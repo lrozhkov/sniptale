@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest';
 
+import { runReleaseWrapper } from './release.mjs';
+
 function createToolingDiffContext() {
   return {
     targetFiles: ['tooling/qa/wrappers/release.mjs'],
@@ -11,10 +13,8 @@ function createToolingDiffContext() {
 }
 
 it('requires a fresh harness stamp before qa:release consumes tooling changes', async () => {
-  const module = await import('./release.mjs');
-
   await expect(
-    module.runReleaseWrapper({
+    runReleaseWrapper({
       contextCollector: createToolingDiffContext,
       harnessStateAsserter: () => {
         throw new Error('Run npm run qa:release-harness for changed tooling/**');
@@ -31,8 +31,7 @@ it('requires a fresh harness stamp before qa:release consumes tooling changes', 
 }, 10_000);
 
 it('runs release verification after tooling harness freshness is confirmed', async () => {
-  const module = await import('./release.mjs');
-  const result = await module.runReleaseWrapper({
+  const result = await runReleaseWrapper({
     contextCollector: createToolingDiffContext,
     harnessStateAsserter: () => undefined,
     verifyScope: {

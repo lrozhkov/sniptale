@@ -25,7 +25,8 @@ const RULES = [
       return /(^|\/)src\/content\//.test(relativePath);
     },
     message:
-      'Static jszip imports are not allowed in apps/extension/src/content/**. Use a lazy runtime import or move the seam.',
+      'Static jszip imports are not allowed in apps/extension/src/content/**. ' +
+      'Use a lazy runtime import or move the seam.',
   },
   {
     rule: 'heavy-import-dompurify-owner',

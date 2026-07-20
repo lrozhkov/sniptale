@@ -150,7 +150,46 @@ it('materializes the immutable pushed tree as a diff from the remote object', ()
   expect(gitOutput(root, 'status', '--porcelain')).toBe('');
 });
 
-it('materializes a new branch as a complete staged tree from the empty base', () => {
+it('materializes the merged candidate when the base diverged from the branch head', () => {
+  const root = createTempRoot('pre-push-merge-candidate-');
+  initGitRepo(root);
+  writeFile(root, 'src/base.ts', 'export const base = 1;\n');
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'base');
+  const baseBranch = gitOutput(root, 'branch', '--show-current');
+  runGit(root, 'checkout', '-b', 'feature');
+  writeFile(root, 'src/feature.ts', 'export const feature = true;\n');
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'feature');
+  const branchHeadSha = gitOutput(root, 'rev-parse', 'HEAD');
+  runGit(root, 'checkout', baseBranch);
+  writeFile(root, 'src/advanced-base.ts', 'export const advanced = true;\n');
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'advance base');
+  const baseSha = gitOutput(root, 'rev-parse', 'HEAD');
+  runGit(root, 'merge', '--no-ff', 'feature', '-m', 'merge candidate');
+  const mergeSha = gitOutput(root, 'rev-parse', 'HEAD');
+
+  expect(mergeSha).not.toBe(branchHeadSha);
+  withPushedRangeWorkspace(
+    {
+      localRef: 'refs/pull/1/merge',
+      localSha: mergeSha,
+      remoteRef: 'refs/heads/main',
+      remoteSha: baseSha,
+    },
+    (workspaceRoot) => {
+      const readSource = (file: string) => fs.readFileSync(path.join(workspaceRoot!, file), 'utf8');
+      expect([readSource('src/advanced-base.ts'), readSource('src/feature.ts')]).toEqual([
+        'export const advanced = true;\n',
+        'export const feature = true;\n',
+      ]);
+    },
+    { linkInstalledDependencies: false, repositoryRoot: root }
+  );
+});
+
+it('materializes an initial ref as the clean local commit tree', () => {
   const root = createTempRoot('pre-push-new-branch-');
   initGitRepo(root);
   writeFile(root, 'src/example.ts', 'export const value = 1;\n');
@@ -166,8 +205,8 @@ it('materializes a new branch as a complete staged tree from the empty base', ()
       remoteSha: ZERO_SHA,
     },
     (workspaceRoot) => {
-      expect(gitOutput(workspaceRoot!, 'status', '--porcelain')).toBe('A  src/example.ts');
-      expect(gitOutput(workspaceRoot!, 'diff', '--cached', '--name-only')).toBe('src/example.ts');
+      expect(gitOutput(workspaceRoot!, 'rev-parse', 'HEAD')).toBe(localSha);
+      expect(gitOutput(workspaceRoot!, 'status', '--porcelain')).toBe('');
     },
     { linkInstalledDependencies: false, repositoryRoot: root }
   );

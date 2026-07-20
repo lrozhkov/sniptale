@@ -194,7 +194,7 @@ it('keeps the repo-wide report-only CLI non-blocking', () => {
   const root = createTempRoot();
   writeFile(
     root,
-    'src/shared/example.ts',
+    'apps/extension/src/shared/example.ts',
     [
       'class ExampleService {',
       '  flush() {',
@@ -209,7 +209,7 @@ it('keeps the repo-wide report-only CLI non-blocking', () => {
 
   const result = spawnSync(
     process.execPath,
-    [script, '--repo-wide', '--report-only', 'src/shared/example.ts'],
+    [script, '--repo-wide', '--report-only', 'apps/extension/src/shared/example.ts'],
     { cwd: root, encoding: 'utf8' }
   );
 

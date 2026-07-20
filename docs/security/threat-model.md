@@ -33,6 +33,8 @@ Threats include malicious pages and frames, replayed or unauthorized senders, ho
 | CONTRIBUTOR / INSTALL / CI | Source, lock resolution, hooks, child output | Dependency admission and build inputs |
 | RELEASE / DISTRIBUTION | Build inputs and verified legal closure | Reproducible artifact and distribution provenance |
 
+GitHub Actions treats pull-request source and dependency hooks as untrusted. The quality gate uses no secrets, receives a read-only token, does not persist checkout credentials, pins external Actions to full commit SHAs, and materializes GitHub's synthetic merge commit against the current base through the canonical pre-push owner. GitHub Releases must have repository-enforced immutability enabled before publication; the draft receives the verified archive before publication locks the tag and assets.
+
 ## Invariants
 
 | Threat | Invariant | Owner | Residual risk |
@@ -53,4 +55,4 @@ The release invariant requires the production closure to be recomputed from the 
 
 ## Review ownership
 
-Security architecture reviews semantic changes to privileged entrypoints, permissions, storage, native/AI destinations, imports/exports, renderers, diagnostics, dependency admission, hooks, and release boundaries. Relocation alone does not change authority or invariants. This local release surface intentionally defines no `SECURITY.md`, hosted reporting channel, publication, or GitHub workflow.
+Security architecture reviews semantic changes to privileged entrypoints, permissions, storage, native/AI destinations, imports/exports, renderers, diagnostics, dependency admission, hooks, GitHub workflows, and release boundaries. Relocation alone does not change authority or invariants. GitHub is the canonical source and immutable release channel; this release surface intentionally defines no `SECURITY.md` or hosted reporting channel.

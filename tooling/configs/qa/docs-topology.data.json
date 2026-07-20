@@ -29,6 +29,7 @@
     "docs/engineering/tech-debt-report.md"
   ],
   "rootDocuments": [
+    ".github/pull_request_template.md",
     "AGENTS.md",
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",

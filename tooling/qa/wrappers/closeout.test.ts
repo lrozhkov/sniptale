@@ -4,6 +4,7 @@ import { expect, it } from 'vitest';
 
 import { createTempRoot, importFresh, initGitRepo, withCwd } from '../core/test-helpers';
 import { createObservabilityRun } from '../runtime/observability/run.mjs';
+import { createCloseoutBuildHandoffEnv, parseCloseoutOptions } from './closeout.mjs';
 
 const ignoreExecutionContract = () => {};
 
@@ -35,34 +36,39 @@ function closeoutContext() {
   };
 }
 
-it('maps qa:closeout -m to qa:build commit mode', async () => {
-  const module = await import('./closeout.mjs');
+async function withObservabilityRoot<T>(root: string, run: () => Promise<T>) {
+  const previousRoot = process.env.SNIPTALE_QA_OBSERVABILITY_ROOT;
+  process.env.SNIPTALE_QA_OBSERVABILITY_ROOT = root;
+  try {
+    return await run();
+  } finally {
+    if (previousRoot === undefined) delete process.env.SNIPTALE_QA_OBSERVABILITY_ROOT;
+    else process.env.SNIPTALE_QA_OBSERVABILITY_ROOT = previousRoot;
+  }
+}
 
-  expect(() => module.parseCloseoutOptions([])).toThrow(/requires -m/u);
-  expect(() => module.parseCloseoutOptions(['--commit'])).toThrow(/owns commit mode/u);
-  expect(module.parseCloseoutOptions(['-m', 'Verified wrapper flow'])).toEqual({
+it('maps qa:closeout -m to qa:build commit mode', () => {
+  expect(() => parseCloseoutOptions([])).toThrow(/requires -m/u);
+  expect(() => parseCloseoutOptions(['--commit'])).toThrow(/owns commit mode/u);
+  expect(parseCloseoutOptions(['-m', 'Verified wrapper flow'])).toEqual({
     files: [],
     buildArgs: ['--commit', '-m', 'Verified wrapper flow'],
   });
 }, 10_000);
 
-it('rejects the retired contract-governance profile', async () => {
-  const module = await import('./closeout.mjs');
-
-  expect(() =>
-    module.parseCloseoutOptions(['--governance', '-m', 'Governance transition'])
-  ).toThrow(/retired governance profile/u);
+it('rejects the retired contract-governance profile', () => {
+  expect(() => parseCloseoutOptions(['--governance', '-m', 'Governance transition'])).toThrow(
+    /retired governance profile/u
+  );
 });
 
-it('passes both the closeout token and owner pid through the build handoff env', async () => {
-  const module = await import('./closeout.mjs');
-
-  expect(module.createCloseoutBuildHandoffEnv('token-value', 12345)).toEqual({
+it('passes both the closeout token and owner pid through the build handoff env', () => {
+  expect(createCloseoutBuildHandoffEnv('token-value', 12345)).toEqual({
     SNIPTALE_QA_CLOSEOUT_BUILD_LOCK: 'token-value',
     SNIPTALE_QA_CLOSEOUT_BUILD_OWNER_PID: '12345',
   });
   expect(
-    module.createCloseoutBuildHandoffEnv('token-value', 12345, {
+    createCloseoutBuildHandoffEnv('token-value', 12345, {
       parentRunId: 'parent-run',
       rootRunId: 'root-run',
       runId: 'child-run',
@@ -105,44 +111,46 @@ it('registers the generated handoff token before any child output is captured', 
 it('resolves a preassigned closeout child to its structured run and log evidence', async () => {
   const root = createTempRoot('qa-closeout-evidence-');
   initGitRepo(root);
-  await withCwd(root, async () => {
-    const module = await importFresh<typeof import('./closeout.mjs')>(
-      './closeout.mjs',
-      import.meta.url
-    );
-    const child = createObservabilityRun({
-      wrapperId: 'qa:build',
-      rootDir: root,
-      runId: 'child-build-run',
-      parentRunId: 'parent-closeout-run',
-      rootRunId: 'root-closeout-run',
-    });
-    const childRecord = child.finalize();
+  await withObservabilityRoot(root, () =>
+    withCwd(root, async () => {
+      const module = await importFresh<typeof import('./closeout.mjs')>(
+        './closeout.mjs',
+        import.meta.url
+      );
+      const child = createObservabilityRun({
+        wrapperId: 'qa:build',
+        rootDir: root,
+        runId: 'child-build-run',
+        parentRunId: 'parent-closeout-run',
+        rootRunId: 'root-closeout-run',
+      });
+      const childRecord = child.finalize();
 
-    const expectation = {
-      parentRunId: 'parent-closeout-run',
-      rootRunId: 'root-closeout-run',
-      processExitCode: 0,
-    };
-    expect(module.collectChildRunEvidence(child.runId, expectation)).toEqual([
-      {
-        kind: 'child-run',
-        runId: child.runId,
-        recordPath: expect.stringMatching(/\.tmp\/qa-observability\/runs\/.+\.json$/u),
-        logPath: expect.stringMatching(/\.tmp\/qa-logs\/.+\.log$/u),
-      },
-    ]);
-    expect(() => module.collectChildRunEvidence('missing-child-run', expectation)).toThrow(
-      /evidence is unavailable/u
-    );
-    expect(() =>
-      module.collectChildRunEvidence(child.runId, { ...expectation, rootRunId: 'forged-root' })
-    ).toThrow(/lineage or result does not match/u);
-    fs.appendFileSync(`${root}/${childRecord.log.path}`, 'tampered');
-    expect(() => module.collectChildRunEvidence(child.runId, expectation)).toThrow(
-      /log integrity does not match/u
-    );
-  });
+      const expectation = {
+        parentRunId: 'parent-closeout-run',
+        rootRunId: 'root-closeout-run',
+        processExitCode: 0,
+      };
+      expect(module.collectChildRunEvidence(child.runId, expectation)).toEqual([
+        {
+          kind: 'child-run',
+          runId: child.runId,
+          recordPath: expect.stringMatching(/\.tmp\/qa-observability\/runs\/.+\.json$/u),
+          logPath: expect.stringMatching(/\.tmp\/qa-logs\/.+\.log$/u),
+        },
+      ]);
+      expect(() => module.collectChildRunEvidence('missing-child-run', expectation)).toThrow(
+        /evidence is unavailable/u
+      );
+      expect(() =>
+        module.collectChildRunEvidence(child.runId, { ...expectation, rootRunId: 'forged-root' })
+      ).toThrow(/lineage or result does not match/u);
+      fs.appendFileSync(`${root}/${childRecord.log.path}`, 'tampered');
+      expect(() => module.collectChildRunEvidence(child.runId, expectation)).toThrow(
+        /log integrity does not match/u
+      );
+    })
+  );
 });
 
 it('runs checkpoint before build while the closeout lock stays held for build handoff', async () => {

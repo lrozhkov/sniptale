@@ -1,4 +1,8 @@
-import { CORRELATION_KEYS, RUN_ID_ENVIRONMENT_KEYS } from './constants.mjs';
+import {
+  CORRELATION_KEYS,
+  MAX_REPOSITORY_TARGET_FILES,
+  RUN_ID_ENVIRONMENT_KEYS,
+} from './constants.mjs';
 import { isOpaqueIdentifier } from './identifiers.mjs';
 import {
   assertExactKeys,
@@ -99,7 +103,7 @@ export function parseRepository(value) {
   assertId(value.scope, 'repository.scope');
   if (value.suite !== null) assertId(value.suite, 'repository.suite');
   assertId(value.mode, 'repository.mode');
-  if (!Array.isArray(value.targetFiles) || value.targetFiles.length > 10_000) {
+  if (!Array.isArray(value.targetFiles) || value.targetFiles.length > MAX_REPOSITORY_TARGET_FILES) {
     throw new TypeError('repository.targetFiles must be a bounded array');
   }
   for (const targetFile of value.targetFiles) assertTargetFile(targetFile);

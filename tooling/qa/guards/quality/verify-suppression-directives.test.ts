@@ -38,8 +38,8 @@ function writeRuntimeSuppressionFixtures(root: string) {
     'export const next = 1;',
   ].join('\n');
 
-  writeFile(root, 'src/runtime.ts', contents);
-  writeFile(root, 'src/runtime.test.ts', contents);
+  writeFile(root, 'apps/extension/src/runtime.ts', contents);
+  writeFile(root, 'apps/extension/src/runtime.test.ts', contents);
   writeFile(root, 'tooling/test/harness/runtime.ts', contents);
 }
 
@@ -125,10 +125,10 @@ it('flags legacy production suppressions while ignoring tests and test harness f
       scope: 'production',
     });
 
-    expect(result.files).toEqual(['src/runtime.ts']);
+    expect(result.files).toEqual(['apps/extension/src/runtime.ts']);
     expect(result.violations).toEqual([
       expect.objectContaining({
-        file: 'src/runtime.ts',
+        file: 'apps/extension/src/runtime.ts',
         line: 2,
         rule: 'eslint-suppression-directive',
       }),

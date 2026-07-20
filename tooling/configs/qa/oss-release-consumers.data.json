@@ -24,12 +24,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "20bdaa767c1cda17ca0e9b1ca3f1f55aa4b22af031803602d02089b8a4507670"
+      "sha256": "b9697ba0889d4067b45f00076bf371c09a25d5cad7c0e3cf33c6c741912f6e93"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "20bdaa767c1cda17ca0e9b1ca3f1f55aa4b22af031803602d02089b8a4507670"
+      "sha256": "b9697ba0889d4067b45f00076bf371c09a25d5cad7c0e3cf33c6c741912f6e93"
     },
     {
       "category": "bundled-font",
@@ -54,12 +54,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/technical-debt.data.json",
-      "sha256": "b0705eea37e45127e5d8220be8532a2e6a6a422901b6bb26206c21713ae6f20f"
+      "sha256": "a20c3f7229d678256b44037d80365821ffecf5276e4e2730470cce37cb50240a"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/technical-debt.data.json",
-      "sha256": "b0705eea37e45127e5d8220be8532a2e6a6a422901b6bb26206c21713ae6f20f"
+      "sha256": "a20c3f7229d678256b44037d80365821ffecf5276e4e2730470cce37cb50240a"
     },
     {
       "category": "archive-integration",

@@ -76,7 +76,8 @@ const STATIC_OWNERSHIP_QLL_SECTIONS = [
     'predicate isParserSnapshotSeam(File file) {',
     '  file.getRelativePath().regexpMatch("^apps/extension/src/content/parser/pipelines/.+\\\\.[cm]?[jt]sx?$")',
     '  or',
-    '  file.getRelativePath().regexpMatch("^apps/extension/src/content/parser/export-manager(?:/.+)?\\\\.[cm]?[jt]sx?$")',
+    '  file.getRelativePath().regexpMatch("^apps/extension/src/content/parser/' +
+      'export-manager(?:/.+)?\\\\.[cm]?[jt]sx?$")',
     '}',
   ],
   [

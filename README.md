@@ -1,6 +1,8 @@
 # Sniptale
 
-**A local-first Chromium (MV3 Extension) workspace for capturing, understanding, annotating, recording, editing, and exporting the web — built as an AI-first software-engineering experiment.**
+**Snip the web. Tell the story.**
+
+Sniptale is a local-first Chromium (MV3 Extension) workspace for capturing, understanding, annotating, recording, editing, and exporting the web — built as an AI-first software-engineering experiment.
 
 > **Alpha preview.** The broad product surface and repository architecture are largely in place, but individual workflows still need product-level validation, polish, compatibility work, performance tuning, and real-world testing. Project, archive, preset, and effect formats may change without migration or backward compatibility. Do not rely on the current build as the only copy of important data.
 
@@ -261,7 +263,7 @@ The normal workflow combines:
 
 The repository's working convention is to begin with acceptance criteria and non-goals, run a preflight, implement one coherent change, execute the relevant checkpoint, request a separate read-only architecture or security review for high-risk seams, consolidate findings, and close out only after the required proof is green.
 
-The QA workflow currently runs through repository-local commands. Some or all of it may eventually move to GitHub Actions, but I am still new to that platform and CI migration is not a current priority.
+Repository-local commands remain the QA authority. GitHub Actions applies the same pushed-range proof to every pull request and update to `main`; it complements the local workflow rather than defining a second validation path.
 
 These guardrails reduce risk; they do not prove correctness. A green pipeline is not a substitute for real-user testing, browser and operating-system compatibility work, production observability, performance profiling, malicious-page testing, fuzzing, or an independent professional security assessment.
 

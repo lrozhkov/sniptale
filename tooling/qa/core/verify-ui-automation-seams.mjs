@@ -13,7 +13,8 @@ import { resolveScopedTargetFiles } from '../runtime/target-files.helpers.mjs';
 const TARGET_FILE_PATTERNS = [
   /^apps\/extension\/src\/content\/parser\/export-manager.+\.[cm]?[jt]sx?$/u,
   /^apps\/extension\/src\/content\/runtime\/(?:bridge\/react|message-bridge)\/.+\.[cm]?[jt]sx?$/u,
-  /^apps\/extension\/src\/content\/overlay\/(?:ai\/pick\/controller|app|scenario|screenshot|toolbar)\/.+\.[cm]?[jt]sx?$/u,
+  /^apps\/extension\/src\/content\/overlay\/ai\/pick\/controller\/.+\.[cm]?[jt]sx?$/u,
+  /^apps\/extension\/src\/content\/overlay\/(?:app|scenario|screenshot|toolbar)\/.+\.[cm]?[jt]sx?$/u,
   /^apps\/extension\/src\/content\/selection\/frame-runtime\/react\/.+\.[cm]?[jt]sx?$/u,
 ];
 

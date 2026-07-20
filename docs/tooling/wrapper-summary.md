@@ -12,7 +12,7 @@ The live scope classifier is `tooling/qa/core/qa-scope.mjs`.
 
 - Product targets are implementation/application/package files plus shared controls.
 - Harness targets include `tooling/**` plus shared controls.
-- Shared controls participate in both scopes: `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/lock/TypeScript/Vite configuration, and active `docs/tooling/**` guidance.
+- Shared controls participate in both scopes: `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/lock/TypeScript/Vite configuration, and active `docs/tooling/**` guidance.
 
 Whenever the current diff has harness targets, run `npm run qa:release-harness` before a consumer wrapper that requires its freshness stamp. Documentation lists the categories; the classifier remains authoritative.
 

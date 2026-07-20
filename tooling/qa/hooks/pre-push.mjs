@@ -18,6 +18,7 @@ import {
 const ZERO_SHA_PATTERN = /^0+$/u;
 const OBJECT_ID_PATTERN = /^[0-9a-f]{40,64}$/iu;
 const JS_LIKE_FILE_PATTERN = /\.(?:ts|tsx|js|mjs|cjs)$/u;
+const FULL_CHECKPOINT_NODE_OPTIONS = '--max-old-space-size=8192';
 
 function splitOutput(stdout) {
   return stdout
@@ -103,15 +104,25 @@ export function createPrePushContext({
 }
 
 export function resolvePrePushCommands({ prePushInput = '', gitRunner = runGit } = {}) {
+  const updates = parsePrePushUpdates(prePushInput).filter(
+    (update) => !ZERO_SHA_PATTERN.test(update.localSha)
+  );
   const context = createPrePushContext({
     pushedFiles: collectPushedFiles(prePushInput, gitRunner),
   });
+  const initialPush = updates.some((update) => ZERO_SHA_PATTERN.test(update.remoteSha));
 
   return [
     ...(hasHarnessQaTargets(context) ? ['qa:release-harness'] : []),
-    'qa:checkpoint',
-    'qa:build',
+    ...(initialPush ? ['qa:release', 'build:release'] : ['qa:checkpoint', 'qa:build']),
   ];
+}
+
+export function resolvePrePushNodeOptions(
+  command,
+  inheritedNodeOptions = process.env.NODE_OPTIONS
+) {
+  return command === 'qa:checkpoint' ? FULL_CHECKPOINT_NODE_OPTIONS : inheritedNodeOptions;
 }
 
 function runNpmProof(command, workspaceRoot, update) {
@@ -119,6 +130,7 @@ function runNpmProof(command, workspaceRoot, update) {
   return runCommand(executable, ['run', command], {
     cwd: workspaceRoot,
     env: {
+      NODE_OPTIONS: resolvePrePushNodeOptions(command),
       SNIPTALE_QA_OBSERVABILITY_ROOT: repoRoot,
       SNIPTALE_QA_PUSH_LOCAL_REF: update.localRef,
       SNIPTALE_QA_PUSH_LOCAL_SHA: update.localSha,

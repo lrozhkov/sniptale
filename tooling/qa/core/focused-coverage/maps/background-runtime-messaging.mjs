@@ -94,11 +94,13 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
     productionPrefix: 'apps/extension/src/background/media/video/runtime/manager/',
     exclusive: true,
     reason:
-      'Video runtime manager control and controlled-cursor messaging is covered by focused runtime manager suites.',
+      'Video runtime manager control and controlled-cursor messaging is covered by focused ' +
+      'runtime manager suites.',
     testFiles: [
       'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/messages.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation.stale-continuation.test.ts',
+      'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/' +
+        'navigation.stale-continuation.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation.stale-epoch.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.pause-resume.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.start-failure.test.ts',

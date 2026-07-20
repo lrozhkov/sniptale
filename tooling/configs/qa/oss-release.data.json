@@ -299,5 +299,5 @@
   ],
   "securityReporting": "excluded",
   "nativeCompanion": "separate-repository",
-  "publication": "local-only"
+  "publication": "github-immutable-release"
 }

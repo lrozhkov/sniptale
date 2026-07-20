@@ -8,7 +8,7 @@ import { recordSuccessfulUnitTestPlan, resolveReusableUnitTestPlan } from './uni
 import { runUnitTests } from './verify-unit-tests.mjs';
 import { PRODUCT_QA_SUITE } from './qa-scope.mjs';
 import { measureAsyncStep, measureSyncStep } from './step-timing.helpers.mjs';
-import { getCoverageMode, hasCoverage, resolveCoveragePlan } from './unit-test-coverage-plan.mjs';
+import { createPlannedCoverage, getCoverageMode, hasCoverage } from './unit-test-coverage-plan.mjs';
 import {
   createDirectUnitTestStep,
   createFailedUnitTestStep,
@@ -240,23 +240,15 @@ export async function collectUnitTestAndCoverageStepResults({
   targetFiles,
   unitTestDetailOverride,
 }) {
-  const coveragePlan = resolveCoveragePlan({ codeFiles, releaseMode });
-  const plannedCoverage = {
-    ...coveragePlan,
-    ...(coverageEnabled
-      ? {}
-      : {
-          coverageCheckFiles: [],
-          coverageTargetFiles: [],
-          mode: 'skip',
-        }),
-    directFiles: [...directFilesOverride],
-    forceFullSuite: fullSuiteOverride,
-    relatedFiles: relatedFilesOverride ?? coveragePlan.relatedFiles,
-    detail:
-      coverageDetailOverride ??
-      (coverageEnabled ? coveragePlan.detail : 'coverage handled by qa:audit'),
-  };
+  const plannedCoverage = createPlannedCoverage({
+    codeFiles,
+    coverageDetailOverride,
+    coverageEnabled,
+    directFilesOverride,
+    fullSuiteOverride,
+    relatedFilesOverride,
+    releaseMode,
+  });
   const unitTestStep = await collectUnitTestStepResult({
     cacheSource,
     coveragePlan: plannedCoverage,

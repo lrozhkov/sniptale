@@ -1,4 +1,5 @@
 export const OBSERVABILITY_SCHEMA_VERSION = 2;
+export const MAX_REPOSITORY_TARGET_FILES = 25_000;
 
 export const DEFAULT_PATHS = Object.freeze({
   runs: '.tmp/qa-observability/runs',

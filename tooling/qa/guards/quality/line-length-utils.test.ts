@@ -51,6 +51,29 @@ describe('collectLineLengthViolations changed-line scope', () => {
   });
 });
 
+describe('collectLineLengthViolations module specifier policy', () => {
+  it('ignores unbreakable static module specifiers but still checks executable strings', () => {
+    const longModulePath = `../../../${'nested-owner/'.repeat(10)}module`;
+    const violations = collectLineLengthViolations(
+      'tooling/test/support/example.ts',
+      [
+        `import { example } from '${longModulePath}';`,
+        `export { example } from '${longModulePath}';`,
+        `const value = '${longModulePath}';`,
+      ],
+      { changedLineNumbers: null }
+    );
+
+    expect(violations).toEqual([
+      expect.objectContaining({
+        file: 'tooling/test/support/example.ts',
+        line: 3,
+        rule: 'max-line-length',
+      }),
+    ]);
+  });
+});
+
 describe('collectLineLengthViolations file policies', () => {
   it('checks changed css lines the same way as code files', () => {
     const violations = collectLineLengthViolations(

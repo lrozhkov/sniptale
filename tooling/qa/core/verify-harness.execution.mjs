@@ -22,6 +22,8 @@ import { expandRelatedTestScope } from './unit-test-plan.mjs';
 import { runDependencyAdmissionCheck } from '../guards/security/verify-dependency-admission.mjs';
 import { collectRuntimeListenerStep } from './verify-harness.runtime-listener-step.mjs';
 
+const HARNESS_MAX_WORKERS = 6;
+
 function collectMeasuredViolationStep(label, header, runner) {
   const { durationMs, value } = measureSyncStep(runner);
   return { ...createViolationStep(label, header, value), durationMs };
@@ -165,6 +167,7 @@ export function createHarnessUnitTestRequest(context) {
   );
   return {
     ...(directFiles.length > 0 ? { directFiles } : { relatedFiles }),
+    maxWorkers: HARNESS_MAX_WORKERS,
     suite: HARNESS_QA_SUITE,
   };
 }

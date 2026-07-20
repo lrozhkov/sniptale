@@ -55,8 +55,13 @@ function validateCorePolicyShape(policy) {
   ) {
     errors.push('OSS release dependency legal policy is incomplete');
   }
-  if (policy?.securityReporting !== 'excluded' || policy?.publication !== 'local-only') {
-    errors.push('OSS release policy must remain local-only without a security-reporting channel');
+  if (
+    policy?.securityReporting !== 'excluded' ||
+    policy?.publication !== 'github-immutable-release'
+  ) {
+    errors.push(
+      'OSS release policy must use immutable GitHub Releases without a security-reporting channel'
+    );
   }
   return errors;
 }

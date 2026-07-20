@@ -14,6 +14,7 @@ it('runs exact changed and owner-local harness tests without broad sibling or gr
     })
   ).toEqual({
     directFiles: ['tooling/qa/core/verify-target-only-paths.test.ts'],
+    maxWorkers: 6,
     suite: 'harness',
   });
 });
@@ -29,6 +30,7 @@ it.each([
 ])('selects exact lifecycle owner proof for %s', (sourceFile, testFile) => {
   expect(createHarnessUnitTestRequest({ harnessTargetFiles: [sourceFile] })).toEqual({
     directFiles: [testFile],
+    maxWorkers: 6,
     suite: 'harness',
   });
 });

@@ -98,7 +98,7 @@ function createPolicy(font: Buffer, legal: Map<string, string>) {
     forbiddenReleaseDocFragments: ['src/shared', '/home/private/repo'],
     securityReporting: 'excluded',
     nativeCompanion: 'separate-repository',
-    publication: 'local-only',
+    publication: 'github-immutable-release',
   };
 }
 
@@ -223,10 +223,16 @@ async function createFixture() {
   return root;
 }
 
-it('accepts a complete release surface from explicit current policy', async () => {
+it('accepts a complete release surface and rejects mutable publication policy', async () => {
   const root = await createFixture();
   expect(collectOssReleaseSurfaceErrors(root)).toEqual([]);
   expect(runOssReleaseSurfaceCheck({ root })).toEqual({ violations: [] });
+  const policyPath = path.join(root, 'tooling/configs/qa/oss-release.data.json');
+  const policy = { ...JSON.parse(readFileSync(policyPath, 'utf8')), publication: 'github-release' };
+  writeFileSync(policyPath, `${JSON.stringify(policy, null, 2)}\n`);
+  expect(collectOssReleaseSurfaceErrors(root)).toContain(
+    'OSS release policy must use immutable GitHub Releases without a security-reporting channel'
+  );
 });
 
 it('rejects a missing legal target and wrong workspace license metadata', async () => {

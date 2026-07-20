@@ -68,23 +68,10 @@ function linkDependencies(repositoryRoot, workspaceRoot) {
   }
 }
 
-function resolveRangeBase(update, repositoryRoot) {
-  if (!ZERO_SHA_PATTERN.test(update.remoteSha)) {
-    return update.remoteSha;
-  }
-
-  return splitOutput(
-    runRepositoryGit(repositoryRoot, [
-      '-c',
-      'user.name=Sniptale QA',
-      '-c',
-      'user.email=qa@sniptale.invalid',
-      'commit-tree',
-      EMPTY_TREE_SHA,
-      '-m',
-      'temporary pre-push empty base',
-    ]).stdout
-  )[0];
+function stagePushedRange(update, workspaceRoot) {
+  if (ZERO_SHA_PATTERN.test(update.remoteSha)) return;
+  runRepositoryGit(workspaceRoot, ['reset', '--mixed', update.remoteSha]);
+  runRepositoryGit(workspaceRoot, ['add', '--all']);
 }
 
 export function withPushedRangeWorkspace(
@@ -109,9 +96,7 @@ export function withPushedRangeWorkspace(
       update.localSha,
     ]);
     worktreeCreated = true;
-    const baseSha = resolveRangeBase(update, repositoryRoot);
-    runRepositoryGit(workspaceRoot, ['reset', '--mixed', baseSha]);
-    runRepositoryGit(workspaceRoot, ['add', '--all']);
+    stagePushedRange(update, workspaceRoot);
     if (linkInstalledDependencies) {
       linkDependencies(repositoryRoot, workspaceRoot);
     }

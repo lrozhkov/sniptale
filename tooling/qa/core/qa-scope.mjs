@@ -12,7 +12,7 @@ export const HARNESS_QA_GUIDANCE = [
 
 const JS_LIKE_FILE_PATTERN = /\.(?:ts|tsx|js|mjs|cjs)$/u;
 const HARNESS_ROOT_PATTERN = /^tooling\//u;
-const SHARED_CONTROL_PATTERNS = [/^\.husky\//u, /^docs\/tooling\//u];
+const SHARED_CONTROL_PATTERNS = [/^\.github\/workflows\//u, /^\.husky\//u, /^docs\/tooling\//u];
 const VITE_CONFIG_PATTERN = /(?:^|\/)vite\.config\.[cm]?[jt]s$/u;
 const SHARED_CONTROL_FILES = new Set([
   '.dependency-cruiser.cjs',

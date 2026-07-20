@@ -6,6 +6,7 @@ import {
   readCorrelationEnvironment,
   readRunIdentityEnvironment,
 } from './schema.mjs';
+import { MAX_REPOSITORY_TARGET_FILES } from './constants.mjs';
 
 function validRepository() {
   return {
@@ -68,6 +69,28 @@ function validRecord() {
     },
   };
 }
+
+describe('repository target manifest bounds', () => {
+  it('accepts a complete initial-push target manifest for the current repository scale', () => {
+    const record = validRecord();
+    record.repository.targetFiles = Array.from(
+      { length: 13_036 },
+      (_, index) => `src/generated/file-${index}.ts`
+    );
+
+    expect(parseRunRecord(record).repository.targetFiles).toHaveLength(13_036);
+  });
+
+  it('rejects an initial-push target manifest above the observability bound', () => {
+    const record = validRecord();
+    record.repository.targetFiles = Array.from(
+      { length: MAX_REPOSITORY_TARGET_FILES + 1 },
+      (_, index) => `src/generated/file-${index}.ts`
+    );
+
+    expect(() => parseRunRecord(record)).toThrow(/bounded array/u);
+  });
+});
 
 describe('parseRunRecord', () => {
   it('accepts the strict v2 record shape', () => {

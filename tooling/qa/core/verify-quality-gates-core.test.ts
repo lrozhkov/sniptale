@@ -11,8 +11,18 @@ import {
   writeFile,
 } from './test-helpers';
 
+function createQualityTempRoot(prefix: string) {
+  const root = createTempRoot(prefix);
+  writeFile(
+    root,
+    'tooling/configs/qa/quality-baseline.json',
+    '{"schemaVersion":1,"allowances":[]}\n'
+  );
+  return root;
+}
+
 it('reports oversized files through verify-ai-limits', async () => {
-  const root = createTempRoot('verify-ai-limits-');
+  const root = createQualityTempRoot('verify-ai-limits-');
   writeFile(root, 'tooling/qa/oversized.ts', `${'const value = 1;\n'.repeat(301)}`);
 
   const module = await withCwd(root, async () =>
@@ -30,7 +40,7 @@ it('reports oversized files through verify-ai-limits', async () => {
 });
 
 it('reports token-heavy files through verify-ai-limits', async () => {
-  const root = createTempRoot('verify-ai-limits-');
+  const root = createQualityTempRoot('verify-ai-limits-');
   writeFile(
     root,
     'packages/foundation/src/heavy.ts',
@@ -54,7 +64,7 @@ it('reports token-heavy files through verify-ai-limits', async () => {
 });
 
 it('includes normalized video-editor authority paths in token budget checks', async () => {
-  const root = createTempRoot('verify-video-editor-token-budget-');
+  const root = createQualityTempRoot('verify-video-editor-token-budget-');
   writeFile(
     root,
     'apps/extension/src/video-editor/project/state/heavy.ts',
@@ -80,7 +90,7 @@ it('includes normalized video-editor authority paths in token budget checks', as
 });
 
 it('includes normalized editor authority paths in token budget checks', async () => {
-  const root = createTempRoot('verify-editor-token-budget-');
+  const root = createQualityTempRoot('verify-editor-token-budget-');
   writeFile(
     root,
     'apps/extension/src/editor/controller/core/heavy.ts',
@@ -128,7 +138,7 @@ it('keeps markdown documents outside standalone prettier scope', () => {
 });
 
 it('flags only changed long lines in verify-line-length', async () => {
-  const root = createTempRoot('verify-line-length-');
+  const root = createQualityTempRoot('verify-line-length-');
   initGitRepo(root);
   writeFile(root, 'package.json', '{"name":"verify-line-length-temp"}\n');
   writeFile(root, 'src/example.ts', 'export const shortValue = 1;\n');
@@ -154,7 +164,7 @@ it('flags only changed long lines in verify-line-length', async () => {
 });
 
 it('skips markdown documents in verify-line-length', async () => {
-  const root = createTempRoot('verify-line-length-docs-');
+  const root = createQualityTempRoot('verify-line-length-docs-');
   initGitRepo(root);
   writeFile(root, 'package.json', '{"name":"verify-line-length-docs-temp"}\n');
   writeFile(root, 'docs/notes.md', 'short note\n');

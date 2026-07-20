@@ -42,6 +42,7 @@ describe('shared QA controls', () => {
         '.dependency-cruiser.cjs',
         '.prettierignore',
         '.prettierrc.json',
+        '.github/workflows/quality-gate.yml',
         '.husky/pre-push',
         'docs/tooling/code-quality.md',
       ];

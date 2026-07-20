@@ -10,7 +10,7 @@ Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGE
 | --- | --- | --- |
 | Read-only context | `npm run qa:preflight` | Accepts `-- --files <paths...>` before a diff exists. |
 | In-progress product proof | `npm run qa:checkpoint` | Focused current-diff gate; does not build or commit. |
-| Harness/shared-control proof | `npm run qa:release-harness` | Required for `tooling/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/config files, and active `docs/tooling/**` guidance. |
+| Harness/shared-control proof | `npm run qa:release-harness` | Required for `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/config files, and active `docs/tooling/**` guidance. |
 | Normal implementation closeout | `npm run qa:closeout -- -m "message"` | Owns checkpoint/build handoff, staging, task-artifact guard, and commit. |
 | Release-grade product proof | `npm run qa:release` | Release preparation or explicit audit-grade proof. |
 | Unpacked release-mode build | `npm run build:release` | Runs only Vite in release mode and writes `dist/`; does not typecheck, run QA, or package an archive. |

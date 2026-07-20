@@ -6,6 +6,10 @@ function okStep(label: string) {
   return { label, status: 'ok' as const, detail: '', durationMs: 0 };
 }
 
+function collectEmptyContext() {
+  return { targetFiles: [], existingTargetFiles: [], addedFiles: [], untrackedFiles: [] };
+}
+
 it('validates explicit clean-tree and harness-only closeout populations before build', async () => {
   const forceExecutedCheckpoint = () => {
     throw new Error('force executed checkpoint');
@@ -13,6 +17,7 @@ it('validates explicit clean-tree and harness-only closeout populations before b
   const noTargets = await runCloseout({
     argv: ['-m', 'No targets'],
     checkpointStateAsserter: forceExecutedCheckpoint,
+    contextCollector: collectEmptyContext,
     checkpointRunner: async () => ({
       context: { targetFiles: [], harnessTargetFiles: [] },
       executionMode: 'no-targets',
@@ -29,6 +34,7 @@ it('validates explicit clean-tree and harness-only closeout populations before b
   const harnessOnly = await runCloseout({
     argv: ['-m', 'Harness only'],
     checkpointStateAsserter: forceExecutedCheckpoint,
+    contextCollector: collectEmptyContext,
     buildStepCollector: () => okStep('Full build'),
     checkpointRunner: async () => ({
       context: { targetFiles: [], harnessTargetFiles: ['tooling/qa/example.mjs'] },

@@ -1,17 +1,33 @@
 import { resolveCoverageTargetFiles } from './verify-test-coverage.mjs';
 
-export function resolveCoveragePlan({ codeFiles, releaseMode }) {
+export function resolveCoveragePlan({
+  codeFiles,
+  coverageEnabled = true,
+  coverageTargetResolver = resolveCoverageTargetFiles,
+  relatedFilesOverride,
+  releaseMode,
+}) {
+  if (!coverageEnabled && relatedFilesOverride !== undefined) {
+    return {
+      mode: 'skip',
+      coverageTargetFiles: [],
+      coverageCheckFiles: [],
+      detail: 'coverage handled by qa:audit',
+      relatedFiles: [...relatedFilesOverride],
+    };
+  }
+
   if (releaseMode) {
     return {
       mode: 'full',
-      coverageTargetFiles: resolveCoverageTargetFiles({ mode: 'full' }),
+      coverageTargetFiles: coverageTargetResolver({ mode: 'full' }),
       coverageCheckFiles: [],
       detail: 'release full-suite coverage',
       relatedFiles: [],
     };
   }
 
-  const coverageTargetFiles = resolveCoverageTargetFiles({ files: codeFiles });
+  const coverageTargetFiles = coverageTargetResolver({ files: codeFiles });
   if (coverageTargetFiles.length === 0) {
     return {
       mode: 'skip',
@@ -28,6 +44,33 @@ export function resolveCoveragePlan({ codeFiles, releaseMode }) {
     coverageCheckFiles: codeFiles,
     detail: 'diff coverage for rollout-covered changed production files',
     relatedFiles: codeFiles,
+  };
+}
+
+export function createPlannedCoverage({
+  codeFiles,
+  coverageDetailOverride,
+  coverageEnabled,
+  directFilesOverride,
+  fullSuiteOverride,
+  relatedFilesOverride,
+  releaseMode,
+}) {
+  const coveragePlan = resolveCoveragePlan({
+    codeFiles,
+    coverageEnabled,
+    relatedFilesOverride,
+    releaseMode,
+  });
+  return {
+    ...coveragePlan,
+    ...(coverageEnabled ? {} : { coverageCheckFiles: [], coverageTargetFiles: [], mode: 'skip' }),
+    directFiles: [...directFilesOverride],
+    forceFullSuite: fullSuiteOverride,
+    relatedFiles: relatedFilesOverride ?? coveragePlan.relatedFiles,
+    detail:
+      coverageDetailOverride ??
+      (coverageEnabled ? coveragePlan.detail : 'coverage handled by qa:audit'),
   };
 }
 

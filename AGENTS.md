@@ -55,7 +55,7 @@ For runtime route changes, keep the action-kernel route registry, authorization 
 
 Implement a coherent wave before running blocking QA. Use targeted commands only to investigate a specific wrapper failure, answer a focused debugging question, or satisfy an explicit user request.
 
-Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has harness/shared-control targets. This includes `tooling/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. The live classifier is `tooling/qa/core/qa-scope.mjs`.
+Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has harness/shared-control targets. This includes `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. The live classifier is `tooling/qa/core/qa-scope.mjs`.
 
 Run `npm run qa:checkpoint` after each substantial coherent implementation wave. It owns supported non-Markdown formatting, advisory state, focused static checks, typecheck, focused tests, and diff coverage; it does not build, stage, or commit.
 

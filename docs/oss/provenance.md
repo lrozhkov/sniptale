@@ -1,6 +1,6 @@
 # OSS provenance
 
-This record describes the local Sniptale release source and redistribution evidence. It does not publish, upload, tag, or create a hosted reporting channel.
+This record describes the Sniptale release source and redistribution evidence published through `https://github.com/lrozhkov/sniptale`. Hosted security reporting remains outside this policy.
 
 ## Project-authored material
 
@@ -22,4 +22,4 @@ The production redistribution closure is not the whole-lock audit inventory. `np
 
 ## Repository and publication scope
 
-The optional native companion is a separate repository and outside this source tree and artifact. The release policy records the current bounded legal, package, font, documentation, and consumer contract through explicit paths, identities, and digests; historical migration trees are not active authority. This repository intentionally has no root `SECURITY.md`, GitHub reporting requirement, remote creation, push, tag, upload, store submission, or publication action.
+The optional native companion is a separate repository and outside this source tree and artifact. The release policy records the current bounded legal, package, font, documentation, and consumer contract through explicit paths, identities, and digests; historical migration trees are not active authority. The canonical repository publishes source and deterministic archives through GitHub Releases with repository-enforced immutability under `vX.Y.Z` tags. A root `SECURITY.md`, hosted security-reporting channel, browser-store submission, and native-companion publication remain outside this release surface.

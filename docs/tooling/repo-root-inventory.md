@@ -8,6 +8,7 @@ The repository root contains only package entrypoints, externally auto-discovere
 
 - Package/dependency entrypoints: `package.json`, `package-lock.json`.
 - Auto-discovered configuration: `tsconfig.json`, `tsconfig.node.json`, `vitest.config.ts`, `eslint.config.js`, `playwright.config.ts`, `.dependency-cruiser.cjs`, `.prettierrc.json`, `.prettierignore`, `.editorconfig`, `.npmrc`.
+- GitHub-owned configuration: `.github/workflows/**` and `.github/pull_request_template.md`.
 - Human and contributor guidance: `AGENTS.md`, `DESIGN.md`, `README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`.
 - Legal/release entrypoints: `LICENSE`, `NOTICE`, `LICENSES/**`, `THIRD_PARTY_DEPENDENCIES.json`, and `THIRD_PARTY_NOTICES.md`. These stay at the conventional root release boundary. `LICENSES/OFL-1.1.txt` is the canonical bundled Manrope license; the dependency generator verifies and references it without creating a versioned duplicate. Other `LICENSES/dependencies/**` files and the two third-party indexes are generator-owned.
 

@@ -29,7 +29,7 @@ function createTempRoot() {
         moduleResolution: 'bundler',
         strict: true,
       },
-      include: ['src'],
+      include: ['apps/extension/src', 'packages/*/src'],
     })
   );
   return root;
@@ -48,17 +48,17 @@ function runTempDeadExportsCheck(root: string) {
 function writesPublicContractSurfaces(root: string) {
   writeFile(
     root,
-    'src/shared/contracts/example.ts',
+    'apps/extension/src/contracts/example.ts',
     'export const ExampleContractVersion = 1;\nexport interface ExampleContract { value: string; }\n'
   );
   writeFile(
     root,
-    'src/shared/contracts/schemas/example.ts',
+    'apps/extension/src/contracts/schemas/example.ts',
     'export const ExampleSchema = { type: "object" };\nexport type ExampleSchemaType = { value: string; };\n'
   );
   writeFile(
     root,
-    'src/shared/contracts/video/types/example.ts',
+    'packages/runtime-contracts/src/video/types/example.ts',
     'export const VideoType = "recording";\nexport interface VideoShape { id: string; }\n'
   );
 }
@@ -85,7 +85,7 @@ describe('runDeadExportsCheck public surfaces', () => {
       const root = createTempRoot();
       writeFile(
         root,
-        'src/shared/ui/button.tsx',
+        'packages/ui/src/button.tsx',
         'export interface ButtonProps { label: string; }\nexport function UnusedButton() { return null; }\n'
       );
 
@@ -93,7 +93,7 @@ describe('runDeadExportsCheck public surfaces', () => {
 
       expect(report.unusedValueExports).toEqual([
         expect.objectContaining({
-          file: 'src/shared/ui/button.tsx',
+          file: 'packages/ui/src/button.tsx',
           exportName: 'UnusedButton',
         }),
       ]);

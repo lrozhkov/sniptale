@@ -4,10 +4,14 @@ import {
   createDirectUnitTestStep,
   createReusableUnitTestStep,
 } from './verify-all.unit-test-results.mjs';
+import { collectUnitTestAndCoverageStepResults } from './verify-all.unit-test-steps.mjs';
+import { runUnitTests } from './verify-unit-tests.mjs';
 
 vi.mock('./verify-unit-tests.mjs', () => ({
   runUnitTests: vi.fn(() => ({ status: 0, stderr: '', stdout: '' })),
 }));
+
+const mockedRunUnitTests = vi.mocked(runUnitTests);
 
 it('preserves the selected build profile in a successful direct unit-test step', () => {
   expect(
@@ -53,12 +57,9 @@ it('preserves the selected profile when a related unit-test plan is reused', () 
 });
 
 it('executes the full product suite when a deleted target has no affected-test scope', async () => {
-  const unitTestModule = await import('./verify-unit-tests.mjs');
-  const runUnitTests = vi.mocked(unitTestModule.runUnitTests);
-  runUnitTests.mockClear();
+  mockedRunUnitTests.mockClear();
 
-  const module = await import('./verify-all.unit-test-steps.mjs');
-  const steps = await module.collectUnitTestAndCoverageStepResults({
+  const steps = await collectUnitTestAndCoverageStepResults({
     codeFiles: [],
     coverageEnabled: false,
     directFilesOverride: [],
@@ -75,7 +76,7 @@ it('executes the full product suite when a deleted target has no affected-test s
     label: 'Unit tests',
     status: 'ok',
   });
-  expect(runUnitTests).toHaveBeenCalledWith(
+  expect(mockedRunUnitTests).toHaveBeenCalledWith(
     expect.objectContaining({
       relatedFiles: [],
       suite: 'product',

@@ -14448,7 +14448,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
-        "contentHash": "c48a54c8f1fe6e1ecdae1deb9c0a22d09c67ec0fad662a3aef35f357ea356dec"
+        "contentHash": "4fadd1cd8c36bad273d91c10cdc410087854df21a293f51fbeb5a312bfe920b6"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
@@ -15100,7 +15100,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/constants.mjs",
-        "contentHash": "3c0b7d656daece4e766d2b8717f065dc8a8e9530fdb7e6bf65f9d9559981f0b6"
+        "contentHash": "0fcf34cb99df9ba228f58e11647211248d98ac183285d009277407670d13ce32"
       },
       "consumers": [
         "tooling/qa/runtime/observability/constants.mjs",
@@ -15111,6 +15111,7 @@
         "tooling/qa/runtime/observability/run.mjs",
         "tooling/qa/runtime/observability/schema-parts.mjs",
         "tooling/qa/runtime/observability/schema.mjs",
+        "tooling/qa/runtime/observability/schema.test.ts",
         "tooling/qa/runtime/observability/storage.mjs"
       ],
       "surfaces": [
@@ -17504,9 +17505,10 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/hooks/pre-push.mjs",
-        "contentHash": "e9fb98b676030f9f8a4076a555f4351487dbfda5c4cd6e266e297fc042757942"
+        "contentHash": "5d5d3c658e4746d984144a57252309ff39ac3f6624212d9d2b038ae820a34956"
       },
       "consumers": [
+        "tooling/qa/hooks/pre-push-command-policy.test.ts",
         "tooling/qa/hooks/pre-push.mjs",
         "tooling/qa/hooks/pre-push.test.ts"
       ],
@@ -17721,7 +17723,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "18ac7fd359d67575833603060316be0d78e5bdbb407b608c8eae80d1acc4f5ca"
+        "contentHash": "45c50ad85191284b5feff9c8e4a7a7eed311bd4c5c32c63db9ae4960edd79651"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -18321,7 +18323,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/observability/schema-parts.mjs",
-        "contentHash": "70a83dc20759d5fffd48911b5746cd96005f2524004783c46624ed99ffb8080c"
+        "contentHash": "2dab3453be50ee34bc2231f0ebd7fda3902000e633fa31cf106bc24660f6321f"
       },
       "consumers": [
         "tooling/qa/runtime/observability/schema-parts.mjs",
@@ -19082,17 +19084,24 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/unit-test-coverage-plan.mjs",
-        "contentHash": "a45fba2b30b784676748f32cdd88e4a50eef2cdbbcc50b69e7539f6332d36f84"
+        "contentHash": "1a89d90e4c9f936a76002c87426cb7c7a58e0ba65a9cbee055a4bb84bcbde621"
       },
       "consumers": [
         "tooling/qa/core/unit-test-coverage-plan.mjs",
+        "tooling/qa/core/unit-test-coverage-plan.test.ts",
         "tooling/qa/core/verify-all.unit-test-steps.mjs"
       ],
       "surfaces": [
+        "property:createPlannedCoverage/coverageCheckFiles",
+        "property:createPlannedCoverage/coverageTargetFiles",
+        "property:createPlannedCoverage/directFiles",
         "property:resolveCoveragePlan/coverageCheckFiles",
         "property:resolveCoveragePlan/coverageCheckFiles[1]",
+        "property:resolveCoveragePlan/coverageCheckFiles[2]",
         "property:resolveCoveragePlan/coverageTargetFiles",
-        "property:resolveCoveragePlan/relatedFiles"
+        "property:resolveCoveragePlan/coverageTargetFiles[1]",
+        "property:resolveCoveragePlan/relatedFiles",
+        "property:resolveCoveragePlan/relatedFiles[1]"
       ]
     },
     {
@@ -19352,28 +19361,6 @@
         "property:buildFullSuiteResult/relatedFiles",
         "property:classifyFullVerifyScope/relatedFiles",
         "property:resolveFullVerifyScope/jsLikeFiles"
-      ]
-    },
-    {
-      "id": "policy.source.verify-all-unit-test-steps-mjs.e47ae9c0c2",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/qa/core/verify-all.unit-test-steps.mjs",
-        "contentHash": "cecaf8eeaa39619d0d3fde308b8208dc32592965a396e7e7be9a7192e41a45d8"
-      },
-      "consumers": [
-        "tooling/qa/core/verify-all.test-steps.mjs",
-        "tooling/qa/core/verify-all.unit-test-steps.mjs",
-        "tooling/qa/core/verify-all.unit-test-steps.test.ts"
-      ],
-      "surfaces": [
-        "property:collectUnitTestAndCoverageStepResults/coverageCheckFiles",
-        "property:collectUnitTestAndCoverageStepResults/coverageTargetFiles",
-        "property:collectUnitTestAndCoverageStepResults/directFiles"
       ]
     },
     {
@@ -20128,7 +20115,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-harness.execution.mjs",
-        "contentHash": "d005d2e40d01542de95cf30644db16d458ce48c599ba2f948eb5881b66842608"
+        "contentHash": "4117fdb129bda6668356e90536882b25f4b84357455879d12be9cacae0ef7f29"
       },
       "consumers": [
         "tooling/qa/core/verify-harness.execution.mjs",
@@ -20136,7 +20123,7 @@
         "tooling/qa/wrappers/release-harness.mjs"
       ],
       "surfaces": [
-        "property:collectAiLimitsStep/anonymous-60/violations",
+        "property:collectAiLimitsStep/anonymous-62/violations",
         "property:collectHarnessStepResults/steps"
       ]
     },
@@ -20149,7 +20136,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-heavy-runtime-import-ownership.mjs",
-        "contentHash": "63e86a0a3635251932163a8a8f23a2a02a3a9cfa051a5c444785a8d6841bd869"
+        "contentHash": "735f7e70acd349426bdec2439b9606f32b5149c7738f0283680140e7f431ea3b"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.architecture.mjs",
@@ -21030,7 +21017,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-ui-automation-seams.mjs",
-        "contentHash": "677c21efcc080f2d38cdc92feef72bb7239f923f98d48802e9e5a8fffb2ff535"
+        "contentHash": "55a527a72542ebe76004370e677718d3d9f4ade8e72cb78da4a0a8aede10fd3b"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.architecture.mjs",
