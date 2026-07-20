@@ -1,0 +1,1 @@
+export { syncSelectionToolSettingsFromObject } from './dispatch';

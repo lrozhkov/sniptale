@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Architecture Code Review'
+  short_description: 'Review Sniptale architecture risks'
+  default_prompt: 'Use $architecture-code-review as an independent read-only reviewer without inherited context for the supplied complete green candidate.'

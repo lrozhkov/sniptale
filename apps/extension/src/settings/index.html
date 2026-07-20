@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sniptale</title>
+    <style>
+      /* Reset and base styles */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body,
+      #root {
+        background: var(--sniptale-color-surface-canvas);
+        height: 100%;
+        min-height: 100%;
+      }
+      html,
+      body {
+        overflow: hidden;
+      }
+      body {
+        font-family:
+          'Sniptale Sans', 'Manrope Variable', 'Manrope', 'Segoe UI', 'Helvetica Neue', Arial,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        color: var(--sniptale-color-text-primary);
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 30%,
+          color-mix(in srgb, var(--sniptale-color-accent) 4%, transparent) 0%,
+          var(--sniptale-color-surface-canvas) 70%
+        );
+      }
+      /* Hide number input spinners */
+      input[type='number']::-webkit-outer-spin-button,
+      input[type='number']::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      input[type='number'] {
+        -moz-appearance: textfield;
+      }
+      select option {
+        background: var(--sniptale-color-surface-panel);
+        color: var(--sniptale-color-text-primary);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+export const SCENARIO_AI_ATTACHMENT_MAX_BYTES = 300 * 1024;
+export const SCENARIO_AI_ATTACHMENT_JPEG_QUALITIES = [0.86, 0.78, 0.7, 0.62] as const;
+export const SCENARIO_AI_ATTACHMENT_CANVAS = {
+  width: 720,
+  height: 420,
+} as const;
+export const SCENARIO_AI_ATTACHMENT_DOWNSCALED_WIDTH = 640;

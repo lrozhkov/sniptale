@@ -1,0 +1,23 @@
+/* ========================================
+ * Glass Step Badge
+ * ======================================== */
+
+.sniptale-step-badge-anchor-dot {
+  pointer-events: none;
+}
+
+.sniptale-step-badge-dim-marker {
+  font-size: 12px;
+}
+
+.sniptale-step-badge-group {
+  margin-top: 10px;
+}
+
+.sniptale-step-badge-chip {
+  flex: 1;
+}
+
+.sniptale-step-badge-input {
+  text-align: center;
+}

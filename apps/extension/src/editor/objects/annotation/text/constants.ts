@@ -1,0 +1,10 @@
+export const CALLOUT_PADDING = 10;
+export const CALLOUT_FRAME_GUTTER_X = 8;
+export const CALLOUT_FRAME_GUTTER_Y = 8;
+export const BUBBLE_TAIL_HALF_WIDTH = 10;
+export const BUBBLE_TAIL_HEIGHT = 10;
+export const ARROW_BUBBLE_TAIL_HALF_WIDTH = 12;
+export const ARROW_BUBBLE_TAIL_HEIGHT = 12;
+export const ARROW_BUBBLE_SHOULDER_OFFSET = 4;
+export const POINTER_TAIL_WIDTH = 36;
+export const FLAG_NOTCH_WIDTH = 24;

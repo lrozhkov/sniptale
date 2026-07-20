@@ -1,0 +1,5 @@
+@import './variables.css';
+@import '../ai-modal-content/index.css';
+@import './shell.css';
+@import './header.css';
+@import './footer.css';

@@ -1,0 +1,1 @@
+export { EditorInspectorFrameBackgroundGradientEditor } from './section';

@@ -1,0 +1,335 @@
+{
+  "format": "sniptale.effect.v1.validation-cases.v1",
+  "cases": [
+    {
+      "id": "wrong-schema",
+      "expected": [{ "code": "SCHEMA_UNSUPPORTED", "path": "$.schemaVersion" }],
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [],
+        "duration": 1,
+        "id": "wrong-schema",
+        "kind": "standalone",
+        "label": { "en": "Wrong schema", "ru": "Неверная схема" },
+        "layers": [],
+        "program": {
+          "commands": [{ "color": "#101820", "op": "clear" }],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [{ "duration": 1, "id": "main", "start": 0 }],
+        "schemaVersion": "sniptale.effect.v3",
+        "timeline": { "phases": [], "tracks": [] }
+      }
+    },
+    {
+      "id": "executable-field",
+      "expected": [
+        { "code": "UNKNOWN_FIELD", "path": "$.renderer" },
+        { "code": "EXECUTABLE_FIELD_FORBIDDEN", "path": "$.renderer" },
+        {
+          "code": "EXECUTABLE_FIELD_FORBIDDEN",
+          "path": "$.renderer.source"
+        }
+      ],
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [],
+        "duration": 1,
+        "id": "executable-field",
+        "kind": "standalone",
+        "label": { "en": "Executable field", "ru": "Исполняемое поле" },
+        "layers": [],
+        "program": {
+          "commands": [{ "color": "#101820", "op": "clear" }],
+          "kind": "graph",
+          "version": 1
+        },
+        "renderer": { "source": "return canvas" },
+        "scenes": [{ "duration": 1, "id": "main", "start": 0 }],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": { "phases": [], "tracks": [] }
+      }
+    },
+    {
+      "id": "missing-transition-inputs",
+      "expected": [
+        { "code": "RUNTIME_INPUT_REQUIRED", "path": "$.program.commands" },
+        { "code": "RUNTIME_INPUT_REQUIRED", "path": "$.program.commands" }
+      ],
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [],
+        "duration": 1,
+        "id": "missing-transition-inputs",
+        "kind": "transition",
+        "label": {
+          "en": "Missing transition inputs",
+          "ru": "Нет входов перехода"
+        },
+        "layers": [],
+        "program": {
+          "commands": [{ "op": "clear" }],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [{ "duration": 1, "id": "main", "start": 0 }],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": { "phases": [], "tracks": [] }
+      }
+    },
+    {
+      "id": "unsafe-asset-path",
+      "expected": [{ "code": "ASSET_PATH_UNSAFE", "path": "$.assets[0].path" }],
+      "document": {
+        "assets": [
+          {
+            "id": "escaped",
+            "kind": "svg",
+            "mimeType": "image/svg+xml",
+            "path": "../secret.svg"
+          }
+        ],
+        "clips": [],
+        "controls": [],
+        "duration": 1,
+        "id": "unsafe-asset-path",
+        "kind": "standalone",
+        "label": { "en": "Unsafe asset", "ru": "Опасный ассет" },
+        "layers": [],
+        "program": {
+          "commands": [
+            { "color": "#101820", "op": "clear" },
+            {
+              "assetId": "escaped",
+              "height": 100,
+              "op": "svgParts",
+              "width": 100,
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [{ "duration": 1, "id": "main", "start": 0 }],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": { "phases": [], "tracks": [] }
+      }
+    },
+    {
+      "id": "unbounded-sampled-path",
+      "expected": [
+        {
+          "code": "SAMPLED_PATH_BOUND",
+          "path": "$.program.commands[1].samples"
+        }
+      ],
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [],
+        "duration": 1,
+        "id": "unbounded-sampled-path",
+        "kind": "standalone",
+        "label": { "en": "Unbounded path", "ru": "Неограниченный путь" },
+        "layers": [],
+        "program": {
+          "commands": [
+            { "color": "#101820", "op": "clear" },
+            {
+              "from": 0,
+              "lineWidth": 2,
+              "op": "sampledPath",
+              "samples": 1024,
+              "stroke": "#ffffff",
+              "to": 1,
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [{ "duration": 1, "id": "main", "start": 0 }],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": { "phases": [], "tracks": [] }
+      }
+    },
+    {
+      "id": "unused-control",
+      "expected": [{ "code": "CONTROL_UNUSED", "path": "$.controls[0]" }],
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "defaultValue": 0.5,
+            "id": "strength",
+            "kind": "number",
+            "label": { "en": "Strength", "ru": "Сила" },
+            "max": 1,
+            "min": 0
+          }
+        ],
+        "duration": 1,
+        "id": "unused-control",
+        "kind": "standalone",
+        "label": { "en": "Unused control", "ru": "Лишний контрол" },
+        "layers": [],
+        "program": {
+          "commands": [{ "color": "#101820", "op": "clear" }],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [{ "duration": 1, "id": "main", "start": 0 }],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": { "phases": [], "tracks": [] }
+      }
+    },
+    {
+      "id": "unknown-command",
+      "expected": [{ "code": "COMMAND_OP", "path": "$.program.commands[1].op" }],
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [],
+        "duration": 1,
+        "id": "unknown-command",
+        "kind": "standalone",
+        "label": { "en": "Unknown command", "ru": "Неизвестная команда" },
+        "layers": [],
+        "program": {
+          "commands": [{ "color": "#101820", "op": "clear" }, { "op": "executeJavaScript" }],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [{ "duration": 1, "id": "main", "start": 0 }],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": { "phases": [], "tracks": [] }
+      }
+    },
+    {
+      "id": "unused-track",
+      "expected": [{ "code": "TRACK_UNUSED", "path": "$.timeline.tracks[0]" }],
+      "document": {
+        "assets": [],
+        "clips": [{ "duration": 1, "layerId": "card", "sceneId": "main", "start": 0 }],
+        "controls": [],
+        "duration": 1,
+        "id": "unused-track",
+        "kind": "standalone",
+        "label": { "en": "Unused track", "ru": "Лишний трек" },
+        "layers": [{ "id": "card", "name": "Card", "type": "customDraw" }],
+        "program": {
+          "commands": [{ "color": "#101820", "op": "clear" }],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [{ "duration": 1, "id": "main", "start": 0 }],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": [
+            {
+              "id": "card.opacity",
+              "keyframes": [
+                { "id": "start", "time": 0, "value": 0 },
+                { "id": "end", "time": 1, "value": 1 }
+              ],
+              "property": "opacity",
+              "target": "card"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "unused-phase",
+      "expected": [{ "code": "PHASE_UNUSED", "path": "$.timeline.phases[0]" }],
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [],
+        "duration": 1,
+        "id": "unused-phase",
+        "kind": "standalone",
+        "label": { "en": "Unused phase", "ru": "Лишняя фаза" },
+        "layers": [],
+        "program": {
+          "commands": [{ "color": "#101820", "op": "clear" }],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [{ "duration": 1, "id": "main", "start": 0 }],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [
+            {
+              "duration": 1,
+              "id": "intro",
+              "sceneId": "main",
+              "start": 0
+            }
+          ],
+          "tracks": []
+        }
+      }
+    },
+    {
+      "id": "unusable-number-control",
+      "expected": [
+        { "code": "CONTROL_RANGE", "path": "$.controls[0]" },
+        { "code": "CONTROL_STEP", "path": "$.controls[0].step" },
+        {
+          "code": "CONTROL_DEFAULT_RANGE",
+          "path": "$.controls[0].defaultValue"
+        }
+      ],
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "defaultValue": 2,
+            "id": "fixed",
+            "kind": "number",
+            "max": 1,
+            "min": 1,
+            "step": 0
+          }
+        ],
+        "duration": 1,
+        "id": "unusable-number-control",
+        "kind": "standalone",
+        "label": {
+          "en": "Unusable number control",
+          "ru": "Неизменяемый числовой параметр"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            { "color": "#101820", "op": "clear" },
+            {
+              "alpha": { "op": "read", "path": "controls.fixed" },
+              "fill": "#ffffff",
+              "height": 1,
+              "op": "fillRect",
+              "width": 1,
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [{ "duration": 1, "id": "main", "start": 0 }],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": { "phases": [], "tracks": [] }
+      }
+    }
+  ]
+}

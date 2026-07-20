@@ -1,0 +1,88 @@
+/* ========================================
+   Legacy Styles (kept for compatibility)
+   ======================================== */
+.sniptale-toolbar-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  height: 28px;
+}
+
+.sniptale-toolbar-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sniptale-toolbar-button.sniptale-disabled {
+  background: color-mix(in srgb, var(--sniptale-color-surface-muted) 92%, transparent);
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-toolbar-button.sniptale-disabled:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sniptale-color-border-subtle) 82%, transparent);
+}
+
+.sniptale-toolbar-button.sniptale-enabled {
+  background: var(--sniptale-color-success);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-toolbar-button.sniptale-enabled:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sniptale-color-success) 88%, black);
+}
+
+.sniptale-toolbar-button svg {
+  flex-shrink: 0;
+}
+
+.sniptale-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sniptale-status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.sniptale-status-indicator.sniptale-inactive {
+  background: var(--sniptale-color-text-dim);
+}
+
+.sniptale-status-indicator.sniptale-active {
+  background: var(--sniptale-color-success);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sniptale-color-success) 50%, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
+}

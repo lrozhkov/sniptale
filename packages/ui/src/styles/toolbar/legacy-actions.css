@@ -1,0 +1,215 @@
+/* ========================================
+   AI Button
+   ======================================== */
+.sniptale-btn-ai {
+  color: var(--sniptale-text-muted);
+  background: transparent;
+  border: none;
+}
+
+.sniptale-btn-ai:hover:not(:disabled) {
+  background: var(--sniptale-hover-bg);
+  color: var(--sniptale-text-main);
+}
+
+.sniptale-btn-ai:active:not(:disabled) {
+  transform: scale(0.96) translateY(0);
+}
+
+/* ========================================
+   Toggle Buttons (Mode Switchers)
+   ======================================== */
+.sniptale-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--sniptale-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.sniptale-toggle[data-active='true'] {
+  border-color: var(--sniptale-color-border-accent-strong);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent-soft) 82%,
+    var(--sniptale-color-surface-panel) 18%
+  );
+  color: var(--sniptale-color-text-primary-strong);
+  box-shadow:
+    var(--sniptale-shadow-sm),
+    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 16%, transparent);
+}
+
+.sniptale-toggle:hover:not(:disabled):not([data-active='true']) {
+  color: var(--sniptale-text-main);
+  background: var(--sniptale-hover-bg);
+  border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 72%, transparent);
+}
+
+.sniptale-toggle[data-active='true']:hover:not(:disabled) {
+  border-color: var(--sniptale-color-border-accent-strong);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent-soft) 88%,
+    var(--sniptale-color-surface-panel) 12%
+  );
+  color: var(--sniptale-color-text-primary-strong);
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--sniptale-color-accent) 14%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent);
+}
+
+.sniptale-toggle:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* ========================================
+   Close Button
+   ======================================== */
+.sniptale-btn-close {
+  color: var(--sniptale-text-muted);
+  margin-left: 4px;
+}
+
+.sniptale-btn-close:hover:not(:disabled) {
+  background: var(--sniptale-danger-bg);
+  color: var(--sniptale-danger-color);
+}
+
+/* ========================================
+   Lock Button
+   ======================================== */
+.sniptale-state-lock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.sniptale-state-lock[data-active='true'] {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent-soft) 82%,
+    var(--sniptale-color-surface-panel) 18%
+  );
+  color: var(--sniptale-color-text-primary-strong);
+  box-shadow:
+    var(--sniptale-shadow-sm),
+    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 16%, transparent);
+}
+
+.sniptale-state-lock[data-active='false'] {
+  color: var(--sniptale-text-muted);
+}
+
+.sniptale-state-lock:hover:not(:disabled):not([data-active='true']) {
+  color: var(--sniptale-text-main);
+  background: var(--sniptale-hover-bg);
+}
+
+.sniptale-state-lock[data-active='true']:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent-soft) 88%,
+    var(--sniptale-color-surface-panel) 12%
+  );
+  color: var(--sniptale-color-text-primary-strong);
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--sniptale-color-accent) 14%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent);
+}
+
+.sniptale-state-lock:disabled[data-active='true'] {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent-soft) 82%,
+    var(--sniptale-color-surface-panel) 18%
+  );
+  color: var(--sniptale-color-text-primary-strong);
+  box-shadow:
+    var(--sniptale-shadow-sm),
+    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 16%, transparent);
+  cursor: not-allowed;
+}
+
+.sniptale-state-lock:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* ========================================
+   Danger Button (Trash)
+   ======================================== */
+.sniptale-btn-danger {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-danger) 22%,
+    var(--sniptale-color-border-soft) 78%
+  );
+  color: color-mix(
+    in srgb,
+    var(--sniptale-color-danger) 74%,
+    var(--sniptale-color-text-secondary) 26%
+  );
+}
+
+.sniptale-btn-danger:hover:not(:disabled) {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-danger) 30%,
+    var(--sniptale-color-border-soft) 70%
+  );
+  background: color-mix(in srgb, var(--sniptale-color-danger-soft) 86%, white 14%);
+  color: var(--sniptale-danger-color);
+}
+
+/* ========================================
+   Exit Button (Screenshot Mode Toggle)
+   ======================================== */
+.sniptale-btn-exit {
+  color: var(--sniptale-text-muted);
+}
+
+.sniptale-btn-exit[data-active='true']:hover:not(:disabled) {
+  background: var(--sniptale-danger-bg);
+  color: var(--sniptale-danger-color);
+}
+
+.sniptale-btn::after {
+  content: none;
+  display: none;
+}
+
+.sniptale-btn:hover::after {
+  content: none;
+  display: none;
+}
+
+.sniptale-btn:focus-visible {
+  border-color: var(--sniptale-color-border-accent-strong);
+  box-shadow:
+    var(--sniptale-shadow-sm),
+    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 22%, transparent);
+}
+
+/* Drag handle tooltip removed */

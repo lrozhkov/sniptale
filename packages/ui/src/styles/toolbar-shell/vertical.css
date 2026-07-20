@@ -1,0 +1,61 @@
+.sniptale-toolbar[data-display-mode='vertical'] {
+  align-items: center;
+  inline-size: var(--sniptale-toolbar-vertical-inline-size);
+  min-height: auto;
+  gap: 4px;
+  padding: 7px;
+  flex-direction: column;
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-drag-handle {
+  width: var(--sniptale-toolbar-button-size);
+  height: 24px;
+  margin-right: 0;
+  margin-bottom: 2px;
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-group {
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn,
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-mode-wrapper,
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-settings-wrapper,
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-capture-action-wrapper,
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-timer-wrapper,
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-viewport-wrapper {
+  width: var(--sniptale-toolbar-button-size);
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-glass-toolbar-divider {
+  width: 100%;
+  height: 1px;
+  margin: 2px 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--sniptale-color-border-soft) 28%, transparent),
+    color-mix(in srgb, var(--sniptale-color-border-strong) 72%, transparent),
+    color-mix(in srgb, var(--sniptale-color-border-soft) 28%, transparent)
+  );
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-glass-toolbar-divider,
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-divider {
+  margin-inline: 0;
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-toolbar-menu-item > svg,
+.sniptale-toolbar[data-display-mode='vertical']
+  .sniptale-toolbar-menu-item
+  > .sniptale-toolbar-mode-icon {
+  width: 18px;
+  height: 18px;
+}

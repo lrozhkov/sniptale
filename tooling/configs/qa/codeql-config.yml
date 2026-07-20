@@ -1,0 +1,16 @@
+# CodeQL audit configuration. Keep committed source/tooling paths included and generated/local artifacts excluded.
+name: sniptale-local-codeql
+paths:
+  - src
+  - apps
+  - packages
+  - scripts
+  - tooling
+paths-ignore:
+  - docs
+  - tests
+  - test
+  - .tmp
+  - dist
+queries:
+  - uses: security-and-quality

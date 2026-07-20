@@ -1,0 +1,172 @@
+/* ========================================
+ * Glass Popover Controls
+ * ======================================== */
+
+.sniptale-glass-icon-button,
+.sniptale-glass-chip,
+.sniptale-glass-color-trigger,
+.sniptale-glass-mini-button,
+.sniptale-glass-bold-button {
+  border: 1px solid var(--sniptale-color-border-soft);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 12%,
+    var(--sniptale-color-surface-panel) 88%
+  );
+  color: var(--sniptale-color-text-secondary);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.08s ease;
+}
+
+.sniptale-glass-icon-button:hover,
+.sniptale-glass-chip:hover,
+.sniptale-glass-color-trigger:hover,
+.sniptale-glass-mini-button:hover,
+.sniptale-glass-bold-button:hover {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 16%,
+    var(--sniptale-color-surface-panel) 84%
+  );
+  border-color: var(--sniptale-color-border-soft);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-glass-icon-button:active,
+.sniptale-glass-chip:active,
+.sniptale-glass-mini-button:active,
+.sniptale-glass-bold-button:active {
+  transform: translateY(1px);
+}
+
+.sniptale-glass-icon-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.sniptale-glass-icon-button--active,
+.sniptale-glass-chip--active,
+.sniptale-glass-mini-button--active,
+.sniptale-glass-bold-button--active,
+.sniptale-glass-color-trigger--active {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 55%,
+    var(--sniptale-color-border-soft) 45%
+  );
+  color: var(--sniptale-color-accent);
+  background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 10%, transparent);
+}
+
+.sniptale-glass-chip {
+  min-height: 32px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.sniptale-glass-chip--stacked {
+  min-height: 54px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.sniptale-glass-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sniptale-glass-option-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sniptale-glass-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sniptale-glass-preset-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 12%,
+    var(--sniptale-color-surface-panel) 88%
+  );
+  color: var(--sniptale-color-text-primary);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.sniptale-glass-preset-item:hover {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 16%,
+    var(--sniptale-color-surface-panel) 84%
+  );
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-glass-preset-item--active {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 55%,
+    var(--sniptale-color-border-soft) 45%
+  );
+  color: var(--sniptale-color-accent);
+  background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 10%, transparent);
+}
+
+.sniptale-glass-preset-preview {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sniptale-glass-preset-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.sniptale-glass-preset-name {
+  display: block;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

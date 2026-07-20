@@ -1,0 +1,1 @@
+export { createEditorControllerPublicApiAdapter } from './factory';

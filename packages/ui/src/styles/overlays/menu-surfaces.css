@@ -1,0 +1,86 @@
+/* Unified Matte Overlays: Tooltip, Popover, Dropdown Menu */
+
+.sniptale-btn[data-tooltip-position='top']::after {
+  top: auto;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%) translateY(4px);
+}
+
+.sniptale-btn[data-tooltip-position='top']:hover::after {
+  transform: translateX(-50%) translateY(0);
+}
+
+.sniptale-popover-menu,
+.sniptale-dropdown-menu {
+  background: color-mix(in srgb, var(--sniptale-color-surface-panel) 99%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 84%, transparent) !important;
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--sniptale-color-overlay) 14%, transparent) !important;
+}
+
+.sniptale-popover-menu,
+.sniptale-popover-menu *,
+.sniptale-dropdown-menu,
+.sniptale-dropdown-menu * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sniptale-popover-menu :is(input, textarea, select, [contenteditable]),
+.sniptale-popover-menu [contenteditable] *,
+.sniptale-dropdown-menu :is(input, textarea, select, [contenteditable]),
+.sniptale-dropdown-menu [contenteditable] * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.sniptale-popover-menu.sniptale-popover-up {
+  top: auto !important;
+  bottom: calc(100% + 10px);
+}
+
+.sniptale-dropdown-menu {
+  min-width: 180px;
+  padding: 8px;
+  border-radius: 12px;
+}
+
+.sniptale-dropdown-item {
+  min-height: 38px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.sniptale-dropdown-item:hover {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 82%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-dropdown-item.sniptale-popover-item-selected {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 88%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-dropdown-item.danger:hover {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-danger-soft) 48%,
+    var(--sniptale-color-surface-hover) 52%
+  );
+  color: var(--sniptale-color-danger);
+}
+
+.sniptale-dropdown-divider {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--sniptale-color-text-primary) 2%, transparent),
+    color-mix(in srgb, var(--sniptale-color-text-primary) 12%, transparent),
+    color-mix(in srgb, var(--sniptale-color-text-primary) 2%, transparent)
+  );
+}

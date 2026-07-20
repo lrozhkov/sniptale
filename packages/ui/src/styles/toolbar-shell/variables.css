@@ -1,0 +1,24 @@
+.sniptale-toolbar-root {
+  --sniptale-h: var(--sniptale-size-toolbar-glass);
+  --sniptale-toolbar-shell-height: 50px;
+  --sniptale-toolbar-button-size: 36px;
+  --sniptale-toolbar-vertical-inline-size: var(--sniptale-toolbar-shell-height);
+  --sniptale-toolbar-shell-padding: 6px;
+  --sniptale-toolbar-gap: 6px;
+  --sniptale-toolbar-divider-margin: 3px;
+  --sniptale-radius: var(--sniptale-radius-md);
+  --sniptale-bg-panel: var(--sniptale-color-surface-panel);
+  --sniptale-border: var(--sniptale-color-border-soft);
+  --sniptale-shadow:
+    0 14px 28px -22px color-mix(in srgb, var(--sniptale-color-shadow-strong) 22%, transparent),
+    0 6px 14px -12px color-mix(in srgb, var(--sniptale-color-shadow-strong) 16%, transparent);
+  --sniptale-text-main: var(--sniptale-color-text-primary-strong);
+  --sniptale-text-muted: var(--sniptale-color-text-secondary);
+  --sniptale-hover-bg: color-mix(in srgb, var(--sniptale-color-surface-panel) 82%, transparent);
+  --sniptale-active-bg: color-mix(in srgb, var(--sniptale-color-accent) 6%, transparent);
+  --sniptale-active-border: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 55%,
+    var(--sniptale-color-border-soft) 45%
+  );
+}

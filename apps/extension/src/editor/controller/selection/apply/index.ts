@@ -1,0 +1,1 @@
+export { applySelectionToolSettingsToObjects } from './dispatch';

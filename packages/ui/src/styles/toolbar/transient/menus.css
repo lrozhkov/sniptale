@@ -1,0 +1,68 @@
+.sniptale-timer-wrapper,
+.sniptale-viewport-wrapper,
+.sniptale-capture-action-wrapper {
+  position: relative;
+}
+
+.sniptale-timer-btn,
+.sniptale-viewport-btn {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+.sniptale-timer-btn[data-menu-open='true']::after,
+.sniptale-viewport-btn[data-menu-open='true']::after,
+.sniptale-capture-action-wrapper button[data-menu-open='true']::after {
+  display: none !important;
+}
+
+.sniptale-viewport-menu {
+  min-width: 160px;
+}
+
+.sniptale-capture-menu {
+  min-width: 140px;
+}
+
+.sniptale-viewport-menu .sniptale-popover-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.sniptale-capture-menu .sniptale-popover-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.sniptale-viewport-menu .sniptale-popover-icon,
+.sniptale-capture-menu .sniptale-popover-icon {
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.sniptale-viewport-label {
+  font-weight: 500;
+}
+
+.sniptale-viewport-dims {
+  font-size: 12px;
+  color: var(--sniptale-color-text-dim);
+  font-weight: 400;
+}
+
+.sniptale-popover-up {
+  animation-name: popoverFadeInUp;
+}
+
+@keyframes popoverFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

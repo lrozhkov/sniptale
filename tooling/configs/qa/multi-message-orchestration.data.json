@@ -1,0 +1,4 @@
+{
+  "$comment": "Multi-message orchestration policy data. Include only reviewed owner exceptions and update when messaging seams move.",
+  "allowedOwners": []
+}

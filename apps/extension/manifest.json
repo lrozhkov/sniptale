@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "Sniptale",
+  "version": "0.1.0",
+  "version_name": "0.1.0",
+  "minimum_chrome_version": "140",
+  "description": "Your new favorite tool for recording the browser workspace",
+  "incognito": "not_allowed",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "unlimitedStorage",
+    "tabs",
+    "webNavigation",
+    "debugger",
+    "activeTab",
+    "scripting",
+    "downloads",
+    "offscreen",
+    "tabCapture",
+    "desktopCapture",
+    "nativeMessaging",
+    "clipboardWrite"
+  ],
+  "optional_host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "fonts/manrope-cyrillic-wght-normal.woff2",
+        "fonts/manrope-latin-ext-wght-normal.woff2",
+        "fonts/manrope-latin-wght-normal.woff2"
+      ],
+      "matches": ["http://*/*", "https://*/*"],
+      "use_dynamic_url": true
+    }
+  ],
+  "background": {
+    "service_worker": "apps/extension/src/background/index.ts",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "apps/extension/src/popup/index.html",
+    "default_title": "Open Sniptale"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';",
+    "sandbox": "sandbox allow-scripts; default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; worker-src blob:; child-src 'none'; object-src 'none';"
+  },
+  "sandbox": {
+    "pages": ["apps/extension/src/effect-runtime-sandbox/index.html"]
+  }
+}

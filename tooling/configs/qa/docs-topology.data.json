@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "activeIndex": "docs/README.md",
+  "activeDocuments": [
+    "docs/architecture/code-organization.md",
+    "docs/architecture/i18n-architecture.md",
+    "docs/architecture/parser-architecture.md",
+    "docs/architecture/platform-patterns-and-tradeoffs.md",
+    "docs/architecture/repository-overview.md",
+    "docs/architecture/runtime-contexts.md",
+    "docs/architecture/shared-topology.md",
+    "docs/architecture/storage-state-authority.md",
+    "docs/architecture/video-editor-layering.md",
+    "docs/architecture/video-effect-bundles.md",
+    "docs/engineering/implementation-rules.md",
+    "docs/oss/provenance.md",
+    "docs/oss/release.md",
+    "docs/security/data-handling.md",
+    "docs/security/manifest-permissions.md",
+    "docs/security/threat-model.md",
+    "docs/tooling/code-quality.md",
+    "docs/tooling/operator-handbook.md",
+    "docs/tooling/repo-root-inventory.md",
+    "docs/tooling/wrapper-summary.md",
+    "docs/tooling/wsl-setup.md"
+  ],
+  "generatedDocuments": [
+    "THIRD_PARTY_NOTICES.md",
+    "docs/engineering/tech-debt-report.md"
+  ],
+  "rootDocuments": [
+    "AGENTS.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "DESIGN.md",
+    "README.md"
+  ],
+  "skillDocuments": [
+    ".agents/README.md",
+    ".agents/skills/architecture-code-review/SKILL.md",
+    ".agents/skills/architecture-code-review/references/architecture-review-checklist.md",
+    ".agents/skills/repo-audit/SKILL.md",
+    ".agents/skills/repo-audit/references/repo-audit-checklist.md",
+    ".agents/skills/security-code-review/SKILL.md",
+    ".agents/skills/security-code-review/references/security-review-checklist.md",
+    ".agents/skills/topology-plan-review/SKILL.md",
+    ".agents/skills/topology-plan-review/references/topology-plan-review-checklist.md"
+  ],
+  "productDocuments": [],
+  "requiredIndexContractFragments": [
+    "## Documentation policy",
+    "### Deterministically enforced",
+    "This file is the sole documentation index",
+    "rejects research, migration, and deprecated-document trees",
+    "rejects hard-wrapped prose and formatter admission",
+    "### Review-only guidance",
+    "Code, machine-readable policy, and deterministic checks are the primary authority"
+  ],
+  "retiredActivePrefixes": [
+    "docs/deprecated/",
+    "docs/migrations/",
+    "docs/research/"
+  ],
+  "forbiddenActiveFragments": [
+    "OSS Transformation Program",
+    "OSS transformation program",
+    "oss-transform-program-state"
+  ],
+  "retiredActivePaths": [
+    "docs/architecture/README.md",
+    "docs/architecture/large-owner-contracts.md",
+    "docs/architecture/singleton-lifecycle.md",
+    "docs/architecture/video-annotation-templates.md",
+    "docs/oss/feasibility.md",
+    "docs/tooling/README.md",
+    "docs/tooling/escaped-defect-protocol.md",
+    "docs/tooling/tmp-inventory.md"
+  ]
+}

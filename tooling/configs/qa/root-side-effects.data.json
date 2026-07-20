@@ -1,0 +1,83 @@
+{
+  "$comment": "Shared/public root side-effect policy. Keep allowlists narrow and tied to explicit init/service owners.",
+  "allowedRoots": [
+    {
+      "file": "packages/runtime-contracts/src/scenario-ai-operations/index.ts",
+      "owner": "shared-contracts-scenario-ai-operations-root",
+      "justification": "This contract root intentionally declares reusable Zod operation schemas at import time for shared scenario AI consumers.",
+      "reviewNote": "Keep executable schema construction confined to this explicit contract root; move runtime registration or mutation logic out of the root."
+    },
+    {
+      "file": "packages/platform/src/observability/logger/index.ts",
+      "owner": "shared-logger-root",
+      "justification": "The logger root intentionally owns the singleton method allowlist used by shared logger instances.",
+      "reviewNote": "Keep import-time logger singleton setup confined to this explicit service root."
+    },
+    {
+      "file": "packages/platform/src/observability/message-tracer/index.ts",
+      "owner": "shared-message-tracer-root",
+      "justification": "The message tracer root intentionally owns shared tracer initialization state.",
+      "reviewNote": "Keep import-time tracer singleton setup confined to this explicit service root."
+    },
+    {
+      "file": "packages/ui/src/annotatable-image-surface/index.tsx",
+      "owner": "shared-ui-annotatable-image-surface-root",
+      "justification": "This UI owner root intentionally defines reusable class-name constants for the annotatable image surface component set.",
+      "reviewNote": "Keep import-time work limited to declarative styling constants and component definitions."
+    },
+    {
+      "file": "packages/ui/src/content-toolbar/index.tsx",
+      "owner": "shared-ui-content-toolbar-root",
+      "justification": "This UI owner root intentionally declares reusable React toolbar components with forwardRef at import time.",
+      "reviewNote": "Keep import-time work limited to declarative component definitions and styling constants."
+    },
+    {
+      "file": "packages/ui/src/control-language/index.ts",
+      "owner": "shared-ui-control-language-root",
+      "justification": "This UI owner root intentionally declares reusable control class-name sets at import time.",
+      "reviewNote": "Keep import-time work limited to declarative styling constants."
+    },
+    {
+      "file": "packages/ui/src/editor-chrome/index.tsx",
+      "owner": "shared-ui-editor-chrome-root",
+      "justification": "This UI owner root intentionally declares reusable editor chrome class names and React components at import time.",
+      "reviewNote": "Keep import-time work limited to declarative styling constants and component definitions."
+    },
+    {
+      "file": "packages/ui/src/floating-chrome/index.tsx",
+      "owner": "shared-ui-floating-chrome-root",
+      "justification": "This UI owner root intentionally declares reusable floating chrome class names and React components at import time.",
+      "reviewNote": "Keep import-time work limited to declarative styling constants and component definitions."
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/inspector/layer-list/index.tsx",
+      "owner": "shared-ui-layer-list-root",
+      "justification": "This UI owner root intentionally declares reusable layer-list styling constants at import time.",
+      "reviewNote": "Keep import-time work limited to declarative styling constants and component definitions."
+    },
+    {
+      "file": "packages/ui/src/product-feedback/toast-service/index.ts",
+      "owner": "shared-ui-toast-service",
+      "justification": "The shared UI toast service intentionally owns the active-toast registry for product feedback surfaces.",
+      "reviewNote": "Keep toast presentation lifecycle confined to this explicit shared UI service owner."
+    },
+    {
+      "file": "packages/ui/src/product-form-controls/index.tsx",
+      "owner": "shared-ui-product-form-controls-root",
+      "justification": "This UI owner root intentionally declares reusable React form controls with forwardRef at import time.",
+      "reviewNote": "Keep import-time work limited to declarative component definitions and styling constants."
+    },
+    {
+      "file": "packages/ui/src/product-glass-toolbar/index.tsx",
+      "owner": "shared-ui-product-glass-toolbar-root",
+      "justification": "This UI owner root intentionally declares reusable React toolbar controls with forwardRef at import time.",
+      "reviewNote": "Keep import-time work limited to declarative component definitions and styling constants."
+    },
+    {
+      "file": "packages/ui/src/product-menus/dropdown/index.tsx",
+      "owner": "shared-ui-product-menu-root",
+      "justification": "This UI owner root intentionally declares the reusable React dropdown shell with forwardRef at import time.",
+      "reviewNote": "Keep import-time work limited to declarative component definitions and styling constants."
+    }
+  ]
+}

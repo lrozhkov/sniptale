@@ -1,0 +1,36 @@
+.sniptale-ai-icon-badge {
+  width: 36px;
+  height: 36px;
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 76%, transparent);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+}
+
+.sniptale-ai-modal-header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sniptale-ai-modal-header-icon {
+  color: var(--sniptale-accent-light);
+}
+
+.sniptale-ai-modal-context-info {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--sniptale-text-secondary);
+}
+
+.sniptale-ai-modal-context-title {
+  color: var(--sniptale-text-muted);
+}
+
+.sniptale-ai-modal-kbd-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--sniptale-text-dim);
+}

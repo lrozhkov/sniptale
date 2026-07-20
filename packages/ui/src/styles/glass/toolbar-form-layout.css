@@ -1,0 +1,145 @@
+/* ========================================
+ * Glass Toolbar Form Layout
+ * ======================================== */
+
+.sniptale-glass-toolbar {
+  --sniptale-toolbar-gap: 6px;
+  --sniptale-glass-danger-hover-border: color-mix(
+    in srgb,
+    var(--sniptale-color-danger) 32%,
+    var(--sniptale-color-border-soft) 68%
+  );
+  --sniptale-glass-danger-hover-bg: color-mix(
+    in srgb,
+    var(--sniptale-color-danger-soft) 84%,
+    white 16%
+  );
+  --sniptale-glass-danger-hover-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--sniptale-color-danger) 8%, transparent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  pointer-events: auto;
+  background: var(--sniptale-color-surface-panel);
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-md);
+  box-shadow:
+    0 18px 40px -22px color-mix(in srgb, var(--sniptale-color-shadow-strong) 36%, transparent),
+    0 8px 18px -12px color-mix(in srgb, var(--sniptale-color-shadow-strong) 22%, transparent);
+}
+
+.sniptale-glass-toolbar,
+.sniptale-glass-toolbar * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sniptale-glass-toolbar-button {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.08s ease;
+}
+
+.sniptale-glass-toolbar-button[data-menu-indicator='true']::before {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 0;
+  height: 0;
+  border-inline: 3px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.sniptale-glass-toolbar-button:hover {
+  background: color-mix(in srgb, var(--sniptale-color-surface-panel) 82%, transparent);
+  border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 74%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-glass-toolbar-button:active {
+  transform: translateY(1px);
+}
+
+.sniptale-glass-toolbar-button--active {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 55%,
+    var(--sniptale-color-border-soft) 45%
+  );
+  color: var(--sniptale-color-accent-emphasis);
+  background: var(--sniptale-active-bg);
+  box-shadow: none;
+}
+
+.sniptale-glass-toolbar-button--active:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 55%,
+    var(--sniptale-color-border-soft) 45%
+  );
+  color: var(--sniptale-color-accent-emphasis);
+  background: color-mix(in srgb, var(--sniptale-color-accent) 9%, transparent);
+  box-shadow: none;
+}
+
+.sniptale-glass-toolbar-button--danger:hover {
+  border-color: var(--sniptale-glass-danger-hover-border);
+  background: var(--sniptale-glass-danger-hover-bg);
+  color: var(--sniptale-color-danger);
+  box-shadow: var(--sniptale-glass-danger-hover-shadow);
+}
+
+.sniptale-glass-toolbar-divider {
+  width: 1px;
+  height: calc(var(--sniptale-toolbar-button-size, 36px) - 4px);
+  align-self: center;
+  margin: 3px 3px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--sniptale-color-border-soft) 28%, transparent),
+    color-mix(in srgb, var(--sniptale-color-border-strong) 72%, transparent),
+    color-mix(in srgb, var(--sniptale-color-border-soft) 28%, transparent)
+  );
+}
+
+.sniptale-glass-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sniptale-glass-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sniptale-glass-toggle-title {
+  font-size: 12px;
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-glass-toggle-hint {
+  font-size: 12px;
+  color: var(--sniptale-color-text-dim);
+}

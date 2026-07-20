@@ -1,0 +1,203 @@
+.sniptale-confirm-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  max-width: 90vw;
+  background: color-mix(in srgb, var(--sniptale-modal-bg) 96%, transparent);
+  border: 1px solid var(--sniptale-modal-border);
+  border-radius: 16px;
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--sniptale-color-overlay) 28%, transparent);
+  z-index: 2147483649;
+  padding: 24px;
+  animation: sniptale-scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.sniptale-confirm-title {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-confirm-message {
+  margin: 0 0 24px 0;
+  font-size: 14px;
+  color: var(--sniptale-text-secondary);
+  line-height: 1.5;
+}
+
+.sniptale-confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.sniptale-confirm-cancel,
+.sniptale-confirm-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border-radius: 12px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.08s ease;
+  font-family: inherit;
+}
+
+.sniptale-confirm-cancel {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 10%,
+    var(--sniptale-color-surface-panel) 90%
+  );
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 82%, transparent);
+  color: var(--sniptale-text-secondary);
+}
+
+.sniptale-confirm-cancel:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 6%,
+    var(--sniptale-color-surface-panel) 94%
+  );
+  border-color: var(--sniptale-color-border-soft);
+  color: var(--sniptale-text-main);
+}
+
+.sniptale-confirm-cancel:disabled,
+.sniptale-confirm-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sniptale-confirm-danger {
+  background: color-mix(in srgb, var(--sniptale-danger-soft) 72%, var(--sniptale-modal-bg) 28%);
+  border: 1px solid
+    color-mix(in srgb, var(--sniptale-danger) 30%, var(--sniptale-color-border-soft) 70%);
+  color: var(--sniptale-danger);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-danger) 8%, transparent);
+}
+
+.sniptale-confirm-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sniptale-danger-soft) 64%, var(--sniptale-modal-bg) 36%);
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-danger) 38%,
+    var(--sniptale-color-border-soft) 62%
+  );
+  color: var(--sniptale-danger);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-danger) 10%, transparent);
+}
+
+.sniptale-confirm-danger:disabled {
+  background: color-mix(in srgb, var(--sniptale-text-main) 4%, transparent);
+  border-color: color-mix(in srgb, var(--sniptale-text-main) 10%, transparent);
+  color: var(--sniptale-text-dim);
+  box-shadow: none;
+}
+
+.sniptale-soft-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--sniptale-color-border-soft) 78%, transparent) 20%,
+    color-mix(in srgb, var(--sniptale-color-border-soft) 78%, transparent) 80%,
+    transparent 100%
+  );
+  margin-bottom: 14px;
+}
+
+.sniptale-data-container {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 34%,
+    var(--sniptale-color-surface-panel) 66%
+  );
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.sniptale-column-exclusion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 18%,
+    var(--sniptale-color-surface-panel) 82%
+  );
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  border: 1px solid var(--sniptale-color-border-soft);
+}
+
+.sniptale-column-exclusion-label {
+  color: var(--sniptale-color-text-dim);
+  font-weight: 500;
+  align-self: center;
+}
+
+.sniptale-column-exclusion-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--sniptale-color-text-secondary);
+  transition: color 0.15s;
+}
+
+.sniptale-column-exclusion-item.excluded {
+  color: var(--sniptale-color-text-dim);
+  text-decoration: line-through;
+}
+
+.sniptale-kbd {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 16%,
+    var(--sniptale-color-surface-panel) 84%
+  );
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  border: 1px solid var(--sniptale-color-border-soft);
+  color: var(--sniptale-color-text-secondary);
+  font-size: 12px;
+}
+
+@keyframes sniptale-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sniptale-spinner-inline {
+  width: 13px;
+  height: 13px;
+  border: 2px solid color-mix(in srgb, var(--sniptale-color-text-primary) 28%, transparent);
+  border-top-color: var(--sniptale-color-text-primary-strong);
+  border-radius: 50%;
+  animation: sniptale-spin 0.6s linear infinite;
+}

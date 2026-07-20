@@ -1,0 +1,1 @@
+export { buildClosedCandidatePath } from './dispatch';

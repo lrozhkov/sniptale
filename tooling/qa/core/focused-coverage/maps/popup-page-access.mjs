@@ -1,0 +1,91 @@
+const popupRuntimePageAccessTests = [
+  'apps/extension/src/popup/shell/runtime/hook.test.tsx',
+  'apps/extension/src/popup/shell/runtime/page-access.test.tsx',
+];
+
+export const POPUP_PAGE_ACCESS_OWNER_MAPPINGS = [
+  {
+    allowCrossOwner: true,
+    owner: 'popup-export-page-access-routing',
+    productionFile: 'apps/extension/src/popup/shell/export/runtime/tab-message-routing.ts',
+    exclusive: true,
+    reason: 'Popup export tab routing is covered by focused export routing tests.',
+    testFiles: ['apps/extension/src/popup/shell/export/runtime/tab-message-routing.test.ts'],
+  },
+  {
+    owner: 'popup-runtime-page-access-hook',
+    productionFile: 'apps/extension/src/popup/shell/runtime/page-access.ts',
+    exclusive: true,
+    reason: 'Popup page-access request and rollback behavior is covered by its hook suite.',
+    testFiles: ['apps/extension/src/popup/shell/runtime/page-access.test.tsx'],
+  },
+  {
+    owner: 'popup-runtime-page-access-grants',
+    productionFile: 'apps/extension/src/popup/shell/runtime/page-access-grants.ts',
+    exclusive: true,
+    reason: 'Popup page-access grant helpers are covered by the hook suite.',
+    testFiles: ['apps/extension/src/popup/shell/runtime/page-access.test.tsx'],
+  },
+  {
+    owner: 'popup-runtime-page-access-assembly',
+    productionFile: 'apps/extension/src/popup/shell/runtime/index.ts',
+    exclusive: true,
+    reason: 'Popup runtime page-access assembly is covered by hook suites.',
+    testFiles: popupRuntimePageAccessTests,
+  },
+  {
+    owner: 'popup-runtime-page-access-assembly',
+    productionFile: 'apps/extension/src/popup/shell/runtime/assembly/index.ts',
+    exclusive: true,
+    reason: 'Popup runtime page-access assembly is covered by hook suites.',
+    testFiles: popupRuntimePageAccessTests,
+  },
+  {
+    owner: 'popup-runtime-page-access-assembly',
+    productionFile: 'apps/extension/src/popup/shell/runtime/assembly/view.ts',
+    exclusive: true,
+    reason: 'Popup runtime page-access view assembly is covered by runtime assembly tests.',
+    testFiles: popupRuntimePageAccessTests,
+  },
+  {
+    owner: 'popup-command-palette-page-access-type',
+    productionFile: 'apps/extension/src/popup/shell/runtime/types/command-palette.ts',
+    exclusive: true,
+    reason: 'Command palette page-access projection is covered by action gating tests.',
+    testFiles: ['apps/extension/src/popup/shell/command-palette/actions.test.tsx'],
+  },
+  {
+    owner: 'popup-runtime-page-access-types',
+    productionPrefix: 'apps/extension/src/popup/shell/runtime/types',
+    exclusive: true,
+    reason: 'Popup runtime page-access type projections are covered by consumer tests.',
+    testFiles: [
+      'apps/extension/src/popup/shell/app-shell/index.test.tsx',
+      'apps/extension/src/popup/shell/export/controller.test.tsx',
+      'apps/extension/src/popup/shell/home/page-shell/index.page-access.test.tsx',
+      'apps/extension/src/popup/recording/video/setup/view-model.test.ts',
+      'apps/extension/src/popup/shell/runtime/hook.test.tsx',
+    ],
+  },
+  {
+    owner: 'popup-page-access-command-palette-layer',
+    productionFile: 'apps/extension/src/popup/shell/app-shell/command-palette-layer.tsx',
+    exclusive: true,
+    reason: 'Command palette lazy layer ownership is covered by its layer suite.',
+    testFiles: ['apps/extension/src/popup/shell/app-shell/command-palette-layer.test.tsx'],
+  },
+  {
+    owner: 'popup-page-access-app-shell',
+    productionFile: 'apps/extension/src/popup/shell/app-shell/index.tsx',
+    exclusive: true,
+    reason: 'Popup shell route composition is covered by the app-shell surface suite.',
+    testFiles: ['apps/extension/src/popup/shell/app-shell/index.test.tsx'],
+  },
+  {
+    owner: 'popup-page-access-tabs-layer',
+    productionFile: 'apps/extension/src/popup/shell/app-shell/tabs-layer.tsx',
+    exclusive: true,
+    reason: 'Page-access tab disabling is covered by tabs-layer tests.',
+    testFiles: ['apps/extension/src/popup/shell/app-shell/tabs-layer.test.tsx'],
+  },
+];

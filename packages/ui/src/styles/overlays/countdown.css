@@ -1,0 +1,141 @@
+/* ========================================
+ * Countdown Overlay Feedback
+ * ======================================== */
+
+.sniptale-countdown-toast-container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999;
+  pointer-events: none;
+  animation: countdownFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes countdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.sniptale-countdown-toast {
+  min-width: min(320px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-panel) 97%,
+    var(--sniptale-color-accent-soft) 3%
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--sniptale-color-accent) 16%, var(--sniptale-color-border-soft) 84%);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--sniptale-color-shadow-strong) 16%, transparent);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  pointer-events: none;
+}
+
+.sniptale-countdown-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sniptale-countdown-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-countdown-label,
+.sniptale-countdown-suffix {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-countdown-number {
+  min-width: 40px;
+  border-radius: 10px;
+  border: 1px solid
+    color-mix(in srgb, var(--sniptale-color-accent) 18%, var(--sniptale-color-border-soft) 82%);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 88%,
+    var(--sniptale-color-accent-soft) 12%
+  );
+  padding: 5px 10px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--sniptale-color-accent);
+  text-align: center;
+  line-height: 1;
+}
+
+.sniptale-countdown-cancel {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 92%,
+    var(--sniptale-color-surface-panel) 8%
+  );
+  color: var(--sniptale-color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+.sniptale-countdown-cancel:hover {
+  background: color-mix(in srgb, var(--sniptale-color-danger-soft) 88%, white 12%);
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-danger) 24%,
+    var(--sniptale-color-border-soft) 76%
+  );
+  color: var(--sniptale-color-danger);
+}
+
+.sniptale-countdown-cancel:active {
+  transform: scale(0.96);
+}
+
+.sniptale-pulse {
+  animation: numberPulse 0.3s ease-out;
+}
+
+@keyframes numberPulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.3);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}

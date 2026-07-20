@@ -1,0 +1,117 @@
+.sniptale-popup-select-shell {
+  width: 100%;
+  max-width: none;
+}
+
+.sniptale-popup-select {
+  --sniptale-field-height: 32px;
+  --sniptale-field-padding-block: 6px;
+  --sniptale-field-padding-inline-start: 10px;
+  --sniptale-field-padding-inline-end: 30px;
+  --sniptale-field-gap: 8px;
+  --sniptale-field-radius: 10px;
+  --sniptale-field-font-size: 12px;
+  --sniptale-field-bg-idle: transparent;
+  --sniptale-field-border-idle: transparent;
+  --sniptale-field-shadow-idle: none;
+  --sniptale-field-bg-hover: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-panel) 98%,
+    var(--sniptale-color-surface-canvas) 2%
+  );
+  --sniptale-field-border-hover: color-mix(
+    in srgb,
+    var(--sniptale-color-border-soft) 84%,
+    transparent
+  );
+  --sniptale-field-shadow-hover: inset 0 0 0 1px
+    color-mix(in srgb, var(--sniptale-color-border-subtle) 24%, transparent);
+  --sniptale-field-bg-active: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-panel) 98%,
+    var(--sniptale-color-surface-canvas) 2%
+  );
+  --sniptale-field-border-active: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 20%,
+    var(--sniptale-color-border-soft) 80%
+  );
+  --sniptale-field-shadow-active:
+    inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 6%, transparent);
+  line-height: 1.25;
+}
+
+.sniptale-popup-select .sniptale-select-value {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sniptale-popup-select .sniptale-select-value-copy {
+  min-width: 0;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.sniptale-popup-select .sniptale-select-value-copy > span:first-child,
+.sniptale-popup-select .sniptale-select-placeholder {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sniptale-popup-select .sniptale-select-option-description {
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.sniptale-popup-select .sniptale-select-chevron {
+  width: 14px;
+  height: 14px;
+}
+
+.sniptale-popup-select-menu {
+  max-height: min(11rem, calc(100vh - 168px));
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.sniptale-popup-select-menu .sniptale-select-option {
+  min-height: 30px;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+
+.sniptale-popup-select-menu .sniptale-select-option-copy {
+  min-width: 0;
+  flex: 1;
+  gap: 8px;
+}
+
+.sniptale-popup-select-menu .sniptale-select-value {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sniptale-popup-select-menu .sniptale-select-value > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sniptale-popup-select-menu .sniptale-select-option-description {
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.sniptale-popup-select-menu .sniptale-select-option-check {
+  width: 14px;
+  height: 14px;
+}

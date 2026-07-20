@@ -1,0 +1,15 @@
+export {
+  clearAllHighlights,
+  clearFrameEditing,
+  clearFrameTooltipVisible,
+  disableHighlighterMode,
+  enableHighlighterMode,
+  invalidateFrameCache,
+  isHighlighterEnabled,
+  isHighlighterPausedState,
+  pauseHighlighter,
+  registerFrameCallbacks,
+  resumeHighlighter,
+  setFrameEditing,
+  setFrameTooltipVisible,
+} from '../highlighter-runtime';

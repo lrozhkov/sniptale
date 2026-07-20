@@ -1,0 +1,2982 @@
+{
+  "schemaVersion": 1,
+  "controls": [
+    {
+      "id": "qa.rule.advisory-report",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.ai-limits",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.app-core-owners",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.architecture-guardrails",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.ast-grep",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.audit",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.audit-evidence",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.backup-import-atomicity",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.boundary-casts",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.boundary-inputs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.browser-adapters",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.build",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.canonical-facades",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.changed-line-readability",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.codeql",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.config-policy",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.contract-optionality-drift",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.contract-parser-coverage",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.cycles",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.dead-exports",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.dependency-admission",
+      "disposition": "keep",
+      "owner": "security-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.dependency-boundaries",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.design-system",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.destructive-async-swaps",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.detached-controller-methods",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.diagnostic-sanitization",
+      "disposition": "keep",
+      "owner": "security-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.domain-fixture-realism",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.e2e-build",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.entrypoint-wiring",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.eslint",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.export-artifact-boundaries",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.fetch-ownership",
+      "disposition": "keep",
+      "owner": "security-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.format",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.full-build",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.full-product-coverage",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.git-commit",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "external"
+    },
+    {
+      "id": "qa.rule.gitleaks",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.harness-qa",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.heavy-runtime-imports",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.history-detached-snapshots",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.history-revision-semantics",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.history-transaction-lifecycle",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.hot-loop-work",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.hotspot-regression",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.i18n",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.interactive-controller-ownership",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.interface-surfaces",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.jscpd",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.knip",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.license-inventory",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.lifecycle-intent-loss",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.logging-policy",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.manifest-integrity",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.manifest-permissions",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.manual-audit-verify-detached-this-methods-mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.manual-audit-verify-hot-path-cleanups-mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.manual-audit-verify-npm-audit-signatures-mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.messaging",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.messaging-schema-casts",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.mock-export-parity",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.multi-message-transitions",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.naming",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.network-fetch-policy",
+      "disposition": "keep",
+      "owner": "security-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.no-applicable-targets",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.npm-audit",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.npm-audit-signatures",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.oss-release-surface",
+      "disposition": "keep",
+      "owner": "security-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.osv-scanner",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.oxlint",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.package-boundaries",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.parser-snapshot-purity",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.playwright",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.pre-commit-diff-guard",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.privacy-feature-settings",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.qa-build",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.qa-checkpoint",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.qa-control-inventory",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.qa-preflight",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.qa-release-harness",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.qa-rule-coverage-contract",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.read-path-side-effects",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.read-safe-naming",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.release-archive",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.resource-budget-consistency",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.resource-lifecycle-pairs",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.retired-controls",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.returned-object-surfaces",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.root-scatter",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.root-side-effects",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.runtime-listener-ownership",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.runtime-protocol-contracts",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.runtime-response-privacy",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.runtime-topology",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.secret-storage",
+      "disposition": "keep",
+      "owner": "security-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.security",
+      "disposition": "keep",
+      "owner": "security-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.semgrep",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.sensitive-retention",
+      "disposition": "keep",
+      "owner": "security-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.shared-style-ownership",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.shared-ui-boundaries",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.sniptale-identity",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control permanently rejects retired product and Effect identities in current-tree and ZIP content.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.sonarjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.stage-changes",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "external"
+    },
+    {
+      "id": "qa.rule.state-machine-proof",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.stats-counter-semantics",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.storage-write-patterns",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.success-failure-asymmetry",
+      "disposition": "keep",
+      "owner": "seam-lifecycle",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.suppression-directives",
+      "disposition": "keep",
+      "owner": "security-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.target-only-paths",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.task-artifacts",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.technical-debt-registry",
+      "disposition": "keep",
+      "owner": "maintainability-governance",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.test-coverage",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.topology-report",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Audit profile requiredness and structured skip semantics use the canonical audit-profile authority.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.typecheck",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.ui-automation-seams",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.unit-tests",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.wrapper-help",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.wrapper-interruption",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.wrapper-lifecycle",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.wrapper-stale-run-recovery",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    },
+    {
+      "id": "qa.rule.zip-package-profile",
+      "disposition": "keep",
+      "owner": "architecture-boundaries",
+      "rationale": "The control remains a permanent repository rule with canonical lane ownership.",
+      "sourceKind": "repository"
+    }
+  ],
+  "executables": [
+    {
+      "path": "tooling/qa/audits/ast-grep.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/audits/codeql.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/audits/evidence.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/audits/gitleaks.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/audits/jscpd.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/audits/knip.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/audits/licenses.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/audits/npm-audit-signatures.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/audits/npm-audit.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/audits/osv.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/audits/semgrep.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/codeql/generate-ownership.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/core/build-step.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/core/oss-release-consumer-discovery.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/core/qa-controls/generate.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint.",
+      "proofReason": "Internal orchestration entrypoint is exercised transitively by release-harness."
+    },
+    {
+      "path": "tooling/qa/core/technical-debt-report.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/core/verify-ai-limits.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-all.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/core/verify-app-core-owners.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-architecture-guardrails.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-backup-import-atomicity.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-boundary-casts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-boundary-inputs.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-browser-adapters.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-canonical-facades.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-config-policy.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-contract-optionality-drift.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-contract-parser-coverage.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-dead-exports.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-design-system.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-destructive-async-swaps.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-detached-controller-methods.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-detached-this-methods.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-domain-fixture-realism.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-entrypoint-wiring.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-eslint.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-export-artifact-boundaries.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-extension-build-artifacts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/core/verify-extension-build-layout.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/core/verify-heavy-runtime-import-ownership.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-history-detached-snapshots.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-history-revision-semantics.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-history-transaction-lifecycle.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-hot-loop-work.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-hot-path-cleanups.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-hotspot-regression.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-i18n.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-instance-ownership.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-interface-surfaces.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-lifecycle-intent.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-logging.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-manifest-integrity.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-messaging-schema-casts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-messaging.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-multi-message-transitions.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-naming.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-network-fetch-policy.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-oxlint.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-package-boundaries.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-parser-snapshot-purity.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-prettier.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-privacy-feature-settings.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-qa-controls.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-qa-rule-coverage-contract.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-read-path-side-effects.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-read-safe-naming.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-resource-budget-consistency.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-resource-lifecycle-pairs.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-root-scatter.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-root-side-effects.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-runtime-listener-seams.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-runtime-protocol-contracts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-runtime-response-privacy.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-shared-style-ownership.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-shared-ui-boundaries.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-sniptale-identity.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-sonarjs.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-state-machine-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-stats-counter-semantics.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-storage-write-patterns.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-success-failure-asymmetry.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-target-only-paths.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-task-artifacts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-technical-debt.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-test-coverage.mjs",
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-typecheck.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-ui-automation-seams.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-unit-tests.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/core/verify-zip-package-profile.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/architecture/verify-boundaries.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/architecture/verify-cycles.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/architecture/verify-manifest-permissions.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/architecture/verify-runtime-topology.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/quality/verify-line-length.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/quality/verify-manual-mock-export-parity.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/quality/verify-suppression-directives.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/security/verify-diagnostic-sanitization.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/security/verify-fetch-ownership.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/security/verify-secret-storage.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/security/verify-security.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/guards/security/verify-sensitive-retention.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/hooks/pre-commit.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint.",
+      "proofReason": "Internal orchestration entrypoint is exercised transitively by release-harness."
+    },
+    {
+      "path": "tooling/qa/hooks/pre-push.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/runtime/observability/report.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/runtime/run-metrics.helpers.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/wrappers/advisory.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/wrappers/audit.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/wrappers/build.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/wrappers/checkpoint.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/wrappers/closeout.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/qa/wrappers/preflight.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/wrappers/release-harness.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/qa/wrappers/release.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/release/generate-dependency-legal.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint."
+    },
+    {
+      "path": "tooling/release/package-dist.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    },
+    {
+      "path": "tooling/release/validate-dependency-legal.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This is a permanent QA orchestration or diagnostic entrypoint.",
+      "proofReason": "Internal orchestration entrypoint is exercised transitively by release-harness."
+    },
+    {
+      "path": "tooling/test/e2e/run-e2e.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "Executable behavior is owned by its canonical control identity."
+    }
+  ],
+  "policyFiles": [
+    {
+      "path": "tooling/configs/qa/app-core-owner-policy.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/target-only-paths.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/core/app-core-owner-policy.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/architecture-debt.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/core/architecture-guardrails.data.mjs",
+        "tooling/qa/core/technical-debt-enforced-sources.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/audit-profiles.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/audits/profiles/registry.mjs",
+        "tooling/qa/core/verify-external-audit-semantics.test-support.ts"
+      ],
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/codeql-baseline.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/core/technical-debt-enforced-sources.mjs",
+        "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/codeql-config.yml",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/control-dispositions.data.json",
+      "consumers": [
+        "tooling/configs/qa/oss-release-consumers.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/core/qa-controls/discovery.mjs",
+        "tooling/qa/core/qa-controls/policy.mjs",
+        "tooling/qa/core/retired-controls/validation.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/dependency-policy-rules.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/core/verify-focused-triggered.helpers.mjs",
+        "tooling/qa/guards/security/verify-dependency-admission.mjs",
+        "tooling/qa/policy/dependency-policy-rules.mjs"
+      ],
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/docs-topology.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/core/docs-topology-policy.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/gitleaks-baseline.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/core/target-only-path-references.mjs",
+        "tooling/qa/core/technical-debt-enforced-sources.mjs",
+        "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/gitleaks.toml",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/jscpd-baseline.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/core/technical-debt-enforced-sources.mjs",
+        "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/jscpd.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/core/verify-external-audit-semantics.test-support.ts",
+        "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/knip.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/licenses.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/dependency-policy-rules.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/audits/licenses/evaluation.mjs",
+        "tooling/qa/core/technical-debt-enforced-sources.mjs",
+        "tooling/qa/core/verify-external-audit-semantics.security.test-support.ts",
+        "tooling/qa/core/verify-focused-triggered.helpers.mjs",
+        "tooling/qa/core/verify-license-audits.test-support.ts",
+        "tooling/qa/guards/security/verify-dependency-admission.mjs",
+        "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/manifest-permissions.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/oss-release-consumers.data.json",
+        "tooling/qa/core/guardrail-owner-audits.mjs",
+        "tooling/qa/core/verify-focused.config.mjs",
+        "tooling/qa/guards/architecture/verify-manifest-permissions.mjs",
+        "tooling/qa/guards/architecture/verify-manifest-permissions.test-support.ts",
+        "tooling/release/artifact-security.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/multi-message-orchestration.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/core/verify-multi-message-transitions.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/oss-release-consumers.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/oss-release.data.json",
+        "tooling/qa/core/oss-release-consumer-discovery.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/oss-release.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/core/oss-release-consumer-discovery.mjs",
+        "tooling/release/oss-release-policy.mjs",
+        "tooling/release/oss-release-policy.test-support.ts"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/quality-baseline.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/core/quality.config.mjs",
+        "tooling/qa/core/technical-debt-static-baselines.mjs"
+      ],
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/retired-controls.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/core/retired-controls/policy.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/root-side-effects.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/core/verify-root-side-effects.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/security-network-ownership.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/codeql/generate-ownership.mjs",
+        "tooling/qa/guards/security/verify-fetch-ownership.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/security-storage-ownership.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/codeql/generate-ownership.mjs",
+        "tooling/qa/guards/security/verify-diagnostic-sanitization.mjs",
+        "tooling/qa/guards/security/verify-secret-storage.mjs",
+        "tooling/qa/guards/security/verify-sensitive-retention.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/semgrep.yml",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/policy/external-tools.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/sonarjs-baseline.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/qa/core/technical-debt-static-baselines.mjs",
+        "tooling/qa/core/verify-sonarjs.mjs",
+        "tooling/qa/core/verify-sonarjs.test-support.ts"
+      ],
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/target-only-paths.data.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/core/target-only-path-policy.mjs"
+      ],
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
+    },
+    {
+      "path": "tooling/configs/qa/technical-debt.data.json",
+      "consumers": [
+        "tooling/configs/qa/codeql-baseline.json",
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/jscpd-baseline.json",
+        "tooling/configs/qa/oss-release-consumers.data.json",
+        "tooling/qa/audits/jscpd-registry.mjs",
+        "tooling/qa/core/target-only-path-references.mjs",
+        "tooling/qa/core/technical-debt-coverage.mjs",
+        "tooling/qa/core/technical-debt-registry.mjs",
+        "tooling/qa/core/technical-debt-report.mjs"
+      ],
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    },
+    {
+      "path": "tooling/configs/qa/validation-manifest.json",
+      "consumers": [
+        "tooling/configs/qa/control-dispositions.data.json",
+        "tooling/configs/qa/oss-release-consumers.data.json",
+        "tooling/qa/core/guardrail-owner-audits.mjs",
+        "tooling/qa/core/oss-release-validation.docs.mjs",
+        "tooling/qa/core/qa-controls/discovery.mjs",
+        "tooling/qa/core/qa-controls/policy-populations.mjs",
+        "tooling/qa/core/verify-qa-rule-coverage-contract.mjs",
+        "tooling/qa/evidence/repo-audit-evidence/core.mjs"
+      ],
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "This policy is validated through the canonical control, debt, or audit-profile authority."
+    }
+  ],
+  "scripts": [
+    {
+      "id": "qa:advisory",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:audit",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:build",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:checkpoint",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:closeout",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:all",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:build",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:critical",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:critical:headed",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:headed",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:install",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:install:deps",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:smoke",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:e2e:smoke:headed",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:preflight",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:ast-grep",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:codeql",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:depcruise",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:eslint",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:knip",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:playwright",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:prettier",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:semgrep",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:typecheck",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:vite",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:raw:vitest",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:release",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:release-harness",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    },
+    {
+      "id": "qa:stats",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The package script is a supported canonical QA operator entrypoint."
+    }
+  ],
+  "validationTools": [
+    {
+      "tool": "ast-grep.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "build.commit-steps.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "build.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "checkpoint.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "cli-contracts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "codeql.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "evidence.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "gitleaks.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "jscpd.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "knip.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "licenses.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "maintenance.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "npm-audit-signatures.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "npm-audit.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "osv.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "package-dist.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "playwright",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "preflight.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "qa-scope.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "release-harness.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "retired-controls/validation.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "run-controller.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "semgrep.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-advisory.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-ai-limits.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.execution.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.scope.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.test-steps.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.unit-test-results.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.unit-test-steps.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.violation-steps.architecture.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.violation-steps.lifecycle.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.violation-steps.quality.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.violation-steps.runtime.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-app-core-owner-test-edges.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-app-core-owners.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-architecture-guardrails.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-audit.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-backup-import-atomicity.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-boundaries.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-boundary-casts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-boundary-inputs.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-browser-adapters.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-build.execution.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-build.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-build.scope.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-build.test-profiles.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-canonical-facades.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-closeout-step-helpers.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-config-policy.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-config-policy.vite-target.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-contract-optionality-drift.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-contract-parser-coverage.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-cycles.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-dead-exports.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-dependency-admission.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-design-system.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-destructive-async-swaps.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-detached-controller-methods.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-detached-this-methods.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-diagnostic-sanitization.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-domain-fixture-realism.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-entrypoint-wiring.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-eslint.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-export-artifact-boundaries.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-extension-build-artifacts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-extension-build-layout.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-fetch-ownership.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-focused-triggered.execution.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-focused-triggered.file-scoped.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-focused-triggered.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-focused.code-steps.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-focused.execution.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-focused.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-focused.test-steps.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-harness.execution.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-harness.runtime-listener-step.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-harness.state.helpers.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-heavy-runtime-import-ownership.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-history-detached-snapshots.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-history-revision-semantics.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-history-transaction-lifecycle.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-hot-loop-work.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-hot-path-cleanups.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-hotspot-regression.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-i18n.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-instance-ownership.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-interface-surfaces.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-interface-surfaces.return-bags.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-lifecycle-intent.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-line-length.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-logging.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-manifest-integrity.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-manifest-permissions.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-manual-mock-export-parity.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-messaging-schema-casts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-messaging.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-multi-message-transitions.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-naming.facades.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-naming.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-network-fetch-policy.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-npm-audit-signatures.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-oss-release-surface.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-oxlint.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-package-boundaries.contracts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-package-boundaries.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-parser-snapshot-purity.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-prettier.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-privacy-feature-settings.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-qa-controls.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-qa-rule-coverage-contract.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-quality-contract-step-definitions.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-read-path-side-effects.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-read-safe-naming.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-release-archive.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-resource-budget-consistency.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-resource-lifecycle-pairs.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-root-scatter-files.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-root-scatter.config.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-root-scatter.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-root-side-effects.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-runtime-listener-seams.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-runtime-protocol-contracts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-runtime-response-privacy.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-runtime-topology.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-secret-storage.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-security.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-sensitive-retention.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-shared-style-ownership.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-shared-ui-boundaries.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-sniptale-identity.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-sonarjs.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-state-machine-proof.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-stats-counter-semantics.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-storage-write-patterns.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-success-failure-asymmetry.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-suppression-directives.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-target-only-paths.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-task-artifacts.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-technical-debt.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-test-coverage.advisory.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-test-coverage.feedback.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-test-coverage.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-test-coverage.registry.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-typecheck-cache.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-typecheck.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-ui-automation-seams.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-unit-tests.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-zip-package-profile.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "vite",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    }
+  ]
+}

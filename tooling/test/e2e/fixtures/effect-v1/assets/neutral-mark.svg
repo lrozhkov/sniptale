@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <g id="ring" fill="none" stroke="#7cf7ff" stroke-width="16">
+    <circle id="outer" cx="120" cy="120" r="92" />
+  </g>
+  <g id="core" fill="#ff8618">
+    <path id="diamond" d="M120 54 186 120 120 186 54 120Z" />
+    <circle id="center" cx="120" cy="120" r="22" fill="#101820" />
+  </g>
+</svg>

@@ -1,0 +1,44 @@
+/* ========================================
+ * AI Modal Template Editor
+ * ======================================== */
+
+.sniptale-ai-template-editor-backdrop {
+  z-index: 2147483648;
+}
+
+.sniptale-ai-template-editor-modal {
+  z-index: 2147483649;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-modal-bg) 98%,
+    var(--sniptale-color-surface-panel) 2%
+  );
+}
+
+.sniptale-ai-template-editor-modal .sniptale-modal-body-sm {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 10%,
+    var(--sniptale-color-surface-panel) 90%
+  );
+}
+
+.sniptale-ai-template-editor-modal .sniptale-textarea,
+.sniptale-ai-template-editor-modal .sniptale-input {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, white 6%, transparent),
+      color-mix(in srgb, var(--sniptale-color-surface-canvas) 4%, transparent)
+    ),
+    color-mix(
+      in srgb,
+      var(--sniptale-color-surface-canvas) 4%,
+      var(--sniptale-color-surface-panel) 96%
+    );
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 96%, transparent);
+  border-top-color: color-mix(in srgb, var(--sniptale-color-border-strong) 90%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-border-subtle) 48%, transparent),
+    0 1px 2px color-mix(in srgb, var(--sniptale-color-overlay) 10%, transparent);
+}

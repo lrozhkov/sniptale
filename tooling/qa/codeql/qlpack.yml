@@ -1,0 +1,9 @@
+name: sniptale/javascript-custom-queries
+version: 0.1.0
+library: false
+warnOnImplicitThis: true
+dependencies:
+  codeql/javascript-all: 2.6.26
+groups:
+  - javascript
+  - queries

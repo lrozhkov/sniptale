@@ -1,0 +1,187 @@
+{
+  "$comment": "Manifest permissions policy source. Update when manifest grants, web-accessible resources, or permission ownership changes.",
+  "permissions": [
+    {
+      "name": "storage",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/browser-storage/index.ts",
+      "feature": "Shared settings, project, session, and AI provider persistence",
+      "runtimeRoute": "shared browser storage adapter consumed by runtime/storage owners",
+      "capabilityPolicy": "Callers use typed storage owners; plaintext AI secrets stay in secret stores only.",
+      "failureBehavior": "Storage failures surface through owner-specific typed errors or fail-soft UI state.",
+      "justification": "Persists extension settings, UI state, scenario sessions, and AI provider/model data through shared storage seams.",
+      "reviewNote": "Includes browserStorage.local-backed AI provider metadata plus encrypted secret envelopes by explicit product choice; secret-storage, retention, and diagnostic guardrails must keep plaintext keys and page payloads out of persistent storage.",
+      "userFacingDisclosure": "settings.permissions.requiredStorageDescription"
+    },
+    {
+      "name": "contextMenus",
+      "owner": "apps/extension/src/background/runtime/context-menu/service.ts",
+      "feature": "Background-owned context menu actions",
+      "runtimeRoute": "background context-menu registration and action dispatch",
+      "capabilityPolicy": "Only background wiring registers menu actions; menu callbacks resolve action owner before side effects.",
+      "failureBehavior": "Unavailable action state leaves the menu handler fail-closed without privileged fallback.",
+      "justification": "Creates extension context-menu actions for capture and scenario flows in the background runtime.",
+      "reviewNote": "Keep creation and handlers in the background owner seam.",
+      "userFacingDisclosure": "settings.permissions.requiredContextMenusDescription"
+    },
+    {
+      "name": "unlimitedStorage",
+      "owner": "apps/extension/src/background/media-hub/assets.ts",
+      "feature": "Large local media and project retention",
+      "runtimeRoute": "background media hub and shared media/project storage owners",
+      "capabilityPolicy": "Writes stay behind media/project storage owners with explicit project or recording ownership.",
+      "failureBehavior": "Quota or write failures surface as export/storage failures instead of alternate ad hoc storage.",
+      "justification": "Supports large local capture/media storage beyond default quota for the media hub and export flows.",
+      "reviewNote": "Retain only while local media/project storage remains a core product behavior.",
+      "userFacingDisclosure": "settings.permissions.requiredUnlimitedStorageDescription"
+    },
+    {
+      "name": "tabs",
+      "owner": "packages/platform/src/browser/tabs.ts",
+      "feature": "Tab metadata and routing coordination",
+      "runtimeRoute": "shared tabs adapter consumed by background capture/editor/runtime routers",
+      "capabilityPolicy": "Privileged tab actions stay behind route/session owners and sender-bound contracts.",
+      "failureBehavior": "Missing tab access returns typed missing-tab or permission-denied results.",
+      "justification": "Queries and coordinates tab metadata for capture, editor routing, and runtime orchestration.",
+      "reviewNote": "All non-messaging tab access should stay behind the shared browser adapter seam.",
+      "userFacingDisclosure": "settings.permissions.requiredTabsDescription"
+    },
+    {
+      "name": "webNavigation",
+      "owner": "apps/extension/src/background/runtime/routing/runtime-wiring/navigation.ts",
+      "feature": "Navigation-aware runtime cleanup and session reconciliation",
+      "runtimeRoute": "background runtime-routing event subscription",
+      "capabilityPolicy": "Only background runtime-routing owns subscriptions and session cleanup side effects.",
+      "failureBehavior": "Navigation gaps clear or reconcile volatile state rather than granting stale authority.",
+      "justification": "Observes top-level navigation changes used by runtime cleanup and capture/session flows.",
+      "reviewNote": "Only the background runtime should subscribe to these events.",
+      "userFacingDisclosure": "settings.permissions.requiredWebNavigationDescription"
+    },
+    {
+      "name": "debugger",
+      "owner": "packages/platform/src/browser/debugger.ts",
+      "feature": "Full-page capture, viewport emulation, and HAR diagnostics",
+      "runtimeRoute": "shared debugger adapter consumed by background capture and HAR owners",
+      "capabilityPolicy": "Attach/detach requires the owning background route, resolved tab, and feature session.",
+      "failureBehavior": "Attach denial or missing permission aborts the feature flow before debugger side effects.",
+      "justification": "Supports debugger-backed capture/export diagnostics and HAR-style inspection flows.",
+      "reviewNote": "Keep attach/detach and event handling behind the shared debugger adapter.",
+      "userFacingDisclosure": "settings.permissions.requiredDebuggerDescription"
+    },
+    {
+      "name": "activeTab",
+      "owner": "apps/extension/src/background/capture/editor/index.ts",
+      "feature": "User-gesture-scoped active tab capture/editor flows",
+      "runtimeRoute": "background capture/editor routing from popup or explicit user actions",
+      "capabilityPolicy": "Use only for user-initiated active-tab flows; do not expand it into ambient host authority.",
+      "failureBehavior": "Missing active-tab grant rejects the requested flow and preserves existing tab state.",
+      "justification": "Allows user-initiated capture/edit flows to access the currently active tab without broad persistent grants.",
+      "reviewNote": "Treat as user-gesture-scoped; do not use as a substitute for registry-driven host permissions.",
+      "userFacingDisclosure": "settings.permissions.requiredActiveTabDescription"
+    },
+    {
+      "name": "scripting",
+      "owner": "packages/platform/src/browser/scripting.ts",
+      "feature": "Canonical runtime script injection",
+      "runtimeRoute": "shared scripting adapter consumed by background-owned feature routes",
+      "capabilityPolicy": "Injection targets and scripts are selected by owner routes, not arbitrary UI or content callers.",
+      "failureBehavior": "Injection denial returns a typed feature failure before downstream assumptions run.",
+      "justification": "Injects or executes runtime scripts through the canonical browser scripting adapter.",
+      "reviewNote": "Use only through the shared adapter and keep target scripts deterministic.",
+      "userFacingDisclosure": "settings.permissions.requiredScriptingDescription"
+    },
+    {
+      "name": "downloads",
+      "owner": "packages/platform/src/browser/downloads.ts",
+      "feature": "Capture, recording, project, and archive downloads",
+      "runtimeRoute": "shared downloads adapter consumed by background export/download owners",
+      "capabilityPolicy": "Download requests are routed through owning background/export flows with normalized filenames.",
+      "failureBehavior": "Download denial or cancellation prevents partial archive/download creation.",
+      "justification": "Exports captures, projects, and generated assets through browser downloads flows.",
+      "reviewNote": "Downloads remain background-owned even when triggered from UI surfaces.",
+      "userFacingDisclosure": "settings.permissions.requiredDownloadsDescription"
+    },
+    {
+      "name": "offscreen",
+      "owner": "packages/platform/src/browser/offscreen.ts",
+      "feature": "Recording and export composition offscreen document",
+      "runtimeRoute": "shared offscreen adapter with background/offscreen lifecycle owners",
+      "capabilityPolicy": "Only background-owned recording/export sessions create or tear down offscreen work.",
+      "failureBehavior": "Creation failure rejects the session before media/export state is committed.",
+      "justification": "Creates and manages the offscreen document used for recording and export composition jobs.",
+      "reviewNote": "Keep lifecycle orchestration centralized in the background/offscreen owners.",
+      "userFacingDisclosure": "settings.permissions.requiredOffscreenDescription"
+    },
+    {
+      "name": "tabCapture",
+      "owner": "packages/platform/src/browser/tab-capture.ts",
+      "feature": "Tab and tab-crop recording capture",
+      "runtimeRoute": "shared tab-capture adapter consumed by background capture-mode owners",
+      "capabilityPolicy": "Capture starts only for the owning capture session and resolved tab capability.",
+      "failureBehavior": "Permission denial fails the recording mode before offscreen export or UI commit.",
+      "justification": "Captures tab media streams for recording flows.",
+      "reviewNote": "Use through shared tab-capture adapters only.",
+      "userFacingDisclosure": "settings.permissions.requiredTabCaptureDescription"
+    },
+    {
+      "name": "desktopCapture",
+      "owner": "packages/platform/src/browser/desktop-capture.ts",
+      "feature": "Screen and window recording capture",
+      "runtimeRoute": "shared desktop-capture adapter consumed by background desktop-capture source selection",
+      "capabilityPolicy": "Desktop source selection stays behind the background screen/window policy and active capture request.",
+      "failureBehavior": "Cancelled or denied source selection aborts capture without reusable authority.",
+      "justification": "Captures full-screen or window media sources when the product records outside a single tab.",
+      "reviewNote": "Use through shared desktop-capture adapter and background source-picker policy only.",
+      "userFacingDisclosure": "settings.permissions.requiredDesktopCaptureDescription"
+    },
+    {
+      "name": "nativeMessaging",
+      "owner": "packages/platform/src/browser/native-messaging.ts",
+      "feature": "Native tray-agent connection for extension-owned screenshot, recording, settings sync, tray actions, and safe telemetry transfer",
+      "runtimeRoute": "background native-app runtime owner under apps/extension/src/background/runtime/native-app with settings-page query/mutation routes",
+      "capabilityPolicy": "Only the background native-app owner calls connectNative with a channel-scoped host name; popup/content/settings surfaces do not connect directly. Unsupported protocol/settings/schema/install states fail closed before operational commands.",
+      "failureBehavior": "Missing, policy-denied, incompatible, repair-required, or other-profile controller states surface as typed native status while browser-only capture and recording remain available.",
+      "justification": "Allows the extension to communicate with the browser-launched Native Messaging host used by the Sniptale native tray agent.",
+      "reviewNote": "Keep Native Messaging access behind packages/platform/src/browser/native-messaging.ts and apps/extension/src/background/runtime/native-app; production builds must not connect to dev host names.",
+      "userFacingDisclosure": "settings.permissions.requiredNativeMessagingDescription"
+    },
+    {
+      "name": "clipboardWrite",
+      "owner": "packages/platform/src/browser/clipboard.ts",
+      "feature": "Copy exported content and generated assets",
+      "runtimeRoute": "shared clipboard adapter or narrow feature-local runtime helper",
+      "capabilityPolicy": "Clipboard writes stay in explicit user-triggered feature flows with normalized payloads.",
+      "failureBehavior": "Clipboard failure reports copy failure without falling back to hidden persistence.",
+      "justification": "Copies exported content and generated assets to the clipboard from popup, content, and scenario-editor flows.",
+      "reviewNote": "Prefer shared clipboard adapters or narrow runtime helpers; avoid ad hoc clipboard writes.",
+      "userFacingDisclosure": "settings.permissions.requiredClipboardWriteDescription"
+    }
+  ],
+  "hostPermissions": [],
+  "optionalHostPermissions": [
+    {
+      "name": "<all_urls>",
+      "owner": "apps/extension/src/background/runtime/page-access/service.ts",
+      "feature": "Optional persistent page tooling and native visible capture authority for shim-restored HTTP/HTTPS pages",
+      "runtimeRoute": "PAGE_ACCESS background-owned route with dynamic top-frame content runtime shim registration, lazy full-runtime injection, and native visible capture routes",
+      "capabilityPolicy": "Optional all-sites access is requested only from extension UI; dynamic content script matches remain owner-registered, HTTP/HTTPS-only, and top-frame only.",
+      "failureBehavior": "Denied or revoked grants leave page tooling inactive; unsupported pages fail closed; visible capture routes use native tabs.captureVisibleTab and do not fall back to debugger for missing activeTab.",
+      "justification": "Shim-restored hotkeys and scenario captures run outside Chrome activeTab user-invocation events, and Chrome tabs.captureVisibleTab checks for literal <all_urls> or activeTab. The all-sites permission therefore has to be the optional literal grant rather than split HTTP/HTTPS origins.",
+      "reviewNote": "Keep optional host access usage centralized in apps/extension/src/background/runtime/page-access and capture routes; do not add required host_permissions, source manifest content_scripts, or debugger fallback for normal visible capture.",
+      "userFacingDisclosure": "settings.permissions.sitesDescription"
+    }
+  ],
+  "contentScripts": [],
+  "webAccessibleResources": [
+    {
+      "name": "web_accessible_resources:{\"resources\":[\"fonts/manrope-cyrillic-wght-normal.woff2\",\"fonts/manrope-latin-ext-wght-normal.woff2\",\"fonts/manrope-latin-wght-normal.woff2\"],\"matches\":[\"http://*/*\",\"https://*/*\"],\"extensionIds\":[],\"useDynamicUrl\":true}",
+      "owner": "apps/extension/src/content/public/preparation-surface/styles.ts",
+      "feature": "Content runtime font rendering on HTTP and HTTPS pages",
+      "runtimeRoute": "content runtime shadow-DOM CSS loaded through chrome.runtime.getURL font URLs",
+      "capabilityPolicy": "Expose only the exact Manrope font files required by extension-owned content UI; injected JavaScript bundles remain non-web-accessible.",
+      "failureBehavior": "Missing font assets fall back to system fonts without expanding web-accessible JavaScript exposure.",
+      "justification": "Allows the injected content runtime to render the extension UI consistently after host-page injection.",
+      "reviewNote": "Keep resources concrete, dynamic-url scoped, and avoid wildcard WAR entries for injected runtime bundles.",
+      "userFacingDisclosure": "settings.permissions.sitesDescription"
+    }
+  ]
+}

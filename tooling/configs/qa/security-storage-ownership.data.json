@@ -1,0 +1,87 @@
+{
+  "$comment": "Sensitive storage ownership policy. Add entries only for committed security-reviewed storage owners.",
+  "secretStorageOwners": [
+    {
+      "file": "apps/extension/src/composition/persistence/ai-settings/provider-secrets.store.ts",
+      "owner": "shared-ai-storage",
+      "justification": "Encrypted AI provider secrets and local key material are owned only by the shared AI storage seam.",
+      "reviewNote": "Only encrypted secret envelopes and key material may persist here; plaintext credential fields stay forbidden outside this owner."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/ai-settings/provider-secret-keys.store.ts",
+      "owner": "shared-ai-storage",
+      "justification": "The AI provider secret key helper owns transparent local key lookup and in-memory passphrase-derived key resolution.",
+      "reviewNote": "Transparent local key material may persist only for default obfuscation mode; passphrase-derived key material is in-memory only, and the legacy session key constant exists solely for cleanup and never authorizes persistence."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/ai-settings/provider-secrets.migration.ts",
+      "owner": "shared-ai-storage",
+      "justification": "The AI storage migration seam rewrites legacy plaintext provider records into encrypted secret envelopes.",
+      "reviewNote": "Migration may touch legacy secret material only to convert it into the canonical encrypted storage format."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/ai-settings/secret-protection.store.ts",
+      "owner": "shared-ai-storage",
+      "justification": "The AI passphrase protection seam owns non-secret protection metadata and the in-memory derived-key lifecycle.",
+      "reviewNote": "Passphrase metadata may persist in local storage, but derived decrypt key material and plaintext passphrases must never persist in local, sync, or session storage; the legacy session key is cleanup-only."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/ai-settings/provider-secret-protection.store.ts",
+      "owner": "shared-ai-storage",
+      "justification": "The AI provider secret protection lifecycle seam migrates provider secrets between transparent and passphrase modes.",
+      "reviewNote": "This owner may rewrite encrypted provider secret envelopes and protection metadata, but it must not persist plaintext passphrases or provider API keys."
+    }
+  ],
+  "sensitiveRetentionOwners": [
+    {
+      "file": "apps/extension/src/composition/persistence/video-preview-cache/mutations.ts",
+      "owner": "video-preview-cache",
+      "justification": "The video preview cache owner persists bounded local-only derived MP4 segments in its dedicated IndexedDB database.",
+      "reviewNote": "Only validated AVC preview segments may persist here; records remain advisory, excluded from backup/export/diagnostics, bounded by retention policy, and subject to required erasure verification."
+    }
+  ],
+  "diagnosticSanitizerOwners": [
+    {
+      "file": "packages/platform/src/observability/diagnostics/sanitizer.ts",
+      "owner": "shared-diagnostic-sanitizer",
+      "justification": "Canonical sanitizer owner for persisted or exported diagnostic payloads.",
+      "reviewNote": "New diagnostic collectors should import this seam rather than duplicating sanitization logic."
+    },
+    {
+      "file": "packages/platform/src/observability/message-tracer/index.ts",
+      "owner": "shared-message-tracer",
+      "justification": "Canonical tracing owner that already centralizes trace payload sanitization for low-level runtime tracing.",
+      "reviewNote": "Tracer internals may stay colocated, but diagnostic collectors outside this seam must import the shared diagnostic sanitizer."
+    },
+    {
+      "file": "packages/platform/src/observability/message-tracer/console.ts",
+      "owner": "shared-message-tracer",
+      "justification": "Low-level trace console interceptor owned by the canonical tracer seam.",
+      "reviewNote": "Keep console interception and trace sanitization inside the tracer family."
+    },
+    {
+      "file": "packages/platform/src/observability/message-tracer/events.ts",
+      "owner": "shared-message-tracer",
+      "justification": "Low-level trace event router owned by the canonical tracer seam.",
+      "reviewNote": "New diagnostic persistence/export paths should not move into this file family without an explicit policy update."
+    },
+    {
+      "file": "packages/platform/src/observability/message-tracer/messaging.ts",
+      "owner": "shared-message-tracer",
+      "justification": "Trace messaging bridge owned by the canonical tracer seam.",
+      "reviewNote": "Keep tracer transport wiring here; product diagnostics still sanitize through the shared diagnostic seam."
+    },
+    {
+      "file": "packages/platform/src/observability/message-tracer/transport.ts",
+      "owner": "shared-message-tracer",
+      "justification": "Trace transport implementation owned by the canonical tracer seam.",
+      "reviewNote": "Transport internals may remain here, but product diagnostics should not bypass sanitizer ownership."
+    },
+    {
+      "file": "packages/platform/src/observability/message-tracer/utils.ts",
+      "owner": "shared-message-tracer",
+      "justification": "Trace utility helpers owned by the canonical tracer seam.",
+      "reviewNote": "Utility-level sanitization stays internal to tracing; new diagnostic writers should import the canonical sanitizer seam."
+    }
+  ]
+}

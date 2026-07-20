@@ -1,0 +1,29 @@
+{
+  "name": "@sniptale/foundation",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "author": "Lev Rozhkov",
+  "type": "module",
+  "exports": {
+    "./best-effort": "./src/best-effort/index.ts",
+    "./default-owner": "./src/default-owner/index.ts",
+    "./gradient-stops": "./src/gradient-stops/index.ts",
+    "./history/clone": "./src/history/clone.ts",
+    "./history/snapshot-history": "./src/history/snapshot-history.ts",
+    "./utils/delay": "./src/utils/delay.ts",
+    "./utils/export-timestamp": "./src/utils/export-timestamp.ts",
+    "./utils/filename": "./src/utils/filename.ts",
+    "./utils/hotkey-key-maps": "./src/utils/hotkey-key-maps.ts",
+    "./utils/preset-path": "./src/utils/preset-path.ts",
+    "./utils/screenshot-filename": "./src/utils/screenshot-filename.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. packages/foundation/src",
+    "typecheck": "tsc --noEmit --project tsconfig.json"
+  }
+}

@@ -1,0 +1,196 @@
+/* Unified Matte Overlays: Save Dialog */
+
+.sniptale-save-dialog {
+  width: 560px;
+  max-width: min(560px, 95vw);
+}
+
+.sniptale-save-dialog-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sniptale-save-dialog-icon {
+  color: var(--sniptale-color-accent);
+}
+
+.sniptale-save-dialog-icon-badge {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-accent) 22%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sniptale-color-accent) 6%, transparent);
+}
+
+.sniptale-save-dialog-subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-save-dialog-subtitle span {
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-save-dialog-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 72%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 42%, transparent);
+}
+
+.sniptale-save-dialog-section-label {
+  font-size: 12px;
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-save-dialog-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sniptale-save-dialog-badge {
+  min-width: 26px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--sniptale-color-accent-emphasis);
+  background: color-mix(in srgb, var(--sniptale-color-accent) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent);
+}
+
+.sniptale-save-dialog-input {
+  width: 100%;
+}
+
+.sniptale-save-dialog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sniptale-save-dialog-item,
+.sniptale-save-dialog-system {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 74%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 52%, transparent);
+  color: var(--sniptale-color-text-primary);
+  text-align: left;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.sniptale-save-dialog-item:hover,
+.sniptale-save-dialog-system:hover {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 84%, transparent);
+  border-color: color-mix(in srgb, var(--sniptale-color-border-strong) 68%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-save-dialog-item-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-accent) 4%, transparent);
+  color: var(--sniptale-color-accent-emphasis);
+}
+
+.sniptale-save-dialog-item-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sniptale-save-dialog-item-title {
+  font-size: 13px;
+  color: inherit;
+}
+
+.sniptale-save-dialog-item-path {
+  font-size: 12px;
+  color: var(--sniptale-color-text-secondary);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Monaco, 'Courier New', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sniptale-save-dialog-item-check {
+  flex: 0 0 auto;
+  color: var(--sniptale-color-accent);
+  opacity: 0.8;
+}
+
+.sniptale-save-dialog-system-icon {
+  flex: 0 0 auto;
+  color: var(--sniptale-color-accent-emphasis);
+}
+
+.sniptale-save-dialog-system-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sniptale-save-dialog-system-label {
+  font-size: 13px;
+  color: inherit;
+}
+
+.sniptale-save-dialog-system-hint {
+  font-size: 12px;
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-save-dialog-empty {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px dashed color-mix(in srgb, var(--sniptale-color-text-primary) 12%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-text-primary) 2%, transparent);
+  color: var(--sniptale-color-text-secondary);
+  font-size: 12px;
+}
+
+.sniptale-save-dialog-footer {
+  justify-content: flex-start;
+}
+
+.sniptale-save-dialog-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--sniptale-color-text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}

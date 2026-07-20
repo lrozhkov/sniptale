@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Repo Audit'
+  short_description: 'Audit Sniptale architecture, security, tooling, docs, and QA drift'
+  default_prompt: 'Use $repo-audit as an independent analysis-only auditor without inherited context for this explicitly requested whole-repository audit.'

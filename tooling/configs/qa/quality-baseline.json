@@ -1,0 +1,5 @@
+{
+  "$comment": "QA baseline for allowed static-analysis violations. Keep entries narrow and owner-named.",
+  "schemaVersion": 1,
+  "allowances": []
+}

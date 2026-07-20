@@ -1,0 +1,156 @@
+.sniptale-toolbar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--sniptale-bg);
+  height: var(--sniptale-h);
+  border-radius: var(--sniptale-radius);
+  box-shadow: none;
+  border: 1px solid var(--sniptale-border);
+  animation: toolbarEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+  user-select: none;
+  gap: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+@keyframes toolbarEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.sniptale-toolbar.sniptale-toolbar-dragging {
+  opacity: 0.9;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--sniptale-color-overlay) 24%, transparent);
+}
+
+/* ========================================
+   Drag Handle
+   ======================================== */
+.sniptale-drag-handle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--sniptale-text-muted);
+  cursor: grab;
+  border-radius: 6px;
+  transition: var(--sniptale-transition);
+  margin-right: 4px;
+}
+
+.sniptale-drag-handle:hover {
+  background: var(--sniptale-hover-bg);
+  color: var(--sniptale-text-main);
+}
+
+.sniptale-drag-handle:active {
+  cursor: grabbing;
+}
+
+.sniptale-drag-handle svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+}
+
+/* ========================================
+   Groups & Spacing (Logical Grouping)
+   ======================================== */
+.sniptale-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sniptale-divider {
+  width: 1px;
+  height: 20px;
+  background-color: color-mix(in srgb, var(--sniptale-color-border-subtle) 70%, transparent);
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+
+.sniptale-spacer {
+  flex: 1;
+  min-width: 20px;
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+.sniptale-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0;
+  width: 36px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--sniptale-transition);
+  font-family: inherit;
+  height: 36px;
+  background: transparent !important;
+  color: var(--sniptale-text-muted);
+  white-space: nowrap;
+  outline: none;
+}
+
+.sniptale-btn:hover:not(:disabled) {
+  background: var(--sniptale-hover-bg);
+  color: var(--sniptale-text-main);
+  border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 72%, transparent);
+}
+
+/* Button without hover animation (for download icons, etc.) */
+.sniptale-btn-no-animate:hover:not(:disabled) {
+  transform: none;
+}
+
+.sniptale-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.sniptale-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.sniptale-btn svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+.sniptale-btn-sm {
+  height: 32px;
+  padding: 4px 8px;
+}
+
+.sniptale-btn-sm svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sniptale-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}

@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "appRoot": "apps/extension",
+  "configPaths": [
+    "apps/extension/manifest.json",
+    "apps/extension/postcss.config.js",
+    "apps/extension/tailwind.config.js",
+    "apps/extension/vite.config.ts",
+    "apps/extension/build/content-runtime-build-id.ts",
+    "apps/extension/build/injected-build-shim-guard.ts",
+    "apps/extension/build/injected-build-support.ts",
+    "apps/extension/build/injected-build.ts",
+    "apps/extension/build/layout.data.json",
+    "apps/extension/build/layout.ts",
+    "apps/extension/build/extension-html-inputs.ts"
+  ],
+  "manifestPath": "apps/extension/manifest.json",
+  "publicRoot": "apps/extension/public",
+  "outputRoot": "dist",
+  "forbiddenOutputRoot": "apps/extension/dist",
+  "externalInputRoots": [
+    "node_modules",
+    "packages/foundation",
+    "packages/platform",
+    "packages/runtime-contracts",
+    "packages/ui",
+    "tooling/build/shims",
+    "tooling/test/harness"
+  ],
+  "aliases": {
+    "jszip": "node_modules/jszip/lib/index.js",
+    "readable-stream": "tooling/build/shims/readable-stream-browser-empty.cjs",
+    "setimmediate": "tooling/build/shims/set-immediate-function-only.cjs",
+    "zod": "tooling/build/shims/zod-jitless.ts"
+  },
+  "manifestModuleInputs": [
+    {
+      "virtualPath": "apps/extension/src/background/index.ts",
+      "sourcePath": "apps/extension/src/background/index.ts"
+    }
+  ],
+  "htmlInputs": [
+    {
+      "outputPath": "apps/extension/src/design-system/index.html",
+      "sourcePath": "apps/extension/src/design-system/index.html",
+      "rollupName": "designSystem",
+      "mode": "non-release"
+    },
+    {
+      "outputPath": "apps/extension/src/editor/index.html",
+      "sourcePath": "apps/extension/src/editor/index.html",
+      "rollupName": "editor",
+      "mode": "always"
+    },
+    {
+      "outputPath": "apps/extension/src/scenario-editor/index.html",
+      "sourcePath": "apps/extension/src/scenario-editor/index.html",
+      "rollupName": "scenarioEditor",
+      "mode": "always"
+    },
+    {
+      "outputPath": "apps/extension/src/video-editor/index.html",
+      "sourcePath": "apps/extension/src/video-editor/index.html",
+      "rollupName": "videoEditor",
+      "mode": "always"
+    },
+    {
+      "outputPath": "apps/extension/src/settings/index.html",
+      "sourcePath": "apps/extension/src/settings/index.html",
+      "rollupName": "settings",
+      "mode": "always"
+    },
+    {
+      "outputPath": "apps/extension/src/gallery/index.html",
+      "sourcePath": "apps/extension/src/gallery/index.html",
+      "rollupName": "gallery",
+      "mode": "always"
+    },
+    {
+      "outputPath": "apps/extension/src/camera-recorder/index.html",
+      "sourcePath": "apps/extension/src/camera-recorder/index.html",
+      "rollupName": "cameraRecorder",
+      "mode": "always"
+    },
+    {
+      "outputPath": "apps/extension/src/web-snapshot-viewer/index.html",
+      "sourcePath": "apps/extension/src/web-snapshot-viewer/index.html",
+      "rollupName": "webSnapshotViewer",
+      "mode": "always"
+    },
+    {
+      "outputPath": "apps/extension/src/offscreen/offscreen.html",
+      "sourcePath": "apps/extension/src/offscreen/offscreen.html",
+      "rollupName": "offscreen",
+      "mode": "always"
+    },
+    {
+      "outputPath": "apps/extension/src/popup/index.html",
+      "sourcePath": "apps/extension/src/popup/index.html",
+      "rollupName": null,
+      "mode": "manifest"
+    },
+    {
+      "outputPath": "apps/extension/src/effect-runtime-sandbox/index.html",
+      "sourcePath": "apps/extension/src/effect-runtime-sandbox/index.html",
+      "rollupName": null,
+      "mode": "manifest"
+    },
+    {
+      "outputPath": "tooling/test/harness/popup.html",
+      "sourcePath": "tooling/test/harness/popup.html",
+      "rollupName": "testHarnessPopup",
+      "mode": "test-e2e"
+    },
+    {
+      "outputPath": "tooling/test/harness/settings.html",
+      "sourcePath": "tooling/test/harness/settings.html",
+      "rollupName": "testHarnessSettings",
+      "mode": "test-e2e"
+    },
+    {
+      "outputPath": "tooling/test/harness/gallery.html",
+      "sourcePath": "tooling/test/harness/gallery.html",
+      "rollupName": "testHarnessGallery",
+      "mode": "test-e2e"
+    },
+    {
+      "outputPath": "tooling/test/harness/editor.html",
+      "sourcePath": "tooling/test/harness/editor.html",
+      "rollupName": "testHarnessEditor",
+      "mode": "test-e2e"
+    },
+    {
+      "outputPath": "tooling/test/harness/scenario-editor-visual.html",
+      "sourcePath": "tooling/test/harness/scenario-editor-visual.html",
+      "rollupName": "testHarnessScenarioEditorVisual",
+      "mode": "test-e2e"
+    },
+    {
+      "outputPath": "tooling/test/harness/video-editor.html",
+      "sourcePath": "tooling/test/harness/video-editor.html",
+      "rollupName": "testHarnessVideoEditor",
+      "mode": "test-e2e"
+    },
+    {
+      "outputPath": "tooling/test/harness/offscreen.html",
+      "sourcePath": "tooling/test/harness/offscreen.html",
+      "rollupName": "testHarnessOffscreen",
+      "mode": "test-e2e"
+    },
+    {
+      "outputPath": "tooling/test/harness/preview-audio-diagnostic.html",
+      "sourcePath": "tooling/test/harness/preview-audio-diagnostic.html",
+      "rollupName": "testHarnessPreviewAudioDiagnostic",
+      "mode": "test-e2e"
+    }
+  ],
+  "requiredReleaseArtifacts": [
+    "manifest.json",
+    "assets/contentRuntime.js",
+    "assets/contentRuntimeShim.js",
+    "assets/webSnapshotInjectedRunner.js",
+    "assets/styles.css",
+    "apps/extension/src/popup/index.html",
+    "apps/extension/src/editor/index.html",
+    "apps/extension/src/scenario-editor/index.html",
+    "apps/extension/src/video-editor/index.html",
+    "apps/extension/src/settings/index.html",
+    "apps/extension/src/gallery/index.html",
+    "apps/extension/src/camera-recorder/index.html",
+    "apps/extension/src/web-snapshot-viewer/index.html",
+    "apps/extension/src/offscreen/offscreen.html",
+    "apps/extension/src/effect-runtime-sandbox/index.html",
+    "fonts/manrope-cyrillic-wght-normal.woff2",
+    "fonts/manrope-latin-ext-wght-normal.woff2",
+    "fonts/manrope-latin-wght-normal.woff2",
+    "icons/icon-16.png",
+    "icons/icon-48.png",
+    "icons/icon-128.png"
+  ],
+  "rootCommands": {
+    "dev": "vite --config apps/extension/vite.config.ts",
+    "qa:e2e:build": "vite build --config apps/extension/vite.config.ts --mode test-e2e",
+    "qa:raw:vite": "vite build --config apps/extension/vite.config.ts",
+    "build": "tsc && vite build --config apps/extension/vite.config.ts",
+    "build:release": "vite build --config apps/extension/vite.config.ts --mode release",
+    "release:package-only": "tsc && npm run build:release && node tooling/release/package-dist.mjs",
+    "preview": "vite preview --config apps/extension/vite.config.ts"
+  },
+  "appCommands": {
+    "build": "node ../../node_modules/vite/bin/vite.js build --config vite.config.ts"
+  },
+  "appDependencies": [
+    "@fontsource-variable/manrope",
+    "@iconify-icons/tabler",
+    "@iconify/react",
+    "@webav/mp4box.js",
+    "dompurify",
+    "fabric",
+    "idb",
+    "jszip",
+    "lucide-react",
+    "mediabunny",
+    "mp4-muxer",
+    "react",
+    "react-dom",
+    "roughjs",
+    "zod",
+    "zustand"
+  ],
+  "appWorkspaceDependencies": {
+    "@sniptale/foundation": "0.1.0",
+    "@sniptale/platform": "0.1.0",
+    "@sniptale/runtime-contracts": "0.1.0",
+    "@sniptale/ui": "0.1.0"
+  },
+  "appDevDependencies": [
+    "@crxjs/vite-plugin",
+    "@vitejs/plugin-react",
+    "autoprefixer",
+    "esbuild",
+    "postcss",
+    "tailwindcss",
+    "vite",
+    "vitest"
+  ]
+}

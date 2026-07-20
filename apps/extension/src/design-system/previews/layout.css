@@ -1,0 +1,79 @@
+.sniptale-design-system-floating-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 16px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  background:
+    radial-gradient(
+      circle at top,
+      color-mix(in srgb, var(--sniptale-color-accent-soft) 16%, transparent),
+      transparent 48%
+    ),
+    color-mix(in srgb, var(--sniptale-color-surface-canvas) 94%, transparent);
+  padding: 16px;
+}
+
+[data-ui='design-system.preview-frame'] .sniptale-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+[data-ui='design-system.preview-frame'] .sniptale-modal,
+[data-ui='design-system.preview-frame'] .sniptale-confirm-dialog {
+  position: relative;
+  inset: auto;
+  top: auto;
+  left: auto;
+  transform: none;
+  z-index: 1;
+  margin: 0 auto;
+  max-width: 100%;
+}
+
+[data-ui='design-system.preview-frame'] .sniptale-modal {
+  width: min(100%, 820px);
+  max-height: 100%;
+}
+
+[data-ui='design-system.preview-frame'] .sniptale-content-size-tooltip {
+  position: absolute !important;
+  inset: auto 12px 12px 12px !important;
+  top: auto !important;
+  right: 12px !important;
+  bottom: 12px !important;
+  left: 12px !important;
+  max-width: calc(100% - 24px) !important;
+  z-index: 1 !important;
+}
+
+[data-ui='design-system.preview-frame'] .sniptale-countdown-toast-container {
+  position: absolute;
+  inset: auto 16px 16px 16px;
+  left: 16px;
+  bottom: 16px;
+  transform: none;
+  animation: none;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+[data-ui='design-system.preview-frame'] .sniptale-countdown-toast {
+  width: min(100%, 320px);
+}
+
+[data-ui='design-system.preview-frame'] .sniptale-expired-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+[data-ui='design-system.preview-frame'] .sniptale-expired-content {
+  max-width: min(100%, 400px);
+}

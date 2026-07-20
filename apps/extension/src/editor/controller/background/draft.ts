@@ -1,0 +1,27 @@
+import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';
+import { type EditorFrameSettings } from '../../../features/editor/document/types';
+
+export function resetFrameBackgroundDraft(): Pick<
+  EditorFrameSettings,
+  | 'backgroundColor'
+  | 'backgroundGradientAngle'
+  | 'backgroundGradientColorStops'
+  | 'backgroundGradientFrom'
+  | 'backgroundGradientStops'
+  | 'backgroundGradientTo'
+  | 'backgroundImageData'
+  | 'backgroundImageFit'
+  | 'backgroundMode'
+> {
+  return {
+    backgroundColor: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundColor,
+    backgroundGradientAngle: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientAngle,
+    backgroundGradientColorStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientColorStops,
+    backgroundGradientFrom: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientFrom,
+    backgroundGradientStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientStops,
+    backgroundGradientTo: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientTo,
+    backgroundImageData: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundImageData,
+    backgroundImageFit: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundImageFit,
+    backgroundMode: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundMode,
+  };
+}

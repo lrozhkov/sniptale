@@ -1,0 +1,160 @@
+{
+  "name": "sniptale",
+  "private": true,
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "author": "Lev Rozhkov",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12 <23"
+  },
+  "workspaces": [
+    "apps/extension",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "vite --config apps/extension/vite.config.ts",
+    "prepare": "husky",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --cache --ext .js,.mjs,.cjs,.ts,.tsx",
+    "lint:fix": "eslint . --cache --fix --ext .js,.mjs,.cjs,.ts,.tsx",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:unit:coverage": "vitest run --coverage",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "qa:preflight": "node tooling/qa/wrappers/preflight.mjs",
+    "qa:advisory": "node tooling/qa/wrappers/advisory.mjs",
+    "qa:checkpoint": "node tooling/qa/wrappers/checkpoint.mjs",
+    "qa:closeout": "node tooling/qa/wrappers/closeout.mjs",
+    "qa:build": "node tooling/qa/wrappers/build.mjs",
+    "qa:release": "NODE_OPTIONS=--max-old-space-size=8192 node tooling/qa/wrappers/release.mjs",
+    "qa:release-harness": "node tooling/qa/wrappers/release-harness.mjs",
+    "qa:audit": "node tooling/qa/wrappers/audit.mjs",
+    "qa:stats": "node tooling/qa/runtime/observability/report.mjs",
+    "qa:e2e": "node tooling/test/e2e/run-e2e.mjs --suite smoke",
+    "qa:e2e:smoke": "node tooling/test/e2e/run-e2e.mjs --suite smoke",
+    "qa:e2e:critical": "node tooling/test/e2e/run-e2e.mjs --suite critical",
+    "qa:e2e:all": "node tooling/test/e2e/run-e2e.mjs --suite all",
+    "qa:e2e:headed": "npm run qa:e2e:smoke:headed",
+    "qa:e2e:smoke:headed": "node tooling/test/e2e/run-e2e.mjs --suite smoke --headed",
+    "qa:e2e:critical:headed": "node tooling/test/e2e/run-e2e.mjs --suite critical --headed",
+    "qa:e2e:install": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers npm exec playwright install chromium",
+    "qa:e2e:install:deps": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers npm exec playwright install-deps chromium",
+    "qa:e2e:build": "vite build --config apps/extension/vite.config.ts --mode test-e2e",
+    "qa:raw:eslint": "eslint . --cache --ext .js,.mjs,.cjs,.ts,.tsx",
+    "qa:raw:prettier": "prettier --check .",
+    "qa:raw:typecheck": "tsc --noEmit",
+    "qa:raw:vitest": "vitest run",
+    "qa:raw:depcruise": "depcruise --config .dependency-cruiser.cjs apps/extension/src apps/extension/build apps/extension/vite.config.ts packages tooling",
+    "qa:raw:vite": "vite build --config apps/extension/vite.config.ts",
+    "qa:raw:playwright": "npm exec playwright",
+    "qa:raw:ast-grep": "ast-grep",
+    "qa:raw:knip": "knip",
+    "qa:raw:semgrep": "semgrep",
+    "qa:raw:codeql": "codeql",
+    "backup:repo": "bash tooling/backup/sc-backup.sh",
+    "backup:prod": "bash tooling/backup/sc-prod-backup.sh",
+    "build": "tsc && vite build --config apps/extension/vite.config.ts",
+    "build:release": "vite build --config apps/extension/vite.config.ts --mode release",
+    "release": "npm run qa:release",
+    "release:legal": "node tooling/release/generate-dependency-legal.mjs",
+    "release:package-only": "tsc && npm run build:release && node tooling/release/package-dist.mjs",
+    "preview": "vite preview --config apps/extension/vite.config.ts"
+  },
+  "dependencies": {
+    "@fontsource-variable/manrope": "^5.2.8",
+    "@iconify-icons/tabler": "^1.2.95",
+    "@iconify/react": "^6.0.2",
+    "@webav/mp4box.js": "^0.5.7",
+    "dompurify": "^3.4.12",
+    "fabric": "^7.4.0",
+    "idb": "^8.0.3",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.575.0",
+    "mediabunny": "^1.46.0",
+    "mp4-muxer": "^5.2.2",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "roughjs": "^4.6.6",
+    "zod": "^4.3.6",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@ast-grep/cli": "^0.42.1",
+    "@crxjs/vite-plugin": "^2.7.1",
+    "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.58.2",
+    "@sniptale/platform": "0.1.0",
+    "@sniptale/runtime-contracts": "0.1.0",
+    "@sniptale/ui": "0.1.0",
+    "@types/chrome": "^0.1.36",
+    "@types/node": "^20.11.24",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^4.1.0",
+    "autoprefixer": "^10.4.18",
+    "dependency-cruiser": "^17.2.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "eslint-plugin-security": "^4.0.0",
+    "eslint-plugin-sonarjs": "^4.0.3",
+    "globals": "^17.4.0",
+    "husky": "^9.1.7",
+    "istanbul-lib-coverage": "^3.2.2",
+    "jscpd": "^4.0.8",
+    "jsdom": "^26.1.0",
+    "knip": "^6.3.1",
+    "oxlint": "^1.64.0",
+    "postcss": "^8.4.35",
+    "prettier": "^3.8.1",
+    "tailwindcss": "^3.4.1",
+    "tiktoken": "^1.0.22",
+    "ts-morph": "^27.0.2",
+    "tsx": "^4.22.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.0",
+    "vite": "^8.0.16",
+    "vitest": "^4.0.18",
+    "ws": "^8.20.0"
+  },
+  "overrides": {
+    "@babel/core": "^7.29.7",
+    "js-yaml": "^4.3.0",
+    "tar": "^7.5.8",
+    "esbuild": "^0.28.1",
+    "flatted": "^3.4.2",
+    "rollup": "^4.59.0",
+    "undici": "^7.24.0",
+    "@rollup/pluginutils": {
+      "picomatch": "^2.3.2"
+    },
+    "anymatch": {
+      "picomatch": "^2.3.2"
+    },
+    "micromatch": {
+      "picomatch": "^2.3.2"
+    },
+    "readdirp": {
+      "picomatch": "^2.3.2"
+    },
+    "dependency-cruiser": {
+      "picomatch": "^4.0.4"
+    },
+    "fdir": {
+      "picomatch": "^4.0.4"
+    },
+    "tinyglobby": {
+      "picomatch": "^4.0.4"
+    },
+    "vite": {
+      "picomatch": "^4.0.4"
+    },
+    "vitest": {
+      "picomatch": "^4.0.4"
+    }
+  }
+}

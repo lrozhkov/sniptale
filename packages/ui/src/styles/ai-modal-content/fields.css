@@ -1,0 +1,187 @@
+/* ========================================
+ * AI Modal Content Controls
+ * Base Inputs And Shared Field Chrome
+ * ======================================== */
+
+.sniptale-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sniptale-text-dim);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sniptale-label-sm {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sniptale-text-secondary);
+  letter-spacing: -0.01em;
+}
+
+.sniptale-textarea {
+  width: 100%;
+  height: 90px;
+  min-height: 90px;
+  padding: 11px 13px;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-input) 86%,
+    var(--sniptale-color-surface-panel) 14%
+  );
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 92%, transparent);
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--sniptale-text-main);
+  font-family: inherit;
+  resize: none;
+  cursor: text;
+  overflow: auto;
+  overflow-x: hidden;
+  outline: none;
+  outline-offset: 0;
+  box-sizing: border-box;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s;
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--sniptale-color-border-subtle) 36%, transparent);
+  display: block;
+  margin-bottom: 0;
+}
+
+.sniptale-textarea::-webkit-scrollbar,
+.sniptale-modal-scroll::-webkit-scrollbar,
+.sniptale-json-preview::-webkit-scrollbar,
+.sniptale-data-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.sniptale-textarea::-webkit-scrollbar-track,
+.sniptale-modal-scroll::-webkit-scrollbar-track,
+.sniptale-json-preview::-webkit-scrollbar-track,
+.sniptale-data-container::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--sniptale-text-main) 2%, transparent);
+  border-radius: 3px;
+}
+
+.sniptale-textarea::-webkit-scrollbar-thumb,
+.sniptale-modal-scroll::-webkit-scrollbar-thumb,
+.sniptale-json-preview::-webkit-scrollbar-thumb,
+.sniptale-data-container::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--sniptale-accent) 20%, transparent);
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--sniptale-accent) 10%, transparent);
+}
+
+.sniptale-textarea::-webkit-scrollbar-thumb:hover,
+.sniptale-modal-scroll::-webkit-scrollbar-thumb:hover,
+.sniptale-json-preview::-webkit-scrollbar-thumb:hover,
+.sniptale-data-container::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--sniptale-accent) 35%, transparent);
+}
+
+.sniptale-resizer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  width: 100%;
+  height: 8px;
+  background: transparent;
+  cursor: ns-resize;
+  transition: all 0.2s ease;
+}
+
+.sniptale-resizer:hover,
+.sniptale-resizer.active {
+  cursor: ns-resize;
+}
+
+.sniptale-textarea:focus,
+.sniptale-input:focus {
+  outline: none !important;
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 32%,
+    var(--sniptale-color-border-soft) 68%
+  ) !important;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-input) 90%,
+    var(--sniptale-color-surface-panel) 10%
+  ) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 12%, transparent) !important;
+}
+
+.sniptale-textarea:disabled,
+.sniptale-input:disabled,
+.sniptale-btn-secondary:disabled,
+.sniptale-add-btn:disabled,
+.sniptale-show-more-btn:disabled,
+.sniptale-toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sniptale-textarea::placeholder,
+.sniptale-input::placeholder {
+  color: var(--sniptale-text-dim);
+}
+
+.sniptale-input {
+  width: 100%;
+  padding: 10px 13px;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-input) 86%,
+    var(--sniptale-color-surface-panel) 14%
+  );
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 92%, transparent);
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--sniptale-text-main);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s;
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--sniptale-color-border-subtle) 36%, transparent);
+}
+
+.sniptale-input[type='number']::-webkit-outer-spin-button,
+.sniptale-input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.sniptale-input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+.sniptale-input:disabled {
+  opacity: 0.6;
+}
+
+.sniptale-input-error {
+  border-color: color-mix(in srgb, var(--sniptale-danger) 50%, transparent) !important;
+}
+
+.sniptale-input-error:focus {
+  border-color: color-mix(in srgb, var(--sniptale-danger) 70%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sniptale-danger) 12%, transparent) !important;
+}
+
+.sniptale-error-text {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--sniptale-danger);
+}

@@ -1,0 +1,611 @@
+{
+  "schemaVersion": 1,
+  "finalOwnerRules": [
+    {
+      "sourcePrefix": "apps/extension/src/contracts/ai",
+      "ownerId": "app-core.ai-wire-policy",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/contracts/messaging",
+      "ownerId": "app-core.runtime-messaging-contracts",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/contracts/effect-runtime",
+      "ownerId": "app-core.effect-runtime-wire",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/contracts/native-app",
+      "ownerId": "app-core.native-app-wire",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/contracts/settings",
+      "ownerId": "app-core.settings-contract",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/contracts/video",
+      "ownerId": "app-core.video-wire",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/ai",
+      "ownerId": "feature.ai",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/editor",
+      "ownerId": "feature.editor",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/highlighter",
+      "ownerId": "feature.highlighter",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/keyboard-shortcuts",
+      "ownerId": "feature.keyboard-shortcuts",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/media-hub",
+      "ownerId": "feature.media-hub",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/prompt-templates",
+      "ownerId": "feature.prompt-templates",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/quick-actions-presets",
+      "ownerId": "feature.quick-actions-presets",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/scenario",
+      "ownerId": "feature.scenario",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/tab-capabilities",
+      "ownerId": "feature.tab-capabilities",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/video",
+      "ownerId": "feature.video",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/web-snapshot",
+      "ownerId": "feature.web-snapshot",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/platform/config",
+      "ownerId": "app-core.extension-config",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/platform/i18n",
+      "ownerId": "app-core.i18n",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/platform/media-utils",
+      "ownerId": "app-core.media-adapters",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/platform/navigation",
+      "ownerId": "app-core.extension-navigation",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/platform/runtime-messaging",
+      "ownerId": "app-core.runtime-messaging-transport",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/color-selector",
+      "ownerId": "app-core.editor-controls.color",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/command-palette",
+      "ownerId": "app-core.command-palette-ui",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/compact-inspector-controls",
+      "ownerId": "app-core.editor-controls.compact",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/glass-select",
+      "ownerId": "app-core.editor-controls.select",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/gradient-preset-grid",
+      "ownerId": "app-core.editor-controls.gradient",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/keyboard",
+      "ownerId": "app-core.keyboard-ui",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/page-bootstrap",
+      "ownerId": "app-core.page-bootstrap-ui",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/popup-shell",
+      "ownerId": "app-core.popup-shell-ui",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/theme",
+      "ownerId": "app-core.theme-ui",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/workflows/ai-session",
+      "ownerId": "workflow.ai-session",
+      "ownerClass": "workflow"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/workflows/ai-settings",
+      "ownerId": "workflow.ai-settings",
+      "ownerClass": "workflow"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/workflows/editor",
+      "ownerId": "workflow.editor",
+      "ownerClass": "workflow"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/workflows/media-hub",
+      "ownerId": "workflow.media-hub",
+      "ownerClass": "workflow"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/workflows/media-hub-backup",
+      "ownerId": "workflow.media-hub-backup",
+      "ownerClass": "workflow"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/workflows/page-preparation",
+      "ownerId": "workflow.page-preparation",
+      "ownerClass": "workflow"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/workflows/scenario-capture-edit",
+      "ownerId": "workflow.scenario-capture-edit",
+      "ownerClass": "workflow"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/workflows/scenario-video",
+      "ownerId": "workflow.scenario-video",
+      "ownerClass": "workflow"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/workflows/video",
+      "ownerId": "workflow.video",
+      "ownerClass": "workflow"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/ai-settings",
+      "ownerId": "persistence.ai-settings",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/command-palette",
+      "ownerId": "persistence.command-palette",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/content-pin-session",
+      "ownerId": "persistence.content-pin-session",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/diagnostics",
+      "ownerId": "persistence.diagnostics",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/editor-bootstrap",
+      "ownerId": "persistence.editor-bootstrap",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/editor-presets",
+      "ownerId": "persistence.editor-presets",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/editor-sessions",
+      "ownerId": "persistence.editor-sessions",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/highlighter",
+      "ownerId": "persistence.highlighter",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/infrastructure",
+      "ownerId": "persistence.infrastructure",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/media-library",
+      "ownerId": "persistence.media-library",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/page-style",
+      "ownerId": "persistence.page-style",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/popup-export-preferences",
+      "ownerId": "persistence.popup-export-preferences",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/privacy-erasure",
+      "ownerId": "persistence.privacy-erasure",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/prompt-templates",
+      "ownerId": "persistence.prompt-templates",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/quick-actions",
+      "ownerId": "persistence.quick-actions",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/recent-colors",
+      "ownerId": "persistence.recent-colors",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/recordings",
+      "ownerId": "persistence.recordings",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/scenario",
+      "ownerId": "persistence.scenario",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/settings",
+      "ownerId": "persistence.settings",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/export-ledger",
+      "ownerId": "persistence.video-export",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/project-export-inputs",
+      "ownerId": "persistence.video-project-export-inputs",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/projects",
+      "ownerId": "persistence.video-projects",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/capture-settings",
+      "ownerId": "persistence.video-settings",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/effect-bundles",
+      "ownerId": "persistence.video-effect-bundles",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/video-editor-preview-preferences",
+      "ownerId": "persistence.video-editor-preview-preferences",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/video-preview-cache",
+      "ownerId": "persistence.video-preview-cache",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/web-snapshots",
+      "ownerId": "persistence.web-snapshots",
+      "ownerClass": "persistence"
+    }
+  ],
+  "authorityOwners": [
+    {
+      "id": "indexed-db-core",
+      "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "browser-storage-infrastructure",
+      "path": "apps/extension/src/composition/persistence/infrastructure/browser-storage",
+      "stateKind": "authoritative-adapter"
+    },
+    {
+      "id": "state-manager-infrastructure",
+      "path": "apps/extension/src/composition/persistence/infrastructure/state-manager",
+      "stateKind": "authoritative-adapter"
+    },
+    {
+      "id": "ai-settings-secrets",
+      "path": "apps/extension/src/composition/persistence/ai-settings",
+      "stateKind": "authoritative-sensitive"
+    },
+    {
+      "id": "command-palette",
+      "path": "apps/extension/src/composition/persistence/command-palette",
+      "stateKind": "advisory-durable"
+    },
+    {
+      "id": "content-pin-session",
+      "path": "apps/extension/src/composition/persistence/content-pin-session",
+      "stateKind": "disposable-session"
+    },
+    {
+      "id": "diagnostics",
+      "path": "apps/extension/src/composition/persistence/diagnostics",
+      "stateKind": "recovery-session"
+    },
+    {
+      "id": "editor-bootstrap-retention",
+      "path": "apps/extension/src/composition/persistence/editor-bootstrap",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "editor-presets",
+      "path": "apps/extension/src/composition/persistence/editor-presets",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "editor-sessions",
+      "path": "apps/extension/src/composition/persistence/editor-sessions",
+      "stateKind": "recovery-session"
+    },
+    {
+      "id": "highlighter",
+      "path": "apps/extension/src/composition/persistence/highlighter",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "media-library",
+      "path": "apps/extension/src/composition/persistence/media-library",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "page-style",
+      "path": "apps/extension/src/composition/persistence/page-style",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "popup-export-preferences",
+      "path": "apps/extension/src/composition/persistence/popup-export-preferences",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "privacy-erasure",
+      "path": "apps/extension/src/composition/persistence/privacy-erasure",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "prompt-templates",
+      "path": "apps/extension/src/composition/persistence/prompt-templates",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "quick-actions",
+      "path": "apps/extension/src/composition/persistence/quick-actions",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "recent-colors",
+      "path": "apps/extension/src/composition/persistence/recent-colors",
+      "stateKind": "advisory-durable"
+    },
+    {
+      "id": "recordings",
+      "path": "apps/extension/src/composition/persistence/recordings",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "scenario",
+      "path": "apps/extension/src/composition/persistence/scenario",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "settings",
+      "path": "apps/extension/src/composition/persistence/settings",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "video-export-ledger",
+      "path": "apps/extension/src/composition/persistence/export-ledger",
+      "stateKind": "authoritative-session"
+    },
+    {
+      "id": "video-project-export-inputs",
+      "path": "apps/extension/src/composition/persistence/project-export-inputs",
+      "stateKind": "authoritative-session"
+    },
+    {
+      "id": "video-projects",
+      "path": "apps/extension/src/composition/persistence/projects",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "video-settings",
+      "path": "apps/extension/src/composition/persistence/capture-settings",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "video-effect-bundles",
+      "path": "apps/extension/src/composition/persistence/effect-bundles",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "video-editor-preview-preferences",
+      "path": "apps/extension/src/composition/persistence/video-editor-preview-preferences",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "video-preview-cache",
+      "path": "apps/extension/src/composition/persistence/video-preview-cache",
+      "stateKind": "advisory-durable"
+    },
+    {
+      "id": "web-snapshots",
+      "path": "apps/extension/src/composition/persistence/web-snapshots",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "scenario-presentation-session",
+      "path": "apps/extension/src/scenario-editor/page-shell/presentation/session",
+      "stateKind": "disposable-session"
+    },
+    {
+      "id": "diagnostics-active-sessions",
+      "path": "apps/extension/src/background/storage/diagnostics",
+      "stateKind": "recovery-session"
+    },
+    {
+      "id": "llm-request-history",
+      "path": "apps/extension/src/background/storage/llm",
+      "stateKind": "advisory-durable"
+    },
+    {
+      "id": "page-access-activation",
+      "path": "apps/extension/src/background/storage/page-access",
+      "stateKind": "disposable-session"
+    },
+    {
+      "id": "scenario-tab-sessions",
+      "path": "apps/extension/src/background/storage/scenario",
+      "stateKind": "recovery-session"
+    },
+    {
+      "id": "video-runtime-recovery",
+      "path": "apps/extension/src/background/storage/video",
+      "stateKind": "recovery-session"
+    }
+  ],
+  "forbiddenSourcePrefixes": [
+    "apps/extension/src/composition/persistence/db",
+    "apps/extension/src/composition/persistence/media-hub-backup",
+    "apps/extension/src/composition/persistence/media-library-events",
+    "apps/extension/src/composition/persistence/scenario-presentation-session",
+    "apps/extension/src/composition/persistence/scenario-store",
+    "apps/extension/src/composition/persistence/state-manager",
+    "apps/extension/src/composition/persistence/storage",
+    "apps/extension/src/contracts/editor",
+    "apps/extension/src/contracts/highlighter",
+    "apps/extension/src/contracts/scenario",
+    "apps/extension/src/contracts/schemas",
+    "apps/extension/src/contracts/tab-capabilities",
+    "apps/extension/src/foundation",
+    "apps/extension/src/features/scenario-video-bridge",
+    "apps/extension/src/platform/browser",
+    "apps/extension/src/platform/content-utils",
+    "apps/extension/src/platform/extension-pages",
+    "apps/extension/src/platform/privacy",
+    "apps/extension/src/platform/sanitizers",
+    "apps/extension/src/platform/security",
+    "apps/extension/src/ui/ai-model-selector",
+    "apps/extension/src/ui/annotatable-image-surface",
+    "apps/extension/src/ui/content-popover-adapter",
+    "apps/extension/src/ui/content-size-tooltip",
+    "apps/extension/src/ui/content-toolbar",
+    "apps/extension/src/ui/design-system-preview",
+    "apps/extension/src/ui/design-system-registry",
+    "apps/extension/src/ui/editor-chrome",
+    "apps/extension/src/ui/expired-overlay",
+    "apps/extension/src/ui/glass-popover",
+    "apps/extension/src/ui/highlighter-style",
+    "apps/extension/src/ui/inspector-shell",
+    "apps/extension/src/ui/layer-list",
+    "apps/extension/src/ui/loading-delay",
+    "apps/extension/src/ui/product-feedback",
+    "apps/extension/src/ui/product-form-controls",
+    "apps/extension/src/ui/product-glass-controls",
+    "apps/extension/src/ui/product-glass-toolbar",
+    "apps/extension/src/ui/product-menus",
+    "apps/extension/src/ui/product-modal",
+    "apps/extension/src/ui/product-save-dialog",
+    "apps/extension/src/ui/prompt-template-editor",
+    "apps/extension/src/ui/prompt-templates",
+    "apps/extension/src/ui/scenario-capture-metadata-dialog",
+    "apps/extension/src/ui/searchable-project-picker",
+    "apps/extension/src/ui/skeleton",
+    "apps/extension/src/workflows/app-bootstrap",
+    "apps/extension/src/workflows/content-root",
+    "apps/extension/src/workflows/design-system-access",
+    "apps/extension/src/workflows/extension-pages",
+    "apps/extension/src/workflows/page-style-rules-access"
+  ],
+  "forbiddenOwnerEdges": [
+    [
+      "apps/extension/src/features",
+      "apps/extension/src/ui"
+    ]
+  ],
+  "featurePublicEntrypoints": [
+    "apps/extension/src/features/ai/schemas/public.ts",
+    "apps/extension/src/features/editor/document/public.ts",
+    "apps/extension/src/features/highlighter/contracts/index.ts",
+    "apps/extension/src/features/highlighter/style/public.ts",
+    "apps/extension/src/features/video/project/public.ts"
+  ],
+  "sameConcernPersistenceEdges": [
+    [
+      "apps/extension/src/features/prompt-templates",
+      "apps/extension/src/composition/persistence/prompt-templates"
+    ]
+  ],
+  "retainedAppUiRoots": [
+    "apps/extension/src/ui/color-selector",
+    "apps/extension/src/ui/command-palette",
+    "apps/extension/src/ui/compact-inspector-controls",
+    "apps/extension/src/ui/glass-select",
+    "apps/extension/src/ui/gradient-preset-grid",
+    "apps/extension/src/ui/keyboard",
+    "apps/extension/src/ui/page-bootstrap",
+    "apps/extension/src/ui/popup-shell",
+    "apps/extension/src/ui/theme"
+  ],
+  "forbiddenBroadBarrels": [
+    "apps/extension/src/composition/persistence/index.ts",
+    "apps/extension/src/composition/persistence/infrastructure/indexed-db/read-guards.ts",
+    "apps/extension/src/composition/persistence/infrastructure/indexed-db/records.ts",
+    "apps/extension/src/contracts/index.ts",
+    "apps/extension/src/features/index.ts",
+    "apps/extension/src/foundation/index.ts",
+    "apps/extension/src/platform/index.ts",
+    "apps/extension/src/ui/index.ts",
+    "apps/extension/src/workflows/index.ts"
+  ]
+}

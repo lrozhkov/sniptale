@@ -1,0 +1,12 @@
+import type { DesignSystemRegistryEntry } from '../types';
+import { SHARED_DESIGN_SYSTEM_CONTENT_OVERLAY_REGISTRY } from './content/overlay.data.ts';
+import { SHARED_DESIGN_SYSTEM_CONTENT_POPOVER_REGISTRY } from './content/popover.data.ts';
+import { SHARED_DESIGN_SYSTEM_CONTENT_TOOLBAR_REGISTRY } from './content/toolbar.data.ts';
+import { SHARED_DESIGN_SYSTEM_CONTENT_TOOLTIP_REGISTRY } from './content/tooltip.data.ts';
+
+export const SHARED_DESIGN_SYSTEM_CONTENT_REGISTRY: DesignSystemRegistryEntry[] = [
+  ...SHARED_DESIGN_SYSTEM_CONTENT_POPOVER_REGISTRY,
+  ...SHARED_DESIGN_SYSTEM_CONTENT_TOOLBAR_REGISTRY,
+  ...SHARED_DESIGN_SYSTEM_CONTENT_TOOLTIP_REGISTRY,
+  ...SHARED_DESIGN_SYSTEM_CONTENT_OVERLAY_REGISTRY,
+];

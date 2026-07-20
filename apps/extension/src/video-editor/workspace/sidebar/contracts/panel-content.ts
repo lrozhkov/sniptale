@@ -1,0 +1,102 @@
+import type { VideoEditorFileInputRefs } from '../../../chrome/file-inputs';
+import type { WorkspaceSidebarProps } from './props';
+
+type WorkspaceSidebarPanelContentPropKeys =
+  | 'activeProjectId'
+  | 'cursorDetection'
+  | 'diagnosticsContent'
+  | 'gridSettings'
+  | 'inspectorMode'
+  | 'onAddActionEvent'
+  | 'onAddMotionRegion'
+  | 'onAddRecording'
+  | 'onAddTrack'
+  | 'onClearCursorSampleSkinOverride'
+  | 'onClearPlacementMode'
+  | 'onCreateProject'
+  | 'onDeleteActionEvent'
+  | 'onDeleteCursorSample'
+  | 'onDeleteMotionRegion'
+  | 'onDeleteObjectTrack'
+  | 'onSelectObjectTrack'
+  | 'onGenerateMotionPathFromCursor'
+  | 'onDeleteProject'
+  | 'onDeleteTrack'
+  | 'onDetachClipGroup'
+  | 'onEnableCursorTrack'
+  | 'onInsertCursorSample'
+  | 'onOpenProject'
+  | 'onPreviewSceneBackground'
+  | 'onRememberRecentColor'
+  | 'onResetSceneBackgroundPreview'
+  | 'onRenameTrack'
+  | 'onResizeProject'
+  | 'onSetCursorCaptureMode'
+  | 'onSetSceneBackground'
+  | 'onStartActionPointPlacement'
+  | 'onStartMotionAreaPlacement'
+  | 'onStartMotionFocusPlacement'
+  | 'onStartMotionPathStopAreaPlacement'
+  | 'onStartMotionPathStopPointPlacement'
+  | 'onStartObjectTrackAnchorPlacement'
+  | 'onUpdateActionEventDetails'
+  | 'onUpdateAnnotationClipContent'
+  | 'onUpdateAnnotationClipStyle'
+  | 'onUpdateAnnotationClipTemplate'
+  | 'onUpdateClipAudioEnvelope'
+  | 'onUpdateClipFades'
+  | 'onUpdateClipPlaybackRate'
+  | 'onUpdateClipMuted'
+  | 'onUpdateClipTransform'
+  | 'onUpdateClipVolume'
+  | 'onUpdateCursorSampleInterpolation'
+  | 'onUpdateCursorSampleSkinOverride'
+  | 'onUpdateCursorSampleVisibility'
+  | 'onUpdateCursorSkin'
+  | 'onApplyMediaClipVisualsToTrack'
+  | 'onConvertTextClipToAnnotation'
+  | 'onUpdateMediaClipFitMode'
+  | 'onUpdateMediaClipFitScalePercent'
+  | 'onUpdateMediaClipShadowIntensity'
+  | 'onUpdateMediaClipShadowMode'
+  | 'onUpdateMotionRegion'
+  | 'onUpdateShapeStyle'
+  | 'onUpdateSubtitleTrackStyle'
+  | 'onUpdateTextContent'
+  | 'onUpdateTextStyle'
+  | 'onUpdateTransitionDuration'
+  | 'onUpdateTransitionEasing'
+  | 'onUpdateTransitionTemplate'
+  | 'onDeleteEffectInstance'
+  | 'onDuplicateEffectInstance'
+  | 'onMoveEffectInstance'
+  | 'onUpdateEffectInstance'
+  | 'onUpsertObjectTrackCorrectionAnchor'
+  | 'placementMode'
+  | 'project'
+  | 'projects'
+  | 'recentColors'
+  | 'recordingId'
+  | 'recordings'
+  | 'selectedActionEvent'
+  | 'selectedClip'
+  | 'selectedCursorSample'
+  | 'selectedMotionRegion'
+  | 'selectedObjectTrack'
+  | 'selectedTrack'
+  | 'selectedTransition'
+  | 'selection';
+
+export interface WorkspaceSidebarPanelContentSharedProps extends Pick<
+  WorkspaceSidebarProps,
+  WorkspaceSidebarPanelContentPropKeys
+> {
+  diagnosticsMeta: string;
+  diagnosticsSectionOpen: boolean;
+  inputRefs: VideoEditorFileInputRefs;
+  onToggleDiagnosticsSection: () => void;
+  onToggleProjectsOpen: () => void;
+  onToggleRecordingsOpen: () => void;
+  projectsOpen: boolean;
+  recordingsOpen: boolean;
+}

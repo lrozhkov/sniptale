@@ -1,0 +1,22 @@
+:root,
+.sniptale-ai-modal-root {
+  --sniptale-modal-bg: var(--sniptale-color-surface-overlay);
+  --sniptale-modal-border: var(--sniptale-color-border-soft);
+  --sniptale-panel-bg: var(--sniptale-color-surface-panel);
+  --sniptale-input-bg: var(--sniptale-color-surface-input);
+  --sniptale-input-border: var(--sniptale-color-border-strong);
+  --sniptale-input-focus: var(--sniptale-color-accent);
+  --sniptale-input-focus-glow: var(--sniptale-color-accent-soft-strong);
+  --sniptale-hover-bg: var(--sniptale-color-border-subtle);
+  --sniptale-selected-bg: transparent;
+  --sniptale-selected-border: var(--sniptale-color-border-accent-soft);
+  --sniptale-text-main: var(--sniptale-color-text-primary);
+  --sniptale-text-secondary: var(--sniptale-color-text-secondary);
+  --sniptale-text-muted: var(--sniptale-color-text-muted);
+  --sniptale-text-dim: var(--sniptale-color-text-dim);
+  --sniptale-accent: var(--sniptale-color-accent);
+  --sniptale-accent-light: var(--sniptale-color-accent-emphasis);
+  --sniptale-success: var(--sniptale-color-success);
+  --sniptale-danger: var(--sniptale-color-danger);
+  --sniptale-info: var(--sniptale-color-info);
+}

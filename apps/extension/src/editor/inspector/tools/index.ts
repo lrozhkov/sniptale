@@ -1,0 +1,1 @@
+export { EditorInspectorToolsPanel } from './panel';

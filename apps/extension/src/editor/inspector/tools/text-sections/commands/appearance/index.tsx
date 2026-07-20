@@ -1,0 +1,1 @@
+export { buildTextAppearanceCommands } from './build';

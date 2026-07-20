@@ -1,0 +1,109 @@
+/* ========================================
+ * AI Modal Template Picker
+ * ======================================== */
+
+.sniptale-ai-modal-root .sniptale-template-container {
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.sniptale-ai-modal-root .sniptale-template-pill,
+.sniptale-ai-modal-root .sniptale-template-btn,
+.sniptale-ai-modal-root .sniptale-template-menu-btn {
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 82%, transparent);
+  border-radius: 10px;
+  background: var(--sniptale-color-surface-panel);
+}
+
+.sniptale-ai-modal-root .sniptale-template-pill:hover,
+.sniptale-ai-modal-root .sniptale-template-btn:hover,
+.sniptale-ai-modal-root .sniptale-template-menu-btn:hover,
+.sniptale-ai-modal-root .sniptale-template-pill.menu-open {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-border-subtle) 72%,
+    var(--sniptale-color-surface-panel) 28%
+  );
+  border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 100%, transparent);
+}
+
+.sniptale-ai-modal-root .sniptale-token-counter {
+  color: var(--sniptale-color-text-dim);
+}
+
+.sniptale-ai-modal-root .sniptale-template-pill {
+  min-height: 32px;
+  padding-right: 0;
+  border-radius: 10px;
+  overflow: visible;
+  box-shadow: none;
+}
+
+.sniptale-ai-modal-root .sniptale-template-pill.menu-open {
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 40%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 10%, transparent);
+  z-index: 10001;
+}
+
+.sniptale-ai-modal-root .sniptale-template-pill.drag-over {
+  background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 40%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--sniptale-color-accent) 14%, transparent);
+  transform: none;
+}
+
+.sniptale-ai-modal-root .sniptale-template-pill.dragging {
+  background: color-mix(in srgb, var(--sniptale-color-accent) 6%, transparent);
+}
+
+.sniptale-ai-modal-root .sniptale-template-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-ai-modal-root .sniptale-template-btn:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-ai-modal-root .sniptale-template-menu-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-left: 1px solid color-mix(in srgb, var(--sniptale-color-text-primary) 6%, transparent);
+  border-radius: 0 9px 9px 0;
+  background: transparent;
+  color: var(--sniptale-color-text-dim);
+}
+
+.sniptale-ai-modal-root .sniptale-template-menu-btn:hover,
+.sniptale-ai-modal-root .sniptale-template-menu-btn.menu-open {
+  color: var(--sniptale-color-text-primary);
+  background: color-mix(in srgb, var(--sniptale-color-text-primary) 5%, transparent);
+}
+
+.sniptale-ai-modal-root .sniptale-template-dropdown {
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 168px;
+  padding: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--sniptale-color-overlay) 18%, transparent);
+}
+
+.sniptale-ai-modal-root .sniptale-template-dropdown .sniptale-dropdown-item {
+  min-height: 36px;
+  border-radius: 8px;
+  padding: 8px 10px;
+}

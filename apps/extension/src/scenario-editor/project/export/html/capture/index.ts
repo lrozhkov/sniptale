@@ -1,0 +1,1 @@
+export { renderCaptureStepHtml } from './render';

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "retiredPaths": [
+    "tooling/configs/qa/oss-transform-program-state.data.json",
+    "tooling/qa/core/shared-topology-migration.data.mjs",
+    "tooling/qa/core/target-only-control-consumers.mjs",
+    "tooling/qa/core/target-only-path-artifacts.mjs",
+    "tooling/qa/core/target-only-path-inventory.test.ts",
+    "tooling/qa/migration/plan-dependency-graph.mjs",
+    "tooling/qa/migration/validate-program.mjs",
+    "tooling/qa/migration/validate-program.test.ts",
+    "tooling/qa/policy/migration-state.mjs",
+    "tooling/qa/policy/migration-state.test.ts",
+    "tooling/qa/wrappers/preflight-oss-hints.mjs"
+  ],
+  "retiredPrefixes": [
+    "tooling/qa/migration/",
+    "tooling/qa/oss-transform/",
+    "tooling/qa/policy/migration-state.",
+    "tooling/qa/wrappers/preflight-oss-hints."
+  ],
+  "requiredPaths": [
+    "tooling/qa/core/oss-release-inventory.mjs",
+    "tooling/qa/core/target-only-path-inventory.mjs",
+    "tooling/qa/wrappers/preflight-security-hints.mjs"
+  ],
+  "forbiddenReferences": [
+    "docs/migrations/oss-transform/plan.md",
+    "docs/migrations/oss-transform/target-architecture.md",
+    "tooling/configs/qa/oss-transform-program-state.data.json",
+    "tooling/qa/core/shared-topology-migration.data.mjs",
+    "tooling/qa/core/target-only-control-consumers.mjs",
+    "tooling/qa/core/target-only-path-artifacts.mjs",
+    "tooling/qa/core/target-only-path-inventory.test.ts",
+    "tooling/qa/migration/plan-dependency-graph.mjs",
+    "tooling/qa/migration/validate-program.mjs",
+    "tooling/qa/migration/validate-program.test.ts",
+    "tooling/qa/policy/migration-state.mjs",
+    "tooling/qa/policy/migration-state.test.ts",
+    "tooling/qa/wrappers/preflight-oss-hints.mjs"
+  ]
+}

@@ -1,0 +1,1 @@
+export { createRichShapeCalloutControls } from './factory';

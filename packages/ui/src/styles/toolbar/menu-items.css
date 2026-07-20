@@ -1,0 +1,138 @@
+/* ========================================
+ * Toolbar Menu Items
+ * ======================================== */
+
+.sniptale-popover-item {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  text-align: left;
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease;
+}
+
+.sniptale-popover-item:hover {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 82%, transparent);
+  border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 78%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-popover-item-selected {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 20%,
+    var(--sniptale-color-border-soft) 80%
+  );
+  color: var(--sniptale-color-text-primary-strong);
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 88%, transparent);
+}
+
+.sniptale-popover-item-selected:hover {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 94%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-toolbar-menu--compact .sniptale-popover-item {
+  min-height: 40px;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.sniptale-toolbar-menu-item > span {
+  flex: 0 0 auto;
+}
+
+.sniptale-toolbar-menu-item-copy {
+  min-width: 0;
+  flex: 1 1 auto !important;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sniptale-toolbar-menu-item-copy span {
+  flex: 0 0 auto;
+}
+
+.sniptale-toolbar-menu-item-label {
+  font-size: 12px;
+  color: inherit;
+}
+
+.sniptale-toolbar-menu-item-hint {
+  font-size: 12px;
+  color: var(--sniptale-color-text-dim);
+}
+
+.sniptale-toolbar-menu--compact .sniptale-toolbar-menu-item-copy {
+  gap: 0;
+}
+
+.sniptale-toolbar-menu--compact .sniptale-toolbar-menu-item-hint {
+  display: none;
+}
+
+.sniptale-popover-item:hover .sniptale-toolbar-menu-item-hint,
+.sniptale-popover-item-selected .sniptale-toolbar-menu-item-hint {
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-toolbar-menu-item-badge {
+  min-width: 38px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 74%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 62%, transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-popover-item-selected .sniptale-toolbar-menu-item-badge {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 22%,
+    var(--sniptale-color-border-soft) 78%
+  );
+  color: var(--sniptale-color-accent-emphasis);
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 78%, transparent);
+}
+
+.sniptale-popover-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: currentColor;
+  opacity: 0.85;
+}
+
+.sniptale-popover-check {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--sniptale-color-accent-emphasis);
+}
+
+.sniptale-popover-divider {
+  height: 1px;
+  margin: 2px 2px 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--sniptale-color-text-primary) 2%, transparent),
+    color-mix(in srgb, var(--sniptale-color-text-primary) 12%, transparent),
+    color-mix(in srgb, var(--sniptale-color-text-primary) 2%, transparent)
+  );
+}

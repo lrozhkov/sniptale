@@ -1,0 +1,3 @@
+export const SMOOTHING_STEP_PX = 2;
+export const DEFAULT_SMOOTHING_WEIGHT = 0.25;
+export const SHARP_CORNER_SMOOTHING_WEIGHT = 0.08;

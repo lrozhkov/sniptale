@@ -1,0 +1,200 @@
+/* ========================================
+ * AI Picker and Model Selection
+ * ======================================== */
+
+.sniptale-ai-dropdown {
+  position: relative;
+}
+
+.sniptale-ai-dropdown .sniptale-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 150px;
+  background: var(--sniptale-bg);
+  border: 1px solid var(--sniptale-border);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--sniptale-color-shadow-strong) 18%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 9999;
+  pointer-events: auto !important;
+  animation: popoverFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sniptale-ai-dropdown .sniptale-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--sniptale-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  font-family: inherit;
+}
+
+.sniptale-ai-dropdown .sniptale-dropdown-item:hover {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 14%,
+    var(--sniptale-color-surface-panel) 86%
+  );
+  color: var(--sniptale-text-main);
+}
+
+.sniptale-dropdown-item .sniptale-dropdown-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.sniptale-btn-ai.sniptale-ai-active {
+  background: color-mix(in srgb, var(--sniptale-color-accent) 15%, transparent);
+  color: var(--sniptale-color-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent);
+}
+
+.sniptale-btn-ai.sniptale-ai-active svg {
+  color: var(--sniptale-color-accent);
+}
+
+.sniptale-btn-ai[data-menu-open='true']::after {
+  display: none !important;
+}
+
+.sniptale-btn-ai:hover:not(.sniptale-ai-active) .sniptale-ai-icon {
+  color: color-mix(in srgb, var(--sniptale-color-info) 72%, white 28%);
+}
+
+body.sniptale-ai-pick-mode {
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.sniptale-ai-pick-mode .sniptale-toolbar,
+body.sniptale-ai-pick-mode .sniptale-toolbar *,
+body.sniptale-ai-pick-mode .sniptale-modal,
+body.sniptale-ai-pick-mode .sniptale-modal * {
+  cursor: pointer !important;
+}
+
+.sniptale-ai-pick-hover {
+  border: 3px solid color-mix(in srgb, var(--sniptale-color-info) 72%, white 28%);
+  border-radius: 4px;
+  background: transparent;
+  opacity: 0.7;
+  transition: all 0.15s ease-out;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sniptale-color-info) 16%, transparent);
+}
+
+@property --sniptale-ai-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes sniptale-ai-border-rotate {
+  to {
+    --sniptale-ai-angle: 360deg;
+  }
+}
+
+body.sniptale-no-select {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+body.sniptale-no-select * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+body.sniptale-no-select .sniptale-toolbar *,
+body.sniptale-no-select .sniptale-modal * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
+.sniptale-ai-icon-badge {
+  width: 36px;
+  height: 36px;
+  background: color-mix(in srgb, var(--sniptale-color-accent) 12%, transparent);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-accent) 25%, transparent);
+  transition: none;
+}
+
+.sniptale-ai-icon-badge:hover {
+  /* no animation */
+}
+
+.sniptale-ai-icon-badge svg {
+  transition: none;
+}
+
+.sniptale-ai-icon-badge:hover svg {
+  /* no animation */
+}
+
+.sniptale-model-selector {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  justify-content: center;
+}
+
+.sniptale-model-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 14%,
+    var(--sniptale-color-surface-panel) 86%
+  );
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--sniptale-color-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  max-width: 200px;
+  text-overflow: ellipsis;
+  transition: all 0.15s ease;
+}
+
+.sniptale-model-select:hover:not(:disabled) {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 30%,
+    var(--sniptale-color-border-soft) 70%
+  );
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-model-select:focus {
+  outline: none;
+  border-color: var(--sniptale-color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sniptale-color-accent) 15%, transparent);
+}

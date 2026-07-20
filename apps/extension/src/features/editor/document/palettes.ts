@@ -1,0 +1,74 @@
+import {
+  DEFAULT_COLOR_ACCENT,
+  DEFAULT_COLOR_DANGER,
+  DEFAULT_COLOR_INFO,
+  DEFAULT_COLOR_SUCCESS,
+  DEFAULT_COLOR_TEXT_INVERSE,
+  DEFAULT_COLOR_TEXT_PANEL,
+  DEFAULT_COLOR_WARNING,
+} from '@sniptale/ui/default-colors/constants';
+
+export const EDITOR_TOOL_TEXT_COLOR_PALETTE = [
+  DEFAULT_COLOR_TEXT_INVERSE,
+  '#111827',
+  DEFAULT_COLOR_DANGER,
+  DEFAULT_COLOR_ACCENT,
+  DEFAULT_COLOR_WARNING,
+  DEFAULT_COLOR_SUCCESS,
+  DEFAULT_COLOR_INFO,
+  '#14b8a6',
+  '#8b5cf6',
+  '#ec4899',
+];
+
+export const EDITOR_TOOL_TEXT_BACKGROUND_PALETTE = [
+  DEFAULT_COLOR_TEXT_PANEL,
+  '#ffffff',
+  '#111827',
+  DEFAULT_COLOR_DANGER,
+  DEFAULT_COLOR_ACCENT,
+  DEFAULT_COLOR_WARNING,
+  DEFAULT_COLOR_SUCCESS,
+  DEFAULT_COLOR_INFO,
+  '#8b5cf6',
+  '#ec4899',
+];
+
+export const EDITOR_TOOL_SHAPE_STROKE_PALETTE = [
+  DEFAULT_COLOR_ACCENT,
+  DEFAULT_COLOR_INFO,
+  DEFAULT_COLOR_SUCCESS,
+  DEFAULT_COLOR_WARNING,
+  DEFAULT_COLOR_DANGER,
+  '#111827',
+  '#ffffff',
+  '#14b8a6',
+  '#8b5cf6',
+  '#ec4899',
+];
+
+export const EDITOR_TOOL_SHAPE_FILL_PALETTE = [
+  '#00000000',
+  'rgba(249, 115, 22, 0.18)',
+  'rgba(96, 165, 250, 0.18)',
+  'rgba(34, 197, 94, 0.18)',
+  'rgba(250, 204, 21, 0.18)',
+  'rgba(239, 68, 68, 0.18)',
+  'rgba(17, 24, 39, 0.18)',
+  'rgba(20, 184, 166, 0.18)',
+  'rgba(139, 92, 246, 0.18)',
+  'rgba(236, 72, 153, 0.18)',
+];
+
+export const EDITOR_SCENE_BACKGROUND_PALETTE = [
+  '#18181b',
+  '#27272a',
+  '#09090b',
+  '#2563eb',
+  '#0f766e',
+  '#22c55e',
+  '#8b5cf6',
+  '#f97316',
+  '#e11d48',
+  '#fafafa',
+];

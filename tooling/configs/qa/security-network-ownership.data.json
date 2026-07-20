@@ -1,0 +1,31 @@
+{
+  "$comment": "Network/fetch ownership policy. Add entries only for committed security-reviewed egress owners.",
+  "secretHeaderOwners": [
+    {
+      "file": "apps/extension/src/background/ai/llm/transport/request.ts",
+      "owner": "background-llm-transport",
+      "justification": "The background LLM transport is the only canonical outbound network seam that assembles Authorization headers from resolved model config.",
+      "reviewNote": "Secret-bearing headers must not drift into UI, hooks, storage, or orchestration modules."
+    }
+  ],
+  "credentialedFetchOwners": [
+    {
+      "file": "apps/extension/src/content/parser/export-manager/files/download.ts",
+      "owner": "content-export-download",
+      "justification": "The export download owner is the canonical content-runtime seam for same-origin credentialed file fetches after URL narrowing.",
+      "reviewNote": "Keep credentialed page-context downloads narrowed and contained here."
+    },
+    {
+      "file": "apps/extension/src/content/parser/dom-tree-parser/froala/index.ts",
+      "owner": "content-froala-parser",
+      "justification": "The Froala parser owner resolves same-origin filename metadata for export flows after URL narrowing.",
+      "reviewNote": "Credentialed Froala fetches must stay same-origin and remain confined to this parser seam."
+    },
+    {
+      "file": "apps/extension/src/content/parser/web-snapshot/assets.ts",
+      "owner": "content-web-snapshot-assets",
+      "justification": "Fetches same-origin DOM-discovered snapshot assets after URL safety and origin narrowing.",
+      "reviewNote": "Do not expand v1 web snapshots to cross-origin or response-body capture here."
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "apps/extension/src/**/*.{ts,tsx,js,mjs,cjs}",
+    "apps/extension/build/**/*.{ts,js,mjs,cjs}",
+    "packages/*/src/**/*.{ts,tsx,js,mjs,cjs}",
+    "tooling/**/*.{ts,tsx,js,mjs,cjs}",
+    "eslint.config.js",
+    "apps/extension/vite.config.ts"
+  ],
+  "project": [
+    "apps/extension/src/**/*.{ts,tsx,js,mjs,cjs}",
+    "apps/extension/build/**/*.{ts,js,mjs,cjs}",
+    "packages/*/src/**/*.{ts,tsx,js,mjs,cjs}",
+    "tooling/**/*.{ts,tsx,js,mjs,cjs}"
+  ],
+  "include": [
+    "unresolved",
+    "unlisted",
+    "binaries"
+  ],
+  "ignoreBinaries": [
+    "codeql",
+    "semgrep"
+  ],
+  "ignoreDependencies": [
+    "@fontsource-variable/manrope"
+  ],
+  "ignore": [
+    ".tmp/**",
+    "coverage/**",
+    "dist/**",
+    "docs/**",
+    "tooling/test/e2e/**",
+    "cases/**"
+  ]
+}

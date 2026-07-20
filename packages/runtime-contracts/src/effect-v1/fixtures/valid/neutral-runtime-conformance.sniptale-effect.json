@@ -1,0 +1,268 @@
+{
+  "assets": [
+    {
+      "byteLength": 358,
+      "height": 240,
+      "id": "neutral-mark",
+      "kind": "svg",
+      "mimeType": "image/svg+xml",
+      "path": "assets/neutral-mark.svg",
+      "sha256": "2cb37035533d3fb9557eb4d27aa04f4b526bf9ce87104e535ceef96e3de69d3f",
+      "width": 240
+    }
+  ],
+  "clips": [
+    { "duration": 3, "layerId": "field", "sceneId": "main", "start": 0 },
+    { "duration": 3, "layerId": "mark", "sceneId": "main", "start": 0 },
+    { "duration": 3, "layerId": "caption", "sceneId": "main", "start": 0 }
+  ],
+  "controls": [
+    {
+      "defaultValue": "#7cf7ff",
+      "id": "accent",
+      "kind": "color",
+      "label": { "en": "Accent", "ru": "Акцент" }
+    },
+    {
+      "defaultValue": 0.8,
+      "id": "intensity",
+      "kind": "number",
+      "label": { "en": "Intensity", "ru": "Интенсивность" },
+      "max": 1,
+      "min": 0,
+      "step": 0.05
+    }
+  ],
+  "description": {
+    "en": "Neutral engine-2 parser, asset and runtime conformance fixture.",
+    "ru": "Нейтральный fixture для проверки parser, assets и runtime engine 2."
+  },
+  "duration": 3,
+  "id": "neutral-runtime-conformance",
+  "kind": "standalone",
+  "label": {
+    "en": "Neutral runtime conformance",
+    "ru": "Нейтральная проверка runtime"
+  },
+  "layers": [
+    { "id": "field", "name": "Field", "type": "customDraw", "visible": true },
+    {
+      "assetId": "neutral-mark",
+      "height": 240,
+      "id": "mark",
+      "name": "Mark",
+      "type": "svgAsset",
+      "visible": true,
+      "width": 240,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "height": 56,
+      "id": "caption",
+      "name": "Caption",
+      "text": "ENGINE 2",
+      "type": "text",
+      "visible": true,
+      "width": 600,
+      "x": 640,
+      "y": 545
+    }
+  ],
+  "program": {
+    "commands": [
+      { "color": "#101820", "layerId": "field", "op": "clear" },
+      {
+        "commands": [
+          {
+            "commands": [
+              {
+                "alpha": {
+                  "args": [
+                    { "op": "read", "path": "controls.intensity" },
+                    0.22
+                  ],
+                  "op": "mul"
+                },
+                "fill": { "op": "read", "path": "controls.accent" },
+                "height": 18,
+                "op": "shape",
+                "shape": "ellipse",
+                "width": 42,
+                "x": {
+                  "args": [
+                    235,
+                    {
+                      "args": [{ "op": "read", "path": "vars.dot" }, 158],
+                      "op": "mul"
+                    }
+                  ],
+                  "op": "add"
+                },
+                "y": {
+                  "args": [
+                    340,
+                    {
+                      "args": [
+                        {
+                          "args": [
+                            {
+                              "args": [
+                                { "op": "read", "path": "vars.dot" },
+                                0.8
+                              ],
+                              "op": "mul"
+                            }
+                          ],
+                          "op": "sin"
+                        },
+                        92
+                      ],
+                      "op": "mul"
+                    }
+                  ],
+                  "op": "add"
+                }
+              }
+            ],
+            "count": 6,
+            "indexVar": "dot",
+            "op": "forRange"
+          },
+          {
+            "alpha": { "op": "read", "path": "controls.intensity" },
+            "blend": "screen",
+            "from": 0,
+            "lineCap": "round",
+            "lineWidth": 4,
+            "op": "sampledPath",
+            "sampleVar": "angle",
+            "samples": 96,
+            "stroke": { "op": "read", "path": "controls.accent" },
+            "to": 6.283185307179586,
+            "x": {
+              "args": [
+                640,
+                {
+                  "args": [
+                    {
+                      "args": [{ "op": "read", "path": "vars.angle" }],
+                      "op": "cos"
+                    },
+                    300
+                  ],
+                  "op": "mul"
+                }
+              ],
+              "op": "add"
+            },
+            "y": {
+              "args": [
+                360,
+                {
+                  "args": [
+                    {
+                      "args": [{ "op": "read", "path": "vars.angle" }],
+                      "op": "sin"
+                    },
+                    112
+                  ],
+                  "op": "mul"
+                }
+              ],
+              "op": "add"
+            }
+          }
+        ],
+        "height": { "op": "read", "path": "height" },
+        "id": "glow-field",
+        "layerId": "field",
+        "op": "renderPass",
+        "width": { "op": "read", "path": "width" }
+      },
+      {
+        "blend": "screen",
+        "filter": { "blur": 2 },
+        "layerId": "field",
+        "op": "compositePass",
+        "passId": "glow-field"
+      },
+      {
+        "assetId": "neutral-mark",
+        "height": 240,
+        "layerId": "mark",
+        "op": "svgParts",
+        "part": {
+          "kind": "preset",
+          "mode": "assemble",
+          "order": "center",
+          "reveal": { "op": "read", "path": "tracks.mark.reveal" },
+          "rotate": 0.08,
+          "scaleFrom": 0.72,
+          "spread": 180,
+          "stagger": 0.12
+        },
+        "shadow": { "blur": 24, "color": "rgba(124,247,255,0.34)" },
+        "width": 240,
+        "x": 520,
+        "y": 240
+      },
+      {
+        "align": "center",
+        "baseline": "middle",
+        "fill": "#ffffff",
+        "fontFamily": "system-ui",
+        "fontSize": 36,
+        "fontWeight": 650,
+        "layerId": "caption",
+        "op": "text",
+        "text": "ENGINE 2",
+        "x": 640,
+        "y": 545
+      }
+    ],
+    "kind": "graph",
+    "version": 1
+  },
+  "scenes": [{ "duration": 3, "id": "main", "label": "Main", "start": 0 }],
+  "schemaVersion": "sniptale.effect.v1",
+  "timeline": {
+    "phases": [
+      {
+        "duration": 3,
+        "id": "resolve",
+        "label": "Resolve",
+        "sceneId": "main",
+        "start": 0
+      }
+    ],
+    "tracks": [
+      {
+        "id": "mark.reveal",
+        "keyframes": [
+          {
+            "easing": "out",
+            "id": "mark-reveal-a",
+            "phaseId": "resolve",
+            "sceneId": "main",
+            "time": 0,
+            "value": 0
+          },
+          {
+            "easing": "inOut",
+            "id": "mark-reveal-b",
+            "phaseId": "resolve",
+            "sceneId": "main",
+            "time": 1.4,
+            "value": 1
+          }
+        ],
+        "label": "Mark reveal",
+        "phaseId": "resolve",
+        "property": "reveal",
+        "sceneId": "main",
+        "target": "mark"
+      }
+    ]
+  }
+}

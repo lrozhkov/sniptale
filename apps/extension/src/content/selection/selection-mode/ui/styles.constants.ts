@@ -1,0 +1,9 @@
+import { SELECTION_MODE_CANCEL_BUTTON_STYLE } from './styles.cancel-button.data';
+import { SELECTION_MODE_OVERLAY_INPUT_STYLE } from './styles.inputs.data';
+import { SELECTION_MODE_OVERLAY_TOGGLE_STYLE } from './styles.toggle.data';
+
+export const SELECTION_MODE_OVERLAY_STYLE = [
+  SELECTION_MODE_CANCEL_BUTTON_STYLE,
+  SELECTION_MODE_OVERLAY_INPUT_STYLE,
+  SELECTION_MODE_OVERLAY_TOGGLE_STYLE,
+].join('\n');

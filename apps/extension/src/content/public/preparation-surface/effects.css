@@ -1,0 +1,173 @@
+.sniptale-app[data-hidden='true'] {
+  display: none !important;
+}
+
+.sniptale-show-toolbar-button[data-hidden='true'] {
+  display: none !important;
+}
+
+body.sniptale-capture-ui-hidden .sniptale-action-toolbar,
+body.sniptale-capture-ui-hidden .sniptale-toolbar-portal-wrapper,
+body.sniptale-capture-ui-hidden .sniptale-frame-settings-popover,
+body.sniptale-capture-ui-hidden .sniptale-step-badge-popover,
+body.sniptale-capture-ui-hidden .sniptale-callout-settings-popover,
+body.sniptale-capture-ui-hidden .sniptale-callout-format-toolbar,
+body.sniptale-capture-ui-hidden .sniptale-content-size-tooltip,
+body.sniptale-capture-ui-hidden .sniptale-highlight-hover,
+body.sniptale-capture-ui-hidden .sniptale-blocking-overlay,
+body.sniptale-capture-ui-hidden .sniptale-editing-blocking-overlay,
+body.sniptale-capture-ui-hidden .sniptale-resize-handle,
+body.sniptale-capture-ui-hidden .sniptale-quick-edit-hover {
+  display: none !important;
+}
+
+/* Highlighter Styles */
+.sniptale-highlight-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2147483643;
+}
+
+.sniptale-highlight {
+  position: absolute;
+  border: 3px solid var(--sniptale-color-accent);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 2147483644;
+  transition: opacity 0.15s ease-out;
+}
+
+.sniptale-highlight:hover {
+  opacity: 0.8;
+}
+
+.sniptale-highlight-hover {
+  position: absolute;
+  border: 3px solid var(--sniptale-color-accent);
+  pointer-events: none;
+  opacity: 0.6;
+  transition: all 0.15s ease-out;
+  z-index: 2147483644;
+}
+
+/* Hide hover overlay during frame editing */
+.sniptale-highlight-container.sniptale-hidden-during-edit .sniptale-highlight-hover {
+  display: none !important;
+}
+
+/* Quick Edit Styles */
+.sniptale-editing {
+  outline: none !important;
+  cursor: text !important;
+}
+
+.sniptale-editing:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.sniptale-quick-edit-hover {
+  position: absolute;
+  border: 2px solid var(--sniptale-color-info);
+  border-radius: 0;
+  pointer-events: none;
+  opacity: 0.7;
+  transition: all 0.15s ease-out;
+  z-index: 2147483645;
+}
+
+@keyframes sniptale-ai-apply-highlight-pulse {
+  0% {
+    background-color: rgba(245, 228, 141, 0);
+    opacity: 0;
+  }
+
+  45% {
+    background-color: rgba(245, 228, 141, 0.56);
+    opacity: 1;
+  }
+
+  100% {
+    background-color: rgba(245, 228, 141, 0);
+    opacity: 0;
+  }
+}
+
+.sniptale-ai-apply-highlight {
+  animation: sniptale-ai-apply-highlight-pulse 1.8s ease-out;
+  background-color: rgba(245, 228, 141, 0.44);
+  outline: none;
+  box-shadow: none;
+}
+
+/* Hide number input spinners for size inputs */
+.sniptale-size-input::-webkit-outer-spin-button,
+.sniptale-size-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.sniptale-size-input {
+  -moz-appearance: textfield;
+  cursor: text;
+}
+
+.sniptale-size-input:focus {
+  outline: none;
+  border-color: var(--sniptale-color-accent) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 16%, transparent) !important;
+}
+
+/* Focus Mode Overlay Fade In */
+@keyframes sniptale-focus-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Blur Mode Overlay Fade In */
+@keyframes sniptale-blur-fade-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+
+  to {
+    opacity: 1;
+    backdrop-filter: blur(10px);
+  }
+}
+
+/* Focus Mode Frame Glow */
+.sniptale-focus-frame-glow {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 24%, transparent),
+    0 0 14px color-mix(in srgb, var(--sniptale-color-accent) 12%, transparent);
+}
+
+body.sniptale-navigation-locked {
+  a:not(.sniptale-editing):not([contenteditable='true']),
+  button:not(.sniptale-editing):not([contenteditable='true']),
+  [role='button']:not(.sniptale-editing):not([contenteditable='true']),
+  .g-button:not(.sniptale-editing):not([contenteditable='true']),
+  [class*='button']:not(.sniptale-editing):not([contenteditable='true']):not(.sniptale-) {
+    opacity: 0.7 !important;
+  }
+
+  .sniptale-editing,
+  [contenteditable='true'] {
+    opacity: 1 !important;
+  }
+
+  .sniptale- * {
+    pointer-events: auto !important;
+  }
+}

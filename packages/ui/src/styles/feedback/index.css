@@ -1,0 +1,113 @@
+/* AI Modal Animations */
+@keyframes sniptale-fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sniptale-scaleIn {
+  from {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes sniptale-slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes sniptale-slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.sniptale-toast {
+  --sniptale-toast-accent: var(--sniptale-color-info);
+  --sniptale-toast-tint: var(--sniptale-color-info-soft);
+  --sniptale-toast-message-color: var(--sniptale-color-text-primary-strong);
+  display: inline-flex;
+  min-width: min(320px, calc(100vw - 40px));
+  max-width: 400px;
+  align-items: center;
+  border-radius: 14px;
+  border: 1px solid
+    color-mix(in srgb, var(--sniptale-toast-accent) 18%, var(--sniptale-color-border-soft) 82%);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-panel) 97%,
+    var(--sniptale-toast-tint) 3%
+  );
+  padding: 12px 14px;
+  color: var(--sniptale-color-text-primary-strong);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--sniptale-color-shadow-strong) 16%, transparent);
+  backdrop-filter: none;
+  animation: sniptale-slideIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.sniptale-toast-message {
+  display: block;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--sniptale-toast-message-color);
+}
+
+.sniptale-toast-success {
+  --sniptale-toast-accent: var(--sniptale-color-success);
+  --sniptale-toast-tint: var(--sniptale-color-success-soft);
+  --sniptale-toast-message-color: color-mix(
+    in srgb,
+    var(--sniptale-color-success) 56%,
+    var(--sniptale-color-text-primary-strong) 44%
+  );
+}
+
+.sniptale-toast-warning {
+  --sniptale-toast-accent: var(--sniptale-color-warning);
+  --sniptale-toast-tint: var(--sniptale-color-warning-soft);
+  --sniptale-toast-message-color: color-mix(
+    in srgb,
+    var(--sniptale-color-warning) 60%,
+    var(--sniptale-color-text-primary-strong) 40%
+  );
+}
+
+.sniptale-toast-error {
+  --sniptale-toast-accent: var(--sniptale-color-danger);
+  --sniptale-toast-tint: var(--sniptale-color-danger-soft);
+  --sniptale-toast-message-color: color-mix(
+    in srgb,
+    var(--sniptale-color-danger) 60%,
+    var(--sniptale-color-text-primary-strong) 40%
+  );
+}
+
+.sniptale-toast-exiting {
+  animation: sniptale-slideOut 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}

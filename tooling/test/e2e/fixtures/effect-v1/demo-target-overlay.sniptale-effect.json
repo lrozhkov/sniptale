@@ -1,0 +1,142 @@
+{
+  "assets": [],
+  "clips": [
+    {
+      "duration": 3,
+      "layerId": "background",
+      "sceneId": "main",
+      "start": 0
+    },
+    {
+      "duration": 3,
+      "layerId": "title",
+      "sceneId": "main",
+      "start": 0
+    }
+  ],
+  "controls": [
+    {
+      "defaultValue": "#5f7cff",
+      "id": "accent",
+      "kind": "color",
+      "label": {
+        "en": "Accent",
+        "ru": "Акцент"
+      }
+    }
+  ],
+  "description": {
+    "en": "Agent-ready targetEffect starter.",
+    "ru": "Стартовый шаблон targetEffect для агента."
+  },
+  "duration": 3,
+  "id": "demo-target-overlay",
+  "kind": "targetEffect",
+  "label": {
+    "en": "Demo Target Overlay",
+    "ru": "Demo Target Overlay"
+  },
+  "layers": [
+    {
+      "height": 720,
+      "id": "background",
+      "name": "Background",
+      "type": "rect",
+      "width": 1280
+    },
+    {
+      "height": 120,
+      "id": "title",
+      "name": "Title",
+      "text": "Demo Target Overlay",
+      "type": "text",
+      "width": 900,
+      "x": 640,
+      "y": 360
+    }
+  ],
+  "presets": [],
+  "program": {
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "fit": "cover",
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "input": "source",
+        "op": "image",
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "x": 0,
+        "y": 0
+      },
+      {
+        "fill": {
+          "op": "read",
+          "path": "controls.accent"
+        },
+        "height": 180,
+        "op": "shape",
+        "radius": 32,
+        "shape": "roundRect",
+        "width": 920,
+        "x": 180,
+        "y": 270
+      },
+      {
+        "align": "center",
+        "baseline": "middle",
+        "fill": "#ffffff",
+        "fontFamily": "system-ui",
+        "fontSize": 54,
+        "fontWeight": 650,
+        "op": "text",
+        "text": "Demo Target Overlay",
+        "x": {
+          "args": [
+            {
+              "op": "read",
+              "path": "width"
+            },
+            0.5
+          ],
+          "op": "mul"
+        },
+        "y": {
+          "args": [
+            {
+              "op": "read",
+              "path": "height"
+            },
+            0.5
+          ],
+          "op": "mul"
+        }
+      }
+    ],
+    "kind": "graph",
+    "version": 1
+  },
+  "scenes": [
+    {
+      "duration": 3,
+      "enabled": true,
+      "id": "main",
+      "label": "Main",
+      "locked": false,
+      "start": 0,
+      "transition": null
+    }
+  ],
+  "schemaVersion": "sniptale.effect.v1",
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  }
+}

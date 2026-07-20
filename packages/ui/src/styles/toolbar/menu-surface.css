@@ -1,0 +1,54 @@
+/* ========================================
+ * Toolbar Menu Surface
+ * ======================================== */
+
+.sniptale-popover-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  min-width: 240px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+  animation: popoverFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sniptale-toolbar-menu--compact {
+  min-width: 220px;
+  padding: 8px;
+  gap: 8px;
+}
+
+.sniptale-capture-menu,
+.sniptale-viewport-menu {
+  min-width: 280px;
+}
+
+.sniptale-toolbar-menu-title {
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1.35;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sniptale-color-text-muted-strong);
+}
+
+.sniptale-toolbar-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

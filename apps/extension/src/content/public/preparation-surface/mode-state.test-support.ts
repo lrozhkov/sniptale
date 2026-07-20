@@ -1,0 +1,43 @@
+import { vi } from 'vitest';
+import type { ContentAppModeState } from '../../../content/overlay/app/mode';
+
+export function createModeState(): ContentAppModeState {
+  return {
+    aiPickMode: false,
+    captureAction: 'download_default',
+    captureActionRef: { current: 'download_default' },
+    clearPendingAutoStartCapture: vi.fn(),
+    currentViewport: null,
+    highlighterMode: false,
+    isCompletelyHidden: false,
+    isToolbarVisible: false,
+    navigationLockEnabled: false,
+    pendingAutoStartCapture: null,
+    pinToTab: false,
+    quickActionOverlayRef: { current: null },
+    quickActionToastCountdown: null,
+    quickEditDocumentMode: false,
+    quickEditMode: false,
+    queueAutoStartCapture: vi.fn(),
+    saveDialogState: null,
+    screenshotMode: false,
+    sessionActivePresetId: null,
+    setAiPickMode: vi.fn(),
+    setCaptureAction: vi.fn(),
+    setCurrentViewport: vi.fn(),
+    setHighlighterMode: vi.fn(),
+    setIsCompletelyHidden: vi.fn(),
+    setIsToolbarVisible: vi.fn(),
+    setNavigationLockEnabled: vi.fn(),
+    setPinToTab: vi.fn(),
+    setQuickActionOverlay: vi.fn(),
+    setQuickActionToastCountdown: vi.fn(),
+    setQuickEditDocumentMode: vi.fn(),
+    setQuickEditMode: vi.fn(),
+    setSaveDialogState: vi.fn(),
+    setScreenshotMode: vi.fn(),
+    setSessionActivePresetId: vi.fn(),
+    setTimerDelay: vi.fn(),
+    timerDelay: 0,
+  };
+}

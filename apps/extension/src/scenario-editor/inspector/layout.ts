@@ -1,0 +1,1 @@
+export const SCENARIO_INSPECTOR_WIDTH_CLASS_NAME = 'w-[312px]';

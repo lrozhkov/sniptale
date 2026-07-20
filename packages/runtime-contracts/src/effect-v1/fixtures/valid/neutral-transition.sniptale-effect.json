@@ -1,0 +1,172 @@
+{
+  "assets": [],
+  "clips": [
+    {
+      "duration": 3,
+      "layerId": "background",
+      "sceneId": "main",
+      "start": 0
+    },
+    {
+      "duration": 3,
+      "layerId": "title",
+      "sceneId": "main",
+      "start": 0
+    }
+  ],
+  "controls": [
+    {
+      "defaultValue": "#5f7cff",
+      "id": "accent",
+      "kind": "color",
+      "label": {
+        "en": "Accent",
+        "ru": "Акцент"
+      }
+    }
+  ],
+  "description": {
+    "en": "Agent-ready transition starter.",
+    "ru": "Стартовый шаблон transition для агента."
+  },
+  "duration": 3,
+  "id": "neutral-transition",
+  "kind": "transition",
+  "label": {
+    "en": "Neutral Transition",
+    "ru": "Neutral Transition"
+  },
+  "layers": [
+    {
+      "height": 720,
+      "id": "background",
+      "name": "Background",
+      "type": "rect",
+      "width": 1280
+    },
+    {
+      "height": 120,
+      "id": "title",
+      "name": "Title",
+      "text": "Neutral Transition",
+      "type": "text",
+      "width": 900,
+      "x": 640,
+      "y": 360
+    }
+  ],
+  "program": {
+    "commands": [
+      {
+        "layerId": "background",
+        "op": "clear"
+      },
+      {
+        "alpha": {
+          "args": [
+            1,
+            {
+              "op": "read",
+              "path": "progress"
+            }
+          ],
+          "op": "sub"
+        },
+        "fit": "cover",
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "input": "from",
+        "layerId": "background",
+        "op": "image",
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "x": 0,
+        "y": 0
+      },
+      {
+        "alpha": {
+          "op": "read",
+          "path": "progress"
+        },
+        "fit": "cover",
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "input": "to",
+        "layerId": "background",
+        "op": "image",
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "x": 0,
+        "y": 0
+      },
+      {
+        "fill": {
+          "op": "read",
+          "path": "controls.accent"
+        },
+        "height": 180,
+        "layerId": "title",
+        "op": "shape",
+        "radius": 32,
+        "shape": "roundRect",
+        "width": 920,
+        "x": 180,
+        "y": 270
+      },
+      {
+        "align": "center",
+        "baseline": "middle",
+        "fill": "#ffffff",
+        "fontFamily": "system-ui",
+        "fontSize": 54,
+        "fontWeight": 650,
+        "layerId": "title",
+        "op": "text",
+        "text": "Neutral Transition",
+        "x": {
+          "args": [
+            {
+              "op": "read",
+              "path": "width"
+            },
+            0.5
+          ],
+          "op": "mul"
+        },
+        "y": {
+          "args": [
+            {
+              "op": "read",
+              "path": "height"
+            },
+            0.5
+          ],
+          "op": "mul"
+        }
+      }
+    ],
+    "kind": "graph",
+    "version": 1
+  },
+  "scenes": [
+    {
+      "duration": 3,
+      "id": "main",
+      "label": "Main",
+      "start": 0
+    }
+  ],
+  "schemaVersion": "sniptale.effect.v1",
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  }
+}

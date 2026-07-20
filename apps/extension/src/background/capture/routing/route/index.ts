@@ -1,0 +1,1 @@
+export { routeCaptureMessage } from './dispatcher';

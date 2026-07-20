@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "allowedProtocols": ["https"],
+  "allowedRegistryHosts": ["registry.npmjs.org"],
+  "sourceExceptions": [],
+  "installScriptApprovals": [
+    {
+      "packageName": "@ast-grep/cli",
+      "resolvedVersion": "0.42.1",
+      "dependencyScope": "direct-development",
+      "artifactInclusion": "development-only",
+      "reason": "Pinned AST analysis CLI installs its platform binary during local QA setup.",
+      "approvalOwner": "repository-owner",
+      "expiresOn": "2027-07-12"
+    },
+    {
+      "packageName": "canvas",
+      "resolvedVersion": "3.2.1",
+      "dependencyScope": "transitive-runtime",
+      "artifactInclusion": "source-runtime-candidate",
+      "reason": "Pinned renderer dependency may install its native binding from the locked package source.",
+      "approvalOwner": "repository-owner",
+      "expiresOn": "2027-07-12"
+    },
+    {
+      "packageName": "esbuild",
+      "resolvedVersion": "0.28.1",
+      "dependencyScope": "transitive-development",
+      "artifactInclusion": "development-only",
+      "reason": "Pinned build tool installs its platform binary during local development setup.",
+      "approvalOwner": "repository-owner",
+      "expiresOn": "2027-07-12"
+    },
+    {
+      "packageName": "fsevents",
+      "resolvedVersion": "2.3.3",
+      "dependencyScope": "transitive-development",
+      "artifactInclusion": "development-only",
+      "reason": "Optional macOS development watcher binary remains lock-pinned and non-production.",
+      "approvalOwner": "repository-owner",
+      "expiresOn": "2027-07-12"
+    },
+    {
+      "packageName": "fsevents",
+      "resolvedVersion": "2.3.2",
+      "dependencyScope": "transitive-development",
+      "artifactInclusion": "development-only",
+      "reason": "Nested optional macOS development watcher binary remains lock-pinned and non-production.",
+      "approvalOwner": "repository-owner",
+      "expiresOn": "2027-07-12"
+    }
+  ],
+  "rootLifecycleApprovals": [
+    {
+      "scriptName": "prepare",
+      "command": "husky",
+      "ownerId": "tooling.qa",
+      "reason": "Repository hook installation is the sole root install lifecycle command.",
+      "approvalOwner": "repository-owner",
+      "expiresOn": "2027-07-12"
+    }
+  ],
+  "licensePolicyPath": "tooling/configs/qa/licenses.json",
+  "workspaceIdentity": "root:sniptale"
+}

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sniptale</title>
+    <style>
+      :root {
+        --sniptale-offscreen-bg: #f4f4f5;
+        --sniptale-offscreen-panel: rgba(255, 255, 255, 0.9);
+        --sniptale-offscreen-panel-border: rgba(24, 24, 27, 0.08);
+        --sniptale-offscreen-shadow: rgba(24, 24, 27, 0.14);
+        --sniptale-offscreen-text: #18181b;
+        --sniptale-offscreen-text-dim: #52525b;
+        --sniptale-offscreen-ready: #10b981;
+        --sniptale-offscreen-recording: #ef4444;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+          sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(249, 115, 22, 0.06), transparent 42%),
+          var(--sniptale-offscreen-bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        color: var(--sniptale-offscreen-text);
+      }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 18px 20px;
+        background: var(--sniptale-offscreen-panel);
+        border: 1px solid var(--sniptale-offscreen-panel-border);
+        border-radius: 14px;
+        box-shadow: 0 12px 32px var(--sniptale-offscreen-shadow);
+        backdrop-filter: blur(10px);
+        text-align: center;
+      }
+      .status-dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--sniptale-offscreen-ready);
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+      }
+      .status-dot.recording {
+        background: var(--sniptale-offscreen-recording);
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+        animation: pulse 1s infinite;
+      }
+      #statusText {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--sniptale-offscreen-text-dim);
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="status">
+      <div id="statusDot" class="status-dot"></div>
+      <span id="statusText">Готово</span>
+    </div>
+    <script type="module" src="./offscreen.ts"></script>
+  </body>
+</html>

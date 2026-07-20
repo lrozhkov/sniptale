@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Topology Plan Review'
+  short_description: 'Plan or review a bounded Sniptale topology move'
+  default_prompt: 'Use $topology-plan-review without inherited context to validate the supplied pre-move bundle or independently review the supplied complete green candidate, according to its stated mode.'

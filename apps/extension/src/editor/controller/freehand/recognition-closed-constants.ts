@@ -1,0 +1,1 @@
+export const MIN_CLOSED_CONFIDENCE = 0.72;

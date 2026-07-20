@@ -1,0 +1,44 @@
+@import './fields.css';
+@import '../product-form-controls/index.css';
+@import './preview-data.css';
+
+.sniptale-ai-modal-body {
+  position: relative;
+}
+
+.sniptale-ai-modal-loading-state {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 28px;
+  text-align: center;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--sniptale-color-surface-panel) 96%, transparent),
+    color-mix(in srgb, var(--sniptale-color-surface-panel) 98%, transparent)
+  );
+  backdrop-filter: blur(10px);
+}
+
+.sniptale-ai-modal-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+}
+
+.sniptale-ai-modal-loading-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-ai-modal-loading-description {
+  max-width: 320px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sniptale-color-text-secondary);
+}

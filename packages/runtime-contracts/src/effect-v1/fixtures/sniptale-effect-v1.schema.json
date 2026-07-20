@@ -1,0 +1,3075 @@
+{
+  "$defs": {
+    "asset": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "anyOf": [
+            { "required": ["dataUrl"] },
+            { "required": ["path"] },
+            { "required": ["svgText"] }
+          ]
+        },
+        {
+          "if": {
+            "anyOf": [{ "required": ["dataUrl"] }, { "required": ["svgText"] }]
+          },
+          "then": { "required": ["byteLength", "sha256"] }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "svg" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "not": { "required": ["dataUrl"] },
+            "properties": { "mimeType": { "const": "image/svg+xml" } }
+          },
+          "else": { "not": { "required": ["svgText"] } }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "image" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "mimeType": { "enum": ["image/jpeg", "image/png", "image/webp"] }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "audio" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "mimeType": { "enum": ["audio/mpeg", "audio/ogg", "audio/wav"] }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "byteLength": { "minimum": 1, "type": "integer" },
+        "dataUrl": {
+          "pattern": "^data:[^;,]+;base64,[A-Za-z0-9+/=]+$",
+          "type": "string"
+        },
+        "duration": { "exclusiveMinimum": 0, "type": "number" },
+        "height": { "exclusiveMinimum": 0, "type": "number" },
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "kind": { "enum": ["audio", "image", "svg"] },
+        "mimeType": { "type": "string" },
+        "path": {
+          "pattern": "^(?!/)(?!.*(?:^|/)..(?:/|$))[^\\\\]+$",
+          "type": "string"
+        },
+        "sha256": { "pattern": "^[a-f0-9]{64}$", "type": "string" },
+        "svgText": { "type": "string" },
+        "width": { "exclusiveMinimum": 0, "type": "number" }
+      },
+      "required": ["id", "kind", "mimeType"],
+      "type": "object"
+    },
+    "clip": {
+      "additionalProperties": false,
+      "properties": {
+        "duration": { "exclusiveMinimum": 0, "type": "number" },
+        "enabled": { "type": "boolean" },
+        "layerId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "locked": { "type": "boolean" },
+        "offset": { "type": "number" },
+        "sceneId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "start": { "minimum": 0, "type": "number" }
+      },
+      "required": ["duration", "layerId", "start"],
+      "type": "object"
+    },
+    "command": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "clear" },
+            "color": { "$ref": "#/$defs/paint" }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "clip" },
+            "commands": {
+              "items": { "$ref": "#/$defs/command" },
+              "minItems": 1,
+              "type": "array"
+            },
+            "height": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "width": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["op", "commands", "height", "width", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "compositePass" },
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "filter": { "$ref": "#/$defs/filter" },
+            "shadow": { "$ref": "#/$defs/shadow" },
+            "height": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "passId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "rotation": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "width": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["op", "passId"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "fillRect" },
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "filter": { "$ref": "#/$defs/filter" },
+            "shadow": { "$ref": "#/$defs/shadow" },
+            "fill": { "$ref": "#/$defs/paint" },
+            "height": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "width": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["op", "fill", "height", "width", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "forEach" },
+            "commands": {
+              "items": { "$ref": "#/$defs/command" },
+              "minItems": 1,
+              "type": "array"
+            },
+            "itemVar": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "items": { "minItems": 1, "type": "array" }
+          },
+          "required": ["op", "commands", "items"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "forGrid" },
+            "columnVar": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "columns": { "maximum": 512, "minimum": 1, "type": "integer" },
+            "commands": {
+              "items": { "$ref": "#/$defs/command" },
+              "minItems": 1,
+              "type": "array"
+            },
+            "rowVar": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "rows": { "maximum": 512, "minimum": 1, "type": "integer" }
+          },
+          "required": ["op", "columns", "commands", "rows"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "forRange" },
+            "commands": {
+              "items": { "$ref": "#/$defs/command" },
+              "minItems": 1,
+              "type": "array"
+            },
+            "count": { "maximum": 512, "minimum": 1, "type": "integer" },
+            "indexVar": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            }
+          },
+          "required": ["op", "commands", "count"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "group" },
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "filter": { "$ref": "#/$defs/filter" },
+            "shadow": { "$ref": "#/$defs/shadow" },
+            "commands": {
+              "items": { "$ref": "#/$defs/command" },
+              "minItems": 1,
+              "type": "array"
+            },
+            "rotation": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "scaleX": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "scaleY": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["op", "commands"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "image" },
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "filter": { "$ref": "#/$defs/filter" },
+            "shadow": { "$ref": "#/$defs/shadow" },
+            "assetId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "fit": { "enum": ["contain", "cover", "fill"] },
+            "height": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "input": { "enum": ["source", "from", "to"] },
+            "rotation": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "width": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["op", "height", "width", "x", "y"],
+          "type": "object",
+          "oneOf": [
+            { "not": { "required": ["input"] }, "required": ["assetId"] },
+            { "not": { "required": ["assetId"] }, "required": ["input"] }
+          ]
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "let" },
+            "bindings": {
+              "additionalProperties": { "$ref": "#/$defs/expression" },
+              "minProperties": 1,
+              "type": "object"
+            },
+            "commands": {
+              "items": { "$ref": "#/$defs/command" },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": ["op", "bindings", "commands"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "path" },
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "filter": { "$ref": "#/$defs/filter" },
+            "shadow": { "$ref": "#/$defs/shadow" },
+            "closed": { "type": "boolean" },
+            "fill": { "$ref": "#/$defs/paint" },
+            "lineCap": { "enum": ["butt", "round", "square"] },
+            "lineJoin": { "enum": ["bevel", "miter", "round"] },
+            "lineWidth": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "points": {
+              "items": { "$ref": "#/$defs/point" },
+              "minItems": 2,
+              "type": "array"
+            },
+            "segments": {
+              "items": { "$ref": "#/$defs/pathSegment" },
+              "minItems": 1,
+              "type": "array"
+            },
+            "stroke": { "$ref": "#/$defs/paint" }
+          },
+          "required": ["op"],
+          "type": "object",
+          "oneOf": [
+            { "not": { "required": ["segments"] }, "required": ["points"] },
+            { "not": { "required": ["points"] }, "required": ["segments"] }
+          ]
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "polyline" },
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "filter": { "$ref": "#/$defs/filter" },
+            "shadow": { "$ref": "#/$defs/shadow" },
+            "lineCap": { "enum": ["butt", "round", "square"] },
+            "lineJoin": { "enum": ["bevel", "miter", "round"] },
+            "lineWidth": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "points": {
+              "items": { "$ref": "#/$defs/point" },
+              "minItems": 2,
+              "type": "array"
+            },
+            "progress": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "stroke": { "$ref": "#/$defs/paint" }
+          },
+          "required": ["op", "points", "stroke"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "renderPass" },
+            "commands": {
+              "items": { "$ref": "#/$defs/command" },
+              "minItems": 1,
+              "type": "array"
+            },
+            "height": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "id": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "width": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["op", "commands", "id"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "sampledPath" },
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "filter": { "$ref": "#/$defs/filter" },
+            "shadow": { "$ref": "#/$defs/shadow" },
+            "from": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "lineCap": { "enum": ["butt", "round", "square"] },
+            "lineJoin": { "enum": ["bevel", "miter", "round"] },
+            "lineWidth": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "samples": { "maximum": 256, "minimum": 2, "type": "integer" },
+            "sampleVar": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "stroke": { "$ref": "#/$defs/paint" },
+            "to": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["op", "from", "samples", "stroke", "to", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "shape" },
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "filter": { "$ref": "#/$defs/filter" },
+            "shadow": { "$ref": "#/$defs/shadow" },
+            "fill": { "$ref": "#/$defs/paint" },
+            "height": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "lineWidth": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "radius": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "rotation": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "shape": {
+              "enum": ["circle", "diamond", "ellipse", "rect", "roundRect"]
+            },
+            "stroke": { "$ref": "#/$defs/paint" },
+            "width": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["op", "height", "shape", "width", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "stableOrderBy" },
+            "commands": {
+              "items": { "$ref": "#/$defs/command" },
+              "minItems": 1,
+              "type": "array"
+            },
+            "direction": { "enum": ["asc", "desc"] },
+            "itemVar": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "items": { "minItems": 1, "type": "array" },
+            "key": { "$ref": "#/$defs/expression" }
+          },
+          "required": ["op", "commands", "items", "key"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "svgParts" },
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "filter": { "$ref": "#/$defs/filter" },
+            "shadow": { "$ref": "#/$defs/shadow" },
+            "assetId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "height": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "part": { "$ref": "#/$defs/svgPartTransform" },
+            "width": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["op", "assetId", "height", "width", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "text" },
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "filter": { "$ref": "#/$defs/filter" },
+            "shadow": { "$ref": "#/$defs/shadow" },
+            "align": { "enum": ["center", "end", "left", "right", "start"] },
+            "baseline": {
+              "enum": [
+                "alphabetic",
+                "bottom",
+                "hanging",
+                "ideographic",
+                "middle",
+                "top"
+              ]
+            },
+            "caret": { "type": "boolean" },
+            "fill": { "$ref": "#/$defs/paint" },
+            "fontFamily": { "$ref": "#/$defs/expression" },
+            "fontSize": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "fontStyle": { "enum": ["italic", "normal", "oblique"] },
+            "fontWeight": { "$ref": "#/$defs/expression" },
+            "maxWidth": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "reveal": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "text": { "$ref": "#/$defs/expression" },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["op", "text", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layerId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            "op": { "const": "when" },
+            "commands": {
+              "items": { "$ref": "#/$defs/command" },
+              "minItems": 1,
+              "type": "array"
+            },
+            "condition": { "$ref": "#/$defs/expression" }
+          },
+          "required": ["op", "commands", "condition"],
+          "type": "object"
+        }
+      ]
+    },
+    "control": {
+      "additionalProperties": false,
+      "properties": {
+        "defaultValue": {},
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "kind": { "enum": ["color", "number", "text"] },
+        "label": {
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "en": { "type": "string" },
+            "ru": { "type": "string" }
+          },
+          "type": "object"
+        },
+        "max": { "type": "number" },
+        "min": { "type": "number" },
+        "step": { "exclusiveMinimum": 0, "type": "number" }
+      },
+      "required": ["defaultValue", "id", "kind"],
+      "type": "object"
+    },
+    "expression": {
+      "anyOf": [
+        { "type": ["boolean", "number", "string", "null"] },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "abs" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "add" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "and" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "op": { "const": "clamp" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "concat" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "cos" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 5,
+              "minItems": 5,
+              "type": "array"
+            },
+            "op": { "const": "cubicPoint" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 5,
+              "minItems": 5,
+              "type": "array"
+            },
+            "op": { "const": "cubicTangent" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "op": { "const": "div" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 5,
+              "minItems": 5,
+              "type": "array"
+            },
+            "op": { "const": "ellipsePoint" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 5,
+              "minItems": 5,
+              "type": "array"
+            },
+            "op": { "const": "ellipseVelocity" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "op": { "const": "eq" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "exp" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "floor" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "op": { "const": "gt" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "op": { "const": "gte" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "inOut" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "op": { "const": "lt" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "op": { "const": "lte" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "max" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "min" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "op": { "const": "mix" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "op": { "const": "mod" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "mul" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "neg" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "not" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "or" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "out" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "op": { "const": "point" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "op": { "const": "pow" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 4,
+              "minItems": 3,
+              "type": "array"
+            },
+            "op": { "const": "rgba" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "sin" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "op": { "const": "sqrt" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "args": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "op": { "const": "sub" }
+          },
+          "required": ["args", "op"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "read" },
+            "path": { "type": "string" }
+          },
+          "required": ["op", "path"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "fallback": { "$ref": "#/$defs/expression" },
+            "op": { "const": "fallback" },
+            "value": { "$ref": "#/$defs/expression" }
+          },
+          "required": ["fallback", "op", "value"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "select" },
+            "value": { "$ref": "#/$defs/expression" },
+            "values": {
+              "items": { "$ref": "#/$defs/expression" },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": ["op", "value", "values"],
+          "type": "object"
+        }
+      ]
+    },
+    "filter": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "blur": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        },
+        "brightness": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        },
+        "saturate": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "gradientStop": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            { "type": "string" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        },
+        "offset": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        }
+      },
+      "required": ["color", "offset"],
+      "type": "object"
+    },
+    "keyframe": {
+      "additionalProperties": false,
+      "properties": {
+        "easing": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "handles": { "$ref": "#/$defs/keyframeHandles" },
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "phaseId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "sceneId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "time": { "minimum": 0, "type": "number" },
+        "value": {}
+      },
+      "required": ["id", "time", "value"],
+      "type": "object"
+    },
+    "keyframeHandles": {
+      "additionalProperties": false,
+      "properties": {
+        "x1": { "type": "number" },
+        "x2": { "type": "number" },
+        "y1": { "type": "number" },
+        "y2": { "type": "number" }
+      },
+      "required": ["x1", "x2", "y1", "y2"],
+      "type": "object"
+    },
+    "layer": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "ellipse",
+                  "imageAsset",
+                  "line",
+                  "path",
+                  "rect",
+                  "svgAsset",
+                  "text"
+                ]
+              }
+            },
+            "required": ["type"]
+          },
+          "then": { "required": ["height", "width"] }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "enum": ["audio", "imageAsset", "svgAsset"] }
+            },
+            "required": ["type"]
+          },
+          "then": { "required": ["assetId"] }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "text" } },
+            "required": ["type"]
+          },
+          "then": { "required": ["text"] }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "group" } },
+            "required": ["type"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["assetId"] },
+                { "required": ["editor"] },
+                { "required": ["height"] },
+                { "required": ["opacity"] },
+                { "required": ["rotation"] },
+                { "required": ["scaleX"] },
+                { "required": ["scaleY"] },
+                { "required": ["width"] },
+                { "required": ["x"] },
+                { "required": ["y"] }
+              ]
+            }
+          }
+        }
+      ],
+      "properties": {
+        "anchorX": { "type": "number" },
+        "anchorY": { "type": "number" },
+        "assetId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "baseX": { "type": "number" },
+        "baseY": { "type": "number" },
+        "blendMode": { "type": "string" },
+        "blur": { "type": "number" },
+        "color": { "type": "string" },
+        "editor": { "$ref": "#/$defs/layerEditor" },
+        "fill": { "type": "string" },
+        "fontFamily": { "type": "string" },
+        "fontSize": { "type": "number" },
+        "fontWeight": { "type": "number" },
+        "height": { "exclusiveMinimum": 0, "type": "number" },
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "locked": { "type": "boolean" },
+        "name": { "type": "string" },
+        "opacity": { "type": "number" },
+        "parentId": {
+          "anyOf": [
+            {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            { "type": "null" }
+          ]
+        },
+        "partBlur": { "type": "number" },
+        "partOrder": { "type": "string" },
+        "partReveal": { "type": "number" },
+        "partSpread": { "type": "number" },
+        "partStagger": { "type": "number" },
+        "pathClosed": { "type": "boolean" },
+        "pathPoints": { "type": "array" },
+        "radius": { "type": "number" },
+        "rotation": { "type": "number" },
+        "scaleX": { "type": "number" },
+        "scaleY": { "type": "number" },
+        "stroke": { "type": "string" },
+        "strokeWidth": { "type": "number" },
+        "svgPartIds": { "items": { "type": "string" }, "type": "array" },
+        "svgPartMode": { "type": "string" },
+        "text": { "type": "string" },
+        "trimEnd": { "type": "number" },
+        "trimStart": { "type": "number" },
+        "type": {
+          "enum": [
+            "audio",
+            "customDraw",
+            "ellipse",
+            "group",
+            "imageAsset",
+            "line",
+            "path",
+            "rect",
+            "svgAsset",
+            "text"
+          ]
+        },
+        "visible": { "type": "boolean" },
+        "volume": { "type": "number" },
+        "width": { "exclusiveMinimum": 0, "type": "number" },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["id", "type"],
+      "type": "object"
+    },
+    "layerEditor": {
+      "additionalProperties": false,
+      "properties": {
+        "canvas": { "enum": ["bounds", "fullFrame", "none"] },
+        "keyframeProperties": {
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "operations": {
+          "items": { "enum": ["delete", "duplicate", "reorder"] },
+          "type": "array"
+        },
+        "properties": { "items": { "type": "string" }, "type": "array" },
+        "transform": {
+          "items": {
+            "enum": [
+              "anchorX",
+              "anchorY",
+              "rotation",
+              "scaleX",
+              "scaleY",
+              "x",
+              "y"
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "localeText": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": { "en": { "type": "string" }, "ru": { "type": "string" } },
+      "type": "object"
+    },
+    "motionPath": {
+      "additionalProperties": false,
+      "properties": {
+        "layerId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "points": {
+          "items": { "$ref": "#/$defs/motionPoint" },
+          "type": "array"
+        }
+      },
+      "required": ["layerId", "points"],
+      "type": "object"
+    },
+    "motionPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "inTangent": { "$ref": "#/$defs/pointNumber" },
+        "kind": { "enum": ["corner", "linear", "smooth"] },
+        "outTangent": { "$ref": "#/$defs/pointNumber" },
+        "xKeyframeId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "yKeyframeId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        }
+      },
+      "required": ["xKeyframeId", "yKeyframeId"],
+      "type": "object"
+    },
+    "paint": {
+      "anyOf": [
+        { "type": "string" },
+        { "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }] },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "linearGradient" },
+            "stops": {
+              "items": { "$ref": "#/$defs/gradientStop" },
+              "minItems": 2,
+              "type": "array"
+            },
+            "x0": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x1": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y0": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y1": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind", "stops", "x0", "x1", "y0", "y1"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "radialGradient" },
+            "r0": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "r1": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "stops": {
+              "items": { "$ref": "#/$defs/gradientStop" },
+              "minItems": 2,
+              "type": "array"
+            },
+            "x0": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x1": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y0": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y1": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind", "r0", "r1", "stops", "x0", "x1", "y0", "y1"],
+          "type": "object"
+        }
+      ]
+    },
+    "phase": {
+      "additionalProperties": false,
+      "properties": {
+        "duration": { "exclusiveMinimum": 0, "type": "number" },
+        "enabled": { "type": "boolean" },
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "label": { "type": "string" },
+        "locked": { "type": "boolean" },
+        "sceneId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "start": { "minimum": 0, "type": "number" }
+      },
+      "required": ["duration", "id", "start"],
+      "type": "object"
+    },
+    "point": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        },
+        "y": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        }
+      },
+      "required": ["x", "y"],
+      "type": "object"
+    },
+    "pathSegment": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "moveTo" },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "lineTo" },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "quadraticTo" },
+            "cpx": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "cpy": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind", "cpx", "cpy", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "cubicTo" },
+            "cp1x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "cp1y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "cp2x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "cp2y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind", "cp1x", "cp1y", "cp2x", "cp2y", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "arc" },
+            "centerX": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "centerY": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "counterclockwise": { "type": "boolean" },
+            "end": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "radius": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "start": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind", "centerX", "centerY", "end", "radius", "start"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "ellipse" },
+            "centerX": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "centerY": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "counterclockwise": { "type": "boolean" },
+            "end": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "radiusX": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "radiusY": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "rotation": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "start": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "centerX",
+            "centerY",
+            "end",
+            "radiusX",
+            "radiusY",
+            "rotation",
+            "start"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "rect" },
+            "height": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "width": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind", "height", "width", "x", "y"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "roundRect" },
+            "height": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "radius": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "width": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind", "height", "radius", "width", "x", "y"],
+          "type": "object"
+        }
+      ]
+    },
+    "pointNumber": {
+      "additionalProperties": false,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } },
+      "required": ["x", "y"],
+      "type": "object"
+    },
+    "program": {
+      "additionalProperties": false,
+      "properties": {
+        "commands": {
+          "items": { "$ref": "#/$defs/command" },
+          "minItems": 1,
+          "type": "array"
+        },
+        "definitions": {
+          "additionalProperties": { "$ref": "#/$defs/expression" },
+          "type": "object"
+        },
+        "kind": { "const": "graph" },
+        "version": { "const": 1 }
+      },
+      "required": ["commands", "kind", "version"],
+      "type": "object"
+    },
+    "scene": {
+      "additionalProperties": false,
+      "properties": {
+        "duration": { "exclusiveMinimum": 0, "type": "number" },
+        "enabled": { "type": "boolean" },
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            { "type": "string" },
+            {
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "en": { "type": "string" },
+                "ru": { "type": "string" }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "locked": { "type": "boolean" },
+        "start": { "minimum": 0, "type": "number" },
+        "transition": { "type": "object" }
+      },
+      "required": ["duration", "id", "start"],
+      "type": "object"
+    },
+    "shadow": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "blur": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        },
+        "color": {
+          "anyOf": [
+            { "type": "string" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        },
+        "x": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        },
+        "y": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "allOf": [{ "$ref": "#/$defs/expression" }, { "type": "object" }]
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "svgPartTransform": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "angle": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blur": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "ease": { "enum": ["inOut", "linear", "out"] },
+            "kind": { "const": "preset" },
+            "mode": { "enum": ["assemble", "scatter", "shatter"] },
+            "order": {
+              "enum": ["center", "document", "edges", "random", "reverse"]
+            },
+            "reveal": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "rotate": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "scaleFrom": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "spread": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "stagger": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "alpha": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "blur": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "kind": { "const": "custom" },
+            "originX": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "originY": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "rotate": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "scale": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "x": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "anyOf": [
+                { "type": "number" },
+                {
+                  "allOf": [
+                    { "$ref": "#/$defs/expression" },
+                    { "type": "object" }
+                  ]
+                }
+              ]
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        }
+      ]
+    },
+    "timeline": {
+      "additionalProperties": false,
+      "properties": {
+        "motionPaths": {
+          "items": { "$ref": "#/$defs/motionPath" },
+          "type": "array"
+        },
+        "phases": { "items": { "$ref": "#/$defs/phase" }, "type": "array" },
+        "tracks": { "items": { "$ref": "#/$defs/track" }, "type": "array" }
+      },
+      "required": ["phases", "tracks"],
+      "type": "object"
+    },
+    "track": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "keyframes": {
+          "items": { "$ref": "#/$defs/keyframe" },
+          "type": "array"
+        },
+        "label": { "type": "string" },
+        "layerId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "phaseId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "property": { "type": "string" },
+        "sceneId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "target": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        }
+      },
+      "required": ["id", "keyframes", "property"],
+      "type": "object"
+    }
+  },
+  "$id": "https://sniptale.local/schemas/effect-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assets": {
+      "items": { "$ref": "#/$defs/asset" },
+      "maxItems": 256,
+      "type": "array"
+    },
+    "clips": { "items": { "$ref": "#/$defs/clip" }, "type": "array" },
+    "controls": { "items": { "$ref": "#/$defs/control" }, "type": "array" },
+    "description": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": { "en": { "type": "string" }, "ru": { "type": "string" } },
+      "type": "object"
+    },
+    "duration": { "exclusiveMinimum": 0, "type": "number" },
+    "id": { "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$", "type": "string" },
+    "kind": { "enum": ["standalone", "targetEffect", "transition"] },
+    "label": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": { "en": { "type": "string" }, "ru": { "type": "string" } },
+      "type": "object"
+    },
+    "layers": { "items": { "$ref": "#/$defs/layer" }, "type": "array" },
+    "presets": { "type": "array" },
+    "program": { "$ref": "#/$defs/program" },
+    "scenes": {
+      "items": { "$ref": "#/$defs/scene" },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schemaVersion": { "const": "sniptale.effect.v1" },
+    "timeline": { "$ref": "#/$defs/timeline" }
+  },
+  "required": [
+    "assets",
+    "clips",
+    "controls",
+    "duration",
+    "id",
+    "kind",
+    "label",
+    "layers",
+    "program",
+    "scenes",
+    "schemaVersion",
+    "timeline"
+  ],
+  "title": "Sniptale Effect v1",
+  "type": "object",
+  "xExpressionOperations": [
+    "abs",
+    "add",
+    "and",
+    "clamp",
+    "concat",
+    "cos",
+    "cubicPoint",
+    "cubicTangent",
+    "div",
+    "ellipsePoint",
+    "ellipseVelocity",
+    "eq",
+    "exp",
+    "fallback",
+    "floor",
+    "gt",
+    "gte",
+    "inOut",
+    "lt",
+    "lte",
+    "max",
+    "min",
+    "mix",
+    "mod",
+    "mul",
+    "neg",
+    "not",
+    "or",
+    "out",
+    "point",
+    "pow",
+    "read",
+    "rgba",
+    "select",
+    "sin",
+    "sqrt",
+    "sub"
+  ]
+}

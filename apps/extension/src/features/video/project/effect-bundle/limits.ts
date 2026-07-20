@@ -1,0 +1,15 @@
+export const EFFECT_BUNDLE_LIMITS = {
+  maxArchiveBytes: 100 * 1024 * 1024,
+  maxAssets: 200,
+  maxCompressionRatio: 1000,
+  maxDocuments: 100,
+  maxEntryBytes: 50 * 1024 * 1024,
+  maxFiles: 500,
+  maxInflatedBytes: 250 * 1024 * 1024,
+  maxJsonBytes: 10 * 1024 * 1024,
+  maxJsonDepth: 128,
+  maxJsonNodes: 250_000,
+  maxJsonStringCharacters: 1_500_000,
+  maxPathCharacters: 512,
+  importTimeoutMs: 5_000,
+} as const;

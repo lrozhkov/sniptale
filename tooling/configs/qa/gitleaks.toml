@@ -1,0 +1,17 @@
+# Gitleaks audit policy. Keep allowlists limited to generated/dependency artifacts and reviewed false positives.
+title = "Sniptale Gitleaks audit policy"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated and dependency artifacts are not source-owned secret surfaces"
+paths = [
+  '''^\.tmp/''',
+  '''^node_modules/''',
+  '''^dist/''',
+  '''^coverage/''',
+  '''^\.playwright-browsers/''',
+  '''^playwright-report/''',
+  '''^test-results/''',
+]

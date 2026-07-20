@@ -1,0 +1,88 @@
+import { defineShapeEntry } from './entry-builders';
+import { EDITOR_RICH_SHAPE_FAMILY } from './families';
+import { SHAPE_GEOMETRY } from './geometry/index';
+import { EDITOR_BUILT_IN_SHAPE_CATEGORY } from './types';
+
+export const BASIC_EXTRA_SHAPE_ENTRIES = [
+  defineShapeEntry({
+    id: 'plus',
+    label: 'Плюс',
+    category: EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC,
+    family: EDITOR_RICH_SHAPE_FAMILY.OFFICE,
+    kind: 'plus',
+    geometry: SHAPE_GEOMETRY.plus,
+    aliases: ['плюс', 'plus', 'cross plus'],
+  }),
+  defineShapeEntry({
+    id: 'cross',
+    label: 'Крест',
+    category: EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC,
+    family: EDITOR_RICH_SHAPE_FAMILY.OFFICE,
+    kind: 'cross',
+    geometry: SHAPE_GEOMETRY.cross,
+    aliases: ['крест', 'cross', 'x'],
+  }),
+  defineShapeEntry({
+    id: 'left-bracket',
+    label: 'Левая скобка',
+    category: EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC,
+    family: EDITOR_RICH_SHAPE_FAMILY.OFFICE,
+    kind: 'left-bracket',
+    geometry: SHAPE_GEOMETRY.leftBracket,
+    aliases: ['левая скобка', 'bracket', 'left bracket'],
+  }),
+  defineShapeEntry({
+    id: 'right-bracket',
+    label: 'Правая скобка',
+    category: EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC,
+    family: EDITOR_RICH_SHAPE_FAMILY.OFFICE,
+    kind: 'right-bracket',
+    geometry: SHAPE_GEOMETRY.rightBracket,
+    aliases: ['правая скобка', 'right bracket'],
+  }),
+  defineShapeEntry({
+    id: 'left-brace',
+    label: 'Левая фигурная скобка',
+    category: EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC,
+    family: EDITOR_RICH_SHAPE_FAMILY.OFFICE,
+    kind: 'left-brace',
+    geometry: SHAPE_GEOMETRY.leftBrace,
+    aliases: ['левая фигурная скобка', 'brace', 'left brace'],
+  }),
+  defineShapeEntry({
+    id: 'right-brace',
+    label: 'Правая фигурная скобка',
+    category: EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC,
+    family: EDITOR_RICH_SHAPE_FAMILY.OFFICE,
+    kind: 'right-brace',
+    geometry: SHAPE_GEOMETRY.rightBrace,
+    aliases: ['правая фигурная скобка', 'right brace'],
+  }),
+  defineShapeEntry({
+    id: 'arc',
+    label: 'Дуга',
+    category: EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC,
+    family: EDITOR_RICH_SHAPE_FAMILY.OFFICE,
+    kind: 'arc',
+    geometry: SHAPE_GEOMETRY.arc,
+    aliases: ['дуга', 'arc'],
+  }),
+  defineShapeEntry({
+    id: 'pie',
+    label: 'Сектор',
+    category: EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC,
+    family: EDITOR_RICH_SHAPE_FAMILY.OFFICE,
+    kind: 'pie',
+    geometry: SHAPE_GEOMETRY.pie,
+    aliases: ['сектор', 'pie', 'pie wedge'],
+  }),
+  defineShapeEntry({
+    id: 'chord',
+    label: 'Сегмент',
+    category: EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC,
+    family: EDITOR_RICH_SHAPE_FAMILY.OFFICE,
+    kind: 'chord',
+    geometry: SHAPE_GEOMETRY.chord,
+    aliases: ['сегмент', 'хорда', 'chord'],
+  }),
+] as const;

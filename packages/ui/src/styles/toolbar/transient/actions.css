@@ -1,0 +1,33 @@
+/* ========================================
+ * Toolbar Visibility and Transient UI
+ * ======================================== */
+
+.sniptale-ai-button {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--sniptale-color-accent-soft-strong) 88%, transparent) 0%,
+    color-mix(in srgb, var(--sniptale-color-info) 52%, transparent) 100%
+  ) !important;
+  color: var(--sniptale-color-text-primary-strong) !important;
+}
+
+.sniptale-ai-button:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--sniptale-color-accent) 82%, transparent) 0%,
+    color-mix(in srgb, var(--sniptale-color-info) 64%, transparent) 100%
+  ) !important;
+  transform: scale(1.05);
+}
+
+.sniptale-hide-button {
+  background: transparent !important;
+  color: var(--sniptale-color-text-dim) !important;
+  padding: 6px !important;
+  margin-left: 4px;
+}
+
+.sniptale-hide-button:hover {
+  background: var(--sniptale-color-danger-soft) !important;
+  color: var(--sniptale-color-danger) !important;
+}

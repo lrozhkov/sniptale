@@ -1,0 +1,13 @@
+dist/
+node_modules/
+.oldcodebase/
+.backup/
+.hatiqo/
+.tmp/
+cases/
+package-lock.json
+tasks/
+tooling/configs/
+packages/runtime-contracts/src/effect-v1/fixtures/sniptale-effect-v1.schema.json
+packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json
+*.md

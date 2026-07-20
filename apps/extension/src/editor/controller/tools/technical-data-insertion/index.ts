@@ -1,0 +1,1 @@
+export { createTechnicalDataTextObject } from './factory';

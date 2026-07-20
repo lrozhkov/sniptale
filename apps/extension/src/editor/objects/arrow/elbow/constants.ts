@@ -1,0 +1,2 @@
+export const ELBOW_COLLINEAR_THRESHOLD = 1;
+export const ELBOW_DEDUP_THRESHOLD = 4;

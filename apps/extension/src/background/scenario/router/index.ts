@@ -1,0 +1,1 @@
+export { routeScenarioMessage } from './route';

@@ -1,0 +1,28 @@
+# Semgrep audit policy. Include only repo-owned rules and keep generated/local artifacts excluded.
+rules:
+  - id: sniptale-secret-storage-local
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: Secret-like field appears inside browser storage write; prefer the canonical encrypted secret owner.
+    patterns:
+      - pattern-either:
+          - pattern: 'chrome.storage.local.set({..., apiKey: $VALUE, ...})'
+          - pattern: 'chrome.storage.local.set({..., token: $VALUE, ...})'
+          - pattern: 'chrome.storage.local.set({..., secret: $VALUE, ...})'
+          - pattern: 'chrome.storage.sync.set({..., apiKey: $VALUE, ...})'
+          - pattern: 'chrome.storage.sync.set({..., token: $VALUE, ...})'
+          - pattern: 'chrome.storage.sync.set({..., secret: $VALUE, ...})'
+          - pattern: 'browserStorage.local.set({..., apiKey: $VALUE, ...})'
+          - pattern: 'browserStorage.local.set({..., token: $VALUE, ...})'
+          - pattern: 'browserStorage.local.set({..., secret: $VALUE, ...})'
+  - id: sniptale-secret-fetch-headers
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: Secret-bearing fetch headers belong only in canonical transport owners.
+    patterns:
+      - pattern-either:
+          - pattern: 'fetch($URL, { ..., headers: { ..., Authorization: $VALUE, ... }, ... })'
+          - pattern: 'fetch($URL, { ..., headers: { ..., "Authorization": $VALUE, ... }, ... })'
+          - pattern: 'fetch($URL, { ..., headers: { ..., Cookie: $VALUE, ... }, ... })'
+          - pattern: 'fetch($URL, { ..., headers: { ..., "Cookie": $VALUE, ... }, ... })'
+          - pattern: 'fetch($URL, { ..., headers: { ..., "X-API-Key": $VALUE, ... }, ... })'

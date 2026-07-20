@@ -1,0 +1,131 @@
+.sniptale-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--sniptale-toolbar-button-size);
+  height: var(--sniptale-toolbar-button-size);
+  padding: 0 9px;
+  border-radius: var(--sniptale-radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sniptale-text-muted);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+  box-shadow: none;
+  outline: none;
+}
+
+.sniptale-btn:hover:not(:disabled) {
+  background: var(--sniptale-hover-bg);
+  border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 74%, transparent);
+  color: var(--sniptale-text-main);
+  transform: none;
+}
+
+.sniptale-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.sniptale-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sniptale-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+.sniptale-btn[data-menu-indicator='true']::before {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 0;
+  height: 0;
+  border-inline: 3px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.sniptale-toolbar-menu-item > svg,
+.sniptale-toolbar-menu-item > .sniptale-toolbar-mode-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.sniptale-toggle,
+.sniptale-state-lock {
+  width: var(--sniptale-toolbar-button-size);
+  padding: 0;
+}
+
+.sniptale-toggle[data-active='true'],
+.sniptale-state-lock[data-active='true'],
+.sniptale-capture-active,
+.sniptale-timer-active,
+.sniptale-viewport-active,
+.sniptale-btn-ai.sniptale-ai-active {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 55%,
+    var(--sniptale-color-border-soft) 45%
+  );
+  color: var(--sniptale-color-accent);
+  background: color-mix(in srgb, var(--sniptale-color-accent) 6%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+}
+
+.sniptale-toggle[data-active='true']:hover:not(:disabled),
+.sniptale-state-lock[data-active='true']:hover:not(:disabled),
+.sniptale-capture-active:hover:not(:disabled),
+.sniptale-timer-active:hover:not(:disabled),
+.sniptale-viewport-active:hover:not(:disabled),
+.sniptale-btn-ai.sniptale-ai-active:hover:not(:disabled) {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 55%,
+    var(--sniptale-color-border-soft) 45%
+  );
+  color: var(--sniptale-color-accent-emphasis);
+  background: color-mix(in srgb, var(--sniptale-color-accent) 10%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+}
+
+.sniptale-btn-danger:hover:not(:disabled),
+.sniptale-btn-close:hover:not(:disabled),
+.sniptale-btn-exit:hover:not(:disabled) {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-danger) 32%,
+    var(--sniptale-color-border-soft) 68%
+  );
+  background: color-mix(in srgb, var(--sniptale-color-danger-soft) 84%, white 16%);
+  color: var(--sniptale-color-danger);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-danger) 8%, transparent);
+}
+
+.sniptale-btn[data-menu-open='true']::after {
+  display: none !important;
+}
+
+.sniptale-toolbar .sniptale-btn::after {
+  content: none !important;
+  display: none !important;
+}
+
+.sniptale-btn:focus-visible {
+  border-color: var(--sniptale-active-border);
+  box-shadow:
+    var(--sniptale-shadow-sm),
+    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 22%, transparent);
+}

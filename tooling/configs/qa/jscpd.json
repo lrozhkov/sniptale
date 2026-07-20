@@ -1,0 +1,40 @@
+{
+  "$comment": "jscpd audit configuration. Scan source/tooling inputs, ignore generated/local artifacts and tests, and write reports under .tmp.",
+  "threshold": 0,
+  "minLines": 5,
+  "minTokens": 60,
+  "reporters": [
+    "json"
+  ],
+  "output": ".tmp/jscpd",
+  "silent": true,
+  "gitignore": true,
+  "ignore": [
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.test-support.*",
+    "**/*.test-helpers.*",
+    "**/test-support.*",
+    "**/test-support/**",
+    "**/*.data.*",
+    "**/*.constants.*",
+    "**/*.json",
+    "**/tooling/qa/core/verify-advisory.flow-detectors.helpers.mjs",
+    "**/tooling/qa/core/verify-advisory.read-transport.helpers.mjs",
+    "**/tooling/qa/core/verify-advisory.stateful-flow.helpers.mjs",
+    "**/tooling/qa/core/verify-advisory.static-detectors.helpers.mjs",
+    "**/tooling/qa/core/verify-read-safe-naming.helpers.mjs",
+    "**/tooling/qa/core/design-system-theme-rules.mjs",
+    "**/tooling/qa/core/design-system-verifier.mjs",
+    "**/tooling/test/**",
+    "docs/**",
+    "tests/**",
+    "test/**",
+    "node_modules/**",
+    ".playwright-browsers/**",
+    ".tmp/**",
+    "coverage/**",
+    "dist/**",
+    "**/apps/extension/src/platform/i18n/**"
+  ]
+}

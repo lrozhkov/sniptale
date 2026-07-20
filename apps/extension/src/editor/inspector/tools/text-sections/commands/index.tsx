@@ -1,0 +1,1 @@
+export { buildTextCompactCommands } from './build';

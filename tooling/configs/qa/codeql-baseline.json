@@ -1,0 +1,6 @@
+{
+  "$comment": "CodeQL non-test finding baseline. Technical-debt metadata is owned by technical-debt.data.json.",
+  "version": 1,
+  "description": "Constrained qa:audit CodeQL non-test exceptions after test-like findings are filtered. New findings or line drift fail closed.",
+  "findings": []
+}

@@ -1,0 +1,61 @@
+export const AUDIT_STORAGE_OWNER_MAPPINGS = [
+  {
+    owner: 'audit-ai-storage-secrets',
+    productionPrefix: 'apps/extension/src/composition/persistence/ai-settings/',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason: 'Audit AI secret storage changes are covered by focused secret tests.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/ai-settings/core.chrome.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/core.queue.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/core.status.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/core.test.ts',
+      'apps/extension/src/workflows/ai-settings/model-selection-bootstrap.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/provider-secret-protection.transition.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/provider-secrets.key-material.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/provider-secrets.read-state.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/provider-secrets.restart.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/provider-secrets.store.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/provider-secrets.test.ts',
+      'packages/platform/src/security/local-secret-crypto.test.ts',
+    ],
+  },
+  {
+    owner: 'audit-browser-storage-boundary',
+    productionFile:
+      'apps/extension/src/composition/persistence/infrastructure/browser-storage/index.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason: 'Browser storage contract changes are covered by adapter and consumer tests.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/infrastructure/browser-storage/adapters.integration.test.ts',
+      'packages/platform/src/browser/runtime.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/browser-storage.test.ts',
+      'packages/platform/src/browser/web-navigation.test.ts',
+      'packages/platform/src/browser/windows.test.ts',
+      'apps/extension/src/content/overlay/toolbar/quick-action-hotkeys/index.test.tsx',
+    ],
+  },
+  {
+    owner: 'audit-package-browser-storage-boundary',
+    productionPrefix: 'packages/platform/src/browser/',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason: 'Package browser storage contract changes are covered by adapter and consumer tests.',
+    testFiles: [
+      'packages/platform/src/browser/runtime.test.ts',
+      'packages/platform/src/browser/web-navigation.test.ts',
+      'packages/platform/src/browser/windows.test.ts',
+    ],
+  },
+  {
+    owner: 'audit-editor-preset-storage',
+    productionPrefix: 'apps/extension/src/composition/persistence/editor-presets/',
+    exclusive: true,
+    reason: 'Editor preset storage parser changes are covered by focused guard suites.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/editor-presets/guards.test.ts',
+      'apps/extension/src/composition/persistence/editor-presets/index.test.ts',
+    ],
+  },
+];

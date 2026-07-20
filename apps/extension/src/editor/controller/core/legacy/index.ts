@@ -1,0 +1,1 @@
+export { upgradeLegacyArrowObjects } from './canvas';

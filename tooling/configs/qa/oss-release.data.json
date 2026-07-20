@@ -1,0 +1,303 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Sniptale",
+    "packageName": "sniptale",
+    "license": "AGPL-3.0-or-later",
+    "author": "Lev Rozhkov",
+    "copyright": "Copyright (C) 2026 Lev Rozhkov"
+  },
+  "workspacePackages": [
+    "package.json",
+    "apps/extension/package.json",
+    "packages/foundation/package.json",
+    "packages/platform/package.json",
+    "packages/runtime-contracts/package.json",
+    "packages/ui/package.json"
+  ],
+  "legalFiles": [
+    {
+      "archivePath": "LICENSE",
+      "sha256": "e9df4c4e4e64b8168a71c3c67668dcffabbe8fca11d4ac4a7d5482562cd1679c",
+      "source": "LICENSE"
+    },
+    {
+      "archivePath": "LICENSES/OFL-1.1.txt",
+      "sha256": "d826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30",
+      "source": "LICENSES/OFL-1.1.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@iconify-icons__tabler-1.2.95.txt",
+      "sha256": "896d3e36cb41d19f279ce9ffb085a9f0d96e58db59c18f042242ff6c7e78d50f",
+      "source": "LICENSES/dependencies/@iconify-icons__tabler-1.2.95.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@iconify__react-6.0.2.txt",
+      "sha256": "e1bae97794b9ccc31efbe671ca4dd03a0d3b6ea5cb496ce1b2c6e3531e36fdfd",
+      "source": "LICENSES/dependencies/@iconify__react-6.0.2.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@iconify__types-2.0.0.txt",
+      "sha256": "045ce74712fc613fdd74d1c55f5140a08d623836ff2aca44132b38d68fbc67ad",
+      "source": "LICENSES/dependencies/@iconify__types-2.0.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt",
+      "sha256": "ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047",
+      "source": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/core-util-is-1.0.3.txt",
+      "sha256": "33b734d60042d0fe0c92dd1fc1e874193a1c899ec3e276a2eb935d2d0bf5b710",
+      "source": "LICENSES/dependencies/core-util-is-1.0.3.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/dompurify-3.4.12.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "source": "LICENSES/dependencies/dompurify-3.4.12.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/fabric-7.4.0.txt",
+      "sha256": "eda412692b7398293a049ecf913319da26eb8f7fe27f10709821dd187b517e0b",
+      "source": "LICENSES/dependencies/fabric-7.4.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/hachure-fill-0.5.2.txt",
+      "sha256": "5e807b516a9be9229ed459880bf353a336e2d947867247290680d437017be391",
+      "source": "LICENSES/dependencies/hachure-fill-0.5.2.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/idb-8.0.3.txt",
+      "sha256": "873a2f333fda393ec3464f4579209b019d98e97c3bf498b10e85f630162fd708",
+      "source": "LICENSES/dependencies/idb-8.0.3.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/immediate-3.0.6.txt",
+      "sha256": "809e66de579fb7d92503848bbe6d1f348f4f6521a71e5d294fe7cc0c87a3b4ff",
+      "source": "LICENSES/dependencies/immediate-3.0.6.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/inherits-2.0.4.txt",
+      "sha256": "5ffe28e7ade7d8f10d85d5337a73fd793dac5c462fb9a28fbf8c5046c7fbca3b",
+      "source": "LICENSES/dependencies/inherits-2.0.4.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/isarray-1.0.0.txt",
+      "sha256": "a1bd5deadb6a06dd74efa852c1b8b23f63b67f2214fbe9c8bd591da51da69268",
+      "source": "LICENSES/dependencies/isarray-1.0.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/jszip-3.10.1.txt",
+      "sha256": "566c953c6090b1218ca6217dd7359d45dde46581968586dc607d59a78af6a9c4",
+      "source": "LICENSES/dependencies/jszip-3.10.1.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/lie-3.3.0.txt",
+      "sha256": "5c81b0caa98593408b03125efa25efe622341ed87ae55561968828cd887d64a4",
+      "source": "LICENSES/dependencies/lie-3.3.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/lucide-react-0.575.0.txt",
+      "sha256": "668dcc52803480e0a026b31140a4cae668772663cd764e5991d252eef03f98db",
+      "source": "LICENSES/dependencies/lucide-react-0.575.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/mediabunny-1.46.0.txt",
+      "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+      "source": "LICENSES/dependencies/mediabunny-1.46.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/mp4-muxer-5.2.2.txt",
+      "sha256": "75c54aae7ef6ad652f684f9dd3b71e4dcef86ccebd88cf441ceed7f5eec037c5",
+      "source": "LICENSES/dependencies/mp4-muxer-5.2.2.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/pako-1.0.11.txt",
+      "sha256": "a04665b3b2de56c66730c1f720f528175739e4104f79073614aa611da1e85539",
+      "source": "LICENSES/dependencies/pako-1.0.11.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/path-data-parser-0.1.0.txt",
+      "sha256": "e9754a00aebde654e80f40bcf41dab667d6a41dfbbd2912bcf14fb07d468bf71",
+      "source": "LICENSES/dependencies/path-data-parser-0.1.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/points-on-curve-0.2.0.txt",
+      "sha256": "e9754a00aebde654e80f40bcf41dab667d6a41dfbbd2912bcf14fb07d468bf71",
+      "source": "LICENSES/dependencies/points-on-curve-0.2.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/points-on-path-0.2.1.txt",
+      "sha256": "b6fc1f7f1d96a48bc97176f3dcef959e364c5c17ba44167511de421500a86c6c",
+      "source": "LICENSES/dependencies/points-on-path-0.2.1.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/process-nextick-args-2.0.1.txt",
+      "sha256": "ecdccbcf39024f624ded480c01c0b25458e1eca8f26ecf040933865ce56d9a4f",
+      "source": "LICENSES/dependencies/process-nextick-args-2.0.1.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/react-19.2.5.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "source": "LICENSES/dependencies/react-19.2.5.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/react-dom-19.2.5.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "source": "LICENSES/dependencies/react-dom-19.2.5.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/readable-stream-2.3.8.txt",
+      "sha256": "ec62dc96da0099b87f4511736c87309335527fb7031639493e06c95728dc8c54",
+      "source": "LICENSES/dependencies/readable-stream-2.3.8.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/roughjs-4.6.6.txt",
+      "sha256": "dca9a392272606ac748ac0976a2a1133f14eef841c27beaa51a844d53c56a09d",
+      "source": "LICENSES/dependencies/roughjs-4.6.6.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/safe-buffer-5.1.2.txt",
+      "sha256": "c7cc929b57080f4b9d0c6cf57669f0463fc5b39906344dfc8d3bc43426b30eac",
+      "source": "LICENSES/dependencies/safe-buffer-5.1.2.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/scheduler-0.27.0.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "source": "LICENSES/dependencies/scheduler-0.27.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/setimmediate-1.0.5.txt",
+      "sha256": "c4b4ad3a5746f1f5249a6dd90396ec519264e1bb02e01e48a6522c48a3a97cb4",
+      "source": "LICENSES/dependencies/setimmediate-1.0.5.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/string_decoder-1.1.1.txt",
+      "sha256": "11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b",
+      "source": "LICENSES/dependencies/string_decoder-1.1.1.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/use-sync-external-store-1.6.0.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "source": "LICENSES/dependencies/use-sync-external-store-1.6.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/util-deprecate-1.0.2.txt",
+      "sha256": "0154425673db15cdfa80ecba2c9b1f1a867f7197a006764712849bfc3a93cbb7",
+      "source": "LICENSES/dependencies/util-deprecate-1.0.2.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/zod-4.3.6.txt",
+      "sha256": "3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8",
+      "source": "LICENSES/dependencies/zod-4.3.6.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/zustand-4.5.7.txt",
+      "sha256": "c1e6e266563517467b1bf874817d23e426f3149252bd7d42758cd697514b8417",
+      "source": "LICENSES/dependencies/zustand-4.5.7.txt"
+    },
+    {
+      "archivePath": "NOTICE",
+      "sha256": "a35ee4ae151a38693b3faaf4fe9bd9d28d5587969e7557bc3136aee47d333ef5",
+      "source": "NOTICE"
+    },
+    {
+      "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
+      "sha256": "2b186f9798a85b7b1626de93b48f6861e493901c5b98c359989c7e5dfb02b350",
+      "source": "THIRD_PARTY_DEPENDENCIES.json"
+    },
+    {
+      "archivePath": "THIRD_PARTY_NOTICES.md",
+      "sha256": "e6819b0eb7a39357d75056ca9b132b41174d8d397b3bb55e7b5a76d5773efb8e",
+      "source": "THIRD_PARTY_NOTICES.md"
+    }
+  ],
+  "bundledAssets": [
+    {
+      "id": "manrope",
+      "sourcePackage": "@fontsource-variable/manrope",
+      "version": "5.2.8",
+      "license": "OFL-1.1",
+      "copyright": "Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)",
+      "artifacts": [
+        {
+          "path": "apps/extension/public/fonts/manrope-cyrillic-wght-normal.woff2",
+          "sha256": "c268b459a9329e59fecf39a17618efd44c71735532048d60b12aab76a8c14914",
+          "sourcePath": "node_modules/@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2"
+        },
+        {
+          "path": "apps/extension/public/fonts/manrope-latin-ext-wght-normal.woff2",
+          "sha256": "3911b66d9f2e005a4b989223405d0e5032619c668597ba467cc76a23c8fffcfb",
+          "sourcePath": "node_modules/@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2"
+        },
+        {
+          "path": "apps/extension/public/fonts/manrope-latin-wght-normal.woff2",
+          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972",
+          "sourcePath": "node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2"
+        }
+      ]
+    }
+  ],
+  "contributorFiles": [
+    "README.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "docs/README.md"
+  ],
+  "releaseDocs": [
+    "README.md",
+    "CONTRIBUTING.md",
+    "docs/README.md",
+    "docs/oss/provenance.md",
+    "docs/oss/release.md"
+  ],
+  "releaseConsumerManifest": "tooling/configs/qa/oss-release-consumers.data.json",
+  "dependencyLegal": {
+    "manifestPath": "THIRD_PARTY_DEPENDENCIES.json",
+    "licenseDirectory": "LICENSES/dependencies",
+    "canonicalLicenseAliases": [
+      {
+        "packageName": "@fontsource-variable/manrope",
+        "version": "5.2.8",
+        "archivePath": "LICENSES/OFL-1.1.txt",
+        "sha256": "d826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30"
+      }
+    ],
+    "pinnedSources": [
+      {
+        "packageName": "@iconify-icons/tabler",
+        "packageVersion": "1.2.95",
+        "packageResolved": "https://registry.npmjs.org/@iconify-icons/tabler/-/tabler-1.2.95.tgz",
+        "packageIntegrity": "sha512-d7bcyNs/AHWcdTwN+2/yohPeU0Kg5jvzt9JiLFnTnx9HYc54q2cU08rSEF0rIVHB5PEP9M8dTN/ZFxquAFCamw==",
+        "upstreamVersion": "2.40.0",
+        "upstreamAuthorName": "Paweł Kuna",
+        "upstreamAuthorUrl": "https://github.com/tabler/tabler-icons",
+        "upstreamLicenseMetadataUrl": "https://github.com/tabler/tabler-icons/blob/master/LICENSE",
+        "license": "MIT",
+        "originUrl": "https://raw.githubusercontent.com/tabler/tabler-icons/v2.40.0/LICENSE",
+        "sourcePath": "tooling/release/dependency-legal/sources/tabler-icons-2.40.0.LICENSE",
+        "sha256": "896d3e36cb41d19f279ce9ffb085a9f0d96e58db59c18f042242ff6c7e78d50f"
+      }
+    ],
+    "reviewedSelections": [
+      {
+        "packageName": "dompurify",
+        "version": "3.4.12",
+        "selectedLicense": "Apache-2.0"
+      },
+      {
+        "packageName": "jszip",
+        "version": "3.10.1",
+        "selectedLicense": "MIT"
+      }
+    ]
+  },
+  "forbiddenReleaseDocFragments": [
+    "/home/",
+    "packages/legacy-shared",
+    "Status: blocked for public OSS release"
+  ],
+  "securityReporting": "excluded",
+  "nativeCompanion": "separate-repository",
+  "publication": "local-only"
+}

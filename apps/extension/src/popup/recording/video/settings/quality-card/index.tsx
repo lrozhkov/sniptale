@@ -1,0 +1,1 @@
+export { QualityCard } from './view';

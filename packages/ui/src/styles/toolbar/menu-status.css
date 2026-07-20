@@ -1,0 +1,41 @@
+/* ========================================
+ * Toolbar Menu Status
+ * ======================================== */
+
+.sniptale-timer-badge,
+.sniptale-viewport-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sniptale-color-accent);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sniptale-timer-badge {
+  font-size: 13px;
+  letter-spacing: -0.04em;
+}
+
+.sniptale-viewport-badge {
+  flex-direction: column;
+  gap: 0;
+  font-size: 8px;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+}
+
+.sniptale-viewport-badge span {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: clip;
+}

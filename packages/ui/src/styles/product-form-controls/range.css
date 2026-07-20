@@ -1,0 +1,179 @@
+.sniptale-range {
+  --sniptale-range-fill-ratio: 50%;
+  --sniptale-range-shell-height: 40px;
+  --sniptale-range-shell-padding-inline: 0px;
+  --sniptale-range-shell-radius: 12px;
+  --sniptale-range-shell-border-idle: transparent;
+  --sniptale-range-shell-bg-idle: transparent;
+  --sniptale-range-shell-shadow-idle: none;
+  --sniptale-range-shell-border-hover: transparent;
+  --sniptale-range-shell-bg-hover: transparent;
+  --sniptale-range-shell-shadow-hover: none;
+  --sniptale-range-shell-border-active: transparent;
+  --sniptale-range-shell-bg-active: transparent;
+  --sniptale-range-shell-shadow-active: none;
+  --sniptale-range-thumb-size: 16px;
+  --sniptale-range-thumb-inner-inset: 5px;
+  --sniptale-range-thumb-hover-inset: 2px;
+  --sniptale-range-track-height: 6px;
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: var(--sniptale-range-shell-height);
+  padding-inline: var(--sniptale-range-shell-padding-inline);
+  border: 1px solid var(--sniptale-range-shell-border-idle);
+  border-radius: var(--sniptale-range-shell-radius);
+  background: var(--sniptale-range-shell-bg-idle);
+  box-shadow: var(--sniptale-range-shell-shadow-idle);
+  outline: none;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s;
+}
+
+.sniptale-range:hover {
+  background: var(--sniptale-range-shell-bg-hover);
+  border-color: var(--sniptale-range-shell-border-hover);
+  box-shadow: var(--sniptale-range-shell-shadow-hover);
+}
+
+.sniptale-range:focus-visible,
+.sniptale-range:active {
+  background: var(--sniptale-range-shell-bg-active);
+  border-color: var(--sniptale-range-shell-border-active);
+  box-shadow: var(--sniptale-range-shell-shadow-active);
+}
+
+.sniptale-range::-webkit-slider-runnable-track {
+  height: var(--sniptale-range-track-height);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--sniptale-color-accent) 88%, white 12%) 0,
+    color-mix(in srgb, var(--sniptale-color-accent) 88%, white 12%) var(--sniptale-range-fill-ratio),
+    color-mix(
+        in srgb,
+        var(--sniptale-color-border-subtle) 76%,
+        var(--sniptale-color-surface-canvas) 24%
+      )
+      var(--sniptale-range-fill-ratio),
+    color-mix(
+        in srgb,
+        var(--sniptale-color-border-subtle) 76%,
+        var(--sniptale-color-surface-canvas) 24%
+      )
+      100%
+  );
+}
+
+.sniptale-range.sniptale-range--edge::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.sniptale-range.sniptale-color-selector-hue-range::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    90deg,
+    #ff0000 0%,
+    #ffff00 16.666%,
+    #00ff00 33.333%,
+    #00ffff 50%,
+    #0000ff 66.666%,
+    #ff00ff 83.333%,
+    #ff0000 100%
+  );
+}
+
+.sniptale-range::-moz-range-track {
+  height: var(--sniptale-range-track-height);
+  border-radius: 999px;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-border-subtle) 76%,
+    var(--sniptale-color-surface-canvas) 24%
+  );
+}
+
+.sniptale-range.sniptale-range--edge::-moz-range-track,
+.sniptale-range.sniptale-range--edge::-moz-range-progress {
+  background: transparent;
+}
+
+.sniptale-range.sniptale-color-selector-hue-range::-moz-range-track {
+  background: linear-gradient(
+    90deg,
+    #ff0000 0%,
+    #ffff00 16.666%,
+    #00ff00 33.333%,
+    #00ffff 50%,
+    #0000ff 66.666%,
+    #ff00ff 83.333%,
+    #ff0000 100%
+  );
+}
+
+.sniptale-range::-moz-range-progress {
+  height: var(--sniptale-range-track-height);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sniptale-color-accent) 88%, white 12%);
+}
+
+.sniptale-range.sniptale-color-selector-hue-range::-moz-range-progress {
+  background: transparent;
+}
+
+.sniptale-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--sniptale-range-thumb-size);
+  height: var(--sniptale-range-thumb-size);
+  border: 1px solid
+    color-mix(in srgb, var(--sniptale-color-accent) 22%, var(--sniptale-color-border-soft) 78%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sniptale-color-accent) 44%, white 56%);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent),
+    0 2px 5px color-mix(in srgb, var(--sniptale-color-overlay) 16%, transparent),
+    inset 0 0 0 var(--sniptale-range-thumb-inner-inset) color-mix(in srgb, white 96%, #fffcf8 4%);
+  cursor: pointer;
+  transition: box-shadow 0.18s ease-out;
+}
+
+.sniptale-range::-webkit-slider-thumb {
+  margin-top: calc((var(--sniptale-range-track-height) - var(--sniptale-range-thumb-size)) / 2);
+}
+
+.sniptale-range:hover:not(:active)::-webkit-slider-thumb {
+  --sniptale-range-thumb-inner-inset: var(--sniptale-range-thumb-hover-inset);
+}
+
+.sniptale-range:active::-webkit-slider-thumb {
+  --sniptale-range-thumb-inner-inset: 3.5px;
+  transition: none;
+}
+
+.sniptale-range::-moz-range-thumb {
+  appearance: none;
+  width: var(--sniptale-range-thumb-size);
+  height: var(--sniptale-range-thumb-size);
+  border: 1px solid
+    color-mix(in srgb, var(--sniptale-color-accent) 22%, var(--sniptale-color-border-soft) 78%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sniptale-color-accent) 44%, white 56%);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent),
+    0 2px 5px color-mix(in srgb, var(--sniptale-color-overlay) 16%, transparent),
+    inset 0 0 0 var(--sniptale-range-thumb-inner-inset) color-mix(in srgb, white 96%, #fffcf8 4%);
+  cursor: pointer;
+  transition: box-shadow 0.18s ease-out;
+}
+
+.sniptale-range:hover:not(:active)::-moz-range-thumb {
+  --sniptale-range-thumb-inner-inset: var(--sniptale-range-thumb-hover-inset);
+}
+
+.sniptale-range:active::-moz-range-thumb {
+  --sniptale-range-thumb-inner-inset: 3.5px;
+  transition: none;
+}

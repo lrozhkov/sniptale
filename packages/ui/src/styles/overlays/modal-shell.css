@@ -1,0 +1,51 @@
+/* Unified Matte Overlays: Modal Shell */
+
+.sniptale-modal-backdrop {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-overlay) 76%,
+    var(--sniptale-color-surface-overlay) 24%
+  );
+}
+
+.sniptale-modal {
+  background: color-mix(in srgb, var(--sniptale-color-surface-panel) 99%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 84%, transparent);
+  box-shadow: 0 20px 44px color-mix(in srgb, var(--sniptale-color-overlay) 20%, transparent);
+}
+
+.sniptale-modal,
+.sniptale-modal * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sniptale-modal :is(input, textarea, select, [contenteditable]),
+.sniptale-modal [contenteditable] * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.sniptale-modal-header,
+.sniptale-modal-header-sm,
+.sniptale-modal-footer,
+.sniptale-modal-footer-sm {
+  border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 72%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-surface-panel) 99%, transparent);
+}
+
+.sniptale-modal-body,
+.sniptale-modal-body-sm {
+  background: transparent;
+}
+
+.sniptale-modal-close {
+  border: none;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-modal-close:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 78%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}

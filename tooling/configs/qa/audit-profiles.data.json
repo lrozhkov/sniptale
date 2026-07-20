@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "defaultProfile": "repository",
+  "profiles": [
+    {
+      "id": "repository",
+      "description": "Repository-wide local controls with external heavyweight engines reported when available.",
+      "gitleaksScopes": ["worktree"],
+      "controls": [
+        { "id": "full-product-coverage", "requirement": "required" },
+        { "id": "audit-evidence", "requirement": "required" },
+        { "id": "topology-report", "requirement": "required" },
+        { "id": "npm-audit", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "osv-scanner", "requirement": "required" },
+        { "id": "gitleaks", "requirement": "required" },
+        { "id": "license-inventory", "requirement": "required" },
+        { "id": "ast-grep", "requirement": "required" },
+        { "id": "knip", "requirement": "required" },
+        { "id": "jscpd", "requirement": "required" },
+        { "id": "semgrep", "requirement": "optional" },
+        { "id": "codeql", "requirement": "optional" }
+      ]
+    },
+    {
+      "id": "security",
+      "description": "Security and supply-chain controls with all security engines and Git history scanning required.",
+      "gitleaksScopes": ["worktree", "history"],
+      "controls": [
+        { "id": "full-product-coverage", "requirement": "excluded" },
+        { "id": "audit-evidence", "requirement": "required" },
+        { "id": "topology-report", "requirement": "excluded" },
+        { "id": "npm-audit", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "osv-scanner", "requirement": "required" },
+        { "id": "gitleaks", "requirement": "required" },
+        { "id": "license-inventory", "requirement": "excluded" },
+        { "id": "ast-grep", "requirement": "required" },
+        { "id": "knip", "requirement": "excluded" },
+        { "id": "jscpd", "requirement": "excluded" },
+        { "id": "semgrep", "requirement": "required" },
+        { "id": "codeql", "requirement": "required" }
+      ]
+    },
+    {
+      "id": "release",
+      "description": "Complete release audit with every registered control and Git history scanning required.",
+      "gitleaksScopes": ["worktree", "history"],
+      "controls": [
+        { "id": "full-product-coverage", "requirement": "required" },
+        { "id": "audit-evidence", "requirement": "required" },
+        { "id": "topology-report", "requirement": "required" },
+        { "id": "npm-audit", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "osv-scanner", "requirement": "required" },
+        { "id": "gitleaks", "requirement": "required" },
+        { "id": "license-inventory", "requirement": "required" },
+        { "id": "ast-grep", "requirement": "required" },
+        { "id": "knip", "requirement": "required" },
+        { "id": "jscpd", "requirement": "required" },
+        { "id": "semgrep", "requirement": "required" },
+        { "id": "codeql", "requirement": "required" }
+      ]
+    }
+  ]
+}

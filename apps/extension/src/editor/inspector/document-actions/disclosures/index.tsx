@@ -1,0 +1,1 @@
+export { EditorDocumentImageFormatContent } from './content';

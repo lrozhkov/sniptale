@@ -1,0 +1,105 @@
+.sniptale-ai-modal-footer-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sniptale-ai-modal-footer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.sniptale-ai-modal-submit-tip-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.sniptale-ai-modal-submit-tip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 2;
+  display: grid;
+  width: min(320px, calc(100vw - 48px));
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--sniptale-border) 84%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--sniptale-color-surface-panel) 98%, transparent);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--sniptale-color-overlay) 16%, transparent);
+  color: var(--sniptale-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease,
+    visibility 0.14s ease;
+  visibility: hidden;
+}
+
+.sniptale-ai-modal-submit-tip-anchor:hover .sniptale-ai-modal-submit-tip,
+.sniptale-ai-modal-submit-tip-anchor:focus-within .sniptale-ai-modal-submit-tip {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.sniptale-ai-modal-submit-tip::after {
+  position: absolute;
+  right: 24px;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid color-mix(in srgb, var(--sniptale-border) 84%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--sniptale-border) 84%, transparent);
+  background: inherit;
+  content: '';
+  transform: rotate(45deg);
+}
+
+.sniptale-ai-modal-submit-tip-title {
+  color: var(--sniptale-text-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sniptale-ai-modal-submit-tip-copy {
+  margin: 0;
+}
+
+.sniptale-ai-modal-token-icon,
+.sniptale-ai-model-selector-icon {
+  color: var(--sniptale-text-muted);
+}
+
+.sniptale-ai-modal-token-text,
+.sniptale-ai-model-selector-label {
+  color: var(--sniptale-text-muted);
+  font-size: 12px;
+}
+
+.sniptale-ai-model-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+
+.sniptale-ai-model-selector-empty {
+  padding: 8px 10px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--sniptale-text-dim);
+}
+
+.sniptale-ai-model-selector-section-label {
+  padding: 6px 10px 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sniptale-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}

@@ -1,0 +1,98 @@
+{
+  "$comment": "Exact jscpd detector owner-family identity/scope. Disposition metadata is owned only by technical-debt.data.json.",
+  "version": 3,
+  "description": "Constrained qa:audit jscpd inventory for the current repository tree.",
+  "families": [
+    {
+      "family": "packages/ui/src",
+      "count": 5,
+      "lines": 89,
+      "debtId": "accepted.jscpd.shared-ui-styles.baff6188de2b",
+      "sampleFingerprint": "6454ec8a1e84850236136ad0c6558752c292b32be82baa782fc264fd3fb44c80"
+    },
+    {
+      "family": "apps/extension/src/scenario-editor/workspace/quick-edit",
+      "count": 1,
+      "lines": 35,
+      "debtId": "accepted.jscpd.scenario-editor-workspace-quick-edit.4ea1649b146d",
+      "sampleFingerprint": "e48ed701389c6e4b063d0e56be271e0354c015d0abd6852a2d97187fc59d9df6"
+    },
+    {
+      "family": "apps/extension/src/background/runtime/page-access",
+      "count": 1,
+      "lines": 14,
+      "debtId": "accepted.jscpd.background-page-access-actions.fee50b3f97f5",
+      "sampleFingerprint": "b8cf9375b9269daa29fe40043f21b14408a7fc40d6ac00878a0b73c96f88dae8"
+    },
+    {
+      "family": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/editor/controller/document",
+      "count": 1,
+      "lines": 14,
+      "debtId": "accepted.jscpd.content-parser-web-snapshot-src-editor-controller-document.e8dcd333035b",
+      "sampleFingerprint": "3418f5388ea01b2c64f34d33ab6e419b08ab0bb409a30ecc6b31f47cf2adfdde"
+    },
+    {
+      "family": "apps/extension/src/features/editor/document",
+      "count": 1,
+      "lines": 14,
+      "debtId": "noise.jscpd.features-editor-document.1680e8d9ddfd",
+      "sampleFingerprint": "c331c4d4b537aea2b43cfb1ad8abc8058c5fd2296a3f0ad1ebfe32821392a971"
+    },
+    {
+      "family": "apps/extension/src/features/video/composition",
+      "count": 1,
+      "lines": 13,
+      "debtId": "noise.jscpd.features-video-composition.99cdaed32ae2",
+      "sampleFingerprint": "8c12a1f8d543eb643732a6ae309bb8ea64053dde9edbddac26526ece30d853b8"
+    },
+    {
+      "family": "apps/extension/src/video-editor/project/state",
+      "count": 1,
+      "lines": 9,
+      "debtId": "noise.jscpd.video-editor-project-state.13ea06eb0f26",
+      "sampleFingerprint": "4414b41209bb2f2bbeb99debbcde0f1665bc38269d867e950057bb546de71380"
+    },
+    {
+      "family": "apps/extension/src/background/ai/settings",
+      "count": 1,
+      "lines": 12,
+      "debtId": "accepted.jscpd.ai-secret-unlock-tests.4216f30002d6",
+      "sampleFingerprint": "e8205b5199489dfba25eb4efbf2dfa795839c7dbc56daf2d1cbfd962b7318ece"
+    },
+    {
+      "family": "apps/extension/src/features/media-hub",
+      "count": 1,
+      "lines": 12,
+      "debtId": "noise.jscpd.src-features-media-hub.c7ffa0eb4285",
+      "sampleFingerprint": "cfec7dd03af566fb9a745004f2212301dfd53d0b7483b9b1e043d6584349543f"
+    },
+    {
+      "family": "apps/extension/src/background/capture/native-app",
+      "count": 1,
+      "lines": 10,
+      "debtId": "noise.jscpd.background-capture-native-app.bffd5da0ae9d",
+      "sampleFingerprint": "d26fd7f0a04f51d993f5c37ebe210fdb929b8b87faad162b910a1dfaabb8d22b"
+    },
+    {
+      "family": "apps/extension/src/content/selection/frame-settings-popover",
+      "count": 1,
+      "lines": 9,
+      "debtId": "noise.jscpd.content-selection-frame-settings-popover.0f926c027424",
+      "sampleFingerprint": "55c139b5f88bc3321c9fd3ed2214a15a6b27296e7cdb29738670dc6e2305fc2d"
+    },
+    {
+      "family": "apps/extension/src/editor/controller/freehand",
+      "count": 1,
+      "lines": 9,
+      "debtId": "accepted.jscpd.editor-controller-freehand.0d071be4fb41",
+      "sampleFingerprint": "088168f00790609fe163b9e4e83e2199d176f0e34b3584d7a0c4fdd3f08b43f0"
+    },
+    {
+      "family": "apps/extension/src/composition/persistence/scenario",
+      "count": 1,
+      "lines": 8,
+      "debtId": "noise.jscpd.composition-persistence-scenario.4647d3736115",
+      "sampleFingerprint": "bacf2fc5aa7b239dff4352f7bbd5108029d33ef28afe59b8c4bda5fb4adf92ae"
+    }
+  ]
+}

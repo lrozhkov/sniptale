@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Sniptale E2E Host</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 0;
+        padding: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 data-testid="host-page-title">Sniptale E2E Host</h1>
+      <p>This page exists so the content script can inject on a real http origin.</p>
+      <iframe
+        data-testid="host-same-origin-frame"
+        src="/fixtures/host-frame.html"
+        title="Same-origin host frame"
+      ></iframe>
+      <button id="host-action" type="button">Host action</button>
+      <p data-testid="host-action-status">Idle</p>
+    </main>
+    <script>
+      (() => {
+        const actionButton = document.getElementById('host-action');
+        const statusNode = document.querySelector('[data-testid="host-action-status"]');
+        let clicks = 0;
+
+        if (!(actionButton instanceof HTMLButtonElement) || !(statusNode instanceof HTMLElement)) {
+          return;
+        }
+
+        actionButton.addEventListener('click', () => {
+          clicks += 1;
+          statusNode.textContent = `Clicked ${clicks} time${clicks === 1 ? '' : 's'}`;
+        });
+      })();
+    </script>
+  </body>
+</html>

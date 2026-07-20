@@ -1,0 +1,1 @@
+export { syncTextSelectionSettings } from './dispatch';

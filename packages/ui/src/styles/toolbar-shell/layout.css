@@ -1,0 +1,75 @@
+.sniptale-toolbar {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  inline-size: max-content;
+  height: auto;
+  min-height: var(--sniptale-toolbar-shell-height);
+  padding: var(--sniptale-toolbar-shell-padding);
+  gap: var(--sniptale-toolbar-gap);
+  background: var(--sniptale-bg-panel);
+  border: 1px solid var(--sniptale-border);
+  border-radius: var(--sniptale-radius);
+  box-shadow: var(--sniptale-shadow);
+  interpolate-size: allow-keywords;
+  animation: toolbarEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+  transition:
+    inline-size 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    min-height 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    gap 140ms cubic-bezier(0.22, 1, 0.36, 1);
+  user-select: none;
+}
+
+.sniptale-toolbar.sniptale-toolbar-dragging {
+  opacity: 0.96;
+  box-shadow:
+    0 18px 34px -22px color-mix(in srgb, var(--sniptale-color-shadow-strong) 28%, transparent),
+    0 8px 18px -12px color-mix(in srgb, var(--sniptale-color-shadow-strong) 18%, transparent);
+}
+
+.sniptale-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: var(--sniptale-toolbar-button-size);
+  margin-right: 2px;
+  border-radius: var(--sniptale-radius-md);
+  color: var(--sniptale-color-text-dim);
+}
+
+.sniptale-drag-handle:hover {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 18%,
+    var(--sniptale-color-surface-panel) 82%
+  );
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-drag-handle svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sniptale-group {
+  display: flex;
+  align-items: center;
+  gap: var(--sniptale-toolbar-gap);
+}
+
+.sniptale-mode-wrapper,
+.sniptale-settings-wrapper {
+  position: relative;
+}
+
+.sniptale-divider {
+  margin: var(--sniptale-toolbar-divider-margin);
+}
+
+.sniptale-spacer {
+  flex: 1 1 20px;
+}

@@ -1,0 +1,13 @@
+export const STORE_NAME = 'recordings';
+export const RECORDING_TELEMETRY_STORE = 'recording_telemetry';
+export const PROJECT_ASSETS_STORE = 'project_assets';
+export const PROJECT_EXPORTS_STORE = 'project_exports';
+export const SCENARIO_ASSETS_STORE = 'scenario_assets';
+export const SCENARIO_EXPORTS_STORE = 'scenario_exports';
+export const SCENARIO_PROJECTS_STORE = 'scenario_projects';
+export const SCENARIO_STEP_EDITOR_DOCUMENTS_STORE = 'scenario_step_editor_documents';
+export const MEDIA_LIBRARY_STORE = 'media_library';
+export const THUMBNAILS_STORE = 'thumbnails';
+export const VIDEO_PROJECTS_STORE = 'video_projects';
+export const VIDEO_EFFECT_BUNDLES_STORE = 'video_effect_bundles';
+export const WEB_SNAPSHOTS_STORE = 'web_snapshots';

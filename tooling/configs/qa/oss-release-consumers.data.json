@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "consumers": [
+    {
+      "category": "archive-integration",
+      "path": "apps/extension/build/layout.data.json",
+      "sha256": "2efc59ec269c53d88993de1230bc4a974a20b0373c398bb8282c0ff4c85aacf2"
+    },
+    {
+      "category": "bundled-font",
+      "path": "apps/extension/build/layout.data.json",
+      "sha256": "2efc59ec269c53d88993de1230bc4a974a20b0373c398bb8282c0ff4c85aacf2"
+    },
+    {
+      "category": "bundled-font",
+      "path": "apps/extension/manifest.json",
+      "sha256": "7ed38a8670752c47d5f7f6d853e9c5950c951ea29a1db5b578ef83119f919d69"
+    },
+    {
+      "category": "bundled-font",
+      "path": "apps/extension/vite.config.ts",
+      "sha256": "f71509f16d741e2da5fa3766e81412cfae9bb7d9e383634cf261a7f0946dfc23"
+    },
+    {
+      "category": "archive-integration",
+      "path": "package.json",
+      "sha256": "20bdaa767c1cda17ca0e9b1ca3f1f55aa4b22af031803602d02089b8a4507670"
+    },
+    {
+      "category": "release-command",
+      "path": "package.json",
+      "sha256": "20bdaa767c1cda17ca0e9b1ca3f1f55aa4b22af031803602d02089b8a4507670"
+    },
+    {
+      "category": "bundled-font",
+      "path": "packages/ui/src/styles/fonts.css",
+      "sha256": "ea275a2cc153960b3d7f15cc248275ba32c430781dc283a71cbcb73cf629bf65"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/configs/qa/control-dispositions.data.json",
+      "sha256": "765e8e1db3af837db7a5c36c2ef8148b5e0464659e867960657338c7effc3997"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/configs/qa/control-dispositions.data.json",
+      "sha256": "765e8e1db3af837db7a5c36c2ef8148b5e0464659e867960657338c7effc3997"
+    },
+    {
+      "category": "bundled-font",
+      "path": "tooling/configs/qa/manifest-permissions.data.json",
+      "sha256": "e53bb2845e30ad404b0be8d856d73bb5db6695793132243ab73c586b4f10f673"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/configs/qa/technical-debt.data.json",
+      "sha256": "b0705eea37e45127e5d8220be8532a2e6a6a422901b6bb26206c21713ae6f20f"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/configs/qa/technical-debt.data.json",
+      "sha256": "b0705eea37e45127e5d8220be8532a2e6a6a422901b6bb26206c21713ae6f20f"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/configs/qa/validation-manifest.json",
+      "sha256": "2ed54770eeee19c8d3874ae9ef0189048734cd64711cfef778f48534bb86ec76"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/configs/qa/validation-manifest.json",
+      "sha256": "2ed54770eeee19c8d3874ae9ef0189048734cd64711cfef778f48534bb86ec76"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/qa/core/oss-release-validation.tree.mjs",
+      "sha256": "497c436f75b1bf646603ccc1957d832f6164fbcf667fa6fc78e0123483c15de6"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
+      "sha256": "0c9bb5bdc262117a31f22f33e9bd810e2621b8524d12e2b88e6616213c6f3119"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
+      "sha256": "0c9bb5bdc262117a31f22f33e9bd810e2621b8524d12e2b88e6616213c6f3119"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/qa/core/qa-steps/definitions.mjs",
+      "sha256": "a9990fd5ce793440b699563af9eb590e1d3edabadc0e872d028539bbb8ea419c"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/qa/core/qa-steps/policy/domain-labels.mjs",
+      "sha256": "cb453f6304458d54b0003b0e11f8e77d3fec4acd8b764bc5ea18b221b839ad9f"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/qa/core/qa-steps/policy/source.mjs",
+      "sha256": "33445d3fd0b6b1eeda288ce9bc87ed6b81760bf719f1c5df8f7c1cc7724aa78f"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/qa/core/verify-all.violation-steps.architecture.mjs",
+      "sha256": "76e5aa662907c7e73df6b9267b437980406e6b739d3689c45fc0ee14910105c1"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/qa/core/verify-closeout-step-helpers.mjs",
+      "sha256": "c33eceb1b6b8136d3a079e923c8892c06655f1268aded00728badde1e34a79a5"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/qa/core/verify-focused-triggered.execution.mjs",
+      "sha256": "f894d55a2cd3e20f20f3ce9d1774399411639282c729990b49260978451b234e"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/qa/core/verify-focused-triggered.helpers.mjs",
+      "sha256": "02073cae7a59f3137af3c792d3cba1276e2b177e3060cf6bb6f33eefc2c2ab56"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/qa/core/verify-release-archive.mjs",
+      "sha256": "33e9ac209630a97309be452bf6ceaa32efb5d7547ca9a7b67fa3d78c31c687c4"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/qa/evidence/repo-audit-evidence/verification-profile.owner-proof.data.mjs",
+      "sha256": "a6aadafc87f039170196ca633f5894652485080b4f2f0abc019851ed8f5fcf93"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/release/artifact-security.mjs",
+      "sha256": "2e16c4326ffe55f8f7d0daf2f935f4296c3548fb0836b289a6c07144d422968f"
+    },
+    {
+      "category": "bundled-font",
+      "path": "tooling/release/dependency-legal/test-support.ts",
+      "sha256": "b5755b2830fbcb8d12b02f10fa56584d6bf0efe990e1bde890b08f90cc83e03e"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/release/dependency-legal/validation.mjs",
+      "sha256": "80e9f4a9f1ca7e1a0d5b8cb592e46916088fb02146f26ad58ab2b2d34986ca8c"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/release/generate-dependency-legal.mjs",
+      "sha256": "4611cf0a4baf8697c898c9103fff4e1e171ce2be049abe0b57d5ba78ba6e62a3"
+    },
+    {
+      "category": "archive-integration",
+      "path": "tooling/release/package-dist.mjs",
+      "sha256": "45fb58ad0975e84df1e2f6f97221037090f7cd7781e345bd6f5d09f4cfc897d4"
+    }
+  ]
+}

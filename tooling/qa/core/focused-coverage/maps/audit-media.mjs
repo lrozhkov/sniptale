@@ -1,0 +1,38 @@
+export const AUDIT_MEDIA_OWNER_MAPPINGS = [
+  {
+    owner: 'audit-media-hub-backup-boundaries',
+    productionPrefix: 'apps/extension/src/workflows/media-hub-backup/',
+    exclusive: true,
+    reason: 'Audit backup import/export boundary changes are covered by focused backup suites.',
+    testFiles: [
+      'apps/extension/src/workflows/media-hub-backup/archive/provenance.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/archive/index.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/archive/web-snapshot-provenance.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/import/duplicate.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/export/projects/boundary.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/export/scenario-parser.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/metadata/blobs.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/metadata/projects.guards.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/metadata/projects.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/restore/project/assets-boundary.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/restore/project/preflight.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/restore/project/replace.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/restore/projects/index.test.ts',
+    ],
+  },
+  {
+    owner: 'audit-media-hub-assembly',
+    productionPrefix: 'apps/extension/src/features/media-hub/',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason: 'Media hub assembly backup surface is covered by focused backup tests.',
+    testFiles: [
+      'apps/extension/src/gallery/library/actions/backup.test.ts',
+      'apps/extension/src/workflows/media-hub/assembly.test.ts',
+      'apps/extension/src/workflows/media-hub/cleanup.inventory.test.ts',
+      'apps/extension/src/workflows/media-hub/cleanup.test.ts',
+      'apps/extension/src/features/media-hub/events/index.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/export/projects/boundary.test.ts',
+    ],
+  },
+];

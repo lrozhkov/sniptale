@@ -1,0 +1,142 @@
+.sniptale-json-preview {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 88%,
+    var(--sniptale-color-surface-panel)
+  );
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--sniptale-color-text-primary);
+  overflow: auto;
+  overflow-x: hidden;
+  max-height: 220px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Monaco, 'Courier New', monospace;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-all;
+}
+
+.sniptale-json-key {
+  color: var(--sniptale-color-info);
+}
+
+.sniptale-json-string {
+  color: var(--sniptale-color-success);
+}
+
+.sniptale-json-number {
+  color: var(--sniptale-color-accent);
+}
+
+.sniptale-json-boolean {
+  color: var(--sniptale-color-warning);
+}
+
+.sniptale-json-null {
+  color: var(--sniptale-color-text-dim);
+}
+
+.sniptale-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-panel) 88%,
+    var(--sniptale-color-surface-canvas) 12%
+  );
+  border: 1px solid color-mix(in srgb, var(--sniptale-text-main) 12%, transparent);
+  border-radius: 5px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sniptale-checkbox:hover {
+  border-color: color-mix(in srgb, var(--sniptale-text-main) 18%, transparent);
+  background: color-mix(in srgb, var(--sniptale-text-main) 6%, transparent);
+}
+
+.sniptale-checkbox:checked {
+  background: color-mix(in srgb, var(--sniptale-accent) 14%, transparent);
+  border-color: var(--sniptale-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-accent) 10%, transparent);
+}
+
+.sniptale-checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--sniptale-accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.sniptale-checkbox-sm {
+  width: 14px;
+  height: 14px;
+}
+
+.sniptale-checkbox-sm:checked::after {
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 7px;
+}
+
+.sniptale-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: transparent;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.sniptale-tree-row:hover {
+  background: color-mix(in srgb, var(--sniptale-text-main) 5%, transparent);
+}
+
+.sniptale-tree-row-selected {
+  background: transparent;
+  border-left: 2px solid var(--sniptale-accent);
+  border-radius: 4px;
+  box-shadow: inset 0 0 20px color-mix(in srgb, var(--sniptale-accent) 8%, transparent);
+}
+
+.sniptale-tree-row-field,
+.sniptale-tree-row-table {
+  padding: 5px 10px;
+}
+
+.sniptale-tree-row-field {
+  margin-bottom: 2px;
+}
+
+.sniptale-tree-row-field-selected {
+  background: transparent;
+}
+
+.sniptale-ai-field-row {
+  font-size: 12px;
+  color: var(--sniptale-text-secondary);
+}
+
+.sniptale-ai-field-label {
+  color: var(--sniptale-text-muted);
+  font-weight: 500;
+}
+
+.sniptale-ai-field-value {
+  color: var(--sniptale-text-secondary);
+}

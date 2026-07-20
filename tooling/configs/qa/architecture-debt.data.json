@@ -1,0 +1,5 @@
+{
+  "$comment": "Exact non-zero architecture debt occurrences. Any substitution, growth, or removal blocks until the owner registry and generated debt report are updated together.",
+  "schemaVersion": 2,
+  "baselines": []
+}

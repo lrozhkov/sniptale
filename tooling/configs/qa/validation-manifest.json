@@ -1,0 +1,1970 @@
+{
+  "$comment": "Validation manifest for deterministic QA tools. Add entries only for active verify tools and keep testFiles pointing at committed proof.",
+  "tools": [
+    {
+      "tool": "verify-advisory.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-advisory.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-ai-limits.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-quality-gates-core.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-all.mjs",
+      "validationMode": "static-contract",
+      "testFiles": [
+        "tooling/qa/core/verify-wrapper-contract.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-all.execution.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-all.execution.test.ts",
+        "tooling/qa/core/verify-wrapper-contract.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-all.test-steps.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/dependency-graph-cache.test.ts",
+        "tooling/qa/core/verify-test-coverage.test.ts",
+        "tooling/qa/core/verify-typecheck-cache.test.ts",
+        "tooling/qa/core/unit-test-cache.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-all.unit-test-results.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-all.unit-test-steps.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-all.unit-test-steps.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-all.unit-test-steps.test.ts",
+        "tooling/qa/core/verify-test-coverage.test.ts",
+        "tooling/qa/core/unit-test-cache.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-all.violation-steps.architecture.mjs",
+      "validationMode": "static-contract",
+      "testFiles": [
+        "tooling/qa/core/verify-wrapper-contract.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-all.violation-steps.lifecycle.mjs",
+      "validationMode": "static-contract",
+      "testFiles": [
+        "tooling/qa/core/verify-wrapper-contract.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-all.violation-steps.quality.mjs",
+      "validationMode": "static-contract",
+      "testFiles": [
+        "tooling/qa/core/verify-wrapper-contract.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-all.violation-steps.runtime.mjs",
+      "validationMode": "static-contract",
+      "testFiles": [
+        "tooling/qa/core/verify-wrapper-contract.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-architecture-guardrails.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-architecture-guardrails.test.ts",
+        "tooling/qa/core/verify-architecture-guardrails.video-layer.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-audit.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-runners.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-backup-import-atomicity.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-contract-optionality-drift.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-contract-parser-coverage.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.inventory.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-domain-fixture-realism.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-domain-fixture-realism.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-hot-loop-work.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.inventory.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-messaging-schema-casts.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-network-fetch-policy.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-privacy-feature-settings.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.inventory.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-qa-rule-coverage-contract.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-qa-rule-coverage-contract.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-quality-contract-step-definitions.mjs",
+      "validationMode": "static-contract",
+      "testFiles": [
+        "tooling/qa/core/qa-steps/definitions.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-qa-controls.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/qa-controls/executables.test.ts",
+        "tooling/qa/core/qa-controls/policy.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-resource-budget-consistency.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.inventory.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-resource-lifecycle-pairs.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.inventory.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-runtime-protocol-contracts.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-runtime-response-privacy.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-state-machine-proof.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.inventory.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-stats-counter-semantics.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.inventory.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-zip-package-profile.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-audit-guardrails.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-all.scope.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-all.scope.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-boundaries.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-runners.test.ts",
+        "tooling/qa/guards/architecture/verify-boundaries-runtime-topology.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-boundary-casts.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-boundary-casts.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-boundary-inputs.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-boundary-inputs.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-browser-adapters.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-browser-adapters.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-build.mjs",
+      "validationMode": "injected-runner-test",
+      "testFiles": [
+        "tooling/qa/core/verify-runners.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-build.execution.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/wrappers/build.test.ts",
+        "tooling/qa/core/verify-wrapper-contract.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-build.scope.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-build.scope.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-build.test-profiles.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-build.scope.test.ts",
+        "tooling/qa/core/verify-build.test-profiles.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-canonical-facades.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-canonical-facades.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-closeout-step-helpers.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-all.execution.test.ts",
+        "tooling/qa/core/verify-build.execution.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-cycles.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-runners.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-config-policy.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-config-policy.test.ts",
+        "tooling/qa/core/verify-focused.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-config-policy.vite-target.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-config-policy.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-dead-exports.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-dead-exports.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-design-system.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-runners.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-diagnostic-sanitization.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/guards/security/verify-diagnostic-sanitization.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-entrypoint-wiring.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-entrypoint-wiring.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-destructive-async-swaps.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-destructive-async-swaps.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-detached-controller-methods.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-detached-controller-methods.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-detached-this-methods.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-detached-this-methods.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-eslint.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-runners.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-export-artifact-boundaries.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-export-artifact-boundaries.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-oxlint.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-oxlint.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-fetch-ownership.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/guards/security/verify-fetch-ownership.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-history-revision-semantics.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-history-revision-semantics.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-history-detached-snapshots.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-history-detached-snapshots.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-history-transaction-lifecycle.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-history-transaction-lifecycle.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-lifecycle-intent.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-lifecycle-intent.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-focused-triggered.execution.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-focused.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-focused-triggered.file-scoped.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-focused.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-focused.execution.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-focused.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-focused-triggered.mjs",
+      "validationMode": "static-contract",
+      "testFiles": [
+        "tooling/qa/core/verify-focused.test.ts",
+        "tooling/qa/evidence/repo-audit-evidence/verification-profile.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-focused.code-steps.mjs",
+      "validationMode": "static-contract",
+      "testFiles": [
+        "tooling/qa/core/verify-focused.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-focused.test-steps.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-focused.test.ts",
+        "tooling/qa/core/unit-test-cache.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-focused.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-focused.test.ts",
+        "tooling/qa/core/unit-test-cache.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-harness.execution.mjs",
+      "validationMode": "wrapper-contract + live-smoke",
+      "testFiles": [
+        "tooling/qa/wrappers/release-harness.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-harness.runtime-listener-step.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-harness.execution.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-heavy-runtime-import-ownership.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-heavy-runtime-import-ownership.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-hotspot-regression.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-hotspot-regression.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-hot-path-cleanups.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-hot-path-cleanups.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-i18n.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-quality-gates-core.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-instance-ownership.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-instance-ownership.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-interface-surfaces.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-interface-surfaces.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-interface-surfaces.return-bags.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-interface-surfaces.return-bags.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-line-length.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-quality-gates-core.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-multi-message-transitions.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-multi-message-transitions.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-root-side-effects.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-root-side-effects.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-logging.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-logging.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-manifest-integrity.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-manifest-integrity.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-manifest-permissions.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/guards/architecture/verify-manifest-permissions.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-manual-mock-export-parity.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/guards/quality/verify-manual-mock-export-parity.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-read-safe-naming.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-read-safe-naming.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-parser-snapshot-purity.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-parser-snapshot-purity.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-messaging.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-messaging.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-naming.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-naming.test.ts",
+        "tooling/qa/evidence/repo-audit-evidence/artifacts.test.ts",
+        "tooling/qa/wrappers/audit.steps.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-npm-audit-signatures.mjs",
+      "validationMode": "injected-runner-test",
+      "testFiles": [
+        "tooling/qa/core/verify-supply-chain-audits.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-naming.facades.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-naming.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-prettier.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-quality-gates-core.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-read-path-side-effects.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-read-path-side-effects.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-release-archive.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-closeout-step-helpers.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-root-scatter.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-root-scatter.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-runtime-listener-seams.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-runtime-listener-seams.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-runtime-topology.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/guards/architecture/verify-runtime-topology.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-dependency-admission.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/guards/security/verify-dependency-admission.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-security.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-quality-gates-core.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-secret-storage.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/guards/security/verify-secret-storage.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-sonarjs.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-sonarjs.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-shared-style-ownership.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-shared-style-ownership.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-shared-ui-boundaries.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-shared-ui-boundaries.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-sniptale-identity.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-sniptale-identity.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-sensitive-retention.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/guards/security/verify-sensitive-retention.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-storage-write-patterns.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-storage-write-patterns.test.ts",
+        "tooling/qa/core/verify-audit-guardrails.inventory.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-suppression-directives.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/guards/quality/verify-suppression-directives.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-success-failure-asymmetry.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-success-failure-asymmetry.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-task-artifacts.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-task-artifacts.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-test-coverage.advisory.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-test-coverage.advisory.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-test-coverage.feedback.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-test-coverage.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-test-coverage.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-test-coverage.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-test-coverage.registry.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-test-coverage.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-ui-automation-seams.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-ui-automation-seams.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "verify-typecheck.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-runners.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-typecheck-cache.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-typecheck-cache.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-app-core-owner-test-edges.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-app-core-owners.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-app-core-owners.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-app-core-owners.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-extension-build-artifacts.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-extension-build-artifacts.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-extension-build-layout.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-extension-build-layout.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-package-boundaries.contracts.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-package-boundaries.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-oss-release-surface.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-oss-release-surface.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-package-boundaries.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-package-boundaries.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-root-scatter-files.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-root-scatter.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-root-scatter.config.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-root-scatter.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-target-only-paths.mjs",
+      "validationMode": "fixture-test + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-target-only-paths.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-unit-tests.mjs",
+      "validationMode": "argument-contract + live-smoke",
+      "testFiles": [
+        "tooling/qa/core/verify-unit-tests.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
+      ]
+    },
+    {
+      "tool": "ast-grep.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-browser-adapters.test.ts",
+        "tooling/qa/core/verify-external-tools.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "build.commit-steps.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-wrapper-contract.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "build.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-runners.test.ts",
+        "tooling/qa/core/verify-wrapper-contract.test.ts",
+        "tooling/qa/wrappers/build.commit.test.ts",
+        "tooling/qa/wrappers/build.contract.test.ts",
+        "tooling/qa/wrappers/build.harness.test.ts",
+        "tooling/qa/wrappers/build.test.ts"
+      ],
+      "states": [
+        "fail",
+        "pass"
+      ]
+    },
+    {
+      "tool": "checkpoint.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-wrapper-contract.test.ts",
+        "tooling/qa/wrappers/checkpoint.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "cli-contracts.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/wrappers/cli-contracts.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "codeql.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-codeql-baseline.test.ts",
+        "tooling/qa/core/verify-external-tools.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "evidence.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-canonical-facades.test.ts",
+        "tooling/qa/evidence/repo-audit-evidence/artifacts.test.ts",
+        "tooling/qa/evidence/repo-audit-evidence/core.test.ts",
+        "tooling/qa/evidence/repo-audit-evidence/verification-profile.test.ts",
+        "tooling/qa/wrappers/audit.steps.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "gitleaks.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-supply-chain-audits.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "jscpd.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-jscpd.policy.test.ts",
+        "tooling/qa/core/verify-jscpd.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "knip.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-external-tools.policy.test.ts",
+        "tooling/qa/core/verify-external-tools.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "licenses.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-supply-chain-audits.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "maintenance.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/runtime/observability/maintenance.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "retired-controls/validation.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/retired-controls/validation.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "npm-audit-signatures.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-supply-chain-audits.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "npm-audit.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-runners.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "osv.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-supply-chain-audits.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "package-dist.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/oss-release-consumer-discovery.test.ts",
+        "tooling/qa/core/verify-extension-build-layout.test.ts",
+        "tooling/qa/core/verify-oss-release-surface.test.ts",
+        "tooling/qa/core/verify-root-scatter.test.ts",
+        "tooling/release/package-dist.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "playwright",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-wrapper-contract.test.ts",
+        "tooling/test/e2e/extension-critical-media.spec.ts",
+        "tooling/test/e2e/extension-critical-offscreen.spec.ts",
+        "tooling/test/e2e/extension-critical-popup.spec.ts",
+        "tooling/test/e2e/extension-critical-video.spec.ts",
+        "tooling/test/e2e/extension-smoke.spec.ts",
+        "tooling/test/e2e/preview-audio-diagnostic.spec.ts",
+        "tooling/test/e2e/run-e2e.test.ts",
+        "tooling/test/harness/browser-mocks.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "preflight.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-wrapper-contract.test.ts",
+        "tooling/qa/wrappers/preflight-app-workspace.test.ts",
+        "tooling/qa/wrappers/preflight-render.test.ts",
+        "tooling/qa/wrappers/preflight-security-policy.test.ts",
+        "tooling/qa/wrappers/preflight.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "qa-scope.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/qa-scope.test.ts",
+        "tooling/qa/core/verify-build.state.test.ts",
+        "tooling/qa/core/verify-checkpoint.state.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "release-harness.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-oss-release-surface.test.ts",
+        "tooling/qa/core/verify-wrapper-contract.test.ts",
+        "tooling/qa/wrappers/release-harness.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "run-controller.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/runtime/observability/lifecycle.test.ts"
+      ],
+      "states": [
+        "fail",
+        "pass"
+      ]
+    },
+    {
+      "tool": "semgrep.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-external-tools.policy.test.ts",
+        "tooling/qa/core/verify-external-tools.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-harness.state.helpers.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-harness.state.helpers.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-technical-debt.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/technical-debt-policy-dispositions.test.ts",
+        "tooling/qa/core/technical-debt-registry.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "vite",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/audits/profiles/schema.test.ts",
+        "tooling/qa/codeql/generate-ownership.test.ts",
+        "tooling/qa/core/active-path-drift.test.ts",
+        "tooling/qa/core/architecture-guardrails.policy-state.test.ts",
+        "tooling/qa/core/architecture-inventory.test.ts",
+        "tooling/qa/core/coverage-audit-report.test.ts",
+        "tooling/qa/core/dependency-graph-cache.test.ts",
+        "tooling/qa/core/dependency-graph-runner.test.ts",
+        "tooling/qa/core/design-system-rules-modal.test.ts",
+        "tooling/qa/core/design-system-verifier.registry-paths.test.ts",
+        "tooling/qa/core/execution-cache.test.ts",
+        "tooling/qa/core/focused-coverage-owner-map.test.ts",
+        "tooling/qa/core/focused-coverage-owner-resolver.test.ts",
+        "tooling/qa/core/git-fallback.test.ts",
+        "tooling/qa/core/git-head-sources.test.ts",
+        "tooling/qa/core/git-object-store.test.ts",
+        "tooling/qa/core/guardrail-preflight-report.test.ts",
+        "tooling/qa/core/guardrail-preflight-report.topology.test.ts",
+        "tooling/qa/core/import-only-diff.specifiers.test.ts",
+        "tooling/qa/core/import-only-diff.test.ts",
+        "tooling/qa/core/oss-release-consumer-discovery.test.ts",
+        "tooling/qa/core/qa-controls/policy.test.ts",
+        "tooling/qa/core/qa-scope.test.ts",
+        "tooling/qa/core/qa-steps/contract.test.ts",
+        "tooling/qa/core/qa-steps/definitions.test.ts",
+        "tooling/qa/core/qa-steps/runtime-registry.test.ts",
+        "tooling/qa/core/repo-scoped-typescript-scan.test.ts",
+        "tooling/qa/core/retired-controls/validation.test.ts",
+        "tooling/qa/core/residual-seams.helpers.test.ts",
+        "tooling/qa/core/runtime-seam-test-helpers.test.ts",
+        "tooling/qa/core/scoped-rule-cli.test.ts",
+        "tooling/qa/core/shared-baseline.test.ts",
+        "tooling/qa/core/shared-cli.test.ts",
+        "tooling/qa/core/shared-process.test.ts",
+        "tooling/qa/core/src-production-targets.test.ts",
+        "tooling/qa/core/step-timing.helpers.test.ts",
+        "tooling/qa/core/surface-growth.helpers.test.ts",
+        "tooling/qa/core/target-snapshots.test.ts",
+        "tooling/qa/core/technical-debt-registry.test.ts",
+        "tooling/qa/core/typecheck-project-map.test.ts",
+        "tooling/qa/core/typescript-ast-helpers.test.ts",
+        "tooling/qa/core/unit-test-cache.test.ts",
+        "tooling/qa/core/validation-manifest.test.ts",
+        "tooling/qa/core/verify-advisory.test.ts",
+        "tooling/qa/core/verify-all.execution.test.ts",
+        "tooling/qa/core/verify-all.scope.test.ts",
+        "tooling/qa/core/verify-all.unit-test-steps.test.ts",
+        "tooling/qa/core/verify-app-core-owners.test.ts",
+        "tooling/qa/core/verify-architecture-guardrails.scc.test.ts",
+        "tooling/qa/core/verify-architecture-guardrails.storage.test.ts",
+        "tooling/qa/core/verify-architecture-guardrails.test.ts",
+        "tooling/qa/core/verify-architecture-guardrails.video-layer.test.ts",
+        "tooling/qa/core/verify-audit-guardrails.inventory.test.ts",
+        "tooling/qa/core/verify-audit-guardrails.test.ts",
+        "tooling/qa/core/verify-boundary-casts.payload.test.ts",
+        "tooling/qa/core/verify-boundary-casts.test.ts",
+        "tooling/qa/core/verify-boundary-inputs.test.ts",
+        "tooling/qa/core/verify-browser-adapters.runtime.test.ts",
+        "tooling/qa/core/verify-browser-adapters.test.ts",
+        "tooling/qa/core/verify-build.execution.test.ts",
+        "tooling/qa/core/verify-build.scope.test.ts",
+        "tooling/qa/core/verify-build.state.test.ts",
+        "tooling/qa/core/verify-build.test-profiles.test.ts",
+        "tooling/qa/core/verify-canonical-facades.test.ts",
+        "tooling/qa/core/verify-checkpoint.state.test.ts",
+        "tooling/qa/core/verify-closeout-step-helpers.test.ts",
+        "tooling/qa/core/verify-codeql-baseline.test.ts",
+        "tooling/qa/core/verify-config-policy.test.ts",
+        "tooling/qa/core/verify-dead-exports.public-surfaces.test.ts",
+        "tooling/qa/core/verify-dead-exports.test.ts",
+        "tooling/qa/core/verify-destructive-async-swaps.test.ts",
+        "tooling/qa/core/verify-detached-controller-methods.test.ts",
+        "tooling/qa/core/verify-detached-this-methods.test.ts",
+        "tooling/qa/core/verify-domain-fixture-realism.test.ts",
+        "tooling/qa/core/verify-entrypoint-wiring.test.ts",
+        "tooling/qa/core/verify-export-artifact-boundaries.test.ts",
+        "tooling/qa/core/verify-extension-build-artifacts.test.ts",
+        "tooling/qa/core/verify-extension-build-layout.test.ts",
+        "tooling/qa/core/verify-external-tools.policy.test.ts",
+        "tooling/qa/core/verify-external-tools.test.ts",
+        "tooling/qa/core/verify-focused-diff-tests.test.ts",
+        "tooling/qa/core/verify-focused-triggered.execution.test.ts",
+        "tooling/qa/core/verify-focused.import-mock-only.test.ts",
+        "tooling/qa/core/verify-focused.invalid-owner-map.test.ts",
+        "tooling/qa/core/verify-focused.local-coverage.test.ts",
+        "tooling/qa/core/verify-focused.test-steps.test.ts",
+        "tooling/qa/core/verify-focused.test.ts",
+        "tooling/qa/core/verify-focused.type-only.test.ts",
+        "tooling/qa/core/verify-harness.execution.test.ts",
+        "tooling/qa/core/verify-harness.state.helpers.test.ts",
+        "tooling/qa/core/verify-heavy-runtime-import-ownership.test.ts",
+        "tooling/qa/core/verify-history-detached-snapshots.test.ts",
+        "tooling/qa/core/verify-history-revision-semantics.test.ts",
+        "tooling/qa/core/verify-history-transaction-lifecycle.test.ts",
+        "tooling/qa/core/verify-hot-path-cleanups.test.ts",
+        "tooling/qa/core/verify-hotspot-regression.test.ts",
+        "tooling/qa/core/verify-instance-ownership.test.ts",
+        "tooling/qa/core/verify-interface-surfaces.broad-public.test.ts",
+        "tooling/qa/core/verify-interface-surfaces.return-bags.test.ts",
+        "tooling/qa/core/verify-interface-surfaces.test.ts",
+        "tooling/qa/core/verify-jscpd.policy.test.ts",
+        "tooling/qa/core/verify-jscpd.test.ts",
+        "tooling/qa/core/verify-lifecycle-intent.test.ts",
+        "tooling/qa/core/verify-logging.test.ts",
+        "tooling/qa/core/verify-manifest-integrity.sandbox.test.ts",
+        "tooling/qa/core/verify-manifest-integrity.test.ts",
+        "tooling/qa/core/verify-messaging.test.ts",
+        "tooling/qa/core/verify-multi-message-transitions.test.ts",
+        "tooling/qa/core/verify-naming.test.ts",
+        "tooling/qa/core/verify-oss-release-surface.test.ts",
+        "tooling/qa/core/verify-oxlint.test.ts",
+        "tooling/qa/core/verify-package-boundaries.test.ts",
+        "tooling/qa/core/verify-parser-snapshot-purity.test.ts",
+        "tooling/qa/core/verify-qa-rule-coverage-contract.test.ts",
+        "tooling/qa/core/verify-quality-gates-core.i18n.test.ts",
+        "tooling/qa/core/verify-quality-gates-core.test.ts",
+        "tooling/qa/core/verify-read-path-side-effects.test.ts",
+        "tooling/qa/core/verify-read-safe-naming.test.ts",
+        "tooling/qa/core/verify-root-scatter.test.ts",
+        "tooling/qa/core/verify-root-side-effects.test.ts",
+        "tooling/qa/core/verify-run-metrics.helpers.test.ts",
+        "tooling/qa/core/verify-runners.test.ts",
+        "tooling/qa/core/verify-runtime-listener-seams.test.ts",
+        "tooling/qa/core/verify-shared-style-ownership.test.ts",
+        "tooling/qa/core/verify-shared-ui-boundaries.test.ts",
+        "tooling/qa/core/verify-sonarjs.test.ts",
+        "tooling/qa/core/verify-storage-write-patterns.test.ts",
+        "tooling/qa/core/verify-success-failure-asymmetry.test.ts",
+        "tooling/qa/core/verify-supply-chain-audits.test.ts",
+        "tooling/qa/core/verify-target-only-paths.test.ts",
+        "tooling/qa/core/verify-task-artifacts.test.ts",
+        "tooling/qa/core/verify-test-coverage.advisory.test.ts",
+        "tooling/qa/core/verify-test-coverage.changed-targets.test.ts",
+        "tooling/qa/core/verify-test-coverage.test.ts",
+        "tooling/qa/core/verify-typecheck-cache.test.ts",
+        "tooling/qa/core/verify-typecheck.projects.test.ts",
+        "tooling/qa/core/verify-ui-automation-seams.test.ts",
+        "tooling/qa/core/verify-unit-tests.test.ts",
+        "tooling/qa/core/verify-wrapper-contract.test.ts",
+        "tooling/qa/core/vitest-config.test.ts",
+        "tooling/qa/evidence/repo-audit-evidence/core.test.ts",
+        "tooling/qa/evidence/repo-audit-evidence/verification-profile.test.ts",
+        "tooling/qa/guards/architecture/verify-boundaries-runtime-topology.test.ts",
+        "tooling/qa/guards/architecture/verify-manifest-permissions.test.ts",
+        "tooling/qa/guards/architecture/verify-runtime-topology.test.ts",
+        "tooling/qa/guards/quality/line-length-utils.test.ts",
+        "tooling/qa/guards/quality/verify-manual-mock-export-parity.test.ts",
+        "tooling/qa/guards/quality/verify-suppression-directives.test.ts",
+        "tooling/qa/guards/security/verify-dependency-admission.test.ts",
+        "tooling/qa/guards/security/verify-diagnostic-sanitization.test.ts",
+        "tooling/qa/guards/security/verify-fetch-ownership.test.ts",
+        "tooling/qa/guards/security/verify-secret-storage.test.ts",
+        "tooling/qa/guards/security/verify-security.test.ts",
+        "tooling/qa/guards/security/verify-sensitive-retention.test.ts",
+        "tooling/qa/hooks/pre-push.test.ts",
+        "tooling/qa/manifests/rule-registry.test.ts",
+        "tooling/qa/policy/repository-contained-paths.test.ts",
+        "tooling/qa/policy/spdx-expression.test.ts",
+        "tooling/qa/runtime/blocking-wrapper-lock.helpers.test.ts",
+        "tooling/qa/runtime/changed-targets.helpers.test.ts",
+        "tooling/qa/runtime/observability/lifecycle.test.ts",
+        "tooling/qa/runtime/observability/maintenance.test.ts",
+        "tooling/qa/runtime/observability/report.test.ts",
+        "tooling/qa/runtime/observability/root.test.ts",
+        "tooling/qa/runtime/observability/schema.test.ts",
+        "tooling/qa/runtime/observability/storage.test.ts",
+        "tooling/qa/runtime/target-files.helpers.test.ts",
+        "tooling/qa/wrappers/audit.test.ts",
+        "tooling/qa/wrappers/build.commit.test.ts",
+        "tooling/qa/wrappers/build.contract.test.ts",
+        "tooling/qa/wrappers/build.harness.test.ts",
+        "tooling/qa/wrappers/build.test.ts",
+        "tooling/qa/wrappers/checkpoint.test.ts",
+        "tooling/qa/wrappers/cli-contracts.test.ts",
+        "tooling/qa/wrappers/closeout.contract.test.ts",
+        "tooling/qa/wrappers/closeout.test.ts",
+        "tooling/qa/wrappers/observed/runner.test.ts",
+        "tooling/qa/wrappers/preflight-app-workspace.test.ts",
+        "tooling/qa/wrappers/preflight-render.test.ts",
+        "tooling/qa/wrappers/preflight-security-policy.test.ts",
+        "tooling/qa/wrappers/preflight.test.ts",
+        "tooling/qa/wrappers/release-harness.test.ts",
+        "tooling/qa/wrappers/release.test.ts",
+        "tooling/release/artifact-security-dynamic-sandbox-worker.test.ts",
+        "tooling/release/artifact-security-dynamic.test.ts",
+        "tooling/release/artifact-security-identity.test.ts",
+        "tooling/release/artifact-security.test.ts",
+        "tooling/release/dependency-legal/license-selection.test.ts",
+        "tooling/release/dependency-legal/lock-closure.test.ts",
+        "tooling/release/dependency-legal/output.test.ts",
+        "tooling/release/dependency-legal/validation.test.ts",
+        "tooling/release/package-dist.test.ts",
+        "tooling/test/e2e/run-e2e.test.ts",
+        "tooling/test/harness/browser-mocks.chrome.test.ts",
+        "tooling/test/harness/browser-mocks.storage.test.ts",
+        "tooling/test/harness/browser-mocks.test.ts",
+        "tooling/test/harness/browser-mocks.types.test.ts",
+        "tooling/test/harness/content-runtime-shim-guard.test.ts",
+        "tooling/test/harness/editor/index.test.tsx",
+        "tooling/test/harness/extension-build-layout.test.ts",
+        "tooling/test/harness/vite-build-shims.test.ts",
+        "tooling/test/harness/vite-injected-build.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    }
+  ]
+}

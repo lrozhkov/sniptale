@@ -1,0 +1,171 @@
+{
+  "assets": [],
+  "clips": [
+    {
+      "duration": 3,
+      "layerId": "background",
+      "sceneId": "main",
+      "start": 0
+    },
+    {
+      "duration": 3,
+      "layerId": "title",
+      "sceneId": "main",
+      "start": 0
+    }
+  ],
+  "controls": [
+    {
+      "defaultValue": "#5f7cff",
+      "id": "accent",
+      "kind": "color",
+      "label": {
+        "en": "Accent",
+        "ru": "Акцент"
+      }
+    }
+  ],
+  "description": {
+    "en": "Agent-ready targetEffect starter.",
+    "ru": "Стартовый шаблон targetEffect для агента."
+  },
+  "duration": 3,
+  "id": "neutral-target-effect",
+  "kind": "targetEffect",
+  "label": {
+    "en": "Neutral Target Effect",
+    "ru": "Neutral Target Effect"
+  },
+  "layers": [
+    {
+      "height": 720,
+      "id": "background",
+      "name": "Background",
+      "type": "rect",
+      "width": 1280
+    },
+    {
+      "height": 120,
+      "id": "title",
+      "name": "Title",
+      "text": "Neutral Target Effect",
+      "type": "text",
+      "width": 900,
+      "x": 640,
+      "y": 360
+    }
+  ],
+  "program": {
+    "commands": [
+      {
+        "layerId": "background",
+        "op": "clear"
+      },
+      {
+        "fit": "cover",
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "input": "source",
+        "layerId": "background",
+        "op": "image",
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "x": 0,
+        "y": 0
+      },
+      {
+        "alpha": {
+          "args": [
+            0.28,
+            {
+              "args": [{ "op": "read", "path": "progress" }, 0.72],
+              "op": "mul"
+            }
+          ],
+          "op": "add"
+        },
+        "fill": {
+          "op": "read",
+          "path": "controls.accent"
+        },
+        "height": 180,
+        "layerId": "title",
+        "op": "shape",
+        "radius": 32,
+        "shape": "roundRect",
+        "width": 920,
+        "x": {
+          "args": [
+            140,
+            {
+              "args": [{ "op": "read", "path": "progress" }, 40],
+              "op": "mul"
+            }
+          ],
+          "op": "add"
+        },
+        "y": 270
+      },
+      {
+        "alpha": {
+          "args": [
+            0.4,
+            {
+              "args": [{ "op": "read", "path": "progress" }, 0.6],
+              "op": "mul"
+            }
+          ],
+          "op": "add"
+        },
+        "align": "center",
+        "baseline": "middle",
+        "fill": "#ffffff",
+        "fontFamily": "system-ui",
+        "fontSize": 54,
+        "fontWeight": 650,
+        "layerId": "title",
+        "op": "text",
+        "text": "Neutral Target Effect",
+        "x": {
+          "args": [
+            {
+              "op": "read",
+              "path": "width"
+            },
+            0.5
+          ],
+          "op": "mul"
+        },
+        "y": {
+          "args": [
+            {
+              "op": "read",
+              "path": "height"
+            },
+            0.5
+          ],
+          "op": "mul"
+        }
+      }
+    ],
+    "kind": "graph",
+    "version": 1
+  },
+  "scenes": [
+    {
+      "duration": 3,
+      "id": "main",
+      "label": "Main",
+      "start": 0
+    }
+  ],
+  "schemaVersion": "sniptale.effect.v1",
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  }
+}

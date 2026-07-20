@@ -1,0 +1,5 @@
+{
+  "$comment": "SonarJS hardfail baseline. Intended state is empty; entries must be confirmed tool-noise with owner and targetAction.",
+  "schemaVersion": 1,
+  "entries": []
+}

@@ -1,0 +1,1 @@
+export { ScenarioWorkspaceCaptureCanvas } from './view';
