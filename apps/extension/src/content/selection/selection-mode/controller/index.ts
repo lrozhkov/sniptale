@@ -6,9 +6,7 @@ import {
   createSelectionModeFacadeBindings,
   createSelectionModeRuntimeBindings,
 } from './runtime-bindings';
-import { createSelectionModeSessionMutableRefs } from '../session/locals/helpers';
 import { createSelectionModeSession, resetSelectionModeSession } from '../session';
-import { createSelectionModeState } from '../session/state';
 
 interface SelectionModeController {
   cleanup: () => void;
@@ -21,9 +19,7 @@ interface SelectionModeController {
  * Creates a selection-mode controller with instance-owned state, session locals, and runtime graph.
  */
 export function createSelectionModeController(): SelectionModeController {
-  const state = createSelectionModeState();
-  const session = createSelectionModeSession(state);
-  const mutableRefs = createSelectionModeSessionMutableRefs(session);
+  const session = createSelectionModeSession();
   let runtimeGraph: ReturnType<typeof createSelectionModeRuntimeBindings>;
 
   const cleanup = () => {
@@ -52,15 +48,12 @@ export function createSelectionModeController(): SelectionModeController {
     getRuntimeArgs: () => runtimeGraph.selectionModeRuntimeArgs,
     getRuntimeEvents: () => runtimeGraph.selectionModeEvents,
     session,
-    state,
   });
 
   runtimeGraph = createSelectionModeRuntimeBindings({
     cleanup,
-    mutableRefs,
     runtimeFacade,
     session,
-    state,
     updateFinalFrame: () => runtimeGraph.selectionModeEvents.updateFinalFrame(),
   });
 

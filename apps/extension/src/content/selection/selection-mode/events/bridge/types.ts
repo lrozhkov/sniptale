@@ -1,9 +1,9 @@
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
-import type { SelectionModeRuntimeState } from '../../session/runtime-state/types';
+import type { SelectionModeSession } from '../../session';
 import type { SelectionModeRuntimeActionsArgs } from '../../interaction/actions/types';
 
 export type SelectionModeEventsBridgeRuntimeArgs = SelectionModeRuntimeActionsArgs & {
-  state: SelectionModeRuntimeState;
+  state: SelectionModeSession;
 };
 
 export type SelectionModeEventsBridgeArgs = {

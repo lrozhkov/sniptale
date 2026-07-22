@@ -9,7 +9,11 @@ import {
   writeBuildState,
 } from '../core/verify-build.state.helpers.mjs';
 import { assertFreshHarnessState } from '../core/verify-harness.state.helpers.mjs';
-import { PRODUCT_QA_SUITE, createScopedQaContext, hasHarnessQaTargets } from '../core/qa-scope.mjs';
+import {
+  PRODUCT_QA_SUITE,
+  createScopedQaContext,
+  hasHarnessVerificationQaTargets,
+} from '../core/qa-scope.mjs';
 import { assertQaResultContract } from '../core/qa-steps/contract.mjs';
 import {
   acquireBlockingWrapperLock,
@@ -82,7 +86,7 @@ export async function runBuildCloseout({
   assertDiffOnlyBuildRun(files);
 
   const context = createScopedQaContext(contextCollector(), { suite: PRODUCT_QA_SUITE });
-  if (hasHarnessQaTargets(context)) {
+  if (hasHarnessVerificationQaTargets(context)) {
     harnessStateAsserter(context, 'qa:build');
   }
   return runBuildForContext({

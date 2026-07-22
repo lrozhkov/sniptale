@@ -1,24 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSelectionModeSession } from '../../session';
 
 const facadeMocks = vi.hoisted(() => ({
-  createSelectionModeRuntimeFacadeMock: vi.fn(),
-  createSelectionModeSessionLocalSettersMock: vi.fn(),
-  setupSelectionModeRuntimeListenersMock: vi.fn(),
+  createSelectionModeRuntimeFacade: vi.fn(),
+  setupSelectionModeRuntimeListeners: vi.fn(),
 }));
 
-vi.mock('../../runtime/facade', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../runtime/facade')>()),
-  createSelectionModeRuntimeFacade: facadeMocks.createSelectionModeRuntimeFacadeMock,
-}));
-
-vi.mock('../../session/locals/setters', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../session/locals/setters')>()),
-  createSelectionModeSessionLocalSetters: facadeMocks.createSelectionModeSessionLocalSettersMock,
+vi.mock('../../runtime/facade', () => ({
+  createSelectionModeRuntimeFacade: facadeMocks.createSelectionModeRuntimeFacade,
 }));
 
 vi.mock('../../interaction/actions/runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../interaction/actions/runtime')>()),
-  setupSelectionModeRuntimeListeners: facadeMocks.setupSelectionModeRuntimeListenersMock,
+  setupSelectionModeRuntimeListeners: facadeMocks.setupSelectionModeRuntimeListeners,
 }));
 
 import { createSelectionModeFacadeBindings } from './facade';
@@ -27,25 +21,9 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function createFacadeFixtures() {
-  const session = {
-    aspectRatio: 1.5,
-    currentSelection: { height: 12, width: 10, x: 1, y: 2 },
-    dom: { hoverFrame: null, hoverSizeLabel: null },
-    isActive: true,
-    maintainAspectRatio: false,
-    rejectCallback: vi.fn(),
-    resolveCallback: vi.fn(),
-  };
-  const sessionSetters = {
-    setAspectRatio: vi.fn(),
-    setCurrentSelection: vi.fn(),
-    setCurrentState: vi.fn(),
-    setIsActive: vi.fn(),
-    setMaintainAspectRatio: vi.fn(),
-    setRejectCallback: vi.fn(),
-    setResolveCallback: vi.fn(),
-  };
+function createScenario() {
+  const session = createSelectionModeSession();
+  const runtimeArgs = { state: session } as never;
   const runtimeEvents = {
     cancelSelection: vi.fn(),
     confirmSelection: vi.fn(),
@@ -53,106 +31,74 @@ function createFacadeFixtures() {
     resetToIdleState: vi.fn(),
     updateFinalFrame: vi.fn(),
   };
-
-  return { runtimeEvents, session, sessionSetters };
-}
-
-function createFacadeScenario() {
-  const { runtimeEvents, session, sessionSetters } = createFacadeFixtures();
-  const runtimeArgs = { state: { currentState: 'idle' } };
-  const cleanup = vi.fn();
-
-  facadeMocks.createSelectionModeSessionLocalSettersMock.mockReturnValue(sessionSetters);
-  facadeMocks.createSelectionModeRuntimeFacadeMock.mockImplementation(() => ({
-    facade: true,
-  }));
+  const runtimeFacade = { facade: true };
+  facadeMocks.createSelectionModeRuntimeFacade.mockReturnValue(runtimeFacade);
 
   const result = createSelectionModeFacadeBindings({
-    cleanup,
-    getRuntimeArgs: () => runtimeArgs as never,
-    getRuntimeEvents: () => runtimeEvents as never,
-    session: session as never,
-    state: { state: true } as never,
-  });
-
-  return {
-    cleanup,
-    result,
-    runtimeArgs,
-    runtimeEvents,
+    cleanup: vi.fn(),
+    getRuntimeArgs: () => runtimeArgs,
+    getRuntimeEvents: () => runtimeEvents,
     session,
-    sessionSetters,
-  };
+  });
+  const args = facadeMocks.createSelectionModeRuntimeFacade.mock.calls[0]?.[0];
+  if (!args) {
+    throw new Error('Expected runtime facade args');
+  }
+
+  return { args, result, runtimeArgs, runtimeEvents, runtimeFacade, session };
 }
 
-function expectFacadeScenario(args: ReturnType<typeof createFacadeScenario>) {
-  expect(facadeMocks.createSelectionModeSessionLocalSettersMock).toHaveBeenCalledWith(args.session);
-  expect(facadeMocks.createSelectionModeRuntimeFacadeMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      cleanup: args.cleanup,
-      cancelSelection: expect.any(Function),
-      confirmSelection: expect.any(Function),
-      constrainSelection: expect.any(Function),
-      getDom: expect.any(Function),
-      getAspectRatio: expect.any(Function),
-      getCurrentSelection: expect.any(Function),
-      getIsActive: expect.any(Function),
-      getMaintainAspectRatio: expect.any(Function),
-      getMaxSelectionHeight: expect.any(Function),
-      getMaxSelectionWidth: expect.any(Function),
-      getRejectCallback: expect.any(Function),
-      resetToIdleState: expect.any(Function),
-      setAspectRatio: args.sessionSetters.setAspectRatio,
-      setCurrentSelection: args.sessionSetters.setCurrentSelection,
-      setCurrentState: args.sessionSetters.setCurrentState,
-      setIsActive: args.sessionSetters.setIsActive,
-      setMaintainAspectRatio: args.sessionSetters.setMaintainAspectRatio,
-      setRejectCallback: args.sessionSetters.setRejectCallback,
-      setResolveCallback: args.sessionSetters.setResolveCallback,
-      setupRuntimeListeners: expect.any(Function),
-      state: { state: true },
-      updateFinalFrame: expect.any(Function),
-    })
-  );
-  const runtimeFacadeArgs = facadeMocks.createSelectionModeRuntimeFacadeMock.mock.calls[0]?.[0];
+describe('selection-mode controller facade bindings', () => {
+  it('binds facade reads and writes to the exact session authority', () => {
+    const scenario = createScenario();
+    const selection = { x: 1, y: 2, width: 30, height: 40 };
+    const rejectCallback = vi.fn();
+    const resolveCallback = vi.fn();
 
-  expect(runtimeFacadeArgs?.getAspectRatio()).toBe(args.session.aspectRatio);
-  expect(runtimeFacadeArgs?.getCurrentSelection()).toBe(args.session.currentSelection);
-  expect(runtimeFacadeArgs?.getDom()).toBe(args.session.dom);
-  expect(runtimeFacadeArgs?.getIsActive()).toBe(args.session.isActive);
-  expect(runtimeFacadeArgs?.getMaintainAspectRatio()).toBe(args.session.maintainAspectRatio);
-  expect(runtimeFacadeArgs?.getRejectCallback()).toBe(args.session.rejectCallback);
-  expect(facadeMocks.setupSelectionModeRuntimeListenersMock).toHaveBeenCalledWith(args.runtimeArgs);
-}
+    expect(scenario.args.state).toBe(scenario.session);
+    scenario.args.setAspectRatio(1.5);
+    scenario.args.setCurrentSelection(selection);
+    scenario.args.setCurrentState('confirmed');
+    scenario.args.setIsActive(true);
+    scenario.args.setMaintainAspectRatio(true);
+    scenario.args.setRejectCallback(rejectCallback);
+    scenario.args.setResolveCallback(resolveCallback);
 
-describe('selection-mode controller bindings facade', () => {
-  it('wires the runtime facade with session locals and runtime event closures', () => {
-    const scenario = createFacadeScenario();
-    const runtimeFacadeArgs = facadeMocks.createSelectionModeRuntimeFacadeMock.mock.calls[0]?.[0];
-
-    runtimeFacadeArgs?.cancelSelection();
-    runtimeFacadeArgs?.confirmSelection();
-    runtimeFacadeArgs?.constrainSelection();
-    runtimeFacadeArgs?.resetToIdleState();
-    runtimeFacadeArgs?.updateFinalFrame();
-    runtimeFacadeArgs?.setupRuntimeListeners();
-
-    expectFacadeScenario(scenario);
-    expect(scenario.runtimeEvents.cancelSelection).toHaveBeenCalledTimes(1);
-    expect(scenario.runtimeEvents.confirmSelection).toHaveBeenCalledTimes(1);
-    expect(scenario.runtimeEvents.constrainSelection).toHaveBeenCalledTimes(1);
-    expect(scenario.runtimeEvents.resetToIdleState).toHaveBeenCalledTimes(1);
-    expect(scenario.runtimeEvents.updateFinalFrame).toHaveBeenCalledTimes(1);
-    expect(scenario.result).toEqual(expect.objectContaining({ facade: true }));
+    expect(scenario.args.getAspectRatio()).toBe(1.5);
+    expect(scenario.args.getCurrentSelection()).toBe(selection);
+    expect(scenario.args.getIsActive()).toBe(true);
+    expect(scenario.args.getMaintainAspectRatio()).toBe(true);
+    expect(scenario.args.getRejectCallback()).toBe(rejectCallback);
+    expect(scenario.session).toEqual(
+      expect.objectContaining({
+        currentState: 'confirmed',
+        rejectCallback,
+        resolveCallback,
+      })
+    );
   });
 
-  it('keeps the runtime facade dom getter aligned with the latest session dom', () => {
-    const scenario = createFacadeScenario();
-    const nextDom = { hoverFrame: null, hoverSizeLabel: null };
-    const runtimeFacadeArgs = facadeMocks.createSelectionModeRuntimeFacadeMock.mock.calls[0]?.[0];
-
+  it('forwards runtime events, listeners, and the latest DOM identity', () => {
+    const scenario = createScenario();
+    const nextDom = { marker: true } as never;
     scenario.session.dom = nextDom;
 
-    expect(runtimeFacadeArgs?.getDom()).toBe(nextDom);
+    scenario.args.cancelSelection();
+    scenario.args.confirmSelection();
+    scenario.args.constrainSelection();
+    scenario.args.resetToIdleState();
+    scenario.args.updateFinalFrame();
+    scenario.args.setupRuntimeListeners();
+
+    expect(scenario.args.getDom()).toBe(nextDom);
+    expect(scenario.runtimeEvents.cancelSelection).toHaveBeenCalledOnce();
+    expect(scenario.runtimeEvents.confirmSelection).toHaveBeenCalledOnce();
+    expect(scenario.runtimeEvents.constrainSelection).toHaveBeenCalledOnce();
+    expect(scenario.runtimeEvents.resetToIdleState).toHaveBeenCalledOnce();
+    expect(scenario.runtimeEvents.updateFinalFrame).toHaveBeenCalledOnce();
+    expect(facadeMocks.setupSelectionModeRuntimeListeners).toHaveBeenCalledWith(
+      scenario.runtimeArgs
+    );
+    expect(scenario.result).toBe(scenario.runtimeFacade);
   });
 });

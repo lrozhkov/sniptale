@@ -1,5 +1,5 @@
 export type SelectionModeRuntimeActionsArgs = ReturnType<
-  typeof import('../../session/runtime-state/args').createSelectionModeRuntimeArgs
+  typeof import('../../runtime/setup').createSelectionModeRuntimeSetup
 >;
 
 export type SelectionModeDragSelectionRuntime = ReturnType<

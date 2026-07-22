@@ -14,7 +14,7 @@ The live scope classifier is `tooling/qa/core/qa-scope.mjs`.
 - Harness targets include `tooling/**` plus shared controls.
 - Shared controls participate in both scopes: `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/lock/TypeScript/Vite configuration, and active `docs/tooling/**` guidance.
 
-Whenever the current diff has harness targets, run `npm run qa:release-harness` before a consumer wrapper that requires its freshness stamp. Documentation lists the categories; the classifier remains authoritative.
+Whenever the current diff has executable harness targets, run `npm run qa:release-harness` before a consumer wrapper that requires its freshness stamp. Exact machine-generated technical-debt and OSS-consumer inventories are data-only targets: checkpoint runs their owner validators without requiring a fresh harness stamp. Generated inventories are never treated as execution evidence for another policy file. Policy JSON, baselines, allowlists, and executable registries are not data-only. Documentation lists the categories; the classifier remains authoritative.
 
 ## Diff And Freshness Model
 
@@ -32,7 +32,7 @@ Changing the relevant diff invalidates reuse. `qa:closeout` may reuse fresh matc
 
 ### `qa:preflight`
 
-Read-only context collection. It reports scope, canonical owner/runtime, relevant documents, structural pressure, contracts/consumer-discovery needs, proof, build forecast, and advisory. Current-diff mode uses behavioral files; `-- --files <paths...>` produces a non-blocking explicit planning snapshot without writing advisory/checkpoint state. It does not format, acquire the blocking lock, build, stage, or commit.
+Read-only context collection. It reports scope, canonical owner/runtime, relevant documents, structural pressure, contracts/consumer-discovery needs, proof, build forecast, and advisory. Current-diff mode uses behavioral files; `-- --files <paths...>` produces a non-blocking explicit planning snapshot without writing advisory/checkpoint state. Large path lists render a bounded head and tail with the total count and a full-list digest so later sections remain visible and the omitted middle remains comparable. It does not format, acquire the blocking lock, build, stage, or commit.
 
 ### `qa:advisory`
 
@@ -44,7 +44,7 @@ Manual report-only architecture-maintenance snapshot over repository code. It wr
 
 ### `qa:release-harness`
 
-Blocking harness/shared-control proof. It runs the harness-owned formatting/static/type/test contract and writes the harness freshness state consumed by checkpoint, build, release, and closeout paths. It does not run product coverage or commit.
+Blocking harness/shared-control proof. It runs the harness-owned formatting/static/type/test contract and writes the harness freshness state consumed by checkpoint, build, release, and closeout paths. An inventory-only scope skips this wrapper and uses the checkpoint owner validators instead; a standalone build still requires that fresh checkpoint. It does not run product coverage or commit.
 
 ### `qa:checkpoint`
 

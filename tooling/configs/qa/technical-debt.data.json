@@ -3426,13 +3426,10 @@
         "apps/extension/src/content/selection/region-selector/tooltip.ts",
         "apps/extension/src/content/selection/region-selector/types.ts",
         "apps/extension/src/content/selection/selection-mode/controller/actions.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/helpers.ts",
         "apps/extension/src/content/selection/selection-mode/controller/index.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/locals.ts",
         "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/facade.ts",
         "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/index.ts",
         "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/runtime.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/runtime.ts",
         "apps/extension/src/content/selection/selection-mode/diag.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/cancel-selection.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/cleanup.ts",
@@ -3488,50 +3485,9 @@
         "apps/extension/src/content/selection/selection-mode/runtime/facade/types.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/facade/ui.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/graph-bindings.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/graph.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/index.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/setup/getters.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/setup/helpers.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/setup/index.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/setup/setters.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/setup/shared.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/setup/types.ts",
         "apps/extension/src/content/selection/selection-mode/session/index.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals-contract.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals-sync.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/cleanup.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/contract.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/core.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/helpers.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/index.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/setter-groups.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/setters.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/snapshots.ts",
-        "apps/extension/src/content/selection/selection-mode/session/refs/index.ts",
-        "apps/extension/src/content/selection/selection-mode/session/refs/readers.ts",
-        "apps/extension/src/content/selection/selection-mode/session/refs/types.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/args.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/core.dom.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/core.lifecycle.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/core.selection.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/core.threshold.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/core.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/drag.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/flags.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/helpers.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/hover-frame.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/hover.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/index.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/interaction.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/listeners.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/merge.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/selection.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/test-support.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/types.ts",
-        "apps/extension/src/content/selection/selection-mode/session/state.ts",
-        "apps/extension/src/content/selection/selection-mode/session/sync-bindings/index.ts",
-        "apps/extension/src/content/selection/selection-mode/session/sync-bindings/sync.ts",
-        "apps/extension/src/content/selection/selection-mode/session/sync.ts",
         "apps/extension/src/content/selection/selection-mode/types.ts",
         "apps/extension/src/content/selection/selection-mode/ui/cancel-button.ts",
         "apps/extension/src/content/selection/selection-mode/ui/container.ts",
@@ -3933,13 +3889,10 @@
         "apps/extension/src/content/selection/region-selector/tooltip.ts",
         "apps/extension/src/content/selection/region-selector/types.ts",
         "apps/extension/src/content/selection/selection-mode/controller/actions.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/helpers.ts",
         "apps/extension/src/content/selection/selection-mode/controller/index.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/locals.ts",
         "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/facade.ts",
         "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/index.ts",
         "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/runtime.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/runtime.ts",
         "apps/extension/src/content/selection/selection-mode/diag.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/cancel-selection.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/cleanup.ts",
@@ -3995,50 +3948,9 @@
         "apps/extension/src/content/selection/selection-mode/runtime/facade/types.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/facade/ui.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/graph-bindings.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/graph.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/index.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/setup/getters.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/setup/helpers.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/setup/index.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/setup/setters.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/setup/shared.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/setup/types.ts",
         "apps/extension/src/content/selection/selection-mode/session/index.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals-contract.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals-sync.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/cleanup.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/contract.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/core.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/helpers.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/index.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/setter-groups.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/setters.ts",
-        "apps/extension/src/content/selection/selection-mode/session/locals/snapshots.ts",
-        "apps/extension/src/content/selection/selection-mode/session/refs/index.ts",
-        "apps/extension/src/content/selection/selection-mode/session/refs/readers.ts",
-        "apps/extension/src/content/selection/selection-mode/session/refs/types.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/args.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/core.dom.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/core.lifecycle.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/core.selection.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/core.threshold.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/core.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/drag.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/flags.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/helpers.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/hover-frame.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/hover.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/index.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/interaction.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/listeners.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/merge.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/selection.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/test-support.ts",
-        "apps/extension/src/content/selection/selection-mode/session/runtime-state/types.ts",
-        "apps/extension/src/content/selection/selection-mode/session/state.ts",
-        "apps/extension/src/content/selection/selection-mode/session/sync-bindings/index.ts",
-        "apps/extension/src/content/selection/selection-mode/session/sync-bindings/sync.ts",
-        "apps/extension/src/content/selection/selection-mode/session/sync.ts",
         "apps/extension/src/content/selection/selection-mode/types.ts",
         "apps/extension/src/content/selection/selection-mode/ui/cancel-button.ts",
         "apps/extension/src/content/selection/selection-mode/ui/container.ts",
@@ -12896,7 +12808,7 @@
       "remediation": "Remove or narrow the exclusion and assign the target to its real coverage owner.",
       "exactSource": {
         "path": "tooling/qa/core/verify-test-coverage.registry.mjs",
-        "contentHash": "e75697624ec3b91a35ca2870fec33057b8e0beec7523fc8e05e7317605d51aac"
+        "contentHash": "c5f5abc378c015d5e31898b677a38e7f5c786fba2732520a63e8f42b8f6e005d"
       },
       "consumers": [
         "tooling/qa/core/coverage-audit-report.mjs",
@@ -13295,7 +13207,7 @@
       "remediation": "Remove the directory exclusion or prove it contains no owned release surface.",
       "exactSource": {
         "path": "tooling/qa/core/oss-release-consumer-discovery.mjs",
-        "contentHash": "0039bbf0d433652cebcc1356527d7034cc8b913361ea502233b45846589c673e"
+        "contentHash": "050b45b2e343464d1270c78610a7542f73502a20f181b30a2db07cbfa77ce059"
       },
       "consumers": [
         "tooling/qa/core/oss-release-consumer-discovery.mjs",
@@ -14710,7 +14622,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/build.mjs",
-        "contentHash": "6fa9ff363770e11f2a4189389756594b0c1dbe061cfdc1c14a3aa5621356bf6e"
+        "contentHash": "48e7f265213d17d7db39d9f11103e4e7dd3dc5695dac3e0b21a3c7ff05d58db8"
       },
       "consumers": [
         "tooling/qa/wrappers/build.contract.test.ts",
@@ -15078,7 +14990,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/config.mjs",
-        "contentHash": "0de6bb78ea9ebc2867115f9d95978c998eb1e0cd49219036c534e484e58a2852"
+        "contentHash": "0881c920e852d55ce9afd729d8efbd1f256d39274872db95d525fae7a5eeb746"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/config.mjs",
@@ -15616,6 +15528,27 @@
         "binding:DIAGNOSTIC_KEYS",
         "binding:EVIDENCE_KEYS",
         "binding:LOCATION_KEYS"
+      ]
+    },
+    {
+      "id": "policy.source.discovery-mjs.d42e45d16b",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/qa-controls/discovery.mjs",
+        "contentHash": "2c2addf32da4d9e567757054f36b67ce9258620a6511571c008e35f3b8905b5b"
+      },
+      "consumers": [
+        "tooling/qa/core/qa-controls/discovery.mjs",
+        "tooling/qa/core/qa-controls/discovery.test.ts",
+        "tooling/qa/core/qa-controls/executables.test.ts",
+        "tooling/qa/core/qa-controls/generate.mjs"
+      ],
+      "surfaces": [
+        "binding:GENERATED_INVENTORY_SOURCE_FILES"
       ]
     },
     {
@@ -16228,7 +16161,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/function-metrics.mjs",
-        "contentHash": "cbaca9e5b62be307cb6cc0ea05b1f6436f030878288034ca34048c943566744d"
+        "contentHash": "a042f0ca827c37797dc676193c630ab0721466e310f438fba93411f7968f48db"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -16239,7 +16172,12 @@
         "binding:LOGICAL_OPERATOR_KINDS",
         "property:collectControlMetrics/effects",
         "property:collectControlMetrics/ownerCalls",
-        "property:collectControlMetrics/stateAuthorities"
+        "property:collectControlMetrics/stateAuthorities",
+        "property:collectControlMetrics/stateReceivers",
+        "property:collectControlMetrics/unresolvedStateAuthorities",
+        "property:collectTopLevelEffectClusters/stateAuthorities",
+        "property:collectTopLevelEffectClusters/stateReceivers",
+        "property:collectTopLevelEffectClusters/unresolvedStateAuthorities"
       ]
     },
     {
@@ -16496,7 +16434,8 @@
         "tooling/qa/core/verify-focused.test-steps.mjs",
         "tooling/qa/core/verify-naming.facades.mjs",
         "tooling/qa/core/verify-structural-risk.mjs",
-        "tooling/qa/guards/quality/verify-manual-mock-export-parity.targets.helpers.mjs"
+        "tooling/qa/guards/quality/verify-manual-mock-export-parity.targets.helpers.mjs",
+        "tooling/qa/runtime/current-diff.helpers.mjs"
       ],
       "surfaces": [
         "binding:cwdScopedCaches",
@@ -16789,7 +16728,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "d50af4bc0d29a4b87e47dfcaa08359e0dfc7822f58fdd56dbb5adf2bce0401e8"
+        "contentHash": "9ca26183ded4826b25ee9f733dc2c4674f054e5f8366caeedd83380192ffbafb"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16824,7 +16763,6 @@
         "property:testFiles[30]",
         "property:testFiles[31]",
         "property:testFiles[32]",
-        "property:testFiles[33]",
         "property:testFiles[4]",
         "property:testFiles[5]",
         "property:testFiles[6]",
@@ -17574,7 +17512,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/hooks/pre-push.mjs",
-        "contentHash": "5d5d3c658e4746d984144a57252309ff39ac3f6624212d9d2b038ae820a34956"
+        "contentHash": "d636bc544f9e2f348e2b41e8762f1f784a275d0139bb96850c45f3d2303089c0"
       },
       "consumers": [
         "tooling/qa/hooks/pre-push-command-policy.test.ts",
@@ -17617,7 +17555,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/preflight-docs.mjs",
-        "contentHash": "b2323bff0fd9c7c93d43df9ea85efcf0cd4668ec2c648c5c7d57052f6c123e1d"
+        "contentHash": "f54dbc831d1166969a0caabf1620b25cc360313732f87e7e13483f6e5c3aac55"
       },
       "consumers": [
         "tooling/qa/wrappers/preflight-docs.mjs",
@@ -17637,7 +17575,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/preflight.mjs",
-        "contentHash": "3d1b1591d42c72b35471cf6024898c3fc32d7f851c74612a5fea669559064cdc"
+        "contentHash": "b38a97bcde57627c3b3401e5c3c50f1de13d0667a493f7bbf722fd3a4f698928"
       },
       "consumers": [
         "tooling/qa/wrappers/preflight-render.test.ts",
@@ -17797,7 +17735,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "45c50ad85191284b5feff9c8e4a7a7eed311bd4c5c32c63db9ae4960edd79651"
+        "contentHash": "5c84e0d055b33395d76f6784a3e2fe1b9dbb3445d5901ed6daca9a41bf870b48"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -17825,6 +17763,7 @@
         "tooling/qa/wrappers/release.mjs"
       ],
       "surfaces": [
+        "binding:HARNESS_INVENTORY_ONLY_FILES",
         "binding:QA_SUITES",
         "binding:SHARED_CONTROL_FILES",
         "binding:SHARED_CONTROL_PATTERNS"
@@ -19666,7 +19605,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scope.mjs",
-        "contentHash": "46fe717e55ecb976679c5744a6e56e2a4e7d8a1c3ed0d43070cd9fd965555cef"
+        "contentHash": "6ad019d818fbc1ee1311ff51ee7a8aea6ead076542d7f9edf7a7dac47aac717e"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",
@@ -20206,7 +20145,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-harness.execution.mjs",
-        "contentHash": "fd6a8bb36623837ff5a8fe2e74c75cf66f8a6f67185ad9ad9f8bfc87f7af942c"
+        "contentHash": "e31af68c4ebac5873da301e2f9974230699a18868562fe1293d49be19a4def90"
       },
       "consumers": [
         "tooling/qa/core/verify-harness.execution.mjs",
@@ -20541,6 +20480,7 @@
         "contentHash": "f511e80f677dc5550727043bba765b2beb11ab7bb578a4fadc0df01a150091e6"
       },
       "consumers": [
+        "tooling/qa/core/harness-freshness-step.mjs",
         "tooling/qa/core/verify-all.violation-steps.architecture.mjs",
         "tooling/qa/core/verify-focused-triggered.execution.mjs",
         "tooling/qa/core/verify-oss-release-surface.mjs",

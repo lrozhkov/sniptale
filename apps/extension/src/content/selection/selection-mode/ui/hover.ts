@@ -1,7 +1,16 @@
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
+import { getAbsolutePosition } from '../../../platform/frame';
+import { logSelectionModeRuntime } from '../diag';
+import type { SelectionState } from '../types';
 import type { SelectionModeDom } from './dom-types';
 import type { SelectionRect } from './types';
 import { getSelectionHoverFrameStyle } from './style';
+
+type SelectionModeHoverSession = {
+  readonly currentState: SelectionState;
+  readonly dom: SelectionModeDom | null;
+  readonly isActive: boolean;
+};
 
 export function createHoverElements(
   dom: SelectionModeDom,
@@ -64,4 +73,37 @@ export function hideHoverFrame(dom: SelectionModeDom): void {
   if (dom.hoverSizeLabel) {
     dom.hoverSizeLabel.style.display = 'none';
   }
+}
+
+export function createSelectionModeHoverFrameHandlers(session: SelectionModeHoverSession) {
+  return {
+    hideHoverFrame: () => {
+      const dom = session.dom;
+      if (!dom) {
+        logMissingHoverDom('hideHoverFrame', session);
+        return;
+      }
+      hideHoverFrame(dom);
+    },
+    showHoverFrameDom: (element: HTMLElement) => {
+      const dom = session.dom;
+      if (!dom) {
+        logMissingHoverDom('showHoverFrame', session, element);
+        return;
+      }
+      showHoverFrame(dom, getAbsolutePosition(element));
+    },
+  };
+}
+
+function logMissingHoverDom(
+  operation: 'hideHoverFrame' | 'showHoverFrame',
+  session: SelectionModeHoverSession,
+  element?: HTMLElement
+): void {
+  logSelectionModeRuntime(`Missing DOM during ${operation}`, {
+    currentState: session.currentState,
+    isActive: session.isActive,
+    ...(element ? { tagName: element.tagName } : {}),
+  });
 }

@@ -207,10 +207,17 @@ export async function collectHarnessStepResults({
     ...collectors,
   };
 
-  if (context.harnessTargetFiles.length === 0) {
+  if ((context.harnessVerificationTargetFiles ?? context.harnessTargetFiles).length === 0) {
     return {
       skipped: true,
-      steps: [createOkStep('QA release harness', 'no changed harness files')],
+      steps: [
+        createOkStep(
+          'QA release harness',
+          context.harnessTargetFiles.length > 0
+            ? 'data-only inventory does not require harness execution'
+            : 'no changed harness files'
+        ),
+      ],
     };
   }
 

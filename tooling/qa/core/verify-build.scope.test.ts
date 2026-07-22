@@ -156,6 +156,23 @@ it('expands parser and export seams to broader related owner files in qa:build',
   ]);
 });
 
+it('does not classify owner-local snapshot helpers as parser or export seams', () => {
+  const file = 'apps/extension/src/content/selection/session/snapshots.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [file],
+    codeFiles: [file],
+    repoCodeFiles: [file],
+    focusedScopeResolver: () => ({
+      detail: 'local owner tests=1; coverageTargets=1',
+      testFiles: ['apps/extension/src/content/selection/session/index.test.ts'],
+      verdict: 'run-local-coverage',
+    }),
+    ownerTestResolver: () => ['apps/extension/src/content/selection/session/index.test.ts'],
+  });
+
+  expect(scope.matchedFamilies).not.toContain('parser-snapshot-export');
+});
+
 it('falls back to direct changed tests when qa:build has no changed code files', () => {
   const scope = resolveBuildTestScope({
     targetFiles: ['apps/extension/src/popup/shell/app/view.test.tsx'],

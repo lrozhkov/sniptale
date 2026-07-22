@@ -86,13 +86,6 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/popup/shell/export/pages/content.test.tsx'],
   },
   {
-    owner: 'content-selection-mode-controller-runtime',
-    productionFile: 'apps/extension/src/content/selection/selection-mode/controller/runtime.ts',
-    reason:
-      'Selection-mode controller runtime facade delegates to the owner-local runtime-state args assembler.',
-    testFiles: ['apps/extension/src/content/selection/selection-mode/controller/runtime.test.ts'],
-  },
-  {
     owner: 'content-area-selection-controller',
     productionFile: 'apps/extension/src/content/selection/area-selector/controller.ts',
     reason:

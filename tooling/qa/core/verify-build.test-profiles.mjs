@@ -118,7 +118,9 @@ function resolveUnavailableProductionProfile({
 }) {
   const proofScopes = unavailableProductionScopes.map((scope) => ({
     ...scope,
-    ownerTests: ownerTestResolver(scope.file),
+    ownerTests: [
+      ...new Set([...ownerTestResolver(scope.file), ...(scope.changedOwnerTests ?? [])]),
+    ],
   }));
   if (
     proofScopes.some((scope) => scope.relatedFiles.length === 0 && scope.ownerTests.length === 0)

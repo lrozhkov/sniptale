@@ -84,6 +84,15 @@ it('runs release harness for shared controls that affect product and harness aut
   expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:build']);
 });
 
+it('skips release harness for a generated inventory-only push', () => {
+  const commands = resolvePrePushCommands({
+    prePushInput: `refs/heads/main ${LOCAL_SHA} refs/heads/main ${REMOTE_SHA}\n`,
+    gitRunner: () => ({ stdout: 'tooling/configs/qa/technical-debt.data.json\n' }),
+  });
+
+  expect(commands).toEqual(['qa:checkpoint', 'qa:build']);
+});
+
 it('rejects malformed hook input instead of silently weakening pushed-range proof', () => {
   expect(() => parsePrePushUpdates('refs/heads/main missing-fields')).toThrow(
     /expected four fields/u

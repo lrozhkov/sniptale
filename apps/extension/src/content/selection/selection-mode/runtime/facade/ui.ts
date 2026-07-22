@@ -3,7 +3,7 @@ import { getSelectionFrameVisual } from '../../../frame-runtime/selection-frame-
 import { createSelectionModeUiRuntime } from '../../ui/runtime';
 
 export function createSelectionModeFacadeUi(args: {
-  getDom: () => ReturnType<typeof import('../../session/state').createSelectionModeState>['dom'];
+  getDom: () => ReturnType<typeof import('../../session').createSelectionModeSession>['dom'];
   getMaxSelectionHeight: typeof import('../../constants').getMaxSelectionHeight;
   getMaxSelectionWidth: typeof import('../../constants').getMaxSelectionWidth;
   cancelSelection: () => void;

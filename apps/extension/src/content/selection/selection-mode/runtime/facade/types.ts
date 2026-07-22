@@ -1,9 +1,9 @@
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
-import type { SelectionModeState } from '../../session/state';
+import type { SelectionModeSession } from '../../session';
 import type { createSelectionModeUiRuntime } from '../../ui/runtime';
 
 interface SelectionModeRuntimeFacadeSetupArgs {
-  state: ReturnType<typeof import('../../session/state').createSelectionModeState>;
+  state: ReturnType<typeof import('../../session').createSelectionModeSession>;
   getMaxSelectionHeight: typeof import('../../constants').getMaxSelectionHeight;
   getMaxSelectionWidth: typeof import('../../constants').getMaxSelectionWidth;
   cleanup: () => void;
@@ -15,20 +15,20 @@ interface SelectionModeRuntimeFacadeSetupArgs {
 
 interface SelectionModeRuntimeFacadeStateArgs {
   getIsActive: () => boolean;
-  getRejectCallback: () => SelectionModeState['rejectCallback'];
+  getRejectCallback: () => SelectionModeSession['rejectCallback'];
   setIsActive: (value: boolean) => void;
-  setCurrentState: (value: SelectionModeState['currentState']) => void;
-  setRejectCallback: (value: SelectionModeState['rejectCallback']) => void;
+  setCurrentState: (value: SelectionModeSession['currentState']) => void;
+  setRejectCallback: (value: SelectionModeSession['rejectCallback']) => void;
   setResolveCallback: (value: ((value: CaptureArea) => void) | null) => void;
   setAspectRatio: (value: number | null) => void;
-  setCurrentSelection: (value: SelectionModeState['currentSelection']) => void;
+  setCurrentSelection: (value: SelectionModeSession['currentSelection']) => void;
   setMaintainAspectRatio: (value: boolean) => void;
 }
 
 interface SelectionModeRuntimeFacadeViewArgs {
-  getDom: () => SelectionModeState['dom'];
+  getDom: () => SelectionModeSession['dom'];
   getAspectRatio: () => number | null;
-  getCurrentSelection: () => SelectionModeState['currentSelection'];
+  getCurrentSelection: () => SelectionModeSession['currentSelection'];
   getMaintainAspectRatio: () => boolean;
   updateFinalFrame: () => void;
   constrainSelection: () => void;

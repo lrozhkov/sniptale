@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Z_INDEX_BASE } from '../../constants';
-import { createSelectionModeState } from '../../session/state';
+import { createSelectionModeSession } from '../../session';
 
 const { createSelectionModePublicApiMock, createSelectionModeRuntimeSetupMock } = vi.hoisted(
   () => ({
@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 function createRuntimeFacadeFixture() {
-  const state = createSelectionModeState();
+  const state = createSelectionModeSession();
   const publicApi = {
     disableCursor: vi.fn(),
     disableSelectionMode: vi.fn(),

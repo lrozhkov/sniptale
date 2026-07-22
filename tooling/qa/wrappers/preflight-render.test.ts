@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
 
 import { renderPreflightReport } from './preflight.mjs';
@@ -60,4 +61,65 @@ it('stays read-only and outside the blocking closeout path', () => {
   ]) {
     expect(source).not.toContain(forbidden);
   }
+});
+
+it('does not prescribe release harness for an inventory-only scope', () => {
+  const output = renderPreflightReport({
+    context: {
+      targetFiles: [],
+      harnessTargetFiles: ['tooling/configs/qa/technical-debt.data.json'],
+      harnessInventoryTargetFiles: ['tooling/configs/qa/technical-debt.data.json'],
+      harnessVerificationTargetFiles: [],
+    },
+    relevantDocs: [],
+    ownerRuntime: [],
+    guardrailReport: {},
+    structuralPressure: [],
+    contractChecklist: [],
+    transitiveConsumerHints: [],
+    typecheckBlastRadius: [],
+    advisoryFindings: [],
+    proofHints: [],
+  });
+
+  expect(output).toContain('data-only harness inventories use checkpoint owner validators');
+  expect(output).toContain('qa:build still requires that fresh checkpoint');
+  expect(output).not.toContain('run npm run qa:release-harness');
+});
+
+it('bounds large scope and boundary inventories without hiding later report sections', () => {
+  const targetFiles = Array.from(
+    { length: 114 },
+    (_, index) => `apps/extension/src/content/selection/selection-mode/path-${index}.ts`
+  );
+  const digest = createHash('sha256').update(JSON.stringify(targetFiles)).digest('hex');
+  const createReport = (files) =>
+    renderPreflightReport({
+      context: { mode: 'explicit-files', targetFiles: files },
+      relevantDocs: ['AGENTS.md'],
+      ownerRuntime: ['extension:content:selection'],
+      guardrailReport: { buildScopeForecast: ['extension artifact build'] },
+      structuralPressure: ['attention=0'],
+      contractChecklist: [`runtime/import boundary files: ${files.join(', ')}`],
+      transitiveConsumerHints: [],
+      typecheckBlastRadius: [],
+      advisoryFindings: [],
+      proofHints: ['selection workflow proof'],
+    });
+  const output = createReport(targetFiles);
+
+  expect(output).toContain(targetFiles[0]);
+  expect(output).toContain(targetFiles.at(-1));
+  expect(output).toContain(`Target files (114):`);
+  expect(output).toContain(`full-list-sha256=${digest}`);
+  expect(output).toContain('Proof:');
+  expect(output).toContain('Build forecast:');
+  expect(output).toContain('Advisory:');
+  expect(output).toContain('attention=0, watch=0');
+  expect(output).not.toContain('console output truncated');
+  expect(Buffer.byteLength(output)).toBeLessThan(16 * 1024);
+
+  const changedMiddle = [...targetFiles];
+  changedMiddle[50] = `${changedMiddle[50]}.changed`;
+  expect(createReport(changedMiddle)).not.toContain(`full-list-sha256=${digest}`);
 });

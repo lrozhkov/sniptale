@@ -2,7 +2,7 @@ import { createSelectionModeEventHandlers } from '../events/handlers';
 import { createSelectionModeEventsBridge } from '../events/bridge';
 import { createSelectionModeRuntimeSetup } from './setup';
 import type { Selection } from '../types';
-import type { SelectionModeMutableRefs } from '../session/locals-contract';
+import type { SelectionModeSession } from '../session';
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
 
 export type SelectionModeRuntimeGraphBindingsArgs = {
@@ -14,14 +14,13 @@ export type SelectionModeRuntimeGraphBindingsArgs = {
   getRejectCallback: () => ((error: Error) => void) | null;
   getResolveCallback: () => ((area: CaptureArea) => void) | null;
   minSelectionSize: number;
-  mutableRefs: SelectionModeMutableRefs;
+  session: SelectionModeSession;
   selectionModeUiRuntime: {
     createDragFrame: () => void;
     createFinalElements: () => void;
   };
   setCleanupEventListeners: (cleanup: (() => void) | null) => void;
   setCleanupScrollListeners: (cleanup: (() => void) | null) => void;
-  state: ReturnType<typeof import('../session/state').createSelectionModeState>;
   updateFinalFrame: () => void;
   zIndexBase: number;
 };
@@ -42,7 +41,7 @@ function createSelectionModeRuntimeArgsBinding(
     handleMouseMove: (event, iframe) => getHandlers().handleMouseMove(event, iframe),
     handleMouseUp: () => getHandlers().handleMouseUp(),
     minSelectionSize: args.minSelectionSize,
-    mutableRefs: args.mutableRefs,
+    session: args.session,
     setCleanupEventListeners: args.setCleanupEventListeners,
     setCleanupScrollListeners: args.setCleanupScrollListeners,
     updateFinalFrame: args.updateFinalFrame,

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_COLOR_INFO_STRONG } from '@sniptale/ui/default-colors/constants';
 import { MIN_SELECTION_SIZE, OVERLAY_BACKGROUND, Z_INDEX_BASE } from '../../constants';
-import { createSelectionModeState } from '../../session/state';
+import { createSelectionModeSession } from '../../session';
 
 const { createSelectionModeUiRuntimeMock } = vi.hoisted(() => ({
   createSelectionModeUiRuntimeMock: vi.fn(),
@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 function expectCanonicalSelectionModeConfig() {
-  const state = createSelectionModeState();
+  const state = createSelectionModeSession();
   const uiRuntime = {
     createHoverElements: vi.fn(),
     createOverlayContainer: vi.fn(),
@@ -54,7 +54,7 @@ function expectCanonicalSelectionModeConfig() {
 }
 
 async function expectFixedBlueSelectionVisual() {
-  const state = createSelectionModeState();
+  const state = createSelectionModeSession();
 
   createSelectionModeFacadeUi({
     cancelSelection: vi.fn(),
@@ -92,7 +92,7 @@ describe('selection-mode runtime facade ui', () => {
 function expectUiRuntimeConfig(args: {
   cancelSelection: () => void;
   confirmSelection: () => void;
-  getDom: () => ReturnType<typeof createSelectionModeState>['dom'];
+  getDom: () => ReturnType<typeof createSelectionModeSession>['dom'];
   onSetupSizePanelListeners: () => void;
   resetToIdleState: () => void;
 }) {

@@ -37,32 +37,12 @@
       "sha256": "ea275a2cc153960b3d7f15cc248275ba32c430781dc283a71cbcb73cf629bf65"
     },
     {
-      "category": "archive-integration",
-      "path": "tooling/configs/qa/control-dispositions.data.json",
-      "sha256": "723c71c70ee55db5d0c70565c715032fd2bfce7a160577c43e7df574dcfd0df5"
-    },
-    {
-      "category": "validator-integration",
-      "path": "tooling/configs/qa/control-dispositions.data.json",
-      "sha256": "723c71c70ee55db5d0c70565c715032fd2bfce7a160577c43e7df574dcfd0df5"
-    },
-    {
       "category": "bundled-font",
       "path": "tooling/configs/qa/manifest-permissions.data.json",
       "sha256": "e53bb2845e30ad404b0be8d856d73bb5db6695793132243ab73c586b4f10f673"
     },
     {
       "category": "archive-integration",
-      "path": "tooling/configs/qa/technical-debt.data.json",
-      "sha256": "ac64f2777306483160120ba5c1462b9b019c10c09c8adbfc28ce28ad4f136115"
-    },
-    {
-      "category": "validator-integration",
-      "path": "tooling/configs/qa/technical-debt.data.json",
-      "sha256": "ac64f2777306483160120ba5c1462b9b019c10c09c8adbfc28ce28ad4f136115"
-    },
-    {
-      "category": "archive-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
       "sha256": "4e7bf23be3bf1022efd56d655ac3529008e66d11ec05e9870daa2815571d9200"
     },
@@ -70,6 +50,11 @@
       "category": "validator-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
       "sha256": "4e7bf23be3bf1022efd56d655ac3529008e66d11ec05e9870daa2815571d9200"
+    },
+    {
+      "category": "validator-integration",
+      "path": "tooling/qa/core/harness-freshness-step.mjs",
+      "sha256": "8b030d7b3228caaa19099bfae1c2193deddd3041e9baeb688d84dd27c17de747"
     },
     {
       "category": "archive-integration",

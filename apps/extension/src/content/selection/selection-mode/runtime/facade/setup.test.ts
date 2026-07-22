@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSelectionModeState } from '../../session/state';
+import { createSelectionModeSession } from '../../session';
 
 const { createSelectionModeFacadeUiMock, createSelectionModeSizePanelSetupMock } = vi.hoisted(
   () => ({
@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 function createRuntimeFacadeSetupFixture() {
-  const state = createSelectionModeState();
+  const state = createSelectionModeSession();
 
   return {
     args: {

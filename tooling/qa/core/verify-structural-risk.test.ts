@@ -231,6 +231,73 @@ describe('effectful cluster architecture levels', () => {
     expect(adapter.effectfulClusters).toBe(0);
     expect(application.effectfulClusters).toBe(1);
   });
+
+  it('does not turn a cohesive runtime binding adapter into a state owner', () => {
+    const adapter = analyzeStructuralSource(
+      'apps/extension/src/content/selection/controller/runtime-bindings/facade.ts',
+      `export function bind(session, getEvents) {
+        return {
+          setActive: (value) => { session.isActive = value; }, setSelection: (value) => { session.selection = value; },
+          setCallback: (value) => { session.callback = value; }, updateFinalFrame: () => getEvents().updateFinalFrame(),
+        };
+      }`
+    );
+    expect(adapter.architecturalLayer).toBe('adapter');
+    expect(adapter.stateAuthorities).toBe(3);
+    expect(adapter.stateReceiverNames).toEqual(['session']);
+    expect(adapter.unresolvedStateAuthorityCount).toBe(0);
+    expect(scoreFile(adapter)).toBe(0);
+  });
+
+  it('does not exempt an adapter that mutates multiple receiver roots', () => {
+    const adapter = analyzeStructuralSource(
+      'apps/extension/src/content/selection/controller/runtime-bindings/facade.ts',
+      `export function bind(firstState, secondState, thirdState) {
+        return { setFirst: (next) => { firstState.ready = next; },
+          setSecond: (next) => { secondState.value = next; },
+          setThird: (next) => { thirdState.callback = next; } };
+      }`
+    );
+    expect(adapter.stateReceiverNames).toEqual(['firstState', 'secondState', 'thirdState']);
+    expect(scoreFile(adapter)).toBe(3);
+  });
+
+  it('keeps mixed or branching runtime bindings subject to state pressure', () => {
+    const adapter = analyzeStructuralSource(
+      'apps/extension/src/content/selection/controller/runtime-bindings/facade.ts',
+      `export function bind(session, value) {
+        return {
+          setFirst: (next) => {
+            if (next > 0) {
+              if (next > 1) {
+                if (next > 2) {
+                  if (next > 3) session.first = next;
+                }
+              }
+            }
+          },
+          setSecond: (next) => { session.second = next; },
+          setThird: (next) => { session.third = next; },
+        };
+      }`
+    );
+    expect(scoreFile(adapter)).toBe(3);
+  });
+});
+
+it('does not score test fixture mutations as production state authority', () => {
+  const metric = analyzeStructuralSource(
+    'apps/extension/src/content/selection/runtime.test.ts',
+    `it('updates a fixture', () => {
+      firstFixture.isActive = true;
+      secondFixture.selection = selection;
+      thirdFixture.cleanup = cleanup;
+    });`
+  );
+
+  expect(metric.profile).toBe('test');
+  expect(metric.stateAuthorities).toBeGreaterThan(2);
+  expect(scoreFile(metric)).toBe(0);
 });
 
 it('uses formatting-stable normalized AST and signature hashes for allowances', () => {

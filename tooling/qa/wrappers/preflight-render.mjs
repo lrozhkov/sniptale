@@ -1,7 +1,44 @@
-import { HARNESS_QA_GUIDANCE } from '../core/qa-scope.mjs';
+import { createHash } from 'node:crypto';
+
+import { HARNESS_QA_GUIDANCE, hasHarnessVerificationQaTargets } from '../core/qa-scope.mjs';
+
+const MAXIMUM_LIST_ITEMS = 16;
+const HEAD_LIST_ITEMS = 10;
+const TAIL_LIST_ITEMS = 4;
+const MAXIMUM_INLINE_LIST_CHARACTERS = 1200;
+const INVENTORY_ONLY_SCOPE_GUIDANCE = [
+  'No product targets detected; data-only harness inventories use checkpoint owner validators',
+  'without a fresh release-harness stamp. qa:build still requires that fresh checkpoint.',
+].join(' ');
+
+function digestList(values) {
+  return createHash('sha256').update(JSON.stringify(values)).digest('hex');
+}
+
+function summarizeList(values) {
+  if (values.length <= MAXIMUM_LIST_ITEMS) return values;
+  const omitted = values.length - HEAD_LIST_ITEMS - TAIL_LIST_ITEMS;
+  return [
+    ...values.slice(0, HEAD_LIST_ITEMS),
+    `… ${omitted} omitted; full-list-sha256=${digestList(values)}`,
+    ...values.slice(-TAIL_LIST_ITEMS),
+  ];
+}
+
+function summarizeInlineList(value) {
+  if (value.length <= MAXIMUM_INLINE_LIST_CHARACTERS) return value;
+  const separatorIndex = value.indexOf(': ');
+  if (separatorIndex === -1) return value;
+  const prefix = value.slice(0, separatorIndex);
+  const values = value.slice(separatorIndex + 2).split(', ');
+  if (values.length <= MAXIMUM_LIST_ITEMS) return value;
+  return `${prefix}: ${summarizeList(values).join(', ')}`;
+}
 
 function formatList(values, emptyText = 'none') {
-  return values.length === 0 ? [emptyText] : values.map((value) => `- ${value}`);
+  return values.length === 0
+    ? [emptyText]
+    : summarizeList(values).map((value) => `- ${summarizeInlineList(value)}`);
 }
 
 function formatAdvisoryFindings(findings) {
@@ -26,7 +63,11 @@ function collectScopeLines(context) {
     `Excluded harness files (${(context.harnessTargetFiles ?? []).length}):`,
     ...formatList(context.harnessTargetFiles ?? []),
     ...(context.targetFiles.length === 0 && (context.harnessTargetFiles ?? []).length > 0
-      ? [`No product targets detected; ${HARNESS_QA_GUIDANCE}.`]
+      ? [
+          hasHarnessVerificationQaTargets(context)
+            ? `No product targets detected; ${HARNESS_QA_GUIDANCE}.`
+            : INVENTORY_ONLY_SCOPE_GUIDANCE,
+        ]
       : []),
   ];
 }

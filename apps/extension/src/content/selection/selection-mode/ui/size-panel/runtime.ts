@@ -1,17 +1,17 @@
 import { MIN_SELECTION_SIZE } from '../../constants';
-import type { SelectionModeState } from '../../session/state';
+import type { SelectionModeSession } from '../../session';
 import { setupSelectionModeSizePanelListeners } from './index';
 
 export function createSelectionModeSizePanelSetup(args: {
   constrainSelection: () => void;
-  state: SelectionModeState;
+  state: SelectionModeSession;
   getAspectRatio: () => number | null;
-  getCurrentSelection: () => SelectionModeState['currentSelection'];
+  getCurrentSelection: () => SelectionModeSession['currentSelection'];
   getMaintainAspectRatio: () => boolean;
   getMaxSelectionHeight: typeof import('../../constants').getMaxSelectionHeight;
   getMaxSelectionWidth: typeof import('../../constants').getMaxSelectionWidth;
   setAspectRatio: (value: number | null) => void;
-  setCurrentSelection: (value: SelectionModeState['currentSelection']) => void;
+  setCurrentSelection: (value: SelectionModeSession['currentSelection']) => void;
   setMaintainAspectRatio: (value: boolean) => void;
   updateFinalFrame: () => void;
 }): () => void {

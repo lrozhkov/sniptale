@@ -1,14 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { createSelectionModeController } from '.';
-import type { SelectionModeState } from '../session/state';
-import type { SelectionModeSession } from '../session/locals/contract';
+import type { SelectionModeSession } from '../session';
 import {
   createCapturedFacadeBindingsBase,
   createCapturedRuntimeGraphBindingsArgs,
   createSelectionModeEventsMock,
   createSelectionModeRuntimeFacadeMock,
-  createSelectionModeStateMock,
+  createSelectionModeSessionMock,
 } from './index.test-support';
 
 function createCapturedFacadeBindingsArgs(args: {
@@ -32,7 +31,6 @@ const mocks = vi.hoisted(() => {
     deactivateOtherContentModes: vi.fn(),
     logSelectionModeDiag: vi.fn(),
     logSelectionModeError: vi.fn(),
-    mutableRefs: {},
     session: null as SelectionModeSession | null,
     createSelectionModeSession: vi.fn(),
     resetSelectionModeSession: vi.fn(),
@@ -41,7 +39,6 @@ const mocks = vi.hoisted(() => {
     selectionModeRuntimeArgs: { state: {} },
     setContentModeEnabled: vi.fn(),
     setupSelectionModeRuntimeListeners: vi.fn(),
-    state: null as SelectionModeState | null,
   };
 });
 
@@ -69,19 +66,10 @@ vi.mock('../interaction/actions/runtime', async (importOriginal) => ({
   setupSelectionModeRuntimeListeners: mocks.setupSelectionModeRuntimeListeners,
 }));
 
-vi.mock('../session/state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../session/state')>()),
-  createSelectionModeState: () => mocks.state!,
-}));
-
-vi.mock('../session', () => ({
+vi.mock('../session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../session')>()),
   createSelectionModeSession: mocks.createSelectionModeSession,
   resetSelectionModeSession: mocks.resetSelectionModeSession,
-}));
-
-vi.mock('../session/locals/helpers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../session/locals/helpers')>()),
-  createSelectionModeSessionMutableRefs: () => mocks.mutableRefs,
 }));
 
 vi.mock('./runtime-bindings', async (importOriginal) => ({
@@ -123,8 +111,7 @@ beforeEach(() => {
   mocks.createSelectionModeSession.mockReset();
   mocks.runtimeFacade = createSelectionModeRuntimeFacadeMock();
   mocks.selectionModeEvents = createSelectionModeEventsMock();
-  mocks.state = createSelectionModeStateMock();
-  mocks.session = createSelectionModeStateMock() as SelectionModeSession;
+  mocks.session = createSelectionModeSessionMock();
   mocks.createSelectionModeSession.mockReturnValue(mocks.session);
 });
 
@@ -167,6 +154,9 @@ it('keeps facade bindings synchronized with session-owned state and runtime even
   const rejectCallback = vi.fn();
   const resolveCallback = vi.fn();
   const selection = { x: 11, y: 12, width: 130, height: 95 };
+
+  expect(mocks.capturedFacadeArgs?.session).toBe(mocks.session);
+  expect(mocks.capturedRuntimeGraphArgs?.session).toBe(mocks.session);
 
   mocks.capturedFacadeArgs?.setAspectRatio(16 / 9);
   mocks.capturedFacadeArgs?.setCurrentSelection(selection);

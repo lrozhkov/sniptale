@@ -9,46 +9,52 @@ import {
   writeFile,
 } from '../core/test-helpers';
 
-it('uses the current uncommitted diff by default', async () => {
-  const root = createTempRoot('qa-preflight-diff-');
-  initGitRepo(root);
-  writeFile(root, 'package.json', '{"name":"qa-preflight-temp"}\n');
-  writeFile(
-    root,
-    'apps/extension/src/composition/persistence/storage/session-store.ts',
-    'export const value = 1;\n'
-  );
-  runGit(
-    root,
-    'add',
-    'package.json',
-    'apps/extension/src/composition/persistence/storage/session-store.ts'
-  );
-  runGit(root, 'commit', '-m', 'init');
+const GIT_INTEGRATION_TIMEOUT = 15_000;
 
-  writeFile(
-    root,
-    'apps/extension/src/composition/persistence/storage/session-store.ts',
-    'export const value = 2;\n'
-  );
-
-  const result = await withCwd(root, async () => {
-    const module = await importFresh<typeof import('./preflight.mjs')>(
-      './preflight.mjs',
-      import.meta.url
+it(
+  'uses the current uncommitted diff by default',
+  async () => {
+    const root = createTempRoot('qa-preflight-diff-');
+    initGitRepo(root);
+    writeFile(root, 'package.json', '{"name":"qa-preflight-temp"}\n');
+    writeFile(
+      root,
+      'apps/extension/src/composition/persistence/storage/session-store.ts',
+      'export const value = 1;\n'
     );
-    return module.collectPreflightReport();
-  });
+    runGit(
+      root,
+      'add',
+      'package.json',
+      'apps/extension/src/composition/persistence/storage/session-store.ts'
+    );
+    runGit(root, 'commit', '-m', 'init');
 
-  expect(result.context.targetFiles).toEqual([
-    'apps/extension/src/composition/persistence/storage/session-store.ts',
-  ]);
-  expect(result.relevantDocs).toContain('docs/architecture/repository-overview.md');
-  expect(result.relevantDocs).toContain('docs/security/data-handling.md');
-  expect(result.proofHints).toContain(
-    'package or app-core seam changed: include transitive consumer tests'
-  );
-});
+    writeFile(
+      root,
+      'apps/extension/src/composition/persistence/storage/session-store.ts',
+      'export const value = 2;\n'
+    );
+
+    const result = await withCwd(root, async () => {
+      const module = await importFresh<typeof import('./preflight.mjs')>(
+        './preflight.mjs',
+        import.meta.url
+      );
+      return module.collectPreflightReport();
+    });
+
+    expect(result.context.targetFiles).toEqual([
+      'apps/extension/src/composition/persistence/storage/session-store.ts',
+    ]);
+    expect(result.relevantDocs).toContain('docs/architecture/repository-overview.md');
+    expect(result.relevantDocs).toContain('docs/security/data-handling.md');
+    expect(result.proofHints).toContain(
+      'package or app-core seam changed: include transitive consumer tests'
+    );
+  },
+  GIT_INTEGRATION_TIMEOUT
+);
 
 it('accepts explicit files for pre-edit planning', async () => {
   const root = createTempRoot('qa-preflight-files-');
@@ -77,6 +83,56 @@ it('accepts explicit files for pre-edit planning', async () => {
   );
 });
 
+it('does not route a local state snapshot helper to parser architecture', async () => {
+  const module = await import('./preflight.mjs');
+  expect(
+    module.collectRelevantDocs([
+      'apps/extension/src/content/selection/selection-mode/session/locals/snapshots.ts',
+    ])
+  ).not.toContain('docs/architecture/parser-architecture.md');
+});
+
+it(
+  'does not request UI proof for a current-diff type-only rename',
+  async () => {
+    const root = createTempRoot('qa-preflight-type-only-ui-');
+    const file = 'apps/extension/src/content/selection/selection-mode/ui/size-panel/runtime.ts';
+    initGitRepo(root);
+    writeFile(root, 'package.json', '{"name":"qa-preflight-temp"}\n');
+    writeFile(
+      root,
+      file,
+      "import type { OldSession } from '../../session/state';\nexport type Value = OldSession['dom'];\n"
+    );
+    runGit(root, 'add', 'package.json', file);
+    runGit(root, 'commit', '-m', 'init');
+    writeFile(
+      root,
+      file,
+      "import type { SelectionModeSession } from '../../session';\nexport type Value = SelectionModeSession['dom'];\n"
+    );
+
+    const result = await withCwd(root, async () => {
+      const module = await importFresh<typeof import('./preflight.mjs')>(
+        './preflight.mjs',
+        import.meta.url
+      );
+      return module.collectPreflightReport();
+    });
+
+    expect(result.context.qualityCodeFiles).toEqual([]);
+    expect(result.context.targetFiles).toEqual([]);
+    expect(result.proofHints).not.toContain(
+      'UI seams need ownership proof for visibility, i18n, focus, and restore behavior'
+    );
+    expect(result.guardrailReport.hints.join('\n')).not.toMatch(/UI|state owner/iu);
+    expect(result.advisoryFindings).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'advisory.ui-proof-gap' })])
+    );
+  },
+  GIT_INTEGRATION_TIMEOUT
+);
+
 it('shows security-control proof guidance without migration-state routing', async () => {
   const root = createTempRoot('qa-preflight-security-control-');
   writeFile(root, 'tooling/configs/qa/security-example.json', '{}\n');
@@ -95,6 +151,34 @@ it('shows security-control proof guidance without migration-state routing', asyn
     'security/dependency policy changes require compact admission and guard fixtures; route review by changed seam'
   );
 });
+
+it(
+  'does not request security proof for a current-diff import-only control change',
+  async () => {
+    const root = createTempRoot('qa-preflight-import-only-security-');
+    const file = 'tooling/qa/security-policy.mjs';
+    initGitRepo(root);
+    writeFile(root, 'package.json', '{"name":"qa-preflight-temp"}\n');
+    writeFile(root, file, "export { value } from './old-owner.mjs';\n");
+    runGit(root, 'add', 'package.json', file);
+    runGit(root, 'commit', '-m', 'init');
+    writeFile(root, file, "export { value } from './new-owner.mjs';\n");
+
+    const result = await withCwd(root, async () => {
+      const module = await importFresh<typeof import('./preflight.mjs')>(
+        './preflight.mjs',
+        import.meta.url
+      );
+      return module.collectPreflightReport();
+    });
+
+    expect(result.context.allQualityTargetFiles).toEqual([]);
+    expect(result.proofHints).not.toContain(
+      'security/dependency policy changes require compact admission and guard fixtures; route review by changed seam'
+    );
+  },
+  GIT_INTEGRATION_TIMEOUT
+);
 
 it('filters harness files out of product preflight context with guidance', async () => {
   const root = createTempRoot('qa-preflight-harness-scope-');
@@ -221,6 +305,32 @@ it('uses the test structural profile instead of file-size warnings', async () =>
     expect.objectContaining({ profile: 'test' })
   );
   expect(result).not.toHaveProperty('targetTestSizeWarnings');
+});
+
+it('renders a structural finding as advisory without duplicating it as pressure', async () => {
+  const root = createTempRoot('qa-preflight-structural-dedup-');
+  const file = 'apps/extension/src/content/selection/selection-mode/controller/deep.ts';
+  writeFile(
+    root,
+    file,
+    `export function handle(a, b, c, d, e, f, g) {
+      if (a) { if (b) { if (c) { if (d) { if (e) { return f ?? g; } } } } }
+      return null;
+    }\n`
+  );
+
+  const result = await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./preflight.mjs')>(
+      './preflight.mjs',
+      import.meta.url
+    );
+    return module.collectPreflightReport({ files: [file] });
+  });
+
+  expect(result.advisoryFindings).toEqual(
+    expect.arrayContaining([expect.objectContaining({ file, id: 'advisory.structural-function' })])
+  );
+  expect(result.structuralPressure.join('\n')).not.toContain(file);
 });
 
 it('does not route markdown docs through structural analysis', async () => {

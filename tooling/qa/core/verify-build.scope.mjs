@@ -16,7 +16,7 @@ const RUNTIME_ENTRYPOINT_PATTERN = new RegExp(
   'u'
 );
 const PARSER_SNAPSHOT_EXPORT_NAME_PATTERN =
-  /(dom-tree-parser|parser|snapshot|markdown-rendering|project-export|scenario-export)/u;
+  /(?:^|\/)(?:dom-tree-parser|parser|snapshot|markdown-rendering|project-export|scenario-export)(?=\/|[.-])/u;
 const EXPORT_OWNER_PATH_PATTERN = /(?:^|\/)export(?:\/|\.)/u;
 const BUILD_SCOPE_FAMILIES = [
   {
@@ -117,6 +117,35 @@ function uniqueSorted(values) {
   return [...new Set(values)].sort();
 }
 
+function collectChangedReplacementOwnerTests(file, productionCodeFiles, directTestFiles) {
+  const deletedStem = path.posix.basename(file, path.posix.extname(file));
+  const candidates = productionCodeFiles
+    .map((candidate) => ({
+      directory: path.posix.dirname(candidate),
+      stem: path.posix.basename(candidate, path.posix.extname(candidate)),
+    }))
+    .filter(({ directory, stem }) => {
+      const normalizedStem = stem.replace(/-bindings$/u, '');
+      return (
+        file.startsWith(`${directory}/`) &&
+        (stem === 'index' ||
+          deletedStem === normalizedStem ||
+          deletedStem.startsWith(`${normalizedStem}-`))
+      );
+    })
+    .sort((left, right) => right.directory.length - left.directory.length);
+  const owner = candidates[0];
+  if (!owner) return [];
+  return directTestFiles.filter((testFile) => {
+    if (path.posix.dirname(testFile) !== owner.directory) return false;
+    const testBasename = path.posix.basename(testFile);
+    return (
+      testBasename.startsWith(`${owner.stem}.test.`) ||
+      testBasename.startsWith(`${owner.stem}.spec.`)
+    );
+  });
+}
+
 function collectOwnerPrefixes(file, rootNames = []) {
   const segments = file.split('/');
   if (segments.length < 3 || segments[0] !== 'src' || !rootNames.includes(segments[1])) {
@@ -204,7 +233,7 @@ export function resolveBuildTestScope({
   const productCodeFiles = codeFiles.filter(isProductQaFile);
   const productAddedFiles = addedFiles.filter(isProductQaFile);
   const productRepoCodeFiles = repoCodeFiles.filter(isProductQaFile);
-  const directTestFiles = uniqueSorted(productTargetFiles.filter(isTestFile));
+  const directTestFiles = uniqueSorted(productCodeFiles.filter(isTestFile));
   const productionCodeFiles = productCodeFiles.filter((file) => !isTestFile(file));
   const productionTargetFiles = productTargetFiles.filter(
     (file) => !isTestFile(file) && (isCodeFile(file) || file === 'apps/extension/manifest.json')
@@ -213,6 +242,11 @@ export function resolveBuildTestScope({
   const unavailableProductionScopes = productionTargetFiles
     .filter((file) => !productionCodeFileSet.has(file))
     .map((file) => ({
+      changedOwnerTests: collectChangedReplacementOwnerTests(
+        file,
+        productionCodeFiles,
+        directTestFiles
+      ),
       file,
       relatedFiles: collectExpandedRelatedFiles([file], productRepoCodeFiles).relatedFiles,
     }));

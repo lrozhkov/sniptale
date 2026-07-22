@@ -1,12 +1,8 @@
 import { getMaxSelectionHeight, getMaxSelectionWidth } from '../../constants';
 import { createSelectionModeRuntimeFacade } from '../../runtime/facade';
-import type {
-  SelectionModeRuntimeFacade,
-  SelectionModeRuntimeFacadeArgs,
-} from '../../runtime/facade/types';
+import type { SelectionModeRuntimeFacade } from '../../runtime/facade/types';
 import { setupSelectionModeRuntimeListeners } from '../../interaction/actions/runtime';
-import { createSelectionModeSessionLocalSetters } from '../../session/locals/setters';
-import type { SelectionModeSession } from '../../session/locals/helpers';
+import type { SelectionModeSession } from '../../session';
 
 type SelectionModeRuntimeArgs = Parameters<typeof setupSelectionModeRuntimeListeners>[0];
 
@@ -23,10 +19,7 @@ export function createSelectionModeFacadeBindings(props: {
   getRuntimeArgs: () => SelectionModeRuntimeArgs;
   getRuntimeEvents: () => SelectionModeRuntimeEvents;
   session: SelectionModeSession;
-  state: SelectionModeRuntimeFacadeArgs['state'];
 }): SelectionModeRuntimeFacade {
-  const sessionSetters = createSelectionModeSessionLocalSetters(props.session);
-
   return createSelectionModeRuntimeFacade({
     cancelSelection: () => props.getRuntimeEvents().cancelSelection(),
     cleanup: props.cleanup,
@@ -41,15 +34,29 @@ export function createSelectionModeFacadeBindings(props: {
     getMaxSelectionWidth,
     getRejectCallback: () => props.session.rejectCallback,
     resetToIdleState: () => props.getRuntimeEvents().resetToIdleState(),
-    setAspectRatio: sessionSetters.setAspectRatio,
-    setCurrentSelection: sessionSetters.setCurrentSelection,
-    setCurrentState: sessionSetters.setCurrentState,
-    setIsActive: sessionSetters.setIsActive,
-    setMaintainAspectRatio: sessionSetters.setMaintainAspectRatio,
-    setRejectCallback: sessionSetters.setRejectCallback,
-    setResolveCallback: sessionSetters.setResolveCallback,
+    setAspectRatio: (value) => {
+      props.session.aspectRatio = value;
+    },
+    setCurrentSelection: (value) => {
+      props.session.currentSelection = value;
+    },
+    setCurrentState: (value) => {
+      props.session.currentState = value;
+    },
+    setIsActive: (value) => {
+      props.session.isActive = value;
+    },
+    setMaintainAspectRatio: (value) => {
+      props.session.maintainAspectRatio = value;
+    },
+    setRejectCallback: (value) => {
+      props.session.rejectCallback = value;
+    },
+    setResolveCallback: (value) => {
+      props.session.resolveCallback = value;
+    },
     setupRuntimeListeners: () => setupSelectionModeRuntimeListeners(props.getRuntimeArgs()),
-    state: props.state,
+    state: props.session,
     updateFinalFrame: () => props.getRuntimeEvents().updateFinalFrame(),
   });
 }

@@ -1567,9 +1567,7 @@
     {
       "path": "tooling/configs/qa/app-core-owner-policy.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/configs/qa/target-only-paths.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
         "tooling/qa/core/app-core-owner-policy.mjs"
       ],
       "disposition": "keep",
@@ -1579,7 +1577,6 @@
     {
       "path": "tooling/configs/qa/architecture-debt.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/architecture-guardrails.data.mjs",
         "tooling/qa/core/technical-debt-enforced-sources.mjs"
       ],
@@ -1590,7 +1587,6 @@
     {
       "path": "tooling/configs/qa/audit-profiles.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/audits/profiles/registry.mjs",
         "tooling/qa/core/verify-external-audit-semantics.test-support.ts"
       ],
@@ -1601,7 +1597,6 @@
     {
       "path": "tooling/configs/qa/codeql-baseline.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/technical-debt-enforced-sources.mjs",
         "tooling/qa/policy/external-tools.mjs"
       ],
@@ -1612,7 +1607,6 @@
     {
       "path": "tooling/configs/qa/codeql-config.yml",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/policy/external-tools.mjs"
       ],
       "disposition": "keep",
@@ -1622,8 +1616,7 @@
     {
       "path": "tooling/configs/qa/control-dispositions.data.json",
       "consumers": [
-        "tooling/configs/qa/oss-release-consumers.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
+        "tooling/qa/core/oss-release-consumer-discovery.mjs",
         "tooling/qa/core/qa-controls/discovery.mjs",
         "tooling/qa/core/qa-controls/policy.mjs",
         "tooling/qa/core/retired-controls/validation.mjs"
@@ -1635,8 +1628,6 @@
     {
       "path": "tooling/configs/qa/dependency-policy-rules.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
         "tooling/qa/core/verify-focused-triggered.helpers.mjs",
         "tooling/qa/guards/security/verify-dependency-admission.mjs",
         "tooling/qa/policy/dependency-policy-rules.mjs"
@@ -1648,7 +1639,6 @@
     {
       "path": "tooling/configs/qa/docs-topology.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/docs-topology-policy.mjs"
       ],
       "disposition": "keep",
@@ -1658,7 +1648,6 @@
     {
       "path": "tooling/configs/qa/gitleaks-baseline.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/target-only-path-references.mjs",
         "tooling/qa/core/technical-debt-enforced-sources.mjs",
         "tooling/qa/policy/external-tools.mjs"
@@ -1670,8 +1659,6 @@
     {
       "path": "tooling/configs/qa/gitleaks.toml",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
         "tooling/qa/policy/external-tools.mjs"
       ],
       "disposition": "keep",
@@ -1681,7 +1668,6 @@
     {
       "path": "tooling/configs/qa/jscpd-baseline.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/technical-debt-enforced-sources.mjs",
         "tooling/qa/policy/external-tools.mjs"
       ],
@@ -1692,7 +1678,6 @@
     {
       "path": "tooling/configs/qa/jscpd.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/verify-external-audit-semantics.test-support.ts",
         "tooling/qa/policy/external-tools.mjs"
       ],
@@ -1703,8 +1688,6 @@
     {
       "path": "tooling/configs/qa/knip.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
         "tooling/qa/policy/external-tools.mjs"
       ],
       "disposition": "keep",
@@ -1714,9 +1697,7 @@
     {
       "path": "tooling/configs/qa/licenses.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/configs/qa/dependency-policy-rules.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
         "tooling/qa/audits/licenses/evaluation.mjs",
         "tooling/qa/core/technical-debt-enforced-sources.mjs",
         "tooling/qa/core/verify-external-audit-semantics.security.test-support.ts",
@@ -1732,8 +1713,6 @@
     {
       "path": "tooling/configs/qa/manifest-permissions.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
-        "tooling/configs/qa/oss-release-consumers.data.json",
         "tooling/qa/core/guardrail-owner-audits.mjs",
         "tooling/qa/core/verify-focused.config.mjs",
         "tooling/qa/guards/architecture/verify-manifest-permissions.mjs",
@@ -1747,8 +1726,6 @@
     {
       "path": "tooling/configs/qa/multi-message-orchestration.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
         "tooling/qa/core/verify-multi-message-transitions.mjs"
       ],
       "disposition": "keep",
@@ -1758,9 +1735,11 @@
     {
       "path": "tooling/configs/qa/oss-release-consumers.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/configs/qa/oss-release.data.json",
-        "tooling/qa/core/oss-release-consumer-discovery.mjs"
+        "tooling/qa/core/harness-freshness-step.mjs",
+        "tooling/qa/core/oss-release-consumer-discovery.mjs",
+        "tooling/qa/core/qa-controls/discovery.mjs",
+        "tooling/qa/core/qa-scope.mjs"
       ],
       "disposition": "keep",
       "owner": "qa-platform",
@@ -1769,7 +1748,6 @@
     {
       "path": "tooling/configs/qa/oss-release.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/oss-release-consumer-discovery.mjs",
         "tooling/release/oss-release-policy.mjs",
         "tooling/release/oss-release-policy.test-support.ts"
@@ -1781,7 +1759,6 @@
     {
       "path": "tooling/configs/qa/quality-baseline.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/quality.config.mjs",
         "tooling/qa/core/technical-debt-static-baselines.mjs"
       ],
@@ -1792,7 +1769,6 @@
     {
       "path": "tooling/configs/qa/retired-controls.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/retired-controls/policy.mjs"
       ],
       "disposition": "keep",
@@ -1802,8 +1778,6 @@
     {
       "path": "tooling/configs/qa/root-side-effects.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
         "tooling/qa/core/verify-root-side-effects.mjs"
       ],
       "disposition": "keep",
@@ -1813,8 +1787,6 @@
     {
       "path": "tooling/configs/qa/security-network-ownership.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
         "tooling/qa/codeql/generate-ownership.mjs",
         "tooling/qa/guards/security/verify-fetch-ownership.mjs"
       ],
@@ -1825,8 +1797,6 @@
     {
       "path": "tooling/configs/qa/security-storage-ownership.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
         "tooling/qa/codeql/generate-ownership.mjs",
         "tooling/qa/guards/security/verify-diagnostic-sanitization.mjs",
         "tooling/qa/guards/security/verify-secret-storage.mjs",
@@ -1839,7 +1809,6 @@
     {
       "path": "tooling/configs/qa/semgrep.yml",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/policy/external-tools.mjs"
       ],
       "disposition": "keep",
@@ -1849,7 +1818,6 @@
     {
       "path": "tooling/configs/qa/sonarjs-baseline.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/technical-debt-static-baselines.mjs",
         "tooling/qa/core/verify-sonarjs.mjs",
         "tooling/qa/core/verify-sonarjs.test-support.ts"
@@ -1861,7 +1829,6 @@
     {
       "path": "tooling/configs/qa/structural-risk-allowances.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/qa/core/structural-risk/config.mjs"
       ],
       "disposition": "keep",
@@ -1871,8 +1838,6 @@
     {
       "path": "tooling/configs/qa/target-only-paths.data.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
-        "tooling/configs/qa/technical-debt.data.json",
         "tooling/qa/core/target-only-path-policy.mjs"
       ],
       "disposition": "keep",
@@ -1883,10 +1848,12 @@
       "path": "tooling/configs/qa/technical-debt.data.json",
       "consumers": [
         "tooling/configs/qa/codeql-baseline.json",
-        "tooling/configs/qa/control-dispositions.data.json",
         "tooling/configs/qa/jscpd-baseline.json",
-        "tooling/configs/qa/oss-release-consumers.data.json",
         "tooling/qa/audits/jscpd-registry.mjs",
+        "tooling/qa/core/harness-freshness-step.mjs",
+        "tooling/qa/core/oss-release-consumer-discovery.mjs",
+        "tooling/qa/core/qa-controls/discovery.mjs",
+        "tooling/qa/core/qa-scope.mjs",
         "tooling/qa/core/target-only-path-references.mjs",
         "tooling/qa/core/technical-debt-coverage.mjs",
         "tooling/qa/core/technical-debt-registry.mjs",
@@ -1899,8 +1866,6 @@
     {
       "path": "tooling/configs/qa/validation-manifest.json",
       "consumers": [
-        "tooling/configs/qa/control-dispositions.data.json",
-        "tooling/configs/qa/oss-release-consumers.data.json",
         "tooling/qa/core/guardrail-owner-audits.mjs",
         "tooling/qa/core/oss-release-validation.docs.mjs",
         "tooling/qa/core/qa-controls/discovery.mjs",

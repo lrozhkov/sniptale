@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSelectionModeState } from '../../session/state';
+import { createSelectionModeSession } from '../../session';
 
 const {
   disableSelectionModeApiMock,
@@ -47,7 +47,7 @@ function createPublicApiFixture() {
     setRejectCallback: vi.fn(),
     setResolveCallback: vi.fn(),
     setupRuntimeListeners: vi.fn(),
-    state: createSelectionModeState(),
+    state: createSelectionModeSession(),
   };
 }
 

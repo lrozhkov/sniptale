@@ -62,12 +62,34 @@ export function collectPreflightContext({ files = [] } = {}) {
     };
   }
 
-  return createScopedQaContext(context, { suite: PRODUCT_QA_SUITE });
+  const scopedContext = createScopedQaContext(context, { suite: PRODUCT_QA_SUITE });
+  return scopedContext;
 }
 
 export { collectRelevantDocs };
 
+function createAnalysisContext(context, explicitFiles) {
+  if (explicitFiles.length > 0) return context;
+
+  const targetFiles = context.qualityTargetFiles ?? context.targetFiles;
+  const targetFileSet = new Set(targetFiles);
+  return {
+    ...context,
+    targetFiles,
+    existingTargetFiles: context.existingTargetFiles.filter((file) => targetFileSet.has(file)),
+    codeFiles: context.qualityCodeFiles ?? context.codeFiles,
+    jsLikeFiles: context.qualityJsLikeFiles ?? context.jsLikeFiles,
+    addedFiles: (context.addedFiles ?? []).filter((file) => targetFileSet.has(file)),
+    untrackedFiles: (context.untrackedFiles ?? []).filter((file) => targetFileSet.has(file)),
+  };
+}
+
 function collectStructuralPressure(report) {
+  const findingKeys = new Set(
+    [...report.violations, ...report.advisories].map(
+      (finding) => `${finding.file}:${finding.symbol}`
+    )
+  );
   const formatFileMetric = (metric) =>
     [
       `${metric.file}: score=${metric.score}, delta=${metric.delta}`,
@@ -81,12 +103,16 @@ function collectStructuralPressure(report) {
       `cohesion=${metric.cohesion.toFixed(2)}`,
     ].join(': ');
   const fileSignals = report.files
-    .filter((metric) => metric.score > 0 || metric.lines > 400)
+    .filter(
+      (metric) =>
+        (metric.score > 0 || metric.lines > 400) &&
+        !findingKeys.has(`${metric.file}:${metric.symbol}`)
+    )
     .sort((left, right) => right.score - left.score || right.lines - left.lines)
     .slice(0, 8)
     .map(formatFileMetric);
   const functionSignals = report.functions
-    .filter((metric) => metric.score >= 4)
+    .filter((metric) => metric.score > 0 && !findingKeys.has(`${metric.file}:${metric.symbol}`))
     .sort((left, right) => right.score - left.score || right.lines - left.lines)
     .slice(0, 8)
     .map(formatFunctionMetric);
@@ -126,11 +152,10 @@ function collectProofHints(context, guardrailReport) {
 }
 
 export function collectPreflightReport({ files = [] } = {}) {
-  const context = collectPreflightContext({ files });
+  const collectedContext = collectPreflightContext({ files });
+  const context = createAnalysisContext(collectedContext, files);
   const structuralFiles =
-    files.length > 0
-      ? collectCodeFiles(context.allExistingTargetFiles)
-      : (context.qualityCodeFiles ?? context.codeFiles);
+    files.length > 0 ? collectCodeFiles(context.allExistingTargetFiles) : context.codeFiles;
   const structuralResult =
     structuralFiles.length === 0
       ? {
@@ -157,7 +182,7 @@ export function collectPreflightReport({ files = [] } = {}) {
 
   return {
     context,
-    relevantDocs: collectRelevantDocs(context.allTargetFiles),
+    relevantDocs: collectRelevantDocs(context.targetFiles),
     ownerRuntime: [...new Set(context.codeFiles.map(classifyOwnerGroup))].sort(),
     guardrailReport,
     structuralReport: structuralResult.report,
@@ -168,7 +193,9 @@ export function collectPreflightReport({ files = [] } = {}) {
     }).slice(0, 12),
     proofHints: [
       ...collectProofHints(context, guardrailReport),
-      ...collectSecurityControlHints(context.allTargetFiles),
+      ...collectSecurityControlHints(
+        files.length > 0 ? context.allTargetFiles : context.allQualityTargetFiles
+      ),
     ],
     contractChecklist: collectContractChecklist(context),
     transitiveConsumerHints: collectTransitiveConsumerHints(context),

@@ -121,7 +121,7 @@ export const COVERAGE_ROLLOUT_GROUPS = [
     files: [
       'apps/extension/src/content/selection/locker/index.ts',
       'apps/extension/src/content/selection/selection-mode/controller/index.ts',
-      'apps/extension/src/content/selection/selection-mode/runtime/graph.ts',
+      'apps/extension/src/content/selection/selection-mode/runtime/graph-bindings.ts',
       'apps/extension/src/content/parser/dom-utils/dom-helpers-selectors.ts',
       'apps/extension/src/content/parser/dom-utils/dom-helpers-text.ts',
       'apps/extension/src/content/parser/dom-utils/id-generator.ts',

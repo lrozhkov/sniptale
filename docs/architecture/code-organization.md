@@ -29,7 +29,7 @@ Conventional roles are:
 
 Create an owner folder when behavior spans multiple files, combines state with effects, exposes contracts plus adapters, or has likely independent extensions. Do not add placeholder folders. Split an existing owner by independent change reason and dependency direction, not solely by line count. The resulting owners must remain stable under the likely next changes; moving the same broad state/effect contract into neighboring files creates a distributed god-object rather than a real split.
 
-A workflow may be an explicit orchestration owner when it coordinates one cohesive domain transaction through narrow adapters, owns recovery, avoids UI effects, and keeps branching bounded. Adapter owners may combine a platform effect with logging or error translation. UI owners are stricter: browser privilege, persistence, transport, and unrelated workflow authority stay behind application/workflow seams.
+A workflow may be an explicit orchestration owner when it coordinates one cohesive domain transaction through narrow adapters, owns recovery, avoids UI effects, and keeps branching bounded. Adapter owners may combine a platform effect with logging or error translation; a stateful adapter is narrow only when all mutations resolve to one normalized receiver root. UI owners are stricter: browser privilege, persistence, transport, and unrelated workflow authority stay behind application/workflow seams.
 
 ## Public surfaces
 

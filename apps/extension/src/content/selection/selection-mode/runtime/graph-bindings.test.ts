@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSelectionModeSession } from '../session';
 
 const graphMocks = vi.hoisted(() => ({
   createSelectionModeEventHandlersMock: vi.fn(),
@@ -36,7 +37,7 @@ function expectRuntimeGraphSetup(args: {
     getRejectCallback: ReturnType<typeof vi.fn>;
     getResolveCallback: ReturnType<typeof vi.fn>;
     minSelectionSize: number;
-    mutableRefs: never;
+    session: ReturnType<typeof createSelectionModeSession>;
     setCleanupEventListeners: ReturnType<typeof vi.fn>;
     setCleanupScrollListeners: ReturnType<typeof vi.fn>;
     updateFinalFrame: ReturnType<typeof vi.fn>;
@@ -50,7 +51,7 @@ function expectRuntimeGraphSetup(args: {
       getMaxSelectionHeight: args.values.getMaxSelectionHeight,
       getMaxSelectionWidth: args.values.getMaxSelectionWidth,
       minSelectionSize: args.values.minSelectionSize,
-      mutableRefs: args.values.mutableRefs,
+      session: args.values.session,
       setCleanupEventListeners: args.values.setCleanupEventListeners,
       setCleanupScrollListeners: args.values.setCleanupScrollListeners,
       updateFinalFrame: args.values.updateFinalFrame,
@@ -85,8 +86,9 @@ function expectRuntimeGraphShape(args: {
 }
 
 function createRuntimeGraphBindingsScenario() {
+  const session = createSelectionModeSession();
   const runtimeArgs = {
-    state: { currentState: 'idle' },
+    state: session,
     hideHoverFrame: vi.fn(),
   } as {
     state: { currentState: string };
@@ -102,11 +104,10 @@ function createRuntimeGraphBindingsScenario() {
     getRejectCallback: vi.fn(() => null),
     getResolveCallback: vi.fn(() => null),
     minSelectionSize: 32,
-    mutableRefs: {} as never,
+    session,
     selectionModeUiRuntime: { createDragFrame: vi.fn(), createFinalElements: vi.fn() },
     setCleanupEventListeners: vi.fn(),
     setCleanupScrollListeners: vi.fn(),
-    state: { currentState: 'idle' } as never,
     updateFinalFrame: vi.fn(),
     zIndexBase: 500,
   };
@@ -124,7 +125,7 @@ function createRuntimeGraphBindingsScenario() {
 
   const graph = createSelectionModeRuntimeGraphBindings(args);
 
-  return { args, graph, runtimeArgs, selectionModeEvents };
+  return { args, graph, runtimeArgs, selectionModeEvents, session };
 }
 
 function expectGraphBindingHandlersReuseSameInstance(args: {
@@ -170,7 +171,8 @@ function expectGraphBindingHandlersReuseSameInstance(args: {
 
 describe('selection-mode runtime graph bindings', () => {
   it('connects runtime setup, event handlers, and events bridge through the same owner graph', () => {
-    const { args, graph, runtimeArgs, selectionModeEvents } = createRuntimeGraphBindingsScenario();
+    const { args, graph, runtimeArgs, selectionModeEvents, session } =
+      createRuntimeGraphBindingsScenario();
 
     expectRuntimeGraphSetup({
       graph,
@@ -182,6 +184,7 @@ describe('selection-mode runtime graph bindings', () => {
       runtimeArgs,
       selectionModeEvents,
     });
+    expect(runtimeArgs.state).toBe(session);
   });
 
   it('forwards bridge keydown handling through the same handler instance', () => {

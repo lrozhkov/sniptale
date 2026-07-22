@@ -8,7 +8,12 @@ export const HARNESS_STATE_PATH = '.tmp/qa/release-harness-state.json';
 const HARNESS_WRAPPER_VERSION = 'qa-release-harness-v2';
 
 function collectHarnessTargetFiles(context) {
-  return [...(context.harnessTargetFiles ?? context.targetFiles ?? [])];
+  return [
+    ...(context.harnessVerificationTargetFiles ??
+      context.harnessTargetFiles ??
+      context.targetFiles ??
+      []),
+  ];
 }
 
 function collectHarnessFingerprint(context) {

@@ -1,8 +1,8 @@
 import { vi } from 'vitest';
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
-import type { SelectionModeState } from '../session/state';
+import type { SelectionModeSession } from '../session';
 
-export function createSelectionModeStateMock(): SelectionModeState {
+export function createSelectionModeSessionMock(): SelectionModeSession {
   return {
     aspectRatio: null,
     cleanupEventListeners: null,
@@ -10,7 +10,7 @@ export function createSelectionModeStateMock(): SelectionModeState {
     currentSelection: { x: 0, y: 0, width: 0, height: 0 },
     currentState: 'idle',
     cursorStyleCleanup: null,
-    dom: {} as SelectionModeState['dom'],
+    dom: {} as SelectionModeSession['dom'],
     dragStartPoint: { x: 0, y: 0 },
     dragThreshold: 5,
     hasMovedEnough: false,
@@ -82,7 +82,7 @@ function createCapturedFacadeEventBindings(args: {
 
 function createCapturedFacadeSessionBindings(
   session: Pick<
-    SelectionModeState,
+    SelectionModeSession,
     | 'aspectRatio'
     | 'currentSelection'
     | 'currentState'
@@ -101,10 +101,10 @@ function createCapturedFacadeSessionBindings(
     setAspectRatio: (value: number | null) => {
       session.aspectRatio = value;
     },
-    setCurrentSelection: (value: SelectionModeState['currentSelection']) => {
+    setCurrentSelection: (value: SelectionModeSession['currentSelection']) => {
       session.currentSelection = value;
     },
-    setCurrentState: (value: SelectionModeState['currentState']) => {
+    setCurrentState: (value: SelectionModeSession['currentState']) => {
       session.currentState = value;
     },
     setIsActive: (value: boolean) => {
@@ -113,10 +113,10 @@ function createCapturedFacadeSessionBindings(
     setMaintainAspectRatio: (value: boolean) => {
       session.maintainAspectRatio = value;
     },
-    setRejectCallback: (value: SelectionModeState['rejectCallback']) => {
+    setRejectCallback: (value: SelectionModeSession['rejectCallback']) => {
       session.rejectCallback = value;
     },
-    setResolveCallback: (value: SelectionModeState['resolveCallback']) => {
+    setResolveCallback: (value: SelectionModeSession['resolveCallback']) => {
       session.resolveCallback = value;
     },
   };
@@ -132,7 +132,7 @@ export function createCapturedFacadeBindingsBase(args: {
     updateFinalFrame: () => void;
   };
   session: Pick<
-    SelectionModeState,
+    SelectionModeSession,
     | 'aspectRatio'
     | 'currentSelection'
     | 'currentState'
@@ -145,13 +145,14 @@ export function createCapturedFacadeBindingsBase(args: {
   return {
     ...createCapturedFacadeEventBindings({ getRuntimeEvents: args.getRuntimeEvents }),
     ...createCapturedFacadeSessionBindings(args.session),
+    session: args.session,
   };
 }
 
 export function createCapturedRuntimeGraphBindingsArgs(args: {
   runtimeFacade: { disableCursor: () => void };
   session: Pick<
-    SelectionModeState,
+    SelectionModeSession,
     | 'cleanupEventListeners'
     | 'cleanupScrollListeners'
     | 'currentSelection'
@@ -173,6 +174,7 @@ export function createCapturedRuntimeGraphBindingsArgs(args: {
     setCleanupScrollListeners: (cleanup: (() => void) | null) => {
       args.session.cleanupScrollListeners = cleanup;
     },
+    session: args.session,
     updateFinalFrame: args.updateFinalFrame,
   };
 }

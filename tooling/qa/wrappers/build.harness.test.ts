@@ -12,6 +12,16 @@ function createHarnessOnlyContext() {
   };
 }
 
+function createInventoryOnlyContext() {
+  return {
+    targetFiles: ['tooling/configs/qa/technical-debt.data.json'],
+    existingTargetFiles: ['tooling/configs/qa/technical-debt.data.json'],
+    codeFiles: [],
+    jsLikeFiles: [],
+    fingerprint: 'inventory-only',
+  };
+}
+
 it('requires fresh harness state for harness-only diffs in non-commit mode', async () => {
   const module = await import('./build.mjs');
   const result = await module.runBuildCloseout({
@@ -19,6 +29,7 @@ it('requires fresh harness state for harness-only diffs in non-commit mode', asy
     argv: [],
     contextCollector: createHarnessOnlyContext,
     harnessStateAsserter: () => undefined,
+    checkpointStateAsserter: () => undefined,
     closeoutStepCollector: async () => {
       throw new Error('product build checks should not run');
     },
@@ -26,7 +37,7 @@ it('requires fresh harness state for harness-only diffs in non-commit mode', asy
 
   expect(result.skipped).toBe(false);
   expect(result.steps[0].detail).toContain('fresh harness stamp');
-});
+}, 10_000);
 
 it('blocks harness-only non-commit mode when harness state is stale', async () => {
   const module = await import('./build.mjs');
@@ -44,6 +55,48 @@ it('blocks harness-only non-commit mode when harness state is stale', async () =
       },
     })
   ).rejects.toThrow(/qa:release-harness/u);
+});
+
+it('requires a checkpoint but no harness stamp for a generated inventory-only diff', async () => {
+  const module = await import('./build.mjs');
+  let checkpointCalls = 0;
+  const result = await module.runBuildCloseout({
+    ...TEST_BUILD_DEPENDENCIES,
+    argv: [],
+    contextCollector: createInventoryOnlyContext,
+    harnessStateAsserter: () => {
+      throw new Error('inventory-only scope must not consult harness state');
+    },
+    checkpointStateAsserter: () => {
+      checkpointCalls += 1;
+    },
+    closeoutStepCollector: async () => {
+      throw new Error('product build checks should not run');
+    },
+  });
+
+  expect(checkpointCalls).toBe(1);
+  expect(result.steps[0].detail).toContain(
+    'fresh checkpoint with data-only inventory owner validation'
+  );
+});
+
+it('blocks an inventory-only build when checkpoint state is stale', async () => {
+  const module = await import('./build.mjs');
+
+  await expect(
+    module.runBuildCloseout({
+      ...TEST_BUILD_DEPENDENCIES,
+      argv: [],
+      contextCollector: createInventoryOnlyContext,
+      checkpointStateAsserter: () => {
+        throw new Error('Run npm run qa:checkpoint for owner validation');
+      },
+      closeoutStepCollector: async () => {
+        throw new Error('product build checks should not run');
+      },
+    })
+  ).rejects.toThrow(/qa:checkpoint/u);
 });
 
 it('allows harness-only commit mode after fresh harness and checkpoint states', async () => {

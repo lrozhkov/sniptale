@@ -3,7 +3,7 @@ import {
   addScrollListenersToAllWindows,
 } from '../../../../platform/frame';
 import { logSelectionModeRuntime } from '../../diag';
-import type { SelectionModeRuntimePointerHandlers } from '../../session/runtime-state/types';
+import type { SelectionModeRuntimePointerHandlers } from '../../runtime/setup';
 
 interface SelectionModeListenerArgs extends SelectionModeRuntimePointerHandlers {
   currentState: () => string;

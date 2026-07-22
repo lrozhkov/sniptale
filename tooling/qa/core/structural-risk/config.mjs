@@ -125,6 +125,6 @@ export const ORCHESTRATION_OWNER_PATTERNS = [
 ];
 
 export const ADAPTER_OWNER_PATTERN =
-  /(?:^|\/)(?:adapter|adapters|platform|infrastructure|ports?|drivers?|persistence)(?:\/|\.|$)/u;
+  /(?:^|\/)(?:adapter|adapters|runtime-bindings|platform|infrastructure|ports?|drivers?|persistence)(?:\/|\.|$)/u;
 export const ENTRYPOINT_PATTERN =
   /(?:^|\/)(?:index|main|entrypoint|routes?|facade)\.[cm]?[jt]sx?$|(?:^|\/)(?:routes?|facades?)\//u;

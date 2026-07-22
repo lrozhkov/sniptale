@@ -1,39 +1,58 @@
-import { createSelectionModeRuntimeArgs } from '../../session/runtime-state/args';
-import { createSelectionModeMutableRefGetters } from './getters';
-import { applySelectionModeMutableRefSetters } from './setters';
-import type { SelectionModeRuntimeSetupArgs } from './types';
+import { getAbsolutePosition } from '../../../../platform/frame';
+import type { SelectionModeSession } from '../../session';
+import { createSelectionModeHoverFrameHandlers } from '../../ui/hover';
 
-export { createSelectionModeMutableRefGetters } from './getters';
-export { applySelectionModeMutableRefSetters } from './setters';
+export interface SelectionModeRuntimePointerHandlers {
+  handleClick: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
+  handleKeyDown: (event: KeyboardEvent) => void;
+  handleMouseDown: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
+  handleMouseLeave: () => void;
+  handleMouseMove: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
+  handleMouseUp: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
+}
 
-export function createSelectionModeMutableRefs(
-  args: Parameters<typeof createSelectionModeMutableRefGetters>[0] &
-    Parameters<typeof applySelectionModeMutableRefSetters>[1]
-) {
-  return applySelectionModeMutableRefSetters(createSelectionModeMutableRefGetters(args), args);
+export interface SelectionModeRuntimeSetupArgs extends SelectionModeRuntimePointerHandlers {
+  createDragFrame: () => void;
+  createFinalElements: () => void;
+  getMaxSelectionHeight: () => number;
+  getMaxSelectionWidth: () => number;
+  minSelectionSize: number;
+  session: SelectionModeSession;
+  setCleanupEventListeners: (cleanup: (() => void) | null) => void;
+  setCleanupScrollListeners: (cleanup: (() => void) | null) => void;
+  updateFinalFrame: () => void;
+  zIndexBase: number;
 }
 
 export function createSelectionModeRuntimeSetup(args: SelectionModeRuntimeSetupArgs) {
-  return createSelectionModeRuntimeArgs({
+  return {
+    ...createSelectionModeHoverFrameHandlers(args.session),
     createDragFrame: args.createDragFrame,
+    getAbsolutePosition,
     getMaxSelectionHeight: args.getMaxSelectionHeight,
     getMaxSelectionWidth: args.getMaxSelectionWidth,
+    minSelectionSize: args.minSelectionSize,
+    setCleanupEventListeners: args.setCleanupEventListeners,
+    setCleanupScrollListeners: args.setCleanupScrollListeners,
+    setupListenerHandlers: createListenerHandlers(args),
+    showFinalFrame: () => {
+      args.createFinalElements();
+      args.session.currentState = 'confirmed';
+      args.updateFinalFrame();
+    },
+    state: args.session,
+    updateFinalFrame: args.updateFinalFrame,
+    zIndexBase: args.zIndexBase,
+  };
+}
+
+function createListenerHandlers(args: SelectionModeRuntimePointerHandlers) {
+  return {
     handleClick: args.handleClick,
     handleKeyDown: args.handleKeyDown,
     handleMouseDown: args.handleMouseDown,
     handleMouseLeave: args.handleMouseLeave,
     handleMouseMove: args.handleMouseMove,
     handleMouseUp: args.handleMouseUp,
-    minSelectionSize: args.minSelectionSize,
-    refs: args.mutableRefs,
-    setCleanupEventListeners: args.setCleanupEventListeners,
-    setCleanupScrollListeners: args.setCleanupScrollListeners,
-    showFinalFrame: () => {
-      args.createFinalElements();
-      args.mutableRefs.currentState = 'confirmed';
-      args.updateFinalFrame();
-    },
-    updateFinalFrame: args.updateFinalFrame,
-    zIndexBase: args.zIndexBase,
-  });
+  };
 }

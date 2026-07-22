@@ -1,18 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSelectionModeSession } from '../../session';
 
 const runtimeMocks = vi.hoisted(() => ({
-  createSelectionModeRuntimeGraphBindingsMock: vi.fn(),
-  createSelectionModeSessionLocalSettersMock: vi.fn(),
+  createSelectionModeRuntimeGraphBindings: vi.fn(),
 }));
 
 vi.mock('../../runtime/graph-bindings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/graph-bindings')>()),
-  createSelectionModeRuntimeGraphBindings: runtimeMocks.createSelectionModeRuntimeGraphBindingsMock,
-}));
-
-vi.mock('../../session/locals/setters', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../session/locals/setters')>()),
-  createSelectionModeSessionLocalSetters: runtimeMocks.createSelectionModeSessionLocalSettersMock,
+  createSelectionModeRuntimeGraphBindings: runtimeMocks.createSelectionModeRuntimeGraphBindings,
 }));
 
 import { createSelectionModeRuntimeBindings } from './runtime';
@@ -22,16 +17,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function createRuntimeScenario() {
-  const session = {
-    rejectCallback: vi.fn(),
-    resolveCallback: vi.fn(),
-    currentSelection: { height: 12, width: 10, x: 1, y: 2 },
-  };
-  const sessionSetters = {
-    setCleanupEventListeners: vi.fn(),
-    setCleanupScrollListeners: vi.fn(),
-  };
+function createScenario() {
+  const session = createSelectionModeSession();
   const runtimeFacade = {
     disableCursor: vi.fn(),
     uiRuntime: {
@@ -43,48 +30,51 @@ function createRuntimeScenario() {
     },
   } as Pick<SelectionModeRuntimeFacade, 'disableCursor' | 'uiRuntime'>;
   const runtimeGraph = { graph: true } as never;
-
-  runtimeMocks.createSelectionModeSessionLocalSettersMock.mockReturnValue(sessionSetters);
-  runtimeMocks.createSelectionModeRuntimeGraphBindingsMock.mockReturnValue(runtimeGraph);
+  runtimeMocks.createSelectionModeRuntimeGraphBindings.mockReturnValue(runtimeGraph);
 
   const result = createSelectionModeRuntimeBindings({
     cleanup: vi.fn(),
-    mutableRefs: {} as never,
     runtimeFacade: runtimeFacade as SelectionModeRuntimeFacade,
-    session: session as never,
-    state: { state: true } as never,
+    session,
     updateFinalFrame: vi.fn(),
   });
+  const args = runtimeMocks.createSelectionModeRuntimeGraphBindings.mock.calls[0]?.[0];
+  if (!args) {
+    throw new Error('Expected runtime graph args');
+  }
 
-  return { result, runtimeFacade, runtimeGraph, session, sessionSetters };
+  return { args, result, runtimeFacade, runtimeGraph, session };
 }
 
-describe('selection-mode controller bindings runtime', () => {
-  it('assembles runtime graph bindings from the runtime facade and session locals', () => {
-    const scenario = createRuntimeScenario();
+describe('selection-mode controller runtime bindings', () => {
+  it('assembles the runtime graph around the exact session authority', () => {
+    const scenario = createScenario();
+    const selection = { x: 1, y: 2, width: 30, height: 40 };
+    const rejectCallback = vi.fn();
+    const resolveCallback = vi.fn();
+    scenario.session.currentSelection = selection;
+    scenario.session.rejectCallback = rejectCallback;
+    scenario.session.resolveCallback = resolveCallback;
 
-    expect(runtimeMocks.createSelectionModeSessionLocalSettersMock).toHaveBeenCalledWith(
-      scenario.session
-    );
-    expect(runtimeMocks.createSelectionModeRuntimeGraphBindingsMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cleanup: expect.any(Function),
-        currentSelection: expect.any(Function),
-        disableCursor: expect.any(Function),
-        getMaxSelectionHeight: expect.any(Function),
-        getMaxSelectionWidth: expect.any(Function),
-        getRejectCallback: expect.any(Function),
-        getResolveCallback: expect.any(Function),
-        minSelectionSize: expect.any(Number),
-        mutableRefs: {},
-        selectionModeUiRuntime: scenario.runtimeFacade.uiRuntime,
-        setCleanupEventListeners: scenario.sessionSetters.setCleanupEventListeners,
-        setCleanupScrollListeners: scenario.sessionSetters.setCleanupScrollListeners,
-        state: { state: true },
-        updateFinalFrame: expect.any(Function),
-        zIndexBase: expect.any(Number),
-      })
-    );
+    expect(scenario.args.session).toBe(scenario.session);
+    expect(scenario.args.currentSelection()).toBe(selection);
+    expect(scenario.args.getRejectCallback()).toBe(rejectCallback);
+    expect(scenario.args.getResolveCallback()).toBe(resolveCallback);
+    expect(scenario.args.selectionModeUiRuntime).toBe(scenario.runtimeFacade.uiRuntime);
     expect(scenario.result).toBe(scenario.runtimeGraph);
+  });
+
+  it('keeps cleanup slots and cursor delegation on the same session graph', () => {
+    const scenario = createScenario();
+    const eventCleanup = vi.fn();
+    const scrollCleanup = vi.fn();
+
+    scenario.args.setCleanupEventListeners(eventCleanup);
+    scenario.args.setCleanupScrollListeners(scrollCleanup);
+    scenario.args.disableCursor();
+
+    expect(scenario.session.cleanupEventListeners).toBe(eventCleanup);
+    expect(scenario.session.cleanupScrollListeners).toBe(scrollCleanup);
+    expect(scenario.runtimeFacade.disableCursor).toHaveBeenCalledOnce();
   });
 });

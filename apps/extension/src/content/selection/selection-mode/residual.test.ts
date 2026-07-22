@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function */
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
@@ -21,29 +20,6 @@ const mocks = vi.hoisted(() => ({
     zIndexBase: 0,
   })),
   createRuntimeGraphBindingsMock: vi.fn((args) => args),
-  createSessionSettersMock: vi.fn((session) => ({
-    setAspectRatio: vi.fn((value) => {
-      session.aspectRatio = value;
-    }),
-    setCleanupEventListeners: vi.fn(),
-    setCleanupScrollListeners: vi.fn(),
-    setCurrentSelection: vi.fn((value) => {
-      session.currentSelection = value;
-    }),
-    setCurrentState: vi.fn(),
-    setIsActive: vi.fn((value) => {
-      session.isActive = value;
-    }),
-    setMaintainAspectRatio: vi.fn((value) => {
-      session.maintainAspectRatio = value;
-    }),
-    setRejectCallback: vi.fn((value) => {
-      session.rejectCallback = value;
-    }),
-    setResolveCallback: vi.fn((value) => {
-      session.resolveCallback = value;
-    }),
-  })),
   mountStyleMock: vi.fn(),
   setupRuntimeListenersMock: vi.fn(),
 }));
@@ -56,11 +32,6 @@ vi.mock('./runtime/facade', async (importOriginal) => ({
 vi.mock('./interaction/actions/runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./interaction/actions/runtime')>()),
   setupSelectionModeRuntimeListeners: mocks.setupRuntimeListenersMock,
-}));
-
-vi.mock('./session/locals/setters', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./session/locals/setters')>()),
-  createSelectionModeSessionLocalSetters: mocks.createSessionSettersMock,
 }));
 
 vi.mock('./runtime/graph-bindings', async (importOriginal) => ({
@@ -82,17 +53,10 @@ import { createSelectionModeFacadeBindings } from './controller/runtime-bindings
 import { createSelectionModeRuntimeBindings } from './controller/runtime-bindings/runtime';
 import { disableSelectionModeCursor, enableSelectionModeCursor } from './interaction/cursor';
 import { handleResizeSelectionMove } from './interaction/selection/helpers';
+import { createSelectionModeSession } from './session';
 
 function createSession() {
-  return {
-    aspectRatio: null,
-    currentSelection: null,
-    dom: { root: document.body },
-    isActive: false,
-    maintainAspectRatio: false,
-    rejectCallback: null,
-    resolveCallback: null,
-  } as any;
+  return createSelectionModeSession();
 }
 
 describe('selection mode residual seams', () => {
@@ -109,14 +73,11 @@ describe('selection mode residual seams', () => {
         updateFinalFrame: vi.fn(),
       }),
       session,
-      state: { status: 'idle' } as never,
     });
     const runtimeBindings = createSelectionModeRuntimeBindings({
       cleanup: vi.fn(),
-      mutableRefs: {} as never,
       runtimeFacade: facade as never,
       session,
-      state: { status: 'idle' } as never,
       updateFinalFrame: vi.fn(),
     });
 

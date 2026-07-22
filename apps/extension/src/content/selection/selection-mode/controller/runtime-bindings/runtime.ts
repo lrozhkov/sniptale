@@ -1,25 +1,16 @@
 import { MIN_SELECTION_SIZE, Z_INDEX_BASE } from '../../constants';
 import { createSelectionModeRuntimeGraphBindings } from '../../runtime/graph-bindings';
-import { createSelectionModeSessionLocalSetters } from '../../session/locals/setters';
-import type { SelectionModeSession } from '../../session/locals/helpers';
+import type { SelectionModeSession } from '../../session';
 import type { SelectionModeRuntimeFacade } from '../../runtime/facade/types';
 import type { SelectionModeRuntimeGraphBindingsArgs } from '../../runtime/graph-bindings';
 
 type SelectionModeRuntimeGraph = ReturnType<typeof createSelectionModeRuntimeGraphBindings>;
-type SelectionModeSessionLocalSetters = ReturnType<typeof createSelectionModeSessionLocalSetters>;
-
 export function createSelectionModeRuntimeBindings(props: {
   cleanup: () => void;
-  mutableRefs: SelectionModeRuntimeGraphBindingsArgs['mutableRefs'];
   runtimeFacade: SelectionModeRuntimeFacade;
   session: SelectionModeSession;
-  state: SelectionModeRuntimeGraphBindingsArgs['state'];
   updateFinalFrame: () => void;
 }): SelectionModeRuntimeGraph {
-  const sessionSetters: SelectionModeSessionLocalSetters = createSelectionModeSessionLocalSetters(
-    props.session
-  );
-
   const runtimeGraphArgs: SelectionModeRuntimeGraphBindingsArgs = {
     cleanup: props.cleanup,
     currentSelection: () => props.session.currentSelection,
@@ -29,11 +20,14 @@ export function createSelectionModeRuntimeBindings(props: {
     getRejectCallback: () => props.session.rejectCallback,
     getResolveCallback: () => props.session.resolveCallback,
     minSelectionSize: MIN_SELECTION_SIZE,
-    mutableRefs: props.mutableRefs,
+    session: props.session,
     selectionModeUiRuntime: props.runtimeFacade.uiRuntime,
-    setCleanupEventListeners: sessionSetters.setCleanupEventListeners,
-    setCleanupScrollListeners: sessionSetters.setCleanupScrollListeners,
-    state: props.state,
+    setCleanupEventListeners: (cleanup) => {
+      props.session.cleanupEventListeners = cleanup;
+    },
+    setCleanupScrollListeners: (cleanup) => {
+      props.session.cleanupScrollListeners = cleanup;
+    },
     updateFinalFrame: props.updateFinalFrame,
     zIndexBase: Z_INDEX_BASE,
   };

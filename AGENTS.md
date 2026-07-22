@@ -57,7 +57,7 @@ Implement a coherent wave before running blocking QA. Use targeted commands only
 
 Structural enforcement analyzes behavioral files in the current diff and compares their current AST shape with `HEAD`; unchanged, import-only, mock-only, and rename-only files are not candidates. A cohesive registered orchestration owner may legitimately coordinate state, effects, recovery, and narrow adapters, but must not absorb unrelated UI or arbitrary branching. `qa:preflight -- --files ...` is a read-only planning snapshot, while `qa:structural-audit` is a manual report-only maintenance tool and is not a routine agent or PR gate.
 
-Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has harness/shared-control targets. This includes `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. The live classifier is `tooling/qa/core/qa-scope.mjs`.
+Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has executable harness/shared-control targets. This includes executable `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. Exact machine-generated inventory-only files classified by `tooling/qa/core/qa-scope.mjs` use checkpoint owner validators and do not require a fresh harness stamp; `qa:build` still requires that fresh checkpoint. Policy JSON, baselines, allowlists, and executable registries remain harness targets.
 
 Run `npm run qa:checkpoint` after each substantial coherent implementation wave. It owns supported non-Markdown formatting, advisory state, focused static checks, typecheck, focused tests, and diff coverage; it does not build, stage, or commit.
 
@@ -85,7 +85,7 @@ Normal implementation flow:
 6. apply one consolidated correction and rerun only invalidated proof/review
 7. run `npm run qa:closeout -- -m "<commit message>"`
 
-`qa:closeout` reuses a fresh matching checkpoint or runs one, invokes `qa:build`, validates the unchanged diff and task-artifact policy, stages allowed changes, and commits only after the build is green. It requires a fresh harness stamp whenever the live diff has harness/shared-control targets.
+`qa:closeout` reuses a fresh matching checkpoint or runs one, invokes `qa:build`, validates the unchanged diff and task-artifact policy, stages allowed changes, and commits only after the build is green. It requires a fresh harness stamp whenever the live diff has executable harness/shared-control targets; exact generated inventory-only targets are validated by their owner checks instead.
 
 Do not run a manual closeout chain, manually stage the candidate, start another blocking wrapper while closeout runs, stage `tasks/**`, or amend an existing commit unless the user explicitly requests it.
 

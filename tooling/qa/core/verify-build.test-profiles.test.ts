@@ -64,6 +64,58 @@ it('does not let an unrelated changed test authorize deletion proof', () => {
   expect(scope.relatedFiles).toEqual([]);
 });
 
+it('uses a changed replacement owner and its direct test for a consolidated deleted subtree', () => {
+  const owner = 'apps/extension/src/content/selection/selection-mode/session/index.ts';
+  const ownerTest = 'apps/extension/src/content/selection/selection-mode/session/index.test.ts';
+  const deleted =
+    'apps/extension/src/content/selection/selection-mode/session/runtime-state/core.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [deleted, owner, ownerTest],
+    codeFiles: [owner, ownerTest],
+    repoCodeFiles: [owner, ownerTest],
+    ownerTestResolver: () => [],
+  });
+
+  expect(scope.profile).toBe('related-transitive');
+  expect(scope.fullSuite).not.toBe(true);
+  expect(scope.relatedFiles).toEqual([ownerTest, owner]);
+  expect(scope.detail).toContain('unavailable production targets have executable');
+});
+
+it('does not accept an unrelated same-directory test as replacement-owner proof', () => {
+  const owner = 'apps/extension/src/content/selection/selection-mode/session/index.ts';
+  const unrelatedTest =
+    'apps/extension/src/content/selection/selection-mode/session/unrelated.test.ts';
+  const deleted =
+    'apps/extension/src/content/selection/selection-mode/session/runtime-state/core.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [deleted, owner, unrelatedTest],
+    codeFiles: [owner, unrelatedTest],
+    repoCodeFiles: [owner, unrelatedTest],
+    ownerTestResolver: () => [],
+  });
+
+  expect(scope.fullSuite).toBe(true);
+  expect(scope.directTestFiles).toEqual([]);
+});
+
+it('does not accept a deleted adjacent test as replacement-owner proof', () => {
+  const owner = 'apps/extension/src/content/selection/selection-mode/session/index.ts';
+  const deletedOwnerTest =
+    'apps/extension/src/content/selection/selection-mode/session/index.test.ts';
+  const deleted =
+    'apps/extension/src/content/selection/selection-mode/session/runtime-state/core.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [deleted, owner, deletedOwnerTest],
+    codeFiles: [owner],
+    repoCodeFiles: [owner],
+    ownerTestResolver: () => [],
+  });
+
+  expect(scope.fullSuite).toBe(true);
+  expect(scope.directTestFiles).toEqual([]);
+});
+
 it('keeps shared feature privacy entrypoints on the related profile', () => {
   const sourceFile = 'apps/extension/src/features/ai/privacy/index.ts';
   const scope = resolveBuildTestScope({

@@ -25,6 +25,26 @@ it('routes harness-owned policy and shared guidance without blind spots', async 
   });
 });
 
+it('separates generated inventories from executable harness changes', async () => {
+  const root = createTempRoot('qa-scope-inventory-only-');
+
+  await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./qa-scope.mjs')>('./qa-scope.mjs');
+
+    expect(module.isHarnessQaFile('tooling/configs/qa/technical-debt.data.json')).toBe(true);
+    expect(module.isHarnessInventoryOnlyFile('tooling/configs/qa/technical-debt.data.json')).toBe(
+      true
+    );
+    expect(module.isHarnessVerificationQaFile('tooling/configs/qa/technical-debt.data.json')).toBe(
+      false
+    );
+    expect(module.isHarnessVerificationQaFile('tooling/configs/qa/quality-baseline.json')).toBe(
+      true
+    );
+    expect(module.isHarnessVerificationQaFile('tooling/qa/core/qa-scope.mjs')).toBe(true);
+  });
+});
+
 describe('shared QA controls', () => {
   it('classifies executable configuration, hooks, and active tooling guidance in both suites', async () => {
     const root = createTempRoot('qa-scope-shared-controls-');

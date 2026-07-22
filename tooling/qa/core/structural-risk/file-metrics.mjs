@@ -86,6 +86,7 @@ function isEffectfulCluster(metric) {
 }
 
 export function collectFileMetrics(sourceFile, relativePath, source) {
+  const profile = TEST_FILE_PATTERN.test(relativePath) ? 'test' : 'default';
   const functions = collectFunctionMetrics(sourceFile, relativePath);
   const topLevelClusters = collectTopLevelEffectClusters(sourceFile, relativePath);
   const imports = collectImports(sourceFile, relativePath);
@@ -108,6 +109,16 @@ export function collectFileMetrics(sourceFile, relativePath, source) {
     ),
   ];
   const stateAuthorities = new Set(stateAuthorityNames).size;
+  const stateReceiverNames = [
+    ...new Set(
+      functions
+        .flatMap((metric) => metric.stateReceiverNames)
+        .concat(topLevelClusters.flatMap((metric) => metric.stateReceiverNames))
+    ),
+  ].sort();
+  const unresolvedStateAuthorityCount =
+    functions.reduce((sum, metric) => sum + metric.unresolvedStateAuthorityCount, 0) +
+    topLevelClusters.reduce((sum, metric) => sum + metric.unresolvedStateAuthorityCount, 0);
   const clusters = [...functions, ...topLevelClusters].filter(isEffectfulCluster);
   const classifiedCalls = functions.filter((metric) => metric.ownerGroups.length > 0);
   const classifiedCallCount = classifiedCalls.reduce(
@@ -115,7 +126,7 @@ export function collectFileMetrics(sourceFile, relativePath, source) {
     0
   );
   const cohesion =
-    TEST_FILE_PATTERN.test(relativePath) || classifiedCalls.length === 0
+    profile === 'test' || classifiedCalls.length === 0
       ? 1
       : classifiedCalls.reduce((sum, metric) => sum + metric.cohesion, 0) / classifiedCalls.length;
 
@@ -123,6 +134,7 @@ export function collectFileMetrics(sourceFile, relativePath, source) {
     file: relativePath,
     line: 1,
     symbol: '<file>',
+    profile,
     lines: source.split(/\r?\n/u).length,
     ownerGroup: ownGroup,
     ownerGroups,
@@ -132,6 +144,9 @@ export function collectFileMetrics(sourceFile, relativePath, source) {
     effectFamilies,
     effectCount: effectFamilies.length,
     stateAuthorities,
+    stateReceiverCount: stateReceiverNames.length,
+    stateReceiverNames,
+    unresolvedStateAuthorityCount,
     effectfulClusters: clusters.length,
     classifiedCallCount,
     cohesion,

@@ -106,11 +106,66 @@ function assignedReceiver(node) {
   return receiver;
 }
 
+function stateReceiverIdentity(node, sourceFile) {
+  let current = unwrapAssignmentExpression(node);
+  const properties = [];
+  while (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
+    if (ts.isPropertyAccessExpression(current)) properties.unshift(current.name.text);
+    current = unwrapAssignmentExpression(current.expression);
+  }
+  if (ts.isCallExpression(current) || ts.isNewExpression(current)) return null;
+  if (current.kind === ts.SyntaxKind.ThisKeyword) return 'this';
+  if (!ts.isIdentifier(current)) return current.getText(sourceFile);
+  if (current.text === 'props' && properties.length > 0) {
+    return `props.${properties[0]}`;
+  }
+  return current.text;
+}
+
+function stateCallReceiver(node, sourceFile, callName) {
+  if (!ts.isCallExpression(node) && !ts.isNewExpression(node)) return null;
+  const expression = unwrapAssignmentExpression(node.expression);
+  if (!ts.isPropertyAccessExpression(expression) && !ts.isElementAccessExpression(expression)) {
+    return null;
+  }
+  const receiver = stateReceiverIdentity(expression.expression, sourceFile);
+  if (receiver === 'props' || receiver === 'args' || receiver === 'options') return callName;
+  return receiver;
+}
+
 function stateAssignmentAuthority(node, sourceFile) {
   if (!ts.isBinaryExpression(node)) return null;
   const kind = node.operatorToken.kind;
   if (kind < ts.SyntaxKind.FirstAssignment || kind > ts.SyntaxKind.LastAssignment) return null;
   return assignedReceiver(node.left)?.getText(sourceFile) ?? null;
+}
+
+function hasDynamicCallReceiver(node) {
+  if (!ts.isCallExpression(node) && !ts.isNewExpression(node)) return false;
+  const expression = unwrapAssignmentExpression(node.expression);
+  if (!ts.isPropertyAccessExpression(expression) && !ts.isElementAccessExpression(expression)) {
+    return false;
+  }
+  const receiver = unwrapAssignmentExpression(expression.expression);
+  return ts.isCallExpression(receiver) || ts.isNewExpression(receiver);
+}
+
+function recordStateCall(node, sourceFile, callName, signals) {
+  if (!STATE_PATTERN.test(callName) || hasDynamicCallReceiver(node)) return;
+  signals.stateAuthorities.add(callName);
+  const receiver = stateCallReceiver(node, sourceFile, callName);
+  if (receiver) signals.stateReceivers.add(receiver);
+  else signals.unresolvedStateAuthorities.add(callName);
+}
+
+function recordStateAssignment(node, sourceFile, signals) {
+  const authority = stateAssignmentAuthority(node, sourceFile);
+  if (!authority) return;
+  signals.stateAuthorities.add(authority);
+  const receiver = assignedReceiver(node.left);
+  const identity = receiver && stateReceiverIdentity(receiver, sourceFile);
+  if (identity) signals.stateReceivers.add(identity);
+  else signals.unresolvedStateAuthorities.add(authority);
 }
 
 function hasRecoveryBoundary(node) {
@@ -123,7 +178,7 @@ function collectCallSignals(current, sourceFile, importOwners, relativePath, sig
   if (!callName) return;
   const effect = classifyEffectFamily(current.getText(sourceFile));
   if (effect) signals.effects.add(effect);
-  if (STATE_PATTERN.test(callName)) signals.stateAuthorities.add(callName);
+  recordStateCall(current, sourceFile, callName, signals);
   if (RECOVERY_PATTERN.test(callName)) signals.recoveryPressure += 1;
   const importedOwner = importOwners.get(rootIdentifier(callName));
   signals.ownerCalls.push(
@@ -139,6 +194,8 @@ function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
   const signals = {
     recoveryPressure: 0,
     stateAuthorities: new Set(),
+    stateReceivers: new Set(),
+    unresolvedStateAuthorities: new Set(),
     effects: new Set(),
     ownerCalls: [],
   };
@@ -159,8 +216,7 @@ function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
     }
 
     if (hasRecoveryBoundary(current)) signals.recoveryPressure += 1;
-    const stateAuthority = stateAssignmentAuthority(current, sourceFile);
-    if (stateAuthority) signals.stateAuthorities.add(stateAuthority);
+    recordStateAssignment(current, sourceFile, signals);
     collectCallSignals(current, sourceFile, importOwners, relativePath, signals);
 
     const nextNesting = isBranch ? nesting + 1 : nesting;
@@ -182,6 +238,9 @@ function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
     effectFamilies: [...signals.effects].sort(),
     stateAuthorities: signals.stateAuthorities.size,
     stateAuthorityNames: [...signals.stateAuthorities].sort(),
+    stateReceiverCount: signals.stateReceivers.size,
+    stateReceiverNames: [...signals.stateReceivers].sort(),
+    unresolvedStateAuthorityCount: signals.unresolvedStateAuthorities.size,
     ownerGroups: [...counts.keys()].sort(),
     classifiedCallCount: signals.ownerCalls.length,
     cohesion,
@@ -263,21 +322,24 @@ export function collectTopLevelEffectClusters(sourceFile, relativePath) {
     )
       continue;
     const effects = new Set();
-    const stateAuthorities = new Set();
+    const stateSignals = {
+      stateAuthorities: new Set(),
+      stateReceivers: new Set(),
+      unresolvedStateAuthorities: new Set(),
+    };
     function visit(node) {
       const callName = getCallName(node, sourceFile);
       if (callName) {
         const effect = classifyEffectFamily(node.getText(sourceFile));
         if (effect) effects.add(effect);
-        if (STATE_PATTERN.test(callName)) stateAuthorities.add(callName);
+        recordStateCall(node, sourceFile, callName, stateSignals);
       }
-      const stateAuthority = stateAssignmentAuthority(node, sourceFile);
-      if (stateAuthority) stateAuthorities.add(stateAuthority);
+      recordStateAssignment(node, sourceFile, stateSignals);
       ts.forEachChild(node, visit);
     }
     visit(statement);
     const effectFamilies = [...effects].sort();
-    if (effectFamilies.length > 0 || stateAuthorities.size > 0) {
+    if (effectFamilies.length > 0 || stateSignals.stateAuthorities.size > 0) {
       clusters.push({
         file: relativePath,
         line: getNodeLine(sourceFile, statement),
@@ -285,8 +347,11 @@ export function collectTopLevelEffectClusters(sourceFile, relativePath) {
         architecturalLayer: classifyArchitecturalLayer(relativePath),
         effectFamilies,
         effectCount: effectFamilies.length,
-        stateAuthorities: stateAuthorities.size,
-        stateAuthorityNames: [...stateAuthorities].sort(),
+        stateAuthorities: stateSignals.stateAuthorities.size,
+        stateAuthorityNames: [...stateSignals.stateAuthorities].sort(),
+        stateReceiverCount: stateSignals.stateReceivers.size,
+        stateReceiverNames: [...stateSignals.stateReceivers].sort(),
+        unresolvedStateAuthorityCount: stateSignals.unresolvedStateAuthorities.size,
         cohesion: 1,
       });
     }
