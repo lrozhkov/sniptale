@@ -3133,8 +3133,9 @@
         "apps/extension/src/content/runtime/ui-activation-bridge/index.ts",
         "apps/extension/src/content/runtime/ui-activation-bridge/targets.ts",
         "apps/extension/src/content/selection/area-selector/controller.ts",
-        "apps/extension/src/content/selection/area-selector/helpers.ts",
         "apps/extension/src/content/selection/area-selector/index.ts",
+        "apps/extension/src/content/selection/area-selector/result.ts",
+        "apps/extension/src/content/selection/area-selector/surface.ts",
         "apps/extension/src/content/selection/auto-blur-runtime/detectors/rule-detector.ts",
         "apps/extension/src/content/selection/auto-blur-runtime/geometry.ts",
         "apps/extension/src/content/selection/auto-blur-runtime/index.ts",
@@ -3277,30 +3278,13 @@
         "apps/extension/src/content/selection/highlighter-hover-preview/mousemove.ts",
         "apps/extension/src/content/selection/highlighter-hover-preview/overlay.ts",
         "apps/extension/src/content/selection/highlighter-hover-preview/types.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/callbacks.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.action-groups.frame-state.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.action-groups.runtime.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.action-groups.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.assembly.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.bindings.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.frame-actions.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.helpers.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.hover.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.invalidate.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.runtime-actions.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.state-actions.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.state.ts",
+        "apps/extension/src/content/selection/highlighter-runtime/controller.actions.ts",
         "apps/extension/src/content/selection/highlighter-runtime/controller.ts",
         "apps/extension/src/content/selection/highlighter-runtime/index.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/mode.disable.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/mode.enable.ts",
         "apps/extension/src/content/selection/highlighter-runtime/mode.ts",
         "apps/extension/src/content/selection/highlighter-runtime/runtime-cursor-style.ts",
         "apps/extension/src/content/selection/highlighter-runtime/runtime-document-mode.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/runtime-escape-key.ts",
         "apps/extension/src/content/selection/highlighter-runtime/runtime-listeners.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/runtime-state.helpers.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/runtime.helpers.ts",
         "apps/extension/src/content/selection/highlighter-runtime/state.ts",
         "apps/extension/src/content/selection/highlighter/index.ts",
         "apps/extension/src/content/selection/interactive-frame/content/index.tsx",
@@ -3872,30 +3856,13 @@
         "apps/extension/src/content/selection/highlighter-hover-preview/mousemove.ts",
         "apps/extension/src/content/selection/highlighter-hover-preview/overlay.ts",
         "apps/extension/src/content/selection/highlighter-hover-preview/types.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/callbacks.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.action-groups.frame-state.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.action-groups.runtime.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.action-groups.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.assembly.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.bindings.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.frame-actions.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.helpers.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.hover.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.invalidate.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.runtime-actions.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.state-actions.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/controller.state.ts",
+        "apps/extension/src/content/selection/highlighter-runtime/controller.actions.ts",
         "apps/extension/src/content/selection/highlighter-runtime/controller.ts",
         "apps/extension/src/content/selection/highlighter-runtime/index.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/mode.disable.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/mode.enable.ts",
         "apps/extension/src/content/selection/highlighter-runtime/mode.ts",
         "apps/extension/src/content/selection/highlighter-runtime/runtime-cursor-style.ts",
         "apps/extension/src/content/selection/highlighter-runtime/runtime-document-mode.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/runtime-escape-key.ts",
         "apps/extension/src/content/selection/highlighter-runtime/runtime-listeners.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/runtime-state.helpers.ts",
-        "apps/extension/src/content/selection/highlighter-runtime/runtime.helpers.ts",
         "apps/extension/src/content/selection/highlighter-runtime/state.ts",
         "apps/extension/src/content/selection/locker/events.ts",
         "apps/extension/src/content/selection/locker/helpers.predicates.ts",
@@ -14961,7 +14928,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/checkpoint.mjs",
-        "contentHash": "857d55d10ceef5bf36f5340be9e78b7b326ec0a4117451d7508aaf39fcd9cb38"
+        "contentHash": "cdfc4b78fd8504ec0b1dfcb2a3e76e87c4eaaa31495a752b7b7b86ad467630ef"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.mjs",
@@ -16175,7 +16142,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage-owner-resolver.mjs",
-        "contentHash": "d619fd73468b74854e4cbf57c53dea45680412def060c112bd927febd628319d"
+        "contentHash": "cf9e9fd100b4b63269b2a5b3019968f3d3e574b175fca2dda1245fd757775d87"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage-owner-resolver.mjs",
@@ -16183,7 +16150,6 @@
         "tooling/qa/core/verify-focused.test-steps.mjs"
       ],
       "surfaces": [
-        "property:createDeferredResult/coverageTargetFiles",
         "property:createDeferredResult/reasons",
         "property:createDeferredResult/testFiles",
         "property:createInvalidMappingScope/counts",
@@ -16262,7 +16228,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/function-metrics.mjs",
-        "contentHash": "1d834973a412a876c8f7abef51b1b65a2cdcca70ce7a5a06461c7acf07d8426d"
+        "contentHash": "cbaca9e5b62be307cb6cc0ea05b1f6436f030878288034ca34048c943566744d"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -16823,7 +16789,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "60bada6cebf71d2dd3fabd2410372da248f483243334846cd735b6f9f61a9bbf"
+        "contentHash": "d50af4bc0d29a4b87e47dfcaa08359e0dfc7822f58fdd56dbb5adf2bce0401e8"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16856,6 +16822,9 @@
         "property:testFiles[29]",
         "property:testFiles[3]",
         "property:testFiles[30]",
+        "property:testFiles[31]",
+        "property:testFiles[32]",
+        "property:testFiles[33]",
         "property:testFiles[4]",
         "property:testFiles[5]",
         "property:testFiles[6]",
@@ -19008,6 +18977,7 @@
         "tooling/qa/runtime/observability/storage.test.ts",
         "tooling/qa/runtime/target-files.helpers.test.ts",
         "tooling/qa/wrappers/build.test-support.ts",
+        "tooling/qa/wrappers/checkpoint.output.test.ts",
         "tooling/qa/wrappers/checkpoint.test.ts",
         "tooling/qa/wrappers/closeout.test.ts",
         "tooling/qa/wrappers/observed/runner.test.ts",
@@ -20385,7 +20355,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-instance-ownership.data.mjs",
-        "contentHash": "5e69cf169ad7d31c28b5c41e89d88bf93f5b0e2dbc63ba93beb7e89007549be3"
+        "contentHash": "78e1cf185b9665ebf0b4eda653e2f645be785568392949a0e84ffc321d47b865"
       },
       "consumers": [
         "tooling/qa/core/verify-instance-ownership.data.mjs",

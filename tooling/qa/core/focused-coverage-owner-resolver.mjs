@@ -1,10 +1,14 @@
 import fs from 'node:fs';
+import { posix } from 'node:path';
 
 import { isCoverageExcluded, isCoverageTargetFile } from './verify-test-coverage.registry.mjs';
 import { resolveCoverageThreshold } from './verify-test-coverage.thresholds.mjs';
 import { fromRelativePath } from './shared.mjs';
 import { collectFocusedCoverageOwnerMappingViolations } from './focused-coverage-owner-map.mjs';
-import { resolveLocalFocusedCoverageOwnerTests } from './focused-coverage-owner-tests.mjs';
+import {
+  resolveDeterministicFocusedCoverageOwnerTests,
+  resolveLocalFocusedCoverageOwnerTests,
+} from './focused-coverage-owner-tests.mjs';
 
 const OWNER_TEST_BUDGET = 260;
 
@@ -35,19 +39,25 @@ function findFilesWithoutOwner(ownerTestsByFile) {
     .map(([file]) => file);
 }
 
-function createCounts(ownerTestsByFile, directTestFiles) {
+function createCounts(ownerTestsByFile, directTestFiles, coverageTargetFiles = []) {
   const ownerTests = [...new Set([...ownerTestsByFile.values()].flat())].sort();
   return {
-    coverageTargets: ownerTestsByFile.size,
+    coverageTargets: coverageTargetFiles.length,
     ownerTests: ownerTests.length,
     tests: new Set([...directTestFiles, ...ownerTests]).size,
   };
 }
 
-function createDeferredResult(verdict, detail, ownerTestsByFile, directTestFiles) {
+function createDeferredResult(
+  verdict,
+  detail,
+  ownerTestsByFile,
+  directTestFiles,
+  coverageTargetFiles = []
+) {
   return {
-    counts: createCounts(ownerTestsByFile, directTestFiles),
-    coverageTargetFiles: [...ownerTestsByFile.keys()],
+    counts: createCounts(ownerTestsByFile, directTestFiles, coverageTargetFiles),
+    coverageTargetFiles,
     detail,
     directTestFiles,
     ownerTestsByFile,
@@ -71,23 +81,11 @@ function createInvalidMappingScope({ directTestFiles, violations }) {
   };
 }
 
-function createNoOwnerRequiredScope({ directTestFiles, outsideExistingFiles }) {
-  if (outsideExistingFiles.length > 0 && directTestFiles.length === 0) {
-    return createDeferredResult(
-      'defer-ambiguous-existing',
-      `outside-registry files without changed local tests: ${outsideExistingFiles.join(', ')}`,
-      new Map(),
-      directTestFiles
-    );
-  }
-
+function createNoOwnerRequiredScope({ directTestFiles }) {
   return {
     counts: { coverageTargets: 0, ownerTests: 0, tests: directTestFiles.length },
     coverageTargetFiles: [],
-    detail:
-      outsideExistingFiles.length > 0
-        ? 'outside-registry runtime changes covered by changed direct tests'
-        : 'no changed runtime coverage targets',
+    detail: 'no changed runtime coverage targets',
     directTestFiles,
     ownerTestsByFile: new Map(),
     reasons: [],
@@ -99,7 +97,7 @@ function createNoOwnerRequiredScope({ directTestFiles, outsideExistingFiles }) {
   };
 }
 
-function createRunnableScope({ counts, directTestFiles, ownerTestsByFile, rolloutFiles }) {
+function createRunnableScope({ directTestFiles, ownerTestsByFile, rolloutFiles }) {
   const ownerTests = [...new Set([...ownerTestsByFile.values()].flat())].sort();
   const directTestSet = new Set(directTestFiles);
   const expandedOwnerTests = ownerTests.filter((testFile) => !directTestSet.has(testFile));
@@ -116,7 +114,7 @@ function createRunnableScope({ counts, directTestFiles, ownerTestsByFile, rollou
 
   const coverageTargetFiles = rolloutFiles.filter((file) => ownerTestsByFile.has(file));
   return {
-    counts,
+    counts: createCounts(ownerTestsByFile, directTestFiles, coverageTargetFiles),
     coverageTargetFiles,
     detail: `local owner tests=${testFiles.length}; coverageTargets=${coverageTargetFiles.length}`,
     directTestFiles,
@@ -125,6 +123,11 @@ function createRunnableScope({ counts, directTestFiles, ownerTestsByFile, rollou
     testFiles,
     verdict: coverageTargetFiles.length > 0 ? 'run-local-coverage' : 'run-local-tests-no-coverage',
   };
+}
+
+function hasChangedDirectOwnerTest(file, directTestFiles) {
+  const directory = posix.dirname(file);
+  return directTestFiles.some((testFile) => posix.dirname(testFile) === directory);
 }
 
 function shouldValidateMappings(mappingOptions) {
@@ -155,12 +158,19 @@ export function resolveFocusedCoverageOwnerScope({
     codeFiles,
     newFiles,
   });
-  const ownerRequiredFiles = [...new Set([...newEligibleFiles, ...rolloutFiles])].sort();
-  if (ownerRequiredFiles.length === 0) {
-    return createNoOwnerRequiredScope({ directTestFiles, outsideExistingFiles });
+  const changedEligibleFiles = [
+    ...new Set([...newEligibleFiles, ...outsideExistingFiles, ...rolloutFiles]),
+  ].sort();
+  if (changedEligibleFiles.length === 0) {
+    return createNoOwnerRequiredScope({ directTestFiles });
   }
 
+  const ownerRequiredFiles = [...new Set([...newEligibleFiles, ...rolloutFiles])].sort();
   const ownerTestsByFile = collectOwnerTests(ownerRequiredFiles, mappingOptions);
+  for (const file of outsideExistingFiles) {
+    ownerTestsByFile.set(file, resolveDeterministicFocusedCoverageOwnerTests(file, mappingOptions));
+  }
+  const coverageTargetFiles = rolloutFiles.filter((file) => ownerTestsByFile.has(file));
   const newFilesWithoutOwner = findFilesWithoutOwner(
     new Map(newEligibleFiles.map((file) => [file, ownerTestsByFile.get(file) ?? []]))
   );
@@ -169,22 +179,43 @@ export function resolveFocusedCoverageOwnerScope({
       'block-new-file-no-owner',
       `new files without local test owner: ${newFilesWithoutOwner.join(', ')}`,
       ownerTestsByFile,
-      directTestFiles
+      directTestFiles,
+      coverageTargetFiles
     );
   }
 
-  const existingWithoutOwner = findFilesWithoutOwner(ownerTestsByFile);
+  const existingWithoutOwner = findFilesWithoutOwner(
+    new Map(ownerRequiredFiles.map((file) => [file, ownerTestsByFile.get(file) ?? []]))
+  );
   if (existingWithoutOwner.length > 0) {
     return createDeferredResult(
       'defer-ambiguous-existing',
       `existing files without explicit local test owner: ${existingWithoutOwner.join(', ')}`,
       ownerTestsByFile,
-      directTestFiles
+      directTestFiles,
+      coverageTargetFiles
+    );
+  }
+
+  const outsideWithoutOwner = outsideExistingFiles.filter(
+    (file) =>
+      (ownerTestsByFile.get(file)?.length ?? 0) === 0 &&
+      !hasChangedDirectOwnerTest(file, directTestFiles)
+  );
+  if (outsideWithoutOwner.length > 0) {
+    return createDeferredResult(
+      'defer-ambiguous-existing',
+      [
+        'outside-registry files without mapped, adjacent, or changed direct owner tests:',
+        outsideWithoutOwner.join(', '),
+      ].join(' '),
+      ownerTestsByFile,
+      directTestFiles,
+      coverageTargetFiles
     );
   }
 
   return createRunnableScope({
-    counts: createCounts(ownerTestsByFile, directTestFiles),
     directTestFiles,
     ownerTestsByFile,
     rolloutFiles,

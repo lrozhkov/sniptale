@@ -93,6 +93,33 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/selection/selection-mode/controller/runtime.test.ts'],
   },
   {
+    owner: 'content-area-selection-controller',
+    productionFile: 'apps/extension/src/content/selection/area-selector/controller.ts',
+    reason:
+      'Area-selection listener, settlement, and cleanup ownership is exercised through its public controller suite.',
+    testFiles: ['apps/extension/src/content/selection/area-selector/index.test.ts'],
+  },
+  {
+    owner: 'content-highlighter-runtime-listeners',
+    productionFile: 'apps/extension/src/content/selection/highlighter-runtime/runtime-listeners.ts',
+    reason:
+      'Highlighter listener registration and Escape policy are split across two owner-local behavior suites.',
+    testFiles: [
+      'apps/extension/src/content/selection/highlighter-runtime/runtime-escape-key.test.ts',
+      'apps/extension/src/content/selection/highlighter-runtime/runtime-listeners.test.ts',
+    ],
+  },
+  {
+    owner: 'content-highlighter-runtime-mode',
+    productionFile: 'apps/extension/src/content/selection/highlighter-runtime/mode.ts',
+    reason:
+      'Highlighter enable and disable lifecycle transactions retain separate owner-local behavior suites.',
+    testFiles: [
+      'apps/extension/src/content/selection/highlighter-runtime/mode.disable.test.ts',
+      'apps/extension/src/content/selection/highlighter-runtime/mode.enable.test.ts',
+    ],
+  },
+  {
     owner: 'content-frame-runtime-contracts',
     productionFile: 'apps/extension/src/content/selection/frame-runtime/contracts/index.ts',
     reason:

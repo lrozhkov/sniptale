@@ -4,7 +4,6 @@ const disableMocks = vi.hoisted(() => ({
   applyHighlighterDocumentModeMock: vi.fn(),
   forceHideTooltipMock: vi.fn(),
   removeHighlighterCursorStyleMock: vi.fn(),
-  resetHighlighterHoverUiMock: vi.fn(),
   setContentModeEnabledMock: vi.fn(),
   dispatchHighlighterModeChangedMock: vi.fn(),
 }));
@@ -13,10 +12,18 @@ vi.mock('../../application/mode-session', () => ({
   setContentModeEnabled: disableMocks.setContentModeEnabledMock,
 }));
 
-vi.mock('./runtime.helpers', () => ({
+vi.mock('./runtime-document-mode', () => ({
   applyHighlighterDocumentMode: disableMocks.applyHighlighterDocumentModeMock,
-  dispatchHighlighterModeChanged: disableMocks.dispatchHighlighterModeChangedMock,
+}));
+
+vi.mock('./runtime-cursor-style', () => ({
+  mountHighlighterCursorStyle: vi.fn(),
   removeHighlighterCursorStyle: disableMocks.removeHighlighterCursorStyleMock,
+}));
+
+vi.mock('../../platform/page-context/mode-events', async (importOriginal) => ({
+  ...(await importOriginal()),
+  dispatchHighlighterModeChanged: disableMocks.dispatchHighlighterModeChangedMock,
 }));
 
 vi.mock('../frame-runtime/state/frame-ui.store', () => ({
@@ -25,12 +32,8 @@ vi.mock('../frame-runtime/state/frame-ui.store', () => ({
   },
 }));
 
-vi.mock('./runtime-state.helpers', () => ({
-  resetHighlighterHoverUi: disableMocks.resetHighlighterHoverUiMock,
-}));
-
-import { createHoverControllerStub } from './controller.test.helpers';
-import { disableHighlighterRuntime } from './mode.disable';
+import { disableHighlighterRuntime } from './mode';
+import { createHoverControllerStub } from './controller.test-support';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -57,11 +60,14 @@ describe('highlighter mode disable lifecycle', () => {
     expect(state.cleanupEventListeners).toBeNull();
     expect(disableMocks.setContentModeEnabledMock).toHaveBeenCalledWith('highlighter', false);
     expect(disableMocks.forceHideTooltipMock).toHaveBeenCalledTimes(1);
-    expect(hoverController.cancelPendingHoverFrame).toHaveBeenCalledTimes(1);
-    expect(hoverController.clearHoverTracking).toHaveBeenCalledTimes(1);
+    expect(hoverController.cancelPendingHoverFrame).toHaveBeenCalledTimes(2);
+    expect(hoverController.clearHoverTracking).toHaveBeenCalledTimes(2);
     expect(cleanupEventListeners).toHaveBeenCalledTimes(1);
-    expect(disableMocks.dispatchHighlighterModeChangedMock).toHaveBeenCalledWith(false);
-    expect(disableMocks.resetHighlighterHoverUiMock).toHaveBeenCalledWith(hoverController);
+    expect(disableMocks.dispatchHighlighterModeChangedMock).toHaveBeenCalledWith({
+      enabled: false,
+    });
+    expect(hoverController.removeHoverOverlay).toHaveBeenCalledTimes(1);
+    expect(hoverController.removeOverlayContainer).toHaveBeenCalledTimes(1);
     expect(disableMocks.applyHighlighterDocumentModeMock).toHaveBeenCalledWith(false);
     expect(disableMocks.removeHighlighterCursorStyleMock).toHaveBeenCalledTimes(1);
   });

@@ -52,6 +52,7 @@ export function resolveDeterministicFocusedCoverageOwnerTests(file, options = {}
 
 export function resolveLocalFocusedCoverageOwnerTests(file, options = {}) {
   const { adjacent, mapped } = collectDeterministicOwnerTests(file, options);
-  const sameDirectory = mapped.length > 0 ? [] : collectSameDirectoryTests(file);
+  const sameDirectory =
+    mapped.length > 0 || adjacent.length > 0 ? [] : collectSameDirectoryTests(file);
   return [...new Set([...adjacent, ...mapped, ...sameDirectory])].sort();
 }

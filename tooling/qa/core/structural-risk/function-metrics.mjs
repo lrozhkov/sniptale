@@ -76,12 +76,41 @@ function isLogicalExpression(node) {
   return ts.isBinaryExpression(node) && LOGICAL_OPERATOR_KINDS.has(node.operatorToken.kind);
 }
 
+function unwrapAssignmentExpression(node) {
+  let current = node;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isNonNullExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    current.kind === ts.SyntaxKind.SatisfiesExpression
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function assignedReceiver(node) {
+  const target = unwrapAssignmentExpression(node);
+  if (!ts.isPropertyAccessExpression(target) && !ts.isElementAccessExpression(target)) {
+    return null;
+  }
+
+  let receiver = unwrapAssignmentExpression(target.expression);
+  if (
+    ts.isPropertyAccessExpression(receiver) &&
+    (receiver.name.text === 'style' || receiver.name.text === 'dataset')
+  ) {
+    receiver = unwrapAssignmentExpression(receiver.expression);
+  }
+  return receiver;
+}
+
 function stateAssignmentAuthority(node, sourceFile) {
   if (!ts.isBinaryExpression(node)) return null;
   const kind = node.operatorToken.kind;
   if (kind < ts.SyntaxKind.FirstAssignment || kind > ts.SyntaxKind.LastAssignment) return null;
-  const target = node.left.getText(sourceFile);
-  return /^(?:this\.|[A-Za-z_$][\w$]*\.)/u.test(target) ? target : null;
+  return assignedReceiver(node.left)?.getText(sourceFile) ?? null;
 }
 
 function hasRecoveryBoundary(node) {
@@ -242,9 +271,8 @@ export function collectTopLevelEffectClusters(sourceFile, relativePath) {
         if (effect) effects.add(effect);
         if (STATE_PATTERN.test(callName)) stateAuthorities.add(callName);
       }
-      if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-        stateAuthorities.add(node.left.getText(sourceFile));
-      }
+      const stateAuthority = stateAssignmentAuthority(node, sourceFile);
+      if (stateAuthority) stateAuthorities.add(stateAuthority);
       ts.forEachChild(node, visit);
     }
     visit(statement);

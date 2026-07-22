@@ -1,11 +1,9 @@
-import { createLogger } from '@sniptale/platform/observability/logger';
+import type { createLogger } from '@sniptale/platform/observability/logger';
 import type { createHighlighterHoverController } from '../highlighter-hover-preview';
-import { logAccessibleIframeCount } from '../highlighter-hover-preview';
-import { disableHighlighterRuntime, enableHighlighterRuntime } from './mode';
 import type { HighlighterRuntimeState } from './state';
 
-type HoverController = ReturnType<typeof createHighlighterHoverController>;
-type HighlighterLogger = Pick<ReturnType<typeof createLogger>, 'log' | 'warn'>;
+export type HoverController = ReturnType<typeof createHighlighterHoverController>;
+export type HighlighterLogger = Pick<ReturnType<typeof createLogger>, 'log' | 'warn'>;
 
 export interface HighlighterControllerDeps {
   createHoverController?: (
@@ -52,30 +50,3 @@ export interface HighlighterController {
   setFrameEditing: () => void;
   setFrameTooltipVisible: () => void;
 }
-
-export function createHighlighterCallbacks(state: HighlighterRuntimeState) {
-  return () => ({
-    addFrame: state.callbacks.addFrame,
-    hasFrameForElement: state.callbacks.hasFrameForElement,
-  });
-}
-
-export function createHighlighterStateGetters(state: HighlighterRuntimeState) {
-  return {
-    isModeEnabled: () => state.isModeEnabled,
-    isPaused: () => state.isPaused,
-    isFrameEditing: () => state.isFrameEditing,
-    isTooltipVisible: () => state.isTooltipVisible,
-  };
-}
-
-export function resolveHighlighterRuntimeDeps(deps: HighlighterControllerDeps) {
-  return {
-    disableRuntime: deps.disableRuntime ?? disableHighlighterRuntime,
-    enableRuntime: deps.enableRuntime ?? enableHighlighterRuntime,
-    logIframeCount: deps.logAccessibleIframeCount ?? logAccessibleIframeCount,
-    logger: deps.logger ?? createLogger({ namespace: 'ContentHighlighter' }),
-  };
-}
-
-export type { HoverController, HighlighterLogger };

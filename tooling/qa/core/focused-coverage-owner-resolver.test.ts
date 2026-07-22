@@ -184,6 +184,85 @@ it('keeps an exact adjacent owner test alongside a broader prefix mapping', asyn
   });
 });
 
+it('does not expand to unrelated same-directory tests when an adjacent owner exists', async () => {
+  const root = createTempRoot('focused-coverage-adjacent-narrow-');
+  const productionFile = 'apps/extension/src/content/selection/callout/view.ts';
+  const adjacentTest = 'apps/extension/src/content/selection/callout/view.test.ts';
+  writeFile(root, productionFile, 'export const value = 1;\n');
+  writeFile(root, adjacentTest, 'export const adjacent = 1;\n');
+  writeFile(
+    root,
+    'apps/extension/src/content/selection/callout/unrelated.test.ts',
+    'export const unrelated = 1;\n'
+  );
+
+  const ownerTests = await withCwd(root, async () => {
+    const module = await importOwnerTests();
+    return module.resolveLocalFocusedCoverageOwnerTests(productionFile, { mappings: [] });
+  });
+
+  expect(ownerTests).toEqual([adjacentTest]);
+});
+
+it('includes owner proof for rollout and outside-registry files in a mixed scope', async () => {
+  const root = createTempRoot('focused-coverage-mixed-owner-proof-');
+  const rolloutFile = 'apps/extension/src/composition/persistence/page-style/storage/index.ts';
+  const rolloutTest = 'apps/extension/src/composition/persistence/page-style/storage/index.test.ts';
+  const outsideFile = 'apps/extension/src/content/selection/area-selector/controller.ts';
+  const outsideTest = 'apps/extension/src/content/selection/area-selector/index.test.ts';
+  writeFile(root, rolloutFile, 'export const rollout = 1;\n');
+  writeFile(root, rolloutTest, 'export const rolloutTest = 1;\n');
+  writeFile(root, outsideFile, 'export const outside = 1;\n');
+  writeFile(root, outsideTest, 'export const outsideTest = 1;\n');
+
+  const scope = await withCwd(root, async () => {
+    const module = await importResolver();
+    return module.resolveFocusedCoverageOwnerScope({
+      codeFiles: [rolloutFile, outsideFile],
+      mappingOptions: {
+        mappings: [
+          {
+            owner: 'area-selection',
+            productionFile: outsideFile,
+            reason: 'the public controller suite owns listener and cleanup behavior',
+            testFiles: [outsideTest],
+          },
+        ],
+      },
+    });
+  });
+
+  expect(scope).toMatchObject({
+    coverageTargetFiles: [rolloutFile],
+    testFiles: [rolloutTest, outsideTest].sort(),
+    verdict: 'run-local-coverage',
+  });
+});
+
+it('defers a mixed scope when an outside-registry file has no bounded owner proof', async () => {
+  const root = createTempRoot('focused-coverage-mixed-missing-owner-');
+  const rolloutFile = 'apps/extension/src/composition/persistence/page-style/storage/index.ts';
+  const rolloutTest = 'apps/extension/src/composition/persistence/page-style/storage/index.test.ts';
+  const outsideFile = 'apps/extension/src/content/selection/callout/view.tsx';
+  writeFile(root, rolloutFile, 'export const rollout = 1;\n');
+  writeFile(root, rolloutTest, 'export const rolloutTest = 1;\n');
+  writeFile(root, outsideFile, 'export const outside = 1;\n');
+
+  const scope = await withCwd(root, async () => {
+    const module = await importResolver();
+    return module.resolveFocusedCoverageOwnerScope({
+      codeFiles: [rolloutFile, outsideFile],
+      mappingOptions: { mappings: [] },
+    });
+  });
+
+  expect(scope).toMatchObject({
+    coverageTargetFiles: [rolloutFile],
+    detail: expect.stringContaining('outside-registry files without mapped, adjacent'),
+    verdict: 'defer-ambiguous-existing',
+  });
+});
+
 it('keeps file-specific mappings in the explicit mapping layer', async () => {
   const root = createTempRoot('focused-coverage-file-specific-');
   writeFile(root, 'apps/extension/src/contracts/messaging/contracts/runtime/actions/export.ts', '');

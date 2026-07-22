@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SelectedArea } from '@sniptale/runtime-contracts/video/types/types';
 import { createAreaSelectionController } from '.';
 
 function appendSelectionElement(): HTMLDivElement {
@@ -14,10 +13,21 @@ function createSelectionController(
   overrides: Partial<Parameters<typeof createAreaSelectionController>[0]> = {}
 ) {
   return createAreaSelectionController({
-    createSelectionElement: appendSelectionElement,
-    removeAreaSelectionTooltip: vi.fn(),
-    showAreaSelectionTooltip: vi.fn(),
-    updateSelectionBox: vi.fn(),
+    surface: {
+      createSelectionElement: appendSelectionElement,
+      hideSelectionElement: (element) => {
+        if (element) element.style.display = 'none';
+      },
+      removeSelectionElement: (element) => element.remove(),
+      removeSelectionTooltip: vi.fn(),
+      showSelectionElement: (element, origin) => {
+        element.style.left = `${origin.startX}px`;
+        element.style.top = `${origin.startY}px`;
+        element.style.display = 'block';
+      },
+      showSelectionTooltip: vi.fn(),
+      updateSelectionBox: vi.fn(),
+    },
     ...overrides,
   });
 }
@@ -53,34 +63,15 @@ function dispatchSelectionGesture(points: {
   }
 }
 
-function createCompleteAreaSelectionMock() {
-  return vi.fn(
-    (args: {
-      callback: ((area: SelectedArea) => void) | null;
-      cleanup: () => void;
-      endX: number;
-      endY: number;
-      startX: number;
-      startY: number;
-    }) => {
-      args.callback?.({
-        x: args.startX,
-        y: args.startY,
-        width: args.endX - args.startX,
-        height: args.endY - args.startY,
-      });
-      args.cleanup();
-    }
-  );
-}
-
-function createAreaSelectionTimeoutMock() {
-  return vi.fn(
-    (args: { cleanup: () => void; isSelecting: boolean; reject: (reason?: unknown) => void }) => {
-      args.reject(new Error(args.isSelecting ? 'timeout' : 'inactive'));
-      args.cleanup();
-    }
-  );
+function createSelectionResultMock() {
+  return vi.fn((args: { endX: number; endY: number; startX: number; startY: number }) => ({
+    area: {
+      x: args.startX,
+      y: args.startY,
+      width: args.endX - args.startX,
+      height: args.endY - args.startY,
+    },
+  }));
 }
 
 beforeEach(() => {
@@ -92,10 +83,18 @@ beforeEach(() => {
 describe('createAreaSelectionController completion', () => {
   it('resolves a selection and clears listeners after mouseup', async () => {
     const updateSelectionBox = vi.fn();
-    const completeAreaSelection = createCompleteAreaSelectionMock();
+    const createSelectionResult = createSelectionResultMock();
     const controller = createSelectionController({
-      completeAreaSelection,
-      updateSelectionBox,
+      result: { createSelectionResult },
+      surface: {
+        createSelectionElement: appendSelectionElement,
+        hideSelectionElement: vi.fn(),
+        removeSelectionElement: (element) => element.remove(),
+        removeSelectionTooltip: vi.fn(),
+        showSelectionElement: vi.fn(),
+        showSelectionTooltip: vi.fn(),
+        updateSelectionBox,
+      },
     });
 
     const pendingSelection = controller.startAreaSelection();
@@ -112,9 +111,39 @@ describe('createAreaSelectionController completion', () => {
       height: 100,
     });
     expect(updateSelectionBox).toHaveBeenCalledTimes(1);
-    expect(completeAreaSelection).toHaveBeenCalledTimes(1);
+    expect(createSelectionResult).toHaveBeenCalledTimes(1);
 
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 140, clientY: 180 }));
+    expect(updateSelectionBox).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects an error outcome and clears listeners after mouseup', async () => {
+    const updateSelectionBox = vi.fn();
+    const createSelectionResult = vi.fn(() => ({ error: new Error('selection too small') }));
+    const controller = createSelectionController({
+      result: { createSelectionResult },
+      surface: {
+        createSelectionElement: appendSelectionElement,
+        hideSelectionElement: vi.fn(),
+        removeSelectionElement: (element) => element.remove(),
+        removeSelectionTooltip: vi.fn(),
+        showSelectionElement: vi.fn(),
+        showSelectionTooltip: vi.fn(),
+        updateSelectionBox,
+      },
+    });
+
+    const pendingSelection = controller.startAreaSelection();
+    dispatchSelectionGesture({
+      start: { x: 15, y: 20 },
+      move: { x: 18, y: 24 },
+      end: { x: 20, y: 25 },
+    });
+
+    await expect(pendingSelection).rejects.toThrow('selection too small');
+    expect(createSelectionResult).toHaveBeenCalledTimes(1);
+
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 40, clientY: 50 }));
     expect(updateSelectionBox).toHaveBeenCalledTimes(1);
   });
 });
@@ -122,17 +151,27 @@ describe('createAreaSelectionController completion', () => {
 describe('createAreaSelectionController cleanup', () => {
   it('rejects on timeout and stops listening after cleanup', async () => {
     vi.useFakeTimers();
-    const handleAreaSelectionTimeout = createAreaSelectionTimeoutMock();
+    const hideSelectionElement = vi.fn();
+    const removeSelectionTooltip = vi.fn();
     const controller = createSelectionController({
-      handleAreaSelectionTimeout,
+      surface: {
+        createSelectionElement: appendSelectionElement,
+        hideSelectionElement,
+        removeSelectionElement: (element) => element.remove(),
+        removeSelectionTooltip,
+        showSelectionElement: vi.fn(),
+        showSelectionTooltip: vi.fn(),
+        updateSelectionBox: vi.fn(),
+      },
     });
 
     const pendingSelection = controller.startAreaSelection();
     dispatchSelectionGesture({ start: { x: 10, y: 12 } });
     vi.runAllTimers();
 
-    await expect(pendingSelection).rejects.toThrow('timeout');
-    expect(handleAreaSelectionTimeout).toHaveBeenCalledTimes(1);
+    await expect(pendingSelection).rejects.toThrow();
+    expect(hideSelectionElement).toHaveBeenCalledTimes(1);
+    expect(removeSelectionTooltip).toHaveBeenCalledTimes(2);
   });
 
   it('removes the mounted selection element when stopped explicitly', () => {

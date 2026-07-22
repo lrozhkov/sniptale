@@ -54,22 +54,22 @@
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/technical-debt.data.json",
-      "sha256": "842d34ae3a0dd4ce8747b3442a2ef4d544ca948cfd37a45ddcd8a81b21775af3"
+      "sha256": "ac64f2777306483160120ba5c1462b9b019c10c09c8adbfc28ce28ad4f136115"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/technical-debt.data.json",
-      "sha256": "842d34ae3a0dd4ce8747b3442a2ef4d544ca948cfd37a45ddcd8a81b21775af3"
+      "sha256": "ac64f2777306483160120ba5c1462b9b019c10c09c8adbfc28ce28ad4f136115"
     },
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "aff477f83e3d2de30d701c19060cee9e22029c6310abb21a07a1ac4861d771b3"
+      "sha256": "4e7bf23be3bf1022efd56d655ac3529008e66d11ec05e9870daa2815571d9200"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "aff477f83e3d2de30d701c19060cee9e22029c6310abb21a07a1ac4861d771b3"
+      "sha256": "4e7bf23be3bf1022efd56d655ac3529008e66d11ec05e9870daa2815571d9200"
     },
     {
       "category": "archive-integration",

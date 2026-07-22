@@ -103,6 +103,21 @@ function collectAdvisoryStep(context, { producerRunId } = {}) {
   });
 }
 
+function deduplicateAdvisoryCoveredConsoleOutput(advisoryStep, focusedSteps) {
+  if (!advisoryStep.consoleOutput) {
+    return focusedSteps;
+  }
+
+  return focusedSteps.map((step) => {
+    if (step.label !== 'Structural risk' || !step.consoleOutput) {
+      return step;
+    }
+    const withoutDuplicate = { ...step };
+    delete withoutDuplicate.consoleOutput;
+    return withoutDuplicate;
+  });
+}
+
 async function collectCheckpointVerificationSteps({
   advisoryStep,
   context,
@@ -118,7 +133,11 @@ async function collectCheckpointVerificationSteps({
     shouldRunManifestPermissions,
     shouldRunRuntimeTopology,
   });
-  return [formatStep, advisoryStep, ...focusedSteps];
+  return [
+    formatStep,
+    advisoryStep,
+    ...deduplicateAdvisoryCoveredConsoleOutput(advisoryStep, focusedSteps),
+  ];
 }
 
 function createCheckpointContext(contextCollector) {

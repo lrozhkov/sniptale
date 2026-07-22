@@ -1,14 +1,8 @@
 import type { SelectedArea } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import type {
-  completeAreaSelection,
-  createSelectionElement,
-  handleAreaSelectionTimeout,
-  hideSelectionElement,
-  removeAreaSelectionTooltip,
-  showAreaSelectionTooltip,
-  updateSelectionBox,
-} from './helpers';
+import { translate } from '../../../platform/i18n';
+import type { AreaSelectionResultOwner } from './result';
+import type { AreaSelectionSurface } from './surface';
 
 const logger = createLogger({ namespace: 'ContentAreaSelector' });
 
@@ -30,15 +24,10 @@ type AreaSelectionState = {
 
 export interface AreaSelectionRuntimeDeps {
   clearScheduledTimeout: (timeoutId: ReturnType<typeof setTimeout>) => void;
-  completeAreaSelection: typeof completeAreaSelection;
-  createSelectionElement: typeof createSelectionElement;
-  handleAreaSelectionTimeout: typeof handleAreaSelectionTimeout;
-  hideSelectionElement: typeof hideSelectionElement;
-  removeAreaSelectionTooltip: typeof removeAreaSelectionTooltip;
+  result: AreaSelectionResultOwner;
   scheduleTimeout: (callback: () => void, delay: number) => ReturnType<typeof setTimeout>;
-  showAreaSelectionTooltip: typeof showAreaSelectionTooltip;
+  surface: AreaSelectionSurface;
   targetDocument: Document;
-  updateSelectionBox: typeof updateSelectionBox;
 }
 
 export function createAreaSelectionState(): AreaSelectionState {
@@ -78,10 +67,10 @@ function createAreaSelectionCleanup(state: AreaSelectionState, deps: AreaSelecti
 
 function getSelectionElement(
   state: AreaSelectionState,
-  createOverlay: typeof createSelectionElement
+  surface: Pick<AreaSelectionSurface, 'createSelectionElement'>
 ) {
   if (!state.selectionElement) {
-    state.selectionElement = createOverlay();
+    state.selectionElement = surface.createSelectionElement();
   }
 
   return state.selectionElement;
@@ -89,7 +78,7 @@ function getSelectionElement(
 
 function createAreaSelectionMouseDownHandler(
   state: AreaSelectionState,
-  deps: Pick<AreaSelectionRuntimeDeps, 'createSelectionElement' | 'removeAreaSelectionTooltip'>
+  surface: AreaSelectionSurface
 ) {
   return (event: MouseEvent) => {
     if (state.isSelecting) {
@@ -100,26 +89,25 @@ function createAreaSelectionMouseDownHandler(
     state.startY = event.clientY;
     state.isSelecting = true;
 
-    const selectionElement = getSelectionElement(state, deps.createSelectionElement);
-    selectionElement.style.left = `${state.startX}px`;
-    selectionElement.style.top = `${state.startY}px`;
-    selectionElement.style.width = '0px';
-    selectionElement.style.height = '0px';
-    selectionElement.style.display = 'block';
-    deps.removeAreaSelectionTooltip();
+    const selectionElement = getSelectionElement(state, surface);
+    surface.showSelectionElement(selectionElement, {
+      startX: state.startX,
+      startY: state.startY,
+    });
+    surface.removeSelectionTooltip();
   };
 }
 
 function createAreaSelectionMouseMoveHandler(
   state: AreaSelectionState,
-  deps: Pick<AreaSelectionRuntimeDeps, 'updateSelectionBox'>
+  surface: Pick<AreaSelectionSurface, 'updateSelectionBox'>
 ) {
   return (event: MouseEvent) => {
     if (!state.isSelecting || !state.selectionElement) {
       return;
     }
 
-    deps.updateSelectionBox(
+    surface.updateSelectionBox(
       state.selectionElement,
       { startX: state.startX, startY: state.startY },
       { x: event.clientX, y: event.clientY }
@@ -129,10 +117,7 @@ function createAreaSelectionMouseMoveHandler(
 
 function createAreaSelectionMouseUpHandler(
   state: AreaSelectionState,
-  deps: Pick<
-    AreaSelectionRuntimeDeps,
-    'completeAreaSelection' | 'hideSelectionElement' | 'removeAreaSelectionTooltip'
-  >,
+  deps: Pick<AreaSelectionRuntimeDeps, 'result' | 'surface'>,
   cleanup: () => void,
   reject: (reason?: unknown) => void
 ) {
@@ -142,17 +127,22 @@ function createAreaSelectionMouseUpHandler(
     }
 
     state.isSelecting = false;
-    deps.hideSelectionElement(state.selectionElement);
-    deps.removeAreaSelectionTooltip();
-    deps.completeAreaSelection({
-      callback: state.onAreaSelectedCallback,
-      cleanup,
+    deps.surface.hideSelectionElement(state.selectionElement);
+    deps.surface.removeSelectionTooltip();
+    const result = deps.result.createSelectionResult({
       endX: event.clientX,
       endY: event.clientY,
-      reject,
       startX: state.startX,
       startY: state.startY,
     });
+    if (result.error) {
+      reject(result.error);
+      cleanup();
+      return;
+    }
+
+    state.onAreaSelectedCallback?.(result.area);
+    cleanup();
   };
 }
 
@@ -165,8 +155,8 @@ function createAreaSelectionHandlers(props: {
   const { cleanup, deps, reject, state } = props;
 
   return {
-    onMouseDown: createAreaSelectionMouseDownHandler(state, deps),
-    onMouseMove: createAreaSelectionMouseMoveHandler(state, deps),
+    onMouseDown: createAreaSelectionMouseDownHandler(state, deps.surface),
+    onMouseMove: createAreaSelectionMouseMoveHandler(state, deps.surface),
     onMouseUp: createAreaSelectionMouseUpHandler(state, deps, cleanup, reject),
   };
 }
@@ -181,9 +171,9 @@ export function createStartAreaSelection(
     new Promise<SelectedArea>((resolve, reject) => {
       logger.log('Starting area selection');
       cleanup();
-      getSelectionElement(state, deps.createSelectionElement);
+      getSelectionElement(state, deps.surface);
       state.onAreaSelectedCallback = resolve;
-      deps.showAreaSelectionTooltip();
+      deps.surface.showSelectionTooltip();
 
       const { onMouseDown, onMouseMove, onMouseUp } = createAreaSelectionHandlers({
         cleanup,
@@ -194,12 +184,14 @@ export function createStartAreaSelection(
       const timeoutId = deps.scheduleTimeout(() => {
         const wasSelecting = state.isSelecting;
         state.isSelecting = false;
-        deps.handleAreaSelectionTimeout({
-          cleanup,
-          isSelecting: wasSelecting,
-          reject,
-          selectionElement: state.selectionElement,
-        });
+        if (!wasSelecting) {
+          return;
+        }
+
+        deps.surface.hideSelectionElement(state.selectionElement);
+        deps.surface.removeSelectionTooltip();
+        reject(new Error(translate('content.runtime.areaSelectTimeout')));
+        cleanup();
       }, 30000);
 
       state.activeSelection = { onMouseDown, onMouseMove, onMouseUp, timeoutId };
@@ -209,27 +201,27 @@ export function createStartAreaSelection(
     });
 }
 
-function removeSelectionElement(state: AreaSelectionState) {
+function removeSelectionElement(
+  state: AreaSelectionState,
+  surface: Pick<AreaSelectionSurface, 'removeSelectionElement'>
+) {
   if (!state.selectionElement) {
     return;
   }
 
-  state.selectionElement.remove();
+  surface.removeSelectionElement(state.selectionElement);
   state.selectionElement = null;
 }
 
 export function createStopAreaSelection(
   state: AreaSelectionState,
-  deps: Pick<
-    AreaSelectionRuntimeDeps,
-    'clearScheduledTimeout' | 'removeAreaSelectionTooltip' | 'targetDocument'
-  >
+  deps: Pick<AreaSelectionRuntimeDeps, 'clearScheduledTimeout' | 'surface' | 'targetDocument'>
 ) {
   return () => {
     logger.log('Stopping area selection');
     clearActiveAreaSelection(state, deps);
     state.onAreaSelectedCallback = null;
-    deps.removeAreaSelectionTooltip();
-    removeSelectionElement(state);
+    deps.surface.removeSelectionTooltip();
+    removeSelectionElement(state, deps.surface);
   };
 }

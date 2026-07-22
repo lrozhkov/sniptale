@@ -290,6 +290,35 @@ it('counts distinct state authorities instead of repeated writes', () => {
   expect(metric.stateAuthorities).toBe(2);
 });
 
+it('collapses repeated DOM field writes to their owning receiver', () => {
+  const metric = analyzeStructuralSource(
+    'apps/extension/src/content/selection/example.ts',
+    `export function update(region, doc, tooltip) {
+      region.style.left = '1px';
+      region.style.width = '2px';
+      region.dataset.owner = 'selection';
+      doc.body.style.userSelect = 'none';
+      tooltip.textContent = 'Ready';
+    }`
+  ).functions[0];
+
+  expect(metric.stateAuthorityNames).toEqual(['doc.body', 'region', 'tooltip']);
+});
+
+it('keeps distinct nested state and collection receivers separate', () => {
+  const metric = analyzeStructuralSource(
+    'apps/extension/src/example.ts',
+    `export function update(state, items, index) {
+      state.isSelecting = true;
+      state.callbacks.addFrame = () => {};
+      (items[index] as { selected: boolean }).selected = true;
+      this.value = 1;
+    }`
+  ).functions[0];
+
+  expect(metric.stateAuthorityNames).toEqual(['items[index]', 'state', 'state.callbacks', 'this']);
+});
+
 it('sanitizes and byte-bounds direct structural CLI output', () => {
   const secret = 'bare-structural-cli-secret';
   const output = sanitizeStructuralCliOutput(`src/${secret}.ts\n${'🙂'.repeat(10_000)}`, {
