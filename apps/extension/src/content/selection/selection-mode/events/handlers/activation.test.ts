@@ -45,23 +45,20 @@ function createActivationFixture() {
   const state = {
     currentState: 'hover',
   };
-  const withStateSync = vi.fn((callback: () => void) => callback());
 
   return {
     handlers: createSelectionModeActivationHandlers({
       selectionModeEvents: selectionModeEvents as never,
       state: state as never,
-      withStateSync,
     }),
     selectionModeEvents,
     state,
-    withStateSync,
   };
 }
 
 describe('selection-mode activation handlers', () => {
-  it('logs click and keydown activation before delegating through state sync', () => {
-    const { handlers, selectionModeEvents, state, withStateSync } = createActivationFixture();
+  it('logs click and keydown activation before direct delegation', () => {
+    const { handlers, selectionModeEvents, state } = createActivationFixture();
     const clickEvent = new MouseEvent('click');
     const keyEvent = new KeyboardEvent('keydown', { key: 'Escape' });
 
@@ -89,6 +86,5 @@ describe('selection-mode activation handlers', () => {
       state,
       selectionModeEvents
     );
-    expect(withStateSync).toHaveBeenCalledTimes(2);
   });
 });

@@ -53,6 +53,117 @@ function isFunctionNode(node) {
   );
 }
 
+function findBindingIdentifier(name, node) {
+  if (!node) return null;
+  if (ts.isIdentifier(node)) return node.text === name ? node : null;
+  if (ts.isBindingElement(node)) return findBindingIdentifier(name, node.name);
+  if (ts.isObjectBindingPattern(node) || ts.isArrayBindingPattern(node)) {
+    for (const element of node.elements) {
+      const match = findBindingIdentifier(name, element);
+      if (match) return match;
+    }
+  }
+  return null;
+}
+
+function findDeclarationListBinding(name, declarationList) {
+  if (!declarationList) return null;
+  for (const declaration of declarationList.declarations) {
+    const match = findBindingIdentifier(name, declaration.name);
+    if (match) return match;
+  }
+  return null;
+}
+
+function findNamedStatementBinding(name, statement) {
+  const namedDeclaration =
+    ts.isFunctionDeclaration(statement) ||
+    ts.isClassDeclaration(statement) ||
+    ts.isEnumDeclaration(statement);
+  return namedDeclaration && statement.name?.text === name ? statement.name : null;
+}
+
+function findImportBinding(name, statement) {
+  if (!ts.isImportDeclaration(statement)) return null;
+  const clause = statement.importClause;
+  if (clause?.name?.text === name) return clause.name;
+  const bindings = clause?.namedBindings;
+  if (bindings && ts.isNamespaceImport(bindings) && bindings.name.text === name) {
+    return bindings.name;
+  }
+  if (!bindings || !ts.isNamedImports(bindings)) return null;
+  return bindings.elements.find((item) => item.name.text === name)?.name ?? null;
+}
+
+function findStatementBinding(name, statement) {
+  const variableBinding = ts.isVariableStatement(statement)
+    ? findDeclarationListBinding(name, statement.declarationList)
+    : null;
+  return (
+    variableBinding ??
+    findNamedStatementBinding(name, statement) ??
+    findImportBinding(name, statement)
+  );
+}
+
+function findFunctionBinding(name, node) {
+  if (!isFunctionNode(node)) return null;
+  for (const parameter of node.parameters ?? []) {
+    const match = findBindingIdentifier(name, parameter.name);
+    if (match) return match;
+  }
+  return node.name && ts.isIdentifier(node.name) && node.name.text === name ? node.name : null;
+}
+
+function findLoopBinding(name, node) {
+  const initializer =
+    ts.isForStatement(node) || ts.isForInStatement(node) || ts.isForOfStatement(node)
+      ? node.initializer
+      : null;
+  return initializer && ts.isVariableDeclarationList(initializer)
+    ? findDeclarationListBinding(name, initializer)
+    : null;
+}
+
+function findScopedStatementBinding(name, node) {
+  if (!ts.isBlock(node) && !ts.isSourceFile(node)) return null;
+  for (const statement of node.statements) {
+    const match = findStatementBinding(name, statement);
+    if (match) return match;
+  }
+  return null;
+}
+
+function findLexicalBinding(identifier) {
+  const name = identifier.text;
+  let current = identifier.parent;
+  while (current) {
+    const binding =
+      findFunctionBinding(name, current) ??
+      (ts.isCatchClause(current)
+        ? findBindingIdentifier(name, current.variableDeclaration?.name)
+        : null) ??
+      findLoopBinding(name, current) ??
+      findScopedStatementBinding(name, current);
+    if (binding) return binding;
+    current = current.parent;
+  }
+  return null;
+}
+
+export function createLexicalBindingKey(root, sourceFile, suffix = '') {
+  if (root.kind === ts.SyntaxKind.ThisKeyword) {
+    let owner = root.parent;
+    while (owner && (!isFunctionNode(owner) || ts.isArrowFunction(owner))) owner = owner.parent;
+    return `this@${owner?.getStart(sourceFile) ?? 'global'}${suffix}`;
+  }
+  if (ts.isIdentifier(root)) {
+    const declaration = findLexicalBinding(root);
+    return `${root.text}@${declaration?.getStart(sourceFile) ?? 'global'}${suffix}`;
+  }
+  return `${root.getText(sourceFile)}@dynamic${suffix}`;
+}
+
 export function collectFunctionNodes(sourceFile) {
   const result = [];
   const nameCounts = new Map();

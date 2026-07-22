@@ -1,5 +1,6 @@
 import {
   collectFunctionNodes,
+  createLexicalBindingKey,
   createNormalizedNodeHashes,
   getCallName,
   getNodeEndLine,
@@ -106,18 +107,29 @@ function assignedReceiver(node) {
   return receiver;
 }
 
-function stateReceiverIdentity(node, sourceFile) {
+function stateReceiverRoot(node) {
   let current = unwrapAssignmentExpression(node);
   const properties = [];
   while (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
     if (ts.isPropertyAccessExpression(current)) properties.unshift(current.name.text);
     current = unwrapAssignmentExpression(current.expression);
   }
+  return { root: current, properties };
+}
+
+function stateReceiverKey(node, sourceFile) {
+  const { root, properties } = stateReceiverRoot(node);
+  const suffix = properties.length > 0 ? `.${properties[0]}` : '';
+  return createLexicalBindingKey(root, sourceFile, suffix);
+}
+
+function stateReceiverIdentity(node, sourceFile) {
+  const { root: current, properties } = stateReceiverRoot(node);
   if (ts.isCallExpression(current) || ts.isNewExpression(current)) return null;
   if (current.kind === ts.SyntaxKind.ThisKeyword) return 'this';
   if (!ts.isIdentifier(current)) return current.getText(sourceFile);
-  if (current.text === 'props' && properties.length > 0) {
-    return `props.${properties[0]}`;
+  if (['args', 'options', 'props'].includes(current.text) && properties.length > 0) {
+    return `${current.text}.${properties[0]}`;
   }
   return current.text;
 }
@@ -154,8 +166,15 @@ function recordStateCall(node, sourceFile, callName, signals) {
   if (!STATE_PATTERN.test(callName) || hasDynamicCallReceiver(node)) return;
   signals.stateAuthorities.add(callName);
   const receiver = stateCallReceiver(node, sourceFile, callName);
-  if (receiver) signals.stateReceivers.add(receiver);
-  else signals.unresolvedStateAuthorities.add(callName);
+  if (receiver) {
+    const expression = unwrapAssignmentExpression(node.expression);
+    const receiverNode = receiver === callName ? expression : expression.expression;
+    signals.stateReceivers.add(receiver);
+    signals.stateReceiverKeys.add(stateReceiverKey(receiverNode, sourceFile));
+  } else {
+    signals.unresolvedStateAuthorities.add(callName);
+    signals.unresolvedStateAuthorityKeys.add(stateReceiverKey(node.expression, sourceFile));
+  }
 }
 
 function recordStateAssignment(node, sourceFile, signals) {
@@ -164,8 +183,13 @@ function recordStateAssignment(node, sourceFile, signals) {
   signals.stateAuthorities.add(authority);
   const receiver = assignedReceiver(node.left);
   const identity = receiver && stateReceiverIdentity(receiver, sourceFile);
-  if (identity) signals.stateReceivers.add(identity);
-  else signals.unresolvedStateAuthorities.add(authority);
+  if (identity) {
+    signals.stateReceivers.add(identity);
+    signals.stateReceiverKeys.add(stateReceiverKey(receiver, sourceFile));
+  } else {
+    signals.unresolvedStateAuthorities.add(authority);
+    signals.unresolvedStateAuthorityKeys.add(`${authority}@dynamic`);
+  }
 }
 
 function hasRecoveryBoundary(node) {
@@ -195,7 +219,9 @@ function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
     recoveryPressure: 0,
     stateAuthorities: new Set(),
     stateReceivers: new Set(),
+    stateReceiverKeys: new Set(),
     unresolvedStateAuthorities: new Set(),
+    unresolvedStateAuthorityKeys: new Set(),
     effects: new Set(),
     ownerCalls: [],
   };
@@ -236,11 +262,14 @@ function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
     nesting: maxNesting,
     recoveryPressure: signals.recoveryPressure,
     effectFamilies: [...signals.effects].sort(),
-    stateAuthorities: signals.stateAuthorities.size,
+    stateAuthorities: signals.stateReceiverKeys.size + signals.unresolvedStateAuthorityKeys.size,
     stateAuthorityNames: [...signals.stateAuthorities].sort(),
     stateReceiverCount: signals.stateReceivers.size,
     stateReceiverNames: [...signals.stateReceivers].sort(),
+    stateReceiverKeys: [...signals.stateReceiverKeys].sort(),
     unresolvedStateAuthorityCount: signals.unresolvedStateAuthorities.size,
+    unresolvedStateAuthorityNames: [...signals.unresolvedStateAuthorities].sort(),
+    unresolvedStateAuthorityKeys: [...signals.unresolvedStateAuthorityKeys].sort(),
     ownerGroups: [...counts.keys()].sort(),
     classifiedCallCount: signals.ownerCalls.length,
     cohesion,
@@ -325,7 +354,9 @@ export function collectTopLevelEffectClusters(sourceFile, relativePath) {
     const stateSignals = {
       stateAuthorities: new Set(),
       stateReceivers: new Set(),
+      stateReceiverKeys: new Set(),
       unresolvedStateAuthorities: new Set(),
+      unresolvedStateAuthorityKeys: new Set(),
     };
     function visit(node) {
       const callName = getCallName(node, sourceFile);
@@ -347,11 +378,15 @@ export function collectTopLevelEffectClusters(sourceFile, relativePath) {
         architecturalLayer: classifyArchitecturalLayer(relativePath),
         effectFamilies,
         effectCount: effectFamilies.length,
-        stateAuthorities: stateSignals.stateAuthorities.size,
+        stateAuthorities:
+          stateSignals.stateReceiverKeys.size + stateSignals.unresolvedStateAuthorityKeys.size,
         stateAuthorityNames: [...stateSignals.stateAuthorities].sort(),
         stateReceiverCount: stateSignals.stateReceivers.size,
         stateReceiverNames: [...stateSignals.stateReceivers].sort(),
+        stateReceiverKeys: [...stateSignals.stateReceiverKeys].sort(),
         unresolvedStateAuthorityCount: stateSignals.unresolvedStateAuthorities.size,
+        unresolvedStateAuthorityNames: [...stateSignals.unresolvedStateAuthorities].sort(),
+        unresolvedStateAuthorityKeys: [...stateSignals.unresolvedStateAuthorityKeys].sort(),
         cohesion: 1,
       });
     }

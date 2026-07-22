@@ -243,7 +243,8 @@ describe('effectful cluster architecture levels', () => {
       }`
     );
     expect(adapter.architecturalLayer).toBe('adapter');
-    expect(adapter.stateAuthorities).toBe(3);
+    expect(adapter.stateAuthorities).toBe(1);
+    expect(adapter.stateAuthorityNames).toEqual(['session']);
     expect(adapter.stateReceiverNames).toEqual(['session']);
     expect(adapter.unresolvedStateAuthorityCount).toBe(0);
     expect(scoreFile(adapter)).toBe(0);
@@ -262,7 +263,7 @@ describe('effectful cluster architecture levels', () => {
     expect(scoreFile(adapter)).toBe(3);
   });
 
-  it('keeps mixed or branching runtime bindings subject to state pressure', () => {
+  it('keeps one state authority distinct from branching pressure', () => {
     const adapter = analyzeStructuralSource(
       'apps/extension/src/content/selection/controller/runtime-bindings/facade.ts',
       `export function bind(session, value) {
@@ -281,8 +282,44 @@ describe('effectful cluster architecture levels', () => {
         };
       }`
     );
-    expect(scoreFile(adapter)).toBe(3);
+    expect(adapter.stateAuthorities).toBe(1);
+    expect(scoreFile(adapter)).toBe(0);
+    expect(Math.max(...adapter.functions.map((metric) => scoreFunction(metric)))).toBeGreaterThan(
+      0
+    );
   });
+});
+
+it('collapses a nested session callback family to one file-level authority', () => {
+  const metric = analyzeStructuralSource(
+    'apps/extension/src/content/selection/ui/size-panel/runtime.ts',
+    `export function bind(args) {
+      return {
+        setAspectRatio: (value) => { args.session.aspectRatio = value; },
+        setSelection: (value) => { args.session.selection = value; },
+        setMaintainAspectRatio: (value) => { args.session.maintainAspectRatio = value; },
+      };
+    }`
+  );
+
+  expect(metric.stateAuthorities).toBe(1);
+  expect(metric.stateAuthorityNames).toEqual(['args.session']);
+  expect(metric.stateReceiverNames).toEqual(['args.session']);
+  expect(scoreFile(metric)).toBe(0);
+});
+
+it('keeps same-spelling independent lexical session bindings distinct', () => {
+  const metric = analyzeStructuralSource(
+    'apps/extension/src/content/selection/state.ts',
+    `export function updateFirst(session) { session.ready = true; }
+    export function updateSecond(session) { session.ready = true; }
+    export function updateThird(session) { session.ready = true; }`
+  );
+
+  expect(metric.stateAuthorities).toBe(3);
+  expect(metric.stateReceiverNames).toEqual(['session']);
+  expect(metric.stateReceiverKeys).toHaveLength(3);
+  expect(scoreFile(metric)).toBe(3);
 });
 
 it('does not score test fixture mutations as production state authority', () => {

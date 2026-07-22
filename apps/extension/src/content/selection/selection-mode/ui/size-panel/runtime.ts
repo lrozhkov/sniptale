@@ -4,30 +4,33 @@ import { setupSelectionModeSizePanelListeners } from './index';
 
 export function createSelectionModeSizePanelSetup(args: {
   constrainSelection: () => void;
-  state: SelectionModeSession;
-  getAspectRatio: () => number | null;
-  getCurrentSelection: () => SelectionModeSession['currentSelection'];
-  getMaintainAspectRatio: () => boolean;
   getMaxSelectionHeight: typeof import('../../constants').getMaxSelectionHeight;
   getMaxSelectionWidth: typeof import('../../constants').getMaxSelectionWidth;
-  setAspectRatio: (value: number | null) => void;
-  setCurrentSelection: (value: SelectionModeSession['currentSelection']) => void;
-  setMaintainAspectRatio: (value: boolean) => void;
+  session: Pick<
+    SelectionModeSession,
+    'aspectRatio' | 'currentSelection' | 'dom' | 'maintainAspectRatio'
+  >;
   updateFinalFrame: () => void;
 }): () => void {
   return () => {
     setupSelectionModeSizePanelListeners({
       constrainSelection: args.constrainSelection,
-      dom: args.state.dom,
-      getAspectRatio: args.getAspectRatio,
-      getCurrentSelection: args.getCurrentSelection,
-      getMaintainAspectRatio: args.getMaintainAspectRatio,
+      dom: args.session.dom,
+      getAspectRatio: () => args.session.aspectRatio,
+      getCurrentSelection: () => args.session.currentSelection,
+      getMaintainAspectRatio: () => args.session.maintainAspectRatio,
       getMaxSelectionHeight: args.getMaxSelectionHeight,
       getMaxSelectionWidth: args.getMaxSelectionWidth,
       minSelectionSize: MIN_SELECTION_SIZE,
-      setAspectRatio: args.setAspectRatio,
-      setCurrentSelection: args.setCurrentSelection,
-      setMaintainAspectRatio: args.setMaintainAspectRatio,
+      setAspectRatio: (value) => {
+        args.session.aspectRatio = value;
+      },
+      setCurrentSelection: (value) => {
+        args.session.currentSelection = value;
+      },
+      setMaintainAspectRatio: (value) => {
+        args.session.maintainAspectRatio = value;
+      },
       updateFinalFrame: args.updateFinalFrame,
     });
   };

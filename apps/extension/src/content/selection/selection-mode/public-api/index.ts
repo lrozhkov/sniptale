@@ -1,8 +1,14 @@
 import { disableNavigationLock, enableNavigationLock } from '../../locker';
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import type { SelectionModeSession } from '../session';
 
 const logger = createLogger({ namespace: 'ContentSelectionMode' });
+
+type SelectionModeEnableSession = Pick<
+  SelectionModeSession,
+  'currentState' | 'isActive' | 'rejectCallback' | 'resolveCallback'
+>;
 
 function logSelectionModeDiag(event: string, details?: Record<string, unknown>): void {
   logger.debug(event, details ?? {});
@@ -13,46 +19,38 @@ export function enableSelectionModeApi(args: {
   createHoverElements: () => void;
   createOverlayContainer: () => void;
   enableCursor: () => void;
-  getIsActive: () => boolean;
   prepareUi: () => Promise<void>;
-  setCurrentState: (state: 'idle') => void;
-  setIsActive: (value: boolean) => void;
-  setRejectCallback: (callback: ((reason?: unknown) => void) | null) => void;
-  setResolveCallback: (callback: ((value: CaptureArea) => void) | null) => void;
+  session: SelectionModeEnableSession;
   setupEventListeners: () => void;
 }) {
   return new Promise<CaptureArea>((resolve, reject) => {
     void (async () => {
-      if (args.getIsActive()) {
+      if (args.session.isActive) {
         logSelectionModeDiag('enableSelectionModeApi.cleanup-existing-session');
         args.cleanup();
       }
 
-      args.setResolveCallback(resolve);
-      args.setRejectCallback(reject);
+      args.session.resolveCallback = resolve;
+      args.session.rejectCallback = reject;
 
       try {
-        args.setCurrentState('idle');
+        args.session.currentState = 'idle';
         enableNavigationLock(true);
         await args.prepareUi();
         args.createOverlayContainer();
         args.createHoverElements();
         args.enableCursor();
         args.setupEventListeners();
-        args.setIsActive(true);
+        args.session.isActive = true;
       } catch (error) {
         disableNavigationLock();
         args.cleanup();
-        args.setIsActive(false);
-        args.setCurrentState('idle');
-        args.setResolveCallback(null);
-        args.setRejectCallback(null);
         reject(error);
         return;
       }
 
       logSelectionModeDiag('enableSelectionModeApi.enabled', {
-        isActive: args.getIsActive(),
+        isActive: args.session.isActive,
       });
       logger.info('Selection mode enabled');
     })();
@@ -61,28 +59,14 @@ export function enableSelectionModeApi(args: {
 
 export function disableSelectionModeApi(args: {
   cleanup: () => void;
-  getRejectCallback: () => ((error: Error) => void) | null;
-  setAspectRatio: (value: number | null) => void;
-  setCurrentSelection: (selection: { x: number; y: number; width: number; height: number }) => void;
-  setCurrentState: (state: 'idle') => void;
-  setIsActive: (value: boolean) => void;
-  setMaintainAspectRatio: (value: boolean) => void;
-  setRejectCallback: (callback: ((error: Error) => void) | null) => void;
-  setResolveCallback: (callback: ((value: CaptureArea) => void) | null) => void;
+  session: Pick<SelectionModeSession, 'rejectCallback'>;
 }) {
-  const rejectCallback = args.getRejectCallback();
+  const rejectCallback = args.session.rejectCallback;
   logSelectionModeDiag('disableSelectionModeApi.start', {
     hasPendingRejectCallback: Boolean(rejectCallback),
   });
   args.cleanup();
   disableNavigationLock();
-  args.setIsActive(false);
-  args.setCurrentState('idle');
-  args.setCurrentSelection({ x: 0, y: 0, width: 0, height: 0 });
-  args.setAspectRatio(null);
-  args.setMaintainAspectRatio(false);
-  args.setResolveCallback(null);
-  args.setRejectCallback(null);
   rejectCallback?.(new Error('Cancelled by user'));
 
   logSelectionModeDiag('disableSelectionModeApi.complete', {

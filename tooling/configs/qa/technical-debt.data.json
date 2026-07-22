@@ -3427,7 +3427,6 @@
         "apps/extension/src/content/selection/region-selector/types.ts",
         "apps/extension/src/content/selection/selection-mode/controller/actions.ts",
         "apps/extension/src/content/selection/selection-mode/controller/index.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/facade.ts",
         "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/index.ts",
         "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/runtime.ts",
         "apps/extension/src/content/selection/selection-mode/diag.ts",
@@ -3890,7 +3889,6 @@
         "apps/extension/src/content/selection/region-selector/types.ts",
         "apps/extension/src/content/selection/selection-mode/controller/actions.ts",
         "apps/extension/src/content/selection/selection-mode/controller/index.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/facade.ts",
         "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/index.ts",
         "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/runtime.ts",
         "apps/extension/src/content/selection/selection-mode/diag.ts",
@@ -16161,7 +16159,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/function-metrics.mjs",
-        "contentHash": "a042f0ca827c37797dc676193c630ab0721466e310f438fba93411f7968f48db"
+        "contentHash": "90ab3b6925de44c98ced298c8142221567ab11eccb79b52a75bc08fe6f34a818"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -16173,11 +16171,15 @@
         "property:collectControlMetrics/effects",
         "property:collectControlMetrics/ownerCalls",
         "property:collectControlMetrics/stateAuthorities",
+        "property:collectControlMetrics/stateReceiverKeys",
         "property:collectControlMetrics/stateReceivers",
         "property:collectControlMetrics/unresolvedStateAuthorities",
+        "property:collectControlMetrics/unresolvedStateAuthorityKeys",
         "property:collectTopLevelEffectClusters/stateAuthorities",
+        "property:collectTopLevelEffectClusters/stateReceiverKeys",
         "property:collectTopLevelEffectClusters/stateReceivers",
-        "property:collectTopLevelEffectClusters/unresolvedStateAuthorities"
+        "property:collectTopLevelEffectClusters/unresolvedStateAuthorities",
+        "property:collectTopLevelEffectClusters/unresolvedStateAuthorityKeys"
       ]
     },
     {
@@ -19020,7 +19022,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/topology-fragmentation.mjs",
-        "contentHash": "0a1e94b75e09fa07947c8f043fcaecda08930b346289687893f1508fab1d2cb6"
+        "contentHash": "e67855949871c88fb616d7a0c66e2d1fe2c6b0a4a5dc49cb95f6a918828b6299"
       },
       "consumers": [
         "tooling/qa/core/topology-fragmentation.mjs",
@@ -19040,7 +19042,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/topology-fragmentation.policy.mjs",
-        "contentHash": "ad11aab8fa67c7c85c2eea8f5cd5256cfd983596906692b88b0170c471b210e5"
+        "contentHash": "2052c46c7c5f9217990dbeaa73cc9de3022d15ce5f637f0f1d65898846ec4df5"
       },
       "consumers": [
         "tooling/qa/core/topology-fragmentation.mjs",

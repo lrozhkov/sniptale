@@ -60,17 +60,14 @@ function createPointerFixture() {
     currentState: 'hover',
     hoveredElement: document.createElement('div'),
   };
-  const withStateSync = vi.fn((callback: () => void) => callback());
 
   return {
     handlers: createSelectionModePointerHandlers({
       selectionModeEvents: selectionModeEvents as never,
       state: state as never,
-      withStateSync,
     }),
     selectionModeEvents,
     state,
-    withStateSync,
   };
 }
 
@@ -96,8 +93,8 @@ describe('selection-mode pointer logger', () => {
 });
 
 describe('selection-mode pointer lifecycle handlers', () => {
-  it('delegates pointer move and down handlers through state sync', () => {
-    const { handlers, selectionModeEvents, state, withStateSync } = createPointerFixture();
+  it('delegates pointer move and down handlers directly', () => {
+    const { handlers, selectionModeEvents, state } = createPointerFixture();
     const moveEvent = new MouseEvent('mousemove');
     const downEvent = new MouseEvent('mousedown');
 
@@ -120,11 +117,10 @@ describe('selection-mode pointer lifecycle handlers', () => {
       selectionModeEvents,
       undefined
     );
-    expect(withStateSync).toHaveBeenCalledTimes(2);
   });
 
-  it('delegates pointer up and leave handlers through state sync', () => {
-    const { handlers, selectionModeEvents, state, withStateSync } = createPointerFixture();
+  it('delegates pointer up and leave handlers directly', () => {
+    const { handlers, selectionModeEvents, state } = createPointerFixture();
 
     handlers.handleMouseUp();
     handlers.handleMouseLeave();
@@ -137,17 +133,15 @@ describe('selection-mode pointer lifecycle handlers', () => {
       state,
       selectionModeEvents
     );
-    expect(withStateSync).toHaveBeenCalledTimes(2);
   });
 });
 
 describe('selection-mode pointer move handler', () => {
   it('creates a pointer move handler that logs before delegating', () => {
-    const { selectionModeEvents, state, withStateSync } = createPointerFixture();
+    const { selectionModeEvents, state } = createPointerFixture();
     const handleMouseMove = createSelectionModePointerMoveHandler({
       selectionModeEvents: selectionModeEvents as never,
       state: state as never,
-      withStateSync,
     });
     const target = document.createElement('section');
     pointerMocks.getContentEventTargetElementMock.mockReturnValue(target);

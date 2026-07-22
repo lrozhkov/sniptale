@@ -62,13 +62,13 @@ function hasCohesiveOrchestration(cluster) {
       (metric) => metric.score < 4 || isOrchestrationReviewExempt(metric)
     ) &&
     cluster.cohesion >= 0.7 &&
-    cluster.lexicalStateReceivers.length <= 1 &&
+    cluster.lexicalStateReceiverKeys.length <= 1 &&
     !hasMixedUiEffects(cluster)
   );
 }
 
 function safeMergeTarget(cluster, publicFiles, moduleByFile, incoming) {
-  if (cluster.lexicalStateReceivers.length > 1) return null;
+  if (cluster.lexicalStateReceiverKeys.length > 1) return null;
   const eligibleReasons = [
     ...new Set(cluster.changeReasons.filter((reason) => PRODUCTION_REASONS.has(reason))),
   ];

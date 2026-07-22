@@ -100,15 +100,6 @@ export function collectFileMetrics(sourceFile, relativePath, source) {
         .concat(topLevelClusters.flatMap((metric) => metric.effectFamilies))
     ),
   ].sort();
-  const stateAuthorityNames = [
-    ...functions.flatMap((metric) =>
-      metric.stateAuthorityNames.map((name) => `${metric.symbol}:${name}`)
-    ),
-    ...topLevelClusters.flatMap((metric) =>
-      metric.stateAuthorityNames.map((name) => `<top-level>:${name}`)
-    ),
-  ];
-  const stateAuthorities = new Set(stateAuthorityNames).size;
   const stateReceiverNames = [
     ...new Set(
       functions
@@ -116,9 +107,30 @@ export function collectFileMetrics(sourceFile, relativePath, source) {
         .concat(topLevelClusters.flatMap((metric) => metric.stateReceiverNames))
     ),
   ].sort();
-  const unresolvedStateAuthorityCount =
-    functions.reduce((sum, metric) => sum + metric.unresolvedStateAuthorityCount, 0) +
-    topLevelClusters.reduce((sum, metric) => sum + metric.unresolvedStateAuthorityCount, 0);
+  const stateReceiverKeys = [
+    ...new Set(
+      functions
+        .flatMap((metric) => metric.stateReceiverKeys)
+        .concat(topLevelClusters.flatMap((metric) => metric.stateReceiverKeys))
+    ),
+  ].sort();
+  const unresolvedStateAuthorityNames = [
+    ...new Set(
+      functions
+        .flatMap((metric) => metric.unresolvedStateAuthorityNames)
+        .concat(topLevelClusters.flatMap((metric) => metric.unresolvedStateAuthorityNames))
+    ),
+  ].sort();
+  const unresolvedStateAuthorityKeys = [
+    ...new Set(
+      functions
+        .flatMap((metric) => metric.unresolvedStateAuthorityKeys)
+        .concat(topLevelClusters.flatMap((metric) => metric.unresolvedStateAuthorityKeys))
+    ),
+  ].sort();
+  const stateAuthorityNames = [...stateReceiverNames, ...unresolvedStateAuthorityNames].sort();
+  const stateAuthorityKeys = [...stateReceiverKeys, ...unresolvedStateAuthorityKeys].sort();
+  const stateAuthorities = stateAuthorityKeys.length;
   const clusters = [...functions, ...topLevelClusters].filter(isEffectfulCluster);
   const classifiedCalls = functions.filter((metric) => metric.ownerGroups.length > 0);
   const classifiedCallCount = classifiedCalls.reduce(
@@ -144,9 +156,14 @@ export function collectFileMetrics(sourceFile, relativePath, source) {
     effectFamilies,
     effectCount: effectFamilies.length,
     stateAuthorities,
-    stateReceiverCount: stateReceiverNames.length,
+    stateAuthorityNames,
+    stateAuthorityKeys,
+    stateReceiverCount: stateReceiverKeys.length,
     stateReceiverNames,
-    unresolvedStateAuthorityCount,
+    stateReceiverKeys,
+    unresolvedStateAuthorityCount: unresolvedStateAuthorityKeys.length,
+    unresolvedStateAuthorityNames,
+    unresolvedStateAuthorityKeys,
     effectfulClusters: clusters.length,
     classifiedCallCount,
     cohesion,

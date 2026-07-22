@@ -2,11 +2,36 @@ import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-
 import { setContentModeEnabled } from '../../../application/mode-session';
 import { logSelectionModeDiag, logSelectionModeError } from '../diag';
 import { createSelectionModeControllerActions } from './actions';
-import {
-  createSelectionModeFacadeBindings,
-  createSelectionModeRuntimeBindings,
-} from './runtime-bindings';
+import { getMaxSelectionHeight, getMaxSelectionWidth } from '../constants';
+import { setupSelectionModeRuntimeListeners } from '../interaction/actions/runtime';
+import { createSelectionModeRuntimeFacade } from '../runtime/facade';
+import type { SelectionModeRuntimeFacade } from '../runtime/facade/types';
+import { createSelectionModeRuntimeBindings } from './runtime-bindings';
 import { createSelectionModeSession, resetSelectionModeSession } from '../session';
+import type { SelectionModeSession } from '../session';
+
+type SelectionModeRuntimeGraph = ReturnType<typeof createSelectionModeRuntimeBindings>;
+
+function createControllerRuntimeFacade(args: {
+  cleanup: () => void;
+  getRuntimeGraph: () => SelectionModeRuntimeGraph;
+  session: SelectionModeSession;
+}): SelectionModeRuntimeFacade {
+  const getEvents = () => args.getRuntimeGraph().selectionModeEvents;
+  return createSelectionModeRuntimeFacade({
+    cancelSelection: () => getEvents().cancelSelection(),
+    cleanup: args.cleanup,
+    confirmSelection: () => getEvents().confirmSelection(),
+    constrainSelection: () => getEvents().constrainSelection(),
+    getMaxSelectionHeight,
+    getMaxSelectionWidth,
+    resetToIdleState: () => getEvents().resetToIdleState(),
+    session: args.session,
+    setupRuntimeListeners: () =>
+      setupSelectionModeRuntimeListeners(args.getRuntimeGraph().selectionModeRuntimeArgs),
+    updateFinalFrame: () => getEvents().updateFinalFrame(),
+  });
+}
 
 interface SelectionModeController {
   cleanup: () => void;
@@ -43,10 +68,9 @@ export function createSelectionModeController(): SelectionModeController {
     logSelectionModeDiag('cleanup.complete');
   };
 
-  const runtimeFacade = createSelectionModeFacadeBindings({
+  const runtimeFacade = createControllerRuntimeFacade({
     cleanup,
-    getRuntimeArgs: () => runtimeGraph.selectionModeRuntimeArgs,
-    getRuntimeEvents: () => runtimeGraph.selectionModeEvents,
+    getRuntimeGraph: () => runtimeGraph,
     session,
   });
 

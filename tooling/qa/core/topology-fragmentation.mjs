@@ -171,6 +171,11 @@ function collectClusterStructuralMetrics(metrics) {
   const stateReceivers = [
     ...new Set(metrics.flatMap((metric) => metric.stateReceiverNames)),
   ].sort();
+  const stateReceiverKeys = [
+    ...new Set(
+      metrics.flatMap((metric) => metric.stateReceiverKeys.map((key) => `${metric.file}:${key}`))
+    ),
+  ].sort();
   const classifiedCalls = metrics.reduce((sum, metric) => sum + metric.classifiedCallCount, 0);
   const cohesion =
     classifiedCalls === 0
@@ -179,9 +184,10 @@ function collectClusterStructuralMetrics(metrics) {
         classifiedCalls;
   return {
     moduleExports: metrics.reduce((sum, metric) => sum + metric.exports, 0),
-    stateMutationPoints: metrics.reduce((sum, metric) => sum + metric.stateAuthorities, 0),
+    stateAuthorityPoints: metrics.reduce((sum, metric) => sum + metric.stateAuthorities, 0),
     stateMutationFiles: metrics.filter((metric) => metric.stateAuthorities > 0).length,
     lexicalStateReceivers: stateReceivers,
+    lexicalStateReceiverKeys: stateReceiverKeys,
     unresolvedStateAuthorities: metrics.reduce(
       (sum, metric) => sum + metric.unresolvedStateAuthorityCount,
       0

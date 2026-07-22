@@ -26,5 +26,4 @@ export type SelectionModeEventHandlersArgs = {
 export type SelectionModeEventHandlersContext = {
   selectionModeEvents: SelectionModeEventHandlersDeps;
   state: SelectionModeInteractionState;
-  withStateSync: (callback: () => void) => void;
 };

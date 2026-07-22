@@ -19,6 +19,7 @@ function metric(file: string, overrides: MetricOverrides = {}) {
     architecturalLayer: 'default',
     stateAuthorities: 0,
     stateReceiverNames: [],
+    stateReceiverKeys: [],
     unresolvedStateAuthorityCount: 0,
     effectFamilies: [],
     effectCount: 0,
@@ -96,6 +97,7 @@ it('keeps the approved decision precedence for mixed and unresolved protected cl
     changeReasons: [],
     cohesion: 1,
     lexicalStateReceivers: [],
+    lexicalStateReceiverKeys: [],
     unresolvedEdges: 0,
     unresolvedStateAuthorities: 0,
     reExportCycle: false,
@@ -157,7 +159,7 @@ it('partitions every file once and consolidates only corroborated one-owner frag
   expect(report.clusters.some((candidate) => candidate.id === 'tooling/quiet/owner')).toBe(false);
 });
 
-it('keeps isolated weak signals and vetoes consolidation with multiple lexical authorities', () => {
+it('vetoes consolidation for independent same-spelling lexical authorities', () => {
   const sources = {
     'tooling/weak/owner/core.ts': 'export const core = true;',
     'tooling/weak/owner/getter.ts': "export { core } from './core';",
@@ -165,7 +167,16 @@ it('keeps isolated weak signals and vetoes consolidation with multiple lexical a
     'tooling/weak/owner/refs.ts': "import { core } from './core'; export const ref = () => core;",
   };
   const metrics = Object.keys(sources).map((file) =>
-    metric(file, file.endsWith('core.ts') ? { stateReceiverNames: ['first', 'second'] } : {})
+    metric(
+      file,
+      file.endsWith('core.ts')
+        ? {
+            stateAuthorities: 3,
+            stateReceiverNames: ['session'],
+            stateReceiverKeys: ['session@10', 'session@20', 'session@30'],
+          }
+        : {}
+    )
   );
   const report = collect(sources, metrics);
 
@@ -239,6 +250,7 @@ it('preserves cohesive orchestration and proven contract boundaries', () => {
       cohesion: 0.9,
       stateAuthorities: 3,
       stateReceiverNames: ['session'],
+      stateReceiverKeys: ['session@10'],
       effectFamilies: ['persistence', 'messaging'],
       effectCount: 2,
       functions: [orchestrationFunction()],

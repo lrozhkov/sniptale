@@ -1,42 +1,9 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import type { SelectionModeRuntimeFacadeArgs } from './runtime/facade/types';
 
 const mocks = vi.hoisted(() => ({
-  createRuntimeFacadeMock: vi.fn((_: SelectionModeRuntimeFacadeArgs) => ({
-    disableCursor: vi.fn(),
-    disableSelectionMode: vi.fn(),
-    enableSelectionMode: vi.fn(),
-    isSelectionModeActive: vi.fn(),
-    setupSizePanelListeners: vi.fn(),
-    uiRuntime: {
-      createDragFrame: vi.fn(),
-      createFinalElements: vi.fn(),
-      createHoverElements: vi.fn(),
-      createOverlayContainer: vi.fn(),
-      prepare: vi.fn(),
-    },
-    zIndexBase: 0,
-  })),
-  createRuntimeGraphBindingsMock: vi.fn((args) => args),
   mountStyleMock: vi.fn(),
-  setupRuntimeListenersMock: vi.fn(),
-}));
-
-vi.mock('./runtime/facade', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./runtime/facade')>()),
-  createSelectionModeRuntimeFacade: mocks.createRuntimeFacadeMock,
-}));
-
-vi.mock('./interaction/actions/runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./interaction/actions/runtime')>()),
-  setupSelectionModeRuntimeListeners: mocks.setupRuntimeListenersMock,
-}));
-
-vi.mock('./runtime/graph-bindings', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./runtime/graph-bindings')>()),
-  createSelectionModeRuntimeGraphBindings: mocks.createRuntimeGraphBindingsMock,
 }));
 
 vi.mock('../../platform/frame', async (importOriginal) => {
@@ -49,48 +16,10 @@ vi.mock('../../platform/frame', async (importOriginal) => {
   };
 });
 
-import { createSelectionModeFacadeBindings } from './controller/runtime-bindings/facade';
-import { createSelectionModeRuntimeBindings } from './controller/runtime-bindings/runtime';
 import { disableSelectionModeCursor, enableSelectionModeCursor } from './interaction/cursor';
 import { handleResizeSelectionMove } from './interaction/selection/helpers';
-import { createSelectionModeSession } from './session';
-
-function createSession() {
-  return createSelectionModeSession();
-}
 
 describe('selection mode residual seams', () => {
-  it('creates facade and runtime bindings around the session owner', () => {
-    const session = createSession();
-    const facade = createSelectionModeFacadeBindings({
-      cleanup: vi.fn(),
-      getRuntimeArgs: () => ({ runtime: 'args' }) as any,
-      getRuntimeEvents: () => ({
-        cancelSelection: vi.fn(),
-        confirmSelection: vi.fn(),
-        constrainSelection: vi.fn(),
-        resetToIdleState: vi.fn(),
-        updateFinalFrame: vi.fn(),
-      }),
-      session,
-    });
-    const runtimeBindings = createSelectionModeRuntimeBindings({
-      cleanup: vi.fn(),
-      runtimeFacade: facade as never,
-      session,
-      updateFinalFrame: vi.fn(),
-    });
-
-    expect(mocks.createRuntimeFacadeMock).toHaveBeenCalled();
-    expect(mocks.setupRuntimeListenersMock).not.toHaveBeenCalled();
-    const runtimeFacadeArgs = mocks.createRuntimeFacadeMock.mock.calls[0]?.[0];
-    runtimeFacadeArgs?.setupRuntimeListeners();
-    expect(mocks.setupRuntimeListenersMock).toHaveBeenCalledWith({ runtime: 'args' });
-    expect(runtimeBindings).toEqual(
-      expect.objectContaining({ minSelectionSize: expect.any(Number) })
-    );
-  });
-
   it('mounts and clears the selection cursor style', () => {
     Object.defineProperty(document.documentElement, 'style', {
       configurable: true,

@@ -31,15 +31,13 @@ function createSelectionModePointerLifecycleHandlers(args: SelectionModeEventHan
         currentState: args.state.currentState,
         tagName: getSelectionModeResolvedTagName(event, iframe),
       });
-      args.withStateSync(() =>
-        handleSelectionModeMouseDown(event, args.state, args.selectionModeEvents, iframe)
-      );
+      handleSelectionModeMouseDown(event, args.state, args.selectionModeEvents, iframe);
     },
     handleMouseUp() {
       logSelectionModeEvent('MouseUp received', {
         currentState: args.state.currentState,
       });
-      args.withStateSync(() => handleSelectionModeMouseUp(args.state, args.selectionModeEvents));
+      handleSelectionModeMouseUp(args.state, args.selectionModeEvents);
     },
   };
 }
@@ -47,9 +45,7 @@ function createSelectionModePointerLifecycleHandlers(args: SelectionModeEventHan
 export function createSelectionModePointerMoveHandler(args: SelectionModeEventHandlersContext) {
   return (event: MouseEvent, iframe?: HTMLIFrameElement) => {
     createSelectionModePointerLogger(args.state, args.state.hoveredElement, event);
-    args.withStateSync(() =>
-      handleSelectionModeMouseMove(event, args.state, args.selectionModeEvents, iframe)
-    );
+    handleSelectionModeMouseMove(event, args.state, args.selectionModeEvents, iframe);
   };
 }
 
@@ -60,7 +56,7 @@ export function createSelectionModePointerHandlers(args: SelectionModeEventHandl
   return {
     ...lifecycleHandlers,
     handleMouseLeave() {
-      args.withStateSync(() => handleSelectionModeMouseLeave(args.state, args.selectionModeEvents));
+      handleSelectionModeMouseLeave(args.state, args.selectionModeEvents);
     },
     handleMouseMove,
   };

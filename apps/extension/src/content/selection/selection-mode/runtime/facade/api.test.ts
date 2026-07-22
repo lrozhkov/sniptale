@@ -39,15 +39,8 @@ function createPublicApiFixture() {
     createOverlayContainer: vi.fn(),
     prepare: vi.fn(async () => undefined),
     resolvedArea: { x: 10, y: 20, width: 300, height: 200 },
-    setAspectRatio: vi.fn(),
-    setCurrentSelection: vi.fn(),
-    setCurrentState: vi.fn(),
-    setIsActive: vi.fn(),
-    setMaintainAspectRatio: vi.fn(),
-    setRejectCallback: vi.fn(),
-    setResolveCallback: vi.fn(),
     setupRuntimeListeners: vi.fn(),
-    state: createSelectionModeSession(),
+    session: createSelectionModeSession(),
   };
 }
 
@@ -58,6 +51,7 @@ function configurePublicApiMocks(resolvedArea: {
   height: number;
 }) {
   enableSelectionModeApiMock.mockImplementation((args) => {
+    args.session.isActive = true;
     void args.prepareUi();
     args.createHoverElements();
     args.createOverlayContainer();
@@ -79,17 +73,10 @@ function expectPublicApiWiring(
   expect(enableSelectionModeApiMock).toHaveBeenCalledTimes(1);
   expect(disableSelectionModeApiMock).toHaveBeenCalledWith({
     cleanup: fixture.cleanup,
-    getRejectCallback: expect.any(Function),
-    setAspectRatio: fixture.setAspectRatio,
-    setCurrentSelection: fixture.setCurrentSelection,
-    setCurrentState: fixture.setCurrentState,
-    setIsActive: fixture.setIsActive,
-    setMaintainAspectRatio: fixture.setMaintainAspectRatio,
-    setRejectCallback: fixture.setRejectCallback,
-    setResolveCallback: fixture.setResolveCallback,
+    session: fixture.session,
   });
-  expect(enableSelectionModeCursorMock).toHaveBeenCalledWith(fixture.state);
-  expect(disableSelectionModeCursorMock).toHaveBeenCalledWith(fixture.state);
+  expect(enableSelectionModeCursorMock).toHaveBeenCalledWith(fixture.session);
+  expect(disableSelectionModeCursorMock).toHaveBeenCalledWith(fixture.session);
   expect(fixture.prepare).toHaveBeenCalledTimes(1);
   expect(fixture.createHoverElements).toHaveBeenCalledTimes(1);
   expect(fixture.createOverlayContainer).toHaveBeenCalledTimes(1);
@@ -104,17 +91,8 @@ async function expectRuntimeFacadeApiWiring() {
 
   const api = createSelectionModePublicApi({
     cleanup: fixture.cleanup,
-    getIsActive: () => true,
-    getRejectCallback: () => null,
-    setAspectRatio: fixture.setAspectRatio,
-    setCurrentSelection: fixture.setCurrentSelection,
-    setCurrentState: fixture.setCurrentState,
-    setIsActive: fixture.setIsActive,
-    setMaintainAspectRatio: fixture.setMaintainAspectRatio,
-    setRejectCallback: fixture.setRejectCallback,
-    setResolveCallback: fixture.setResolveCallback,
+    session: fixture.session,
     setupRuntimeListeners: fixture.setupRuntimeListeners,
-    state: fixture.state,
     uiRuntime: {
       createHoverElements: fixture.createHoverElements,
       createOverlayContainer: fixture.createOverlayContainer,

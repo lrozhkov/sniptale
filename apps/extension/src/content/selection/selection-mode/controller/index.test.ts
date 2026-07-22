@@ -1,32 +1,20 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { createSelectionModeController } from '.';
+import type { SelectionModeRuntimeFacadeArgs } from '../runtime/facade/types';
 import type { SelectionModeSession } from '../session';
 import {
-  createCapturedFacadeBindingsBase,
   createCapturedRuntimeGraphBindingsArgs,
   createSelectionModeEventsMock,
   createSelectionModeRuntimeFacadeMock,
   createSelectionModeSessionMock,
 } from './index.test-support';
 
-function createCapturedFacadeBindingsArgs(args: {
-  getRuntimeArgs: () => { state: unknown };
-  getRuntimeEvents: Parameters<typeof createCapturedFacadeBindingsBase>[0]['getRuntimeEvents'];
-  session: Parameters<typeof createCapturedFacadeBindingsBase>[0]['session'];
-}) {
-  return {
-    ...createCapturedFacadeBindingsBase(args),
-    setupRuntimeListeners: () => mocks.setupSelectionModeRuntimeListeners(args.getRuntimeArgs()),
-  };
-}
-
-type CapturedFacadeBindingsArgs = ReturnType<typeof createCapturedFacadeBindingsArgs>;
 type CapturedRuntimeGraphArgs = ReturnType<typeof createCapturedRuntimeGraphBindingsArgs>;
 
 const mocks = vi.hoisted(() => {
   return {
-    capturedFacadeArgs: null as CapturedFacadeBindingsArgs | null,
+    capturedFacadeArgs: null as SelectionModeRuntimeFacadeArgs | null,
     capturedRuntimeGraphArgs: null as CapturedRuntimeGraphArgs | null,
     deactivateOtherContentModes: vi.fn(),
     logSelectionModeDiag: vi.fn(),
@@ -66,6 +54,14 @@ vi.mock('../interaction/actions/runtime', async (importOriginal) => ({
   setupSelectionModeRuntimeListeners: mocks.setupSelectionModeRuntimeListeners,
 }));
 
+vi.mock('../runtime/facade', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/facade')>()),
+  createSelectionModeRuntimeFacade: (args: SelectionModeRuntimeFacadeArgs) => {
+    mocks.capturedFacadeArgs = args;
+    return mocks.runtimeFacade!;
+  },
+}));
+
 vi.mock('../session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../session')>()),
   createSelectionModeSession: mocks.createSelectionModeSession,
@@ -74,16 +70,6 @@ vi.mock('../session', async (importOriginal) => ({
 
 vi.mock('./runtime-bindings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./runtime-bindings')>()),
-  createSelectionModeFacadeBindings: (
-    args: Parameters<typeof import('./runtime-bindings').createSelectionModeFacadeBindings>[0]
-  ) => {
-    mocks.capturedFacadeArgs = createCapturedFacadeBindingsArgs({
-      getRuntimeArgs: args.getRuntimeArgs,
-      getRuntimeEvents: args.getRuntimeEvents,
-      session: args.session,
-    }) as never;
-    return mocks.runtimeFacade!;
-  },
   createSelectionModeRuntimeBindings: (
     args: Parameters<typeof import('./runtime-bindings').createSelectionModeRuntimeBindings>[0]
   ) => {
@@ -149,40 +135,27 @@ it('exposes activity through the runtime facade and keeps runtime listeners wire
   );
 });
 
-it('keeps facade bindings synchronized with session-owned state and runtime events', () => {
+it('passes one session authority and lazy event delegates to the runtime facade', () => {
   createSelectionModeController();
-  const rejectCallback = vi.fn();
-  const resolveCallback = vi.fn();
-  const selection = { x: 11, y: 12, width: 130, height: 95 };
 
   expect(mocks.capturedFacadeArgs?.session).toBe(mocks.session);
   expect(mocks.capturedRuntimeGraphArgs?.session).toBe(mocks.session);
 
-  mocks.capturedFacadeArgs?.setAspectRatio(16 / 9);
-  mocks.capturedFacadeArgs?.setCurrentSelection(selection);
-  mocks.capturedFacadeArgs?.setCurrentState('confirmed');
-  mocks.capturedFacadeArgs?.setIsActive(true);
-  mocks.capturedFacadeArgs?.setMaintainAspectRatio(true);
-  mocks.capturedFacadeArgs?.setRejectCallback(rejectCallback);
-  mocks.capturedFacadeArgs?.setResolveCallback(resolveCallback);
   mocks.capturedFacadeArgs?.cancelSelection();
   mocks.capturedFacadeArgs?.confirmSelection();
   mocks.capturedFacadeArgs?.constrainSelection();
   mocks.capturedFacadeArgs?.resetToIdleState();
+  mocks.capturedFacadeArgs?.setupRuntimeListeners();
   mocks.capturedFacadeArgs?.updateFinalFrame();
 
-  expect(mocks.capturedFacadeArgs?.getAspectRatio()).toBe(16 / 9);
-  expect(mocks.capturedFacadeArgs?.getCurrentSelection()).toEqual(selection);
-  expect(mocks.capturedFacadeArgs?.getIsActive()).toBe(true);
-  expect(mocks.capturedFacadeArgs?.getMaintainAspectRatio()).toBe(true);
-  expect(mocks.capturedFacadeArgs?.getRejectCallback()).toBe(rejectCallback);
-  expect(mocks.session?.currentState).toBe('confirmed');
-  expect(mocks.session?.resolveCallback).toBe(resolveCallback);
   expect(selectionModeEvents().cancelSelection).toHaveBeenCalledTimes(1);
   expect(selectionModeEvents().confirmSelection).toHaveBeenCalledTimes(1);
   expect(selectionModeEvents().constrainSelection).toHaveBeenCalledTimes(1);
   expect(selectionModeEvents().resetToIdleState).toHaveBeenCalledTimes(1);
   expect(selectionModeEvents().updateFinalFrame).toHaveBeenCalledTimes(1);
+  expect(mocks.setupSelectionModeRuntimeListeners).toHaveBeenCalledWith(
+    mocks.selectionModeRuntimeArgs
+  );
 });
 
 it('keeps runtime graph bindings synchronized with session cleanup slots and callbacks', () => {
