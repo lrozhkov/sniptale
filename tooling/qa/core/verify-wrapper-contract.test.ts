@@ -7,7 +7,6 @@ import {
 } from '../evidence/repo-audit-evidence/registry.mjs';
 
 const VERIFY_ALL_VIOLATION_STEP_ORDER = [
-  'Hotspot regression',
   'Architecture guardrails',
   'Boundary casts',
   'Boundary inputs',
@@ -113,7 +112,8 @@ it('keeps the release wrapper direct steps in the aggregate order around tests a
     'Oxlint',
     'ESLint',
     'SonarJS',
-    'AI limits',
+    'AI hygiene',
+    'Structural risk',
     'Naming',
     'i18n',
     'Design system',
@@ -137,7 +137,8 @@ it('keeps the focused wrapper direct steps in the aggregate reporting order arou
     'ESLint',
     'SonarJS',
     'Changed-line readability',
-    'AI limits',
+    'AI hygiene',
+    'Structural risk',
     'Mock export parity',
     'Security',
     'Dead exports',

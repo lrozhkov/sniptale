@@ -1,6 +1,6 @@
 # Operator Handbook
 
-Updated: 2026-07-16
+Updated: 2026-07-22
 
 Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), quality policy in [code-quality.md](code-quality.md), and wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md).
 
@@ -16,6 +16,7 @@ Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGE
 | Unpacked release-mode build | `npm run build:release` | Runs only Vite in release mode and writes `dist/`; does not typecheck, run QA, or package an archive. |
 | Package current release build | `npm run release:package-only` | Debug/package-only path; does not replace `qa:release`. |
 | Repository audit | `npm run qa:audit` | Manual audit profiles, full coverage, evidence, supply-chain checks, and external engines. |
+| Structural maintenance snapshot | `npm run qa:structural-audit` | Manual report-only repository snapshot; not a PR, agent, closeout, or `qa:audit` gate. |
 | Extension smoke | `npm run qa:e2e` | Separate Playwright runtime acceptance path. |
 | Wrapper statistics | `npm run qa:stats -- [--wrapper <id>] [--task <id>]` | Reads structured run records. |
 | WSL setup/recovery | [wsl-setup.md](wsl-setup.md) | Environment setup only. |
@@ -59,9 +60,10 @@ Use direct commands only to investigate a specific wrapper failure or answer an 
 | Design system | `node tooling/qa/core/verify-design-system.mjs` |
 | Canonical facades | `node tooling/qa/core/verify-canonical-facades.mjs` |
 | Line length | `node tooling/qa/guards/quality/verify-line-length.mjs` |
+| Diff structural risk | `node tooling/qa/core/verify-structural-risk.mjs` |
 | Task artifacts | `node tooling/qa/core/verify-task-artifacts.mjs` |
 
-Repo-wide report-only inventory belongs in `qa:audit` unless a failed stage requires a direct adapter. Successful inventory steps break down their finding families and atomically replace sanitized complete artifacts at `.tmp/repo-audit/evidence.json` and `.tmp/repo-audit/topology.json`; Semgrep and npm evidence is written to `.tmp/semgrep/results.json`, `.tmp/npm-audit/results.json`, and `.tmp/npm-audit/signatures.json`. Findings remain visible without turning report-only naming or heuristic controls into hard-fail gates. Raw binary entrypoints are finite `qa:raw:*` package scripts; inspect `package.json` rather than assuming an arbitrary wildcard command exists.
+Repo-wide audit inventory belongs in `qa:audit` unless a failed stage requires a direct adapter. Successful inventory steps break down their finding families and atomically replace sanitized complete artifacts at `.tmp/repo-audit/evidence.json` and `.tmp/repo-audit/topology.json`; Semgrep and npm evidence is written to `.tmp/semgrep/results.json`, `.tmp/npm-audit/results.json`, and `.tmp/npm-audit/signatures.json`. Structural debt is deliberately separate: an operator may run `qa:structural-audit` for periodic architecture maintenance, but agents do not run it as implementation proof and its report never blocks. Neither inventory collects model-token hotspots. Raw binary entrypoints are finite `qa:raw:*` package scripts; inspect `package.json` rather than assuming an arbitrary wildcard command exists.
 
 ## Environment Rules
 

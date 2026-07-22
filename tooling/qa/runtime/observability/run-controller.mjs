@@ -7,7 +7,7 @@ import {
   summarizeSteps,
 } from './run-record.mjs';
 import { parseRunRecord } from './schema.mjs';
-import { sanitizeDiagnostic } from './sanitize.mjs';
+import { sanitizeBoundedConsoleOutput, sanitizeDiagnostic } from './sanitize.mjs';
 import { appendBoundedLog, writeJsonAtomic } from './storage.mjs';
 import { assertObservedQaRuleId } from '../../core/qa-steps/runtime-registry.mjs';
 
@@ -58,6 +58,17 @@ export class ObservabilityRunController {
     };
     this.#persist();
     return result;
+  }
+
+  sanitizeConsoleOutput(value, maximumBytes = 16 * 1024) {
+    return sanitizeBoundedConsoleOutput(
+      value,
+      {
+        repositoryRoots: this.#repositoryRoots,
+        sensitiveValues: [...this.#sensitiveValues],
+      },
+      maximumBytes
+    );
   }
 
   addSensitiveValues(values = []) {

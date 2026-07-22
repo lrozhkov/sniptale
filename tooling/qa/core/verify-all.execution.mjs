@@ -1,4 +1,4 @@
-import { collectAiLimitReport } from './ai-limit-utils.mjs';
+import { collectAiHygieneReport } from './ai-hygiene-utils.mjs';
 import { collectAuditStep, collectOptionalSecurityStep } from './full-verify-audit-steps.mjs';
 import { runDesignSystemCheck } from './verify-design-system.mjs';
 import { lintWithEslint } from './verify-eslint.mjs';
@@ -23,6 +23,7 @@ import { collectViolationSteps } from './full-verify-violation-steps.mjs';
 import { filterAllowedViolations, loadBaseline } from './shared.mjs';
 import { measureAsyncStep, measureSyncStep } from './step-timing.helpers.mjs';
 import { runSonarjsCheck } from './verify-sonarjs.mjs';
+import { runStructuralRiskCheck } from './verify-structural-risk.mjs';
 import {
   appendBuildStepOrBlock,
   appendReleaseArchiveStepOrBlock,
@@ -85,12 +86,22 @@ async function collectEslintStep(context = {}) {
     : withDuration(createOkStep('ESLint'), durationMs);
 }
 
-function collectAiLimitsStep({ baseline, codeFiles }) {
-  const { durationMs, value: aiReport } = measureSyncStep(() => collectAiLimitReport(codeFiles));
+function collectAiHygieneStep({ baseline, codeFiles }) {
+  const { durationMs, value: report } = measureSyncStep(() => collectAiHygieneReport(codeFiles));
   return withDuration(
-    createViolationStep('AI limits', 'AI limit violations found:', {
-      violations: filterAllowedViolations(aiReport.violations, baseline),
+    createViolationStep('AI hygiene', 'AI hygiene violations found:', {
+      violations: filterAllowedViolations(report.violations, baseline),
     }),
+    durationMs
+  );
+}
+
+function collectStructuralRiskStep({ codeFiles }) {
+  const { durationMs, value } = measureSyncStep(() =>
+    runStructuralRiskCheck({ files: codeFiles, reportScope: 'current-diff', enforce: true })
+  );
+  return withDuration(
+    createViolationStep('Structural risk', 'Structural risk violations found:', value),
     durationMs
   );
 }
@@ -125,7 +136,8 @@ function createDefaultCollectors() {
     collectOxlintStep,
     collectEslintStep,
     collectSonarjsReleaseStep,
-    collectAiLimitsStep,
+    collectAiHygieneStep,
+    collectStructuralRiskStep,
     collectNamingStep,
     collectViolationSteps,
     collectI18nStep: () =>
@@ -170,7 +182,8 @@ async function collectCoreStepResults(context, collectors) {
     collectors.collectOxlintStep(context),
     await collectors.collectEslintStep(context),
     ...(context.releaseMode ? [await collectors.collectSonarjsReleaseStep(context)] : []),
-    collectors.collectAiLimitsStep(context),
+    collectors.collectAiHygieneStep(context),
+    collectors.collectStructuralRiskStep(context),
     collectors.collectNamingStep(context),
     ...collectors.collectViolationSteps(context),
     collectors.collectI18nStep(context),

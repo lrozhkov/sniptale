@@ -9,9 +9,11 @@
 ## Tooling And Workflow
 
 - `AGENTS.md`, active docs, package scripts, wrappers, QA policy, and active skills teach the same workflow and product/harness split.
+- Diff-scoped structural enforcement, the four-ID advisory catalog, visible sanitized output, advisory state, validation manifest, step registry, control dispositions, and manual report-only structural-audit labeling remain synchronized.
+- No enforcement, advisory, preflight, repository evidence, dependency, or skill path reintroduces model-token limits or token-hotspot inventories. Do not run a repository-wide structural detector to establish this; inspect policy and supplied artifacts.
 - Required review follows green proof, remains independent/read-only, and receives no inherited context.
 - Baselines, allowlists, dispositions, and policy registries are narrow, justified, consumed, and validated.
-- Manual, report-only, external, optional, or skip-capable tools state their risk and do not masquerade as normal closeout gates.
+- Manual, report-only, external, optional, or skip-capable tools state their risk and do not masquerade as normal closeout gates. `qa:structural-audit` remains operator-invoked architecture maintenance outside PR, agent, closeout, and `qa:audit` flows.
 - Obsolete wrappers, scripts, migration scaffolds, path literals, and agent helpers are removed or retained only as explicit negative guards/history.
 
 ## Documentation

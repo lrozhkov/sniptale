@@ -109,7 +109,7 @@ it('reports path-sensitive registry hints for missing moved paths referenced in 
   );
 });
 
-it('reports deleted internal aggregates, thin shell drift, owner-local proof gaps, and residual seams', async () => {
+it('reports deleted internal aggregates, thin shell drift, and owner-local proof gaps', async () => {
   const root = createTempRoot('guardrail-seam-audits-');
   writeDragSeamFixture(root);
 
@@ -137,14 +137,9 @@ it('reports deleted internal aggregates, thin shell drift, owner-local proof gap
   expect(report.ownerLocalProof).toEqual(
     expect.arrayContaining([expect.stringContaining('owner-local proof may be missing')])
   );
-  expect(report.residualSeams).toEqual(
-    expect.arrayContaining([
-      expect.stringContaining('apps/extension/src/content/overlay/ai/template-list-drag.ts'),
-    ])
-  );
 });
 
-it('forecasts broad qa:build scope and related test budget risks', async () => {
+it('forecasts broad qa:build scope without test-size budgets', async () => {
   const root = createTempRoot('guardrail-build-scope-');
   writeFile(
     root,
@@ -173,9 +168,7 @@ it('forecasts broad qa:build scope and related test budget risks', async () => {
       expect.stringContaining('broad transitive scope expected'),
     ])
   );
-  expect(report.buildScopeBudgetRisks).toEqual(
-    expect.arrayContaining([expect.stringContaining('client.test.ts: 245 lines')])
-  );
+  expect(report).not.toHaveProperty('buildScopeBudgetRisks');
 });
 
 it('forecasts exact owner tests without a broad transitive warning', async () => {
@@ -238,7 +231,7 @@ it('forecasts the full-suite fallback for a deleted owner without surviving proo
   expect(report.buildScopeForecast[0]).toContain('selected unit-test scope=full-suite');
 });
 
-it('reports product proof risk checklist and changed test shape hints', async () => {
+it('reports product proof risk checklist without test-size hints', async () => {
   const root = createTempRoot('guardrail-product-proof-risk-');
   writeProductProofRiskFixture(root);
   writeFile(
@@ -265,7 +258,9 @@ it('reports product proof risk checklist and changed test shape hints', async ()
       expect.stringContaining('risk checklist: untracked tests'),
       expect.stringContaining('visual proof plan recommended'),
       expect.stringContaining('capability-loss risk'),
-      expect.stringContaining('test shape risk'),
     ])
+  );
+  expect(report.hints).not.toEqual(
+    expect.arrayContaining([expect.stringContaining('test shape risk')])
   );
 });

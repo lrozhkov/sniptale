@@ -9,7 +9,7 @@
 ## Target Shape
 
 - The current code-organization contract and supplied bounded manifest define target paths. Historical paths are evidence, not authority.
-- Major areas describe product/runtime/platform ownership. Owned seams describe independently changing flows, contracts, state authorities, UI surfaces, or effect boundaries. Roles such as `view`, `controller`, `state`, `hooks`, `types`, `utils`, and `actions` belong inside an owned seam unless the role itself is the documented stable owner.
+- Major areas describe product/runtime/platform ownership. Owned seams describe independently changing flows, contracts, state authorities, UI surfaces, or effect boundaries. Each proposed owner has an explicit change reason and remains stable under the likely next `2-3` changes. Roles such as `view`, `controller`, `state`, `hooks`, `types`, `utils`, and `actions` belong inside an owned seam unless the role itself is the documented stable owner.
 - Root entrypoints and compatibility facades stay thin and frozen. Same-name file/folder pairs require an explicit fold, index, deletion, or compatibility decision.
 - Shared residency is proven per layer. Runtime adapters, UI, effects, persistence, and authority do not become shared merely because a broad family contains reusable primitives.
 
@@ -35,7 +35,7 @@ Validate all source paths, target parents, file/directory collisions, duplicate 
 - Treat rename-only, import-only, and top-level mock-ID-only changes as mechanical only when old and new bodies prove that classification; body/assertion/factory changes remain behavioral.
 - Update mocks, type-query strings, source-reading paths, facade tests, registries, build/static-asset owners, owner maps, focused-proof targets, and policy data in the same batch.
 - Production and proof paths must resolve after the move. A surviving test is insufficient when its mapped production owner is missing or empty.
-- Do not create replacement barrels, hidden runtime backedges, broad compatibility surfaces, or new public types merely to simplify the move.
+- Do not create replacement barrels, hidden runtime backedges, broad compatibility surfaces, new public types, or neighboring helper files that preserve one broad owner merely to simplify the move or satisfy a structural metric.
 - Do not manually stage. Closeout owns staging after proof.
 
 ## Planning Bundle And Cheap Negative Proof
@@ -48,6 +48,6 @@ When harness/shared-control targets change, the main implementation thread runs 
 
 ## Review Decisions
 
-Request changes when the bundle is incomplete, the target is not a stable owner shape, the move crosses a runtime/authority boundary without an adapter/contract, rewrite mechanics are unbounded, collision/facade decisions are unresolved, dependent maps remain stale, or supplied proof does not attach to the moved owners.
+Request changes when the bundle is incomplete, the target is not a stable owner shape, proposed owners lack independent change reasons, the result is a distributed god-object, the move crosses a runtime/authority boundary without an adapter/contract, rewrite mechanics are unbounded, collision/facade decisions are unresolved, dependent maps remain stale, or supplied proof does not attach to the moved owners.
 
 Approve with comments only for explicit non-blocking residual debt outside the bounded candidate. Do not turn the review into a new root plan or require another review after mechanical cleanup unless the relevant owner, behavior, public contract, or security seam changed.

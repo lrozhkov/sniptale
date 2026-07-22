@@ -10,8 +10,9 @@ function expectAuditReportSections(report: string) {
   expect(report).toContain('Advisory scripts:\n');
   expect(report).toContain('- qa:advisory: verify-advisory.mjs\n');
   expect(report).toContain('Repo audit report tools:\n');
-  expect(report).toContain('Smell families:\n');
-  expect(report).toContain('- Hidden mutable module state: 2 hit(s) [src/shared/example.ts:1]\n');
+  expect(report).toContain(
+    '- Structural maintenance: npm run qa:structural-audit (manual-report-only)\n'
+  );
   expect(report).toContain(
     [
       '- verify-interface-surfaces.mjs:',
@@ -28,8 +29,9 @@ function createAuditReportFixture() {
       repoLocalSkills: [],
       topDirectories: [],
     },
-    hotspots: {
-      baselineAllowanceCount: 0,
+    structuralMaintenance: {
+      auditCommand: 'npm run qa:structural-audit',
+      auditMode: 'manual-report-only',
     },
     verification: {
       fullWrapperTools: [],
@@ -55,13 +57,6 @@ function createAuditReportFixture() {
       ],
       skipCapableTools: [],
     },
-    smellFamilies: [
-      {
-        family: 'Hidden mutable module state',
-        count: 2,
-        examples: ['src/shared/example.ts:1'],
-      },
-    ],
   };
 }
 

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import ts from 'typescript';
 
 import { collectCodeFiles, isExecutedAsScript, toRelativePath } from './shared.mjs';
@@ -42,16 +43,52 @@ function buildIndexRecords(files) {
   }));
 }
 
+function resolveRelativeImport(importer, specifier) {
+  if (!specifier.startsWith('.')) return null;
+  const base = path.resolve(path.dirname(importer), specifier);
+  const candidates = [
+    base,
+    `${base}.ts`,
+    `${base}.tsx`,
+    `${base}.js`,
+    `${base}.mjs`,
+    path.join(base, 'index.ts'),
+    path.join(base, 'index.tsx'),
+  ];
+  return (
+    candidates.find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile()) ??
+    null
+  );
+}
+
+export function collectBoundedImportClosure(files) {
+  const pending = files.map((file) => path.resolve(file));
+  const visited = new Set();
+  while (pending.length > 0) {
+    const filePath = pending.shift();
+    if (!filePath || visited.has(filePath) || !fs.existsSync(filePath)) continue;
+    visited.add(filePath);
+    const sourceFile = createSourceFile(filePath);
+    for (const statement of sourceFile.statements) {
+      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
+        continue;
+      const imported = resolveRelativeImport(filePath, statement.moduleSpecifier.text);
+      if (imported && !visited.has(imported)) pending.push(imported);
+    }
+  }
+  return [...visited].sort();
+}
+
 export function collectDetachedThisMethodViolations(
   files,
-  { collectIndexFiles = collectCodeFiles, indexFiles = null } = {}
+  { collectIndexFiles = collectBoundedImportClosure, indexFiles = null } = {}
 ) {
   const targetRecords = collectProductionTypeScriptRecords(files);
   if (targetRecords.length === 0) {
     return [];
   }
 
-  const allIndexFiles = indexFiles ?? collectIndexFiles();
+  const allIndexFiles = indexFiles ?? collectIndexFiles(files);
   const recordsByPath = new Map(
     targetRecords.map((record) => [toRelativePath(record.filePath), record])
   );
@@ -74,7 +111,7 @@ export function collectDetachedThisMethodViolations(
 
 export function runDetachedThisMethodCheck({
   collectFiles = collectCodeFiles,
-  collectIndexFiles = collectCodeFiles,
+  collectIndexFiles = collectBoundedImportClosure,
   files = [],
   indexFiles = null,
   scope = 'workspace',

@@ -4,6 +4,7 @@ import { collectAndPersistAdvisoryReport } from '../core/advisory-report.helpers
 import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
 import { assertDiffOnlyAdvisoryRun } from '../core/verify-advisory.state.helpers.mjs';
 import { runObservedWrapper } from './observed/runner.mjs';
+import { formatAdvisoryReport } from '../core/verify-advisory.report.helpers.mjs';
 
 export function runAdvisoryVerification({ files = [] } = {}) {
   assertDiffOnlyAdvisoryRun(files);
@@ -26,7 +27,8 @@ export function runAdvisoryWrapper({ producerRunId } = {}) {
     steps: [
       {
         ...createOkStep('Advisory report', `attention=${attentionCount}, watch=${watchCount}`),
-        stdout: `${JSON.stringify(report, null, 2)}\n`,
+        consoleOutput: formatAdvisoryReport(report),
+        advisories: report.findings,
       },
     ],
   };

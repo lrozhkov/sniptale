@@ -160,3 +160,31 @@ it('retains structured child-run evidence for a failed closeout build', () => {
   });
   expect(normalized.observation.diagnostic?.evidence).toHaveLength(1);
 });
+
+it('persists successful advisory findings as diagnostic locations', () => {
+  const normalized = normalizeObservedStep({
+    label: 'Advisory report',
+    status: 'ok',
+    detail: 'attention=0, watch=1',
+    advisories: [
+      {
+        id: 'advisory.structural-function',
+        file: 'apps/extension/src/example.ts',
+        line: 17,
+        reason: 'score=5',
+      },
+    ],
+  });
+  expect(normalized.observation).toMatchObject({
+    outcome: 'passed',
+    diagnostic: {
+      locations: [
+        {
+          file: 'apps/extension/src/example.ts',
+          line: 17,
+          message: 'advisory.structural-function: score=5',
+        },
+      ],
+    },
+  });
+});

@@ -3,7 +3,8 @@ export const RELEASE_DIRECT_STEPS = [
   ['oxlint', 'Oxlint', 'verify-oxlint.mjs'],
   ['eslint', 'ESLint', 'verify-eslint.mjs'],
   ['sonarjs', 'SonarJS', 'verify-sonarjs.mjs'],
-  ['ai-limits', 'AI limits', 'verify-ai-limits.mjs'],
+  ['ai-hygiene', 'AI hygiene', 'verify-ai-hygiene.mjs'],
+  ['structural-risk', 'Structural risk', 'verify-structural-risk.mjs'],
   ['naming', 'Naming', 'verify-naming.mjs'],
   ['i18n', 'i18n', 'verify-i18n.mjs'],
   ['design-system', 'Design system', 'verify-design-system.mjs'],
@@ -25,7 +26,8 @@ export const FOCUSED_DIRECT_STEPS = [
   ['eslint', 'ESLint', 'verify-eslint.mjs'],
   ['sonarjs', 'SonarJS', 'verify-sonarjs.mjs'],
   ['changed-line-readability', 'Changed-line readability', 'verify-line-length.mjs'],
-  ['ai-limits', 'AI limits', 'verify-ai-limits.mjs'],
+  ['ai-hygiene', 'AI hygiene', 'verify-ai-hygiene.mjs'],
+  ['structural-risk', 'Structural risk', 'verify-structural-risk.mjs'],
   ['mock-export-parity', 'Mock export parity', 'verify-manual-mock-export-parity.mjs'],
   ['security', 'Security', 'verify-security.mjs'],
   ['dead-exports', 'Dead exports', 'verify-dead-exports.mjs'],
@@ -42,7 +44,8 @@ export const HARNESS_STEPS = [
   ['oxlint', 'Oxlint', 'verify-oxlint.mjs', 'always'],
   ['eslint', 'ESLint', 'verify-eslint.mjs', 'always'],
   ['changed-line-readability', 'Changed-line readability', 'verify-line-length.mjs', 'always'],
-  ['ai-limits', 'AI limits', 'verify-ai-limits.mjs', 'always'],
+  ['ai-hygiene', 'AI hygiene', 'verify-ai-hygiene.mjs', 'always'],
+  ['structural-risk', 'Structural risk', 'verify-structural-risk.mjs', 'always'],
   [
     'qa-rule-coverage-contract',
     'QA rule coverage contract',
@@ -104,6 +107,7 @@ export const CLOSEOUT_STEPS = [
 export const CANONICAL_WRAPPER_IDS = Object.freeze([
   'qa:preflight',
   'qa:advisory',
+  'qa:structural-audit',
   'qa:checkpoint',
   'qa:closeout',
   'qa:build',
@@ -205,6 +209,17 @@ export const ADVISORY_STEPS = [
   ['advisory-report', 'Advisory report', 'verify-advisory.mjs', 'advisory'],
 ];
 
+export const STRUCTURAL_AUDIT_STEPS = [
+  [
+    'structural-audit',
+    'Structural audit',
+    'verify-structural-risk.mjs',
+    'manual',
+    'tooling/qa/wrappers/structural-audit.mjs',
+    ['qa:structural-audit'],
+  ],
+];
+
 export const AUDIT_STEPS = [
   ['full-product-coverage', 'Full product coverage', 'verify-test-coverage.mjs'],
   ['audit-evidence', 'Audit evidence report-only inventory', 'evidence.mjs'],
@@ -222,7 +237,6 @@ export const AUDIT_STEPS = [
 ];
 
 export const FULL_VIOLATION_STEP_TOOLS = new Map([
-  ['Hotspot regression', 'verify-hotspot-regression.mjs'],
   ['Architecture guardrails', 'verify-architecture-guardrails.mjs'],
   ['Boundary casts', 'verify-boundary-casts.mjs'],
   ['Boundary inputs', 'verify-boundary-inputs.mjs'],

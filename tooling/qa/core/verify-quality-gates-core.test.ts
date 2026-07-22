@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 
 import { expect, it } from 'vitest';
 
@@ -21,98 +22,28 @@ function createQualityTempRoot(prefix: string) {
   return root;
 }
 
-it('reports oversized files through verify-ai-limits', async () => {
-  const root = createQualityTempRoot('verify-ai-limits-');
-  writeFile(root, 'tooling/qa/oversized.ts', `${'const value = 1;\n'.repeat(301)}`);
-
-  const module = await withCwd(root, async () =>
-    importFresh<typeof import('./verify-ai-limits.mjs')>('./verify-ai-limits.mjs')
+it('keeps model text budgets out of active QA runtime and manifests', () => {
+  function collectFiles(root: string): string[] {
+    if (!fs.existsSync(root)) return [];
+    return fs.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+      const file = path.join(root, entry.name);
+      if (entry.isDirectory()) return collectFiles(file);
+      return /\.test\.[cm]?[jt]sx?$/u.test(file) ? [] : [file];
+    });
+  }
+  const files = [
+    'package.json',
+    'package-lock.json',
+    'eslint.config.js',
+    ...collectFiles('tooling/configs/qa'),
+    ...collectFiles('tooling/qa'),
+  ];
+  const source = files.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+  expect(source).not.toMatch(
+    /maxLogicTokens|tokenHotspots|tokenHotspotCount|topTokenHotspots|hotspot-regression-tokens|max-file-tokens|isTokenBudgetFile|TOKEN_BUDGET|tiktoken|verify-ai-limits|verify-hotspot-regression/u
   );
-
-  expect(module.runAiLimitCheck({ files: ['tooling/qa/oversized.ts'] }).violations).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        rule: 'max-file-lines',
-        file: 'tooling/qa/oversized.ts',
-      }),
-    ])
-  );
-});
-
-it('reports token-heavy files through verify-ai-limits', async () => {
-  const root = createQualityTempRoot('verify-ai-limits-');
-  writeFile(
-    root,
-    'packages/foundation/src/heavy.ts',
-    `export const payload = [${'"value",'.repeat(2500)}];\n`
-  );
-
-  const module = await withCwd(root, async () =>
-    importFresh<typeof import('./verify-ai-limits.mjs')>('./verify-ai-limits.mjs')
-  );
-
-  expect(
-    module.runAiLimitCheck({ files: ['packages/foundation/src/heavy.ts'] }).violations
-  ).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        rule: 'max-file-tokens',
-        file: 'packages/foundation/src/heavy.ts',
-      }),
-    ])
-  );
-});
-
-it('includes normalized video-editor authority paths in token budget checks', async () => {
-  const root = createQualityTempRoot('verify-video-editor-token-budget-');
-  writeFile(
-    root,
-    'apps/extension/src/video-editor/project/state/heavy.ts',
-    `export const payload = [${'"value",'.repeat(2500)}];\n`
-  );
-
-  const module = await withCwd(root, async () =>
-    importFresh<typeof import('./verify-ai-limits.mjs')>('./verify-ai-limits.mjs')
-  );
-
-  expect(
-    module.runAiLimitCheck({
-      files: ['apps/extension/src/video-editor/project/state/heavy.ts'],
-    }).violations
-  ).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        rule: 'max-file-tokens',
-        file: 'apps/extension/src/video-editor/project/state/heavy.ts',
-      }),
-    ])
-  );
-});
-
-it('includes normalized editor authority paths in token budget checks', async () => {
-  const root = createQualityTempRoot('verify-editor-token-budget-');
-  writeFile(
-    root,
-    'apps/extension/src/editor/controller/core/heavy.ts',
-    `export const payload = [${'"value",'.repeat(2500)}];\n`
-  );
-
-  const module = await withCwd(root, async () =>
-    importFresh<typeof import('./verify-ai-limits.mjs')>('./verify-ai-limits.mjs')
-  );
-
-  expect(
-    module.runAiLimitCheck({
-      files: ['apps/extension/src/editor/controller/core/heavy.ts'],
-    }).violations
-  ).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        rule: 'max-file-tokens',
-        file: 'apps/extension/src/editor/controller/core/heavy.ts',
-      }),
-    ])
-  );
+  expect(fs.existsSync('tooling/qa/core/verify-ai-limits.mjs')).toBe(false);
+  expect(fs.existsSync('tooling/qa/core/verify-hotspot-regression.mjs')).toBe(false);
 });
 
 it('passes verify-prettier for formatted files and fails for unformatted files', async () => {

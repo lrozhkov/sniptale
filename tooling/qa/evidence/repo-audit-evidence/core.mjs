@@ -1,14 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {
-  collectFileHeuristicFindings,
-  compareFindings,
-} from '../../core/verify-advisory.detectors.helpers.mjs';
-import { collectAiLimitReport } from '../../core/ai-limit-utils.mjs';
-import { runReturnedObjectSurfaceAdvisoryCheck } from '../../core/verify-interface-surfaces.return-bags.mjs';
-import { QUALITY_BASELINE_PATH } from '../../core/quality.config.mjs';
-import { collectCodeFiles, loadBaseline } from '../../core/shared.mjs';
 import { collectRepositoryProfile } from './repository-profile.mjs';
 import { collectVerificationProfile } from './verification-profile.mjs';
 
@@ -38,7 +30,12 @@ export function createSmellInventory(findings, topCount) {
   }
 
   return {
-    findings: [...findings].sort(compareFindings),
+    findings: [...findings].sort(
+      (left, right) =>
+        left.family.localeCompare(right.family) ||
+        left.file.localeCompare(right.file) ||
+        (left.line ?? 0) - (right.line ?? 0)
+    ),
     families: [...findingsByFamily.entries()]
       .map(([family, familyFindings]) => ({
         family,
@@ -55,54 +52,30 @@ export function createSmellInventory(findings, topCount) {
   };
 }
 
-function collectSmellInventory(codeFiles, topCount) {
-  const returnedBagResult = runReturnedObjectSurfaceAdvisoryCheck({ scope: 'repo-wide' });
-  return createSmellInventory(
-    [
-      ...returnedBagResult.advisories.map((advisory) => ({
-        family: 'Broad returned object surfaces',
-        file: advisory.file,
-        line: advisory.line ?? null,
-        reason: advisory.message,
-        hint: 'Split the returned controller/state bag before the next feature lands here.',
-        severity: 'attention',
-      })),
-      ...codeFiles.flatMap((file) => collectFileHeuristicFindings(file)),
-    ],
-    topCount
-  );
-}
-
 export function collectRepoAuditEvidence({ rootDir = process.cwd(), topCount = 10 } = {}) {
   const root = path.resolve(rootDir);
   const packageJson = safeReadJson(path.join(root, 'package.json'));
   const validationManifest = safeReadJson(
     path.join(root, 'tooling/configs/qa/validation-manifest.json')
   );
-  const baseline = loadBaseline();
-  const codeFiles = collectCodeFiles();
-  const aiReport = collectAiLimitReport(codeFiles);
   const { profile } = collectRepositoryProfile(root, topCount);
   const { verification, loopholes } = collectVerificationProfile(packageJson, validationManifest);
-  const smellInventory = collectSmellInventory(codeFiles, topCount);
 
   return {
     generatedAt: new Date().toISOString(),
     repository: profile,
-    hotspots: {
-      scannedCodeFiles: codeFiles.length,
-      baselineAllowanceCount: baseline.allowances.length,
-      baselinePath: QUALITY_BASELINE_PATH,
-      topLineHotspots: aiReport.lineHotspots.slice(0, topCount),
-      topTokenHotspots: aiReport.tokenHotspots.slice(0, topCount),
+    structuralMaintenance: {
+      enforcementScope: 'current-diff',
+      auditCommand: 'npm run qa:structural-audit',
+      artifact: '.tmp/structural-audit/report.json',
+      auditMode: 'manual-report-only',
     },
     verification,
     loopholes,
-    smellFindings: smellInventory.findings,
-    smellFamilies: smellInventory.families,
     recommendedAuditCommands: [
       'node tooling/qa/audits/evidence.mjs --json',
       'npm run qa:audit',
+      'npm run qa:structural-audit',
       'npm run qa:release-harness',
     ],
   };
@@ -128,7 +101,10 @@ export function printTextReport(evidence) {
     `- Scale: ${evidence.repository.trackedFileCount} tracked files (${evidence.repository.scale})\n`
   );
   process.stdout.write(`- Repo-local skills: ${evidence.repository.repoLocalSkills.length}\n`);
-  process.stdout.write(`- Baseline allowances: ${evidence.hotspots.baselineAllowanceCount}\n`);
+  const structural = evidence.structuralMaintenance;
+  process.stdout.write(
+    `- Structural maintenance: ${structural.auditCommand} (${structural.auditMode})\n`
+  );
   printWrapperCounts(evidence.verification);
   printListSection(
     'Top directories',
@@ -159,11 +135,6 @@ export function printTextReport(evidence) {
     'Repo audit report tools',
     evidence.verification.repoAuditReportDefinitions,
     (entry) => `${entry.tool}: ${entry.commands.join(' | ')}`
-  );
-  printListSection(
-    'Smell families',
-    evidence.smellFamilies ?? [],
-    (entry) => `${entry.family}: ${entry.count} hit(s) [${entry.examples.join(', ')}]`
   );
   printListSection(
     'Skip-capable tools',

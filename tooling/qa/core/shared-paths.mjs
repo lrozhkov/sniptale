@@ -7,8 +7,6 @@ import {
   FORMATTABLE_FILE_PATTERN,
   FORMATTER_EXCLUDE_PATTERNS,
   IGNORED_ROOT_SEGMENTS,
-  TOKEN_BUDGET_EXCLUDE_PATTERNS,
-  TOKEN_BUDGET_INCLUDE_PATTERNS,
   WORKSPACE_ONLY_IGNORE_PATTERNS,
 } from './quality.config.mjs';
 
@@ -52,14 +50,6 @@ export function isFormattableFile(relativePath) {
 
 export function isDataCarrierFile(relativePath) {
   return matchesAny(relativePath, DATA_FILE_PATTERNS);
-}
-
-export function isTokenBudgetFile(relativePath) {
-  return (
-    isCodeFile(relativePath) &&
-    matchesAny(relativePath, TOKEN_BUDGET_INCLUDE_PATTERNS) &&
-    !matchesAny(relativePath, TOKEN_BUDGET_EXCLUDE_PATTERNS)
-  );
 }
 
 export function readText(relativePath) {

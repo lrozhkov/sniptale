@@ -24,12 +24,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "b9697ba0889d4067b45f00076bf371c09a25d5cad7c0e3cf33c6c741912f6e93"
+      "sha256": "16829cda185f9bbf6dd4a20579e8a5d8b09df36dc80bc4bb0d9f03e6f128303f"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "b9697ba0889d4067b45f00076bf371c09a25d5cad7c0e3cf33c6c741912f6e93"
+      "sha256": "16829cda185f9bbf6dd4a20579e8a5d8b09df36dc80bc4bb0d9f03e6f128303f"
     },
     {
       "category": "bundled-font",
@@ -39,12 +39,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/control-dispositions.data.json",
-      "sha256": "765e8e1db3af837db7a5c36c2ef8148b5e0464659e867960657338c7effc3997"
+      "sha256": "723c71c70ee55db5d0c70565c715032fd2bfce7a160577c43e7df574dcfd0df5"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/control-dispositions.data.json",
-      "sha256": "765e8e1db3af837db7a5c36c2ef8148b5e0464659e867960657338c7effc3997"
+      "sha256": "723c71c70ee55db5d0c70565c715032fd2bfce7a160577c43e7df574dcfd0df5"
     },
     {
       "category": "bundled-font",
@@ -54,22 +54,22 @@
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/technical-debt.data.json",
-      "sha256": "a20c3f7229d678256b44037d80365821ffecf5276e4e2730470cce37cb50240a"
+      "sha256": "842d34ae3a0dd4ce8747b3442a2ef4d544ca948cfd37a45ddcd8a81b21775af3"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/technical-debt.data.json",
-      "sha256": "a20c3f7229d678256b44037d80365821ffecf5276e4e2730470cce37cb50240a"
+      "sha256": "842d34ae3a0dd4ce8747b3442a2ef4d544ca948cfd37a45ddcd8a81b21775af3"
     },
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "2ed54770eeee19c8d3874ae9ef0189048734cd64711cfef778f48534bb86ec76"
+      "sha256": "aff477f83e3d2de30d701c19060cee9e22029c6310abb21a07a1ac4861d771b3"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "2ed54770eeee19c8d3874ae9ef0189048734cd64711cfef778f48534bb86ec76"
+      "sha256": "aff477f83e3d2de30d701c19060cee9e22029c6310abb21a07a1ac4861d771b3"
     },
     {
       "category": "archive-integration",
@@ -79,22 +79,22 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-      "sha256": "0c9bb5bdc262117a31f22f33e9bd810e2621b8524d12e2b88e6616213c6f3119"
+      "sha256": "697bdb3bb849d15b476c8ae52d90088fc73df43aa1e7d6cdd96f85eadf6369e2"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-      "sha256": "0c9bb5bdc262117a31f22f33e9bd810e2621b8524d12e2b88e6616213c6f3119"
+      "sha256": "697bdb3bb849d15b476c8ae52d90088fc73df43aa1e7d6cdd96f85eadf6369e2"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/qa-steps/definitions.mjs",
-      "sha256": "a9990fd5ce793440b699563af9eb590e1d3edabadc0e872d028539bbb8ea419c"
+      "sha256": "c46032a1920384c4acbd35442bd041d6ade32941a1c4349e48454b970d38d6e9"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/qa-steps/policy/domain-labels.mjs",
-      "sha256": "cb453f6304458d54b0003b0e11f8e77d3fec4acd8b764bc5ea18b221b839ad9f"
+      "sha256": "c436a59e6bbc7efa2d92ee1f9e86d887b1805ed457d9ff6028f05d327d2afa5d"
     },
     {
       "category": "archive-integration",

@@ -17,13 +17,13 @@ Run as an independent read-only agent without inherited context. Receive the exp
 
 Read `AGENTS.md`, `docs/architecture/repository-overview.md`, `docs/engineering/implementation-rules.md`, `docs/security/data-handling.md`, `docs/tooling/code-quality.md`, `docs/tooling/wrapper-summary.md`, and the required checklist. Historical documents are evidence, never current authority.
 
-Build an evidence map from source, active documentation, package scripts, wrappers, QA policy data, and supplied output. QA validation manifests live under `tooling/configs/qa/validation-manifest.json`; the legacy core location is not authoritative.
+Build an evidence map from source, active documentation, package scripts, wrappers, QA policy data, and supplied output. QA validation manifests live under `tooling/configs/qa/validation-manifest.json`; the legacy core location is not authoritative. Audit structural/advisory policy drift across source, catalogs, lanes, manifests, and active guidance, but do not launch a repository-wide structural detector or collect model-token/token-hotspot inventories. A separately supplied manual `qa:structural-audit` artifact is report-only maintenance evidence, never whole-repository acceptance proof.
 
 For final whole-repository acceptance, require supplied green `qa:audit` followed by green `qa:e2e`; run the Repo Audit review after both so its verdict is the last acceptance action.
 
 ## Analysis-Only Rules
 
-- Do not edit files or run `npm`, QA wrappers, formatters, linters, code generation, automated rewrites, staging, or destructive commands.
+- Do not edit files or run `npm`, QA wrappers, structural detectors, formatters, linters, code generation, automated rewrites, staging, or destructive commands.
 - Do not request blanket reruns or proof-receipt hashes when relevant supplied proof is green.
 - State evidence paths, label inference, and distinguish unverified areas from findings.
 

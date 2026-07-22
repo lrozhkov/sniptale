@@ -1,83 +1,45 @@
 import { HARNESS_QA_GUIDANCE } from '../core/qa-scope.mjs';
 
-function formatList(values, emptyText) {
-  if (values.length === 0) {
-    return [emptyText];
-  }
-
-  return values.map((value) => `- ${value}`);
+function formatList(values, emptyText = 'none') {
+  return values.length === 0 ? [emptyText] : values.map((value) => `- ${value}`);
 }
 
 function formatAdvisoryFindings(findings) {
-  if (findings.length === 0) {
-    return ['none'];
-  }
-
-  return findings.map((finding) => {
-    const line = finding.line == null ? '' : `:${finding.line}`;
-    return `- ${finding.file}${line} ${finding.family}: ${finding.reason}`;
-  });
+  const attention = findings.filter((finding) => finding.severity === 'attention').length;
+  const watch = findings.length - attention;
+  return findings.length === 0
+    ? ['attention=0, watch=0']
+    : [
+        `attention=${attention}, watch=${watch}`,
+        ...findings.map((finding) => {
+          const line = finding.line == null ? '' : `:${finding.line}`;
+          return `- ${finding.file}${line} [${finding.id}] ${finding.reason}`;
+        }),
+      ];
 }
 
-function formatPreflightHints(guardrailReport) {
-  return formatList(
-    [
-      ...guardrailReport.hints,
-      ...guardrailReport.residualSeams,
-      ...guardrailReport.deletedInternalAggregates,
-      ...guardrailReport.thinShells,
-      ...guardrailReport.falsePublicSeams,
-      ...guardrailReport.pathAudits,
-    ],
-    'none'
-  );
-}
-
-function collectTargetLines(context) {
+function collectScopeLines(context) {
   return [
+    `Mode: ${context.mode ?? (context.fingerprint ? 'current-diff' : 'explicit-files')}`,
     `Target files (${context.targetFiles.length}):`,
-    ...formatList(context.targetFiles, 'none'),
-    '',
+    ...formatList(context.targetFiles),
     `Excluded harness files (${(context.harnessTargetFiles ?? []).length}):`,
-    ...formatList(context.harnessTargetFiles ?? [], 'none'),
+    ...formatList(context.harnessTargetFiles ?? []),
     ...(context.targetFiles.length === 0 && (context.harnessTargetFiles ?? []).length > 0
-      ? ['', `No product targets detected; ${HARNESS_QA_GUIDANCE}.`]
+      ? [`No product targets detected; ${HARNESS_QA_GUIDANCE}.`]
       : []),
   ];
 }
 
 function collectContractLines(report) {
-  return [
-    'Contract checklist:',
-    ...formatList(report.contractChecklist ?? [], 'not required for current targets'),
-    '',
-    'Transitive consumers:',
-    ...formatList(report.transitiveConsumerHints ?? [], 'none'),
-    '',
-    'Likely typecheck blast radius:',
-    ...formatList(report.typecheckBlastRadius ?? [], 'none'),
-    '',
-    'Target test size warnings:',
-    ...formatList(report.targetTestSizeWarnings ?? [], 'none'),
+  const lines = [
+    ...(report.contractChecklist ?? []),
+    ...(report.transitiveConsumerHints ?? []),
+    ...(report.typecheckBlastRadius ?? []),
   ];
-}
-
-function collectGuardrailLines(report, guardrailReport) {
-  const budgetRisks = report.budgetRisks ?? [];
-  const buildScopeBudgetRisks = guardrailReport.buildScopeBudgetRisks ?? [];
-  const buildScopeForecast = guardrailReport.buildScopeForecast ?? [];
   return [
-    'Topology first questions:',
-    ...formatList(guardrailReport.topologyQuestions ?? [], 'none'),
-    '',
-    'Preflight hints:',
-    ...formatPreflightHints(guardrailReport),
-    '',
-    'Budget signals:',
-    ...formatList([...budgetRisks, ...buildScopeBudgetRisks], 'none'),
-    '',
-    'Build scope forecast:',
-    ...formatList(buildScopeForecast, 'none'),
+    'Contracts and consumers:',
+    ...formatList([...new Set(lines)], 'not required for current targets'),
   ];
 }
 
@@ -85,22 +47,27 @@ export function collectPreflightReportLines(report, context, guardrailReport) {
   return [
     'QA preflight: read-only context',
     '',
-    ...collectTargetLines(context),
+    'Scope:',
+    ...collectScopeLines(context),
+    '',
+    'Owner/runtime:',
+    ...formatList(report.ownerRuntime ?? []),
     '',
     'Relevant docs:',
-    ...formatList(report.relevantDocs, 'none'),
+    ...formatList(report.relevantDocs),
     '',
-    'Seam clusters:',
-    ...formatList(guardrailReport.clusters, 'none'),
+    'Structural pressure:',
+    ...formatList(report.structuralPressure ?? []),
     '',
     ...collectContractLines(report),
     '',
-    ...collectGuardrailLines(report, guardrailReport),
+    'Proof:',
+    ...formatList([...new Set(report.proofHints)]),
     '',
-    'Advisory findings:',
-    ...formatAdvisoryFindings(report.advisoryFindings),
+    'Build forecast:',
+    ...formatList([...new Set(guardrailReport.buildScopeForecast ?? [])]),
     '',
-    'Likely proof:',
-    ...formatList(report.proofHints, 'none'),
+    'Advisory:',
+    ...formatAdvisoryFindings(report.advisoryFindings ?? []),
   ];
 }

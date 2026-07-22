@@ -28,11 +28,8 @@ const OXLINT_IGNORED_ROOT_SEGMENTS = new Set([
 export const DEFAULT_OXLINT_ROOTS = DEFAULT_SCAN_ROOTS;
 export const BASE_OXLINT_ARGS = ['--react-plugin', '--vitest-plugin', '--jsx-a11y-plugin'];
 
-export const OXLINT_SIZE_RULE_ARGS = ['-D', 'max-lines', '-D', 'max-lines-per-function'];
-
 export const STRICT_OXLINT_ARGS = [
   ...BASE_OXLINT_ARGS,
-  ...OXLINT_SIZE_RULE_ARGS,
   '-D',
   'exhaustive-deps',
   '-D',
@@ -114,25 +111,15 @@ export function collectOxlintFiles(files = []) {
   return [...new Set(result)].sort();
 }
 
-export function createOxlintArgs(targetFiles, { quiet = true, sizeRules = true } = {}) {
-  const args = [
-    ...(sizeRules ? STRICT_OXLINT_ARGS : BASE_OXLINT_ARGS),
-    '--format',
-    'unix',
-    ...targetFiles,
-  ];
+export function createOxlintArgs(targetFiles, { quiet = true } = {}) {
+  const args = [...STRICT_OXLINT_ARGS, '--format', 'unix', ...targetFiles];
   if (quiet) {
     args.push('--quiet');
   }
   return args;
 }
 
-export function runOxlint({
-  files = [],
-  quiet = true,
-  sizeRules = true,
-  commandRunner = runRepoNodeEntry,
-} = {}) {
+export function runOxlint({ files = [], quiet = true, commandRunner = runRepoNodeEntry } = {}) {
   const targetFiles = collectOxlintFiles(files);
   if (targetFiles.length === 0) {
     return {
@@ -145,7 +132,7 @@ export function runOxlint({
     skipped: false,
     step: createProcessStep(
       'Oxlint',
-      commandRunner(OXLINT_ENTRY, createOxlintArgs(targetFiles, { quiet, sizeRules }), {
+      commandRunner(OXLINT_ENTRY, createOxlintArgs(targetFiles, { quiet }), {
         stdio: 'pipe',
       })
     ),

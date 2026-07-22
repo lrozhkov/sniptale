@@ -49,6 +49,11 @@ export function recordObservedResult(session, result, verbose, contract) {
     skipped: result.skipped ?? false,
   });
   for (const step of steps) {
+    if (step.consoleOutput) {
+      const consoleOutput = session.sanitizeConsoleOutput(step.consoleOutput);
+      process.stdout.write(consoleOutput.endsWith('\n') ? consoleOutput : `${consoleOutput}\n`);
+      session.writeLog(`[${step.label}.console]\n${consoleOutput}\n`);
+    }
     const normalized = normalizeObservedStep(step);
     session.addStep(normalized.observation);
     if (verbose) process.stdout.write(normalized.observation.log);

@@ -1,4 +1,4 @@
-import { collectAiLimitReport } from './ai-limit-utils.mjs';
+import { collectAiHygieneReport } from './ai-hygiene-utils.mjs';
 import { retiredControlErrors } from './retired-controls/validation.mjs';
 import { runQaControlCheck } from './verify-qa-controls.mjs';
 import { verifyTechnicalDebtReport } from './technical-debt-report.mjs';
@@ -21,6 +21,7 @@ import { runUnitTests } from './verify-unit-tests.mjs';
 import { expandRelatedTestScope } from './unit-test-plan.mjs';
 import { runDependencyAdmissionCheck } from '../guards/security/verify-dependency-admission.mjs';
 import { collectRuntimeListenerStep } from './verify-harness.runtime-listener-step.mjs';
+import { runStructuralRiskCheck } from './verify-structural-risk.mjs';
 
 const HARNESS_MAX_WORKERS = 6;
 
@@ -57,20 +58,33 @@ function collectLineLengthStep(context) {
   );
 }
 
-function collectAiLimitsStep(context, baseline) {
+function collectAiHygieneStep(context, baseline) {
   const codeFiles = context.qualityCodeFiles ?? context.codeFiles;
   const { durationMs, value } = measureSyncStep(() =>
     codeFiles.length === 0
       ? { skipped: true, violations: [] }
       : {
           skipped: false,
-          violations: filterAllowedViolations(collectAiLimitReport(codeFiles).violations, baseline),
+          violations: filterAllowedViolations(
+            collectAiHygieneReport(codeFiles).violations,
+            baseline
+          ),
         }
   );
   return {
-    ...createViolationStep('AI limits', 'AI limit violations found:', value),
+    ...createViolationStep('AI hygiene', 'AI hygiene violations found:', value),
     durationMs,
   };
+}
+
+function collectStructuralRiskStep(context) {
+  return collectMeasuredViolationStep('Structural risk', 'Structural risk violations found:', () =>
+    runStructuralRiskCheck({
+      files: context.qualityCodeFiles ?? context.codeFiles,
+      reportScope: 'current-diff',
+      enforce: true,
+    })
+  );
 }
 
 function collectQaRuleCoverageContractStep(context) {
@@ -183,7 +197,8 @@ export async function collectHarnessStepResults({
       runOxlint({ files: nextContext.qualityJsLikeFiles ?? nextContext.jsLikeFiles }).step,
     collectEslintStep,
     collectLineLengthStep,
-    collectAiLimitsStep,
+    collectAiHygieneStep,
+    collectStructuralRiskStep,
     collectQaRuleCoverageContractStep,
     collectQaControlStep,
     collectTechnicalDebtStep,
@@ -204,7 +219,8 @@ export async function collectHarnessStepResults({
     resolvedCollectors.collectOxlintStep(context),
     await resolvedCollectors.collectEslintStep(context),
     resolvedCollectors.collectLineLengthStep(context),
-    resolvedCollectors.collectAiLimitsStep(context, baseline),
+    resolvedCollectors.collectAiHygieneStep(context, baseline),
+    resolvedCollectors.collectStructuralRiskStep(context),
     resolvedCollectors.collectQaRuleCoverageContractStep(context),
     resolvedCollectors.collectQaControlStep(),
     resolvedCollectors.collectTechnicalDebtStep(),

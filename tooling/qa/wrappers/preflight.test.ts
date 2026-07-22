@@ -135,14 +135,17 @@ it('renders no-product-target guidance for harness-only preflight', async () => 
     guardrailReport: {
       clusters: [],
       hints: [],
-      residualSeams: [],
       deletedInternalAggregates: [],
       thinShells: [],
       ownerLocalProof: [],
       falsePublicSeams: [],
       pathAudits: [],
     },
-    budgetRisks: [],
+    ownerRuntime: [],
+    structuralPressure: [],
+    contractChecklist: [],
+    transitiveConsumerHints: [],
+    typecheckBlastRadius: [],
     advisoryFindings: [],
     proofHints: [],
   });
@@ -190,20 +193,18 @@ it('renders contract checklist, consumer hints, and typecheck blast radius for b
   });
   const output = (await import('./preflight.mjs')).renderPreflightReport(result);
 
-  expect(output).toContain('Contract checklist:');
+  expect(output).toContain('Contracts and consumers:');
   expect(output).toContain('owner seam / boundary');
-  expect(output).toContain('Transitive consumers:');
   expect(output).toContain('messaging contracts: check runtime route maps');
-  expect(output).toContain('Likely typecheck blast radius:');
   expect(output).toContain('messaging contracts can fan out');
 });
 
-it('warns when target tests are near the file-size split threshold', async () => {
+it('uses the test structural profile instead of file-size warnings', async () => {
   const root = createTempRoot('qa-preflight-target-test-size-');
   writeFile(
     root,
     'apps/extension/src/editor/document/file-actions/import-session.test.ts',
-    `${'it.todo("x");\n'.repeat(280)}`
+    `it('covers a cohesive fixture', () => {\n${'expect(true).toBe(true);\n'.repeat(135)}});\n`
   );
 
   const result = await withCwd(root, async () => {
@@ -216,12 +217,13 @@ it('warns when target tests are near the file-size split threshold', async () =>
     });
   });
 
-  expect(result.targetTestSizeWarnings).toEqual([
-    expect.stringContaining('split boundary/roundtrip/fixture cases owner-locally'),
-  ]);
+  expect(result.structuralReport.functions[0]).toEqual(
+    expect.objectContaining({ profile: 'test' })
+  );
+  expect(result).not.toHaveProperty('targetTestSizeWarnings');
 });
 
-it('does not route markdown docs through code budget risk checks', async () => {
+it('does not route markdown docs through structural analysis', async () => {
   const root = createTempRoot('qa-preflight-docs-');
   initGitRepo(root);
   writeFile(root, 'package.json', '{"name":"qa-preflight-docs-temp"}\n');
@@ -240,5 +242,6 @@ it('does not route markdown docs through code budget risk checks', async () => {
   });
 
   expect(result.context.codeFiles).toEqual([]);
-  expect(result.budgetRisks).toEqual([]);
+  expect(result.structuralPressure).toEqual([]);
+  expect(result.structuralReport.files).toEqual([]);
 });

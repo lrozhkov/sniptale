@@ -47,44 +47,25 @@ it('discovers changed tracked and untracked files for advisory runs', async () =
   expect(result.untrackedFiles).toEqual(['untracked.ts']);
 });
 
-it('collects returned-bag, singleton, mutable-state, and props-builder advisory findings', async () => {
+it('replaces legacy smell collectors with the machine-owned structural catalog', async () => {
   const root = createStructuralAdvisoryFixtureRoot();
   const findings = await collectAdvisoryFindings(root, [
     'src/shared/example-service.ts',
     'apps/extension/src/editor/workspace/panel/controller.tsx',
   ]);
 
-  expect(findings).toEqual(
+  expect(findings.every((finding) => finding.id.startsWith('advisory.'))).toBe(true);
+  expect(findings.map((finding) => finding.family)).not.toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ family: 'Shared singleton/service roots' }),
-      expect.objectContaining({ family: 'Hidden mutable module state' }),
-      expect.objectContaining({ family: 'Hidden mutable module state' }),
-      expect.objectContaining({ family: 'Hidden mutable module state' }),
-      expect.objectContaining({ family: 'Broad returned object surfaces' }),
-      expect.objectContaining({ family: 'Props-builder proliferation' }),
+      'Shared singleton/service roots',
+      'Hidden mutable module state',
+      'Broad returned object surfaces',
+      'Props-builder proliferation',
     ])
-  );
-  expect(
-    findings.filter(
-      (finding) =>
-        finding.family === 'Hidden mutable module state' && /SESSION_LABELS/u.test(finding.reason)
-    )
-  ).toHaveLength(1);
-  expect(
-    findings.filter((finding) => finding.family === 'Shared singleton/service roots')
-  ).toHaveLength(1);
-  expect(
-    findings.filter(
-      (finding) =>
-        finding.family === 'Hidden mutable module state' && /STATIC_REGISTRY/u.test(finding.reason)
-    )
-  ).toHaveLength(0);
-  expect(findings.filter((finding) => finding.file === 'src/shared/example-service.ts')).toEqual(
-    expect.arrayContaining([expect.objectContaining({ severity: 'attention' })])
   );
 });
 
-it('collects orchestration, read-path drift, transport catalog, and stateful flow advisory findings', async () => {
+it('does not duplicate blocking lifecycle/read-path guards in advisory', async () => {
   const root = createRuntimeAdvisoryFixtureRoot();
   const findings = await collectAdvisoryFindings(root, [
     'apps/extension/src/content/hooks/example-controller.ts',
@@ -93,24 +74,14 @@ it('collects orchestration, read-path drift, transport catalog, and stateful flo
     'apps/extension/src/popup/shell/runtime/state.ts',
   ]);
 
-  expect(findings).toEqual(
+  expect(findings.map((finding) => finding.family)).not.toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ family: 'Hidden orchestration in helpers/controllers' }),
-      expect.objectContaining({ family: 'Read-path compat / normalization drift' }),
-      expect.objectContaining({ family: 'Transport/command catalog pressure' }),
-      expect.objectContaining({ family: 'Misleading read-safe / bootstrap naming' }),
-      expect.objectContaining({ family: 'Lifecycle intent loss in reconnect/retry seams' }),
-      expect.objectContaining({ family: 'Destructive async swap risk' }),
-      expect.objectContaining({ family: 'Success/failure asymmetry' }),
+      'Read-path compat / normalization drift',
+      'Lifecycle intent loss in reconnect/retry seams',
+      'Destructive async swap risk',
+      'Success/failure asymmetry',
     ])
   );
-  expect(findings.filter((finding) => finding.family === 'Success/failure asymmetry')).toHaveLength(
-    1
-  );
-  expect(
-    findings.filter((finding) => finding.family === 'Destructive async swap risk')
-  ).toHaveLength(1);
-  expect(findings.find((finding) => /restartRecording/u.test(finding.reason))).toBeUndefined();
 });
 
 it('collects detached this-sensitive method findings from the current diff only', async () => {
@@ -120,7 +91,7 @@ it('collects detached this-sensitive method findings from the current diff only'
   expect(findings).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
-        family: 'Detached this-sensitive methods',
+        id: 'advisory.detached-this-method',
         file: 'apps/extension/src/popup/use-service.ts',
         severity: 'attention',
       }),
@@ -145,9 +116,8 @@ it('flags broad UI diffs that risk capability loss without a proof matrix', asyn
 
   expect(findings).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ family: 'Wide UI diff without proof matrix' }),
-      expect.objectContaining({ family: 'UI visual proof plan' }),
-      expect.objectContaining({ family: 'Capability loss risk' }),
+      expect.objectContaining({ id: 'advisory.ui-proof-gap', severity: 'attention' }),
+      expect.objectContaining({ id: 'advisory.ui-proof-gap', severity: 'watch' }),
     ])
   );
 });
@@ -160,7 +130,7 @@ it('includes web-snapshot-viewer in UI advisory proof planning', async () => {
   const findings = await collectAdvisoryFindings(root, [uiFile]);
 
   expect(findings).toEqual(
-    expect.arrayContaining([expect.objectContaining({ family: 'UI visual proof plan' })])
+    expect.arrayContaining([expect.objectContaining({ id: 'advisory.ui-proof-gap' })])
   );
 });
 
@@ -185,16 +155,6 @@ it('prints advisory check coverage so the wrapper explains what it inspects', as
   });
 
   module.printAdvisoryReport({
-    preflightReport: {
-      clusters: [],
-      residualSeams: [],
-      hints: [],
-      deletedInternalAggregates: [],
-      thinShells: [],
-      ownerLocalProof: [],
-      falsePublicSeams: [],
-      pathAudits: [],
-    },
     findings: [],
   });
 
@@ -202,13 +162,23 @@ it('prints advisory check coverage so the wrapper explains what it inspects', as
 
   const output = stdoutChunks.join('');
   expect(output).toContain('Advisory checks:');
-  expect(output).toContain('preflight structural hints');
-  expect(output).toContain('broad returned object surfaces');
-  expect(output).toContain('transport/command catalog pressure');
-  expect(output).toContain('misleading read-safe / bootstrap naming');
-  expect(output).toContain('destructive async swap risk');
+  expect(output).toContain('structural file pressure');
+  expect(output).toContain('structural function pressure');
+  expect(output).toContain('UI proof gaps');
   expect(output).toContain('detached this-sensitive method references');
-  expect(output).toContain('wide UI diffs without proof matrix');
-  expect(output).toContain('capability loss risk in command/toolbars');
-  expect(output).toContain('Advisory heuristics: no smell hits in current diff');
+  expect(output).toContain('Advisory: attention=0, watch=0');
+});
+
+it('keeps the advisory catalog exact and separate from blocking guard IDs', async () => {
+  const { ADVISORY_CATALOG } = await import('./advisory-catalog.data.mjs');
+  const { QA_RULE_DEFINITIONS } = await import('./qa-steps/definitions.mjs');
+  expect(Object.keys(ADVISORY_CATALOG).sort()).toEqual([
+    'advisory.detached-this-method',
+    'advisory.structural-file',
+    'advisory.structural-function',
+    'advisory.ui-proof-gap',
+  ]);
+  expect(QA_RULE_DEFINITIONS.map(({ id }) => id)).not.toEqual(
+    expect.arrayContaining(Object.keys(ADVISORY_CATALOG))
+  );
 });

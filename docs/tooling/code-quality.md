@@ -1,6 +1,6 @@
 # Code Quality
 
-Updated: 2026-07-16
+Updated: 2026-07-22
 
 This document owns the Sniptale quality model, guard families, baseline policy, and the boundary between deterministic enforcement and review judgment. Workflow belongs in [AGENTS.md](../../AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md), and command lookup in [operator-handbook.md](operator-handbook.md).
 
@@ -30,7 +30,8 @@ The machine authority is source and policy, not prose. This mapping identifies t
 | Manifest permissions | `tooling/configs/qa/manifest-permissions.data.json`, `tooling/qa/guards/architecture/verify-manifest-permissions.mjs` |
 | Browser, messaging, storage, and security ownership | `tooling/qa/policy/**`, `tooling/configs/qa/security-*-ownership.data.json`, `tooling/qa/guards/security/**` |
 | Product identity retirement | `tooling/qa/core/verify-sniptale-identity.mjs`, `tooling/release/artifact-security-identity.mjs` |
-| Readability, naming, suppression, logging, and shape | `tooling/qa/core/quality.config.mjs`, `tooling/qa/guards/quality/**`, focused verifier definitions |
+| Structural risk and allowances | `tooling/qa/core/structural-risk/**`, `tooling/qa/core/verify-structural-risk.mjs`, `tooling/configs/qa/structural-risk-allowances.data.json` |
+| Readability, AI hygiene, naming, suppression, and logging | `tooling/qa/core/quality.config.mjs`, `tooling/qa/core/verify-ai-hygiene.mjs`, `tooling/qa/guards/quality/**`, focused verifier definitions |
 | Coverage rollout, unit-test profiles, and thresholds | `tooling/qa/core/verify-test-coverage.registry.mjs`, `tooling/qa/core/verify-test-coverage.thresholds.mjs`, `tooling/qa/core/verify-build.test-profiles.mjs`, focused owner maps |
 | Audit requiredness and structured skips | `tooling/configs/qa/audit-profiles.data.json`, `tooling/qa/audits/profiles/**` |
 | Baselines, exceptions, and technical debt | `tooling/configs/qa/*baseline*`, `tooling/configs/qa/technical-debt.data.json`, owner-specific policy registries |
@@ -41,9 +42,21 @@ The machine authority is source and policy, not prose. This mapping identifies t
 
 ### Static Correctness And Readability
 
-The enforced floor includes TypeScript/module hygiene, Oxlint, the type-aware ESLint subset, curated SonarJS correctness rules, formatting of supported non-Markdown files, changed-line readability, function/test/file pressure, naming, suppression bans, canonical logging, dead-export fallout, and cycle checks. Tests are not exempt.
+The enforced floor includes TypeScript/module hygiene, Oxlint, the type-aware ESLint subset, curated SonarJS correctness rules, formatting of supported non-Markdown files, changed-line readability, diff-scoped structural pressure, AI hygiene, naming, suppression bans, canonical logging, dead-export fallout, and cycle checks. Tests are not exempt, but their structural profile reflects their different role.
 
 Metrics are signals, not architecture boundaries. A file below a limit may still have the wrong owner, and a line-count extraction is incomplete when the same public contract or hidden seam remains.
+
+### Diff-Scoped Structural Risk
+
+Structural enforcement receives only behaviorally changed tracked or untracked code files. It reads each selected file's complete current AST and, for existing files, its `HEAD` shape. Unchanged, import-only, mock-only, and rename-only files do not become candidates. There is no repository-wide enforcement mode.
+
+File pressure combines physical lines with external owner groups and edges, exports, effect families, state authorities, effectful clusters, and cohesion. Function pressure uses role profiles for tests, generated/data code, registered entrypoints/facades/routes, React components/hooks, proven pure parser/algorithm/reducer functions, adapters, registered orchestration owners, and default functions. The detector scores length, statements, cyclomatic/cognitive/nesting/recovery pressure, parameters, effects, state, ownership, and cohesion. Effects are interpreted by layer: adapters tolerate narrow platform calls, cohesive workflow/application orchestration is bounded, and UI owners are strict.
+
+Absolute high scores do not by themselves fail a pre-existing cohesive orchestration owner. The exemption requires machine registration, high cohesion, no UI effects, bounded branching/nesting, and narrow ownership. Hard caps or disqualifying behavior still fail. For existing files and functions, structural delta is explicit: `+0..2` is accepted or reported as legacy pressure, `+3..5` is advisory, and `>5` fails; newly crossed or worsened hard caps fail. New files and functions use the absolute policy.
+
+Changed ordinary lines have a `120` hard limit. Module specifiers have a `200` limit; classified URL, regex, hash/signature, protocol, and snapshot literals have a `240` limit; exactly classified generated/data/fixture files have a `1000` limit. Structural allowances are hash-locked to normalized AST bodies and symbol signatures and carry owner, reason, removal condition, and review date. Inline suppression is not allowed.
+
+Model token counts, token hotspots, and text-token budgets are not quality signals and are not collected in enforcement, advisory, preflight, or audit evidence. AI hygiene covers dead comments and classified oversized literals only.
 
 ### Architecture And Ownership
 
@@ -66,8 +79,8 @@ Focused proof follows explicit owner mappings and the current diff. Closeout may
 The following remain required implementation/review judgment where current automation cannot detect them reliably without excessive noise:
 
 - whether a topology is stable for the likely next `2-3` seam expansions
-- whether a controller/state/props surface mixes independent authorities despite staying under size limits
-- whether an extraction is a mechanical split that preserves the same broad contract
+- whether a controller/state/props surface mixes independent authorities despite a moderate structural score
+- whether an extraction is a mechanical or distributed split that preserves the same broad contract
 - whether shared residency is genuinely cross-runtime or merely a nested runtime-specific owner
 - whether generic helpers conceal meaningful multi-transport, persistence, or authorization orchestration beyond current structural matchers
 - whether failure, rollback, compensation, or user-visible degradation is complete for the product semantics
@@ -90,6 +103,8 @@ The canonical general baseline is `tooling/configs/qa/quality-baseline.json` and
 Every exception needs a rule/control identity, exact target scope, owner, reason, risk, removal action/condition, and review date where its schema supports one. Baseline growth is a policy change, not ordinary implementation fallout. Inline suppression directives are not a local exception mechanism.
 
 Audit-tool baselines remain bounded by their own policy owners. A jscpd debt entry additionally freezes criteria, negative cases, and non-goals in its registry record. The scan remains audit-only: `qa:audit` deletes the previous report before execution, writes a fresh report, and validates exact baseline/registry scope and stale removal. Fast checkpoint and closeout wrappers do not run jscpd. Report-only or optional engines must emit explicit status and skip reasons; unavailable external tooling must not be confused with a green result.
+
+`qa:structural-audit` is a separate manual, report-only architecture-maintenance lane. It may enumerate repository code and writes a bounded sanitized snapshot, but findings never become a PR gate and agents do not run it as routine implementation proof. It does not collect token inventories and is not part of `qa:audit`.
 
 Heavy lifecycle tools stay in their owning lanes: repository audit in `qa:audit`, build and release archive checks in `qa:build`/closeout. Their source changes are not focused blind spots: `qa:release-harness` selects exact adjacent owner tests for `verify-audit.mjs`, `verify-build.mjs`, `package-dist.mjs`, and `verify-architecture-guardrails.mjs`. Do not pull the full lifecycle operation into checkpoint to prove an implementation-only diff.
 

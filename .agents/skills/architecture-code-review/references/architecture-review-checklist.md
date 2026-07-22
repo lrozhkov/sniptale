@@ -11,7 +11,8 @@
 
 - Runtime folders do not import each other directly. Cross-runtime reuse uses `@sniptale/*` packages, typed contracts, browser adapters, messaging, persistence, i18n, theme, and reusable UI owners.
 - Entrypoints, page shells, app shells, and public facades stay thin. Runtime route, authorization-policy, and drift registries stay aligned.
-- Paths own domains and filenames own roles. A split must reduce real owner complexity rather than move the same broad contract into neighboring files.
+- Paths own domains and filenames own roles. A split must reduce real owner complexity rather than move the same broad contract, state authority, or effect surface into neighboring files as a distributed god-object.
+- Structural pressure is interpreted with ownership and cohesion. A registered transaction/workflow owner may legitimately coordinate validation, commit, rollback, publication, state, and effects through narrow adapters; flag it only when responsibilities cross domains, UI authority leaks in, or arbitrary branching erodes the boundary.
 - Shared placement is proven by consumer symmetry. Runtime-specific UI, controller, effect, storage, or authority concerns remain with their runtime owner or behind a narrow shared contract and runtime adapter.
 
 ## Contracts And Boundaries
@@ -42,4 +43,4 @@
 - UI lifecycle, parser, messaging, and persistence changes cover applicable failure, duplicate, replay, stale-result, rollback, and restore cases.
 - Repeated low-noise review findings should graduate into advisory inventory or deterministic gates with narrow owner-named policy.
 
-Request changes for runtime-boundary bypass, dual authority, write-on-read repair, stale overwrite risk, unsafe public/parser widening, generic hidden multi-transport orchestration, failure-prone success-only proof, or a mechanical split that preserves the same broad owner contract.
+Request changes for runtime-boundary bypass, dual authority, write-on-read repair, stale overwrite risk, unsafe public/parser widening, generic hidden multi-transport orchestration, failure-prone success-only proof, or a mechanical/distributed split that preserves the same broad owner contract.

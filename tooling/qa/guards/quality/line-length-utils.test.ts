@@ -52,7 +52,7 @@ describe('collectLineLengthViolations changed-line scope', () => {
 });
 
 describe('collectLineLengthViolations module specifier policy', () => {
-  it('ignores unbreakable static module specifiers but still checks executable strings', () => {
+  it('allows module specifiers up to 200 and still checks executable strings at 120', () => {
     const longModulePath = `../../../${'nested-owner/'.repeat(10)}module`;
     const violations = collectLineLengthViolations(
       'tooling/test/support/example.ts',
@@ -71,6 +71,21 @@ describe('collectLineLengthViolations module specifier policy', () => {
         rule: 'max-line-length',
       }),
     ]);
+  });
+
+  it('reports module specifiers beyond 200', () => {
+    const specifier = `../../${'long-owner/'.repeat(20)}module`;
+    expect(
+      collectLineLengthViolations('tooling/example.ts', [`import value from '${specifier}';`])
+    ).toEqual([expect.objectContaining({ message: expect.stringContaining('limit 200') })]);
+  });
+
+  it('applies the module-specifier limit to dynamic imports', () => {
+    const modulePath = `@sniptale/${'owner/'.repeat(20)}entrypoint`;
+    const line = `const owner = await import('${modulePath}');`;
+    expect(line.length).toBeGreaterThan(120);
+    expect(line.length).toBeLessThanOrEqual(200);
+    expect(collectLineLengthViolations('apps/extension/src/example.ts', [line])).toEqual([]);
   });
 });
 
@@ -92,7 +107,7 @@ describe('collectLineLengthViolations file policies', () => {
     });
   });
 
-  it('ignores data-carrier files even when changed lines are long', () => {
+  it('allows classified data carriers up to 1000', () => {
     const violations = collectLineLengthViolations(
       'apps/extension/src/platform/i18n/messages/content/runtime.data.ts',
       [buildLongLine(160)],
@@ -102,5 +117,24 @@ describe('collectLineLengthViolations file policies', () => {
     );
 
     expect(violations).toEqual([]);
+  });
+
+  it('reports classified data carrier lines beyond 1000', () => {
+    const violations = collectLineLengthViolations('tooling/test/fixtures/catalog.data.ts', [
+      buildLongLine(1001),
+    ]);
+    expect(violations[0]).toEqual(
+      expect.objectContaining({ message: expect.stringContaining('limit 1000') })
+    );
+  });
+
+  it('allows URL, regex, hash, protocol, and snapshot literals only up to 240', () => {
+    const lines = [
+      `const url = 'https://example.test/${'x'.repeat(190)}';`,
+      `const hash = '${'a'.repeat(250)}'; // sha256 digest`,
+    ];
+    expect(collectLineLengthViolations('src/example.ts', lines)).toEqual([
+      expect.objectContaining({ line: 2, message: expect.stringContaining('limit 240') }),
+    ]);
   });
 });

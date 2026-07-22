@@ -19,7 +19,6 @@ export {
   isDataCarrierFile,
   isFormattableFile,
   isIgnoredRelativePath,
-  isTokenBudgetFile,
   matchesAny,
   readText,
   repoRoot,

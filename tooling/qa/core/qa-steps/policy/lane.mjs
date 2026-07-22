@@ -4,6 +4,11 @@ function checkpointRequiredBy() {
 
 const LANE_POLICY = {
   advisory: { runsIn: ['qa:advisory'], requiredBy: [], execution: 'advisory' },
+  'structural-audit': {
+    runsIn: ['qa:structural-audit'],
+    requiredBy: [],
+    execution: 'manual',
+  },
   audit: { runsIn: ['qa:audit'], requiredBy: ['qa:audit'], execution: 'always' },
   build: { runsIn: ['qa:build'], requiredBy: ['qa:build', 'qa:closeout'], execution: 'always' },
   'build-commit': {

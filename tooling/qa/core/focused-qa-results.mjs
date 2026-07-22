@@ -57,8 +57,15 @@ export function createBlockedStep(label, detail = 'blocked by earlier hardfail s
 }
 
 export function createViolationStep(label, header, result) {
+  const metadata = {
+    ...(result.consoleOutput ? { consoleOutput: result.consoleOutput } : {}),
+    ...(result.advisories ? { advisories: result.advisories } : {}),
+  };
   if (result.violations.length === 0) {
-    return result.skipped ? createSkippedStep(label) : createOkStep(label);
+    return {
+      ...(result.skipped ? createSkippedStep(label) : createOkStep(label)),
+      ...metadata,
+    };
   }
 
   return {
@@ -67,6 +74,7 @@ export function createViolationStep(label, header, result) {
     summary: trimTrailingColon(header),
     header,
     violations: result.violations,
+    ...metadata,
   };
 }
 

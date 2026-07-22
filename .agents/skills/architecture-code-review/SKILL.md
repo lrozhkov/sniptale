@@ -21,7 +21,7 @@ Required closeout review starts only after the supplied bounded manifest is comp
 
 1. Read `AGENTS.md`, the supplied bounded manifest, and completion matrix.
 2. Read `docs/engineering/implementation-rules.md`, `docs/architecture/repository-overview.md`, and the deeper architecture/design documents mapped by `AGENTS.md` for the touched seam.
-3. Read the required checklist and inspect the supplied scope plus nearby owner boundaries needed to validate it.
+3. Read the required checklist and inspect the supplied scope plus nearby owner boundaries needed to validate mixed ownership, cohesion, and whether an apparent split merely distributes one god-object.
 4. Confirm that required proof is green. Do not rerun wrappers or demand receipt hashes.
 5. Classify every candidate finding as a current-wave regression, direct acceptance blocker, provable security issue, or pre-existing hardening. Report pre-existing hardening as comments/debt, not current-wave corrections.
 
@@ -33,6 +33,6 @@ Required closeout review starts only after the supplied bounded manifest is comp
 
 ## Output Contract
 
-List findings first, highest severity first, with file/line evidence, violated invariant, reproducible risk, closeout impact, and minimal correction class. Then list residual assumptions, missing QA context, architecture posture, and one decision: `Approve`, `Approve with comments`, `Request changes`, or `Needs security review`.
+List findings first, highest severity first, with file/line evidence, violated invariant, reproducible risk, closeout impact, and minimal correction class. Distinguish a cohesive registered transaction/workflow owner from mixed orchestration: state, effects, and recovery are not defects by themselves when the function stays in one domain, calls narrow adapters, excludes UI authority, and avoids arbitrary branching. Then list residual assumptions, missing QA context, architecture posture, and one decision: `Approve`, `Approve with comments`, `Request changes`, or `Needs security review`.
 
 Use `Request changes` only for evidenced current-wave regressions, direct acceptance blockers, or provable security issues. Wishlist items, extra tests not required by the frozen acceptance criteria, pre-existing hardening, and unrelated repository defects are comments. Prefer the minimal correction class inside the supplied manifest; if a fix would introduce new runtime contracts, touch all persistence writers, or spread across dozens of additional owners, identify the scope escape instead of silently broadening the candidate. State whether a correction changes the reviewed behavior, owner, public contract, dependency direction, parser semantics, or topology and therefore requires another review; mechanical cleanup alone does not.

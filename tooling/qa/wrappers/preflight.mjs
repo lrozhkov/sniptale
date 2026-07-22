@@ -4,8 +4,6 @@
 
 import fs from 'node:fs';
 
-import { collectAiLimitReport } from '../core/ai-limit-utils.mjs';
-import { QUALITY_LIMITS } from '../core/quality.config.mjs';
 import { collectFocusedGuardrailReport } from '../core/guardrail-preflight-report.mjs';
 import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
 import { collectAdvisoryFindings } from '../core/verify-advisory.collectors.helpers.mjs';
@@ -20,7 +18,6 @@ import { createOkStep } from '../core/focused-qa-results.mjs';
 import { PRODUCT_QA_SUITE, createScopedQaContext } from '../core/qa-scope.mjs';
 import {
   collectContractChecklist,
-  collectTargetTestSizeWarnings,
   collectTransitiveConsumerHints,
   collectTypecheckBlastRadius,
 } from './preflight-contract-report.mjs';
@@ -28,6 +25,8 @@ import { collectRelevantDocs, isUiFile } from './preflight-docs.mjs';
 import { collectSecurityControlHints } from './preflight-security-hints.mjs';
 import { collectPreflightReportLines } from './preflight-render.mjs';
 import { runObservedWrapper } from './observed/runner.mjs';
+import { classifyOwnerGroup } from '../core/structural-risk/owner-classifier.mjs';
+import { runStructuralRiskCheck } from '../core/verify-structural-risk.mjs';
 
 const JS_LIKE_FILE_PATTERN = /\.(?:ts|tsx|js|mjs|cjs)$/u;
 const SHARED_SOURCE_PATTERNS = [
@@ -35,9 +34,9 @@ const SHARED_SOURCE_PATTERNS = [
   /^apps\/extension\/src\/(?:composition|contracts|features|foundation|platform|ui|workflows)\//u,
 ];
 const STORAGE_OR_SETTINGS_SOURCE_PATTERN =
-  /^(?:src|apps\/extension\/src)\/(?:shared\/storage|shared\/db|settings)\//u;
+  /^apps\/extension\/src\/(?:composition\/persistence|[^/]+\/(?:persistence|state)|settings)\//u;
 const CONTENT_PARSER_SOURCE_PATTERN =
-  /^(?:src|apps\/extension\/src)\/content\/.*(?:parser|snapshot|profile|export)/u;
+  /^apps\/extension\/src\/content\/(?:parser|application\/.*(?:snapshot|profile|export))/u;
 
 function normalizeExplicitFiles(files) {
   return [
@@ -53,6 +52,7 @@ export function collectPreflightContext({ files = [] } = {}) {
     const targetFiles = normalizeExplicitFiles(files);
     const existingTargetFiles = targetFiles.filter((file) => fs.existsSync(fromRelativePath(file)));
     context = {
+      mode: 'explicit-files',
       targetFiles,
       existingTargetFiles,
       codeFiles: collectCodeFiles(existingTargetFiles),
@@ -67,31 +67,30 @@ export function collectPreflightContext({ files = [] } = {}) {
 
 export { collectRelevantDocs };
 
-function collectBudgetRisks(codeFiles) {
-  if (codeFiles.length === 0) {
-    return [];
-  }
-
-  const report = collectAiLimitReport(codeFiles, ['lines', 'tokens']);
-  const lineWarning = Math.floor(QUALITY_LIMITS.maxFileLines * 0.8);
-  const tokenWarning = Math.floor(QUALITY_LIMITS.maxLogicTokens * 0.8);
-  const risks = [];
-
-  for (const entry of report.lineHotspots.filter((item) => item.lines >= lineWarning).slice(0, 6)) {
-    risks.push(`${entry.file}: ${entry.lines} lines`);
-  }
-
-  for (const entry of report.tokenHotspots
-    .filter((item) => item.tokens >= tokenWarning)
-    .slice(0, 6)) {
-    risks.push(`${entry.file}: ${entry.tokens} tokens`);
-  }
-
-  for (const violation of report.violations.slice(0, 6)) {
-    risks.push(`${violation.file}: ${violation.message}`);
-  }
-
-  return [...new Set(risks)];
+function collectStructuralPressure(report) {
+  const formatFileMetric = (metric) =>
+    [
+      `${metric.file}: score=${metric.score}, delta=${metric.delta}`,
+      `owners=${metric.ownerGroupCount}, effects=${metric.effectCount}`,
+      `state=${metric.stateAuthorities}, cohesion=${metric.cohesion.toFixed(2)}`,
+    ].join(', ');
+  const formatFunctionMetric = (metric) =>
+    [
+      `${metric.file}:${metric.line} ${metric.symbol} (${metric.profile})`,
+      `score=${metric.score}, delta=${metric.delta}`,
+      `cohesion=${metric.cohesion.toFixed(2)}`,
+    ].join(': ');
+  const fileSignals = report.files
+    .filter((metric) => metric.score > 0 || metric.lines > 400)
+    .sort((left, right) => right.score - left.score || right.lines - left.lines)
+    .slice(0, 8)
+    .map(formatFileMetric);
+  const functionSignals = report.functions
+    .filter((metric) => metric.score >= 4)
+    .sort((left, right) => right.score - left.score || right.lines - left.lines)
+    .slice(0, 8)
+    .map(formatFunctionMetric);
+  return [...fileSignals, ...functionSignals];
 }
 
 function collectProofHints(context, guardrailReport) {
@@ -128,6 +127,26 @@ function collectProofHints(context, guardrailReport) {
 
 export function collectPreflightReport({ files = [] } = {}) {
   const context = collectPreflightContext({ files });
+  const structuralFiles =
+    files.length > 0
+      ? collectCodeFiles(context.allExistingTargetFiles)
+      : (context.qualityCodeFiles ?? context.codeFiles);
+  const structuralResult =
+    structuralFiles.length === 0
+      ? {
+          report: {
+            scope: files.length > 0 ? 'preflight-explicit' : 'current-diff',
+            files: [],
+            functions: [],
+            violations: [],
+            advisories: [],
+          },
+        }
+      : runStructuralRiskCheck({
+          files: structuralFiles,
+          reportScope: files.length > 0 ? 'preflight-explicit' : 'current-diff',
+          enforce: files.length === 0,
+        });
   const guardrailReport = collectFocusedGuardrailReport({
     targetFiles: context.targetFiles,
     codeFiles: context.codeFiles,
@@ -139,8 +158,10 @@ export function collectPreflightReport({ files = [] } = {}) {
   return {
     context,
     relevantDocs: collectRelevantDocs(context.allTargetFiles),
+    ownerRuntime: [...new Set(context.codeFiles.map(classifyOwnerGroup))].sort(),
     guardrailReport,
-    budgetRisks: collectBudgetRisks(context.codeFiles),
+    structuralReport: structuralResult.report,
+    structuralPressure: collectStructuralPressure(structuralResult.report),
     advisoryFindings: collectAdvisoryFindings({
       codeFiles: context.codeFiles,
       targetFiles: context.targetFiles,
@@ -152,7 +173,6 @@ export function collectPreflightReport({ files = [] } = {}) {
     contractChecklist: collectContractChecklist(context),
     transitiveConsumerHints: collectTransitiveConsumerHints(context),
     typecheckBlastRadius: collectTypecheckBlastRadius(context),
-    targetTestSizeWarnings: collectTargetTestSizeWarnings(context.targetFiles),
   };
 }
 
@@ -170,7 +190,8 @@ export function runPreflightWrapper({ files = [] } = {}) {
     steps: [
       {
         ...createOkStep('QA preflight', `inspected=${report.context.targetFiles.length}`),
-        stdout: renderPreflightReport(report),
+        consoleOutput: renderPreflightReport(report),
+        advisories: report.advisoryFindings,
       },
     ],
   };

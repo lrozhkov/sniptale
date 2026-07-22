@@ -7,7 +7,6 @@ import fs from 'node:fs';
 import ts from 'typescript';
 
 import { createHeadFileTextResolver } from './git-head-sources.mjs';
-import { QUALITY_LIMITS } from './quality.config.mjs';
 import { collectSurfaceMaps, didSurfaceGrow } from './surface-growth.helpers.mjs';
 import { collectBroadPublicSurfaceViolations } from './verify-interface-surfaces.broad-public.helpers.mjs';
 import { runReturnedObjectSurfaceAdvisoryCheck } from './verify-interface-surfaces.return-bags.mjs';
@@ -167,8 +166,6 @@ export function runInterfaceSurfaceCheck({ files = [], scope = 'workspace' } = {
     files: targetFiles.map(toRelativePath),
     limits: {
       maxMembers: DEFAULT_MEMBER_LIMIT,
-      maxFileLines: QUALITY_LIMITS.maxFileLines,
-      maxFunctionLines: QUALITY_LIMITS.maxFunctionLines,
     },
     violations: collectInterfaceSurfaceViolations(targetFiles),
   };

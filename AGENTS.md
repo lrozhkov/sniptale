@@ -41,9 +41,9 @@ Read deeper docs only when the task touches their area:
 
 Run `npm run qa:preflight` when scope is unclear or non-trivial. Use `npm run qa:preflight -- --files <paths...>` for pre-edit planning before a diff exists.
 
-Record the owner seam, runtime boundary, target topology, likely next `2-3` seam expansions, state authorities, risk families, size pressure, transitive consumers, and expected negative/user-visible proof before editing. For a broad topology move, pin a bounded manifest with the owner/import boundary, public contracts, complete consumer set, typecheck blast radius, collision handling, rollback, negative proof, acceptance proof, and near-limit files/tests.
+Record the owner seam, runtime boundary, target topology, likely next `2-3` seam expansions, state authorities, risk families, structural pressure, transitive consumers, and expected negative/user-visible proof before editing. For a broad topology move, pin a bounded manifest with the owner/import boundary, public contracts, complete consumer set, typecheck blast radius, collision handling, rollback, negative proof, acceptance proof, and structurally pressured files/functions.
 
-If preflight shows a near-capacity owner, broad public surface, flat sibling scatter, repeated-prefix names, root-facade drift, or multiple independent reasons for the same file to change, fix the shape before adding behavior. Metrics are signals, not architecture boundaries.
+If preflight shows mixed ownership, low cohesion, a broad public surface, flat sibling scatter, repeated-prefix names, root-facade drift, or multiple independent reasons for the same file to change, fix the shape before adding behavior. Metrics are signals, not architecture boundaries. Token counts are not a quality signal, and a mechanical or distributed split is not a fix when the same broad owner contract remains.
 
 Return to preflight and the minimal correction class when a proposed fix starts changing new runtime contracts, all persistence writers, or dozens of additional owners beyond the accepted manifest. Expand the task only when those changes are proved necessary for the frozen acceptance criteria.
 
@@ -54,6 +54,8 @@ Keep changes inside the selected owner seam. Use canonical browser, messaging, s
 For runtime route changes, keep the action-kernel route registry, authorization policy registry, and drift tests synchronized. Legacy family routers are adapters; dispatch and authorization proof should run through listener/action-kernel paths.
 
 Implement a coherent wave before running blocking QA. Use targeted commands only to investigate a specific wrapper failure, answer a focused debugging question, or satisfy an explicit user request.
+
+Structural enforcement analyzes behavioral files in the current diff and compares their current AST shape with `HEAD`; unchanged, import-only, mock-only, and rename-only files are not candidates. A cohesive registered orchestration owner may legitimately coordinate state, effects, recovery, and narrow adapters, but must not absorb unrelated UI or arbitrary branching. `qa:preflight -- --files ...` is a read-only planning snapshot, while `qa:structural-audit` is a manual report-only maintenance tool and is not a routine agent or PR gate.
 
 Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has harness/shared-control targets. This includes `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. The live classifier is `tooling/qa/core/qa-scope.mjs`.
 
@@ -69,7 +71,7 @@ Required closeout review runs only after the complete candidate, deterministic n
 
 Collect all findings, classify them with the four finding categories, confirm blockers against evidence and the frozen acceptance criteria, and apply one consolidated correction. A reviewer may not turn an unrelated test wish or stronger guarantee into a blocker. Do not repeat review after mechanical cleanup unless the correction changed the reviewed behavior, owner, public contract, dependency direction, parser semantics, or security seam. Rerun only proof invalidated by the correction.
 
-Expect QA or review to reject dual authority, write-on-read repair, blind overwrites, stale async results, missing rollback/failure surfacing, raw privileged effects outside canonical owners, unsafe boundary casts, broad controller/state/props bags, hidden multi-transport orchestration, topology-only line splitting, dead exports/cycles, i18n/design-system bypasses, and success-only proof for failure-prone seams.
+Expect QA or review to reject dual authority, write-on-read repair, blind overwrites, stale async results, missing rollback/failure surfacing, raw privileged effects outside canonical owners, unsafe boundary casts, broad controller/state/props bags, hidden multi-transport orchestration, topology-only line splitting, distributed god-objects, dead exports/cycles, i18n/design-system bypasses, and success-only proof for failure-prone seams.
 
 ## Closeout
 

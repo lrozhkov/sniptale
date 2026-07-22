@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { fromRelativePath } from './shared.mjs';
-import { QUALITY_LIMITS } from './quality.config.mjs';
 import { OWNER_LOCAL_SCOPES } from './verify-all.scope.mjs';
 import { resolveBuildCloseoutScope } from './verify-build.scope.mjs';
 import { findCoverageRolloutGroup } from './verify-test-coverage.registry.mjs';
@@ -89,35 +88,8 @@ export function collectScopeHints(targetFiles, codeFiles) {
   return hints;
 }
 
-function countFileLines(file) {
-  const absolutePath = fromRelativePath(file);
-  try {
-    return fs.readFileSync(absolutePath, 'utf8').split(/\r?\n/u).length;
-  } catch (error) {
-    if (
-      error &&
-      typeof error === 'object' &&
-      (error.code === 'ENOENT' || error.code === 'EISDIR')
-    ) {
-      return 0;
-    }
-    throw error;
-  }
-}
-
-function collectRelatedTestBudgetRisks(files) {
-  const warningLimit = Math.floor(QUALITY_LIMITS.maxFileLines * 0.8);
-  return files
-    .filter((file) => TEST_FILE_PATTERN.test(file))
-    .map((file) => ({ file, lines: countFileLines(file) }))
-    .filter((entry) => entry.lines >= warningLimit)
-    .sort((left, right) => right.lines - left.lines || left.file.localeCompare(right.file))
-    .slice(0, 6)
-    .map((entry) => `related test near size limit: ${entry.file}: ${entry.lines} lines`);
-}
-
 export function collectBuildScopeForecast({ targetFiles, codeFiles, addedFiles = [] }) {
-  if (targetFiles.length === 0) return { budgetRisks: [], details: [] };
+  if (targetFiles.length === 0) return { details: [] };
   const { testScope } = resolveBuildCloseoutScope({ targetFiles, codeFiles, addedFiles });
   const selectedUnitFiles =
     testScope.directTestFiles.length > 0
@@ -135,5 +107,5 @@ export function collectBuildScopeForecast({ targetFiles, codeFiles, addedFiles =
       `broad transitive scope expected for ${broadFamilies.join(', ')}: check related mocks and tests before closeout`
     );
   }
-  return { budgetRisks: collectRelatedTestBudgetRisks(selectedUnitFiles), details };
+  return { details };
 }

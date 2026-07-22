@@ -1,9 +1,3 @@
-import fs from 'node:fs';
-import ts from 'typescript';
-
-import { fromRelativePath } from './shared.mjs';
-import { QUALITY_LIMITS } from './quality.config.mjs';
-
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:ts|tsx)$/u;
 const UI_SURFACE_OWNERS = [
   'content',
@@ -54,11 +48,6 @@ function hasOwnerPrefix(file, owners) {
 
 function isRuntimeSecurityFile(file) {
   return RUNTIME_SECURITY_PREFIXES.some((prefix) => file.startsWith(prefix));
-}
-
-function existingFile(relativePath) {
-  const absolutePath = fromRelativePath(relativePath);
-  return fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile();
 }
 
 function collectChangedTests(targetFiles) {
@@ -132,60 +121,6 @@ export function collectCapabilityLossHints({ targetFiles = [], codeFiles = [] })
   return [
     `capability-loss risk: ${capabilityFiles.slice(0, 3).join(', ')} changed with limited coverage-table proof`,
   ];
-}
-
-function nodeLineSpan(sourceFile, node) {
-  const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-  const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
-  return end - start + 1;
-}
-
-function isNamedTestCall(node) {
-  return (
-    ts.isCallExpression(node) &&
-    ts.isIdentifier(node.expression) &&
-    ['it', 'test', 'describe'].includes(node.expression.text)
-  );
-}
-
-function collectLongTestBodies(sourceFile) {
-  const limit = Math.floor(QUALITY_LIMITS.maxFunctionLines * 0.8);
-  const findings = [];
-
-  function visit(node) {
-    if (isNamedTestCall(node) && nodeLineSpan(sourceFile, node) >= limit) {
-      const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-      findings.push(`test body near size limit at line ${line}`);
-    }
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return findings.slice(0, 2);
-}
-
-export function collectTestShapeHints({ targetFiles = [] }) {
-  const warningFileLines = Math.floor(QUALITY_LIMITS.maxFileLines * 0.8);
-  const hints = [];
-
-  for (const file of collectChangedTests(targetFiles)) {
-    if (!existingFile(file)) {
-      continue;
-    }
-
-    const sourceText = fs.readFileSync(fromRelativePath(file), 'utf8');
-    const lineCount = sourceText.split(/\r?\n/u).length;
-    if (lineCount >= warningFileLines) {
-      hints.push(`test shape risk: ${file}: ${lineCount} lines`);
-    }
-
-    const sourceFile = ts.createSourceFile(file, sourceText, ts.ScriptTarget.Latest, true);
-    hints.push(
-      ...collectLongTestBodies(sourceFile).map((detail) => `test shape risk: ${file}: ${detail}`)
-    );
-  }
-
-  return hints.slice(0, 6);
 }
 
 export function collectDeterministicProofHints({ codeFiles = [] }) {

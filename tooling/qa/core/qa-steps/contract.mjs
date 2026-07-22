@@ -11,6 +11,7 @@ import {
   FOCUSED_DIRECT_STEPS,
   HARNESS_STEPS,
   RELEASE_DIRECT_STEPS,
+  STRUCTURAL_AUDIT_STEPS,
 } from './definitions.data.mjs';
 import { VERIFY_ALL_VIOLATION_STEPS } from '../verify-all.violation-steps.mjs';
 
@@ -116,6 +117,9 @@ function resolveContract({ wrapperId, mode, hasFailure }) {
   if (mode === 'help') return { required: ['Wrapper help'] };
   if (wrapperId === 'qa:preflight') return { required: ['QA preflight'] };
   if (wrapperId === 'qa:advisory') return { required: tupleLabels(ADVISORY_STEPS) };
+  if (wrapperId === 'qa:structural-audit') {
+    return { required: tupleLabels(STRUCTURAL_AUDIT_STEPS) };
+  }
   if (wrapperId === 'qa:release-harness') {
     return mode === 'no-targets'
       ? { required: ['QA release harness'] }

@@ -21,7 +21,7 @@ it('keeps oxlint scoped to JS-like files and skips empty scopes', async () => {
   );
 });
 
-it('runs strict oxlint shape and hook limits as errors', async () => {
+it('runs strict oxlint hook and accessibility rules as errors', async () => {
   const module = await import('./verify-oxlint.mjs');
   const calls: unknown[][] = [];
 
@@ -38,10 +38,6 @@ it('runs strict oxlint shape and hook limits as errors', async () => {
       '--react-plugin',
       '--vitest-plugin',
       '--jsx-a11y-plugin',
-      '-D',
-      'max-lines',
-      '-D',
-      'max-lines-per-function',
       '-D',
       'exhaustive-deps',
       '-D',
@@ -52,34 +48,6 @@ it('runs strict oxlint shape and hook limits as errors', async () => {
       'jsx-a11y/aria-props',
       '-D',
       'react/jsx-no-target-blank',
-      '--format',
-      'unix',
-      'tooling/qa/core/verify-oxlint.mjs',
-      '--quiet',
-    ])
-  );
-});
-
-it('can run oxlint without size rules for import-only focused files', async () => {
-  const module = await import('./verify-oxlint.mjs');
-  const calls: unknown[][] = [];
-
-  module.runOxlint({
-    files: ['tooling/qa/core/verify-oxlint.mjs'],
-    sizeRules: false,
-    commandRunner: (...args: unknown[]) => {
-      calls.push(args);
-      return { status: 0, stdout: '', stderr: '' };
-    },
-  });
-
-  expect(calls[0]?.[1]).toEqual(expect.not.arrayContaining(['max-lines']));
-  expect(calls[0]?.[1]).toEqual(expect.not.arrayContaining(['max-lines-per-function']));
-  expect(calls[0]?.[1]).toEqual(
-    expect.arrayContaining([
-      '--react-plugin',
-      '--vitest-plugin',
-      '--jsx-a11y-plugin',
       '--format',
       'unix',
       'tooling/qa/core/verify-oxlint.mjs',

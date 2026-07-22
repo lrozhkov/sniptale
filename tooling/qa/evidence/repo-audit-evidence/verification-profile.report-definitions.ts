@@ -43,3 +43,10 @@ export const REPO_AUDIT_REPORT_DEFINITIONS = [
     commands: ['node tooling/qa/core/verify-hot-path-cleanups.mjs --repo-wide --report-only'],
   },
 ] as const;
+
+export const STRUCTURAL_AUDIT_REPORT_DEFINITION = {
+  tool: 'verify-structural-risk.mjs',
+  commands: ['npm run qa:structural-audit'],
+  artifact: '.tmp/structural-audit/report.json',
+  mode: 'manual-report-only',
+} as const;

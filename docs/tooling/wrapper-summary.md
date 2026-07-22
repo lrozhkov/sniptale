@@ -1,6 +1,6 @@
 # Wrapper Summary
 
-Updated: 2026-07-14
+Updated: 2026-07-22
 
 This document owns wrapper lifecycle, scope/freshness state, locks, handoffs, and observability. Workflow belongs in [AGENTS.md](../../AGENTS.md), quality policy in [code-quality.md](code-quality.md), and command lookup in [operator-handbook.md](operator-handbook.md).
 
@@ -18,7 +18,7 @@ Whenever the current diff has harness targets, run `npm run qa:release-harness` 
 
 ## Diff And Freshness Model
 
-`qa:preflight`, `qa:advisory`, `qa:checkpoint`, `qa:closeout`, `qa:build`, and `qa:release-harness` resolve the current workspace state according to their contracts. Focused/checkpoint/build/closeout commands do not accept an explicit file scope; preflight alone accepts `--files <paths...>` for pre-edit planning.
+`qa:preflight`, `qa:advisory`, `qa:checkpoint`, `qa:closeout`, `qa:build`, and `qa:release-harness` resolve the current workspace state according to their contracts. Focused/checkpoint/build/closeout commands do not accept an explicit file scope; preflight alone accepts `--files <paths...>` for a read-only pre-edit structural snapshot. `qa:structural-audit` is a distinct manual repository-maintenance report, not an enforcement scope.
 
 Freshness states bind proof to the relevant content fingerprint rather than a mutable claim:
 
@@ -32,11 +32,15 @@ Changing the relevant diff invalidates reuse. `qa:closeout` may reuse fresh matc
 
 ### `qa:preflight`
 
-Read-only context collection. It reports relevant documents, target files, seam clusters, likely build scope, budget risks, advisory hints, and proof areas. It does not format, write proof state, acquire the blocking lock, build, stage, or commit. Use `--verbose` for inline detail and `-- --files <paths...>` before a diff exists.
+Read-only context collection. It reports scope, canonical owner/runtime, relevant documents, structural pressure, contracts/consumer-discovery needs, proof, build forecast, and advisory. Current-diff mode uses behavioral files; `-- --files <paths...>` produces a non-blocking explicit planning snapshot without writing advisory/checkpoint state. It does not format, acquire the blocking lock, build, stage, or commit.
 
 ### `qa:advisory`
 
-Optional non-blocking diagnosis over the current diff. It emits structured heuristic findings and does not replace blocking proof. Normal implementation receives advisory state through `qa:checkpoint`; do not add advisory as a routine extra gate.
+Optional non-blocking diagnosis over the current diff. Its machine catalog contains only structural file/function pressure, UI proof gaps, and detached this-sensitive methods. Findings are always printed and saved as sanitized diagnostic locations plus bounded advisory state v2. Normal implementation receives the same advisory block through `qa:checkpoint`; do not add advisory as a routine extra gate.
+
+### `qa:structural-audit`
+
+Manual report-only architecture-maintenance snapshot over repository code. It writes a bounded sanitized artifact at `.tmp/structural-audit/report.json`, never converts findings into a blocking result, and is not part of PR gates, normal agent workflow, closeout, or `qa:audit`. It does not collect model-token or token-hotspot inventories.
 
 ### `qa:release-harness`
 
@@ -44,7 +48,7 @@ Blocking harness/shared-control proof. It runs the harness-owned formatting/stat
 
 ### `qa:checkpoint`
 
-Blocking in-progress product proof over the current diff. It verifies required harness freshness, formats supported non-Markdown product targets, records advisory state, runs focused static/architecture/security controls, typecheck when required, directly changed and owner-selected tests, and eligible diff coverage. Successful unit-test steps identify their `checkpoint-owner` or `checkpoint-direct` profile in the diagnostic log. It writes checkpoint state and does not build, stage, or commit.
+Blocking in-progress product proof over the current diff. It verifies required harness freshness, formats supported non-Markdown product targets, prints and records advisory state, runs diff-scoped structural risk plus focused static/architecture/security controls, typecheck when required, directly changed and owner-selected tests, and eligible diff coverage. Successful unit-test steps identify their `checkpoint-owner` or `checkpoint-direct` profile in the diagnostic log. It writes checkpoint state and does not build, stage, or commit.
 
 ### `qa:build`
 
@@ -74,7 +78,7 @@ A live process consuming CPU is not a hang merely because output is quiet. `qa:a
 
 ## Observability
 
-Canonical wrappers write one structured run record and one bounded sanitized diagnostic log per invocation under `.tmp`. Default terminal output stays concise: overall result, duration, problem/control identifiers, the JSON run-record path, and the sanitized diagnostic-log path. The diagnostic log is live evidence: wrappers may append bounded progress before final steps are known, and each append refreshes the run record's log metadata. When a wrapper failure contains structured child-run evidence, the summary also prints every unique child diagnostic-log path so the actionable nested output is directly reachable. `--verbose` is wrapper-specific; use the diagnostic logs for detail.
+Canonical wrappers write one structured run record and one bounded sanitized diagnostic log per invocation under `.tmp`. Advisory, preflight, checkpoint/closeout advisory reuse, and structural steps expose a `consoleOutput` block before the summary; the common sanitizer removes secrets and workspace paths, caps the block at `16 KiB`, and marks truncation. The zero case is explicit as `attention=0, watch=0`, and `--verbose` does not duplicate the block. Successful advisory findings are also stored as sanitized diagnostic locations. Other default output stays concise: overall result, duration, problem/control identifiers, the JSON run-record path, and the sanitized diagnostic-log path.
 
 `npm run qa:stats -- [--wrapper <id>] [--task <id>]` aggregates records by wrapper, mode, root run, task, step, control, problem, and skip reason. Legacy JSONL timing files are read-only fallback and receive no new writes.
 
