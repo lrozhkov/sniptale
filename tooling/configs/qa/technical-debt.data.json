@@ -14863,7 +14863,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/cli-contracts.mjs",
-        "contentHash": "aa20bebc4ea733a8fc3558fe766239eda76878fe38bfdae91e0fa552e4d5c981"
+        "contentHash": "a20c2dc14bd16160812ee96dc1f4c8bae5e1493463ef94e7565e786f5accb523"
       },
       "consumers": [
         "tooling/qa/wrappers/build.mjs",
@@ -16624,7 +16624,8 @@
       },
       "consumers": [
         "tooling/qa/core/qa-steps/policy/index.mjs",
-        "tooling/qa/core/qa-steps/policy/lane.mjs"
+        "tooling/qa/core/qa-steps/policy/lane.mjs",
+        "tooling/qa/wrappers/structural-audit.test.ts"
       ],
       "surfaces": [
         "binding:LANE_POLICY",
@@ -18600,7 +18601,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/structural-audit.mjs",
-        "contentHash": "0d39a62d8b35ae0bcab5b1b786da08f0fb4965c18b40c07e7d28468689637874"
+        "contentHash": "e9fb30f34509a19173a41211e83406c4fb207c5da57400f8b8c2c8113d7c91bc"
       },
       "consumers": [
         "tooling/qa/wrappers/structural-audit.mjs",
@@ -18610,7 +18611,9 @@
         "property:createStructuralAuditArtifact/summary",
         "property:runStructuralAuditWrapper/context",
         "property:runStructuralAuditWrapper/steps",
-        "property:runStructuralAuditWrapper/targetFiles"
+        "property:runStructuralAuditWrapper/targetFiles",
+        "property:writeStructuralAuditArtifact/clusters",
+        "property:writeStructuralAuditArtifact/summary"
       ]
     },
     {
@@ -18985,6 +18988,72 @@
       "surfaces": [
         "property:resolveSemgrepCommand/args",
         "property:resolveSemgrepCommand/args[1]"
+      ]
+    },
+    {
+      "id": "policy.source.topology-fragmentation-graph-mjs.15ed9d0730",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/topology-fragmentation.graph.mjs",
+        "contentHash": "328b8f7b02cbd15dc8ba005b1ca602f31133f1f36e1a4aef29520b8dae8feb55"
+      },
+      "consumers": [
+        "tooling/qa/core/topology-fragmentation.graph.mjs",
+        "tooling/qa/core/topology-fragmentation.graph.test.ts",
+        "tooling/qa/core/topology-fragmentation.mjs"
+      ],
+      "surfaces": [
+        "binding:CODE_EXTENSION_SET",
+        "binding:CODE_EXTENSIONS"
+      ]
+    },
+    {
+      "id": "policy.source.topology-fragmentation-mjs.7940bb12dd",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/topology-fragmentation.mjs",
+        "contentHash": "0a1e94b75e09fa07947c8f043fcaecda08930b346289687893f1508fab1d2cb6"
+      },
+      "consumers": [
+        "tooling/qa/core/topology-fragmentation.mjs",
+        "tooling/qa/core/topology-fragmentation.test.ts",
+        "tooling/qa/wrappers/structural-audit.mjs"
+      ],
+      "surfaces": [
+        "property:collectTopologyFragmentationReport/summary"
+      ]
+    },
+    {
+      "id": "policy.source.topology-fragmentation-policy-mjs.017c086980",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/topology-fragmentation.policy.mjs",
+        "contentHash": "ad11aab8fa67c7c85c2eea8f5cd5256cfd983596906692b88b0170c471b210e5"
+      },
+      "consumers": [
+        "tooling/qa/core/topology-fragmentation.mjs",
+        "tooling/qa/core/topology-fragmentation.policy.mjs",
+        "tooling/qa/core/topology-fragmentation.test.ts"
+      ],
+      "surfaces": [
+        "binding:PRODUCTION_REASONS",
+        "property:createConsolidationDecision/reasons",
+        "property:decideTopologyCluster/reasons",
+        "property:decideTopologyCluster/reasons[1]",
+        "property:decideTopologyCluster/reasons[2]",
+        "property:decideTopologyCluster/reasons[3]"
       ]
     },
     {

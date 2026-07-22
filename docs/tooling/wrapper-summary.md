@@ -40,7 +40,7 @@ Optional non-blocking diagnosis over the current diff. Its machine catalog conta
 
 ### `qa:structural-audit`
 
-Manual report-only architecture-maintenance snapshot over repository code. It writes a bounded sanitized artifact at `.tmp/structural-audit/report.json`, never converts findings into a blocking result, and is not part of PR gates, normal agent workflow, closeout, or `qa:audit`. It does not collect model-token or token-hotspot inventories.
+Manual report-only architecture-maintenance snapshot over repository code. It combines structural concentration with deterministic owner/change-reason topology clusters and reports `Split`, `Consolidate`, or `Keep` evidence, including navigation transitions and fragmentation signals. The goal is fewer transitions without removing explicit runtime, owner, adapter, or contract boundaries. It writes a bounded sanitized schema-v2 artifact at `.tmp/structural-audit/report.json`, never converts findings into a blocking result, and is not part of PR gates, normal agent workflow, closeout, or `qa:audit`. It does not collect model-token or token-hotspot inventories.
 
 ### `qa:release-harness`
 

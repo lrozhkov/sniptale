@@ -16,7 +16,7 @@ Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGE
 | Unpacked release-mode build | `npm run build:release` | Runs only Vite in release mode and writes `dist/`; does not typecheck, run QA, or package an archive. |
 | Package current release build | `npm run release:package-only` | Debug/package-only path; does not replace `qa:release`. |
 | Repository audit | `npm run qa:audit` | Manual audit profiles, full coverage, evidence, supply-chain checks, and external engines. |
-| Structural maintenance snapshot | `npm run qa:structural-audit` | Manual report-only repository snapshot; not a PR, agent, closeout, or `qa:audit` gate. |
+| Structural/topology maintenance snapshot | `npm run qa:structural-audit` | Manual report-only structural concentration and owner/change-reason fragmentation snapshot; not a PR, agent, closeout, or `qa:audit` gate. |
 | Extension smoke | `npm run qa:e2e` | Separate Playwright runtime acceptance path. |
 | Wrapper statistics | `npm run qa:stats -- [--wrapper <id>] [--task <id>]` | Reads structured run records. |
 | WSL setup/recovery | [wsl-setup.md](wsl-setup.md) | Environment setup only. |

@@ -13,6 +13,10 @@ import {
   formatStructuralRiskConsole,
 } from '../core/structural-risk/report.mjs';
 import {
+  collectTopologyFragmentationReport,
+  formatTopologyFragmentationConsole,
+} from '../core/topology-fragmentation.mjs';
+import {
   collectSensitiveEnvironmentValues,
   sanitizeLogText,
 } from '../runtime/observability/sanitize.mjs';
@@ -46,7 +50,8 @@ function sanitizeArtifactValue(value, sanitizerOptions) {
 }
 
 function sanitizeMetric(metric, sanitizerOptions, { omitFunctions = false } = {}) {
-  const entries = Object.entries(metric).filter(([key]) => !omitFunctions || key !== 'functions');
+  const omittedKeys = new Set(omitFunctions ? ['functions', 'fileMetrics'] : []);
+  const entries = Object.entries(metric).filter(([key]) => !omittedKeys.has(key));
   return Object.fromEntries(
     entries.map(([key, value]) => [key, sanitizeArtifactValue(value, sanitizerOptions)])
   );
@@ -57,7 +62,7 @@ function serializedArtifactBytes(artifact) {
 }
 
 function boundAuditArtifact(artifact, maximumBytes) {
-  const trimOrder = ['findings', 'functions', 'files'];
+  const trimOrder = ['findings', 'functions', 'files', 'clusters'];
   while (serializedArtifactBytes(artifact) > maximumBytes) {
     const collection = trimOrder.find((key) => artifact[key].length > 0);
     if (!collection) {
@@ -68,11 +73,13 @@ function boundAuditArtifact(artifact, maximumBytes) {
   artifact.summary.reportedFiles = artifact.files.length;
   artifact.summary.reportedFunctions = artifact.functions.length;
   artifact.summary.reportedFindings = artifact.findings.length;
+  artifact.summary.reportedClusters = artifact.clusters.length;
   return artifact;
 }
 
 export function createStructuralAuditArtifact(
   report,
+  fragmentationReport,
   {
     maximumBytes = STRUCTURAL_AUDIT_MAX_BYTES,
     sanitizerOptions = {
@@ -93,9 +100,19 @@ export function createStructuralAuditArtifact(
   const findings = report.advisories
     .slice(0, ARTIFACT_ITEM_LIMIT)
     .map((finding) => sanitizeMetric(finding, sanitizerOptions));
+  const clusters = [...fragmentationReport.clusters]
+    .sort(
+      (left, right) =>
+        ({ Split: 0, Consolidate: 1, Keep: 2 })[left.decision] -
+          { Split: 0, Consolidate: 1, Keep: 2 }[right.decision] ||
+        right.maximumStructuralScore - left.maximumStructuralScore ||
+        left.id.localeCompare(right.id)
+    )
+    .slice(0, ARTIFACT_ITEM_LIMIT)
+    .map((cluster) => sanitizeMetric(cluster, sanitizerOptions, { omitFunctions: true }));
   return boundAuditArtifact(
     {
-      schemaVersion: 1,
+      schemaVersion: 2,
       generatedAt: new Date().toISOString(),
       scope: sanitizeArtifactValue(report.scope, sanitizerOptions),
       summary: {
@@ -105,10 +122,17 @@ export function createStructuralAuditArtifact(
         reportedFunctions: functions.length,
         totalFindings: report.advisories.length,
         reportedFindings: findings.length,
+        totalClusters: fragmentationReport.summary.totalClusters,
+        candidateClusters: fragmentationReport.summary.candidateClusters,
+        reportedClusters: clusters.length,
+        split: fragmentationReport.summary.split,
+        consolidate: fragmentationReport.summary.consolidate,
+        keep: fragmentationReport.summary.keep,
       },
       files,
       functions,
       findings,
+      clusters,
     },
     maximumBytes
   );
@@ -117,31 +141,69 @@ export function createStructuralAuditArtifact(
 export function writeStructuralAuditArtifact(report, options = {}) {
   const outputPath = options.outputPath ?? STRUCTURAL_AUDIT_REPORT_PATH;
   const filePath = path.isAbsolute(outputPath) ? outputPath : fromRelativePath(outputPath);
-  const artifact = createStructuralAuditArtifact(report, options);
+  const fragmentationReport = options.fragmentationReport ?? {
+    clusters: [],
+    summary: { totalClusters: 0, candidateClusters: 0, split: 0, consolidate: 0, keep: 0 },
+  };
+  const artifact = createStructuralAuditArtifact(report, fragmentationReport, options);
   writeJsonAtomic(filePath, artifact);
   return artifact;
 }
 
-export function runStructuralAuditWrapper() {
-  const files = collectCodeFiles().filter((file) => JAVASCRIPT_FILE_PATTERN.test(file));
-  const report = createStructuralRiskReport({
+export function createStructuralAuditSnapshot({
+  files,
+  root = process.cwd(),
+  readFile = readText,
+  structuralReportFactory = createStructuralRiskReport,
+  fragmentationReportFactory = collectTopologyFragmentationReport,
+}) {
+  const report = structuralReportFactory({
     files,
-    getCurrentSource: readText,
+    getCurrentSource: readFile,
     getPreviousSource: () => null,
     scope: 'repo-wide-audit',
     enforce: false,
   });
-  writeStructuralAuditArtifact(report);
+  const fragmentationReport = fragmentationReportFactory({
+    files,
+    structuralReport: report,
+    root,
+    readFile,
+  });
+  return { report, fragmentationReport };
+}
+
+export function runStructuralAuditWrapper(options = {}) {
+  const files =
+    options.files ?? collectCodeFiles().filter((file) => JAVASCRIPT_FILE_PATTERN.test(file));
+  const { report, fragmentationReport } = createStructuralAuditSnapshot({
+    files,
+    root: options.root,
+    readFile: options.readFile,
+    structuralReportFactory: options.structuralReportFactory,
+    fragmentationReportFactory: options.fragmentationReportFactory,
+  });
+  writeStructuralAuditArtifact(report, {
+    ...options.artifactOptions,
+    fragmentationReport,
+  });
   return {
     context: { scope: 'repo-wide-audit', targetFiles: [], mode: 'manual-report-only' },
     steps: [
       {
         ...createOkStep(
           'Structural audit',
-          `report-only; files=${report.files.length}, watch=${report.advisories.length}`
+          [
+            'report-only;',
+            `files=${report.files.length},`,
+            `watch=${report.advisories.length},`,
+            `clusters=${fragmentationReport.summary.candidateClusters}`,
+          ].join(' ')
         ),
         consoleOutput:
-          formatStructuralRiskConsole(report) + `Artifact: ${STRUCTURAL_AUDIT_REPORT_PATH}\n`,
+          formatStructuralRiskConsole(report) +
+          formatTopologyFragmentationConsole(fragmentationReport) +
+          `Artifact: ${STRUCTURAL_AUDIT_REPORT_PATH}\n`,
         advisories: report.advisories,
       },
     ],

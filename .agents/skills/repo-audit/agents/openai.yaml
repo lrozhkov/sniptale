@@ -1,4 +1,4 @@
 interface:
   display_name: 'Repo Audit'
   short_description: 'Audit Sniptale architecture, security, tooling, docs, and QA drift'
-  default_prompt: 'Use $repo-audit as an independent analysis-only auditor without inherited context for this explicitly requested whole-repository audit; inspect structural/advisory policy drift without running repository-wide structural or token-hotspot collection.'
+  default_prompt: 'Use $repo-audit as an independent analysis-only auditor without inherited context for this explicitly requested whole-repository audit; inspect structural/advisory/topology-fragmentation policy drift without running repository-wide structural or token-hotspot collection.'

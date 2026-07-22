@@ -41,7 +41,8 @@ export const QA_WRAPPER_CLI_CONTRACTS = Object.freeze({
     lifecycleLabel: 'QA structural audit',
     scripts: ['qa:structural-audit'],
     usage: 'npm run qa:structural-audit -- [--verbose]',
-    description: 'Generate a manual, report-only repository structural debt snapshot.',
+    description:
+      'Generate a manual, report-only structural and owner/change-reason topology snapshot.',
     options: [
       {
         name: '--verbose',

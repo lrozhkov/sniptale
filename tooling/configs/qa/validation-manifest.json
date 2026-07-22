@@ -1959,6 +1959,8 @@
       "tool": "verify-structural-risk.mjs",
       "validationMode": "canonical-control-fixture",
       "testFiles": [
+        "tooling/qa/core/topology-fragmentation.graph.test.ts",
+        "tooling/qa/core/topology-fragmentation.test.ts",
         "tooling/qa/core/verify-structural-risk.diff.test.ts",
         "tooling/qa/core/verify-structural-risk.test.ts",
         "tooling/qa/wrappers/structural-audit.test.ts"

@@ -10,6 +10,7 @@
 
 - The current code-organization contract and supplied bounded manifest define target paths. Historical paths are evidence, not authority.
 - Major areas describe product/runtime/platform ownership. Owned seams describe independently changing flows, contracts, state authorities, UI surfaces, or effect boundaries. Each proposed owner has an explicit change reason and remains stable under the likely next `2-3` changes. Roles such as `view`, `controller`, `state`, `hooks`, `types`, `utils`, and `actions` belong inside an owned seam unless the role itself is the documented stable owner.
+- The planning unit is an owner/change-reason cluster. Classify the candidate as `Split`, `Consolidate`, or `Keep`; raw line reduction, file growth, or minimum file count is never the objective. Minimize navigation transitions while retaining explicit runtime, owner, adapter, and public-contract boundaries.
 - Root entrypoints and compatibility facades stay thin and frozen. Same-name file/folder pairs require an explicit fold, index, deletion, or compatibility decision.
 - Shared residency is proven per layer. Runtime adapters, UI, effects, persistence, and authority do not become shared merely because a broad family contains reusable primitives.
 
@@ -36,6 +37,8 @@ Validate all source paths, target parents, file/directory collisions, duplicate 
 - Update mocks, type-query strings, source-reading paths, facade tests, registries, build/static-asset owners, owner maps, focused-proof targets, and policy data in the same batch.
 - Production and proof paths must resolve after the move. A surviving test is insufficient when its mapped production owner is missing or empty.
 - Do not create replacement barrels, hidden runtime backedges, broad compatibility surfaces, new public types, or neighboring helper files that preserve one broad owner merely to simplify the move or satisfy a structural metric.
+- Before and after the move, record file/navigation transitions, facade/proxy/pass-through layers, public contract size, state authorities, effects/recovery placement, cohesion, and independent change reasons. Consolidation needs corroborated fragmentation families, one shared owner/change reason, and a proven existing merge target.
+- Negative architecture proof covers cycles, dual state authority, cross-owner imports, broad facade/state/props bags, forwarding-only layers, dead exports, generic helpers, and UI mixed with privileged, persistence, or transport effects. Preserve ordering, failure, rollback, and cleanup proof.
 - Do not manually stage. Closeout owns staging after proof.
 
 ## Planning Bundle And Cheap Negative Proof
