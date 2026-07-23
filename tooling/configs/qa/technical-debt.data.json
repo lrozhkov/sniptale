@@ -3158,7 +3158,6 @@
         "apps/extension/src/content/selection/frame-runtime/manager/step-badge/order.ts",
         "apps/extension/src/content/selection/frame-runtime/manager/step-badge/reorder.ts",
         "apps/extension/src/content/selection/frame-runtime/manager/step-badge/update.ts",
-        "apps/extension/src/content/selection/frame-runtime/manager/types.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/auto-blur.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/clear.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/frame-build.ts",
@@ -16379,11 +16378,12 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/import-only-diff.mjs",
-        "contentHash": "eb376e2afef37635278f928c8d50703baceaa1b6aa8f98f652b941fd07a935c4"
+        "contentHash": "c2ad3c49a267378597ad9a21fb28d90d3c87d82eb847d4141722666d7844a170"
       },
       "consumers": [
         "tooling/qa/core/import-only-diff.mjs",
         "tooling/qa/core/verify-ai-hygiene.mjs",
+        "tooling/qa/core/verify-build.scope.mjs",
         "tooling/qa/core/verify-domain-fixture-realism.mjs",
         "tooling/qa/core/verify-focused.execution.mjs",
         "tooling/qa/core/verify-focused.oxlint-step.helpers.mjs",
@@ -18831,6 +18831,7 @@
         "tooling/qa/core/verify-build.deleted-package-closure.test.ts",
         "tooling/qa/core/verify-build.state.test.ts",
         "tooling/qa/core/verify-build.test-profiles.test.ts",
+        "tooling/qa/core/verify-build.type-only-scope.test.ts",
         "tooling/qa/core/verify-checkpoint.state.test.ts",
         "tooling/qa/core/verify-codeql-baseline.test.ts",
         "tooling/qa/core/verify-config-policy.test.ts",
@@ -19677,7 +19678,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scope.mjs",
-        "contentHash": "bd98568254e590adeeecac41ae93b38d104cfbb67f5812b5b43e519e00f31dff"
+        "contentHash": "be4e786a73bb9451c686adf342baafd5b637e6ce764b3789354502629d590605"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",

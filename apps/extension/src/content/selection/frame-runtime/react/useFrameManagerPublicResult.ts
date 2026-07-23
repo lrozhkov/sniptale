@@ -4,7 +4,7 @@ import type {
   GlobalStepBadgeSettings,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
-import type { FrameMutations, RecalculateStepBadges } from '../manager/types';
+import type { FrameMutations, RecalculateStepBadges } from '../contracts';
 
 interface FrameManagerPublicResultParams {
   addAutoBlurFrames: FrameMutations['addAutoBlurFrames'];

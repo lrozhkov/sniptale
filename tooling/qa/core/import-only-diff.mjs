@@ -184,14 +184,17 @@ export function isImportOrMockOnlyDiffFile(file) {
     return false;
   }
 
-  return memoizeValue('import-or-mock-only-result', relativePath, () =>
-    isDiffOnlyAfterStripping(
-      relativePath,
-      (statement) =>
-        ts.isImportDeclaration(statement) ||
-        ts.isExportDeclaration(statement) ||
-        isViMockExpressionStatement(statement)
-    )
+  return memoizeValue(
+    'import-or-mock-only-result',
+    relativePath,
+    () =>
+      isDiffOnlyAfterStripping(
+        relativePath,
+        (statement) =>
+          ts.isImportDeclaration(statement) ||
+          ts.isExportDeclaration(statement) ||
+          isViMockExpressionStatement(statement)
+      ) || isTypeOnlyDiffFile(file)
   );
 }
 
@@ -235,10 +238,16 @@ function eraseTypes(relativePath, sourceText) {
         jsx: ts.JsxEmit.ReactJSX,
         module: ts.ModuleKind.ESNext,
         target: ts.ScriptTarget.ESNext,
+        verbatimModuleSyntax: true,
       },
       fileName: relativePath,
     })
     .outputText.trim();
+}
+
+function hasNoTypeErasedRuntime(relativePath, sourceText) {
+  const output = eraseTypes(relativePath, sourceText);
+  return output === '' || /^export\s*\{\s*\};?$/u.test(output);
 }
 
 function isTypeOnlyDiffFile(file) {
@@ -249,7 +258,10 @@ function isTypeOnlyDiffFile(file) {
 
   const absolutePath = fromWorkspaceRelativePath(relativePath);
   if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
-    return false;
+    return memoizeValue('type-only-result', relativePath, () => {
+      const previousSource = readPreviousSource(relativePath);
+      return previousSource !== null && hasNoTypeErasedRuntime(relativePath, previousSource);
+    });
   }
 
   return memoizeValue('type-only-result', relativePath, () => {

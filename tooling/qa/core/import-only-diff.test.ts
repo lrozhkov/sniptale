@@ -141,6 +141,72 @@ it('detects erased type-only contract renames as non-behavioral diffs', async ()
   expect(result).toBe(true);
 });
 
+it('detects deleted erased type-only modules as non-behavioral diffs', async () => {
+  const root = createTempRoot('import-only-diff-deleted-type-only-');
+  initGitRepo(root);
+  writeFile(
+    root,
+    'src/contracts.ts',
+    [
+      "import type { Dispatch } from 'react';",
+      'export interface RuntimeState { id: string; }',
+      'export type RuntimeDispatch = Dispatch<RuntimeState>;',
+      '',
+    ].join('\n')
+  );
+  commitBaseline(root);
+  runGit(root, 'rm', 'src/contracts.ts');
+
+  const result = await withCwd(root, async () => {
+    const module = await loadModule(root);
+    return {
+      importOnly: module.isImportOnlyDiffFile('src/contracts.ts'),
+      importOrMockOnly: module.isImportOrMockOnlyDiffFile('src/contracts.ts'),
+    };
+  });
+
+  expect(result).toEqual({ importOnly: true, importOrMockOnly: true });
+});
+
+it('keeps deleted runtime modules in behavioral scope', async () => {
+  const root = createTempRoot('import-only-diff-deleted-runtime-');
+  initGitRepo(root);
+  writeFile(root, 'src/runtime.ts', 'export const runtimeValue = 1;\n');
+  commitBaseline(root);
+  runGit(root, 'rm', 'src/runtime.ts');
+
+  const result = await withCwd(root, async () => {
+    const module = await loadModule(root);
+    return module.isImportOnlyDiffFile('src/runtime.ts');
+  });
+
+  expect(result).toBe(false);
+});
+
+it('keeps deleted modules with retained value imports in behavioral scope', async () => {
+  const root = createTempRoot('import-only-diff-deleted-value-import-');
+  initGitRepo(root);
+  writeFile(root, 'src/side-effect.ts', 'export class RuntimeValue {}\n');
+  writeFile(
+    root,
+    'src/contracts.ts',
+    [
+      "import { RuntimeValue } from './side-effect';",
+      'export type RuntimeState = RuntimeValue;',
+      '',
+    ].join('\n')
+  );
+  commitBaseline(root);
+  runGit(root, 'rm', 'src/contracts.ts');
+
+  const result = await withCwd(root, async () => {
+    const module = await loadModule(root);
+    return module.isImportOnlyDiffFile('src/contracts.ts');
+  });
+
+  expect(result).toBe(false);
+});
+
 it('treats declaration file changes as type-only without TypeScript output generation', async () => {
   const root = createTempRoot('import-only-diff-declaration-');
   initGitRepo(root);

@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import type { InteractiveFrameComponent } from '../roots/component';
 import type { useFrameManagerRefs } from './useFrameManagerRefs';
-import type { FrameMutations } from '../manager/types';
+import type { FrameMutations } from '../contracts';
 import { useFrameEffectOverlays } from './useFrameEffectOverlays';
 import { useFrameRootsRenderer } from './useFrameRootsRenderer';
 import { useFrameScrollSync } from './useFrameScrollSync';

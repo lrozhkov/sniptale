@@ -63,6 +63,8 @@ export interface FrameMutations {
 }
 
 export type UpdateFrameStepBadge = (frameId: string, settings: Partial<StepBadgeSettings>) => void;
+export type UpdateGlobalStepBadgeSettings = (settings: Partial<GlobalStepBadgeSettings>) => void;
+export type ReorderStepBadge = (frameId: string, direction: 'up' | 'down') => void;
 export type RecalculateStepBadges = (excludeFrameId?: string) => void;
 export type RecalculateStepBadgesRef = MutableRefObject<RecalculateStepBadges>;
 export type WithHistoryCommit = <T extends (...args: never[]) => unknown>(action: T) => T;

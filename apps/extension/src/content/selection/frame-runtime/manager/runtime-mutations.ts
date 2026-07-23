@@ -1,4 +1,4 @@
-import type { FrameMutations, WithHistoryCommit } from './types';
+import type { FrameMutations, WithHistoryCommit } from '../contracts';
 
 export function createRuntimeHistoryWrappedMutations(
   mutations: FrameMutations,

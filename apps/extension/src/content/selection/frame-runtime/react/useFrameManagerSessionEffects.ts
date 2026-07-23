@@ -7,7 +7,7 @@ import type {
   UpdateFrameStepBadge,
   UpdateGlobalStepBadgeSettings,
   WithHistoryCommit,
-} from '../manager/types';
+} from '../contracts';
 
 export function useFrameManagerSessionEffects(params: {
   setFrames: FrameSetter;

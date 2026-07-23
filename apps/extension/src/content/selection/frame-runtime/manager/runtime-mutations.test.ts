@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRuntimeHistoryWrappedMutations } from './runtime-mutations';
-import type { FrameMutations, WithHistoryCommit } from './types';
+import type { FrameMutations, WithHistoryCommit } from '../contracts';
 
 function createMutations(): FrameMutations {
   return {

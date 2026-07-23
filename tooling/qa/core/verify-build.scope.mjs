@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { isProductQaFile } from './qa-scope.mjs';
+import { filterImportOrMockOnlyDiffFiles } from './import-only-diff.mjs';
 import { collectCodeFiles, fromRelativePath, isCodeFile } from './shared.mjs';
 import { collectDeletedTargetSuccessors } from './verify-build.deleted-closure.mjs';
 import { resolveBuildTestProfile } from './verify-build.test-profiles.mjs';
@@ -242,9 +243,12 @@ export function resolveBuildTestScope({
   ownerTestResolver,
   deletedSuccessorResolver = collectDeletedTargetSuccessors,
 } = {}) {
-  const productTargetFiles = targetFiles.filter(isProductQaFile);
-  const productRiskTargetFiles = riskTargetFiles.filter(isProductQaFile);
-  const productCodeFiles = codeFiles.filter(isProductQaFile);
+  const behavioralTargetFiles = filterImportOrMockOnlyDiffFiles(targetFiles);
+  const behavioralRiskTargetFiles = filterImportOrMockOnlyDiffFiles(riskTargetFiles);
+  const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
+  const productTargetFiles = behavioralTargetFiles.filter(isProductQaFile);
+  const productRiskTargetFiles = behavioralRiskTargetFiles.filter(isProductQaFile);
+  const productCodeFiles = behavioralCodeFiles.filter(isProductQaFile);
   const productAddedFiles = addedFiles.filter(isProductQaFile);
   const productRepoCodeFiles = repoCodeFiles.filter(isProductQaFile);
   const directTestFiles = uniqueSorted(productCodeFiles.filter(isTestFile));

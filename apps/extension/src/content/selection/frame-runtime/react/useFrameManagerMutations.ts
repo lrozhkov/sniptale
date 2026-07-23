@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import type { FrameManagerRefs, FrameSetter, RecalculateStepBadgesRef } from '../manager/types';
+import type { FrameManagerRefs, FrameSetter, RecalculateStepBadgesRef } from '../contracts';
 import { buildFrameMutationActions } from '../mutation-actions';
 
 const logger = createLogger({ namespace: 'ContentFrameManager' });

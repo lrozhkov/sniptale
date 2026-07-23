@@ -6,7 +6,7 @@ import type {
   FrameSetter,
   FrameStateSetter,
   WithHistoryCommit,
-} from '../manager/types';
+} from '../contracts';
 import { useFrameContainer } from './useFrameManagerRefs';
 import { createRuntimeHistoryWrappedMutations } from '../manager/runtime-mutations';
 import {
