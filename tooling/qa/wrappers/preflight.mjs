@@ -85,34 +85,29 @@ function createAnalysisContext(context, explicitFiles) {
 }
 
 function collectStructuralPressure(report) {
-  const findingKeys = new Set(
-    [...report.violations, ...report.advisories].map(
-      (finding) => `${finding.file}:${finding.symbol}`
-    )
+  const findingFiles = new Set(
+    [...report.violations, ...report.advisories].map((finding) => finding.file)
   );
   const formatFileMetric = (metric) =>
     [
       `${metric.file}: score=${metric.score}, delta=${metric.delta}`,
+      `delta-kind=${metric.deltaKind}`,
       `owners=${metric.ownerGroupCount}, effects=${metric.effectCount}`,
       `state=${metric.stateAuthorities}, cohesion=${metric.cohesion.toFixed(2)}`,
     ].join(', ');
   const formatFunctionMetric = (metric) =>
     [
       `${metric.file}:${metric.line} ${metric.symbol} (${metric.profile})`,
-      `score=${metric.score}, delta=${metric.delta}`,
+      `score=${metric.score}, delta=${metric.delta}, delta-kind=${metric.deltaKind}`,
       `cohesion=${metric.cohesion.toFixed(2)}`,
     ].join(': ');
   const fileSignals = report.files
-    .filter(
-      (metric) =>
-        (metric.score > 0 || metric.lines > 400) &&
-        !findingKeys.has(`${metric.file}:${metric.symbol}`)
-    )
+    .filter((metric) => (metric.score > 0 || metric.lines > 400) && !findingFiles.has(metric.file))
     .sort((left, right) => right.score - left.score || right.lines - left.lines)
     .slice(0, 8)
     .map(formatFileMetric);
   const functionSignals = report.functions
-    .filter((metric) => metric.score > 0 && !findingKeys.has(`${metric.file}:${metric.symbol}`))
+    .filter((metric) => metric.score > 0 && !findingFiles.has(metric.file))
     .sort((left, right) => right.score - left.score || right.lines - left.lines)
     .slice(0, 8)
     .map(formatFunctionMetric);
@@ -200,6 +195,7 @@ export function collectPreflightReport({ files = [] } = {}) {
     advisoryFindings: collectAdvisoryFindings({
       codeFiles: context.codeFiles,
       targetFiles: context.targetFiles,
+      structuralReport: structuralResult.report,
     }).slice(0, 12),
     proofHints: [
       ...collectProofHints(context, guardrailReport),

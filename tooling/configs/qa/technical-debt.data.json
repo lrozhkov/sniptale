@@ -14684,6 +14684,7 @@
         "tooling/qa/core/verify-domain-fixture-realism.mjs",
         "tooling/qa/core/verify-logging.mjs",
         "tooling/qa/core/verify-naming.facades.mjs",
+        "tooling/qa/core/verify-structural-risk.mjs",
         "tooling/qa/core/verify-test-coverage.mjs",
         "tooling/qa/guards/quality/verify-line-length.mjs",
         "tooling/qa/guards/quality/verify-manual-mock-export-parity.mjs",
@@ -16031,7 +16032,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/function-metrics.mjs",
-        "contentHash": "0ddb204bc71514c15cb6021f685860c898b14a4a198f61ca7b127770d4c3c56a"
+        "contentHash": "ebab1c00191522584b60afc3781348a093c8afbf021429398db264c1965a0a33"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -16641,6 +16642,27 @@
       ],
       "surfaces": [
         "property:runLicenseCheck/statuses"
+      ]
+    },
+    {
+      "id": "policy.source.lineage-mjs.2934bc0c9a",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/structural-risk/lineage.mjs",
+        "contentHash": "2ad1c61ae7ce1faf3ae2aa810226b32eac340c9b1431d8d08953e9ffd0bbb139"
+      },
+      "consumers": [
+        "tooling/qa/core/structural-risk/file-metrics.mjs",
+        "tooling/qa/core/structural-risk/function-metrics.mjs",
+        "tooling/qa/core/structural-risk/lineage.mjs",
+        "tooling/qa/core/structural-risk/report.mjs"
+      ],
+      "surfaces": [
+        "binding:NON_REFERENCE_NAME_PARENT_KINDS"
       ]
     },
     {
@@ -17506,7 +17528,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/preflight.mjs",
-        "contentHash": "5fceedf050528674b665c739b6ffd133ea0d118687fbf38605779b8f8217b01d"
+        "contentHash": "400e33393a73c3bbcc23d1de24b804bbbba136095e0e494a47f42fd7e8a85a76"
       },
       "consumers": [
         "tooling/qa/wrappers/preflight-render.test.ts",
@@ -17809,11 +17831,12 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/report.mjs",
-        "contentHash": "6ba20c0deaf516a47a263a3c0a0b95016bcef3d82f91007b26b3cf763155a1bb"
+        "contentHash": "0bc556bd7889fcc148027dd1b1ce0453b7f4ba4275c9affce44ea05a79b2896c"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/authority-aliases.test.ts",
         "tooling/qa/core/structural-risk/function-profile.test.ts",
+        "tooling/qa/core/structural-risk/lineage.test.ts",
         "tooling/qa/core/structural-risk/remediation.test.ts",
         "tooling/qa/core/structural-risk/report.mjs",
         "tooling/qa/core/verify-structural-risk.mjs",

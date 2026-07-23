@@ -14,6 +14,37 @@ import {
   withCwd,
   writeFile,
 } from './test-helpers';
+import { collectAdvisoryFindings as collectRawAdvisoryFindings } from './verify-advisory.collectors.helpers.mjs';
+
+it('reuses a supplied structural report instead of recollecting structural findings', () => {
+  const file = 'virtual/example.ts';
+  const findings = collectRawAdvisoryFindings({
+    codeFiles: [file],
+    targetFiles: [file],
+    structuralReport: {
+      violations: [],
+      advisories: [
+        {
+          rule: 'structural-function-risk',
+          severity: 'watch',
+          file,
+          line: 3,
+          symbol: 'run',
+          reason: 'score=4, delta=0, delta-kind=move-only',
+          remediationHint: 'Keep the cohesive owner.',
+        },
+      ],
+    },
+  });
+
+  expect(findings).toContainEqual(
+    expect.objectContaining({
+      id: 'advisory.structural-function',
+      file,
+      reason: 'score=4, delta=0, delta-kind=move-only',
+    })
+  );
+});
 
 it('rejects explicit file scopes because advisory is diff-only', async () => {
   const module = await import('./verify-advisory.mjs');

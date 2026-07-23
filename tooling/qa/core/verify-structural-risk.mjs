@@ -1,4 +1,6 @@
-import { createHeadFileTextResolver } from './git-head-sources.mjs';
+import fs from 'node:fs';
+
+import { createHeadFileTextResolver, readHeadFileTexts } from './git-head-sources.mjs';
 import {
   collectRenameSourceByTarget,
   filterImportOrMockOnlyDiffFiles,
@@ -6,6 +8,7 @@ import {
 import {
   collectCodeFiles,
   isExecutedAsScript,
+  isIgnoredRelativePath,
   parseFilesArgument,
   readText,
   toRelativePath,
@@ -20,6 +23,7 @@ import {
   collectSensitiveEnvironmentValues,
   sanitizeBoundedConsoleOutput,
 } from '../runtime/observability/sanitize.mjs';
+import { collectChangedTargets } from '../runtime/changed-targets.helpers.mjs';
 
 function resolveStructuralFiles({ files = [] } = {}) {
   const targets = resolveScopedTargetFiles({
@@ -42,6 +46,17 @@ function createPreviousSourceResolver(targetFiles) {
   return (relativePath) => direct(relativePath) ?? renamed(renameMap.get(relativePath));
 }
 
+function collectPreviousCandidateSources({ enforce, reportScope }) {
+  if (!enforce || reportScope !== 'current-diff' || !fs.existsSync('.git')) return [];
+  const deletedFiles = collectChangedTargets({ scope: 'workspace' }).deletedFiles.filter(
+    (file) => JAVASCRIPT_FILE_PATTERN.test(file) && !isIgnoredRelativePath(file)
+  );
+  const sources = readHeadFileTexts(deletedFiles);
+  return deletedFiles
+    .map((file) => ({ file, source: sources.get(file) }))
+    .filter(({ source }) => typeof source === 'string');
+}
+
 export function runStructuralRiskCheck({
   files = [],
   reportScope = files.length > 0 ? 'preflight-explicit' : 'current-diff',
@@ -55,6 +70,7 @@ export function runStructuralRiskCheck({
     files: targetFiles,
     getCurrentSource,
     getPreviousSource: previous,
+    previousCandidateSources: collectPreviousCandidateSources({ enforce, reportScope }),
     scope: reportScope,
     enforce,
   });

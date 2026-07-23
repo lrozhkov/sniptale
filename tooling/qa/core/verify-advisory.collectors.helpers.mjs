@@ -20,9 +20,13 @@ function isUiFile(file) {
   return !TEST_FILE_PATTERN.test(file) && EXTENSION_UI_FILE_PATTERN.test(file);
 }
 
-export function collectAdvisoryFindings({ codeFiles = [], targetFiles = [] } = {}) {
+export function collectAdvisoryFindings({
+  codeFiles = [],
+  targetFiles = [],
+  structuralReport = null,
+} = {}) {
   const findings = [
-    ...collectStructuralFindings(codeFiles),
+    ...collectStructuralFindings(codeFiles, structuralReport),
     ...collectUiProofGapFindings({ codeFiles, targetFiles }),
     ...collectDetachedThisMethodFindings(codeFiles),
   ];
@@ -30,13 +34,15 @@ export function collectAdvisoryFindings({ codeFiles = [], targetFiles = [] } = {
   return findings.sort(compareAdvisoryFindings);
 }
 
-function collectStructuralFindings(codeFiles) {
+function collectStructuralFindings(codeFiles, structuralReport) {
   if (codeFiles.length === 0) return [];
-  const report = runStructuralRiskCheck({
-    files: codeFiles,
-    reportScope: 'current-diff',
-    enforce: true,
-  }).report;
+  const report =
+    structuralReport ??
+    runStructuralRiskCheck({
+      files: codeFiles,
+      reportScope: 'current-diff',
+      enforce: true,
+    }).report;
   return [...report.violations, ...report.advisories].map((finding) =>
     createAdvisoryFinding({
       id:

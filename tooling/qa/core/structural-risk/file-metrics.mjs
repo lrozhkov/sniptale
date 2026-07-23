@@ -7,6 +7,7 @@ import {
 } from './owner-classifier.mjs';
 import { createNormalizedSourceHash, getNodeLine, sha256, ts } from './ast.mjs';
 import { TEST_FILE_PATTERN } from './config.mjs';
+import { createTopLevelLineageHashes } from './lineage.mjs';
 
 function collectImports(sourceFile, relativePath) {
   const edges = [];
@@ -177,6 +178,7 @@ export function collectFileMetrics(sourceFile, relativePath, source) {
         exports: collectExportSignatures(sourceFile).sort(),
       })
     ),
+    topLevelLineageHashes: createTopLevelLineageHashes(sourceFile, relativePath),
     functions,
   };
 }

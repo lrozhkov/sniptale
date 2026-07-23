@@ -7,11 +7,15 @@ import {
   getFunctionWarningLineLimit,
   isOrchestrationReviewExempt,
   scoreFile,
-  scoreFunction,
 } from './score.mjs';
 import { STRUCTURAL_ALLOWANCES_PATH, STRUCTURAL_RISK_LIMITS } from './config.mjs';
 import { buildFileRemediationHint, buildFunctionRemediationHint } from './remediation.mjs';
 import { fromRelativePath } from '../shared.mjs';
+import {
+  compareStructuralFunctions,
+  createLineagePool,
+  hasCompleteTopLevelLineage,
+} from './lineage.mjs';
 
 function createFinding(rule, severity, metric, reason, hint) {
   const profile = metric.profile ?? metric.architecturalLayer ?? 'file';
@@ -61,19 +65,36 @@ function resolveFunctionDisposition(metric, enforce) {
     : classifyExistingRisk(metric, getFunctionHardLineLimit(metric));
 }
 
-function analyzeFilePair(relativePath, source, previousSource) {
+function analyzeFilePair(relativePath, source, previousSource, lineagePool, lineageCandidates) {
   const current = analyzeStructuralSource(relativePath, source);
   const previous =
     previousSource == null ? null : analyzeStructuralSource(relativePath, previousSource);
   const score = scoreFile(current);
-  const functions = compareFunctions(current, previous);
+  const { functions, movedSourceCounts } = compareStructuralFunctions(
+    current,
+    previous,
+    lineagePool
+  );
+  const completePredecessors = [...movedSourceCounts]
+    .filter(
+      ([file, matchCount]) =>
+        matchCount > 0 &&
+        matchCount === lineageCandidates.get(file)?.functions.length &&
+        hasCompleteTopLevelLineage(current, lineageCandidates.get(file))
+    )
+    .map(([file]) => lineageCandidates.get(file));
+  const previousMetrics = [previous, ...completePredecessors].filter(Boolean);
+  const previousScore = Math.max(0, ...previousMetrics.map(scoreFile));
+  const previousLines = Math.max(0, ...previousMetrics.map((metric) => metric.lines));
   return {
     ...current,
     functions,
     score,
-    previousScore: previous ? scoreFile(previous) : 0,
-    delta: score - (previous ? scoreFile(previous) : 0),
-    previousLines: previous?.lines ?? 0,
+    previousScore,
+    delta: score - previousScore,
+    deltaKind: completePredecessors.length > 0 ? 'consolidated' : previous ? 'same-path' : 'new',
+    predecessorFiles: completePredecessors.map((metric) => metric.file).sort(),
+    previousLines,
     isNew: previous == null,
   };
 }
@@ -150,70 +171,6 @@ function isAllowed(finding, metric, allowances) {
   );
 }
 
-function functionSymbolGroup(symbol) {
-  return symbol.replace(/#\d+$/u, '');
-}
-
-function groupFunctionsBySymbol(metrics) {
-  const groups = new Map();
-  for (const metric of metrics) {
-    const key = functionSymbolGroup(metric.symbol);
-    const group = groups.get(key) ?? [];
-    group.push(metric);
-    groups.set(key, group);
-  }
-  return groups;
-}
-
-function matchFunctionGroup(currentGroup, previousGroup) {
-  const matches = new Map();
-  const unmatchedPrevious = new Set(previousGroup);
-
-  for (const currentMetric of currentGroup) {
-    const exactMatch = previousGroup.find(
-      (previousMetric) =>
-        unmatchedPrevious.has(previousMetric) &&
-        previousMetric.astHash === currentMetric.astHash &&
-        previousMetric.signatureHash === currentMetric.signatureHash
-    );
-    if (!exactMatch) continue;
-    matches.set(currentMetric, exactMatch);
-    unmatchedPrevious.delete(exactMatch);
-  }
-
-  const remainingCurrent = currentGroup.filter((metric) => !matches.has(metric));
-  const remainingPrevious = previousGroup.filter((metric) => unmatchedPrevious.has(metric));
-  for (const [index, currentMetric] of remainingCurrent.entries()) {
-    const previousMetric = remainingPrevious[index];
-    if (previousMetric) matches.set(currentMetric, previousMetric);
-  }
-  return matches;
-}
-
-function compareFunctions(current, previous) {
-  const currentGroups = groupFunctionsBySymbol(current.functions);
-  const previousGroups = groupFunctionsBySymbol(previous?.functions ?? []);
-  const previousByMetric = new Map();
-  for (const [symbolGroup, currentGroup] of currentGroups) {
-    const matches = matchFunctionGroup(currentGroup, previousGroups.get(symbolGroup) ?? []);
-    for (const [currentMetric, previousMetric] of matches) {
-      previousByMetric.set(currentMetric, previousMetric);
-    }
-  }
-  return current.functions.map((metric) => {
-    const previousMetric = previousByMetric.get(metric);
-    const score = scoreFunction(metric);
-    return {
-      ...metric,
-      score,
-      previousScore: previousMetric ? scoreFunction(previousMetric) : 0,
-      delta: score - (previousMetric ? scoreFunction(previousMetric) : 0),
-      isNew: previousMetric == null,
-      previousLines: previousMetric?.lines ?? 0,
-    };
-  });
-}
-
 function classifyExistingRisk(metric, hardCap) {
   if (
     metric.lines > hardCap &&
@@ -266,7 +223,7 @@ function classifyNewFunction(metric) {
 
 function buildFileFinding(metric, severity) {
   const reason = [
-    `score=${metric.score}, delta=${metric.delta}, lines=${metric.lines}`,
+    `score=${metric.score}, delta=${metric.delta}, delta-kind=${metric.deltaKind}, lines=${metric.lines}`,
     `owners=${metric.ownerGroupCount}, effects=${metric.effectCount}`,
     `state=${metric.stateAuthorities}, clusters=${metric.effectfulClusters}`,
     `cohesion=${metric.cohesion.toFixed(2)}`,
@@ -282,7 +239,7 @@ function buildFileFinding(metric, severity) {
 
 function buildFunctionFinding(metric, severity) {
   const reason = [
-    `score=${metric.score}, delta=${metric.delta}, lines=${metric.lines}`,
+    `score=${metric.score}, delta=${metric.delta}, delta-kind=${metric.deltaKind}, lines=${metric.lines}`,
     `statements=${metric.statements}, cyclomatic=${metric.cyclomatic}`,
     `cognitive=${metric.cognitive}, nesting=${metric.nesting}`,
     `recovery=${metric.recoveryPressure}, params=${metric.params}`,
@@ -307,6 +264,7 @@ export function createStructuralRiskReport({
   files,
   getCurrentSource,
   getPreviousSource = () => null,
+  previousCandidateSources = [],
   scope = 'current-diff',
   enforce = true,
 } = {}) {
@@ -315,11 +273,24 @@ export function createStructuralRiskReport({
   const functionMetrics = [];
   const violations = [];
   const advisories = [];
+  const lineageCandidates = new Map(
+    previousCandidateSources.map(({ file, source }) => [
+      file,
+      analyzeStructuralSource(file, source),
+    ])
+  );
+  const lineagePool = createLineagePool(lineageCandidates);
 
   for (const relativePath of files) {
     const source = getCurrentSource(relativePath);
     if (source == null) continue;
-    const scoredFile = analyzeFilePair(relativePath, source, getPreviousSource(relativePath));
+    const scoredFile = analyzeFilePair(
+      relativePath,
+      source,
+      getPreviousSource(relativePath),
+      lineagePool,
+      lineageCandidates
+    );
     fileMetrics.push(scoredFile);
     functionMetrics.push(...scoredFile.functions);
     collectFileFindings({ violations, advisories }, scoredFile, { allowances, enforce });

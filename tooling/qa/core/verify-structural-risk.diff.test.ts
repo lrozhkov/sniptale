@@ -73,6 +73,74 @@ it('reports skip when the diff contains only import, mock, and rename changes', 
   expect(JSON.parse(output)).toEqual({ files: [], skipped: true });
 });
 
+it('uses deleted same-owner functions as move-only structural predecessors', () => {
+  const root = createTempRoot('structural-risk-lineage-');
+  const owner = 'apps/extension/src/content/selection/example';
+  const target = `${owner}/index.ts`;
+  const predecessor = `${owner}/update.ts`;
+  const implementation = `export function update(region, tooltip) {
+    region.style.left = '1px';
+    region.style.width = '2px';
+    tooltip.textContent = 'Ready';
+  }
+`;
+  initGitRepo(root);
+  writeFile(root, 'package.json', '{"name":"structural-risk-lineage","type":"module"}\n');
+  writeFile(root, target, "export { update } from './update';\n");
+  writeFile(root, predecessor, implementation);
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'initial');
+
+  writeFile(root, target, implementation);
+  runGit(root, 'rm', predecessor);
+
+  const moduleUrl = pathToFileURL(path.resolve('tooling/qa/core/verify-structural-risk.mjs')).href;
+  const source = `
+    import { runStructuralRiskCheck } from ${JSON.stringify(moduleUrl)};
+    const result = runStructuralRiskCheck();
+    const file = result.report.files[0];
+    const fn = result.report.functions.find((metric) => metric.symbol === 'update');
+    const explicit = runStructuralRiskCheck({ files: [${JSON.stringify(target)}] });
+    const explicitFile = explicit.report.files[0];
+    const explicitFn = explicit.report.functions.find((metric) => metric.symbol === 'update');
+    process.stdout.write(JSON.stringify({
+      files: result.files,
+      file: {
+        delta: file.delta,
+        deltaKind: file.deltaKind,
+        predecessorFiles: file.predecessorFiles,
+      },
+      fn: {
+        delta: fn.delta,
+        deltaKind: fn.deltaKind,
+        predecessorFile: fn.predecessorFile,
+      },
+      explicit: {
+        scope: explicit.report.scope,
+        enforceLineage: explicitFn.deltaKind,
+        predecessorFile: explicitFn.predecessorFile,
+        predecessorFiles: explicitFile.predecessorFiles,
+      },
+    }));
+  `;
+  const output = execFileSync(process.execPath, ['--input-type=module', '-e', source], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+
+  expect(JSON.parse(output)).toEqual({
+    files: [target],
+    file: { delta: 0, deltaKind: 'consolidated', predecessorFiles: [predecessor] },
+    fn: { delta: 0, deltaKind: 'move-only', predecessorFile: predecessor },
+    explicit: {
+      scope: 'preflight-explicit',
+      enforceLineage: 'new',
+      predecessorFile: null,
+      predecessorFiles: [],
+    },
+  });
+});
+
 it('does not expose repo-wide or raw JSON modes from the enforcement entrypoint', () => {
   const source = fs.readFileSync('tooling/qa/core/verify-structural-risk.mjs', 'utf8');
   expect(source).not.toContain("scope === 'repo-wide'");

@@ -355,7 +355,7 @@ it('renders a structural finding as advisory without duplicating it as pressure'
   expect(result.advisoryFindings).toEqual(
     expect.arrayContaining([expect.objectContaining({ file, id: 'advisory.structural-function' })])
   );
-  expect(result.structuralPressure.join('\n')).not.toContain(file);
+  expect(result.structuralPressure).toEqual([]);
 });
 
 it('does not route markdown docs through structural analysis', async () => {

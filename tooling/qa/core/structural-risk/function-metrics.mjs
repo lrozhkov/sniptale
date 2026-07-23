@@ -14,6 +14,7 @@ import {
   classifyOwnerGroup,
 } from './owner-classifier.mjs';
 import { createFunctionProfileClassifier } from './function-profile.mjs';
+import { createFunctionLineageHasher } from './lineage.mjs';
 
 const RECOVERY_PATTERN =
   /\b(?:rollback|recover|restore|cleanup|compensat|abort|release|finally)\b/iu;
@@ -275,11 +276,13 @@ function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
 export function collectFunctionMetrics(sourceFile, relativePath) {
   const importOwners = createImportOwnerMap(sourceFile, relativePath);
   const classifyProfile = createFunctionProfileClassifier(sourceFile, relativePath);
+  const createLineageHash = createFunctionLineageHasher(sourceFile, relativePath);
   return collectFunctionNodes(sourceFile).map(({ node, symbol }) => {
     const line = getNodeLine(sourceFile, node);
     const endLine = getNodeEndLine(sourceFile, node);
     const controls = collectControlMetrics(node, sourceFile, importOwners, relativePath);
     const profile = classifyProfile(symbol, node, controls);
+    const normalizedHashes = createNormalizedNodeHashes(node, sourceFile, symbol);
     return {
       file: relativePath,
       line,
@@ -292,7 +295,8 @@ export function collectFunctionMetrics(sourceFile, relativePath) {
       ownerGroupCount: controls.ownerGroups.length,
       architecturalLayer: classifyArchitecturalLayer(relativePath),
       ...controls,
-      ...createNormalizedNodeHashes(node, sourceFile, symbol),
+      ...normalizedHashes,
+      lineageHash: createLineageHash(node, normalizedHashes),
     };
   });
 }

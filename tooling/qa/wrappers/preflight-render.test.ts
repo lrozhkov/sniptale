@@ -22,7 +22,7 @@ it('renders deduplicated owner, structural, advisory, and proof sections', () =>
       falsePublicSeams: [],
       pathAudits: [],
     },
-    structuralPressure: ['session.ts: score=5, delta=3, cohesion=0.60'],
+    structuralPressure: ['queue.ts: score=5, delta=3, cohesion=0.60'],
     contractChecklist: [],
     transitiveConsumerHints: [],
     typecheckBlastRadius: [],
@@ -44,6 +44,7 @@ it('renders deduplicated owner, structural, advisory, and proof sections', () =>
   expect(output).toContain('- extension:composition:persistence');
   expect(output).toContain('Structural pressure:');
   expect(output).toContain('score=5, delta=3');
+  expect(output).toContain('queue.ts');
   expect(output).toContain('[advisory.structural-file] dual truth risk');
   expect(output).toContain('Hint: Keep the transaction boundary cohesive.');
   expect(output).not.toContain('Budget signals:');
