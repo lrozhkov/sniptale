@@ -3,7 +3,7 @@ import type { ExportOptions, ExportPagePackage } from '@sniptale/runtime-contrac
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type * as ContentIntentTypes from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import * as contentIntent from '../../../platform/privileged-action-intent/client';
-import type { PopupExportRequestHandlerRuntime } from './request-handler/types/runtime';
+import type { PopupExportRequestHandlerRuntime } from './types';
 
 type ContentActionGrant = ContentIntentTypes.ContentPrivilegedActionAutoStartGrant;
 const createAutoStartIntentSource =

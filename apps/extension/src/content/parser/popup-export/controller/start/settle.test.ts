@@ -25,7 +25,7 @@ function createExportOptions(): ExportOptions {
   };
 }
 
-function createExportResult(): ExportResult {
+function createExportResult(overrides: Partial<ExportResult> = {}): ExportResult {
   return {
     errors: [],
     filename: 'popup-export.zip',
@@ -36,6 +36,7 @@ function createExportResult(): ExportResult {
       sectionsCount: 1,
     },
     success: true,
+    ...overrides,
   };
 }
 
@@ -46,8 +47,8 @@ function createState(requestId: string | null): PopupExportState {
   };
 }
 
-it('settles a successful export result and resets state', async () => {
-  const exportResult = createExportResult();
+it('merges export and persistence errors in order while resetting state', async () => {
+  const exportResult = createExportResult({ errors: ['export warning'] });
   const exportRunner = {
     export: vi.fn().mockResolvedValue(exportResult),
     onProgress: vi.fn(),
@@ -64,7 +65,7 @@ it('settles a successful export result and resets state', async () => {
       state,
     })
   ).resolves.toEqual({
-    errors: ['archive write failed'],
+    errors: ['export warning', 'archive write failed'],
     filename: 'popup-export.zip',
     stats: exportResult.stats,
     success: false,
@@ -75,6 +76,33 @@ it('settles a successful export result and resets state', async () => {
     activeExportRequestId: null,
     isExportRunning: false,
   });
+});
+
+it('keeps a successful result without adding a missing filename', async () => {
+  const exportResult = createExportResult();
+  delete exportResult.filename;
+  const exportRunner = {
+    export: vi.fn().mockResolvedValue(exportResult),
+    onProgress: vi.fn(),
+  };
+  const persistArchive = vi.fn().mockResolvedValue([]);
+  const state = createState('req-1');
+
+  await expect(
+    settlePopupExportStartFlow({
+      exportRunner,
+      options: createExportOptions(),
+      persistArchive,
+      requestId: 'req-1',
+      state,
+    })
+  ).resolves.toEqual({
+    errors: [],
+    stats: exportResult.stats,
+    success: true,
+  });
+
+  expect(persistArchive).toHaveBeenCalledWith(exportResult);
 });
 
 it('returns null for a stale export request and still resets state', async () => {
@@ -109,6 +137,7 @@ it('normalizes a rejected export into a generic failure result', async () => {
   };
   const persistArchive = vi.fn();
   const state = createState('req-1');
+  translateMock.mockClear();
 
   await expect(
     settlePopupExportStartFlow({
@@ -131,6 +160,72 @@ it('normalizes a rejected export into a generic failure result', async () => {
   });
 
   expect(persistArchive).not.toHaveBeenCalled();
+  expect(translateMock).toHaveBeenCalledWith('content.runtime.exportFailed');
+  expect(state).toEqual({
+    activeExportRequestId: null,
+    isExportRunning: false,
+  });
+});
+
+it('preserves an Error message while resetting failed export state', async () => {
+  const exportRunner = {
+    export: vi.fn(() => Promise.reject(new Error('runner failed'))),
+    onProgress: vi.fn(),
+  };
+  const persistArchive = vi.fn();
+  const state = createState('req-1');
+
+  await expect(
+    settlePopupExportStartFlow({
+      exportRunner,
+      options: createExportOptions(),
+      persistArchive,
+      requestId: 'req-1',
+      state,
+    })
+  ).resolves.toEqual({
+    errors: ['runner failed'],
+    stats: {
+      filesCount: 0,
+      filesFailed: 0,
+      rowsCount: 0,
+      sectionsCount: 0,
+    },
+    success: false,
+  });
+
+  expect(persistArchive).not.toHaveBeenCalled();
+  expect(state).toEqual({
+    activeExportRequestId: null,
+    isExportRunning: false,
+  });
+});
+
+it('surfaces export warnings as a failed popup result', async () => {
+  const exportResult = createExportResult({ errors: ['screenshot failed'] });
+  const exportRunner = {
+    export: vi.fn().mockResolvedValue(exportResult),
+    onProgress: vi.fn(),
+  };
+  const persistArchive = vi.fn().mockResolvedValue([]);
+  const state = createState('req-1');
+
+  await expect(
+    settlePopupExportStartFlow({
+      exportRunner,
+      options: createExportOptions(),
+      persistArchive,
+      requestId: 'req-1',
+      state,
+    })
+  ).resolves.toEqual({
+    errors: ['screenshot failed'],
+    filename: 'popup-export.zip',
+    stats: exportResult.stats,
+    success: false,
+  });
+
+  expect(persistArchive).toHaveBeenCalledWith(exportResult);
   expect(state).toEqual({
     activeExportRequestId: null,
     isExportRunning: false,

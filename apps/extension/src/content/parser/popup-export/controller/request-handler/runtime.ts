@@ -1,6 +1,6 @@
 import { parsePopupExportRequest, type PopupSendResponse } from '../../helpers';
 import { dispatchPopupExportRequest } from './dispatch';
-import type { PopupExportRequestHandlerRuntime } from './types/runtime';
+import type { PopupExportRequestHandlerRuntime } from '../types';
 
 export function createPopupExportRequestHandler(
   props: PopupExportRequestHandlerRuntime

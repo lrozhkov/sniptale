@@ -49,6 +49,17 @@ it('rejects package builds while another export is already running', () => {
 
 it('returns the built page package and clears the running flag after completion', async () => {
   const sendResponse = vi.fn();
+  const buildPackage = vi.fn().mockResolvedValue({
+    archiveBaseName: 'page_2026-04-09_12-00-00',
+    entries: [{ path: 'page_2026-04-09_12-00-00.json', textContent: '{}' }],
+    errors: [],
+    stats: {
+      sectionsCount: 1,
+      rowsCount: 0,
+      filesCount: 0,
+      filesFailed: 0,
+    },
+  });
   const state = {
     activeExportRequestId: null,
     isExportRunning: false,
@@ -57,19 +68,10 @@ it('returns the built page package and clears the running flag after completion'
   expect(
     handlePopupExportBuildPackageRuntime({
       exportRunner: {
-        buildPackage: vi.fn().mockResolvedValue({
-          archiveBaseName: 'page_2026-04-09_12-00-00',
-          entries: [{ path: 'page_2026-04-09_12-00-00.json', textContent: '{}' }],
-          errors: [],
-          stats: {
-            sectionsCount: 1,
-            rowsCount: 0,
-            filesCount: 0,
-            filesFailed: 0,
-          },
-        }),
+        buildPackage,
       } as never,
       request: {
+        contentIntentGrant: { grantToken: 'grant-package' },
         type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
         options: createExportOptions(),
       },
@@ -86,6 +88,12 @@ it('returns the built page package and clears the running flag after completion'
     pagePackage: expect.objectContaining({
       archiveBaseName: 'page_2026-04-09_12-00-00',
     }),
+  });
+  expect(buildPackage).toHaveBeenCalledWith(createExportOptions(), {
+    contentIntentSource: {
+      grantToken: 'grant-package',
+      kind: 'background-auto-start',
+    },
   });
   expect(state.isExportRunning).toBe(false);
 });
