@@ -1,4 +1,5 @@
-export { moveLayerSelection, moveLayerSelectionToEdge, reorderLayerObjects } from './reorder';
+export { reorderLayerObjects } from './reorder/drag';
+export { moveLayerSelection, moveLayerSelectionToEdge } from './reorder/selection';
 export {
   resizeLayerObject,
   selectLayerObject,

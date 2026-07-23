@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   findObjectByIdMock: vi.fn(),
-  getLayerObjectsMock: vi.fn(),
   isTextboxMock: vi.fn(() => false),
   isEditableObjectMock: vi.fn(() => true),
   isUserObjectMock: vi.fn(() => true),
@@ -12,7 +11,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../document/layers', async () => ({
   ...(await vi.importActual<typeof import('../document/layers')>('../document/layers')),
   findObjectById: mocks.findObjectByIdMock,
-  getLayerObjects: mocks.getLayerObjectsMock,
 }));
 
 vi.mock('../../document/model', async () => ({
@@ -29,7 +27,6 @@ vi.mock('../core/helpers', async () => ({
 import {
   moveLayerSelection,
   moveLayerSelectionToEdge,
-  reorderLayerObjects,
   resizeLayerObject,
   selectLayerObject,
   toggleLayerLock,
@@ -107,58 +104,6 @@ beforeEach(() => {
   mocks.isTextboxMock.mockReturnValue(false);
   mocks.isUserObjectMock.mockReturnValue(true);
 });
-
-function runReorderSuite() {
-  it('reorders layer objects using reversed layer order', () => {
-    const first = createObject('first');
-    const second = createObject('second');
-    const third = createObject('third');
-    const canvas = createCanvas([first, second, third]);
-    mocks.getLayerObjectsMock.mockReturnValue([first, second, third]);
-
-    expect(reorderLayerObjects(canvas, 'third', 'first')).toBe(true);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(1, third, 0);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(2, first, 1);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(3, second, 2);
-    expect(reorderLayerObjects(canvas, 'missing', 'first')).toBe(false);
-    expect(reorderLayerObjects(canvas, 'first', 'first')).toBe(false);
-  });
-}
-
-function runSelectionMovementSuite() {
-  it('moves active editable selection forward, backward, and to edges', () => {
-    const first = createObject('first');
-    const second = createObject('second');
-    const third = createObject('third');
-    const canvas = createCanvas([first, second, third], [second, first]);
-
-    expect(moveLayerSelection(canvas, 1)).toBe(true);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(1, third, 0);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(2, first, 1);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(3, second, 2);
-    canvas.moveObjectTo.mockClear();
-    expect(moveLayerSelection(canvas, -1)).toBe(true);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(1, first, 0);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(2, second, 1);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(3, third, 2);
-    canvas.moveObjectTo.mockClear();
-    const source = createObject('source', { sniptaleType: 'source-image' });
-    const sourceBoundaryCanvas = createCanvas([source, first], [first]);
-    expect(moveLayerSelection(sourceBoundaryCanvas, -1)).toBe(true);
-    expect(sourceBoundaryCanvas.moveObjectTo).toHaveBeenNthCalledWith(1, source, 0);
-    expect(sourceBoundaryCanvas.moveObjectTo).toHaveBeenNthCalledWith(2, first, 1);
-    expect(moveLayerSelectionToEdge(canvas, 'front')).toBe(true);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(1, third, 0);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(2, first, 1);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(3, second, 2);
-    canvas.moveObjectTo.mockClear();
-    expect(moveLayerSelectionToEdge(canvas, 'back')).toBe(true);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(1, first, 0);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(2, second, 1);
-    expect(canvas.moveObjectTo).toHaveBeenNthCalledWith(3, third, 2);
-    expect(moveLayerSelection(createCanvas([first, second, third], []), 1)).toBe(false);
-  });
-}
 
 function runSelectionFocusSuite() {
   it('selects a reachable layer object and syncs focus', () => {
@@ -289,8 +234,6 @@ function runGuardSuite() {
 }
 
 describe('editor-controller-layer-actions', () => {
-  runReorderSuite();
-  runSelectionMovementSuite();
   runSelectionFocusSuite();
   runToggleLayerStateSuite();
   runGenericResizeSuite();
