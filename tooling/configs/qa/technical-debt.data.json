@@ -14285,6 +14285,25 @@
       ]
     },
     {
+      "id": "policy.source.authority-aliases-mjs.f62d1ec39f",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/structural-risk/authority-aliases.mjs",
+        "contentHash": "b19f62bd2761d7788bab9b7ca6cfad8c7a4b84177d5d484b2fa3ed7878fdeb9b"
+      },
+      "consumers": [
+        "tooling/qa/core/structural-risk/authority-aliases.mjs",
+        "tooling/qa/core/structural-risk/file-metrics.mjs"
+      ],
+      "surfaces": [
+        "property:collectCallsByFunction/anonymous-120/calls"
+      ]
+    },
+    {
       "id": "policy.source.background-runtime-messaging-mjs.90e011a5f4",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -14954,8 +14973,9 @@
       "consumers": [
         "tooling/qa/core/structural-risk/config.mjs",
         "tooling/qa/core/structural-risk/file-metrics.mjs",
-        "tooling/qa/core/structural-risk/function-metrics.mjs",
+        "tooling/qa/core/structural-risk/function-profile.mjs",
         "tooling/qa/core/structural-risk/owner-classifier.mjs",
+        "tooling/qa/core/structural-risk/remediation.mjs",
         "tooling/qa/core/structural-risk/report.mjs",
         "tooling/qa/core/structural-risk/score.mjs",
         "tooling/qa/core/verify-structural-risk.mjs",
@@ -16120,7 +16140,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/function-metrics.mjs",
-        "contentHash": "90ab3b6925de44c98ced298c8142221567ab11eccb79b52a75bc08fe6f34a818"
+        "contentHash": "0ddb204bc71514c15cb6021f685860c898b14a4a198f61ca7b127770d4c3c56a"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -17196,6 +17216,7 @@
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
         "tooling/qa/core/structural-risk/function-metrics.mjs",
+        "tooling/qa/core/structural-risk/function-profile.mjs",
         "tooling/qa/core/structural-risk/owner-classifier.mjs",
         "tooling/qa/core/verify-build.deleted-closure.mjs",
         "tooling/qa/wrappers/preflight.mjs"
@@ -17863,9 +17884,12 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/report.mjs",
-        "contentHash": "452a4b98a67206a3b3fd7e4bab782bcea99f463a012f6981c6265a315533b4b7"
+        "contentHash": "6ba20c0deaf516a47a263a3c0a0b95016bcef3d82f91007b26b3cf763155a1bb"
       },
       "consumers": [
+        "tooling/qa/core/structural-risk/authority-aliases.test.ts",
+        "tooling/qa/core/structural-risk/function-profile.test.ts",
+        "tooling/qa/core/structural-risk/remediation.test.ts",
         "tooling/qa/core/structural-risk/report.mjs",
         "tooling/qa/core/verify-structural-risk.mjs",
         "tooling/qa/core/verify-structural-risk.test.ts",

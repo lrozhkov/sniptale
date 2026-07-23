@@ -27,6 +27,21 @@ export function getNodeEndLine(sourceFile, node) {
   return sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
 }
 
+export function getTransparentExpressionRoot(node) {
+  let current = node;
+  while (
+    current.parent &&
+    (ts.isParenthesizedExpression(current.parent) ||
+      ts.isNonNullExpression(current.parent) ||
+      ts.isAsExpression(current.parent) ||
+      ts.isTypeAssertionExpression(current.parent) ||
+      current.parent.kind === ts.SyntaxKind.SatisfiesExpression)
+  ) {
+    current = current.parent;
+  }
+  return current;
+}
+
 function functionName(node, sourceFile) {
   if (node.name && ts.isIdentifier(node.name)) return node.name.text;
   const parent = node.parent;

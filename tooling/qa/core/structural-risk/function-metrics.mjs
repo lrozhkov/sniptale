@@ -12,17 +12,13 @@ import {
   classifyEffectFamily,
   classifyImportedOwner,
   classifyOwnerGroup,
-  isEntrypointOwner,
-  isRegisteredOrchestrationOwner,
 } from './owner-classifier.mjs';
-import { isGeneratedDataFile, TEST_FILE_PATTERN } from './config.mjs';
+import { createFunctionProfileClassifier } from './function-profile.mjs';
 
 const RECOVERY_PATTERN =
   /\b(?:rollback|recover|restore|cleanup|compensat|abort|release|finally)\b/iu;
 const STATE_PATTERN =
   /\b(?:setState|set[A-Z][\w$]*|update[A-Z][\w$]*|dispatch|mutate|commit|store\.(?:setState|set)|\.current\s*=)\b/u;
-const ALGORITHM_PATTERN =
-  /(?:^|\/)(?:parser|parsers|algorithm|algorithms|reducer|reducers)(?:\/|\.)/u;
 const BRANCH_KINDS = new Set([
   ts.SyntaxKind.IfStatement,
   ts.SyntaxKind.ForStatement,
@@ -276,53 +272,14 @@ function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
   };
 }
 
-function containsJsx(node) {
-  let found = false;
-  function visit(current) {
-    if (
-      ts.isJsxElement(current) ||
-      ts.isJsxSelfClosingElement(current) ||
-      ts.isJsxFragment(current)
-    ) {
-      found = true;
-      return;
-    }
-    ts.forEachChild(current, visit);
-  }
-  visit(node);
-  return found;
-}
-
-function chooseProfile(relativePath, symbol, node, metrics) {
-  if (TEST_FILE_PATTERN.test(relativePath)) return 'test';
-  if (isGeneratedDataFile(relativePath)) return 'generated-data';
-  if (isEntrypointOwner(relativePath)) return 'entrypoint';
-  if (
-    /^(?:use[A-Z]|[A-Z])/u.test(symbol) &&
-    (containsJsx(node) || /(?:Component|Hook)$/u.test(symbol))
-  ) {
-    return 'react';
-  }
-  if (
-    ALGORITHM_PATTERN.test(relativePath) &&
-    metrics.effectFamilies.length === 0 &&
-    metrics.stateAuthorities === 0
-  ) {
-    return 'pure';
-  }
-  const layer = classifyArchitecturalLayer(relativePath);
-  if (layer === 'adapter') return 'adapter';
-  if (isRegisteredOrchestrationOwner(relativePath)) return 'orchestration';
-  return 'default';
-}
-
 export function collectFunctionMetrics(sourceFile, relativePath) {
   const importOwners = createImportOwnerMap(sourceFile, relativePath);
+  const classifyProfile = createFunctionProfileClassifier(sourceFile, relativePath);
   return collectFunctionNodes(sourceFile).map(({ node, symbol }) => {
     const line = getNodeLine(sourceFile, node);
     const endLine = getNodeEndLine(sourceFile, node);
     const controls = collectControlMetrics(node, sourceFile, importOwners, relativePath);
-    const profile = chooseProfile(relativePath, symbol, node, controls);
+    const profile = classifyProfile(symbol, node, controls);
     return {
       file: relativePath,
       line,

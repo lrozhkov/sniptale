@@ -1,4 +1,5 @@
 import { collectFunctionMetrics, collectTopLevelEffectClusters } from './function-metrics.mjs';
+import { authorityNameFromKey, resolveFileStateAuthorityKeys } from './authority-aliases.mjs';
 import {
   classifyArchitecturalLayer,
   classifyImportedOwner,
@@ -100,36 +101,37 @@ export function collectFileMetrics(sourceFile, relativePath, source) {
         .concat(topLevelClusters.flatMap((metric) => metric.effectFamilies))
     ),
   ].sort();
-  const stateReceiverNames = [
-    ...new Set(
-      functions
-        .flatMap((metric) => metric.stateReceiverNames)
-        .concat(topLevelClusters.flatMap((metric) => metric.stateReceiverNames))
-    ),
-  ].sort();
-  const stateReceiverKeys = [
+  const rawStateReceiverKeys = [
     ...new Set(
       functions
         .flatMap((metric) => metric.stateReceiverKeys)
         .concat(topLevelClusters.flatMap((metric) => metric.stateReceiverKeys))
     ),
   ].sort();
-  const unresolvedStateAuthorityNames = [
-    ...new Set(
-      functions
-        .flatMap((metric) => metric.unresolvedStateAuthorityNames)
-        .concat(topLevelClusters.flatMap((metric) => metric.unresolvedStateAuthorityNames))
-    ),
-  ].sort();
-  const unresolvedStateAuthorityKeys = [
+  const rawUnresolvedStateAuthorityKeys = [
     ...new Set(
       functions
         .flatMap((metric) => metric.unresolvedStateAuthorityKeys)
         .concat(topLevelClusters.flatMap((metric) => metric.unresolvedStateAuthorityKeys))
     ),
   ].sort();
+  const resolvedStateReceiverKeys = resolveFileStateAuthorityKeys(sourceFile, rawStateReceiverKeys);
+  const unresolvedStateAuthorityKeys = resolveFileStateAuthorityKeys(
+    sourceFile,
+    rawUnresolvedStateAuthorityKeys
+  );
+  const unresolvedStateAuthorityKeySet = new Set(unresolvedStateAuthorityKeys);
+  const stateReceiverKeys = resolvedStateReceiverKeys.filter(
+    (key) => !unresolvedStateAuthorityKeySet.has(key)
+  );
+  const stateReceiverNames = [...new Set(stateReceiverKeys.map(authorityNameFromKey))].sort();
+  const unresolvedStateAuthorityNames = [
+    ...new Set(unresolvedStateAuthorityKeys.map(authorityNameFromKey)),
+  ].sort();
   const stateAuthorityNames = [...stateReceiverNames, ...unresolvedStateAuthorityNames].sort();
-  const stateAuthorityKeys = [...stateReceiverKeys, ...unresolvedStateAuthorityKeys].sort();
+  const stateAuthorityKeys = [
+    ...new Set([...stateReceiverKeys, ...unresolvedStateAuthorityKeys]),
+  ].sort();
   const stateAuthorities = stateAuthorityKeys.length;
   const clusters = [...functions, ...topLevelClusters].filter(isEffectfulCluster);
   const classifiedCalls = functions.filter((metric) => metric.ownerGroups.length > 0);

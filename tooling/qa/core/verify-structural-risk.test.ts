@@ -272,7 +272,9 @@ describe('effectful cluster architecture levels', () => {
             if (next > 0) {
               if (next > 1) {
                 if (next > 2) {
-                  if (next > 3) session.first = next;
+                  if (next > 3) {
+                    if (next > 4) session.first = next;
+                  }
                 }
               }
             }

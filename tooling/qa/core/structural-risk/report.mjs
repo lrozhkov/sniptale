@@ -10,6 +10,7 @@ import {
   scoreFunction,
 } from './score.mjs';
 import { STRUCTURAL_ALLOWANCES_PATH, STRUCTURAL_RISK_LIMITS } from './config.mjs';
+import { buildFileRemediationHint, buildFunctionRemediationHint } from './remediation.mjs';
 import { fromRelativePath } from '../shared.mjs';
 
 function createFinding(rule, severity, metric, reason, hint) {
@@ -275,10 +276,7 @@ function buildFileFinding(metric, severity) {
     severity,
     metric,
     reason,
-    [
-      'Split by independent change reason or move effects/state behind narrow owner contracts;',
-      'mechanical line-only splits do not resolve the finding.',
-    ].join(' ')
+    buildFileRemediationHint(metric)
   );
 }
 
@@ -296,10 +294,7 @@ function buildFunctionFinding(metric, severity) {
     severity,
     metric,
     reason,
-    [
-      'Extract a cohesive owner operation or narrow adapter while preserving',
-      'the transactional boundary and explicit recovery behavior.',
-    ].join(' ')
+    buildFunctionRemediationHint(metric)
   );
 }
 
