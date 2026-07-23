@@ -33,8 +33,8 @@ vi.mock('../interaction/cursor', () => ({
   disableSelectionModeCursor: mocks.disableCursor,
   enableSelectionModeCursor: mocks.enableCursor,
 }));
-vi.mock('../events/listeners/runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../events/listeners/runtime')>()),
+vi.mock('../events/listeners', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../events/listeners')>()),
   setupSelectionModeRuntimeListeners: mocks.setupRuntimeListeners,
 }));
 vi.mock('../public-api', () => ({

@@ -40,6 +40,17 @@ export const CONTENT_SELECTION_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'content-selection-mode-listener-lifecycle',
+    productionPrefix: 'apps/extension/src/content/selection/selection-mode/events/listeners/',
+    exclusive: true,
+    reason:
+      'Selection listener registration, runtime mapping, and cleanup have bounded owner proof.',
+    testFiles: [
+      'apps/extension/src/content/selection/selection-mode/events/listeners/index.test.ts',
+      'apps/extension/src/content/selection/selection-mode/runtime/composition.test.ts',
+    ],
+  },
+  {
     owner: 'content-selection-mode-overlay-cancel-style-predecessor',
     productionFile:
       'apps/extension/src/content/selection/selection-mode/ui/styles.cancel-button.data.ts',

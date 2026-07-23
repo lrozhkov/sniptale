@@ -2,7 +2,7 @@ import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-
 import { getSelectionFrameVisual } from '../../frame-runtime/selection-frame-visual';
 import { createSelectionModeEventHandlers } from '../events/handlers';
 import { createSelectionModeEventsBridge } from '../events/bridge';
-import { setupSelectionModeRuntimeListeners } from '../events/listeners/runtime';
+import { setupSelectionModeRuntimeListeners } from '../events/listeners';
 import { disableSelectionModeCursor, enableSelectionModeCursor } from '../interaction/cursor';
 import {
   disableSelectionModeApi,

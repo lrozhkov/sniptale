@@ -3362,7 +3362,6 @@
         "apps/extension/src/content/selection/selection-mode/events/helpers.ts",
         "apps/extension/src/content/selection/selection-mode/events/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/listeners/index.ts",
-        "apps/extension/src/content/selection/selection-mode/events/listeners/runtime.ts",
         "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/target.ts",
         "apps/extension/src/content/selection/selection-mode/events/types.ts",
@@ -3751,7 +3750,6 @@
         "apps/extension/src/content/selection/selection-mode/events/helpers.ts",
         "apps/extension/src/content/selection/selection-mode/events/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/listeners/index.ts",
-        "apps/extension/src/content/selection/selection-mode/events/listeners/runtime.ts",
         "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/target.ts",
         "apps/extension/src/content/selection/selection-mode/events/types.ts",
@@ -14912,7 +14910,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
-        "contentHash": "fa8cad0fe9348b6c29b385b5c444f0faa19f1ff4777e2cf3eefa92d803b52844"
+        "contentHash": "b13c3e64405ad957e9443a7dcb3fb725bd308c9352fa8a144e21ac9c9829b187"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
@@ -14925,7 +14923,8 @@
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
-        "property:testFiles[5]"
+        "property:testFiles[5]",
+        "property:testFiles[6]"
       ]
     },
     {
