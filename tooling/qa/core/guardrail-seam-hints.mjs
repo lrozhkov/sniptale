@@ -2,6 +2,7 @@ import ts from 'typescript';
 
 import {
   collectDeletedWorkspaceFiles,
+  collectOwnerDirectoryCodeFiles,
   collectSiblingFamilyFiles,
   countBranchNodes,
   countTopLevelFunctions,
@@ -10,7 +11,6 @@ import {
   hasExactAdjacentTest,
   hasShellChildren,
   isProductionCodeFile,
-  readProductionCodeFiles,
 } from './guardrail-seam-audit-helpers.mjs';
 import { isCodeFile, readText, splitLines } from './shared.mjs';
 import { isProductSourcePath } from './src-production-targets.mjs';
@@ -22,8 +22,8 @@ function collectRelevantReferenceFiles(targetFiles, codeFiles) {
 }
 
 export function collectDeletedInternalAggregateHints({ targetFiles = [], codeFiles = [] } = {}) {
-  const allCodeFiles = readProductionCodeFiles();
   const referenceFiles = collectRelevantReferenceFiles(targetFiles, codeFiles);
+  const allCodeFiles = collectOwnerDirectoryCodeFiles([...targetFiles, ...codeFiles]);
   const missingFiles = [
     ...targetFiles.filter(
       (file) => isProductSourcePath(file) && isProductionCodeFile(file) && !fileExists(file)
@@ -59,7 +59,7 @@ export function collectDeletedInternalAggregateHints({ targetFiles = [], codeFil
 }
 
 export function collectThinShellHints(codeFiles) {
-  const allCodeFiles = readProductionCodeFiles();
+  const allCodeFiles = collectOwnerDirectoryCodeFiles(codeFiles);
   const hints = [];
 
   for (const file of codeFiles.filter(
@@ -91,7 +91,7 @@ export function collectThinShellHints(codeFiles) {
 }
 
 export function collectOwnerLocalProofHints(codeFiles) {
-  const allCodeFiles = readProductionCodeFiles();
+  const allCodeFiles = collectOwnerDirectoryCodeFiles(codeFiles);
   const hints = [];
 
   for (const file of codeFiles.filter(

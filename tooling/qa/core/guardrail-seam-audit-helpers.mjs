@@ -3,13 +3,13 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import ts from 'typescript';
 
-import { collectCodeFiles, fromRelativePath, readText } from './shared.mjs';
+import { fromRelativePath, readText } from './shared.mjs';
 import { resolveImportCandidates, resolveRelativeImport } from './path-import-helpers.mjs';
 
-const CODE_FILE_PATTERN = /\.(?:ts|tsx|js|mjs|cjs)$/u;
-const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:ts|tsx)$/u;
+const CODE_FILE_PATTERN = /\.[cm]?[jt]sx?$/u;
+const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const SUPPORT_FILE_PATTERN =
-  /\.(?:test-helpers|test-support|fixtures|test\.fixtures|test\.helpers)\.(?:ts|tsx)$/u;
+  /\.(?:test-helpers|test-support|fixtures|test\.fixtures|test\.helpers)\.[cm]?[jt]sx?$/u;
 
 export function isProductionCodeFile(file) {
   return (
@@ -19,16 +19,29 @@ export function isProductionCodeFile(file) {
   );
 }
 
-export function readProductionCodeFiles() {
-  return collectCodeFiles().filter(isProductionCodeFile);
-}
-
 export function fileExists(file) {
   return fs.existsSync(fromRelativePath(file));
 }
 
+export function collectOwnerDirectoryCodeFiles(files = []) {
+  const codeFiles = new Set();
+  const directories = new Set(files.map((file) => path.posix.dirname(file)));
+  for (const directory of directories) {
+    const absoluteDirectory = fromRelativePath(directory);
+    if (!fs.existsSync(absoluteDirectory) || !fs.statSync(absoluteDirectory).isDirectory()) {
+      continue;
+    }
+    for (const entry of fs.readdirSync(absoluteDirectory, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const candidate = `${directory}/${entry.name}`;
+      if (isProductionCodeFile(candidate)) codeFiles.add(candidate);
+    }
+  }
+  return [...codeFiles].sort();
+}
+
 function toStem(file) {
-  return path.posix.basename(file).replace(/\.(?:ts|tsx|js|mjs|cjs)$/u, '');
+  return path.posix.basename(file).replace(/\.[cm]?[jt]sx?$/u, '');
 }
 
 function deriveFamilyKeys(file) {

@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { isProductQaFile } from './qa-scope.mjs';
 import { collectCodeFiles, fromRelativePath, isCodeFile } from './shared.mjs';
+import { collectDeletedTargetSuccessors } from './verify-build.deleted-closure.mjs';
 import { resolveBuildTestProfile } from './verify-build.test-profiles.mjs';
 export { BUILD_TEST_PROFILE_LIMITS } from './verify-build.test-profiles.mjs';
 
@@ -117,35 +118,6 @@ function uniqueSorted(values) {
   return [...new Set(values)].sort();
 }
 
-function collectChangedReplacementOwnerTests(file, productionCodeFiles, directTestFiles) {
-  const deletedStem = path.posix.basename(file, path.posix.extname(file));
-  const candidates = productionCodeFiles
-    .map((candidate) => ({
-      directory: path.posix.dirname(candidate),
-      stem: path.posix.basename(candidate, path.posix.extname(candidate)),
-    }))
-    .filter(({ directory, stem }) => {
-      const normalizedStem = stem.replace(/-bindings$/u, '');
-      return (
-        file.startsWith(`${directory}/`) &&
-        (stem === 'index' ||
-          deletedStem === normalizedStem ||
-          deletedStem.startsWith(`${normalizedStem}-`))
-      );
-    })
-    .sort((left, right) => right.directory.length - left.directory.length);
-  const owner = candidates[0];
-  if (!owner) return [];
-  return directTestFiles.filter((testFile) => {
-    if (path.posix.dirname(testFile) !== owner.directory) return false;
-    const testBasename = path.posix.basename(testFile);
-    return (
-      testBasename.startsWith(`${owner.stem}.test.`) ||
-      testBasename.startsWith(`${owner.stem}.spec.`)
-    );
-  });
-}
-
 function collectOwnerPrefixes(file, rootNames = []) {
   const segments = file.split('/');
   if (segments.length < 3 || segments[0] !== 'src' || !rootNames.includes(segments[1])) {
@@ -228,6 +200,7 @@ export function resolveBuildTestScope({
   repoCodeFiles = collectCodeFiles(),
   focusedScopeResolver,
   ownerTestResolver,
+  deletedSuccessorResolver = collectDeletedTargetSuccessors,
 } = {}) {
   const productTargetFiles = targetFiles.filter(isProductQaFile);
   const productCodeFiles = codeFiles.filter(isProductQaFile);
@@ -238,18 +211,29 @@ export function resolveBuildTestScope({
   const productionTargetFiles = productTargetFiles.filter(
     (file) => !isTestFile(file) && (isCodeFile(file) || file === 'apps/extension/manifest.json')
   );
-  const productionCodeFileSet = new Set(productionCodeFiles);
-  const unavailableProductionScopes = productionTargetFiles
-    .filter((file) => !productionCodeFileSet.has(file))
-    .map((file) => ({
-      changedOwnerTests: collectChangedReplacementOwnerTests(
-        file,
-        productionCodeFiles,
-        directTestFiles
-      ),
-      file,
-      relatedFiles: collectExpandedRelatedFiles([file], productRepoCodeFiles).relatedFiles,
-    }));
+  const existingNonCodeProductionFiles = productionTargetFiles.filter(
+    (file) => file === 'apps/extension/manifest.json' && fs.existsSync(fromRelativePath(file))
+  );
+  const availableProductionFiles = uniqueSorted([
+    ...productionCodeFiles,
+    ...existingNonCodeProductionFiles,
+  ]);
+  const productionCodeFileSet = new Set(availableProductionFiles);
+  const unavailableProductionFiles = productionTargetFiles.filter(
+    (file) => !productionCodeFileSet.has(file)
+  );
+  const deletedSuccessorsByFile =
+    unavailableProductionFiles.length === 0
+      ? new Map()
+      : deletedSuccessorResolver({
+          productionCodeFiles,
+          productionTargetFiles,
+        });
+  const unavailableProductionScopes = unavailableProductionFiles.map((file) => ({
+    changedSuccessorFiles: deletedSuccessorsByFile.get(file) ?? [],
+    file,
+    relatedFiles: collectExpandedRelatedFiles([file], productRepoCodeFiles).relatedFiles,
+  }));
   const { matchedFamilies, relatedFiles: expandedRelatedFiles } = collectExpandedRelatedFiles(
     productTargetFiles,
     productRepoCodeFiles
@@ -262,7 +246,7 @@ export function resolveBuildTestScope({
     matchedFamilies,
     ownerTestResolver,
     productTargetFiles,
-    productionCodeFiles,
+    productionCodeFiles: availableProductionFiles,
     relatedFiles: uniqueSorted([
       ...productionCodeFiles,
       ...expandedRelatedFiles,
@@ -272,12 +256,23 @@ export function resolveBuildTestScope({
   });
 }
 
-export function resolveBuildCloseoutScope(context, { repoCodeFiles = collectCodeFiles() } = {}) {
+export function resolveBuildCloseoutScope(
+  context,
+  {
+    repoCodeFiles = collectCodeFiles(),
+    focusedScopeResolver,
+    ownerTestResolver,
+    deletedSuccessorResolver,
+  } = {}
+) {
   const testScope = resolveBuildTestScope({
     targetFiles: context.targetFiles,
     codeFiles: context.codeFiles,
     addedFiles: context.addedFiles,
     repoCodeFiles,
+    focusedScopeResolver,
+    ownerTestResolver,
+    deletedSuccessorResolver,
   });
 
   return {

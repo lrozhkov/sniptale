@@ -8,11 +8,13 @@ import { findCoverageRolloutGroup } from './verify-test-coverage.registry.mjs';
 import { resolveCoverageThreshold } from './verify-test-coverage.thresholds.mjs';
 import { expandRelatedTestScope } from './unit-test-plan.mjs';
 
-const COVERAGE_HINT_FILE_PATTERN = /\.(?:ts|tsx)$/u;
-const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:ts|tsx)$/u;
+const COVERAGE_HINT_FILE_PATTERN = /\.[cm]?[jt]sx?$/u;
+const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const BROAD_BUILD_SCOPE_FAMILIES = new Set([
+  'manifest-owned',
   'package-and-app-core',
   'messaging-runtime',
+  'parser-snapshot-export',
   'storage-persistence',
 ]);
 
@@ -88,20 +90,30 @@ export function collectScopeHints(targetFiles, codeFiles) {
   return hints;
 }
 
-export function collectBuildScopeForecast({ targetFiles, codeFiles, addedFiles = [] }) {
+export function collectBuildScopeForecast(
+  { targetFiles, codeFiles, addedFiles = [] },
+  buildScopeOptions = {}
+) {
   if (targetFiles.length === 0) return { details: [] };
-  const { testScope } = resolveBuildCloseoutScope({ targetFiles, codeFiles, addedFiles });
+  const { testScope } = resolveBuildCloseoutScope(
+    { targetFiles, codeFiles, addedFiles },
+    { repoCodeFiles: codeFiles, ...buildScopeOptions }
+  );
   const selectedUnitFiles =
     testScope.directTestFiles.length > 0
       ? testScope.directTestFiles
       : expandRelatedTestScope(testScope.relatedFiles);
-  const selectedScopeDetail = testScope.fullSuite ? 'full-suite' : selectedUnitFiles.length;
-  const details = [
-    `qa:build forecast: ${testScope.detail}; selected unit-test scope=${selectedScopeDetail}`,
-  ];
   const broadFamilies = testScope.matchedFamilies.filter((family) =>
     BROAD_BUILD_SCOPE_FAMILIES.has(family)
   );
+  const selectedScopeDetail = testScope.fullSuite
+    ? 'full-suite'
+    : testScope.profile === 'related-transitive' && broadFamilies.length > 0
+      ? 'consumer-discovery-required'
+      : selectedUnitFiles.length;
+  const details = [
+    `qa:build forecast: ${testScope.detail}; selected unit-test scope=${selectedScopeDetail}`,
+  ];
   if (testScope.profile === 'related-transitive' && broadFamilies.length > 0) {
     details.push(
       `broad transitive scope expected for ${broadFamilies.join(', ')}: check related mocks and tests before closeout`

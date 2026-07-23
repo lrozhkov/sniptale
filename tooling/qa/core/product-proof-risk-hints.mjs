@@ -1,4 +1,9 @@
-const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:ts|tsx)$/u;
+import fs from 'node:fs';
+
+import { readHeadFileText } from './git-head-sources.mjs';
+import { createSourceFile, ts } from './structural-risk/ast.mjs';
+
+const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const UI_SURFACE_OWNERS = [
   'content',
   'popup',
@@ -38,7 +43,7 @@ const RUNTIME_SECURITY_PREFIXES = [
 ];
 const BOUNDARY_PAYLOAD_PATTERN =
   /(?:runtime|message|schema|contract|parser|import|backup|manifest|zip|package|snapshot|payload)/u;
-const UI_SURFACE_FILE_PATTERN = /\.(?:ts|tsx|css)$/u;
+const UI_SOURCE_FILE_PATTERN = /\.(?:[jt]sx?|css)$/u;
 
 function hasOwnerPrefix(file, owners) {
   return owners.some(
@@ -51,13 +56,56 @@ function isRuntimeSecurityFile(file) {
 }
 
 function collectChangedTests(targetFiles) {
-  return targetFiles.filter((file) => TEST_FILE_PATTERN.test(file));
+  return targetFiles.filter((file) => TEST_FILE_PATTERN.test(file) && fs.existsSync(file));
+}
+
+function collectProductionCodeFiles(codeFiles) {
+  return codeFiles.filter((file) => !TEST_FILE_PATTERN.test(file));
+}
+
+function readDiffSource(file) {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return readHeadFileText(file);
+  }
+}
+
+function hasViewBearingSyntax(file) {
+  if (file.endsWith('.css')) return true;
+  const source = readDiffSource(file);
+  if (source === null) return false;
+  const sourceFile = createSourceFile(file, source);
+  let viewBearing = false;
+  function visit(node) {
+    if (
+      ts.isJsxElement(node) ||
+      ts.isJsxSelfClosingElement(node) ||
+      ts.isJsxFragment(node) ||
+      (ts.isCallExpression(node) &&
+        /(?:^|\.)(?:createElement|createPortal|render)$/u.test(
+          node.expression.getText(sourceFile)
+        )) ||
+      (ts.isTaggedTemplateExpression(node) &&
+        /^(?:css|styled(?:\.|$))/u.test(node.tag.getText(sourceFile)))
+    ) {
+      viewBearing = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return viewBearing;
+}
+
+function collectUiOwnerFiles(codeFiles) {
+  return codeFiles.filter(
+    (file) => hasOwnerPrefix(file, UI_SURFACE_OWNERS) && UI_SOURCE_FILE_PATTERN.test(file)
+  );
 }
 
 function collectUiSurfaceFiles(codeFiles) {
-  return codeFiles.filter(
-    (file) => hasOwnerPrefix(file, UI_SURFACE_OWNERS) && UI_SURFACE_FILE_PATTERN.test(file)
-  );
+  return collectUiOwnerFiles(collectProductionCodeFiles(codeFiles)).filter(hasViewBearingSyntax);
 }
 
 function createRiskHint(label, detail) {
@@ -74,17 +122,24 @@ export function collectRiskChecklistHints({
   }
 
   const hints = [];
-  if (codeFiles.some((file) => STATE_AUTHORITY_PATTERN.test(file))) {
+  const productionCodeFiles = collectProductionCodeFiles(codeFiles);
+  const uiOwnerFiles = collectUiOwnerFiles(productionCodeFiles);
+  const uiSurfaceFiles = collectUiSurfaceFiles(productionCodeFiles);
+  if (productionCodeFiles.some((file) => STATE_AUTHORITY_PATTERN.test(file))) {
     hints.push(createRiskHint('state authority', 'name authoritative/advisory/disposable state'));
   }
-  if (collectUiSurfaceFiles(codeFiles).length > 0) {
+  if (uiSurfaceFiles.length > 0) {
     hints.push(createRiskHint('UI parity', 'map old behavior to new surface and proof'));
     hints.push(createRiskHint('visual states', 'cover hover/active/disabled/open/empty/overflow'));
+  } else if (uiOwnerFiles.some((file) => STATE_AUTHORITY_PATTERN.test(file))) {
+    hints.push(
+      createRiskHint('UI wiring', 'prove state, action, and lifecycle bindings behaviorally')
+    );
   }
-  if (codeFiles.some((file) => HIDDEN_INPUT_PATTERN.test(file))) {
+  if (productionCodeFiles.some((file) => HIDDEN_INPUT_PATTERN.test(file))) {
     hints.push(createRiskHint('hidden inputs', 'prove hidden inputs/dialogs stay mounted'));
   }
-  if (codeFiles.some((file) => PUBLIC_API_PATTERN.test(file))) {
+  if (productionCodeFiles.some((file) => PUBLIC_API_PATTERN.test(file))) {
     hints.push(createRiskHint('public API', 'include consumers and tests'));
   }
 
@@ -108,7 +163,9 @@ export function collectVisualProofHints({ codeFiles = [] }) {
 }
 
 export function collectCapabilityLossHints({ targetFiles = [], codeFiles = [] }) {
-  const capabilityFiles = codeFiles.filter((file) => CAPABILITY_SURFACE_PATTERN.test(file));
+  const capabilityFiles = collectProductionCodeFiles(codeFiles).filter((file) =>
+    CAPABILITY_SURFACE_PATTERN.test(file)
+  );
   if (capabilityFiles.length === 0) {
     return [];
   }
@@ -129,7 +186,8 @@ export function collectDeterministicProofHints({ codeFiles = [] }) {
   }
 
   const hints = [];
-  if (codeFiles.some(isRuntimeSecurityFile)) {
+  const productionCodeFiles = collectProductionCodeFiles(codeFiles);
+  if (productionCodeFiles.some(isRuntimeSecurityFile)) {
     hints.push(
       createRiskHint(
         'runtime/security proof',
@@ -137,7 +195,7 @@ export function collectDeterministicProofHints({ codeFiles = [] }) {
       )
     );
   }
-  if (codeFiles.some((file) => BOUNDARY_PAYLOAD_PATTERN.test(file))) {
+  if (productionCodeFiles.some((file) => BOUNDARY_PAYLOAD_PATTERN.test(file))) {
     hints.push(
       createRiskHint(
         'boundary payload proof',
@@ -145,7 +203,7 @@ export function collectDeterministicProofHints({ codeFiles = [] }) {
       )
     );
   }
-  if (codeFiles.some((file) => hasOwnerPrefix(file, UX_DEFERRED_OWNERS))) {
+  if (productionCodeFiles.some((file) => hasOwnerPrefix(file, UX_DEFERRED_OWNERS))) {
     hints.push(
       createRiskHint(
         'UX-deferred proof',

@@ -117,7 +117,62 @@ it('flags broad UI diffs that risk capability loss without a proof matrix', asyn
   expect(findings).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ id: 'advisory.ui-proof-gap', severity: 'attention' }),
+    ])
+  );
+  expect(findings).not.toEqual(
+    expect.arrayContaining([
       expect.objectContaining({ id: 'advisory.ui-proof-gap', severity: 'watch' }),
+    ])
+  );
+  const wideFinding = findings.find(
+    (finding) => finding.id === 'advisory.ui-proof-gap' && finding.severity === 'attention'
+  );
+  expect(wideFinding?.hint).toContain('state, action, and lifecycle bindings behaviorally');
+  expect(wideFinding?.hint).not.toContain('visual states');
+});
+
+it('does not count deleted tests as broad UI proof', async () => {
+  const root = createTempRoot('verify-advisory-deleted-ui-tests-');
+  const uiFiles = Array.from(
+    { length: 6 },
+    (_, index) => `apps/extension/src/editor/workspace/floating/panel-${index}.ts`
+  );
+  for (const file of uiFiles) {
+    writeFile(root, file, 'export function usePanelController() { return null; }\n');
+  }
+  const deletedTests = [
+    'apps/extension/src/editor/workspace/floating/panel-a.test.ts',
+    'apps/extension/src/editor/workspace/floating/panel-b.test.ts',
+  ];
+
+  const findings = await collectAdvisoryFindings(root, [...uiFiles, ...deletedTests]);
+
+  expect(findings).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: 'advisory.ui-proof-gap',
+        reason: expect.stringContaining('6 UI/controller files changed with 0 changed test'),
+        severity: 'attention',
+      }),
+    ])
+  );
+});
+
+it('does not let a deleted test suppress capability-loss guidance', async () => {
+  const root = createTempRoot('verify-advisory-deleted-capability-test-');
+  const capabilityFile = 'apps/extension/src/editor/workspace/floating/tool-commands.tsx';
+  const deletedTest = 'apps/extension/src/editor/workspace/floating/tool-commands.test.tsx';
+  writeFile(root, capabilityFile, 'export function Toolbar() { return <button />; }\n');
+
+  const findings = await collectAdvisoryFindings(root, [capabilityFile, deletedTest]);
+
+  expect(findings).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: 'advisory.ui-proof-gap',
+        reason: expect.stringContaining('capability-loss risk'),
+        severity: 'attention',
+      }),
     ])
   );
 });
@@ -125,13 +180,63 @@ it('flags broad UI diffs that risk capability loss without a proof matrix', asyn
 it('includes web-snapshot-viewer in UI advisory proof planning', async () => {
   const root = createTempRoot('verify-advisory-web-snapshot-viewer-');
   const uiFile = 'apps/extension/src/web-snapshot-viewer/shell/app/floating-toolbar.tsx';
-  writeFile(root, uiFile, 'export function FloatingToolbarController() { return null; }\n');
+  writeFile(root, uiFile, 'export function FloatingToolbar() { return <button />; }\n');
 
   const findings = await collectAdvisoryFindings(root, [uiFile]);
 
   expect(findings).toEqual(
     expect.arrayContaining([expect.objectContaining({ id: 'advisory.ui-proof-gap' })])
   );
+});
+
+it('uses behavioral context instead of visual advisory for state-only modal wiring', async () => {
+  const root = createTempRoot('verify-advisory-state-only-modal-');
+  const controllerFile = 'apps/extension/src/content/overlay/ai/modal/session/controller.ts';
+  const testFile = 'apps/extension/src/content/overlay/ai/modal/session/controller.test.tsx';
+  writeFile(root, controllerFile, 'export function useModalController() { return {}; }\n');
+  writeFile(root, testFile, "it('binds state', () => {});\n");
+
+  const findings = await collectAdvisoryFindings(root, [controllerFile, testFile]);
+
+  expect(findings.filter((finding) => finding.id === 'advisory.ui-proof-gap')).toEqual([]);
+});
+
+it('keeps visual proof advisory for view-bearing modal changes', async () => {
+  const root = createTempRoot('verify-advisory-view-modal-');
+  const viewFile = 'apps/extension/src/content/overlay/ai/modal/shell/dialog.tsx';
+  writeFile(root, viewFile, 'export function Dialog() { return <section />; }\n');
+
+  const findings = await collectAdvisoryFindings(root, [viewFile]);
+
+  expect(findings).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'advisory.ui-proof-gap', severity: 'watch' }),
+    ])
+  );
+});
+
+it('keeps visual proof advisory for imperative render changes without JSX', async () => {
+  const root = createTempRoot('verify-advisory-imperative-render-');
+  const viewFile = 'apps/extension/src/content/overlay/ai/modal/shell/render.ts';
+  writeFile(root, viewFile, 'export function mount(root) { root.render(Dialog()); }\n');
+
+  const findings = await collectAdvisoryFindings(root, [viewFile]);
+
+  expect(findings).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'advisory.ui-proof-gap', severity: 'watch' }),
+    ])
+  );
+});
+
+it('does not treat JavaScript test JSX as a production view change', async () => {
+  const root = createTempRoot('verify-advisory-jsx-test-');
+  const testFile = 'apps/extension/src/content/overlay/ai/modal/shell/dialog.test.jsx';
+  writeFile(root, testFile, 'export function Fixture() { return <section />; }\n');
+
+  const findings = await collectAdvisoryFindings(root, [testFile]);
+
+  expect(findings.filter((finding) => finding.id === 'advisory.ui-proof-gap')).toEqual([]);
 });
 
 it('keeps migrated preflight advisory printing out of focused and full wrappers', async () => {

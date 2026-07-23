@@ -1,6 +1,14 @@
 import { expect, it } from 'vitest';
 
 import { resolveBuildTestScope } from './verify-build.scope.mjs';
+import {
+  createTempRoot,
+  importFresh,
+  initGitRepo,
+  runGit,
+  withCwd,
+  writeFile,
+} from './test-helpers';
 
 it('uses a full product fallback for a deleted owner without executable tests', () => {
   const scope = resolveBuildTestScope({
@@ -17,7 +25,7 @@ it('uses a full product fallback for a deleted owner without executable tests', 
   expect(scope.detail).toContain('full product test suite');
 });
 
-it('uses surviving deterministic owner tests for a deleted leaf', () => {
+it('does not accept a test keyed only to a deleted path without a surviving graph owner', () => {
   const ownerTest = 'apps/extension/src/popup/shell/app/deleted-leaf.test.tsx';
   const scope = resolveBuildTestScope({
     targetFiles: ['apps/extension/src/popup/shell/app/deleted-leaf.tsx'],
@@ -27,9 +35,9 @@ it('uses surviving deterministic owner tests for a deleted leaf', () => {
   });
 
   expect(scope.profile).toBe('related-transitive');
-  expect(scope.fullSuite).not.toBe(true);
+  expect(scope.fullSuite).toBe(true);
   expect(scope.directTestFiles).toEqual([]);
-  expect(scope.relatedFiles).toEqual([ownerTest]);
+  expect(scope.relatedFiles).toEqual([]);
 });
 
 it('forces the full suite when one target in a mixed production diff is deleted and uncovered', () => {
@@ -73,13 +81,14 @@ it('uses a changed replacement owner and its direct test for a consolidated dele
     targetFiles: [deleted, owner, ownerTest],
     codeFiles: [owner, ownerTest],
     repoCodeFiles: [owner, ownerTest],
-    ownerTestResolver: () => [],
+    ownerTestResolver: (file) => (file === owner ? [ownerTest] : []),
+    deletedSuccessorResolver: () => new Map([[deleted, [owner]]]),
   });
 
   expect(scope.profile).toBe('related-transitive');
   expect(scope.fullSuite).not.toBe(true);
   expect(scope.relatedFiles).toEqual([ownerTest, owner]);
-  expect(scope.detail).toContain('unavailable production targets have executable');
+  expect(scope.detail).toContain('graph-closed successor owner proof');
 });
 
 it('does not accept an unrelated same-directory test as replacement-owner proof', () => {
@@ -114,6 +123,116 @@ it('does not accept a deleted adjacent test as replacement-owner proof', () => {
 
   expect(scope.fullSuite).toBe(true);
   expect(scope.directTestFiles).toEqual([]);
+});
+
+it('maps a deleted modal facade chain to bounded surviving owner proof', async () => {
+  const root = createTempRoot('build-deleted-modal-chain-');
+  const ownerRoot = 'apps/extension/src/content/overlay/ai/modal/session';
+  const deletedFiles = [
+    'action-builders.ts',
+    'action-props.ts',
+    'actions.ts',
+    'boot-props.ts',
+    'build.ts',
+    'core.ts',
+    'prompt-template-state.ts',
+    'view-props.ts',
+  ].map((file) => `${ownerRoot}/${file}`);
+  const survivingFiles = [
+    'boot.ts',
+    'controller.ts',
+    'core-state.ts',
+    'index.ts',
+    'open.ts',
+    'view-state.ts',
+  ].map((file) => `${ownerRoot}/${file}`);
+  const ownerTests = [
+    'boot.test.ts',
+    'controller.test.ts',
+    'core-state.test.ts',
+    'open.test.ts',
+    'view-state.test.ts',
+  ].map((file) => `${ownerRoot}/${file}`);
+  const previousSources = new Map([
+    [`${ownerRoot}/action-builders.ts`, 'export const actions = {};\n'],
+    [`${ownerRoot}/action-props.ts`, "import './actions';\nimport './build';\n"],
+    [`${ownerRoot}/actions.ts`, 'export const createAction = () => null;\n'],
+    [`${ownerRoot}/boot-props.ts`, 'export type BootProps = {};\n'],
+    [`${ownerRoot}/build.ts`, "import './action-builders';\nexport const build = () => null;\n"],
+    [`${ownerRoot}/core.ts`, "import './controller';\nimport './core-state';\n"],
+    [`${ownerRoot}/prompt-template-state.ts`, 'export const templates = [];\n'],
+    [`${ownerRoot}/view-props.ts`, 'export const viewProps = {};\n'],
+    [`${ownerRoot}/boot.ts`, "import './boot-props';\nexport const boot = () => null;\n"],
+    [
+      `${ownerRoot}/controller.ts`,
+      "import './action-props';\nimport './boot-props';\nimport './build';\nimport './view-props';\n",
+    ],
+    [`${ownerRoot}/core-state.ts`, "import './prompt-template-state';\nexport const state = {};\n"],
+    [`${ownerRoot}/index.ts`, "import './core';\nexport const modal = {};\n"],
+    [`${ownerRoot}/open.ts`, "import './boot-props';\nexport const open = () => null;\n"],
+    [`${ownerRoot}/view-state.ts`, "import './prompt-template-state';\nexport const view = {};\n"],
+  ]);
+
+  initGitRepo(root);
+  for (const [file, source] of previousSources) writeFile(root, file, source);
+  for (const testFile of ownerTests) writeFile(root, testFile, "it('covers owner', () => {});\n");
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'baseline');
+  runGit(root, 'rm', ...deletedFiles);
+
+  const currentSources = new Map([
+    [`${ownerRoot}/index.ts`, "import './controller';\nexport const modal = {};\n"],
+    [
+      `${ownerRoot}/controller.ts`,
+      "import './boot';\nimport './core-state';\nimport './view-state';\nexport const controller = {};\n",
+    ],
+    [`${ownerRoot}/boot.ts`, "import './open';\nexport const boot = () => null;\n"],
+    [`${ownerRoot}/open.ts`, 'export const open = () => null;\n'],
+    [`${ownerRoot}/core-state.ts`, 'export const state = {};\n'],
+    [`${ownerRoot}/view-state.ts`, 'export const view = {};\n'],
+  ]);
+  for (const [file, source] of currentSources) writeFile(root, file, source);
+  writeFile(
+    root,
+    `${ownerRoot}/controller.test.ts`,
+    "it('covers consolidated owner', () => {});\n"
+  );
+
+  const changedTest = `${ownerRoot}/controller.test.ts`;
+  const targetFiles = [...deletedFiles, ...survivingFiles, changedTest];
+  const codeFiles = [...survivingFiles, changedTest];
+  const repoCodeFiles = [...survivingFiles, ...ownerTests];
+  const ownerTestByFile = new Map(
+    survivingFiles.map((file) => {
+      const candidate = file.replace(/\.ts$/u, '.test.ts');
+      return [file, ownerTests.includes(candidate) ? [candidate] : []];
+    })
+  );
+  const ownerTestResolver = (file) => ownerTestByFile.get(file) ?? [];
+
+  const result = await withCwd(root, async () => {
+    const scopeModule = await importFresh<typeof import('./verify-build.scope.mjs')>(
+      './verify-build.scope.mjs',
+      import.meta.url
+    );
+    const preflightModule = await importFresh<typeof import('./guardrail-preflight-scope.mjs')>(
+      './guardrail-preflight-scope.mjs',
+      import.meta.url
+    );
+    const scope = scopeModule.resolveBuildTestScope({
+      targetFiles,
+      codeFiles,
+      repoCodeFiles,
+      ownerTestResolver,
+    });
+    const forecast = preflightModule.collectBuildScopeForecast({ targetFiles, codeFiles });
+    return { forecast, scope };
+  });
+
+  expect(result.scope.fullSuite).not.toBe(true);
+  expect(result.scope.relatedFiles).toHaveLength(11);
+  expect(result.forecast.details[0]).toContain('selected unit-test scope=11');
+  expect(result.forecast.details[0]).not.toContain('full product test suite');
 });
 
 it('keeps shared feature privacy entrypoints on the related profile', () => {

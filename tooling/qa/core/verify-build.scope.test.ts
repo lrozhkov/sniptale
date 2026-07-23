@@ -232,7 +232,8 @@ it('keeps deleted high-risk targets on the related profile', () => {
 
   expect(scope.profile).toBe('related-transitive');
   expect(scope.matchedFamilies).toEqual(['messaging-runtime', 'package-and-app-core']);
-  expect(scope.relatedFiles).toEqual(['apps/extension/src/platform/runtime-messaging/client.ts']);
+  expect(scope.fullSuite).toBe(true);
+  expect(scope.relatedFiles).toEqual([]);
 });
 
 it('keeps high-risk runtime diffs on the transitive related profile', () => {

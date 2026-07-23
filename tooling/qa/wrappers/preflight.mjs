@@ -122,7 +122,11 @@ function collectStructuralPressure(report) {
 function collectProofHints(context, guardrailReport) {
   const hints = [];
 
-  if (context.targetFiles.some((file) => /\.(?:test|spec)\.(?:ts|tsx)$/u.test(file))) {
+  if (
+    context.targetFiles.some(
+      (file) => /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file) && fs.existsSync(file)
+    )
+  ) {
     hints.push('changed tests will be included by the focused wrapper');
   }
 
@@ -182,7 +186,7 @@ export function collectPreflightReport({ files = [] } = {}) {
 
   return {
     context,
-    relevantDocs: collectRelevantDocs(context.targetFiles),
+    relevantDocs: collectRelevantDocs(context.allTargetFiles ?? context.targetFiles),
     ownerRuntime: [...new Set(context.codeFiles.map(classifyOwnerGroup))].sort(),
     guardrailReport,
     structuralReport: structuralResult.report,

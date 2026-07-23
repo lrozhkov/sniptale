@@ -1,13 +1,13 @@
 import {
   collectSiblingFamilyFiles,
+  collectOwnerDirectoryCodeFiles,
   fileExists,
   isProductionCodeFile,
-  readProductionCodeFiles,
 } from './guardrail-seam-audit-helpers.mjs';
 import { isProductSourcePath } from './src-production-targets.mjs';
 
 function collectSiblingFamilyTopologyQuestions(codeFiles) {
-  const allCodeFiles = readProductionCodeFiles();
+  const allCodeFiles = collectOwnerDirectoryCodeFiles(codeFiles);
   const questions = [];
   const seen = new Set();
 

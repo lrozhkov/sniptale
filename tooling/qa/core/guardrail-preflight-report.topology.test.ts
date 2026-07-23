@@ -43,7 +43,9 @@ it('reports false public seam hints for moved root facades without importers', a
   });
 
   expect(report.falsePublicSeams).toEqual(
-    expect.arrayContaining([expect.stringContaining('root facade candidate has no importer graph')])
+    expect.arrayContaining([
+      expect.stringContaining('root facade candidate needs bounded consumer discovery'),
+    ])
   );
 });
 

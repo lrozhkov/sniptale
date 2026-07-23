@@ -16280,7 +16280,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/guardrail-owner-audits.mjs",
-        "contentHash": "62b492171c7111d9265102965eb366ad5076379a544467ffe063540ce44f2b69"
+        "contentHash": "6e7902cbb74c07374b0399d5d4763dc2fbe3e0f03dbc8a1bd351c1e68302d47f"
       },
       "consumers": [
         "tooling/qa/core/guardrail-owner-audits.mjs",
@@ -16300,7 +16300,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/guardrail-preflight-report.mjs",
-        "contentHash": "dd656eeed863d23596c178042de754f76d8b388477b12899e2ff4c4269e8d2d9"
+        "contentHash": "05e15dfc72ff19421b1692a3addc3fd164aeeff859f88b2545482a84c43bf044"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-report.mjs",
@@ -16319,7 +16319,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/guardrail-preflight-scope.mjs",
-        "contentHash": "500a92ebf754d462baf2040f24caab8bcb920d7b13eddccf451861f6ba16745d"
+        "contentHash": "e302e575ac717e93820a19efff2933c08c4b2227ffee9e4f6e2f310f2d0e5139"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-report.mjs",
@@ -16999,6 +16999,28 @@
       ]
     },
     {
+      "id": "policy.source.module-import-graph-mjs.9776dd9e7b",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/module-import-graph.mjs",
+        "contentHash": "33e3a260f0db594163617f897b0d2343223e1bbaa1911f62cb3f05583a44387d"
+      },
+      "consumers": [
+        "tooling/qa/core/module-import-graph.mjs",
+        "tooling/qa/core/module-import-graph.test.ts",
+        "tooling/qa/core/topology-fragmentation.graph.mjs",
+        "tooling/qa/core/verify-build.deleted-closure.mjs"
+      ],
+      "surfaces": [
+        "binding:CODE_EXTENSION_SET",
+        "binding:CODE_EXTENSIONS"
+      ]
+    },
+    {
       "id": "policy.source.nh5-rollout-files-mjs.442ada6456",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -17184,6 +17206,7 @@
         "tooling/qa/core/structural-risk/file-metrics.mjs",
         "tooling/qa/core/structural-risk/function-metrics.mjs",
         "tooling/qa/core/structural-risk/owner-classifier.mjs",
+        "tooling/qa/core/verify-build.deleted-closure.mjs",
         "tooling/qa/wrappers/preflight.mjs"
       ],
       "surfaces": [
@@ -17548,7 +17571,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/preflight.mjs",
-        "contentHash": "b38a97bcde57627c3b3401e5c3c50f1de13d0667a493f7bbf722fd3a4f698928"
+        "contentHash": "020ef9feffa2f44e5959173f55e3bb5cd69f42cb355dbd9a7cc2ad20ac5a8618"
       },
       "consumers": [
         "tooling/qa/wrappers/preflight-render.test.ts",
@@ -17686,7 +17709,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/product-proof-risk-hints.mjs",
-        "contentHash": "4c6826d6db822ac447b8f0f0c926244cb57bae1abc09e4528d2398f384bd7a8b"
+        "contentHash": "274f332b1ff31f0d2572f2bd659a42291bf56a2522eac26c947df5e6a2715b0b"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-report.mjs",
@@ -18833,7 +18856,9 @@
         "tooling/qa/core/verify-audit-guardrails.test.ts",
         "tooling/qa/core/verify-audit.test.ts",
         "tooling/qa/core/verify-boundary-casts.test.ts",
+        "tooling/qa/core/verify-build.deleted-closure.test.ts",
         "tooling/qa/core/verify-build.state.test.ts",
+        "tooling/qa/core/verify-build.test-profiles.test.ts",
         "tooling/qa/core/verify-checkpoint.state.test.ts",
         "tooling/qa/core/verify-codeql-baseline.test.ts",
         "tooling/qa/core/verify-config-policy.test.ts",
@@ -18842,6 +18867,7 @@
         "tooling/qa/core/verify-external-audit-results.test.ts",
         "tooling/qa/core/verify-external-audit-semantics.test-support.ts",
         "tooling/qa/core/verify-external-tools.test.ts",
+        "tooling/qa/core/verify-focused-diff-tests.test.ts",
         "tooling/qa/core/verify-focused.import-mock-only.test.ts",
         "tooling/qa/core/verify-focused.invalid-owner-map.test.ts",
         "tooling/qa/core/verify-focused.local-coverage.test.ts",
@@ -18960,27 +18986,6 @@
       "surfaces": [
         "property:resolveSemgrepCommand/args",
         "property:resolveSemgrepCommand/args[1]"
-      ]
-    },
-    {
-      "id": "policy.source.topology-fragmentation-graph-mjs.15ed9d0730",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/qa/core/topology-fragmentation.graph.mjs",
-        "contentHash": "328b8f7b02cbd15dc8ba005b1ca602f31133f1f36e1a4aef29520b8dae8feb55"
-      },
-      "consumers": [
-        "tooling/qa/core/topology-fragmentation.graph.mjs",
-        "tooling/qa/core/topology-fragmentation.graph.test.ts",
-        "tooling/qa/core/topology-fragmentation.mjs"
-      ],
-      "surfaces": [
-        "binding:CODE_EXTENSION_SET",
-        "binding:CODE_EXTENSIONS"
       ]
     },
     {
@@ -19646,7 +19651,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scope.mjs",
-        "contentHash": "6ad019d818fbc1ee1311ff51ee7a8aea6ead076542d7f9edf7a7dac47aac717e"
+        "contentHash": "e23ff051ebf50246f0a7e9f5fd7eadcd1e70736d1c98481f2c5b35f4882a0c9f"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",

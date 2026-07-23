@@ -30,6 +30,10 @@ export function readHeadFileTexts(relativePaths, { spawnSyncImpl = spawnSync } =
   return sources;
 }
 
+export function readHeadFileText(relativePath, options = {}) {
+  return readHeadFileTexts([relativePath], options).get(relativePath) ?? null;
+}
+
 export function createHeadFileTextResolver(relativePaths, options = {}) {
   const sources = readHeadFileTexts(relativePaths, options);
   return (relativePath) => sources.get(relativePath) ?? null;

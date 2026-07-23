@@ -32,6 +32,7 @@ it('renders deduplicated owner, structural, advisory, and proof sections', () =>
         file: 'session.ts',
         line: 12,
         family: 'Structural file pressure',
+        hint: 'Keep the transaction boundary cohesive.',
         reason: 'dual truth risk',
         severity: 'watch',
       },
@@ -44,7 +45,59 @@ it('renders deduplicated owner, structural, advisory, and proof sections', () =>
   expect(output).toContain('Structural pressure:');
   expect(output).toContain('score=5, delta=3');
   expect(output).toContain('[advisory.structural-file] dual truth risk');
+  expect(output).toContain('Hint: Keep the transaction boundary cohesive.');
   expect(output).not.toContain('Budget signals:');
+});
+
+it('renders behavioral wiring context collected by guardrail preflight', () => {
+  const output = renderPreflightReport({
+    context: { targetFiles: ['apps/extension/src/content/overlay/example/controller.ts'] },
+    relevantDocs: [],
+    ownerRuntime: [],
+    guardrailReport: {
+      hints: [
+        'risk checklist: UI wiring: prove state, action, and lifecycle bindings behaviorally',
+      ],
+      buildScopeForecast: [],
+    },
+    structuralPressure: [],
+    contractChecklist: [],
+    transitiveConsumerHints: [],
+    typecheckBlastRadius: [],
+    advisoryFindings: [],
+    proofHints: [],
+  });
+
+  expect(output).toContain(
+    'risk checklist: UI wiring: prove state, action, and lifecycle bindings behaviorally'
+  );
+});
+
+it('does not duplicate advisory reasons in the proof section', () => {
+  const visualReason =
+    'visual proof plan recommended: dialog.tsx changed; capture key open/closed states';
+  const output = renderPreflightReport({
+    context: { targetFiles: ['apps/extension/src/content/overlay/dialog.tsx'] },
+    relevantDocs: [],
+    ownerRuntime: [],
+    guardrailReport: { hints: [visualReason], buildScopeForecast: [] },
+    structuralPressure: [],
+    contractChecklist: [],
+    transitiveConsumerHints: [],
+    typecheckBlastRadius: [],
+    advisoryFindings: [
+      {
+        id: 'advisory.ui-proof-gap',
+        file: 'apps/extension/src/content/overlay/dialog.tsx',
+        hint: 'Capture representative visual states.',
+        reason: visualReason,
+        severity: 'watch',
+      },
+    ],
+    proofHints: [],
+  });
+
+  expect(output.split(visualReason)).toHaveLength(2);
 });
 
 it('stays read-only and outside the blocking closeout path', () => {

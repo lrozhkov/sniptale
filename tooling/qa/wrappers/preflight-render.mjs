@@ -50,7 +50,8 @@ function formatAdvisoryFindings(findings) {
         `attention=${attention}, watch=${watch}`,
         ...findings.map((finding) => {
           const line = finding.line == null ? '' : `:${finding.line}`;
-          return `- ${finding.file}${line} [${finding.id}] ${finding.reason}`;
+          const hint = finding.hint ? ` Hint: ${finding.hint}` : '';
+          return `- ${finding.file}${line} [${finding.id}] ${finding.reason}${hint}`;
         }),
       ];
 }
@@ -85,6 +86,10 @@ function collectContractLines(report) {
 }
 
 export function collectPreflightReportLines(report, context, guardrailReport) {
+  const advisoryReasons = new Set((report.advisoryFindings ?? []).map((finding) => finding.reason));
+  const proofHints = [...(report.proofHints ?? []), ...(guardrailReport.hints ?? [])].filter(
+    (hint) => !advisoryReasons.has(hint)
+  );
   return [
     'QA preflight: read-only context',
     '',
@@ -103,7 +108,7 @@ export function collectPreflightReportLines(report, context, guardrailReport) {
     ...collectContractLines(report),
     '',
     'Proof:',
-    ...formatList([...new Set(report.proofHints)]),
+    ...formatList([...new Set(proofHints)]),
     '',
     'Build forecast:',
     ...formatList([...new Set(guardrailReport.buildScopeForecast ?? [])]),

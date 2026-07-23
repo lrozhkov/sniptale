@@ -57,7 +57,7 @@ const PRODUCT_PROOF_CODE_FILES = [
 ];
 function writeProductProofRiskFixture(root) {
   const sources = new Map([
-    [PRODUCT_PROOF_CODE_FILES[0], 'export function ToolbarControllerState() { return null; }\n'],
+    [PRODUCT_PROOF_CODE_FILES[0], 'export function Toolbar() { return <button />; }\n'],
     [
       PRODUCT_PROOF_CODE_FILES[1],
       'export function useHiddenFileInputController() { return null; }\n',
@@ -139,6 +139,43 @@ it('reports deleted internal aggregates, thin shell drift, and owner-local proof
   );
 });
 
+it('keeps same-directory fragmentation context when only one family file changed', async () => {
+  const root = createTempRoot('guardrail-bounded-owner-directory-');
+  const controller = 'apps/extension/src/content/overlay/example/controller.ts';
+  const sibling = 'apps/extension/src/content/overlay/example/controller-state.ts';
+  const operation = 'apps/extension/src/content/overlay/example/operation-step.ts';
+  const operationSibling = 'apps/extension/src/content/overlay/example/operation-result.ts';
+  writeFile(
+    root,
+    controller,
+    [
+      'export function createController() {',
+      ...Array.from({ length: 121 }, (_, index) => `  const value${index} = ${index};`),
+      '  return null;',
+      '}',
+      '',
+    ].join('\n')
+  );
+  writeFile(root, sibling, 'export const state = {};\n');
+  writeFile(root, operation, 'export const step = {};\n');
+  writeFile(root, operationSibling, 'export const result = {};\n');
+
+  const report = await collectReport(root, {
+    targetFiles: [controller, operation],
+    codeFiles: [controller, operation],
+  });
+
+  expect(report.thinShells).toEqual(
+    expect.arrayContaining([expect.stringContaining('thin-shell candidate still owns local logic')])
+  );
+  expect(report.ownerLocalProof).toEqual(
+    expect.arrayContaining([expect.stringContaining('owner-local proof may be missing')])
+  );
+  expect(report.topologyQuestions).toEqual(
+    expect.arrayContaining([expect.stringContaining('same-family seams')])
+  );
+});
+
 it('forecasts broad qa:build scope without test-size budgets', async () => {
   const root = createTempRoot('guardrail-build-scope-');
   writeFile(
@@ -169,6 +206,24 @@ it('forecasts broad qa:build scope without test-size budgets', async () => {
     ])
   );
   expect(report).not.toHaveProperty('buildScopeBudgetRisks');
+});
+
+it('does not claim an exact selected scope for bounded manifest forecasting', async () => {
+  const root = createTempRoot('guardrail-build-manifest-scope-');
+  writeFile(root, 'apps/extension/manifest.json', '{}\n');
+
+  const report = await collectReport(root, {
+    targetFiles: ['apps/extension/manifest.json'],
+    codeFiles: [],
+  });
+
+  expect(report.buildScopeForecast[0]).toContain(
+    'selected unit-test scope=consumer-discovery-required'
+  );
+  expect(report.buildScopeForecast[0]).not.toContain('skipped');
+  expect(report.buildScopeForecast).toEqual(
+    expect.arrayContaining([expect.stringContaining('broad transitive scope expected')])
+  );
 });
 
 it('forecasts exact owner tests without a broad transitive warning', async () => {
@@ -262,5 +317,28 @@ it('reports product proof risk checklist without test-size hints', async () => {
   );
   expect(report.hints).not.toEqual(
     expect.arrayContaining([expect.stringContaining('test shape risk')])
+  );
+});
+
+it('recommends behavioral wiring proof without visual states for state-only UI code', async () => {
+  const root = createTempRoot('guardrail-state-only-ui-proof-');
+  const controller = 'apps/extension/src/content/overlay/ai/modal/session/controller.ts';
+  const controllerTest = 'apps/extension/src/content/overlay/ai/modal/session/controller.test.tsx';
+  writeFile(root, controller, 'export function useModalController() { return {}; }\n');
+  writeFile(root, controllerTest, "it('binds state', () => {});\n");
+
+  const report = await collectReport(root, {
+    targetFiles: [controller, controllerTest],
+    codeFiles: [controller, controllerTest],
+  });
+
+  expect(report.hints).toEqual(
+    expect.arrayContaining([expect.stringContaining('risk checklist: UI wiring')])
+  );
+  expect(report.hints).not.toEqual(
+    expect.arrayContaining([
+      expect.stringContaining('risk checklist: visual states'),
+      expect.stringContaining('visual proof plan recommended'),
+    ])
   );
 });

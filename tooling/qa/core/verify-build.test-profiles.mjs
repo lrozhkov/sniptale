@@ -46,6 +46,9 @@ function createScopeDetail({
   if (directTestFiles.length > 0) {
     return `profile=${profile}; direct tests (${directTestFiles.length})${reasonDetail}`;
   }
+  if (profile === 'related-transitive') {
+    return `profile=${profile}; bounded consumer discovery required${reasonDetail}`;
+  }
   return `profile=${profile}; skipped: no matching unit-test targets${reasonDetail}`;
 }
 
@@ -119,11 +122,15 @@ function resolveUnavailableProductionProfile({
   const proofScopes = unavailableProductionScopes.map((scope) => ({
     ...scope,
     ownerTests: [
-      ...new Set([...ownerTestResolver(scope.file), ...(scope.changedOwnerTests ?? [])]),
+      ...new Set([
+        ...(scope.changedSuccessorFiles ?? []).flatMap((file) => ownerTestResolver(file)),
+      ]),
     ],
   }));
   if (
-    proofScopes.some((scope) => scope.relatedFiles.length === 0 && scope.ownerTests.length === 0)
+    proofScopes.some(
+      (scope) => (scope.changedSuccessorFiles ?? []).length === 0 || scope.ownerTests.length === 0
+    )
   ) {
     return finalizeTestScope({
       directTestFiles: [],
@@ -134,13 +141,17 @@ function resolveUnavailableProductionProfile({
       profileReason: 'unavailable production target has no executable affected-test scope',
     });
   }
-  const proofFiles = proofScopes.flatMap((scope) => [...scope.relatedFiles, ...scope.ownerTests]);
+  const proofFiles = proofScopes.flatMap((scope) => [
+    ...scope.relatedFiles,
+    ...(scope.changedSuccessorFiles ?? []),
+    ...scope.ownerTests,
+  ]);
   return finalizeTestScope({
     directTestFiles: [],
     relatedFiles: [...new Set([...relatedFiles, ...proofFiles])].sort(),
     matchedFamilies,
     profile: 'related-transitive',
-    profileReason: 'unavailable production targets have executable related or owner proof',
+    profileReason: 'unavailable production targets have graph-closed successor owner proof',
   });
 }
 

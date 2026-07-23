@@ -56,6 +56,31 @@ it(
   GIT_INTEGRATION_TIMEOUT
 );
 
+it(
+  'does not claim that a deleted test will be executed by focused proof',
+  async () => {
+    const root = createTempRoot('qa-preflight-deleted-test-');
+    const testFile = 'apps/extension/src/content/overlay/example/controller.test.ts';
+    initGitRepo(root);
+    writeFile(root, 'package.json', '{"name":"qa-preflight-temp"}\n');
+    writeFile(root, testFile, "it('covers the old owner', () => {});\n");
+    runGit(root, 'add', '.');
+    runGit(root, 'commit', '-m', 'init');
+    runGit(root, 'rm', testFile);
+
+    const output = await withCwd(root, async () => {
+      const module = await importFresh<typeof import('./preflight.mjs')>(
+        './preflight.mjs',
+        import.meta.url
+      );
+      return module.renderPreflightReport(module.collectPreflightReport());
+    });
+
+    expect(output).not.toContain('changed tests will be included by the focused wrapper');
+  },
+  GIT_INTEGRATION_TIMEOUT
+);
+
 it('accepts explicit files for pre-edit planning', async () => {
   const root = createTempRoot('qa-preflight-files-');
   writeFile(

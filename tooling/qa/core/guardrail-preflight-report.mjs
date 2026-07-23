@@ -23,8 +23,12 @@ export function collectFocusedGuardrailReport({
   codeFiles = [],
   addedFiles = [],
   untrackedFiles = [],
+  buildScopeOptions = {},
 } = {}) {
-  const buildScopeForecast = collectBuildScopeForecast({ targetFiles, codeFiles, addedFiles });
+  const buildScopeForecast = collectBuildScopeForecast(
+    { targetFiles, codeFiles, addedFiles },
+    buildScopeOptions
+  );
   const clusters = summarizeClusterKeys(targetFiles);
   const deletedInternalAggregates = collectDeletedInternalAggregateHints({
     targetFiles,
