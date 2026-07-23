@@ -21,6 +21,10 @@ const contentUiRoot = vi.hoisted(() => ({
 const isolatedRoot = vi.hoisted(() => ({
   applyIsolatedContentRootStyle: vi.fn(),
 }));
+const framePosition = vi.hoisted(() => ({
+  getAbsolutePosition: vi.fn(() => ({ height: 10, width: 12, x: 1, y: 2 })),
+}));
+const logger = vi.hoisted(() => ({ debug: vi.fn(), warn: vi.fn() }));
 const storage = vi.hoisted(() => ({
   DEFAULT_BORDER_PRESET: {
     color: '#ff0',
@@ -47,14 +51,19 @@ const storage = vi.hoisted(() => ({
 }));
 
 vi.mock('../frame-runtime/coords', () => frameCoords);
+vi.mock('../../platform/frame', () => framePosition);
 vi.mock('../../platform/dom-host', () => contentUiRoot);
 vi.mock('../../platform/dom-host/isolated', () => isolatedRoot);
+vi.mock('@sniptale/platform/observability/logger', () => ({
+  createLogger: vi.fn(() => logger),
+}));
 vi.mock('../../../composition/persistence/highlighter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/highlighter')>()),
   ...storage,
 }));
 
 import {
+  createHoverOverlayActions,
   ensureHighlighterOverlayContainer,
   ensureHoverOverlay,
   hideHoverOverlay,
@@ -62,10 +71,12 @@ import {
   removeHoverOverlay,
   showHoverOverlay,
 } from './overlay';
+import { createHoverSession } from './session';
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
+  document.body.classList.remove('sniptale-capture-ui-hidden');
   document.body.replaceChildren();
 });
 
@@ -146,6 +157,28 @@ function shouldRemoveOverlayArtifactsAndResetState(): void {
   expect(state.hoverOverlay).toBeNull();
 }
 
+function shouldExposeOverlayActionsOverOneSession(): void {
+  const session = createHoverSession();
+  session.cachedHighlighterSettings = {
+    borderPresets: [storage.DEFAULT_BORDER_PRESET],
+    defaultBorderPresetId: storage.DEFAULT_BORDER_PRESET.id,
+  } as typeof session.cachedHighlighterSettings;
+  const actions = createHoverOverlayActions(session);
+  const target = document.createElement('button');
+
+  actions.showHoverOverlay(target);
+
+  expect(framePosition.getAbsolutePosition).toHaveBeenCalledWith(target);
+  expect(session.overlayContainer).not.toBeNull();
+  expect(session.hoverOverlay?.style.display).toBe('block');
+  expect(logger.debug).toHaveBeenCalledWith(
+    'Showing hover overlay',
+    expect.objectContaining({
+      calculatedCoords: framePosition.getAbsolutePosition.mock.results[0]?.value,
+    })
+  );
+}
+
 describe('highlighter hover overlay', () => {
   it('creates and reuses the overlay container', shouldCreateAndReuseTheOverlayContainer);
   it('creates and updates the hover overlay', shouldCreateAndUpdateTheHoverOverlay);
@@ -154,4 +187,5 @@ describe('highlighter hover overlay', () => {
     shouldKeepHoverPreviewHiddenWhileCaptureUiIsHidden
   );
   it('removes overlay artifacts and resets state', shouldRemoveOverlayArtifactsAndResetState);
+  it('exposes overlay actions over one session', shouldExposeOverlayActionsOverOneSession);
 });

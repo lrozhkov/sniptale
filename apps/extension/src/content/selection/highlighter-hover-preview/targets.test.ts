@@ -1,0 +1,67 @@
+// @vitest-environment jsdom
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const contentUiRoot = vi.hoisted(() => ({
+  getContentUiElementById: vi.fn<(id: string) => HTMLElement | null>(),
+  queryAllContentUiElements: vi.fn<(selector: string) => Element[]>(() => []),
+  queryContentUiElement: vi.fn<(selector: string) => Element | null>(),
+}));
+const pageContext = vi.hoisted(() => ({
+  isContentRuntimeUiElement: vi.fn(() => false),
+}));
+
+vi.mock('../../platform/dom-host', () => contentUiRoot);
+vi.mock('../../platform/page-context/dom', () => pageContext);
+
+import { createHoverSession } from './session';
+import {
+  hasBlockingHighlighterPopover,
+  isHighlighterExtensionUiElement,
+  isNearExistingFrameBorder,
+} from './targets';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+  document.body.replaceChildren();
+});
+
+describe('highlighter hover target policy', () => {
+  it('detects direct classes and delegates portal/closest ownership checks', () => {
+    const directTarget = document.createElement('button');
+    directTarget.classList.add('sniptale-highlight');
+    expect(isHighlighterExtensionUiElement(directTarget)).toBe(true);
+
+    const target = document.createElement('span');
+    const portal = document.createElement('div');
+    contentUiRoot.getContentUiElementById.mockReturnValueOnce(portal);
+    pageContext.isContentRuntimeUiElement.mockReturnValueOnce(true);
+
+    expect(isHighlighterExtensionUiElement(target)).toBe(true);
+    expect(pageContext.isContentRuntimeUiElement).toHaveBeenCalledWith(
+      target,
+      expect.objectContaining({ portalElements: [portal] })
+    );
+  });
+
+  it('detects popovers that block click handling', () => {
+    contentUiRoot.queryContentUiElement.mockImplementation((selector) =>
+      selector === '.sniptale-callout-settings-popover' ? document.createElement('div') : null
+    );
+
+    expect(hasBlockingHighlighterPopover()).toBe(true);
+  });
+
+  it('refreshes frame geometry through session authority and excludes only the border zone', () => {
+    const session = createHoverSession();
+    const frame = document.createElement('div');
+    frame.id = 'frame-1';
+    frame.getBoundingClientRect = vi.fn(() => new DOMRect(20, 40, 20, 20));
+    contentUiRoot.queryAllContentUiElements.mockReturnValue([frame]);
+
+    expect(isNearExistingFrameBorder(session, 15, 45)).toBe(true);
+    expect(isNearExistingFrameBorder(session, 30, 50)).toBe(false);
+    expect(contentUiRoot.queryAllContentUiElements).toHaveBeenCalledOnce();
+  });
+});

@@ -31,7 +31,7 @@ function collectPackageTargets(value) {
 function resolveExistingCodeTarget(base, fileSet) {
   const normalized = normalize(base);
   const candidates = [normalized];
-  if (!path.posix.extname(normalized)) {
+  if (!CODE_EXTENSION_SET.has(path.posix.extname(normalized))) {
     candidates.push(...CODE_EXTENSIONS.map((extension) => `${normalized}${extension}`));
     candidates.push(...CODE_EXTENSIONS.map((extension) => `${normalized}/index${extension}`));
   }
@@ -68,15 +68,15 @@ function resolvePackageSpecifier(specifier, fileSet, root, readFile) {
   let missingResourceTarget = null;
   for (const target of collectPackageTargets(declaration)) {
     const manifestTarget = normalize(path.posix.join(path.posix.dirname(packagePath), target));
-    if (hasExplicitResourceExtension(target)) {
-      if (resourceExists(root, manifestTarget, readFile)) {
-        return { kind: 'resource', target: manifestTarget };
-      }
-      missingResourceTarget = manifestTarget;
-      continue;
+    if (hasExplicitResourceExtension(target) && resourceExists(root, manifestTarget, readFile)) {
+      return { kind: 'resource', target: manifestTarget };
     }
     const resolved = resolveExistingCodeTarget(manifestTarget, fileSet);
     if (resolved) return { kind: 'code', target: resolved };
+    if (hasExplicitResourceExtension(target)) {
+      missingResourceTarget = manifestTarget;
+      continue;
+    }
   }
   return missingResourceTarget ? { kind: 'missing-resource', target: missingResourceTarget } : null;
 }
@@ -85,15 +85,15 @@ function resolveSpecifier({ file, specifier, fileSet, root, readFile }) {
   const cleanSpecifier = stripQueryAndHash(specifier);
   if (cleanSpecifier.startsWith('.')) {
     const base = normalize(path.posix.join(path.posix.dirname(file), cleanSpecifier));
-    if (hasExplicitResourceExtension(base)) {
-      return resourceExists(root, base, readFile)
-        ? { kind: 'resource', target: base, retainedSpecifier: specifier }
-        : { kind: 'missing-resource', target: base, retainedSpecifier: specifier };
+    if (hasExplicitResourceExtension(base) && resourceExists(root, base, readFile)) {
+      return { kind: 'resource', target: base, retainedSpecifier: specifier };
     }
     const target = resolveExistingCodeTarget(base, fileSet);
-    return target
-      ? { kind: 'code', target, retainedSpecifier: specifier }
-      : { kind: 'unresolved', retainedSpecifier: specifier };
+    if (target) return { kind: 'code', target, retainedSpecifier: specifier };
+    if (hasExplicitResourceExtension(base)) {
+      return { kind: 'missing-resource', target: base, retainedSpecifier: specifier };
+    }
+    return { kind: 'unresolved', retainedSpecifier: specifier };
   }
   if (cleanSpecifier.startsWith('@sniptale/')) {
     const target = resolvePackageSpecifier(cleanSpecifier, fileSet, root, readFile);

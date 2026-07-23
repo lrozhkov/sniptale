@@ -3,6 +3,7 @@ import {
   createFrameCalcSettings,
   type ElementAbsolutePosition,
 } from '../frame-runtime/coords';
+import { getAbsolutePosition } from '../../platform/frame';
 import { appendToContentOverlayRoot, queryAllContentUiElements } from '../../platform/dom-host';
 import { applyIsolatedContentRootStyle } from '../../platform/dom-host/isolated';
 import {
@@ -12,10 +13,27 @@ import {
   resolveBorderShadowVisual,
 } from '../../../features/highlighter/style';
 import type { BorderPreset } from '../../../features/highlighter/contracts';
-import type { HighlighterHoverState } from './types';
+import { createLogger } from '@sniptale/platform/observability/logger';
+import {
+  ensureHighlighterSettingsLoaded,
+  getCurrentBorderPreset,
+  type HoverDomSession,
+  type HoverSession,
+} from './session';
 
-export function ensureHighlighterOverlayContainer(state: HighlighterHoverState): HTMLElement {
-  if (state.overlayContainer) return state.overlayContainer;
+const logger = createLogger({ namespace: 'ContentHighlighter:HoverPreview' });
+
+export type HoverOverlayActions = {
+  createHoverOverlay: () => void;
+  createOverlayContainer: () => void;
+  hideHoverOverlay: () => void;
+  removeHoverOverlay: () => void;
+  removeOverlayContainer: () => void;
+  showHoverOverlay: (element: HTMLElement) => void;
+};
+
+export function ensureHighlighterOverlayContainer(session: HoverDomSession): HTMLElement {
+  if (session.overlayContainer) return session.overlayContainer;
 
   const overlayContainer = document.createElement('div');
   overlayContainer.className = 'sniptale-highlight-container';
@@ -34,24 +52,21 @@ export function ensureHighlighterOverlayContainer(state: HighlighterHoverState):
     `
   );
   appendToContentOverlayRoot(overlayContainer);
-  state.overlayContainer = overlayContainer;
+  session.overlayContainer = overlayContainer;
   return overlayContainer;
 }
 
-export function removeHighlighterOverlayContainer(state: HighlighterHoverState): void {
-  state.overlayContainer?.remove();
-  state.overlayContainer = null;
+export function removeHighlighterOverlayContainer(session: HoverDomSession): void {
+  session.overlayContainer?.remove();
+  session.overlayContainer = null;
   queryAllContentUiElements('.sniptale-highlight-container').forEach((element: Element) =>
     element.remove()
   );
-  state.hoverOverlay = null;
+  session.hoverOverlay = null;
 }
 
-export function ensureHoverOverlay(
-  state: HighlighterHoverState,
-  preset: BorderPreset
-): HTMLElement {
-  if (state.hoverOverlay) return state.hoverOverlay;
+export function ensureHoverOverlay(session: HoverDomSession, preset: BorderPreset): HTMLElement {
+  if (session.hoverOverlay) return session.hoverOverlay;
 
   const visual = resolveBorderPresetVisual(preset);
   const hoverOverlay = document.createElement('div');
@@ -79,14 +94,14 @@ export function ensureHoverOverlay(
     background-color: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
   `;
   Object.assign(hoverOverlay.style, visual.customCssStyles);
-  ensureHighlighterOverlayContainer(state).appendChild(hoverOverlay);
-  state.hoverOverlay = hoverOverlay;
+  ensureHighlighterOverlayContainer(session).appendChild(hoverOverlay);
+  session.hoverOverlay = hoverOverlay;
   return hoverOverlay;
 }
 
-export function removeHoverOverlay(state: HighlighterHoverState): void {
-  state.hoverOverlay?.remove();
-  state.hoverOverlay = null;
+export function removeHoverOverlay(session: HoverDomSession): void {
+  session.hoverOverlay?.remove();
+  session.hoverOverlay = null;
   queryAllContentUiElements('.sniptale-highlight-hover').forEach((element: Element) =>
     element.remove()
   );
@@ -97,13 +112,13 @@ function isCaptureUiHidden(): boolean {
 }
 
 export function showHoverOverlay(
-  state: HighlighterHoverState,
+  session: HoverDomSession,
   position: ElementAbsolutePosition,
   preset: BorderPreset
 ): void {
-  const hoverOverlay = ensureHoverOverlay(state, preset);
+  const hoverOverlay = ensureHoverOverlay(session, preset);
   if (isCaptureUiHidden()) {
-    hideHoverOverlay(state);
+    hideHoverOverlay(session);
     return;
   }
 
@@ -112,7 +127,6 @@ export function showHoverOverlay(
     position,
     createFrameCalcSettings({ width: visual.strokeWidth, padding: visual.padding })
   );
-
   hoverOverlay.style.top = `${coords.y}px`;
   hoverOverlay.style.left = `${coords.x}px`;
   hoverOverlay.style.width = `${coords.width}px`;
@@ -129,8 +143,54 @@ export function showHoverOverlay(
   hoverOverlay.style.display = 'block';
 }
 
-export function hideHoverOverlay(state: HighlighterHoverState): void {
-  if (state.hoverOverlay) {
-    state.hoverOverlay.style.opacity = '0';
-  }
+export function hideHoverOverlay(session: HoverDomSession): void {
+  if (session.hoverOverlay) session.hoverOverlay.style.opacity = '0';
+}
+
+function logHoverOverlayShown(position: ElementAbsolutePosition, preset: BorderPreset): void {
+  logger.debug('Showing hover overlay', {
+    elementPos: {
+      x: position.x,
+      y: position.y,
+      width: position.width,
+      height: position.height,
+    },
+    presetPadding: preset.padding,
+    presetBorderWidth: preset.width,
+    calculatedCoords: position,
+  });
+}
+
+export function createHoverOverlayActions(session: HoverSession): HoverOverlayActions {
+  return {
+    createOverlayContainer: () => {
+      ensureHighlighterOverlayContainer(session);
+    },
+    removeOverlayContainer: () => {
+      removeHighlighterOverlayContainer(session);
+    },
+    createHoverOverlay: () => {
+      void ensureHighlighterSettingsLoaded(session);
+      ensureHoverOverlay(session, getCurrentBorderPreset(session));
+    },
+    removeHoverOverlay: () => {
+      removeHoverOverlay(session);
+    },
+    hideHoverOverlay: () => {
+      hideHoverOverlay(session);
+    },
+    showHoverOverlay: (element) => {
+      ensureHighlighterOverlayContainer(session);
+      void ensureHighlighterSettingsLoaded(session);
+      ensureHoverOverlay(session, getCurrentBorderPreset(session));
+      if (!session.hoverOverlay || !session.overlayContainer) {
+        logger.warn('Cannot show hover overlay without overlay container state');
+        return;
+      }
+      const position = getAbsolutePosition(element);
+      const preset = getCurrentBorderPreset(session);
+      logHoverOverlayShown(position, preset);
+      showHoverOverlay(session, position, preset);
+    },
+  };
 }

@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import {
   createTempRoot,
@@ -72,6 +72,95 @@ it('rejects partial deleted chains with an uncovered terminal facade', async () 
   );
 
   expect(successors.has(deleted)).toBe(false);
+});
+
+it('closes deleted chains through dotted TypeScript module stems', async () => {
+  const root = createTempRoot('build-deleted-dotted-stem-');
+  const ownerRoot = 'apps/extension/src/content/overlay/example';
+  const dottedLeaf = `${ownerRoot}/events.helpers.ts`;
+  const eventFacade = `${ownerRoot}/events.ts`;
+  const controller = `${ownerRoot}/controller.ts`;
+  initGitRepo(root);
+  writeFile(root, dottedLeaf, 'export const helper = true;\n');
+  writeFile(root, eventFacade, "import './events.helpers';\nexport const event = true;\n");
+  writeFile(root, controller, "import './events';\nexport const controller = 1;\n");
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'baseline');
+  runGit(root, 'rm', dottedLeaf, eventFacade);
+  writeFile(root, controller, 'export const controller = 2;\n');
+
+  const successors = await collectSuccessors(
+    root,
+    [dottedLeaf, eventFacade, controller],
+    [controller]
+  );
+
+  expect(successors.get(dottedLeaf)).toEqual([controller]);
+  expect(successors.get(eventFacade)).toEqual([controller]);
+});
+
+it('closes converging deleted chains without treating a visited importer as uncovered', async () => {
+  const root = createTempRoot('build-deleted-converging-');
+  const ownerRoot = 'apps/extension/src/content/overlay/example';
+  const leaf = `${ownerRoot}/leaf.ts`;
+  const adapter = `${ownerRoot}/adapter.ts`;
+  const facade = `${ownerRoot}/facade.ts`;
+  const controller = `${ownerRoot}/controller.ts`;
+  initGitRepo(root);
+  writeFile(root, leaf, 'export const leaf = true;\n');
+  writeFile(root, adapter, "import './leaf';\nexport const adapter = true;\n");
+  writeFile(root, facade, "import './leaf';\nimport './adapter';\nexport const facade = true;\n");
+  writeFile(root, controller, "import './facade';\nexport const controller = 1;\n");
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'baseline');
+  runGit(root, 'rm', leaf, adapter, facade);
+  writeFile(root, controller, 'export const controller = 2;\n');
+
+  const successors = await collectSuccessors(
+    root,
+    [leaf, adapter, facade, controller],
+    [controller]
+  );
+
+  expect(successors.get(leaf)).toEqual([controller]);
+  expect(successors.get(adapter)).toEqual([controller]);
+  expect(successors.get(facade)).toEqual([controller]);
+});
+
+it('memoizes HEAD importer discovery across deleted roots in one closure run', async () => {
+  const root = createTempRoot('build-deleted-importer-cache-');
+  const ownerRoot = 'apps/extension/src/content/overlay/example';
+  const leaf = `${ownerRoot}/leaf.ts`;
+  const adapter = `${ownerRoot}/adapter.ts`;
+  const facade = `${ownerRoot}/facade.ts`;
+  const controller = `${ownerRoot}/controller.ts`;
+  writeFile(root, controller, 'export const controller = 2;\n');
+  const importers = new Map([
+    [leaf, [adapter, facade]],
+    [adapter, [facade]],
+    [facade, [controller]],
+  ]);
+  const headImporterResolver = vi.fn((file: string) => importers.get(file) ?? []);
+
+  const successors = await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./verify-build.deleted-closure.mjs')>(
+      './verify-build.deleted-closure.mjs',
+      import.meta.url
+    );
+    return module.collectDeletedTargetSuccessors({
+      headImporterResolver,
+      productionTargetFiles: [leaf, adapter, facade, controller],
+      productionCodeFiles: [controller],
+    });
+  });
+
+  expect(successors.get(leaf)).toEqual([controller]);
+  expect(successors.get(adapter)).toEqual([controller]);
+  expect(successors.get(facade)).toEqual([controller]);
+  expect(headImporterResolver).toHaveBeenCalledTimes(3);
+  expect(new Set(headImporterResolver.mock.calls.map(([file]) => file))).toEqual(
+    new Set([leaf, adapter, facade])
+  );
 });
 
 it('rejects a deleted chain when an unchanged HEAD importer remains outside the diff', async () => {
