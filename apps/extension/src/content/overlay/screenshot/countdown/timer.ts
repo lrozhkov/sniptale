@@ -1,18 +1,18 @@
-export type ScreenshotType = 'visible' | 'full' | 'selection';
+import type { ScreenshotControllerSession } from '../session/state';
+import type { ScreenshotType } from '../types';
 
 type CountdownRuntimeState = {
-  countdownTimeoutRef: { current: ReturnType<typeof setTimeout> | null };
-  pendingScreenshotType: { current: ScreenshotType | null };
+  session: Pick<ScreenshotControllerSession, 'countdownTimeout' | 'pendingType'>;
   setCountdown: (value: number | null) => void;
 };
 
 export function resetScreenshotCountdownRuntimeState(args: CountdownRuntimeState): void {
   args.setCountdown(null);
-  if (args.countdownTimeoutRef.current) {
-    clearTimeout(args.countdownTimeoutRef.current);
+  if (args.session.countdownTimeout) {
+    clearTimeout(args.session.countdownTimeout);
   }
-  args.countdownTimeoutRef.current = null;
-  args.pendingScreenshotType.current = null;
+  args.session.countdownTimeout = null;
+  args.session.pendingType = null;
 }
 
 export function startScreenshotCountdownTimer(
@@ -23,7 +23,7 @@ export function startScreenshotCountdownTimer(
   }
 ): void {
   args.setCountdown(args.timerDelay);
-  args.pendingScreenshotType.current = args.type;
+  args.session.pendingType = args.type;
 
   let currentCount = args.timerDelay;
   const tick = () => {
@@ -31,7 +31,7 @@ export function startScreenshotCountdownTimer(
 
     if (currentCount > 0) {
       args.setCountdown(currentCount);
-      args.countdownTimeoutRef.current = setTimeout(tick, 1000);
+      args.session.countdownTimeout = setTimeout(tick, 1000);
       return;
     }
 
@@ -39,5 +39,5 @@ export function startScreenshotCountdownTimer(
     args.onElapsed();
   };
 
-  args.countdownTimeoutRef.current = setTimeout(tick, 1000);
+  args.session.countdownTimeout = setTimeout(tick, 1000);
 }

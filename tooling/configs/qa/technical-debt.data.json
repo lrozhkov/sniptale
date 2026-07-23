@@ -2716,11 +2716,11 @@
         "apps/extension/src/content/overlay/screenshot/persistence/index.ts",
         "apps/extension/src/content/overlay/screenshot/scenario.ts",
         "apps/extension/src/content/overlay/screenshot/session/action-types.ts",
-        "apps/extension/src/content/overlay/screenshot/session/actions.ts",
         "apps/extension/src/content/overlay/screenshot/session/cancel.ts",
         "apps/extension/src/content/overlay/screenshot/session/capture.ts",
         "apps/extension/src/content/overlay/screenshot/session/elapsed.ts",
         "apps/extension/src/content/overlay/screenshot/session/immediate.ts",
+        "apps/extension/src/content/overlay/screenshot/session/state.ts",
         "apps/extension/src/content/overlay/screenshot/types.ts",
         "apps/extension/src/content/overlay/state/ai-modal.store.ts",
         "apps/extension/src/content/overlay/toolbar/capture/action-dropdown.tsx",
@@ -21119,7 +21119,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-ui-automation-seams.mjs",
-        "contentHash": "55a527a72542ebe76004370e677718d3d9f4ade8e72cb78da4a0a8aede10fd3b"
+        "contentHash": "15ab8b264ec76a5f87ab9e595f6df579c793b87cfd8eb78b7ce849e1892c957c"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.architecture.mjs",

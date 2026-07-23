@@ -15,7 +15,7 @@ import {
   syncCaptureAction,
 } from '../mode';
 import type { CreateScreenshotControllerActionsArgs } from './action-types';
-import type { ScreenshotType } from '../countdown/controller';
+import type { ScreenshotType } from '../types';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 import type { CaptureActionType } from '../../../../contracts/settings';
 
@@ -72,15 +72,15 @@ function clearCountdownStateIfOwned(
   args: CreateScreenshotControllerActionsArgs,
   runToken: number
 ): void {
-  if (args.refs.countdownRunTokenRef.current !== null) {
-    if (args.refs.countdownRunTokenRef.current !== runToken) {
+  if (args.session.countdownRunToken !== null) {
+    if (args.session.countdownRunToken !== runToken) {
       return;
     }
-    args.refs.countdownRunTokenRef.current = null;
+    args.session.countdownRunToken = null;
   }
 
   args.setCountdown(null);
-  args.refs.pendingScreenshotType.current = null;
+  args.session.pendingType = null;
 }
 
 export async function executeCountdownScreenshot(

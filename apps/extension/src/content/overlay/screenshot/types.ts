@@ -19,6 +19,8 @@ export type ScreenshotStartContext = {
   navigationLockBaseline?: boolean | undefined;
 };
 
+export type ScreenshotType = 'visible' | 'full' | 'selection';
+
 export interface ScreenshotCaptureAdapter {
   captureSelection: () => Promise<string>;
   captureViewport: (type: 'visible' | 'full') => Promise<string>;
@@ -29,13 +31,17 @@ export interface ScreenshotControllerCapturePersistenceBridge {
   setSaveDialogState: (state: SaveDialogState | null) => void;
 }
 
+export interface ScreenshotControllerRuntimeSession {
+  navigationLockBaseline: boolean;
+  runActive: boolean;
+  runGeneration: number;
+}
+
 export interface ScreenshotControllerRuntime {
   captureAdapter?: ScreenshotCaptureAdapter;
   capturePersistence: ScreenshotControllerCapturePersistenceBridge;
   captureActionRef: MutableRefObject<CaptureActionType>;
-  navigationLockStateBeforeScreenshot: { current: boolean };
-  screenshotRunActiveRef: { current: boolean };
-  screenshotRunGenerationRef: { current: number };
+  session: ScreenshotControllerRuntimeSession;
   scenario?: ScreenshotControllerScenarioBridge;
   setIsCompletelyHidden: (hidden: boolean) => void;
   setIsToolbarVisible: (visible: boolean) => void;

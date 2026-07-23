@@ -23,41 +23,36 @@ export function getQuickActionSuccessMessage(actionType: CaptureActionType): str
 
 export function restoreVisibleUiState(
   {
-    navigationLockStateBeforeScreenshot,
-    screenshotRunGenerationRef,
+    session,
     setIsCompletelyHidden,
     setIsToolbarVisible,
     setNavigationLockEnabled,
   }: Pick<
     ScreenshotControllerRuntime,
-    | 'navigationLockStateBeforeScreenshot'
-    | 'screenshotRunGenerationRef'
-    | 'setIsCompletelyHidden'
-    | 'setIsToolbarVisible'
-    | 'setNavigationLockEnabled'
+    'session' | 'setIsCompletelyHidden' | 'setIsToolbarVisible' | 'setNavigationLockEnabled'
   >,
   runToken?: number
 ) {
-  if (!isCurrentScreenshotRun({ screenshotRunGenerationRef }, runToken)) {
+  if (!isCurrentScreenshotRun({ session }, runToken)) {
     return;
   }
 
   logger.debug('restoreVisibleUiState.start', {
-    navigationLockBeforeScreenshot: navigationLockStateBeforeScreenshot.current,
+    navigationLockBeforeScreenshot: session.navigationLockBaseline,
   });
   setUIHidden(false);
   setIsCompletelyHidden(false);
   setIsToolbarVisible(true);
 
-  if (navigationLockStateBeforeScreenshot.current) {
+  if (session.navigationLockBaseline) {
     enableNavigationLock(false);
   } else {
     disableNavigationLock();
   }
 
-  setNavigationLockEnabled(navigationLockStateBeforeScreenshot.current);
+  setNavigationLockEnabled(session.navigationLockBaseline);
   logger.debug('restoreVisibleUiState.complete', {
-    navigationLockRestoredTo: navigationLockStateBeforeScreenshot.current,
+    navigationLockRestoredTo: session.navigationLockBaseline,
   });
 }
 

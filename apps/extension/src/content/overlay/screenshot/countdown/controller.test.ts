@@ -4,9 +4,9 @@ import {
   resetCountdownRuntimeState,
   restoreCountdownLockOnCancel,
   startCountdown,
-  type CountdownLockSession,
 } from './controller';
 import { disableNavigationLock, enableNavigationLock } from '../../../selection/locker';
+import { createScreenshotControllerSession } from '../session/state';
 
 vi.mock('../../../selection/locker', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../selection/locker')>()),
@@ -20,28 +20,14 @@ beforeEach(() => {
 });
 
 function expectCountdownDisablesNavigationLock() {
-  const countdownLockSessionRef = {
-    current: null,
-  } as { current: CountdownLockSession | null };
-  const countdownTimeoutRef = {
-    current: null,
-  } as { current: ReturnType<typeof setTimeout> | null };
-  const navigationLockStateBeforeScreenshot = {
-    current: true,
-  };
-  const pendingScreenshotType = {
-    current: null,
-  } as { current: 'visible' | 'full' | 'selection' | null };
+  const session = createScreenshotControllerSession(true);
   const setCountdown = vi.fn();
   const setIsToolbarVisible = vi.fn();
   const setNavigationLockEnabled = vi.fn();
 
   startCountdown({
-    countdownLockSessionRef,
-    countdownTimeoutRef,
-    navigationLockStateBeforeScreenshot,
     onElapsed: vi.fn(),
-    pendingScreenshotType,
+    session,
     setCountdown,
     setIsToolbarVisible,
     setNavigationLockEnabled,
@@ -53,61 +39,40 @@ function expectCountdownDisablesNavigationLock() {
   expect(setNavigationLockEnabled).toHaveBeenCalledWith(false);
   expect(setIsToolbarVisible).toHaveBeenCalledWith(false);
   expect(setCountdown).toHaveBeenCalledWith(3);
-  expect(countdownLockSessionRef.current).toEqual({
+  expect(session.countdownLock).toEqual({
     navigationLockEnabledBeforeCountdown: true,
   });
-  expect(pendingScreenshotType.current).toBe('visible');
+  expect(session.pendingType).toBe('visible');
 }
 
 function expectCancelledCountdownRestoresNavigationLock() {
-  const countdownLockSessionRef = {
-    current: null,
-  } as { current: CountdownLockSession | null };
-  const navigationLockStateBeforeScreenshot = {
-    current: true,
-  };
+  const session = createScreenshotControllerSession(true);
   const setNavigationLockEnabled = vi.fn();
 
   beginCountdownLockSession({
-    countdownLockSessionRef,
-    navigationLockStateBeforeScreenshot,
+    session,
     setNavigationLockEnabled,
   });
 
   restoreCountdownLockOnCancel({
-    countdownLockSessionRef,
-    navigationLockStateBeforeScreenshot,
+    session,
     setNavigationLockEnabled,
   });
 
   expect(enableNavigationLock).toHaveBeenCalledWith(false);
   expect(setNavigationLockEnabled).toHaveBeenLastCalledWith(true);
-  expect(countdownLockSessionRef.current).toBeNull();
+  expect(session.countdownLock).toBeNull();
 }
 
 function expectVisibleCountdownCompletionLeavesNavigationUnlocked() {
   vi.useFakeTimers();
 
-  const countdownLockSessionRef = {
-    current: null,
-  } as { current: CountdownLockSession | null };
-  const countdownTimeoutRef = {
-    current: null,
-  } as { current: ReturnType<typeof setTimeout> | null };
-  const navigationLockStateBeforeScreenshot = {
-    current: true,
-  };
-  const pendingScreenshotType = {
-    current: null,
-  } as { current: 'visible' | 'full' | 'selection' | null };
+  const session = createScreenshotControllerSession(true);
   const onElapsed = vi.fn();
 
   startCountdown({
-    countdownLockSessionRef,
-    countdownTimeoutRef,
-    navigationLockStateBeforeScreenshot,
     onElapsed,
-    pendingScreenshotType,
+    session,
     setCountdown: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
@@ -119,29 +84,25 @@ function expectVisibleCountdownCompletionLeavesNavigationUnlocked() {
 
   expect(enableNavigationLock).not.toHaveBeenCalled();
   expect(onElapsed).toHaveBeenCalledTimes(1);
-  expect(countdownLockSessionRef.current).toBeNull();
+  expect(session.countdownLock).toBeNull();
 }
 
 function expectResetClearsTimerAndPendingType() {
   const timeoutId = setTimeout(() => undefined, 1_000);
-  const countdownTimeoutRef = {
-    current: timeoutId,
-  } as { current: ReturnType<typeof setTimeout> | null };
-  const pendingScreenshotType = {
-    current: 'visible',
-  } as { current: 'visible' | 'full' | 'selection' | null };
+  const session = createScreenshotControllerSession(true);
+  session.countdownTimeout = timeoutId;
+  session.pendingType = 'visible';
   const setCountdown = vi.fn();
 
   resetCountdownRuntimeState({
-    countdownTimeoutRef,
-    pendingScreenshotType,
+    session,
     setCountdown,
   });
   clearTimeout(timeoutId);
 
   expect(setCountdown).toHaveBeenCalledWith(null);
-  expect(countdownTimeoutRef.current).toBeNull();
-  expect(pendingScreenshotType.current).toBeNull();
+  expect(session.countdownTimeout).toBeNull();
+  expect(session.pendingType).toBeNull();
 }
 
 describe('screenshot-controller-countdown', () => {

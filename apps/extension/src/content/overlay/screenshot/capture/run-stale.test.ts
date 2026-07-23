@@ -66,9 +66,11 @@ function createRuntime(
       setSaveDialogState: vi.fn(),
     },
     captureActionRef: { current: actionType },
-    navigationLockStateBeforeScreenshot: { current: false },
-    screenshotRunActiveRef: { current: true },
-    screenshotRunGenerationRef: { current: 1 },
+    session: {
+      navigationLockBaseline: false,
+      runActive: true,
+      runGeneration: 1,
+    },
     scenario: {
       buildCapturePayload: vi.fn(() => createScenarioPayload()),
       ensureCaptureReady: vi.fn(async () => undefined),
@@ -114,7 +116,7 @@ afterEach(() => {
 async function expectStaleBackgroundViewportSkipsPersistenceAndFeedback() {
   const runtime = createRuntime();
   sendRuntimeMessageMock.mockImplementationOnce(async () => {
-    runtime.screenshotRunGenerationRef.current = 2;
+    runtime.session.runGeneration = 2;
     return {
       dataUrl: 'data:image/png;base64,stale',
       success: true,
@@ -150,7 +152,7 @@ async function expectStaleBackgroundViewportSkipsDispatchAfterSettingsAwait() {
   });
 
   await settleCaptureTimers();
-  runtime.screenshotRunGenerationRef.current = 2;
+  runtime.session.runGeneration = 2;
   settings.resolve({ saveCapturesToGallery: false });
   await captureExpectation;
 

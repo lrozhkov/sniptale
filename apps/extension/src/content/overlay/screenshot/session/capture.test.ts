@@ -1,10 +1,8 @@
-import type { MutableRefObject } from 'react';
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createHandleTakeScreenshot } from './capture';
-import type { CountdownLockSession, ScreenshotType } from '../countdown/controller';
 import type { ScreenshotControllerParams } from '../mode';
+import { createScreenshotControllerSession } from './state';
 
 const {
   executeCountdownScreenshotMock,
@@ -75,34 +73,20 @@ function createParams(
   };
 }
 
-function createRefs(overrides: Partial<FactoryArgs['refs']> = {}): FactoryArgs['refs'] {
-  return {
-    countdownLockSessionRef: { current: null } as MutableRefObject<CountdownLockSession | null>,
-    countdownRunTokenRef: { current: null } as MutableRefObject<number | null>,
-    countdownTimeoutRef: {
-      current: null,
-    } as MutableRefObject<ReturnType<typeof setTimeout> | null>,
-    navigationLockStateBeforeScreenshot: { current: true },
-    pendingScreenshotType: { current: null } as MutableRefObject<ScreenshotType | null>,
-    ...overrides,
-  };
-}
-
 function createArgs(overrides: Partial<FactoryArgs> = {}) {
   const setCountdown = vi.fn();
+  const session = overrides.session ?? createScreenshotControllerSession(true);
 
   const args: FactoryArgs = {
     params: createParams(),
-    refs: createRefs(),
+    session,
     runtime: {
       capturePersistence: {
         sessionActivePresetId: null,
         setSaveDialogState: vi.fn(),
       },
       captureActionRef: { current: 'download_default' },
-      navigationLockStateBeforeScreenshot: { current: true },
-      screenshotRunActiveRef: { current: false },
-      screenshotRunGenerationRef: { current: 0 },
+      session,
       setIsCompletelyHidden: vi.fn(),
       setIsToolbarVisible: vi.fn(),
       setNavigationLockEnabled: vi.fn(),
@@ -129,16 +113,12 @@ async function verifyCountdownStartBranch() {
   await createHandleTakeScreenshot(args)('selection');
 
   expect(syncCaptureActionMock).toHaveBeenCalledWith(args.params);
-  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(
-    args.params,
-    args.refs.navigationLockStateBeforeScreenshot,
-    undefined
-  );
+  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(args.params, args.session, undefined);
   expect(startCountdownMock).toHaveBeenCalledTimes(1);
   expect(runImmediateScreenshotMock).not.toHaveBeenCalled();
   const countdownArgs = startCountdownMock.mock.calls[0]?.[0];
   expect(countdownArgs?.type).toBe('selection');
-  expect(args.refs.countdownRunTokenRef.current).toBe(1);
+  expect(args.session.countdownRunToken).toBe(1);
   countdownArgs?.onElapsed();
   expect(executeCountdownScreenshotMock).toHaveBeenCalledWith('selection', args, 1, undefined);
 }
@@ -149,11 +129,7 @@ async function verifyImmediateViewportBranch() {
   await createHandleTakeScreenshot(args)('visible');
 
   expect(syncCaptureActionMock).toHaveBeenCalledWith(args.params);
-  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(
-    args.params,
-    args.refs.navigationLockStateBeforeScreenshot,
-    undefined
-  );
+  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(args.params, args.session, undefined);
   expect(prepareScreenshotModeMock.mock.invocationCallOrder[0]).toBeLessThan(
     runImmediateScreenshotMock.mock.invocationCallOrder[0] ?? 0
   );
@@ -167,11 +143,7 @@ async function verifyAutoStartContextBranch() {
 
   await createHandleTakeScreenshot(args)('visible', undefined, startContext);
 
-  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(
-    args.params,
-    args.refs.navigationLockStateBeforeScreenshot,
-    startContext
-  );
+  expect(prepareScreenshotModeMock).toHaveBeenCalledWith(args.params, args.session, startContext);
   expect(runImmediateScreenshotMock).toHaveBeenCalledWith('visible', args, 1);
 }
 

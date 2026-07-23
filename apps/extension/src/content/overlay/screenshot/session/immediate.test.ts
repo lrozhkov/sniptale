@@ -1,11 +1,10 @@
-import type { MutableRefObject } from 'react';
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runImmediateScreenshot } from './immediate';
 import type { ScreenshotControllerRuntime } from '../types';
-import type { CountdownLockSession, ScreenshotType } from '../countdown/controller';
 import { StaleScreenshotRunError, type ScreenshotControllerParams } from '../mode';
+import { createScreenshotControllerSession } from './state';
+import type { ScreenshotControllerSession } from './state';
 
 const {
   hideAllToastsMock,
@@ -87,16 +86,14 @@ function createParams(
   };
 }
 
-function createRuntime(): ScreenshotControllerRuntime {
+function createRuntime(session: ScreenshotControllerSession): ScreenshotControllerRuntime {
   return {
     capturePersistence: {
       sessionActivePresetId: null,
       setSaveDialogState: vi.fn(),
     },
     captureActionRef: { current: 'download_default' },
-    navigationLockStateBeforeScreenshot: { current: true },
-    screenshotRunActiveRef: { current: false },
-    screenshotRunGenerationRef: { current: 1 },
+    session,
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
@@ -104,18 +101,15 @@ function createRuntime(): ScreenshotControllerRuntime {
 }
 
 function createArgs(overrides: Partial<ActionArgs> = {}): ActionArgs {
+  const session = overrides.session ?? createScreenshotControllerSession(true);
+  if (session.runGeneration === 0) {
+    session.runGeneration = 1;
+  }
+
   return {
     params: createParams(),
-    refs: {
-      countdownLockSessionRef: { current: null } as MutableRefObject<CountdownLockSession | null>,
-      countdownRunTokenRef: { current: null } as MutableRefObject<number | null>,
-      countdownTimeoutRef: {
-        current: null,
-      } as MutableRefObject<ReturnType<typeof setTimeout> | null>,
-      navigationLockStateBeforeScreenshot: { current: true },
-      pendingScreenshotType: { current: null } as MutableRefObject<ScreenshotType | null>,
-    },
-    runtime: createRuntime(),
+    runtime: createRuntime(session),
+    session,
     setCountdown: vi.fn(),
     ...overrides,
   };
@@ -156,7 +150,7 @@ async function expectSelectionFailureShowsSelectionError() {
 async function expectStaleImmediateFailureDoesNotShowError() {
   const args = createArgs();
   runViewportScreenshotMock.mockImplementation(async () => {
-    args.runtime.screenshotRunGenerationRef.current = 2;
+    args.session.runGeneration = 2;
     throw new StaleScreenshotRunError();
   });
 
