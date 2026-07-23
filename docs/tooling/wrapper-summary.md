@@ -48,7 +48,7 @@ Blocking harness/shared-control proof. It runs the harness-owned formatting/stat
 
 ### `qa:checkpoint`
 
-Blocking in-progress product proof over the current diff. It verifies required harness freshness, formats supported non-Markdown product targets, prints and records advisory state, runs diff-scoped structural risk plus focused static/architecture/security controls, typecheck when required, directly changed and owner-selected tests, and eligible diff coverage. Successful unit-test steps identify their `checkpoint-owner` or `checkpoint-direct` profile in the diagnostic log. It writes checkpoint state and does not build, stage, or commit.
+Blocking in-progress product proof over the current diff. It verifies required harness freshness, formats supported non-Markdown product targets, prints and records advisory state, runs diff-scoped structural risk plus focused static/architecture/security controls, typechecks the affected owner-project and declared reverse-consumer closure when possible, runs directly changed and owner-selected tests, and checks eligible diff coverage. Deleted or unmapped TypeScript targets, broad shared contracts, and typecheck/configuration changes retain the full-workspace fallback. Successful unit-test steps identify their `checkpoint-owner` or `checkpoint-direct` profile in the diagnostic log. It writes checkpoint state and does not build, stage, or commit.
 
 ### `qa:build`
 

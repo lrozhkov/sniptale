@@ -25,9 +25,48 @@ it('keeps sanctioned content dependents in the affected closure', () => {
     resolveAffectedTypecheckProjects([
       'apps/extension/src/content/overlay/toolbar/shell/drag-position.ts',
     ])
+  ).toEqual({
+    mode: 'affected',
+    projectIds: ['content', 'content-tests', 'web-snapshot-viewer', 'web-snapshot-viewer-tests'],
+    reason: 'changed owner projects',
+  });
+});
+
+it('keeps content test and test-helper changes inside the content test project', () => {
+  expect(
+    resolveAffectedTypecheckProjects([
+      'apps/extension/src/content/selection/frame-settings-popover/state/lifecycle.test.tsx',
+      'apps/extension/src/content/parser/export-manager/diagnostics/core.test.helpers.ts',
+    ])
+  ).toEqual({
+    mode: 'affected',
+    projectIds: ['content-tests'],
+    reason: 'changed owner projects',
+  });
+});
+
+it('keeps cross-owner test-helper consumers in the conservative closure', () => {
+  const resolution = resolveAffectedTypecheckProjects([
+    'apps/extension/src/features/video/project/timeline/project-meta.test.helpers.ts',
+  ]);
+
+  expect(resolution).toMatchObject({
+    mode: 'affected',
+    reason: 'changed owner projects',
+  });
+  expect(resolution.projectIds).toEqual(
+    expect.arrayContaining(['app-core', 'app-core-tests', 'video-editor', 'video-editor-tests'])
+  );
+});
+
+it('keeps a missing content source on the full fail-safe path', () => {
+  expect(
+    resolveAffectedTypecheckProjects([
+      'apps/extension/src/content/selection/missing-runtime-owner.ts',
+    ])
   ).toMatchObject({
     mode: 'full',
-    reason: 'broad content owner changed',
+    reason: 'deleted or missing TypeScript source target',
   });
 });
 

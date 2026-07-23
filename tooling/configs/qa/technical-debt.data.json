@@ -19003,7 +19003,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/typecheck-project-definitions.mjs",
-        "contentHash": "8933abcecec35767e1867011a1c18860ff8cfce8f03ea6329e29467df2f5f2c7"
+        "contentHash": "a0e7905a438186cee23980b8d405e8cabb263e5a3a32031b0057268ce57393ab"
       },
       "consumers": [
         "tooling/qa/core/typecheck-project-definitions.mjs",
@@ -19020,7 +19020,6 @@
         "property:createOwnerTestProject/editor",
         "property:createOwnerTestProject/references",
         "property:createOwnerTestProject/rootPrefixes",
-        "property:createOwnerTestProject/web-snapshot-viewer",
         "property:files",
         "property:include",
         "property:include[1]",
@@ -19088,7 +19087,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/typecheck-project-map.mjs",
-        "contentHash": "4468076d47bfa9ceccd31f8abdbb0911d99ad29c6784bcb6ee7cb75cc9e3fb09"
+        "contentHash": "3ffc60ba978320c157cae606be86be831a00e8ee4468c4c17d53c34362a641f8"
       },
       "consumers": [
         "tooling/qa/core/typecheck-project-map.mjs",
@@ -19098,7 +19097,6 @@
       ],
       "surfaces": [
         "binding:BROAD_SHARED_PREFIXES",
-        "binding:FULL_TYPECHECK_SOURCE_PREFIXES",
         "binding:FULL_TYPECHECK_TRIGGER_FILES",
         "binding:OWNER_TEST_PROJECT_BY_ROOT",
         "binding:PROJECT_BY_ID",
@@ -21128,7 +21126,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-typecheck.mjs",
-        "contentHash": "d27e41b1d1a8b5a87d3700fddce4c3a3a60b763e932829797b62d5f6baf2cd2e"
+        "contentHash": "b857e2cc0a9d2a47af45b000d201bd74e98095f9e829ecb3883228ea9cb0fe5d"
       },
       "consumers": [
         "tooling/qa/core/verify-all.test-steps.mjs",

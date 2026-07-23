@@ -1,4 +1,7 @@
+import path from 'node:path';
+
 import { expect, it } from 'vitest';
+import ts from 'typescript';
 
 import {
   OWNER_TEST_TYPECHECK_PROJECTS,
@@ -11,6 +14,12 @@ const REPO_ROOT = '../../../../..';
 
 function repoPath(path: string): string {
   return `${REPO_ROOT}/${path}`;
+}
+
+function collectRootFiles(project: Parameters<typeof createProjectConfig>[0]): string[] {
+  const configDir = path.resolve('.tmp/qa/typecheck/projects', project.id);
+  const parsed = ts.parseJsonConfigFileContent(createProjectConfig(project), ts.sys, configDir);
+  return parsed.fileNames.map((file) => path.relative(process.cwd(), file).replaceAll('\\', '/'));
 }
 
 it('keeps test fixtures out of production typecheck projects', () => {
@@ -65,6 +74,38 @@ it('includes owner-local editor harness files in the editor test project', () =>
 
   const config = createProjectConfig(editorTestsProject!);
   expect(config.include).toContain(repoPath('tooling/test/harness/editor/ownership/**/*'));
+});
+
+it('keeps content tests out of Web Snapshot Viewer test roots', () => {
+  const viewerTestsProject = OWNER_TEST_TYPECHECK_PROJECTS.find(
+    (project) => project.id === 'web-snapshot-viewer-tests'
+  );
+  expect(viewerTestsProject).toBeDefined();
+
+  const config = createProjectConfig(viewerTestsProject!);
+  expect(config.include).not.toContain(
+    repoPath('apps/extension/src/content/public/preparation-surface/**/*')
+  );
+  expect(config.include).not.toContain(repoPath('apps/extension/src/content/**/*'));
+  expect(collectRootFiles(viewerTestsProject!)).not.toContain(
+    'apps/extension/src/content/public/preparation-surface/index.test.tsx'
+  );
+});
+
+it('keeps only production preparation-surface roots in the viewer project', () => {
+  const viewerProject = PRODUCTION_TYPECHECK_PROJECTS.find(
+    (project) => project.id === 'web-snapshot-viewer'
+  );
+  expect(viewerProject).toBeDefined();
+
+  const rootFiles = collectRootFiles(viewerProject!);
+  expect(rootFiles).toContain('apps/extension/src/content/public/preparation-surface/index.tsx');
+  expect(rootFiles).not.toContain(
+    'apps/extension/src/content/public/preparation-surface/index.test.tsx'
+  );
+  expect(rootFiles).not.toContain(
+    'apps/extension/src/content/public/preparation-surface/mode-state.test-support.ts'
+  );
 });
 
 it('includes nested editor ownership harness files in the test harness project', () => {

@@ -37,7 +37,6 @@ const BROAD_SHARED_PREFIXES = [
   'packages/platform/src/',
   'packages/ui/src/',
 ];
-const FULL_TYPECHECK_SOURCE_PREFIXES = ['apps/extension/src/content/'];
 const FULL_TYPECHECK_TRIGGER_FILES = new Set([
   'package.json',
   'package-lock.json',
@@ -56,6 +55,8 @@ const FULL_TYPECHECK_TRIGGER_FILES = new Set([
 ]);
 const TS_SOURCE_PATTERN = /\.(?:ts|tsx|cts|mts)$/u;
 const TEST_SOURCE_PATTERN = /\.(?:test|spec|test-support)\.(?:ts|tsx)$/u;
+const CONTENT_TEST_HELPER_PATTERN =
+  /^apps\/extension\/src\/content\/.*\.test\.helpers\.(?:ts|tsx)$/u;
 
 function normalizePath(file) {
   return file.replaceAll('\\', '/');
@@ -63,6 +64,10 @@ function normalizePath(file) {
 
 function isTypeScriptSource(file) {
   return TS_SOURCE_PATTERN.test(file);
+}
+
+function isOwnerTestSource(file) {
+  return TEST_SOURCE_PATTERN.test(file) || CONTENT_TEST_HELPER_PATTERN.test(file);
 }
 
 function isBroadSharedFile(file) {
@@ -119,7 +124,7 @@ function resolveDirectProjectId(file) {
     return null;
   }
 
-  if (TEST_SOURCE_PATTERN.test(file) || file.includes('/test-support/')) {
+  if (isOwnerTestSource(file) || file.includes('/test-support/')) {
     const matchingRoot = matchingProductionProject.rootPrefixes.find((prefix) =>
       file.startsWith(prefix)
     );
@@ -166,14 +171,6 @@ export function resolveAffectedTypecheckProjects(targetFiles = []) {
   if (sourceFiles.some(isBroadSharedFile)) {
     return createFullResolution('broad shared contract owner changed');
   }
-  if (
-    sourceFiles.some((file) =>
-      FULL_TYPECHECK_SOURCE_PREFIXES.some((prefix) => file.startsWith(prefix))
-    )
-  ) {
-    return createFullResolution('broad content owner changed');
-  }
-
   const directProjectIds = new Set();
   for (const file of sourceFiles) {
     const projectId = resolveDirectProjectId(file);
