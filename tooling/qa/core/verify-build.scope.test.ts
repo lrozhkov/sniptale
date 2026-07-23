@@ -149,11 +149,37 @@ it('expands parser and export seams to broader related owner files in qa:build',
   expect(scope.matchedFamilies).toContain('parser-snapshot-export');
   expect(scope.profile).toBe('related-transitive');
   expect(scope.relatedFiles).toEqual([
-    'apps/extension/src/content/parser/dom-tree-parser/index.ts',
     'apps/extension/src/content/parser/dom-tree-parser/traversal/section-titles.helpers.ts',
     'apps/extension/src/offscreen/project-export/runtime.ts',
     'apps/extension/src/offscreen/project-export/service/runner.ts',
   ]);
+});
+
+it('bounds parser-family expansion to the closest behavioral owner', () => {
+  const aiOwner = 'apps/extension/src/content/parser/dom-tree-parser/ai/editable-format.ts';
+  const aiSibling = 'apps/extension/src/content/parser/dom-tree-parser/ai/response-markdown.ts';
+  const importOnlyConsumer = 'apps/extension/src/content/parser/popup-export/helpers/preview.ts';
+  const unrelatedDomTreeOwner =
+    'apps/extension/src/content/parser/dom-tree-parser/traversal/index.ts';
+  const unrelatedParserOwner =
+    'apps/extension/src/content/parser/page-preparation/snapshot/index.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [aiOwner, importOnlyConsumer],
+    riskTargetFiles: [aiOwner],
+    codeFiles: [aiOwner, importOnlyConsumer],
+    repoCodeFiles: [
+      aiOwner,
+      aiSibling,
+      importOnlyConsumer,
+      unrelatedDomTreeOwner,
+      unrelatedParserOwner,
+    ],
+  });
+
+  expect(scope.matchedFamilies).toContain('parser-snapshot-export');
+  expect(scope.relatedFiles).toEqual([aiOwner, aiSibling, importOnlyConsumer]);
+  expect(scope.relatedFiles).not.toContain(unrelatedDomTreeOwner);
+  expect(scope.relatedFiles).not.toContain(unrelatedParserOwner);
 });
 
 it('does not classify owner-local snapshot helpers as parser or export seams', () => {

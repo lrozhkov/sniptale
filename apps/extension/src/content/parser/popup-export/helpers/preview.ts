@@ -1,6 +1,6 @@
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import type { PopupExportPreview } from '@sniptale/runtime-contracts/export';
-import { convertTreeToMarkdown } from '../../dom-tree-parser/ai/format';
+import { convertTreeToMarkdown } from '../../dom-tree-parser/ai/markdown';
 
 function countRows(tree: ParsedDOMTree): number {
   return tree.structure.reduce((rowsCount, section) => {

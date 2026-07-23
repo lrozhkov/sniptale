@@ -121,15 +121,21 @@ function resolveUnavailableProductionProfile({
 }) {
   const proofScopes = unavailableProductionScopes.map((scope) => ({
     ...scope,
-    ownerTests: [
-      ...new Set([
-        ...(scope.changedSuccessorFiles ?? []).flatMap((file) => ownerTestResolver(file)),
-      ]),
-    ],
+    ownerTestsBySuccessor: (scope.changedSuccessorFiles ?? []).map((file) => ({
+      file,
+      tests: ownerTestResolver(file),
+    })),
   }));
+  for (const scope of proofScopes) {
+    scope.ownerTests = [...new Set(scope.ownerTestsBySuccessor.flatMap(({ tests }) => tests))];
+  }
   if (
     proofScopes.some(
-      (scope) => (scope.changedSuccessorFiles ?? []).length === 0 || scope.ownerTests.length === 0
+      (scope) =>
+        (scope.changedSuccessorFiles ?? []).length === 0 ||
+        scope.ownerTests.length === 0 ||
+        (scope.successorProofKind === 'aggregate-providers' &&
+          scope.ownerTestsBySuccessor.some(({ tests }) => tests.length === 0))
     )
   ) {
     return finalizeTestScope({

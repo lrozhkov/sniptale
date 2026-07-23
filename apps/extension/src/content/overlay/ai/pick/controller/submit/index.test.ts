@@ -33,8 +33,10 @@ vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) =>
   showToast: showToastMock,
 }));
 
-vi.mock('../../../../../parser/dom-tree-parser/ai/format', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../parser/dom-tree-parser/ai/format')>()),
+vi.mock('../../../../../parser/dom-tree-parser/ai/editable-format', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../../parser/dom-tree-parser/ai/editable-format')
+  >()),
   formatDataForAIJSON: formatDataForAIJSONMock,
 }));
 

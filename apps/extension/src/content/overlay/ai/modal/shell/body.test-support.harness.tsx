@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { useMemo, useRef, useState } from 'react';
 import { vi } from 'vitest';
 
-import { estimateTokens } from '../../../../parser/dom-tree-parser/ai/format';
+import { estimateTokens } from '../../../../parser/dom-tree-parser/ai/markdown';
 import { AIModalContent } from './body';
 import { integrationTreeData } from './test-fixtures';
 

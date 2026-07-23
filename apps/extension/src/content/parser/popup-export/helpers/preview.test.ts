@@ -2,7 +2,7 @@ import { vi, expect, it, describe } from 'vitest';
 
 const convertTreeToMarkdownMock = vi.hoisted(() => vi.fn(() => '# popup export'));
 
-vi.mock('../../dom-tree-parser/ai/format', () => ({
+vi.mock('../../dom-tree-parser/ai/markdown', () => ({
   convertTreeToMarkdown: convertTreeToMarkdownMock,
 }));
 

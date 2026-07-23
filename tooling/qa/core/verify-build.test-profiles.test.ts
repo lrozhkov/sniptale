@@ -125,6 +125,32 @@ it('uses a changed replacement owner and its direct test for a consolidated dele
   expect(scope.detail).toContain('graph-closed successor owner proof');
 });
 
+it('requires deterministic owner proof for every aggregate provider', () => {
+  const deleted = 'apps/extension/src/content/parser/example/facade.ts';
+  const covered = 'apps/extension/src/content/parser/example/covered.ts';
+  const untested = 'apps/extension/src/content/parser/example/untested.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [deleted],
+    codeFiles: [],
+    repoCodeFiles: [covered, untested],
+    ownerTestResolver: (file) =>
+      file === covered ? ['apps/extension/src/content/parser/example/covered.test.ts'] : [],
+    deletedSuccessorResolver: () =>
+      new Map([
+        [
+          deleted,
+          {
+            files: [covered, untested],
+            proofKind: 'aggregate-providers',
+          },
+        ],
+      ]),
+  });
+
+  expect(scope.fullSuite).toBe(true);
+  expect(scope.detail).toContain('unavailable production target has no executable affected-test');
+});
+
 it('does not accept an unrelated same-directory test as replacement-owner proof', () => {
   const owner = 'apps/extension/src/content/selection/selection-mode/session/index.ts';
   const unrelatedTest =

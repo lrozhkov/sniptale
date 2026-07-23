@@ -27,8 +27,8 @@ vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
   sendRuntimeMessage: sendRuntimeMessageMock,
 }));
 
-vi.mock('../../dom-tree-parser/ai/format', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../dom-tree-parser/ai/format')>()),
+vi.mock('../../dom-tree-parser/ai/markdown', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../dom-tree-parser/ai/markdown')>()),
   convertTreeToMarkdown: convertTreeToMarkdownMock,
 }));
 

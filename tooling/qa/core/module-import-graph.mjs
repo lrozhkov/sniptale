@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { createSourceFile, ts } from './structural-risk/ast.mjs';
 
-const CODE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+export const CODE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 const CODE_EXTENSION_SET = new Set(CODE_EXTENSIONS);
 
 function normalize(value) {

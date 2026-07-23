@@ -36,7 +36,8 @@ export const COVERAGE_ROLLOUT_EXACT_FILES = {
     'apps/extension/src/content/parser/backends/legacy-tree-walker/index.ts',
     'apps/extension/src/content/parser/export-manager/formats/froala.ts',
     'apps/extension/src/content/parser/dom-tree-parser/index.ts',
-    'apps/extension/src/content/parser/dom-tree-parser/ai/format.ts',
+    'apps/extension/src/content/parser/dom-tree-parser/ai/editable-format.ts',
+    'apps/extension/src/content/parser/dom-tree-parser/ai/markdown.ts',
     'apps/extension/src/content/parser/parsers/types.ts',
   ],
   contentHighlighterAndQuickEdit: [

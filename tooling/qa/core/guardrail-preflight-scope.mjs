@@ -91,12 +91,12 @@ export function collectScopeHints(targetFiles, codeFiles) {
 }
 
 export function collectBuildScopeForecast(
-  { targetFiles, codeFiles, addedFiles = [] },
+  { targetFiles, riskTargetFiles = targetFiles, codeFiles, addedFiles = [] },
   buildScopeOptions = {}
 ) {
   if (targetFiles.length === 0) return { details: [] };
   const { testScope } = resolveBuildCloseoutScope(
-    { targetFiles, codeFiles, addedFiles },
+    { targetFiles, riskTargetFiles, qualityTargetFiles: riskTargetFiles, codeFiles, addedFiles },
     { repoCodeFiles: codeFiles, ...buildScopeOptions }
   );
   const selectedUnitFiles =
@@ -111,8 +111,18 @@ export function collectBuildScopeForecast(
     : testScope.profile === 'related-transitive' && broadFamilies.length > 0
       ? 'consumer-discovery-required'
       : selectedUnitFiles.length;
+  const forecastScopeDetail =
+    testScope.profile === 'related-transitive' && broadFamilies.length > 0
+      ? [
+          `profile=${testScope.profile}`,
+          'bounded owner and affected-consumer discovery required',
+          testScope.profileReason ? `reason=${testScope.profileReason}` : '',
+        ]
+          .filter(Boolean)
+          .join('; ')
+      : testScope.detail;
   const details = [
-    `qa:build forecast: ${testScope.detail}; selected unit-test scope=${selectedScopeDetail}`,
+    `qa:build forecast: ${forecastScopeDetail}; selected unit-test scope=${selectedScopeDetail}`,
   ];
   if (testScope.profile === 'related-transitive' && broadFamilies.length > 0) {
     details.push(

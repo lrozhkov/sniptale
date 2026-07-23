@@ -178,17 +178,17 @@ function collectOwnerPrefixes(file, rootNames = []) {
 
 function collectFamilyPrefixes(file, familySegments = []) {
   const segments = file.split('/');
-  const prefixes = [];
-
-  for (const [index, segment] of segments.entries()) {
-    if (index < 2 || !familySegments.includes(segment)) {
-      continue;
-    }
-
-    prefixes.push(`${segments.slice(0, index + 1).join('/')}/`);
-  }
-
-  return uniqueSorted(prefixes);
+  const lastDirectoryIndex = segments.length - 2;
+  const matchingIndexes = segments
+    .map((segment, index) => {
+      const candidate = index === segments.length - 1 ? path.posix.parse(segment).name : segment;
+      return index >= 2 && familySegments.includes(candidate) ? index : -1;
+    })
+    .filter((index) => index >= 0);
+  if (matchingIndexes.length === 0 || lastDirectoryIndex < 0) return [];
+  const closestFamilyIndex = matchingIndexes.at(-1);
+  const ownerIndex = Math.min(closestFamilyIndex + 1, lastDirectoryIndex);
+  return [`${segments.slice(0, ownerIndex + 1).join('/')}/`];
 }
 
 function collectExpandedRelatedFiles(targetFiles, repoCodeFiles) {
@@ -234,6 +234,7 @@ function collectExpandedRelatedFiles(targetFiles, repoCodeFiles) {
 
 export function resolveBuildTestScope({
   targetFiles = [],
+  riskTargetFiles = targetFiles,
   codeFiles = [],
   addedFiles = [],
   repoCodeFiles = collectCodeFiles(),
@@ -242,6 +243,7 @@ export function resolveBuildTestScope({
   deletedSuccessorResolver = collectDeletedTargetSuccessors,
 } = {}) {
   const productTargetFiles = targetFiles.filter(isProductQaFile);
+  const productRiskTargetFiles = riskTargetFiles.filter(isProductQaFile);
   const productCodeFiles = codeFiles.filter(isProductQaFile);
   const productAddedFiles = addedFiles.filter(isProductQaFile);
   const productRepoCodeFiles = repoCodeFiles.filter(isProductQaFile);
@@ -269,12 +271,15 @@ export function resolveBuildTestScope({
           productionTargetFiles,
         });
   const unavailableProductionScopes = unavailableProductionFiles.map((file) => ({
-    changedSuccessorFiles: deletedSuccessorsByFile.get(file) ?? [],
+    changedSuccessorFiles: Array.isArray(deletedSuccessorsByFile.get(file))
+      ? deletedSuccessorsByFile.get(file)
+      : (deletedSuccessorsByFile.get(file)?.files ?? []),
     file,
+    successorProofKind: deletedSuccessorsByFile.get(file)?.proofKind ?? 'changed-consumers',
     relatedFiles: collectExpandedRelatedFiles([file], productRepoCodeFiles).relatedFiles,
   }));
   const { matchedFamilies, relatedFiles: expandedRelatedFiles } = collectExpandedRelatedFiles(
-    productTargetFiles,
+    productRiskTargetFiles,
     productRepoCodeFiles
   );
 
@@ -306,6 +311,7 @@ export function resolveBuildCloseoutScope(
 ) {
   const testScope = resolveBuildTestScope({
     targetFiles: context.targetFiles,
+    riskTargetFiles: context.qualityTargetFiles ?? context.targetFiles,
     codeFiles: context.codeFiles,
     addedFiles: context.addedFiles,
     repoCodeFiles,

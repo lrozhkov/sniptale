@@ -201,10 +201,11 @@ it('forecasts broad qa:build scope without test-size budgets', async () => {
 
   expect(report.buildScopeForecast).toEqual(
     expect.arrayContaining([
-      expect.stringContaining('trigger families: messaging-runtime, package-and-app-core'),
+      expect.stringContaining('bounded owner and affected-consumer discovery required'),
       expect.stringContaining('broad transitive scope expected'),
     ])
   );
+  expect(report.buildScopeForecast[0]).not.toContain('broader related tests');
   expect(report).not.toHaveProperty('buildScopeBudgetRisks');
 });
 

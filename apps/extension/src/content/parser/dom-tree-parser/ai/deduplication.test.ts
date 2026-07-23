@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import { finalizeParsedDocument } from '../../ir/finalize-parsed-document';
-import { formatDataForAIJSON } from './format';
+import { formatDataForAIJSON } from './editable-format';
 
 type ParsedSection = ParsedDOMTree['structure'][number];
 type ParsedChild = ParsedSection['children'][number];

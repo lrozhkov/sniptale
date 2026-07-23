@@ -2,10 +2,15 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { resolveDeterministicFocusedCoverageOwnerTests } from './focused-coverage-owner-tests.mjs';
 import { readHeadFileText } from './git-head-sources.mjs';
 import { collectModuleImportGraph } from './module-import-graph.mjs';
 import { isCodeFile } from './shared.mjs';
 import { classifyOwnerGroup } from './structural-risk/owner-classifier.mjs';
+import {
+  collectDeletedAggregateProviders,
+  createDeletedAggregateAnalyzer,
+} from './verify-build.deleted-aggregate.mjs';
 
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 
@@ -23,17 +28,22 @@ function indexEdges(edges, key, value) {
   return index;
 }
 
-function runHeadPathQuery(root, args) {
+function runHeadPathQuery(root, args, acceptedStatuses) {
   const result = spawnSync('git', args, {
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.status !== 0 && result.status !== 1) return [];
-  return result.stdout
-    .split(/\r?\n/u)
-    .map((line) => line.replace(/^HEAD:/u, ''))
-    .filter(Boolean);
+  if (result.error || !acceptedStatuses.has(result.status) || typeof result.stdout !== 'string') {
+    return { complete: false, files: [] };
+  }
+  return {
+    complete: true,
+    files: result.stdout
+      .split(/\r?\n/u)
+      .map((line) => line.replace(/^HEAD:/u, ''))
+      .filter(Boolean),
+  };
 }
 
 function collectManifestTargets(value) {
@@ -56,11 +66,11 @@ function resolveExportKeyForTarget(packageRoot, exportKey, target, file) {
 
 function readHeadJson(file, readHeadSource) {
   const source = readHeadSource(file);
-  if (source === null) return null;
+  if (source === null) return { complete: false, value: null };
   try {
-    return JSON.parse(source);
+    return { complete: true, value: JSON.parse(source) };
   } catch {
-    return null;
+    return { complete: false, value: null };
   }
 }
 
@@ -81,97 +91,121 @@ function toPackageSpecifier(packageName, exportKey) {
 
 function collectPackageExportTokens(file, readHeadSource) {
   const packageMatch = file.match(/^packages\/([^/]+)\//u);
-  if (!packageMatch) return [];
+  if (!packageMatch) return { complete: true, tokens: [] };
   const packageName = packageMatch[1];
   const packageRoot = `packages/${packageName}`;
   const manifest = readHeadJson(`${packageRoot}/package.json`, readHeadSource);
-  return [
-    ...new Set(
-      collectManifestExportEntries(manifest?.exports).flatMap(([exportKey, declaration]) =>
-        collectManifestTargets(declaration)
-          .map((target) => resolveExportKeyForTarget(packageRoot, exportKey, target, file))
-          .filter((resolvedKey) => resolvedKey !== null)
-          .map((resolvedKey) => toPackageSpecifier(packageName, resolvedKey))
-      )
-    ),
-  ];
+  if (!manifest.complete) return { complete: false, tokens: [] };
+  return {
+    complete: true,
+    tokens: [
+      ...new Set(
+        collectManifestExportEntries(manifest.value?.exports).flatMap(([exportKey, declaration]) =>
+          collectManifestTargets(declaration)
+            .map((target) => resolveExportKeyForTarget(packageRoot, exportKey, target, file))
+            .filter((resolvedKey) => resolvedKey !== null)
+            .map((resolvedKey) => toPackageSpecifier(packageName, resolvedKey))
+        )
+      ),
+    ],
+  };
 }
 
 function collectHeadSearchTokens(file, readHeadSource) {
   const extension = path.posix.extname(file);
   const stem = path.posix.basename(file, extension);
-  const tokens = [`/${stem}`, ...collectPackageExportTokens(file, readHeadSource)];
-  if (stem !== 'index') return [...new Set(tokens)];
+  const packageTokens = collectPackageExportTokens(file, readHeadSource);
+  if (!packageTokens.complete) return { complete: false, tokens: [] };
+  const tokens = [`/${stem}`, ...packageTokens.tokens];
+  if (stem !== 'index') return { complete: true, tokens: [...new Set(tokens)] };
   tokens.push(`/${path.posix.basename(path.posix.dirname(file))}`);
-  return [...new Set(tokens)];
+  return { complete: true, tokens: [...new Set(tokens)] };
 }
 
 function collectHeadCandidateImporters(file, root, readHeadSource) {
   const candidates = new Set();
-  for (const token of collectHeadSearchTokens(file, readHeadSource)) {
-    for (const candidate of runHeadPathQuery(root, [
-      'grep',
-      '-l',
-      '-F',
-      '-e',
-      token,
-      'HEAD',
-      '--',
-      '*.ts',
-      '*.tsx',
-      '*.js',
-      '*.jsx',
-      '*.mjs',
-      '*.cjs',
-    ])) {
+  const search = collectHeadSearchTokens(file, readHeadSource);
+  if (!search.complete) return { candidates: [], complete: false };
+  for (const token of search.tokens) {
+    const query = runHeadPathQuery(
+      root,
+      [
+        'grep',
+        '-l',
+        '-F',
+        '-e',
+        token,
+        'HEAD',
+        '--',
+        '*.ts',
+        '*.tsx',
+        '*.js',
+        '*.jsx',
+        '*.mjs',
+        '*.cjs',
+      ],
+      new Set([0, 1])
+    );
+    if (!query.complete) return { candidates: [], complete: false };
+    for (const candidate of query.files) {
       candidates.add(candidate);
     }
   }
   if (path.posix.basename(file, path.posix.extname(file)) === 'index') {
-    for (const candidate of runHeadPathQuery(root, [
-      'ls-tree',
-      '-r',
-      '--name-only',
-      'HEAD',
-      '--',
-      path.posix.dirname(file),
-    ])) {
+    const query = runHeadPathQuery(
+      root,
+      ['ls-tree', '-r', '--name-only', 'HEAD', '--', path.posix.dirname(file)],
+      new Set([0])
+    );
+    if (!query.complete) return { candidates: [], complete: false };
+    for (const candidate of query.files) {
       candidates.add(candidate);
     }
   }
-  return [...candidates]
-    .filter(
-      (candidate) =>
-        candidate !== file && isCodeFile(candidate) && !TEST_FILE_PATTERN.test(candidate)
-    )
-    .sort();
+  return {
+    candidates: [...candidates]
+      .filter(
+        (candidate) =>
+          candidate !== file && isCodeFile(candidate) && !TEST_FILE_PATTERN.test(candidate)
+      )
+      .sort(),
+    complete: true,
+  };
 }
 
 function collectHeadImporters(file, root, readHeadSource) {
-  const candidates = collectHeadCandidateImporters(file, root, readHeadSource);
+  const candidateResult = collectHeadCandidateImporters(file, root, readHeadSource);
+  if (!candidateResult.complete) return { complete: false, importers: [] };
+  const { candidates } = candidateResult;
   const sourceByFile = new Map(
     [file, ...candidates].map((candidate) => [candidate, readHeadSource(candidate)])
   );
-  if (sourceByFile.get(file) === null) return [];
-  const availableFiles = [...sourceByFile]
-    .filter(([, source]) => source !== null)
-    .map(([candidate]) => candidate);
-  const graph = collectModuleImportGraph({
-    files: availableFiles,
-    root,
-    readFile(candidate) {
-      const source = sourceByFile.has(candidate)
-        ? sourceByFile.get(candidate)
-        : readHeadSource(candidate);
-      if (source === null || source === undefined) {
-        throw new Error(`HEAD source is unavailable: ${candidate}`);
-      }
-      return source;
-    },
-  });
-  return uniqueSorted(
-    graph.codeEdges.filter((edge) => edge.target === file).map((edge) => edge.importer)
-  );
+  if ([...sourceByFile.values()].some((source) => source === null)) {
+    return { complete: false, importers: [] };
+  }
+  try {
+    const graph = collectModuleImportGraph({
+      files: [...sourceByFile.keys()],
+      root,
+      readFile(candidate) {
+        const source = sourceByFile.has(candidate)
+          ? sourceByFile.get(candidate)
+          : readHeadSource(candidate);
+        if (source === null || source === undefined) {
+          throw new Error(`HEAD source is unavailable: ${candidate}`);
+        }
+        return source;
+      },
+    });
+    return {
+      complete: true,
+      importers: uniqueSorted(
+        graph.codeEdges.filter((edge) => edge.target === file).map((edge) => edge.importer)
+      ),
+    };
+  } catch {
+    return { complete: false, importers: [] };
+  }
 }
 
 function collectCurrentGraph(productionCodeFiles, root) {
@@ -186,17 +220,26 @@ function collectCurrentGraph(productionCodeFiles, root) {
   });
 }
 
-function collectPreviousConsumerFrontier(file, currentFiles, targetFiles, resolveHeadImporters) {
+function collectPreviousConsumerFrontier(
+  file,
+  currentFiles,
+  targetFiles,
+  resolveHeadImporters,
+  analyzeAggregate
+) {
   const frontier = new Set();
   const visited = new Set([file]);
   const queue = [file];
-  let hasUncoveredTerminal = false;
 
   while (queue.length > 0) {
     const target = queue.shift();
-    const importers = resolveHeadImporters(target);
+    const result = resolveHeadImporters(target);
+    if (!result.complete) return { complete: false, frontier: [] };
+    const { importers } = result;
     if (importers.length === 0) {
-      hasUncoveredTerminal = true;
+      if (target !== file && !analyzeAggregate(target).eligible) {
+        return { complete: false, frontier: [] };
+      }
       continue;
     }
     for (const importer of importers) {
@@ -205,8 +248,7 @@ function collectPreviousConsumerFrontier(file, currentFiles, targetFiles, resolv
         continue;
       }
       if (!targetFiles.has(importer)) {
-        hasUncoveredTerminal = true;
-        continue;
+        return { complete: false, frontier: [] };
       }
       if (visited.has(importer)) continue;
       visited.add(importer);
@@ -214,7 +256,7 @@ function collectPreviousConsumerFrontier(file, currentFiles, targetFiles, resolv
     }
   }
 
-  return hasUncoveredTerminal ? [] : [...frontier].sort();
+  return { complete: true, frontier: [...frontier].sort() };
 }
 
 function expandCurrentSuccessors(frontier, currentEdges, currentFiles) {
@@ -231,8 +273,33 @@ function expandCurrentSuccessors(frontier, currentEdges, currentFiles) {
   return [...successors].sort();
 }
 
+function hasCurrentProviderRedirect(frontier, providers, productionCodeFiles, root) {
+  if (frontier.length === 0) return true;
+  const providerSet = new Set(providers);
+  const graphFiles = uniqueSorted([...productionCodeFiles, ...providers]);
+  const graph = collectCurrentGraph(graphFiles, root);
+  if (!graph) return false;
+  const edges = indexEdges(graph.codeEdges, 'importer', 'target');
+
+  return frontier.every((consumer) => {
+    const visited = new Set([consumer]);
+    const queue = [consumer];
+    while (queue.length > 0) {
+      const importer = queue.shift();
+      for (const target of edges.get(importer) ?? []) {
+        if (providerSet.has(target)) return true;
+        if (visited.has(target)) continue;
+        visited.add(target);
+        queue.push(target);
+      }
+    }
+    return false;
+  });
+}
+
 export function collectDeletedTargetSuccessors({
   headImporterResolver,
+  providerOwnerTestResolver = resolveDeterministicFocusedCoverageOwnerTests,
   productionCodeFiles = [],
   productionTargetFiles = [],
   root = process.cwd(),
@@ -241,9 +308,9 @@ export function collectDeletedTargetSuccessors({
   const targetFiles = new Set(productionTargetFiles);
   const deletedFiles = productionTargetFiles.filter((file) => !currentFiles.has(file));
   const currentGraph = collectCurrentGraph(productionCodeFiles, root);
-  if (!currentGraph) return new Map();
-
-  const currentEdges = indexEdges(currentGraph.codeEdges, 'importer', 'target');
+  const currentEdges = currentGraph
+    ? indexEdges(currentGraph.codeEdges, 'importer', 'target')
+    : new Map();
   const successorsByFile = new Map();
   const headImportersByFile = new Map();
   const headSourcesByFile = new Map();
@@ -257,22 +324,46 @@ export function collectDeletedTargetSuccessors({
     headImporterResolver ?? ((file) => collectHeadImporters(file, root, readHeadSource));
   function resolveHeadImporters(file) {
     if (!headImportersByFile.has(file)) {
-      headImportersByFile.set(file, collectImporters(file));
+      const result = collectImporters(file);
+      headImportersByFile.set(
+        file,
+        Array.isArray(result) ? { complete: true, importers: result } : result
+      );
     }
     return headImportersByFile.get(file);
   }
+  const analyzeAggregate = createDeletedAggregateAnalyzer(readHeadSource);
 
   for (const file of deletedFiles) {
     const frontier = collectPreviousConsumerFrontier(
       file,
       currentFiles,
       targetFiles,
-      resolveHeadImporters
+      resolveHeadImporters,
+      analyzeAggregate
     );
-    if (frontier.length === 0) continue;
-    const successors = expandCurrentSuccessors(frontier, currentEdges, currentFiles);
-    if (new Set(successors.map(classifyOwnerGroup)).size !== 1) continue;
-    successorsByFile.set(file, successors);
+    if (!frontier.complete) continue;
+    if (frontier.frontier.length > 0) {
+      const successors = expandCurrentSuccessors(frontier.frontier, currentEdges, currentFiles);
+      if (new Set(successors.map(classifyOwnerGroup)).size === 1) {
+        successorsByFile.set(file, successors);
+        continue;
+      }
+    }
+    const providers = collectDeletedAggregateProviders({
+      analyzeAggregate,
+      file,
+      readHeadSource,
+      root,
+      targets: targetFiles,
+    });
+    if (
+      providers.length > 0 &&
+      providers.every((provider) => providerOwnerTestResolver(provider).length > 0) &&
+      hasCurrentProviderRedirect(frontier.frontier, providers, productionCodeFiles, root)
+    ) {
+      successorsByFile.set(file, { files: providers, proofKind: 'aggregate-providers' });
+    }
   }
 
   return successorsByFile;

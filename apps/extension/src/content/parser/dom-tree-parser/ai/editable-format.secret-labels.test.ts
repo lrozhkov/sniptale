@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { formatDataForAI, formatDataForAIJSON } from './format';
+import { formatDataForAI, formatDataForAIJSON } from './editable-format';
 
 function createSecretPayloadFixture(): ParsedDOMTree {
   return {

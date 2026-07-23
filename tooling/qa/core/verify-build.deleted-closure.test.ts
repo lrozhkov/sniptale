@@ -26,6 +26,31 @@ async function collectSuccessors(
   });
 }
 
+function prepareCrossOwnerAggregate(root: string) {
+  const facade = 'apps/extension/src/shared/facade.ts';
+  const provider = 'apps/extension/src/shared/provider.ts';
+  const contentOwner = 'apps/extension/src/content/overlay/example/controller.ts';
+  const popupOwner = 'apps/extension/src/popup/shell/example/controller.ts';
+  initGitRepo(root);
+  writeFile(root, provider, 'export const value = 1;\n');
+  writeFile(root, provider.replace(/\.ts$/u, '.test.ts'), "it('covers provider', () => {});\n");
+  writeFile(root, facade, "export { value } from './provider';\n");
+  writeFile(
+    root,
+    contentOwner,
+    "import { value } from '../../../shared/facade';\nexport const content = value;\n"
+  );
+  writeFile(
+    root,
+    popupOwner,
+    "import { value } from '../../../shared/facade';\nexport const popup = value;\n"
+  );
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'baseline');
+  runGit(root, 'rm', facade);
+  return { contentOwner, facade, popupOwner, provider };
+}
+
 it('keeps ambiguous cross-owner deleted successors on the full-suite fallback', async () => {
   const root = createTempRoot('build-deleted-ambiguous-');
   const deleted = 'apps/extension/src/shared/deleted.ts';
@@ -48,6 +73,78 @@ it('keeps ambiguous cross-owner deleted successors on the full-suite fallback', 
   );
 
   expect(successors.has(deleted)).toBe(false);
+});
+
+it('maps a deleted cross-owner re-export aggregate to its surviving provider', async () => {
+  const root = createTempRoot('build-deleted-cross-owner-aggregate-');
+  const { contentOwner, facade, popupOwner, provider } = prepareCrossOwnerAggregate(root);
+  writeFile(
+    root,
+    contentOwner,
+    "import { value } from '../../../shared/provider';\nexport const content = value;\n"
+  );
+  writeFile(
+    root,
+    popupOwner,
+    "import { value } from '../../../shared/provider';\nexport const popup = value;\n"
+  );
+
+  const successors = await collectSuccessors(
+    root,
+    [facade, contentOwner, popupOwner],
+    [contentOwner, popupOwner]
+  );
+
+  expect(successors.get(facade)).toEqual({
+    files: [provider],
+    proofKind: 'aggregate-providers',
+  });
+});
+
+it('rejects provider proof when changed consumers do not redirect to the provider', async () => {
+  const root = createTempRoot('build-deleted-unrelated-cross-owner-aggregate-');
+  const { contentOwner, facade, popupOwner } = prepareCrossOwnerAggregate(root);
+  writeFile(root, contentOwner, 'export const content = 2;\n');
+  writeFile(root, popupOwner, 'export const popup = 2;\n');
+
+  const successors = await collectSuccessors(
+    root,
+    [facade, contentOwner, popupOwner],
+    [contentOwner, popupOwner]
+  );
+
+  expect(successors.has(facade)).toBe(false);
+});
+
+it('closes a deleted re-export and pass-through chain onto its narrow provider', async () => {
+  const root = createTempRoot('build-deleted-provider-chain-');
+  const ownerRoot = 'apps/extension/src/content/parser/example';
+  const facade = `${ownerRoot}/response.ts`;
+  const adapter = `${ownerRoot}/response-json.ts`;
+  const provider = `${ownerRoot}/edit-response.ts`;
+  initGitRepo(root);
+  writeFile(root, provider, 'export const parse = () => 1;\n');
+  writeFile(root, provider.replace(/\.ts$/u, '.test.ts'), "it('covers provider', () => {});\n");
+  writeFile(
+    root,
+    adapter,
+    "import { parse } from './edit-response';\nexport function parseJson() { return parse(); }\n"
+  );
+  writeFile(root, facade, "export { parseJson } from './response-json';\n");
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'baseline');
+  runGit(root, 'rm', facade, adapter);
+
+  const successors = await collectSuccessors(root, [facade, adapter], []);
+
+  expect(successors.get(facade)).toEqual({
+    files: [provider],
+    proofKind: 'aggregate-providers',
+  });
+  expect(successors.get(adapter)).toEqual({
+    files: [provider],
+    proofKind: 'aggregate-providers',
+  });
 });
 
 it('rejects partial deleted chains with an uncovered terminal facade', async () => {
@@ -183,58 +280,84 @@ it('rejects a deleted chain when an unchanged HEAD importer remains outside the 
   expect(successors.has(deleted)).toBe(false);
 });
 
-it('finds unchanged package consumers of a deleted package root index', async () => {
-  const root = createTempRoot('build-deleted-package-index-');
-  const deleted = 'packages/example/src/index.ts';
-  const packageOwner = 'packages/example/src/controller.ts';
-  const unchangedConsumer = 'apps/extension/src/content/overlay/example/use-package.ts';
+it('does not bypass an unchanged consumer through aggregate provider proof', async () => {
+  const root = createTempRoot('build-deleted-aggregate-unchanged-importer-');
+  const facade = 'apps/extension/src/shared/facade.ts';
+  const provider = 'apps/extension/src/shared/provider.ts';
+  const changedOwner = 'apps/extension/src/content/overlay/example/controller.ts';
+  const unchangedOwner = 'apps/extension/src/popup/shell/example/controller.ts';
   initGitRepo(root);
+  writeFile(root, provider, 'export const value = 1;\n');
+  writeFile(root, provider.replace(/\.ts$/u, '.test.ts'), "it('covers provider', () => {});\n");
+  writeFile(root, facade, "export { value } from './provider';\n");
   writeFile(
     root,
-    'packages/example/package.json',
-    '{"name":"@sniptale/example","exports":{".":"./src/index.ts"}}\n'
+    changedOwner,
+    "import { value } from '../../../shared/facade';\nexport const content = value;\n"
   );
-  writeFile(root, deleted, 'export const value = 1;\n');
-  writeFile(root, packageOwner, "import './index';\nexport const controller = 1;\n");
   writeFile(
     root,
-    unchangedConsumer,
-    "import { value } from '@sniptale/example';\nexport const consumer = value;\n"
+    unchangedOwner,
+    "import { value } from '../../../shared/facade';\nexport const popup = value;\n"
   );
   runGit(root, 'add', '.');
   runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', deleted);
-  writeFile(root, packageOwner, 'export const controller = 2;\n');
+  runGit(root, 'rm', facade);
+  writeFile(
+    root,
+    changedOwner,
+    "import { value } from '../../../shared/provider';\nexport const content = value;\n"
+  );
 
-  const successors = await collectSuccessors(root, [deleted, packageOwner], [packageOwner]);
+  const successors = await collectSuccessors(root, [facade, changedOwner], [changedOwner]);
 
-  expect(successors.has(deleted)).toBe(false);
+  expect(successors.has(facade)).toBe(false);
 });
 
-it('finds unchanged consumers when a package export alias differs from the target basename', async () => {
-  const root = createTempRoot('build-deleted-package-alias-');
-  const deleted = 'packages/example/src/data/state-manager/manager.ts';
-  const packageOwner = 'packages/example/src/data/state-manager/controller.ts';
-  const unchangedConsumer = 'apps/extension/src/content/overlay/example/use-state.ts';
+it('keeps full-suite proof when HEAD consumer discovery is incomplete', async () => {
+  const root = createTempRoot('build-deleted-incomplete-discovery-');
+  const facade = 'apps/extension/src/shared/facade.ts';
+  const provider = 'apps/extension/src/shared/provider.ts';
+  const providerTest = 'apps/extension/src/shared/provider.test.ts';
+  const unchangedOwner = 'apps/extension/src/content/overlay/example/controller.ts';
   initGitRepo(root);
+  writeFile(root, provider, 'export const value = 1;\n');
+  writeFile(root, providerTest, "it('covers provider', () => {});\n");
+  writeFile(root, facade, "export { value } from './provider';\n");
   writeFile(
     root,
-    'packages/example/package.json',
-    '{"name":"@sniptale/example","exports":{"./data/state-manager":"./src/data/state-manager/manager.ts"}}\n'
-  );
-  writeFile(root, deleted, 'export const value = 1;\n');
-  writeFile(root, packageOwner, "import './manager';\nexport const controller = 1;\n");
-  writeFile(
-    root,
-    unchangedConsumer,
-    "import { value } from '@sniptale/example/data/state-manager';\nexport const consumer = value;\n"
+    unchangedOwner,
+    "import { value } from '../../../shared/facade';\nexport const content = value;\n"
   );
   runGit(root, 'add', '.');
   runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', deleted);
-  writeFile(root, packageOwner, 'export const controller = 2;\n');
+  runGit(root, 'rm', facade);
 
-  const successors = await collectSuccessors(root, [deleted, packageOwner], [packageOwner]);
+  const result = await withCwd(root, async () => {
+    const closureModule = await importFresh<typeof import('./verify-build.deleted-closure.mjs')>(
+      './verify-build.deleted-closure.mjs',
+      import.meta.url
+    );
+    const scopeModule = await importFresh<typeof import('./verify-build.scope.mjs')>(
+      './verify-build.scope.mjs',
+      import.meta.url
+    );
+    const successors = closureModule.collectDeletedTargetSuccessors({
+      headImporterResolver: () => ({ complete: false, importers: [] }),
+      productionTargetFiles: [facade],
+      productionCodeFiles: [],
+    });
+    const scope = scopeModule.resolveBuildTestScope({
+      targetFiles: [facade],
+      codeFiles: [],
+      repoCodeFiles: [provider, providerTest, unchangedOwner],
+      deletedSuccessorResolver: () => successors,
+      ownerTestResolver: (file) => (file === provider ? [providerTest] : []),
+    });
+    return { scope, successors };
+  });
 
-  expect(successors.has(deleted)).toBe(false);
+  expect(result.successors.has(facade)).toBe(false);
+  expect(result.scope.fullSuite).toBe(true);
+  expect(result.scope.detail).toContain('full product test suite');
 });

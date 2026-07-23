@@ -26,8 +26,8 @@ const {
   usePromptTemplatesMock: vi.fn(),
 }));
 
-vi.mock('../../../../parser/dom-tree-parser/ai/format', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../parser/dom-tree-parser/ai/format')>()),
+vi.mock('../../../../parser/dom-tree-parser/ai/markdown', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../parser/dom-tree-parser/ai/markdown')>()),
   estimateTokens: estimateTokensMock,
 }));
 

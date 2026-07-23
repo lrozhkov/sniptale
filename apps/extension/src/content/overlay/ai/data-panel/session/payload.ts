@@ -1,5 +1,5 @@
 import type { FieldNode, ParsedDOMTree, TableNode } from '@sniptale/runtime-contracts/dom-tree';
-import { formatDataForAIJSON } from '../../../../parser/dom-tree-parser/ai/format';
+import { formatDataForAIJSON } from '../../../../parser/dom-tree-parser/ai/editable-format';
 import type { TreeNodeState } from '../types';
 
 function mapSelectedChild(props: {

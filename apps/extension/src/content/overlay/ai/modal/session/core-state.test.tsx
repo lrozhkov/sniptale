@@ -14,10 +14,10 @@ const { estimateTokensMock, selectLastPromptMock, setLastPromptMock, usePromptTe
     usePromptTemplatesMock: vi.fn(),
   }));
 
-vi.mock('../../../../parser/dom-tree-parser/ai/format', async () => {
+vi.mock('../../../../parser/dom-tree-parser/ai/markdown', async () => {
   const actual = await vi.importActual<
-    typeof import('../../../../parser/dom-tree-parser/ai/format')
-  >('../../../../parser/dom-tree-parser/ai/format');
+    typeof import('../../../../parser/dom-tree-parser/ai/markdown')
+  >('../../../../parser/dom-tree-parser/ai/markdown');
 
   return {
     ...actual,

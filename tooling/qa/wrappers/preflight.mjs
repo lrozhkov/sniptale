@@ -184,6 +184,7 @@ export function collectPreflightReport({ files = [] } = {}) {
     untrackedFiles: context.untrackedFiles,
     buildScopeContext: {
       targetFiles: collectedContext.targetFiles,
+      riskTargetFiles: collectedContext.qualityTargetFiles,
       codeFiles: collectedContext.codeFiles,
       addedFiles: collectedContext.addedFiles,
     },

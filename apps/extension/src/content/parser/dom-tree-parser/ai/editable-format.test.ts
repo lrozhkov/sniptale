@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ParsedDOMTree, TargetRef } from '@sniptale/runtime-contracts/dom-tree';
-import {
-  convertTreeToMarkdown,
-  estimateTokens,
-  formatDataForAI,
-  formatDataForAIJSON,
-} from './format';
+import { formatDataForAI, formatDataForAIJSON } from './editable-format';
 
 function createProfileFields(): ParsedDOMTree['structure'][number]['children'] {
   return [
@@ -270,23 +265,7 @@ function registerMarkdownFormattingTests() {
   });
 }
 
-function registerMarkdownConversionTests() {
-  it('converts parsed trees to markdown and estimates tokens', () => {
-    const markdown = convertTreeToMarkdown(createParsedTreeFixture());
-
-    expect(markdown).toContain('# Demo page');
-    expect(markdown).toContain('*Demo context*');
-    expect(markdown).toContain('[Example\\|Site<br>Docs](https://example.com)');
-    expect(markdown).toContain('The Web was invented by Tim Berners-Lee at CERN.');
-    expect(markdown).toContain('- HTTP');
-    expect(markdown).toContain('| Status | Name | Screenshot |');
-    expect(estimateTokens('abcd')).toBe(1);
-    expect(estimateTokens('abcdef')).toBe(2);
-  });
-}
-
-describe('dom-tree-parser ai format facade', () => {
+describe('dom-tree-parser editable AI format', () => {
   registerEditablePayloadFormattingTests();
   registerMarkdownFormattingTests();
-  registerMarkdownConversionTests();
 });

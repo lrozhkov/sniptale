@@ -8,6 +8,9 @@ import {
 
 const ALGORITHM_PATTERN =
   /(?:^|\/)(?:parser|parsers|algorithm|algorithms|reducer|reducers)(?:\/|\.)/u;
+const REGISTERED_PURE_ALGORITHM_OWNERS = new Set([
+  'tooling/qa/core/verify-build.deleted-aggregate.mjs',
+]);
 
 function containsJsx(node) {
   let found = false;
@@ -109,7 +112,7 @@ function chooseProfile(relativePath, symbol, node, metrics, exportedBindings) {
     return 'react';
   }
   if (
-    ALGORITHM_PATTERN.test(relativePath) &&
+    (ALGORITHM_PATTERN.test(relativePath) || REGISTERED_PURE_ALGORITHM_OWNERS.has(relativePath)) &&
     metrics.effectFamilies.length === 0 &&
     metrics.stateAuthorities === 0
   ) {

@@ -46,4 +46,19 @@ describe('function profile classification', () => {
 
     expect(metric.functions[0]?.profile).toBe('entrypoint');
   });
+
+  it('uses the pure profile for the registered deleted-aggregate AST owner', () => {
+    const metric = analyzeStructuralSource(
+      'tooling/qa/core/verify-build.deleted-aggregate.mjs',
+      `function collectBindings(nodes) {
+        const bindings = [];
+        for (const node of nodes) {
+          if (node.kind === 'import') bindings.push(node.name);
+        }
+        return bindings;
+      }`
+    );
+
+    expect(metric.functions[0]?.profile).toBe('pure');
+  });
 });
