@@ -1,5 +1,5 @@
-import type { addEventListenerToAllWindowsDynamic, walkAllDocuments } from '../../platform/frame';
 import type { Logger } from '@sniptale/platform/observability/logger/types';
+import type { addEventListenerToAllWindowsDynamic, walkAllDocuments } from '../../platform/frame';
 import type { removeNavigationLockOverlay, syncNavigationLockOverlay } from './overlay';
 
 type BeforeUnloadHandler = (this: Window, ev: BeforeUnloadEvent) => string | void;

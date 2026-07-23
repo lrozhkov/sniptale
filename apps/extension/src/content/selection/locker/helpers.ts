@@ -1,15 +1,107 @@
-import { EXTENSION_CLASS_PREFIX, QUICK_EDIT_TEXT_TAGS } from './helpers.constants';
-import {
-  hasFocusableTabIndex,
-  hasInteractiveAttributes,
-  hasInteractiveGwtClasses,
-  hasInteractiveParent,
-  hasNavigationAttributes,
-  hasSniptaleClass,
-  isEditableElement,
-  isExtensionElement,
-  isStandardInteractiveTag,
-} from './helpers.predicates';
+const EXTENSION_CLASS_PREFIX = 'sniptale-';
+const INTERACTIVE_TAGS = ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'];
+const NAVIGATION_DATA_ATTRIBUTES = [
+  'href',
+  'data-href',
+  'data-url',
+  'data-link',
+  'data-target-url',
+  'data-navigation-url',
+];
+const QUICK_EDIT_TEXT_TAGS = [
+  'p',
+  'span',
+  'div',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'li',
+  'td',
+  'th',
+  'label',
+  'a',
+  'button',
+];
+
+function hasSniptaleClass(element: HTMLElement): boolean {
+  return (
+    typeof element.className === 'string' &&
+    element.className.split(' ').some((className) => className.startsWith(EXTENSION_CLASS_PREFIX))
+  );
+}
+
+function isExtensionElement(element: HTMLElement): boolean {
+  return hasSniptaleClass(element) || Boolean(element.closest('[class*="sniptale-"]'));
+}
+
+function isEditableElement(element: HTMLElement): boolean {
+  return element.classList.contains('sniptale-editing') || element.isContentEditable;
+}
+
+function hasFocusableTabIndex(element: HTMLElement): boolean {
+  const tabindex = element.getAttribute('tabindex');
+  if (tabindex === null) {
+    return false;
+  }
+
+  const parsedTabIndex = Number.parseInt(tabindex, 10);
+  return Number.isFinite(parsedTabIndex) && parsedTabIndex >= 0;
+}
+
+function hasInteractiveAttributes(element: HTMLElement): boolean {
+  return (
+    element.hasAttribute('onclick') ||
+    element.hasAttribute('onmousedown') ||
+    element.hasAttribute('onpointerdown')
+  );
+}
+
+function hasNavigationAttributes(element: HTMLElement): boolean {
+  return NAVIGATION_DATA_ATTRIBUTES.some((attribute) => {
+    const value = element.getAttribute(attribute);
+    return typeof value === 'string' && value.trim().length > 0;
+  });
+}
+
+function hasInteractiveGwtClasses(element: HTMLElement): boolean {
+  if (typeof element.className !== 'string') {
+    return false;
+  }
+
+  return [
+    'button',
+    'Button',
+    'g-button',
+    'gwt-Button',
+    'gwt-HTML',
+    'vectorIcon',
+    'GAQEVERIPC',
+    'actionsForceEnabled',
+  ].some((token) => element.className.includes(token));
+}
+
+function hasInteractiveParent(element: HTMLElement): boolean {
+  let parent = element.parentElement;
+  while (parent && parent !== document.body) {
+    if (
+      typeof parent.className === 'string' &&
+      (parent.className.includes('GAQEVERIPC') ||
+        parent.className.includes('gwt-') ||
+        parent.className.includes('actionsForceEnabled'))
+    ) {
+      return true;
+    }
+    parent = parent.parentElement;
+  }
+  return false;
+}
+
+function isStandardInteractiveTag(element: HTMLElement): boolean {
+  return INTERACTIVE_TAGS.includes(element.tagName);
+}
 
 export function isInteractiveElementForLock(element: HTMLElement): boolean {
   if (isExtensionElement(element) || isEditableElement(element)) {
