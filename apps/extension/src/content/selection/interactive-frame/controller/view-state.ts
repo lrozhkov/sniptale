@@ -1,7 +1,7 @@
 import React from 'react';
 import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
-import type { FrameUIState } from '../../frame-runtime/state/frame-ui.store.types';
+import type { FrameUIState } from '../../frame-runtime/state/frame-ui.store';
 
 export function useInteractiveFrameViewState(params: {
   frame: FrameData;
