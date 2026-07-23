@@ -1,7 +1,13 @@
+import { calculateContentSizeTooltipPosition } from '@sniptale/ui/content-size-tooltip/core';
+import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
+import {
+  setContentSizeTooltipPosition,
+  syncContentSizeTooltipValues,
+} from '@sniptale/ui/content-size-tooltip/dom';
 import { bindRegionSelectorRootEvents } from './events';
-import { buildRegionSelectorMarkup } from './markup';
+import { MIN_REGION_SELECTOR_SIZE } from './helpers';
+import { buildRegionSelectorMarkup, updateOverlayMask } from './markup';
 import { buildRecordingOverlayNode } from './recording-overlay.helpers';
-import { updateRegionDisplay } from './runtime';
 import { createRegionSelectorTooltip } from './tooltip';
 import {
   applyRegionSelectorTheme,
@@ -21,12 +27,54 @@ function getRegionSelectorElements(root: HTMLElement) {
   };
 }
 
-export function updateRegionSelectorUi(state: RegionSelectorState): void {
-  updateRegionDisplay(
-    state.regionSelectorContainer,
-    state.currentRegion,
-    state.regionSelectorTooltip
+function updateRegionSurface(region: HTMLElement, currentRegion: RegionSelectorBounds): void {
+  region.style.left = `${currentRegion.x}px`;
+  region.style.top = `${currentRegion.y}px`;
+  region.style.width = `${currentRegion.width}px`;
+  region.style.height = `${currentRegion.height}px`;
+}
+
+function syncRegionSelectorTooltip(
+  tooltip: ContentSizeTooltipDom,
+  currentRegion: RegionSelectorBounds
+): void {
+  const maintainAspectRatio = tooltip.aspectRatioButton.getAttribute('aria-pressed') === 'true';
+
+  setContentSizeTooltipPosition(
+    tooltip.root,
+    calculateContentSizeTooltipPosition({ anchorRect: currentRegion })
   );
+  syncContentSizeTooltipValues({
+    tooltip,
+    width: currentRegion.width,
+    height: currentRegion.height,
+    maintainAspectRatio,
+    widthMin: MIN_REGION_SELECTOR_SIZE,
+    widthMax: window.innerWidth,
+    heightMin: MIN_REGION_SELECTOR_SIZE,
+    heightMax: window.innerHeight,
+    canToggleAspectRatio: true,
+  });
+}
+
+export function updateRegionSelectorUi(state: RegionSelectorState): void {
+  if (!state.regionSelectorContainer) {
+    return;
+  }
+
+  const region = state.regionSelectorContainer.querySelector<HTMLElement>('#sniptale-region');
+  if (region) {
+    updateRegionSurface(region, state.currentRegion);
+  }
+
+  const overlay = state.regionSelectorContainer.querySelector<HTMLElement>('#sniptale-overlay');
+  if (overlay) {
+    updateOverlayMask(overlay, state.currentRegion);
+  }
+
+  if (state.regionSelectorTooltip) {
+    syncRegionSelectorTooltip(state.regionSelectorTooltip, state.currentRegion);
+  }
 }
 
 function renderRegionSelector(args: {

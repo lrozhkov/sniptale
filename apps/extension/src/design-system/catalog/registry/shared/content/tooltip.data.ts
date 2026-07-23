@@ -66,7 +66,7 @@ export const SHARED_DESIGN_SYSTEM_CONTENT_TOOLTIP_REGISTRY: DesignSystemRegistry
         'Content > Region selector > Size tooltip',
         [
           'apps/extension/src/content/selection/region-selector/tooltip.ts',
-          'apps/extension/src/content/selection/region-selector/runtime.ts',
+          'apps/extension/src/content/selection/region-selector/surface.ts',
         ]
       ),
     ],

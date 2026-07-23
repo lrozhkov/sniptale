@@ -5,11 +5,12 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { toDevicePixelRegion } from './helpers';
 import { sendRegionSelectorRuntimeMessage } from './messaging';
-import { createRegionSelectorSurfaceActions, hideRecordingOverlay } from './surface';
+import { createRegionSelectorDocumentHandlers, detachRegionSelectorListeners } from './events';
 import {
-  createRegionSelectorDocumentHandlers,
-  detachRegionSelectorListeners,
-} from './document-events';
+  createRegionSelectorSurfaceActions,
+  hideRecordingOverlay,
+  updateRegionSelectorUi,
+} from './surface';
 import {
   createDefaultRegionSelectorState,
   type RegionSelectorBounds,
@@ -105,6 +106,7 @@ export function createRegionSelectorController(
   const documentHandlers = createRegionSelectorDocumentHandlers({
     handleRegionCancelled: () => handleRegionCancelled(),
     state,
+    updateUi: () => updateRegionSelectorUi(state),
   });
   const detachListeners = () =>
     detachRegionSelectorListeners({

@@ -73,6 +73,60 @@ export const CONTENT_SELECTION_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'content-region-selector-surface',
+    productionFile: 'apps/extension/src/content/selection/region-selector/surface.ts',
+    exclusive: true,
+    reason: 'Region selector DOM surface rendering has bounded visual-state proof.',
+    testFiles: [
+      'apps/extension/src/content/selection/region-selector/surface.coverage.test.ts',
+      'apps/extension/src/content/selection/region-selector/surface.test.ts',
+    ],
+  },
+  {
+    owner: 'content-region-selector-runtime-predecessor',
+    productionFile: 'apps/extension/src/content/selection/region-selector/runtime.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed display proxy is consolidated into the region selector surface owner.',
+    testFiles: [
+      'apps/extension/src/content/selection/region-selector/surface.coverage.test.ts',
+      'apps/extension/src/content/selection/region-selector/surface.test.ts',
+    ],
+  },
+  {
+    owner: 'content-region-selector-events',
+    productionFile: 'apps/extension/src/content/selection/region-selector/events.ts',
+    exclusive: true,
+    reason: 'Region selector root and document event lifecycles have bounded owner proof.',
+    testFiles: [
+      'apps/extension/src/content/selection/region-selector/events.test.ts',
+      'apps/extension/src/content/selection/region-selector/index.coverage.test.ts',
+      'apps/extension/src/content/selection/region-selector/index.test.ts',
+    ],
+  },
+  {
+    owner: 'content-region-selector-document-events-predecessor',
+    productionFile: 'apps/extension/src/content/selection/region-selector/document-events.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed document-event fragment is consolidated into the event lifecycle owner.',
+    testFiles: [
+      'apps/extension/src/content/selection/region-selector/events.test.ts',
+      'apps/extension/src/content/selection/region-selector/index.coverage.test.ts',
+      'apps/extension/src/content/selection/region-selector/index.test.ts',
+    ],
+  },
+  {
+    owner: 'content-region-selector-composition',
+    productionFile: 'apps/extension/src/content/selection/region-selector/index.ts',
+    exclusive: true,
+    reason: 'Region selector state, event, surface, and messaging composition has bounded proof.',
+    testFiles: [
+      'apps/extension/src/content/selection/region-selector/index.coverage.test.ts',
+      'apps/extension/src/content/selection/region-selector/index.test.ts',
+    ],
+  },
+  {
     owner: 'content-selection-mode-overlay-cancel-style-predecessor',
     productionFile:
       'apps/extension/src/content/selection/selection-mode/ui/styles.cancel-button.data.ts',
