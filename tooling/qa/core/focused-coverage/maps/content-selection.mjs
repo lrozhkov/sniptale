@@ -29,4 +29,38 @@ export const CONTENT_SELECTION_OWNER_MAPPINGS = [
       'apps/extension/src/content/selection/selection-mode/events/pointer.test.ts',
     ],
   },
+  {
+    owner: 'content-selection-mode-overlay-cancel-style-predecessor',
+    productionFile:
+      'apps/extension/src/content/selection/selection-mode/ui/styles.cancel-button.data.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed cancel style fragment is consolidated into the overlay stylesheet owner.',
+    testFiles: [
+      'apps/extension/src/content/selection/selection-mode/ui/container.test.ts',
+      'apps/extension/src/content/selection/selection-mode/ui/styles.constants.test.ts',
+    ],
+  },
+  {
+    owner: 'content-selection-mode-overlay-input-style-predecessor',
+    productionFile: 'apps/extension/src/content/selection/selection-mode/ui/styles.inputs.data.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed input style fragment is consolidated into the overlay stylesheet owner.',
+    testFiles: [
+      'apps/extension/src/content/selection/selection-mode/ui/container.test.ts',
+      'apps/extension/src/content/selection/selection-mode/ui/styles.constants.test.ts',
+    ],
+  },
+  {
+    owner: 'content-selection-mode-overlay-toggle-style-predecessor',
+    productionFile: 'apps/extension/src/content/selection/selection-mode/ui/styles.toggle.data.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed toggle style fragment is consolidated into the overlay stylesheet owner.',
+    testFiles: [
+      'apps/extension/src/content/selection/selection-mode/ui/container.test.ts',
+      'apps/extension/src/content/selection/selection-mode/ui/styles.constants.test.ts',
+    ],
+  },
 ];

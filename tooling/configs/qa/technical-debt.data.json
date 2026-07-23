@@ -14920,7 +14920,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
-        "contentHash": "12ceb69dce233adc62eb8f7182fb9df476def76d007f53ea1e9b35a294504168"
+        "contentHash": "d07a010950abc88457753c786edc0ffd70277ff417547d30456435ab5987b50c"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
@@ -14929,7 +14929,10 @@
       "surfaces": [
         "binding:CONTENT_SELECTION_OWNER_MAPPINGS",
         "property:testFiles",
-        "property:testFiles[1]"
+        "property:testFiles[1]",
+        "property:testFiles[2]",
+        "property:testFiles[3]",
+        "property:testFiles[4]"
       ]
     },
     {
