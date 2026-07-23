@@ -3358,11 +3358,7 @@
         "apps/extension/src/content/selection/selection-mode/diag.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/commands.ts",
-        "apps/extension/src/content/selection/selection-mode/events/handlers/activation.ts",
-        "apps/extension/src/content/selection/selection-mode/events/handlers/helpers.ts",
         "apps/extension/src/content/selection/selection-mode/events/handlers/index.ts",
-        "apps/extension/src/content/selection/selection-mode/events/handlers/pointer.ts",
-        "apps/extension/src/content/selection/selection-mode/events/handlers/types.ts",
         "apps/extension/src/content/selection/selection-mode/events/helpers.ts",
         "apps/extension/src/content/selection/selection-mode/events/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/listeners/index.ts",
@@ -3751,11 +3747,7 @@
         "apps/extension/src/content/selection/selection-mode/diag.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/commands.ts",
-        "apps/extension/src/content/selection/selection-mode/events/handlers/activation.ts",
-        "apps/extension/src/content/selection/selection-mode/events/handlers/helpers.ts",
         "apps/extension/src/content/selection/selection-mode/events/handlers/index.ts",
-        "apps/extension/src/content/selection/selection-mode/events/handlers/pointer.ts",
-        "apps/extension/src/content/selection/selection-mode/events/handlers/types.ts",
         "apps/extension/src/content/selection/selection-mode/events/helpers.ts",
         "apps/extension/src/content/selection/selection-mode/events/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/listeners/index.ts",
@@ -14920,7 +14912,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
-        "contentHash": "d07a010950abc88457753c786edc0ffd70277ff417547d30456435ab5987b50c"
+        "contentHash": "fa8cad0fe9348b6c29b385b5c444f0faa19f1ff4777e2cf3eefa92d803b52844"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
@@ -14932,7 +14924,8 @@
         "property:testFiles[1]",
         "property:testFiles[2]",
         "property:testFiles[3]",
-        "property:testFiles[4]"
+        "property:testFiles[4]",
+        "property:testFiles[5]"
       ]
     },
     {
