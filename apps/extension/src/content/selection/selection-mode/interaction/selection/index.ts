@@ -12,7 +12,3 @@ export {
   updateDragFrame,
   updateFinalFrame,
 } from '../frame';
-export {
-  setupSelectionModeSizePanelListeners as setupSizePanelListeners,
-  type SelectionModeSizePanelListenersArgs,
-} from '../../ui/size-panel';

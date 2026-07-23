@@ -10,7 +10,7 @@ import {
   startSelectionModeDragSelection,
   updateSelectionModeDragSelection,
   updateSelectionModeFinalFrame,
-} from '../../interaction/actions/runtime';
+} from '../../runtime/drag';
 import { isSelectionModeExtensionUiElement } from '../../runtime';
 import type { SelectionModeEventsBridgeRuntimeArgs } from './types';
 

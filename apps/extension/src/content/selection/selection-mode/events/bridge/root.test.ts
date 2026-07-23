@@ -17,7 +17,7 @@ import {
   startSelectionModeDragSelection,
   updateSelectionModeDragSelection,
   updateSelectionModeFinalFrame,
-} from '../../interaction/actions/runtime';
+} from '../../runtime/drag';
 import {
   buildSelectionCaptureArea,
   cleanupSelectionModeRuntime,
@@ -46,7 +46,7 @@ vi.mock('../../runtime', () => ({
   isSelectionModeExtensionUiElement: vi.fn(),
 }));
 
-vi.mock('../../interaction/actions/runtime', () => ({
+vi.mock('../../runtime/drag', () => ({
   constrainSelectionModeSelection: vi.fn(),
   finalizeSelectionModeDragSelection: vi.fn(),
   handleSelectionModeDragMove: vi.fn(),
