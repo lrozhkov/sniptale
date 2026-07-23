@@ -3154,7 +3154,6 @@
         "apps/extension/src/content/selection/frame-runtime/manager/runtime-mutations.ts",
         "apps/extension/src/content/selection/frame-runtime/manager/step-badge/actions-runtime.ts",
         "apps/extension/src/content/selection/frame-runtime/manager/step-badge/auto-values.ts",
-        "apps/extension/src/content/selection/frame-runtime/manager/step-badge/badges.ts",
         "apps/extension/src/content/selection/frame-runtime/manager/step-badge/controllers.ts",
         "apps/extension/src/content/selection/frame-runtime/manager/step-badge/order.ts",
         "apps/extension/src/content/selection/frame-runtime/manager/step-badge/reorder.ts",
