@@ -1,14 +1,52 @@
 import { applyDomMutationBatch } from './dom';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import type { HistoryStoreInternals } from './store.internals';
 import type {
   FrameSessionSnapshot,
   PageDomMutationBatch,
+  PagePreparationHistoryBridge,
   PagePreparationHistoryEntry,
   PagePreparationHistoryState,
 } from './types';
 
 const logger = createLogger({ namespace: 'ContentPagePreparationHistoryApply' });
+
+type DeferredCommit = {
+  before: FrameSessionSnapshot;
+  id: number;
+};
+
+type OpenTransaction = {
+  before: FrameSessionSnapshot;
+  domBatch: PageDomMutationBatch | null;
+};
+
+export type HistoryListener = () => void;
+
+export type HistoryStoreRuntimeState = {
+  bridge: PagePreparationHistoryBridge | null;
+  deferredCommitId: number;
+  deferredCommits: Map<number, DeferredCommit>;
+  future: PagePreparationHistoryEntry[];
+  isApplying: boolean;
+  listeners: Set<HistoryListener>;
+  past: PagePreparationHistoryEntry[];
+  revision: number;
+  transactions: Map<string, OpenTransaction>;
+};
+
+export function createHistoryStoreState(): HistoryStoreRuntimeState {
+  return {
+    bridge: null,
+    deferredCommitId: 0,
+    deferredCommits: new Map<number, DeferredCommit>(),
+    future: [],
+    isApplying: false,
+    listeners: new Set<HistoryListener>(),
+    past: [],
+    revision: 0,
+    transactions: new Map<string, OpenTransaction>(),
+  };
+}
 
 function buildHistoryState(
   past: PagePreparationHistoryEntry[],
@@ -78,7 +116,7 @@ function domBatchEqual(
   return historyValueEqual(left, right);
 }
 
-function normalizeDomBatch(
+export function normalizeHistoryDomBatch(
   batch: PageDomMutationBatch | null | undefined
 ): PageDomMutationBatch | null {
   if (!batch) {
@@ -89,40 +127,45 @@ function normalizeDomBatch(
   return patches.length > 0 ? { patches } : null;
 }
 
-function notifyListeners(state: HistoryStoreInternals): void {
+function notifyListeners(state: HistoryStoreRuntimeState): void {
   state.listeners.forEach((listener) => listener());
 }
 
-function publishState(state: HistoryStoreInternals): void {
+export function publishHistoryState(state: HistoryStoreRuntimeState): void {
   state.revision += 1;
   notifyListeners(state);
 }
 
-function getHistoryState(state: HistoryStoreInternals): PagePreparationHistoryState {
+export function readHistoryState(state: HistoryStoreRuntimeState): PagePreparationHistoryState {
   return buildHistoryState(state.past, state.future, state.revision);
 }
 
-function captureSnapshot(state: HistoryStoreInternals): FrameSessionSnapshot | null {
+export function captureHistorySnapshot(
+  state: HistoryStoreRuntimeState
+): FrameSessionSnapshot | null {
   return state.bridge?.captureSnapshot() ?? null;
 }
 
-function pushEntry(state: HistoryStoreInternals, entry: PagePreparationHistoryEntry): boolean {
-  const domBatch = normalizeDomBatch(entry.domBatch);
+export function pushHistoryEntry(
+  state: HistoryStoreRuntimeState,
+  entry: PagePreparationHistoryEntry
+): boolean {
+  const domBatch = normalizeHistoryDomBatch(entry.domBatch);
   if (snapshotsEqual(entry.before, entry.after) && domBatchEqual(domBatch, null)) {
     return false;
   }
 
   state.past = [...state.past, { ...entry, domBatch }];
   state.future = [];
-  publishState(state);
+  publishHistoryState(state);
   return true;
 }
 
-function applyEntry(
+export function applyHistoryEntry(
   direction: 'undo' | 'redo',
   dispatchEventName: string,
   entry: PagePreparationHistoryEntry,
-  state: HistoryStoreInternals
+  state: HistoryStoreRuntimeState
 ): boolean {
   if (!state.bridge) {
     return false;
@@ -157,12 +200,3 @@ function applyEntry(
     state.isApplying = false;
   }
 }
-
-export const storeHelperFns = {
-  applyEntry,
-  captureSnapshot,
-  getHistoryState,
-  normalizeDomBatch,
-  publishState,
-  pushEntry,
-};

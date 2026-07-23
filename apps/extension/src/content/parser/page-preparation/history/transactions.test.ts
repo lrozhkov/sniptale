@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createHistoryStoreInternals } from './store.internals';
+import { createHistoryStoreState } from './store-state';
 import { createHistoryStoreCommitApi } from './transactions';
 import type { FrameSessionSnapshot } from './types';
 
@@ -31,7 +31,7 @@ function cloneSnapshot(snapshot: FrameSessionSnapshot): FrameSessionSnapshot {
 
 function createTransactionHarness(initialSnapshot = createSnapshot('a')) {
   let currentSnapshot = cloneSnapshot(initialSnapshot);
-  const state = createHistoryStoreInternals();
+  const state = createHistoryStoreState();
   state.bridge = {
     applySnapshot: () => undefined,
     captureSnapshot: () => cloneSnapshot(currentSnapshot),
