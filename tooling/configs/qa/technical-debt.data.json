@@ -3367,10 +3367,7 @@
         "apps/extension/src/content/selection/selection-mode/events/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/listeners/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/listeners/runtime.ts",
-        "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-down.ts",
-        "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-leave.ts",
-        "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-move.ts",
-        "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-up.ts",
+        "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/target.ts",
         "apps/extension/src/content/selection/selection-mode/events/types.ts",
         "apps/extension/src/content/selection/selection-mode/index.ts",
@@ -3763,10 +3760,7 @@
         "apps/extension/src/content/selection/selection-mode/events/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/listeners/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/listeners/runtime.ts",
-        "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-down.ts",
-        "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-leave.ts",
-        "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-move.ts",
-        "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-up.ts",
+        "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/index.ts",
         "apps/extension/src/content/selection/selection-mode/events/pointer-handlers/target.ts",
         "apps/extension/src/content/selection/selection-mode/events/types.ts",
         "apps/extension/src/content/selection/selection-mode/index.ts",
@@ -14926,7 +14920,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
-        "contentHash": "28d1ba6248f70f58ca32ed9a5ae23793ead358b701072cf7525252d9284c7526"
+        "contentHash": "12ceb69dce233adc62eb8f7182fb9df476def76d007f53ea1e9b35a294504168"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
@@ -14934,7 +14928,8 @@
       ],
       "surfaces": [
         "binding:CONTENT_SELECTION_OWNER_MAPPINGS",
-        "property:testFiles"
+        "property:testFiles",
+        "property:testFiles[1]"
       ]
     },
     {

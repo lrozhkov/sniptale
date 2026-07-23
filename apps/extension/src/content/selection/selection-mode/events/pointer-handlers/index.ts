@@ -1,5 +1,14 @@
-import { resolveSelectionModePointerTarget } from './target';
+import {
+  logSelectionModeDragFinalize,
+  logSelectionModePointerFinish,
+  logSelectionModeRuntime,
+} from '../../diag';
+import {
+  handleSelectionModeConfirmedMouseDown,
+  handleSelectionModeIdleMouseDown,
+} from '../helpers';
 import type { SelectionModeEventOptions, SelectionModeInteractionState } from '../types';
+import { resolveSelectionModePointerTarget } from './target';
 
 type SelectionModeMouseMoveOptions = Pick<
   SelectionModeEventOptions,
@@ -11,6 +20,47 @@ type SelectionModeMouseMoveOptions = Pick<
   | 'startDragSelection'
   | 'updateDragSelection'
 >;
+
+export function handleSelectionModeMouseDown(
+  event: MouseEvent,
+  state: SelectionModeInteractionState,
+  options: Pick<SelectionModeEventOptions, 'isExtensionUIElement'>,
+  iframe?: HTMLIFrameElement
+): void {
+  if (!state.isActive) {
+    return;
+  }
+
+  const target = resolveSelectionModePointerTarget(event, iframe);
+  if (!target) {
+    return;
+  }
+
+  if (state.currentState === 'idle' || state.currentState === 'hover') {
+    handleSelectionModeIdleMouseDown(event, state, options.isExtensionUIElement, target);
+    return;
+  }
+
+  if (state.currentState !== 'confirmed') {
+    return;
+  }
+
+  handleSelectionModeConfirmedMouseDown(event, state, options.isExtensionUIElement, target);
+}
+
+export function handleSelectionModeMouseLeave(
+  state: SelectionModeInteractionState,
+  options: Pick<SelectionModeEventOptions, 'hideHoverFrame'>
+): void {
+  if (!state.isActive) {
+    return;
+  }
+
+  if (state.currentState === 'idle' || state.currentState === 'hover') {
+    options.hideHoverFrame();
+    logSelectionModeRuntime('Hover preview hidden - cursor left viewport');
+  }
+}
 
 function handleHoverStateMove(
   event: MouseEvent,
@@ -83,4 +133,34 @@ export function handleSelectionModeMouseMove(
   if (state.currentState === 'confirmed') {
     handleConfirmedStateMove(event, state, options);
   }
+}
+
+export function handleSelectionModeMouseUp(
+  state: SelectionModeInteractionState,
+  options: Pick<SelectionModeEventOptions, 'finalizeDragSelection'>
+): void {
+  if (!state.isActive) {
+    return;
+  }
+
+  if (state.currentState === 'drag') {
+    logSelectionModeDragFinalize(state);
+    options.finalizeDragSelection();
+    state.mouseDownPoint = null;
+    state.hasMovedEnough = false;
+    return;
+  }
+
+  if (state.currentState === 'confirmed') {
+    if (state.isDragging || state.isResizing) {
+      logSelectionModePointerFinish(state);
+      state.skipNextClick = true;
+    }
+    state.isDragging = false;
+    state.isResizing = false;
+    state.resizeDirection = null;
+  }
+
+  state.mouseDownPoint = null;
+  state.hasMovedEnough = false;
 }
