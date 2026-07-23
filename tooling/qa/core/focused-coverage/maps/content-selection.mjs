@@ -51,6 +51,28 @@ export const CONTENT_SELECTION_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'content-selection-mode-runtime-drag-actions',
+    productionPrefix: 'apps/extension/src/content/selection/selection-mode/runtime/drag/',
+    exclusive: true,
+    reason:
+      'Selection drag, hover, and element runtime actions share one session transition owner.',
+    testFiles: [
+      'apps/extension/src/content/selection/selection-mode/events/bridge/root.test.ts',
+      'apps/extension/src/content/selection/selection-mode/runtime/drag/drag.test.ts',
+      'apps/extension/src/content/selection/selection-mode/runtime/drag/index.test.ts',
+    ],
+  },
+  {
+    owner: 'content-selection-mode-runtime-setup',
+    productionPrefix: 'apps/extension/src/content/selection/selection-mode/runtime/setup/',
+    exclusive: true,
+    reason: 'Selection runtime setup and its composition have bounded single-session proof.',
+    testFiles: [
+      'apps/extension/src/content/selection/selection-mode/runtime/composition.test.ts',
+      'apps/extension/src/content/selection/selection-mode/runtime/setup/index.test.ts',
+    ],
+  },
+  {
     owner: 'content-selection-mode-overlay-cancel-style-predecessor',
     productionFile:
       'apps/extension/src/content/selection/selection-mode/ui/styles.cancel-button.data.ts',

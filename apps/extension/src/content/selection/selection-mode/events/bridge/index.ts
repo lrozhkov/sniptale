@@ -1,7 +1,7 @@
 import { disableNavigationLock } from '../../../locker';
 import { logSelectionModeDiag, logSelectionModeError } from '../../diag';
 import type { SelectionModeSession } from '../../session';
-import type { SelectionModeRuntimeActionsArgs } from '../../interaction/actions/types';
+import type { SelectionModeRuntimeActionsArgs } from '../../runtime/setup';
 import {
   constrainSelectionModeSelection,
   finalizeSelectionModeDragSelection,

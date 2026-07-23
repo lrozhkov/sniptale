@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SelectionModeRuntimeActionsArgs } from '../../interaction/actions/types';
+import type { SelectionModeRuntimeActionsArgs } from '../setup';
 
 const { applySelectionModeDragSelectionMock, applySelectionModeElementSelectionMock } = vi.hoisted(
   () => ({
@@ -88,8 +88,6 @@ function createArgs(
     getMaxSelectionWidth: vi.fn(() => 800),
     hideHoverFrame: vi.fn(),
     minSelectionSize: 20,
-    setCleanupEventListeners: vi.fn(),
-    setCleanupScrollListeners: vi.fn(),
     setupListenerHandlers: createSetupListenerHandlers(),
     showFinalFrame: vi.fn(),
     showHoverFrameDom: vi.fn(),

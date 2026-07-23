@@ -30,12 +30,6 @@ export function createSelectionModeRuntimeSetup(args: SelectionModeRuntimeSetupA
     getMaxSelectionHeight: args.getMaxSelectionHeight,
     getMaxSelectionWidth: args.getMaxSelectionWidth,
     minSelectionSize: args.minSelectionSize,
-    setCleanupEventListeners: (cleanup: (() => void) | null) => {
-      args.session.cleanupEventListeners = cleanup;
-    },
-    setCleanupScrollListeners: (cleanup: (() => void) | null) => {
-      args.session.cleanupScrollListeners = cleanup;
-    },
     setupListenerHandlers: createListenerHandlers(args),
     showFinalFrame: () => {
       args.createFinalElements();
@@ -47,6 +41,8 @@ export function createSelectionModeRuntimeSetup(args: SelectionModeRuntimeSetupA
     zIndexBase: args.zIndexBase,
   };
 }
+
+export type SelectionModeRuntimeActionsArgs = ReturnType<typeof createSelectionModeRuntimeSetup>;
 
 function createListenerHandlers(args: SelectionModeRuntimePointerHandlers) {
   return {

@@ -3,14 +3,18 @@ import {
   addScrollListenersToAllWindows,
 } from '../../../../platform/frame';
 import { logSelectionModeRuntime } from '../../diag';
-import type { SelectionModeRuntimeActionsArgs } from '../../interaction/actions/types';
+import type { SelectionModeSession } from '../../session';
 import type { SelectionModeRuntimePointerHandlers } from '../../runtime/setup';
 
 interface SelectionModeListenerArgs extends SelectionModeRuntimePointerHandlers {
-  currentState: () => string;
   hideHoverFrame: () => void;
-  setCleanupEventListeners: (cleanup: (() => void) | null) => void;
-  setCleanupScrollListeners: (cleanup: (() => void) | null) => void;
+  session: SelectionModeSession;
+}
+
+interface SelectionModeRuntimeListenerArgs {
+  hideHoverFrame: () => void;
+  session: SelectionModeSession;
+  setupListenerHandlers: SelectionModeRuntimePointerHandlers;
 }
 
 function attachPointerListeners(args: SelectionModeListenerArgs): Array<() => void> {
@@ -39,32 +43,29 @@ function attachPointerListeners(args: SelectionModeListenerArgs): Array<() => vo
 }
 
 function attachScrollListeners(args: SelectionModeListenerArgs): void {
-  args.setCleanupScrollListeners(
-    addScrollListenersToAllWindows(() => {
-      const currentState = args.currentState();
-      if (currentState === 'hover' || currentState === 'idle') {
-        args.hideHoverFrame();
-      }
-    })
-  );
+  args.session.cleanupScrollListeners = addScrollListenersToAllWindows(() => {
+    const currentState = args.session.currentState;
+    if (currentState === 'hover' || currentState === 'idle') {
+      args.hideHoverFrame();
+    }
+  });
 }
 
-export function setupSelectionModeEventListeners(args: SelectionModeListenerArgs): void {
+function setupSelectionModeEventListeners(args: SelectionModeListenerArgs): void {
   logSelectionModeRuntime('Attaching selection listeners');
   const cleanupListeners = attachPointerListeners(args);
   attachScrollListeners(args);
 
-  args.setCleanupEventListeners(() => {
+  args.session.cleanupEventListeners = () => {
     logSelectionModeRuntime('Cleaning selection listeners');
     cleanupListeners.forEach((cleanupListener) => {
       cleanupListener();
     });
-  });
+  };
 }
 
-export function setupSelectionModeRuntimeListeners(args: SelectionModeRuntimeActionsArgs): void {
+export function setupSelectionModeRuntimeListeners(args: SelectionModeRuntimeListenerArgs): void {
   setupSelectionModeEventListeners({
-    currentState: () => args.state.currentState,
     handleClick: args.setupListenerHandlers.handleClick,
     handleKeyDown: args.setupListenerHandlers.handleKeyDown,
     handleMouseDown: args.setupListenerHandlers.handleMouseDown,
@@ -72,7 +73,6 @@ export function setupSelectionModeRuntimeListeners(args: SelectionModeRuntimeAct
     handleMouseMove: args.setupListenerHandlers.handleMouseMove,
     handleMouseUp: args.setupListenerHandlers.handleMouseUp,
     hideHoverFrame: args.hideHoverFrame,
-    setCleanupEventListeners: args.setCleanupEventListeners,
-    setCleanupScrollListeners: args.setCleanupScrollListeners,
+    session: args.session,
   });
 }

@@ -3367,7 +3367,6 @@
         "apps/extension/src/content/selection/selection-mode/events/types.ts",
         "apps/extension/src/content/selection/selection-mode/index.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/actions/index.ts",
-        "apps/extension/src/content/selection/selection-mode/interaction/actions/types.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/cursor.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/frame/index.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/frame/resize.ts",
@@ -3382,9 +3381,6 @@
         "apps/extension/src/content/selection/selection-mode/runtime/capture-area.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/cleanup.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/composition.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/drag/drag.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/drag/element.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/drag/hover.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/index.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/extension-ui.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/index.ts",
@@ -3755,7 +3751,6 @@
         "apps/extension/src/content/selection/selection-mode/events/types.ts",
         "apps/extension/src/content/selection/selection-mode/index.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/actions/index.ts",
-        "apps/extension/src/content/selection/selection-mode/interaction/actions/types.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/cursor.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/frame/index.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/frame/resize.ts",
@@ -3770,9 +3765,6 @@
         "apps/extension/src/content/selection/selection-mode/runtime/capture-area.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/cleanup.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/composition.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/drag/drag.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/drag/element.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/drag/hover.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/index.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/extension-ui.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/index.ts",
@@ -14910,7 +14902,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
-        "contentHash": "b13c3e64405ad957e9443a7dcb3fb725bd308c9352fa8a144e21ac9c9829b187"
+        "contentHash": "b9ebda79347c5a19b5b7afd03744b8fe9007ffc3ec78fcebc64cb1c128371f64"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
@@ -14924,7 +14916,9 @@
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
-        "property:testFiles[6]"
+        "property:testFiles[6]",
+        "property:testFiles[7]",
+        "property:testFiles[8]"
       ]
     },
     {

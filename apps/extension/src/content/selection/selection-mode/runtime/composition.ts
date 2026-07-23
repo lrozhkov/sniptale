@@ -102,7 +102,12 @@ export function createSelectionModeRuntime(args: {
         enableCursor: () => enableSelectionModeCursor(args.session),
         prepareUi: () => uiRuntime.prepare(),
         session: args.session,
-        setupEventListeners: () => setupSelectionModeRuntimeListeners(runtimeArgs),
+        setupEventListeners: () =>
+          setupSelectionModeRuntimeListeners({
+            hideHoverFrame: runtimeArgs.hideHoverFrame,
+            session: args.session,
+            setupListenerHandlers: runtimeArgs.setupListenerHandlers,
+          }),
       }),
     isSelectionModeActive: () => isSelectionModeActiveApi(args.session.isActive),
   };

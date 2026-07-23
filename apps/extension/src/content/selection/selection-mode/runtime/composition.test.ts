@@ -2,8 +2,8 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
-import type { SelectionModeRuntimeActionsArgs } from '../interaction/actions/types';
 import { createSelectionModeSession } from '../session';
+import type { SelectionModeRuntimeActionsArgs } from './setup';
 
 const mocks = vi.hoisted(() => ({
   createEventHandlers: vi.fn(),
@@ -81,8 +81,6 @@ function createScenario() {
     getMaxSelectionWidth: vi.fn(() => 1280),
     hideHoverFrame: vi.fn(),
     minSelectionSize: 10,
-    setCleanupEventListeners: vi.fn(),
-    setCleanupScrollListeners: vi.fn(),
     setupListenerHandlers: handlers,
     showFinalFrame: vi.fn(),
     showHoverFrameDom: vi.fn(),
@@ -208,7 +206,11 @@ describe('selection-mode runtime composition', () => {
     expect(scenario.uiRuntime.createOverlayContainer).toHaveBeenCalledOnce();
     expect(scenario.uiRuntime.createHoverElements).toHaveBeenCalledOnce();
     expect(mocks.enableCursor).toHaveBeenCalledWith(scenario.session);
-    expect(mocks.setupRuntimeListeners).toHaveBeenCalledWith(scenario.runtimeArgs);
+    expect(mocks.setupRuntimeListeners).toHaveBeenCalledWith({
+      hideHoverFrame: scenario.runtimeArgs.hideHoverFrame,
+      session: scenario.session,
+      setupListenerHandlers: scenario.runtimeArgs.setupListenerHandlers,
+    });
     expect(mocks.disableSelectionModeApi).toHaveBeenCalledWith({
       cleanup: scenario.cleanup,
       session: scenario.session,

@@ -35,16 +35,9 @@ function createSetupFixture() {
 describe('selection-mode runtime setup', () => {
   it('exposes the exact session identity and listener bindings', () => {
     const { handlers, runtime, session } = createSetupFixture();
-    const eventCleanup = vi.fn();
-    const scrollCleanup = vi.fn();
 
     expect(runtime.state).toBe(session);
     expect(runtime.setupListenerHandlers).toEqual(handlers);
-
-    runtime.setCleanupEventListeners(eventCleanup);
-    runtime.setCleanupScrollListeners(scrollCleanup);
-    expect(session.cleanupEventListeners).toBe(eventCleanup);
-    expect(session.cleanupScrollListeners).toBe(scrollCleanup);
 
     session.currentSelection = { x: 1, y: 2, width: 3, height: 4 };
     expect(runtime.state.currentSelection).toEqual({ x: 1, y: 2, width: 3, height: 4 });

@@ -4,8 +4,8 @@ import {
   handleSelectionModeResizeMove,
   startSelectionModeDragSelection,
 } from '.';
-import type { SelectionModeRuntimeActionsArgs } from '../../interaction/actions/types';
 import { createSelectionModeDom } from '../../ui';
+import type { SelectionModeRuntimeActionsArgs } from '../setup';
 
 const originalDocument = globalThis.document;
 
@@ -40,8 +40,6 @@ function createRuntimeArgs(
     getMaxSelectionWidth: () => 500,
     hideHoverFrame: vi.fn(),
     minSelectionSize: 10,
-    setCleanupEventListeners: vi.fn(),
-    setCleanupScrollListeners: vi.fn(),
     setupListenerHandlers: {
       handleClick: vi.fn(),
       handleKeyDown: vi.fn(),
