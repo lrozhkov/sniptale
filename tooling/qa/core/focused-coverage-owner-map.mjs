@@ -3,7 +3,8 @@ import path from 'node:path';
 import { fromRelativePath, repoRoot } from './shared.mjs';
 import { FOCUSED_COVERAGE_OWNER_MAPPINGS } from './focused-coverage/maps/index.mjs';
 import { collectMappingProductionTargetViolations } from './focused-coverage/production-targets.mjs';
-import { createSourceFile, ts } from './structural-risk/ast.mjs';
+import { parseDeclarativeConstArrayModule } from './declarative-inventory.mjs';
+import { createSourceFile } from './structural-risk/ast.mjs';
 
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 export { FOCUSED_COVERAGE_OWNER_MAPPINGS };
@@ -43,75 +44,6 @@ function createMappingViolation(rule, file, message) {
   return { file, message, rule };
 }
 
-function unwrapInventoryExpression(expression) {
-  let current = expression;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isTypeAssertionExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
-
-function isStaticInventoryProperty(property) {
-  return (
-    ts.isPropertyAssignment(property) &&
-    !ts.isComputedPropertyName(property.name) &&
-    isStaticInventoryExpression(property.initializer)
-  );
-}
-
-function isStaticInventoryExpression(expression) {
-  const current = unwrapInventoryExpression(expression);
-  if (
-    ts.isStringLiteral(current) ||
-    ts.isNumericLiteral(current) ||
-    ts.isNoSubstitutionTemplateLiteral(current) ||
-    current.kind === ts.SyntaxKind.TrueKeyword ||
-    current.kind === ts.SyntaxKind.FalseKeyword ||
-    current.kind === ts.SyntaxKind.NullKeyword
-  ) {
-    return true;
-  }
-  if (ts.isArrayLiteralExpression(current)) {
-    return current.elements.every(
-      (element) => !ts.isSpreadElement(element) && isStaticInventoryExpression(element)
-    );
-  }
-  return (
-    ts.isObjectLiteralExpression(current) && current.properties.every(isStaticInventoryProperty)
-  );
-}
-
-function isExportedConstStatement(statement) {
-  return (
-    ts.isVariableStatement(statement) &&
-    statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ===
-      true &&
-    (statement.declarationList.flags & ts.NodeFlags.Const) !== 0
-  );
-}
-
-function isDeclarativeOwnerMappingModule(sourceFile) {
-  if (sourceFile.parseDiagnostics.length > 0 || sourceFile.statements.length !== 1) {
-    return false;
-  }
-  const [statement] = sourceFile.statements;
-  if (!isExportedConstStatement(statement) || statement.declarationList.declarations.length !== 1) {
-    return false;
-  }
-  const [declaration] = statement.declarationList.declarations;
-  return (
-    ts.isIdentifier(declaration.name) &&
-    declaration.initializer != null &&
-    ts.isArrayLiteralExpression(unwrapInventoryExpression(declaration.initializer)) &&
-    isStaticInventoryExpression(declaration.initializer)
-  );
-}
-
 export function collectFocusedCoverageOwnerMapInventoryViolations(
   files = [],
   { root = repoRoot } = {}
@@ -128,7 +60,7 @@ export function collectFocusedCoverageOwnerMapInventoryViolations(
       ];
     }
     const sourceFile = createSourceFile(file, fs.readFileSync(absolutePath, 'utf8'));
-    return isDeclarativeOwnerMappingModule(sourceFile)
+    return parseDeclarativeConstArrayModule(sourceFile) != null
       ? []
       : [
           createMappingViolation(

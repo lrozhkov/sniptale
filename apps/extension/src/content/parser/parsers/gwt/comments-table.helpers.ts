@@ -8,7 +8,7 @@ import {
   setSniptaleId,
 } from '../../dom-utils/dom-helpers';
 import type { TraversalContext } from '../types';
-import { extractFroalaContentSync } from './comments-froala.helpers';
+import { extractFroalaIframeContent } from './rich-text-iframe.helpers';
 
 function extractAuthorName(element: HTMLElement): string {
   const link = element.querySelector('a[__code="author"]') || element.querySelector('a');
@@ -46,7 +46,7 @@ function resolveCommentText(textEl: Element | null) {
       (textEl.querySelector('div[id^="iframe$"]') as HTMLElement | null));
 
   if (iframe || virtualContainer) {
-    const froalaContent = extractFroalaContentSync((iframe || virtualContainer) as HTMLElement);
+    const froalaContent = extractFroalaIframeContent((iframe || virtualContainer) as HTMLElement);
     if (froalaContent) {
       return { attachments: froalaContent.images, text: froalaContent.text };
     }

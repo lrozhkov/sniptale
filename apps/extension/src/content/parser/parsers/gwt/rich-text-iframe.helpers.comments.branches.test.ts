@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { extractFroalaContentSync } from './comments-froala.helpers';
+import { extractFroalaIframeContent } from './rich-text-iframe.helpers';
 
 function appendElement<K extends keyof HTMLElementTagNameMap>(
   parent: ParentNode,
@@ -23,14 +23,13 @@ function registerContentWindowFallbackTest() {
       className: 'fr-view',
       textContent: 'Контент из contentWindow',
     });
-    const iframe = {
-      src: '',
-      contentDocument: null,
-      contentWindow: { document: iframeDocument },
-      tagName: 'IFRAME',
-    } as unknown as HTMLIFrameElement;
+    const iframe = document.createElement('iframe');
+    Object.defineProperties(iframe, {
+      contentDocument: { configurable: true, value: null },
+      contentWindow: { configurable: true, value: { document: iframeDocument } },
+    });
 
-    expect(extractFroalaContentSync(iframe)).toEqual({
+    expect(extractFroalaIframeContent(iframe)).toEqual({
       images: [],
       text: 'Контент из contentWindow',
     });
@@ -39,14 +38,15 @@ function registerContentWindowFallbackTest() {
 
 function registerOuterCatchGuardTest() {
   it('returns null when iframe access throws before body extraction', () => {
-    const iframe = {
-      tagName: 'IFRAME',
-      get src() {
+    const iframe = document.createElement('iframe');
+    Object.defineProperty(iframe, 'src', {
+      configurable: true,
+      get() {
         throw new Error('broken src');
       },
-    } as unknown as HTMLIFrameElement;
+    });
 
-    expect(extractFroalaContentSync(iframe)).toBeNull();
+    expect(extractFroalaIframeContent(iframe)).toBeNull();
   });
 }
 

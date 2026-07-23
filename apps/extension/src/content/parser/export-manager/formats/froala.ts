@@ -1,7 +1,7 @@
 import type { FileResource } from '@sniptale/runtime-contracts/export';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { collectFroalaImages } from '../../dom-tree-parser/froala';
-import { generateFilename } from '../files/utils';
+import { generateFilename } from '../files/download-utils';
 import type { ExportDiagnosticsSource } from '../diagnostics/source';
 
 const logger = createLogger({ namespace: 'ContentExportManager' });

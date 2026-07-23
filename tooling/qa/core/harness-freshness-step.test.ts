@@ -10,6 +10,7 @@ import {
 const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs';
 const FOCUSED_OWNER_MAP_INVENTORY =
   'tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs';
+const INSTANCE_OWNERSHIP_INVENTORY = 'tooling/configs/qa/instance-ownership.data.json';
 
 it('validates machine-owned inventory without consulting a harness stamp', () => {
   const harnessStateAsserter = vi.fn();
@@ -65,6 +66,28 @@ it('owner-validates the exact coverage rollout inventory without consulting a ha
     status: 'ok',
     detail: 'data-only inventory owner validators passed',
   });
+  expect(harnessStateAsserter).not.toHaveBeenCalled();
+});
+
+it('owner-validates instance ownership inventory without consulting a harness stamp', () => {
+  const harnessStateAsserter = vi.fn();
+  const instanceOwnershipInventoryValidator = vi.fn(() => []);
+  const step = collectHarnessFreshnessStep(
+    {
+      harnessTargetFiles: [INSTANCE_OWNERSHIP_INVENTORY],
+      harnessInventoryTargetFiles: [INSTANCE_OWNERSHIP_INVENTORY],
+      harnessVerificationTargetFiles: [],
+    },
+    harnessStateAsserter,
+    'qa:checkpoint',
+    (context) => collectHarnessInventoryViolations(context, { instanceOwnershipInventoryValidator })
+  );
+
+  expect(step).toMatchObject({
+    status: 'ok',
+    detail: 'data-only inventory owner validators passed',
+  });
+  expect(instanceOwnershipInventoryValidator).toHaveBeenCalledOnce();
   expect(harnessStateAsserter).not.toHaveBeenCalled();
 });
 

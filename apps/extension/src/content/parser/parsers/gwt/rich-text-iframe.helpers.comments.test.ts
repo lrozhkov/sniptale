@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { extractFroalaContentSync } from './comments-froala.helpers';
+import { extractFroalaIframeContent } from './rich-text-iframe.helpers';
 
 function appendElement<K extends keyof HTMLElementTagNameMap>(
   parent: ParentNode,
@@ -49,7 +49,7 @@ function registerVirtualIframeExtractionTest() {
     });
     appendRichTextImage(editable, 'abc123');
 
-    const result = extractFroalaContentSync(container);
+    const result = extractFroalaIframeContent(container);
 
     expect(result).toEqual({
       images: [
@@ -81,7 +81,7 @@ function registerIframeDocumentExtractionTest() {
       appendRichTextImage(editable, 'xyz789');
     });
 
-    const result = extractFroalaContentSync(iframe);
+    const result = extractFroalaIframeContent(iframe);
 
     expect(result).toEqual({
       images: [
@@ -100,7 +100,7 @@ function registerCrossOriginGuardTest() {
     const iframe = document.createElement('iframe');
     iframe.src = 'https://external.example/editor';
 
-    expect(extractFroalaContentSync(iframe)).toBeNull();
+    expect(extractFroalaIframeContent(iframe)).toBeNull();
   });
 }
 
@@ -111,7 +111,7 @@ function registerVirtualContainerHeuristicTest() {
       textContent: 'Текст без специальных вложений',
     });
 
-    const result = extractFroalaContentSync(container);
+    const result = extractFroalaIframeContent(container);
 
     expect(result).toEqual({
       images: [],
@@ -129,7 +129,7 @@ function registerVirtualContainerSourceMarkerTest() {
       textContent: 'Контент из источника iframe',
     });
 
-    expect(extractFroalaContentSync(container)).toEqual({
+    expect(extractFroalaIframeContent(container)).toEqual({
       images: [],
       text: 'Контент из источника iframe',
     });
@@ -148,7 +148,7 @@ function registerFallbackImageNameAndSourceHeuristicTests() {
     const image = appendElement(editable, 'img');
     image.src = 'https://example.test/file?uuid=file$-broken';
 
-    const result = extractFroalaContentSync(container);
+    const result = extractFroalaIframeContent(container);
 
     expect(result).toEqual({
       images: [],
@@ -170,7 +170,7 @@ function registerHiddenContentPreservationTest() {
       textContent: 'скрытый',
     });
 
-    expect(extractFroalaContentSync(container)).toEqual({
+    expect(extractFroalaIframeContent(container)).toEqual({
       images: [],
       text: 'Комментарий скрытый',
     });
@@ -186,7 +186,7 @@ function registerIframeBodyGuardTest() {
       value: { body: null },
     });
 
-    expect(extractFroalaContentSync(iframe)).toBeNull();
+    expect(extractFroalaIframeContent(iframe)).toBeNull();
   });
 }
 

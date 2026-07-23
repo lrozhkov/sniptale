@@ -1,11 +1,6 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
-import {
-  closeModal,
-  delay,
-  EXPORT_SELECTORS,
-  isValidDownloadUrl,
-  waitForElement,
-} from '../files/utils';
+import { closeModal, delay, EXPORT_SELECTORS, waitForElement } from '../files/modal-utils';
+import { isValidDownloadUrl } from '../files/download-utils';
 import { clickHostPageElement } from '../../host-page-click';
 
 const logger = createLogger({ namespace: 'ContentExportManager' });

@@ -1666,6 +1666,16 @@
       "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
     },
     {
+      "path": "tooling/configs/qa/instance-ownership.data.json",
+      "consumers": [
+        "tooling/qa/core/qa-scope.mjs",
+        "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs"
+      ],
+      "disposition": "adapt",
+      "owner": "qa-platform",
+      "rationale": "This inert scope inventory is validated before use and against its HEAD census."
+    },
+    {
       "path": "tooling/configs/qa/jscpd-baseline.json",
       "consumers": [
         "tooling/qa/core/technical-debt-enforced-sources.mjs",

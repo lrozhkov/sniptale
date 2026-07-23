@@ -13,6 +13,10 @@ import {
   collectFocusedCoverageOwnerMapInventoryViolations,
   collectFocusedCoverageOwnerMappingViolations,
 } from './focused-coverage-owner-map.mjs';
+import {
+  collectInstanceOwnershipInventoryViolations,
+  INSTANCE_OWNERSHIP_INVENTORY,
+} from './verify-instance-ownership.inventory-owner.mjs';
 
 const TECHNICAL_DEBT_INVENTORY = 'tooling/configs/qa/technical-debt.data.json';
 const OSS_RELEASE_CONSUMER_INVENTORY = 'tooling/configs/qa/oss-release-consumers.data.json';
@@ -24,6 +28,7 @@ export function collectHarnessInventoryViolations(
     coverageInventoryValidator = collectCoverageRolloutInventoryViolations,
     focusedCoverageOwnerMapInventoryValidator = collectFocusedCoverageOwnerMapInventoryViolations,
     focusedCoverageOwnerMapValidator = collectFocusedCoverageOwnerMappingViolations,
+    instanceOwnershipInventoryValidator = collectInstanceOwnershipInventoryViolations,
     ossInventoryValidator = runOssReleaseSurfaceCheck,
     technicalDebtInventoryValidator = verifyTechnicalDebtReport,
   } = {}
@@ -53,6 +58,9 @@ export function collectHarnessInventoryViolations(
           file: COVERAGE_ROLLOUT_INVENTORY,
           message,
         }))
+      : []),
+    ...(inventoryTargets.has(INSTANCE_OWNERSHIP_INVENTORY)
+      ? instanceOwnershipInventoryValidator()
       : []),
     ...(focusedCoverageOwnerMapTargets.length > 0
       ? [

@@ -47,6 +47,12 @@ it('separates generated inventories from executable harness changes', async () =
       )
     ).toBe(false);
     expect(
+      module.isHarnessInventoryOnlyFile('tooling/configs/qa/instance-ownership.data.json')
+    ).toBe(true);
+    expect(
+      module.isHarnessVerificationQaFile('tooling/qa/core/verify-instance-ownership.data.mjs')
+    ).toBe(true);
+    expect(
       module.isHarnessVerificationQaFile(
         'tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs'
       )

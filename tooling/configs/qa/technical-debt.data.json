@@ -2843,7 +2843,6 @@
         "apps/extension/src/content/parser/export-manager/files/index.ts",
         "apps/extension/src/content/parser/export-manager/files/modal-utils.ts",
         "apps/extension/src/content/parser/export-manager/files/naming.ts",
-        "apps/extension/src/content/parser/export-manager/files/utils.ts",
         "apps/extension/src/content/parser/export-manager/formats/data.ts",
         "apps/extension/src/content/parser/export-manager/formats/froala.ts",
         "apps/extension/src/content/parser/export-manager/formats/markdown.ts",
@@ -2944,7 +2943,6 @@
         "apps/extension/src/content/parser/parsers/gwt/attr-list-wide.helpers.ts",
         "apps/extension/src/content/parser/parsers/gwt/attr-list.helpers.ts",
         "apps/extension/src/content/parser/parsers/gwt/attr-list.ts",
-        "apps/extension/src/content/parser/parsers/gwt/comments-froala.helpers.ts",
         "apps/extension/src/content/parser/parsers/gwt/comments-table.helpers.ts",
         "apps/extension/src/content/parser/parsers/gwt/comments.ts",
         "apps/extension/src/content/parser/parsers/gwt/index.ts",
@@ -3574,7 +3572,6 @@
         "apps/extension/src/content/parser/export-manager/files/index.ts",
         "apps/extension/src/content/parser/export-manager/files/modal-utils.ts",
         "apps/extension/src/content/parser/export-manager/files/naming.ts",
-        "apps/extension/src/content/parser/export-manager/files/utils.ts",
         "apps/extension/src/content/parser/export-manager/formats/data.ts",
         "apps/extension/src/content/parser/export-manager/formats/froala.ts",
         "apps/extension/src/content/parser/export-manager/formats/markdown.ts",
@@ -3651,7 +3648,6 @@
         "apps/extension/src/content/parser/parsers/gwt/attr-list-wide.helpers.ts",
         "apps/extension/src/content/parser/parsers/gwt/attr-list.helpers.ts",
         "apps/extension/src/content/parser/parsers/gwt/attr-list.ts",
-        "apps/extension/src/content/parser/parsers/gwt/comments-froala.helpers.ts",
         "apps/extension/src/content/parser/parsers/gwt/comments-table.helpers.ts",
         "apps/extension/src/content/parser/parsers/gwt/comments.ts",
         "apps/extension/src/content/parser/parsers/gwt/index.ts",
@@ -16190,7 +16186,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/git-head-sources.mjs",
-        "contentHash": "fbb9e61f6ccd7acb54a670130bde90561b1ccb41ce6a27c539e8609fe2a080d6"
+        "contentHash": "1ac91786763a2f03ba25317e09dfe4ab2f757da6527f3f52257e939c3bdff4b0"
       },
       "consumers": [
         "tooling/qa/core/git-head-sources.mjs",
@@ -16199,6 +16195,7 @@
         "tooling/qa/core/verify-build.deleted-closure.mjs",
         "tooling/qa/core/verify-build.deleted-dead-export.mjs",
         "tooling/qa/core/verify-domain-fixture-realism.mjs",
+        "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs",
         "tooling/qa/core/verify-interface-surfaces.mjs",
         "tooling/qa/core/verify-interface-surfaces.return-bags.helpers.mjs",
         "tooling/qa/core/verify-structural-risk.mjs",
@@ -17695,7 +17692,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "4e28fcf130a59f2c055fceb17a22570efbe61a352f2d49898567286b7901ff82"
+        "contentHash": "2a1cc38dcf75146e4f9ea8af113b89f67f1bc46d1912e292b89d81f4bde962ba"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -18850,6 +18847,7 @@
         "tooling/qa/core/verify-gitleaks.test.ts",
         "tooling/qa/core/verify-harness.execution.test.ts",
         "tooling/qa/core/verify-harness.state.helpers.test.ts",
+        "tooling/qa/core/verify-instance-ownership.inventory-owner.test.ts",
         "tooling/qa/core/verify-jscpd.baseline.test.ts",
         "tooling/qa/core/verify-jscpd.policy.test.ts",
         "tooling/qa/core/verify-jscpd.test.ts",
@@ -20371,7 +20369,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-instance-ownership.data.mjs",
-        "contentHash": "78e1cf185b9665ebf0b4eda653e2f645be785568392949a0e84ffc321d47b865"
+        "contentHash": "38212295f8c454f831bb4b276e2416eb71e87838c77a2a96f7e44ea75b4bb303"
       },
       "consumers": [
         "tooling/qa/core/verify-instance-ownership.data.mjs",
@@ -20380,19 +20378,35 @@
       ],
       "surfaces": [
         "binding:OWNERSHIP_FACADE_FILES",
-        "binding:OWNERSHIP_STATE_FILES",
-        "binding:OWNERSHIP_WAVES",
-        "property:files",
-        "property:files[1]",
-        "property:files[10]",
-        "property:files[2]",
-        "property:files[3]",
-        "property:files[4]",
-        "property:files[5]",
-        "property:files[6]",
-        "property:files[7]",
-        "property:files[8]",
-        "property:files[9]"
+        "binding:OWNERSHIP_STATE_FILES"
+      ]
+    },
+    {
+      "id": "policy.source.verify-instance-ownership-inventory-owner-mjs.4ff8aca0fd",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs",
+        "contentHash": "5b3246e533bcddcef47deeb2728b5cc5b756a88572d138241099ceee64dacd75"
+      },
+      "consumers": [
+        "tooling/qa/core/harness-freshness-step.mjs",
+        "tooling/qa/core/verify-instance-ownership.data.mjs",
+        "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs",
+        "tooling/qa/core/verify-instance-ownership.inventory-owner.test.ts"
+      ],
+      "surfaces": [
+        "binding:OWNERSHIP_RULES",
+        "binding:WAVE_KEYS",
+        "property:parseInventoryJson/violations",
+        "property:parseInventoryJson/waves",
+        "property:readCurrentInventory/violations",
+        "property:readCurrentInventory/waves",
+        "property:validateInventoryValue/violations",
+        "property:validateInventoryValue/waves"
       ]
     },
     {

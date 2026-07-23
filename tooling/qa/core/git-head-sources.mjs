@@ -41,7 +41,10 @@ export function listHeadFilesUnderPath(relativePath, options = {}) {
   );
 }
 
-export function readHeadFileTexts(relativePaths, { spawnSyncImpl = spawnSync } = {}) {
+export function readHeadFileTexts(
+  relativePaths,
+  { root = process.cwd(), spawnSyncImpl = spawnSync } = {}
+) {
   if (relativePaths.length === 0) {
     return new Map();
   }
@@ -49,7 +52,7 @@ export function readHeadFileTexts(relativePaths, { spawnSyncImpl = spawnSync } =
   const sources = new Map();
   for (const relativePath of relativePaths) {
     const result = spawnSyncImpl(resolveGitExecutable(), ['show', `HEAD:${relativePath}`], {
-      cwd: process.cwd(),
+      cwd: root,
       encoding: 'utf8',
       maxBuffer: GIT_BATCH_MAX_BUFFER,
     });

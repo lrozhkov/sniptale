@@ -16,6 +16,7 @@ const HARNESS_ROOT_PATTERN = /^tooling\//u;
 const HARNESS_INVENTORY_ONLY_FILES = new Set([
   'tooling/configs/qa/oss-release-consumers.data.json',
   'tooling/configs/qa/technical-debt.data.json',
+  'tooling/configs/qa/instance-ownership.data.json',
   'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs',
 ]);
 const FOCUSED_COVERAGE_OWNER_MAP_PREFIX = 'tooling/qa/core/focused-coverage/maps/';
