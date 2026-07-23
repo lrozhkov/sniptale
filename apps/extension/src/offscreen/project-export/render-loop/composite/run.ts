@@ -1,21 +1,21 @@
-import { type LoadedImagesMap } from '../../../renderer';
-import { waitForDelay } from '../../../runtime';
-import { resolveProjectExportRange } from '../../../../../features/video/project/export/range';
-import { createVideoCompositionTimelineIndex } from '../../../../../features/video/composition/timeline/frame/index';
-import { type VideoProjectExportSettings } from '../../../../../features/video/project/types/export';
-import { type VideoProject } from '../../../../../features/video/project/types/model';
+import { type LoadedImagesMap } from '../../renderer';
+import { waitForDelay } from '../../runtime';
+import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
+import { createVideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
+import { type VideoProjectExportSettings } from '../../../../features/video/project/types/export';
+import { type VideoProject } from '../../../../features/video/project/types/model';
 import {
   getRenderLoopCurrentTime,
   getRenderLoopDuration,
   getRenderLoopFps,
   getRenderLoopTotalFrames,
-} from '../../shared/timing';
-import { pauseRenderLoopMediaElements } from '../../shared/media';
+} from '../shared/timing';
+import { pauseRenderLoopMediaElements } from '../shared/media';
 import {
   createOffscreenProjectEffectRuntime,
   type OffscreenProjectEffectRuntime,
-} from '../../../effect-runtime';
-import type { RenderLoopJobState } from '../../shared/types';
+} from '../../effect-runtime';
+import type { RenderLoopJobState } from '../shared/types';
 import { renderCompositeFrame } from './frame';
 
 interface CompositeLoopFrameArgs {

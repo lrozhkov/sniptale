@@ -115,9 +115,21 @@ export const VIDEO_PROJECT_EXPORT_OWNER_MAPPINGS = [
       'apps/extension/src/offscreen/project-export/renderer/clip.test.ts',
       'apps/extension/src/offscreen/project-export/renderer/frame.locked-overlays.motion-blur.test.ts',
       'apps/extension/src/offscreen/project-export/renderer/frame.locked-overlays.test.ts',
-      'apps/extension/src/offscreen/project-export/render-loop/composite/run/frame.test.ts',
+      'apps/extension/src/offscreen/project-export/render-loop/composite/frame.test.ts',
       'apps/extension/src/offscreen/project-export/render-loop/frame-driven/render/frame.test.ts',
       'apps/extension/src/offscreen/project-export/renderer/frame.test.ts',
+    ],
+  },
+  {
+    exclusive: true,
+    owner: 'video-project-export-composite-render-loop',
+    productionFile: 'apps/extension/src/offscreen/project-export/render-loop/composite/run.ts',
+    reason:
+      'Composite render-loop orchestration is covered by owner-local timing and lifecycle proof plus the export scope/service contract suites.',
+    testFiles: [
+      'apps/extension/src/offscreen/project-export/render-loop/composite/run.lifecycle.test.ts',
+      'apps/extension/src/offscreen/project-export/scope.test.ts',
+      'apps/extension/src/offscreen/project-export/service/lifecycle.test.ts',
     ],
   },
   {

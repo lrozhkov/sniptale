@@ -4,33 +4,42 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
   drawProjectFrameMock,
+  disposeEffectRuntimeCompositionMock,
   renderOffscreenProjectEffectFramesMock,
   sendCompositeRenderProgressMock,
   syncClipPlaybackMock,
 } = vi.hoisted(() => ({
   drawProjectFrameMock: vi.fn(),
+  disposeEffectRuntimeCompositionMock: vi.fn(),
   renderOffscreenProjectEffectFramesMock: vi.fn(),
   sendCompositeRenderProgressMock: vi.fn(),
   syncClipPlaybackMock: vi.fn(),
 }));
 
-vi.mock('../../../renderer', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../renderer')>()),
+vi.mock('../../renderer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../renderer')>()),
   drawProjectFrame: drawProjectFrameMock,
 }));
 
-vi.mock('../../../media', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../media')>()),
+vi.mock('../../media', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../media')>()),
   syncClipPlayback: syncClipPlaybackMock,
 }));
 
-vi.mock('../../../effect-runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../effect-runtime')>()),
+vi.mock('../../effect-runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../effect-runtime')>()),
   renderOffscreenProjectEffectFrames: renderOffscreenProjectEffectFramesMock,
 }));
 
-vi.mock('../../progress/index', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../progress/index')>()),
+vi.mock('../../../../features/video/composition/effect-runtime', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../features/video/composition/effect-runtime')
+  >()),
+  disposeEffectRuntimeComposition: disposeEffectRuntimeCompositionMock,
+}));
+
+vi.mock('../progress/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../progress/index')>()),
   sendFrameDrivenProgress: vi.fn(),
   sendCompositeRenderProgress: sendCompositeRenderProgressMock,
 }));
@@ -38,10 +47,10 @@ import {
   VideoExportFormat,
   VideoExportQualityPreset,
   type VideoProjectExportSettings,
-} from '../../../../../features/video/project/types';
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
-import type { LoadedImagesMap } from '../../../renderer';
-import type { RenderLoopJobState } from '../../shared';
+} from '../../../../features/video/project/types';
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import type { LoadedImagesMap } from '../../renderer';
+import type { RenderLoopJobState } from '../shared';
 import { renderCompositeFrame } from './frame';
 
 function createProject(duration = 1) {
@@ -175,6 +184,36 @@ it('renders effect frames through the reusable runtime when one is provided', as
     expect.any(Map),
     { effectRuntimeFrames }
   );
+  expect(disposeEffectRuntimeCompositionMock).toHaveBeenCalledWith(effectRuntimeFrames);
+});
+
+it('disposes effect frames when drawing the composite frame fails', async () => {
+  const effectRuntimeFrames = { framesByTime: new Map(), overlayFrames: new Map() };
+  const runtime = {
+    dispose: vi.fn(),
+    renderProjectFrames: vi.fn().mockResolvedValue(effectRuntimeFrames),
+  };
+  drawProjectFrameMock.mockImplementationOnce(() => {
+    throw new Error('draw failed');
+  });
+
+  await expect(
+    renderCompositeFrame({
+      context: createRenderContext(),
+      currentTime: 0.25,
+      frameIndex: 0,
+      job: createJob(),
+      loadedImages: createLoadedImages(),
+      lastProgressSent: 0,
+      effectRuntime: runtime,
+      project: createProject(1),
+      settings: createSettings(),
+      totalFrames: 4,
+    })
+  ).rejects.toThrow('draw failed');
+
+  expect(disposeEffectRuntimeCompositionMock).toHaveBeenCalledWith(effectRuntimeFrames);
+  expect(sendCompositeRenderProgressMock).not.toHaveBeenCalled();
 });
 
 it('rejects cancelled composite frames before touching playback', async () => {

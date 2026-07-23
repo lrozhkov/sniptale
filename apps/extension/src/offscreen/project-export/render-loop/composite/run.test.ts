@@ -33,7 +33,7 @@ import {
   VideoExportQualityPreset,
   VideoTimelinePlacementMode,
 } from '../../../../features/video/project/types';
-import { runCompositeRenderLoop } from './run/loop';
+import { runCompositeRenderLoop } from './run';
 
 function createProject(duration = 1) {
   return {

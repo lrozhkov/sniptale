@@ -1,15 +1,15 @@
-import { type LoadedImagesMap, drawProjectFrame } from '../../../renderer';
-import type { VideoCompositionTimelineIndex } from '../../../../../features/video/composition/timeline/frame/index';
-import { syncClipPlayback } from '../../../media';
-import { type VideoProjectExportSettings } from '../../../../../features/video/project/types/export';
-import { type VideoProject } from '../../../../../features/video/project/types/model';
-import type { RenderLoopJobState } from '../../shared/index';
+import { type LoadedImagesMap, drawProjectFrame } from '../../renderer';
+import type { VideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
+import { syncClipPlayback } from '../../media';
+import { type VideoProjectExportSettings } from '../../../../features/video/project/types/export';
+import { type VideoProject } from '../../../../features/video/project/types/model';
+import type { RenderLoopJobState } from '../shared/index';
 import {
   renderOffscreenProjectEffectFrames,
   type OffscreenProjectEffectRuntime,
-} from '../../../effect-runtime';
-import { disposeEffectRuntimeComposition } from '../../../../../features/video/composition/effect-runtime';
-import { sendCompositeRenderProgress } from '../../progress/index';
+} from '../../effect-runtime';
+import { disposeEffectRuntimeComposition } from '../../../../features/video/composition/effect-runtime';
+import { sendCompositeRenderProgress } from '../progress/index';
 
 type RenderCompositeFrameArgs = {
   context: CanvasRenderingContext2D;

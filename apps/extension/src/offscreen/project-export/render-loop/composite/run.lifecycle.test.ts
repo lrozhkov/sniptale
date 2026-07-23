@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
@@ -22,25 +24,25 @@ const {
   waitForDelayMock: vi.fn(),
 }));
 
-vi.mock('../../shared/media', () => ({
+vi.mock('../shared/media', () => ({
   pauseRenderLoopMediaElements: pauseRenderLoopMediaElementsMock,
 }));
 
-vi.mock('../../shared/timing', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../shared/timing')>()),
+vi.mock('../shared/timing', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/timing')>()),
   getRenderLoopCurrentTime: getRenderLoopCurrentTimeMock,
   getRenderLoopDuration: getRenderLoopDurationMock,
   getRenderLoopFps: getRenderLoopFpsMock,
   getRenderLoopTotalFrames: getRenderLoopTotalFramesMock,
 }));
 
-vi.mock('../../../runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../runtime')>()),
+vi.mock('../../runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime')>()),
   waitForDelay: waitForDelayMock,
 }));
 
-vi.mock('../../../effect-runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../effect-runtime')>()),
+vi.mock('../../effect-runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../effect-runtime')>()),
   createOffscreenProjectEffectRuntime: createEffectRuntimeMock,
 }));
 
@@ -48,10 +50,57 @@ vi.mock('./frame', () => ({
   renderCompositeFrame: renderCompositeFrameMock,
 }));
 
-import { runCompositeRenderLoop } from './orchestrate';
+import {
+  VideoExportFormat,
+  VideoExportQualityPreset,
+  type VideoProjectExportSettings,
+} from '../../../../features/video/project/types';
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import type { LoadedImagesMap } from '../../renderer';
+import type { RenderLoopJobState } from '../shared';
+import { runCompositeRenderLoop } from './run';
 
 const RENDERS_COMPOSITE_FRAMES_CASE =
   'renders composite frames in sequence, forwards the abort signal, and reuses the last progress timestamp';
+
+function createProject(duration = 3) {
+  return { ...createEmptyVideoProject('Project', 1280, 720), duration };
+}
+
+function createSettings(
+  overrides: Partial<VideoProjectExportSettings> = {}
+): VideoProjectExportSettings {
+  return {
+    width: 1280,
+    height: 720,
+    fps: 2,
+    quality: VideoExportQualityPreset.BALANCED,
+    format: VideoExportFormat.WEBM,
+    downloadAfterExport: true,
+    ...overrides,
+  };
+}
+
+function createJob(cancelled = false): RenderLoopJobState {
+  return {
+    cancelled,
+    jobId: 'job-1',
+    clipMediaElements: new Map(),
+    clipAudioNodes: new Map(),
+  };
+}
+
+function createLoadedImages(): LoadedImagesMap {
+  return {};
+}
+
+function createRenderContext(): CanvasRenderingContext2D {
+  const context = document.createElement('canvas').getContext('2d');
+  if (!context) {
+    throw new Error('Expected test canvas context.');
+  }
+  return context;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -76,15 +125,18 @@ it(RENDERS_COMPOSITE_FRAMES_CASE, async () => {
   const controller = new AbortController();
 
   await runCompositeRenderLoop(
-    { cancelled: false } as never,
-    { duration: 3 } as never,
-    { fps: 2 } as never,
-    {} as CanvasRenderingContext2D,
-    {} as never,
+    createJob(),
+    createProject(),
+    createSettings(),
+    createRenderContext(),
+    createLoadedImages(),
     controller.signal
   );
 
   expect(pauseRenderLoopMediaElementsMock).toHaveBeenCalledOnce();
+  expect(pauseRenderLoopMediaElementsMock.mock.invocationCallOrder[0]).toBeLessThan(
+    renderCompositeFrameMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+  );
   expect(renderCompositeFrameMock.mock.calls.map(([args]) => args.lastProgressSent)).toEqual([
     0, 0, 1234,
   ]);
@@ -103,11 +155,11 @@ it(RENDERS_COMPOSITE_FRAMES_CASE, async () => {
 
 it('offsets frame times by the selected export range start', async () => {
   await runCompositeRenderLoop(
-    { cancelled: false } as never,
-    { duration: 5 } as never,
-    { fps: 2, rangeEndSeconds: 3.5, rangeStartSeconds: 1 } as never,
-    {} as CanvasRenderingContext2D,
-    {} as never
+    createJob(),
+    createProject(5),
+    createSettings({ rangeEndSeconds: 3.5, rangeStartSeconds: 1 }),
+    createRenderContext(),
+    createLoadedImages()
   );
 
   expect(getRenderLoopDurationMock).toHaveBeenCalledWith(2.5);
@@ -119,15 +171,33 @@ it('offsets frame times by the selected export range start', async () => {
 it('aborts before rendering when the job has already been cancelled', async () => {
   await expect(
     runCompositeRenderLoop(
-      { cancelled: true } as never,
-      { duration: 3 } as never,
-      { fps: 2 } as never,
-      {} as CanvasRenderingContext2D,
-      {} as never
+      createJob(true),
+      createProject(),
+      createSettings(),
+      createRenderContext(),
+      createLoadedImages()
     )
   ).rejects.toThrow('PROJECT_EXPORT_CANCELLED');
 
   expect(pauseRenderLoopMediaElementsMock).toHaveBeenCalledOnce();
   expect(renderCompositeFrameMock).not.toHaveBeenCalled();
+  expect(waitForDelayMock).not.toHaveBeenCalled();
+  expect(effectRuntimeDisposeMock).toHaveBeenCalledOnce();
+});
+
+it('disposes the reusable effect runtime when frame rendering fails', async () => {
+  renderCompositeFrameMock.mockReset().mockRejectedValueOnce(new Error('render failed'));
+
+  await expect(
+    runCompositeRenderLoop(
+      createJob(),
+      createProject(),
+      createSettings(),
+      createRenderContext(),
+      createLoadedImages()
+    )
+  ).rejects.toThrow('render failed');
+
+  expect(effectRuntimeDisposeMock).toHaveBeenCalledOnce();
   expect(waitForDelayMock).not.toHaveBeenCalled();
 });
