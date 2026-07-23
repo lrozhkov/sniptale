@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function */
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,10 +23,13 @@ vi.mock('./overlay.frame', () => ({
   applyQuickEditFrameRect: eventMocks.applyFrameRectMock,
 }));
 
-vi.mock('./events', () => ({
+vi.mock('./keydown', () => ({
+  handleQuickEditKeyDown: eventMocks.keyDownMock,
+}));
+
+vi.mock('./pointer', () => ({
   handleQuickEditBlur: eventMocks.blurMock,
   handleQuickEditClick: eventMocks.clickMock,
-  handleQuickEditKeyDown: eventMocks.keyDownMock,
   handleQuickEditMouseLeave: eventMocks.mouseLeaveMock,
   handleQuickEditMouseMove: eventMocks.mouseMoveMock,
   handleQuickEditOutsideClick: eventMocks.outsideClickMock,

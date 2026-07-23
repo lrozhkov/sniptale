@@ -1,5 +1,4 @@
-import type { enableQuickEditCursor } from './helpers';
-import { disableQuickEditCursor } from './helpers';
+import { disableQuickEditCursor, type enableQuickEditCursor } from './cursor';
 import type { QuickEditModeHelpersProps } from './controller.contracts';
 import { createQuickEditEnableGuards } from './controller-guards';
 

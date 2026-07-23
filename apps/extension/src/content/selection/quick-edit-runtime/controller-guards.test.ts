@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createQuickEditEnableGuards, createQuickEditModeHandlers } from './controller.helpers';
+import { createQuickEditEnableGuards, createQuickEditModeHandlers } from './controller-guards';
 
-describe('quick-edit-runtime controller helpers', () => {
+describe('quick-edit-runtime controller guards', () => {
   it('enables quick edit mode only once per active session', () => {
     let isQuickEditMode = false;
     const guards = createQuickEditEnableGuards({

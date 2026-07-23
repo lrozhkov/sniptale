@@ -7,15 +7,21 @@ const controllerMocks = vi.hoisted(() => ({
   createModeHelpers: vi.fn(),
 }));
 
-vi.mock('./controller.helpers', () => ({
+vi.mock('./controller-guards', () => ({
   createQuickEditModeHandlers: controllerMocks.createModeHandlers,
+}));
+
+vi.mock('./controller-disable', () => ({
   createQuickEditModeHelpers: controllerMocks.createModeHelpers,
+}));
+
+vi.mock('./controller-listeners', () => ({
   createQuickEditModeListenerProps: controllerMocks.createListenerProps,
   createQuickEditModeListenerRegistration: controllerMocks.createListenerRegistration,
 }));
 
 import { createQuickEditModeToggles } from './controller';
-import { createQuickEditOverlayState } from './helpers';
+import { createQuickEditOverlayState } from './overlay.state';
 
 beforeEach(() => {
   controllerMocks.createListenerProps.mockReset();

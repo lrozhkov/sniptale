@@ -286,6 +286,33 @@ it('forecasts the full-suite fallback for a deleted owner without surviving proo
   expect(report.buildScopeForecast[0]).toContain('selected unit-test scope=full-suite');
 });
 
+it('uses the full diff for build forecasting while behavioral hints stay diff-filtered', async () => {
+  const root = createTempRoot('guardrail-build-full-diff-');
+  const deleted = 'apps/extension/src/content/selection/example/events.ts';
+  const owner = 'apps/extension/src/content/selection/example/runtime.events.ts';
+  const ownerTest = 'apps/extension/src/content/selection/example/runtime.events.test.ts';
+  writeFile(root, owner, 'export const createRuntimeEvents = () => ({});\n');
+  writeFile(root, ownerTest, "it('covers runtime events', () => {});\n");
+
+  const report = await collectReport(root, {
+    targetFiles: [deleted, ownerTest],
+    codeFiles: [ownerTest],
+    buildScopeContext: {
+      targetFiles: [deleted, owner, ownerTest],
+      codeFiles: [owner, ownerTest],
+      addedFiles: [],
+    },
+    buildScopeOptions: {
+      deletedSuccessorResolver: () => new Map([[deleted, [owner]]]),
+      ownerTestResolver: (file) => (file === owner ? [ownerTest] : []),
+    },
+  });
+
+  expect(report.buildScopeForecast[0]).toContain('graph-closed successor owner proof');
+  expect(report.buildScopeForecast[0]).not.toContain('full product test suite');
+  expect(report.clusters).toEqual(['apps/extension/src=2']);
+});
+
 it('reports product proof risk checklist without test-size hints', async () => {
   const root = createTempRoot('guardrail-product-proof-risk-');
   writeProductProofRiskFixture(root);

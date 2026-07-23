@@ -1,5 +1,5 @@
 import type { EditableElement } from '../../../features/highlighter/contracts';
-import { createQuickEditOverlayState } from './helpers';
+import { createQuickEditOverlayState } from './overlay.state';
 import { createQuickEditModeToggles } from './controller';
 import { createQuickEditDocumentMode } from './document-mode';
 import { createQuickEditEditingActions } from './editing';

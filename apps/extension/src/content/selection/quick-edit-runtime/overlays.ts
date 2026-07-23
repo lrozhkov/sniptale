@@ -1,17 +1,21 @@
-import type { QuickEditOverlayState } from './helpers';
+import {
+  ensureQuickEditBlockingOverlay,
+  hideQuickEditBlockingOverlay,
+  removeQuickEditBlockingOverlay,
+  showQuickEditBlockingOverlay,
+  updateQuickEditBlockingOverlayShape,
+} from './overlay.blocking';
+import {
+  ensureQuickEditHoverOverlay,
+  hideQuickEditHoverOverlay,
+  removeQuickEditHoverOverlay,
+  showQuickEditHoverOverlay,
+} from './overlay.hover';
 import {
   disconnectQuickEditResizeObserver,
-  ensureQuickEditBlockingOverlay,
-  ensureQuickEditHoverOverlay,
-  hideQuickEditBlockingOverlay,
-  hideQuickEditHoverOverlay,
-  removeQuickEditBlockingOverlay,
-  removeQuickEditHoverOverlay,
   setupQuickEditResizeObserver,
-  showQuickEditBlockingOverlay,
-  showQuickEditHoverOverlay,
-  updateQuickEditBlockingOverlayShape,
-} from './helpers';
+  type QuickEditOverlayState,
+} from './overlay.state';
 
 interface QuickEditOverlayActions {
   createHoverOverlay: () => void;

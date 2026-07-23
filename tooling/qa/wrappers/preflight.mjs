@@ -182,6 +182,11 @@ export function collectPreflightReport({ files = [] } = {}) {
     addedFiles: context.addedFiles,
     jsLikeFiles: context.jsLikeFiles,
     untrackedFiles: context.untrackedFiles,
+    buildScopeContext: {
+      targetFiles: collectedContext.targetFiles,
+      codeFiles: collectedContext.codeFiles,
+      addedFiles: collectedContext.addedFiles,
+    },
   });
 
   return {

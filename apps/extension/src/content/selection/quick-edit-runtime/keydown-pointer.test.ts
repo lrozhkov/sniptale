@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
-import { handleQuickEditKeyDown, handleQuickEditMouseMove } from './events';
+import { handleQuickEditKeyDown } from './keydown';
+import { handleQuickEditMouseMove } from './pointer';
 
 function createIframeTarget() {
   const iframe = document.createElement('iframe');
@@ -38,14 +39,15 @@ it('uses the inner iframe text node for quick edit hover resolution', () => {
   const { iframe, innerTarget } = createIframeTarget();
   const showHoverOverlay = vi.fn();
   const hideHoverOverlay = vi.fn();
+  const event = new MouseEvent('mousemove', { clientX: 14, clientY: 8 });
+  Object.defineProperty(event, 'target', { configurable: true, value: iframe });
+  Object.defineProperty(event, 'composedPath', {
+    configurable: true,
+    value: () => [iframe],
+  });
 
   handleQuickEditMouseMove(
-    {
-      clientX: 14,
-      clientY: 8,
-      target: iframe,
-      composedPath: () => [iframe],
-    } as unknown as MouseEvent,
+    event,
     {
       cancelEditing: vi.fn(),
       disableDocumentMode: vi.fn(),

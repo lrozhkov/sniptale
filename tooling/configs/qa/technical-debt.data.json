@@ -3331,7 +3331,6 @@
         "apps/extension/src/content/selection/quick-edit-runtime/controller-guards.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/controller-listeners.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/controller.contracts.ts",
-        "apps/extension/src/content/selection/quick-edit-runtime/controller.helpers.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/controller.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/cursor.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/document-mode.history.ts",
@@ -3341,15 +3340,12 @@
         "apps/extension/src/content/selection/quick-edit-runtime/editing.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/elements.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/events.shared.ts",
-        "apps/extension/src/content/selection/quick-edit-runtime/events.ts",
-        "apps/extension/src/content/selection/quick-edit-runtime/helpers.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/history.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/index.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/keydown.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/listeners.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/overlay.blocking.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/overlay.frame.ts",
-        "apps/extension/src/content/selection/quick-edit-runtime/overlay.helpers.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/overlay.hover.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/overlay.state.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/overlays.ts",
@@ -3779,7 +3775,6 @@
         "apps/extension/src/content/selection/quick-edit-runtime/controller-guards.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/controller-listeners.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/controller.contracts.ts",
-        "apps/extension/src/content/selection/quick-edit-runtime/controller.helpers.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/controller.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/cursor.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/document-mode.history.ts",
@@ -3789,15 +3784,12 @@
         "apps/extension/src/content/selection/quick-edit-runtime/editing.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/elements.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/events.shared.ts",
-        "apps/extension/src/content/selection/quick-edit-runtime/events.ts",
-        "apps/extension/src/content/selection/quick-edit-runtime/helpers.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/history.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/index.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/keydown.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/listeners.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/overlay.blocking.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/overlay.frame.ts",
-        "apps/extension/src/content/selection/quick-edit-runtime/overlay.helpers.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/overlay.hover.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/overlay.state.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/overlays.ts",
@@ -16288,7 +16280,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/guardrail-preflight-report.mjs",
-        "contentHash": "05e15dfc72ff19421b1692a3addc3fd164aeeff859f88b2545482a84c43bf044"
+        "contentHash": "cc56bce865d9e098b5736fd618068f99e6133462ad572e9bdf33ca52798d96bc"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-report.mjs",
@@ -17540,7 +17532,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/preflight.mjs",
-        "contentHash": "020ef9feffa2f44e5959173f55e3bb5cd69f42cb355dbd9a7cc2ad20ac5a8618"
+        "contentHash": "6f365d1e6d367c22bdb78530ed99307f6bae86609462190662f9450b600a461f"
       },
       "consumers": [
         "tooling/qa/wrappers/preflight-render.test.ts",
@@ -17552,6 +17544,7 @@
         "binding:SHARED_SOURCE_PATTERNS",
         "property:collectPreflightContext/untrackedFiles",
         "property:collectPreflightReport/advisories",
+        "property:collectPreflightReport/buildScopeContext",
         "property:collectPreflightReport/files",
         "property:collectPreflightReport/functions",
         "property:collectPreflightReport/proofHints",
@@ -19623,7 +19616,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scope.mjs",
-        "contentHash": "7fe3dac4dfe8738e1ba949815314df2c3a3aeaeeb6d6a41c505190fd2ce2068c"
+        "contentHash": "a95dfa1b937db75e56a2b109e4f49144b87d8b6487b105bec6ce7b87d527ce88"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",
@@ -19633,7 +19626,9 @@
         "tooling/qa/core/verify-build.test-profiles.test.ts"
       ],
       "surfaces": [
-        "binding:BUILD_SCOPE_FAMILIES"
+        "binding:BUILD_SCOPE_FAMILIES",
+        "binding:MESSAGING_RUNTIME_PATH_TOKENS",
+        "binding:RUNTIME_TRANSPORT_PATH_TOKENS"
       ]
     },
     {

@@ -20,6 +20,42 @@ const RUNTIME_ENTRYPOINT_PATTERN = new RegExp(
 const PARSER_SNAPSHOT_EXPORT_NAME_PATTERN =
   /(?:^|\/)(?:dom-tree-parser|parser|snapshot|markdown-rendering|project-export|scenario-export)(?=\/|[.-])/u;
 const EXPORT_OWNER_PATH_PATTERN = /(?:^|\/)export(?:\/|\.)/u;
+const MESSAGING_RUNTIME_PATH_TOKENS = new Set([
+  'message-bridge',
+  'message-listener',
+  'message-sync',
+  'message-tracer',
+  'messaging',
+  'native-messaging',
+  'runtime-bridge',
+  'runtime-effects',
+  'runtime-message',
+  'runtime-message-listener',
+  'runtime-messaging',
+  'runtime-routing',
+  'tab-message-routing',
+  'worker-message-boundary',
+]);
+const RUNTIME_TRANSPORT_PATH_TOKENS = new Set(['bridge', 'transport']);
+
+function segmentMatchesToken(segment, token) {
+  return segment === token || segment.startsWith(`${token}.`);
+}
+
+function hasPathToken(file, tokens) {
+  return file
+    .split('/')
+    .some((segment) => [...tokens].some((token) => segmentMatchesToken(segment, token)));
+}
+
+function isRuntimeTransportOwner(file) {
+  const segments = file.split('/');
+  return segments.some(
+    (segment, index) =>
+      segment === 'runtime' &&
+      hasPathToken(segments.slice(index + 1).join('/'), RUNTIME_TRANSPORT_PATH_TOKENS)
+  );
+}
 const BUILD_SCOPE_FAMILIES = [
   {
     name: 'package-and-app-core',
@@ -63,17 +99,19 @@ const BUILD_SCOPE_FAMILIES = [
   {
     name: 'messaging-runtime',
     matches(file) {
-      return /(?:runtime|messag(?:e|ing))/u.test(file);
+      return hasPathToken(file, MESSAGING_RUNTIME_PATH_TOKENS) || isRuntimeTransportOwner(file);
     },
     collectPrefixes(file) {
       return collectFamilyPrefixes(file, [
-        'runtime',
+        'bridge',
+        'transport',
         'runtime-bridge',
         'runtime-effects',
+        'runtime-message',
         'runtime-message-listener',
         'runtime-messaging',
         'runtime-routing',
-        'runtime-state',
+        'message-bridge',
         'message-listener',
         'message-sync',
         'message-tracer',

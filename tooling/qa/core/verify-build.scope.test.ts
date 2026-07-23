@@ -253,6 +253,52 @@ it('keeps high-risk runtime diffs on the transitive related profile', () => {
   expect(scope.relatedFiles).toEqual(['apps/extension/src/background/runtime/session.ts']);
 });
 
+it('does not classify owner-local runtime naming as a messaging transport seam', () => {
+  const sourceFile = 'apps/extension/src/content/selection/quick-edit-runtime/runtime.events.ts';
+  const sourceTest =
+    'apps/extension/src/content/selection/quick-edit-runtime/runtime.events.test.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [sourceFile, sourceTest],
+    codeFiles: [sourceFile, sourceTest],
+    repoCodeFiles: [sourceFile, sourceTest],
+    focusedScopeResolver: () => ({
+      detail: 'local owner tests=1; coverageTargets=1',
+      testFiles: [sourceTest],
+      verdict: 'run-local-coverage',
+    }),
+    ownerTestResolver: () => [sourceTest],
+  });
+
+  expect(scope.matchedFamilies).not.toContain('messaging-runtime');
+  expect(scope.profile).toBe('owner-direct');
+  expect(scope.directTestFiles).toEqual([sourceTest]);
+});
+
+it.each([
+  'apps/extension/src/content/overlay/app/message-bridge/index.ts',
+  'apps/extension/src/content/runtime/bridge/core.ts',
+  'apps/extension/src/content/runtime/shim/transport/quick-action.ts',
+  'apps/extension/src/effect-runtime-sandbox/broker/worker-message-boundary.ts',
+  'apps/extension/src/popup/shell/export/runtime/tab-message-routing.ts',
+])('keeps canonical messaging boundary %s on the transitive profile', (sourceFile) => {
+  const sourceTest = sourceFile.replace(/\.ts$/u, '.test.ts');
+  const scope = resolveBuildTestScope({
+    targetFiles: [sourceFile, sourceTest],
+    codeFiles: [sourceFile, sourceTest],
+    repoCodeFiles: [sourceFile, sourceTest],
+    focusedScopeResolver: () => ({
+      detail: 'local owner tests=1; coverageTargets=1',
+      testFiles: [sourceTest],
+      verdict: 'run-local-coverage',
+    }),
+    ownerTestResolver: () => [sourceTest],
+  });
+
+  expect(scope.matchedFamilies).toContain('messaging-runtime');
+  expect(scope.profile).toBe('related-transitive');
+  expect(scope.directTestFiles).toEqual([]);
+});
+
 it('falls back to related tests when a small owner scope is ambiguous', () => {
   const scope = resolveBuildTestScope({
     targetFiles: ['apps/extension/src/popup/shell/app/view.tsx'],

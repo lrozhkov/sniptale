@@ -5,8 +5,8 @@ const listenerMocks = vi.hoisted(() => ({
   registerListeners: vi.fn(),
 }));
 
-vi.mock('./helpers', async () => {
-  const actual = await vi.importActual<typeof import('./helpers')>('./helpers');
+vi.mock('./cursor', async () => {
+  const actual = await vi.importActual<typeof import('./cursor')>('./cursor');
 
   return {
     ...actual,
@@ -22,7 +22,7 @@ import {
   createQuickEditModeListenerProps,
   createQuickEditModeListenerRegistration,
 } from './controller-listeners';
-import { createQuickEditOverlayState } from './helpers';
+import { createQuickEditOverlayState } from './overlay.state';
 
 function resetListenerMocks(): void {
   listenerMocks.enableCursor.mockReset();
