@@ -2,22 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { EDITOR_BOOTSTRAP_EVENT } from '@sniptale/ui/branding';
 import { isEditorBootstrapPayload } from '../../../features/editor/contracts/bootstrap';
-import {
-  createScenarioEditorEmbedCloseMessage,
-  readEditorEmbedMode,
-} from '../../../features/editor/contracts/embed';
+import { readEditorEmbedMode } from '../../../features/editor/contracts/embed';
 import { usePageLocaleMetadata } from '../../../platform/i18n';
 import { useCommandPaletteHotkey } from '../../../ui/command-palette/hotkey';
 import { EditorControllerProvider } from '../../application/controller-context';
-import { EditorCommandPalette } from '../command-palette';
-import { CanvasWrapper } from '../../workspace/canvas';
-import {
-  EDITOR_CANVAS_CONTEXT_MENU_DATA_UI,
-  EDITOR_CANVAS_CONTEXT_SURFACE_DATA_UI,
-  EDITOR_CANVAS_EMPTY_DROPZONE_DATA_UI,
-} from '../../workspace/canvas/context-menu/types';
 import { EditorEmbedProvider } from '../../application/embed-context/context';
-import { EditorFloatingWorkspace } from '../../workspace/floating';
 import {
   bootstrapEditorPageSession,
   createEditorPageServices,
@@ -27,31 +16,8 @@ import {
   type EditorPageServices,
 } from './runtime';
 import { useEditorStore } from '../../state/useEditorStore';
-import { saveEditorRenderedImage } from '../../document/file-actions';
-
-const EDITOR_PAGE_ROOT_CLASS_NAME = [
-  'sniptale-extension-surface relative h-screen min-h-0 overflow-hidden',
-  'bg-[var(--sniptale-color-surface-canvas)]',
-  'text-[var(--sniptale-color-text-primary)]',
-].join(' ');
-
-const EDITOR_CANVAS_CONTEXT_MENU_SELECTOR = [
-  `[data-ui="${EDITOR_CANVAS_CONTEXT_MENU_DATA_UI}"]`,
-  `[data-ui="${EDITOR_CANVAS_CONTEXT_SURFACE_DATA_UI}"]`,
-  `[data-ui="${EDITOR_CANVAS_EMPTY_DROPZONE_DATA_UI}"]`,
-].join(', ');
-
-function shouldAllowEditorPageContextMenu(target: EventTarget | null) {
-  return target instanceof Element && Boolean(target.closest(EDITOR_CANVAS_CONTEXT_MENU_SELECTOR));
-}
-
-function handleEditorPageContextMenuCapture(event: React.MouseEvent<HTMLDivElement>) {
-  if (shouldAllowEditorPageContextMenu(event.target)) {
-    return;
-  }
-
-  event.preventDefault();
-}
+import { createEditorPageEmbedProviderValue } from './embed';
+import { EditorPageLayout } from './layout';
 
 function createEditorPageBootstrapLifecycle(args: {
   services: EditorPageServices;
@@ -146,52 +112,6 @@ function useEditorPageServiceDisposal(services: EditorPageServices) {
   }, [services]);
 }
 
-function useEditorEmbedProviderValue(
-  embedMode: ReturnType<typeof readEditorEmbedMode>,
-  services: EditorPageServices
-) {
-  if (embedMode !== 'scenario') {
-    return {
-      mode: null,
-      onApply: null,
-      onClose: null,
-    };
-  }
-
-  return {
-    mode: embedMode,
-    onApply: async () => saveEditorRenderedImage(services.controller),
-    onClose: () =>
-      window.parent.postMessage(createScenarioEditorEmbedCloseMessage(), window.location.origin),
-  };
-}
-
-function EditorPageLayout(props: {
-  commandPaletteOpen: boolean;
-  hasImage: boolean;
-  onCloseCommandPalette: () => void;
-  afterLayout?: React.ReactNode;
-}) {
-  return (
-    <div
-      data-ui="editor.page.root"
-      className={EDITOR_PAGE_ROOT_CLASS_NAME}
-      onContextMenuCapture={handleEditorPageContextMenuCapture}
-    >
-      <div className="absolute inset-0 min-h-0 min-w-0" data-ui="editor.canvas.layer">
-        <CanvasWrapper hasImage={props.hasImage} />
-      </div>
-      <EditorFloatingWorkspace hasImage={props.hasImage} />
-      <EditorCommandPalette
-        hasImage={props.hasImage}
-        isOpen={props.commandPaletteOpen}
-        onClose={props.onCloseCommandPalette}
-      />
-      {props.afterLayout}
-    </div>
-  );
-}
-
 export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterLayout }) => {
   usePageLocaleMetadata('editor.page.documentTitle');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -207,7 +127,7 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
   const hasImageRef = useRef(hasImage);
   hasImageRef.current = hasImage;
   const embedMode = readEditorEmbedMode(window.location.search);
-  const embedProps = useEditorEmbedProviderValue(embedMode, services);
+  const embedProps = createEditorPageEmbedProviderValue(embedMode, services.controller);
 
   useCommandPaletteHotkey({
     isOpen: commandPaletteOpen,
