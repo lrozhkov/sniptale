@@ -2,7 +2,22 @@ import { useEffect } from 'react';
 import { reconcileSelectedAIModelId } from '../../../../../features/ai/selection';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { requestAIModelSelectionBootstrap } from '../../../../../workflows/ai-settings/query';
-import type { AIModalOpenBootstrapEffectProps } from './boot-props';
+import type { useAIModalSettingsState } from './locals';
+
+type AIModalSettingsState = ReturnType<typeof useAIModalSettingsState>;
+
+export interface AIModalOpenBootstrapEffectProps {
+  bootedWhileOpenRef: React.MutableRefObject<boolean>;
+  isOpen: boolean;
+  lastPrompt: string;
+  prompt: string;
+  setAvailableModels: AIModalSettingsState['setAvailableModels'];
+  setGlobalSystemPrompt: AIModalSettingsState['setGlobalSystemPrompt'];
+  setPrompt: React.Dispatch<React.SetStateAction<string>>;
+  setProviders: AIModalSettingsState['setProviders'];
+  setSelectedModelId: AIModalSettingsState['setSelectedModelId'];
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+}
 
 const logger = createLogger({ namespace: 'content:ai-modal:state' });
 

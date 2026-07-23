@@ -40,10 +40,15 @@ vi.mock('../../../../../features/ai/selection', async (importOriginal) => ({
   reconcileSelectedAIModelId: reconcileSelectedAIModelIdMock,
 }));
 
-vi.mock('../session/prompt-template-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../session/prompt-template-state')>()),
-  usePromptTemplates: usePromptTemplatesMock,
-}));
+vi.mock(
+  '../../../../../features/prompt-templates/hooks/use-prompt-templates',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../../features/prompt-templates/hooks/use-prompt-templates')
+    >()),
+    usePromptTemplates: usePromptTemplatesMock,
+  })
+);
 
 vi.mock('../../../state/ai-modal.store', () => ({
   selectLastPrompt: selectLastPromptMock,

@@ -1,1 +1,1 @@
-export { useAIModalState } from './core';
+export { useAIModalState } from './controller';

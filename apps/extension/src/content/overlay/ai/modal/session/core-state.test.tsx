@@ -25,10 +25,15 @@ vi.mock('../../../../parser/dom-tree-parser/ai/format', async () => {
   };
 });
 
-vi.mock('./prompt-template-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./prompt-template-state')>()),
-  usePromptTemplates: usePromptTemplatesMock,
-}));
+vi.mock(
+  '../../../../../features/prompt-templates/hooks/use-prompt-templates',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../../features/prompt-templates/hooks/use-prompt-templates')
+    >()),
+    usePromptTemplates: usePromptTemplatesMock,
+  })
+);
 
 vi.mock('../../../state/ai-modal.store', () => ({
   selectLastPrompt: selectLastPromptMock,
