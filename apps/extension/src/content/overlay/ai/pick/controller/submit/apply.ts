@@ -1,7 +1,7 @@
 import { clearAllSniptaleIds } from '../../../../../platform/frame';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { AIEditChange, ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { findAIChangeTargets } from '../../runtime/dom-apply';
+import { findAIChangeTargets } from '../../runtime/target-resolution/change-targets';
 import { flashAppliedAiTargets } from '../../runtime/dom-apply/highlight';
 import { parsePageSnapshotAfterIframePreflight } from '../../../../../parser/dom-tree-parser/snapshot';
 import { showAiApplyToast, showAiNoChangesInfo, showAiParseErrors } from './feedback';

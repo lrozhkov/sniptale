@@ -46,8 +46,8 @@ vi.mock('../../runtime/dom-apply/highlight', async (importOriginal) => ({
   flashAppliedAiTargets: flashAppliedAiTargetsMock,
 }));
 
-vi.mock('../../runtime/dom-apply', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../runtime/dom-apply')>()),
+vi.mock('../../runtime/target-resolution/change-targets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/target-resolution/change-targets')>()),
   findAIChangeTargets: findAIChangeTargetsMock,
 }));
 

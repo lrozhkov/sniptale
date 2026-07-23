@@ -1,7 +1,7 @@
 import type { Logger } from '@sniptale/platform/observability/logger/types';
 import type { AIEditChange, ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import { applyEditToElement } from '../element';
-import { findFieldElementById } from '../../target-resolution';
+import { findFieldElementById } from '../../target-resolution/field-search';
 
 export function applyFieldChange(
   tree: ParsedDOMTree,

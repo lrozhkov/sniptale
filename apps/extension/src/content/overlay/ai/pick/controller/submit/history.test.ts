@@ -20,8 +20,11 @@ const {
   },
 }));
 
-vi.mock('../../runtime/dom-apply', () => ({
+vi.mock('../../runtime/dom-apply/apply', () => ({
   applyAIChanges: applyAIChangesMock,
+}));
+
+vi.mock('../../runtime/target-resolution/change-targets', () => ({
   findAIChangeTargets: findAIChangeTargetsMock,
 }));
 

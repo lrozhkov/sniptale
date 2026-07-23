@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { createAiPickOverlayController } from './overlay';
+import { createAiPickOverlayController } from './overlay.controller';
 
 const overlayController = createAiPickOverlayController();
 

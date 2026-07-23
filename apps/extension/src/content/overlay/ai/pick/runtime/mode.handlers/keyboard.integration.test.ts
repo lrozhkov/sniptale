@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addContentModeDisabledListener } from '../../../../platform/page-context/mode-events';
-import { createAiPickModeState, createKeyDownHandler } from './mode.runtime';
+import { addContentModeDisabledListener } from '../../../../../platform/page-context/mode-events';
+import { createAiPickModeState } from '../mode.state';
+import { createKeyDownHandler } from './keyboard';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -17,11 +18,7 @@ describe('ai pick mode runtime keyboard handling', () => {
     const cleanup = addContentModeDisabledListener(listener);
     const handler = createKeyDownHandler(state, disable);
 
-    handler({
-      key: 'Escape',
-      preventDefault: vi.fn(),
-      stopPropagation: vi.fn(),
-    } as unknown as KeyboardEvent);
+    handler(new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' }));
 
     expect(disable).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith({ mode: 'ai-pick' });
@@ -34,11 +31,7 @@ describe('ai pick mode runtime keyboard handling', () => {
     const disable = vi.fn();
     const handler = createKeyDownHandler(state, disable);
 
-    handler({
-      key: 'Escape',
-      preventDefault: vi.fn(),
-      stopPropagation: vi.fn(),
-    } as unknown as KeyboardEvent);
+    handler(new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' }));
 
     expect(disable).not.toHaveBeenCalled();
   });

@@ -1,5 +1,6 @@
 import type { AIEditChange, ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { applyAIChanges, findAIChangeTargets } from '../../runtime/dom-apply';
+import { applyAIChanges } from '../../runtime/dom-apply/apply';
+import { findAIChangeTargets } from '../../runtime/target-resolution/change-targets';
 import {
   captureDomStateMap,
   createDomMutationBatch,

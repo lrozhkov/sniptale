@@ -30,7 +30,7 @@ vi.mock('./mode.controller', () => ({
   createAiPickModeController: vi.fn(() => runtimeMocks.controller),
 }));
 
-vi.mock('./overlay', () => ({
+vi.mock('./overlay.controller', () => ({
   createAiPickOverlayController: vi.fn(() => ({})),
 }));
 
