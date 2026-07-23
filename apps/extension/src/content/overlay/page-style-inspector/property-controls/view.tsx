@@ -1,5 +1,8 @@
 import type { PageStyleInspectorActions, PageStyleInspectorViewState } from '../types';
-import { AppearanceSection, BoxSection, ImageSection, TextSection } from './section-registry';
+import { ImageSection } from './image-section';
+import { AppearanceSection } from './sections/appearance';
+import { BoxSection } from './sections/frame';
+import { TextSection } from './sections/text';
 
 export function PageStylePropertyControls(props: {
   actions: PageStyleInspectorActions;

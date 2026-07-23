@@ -4,7 +4,7 @@ import type {
 } from '@sniptale/runtime-contracts/page-style';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createLazyContentDefaultOwner } from '../../application/default-owner';
-import { createPageStyleRuntimeController } from '../quick-edit-runtime/page-style';
+import { createPageStyleRuntimeController } from '../quick-edit-runtime/page-style/controller';
 import { dispatchPageStyleInspectorOpen } from './page-style-events';
 
 const logger = createLogger({ namespace: 'ContentQuickEditPageStyle' });
