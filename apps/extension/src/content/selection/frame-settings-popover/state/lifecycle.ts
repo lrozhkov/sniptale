@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
   BlurSettings,
@@ -17,206 +17,136 @@ import { getDefaultFocusSettings } from './helpers';
 
 const logger = createLogger({ namespace: 'ContentFrameSettingsPopoverLifecycle' });
 
-function syncFrameSettingsPopoverOpenState(args: {
-  blurSettingsRef: { current: BlurSettings | undefined };
-  borderSettingsRef: { current: BorderPreset | undefined };
-  focusSettingsRef: { current: FocusSettings | undefined };
-  frameId: string;
-  isOpen: boolean;
-  localBlurSettingsDirtyRef: { current: boolean };
-  localFocusSettingsDirtyRef: { current: boolean };
-  prevIsOpenRef: { current: boolean };
-  setLocalBlurSettings: (settings: BlurSettings) => void;
-  setLocalFocusSettings: (settings: FocusSettings) => void;
-  setSelectedPresetId: (presetId: string) => void;
-}) {
-  const transactionKey = `frame-settings:${args.frameId}`;
-
-  if (args.isOpen && !args.prevIsOpenRef.current) {
-    pagePreparationHistory.beginTransaction(transactionKey);
-    args.localBlurSettingsDirtyRef.current = false;
-    args.localFocusSettingsDirtyRef.current = false;
-    args.setSelectedPresetId(args.borderSettingsRef.current?.id ?? DEFAULT_BORDER_PRESET.id);
-    args.setLocalBlurSettings({
-      ...(args.blurSettingsRef.current ?? DEFAULT_BLUR_SETTINGS),
-    });
-    args.setLocalFocusSettings({
-      ...(args.focusSettingsRef.current ?? getDefaultFocusSettings()),
-    });
-  } else if (!args.isOpen && args.prevIsOpenRef.current) {
-    pagePreparationHistory.commitTransaction(transactionKey);
-  }
-
-  args.prevIsOpenRef.current = args.isOpen;
+interface FrameSettingsDraft {
+  globalSettings: HighlighterSettings;
+  localBlurSettings: BlurSettings;
+  localFocusSettings: FocusSettings;
+  selectedPresetId: string;
 }
 
-function useFrameSettingsPopoverOpenStateCleanup(frameId: string) {
+interface FrameSettingsLifecycleState {
+  dirty: { blur: boolean; focus: boolean };
+  previousOpen: boolean;
+  source: {
+    blur: BlurSettings | undefined;
+    border: BorderPreset | undefined;
+    focus: FocusSettings | undefined;
+  };
+}
+
+type FrameSettingsLifecycleRef = { current: FrameSettingsLifecycleState };
+type SetFrameSettingsDraft = Dispatch<SetStateAction<FrameSettingsDraft>>;
+
+function createInitialDraft(): FrameSettingsDraft {
+  return {
+    globalSettings: createDefaultHighlighterSettings(),
+    localBlurSettings: { ...DEFAULT_BLUR_SETTINGS },
+    localFocusSettings: getDefaultFocusSettings(),
+    selectedPresetId: DEFAULT_BORDER_PRESET.id,
+  };
+}
+
+function createLifecycleState(args: {
+  blurSettings?: BlurSettings;
+  borderSettings?: BorderPreset;
+  focusSettings?: FocusSettings;
+}): FrameSettingsLifecycleState {
+  return {
+    dirty: { blur: false, focus: false },
+    previousOpen: false,
+    source: {
+      blur: args.blurSettings,
+      border: args.borderSettings,
+      focus: args.focusSettings,
+    },
+  };
+}
+
+function applyLoadedFrameSettingsDefaults(
+  settings: HighlighterSettings,
+  lifecycleRef: FrameSettingsLifecycleRef,
+  setDraft: SetFrameSettingsDraft
+): void {
+  const { dirty, source } = lifecycleRef.current;
+  setDraft((current) => ({
+    ...current,
+    globalSettings: settings,
+    ...(!source.blur && !dirty.blur && settings.defaultBlurSettings
+      ? { localBlurSettings: { ...settings.defaultBlurSettings } }
+      : {}),
+    ...(!source.focus && !dirty.focus && settings.defaultFocusSettings
+      ? { localFocusSettings: { ...settings.defaultFocusSettings } }
+      : {}),
+  }));
+}
+
+function useFrameSettingsDefaultsLoad(
+  isOpen: boolean,
+  lifecycleRef: FrameSettingsLifecycleRef,
+  setDraft: SetFrameSettingsDraft
+): void {
   useEffect(() => {
-    return () => {
-      pagePreparationHistory.cancelTransaction(`frame-settings:${frameId}`);
-    };
-  }, [frameId]);
-}
-
-type FrameSettingsPopoverLoadEffectArgs = {
-  blurSettingsRef: { current: BlurSettings | undefined };
-  focusSettingsRef: { current: FocusSettings | undefined };
-  isOpen: boolean;
-  localBlurSettingsDirtyRef: { current: boolean };
-  localFocusSettingsDirtyRef: { current: boolean };
-  setGlobalSettings: (settings: HighlighterSettings) => void;
-  setLocalBlurSettings: (settings: BlurSettings) => void;
-  setLocalFocusSettings: (settings: FocusSettings) => void;
-};
-
-type LoadFrameSettingsDefaultsArgs = Omit<FrameSettingsPopoverLoadEffectArgs, 'isOpen'> & {
-  isCancelled: () => boolean;
-};
-
-function loadFrameSettingsDefaults(args: LoadFrameSettingsDefaultsArgs) {
-  void loadHighlighterSettings()
-    .then((settings) => applyLoadedFrameSettingsDefaults({ ...args, settings }))
-    .catch((error) => {
-      logger.error('Failed to load frame-settings popover defaults', error);
-    });
-}
-
-function useFrameSettingsPopoverLoadEffect(args: FrameSettingsPopoverLoadEffectArgs) {
-  const {
-    blurSettingsRef,
-    focusSettingsRef,
-    isOpen,
-    localBlurSettingsDirtyRef,
-    localFocusSettingsDirtyRef,
-    setGlobalSettings,
-    setLocalBlurSettings,
-    setLocalFocusSettings,
-  } = args;
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
+    if (!isOpen) return;
 
     let cancelled = false;
-
-    loadFrameSettingsDefaults({
-      blurSettingsRef,
-      focusSettingsRef,
-      isCancelled: () => cancelled,
-      localBlurSettingsDirtyRef,
-      localFocusSettingsDirtyRef,
-      setGlobalSettings,
-      setLocalBlurSettings,
-      setLocalFocusSettings,
-    });
+    void loadHighlighterSettings()
+      .then((settings) => {
+        if (!cancelled) {
+          applyLoadedFrameSettingsDefaults(settings, lifecycleRef, setDraft);
+        }
+      })
+      .catch((error) => {
+        logger.error('Failed to load frame-settings popover defaults', error);
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [
-    blurSettingsRef,
-    focusSettingsRef,
-    isOpen,
-    localBlurSettingsDirtyRef,
-    localFocusSettingsDirtyRef,
-    setGlobalSettings,
-    setLocalBlurSettings,
-    setLocalFocusSettings,
-  ]);
+  }, [isOpen, lifecycleRef, setDraft]);
 }
 
-function applyLoadedFrameSettingsDefaults(args: {
-  blurSettingsRef: { current: BlurSettings | undefined };
-  focusSettingsRef: { current: FocusSettings | undefined };
-  isCancelled: () => boolean;
-  localBlurSettingsDirtyRef: { current: boolean };
-  localFocusSettingsDirtyRef: { current: boolean };
-  setGlobalSettings: (settings: HighlighterSettings) => void;
-  setLocalBlurSettings: (settings: BlurSettings) => void;
-  setLocalFocusSettings: (settings: FocusSettings) => void;
-  settings: HighlighterSettings;
-}) {
-  if (args.isCancelled()) {
-    return;
+function syncFrameSettingsPopoverOpenState(
+  frameId: string,
+  isOpen: boolean,
+  lifecycleRef: FrameSettingsLifecycleRef,
+  setDraft: SetFrameSettingsDraft
+): void {
+  const lifecycle = lifecycleRef.current;
+  const transactionKey = `frame-settings:${frameId}`;
+
+  if (isOpen && !lifecycle.previousOpen) {
+    pagePreparationHistory.beginTransaction(transactionKey);
+    lifecycle.dirty.blur = false;
+    lifecycle.dirty.focus = false;
+    setDraft((current) => ({
+      ...current,
+      selectedPresetId: lifecycle.source.border?.id ?? DEFAULT_BORDER_PRESET.id,
+      localBlurSettings: { ...(lifecycle.source.blur ?? DEFAULT_BLUR_SETTINGS) },
+      localFocusSettings: { ...(lifecycle.source.focus ?? getDefaultFocusSettings()) },
+    }));
+  } else if (!isOpen && lifecycle.previousOpen) {
+    pagePreparationHistory.commitTransaction(transactionKey);
   }
 
-  args.setGlobalSettings(args.settings);
-
-  if (
-    !args.blurSettingsRef.current &&
-    !args.localBlurSettingsDirtyRef.current &&
-    args.settings.defaultBlurSettings
-  ) {
-    args.setLocalBlurSettings({ ...args.settings.defaultBlurSettings });
-  }
-
-  if (
-    !args.focusSettingsRef.current &&
-    !args.localFocusSettingsDirtyRef.current &&
-    args.settings.defaultFocusSettings
-  ) {
-    args.setLocalFocusSettings({ ...args.settings.defaultFocusSettings });
-  }
+  lifecycle.previousOpen = isOpen;
 }
 
-type FrameSettingsPopoverOpenStateEffectArgs = {
-  blurSettingsRef: { current: BlurSettings | undefined };
-  borderSettingsRef: { current: BorderPreset | undefined };
-  frameId: string;
-  focusSettingsRef: { current: FocusSettings | undefined };
-  isOpen: boolean;
-  localBlurSettingsDirtyRef: { current: boolean };
-  localFocusSettingsDirtyRef: { current: boolean };
-  prevIsOpenRef: { current: boolean };
-  setLocalBlurSettings: (settings: BlurSettings) => void;
-  setLocalFocusSettings: (settings: FocusSettings) => void;
-  setSelectedPresetId: (presetId: string) => void;
-};
-
-function useFrameSettingsPopoverOpenStateEffect(args: FrameSettingsPopoverOpenStateEffectArgs) {
-  const {
-    blurSettingsRef,
-    borderSettingsRef,
-    frameId,
-    focusSettingsRef,
-    isOpen,
-    localBlurSettingsDirtyRef,
-    localFocusSettingsDirtyRef,
-    prevIsOpenRef,
-    setLocalBlurSettings,
-    setLocalFocusSettings,
-    setSelectedPresetId,
-  } = args;
-  useFrameSettingsPopoverOpenStateCleanup(frameId);
+function useFrameSettingsOpenTransaction(
+  frameId: string,
+  isOpen: boolean,
+  lifecycleRef: FrameSettingsLifecycleRef,
+  setDraft: SetFrameSettingsDraft
+): void {
+  useEffect(
+    () => () => {
+      pagePreparationHistory.cancelTransaction(`frame-settings:${frameId}`);
+    },
+    [frameId]
+  );
 
   useEffect(() => {
-    syncFrameSettingsPopoverOpenState({
-      blurSettingsRef,
-      borderSettingsRef,
-      focusSettingsRef,
-      frameId,
-      isOpen,
-      localBlurSettingsDirtyRef,
-      localFocusSettingsDirtyRef,
-      prevIsOpenRef,
-      setLocalBlurSettings,
-      setLocalFocusSettings,
-      setSelectedPresetId,
-    });
-  }, [
-    blurSettingsRef,
-    borderSettingsRef,
-    focusSettingsRef,
-    frameId,
-    isOpen,
-    localBlurSettingsDirtyRef,
-    localFocusSettingsDirtyRef,
-    prevIsOpenRef,
-    setLocalBlurSettings,
-    setLocalFocusSettings,
-    setSelectedPresetId,
-  ]);
+    syncFrameSettingsPopoverOpenState(frameId, isOpen, lifecycleRef, setDraft);
+  }, [frameId, isOpen, lifecycleRef, setDraft]);
 }
 
 export function useFrameSettingsPopoverLifecycle(args: {
@@ -226,62 +156,32 @@ export function useFrameSettingsPopoverLifecycle(args: {
   frameId: string;
   isOpen: boolean;
 }) {
-  const [globalSettings, setGlobalSettings] = useState(() => createDefaultHighlighterSettings());
-  const [selectedPresetId, setSelectedPresetId] = useState(DEFAULT_BORDER_PRESET.id);
-  const [localBlurSettings, setLocalBlurSettings] = useState<BlurSettings>({
-    ...DEFAULT_BLUR_SETTINGS,
-  });
-  const [localFocusSettings, setLocalFocusSettings] = useState<FocusSettings>(() =>
-    getDefaultFocusSettings()
-  );
-  const prevIsOpenRef = useRef(false);
-  const borderSettingsRef = useRef(args.borderSettings);
-  const blurSettingsRef = useRef(args.blurSettings);
-  const focusSettingsRef = useRef(args.focusSettings);
-  const localBlurSettingsDirtyRef = useRef(false);
-  const localFocusSettingsDirtyRef = useRef(false);
+  const [draft, setDraft] = useState(createInitialDraft);
+  const lifecycleRef = useRef(createLifecycleState(args));
+  lifecycleRef.current.source = {
+    blur: args.blurSettings,
+    border: args.borderSettings,
+    focus: args.focusSettings,
+  };
 
-  borderSettingsRef.current = args.borderSettings;
-  blurSettingsRef.current = args.blurSettings;
-  focusSettingsRef.current = args.focusSettings;
-
-  useFrameSettingsPopoverLoadEffect({
-    blurSettingsRef,
-    focusSettingsRef,
-    isOpen: args.isOpen,
-    localBlurSettingsDirtyRef,
-    localFocusSettingsDirtyRef,
-    setGlobalSettings,
-    setLocalBlurSettings,
-    setLocalFocusSettings,
-  });
-  useFrameSettingsPopoverOpenStateEffect({
-    blurSettingsRef,
-    borderSettingsRef,
-    focusSettingsRef,
-    frameId: args.frameId,
-    isOpen: args.isOpen,
-    localBlurSettingsDirtyRef,
-    localFocusSettingsDirtyRef,
-    prevIsOpenRef,
-    setLocalBlurSettings,
-    setLocalFocusSettings,
-    setSelectedPresetId,
-  });
+  useFrameSettingsDefaultsLoad(args.isOpen, lifecycleRef, setDraft);
+  useFrameSettingsOpenTransaction(args.frameId, args.isOpen, lifecycleRef, setDraft);
 
   return {
     applyBlurSettingsFromUser: (settings: BlurSettings) => {
-      localBlurSettingsDirtyRef.current = true;
-      setLocalBlurSettings(settings);
+      lifecycleRef.current.dirty.blur = true;
+      setDraft((current) => ({ ...current, localBlurSettings: settings }));
     },
     applyFocusSettingsFromUser: (settings: FocusSettings) => {
-      localFocusSettingsDirtyRef.current = true;
-      setLocalFocusSettings(settings);
+      lifecycleRef.current.dirty.focus = true;
+      setDraft((current) => ({ ...current, localFocusSettings: settings }));
     },
-    globalSettings,
-    localBlurSettings,
-    localFocusSettings,
-    selectPreset: (presetId: string) => setSelectedPresetId(presetId),
-    selectedPresetId,
+    globalSettings: draft.globalSettings,
+    localBlurSettings: draft.localBlurSettings,
+    localFocusSettings: draft.localFocusSettings,
+    selectPreset: (presetId: string) => {
+      setDraft((current) => ({ ...current, selectedPresetId: presetId }));
+    },
+    selectedPresetId: draft.selectedPresetId,
   };
 }

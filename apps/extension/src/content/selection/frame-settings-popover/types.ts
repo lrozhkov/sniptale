@@ -41,7 +41,7 @@ export interface FrameSettingsPopoverBodyProps {
   onClose: () => void;
 }
 
-export interface FrameSettingsPopoverSurfaceContentProps
+interface FrameSettingsPopoverSurfaceContentProps
   extends FrameSettingsPopoverSettingHandlers, FrameSettingsPopoverLocalSettings {
   effectMode: EffectMode;
   globalSettings: HighlighterSettings;
