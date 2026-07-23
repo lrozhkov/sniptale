@@ -4,12 +4,11 @@ import path from 'node:path';
 import { isProductQaFile } from './qa-scope.mjs';
 import { filterImportOrMockOnlyDiffFiles } from './import-only-diff.mjs';
 import { collectCodeFiles, fromRelativePath, isCodeFile } from './shared.mjs';
+import { isBuildTestFile } from './build-test-file-classifier.mjs';
 import { collectDeletedTargetSuccessors } from './verify-build.deleted-closure.mjs';
 import { resolveBuildTestProfile } from './verify-build.test-profiles.mjs';
 export { BUILD_TEST_PROFILE_LIMITS } from './verify-build.test-profiles.mjs';
 
-const TEST_FILE_PATTERN =
-  /(?:^|\/)(?:__tests__|__fixtures__|test|test-support|fixtures)(?:\/|$)|(?:^|\/)(?:test-support|test-helpers|fixtures)\.[cm]?[jt]sx?$|\.(?:test|spec|test-support|test\.helpers|test\.fixtures|fixtures)\.[cm]?[jt]sx?$/u;
 const RUNTIME_ENTRYPOINT_PATTERN = new RegExp(
   '^(?:apps/extension/src/' +
     '(?:background|camera-recorder|content|design-system|gallery|offscreen|' +
@@ -151,7 +150,7 @@ const BUILD_SCOPE_FAMILIES = [
 ];
 
 function isTestFile(file) {
-  return TEST_FILE_PATTERN.test(file);
+  return isBuildTestFile(file);
 }
 
 function uniqueSorted(values) {

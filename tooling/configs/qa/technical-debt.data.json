@@ -2455,7 +2455,6 @@
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/table-target/index.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/table-target/mapping.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/table.ts",
-        "apps/extension/src/content/overlay/ai/pick/runtime/dom-helpers.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-index.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-lookup.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-registration.ts",
@@ -3482,7 +3481,6 @@
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/table-target/index.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/table-target/mapping.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/table.ts",
-        "apps/extension/src/content/overlay/ai/pick/runtime/dom-helpers.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-index.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-lookup.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/dom-registration.ts",
@@ -19618,7 +19616,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.deleted-closure.mjs",
-        "contentHash": "8fcfc7522e43b76c51e0cb583b4e1c8a64d047228d7a80e7912640d5cf642615"
+        "contentHash": "d1e185f4d130f9a5df1e58c71e89a2d8ce543974a3f3bd682fb0506b4e795965"
       },
       "consumers": [
         "tooling/qa/core/verify-build.deleted-closure.mjs",
@@ -19653,7 +19651,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scope.mjs",
-        "contentHash": "89a1525d7a179f4ad6ea862ede80f5cd29ca97bd3960eb7a54cdbe64e8fc083e"
+        "contentHash": "00fdaa17027cb1f5defbb8353c0a0cca15e4475030d0aee76ef856974b8158c9"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",

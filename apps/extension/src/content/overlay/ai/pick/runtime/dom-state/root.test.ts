@@ -67,7 +67,7 @@ vi.mock('../dom-index', async (importOriginal) => ({
   resetAiPickElementIndex: resetAiPickElementIndexMock,
 }));
 
-vi.mock('../dom-helpers', async (importOriginal) => ({
+vi.mock('../dom-registration', async (importOriginal) => ({
   ...(await importOriginal()),
   buildElementMaps: buildElementMapsMock,
 }));

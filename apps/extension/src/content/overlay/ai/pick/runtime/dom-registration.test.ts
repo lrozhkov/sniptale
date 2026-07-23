@@ -12,7 +12,8 @@ import {
   expectMappingFallbackCounts,
   expectMappingFallbackTargets,
 } from './dom-helpers.test-support';
-import { buildElementMaps, getDataIdsForElement, getNearestDataElement } from './dom-helpers';
+import { getDataIdsForElement, getNearestDataElement } from './dom-lookup';
+import { buildElementMaps } from './dom-registration';
 
 const elementIndex = createAiPickElementIndex();
 
@@ -142,7 +143,7 @@ function registerBodyFallbackTests(): void {
   });
 }
 
-describe('ai-pick dom helpers', () => {
+describe('ai-pick DOM registration and lookup', () => {
   afterEach(() => {
     resetAiPickElementIndex(elementIndex);
     document.body.replaceChildren();

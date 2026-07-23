@@ -9,7 +9,7 @@ import { setContentModeEnabled } from '../../../../../application/mode-session';
 import { addEventListenerToAllWindowsDynamic } from '../../../../../platform/frame';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { buildElementMaps } from '../dom-helpers';
+import { buildElementMaps } from '../dom-registration';
 import { resetAiPickElementIndex } from '../dom-index';
 import type { AiPickSourceAdapter } from '../source.types';
 import { applyAiPickCursorStyles } from './cursor';

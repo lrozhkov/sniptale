@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { resolveDeterministicFocusedCoverageOwnerTests } from './focused-coverage-owner-tests.mjs';
+import { isBuildTestFile } from './build-test-file-classifier.mjs';
 import { readHeadFileText } from './git-head-sources.mjs';
 import { collectModuleImportGraph } from './module-import-graph.mjs';
 import { isCodeFile } from './shared.mjs';
@@ -11,8 +12,6 @@ import {
   collectDeletedAggregateProviders,
   createDeletedAggregateAnalyzer,
 } from './verify-build.deleted-aggregate.mjs';
-
-const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 
 function uniqueSorted(values) {
   return [...new Set(values)].sort();
@@ -165,8 +164,7 @@ function collectHeadCandidateImporters(file, root, readHeadSource) {
   return {
     candidates: [...candidates]
       .filter(
-        (candidate) =>
-          candidate !== file && isCodeFile(candidate) && !TEST_FILE_PATTERN.test(candidate)
+        (candidate) => candidate !== file && isCodeFile(candidate) && !isBuildTestFile(candidate)
       )
       .sort(),
     complete: true,

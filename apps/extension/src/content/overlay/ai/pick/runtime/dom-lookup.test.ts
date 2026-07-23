@@ -3,7 +3,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import { createAiPickElementIndex, resetAiPickElementIndex } from './dom-index';
-import { buildElementMaps, getNearestDataElement } from './dom-helpers';
+import { getNearestDataElement } from './dom-lookup';
+import { buildElementMaps } from './dom-registration';
 
 const elementIndex = createAiPickElementIndex();
 
@@ -70,7 +71,7 @@ function createGroupedWrapperFixture() {
   return { section, title };
 }
 
-describe('ai-pick grouped dom helpers', () => {
+describe('ai-pick grouped DOM lookup', () => {
   afterEach(() => {
     resetAiPickElementIndex(elementIndex);
     document.body.replaceChildren();

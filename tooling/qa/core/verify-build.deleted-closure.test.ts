@@ -101,6 +101,42 @@ it('maps a deleted cross-owner re-export aggregate to its surviving provider', a
   });
 });
 
+it('ignores test-support importers when closing a deleted production aggregate', async () => {
+  const root = createTempRoot('build-deleted-test-support-importer-');
+  const ownerRoot = 'apps/extension/src/content/overlay/example';
+  const facade = `${ownerRoot}/facade.ts`;
+  const provider = `${ownerRoot}/provider.ts`;
+  const controller = `${ownerRoot}/controller.ts`;
+  const testSupport = `${ownerRoot}/controller.test-support.ts`;
+  initGitRepo(root);
+  writeFile(root, provider, 'export const value = 1;\n');
+  writeFile(root, provider.replace(/\.ts$/u, '.test.ts'), "it('covers provider', () => {});\n");
+  writeFile(root, facade, "export { value } from './provider';\n");
+  writeFile(root, controller, "import { value } from './facade';\nexport const result = value;\n");
+  writeFile(
+    root,
+    testSupport,
+    "import { value } from './facade';\nexport const fixture = value;\n"
+  );
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'baseline');
+  runGit(root, 'rm', facade);
+  writeFile(
+    root,
+    controller,
+    "import { value } from './provider';\nexport const result = value;\n"
+  );
+  writeFile(
+    root,
+    testSupport,
+    "import { value } from './provider';\nexport const fixture = value;\n"
+  );
+
+  const successors = await collectSuccessors(root, [facade, controller], [controller]);
+
+  expect(successors.get(facade)).toEqual([controller]);
+});
+
 it('rejects provider proof when changed consumers do not redirect to the provider', async () => {
   const root = createTempRoot('build-deleted-unrelated-cross-owner-aggregate-');
   const { contentOwner, facade, popupOwner } = prepareCrossOwnerAggregate(root);

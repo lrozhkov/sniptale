@@ -2,7 +2,8 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { createAiPickElementIndex, resetAiPickElementIndex } from './dom-index';
-import { buildElementMaps, getDataIdsForElement, getNearestDataElement } from './dom-helpers';
+import { getDataIdsForElement, getNearestDataElement } from './dom-lookup';
+import { buildElementMaps } from './dom-registration';
 import {
   createNaumenMvsContainer,
   setupCardPageContext,
