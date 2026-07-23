@@ -14174,14 +14174,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/authority-aliases.mjs",
-        "contentHash": "b19f62bd2761d7788bab9b7ca6cfad8c7a4b84177d5d484b2fa3ed7878fdeb9b"
+        "contentHash": "b2f97ae2e1caa99a190c8d9c2ba3cd6a9dd3ec157c584531451e0c60862380c2"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/authority-aliases.mjs",
         "tooling/qa/core/structural-risk/file-metrics.mjs"
       ],
       "surfaces": [
-        "property:collectCallsByFunction/anonymous-120/calls"
+        "property:collectCallsByFunction/anonymous-121/calls"
       ]
     },
     {

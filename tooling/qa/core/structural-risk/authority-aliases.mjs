@@ -1,4 +1,5 @@
 import { createLexicalBindingKey, getTransparentExpressionRoot, ts } from './ast.mjs';
+import { collectReactRefBindings } from './react-ref-provenance.mjs';
 
 function unwrapExpression(node) {
   let current = node;
@@ -227,16 +228,18 @@ function splitBindingKey(key, candidates) {
     .sort((left, right) => right.length - left.length)[0];
 }
 
-function canonicalAuthorityKey(key) {
+function canonicalAuthorityKey(key, reactRefBindings) {
   const at = key.indexOf('@');
   if (at === -1) return key;
   const propertyStart = key.indexOf('.', at);
   if (propertyStart === -1) return key;
   const root = key.slice(0, propertyStart);
-  const properties = key
+  const rawProperties = key
     .slice(propertyStart + 1)
     .split('.')
-    .filter((property) => property && property !== 'current');
+    .filter(Boolean);
+  if (reactRefBindings.has(root) && rawProperties[0] === 'current') return root;
+  const properties = rawProperties.filter((property) => property !== 'current');
   return properties.length === 0 ? root : `${root}.${properties[0]}`;
 }
 
@@ -257,23 +260,29 @@ function collectParameterCallAuthorities(key, parameterBase, descriptor, context
       resolved.add(authority);
     }
   }
-  if (unresolved || resolved.size === 0) resolved.add(canonicalAuthorityKey(key));
+  if (unresolved || resolved.size === 0) {
+    resolved.add(canonicalAuthorityKey(key, context.reactRefBindings));
+  }
   return resolved;
 }
 
 function resolveConstAuthority(key, constBase, context, visitedAliases) {
   const aliasId = `const:${constBase}`;
-  if (visitedAliases.has(aliasId)) return new Set([canonicalAuthorityKey(key)]);
+  if (visitedAliases.has(aliasId)) {
+    return new Set([canonicalAuthorityKey(key, context.reactRefBindings)]);
+  }
   const target = `${context.constAliases.get(constBase)}${key.slice(constBase.length)}`;
   return resolveAuthorityKey(target, context, new Set(visitedAliases).add(aliasId));
 }
 
 function resolveParameterAuthority(key, parameterBase, context, visitedAliases) {
   const aliasId = `parameter:${parameterBase}`;
-  if (visitedAliases.has(aliasId)) return new Set([canonicalAuthorityKey(key)]);
+  if (visitedAliases.has(aliasId)) {
+    return new Set([canonicalAuthorityKey(key, context.reactRefBindings)]);
+  }
   const descriptor = context.parameterAliases.get(parameterBase);
   if (!descriptor || descriptor.calls.length === 0) {
-    return new Set([canonicalAuthorityKey(key)]);
+    return new Set([canonicalAuthorityKey(key, context.reactRefBindings)]);
   }
   return collectParameterCallAuthorities(
     key,
@@ -290,7 +299,7 @@ function resolveAuthorityKey(key, context, visitedAliases = new Set()) {
   const parameterBase = splitBindingKey(key, context.parameterAliases.keys());
   return parameterBase
     ? resolveParameterAuthority(key, parameterBase, context, visitedAliases)
-    : new Set([canonicalAuthorityKey(key)]);
+    : new Set([canonicalAuthorityKey(key, context.reactRefBindings)]);
 }
 
 export function resolveFileStateAuthorityKeys(sourceFile, keys) {
@@ -300,6 +309,7 @@ export function resolveFileStateAuthorityKeys(sourceFile, keys) {
     sourceFile,
     constAliases: collectConstAliases(sourceFile),
     parameterAliases: collectParameterAliases(sourceFile, callsByFunction),
+    reactRefBindings: collectReactRefBindings(sourceFile),
   };
   const resolved = new Set();
   for (const key of keys) {
