@@ -101,6 +101,65 @@ it('writes parseable private byte-bounded artifacts after deep sanitization', ()
   expect(fs.statSync(outputPath).mode & 0o777).toBe(0o600);
 });
 
+it('retains structural and topology evidence when every artifact section exceeds its budget', () => {
+  const root = createTempRoot('structural-audit-balanced-artifact-');
+  const outputPath = path.join(root, 'report.json');
+  const metrics = Array.from({ length: 120 }, (_, index) => ({
+    file: `apps/extension/src/content/demo/owner-${index}/runtime.ts`,
+    symbol: `run${index}`,
+    score: 8 - (index % 8),
+    lines: 120,
+    stateAuthorityNames: Array.from({ length: 50 }, (__, state) => `state-${state}`),
+  }));
+  const clusters = Array.from({ length: 120 }, (_, index) => ({
+    id: `apps/extension/src/content/demo/owner-${index}`,
+    decision: index % 2 === 0 ? 'Consolidate' : 'Keep',
+    confidence: 'low',
+    maximumStructuralScore: 8 - (index % 8),
+    files: Array.from(
+      { length: 50 },
+      (__, fileIndex) => `apps/extension/src/content/demo/owner-${index}/operation-${fileIndex}.ts`
+    ),
+    fileDetails: Array.from({ length: 50 }, (__, fileIndex) => ({
+      file: `apps/extension/src/content/demo/owner-${index}/operation-${fileIndex}.ts`,
+      reason: 'default',
+    })),
+  }));
+
+  writeStructuralAuditArtifact(
+    {
+      scope: 'repo-wide-audit',
+      files: metrics,
+      functions: metrics,
+      advisories: metrics.map((metric) => ({ ...metric, reason: 'bounded structural evidence' })),
+    },
+    {
+      outputPath,
+      maximumBytes: STRUCTURAL_AUDIT_MAX_BYTES,
+      sanitizerOptions: { repositoryRoot: root, sensitiveValues: [] },
+      fragmentationReport: {
+        clusters,
+        summary: {
+          totalClusters: clusters.length,
+          candidateClusters: clusters.length,
+          split: 0,
+          consolidate: 60,
+          keep: 60,
+        },
+      },
+    }
+  );
+
+  const artifact = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
+  expect(artifact.files.length).toBeGreaterThan(0);
+  expect(artifact.functions.length).toBeGreaterThan(0);
+  expect(artifact.findings.length).toBeGreaterThan(0);
+  expect(artifact.clusters.length).toBeGreaterThan(0);
+  expect(new Set(artifact.clusters.map((cluster) => cluster.decision))).toEqual(
+    new Set(['Consolidate', 'Keep'])
+  );
+});
+
 it('composes one visible structural and topology block without running a repository audit', () => {
   const root = createTempRoot('structural-audit-wrapper-');
   const outputPath = path.join(root, 'report.json');

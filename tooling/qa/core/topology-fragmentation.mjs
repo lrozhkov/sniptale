@@ -17,7 +17,7 @@ function runtimeFor(file, runtimes) {
 
 function clusterKey(file, runtimes) {
   const runtime = runtimeFor(file, runtimes);
-  if (runtime) return boundedOwnerKey(file, runtime.root, 2);
+  if (runtime) return boundedOwnerKey(file, runtime.root, 3);
   if (file.startsWith('apps/extension/src/')) {
     return boundedOwnerKey(file, 'apps/extension/src', 3);
   }
@@ -289,7 +289,7 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
   );
   return {
     schemaVersion: 1,
-    clusterStrategy: 'path-depth-v1',
+    clusterStrategy: 'path-depth-v2',
     scannedFiles: graph.files.length,
     partitionedFiles: eligibleMetrics.length,
     unresolvedEdges: graph.unresolvedEdges.length,

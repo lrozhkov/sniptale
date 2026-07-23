@@ -28,6 +28,12 @@ export const STRUCTURAL_AUDIT_MAX_BYTES = 512 * 1024;
 const ARTIFACT_ITEM_LIMIT = 500;
 const NESTED_VALUE_LIMIT = 50;
 const STRING_VALUE_LIMIT = 4096;
+const ARTIFACT_SECTION_MINIMUMS = {
+  clusters: 10,
+  files: 50,
+  findings: 100,
+  functions: 50,
+};
 
 function sanitizeArtifactValue(value, sanitizerOptions) {
   if (typeof value === 'string') {
@@ -61,14 +67,50 @@ function serializedArtifactBytes(artifact) {
   return Buffer.byteLength(`${JSON.stringify(artifact, null, 2)}\n`);
 }
 
+function interleaveAuditClusters(clusters) {
+  const decisionOrder = ['Split', 'Consolidate', 'Keep'];
+  const groups = new Map(decisionOrder.map((decision) => [decision, []]));
+  for (const cluster of clusters) {
+    const group = groups.get(cluster.decision);
+    if (group) group.push(cluster);
+  }
+  for (const group of groups.values()) {
+    group.sort(
+      (left, right) =>
+        right.maximumStructuralScore - left.maximumStructuralScore ||
+        left.id.localeCompare(right.id)
+    );
+  }
+  const ordered = [];
+  const maximumLength = Math.max(0, ...[...groups.values()].map((group) => group.length));
+  for (let index = 0; index < maximumLength; index += 1) {
+    for (const decision of decisionOrder) {
+      const cluster = groups.get(decision)[index];
+      if (cluster) ordered.push(cluster);
+    }
+  }
+  return ordered;
+}
+
 function boundAuditArtifact(artifact, maximumBytes) {
-  const trimOrder = ['findings', 'functions', 'files', 'clusters'];
+  const fallbackTrimOrder = ['clusters', 'functions', 'files', 'findings'];
   while (serializedArtifactBytes(artifact) > maximumBytes) {
-    const collection = trimOrder.find((key) => artifact[key].length > 0);
+    const aboveMinimum = fallbackTrimOrder
+      .filter((key) => artifact[key].length > ARTIFACT_SECTION_MINIMUMS[key])
+      .sort(
+        (left, right) =>
+          Buffer.byteLength(JSON.stringify(artifact[right])) -
+          Buffer.byteLength(JSON.stringify(artifact[left]))
+      );
+    const collection = aboveMinimum[0] ?? fallbackTrimOrder.find((key) => artifact[key].length > 0);
     if (!collection) {
       throw new Error(`Structural audit metadata exceeds ${maximumBytes} bytes.`);
     }
-    artifact[collection].pop();
+    const removable = Math.max(
+      1,
+      artifact[collection].length - (ARTIFACT_SECTION_MINIMUMS[collection] ?? 0)
+    );
+    artifact[collection].splice(-Math.max(1, Math.ceil(removable / 2)));
   }
   artifact.summary.reportedFiles = artifact.files.length;
   artifact.summary.reportedFunctions = artifact.functions.length;
@@ -97,17 +139,17 @@ export function createStructuralAuditArtifact(
     .sort((left, right) => right.score - left.score || right.lines - left.lines)
     .slice(0, ARTIFACT_ITEM_LIMIT)
     .map((metric) => sanitizeMetric(metric, sanitizerOptions));
-  const findings = report.advisories
-    .slice(0, ARTIFACT_ITEM_LIMIT)
-    .map((finding) => sanitizeMetric(finding, sanitizerOptions));
-  const clusters = [...fragmentationReport.clusters]
+  const findings = [...report.advisories]
     .sort(
       (left, right) =>
-        ({ Split: 0, Consolidate: 1, Keep: 2 })[left.decision] -
-          { Split: 0, Consolidate: 1, Keep: 2 }[right.decision] ||
-        right.maximumStructuralScore - left.maximumStructuralScore ||
-        left.id.localeCompare(right.id)
+        (right.score ?? 0) - (left.score ?? 0) ||
+        (left.file ?? '').localeCompare(right.file ?? '') ||
+        (left.line ?? 0) - (right.line ?? 0) ||
+        (left.id ?? '').localeCompare(right.id ?? '')
     )
+    .slice(0, ARTIFACT_ITEM_LIMIT)
+    .map((finding) => sanitizeMetric(finding, sanitizerOptions));
+  const clusters = interleaveAuditClusters(fragmentationReport.clusters)
     .slice(0, ARTIFACT_ITEM_LIMIT)
     .map((cluster) => sanitizeMetric(cluster, sanitizerOptions, { omitFunctions: true }));
   return boundAuditArtifact(

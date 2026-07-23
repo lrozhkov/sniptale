@@ -159,6 +159,34 @@ it('partitions every file once and consolidates only corroborated one-owner frag
   expect(report.clusters.some((candidate) => candidate.id === 'tooling/quiet/owner')).toBe(false);
 });
 
+it('keeps nested change-reason owners separate from unrelated adapter boundaries', () => {
+  const sources = {
+    'apps/extension/src/content/demo/owner/operation/core.ts':
+      'export function run() { return true; }',
+    'apps/extension/src/content/demo/owner/operation/getter.ts': "export { run } from './core';",
+    'apps/extension/src/content/demo/owner/operation/setter.ts': "export { run } from './core';",
+    'apps/extension/src/content/demo/owner/operation/refs.ts':
+      "import { run } from './core'; export const ref = () => run();",
+    'apps/extension/src/content/demo/owner/transport/adapter.ts':
+      'export function send() { return true; }',
+  };
+  const metrics = Object.keys(sources).map((file) =>
+    metric(file, file.endsWith('/transport/adapter.ts') ? { architecturalLayer: 'adapter' } : {})
+  );
+  const report = collect(sources, metrics);
+
+  expect(report.summary.totalClusters).toBe(2);
+  expect(
+    report.clusters.find((cluster) => cluster.id.endsWith('/demo/owner/operation'))
+  ).toMatchObject({
+    decision: 'Consolidate',
+    mergeTarget: 'apps/extension/src/content/demo/owner/operation/core.ts',
+  });
+  expect(report.clusters.some((cluster) => cluster.id.endsWith('/demo/owner/transport'))).toBe(
+    false
+  );
+});
+
 it('vetoes consolidation for independent same-spelling lexical authorities', () => {
   const sources = {
     'tooling/weak/owner/core.ts': 'export const core = true;',

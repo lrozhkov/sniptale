@@ -18550,13 +18550,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/structural-audit.mjs",
-        "contentHash": "e9fb30f34509a19173a41211e83406c4fb207c5da57400f8b8c2c8113d7c91bc"
+        "contentHash": "3aa58b98b4b4944dafd51b090ffa7de1f993f988649cf60a9ef987a12eeda427"
       },
       "consumers": [
         "tooling/qa/wrappers/structural-audit.mjs",
         "tooling/qa/wrappers/structural-audit.test.ts"
       ],
       "surfaces": [
+        "binding:ARTIFACT_SECTION_MINIMUMS",
         "property:createStructuralAuditArtifact/summary",
         "property:runStructuralAuditWrapper/context",
         "property:runStructuralAuditWrapper/steps",
@@ -18957,7 +18958,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/topology-fragmentation.mjs",
-        "contentHash": "e67855949871c88fb616d7a0c66e2d1fe2c6b0a4a5dc49cb95f6a918828b6299"
+        "contentHash": "89fb76e8670ccfb5b84691ccb5e37ff675b02cb1073a307dea08275b50f9a073"
       },
       "consumers": [
         "tooling/qa/core/topology-fragmentation.mjs",
