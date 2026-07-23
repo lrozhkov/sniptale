@@ -30,6 +30,7 @@ const FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES = new Set([
   'background-storage.mjs',
   'cast-cleanup-content.mjs',
   'cast-cleanup-shared.mjs',
+  'content-selection.mjs',
   'editor.mjs',
   'extension-ui-entrypoints.mjs',
   'gallery-backup.mjs',

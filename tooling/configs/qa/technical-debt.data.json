@@ -3356,12 +3356,7 @@
         "apps/extension/src/content/selection/selection-mode/controller/actions.ts",
         "apps/extension/src/content/selection/selection-mode/controller/index.ts",
         "apps/extension/src/content/selection/selection-mode/diag.ts",
-        "apps/extension/src/content/selection/selection-mode/events/bridge/cancel-selection.ts",
-        "apps/extension/src/content/selection/selection-mode/events/bridge/cleanup.ts",
-        "apps/extension/src/content/selection/selection-mode/events/bridge/confirm-selection.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/index.ts",
-        "apps/extension/src/content/selection/selection-mode/events/bridge/runtime-event-actions.ts",
-        "apps/extension/src/content/selection/selection-mode/events/bridge/types.ts",
         "apps/extension/src/content/selection/selection-mode/events/commands.ts",
         "apps/extension/src/content/selection/selection-mode/events/handlers/activation.ts",
         "apps/extension/src/content/selection/selection-mode/events/handlers/helpers.ts",
@@ -3757,12 +3752,7 @@
         "apps/extension/src/content/selection/selection-mode/controller/actions.ts",
         "apps/extension/src/content/selection/selection-mode/controller/index.ts",
         "apps/extension/src/content/selection/selection-mode/diag.ts",
-        "apps/extension/src/content/selection/selection-mode/events/bridge/cancel-selection.ts",
-        "apps/extension/src/content/selection/selection-mode/events/bridge/cleanup.ts",
-        "apps/extension/src/content/selection/selection-mode/events/bridge/confirm-selection.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/index.ts",
-        "apps/extension/src/content/selection/selection-mode/events/bridge/runtime-event-actions.ts",
-        "apps/extension/src/content/selection/selection-mode/events/bridge/types.ts",
         "apps/extension/src/content/selection/selection-mode/events/commands.ts",
         "apps/extension/src/content/selection/selection-mode/events/handlers/activation.ts",
         "apps/extension/src/content/selection/selection-mode/events/handlers/helpers.ts",
@@ -14928,6 +14918,26 @@
       ]
     },
     {
+      "id": "policy.source.content-selection-mjs.86ac00cc5c",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
+        "contentHash": "28d1ba6248f70f58ca32ed9a5ae23793ead358b701072cf7525252d9284c7526"
+      },
+      "consumers": [
+        "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
+        "tooling/qa/core/focused-coverage/maps/index.mjs"
+      ],
+      "surfaces": [
+        "binding:CONTENT_SELECTION_OWNER_MAPPINGS",
+        "property:testFiles"
+      ]
+    },
+    {
       "id": "policy.source.contract-mjs.0013ae4e22",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -16372,7 +16382,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/index.mjs",
-        "contentHash": "e1e0964023720ffd22ebf34228843e640e969e8964db06dbd6c5d3c139eaae13"
+        "contentHash": "2c97b04cd249ae0934820e1766e75c6bcf15ed74075ce91cc4d442bd97a74d6b"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage-owner-map.mjs",
@@ -17692,7 +17702,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "39ec9586b6f45314b2e9b9c5f4751cd38d2289d08b2289c3640d4c443f763e0e"
+        "contentHash": "8dabc3a03bcc0c81a85b7ae7e0d1dea23e3ef0361feff6d0d307be3b70e577a2"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",

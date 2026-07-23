@@ -44,6 +44,19 @@ it('keeps popup runtime owners on their adjacent proof instead of the broad popu
   ]);
 });
 
+it('keeps selection-mode event bridge changes on bounded owner proof', async () => {
+  const module = await importOwnerMap();
+
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/content/selection/selection-mode/events/bridge/index.ts'
+    )
+  ).toEqual([
+    'apps/extension/src/content/selection/selection-mode/events/bridge/root.test.ts',
+    'apps/extension/src/content/selection/selection-mode/runtime/composition.test.ts',
+  ]);
+});
+
 it('keeps a migration prefix non-exclusive so exact owner proof remains authoritative', async () => {
   const module = await importOwnerMap();
   const file = 'apps/extension/src/composition/persistence/projects/index.ts';
