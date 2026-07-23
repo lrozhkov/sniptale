@@ -243,9 +243,9 @@ export function runStructuralAuditWrapper(options = {}) {
           ].join(' ')
         ),
         consoleOutput:
-          formatStructuralRiskConsole(report) +
           formatTopologyFragmentationConsole(fragmentationReport) +
-          `Artifact: ${STRUCTURAL_AUDIT_REPORT_PATH}\n`,
+          `Artifact: ${STRUCTURAL_AUDIT_REPORT_PATH}\n` +
+          formatStructuralRiskConsole(report, { limit: 12, remainderLocation: 'in artifact' }),
         advisories: report.advisories,
       },
     ],

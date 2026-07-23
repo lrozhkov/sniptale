@@ -305,14 +305,21 @@ export function createStructuralRiskReport({
   };
 }
 
-export function formatStructuralRiskConsole(report) {
+export function formatStructuralRiskConsole(
+  report,
+  { limit = 100, remainderLocation = 'not shown' } = {}
+) {
   const lines = [
     `Structural risk (${report.scope}): attention=${report.violations.length}, watch=${report.advisories.length}`,
   ];
-  for (const finding of [...report.violations, ...report.advisories].slice(0, 100)) {
+  const findings = [...report.violations, ...report.advisories];
+  for (const finding of findings.slice(0, limit)) {
     lines.push(
       `- [${finding.severity}] ${finding.id} ${finding.file}:${finding.line} ${finding.symbol} — ${finding.reason}`
     );
+  }
+  if (findings.length > limit) {
+    lines.push(`... ${findings.length - limit} more structural findings ${remainderLocation}`);
   }
   return `${lines.join('\n')}\n`;
 }

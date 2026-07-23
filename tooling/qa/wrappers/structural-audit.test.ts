@@ -5,6 +5,7 @@ import { expect, it } from 'vitest';
 import { QA_WRAPPER_CLI_CONTRACTS } from './cli-contracts.mjs';
 import { STRUCTURAL_AUDIT_STEPS } from '../core/qa-steps/definitions.data.mjs';
 import { resolveQaLanePolicy } from '../core/qa-steps/policy/lane.mjs';
+import { formatStructuralRiskConsole } from '../core/structural-risk/report.mjs';
 import { createTempRoot } from '../core/test-helpers';
 import {
   runStructuralAuditWrapper,
@@ -195,4 +196,59 @@ it('composes one visible structural and topology block without running a reposit
   expect(output.match(/Topology fragmentation \(manual report-only\)/gu)).toHaveLength(1);
   expect(output).toContain('attention=0, watch=0');
   expect(output).toContain('candidates=0, split=0, consolidate=0, keep=0');
+});
+
+it('keeps topology, artifact location, and a bounded structural preview visible', () => {
+  const root = createTempRoot('structural-audit-console-');
+  const outputPath = path.join(root, 'report.json');
+  const advisories = Array.from({ length: 20 }, (_, index) => ({
+    severity: 'watch',
+    id: `structural-${index}`,
+    file: `apps/extension/src/content/demo/file-${index}.ts`,
+    line: 1,
+    symbol: '<file>',
+    reason: 'bounded preview evidence',
+  }));
+  const result = runStructuralAuditWrapper({
+    files: [],
+    root,
+    structuralReportFactory: () => ({
+      scope: 'repo-wide-audit',
+      files: [],
+      functions: [],
+      violations: [],
+      advisories,
+    }),
+    fragmentationReportFactory: () => ({
+      clusters: [],
+      summary: { totalClusters: 0, candidateClusters: 0, split: 0, consolidate: 0, keep: 0 },
+    }),
+    artifactOptions: {
+      outputPath,
+      sanitizerOptions: { repositoryRoot: root, sensitiveValues: [] },
+    },
+  });
+  const output = result.steps[0].consoleOutput;
+
+  expect(output.indexOf('Topology fragmentation')).toBeLessThan(output.indexOf('Artifact:'));
+  expect(output.indexOf('Artifact:')).toBeLessThan(output.indexOf('Structural risk'));
+  expect(output.match(/- \[watch\]/gu)).toHaveLength(12);
+  expect(output).toContain('... 8 more structural findings in artifact');
+});
+
+it('does not claim an audit artifact for bounded diff-scoped output', () => {
+  const output = formatStructuralRiskConsole(
+    {
+      scope: 'current-diff',
+      violations: [],
+      advisories: [
+        { severity: 'watch', id: 'one', file: 'one.ts', line: 1, symbol: '<file>', reason: 'one' },
+        { severity: 'watch', id: 'two', file: 'two.ts', line: 1, symbol: '<file>', reason: 'two' },
+      ],
+    },
+    { limit: 1 }
+  );
+
+  expect(output).toContain('... 1 more structural findings not shown');
+  expect(output).not.toContain('in artifact');
 });

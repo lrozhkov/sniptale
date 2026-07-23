@@ -17821,7 +17821,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/report.mjs",
-        "contentHash": "0bc556bd7889fcc148027dd1b1ce0453b7f4ba4275c9affce44ea05a79b2896c"
+        "contentHash": "6194038ec9badbbf70a935d38d0154b827896298569dcc0749e113f0e9736ea9"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/authority-aliases.test.ts",
@@ -17831,7 +17831,8 @@
         "tooling/qa/core/structural-risk/report.mjs",
         "tooling/qa/core/verify-structural-risk.mjs",
         "tooling/qa/core/verify-structural-risk.test.ts",
-        "tooling/qa/wrappers/structural-audit.mjs"
+        "tooling/qa/wrappers/structural-audit.mjs",
+        "tooling/qa/wrappers/structural-audit.test.ts"
       ],
       "surfaces": [
         "binding:ALLOWANCE_RULES"
@@ -18549,7 +18550,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/structural-audit.mjs",
-        "contentHash": "3aa58b98b4b4944dafd51b090ffa7de1f993f988649cf60a9ef987a12eeda427"
+        "contentHash": "ac2c14ee17fd951a0d964799afde589734b7fd2b60aacd2ccc2d2c16c9f586fa"
       },
       "consumers": [
         "tooling/qa/wrappers/structural-audit.mjs",
