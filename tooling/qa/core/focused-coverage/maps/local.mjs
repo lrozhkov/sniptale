@@ -139,6 +139,24 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'content-frame-settings-popover-bindings',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/bindings.ts',
+    reason:
+      'Frame-settings popover binding and close ordering are exercised through the owner-level body suite.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/body.test.tsx'],
+  },
+  {
+    owner: 'content-frame-settings-popover-state',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/state/index.ts',
+    reason:
+      'Frame-settings session state is exercised by the body, lifecycle, and action behavior suites.',
+    testFiles: [
+      'apps/extension/src/content/selection/frame-settings-popover/body.test.tsx',
+      'apps/extension/src/content/selection/frame-settings-popover/state/helpers.test.ts',
+      'apps/extension/src/content/selection/frame-settings-popover/state/lifecycle.test.tsx',
+    ],
+  },
+  {
     owner: 'gallery-library-types',
     productionFile: 'apps/extension/src/gallery/library/types.ts',
     reason:

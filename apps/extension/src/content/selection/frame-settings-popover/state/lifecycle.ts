@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
   BlurSettings,
@@ -6,11 +6,12 @@ import type {
   FocusSettings,
   HighlighterSettings,
 } from '../../../../features/highlighter/contracts';
+import { loadHighlighterSettings } from '../../../../composition/persistence/highlighter';
 import {
+  createDefaultHighlighterSettings,
   DEFAULT_BLUR_SETTINGS,
   DEFAULT_BORDER_PRESET,
-  loadHighlighterSettings,
-} from '../../../../composition/persistence/highlighter';
+} from '../../../../features/highlighter/style/defaults';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import { getDefaultFocusSettings } from './helpers';
 
@@ -80,7 +81,7 @@ function loadFrameSettingsDefaults(args: LoadFrameSettingsDefaultsArgs) {
     });
 }
 
-export function useFrameSettingsPopoverLoadEffect(args: FrameSettingsPopoverLoadEffectArgs) {
+function useFrameSettingsPopoverLoadEffect(args: FrameSettingsPopoverLoadEffectArgs) {
   const {
     blurSettingsRef,
     focusSettingsRef,
@@ -173,9 +174,7 @@ type FrameSettingsPopoverOpenStateEffectArgs = {
   setSelectedPresetId: (presetId: string) => void;
 };
 
-export function useFrameSettingsPopoverOpenStateEffect(
-  args: FrameSettingsPopoverOpenStateEffectArgs
-) {
+function useFrameSettingsPopoverOpenStateEffect(args: FrameSettingsPopoverOpenStateEffectArgs) {
   const {
     blurSettingsRef,
     borderSettingsRef,
@@ -220,29 +219,69 @@ export function useFrameSettingsPopoverOpenStateEffect(
   ]);
 }
 
-export function useFrameSettingsPopoverCleanupEffect(args: {
-  blurDebounceRef: { current: number | null };
-  focusDebounceRef: { current: number | null };
+export function useFrameSettingsPopoverLifecycle(args: {
+  blurSettings?: BlurSettings;
+  borderSettings?: BorderPreset;
+  focusSettings?: FocusSettings;
+  frameId: string;
+  isOpen: boolean;
 }) {
-  const { blurDebounceRef, focusDebounceRef } = args;
+  const [globalSettings, setGlobalSettings] = useState(() => createDefaultHighlighterSettings());
+  const [selectedPresetId, setSelectedPresetId] = useState(DEFAULT_BORDER_PRESET.id);
+  const [localBlurSettings, setLocalBlurSettings] = useState<BlurSettings>({
+    ...DEFAULT_BLUR_SETTINGS,
+  });
+  const [localFocusSettings, setLocalFocusSettings] = useState<FocusSettings>(() =>
+    getDefaultFocusSettings()
+  );
+  const prevIsOpenRef = useRef(false);
+  const borderSettingsRef = useRef(args.borderSettings);
+  const blurSettingsRef = useRef(args.blurSettings);
+  const focusSettingsRef = useRef(args.focusSettings);
+  const localBlurSettingsDirtyRef = useRef(false);
+  const localFocusSettingsDirtyRef = useRef(false);
 
-  useEffect(() => {
-    return () => clearFrameSettingsDebounces(blurDebounceRef, focusDebounceRef);
-  }, [blurDebounceRef, focusDebounceRef]);
-}
+  borderSettingsRef.current = args.borderSettings;
+  blurSettingsRef.current = args.blurSettings;
+  focusSettingsRef.current = args.focusSettings;
 
-function clearFrameSettingsDebounces(
-  blurDebounceRef: { current: number | null },
-  focusDebounceRef: { current: number | null }
-) {
-  const blurTimeout = blurDebounceRef.current;
-  const focusTimeout = focusDebounceRef.current;
+  useFrameSettingsPopoverLoadEffect({
+    blurSettingsRef,
+    focusSettingsRef,
+    isOpen: args.isOpen,
+    localBlurSettingsDirtyRef,
+    localFocusSettingsDirtyRef,
+    setGlobalSettings,
+    setLocalBlurSettings,
+    setLocalFocusSettings,
+  });
+  useFrameSettingsPopoverOpenStateEffect({
+    blurSettingsRef,
+    borderSettingsRef,
+    focusSettingsRef,
+    frameId: args.frameId,
+    isOpen: args.isOpen,
+    localBlurSettingsDirtyRef,
+    localFocusSettingsDirtyRef,
+    prevIsOpenRef,
+    setLocalBlurSettings,
+    setLocalFocusSettings,
+    setSelectedPresetId,
+  });
 
-  if (blurTimeout) {
-    clearTimeout(blurTimeout);
-  }
-
-  if (focusTimeout) {
-    clearTimeout(focusTimeout);
-  }
+  return {
+    applyBlurSettingsFromUser: (settings: BlurSettings) => {
+      localBlurSettingsDirtyRef.current = true;
+      setLocalBlurSettings(settings);
+    },
+    applyFocusSettingsFromUser: (settings: FocusSettings) => {
+      localFocusSettingsDirtyRef.current = true;
+      setLocalFocusSettings(settings);
+    },
+    globalSettings,
+    localBlurSettings,
+    localFocusSettings,
+    selectPreset: (presetId: string) => setSelectedPresetId(presetId),
+    selectedPresetId,
+  };
 }

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { createTempRoot, writeFile } from './test-helpers';
+import { createTempRoot, importFresh, withCwd, writeFile } from './test-helpers';
 import {
   collectInstanceOwnershipInventoryViolations,
   INSTANCE_OWNERSHIP_INVENTORY,
@@ -49,6 +49,18 @@ it('loads validated inert JSON before deriving ownership sets', () => {
 
   writeFile(root, INSTANCE_OWNERSHIP_INVENTORY, '{ invalid json');
   expect(() => loadInstanceOwnershipInventory({ root })).toThrow('valid inert JSON');
+});
+
+it('resolves the default inventory independently of the caller working directory', async () => {
+  const expected = loadInstanceOwnershipInventory();
+  const unrelatedRoot = createTempRoot('instance-ownership-cwd-');
+
+  await withCwd(unrelatedRoot, async () => {
+    const freshOwner = await importFresh<
+      typeof import('./verify-instance-ownership.inventory-owner.mjs')
+    >('./verify-instance-ownership.inventory-owner.mjs');
+    expect(freshOwner.loadInstanceOwnershipInventory()).toEqual(expected);
+  });
 });
 
 it('accepts a retired target removal while preserving the remaining census', () => {

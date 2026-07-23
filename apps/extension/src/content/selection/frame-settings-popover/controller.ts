@@ -37,7 +37,7 @@ export function useFrameSettingsPopoverController(args: {
   });
   const bindings = useFrameSettingsPopoverBindings({
     anchorEl: args.anchorEl,
-    handleSelectPreset: state.handleSelectPreset,
+    handleSelectPreset: state.handlers.handleSelectPreset,
     onClose: args.onClose,
   });
 
@@ -54,10 +54,15 @@ export function useFrameSettingsPopoverController(args: {
   });
 
   return {
-    ...state,
-    getPopoverStyle: bindings.getPopoverStyle,
-    handleSelectPresetAndClose: bindings.handleSelectPresetAndClose,
-    popoverRef: bindings.popoverRef,
-    portalTheme,
+    handlers: {
+      ...state.handlers,
+      handleSelectPreset: bindings.handleSelectPresetAndClose,
+    },
+    settings: state.settings,
+    surface: {
+      getPopoverStyle: bindings.getPopoverStyle,
+      popoverRef: bindings.popoverRef,
+      portalTheme,
+    },
   };
 }

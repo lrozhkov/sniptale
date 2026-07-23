@@ -12,6 +12,7 @@ const loggerMocks = vi.hoisted(() => ({
 
 const storageMocks = vi.hoisted(() => ({
   loadHighlighterSettings: vi.fn(),
+  setDefaultBorderPreset: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -26,6 +27,7 @@ vi.mock('../../../composition/persistence/highlighter', async () => {
   return {
     ...actual,
     loadHighlighterSettings: storageMocks.loadHighlighterSettings,
+    setDefaultBorderPreset: storageMocks.setDefaultBorderPreset,
   };
 });
 
@@ -94,6 +96,18 @@ function getRangeInput() {
   return input;
 }
 
+function getPresetButton(name: string) {
+  const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find((candidate) =>
+    candidate.textContent?.includes(name)
+  );
+
+  if (!button) {
+    throw new Error(`Expected frame settings preset button: ${name}`);
+  }
+
+  return button;
+}
+
 function setRangeInputValue(input: HTMLInputElement, value: string) {
   const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
 
@@ -134,6 +148,7 @@ async function flushAsyncEffects() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   storageMocks.loadHighlighterSettings.mockReset();
+  storageMocks.setDefaultBorderPreset.mockReset();
   loggerMocks.error.mockReset();
 
   anchorEl = document.createElement('button');
@@ -254,5 +269,36 @@ describe('FrameSettingsPopoverBody pending focus edits', () => {
     });
 
     expect(getRangeInput().value).toBe('30');
+  });
+});
+
+describe('FrameSettingsPopoverBody preset close ordering', () => {
+  it('closes after the selected preset persistence attempt completes', async () => {
+    const deferredPersistence = createDeferred<void>();
+    const onApplyToFrame = vi.fn();
+    const onClose = vi.fn();
+    storageMocks.loadHighlighterSettings.mockReturnValue(
+      new Promise<HighlighterSettings>(() => undefined)
+    );
+    storageMocks.setDefaultBorderPreset.mockReturnValue(deferredPersistence.promise);
+
+    renderBody({ onApplyToFrame, onClose });
+
+    act(() => {
+      getPresetButton(DEFAULT_BORDER_PRESET.name).click();
+    });
+
+    expect(onApplyToFrame).toHaveBeenCalledWith({
+      borderSettings: { ...DEFAULT_BORDER_PRESET },
+    });
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      deferredPersistence.resolve(undefined);
+      await deferredPersistence.promise;
+      await Promise.resolve();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

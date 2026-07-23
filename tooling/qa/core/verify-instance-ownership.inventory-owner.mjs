@@ -1,14 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { parseNamedDeclarativeConstArray } from './declarative-inventory.mjs';
 import { readHeadFileText } from './git-head-sources.mjs';
-import { repoRoot } from './shared.mjs';
 import { createSourceFile } from './structural-risk/ast.mjs';
 
 export const INSTANCE_OWNERSHIP_INVENTORY = 'tooling/configs/qa/instance-ownership.data.json';
 
 const LEGACY_INSTANCE_OWNERSHIP_SOURCE = 'tooling/qa/core/verify-instance-ownership.data.mjs';
+const DEFAULT_INVENTORY_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const OWNERSHIP_RULES = new Set(['facade-default-owner', 'no-top-level-mutable-runtime-state']);
 const WAVE_KEYS = ['files', 'id', 'rule'];
 
@@ -192,7 +193,7 @@ function collectPopulationViolations(currentWaves, headWaves, root) {
   return issues;
 }
 
-export function loadInstanceOwnershipInventory({ root = repoRoot } = {}) {
+export function loadInstanceOwnershipInventory({ root = DEFAULT_INVENTORY_ROOT } = {}) {
   const current = readCurrentInventory(root);
   if (current.violations.length > 0) {
     throw new Error(current.violations.map((item) => item.message).join(' '));
@@ -201,7 +202,7 @@ export function loadInstanceOwnershipInventory({ root = repoRoot } = {}) {
 }
 
 export function collectInstanceOwnershipInventoryViolations({
-  root = repoRoot,
+  root = DEFAULT_INVENTORY_ROOT,
   headSourceResolver = (file) => readHeadFileText(file, { root }),
 } = {}) {
   const current = readCurrentInventory(root);

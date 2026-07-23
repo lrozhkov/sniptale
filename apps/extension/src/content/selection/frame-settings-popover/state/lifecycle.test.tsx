@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,7 +28,7 @@ vi.mock('../../../../composition/persistence/highlighter', async () => {
   };
 });
 
-import { useFrameSettingsPopoverLoadEffect } from './lifecycle';
+import { useFrameSettingsPopoverState } from '.';
 
 const DEFAULT_SETTINGS: HighlighterSettings = {
   borderPresets: [],
@@ -43,27 +42,10 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 function Harness(props: { isOpen: boolean; tick: number }) {
-  const blurSettingsRef = React.useRef<HighlighterSettings['defaultBlurSettings'] | undefined>(
-    undefined
-  );
-  const focusSettingsRef = React.useRef<HighlighterSettings['defaultFocusSettings'] | undefined>(
-    undefined
-  );
-  const localBlurSettingsDirtyRef = React.useRef(false);
-  const localFocusSettingsDirtyRef = React.useRef(false);
-  const [, setGlobalSettings] = React.useState<HighlighterSettings | null>(null);
-  const [, setLocalBlurSettings] = React.useState(DEFAULT_SETTINGS.defaultBlurSettings);
-  const [, setLocalFocusSettings] = React.useState(DEFAULT_SETTINGS.defaultFocusSettings);
-
-  useFrameSettingsPopoverLoadEffect({
-    blurSettingsRef,
-    focusSettingsRef,
+  useFrameSettingsPopoverState({
+    frameId: 'frame-1',
     isOpen: props.isOpen,
-    localBlurSettingsDirtyRef,
-    localFocusSettingsDirtyRef,
-    setGlobalSettings,
-    setLocalBlurSettings,
-    setLocalFocusSettings,
+    onApplyToFrame: () => undefined,
   });
 
   return <div data-tick={String(props.tick)} />;
@@ -97,7 +79,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('useFrameSettingsPopoverLoadEffect', () => {
+describe('frame settings popover state lifecycle', () => {
   it('loads persisted defaults once while the popover stays open across rerenders', async () => {
     storageMocks.loadHighlighterSettings.mockResolvedValue(DEFAULT_SETTINGS);
 

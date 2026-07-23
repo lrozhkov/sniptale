@@ -47,11 +47,6 @@ export interface FrameSettingsPopoverSurfaceContentProps
   globalSettings: HighlighterSettings;
 }
 
-export interface FrameSettingsPopoverStateResult
-  extends FrameSettingsPopoverSettingHandlers, FrameSettingsPopoverLocalSettings {
-  globalSettings: HighlighterSettings;
-}
-
 export interface FrameSettingsPopoverSurfaceShellProps extends FrameSettingsPopoverSurfaceContentProps {
   dataFrameId: string;
   getPopoverStyle: () => React.CSSProperties;

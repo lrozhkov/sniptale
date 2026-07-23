@@ -1,6 +1,6 @@
 import { getThemedPortalStyle } from '../interactive-frame/layout/portal';
-import { FrameSettingsPopoverSurfaceContent } from './surface-content';
 import type { FrameSettingsPopoverSurfaceShellProps } from './types';
+import { FrameSettingsPopoverContent } from './views';
 
 function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
   event.stopPropagation();
@@ -19,7 +19,19 @@ export function FrameSettingsPopoverSurfaceShell(props: FrameSettingsPopoverSurf
       style={getThemedPortalStyle(props.portalTheme, props.getPopoverStyle())}
     >
       <div className="sniptale-content-popover-body">
-        <FrameSettingsPopoverSurfaceContent {...props} />
+        <FrameSettingsPopoverContent
+          effectMode={props.effectMode}
+          globalSettings={props.globalSettings}
+          handleBlurChange={props.handleBlurChange}
+          handleBlurShowBorderChange={props.handleBlurShowBorderChange}
+          handleBlurTypeChange={props.handleBlurTypeChange}
+          handleFocusChange={props.handleFocusChange}
+          handleFocusShowBorderChange={props.handleFocusShowBorderChange}
+          handleSelectPreset={props.handleSelectPreset}
+          localBlurSettings={props.localBlurSettings}
+          localFocusSettings={props.localFocusSettings}
+          selectedPresetId={props.selectedPresetId}
+        />
       </div>
     </div>
   );

@@ -3198,18 +3198,11 @@
         "apps/extension/src/content/selection/frame-settings-popover/bindings.ts",
         "apps/extension/src/content/selection/frame-settings-popover/body.tsx",
         "apps/extension/src/content/selection/frame-settings-popover/controller.ts",
-        "apps/extension/src/content/selection/frame-settings-popover/handlers.ts",
         "apps/extension/src/content/selection/frame-settings-popover/helpers.tsx",
         "apps/extension/src/content/selection/frame-settings-popover/index.tsx",
-        "apps/extension/src/content/selection/frame-settings-popover/state/bindings.ts",
-        "apps/extension/src/content/selection/frame-settings-popover/state/handlers.ts",
         "apps/extension/src/content/selection/frame-settings-popover/state/helpers.ts",
         "apps/extension/src/content/selection/frame-settings-popover/state/index.ts",
         "apps/extension/src/content/selection/frame-settings-popover/state/lifecycle.ts",
-        "apps/extension/src/content/selection/frame-settings-popover/state/refs.ts",
-        "apps/extension/src/content/selection/frame-settings-popover/state/result.ts",
-        "apps/extension/src/content/selection/frame-settings-popover/state/values.ts",
-        "apps/extension/src/content/selection/frame-settings-popover/surface-content.tsx",
         "apps/extension/src/content/selection/frame-settings-popover/surface-shell.tsx",
         "apps/extension/src/content/selection/frame-settings-popover/surface.tsx",
         "apps/extension/src/content/selection/frame-settings-popover/sync.ts",
@@ -16679,7 +16672,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "9ca26183ded4826b25ee9f733dc2c4674f054e5f8366caeedd83380192ffbafb"
+        "contentHash": "b8e8d7ea0a9f82380e40a6df969bd2776890a43af71d2aa5ad5ba251ec3a6c02"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16714,6 +16707,8 @@
         "property:testFiles[30]",
         "property:testFiles[31]",
         "property:testFiles[32]",
+        "property:testFiles[33]",
+        "property:testFiles[34]",
         "property:testFiles[4]",
         "property:testFiles[5]",
         "property:testFiles[6]",
@@ -20390,7 +20385,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs",
-        "contentHash": "5b3246e533bcddcef47deeb2728b5cc5b756a88572d138241099ceee64dacd75"
+        "contentHash": "26dd45e7d7b4bd10bac778c1e4cf82312e7b76090c8b4eefba9ffeadfecf8e48"
       },
       "consumers": [
         "tooling/qa/core/harness-freshness-step.mjs",
