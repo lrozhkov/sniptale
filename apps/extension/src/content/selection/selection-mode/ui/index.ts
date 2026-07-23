@@ -1,8 +1,9 @@
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
-import { createSelectionModeFinalElements, type FinalElementsOptions } from './final-elements';
+import { createSelectionModeFinalElements } from './final-elements';
 import { hideSelectionModeCancelButton } from './cancel-button';
 import type { SelectionModeDom } from './dom-types';
 import { getSelectionDragFrameStyle } from './style';
+import type { SelectionModeFinalElementsOptions } from './types';
 export {
   cleanupSelectionModeDom,
   resetFinalElements,
@@ -53,7 +54,10 @@ export function removeDragEventCatcher(dom: SelectionModeDom): void {
   dom.dragEventCatcher = null;
 }
 
-export function createFinalElements(dom: SelectionModeDom, options: FinalElementsOptions): void {
+export function createFinalElements(
+  dom: SelectionModeDom,
+  options: SelectionModeFinalElementsOptions
+): void {
   createSelectionModeFinalElements(dom, options);
   hideSelectionModeCancelButton(dom);
 }
