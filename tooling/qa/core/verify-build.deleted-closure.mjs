@@ -1,10 +1,13 @@
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { resolveDeterministicFocusedCoverageOwnerTests } from './focused-coverage-owner-tests.mjs';
 import { isBuildTestFile } from './build-test-file-classifier.mjs';
-import { readHeadFileText } from './git-head-sources.mjs';
+import {
+  listHeadCodeFilesContainingText,
+  listHeadFilesUnderPath,
+  readHeadFileText,
+} from './git-head-sources.mjs';
 import { collectModuleImportGraph } from './module-import-graph.mjs';
 import { isCodeFile } from './shared.mjs';
 import { classifyOwnerGroup } from './structural-risk/owner-classifier.mjs';
@@ -12,6 +15,7 @@ import {
   collectDeletedAggregateProviders,
   createDeletedAggregateAnalyzer,
 } from './verify-build.deleted-aggregate.mjs';
+import { createDeletedDeadExportAnalyzer } from './verify-build.deleted-dead-export.mjs';
 
 function uniqueSorted(values) {
   return [...new Set(values)].sort();
@@ -25,24 +29,6 @@ function indexEdges(edges, key, value) {
     index.set(edge[key], values);
   }
   return index;
-}
-
-function runHeadPathQuery(root, args, acceptedStatuses) {
-  const result = spawnSync('git', args, {
-    cwd: root,
-    encoding: 'utf8',
-    maxBuffer: 16 * 1024 * 1024,
-  });
-  if (result.error || !acceptedStatuses.has(result.status) || typeof result.stdout !== 'string') {
-    return { complete: false, files: [] };
-  }
-  return {
-    complete: true,
-    files: result.stdout
-      .split(/\r?\n/u)
-      .map((line) => line.replace(/^HEAD:/u, ''))
-      .filter(Boolean),
-  };
 }
 
 function collectManifestTargets(value) {
@@ -126,36 +112,14 @@ function collectHeadCandidateImporters(file, root, readHeadSource) {
   const search = collectHeadSearchTokens(file, readHeadSource);
   if (!search.complete) return { candidates: [], complete: false };
   for (const token of search.tokens) {
-    const query = runHeadPathQuery(
-      root,
-      [
-        'grep',
-        '-l',
-        '-F',
-        '-e',
-        token,
-        'HEAD',
-        '--',
-        '*.ts',
-        '*.tsx',
-        '*.js',
-        '*.jsx',
-        '*.mjs',
-        '*.cjs',
-      ],
-      new Set([0, 1])
-    );
+    const query = listHeadCodeFilesContainingText(token, { root });
     if (!query.complete) return { candidates: [], complete: false };
     for (const candidate of query.files) {
       candidates.add(candidate);
     }
   }
   if (path.posix.basename(file, path.posix.extname(file)) === 'index') {
-    const query = runHeadPathQuery(
-      root,
-      ['ls-tree', '-r', '--name-only', 'HEAD', '--', path.posix.dirname(file)],
-      new Set([0])
-    );
+    const query = listHeadFilesUnderPath(path.posix.dirname(file), { root });
     if (!query.complete) return { candidates: [], complete: false };
     for (const candidate of query.files) {
       candidates.add(candidate);
@@ -295,6 +259,64 @@ function hasCurrentProviderRedirect(frontier, providers, productionCodeFiles, ro
   });
 }
 
+function createHeadSourceResolver() {
+  const sourcesByFile = new Map();
+  return function readHeadSource(file) {
+    if (!sourcesByFile.has(file)) {
+      sourcesByFile.set(file, readHeadFileText(file));
+    }
+    return sourcesByFile.get(file);
+  };
+}
+
+function createHeadImporterResolver({ headImporterResolver, readHeadSource, root }) {
+  const importersByFile = new Map();
+  const collectImporters =
+    headImporterResolver ?? ((file) => collectHeadImporters(file, root, readHeadSource));
+  return function resolveHeadImporters(file) {
+    if (!importersByFile.has(file)) {
+      const result = collectImporters(file);
+      importersByFile.set(
+        file,
+        Array.isArray(result) ? { complete: true, importers: result } : result
+      );
+    }
+    return importersByFile.get(file);
+  };
+}
+
+function resolveChangedConsumerProof(frontier, currentEdges, currentFiles) {
+  if (frontier.length === 0) return null;
+  const successors = expandCurrentSuccessors(frontier, currentEdges, currentFiles);
+  return new Set(successors.map(classifyOwnerGroup)).size === 1 ? successors : null;
+}
+
+function resolveAggregateProviderProof({
+  analyzeAggregate,
+  file,
+  frontier,
+  isDeletedDeadExport,
+  productionCodeFiles,
+  providerOwnerTestResolver,
+  readHeadSource,
+  root,
+  targetFiles,
+}) {
+  const providers = collectDeletedAggregateProviders({
+    analyzeAggregate,
+    file,
+    isDeletedDeadExport,
+    readHeadSource,
+    root,
+    targets: targetFiles,
+  });
+  return providers.length > 0 &&
+    providers.every((provider) => providerOwnerTestResolver(provider).length > 0) &&
+    hasCurrentProviderRedirect(frontier, providers, productionCodeFiles, root)
+    ? { files: providers, proofKind: 'aggregate-providers' }
+    : null;
+}
+
 export function collectDeletedTargetSuccessors({
   headImporterResolver,
   providerOwnerTestResolver = resolveDeterministicFocusedCoverageOwnerTests,
@@ -310,27 +332,19 @@ export function collectDeletedTargetSuccessors({
     ? indexEdges(currentGraph.codeEdges, 'importer', 'target')
     : new Map();
   const successorsByFile = new Map();
-  const headImportersByFile = new Map();
-  const headSourcesByFile = new Map();
-  function readHeadSource(file) {
-    if (!headSourcesByFile.has(file)) {
-      headSourcesByFile.set(file, readHeadFileText(file));
-    }
-    return headSourcesByFile.get(file);
-  }
-  const collectImporters =
-    headImporterResolver ?? ((file) => collectHeadImporters(file, root, readHeadSource));
-  function resolveHeadImporters(file) {
-    if (!headImportersByFile.has(file)) {
-      const result = collectImporters(file);
-      headImportersByFile.set(
-        file,
-        Array.isArray(result) ? { complete: true, importers: result } : result
-      );
-    }
-    return headImportersByFile.get(file);
-  }
+  const readHeadSource = createHeadSourceResolver();
+  const resolveHeadImporters = createHeadImporterResolver({
+    headImporterResolver,
+    readHeadSource,
+    root,
+  });
   const analyzeAggregate = createDeletedAggregateAnalyzer(readHeadSource);
+  const isDeletedDeadExport = createDeletedDeadExportAnalyzer({
+    analyzeAggregate,
+    deletedFiles: new Set(deletedFiles),
+    readHeadSource,
+    root,
+  });
 
   for (const file of deletedFiles) {
     const frontier = collectPreviousConsumerFrontier(
@@ -341,26 +355,32 @@ export function collectDeletedTargetSuccessors({
       analyzeAggregate
     );
     if (!frontier.complete) continue;
-    if (frontier.frontier.length > 0) {
-      const successors = expandCurrentSuccessors(frontier.frontier, currentEdges, currentFiles);
-      if (new Set(successors.map(classifyOwnerGroup)).size === 1) {
-        successorsByFile.set(file, successors);
-        continue;
-      }
+    const changedConsumerProof = resolveChangedConsumerProof(
+      frontier.frontier,
+      currentEdges,
+      currentFiles
+    );
+    if (changedConsumerProof) {
+      successorsByFile.set(file, changedConsumerProof);
+      continue;
     }
-    const providers = collectDeletedAggregateProviders({
+    const aggregateProviderProof = resolveAggregateProviderProof({
       analyzeAggregate,
       file,
+      frontier: frontier.frontier,
+      isDeletedDeadExport,
+      productionCodeFiles,
+      providerOwnerTestResolver,
       readHeadSource,
       root,
-      targets: targetFiles,
+      targetFiles,
     });
-    if (
-      providers.length > 0 &&
-      providers.every((provider) => providerOwnerTestResolver(provider).length > 0) &&
-      hasCurrentProviderRedirect(frontier.frontier, providers, productionCodeFiles, root)
-    ) {
-      successorsByFile.set(file, { files: providers, proofKind: 'aggregate-providers' });
+    if (aggregateProviderProof) {
+      successorsByFile.set(file, aggregateProviderProof);
+      continue;
+    }
+    if (isDeletedDeadExport(file)) {
+      successorsByFile.set(file, { files: [], proofKind: 'dead-export' });
     }
   }
 

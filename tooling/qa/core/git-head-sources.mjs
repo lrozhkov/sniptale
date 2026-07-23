@@ -1,9 +1,44 @@
 import { spawnSync } from 'node:child_process';
 
 const GIT_BATCH_MAX_BUFFER = 64 * 1024 * 1024;
+const HEAD_CODE_GLOBS = ['*.ts', '*.tsx', '*.js', '*.jsx', '*.mjs', '*.cjs'];
 
 function resolveGitExecutable() {
   return process.platform === 'win32' ? 'git.exe' : 'git';
+}
+
+function runHeadQuery(args, acceptedStatuses, { root = process.cwd(), spawnSyncImpl = spawnSync }) {
+  const result = spawnSyncImpl(resolveGitExecutable(), args, {
+    cwd: root,
+    encoding: 'utf8',
+    maxBuffer: GIT_BATCH_MAX_BUFFER,
+  });
+  if (result.error || !acceptedStatuses.has(result.status) || typeof result.stdout !== 'string') {
+    return { complete: false, files: [] };
+  }
+  return {
+    complete: true,
+    files: result.stdout
+      .split(/\r?\n/u)
+      .map((line) => line.replace(/^HEAD:/u, ''))
+      .filter(Boolean),
+  };
+}
+
+export function listHeadCodeFilesContainingText(text, options = {}) {
+  return runHeadQuery(
+    ['grep', '-l', '-F', '-e', text, 'HEAD', '--', ...HEAD_CODE_GLOBS],
+    new Set([0, 1]),
+    options
+  );
+}
+
+export function listHeadFilesUnderPath(relativePath, options = {}) {
+  return runHeadQuery(
+    ['ls-tree', '-r', '--name-only', 'HEAD', '--', relativePath],
+    new Set([0]),
+    options
+  );
 }
 
 export function readHeadFileTexts(relativePaths, { spawnSyncImpl = spawnSync } = {}) {

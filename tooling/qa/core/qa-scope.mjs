@@ -18,6 +18,38 @@ const HARNESS_INVENTORY_ONLY_FILES = new Set([
   'tooling/configs/qa/technical-debt.data.json',
   'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs',
 ]);
+const FOCUSED_COVERAGE_OWNER_MAP_PREFIX = 'tooling/qa/core/focused-coverage/maps/';
+const FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES = new Set([
+  'ai.mjs',
+  'archive.mjs',
+  'as-never.mjs',
+  'audit-media.mjs',
+  'audit-storage.mjs',
+  'audit.mjs',
+  'background-storage.mjs',
+  'cast-cleanup-content.mjs',
+  'cast-cleanup-shared.mjs',
+  'editor.mjs',
+  'extension-ui-entrypoints.mjs',
+  'gallery-backup.mjs',
+  'har-export.mjs',
+  'media-hub-backup-package.mjs',
+  'media-hub-backup-privacy-export.mjs',
+  'media-hub-backup-privacy-restore.mjs',
+  'media-hub-backup-restore.mjs',
+  'media-hub.mjs',
+  'messaging.mjs',
+  'page-style.mjs',
+  'privacy-erasure-runtime.mjs',
+  'privacy-erasure-video-preview.mjs',
+  'scenario-ai.mjs',
+  'scenario-export.mjs',
+  'scenario-stage.mjs',
+  'video-project-export.mjs',
+  'video-recording-lease.mjs',
+  'video-runtime-routing.mjs',
+  'web-snapshot.mjs',
+]);
 const SHARED_CONTROL_PATTERNS = [/^\.github\/workflows\//u, /^\.husky\//u, /^docs\/tooling\//u];
 const VITE_CONFIG_PATTERN = /(?:^|\/)vite\.config\.[cm]?[jt]s$/u;
 const SHARED_CONTROL_FILES = new Set([
@@ -52,7 +84,16 @@ export function isHarnessQaFile(file) {
 }
 
 export function isHarnessInventoryOnlyFile(file) {
-  return HARNESS_INVENTORY_ONLY_FILES.has(file);
+  return HARNESS_INVENTORY_ONLY_FILES.has(file) || isFocusedCoverageOwnerMapInventoryFile(file);
+}
+
+export function isFocusedCoverageOwnerMapInventoryFile(file) {
+  if (!file.startsWith(FOCUSED_COVERAGE_OWNER_MAP_PREFIX) || !file.endsWith('.mjs')) {
+    return false;
+  }
+
+  const basename = file.slice(FOCUSED_COVERAGE_OWNER_MAP_PREFIX.length);
+  return !basename.includes('/') && FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES.has(basename);
 }
 
 export function isHarnessVerificationQaFile(file) {

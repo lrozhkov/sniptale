@@ -6,8 +6,8 @@ import type {
 } from '@sniptale/runtime-contracts/export';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
-import type { PopupSendResponse } from '../helpers';
-import type { emitPopupExportMessage, persistPopupExportArchive } from '../helpers';
+import type { persistPopupExportArchive } from '../helpers/archive/persist';
+import type { emitPopupExportMessage, PopupSendResponse } from '../helpers/messaging';
 
 export type PopupExportRunner = {
   buildPackage: (

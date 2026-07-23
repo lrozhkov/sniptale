@@ -1,11 +1,15 @@
 import { expect, it, vi } from 'vitest';
 
+import { createTempRoot, withCwd, writeFile } from './test-helpers';
+import { collectFocusedCoverageOwnerMapInventoryViolations } from './focused-coverage-owner-map.mjs';
 import {
   collectHarnessFreshnessStep,
   collectHarnessInventoryViolations,
 } from './harness-freshness-step.mjs';
 
 const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs';
+const FOCUSED_OWNER_MAP_INVENTORY =
+  'tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs';
 
 it('validates machine-owned inventory without consulting a harness stamp', () => {
   const harnessStateAsserter = vi.fn();
@@ -87,4 +91,115 @@ it('fails the harness step when the exact coverage rollout owner validator rejec
     ],
   });
   expect(coverageInventoryValidator).toHaveBeenCalledOnce();
+});
+
+it('owner-validates a focused coverage map without consulting a harness stamp', () => {
+  const harnessStateAsserter = vi.fn();
+  const focusedCoverageOwnerMapValidator = vi.fn(() => []);
+  const step = collectHarnessFreshnessStep(
+    {
+      harnessTargetFiles: [FOCUSED_OWNER_MAP_INVENTORY],
+      harnessInventoryTargetFiles: [FOCUSED_OWNER_MAP_INVENTORY],
+      harnessVerificationTargetFiles: [],
+    },
+    harnessStateAsserter,
+    'qa:checkpoint',
+    (context) => collectHarnessInventoryViolations(context, { focusedCoverageOwnerMapValidator })
+  );
+
+  expect(step).toMatchObject({
+    status: 'ok',
+    detail: 'data-only inventory owner validators passed',
+  });
+  expect(focusedCoverageOwnerMapValidator).toHaveBeenCalledOnce();
+  expect(harnessStateAsserter).not.toHaveBeenCalled();
+});
+
+it('fails a map-only harness step when focused owner mappings are stale', () => {
+  const mappingViolation = {
+    file: 'apps/extension/src/content/parser/popup-export/helpers/root.test.ts',
+    message: 'Mapped owner test file does not exist.',
+    rule: 'focused-coverage-owner-mapping-missing-test',
+  };
+  const focusedCoverageOwnerMapValidator = vi.fn(() => [mappingViolation]);
+  const step = collectHarnessFreshnessStep(
+    {
+      harnessTargetFiles: [FOCUSED_OWNER_MAP_INVENTORY],
+      harnessInventoryTargetFiles: [FOCUSED_OWNER_MAP_INVENTORY],
+      harnessVerificationTargetFiles: [],
+    },
+    vi.fn(),
+    'qa:checkpoint',
+    (context) => collectHarnessInventoryViolations(context, { focusedCoverageOwnerMapValidator })
+  );
+
+  expect(step).toMatchObject({
+    status: 'failed',
+    violations: [mappingViolation],
+  });
+  expect(focusedCoverageOwnerMapValidator).toHaveBeenCalledOnce();
+});
+
+it.each([
+  [
+    'relative static import',
+    [
+      'import { OTHER_MAPPINGS } from "./other.mjs";',
+      'export const CAST_CLEANUP_CONTENT_OWNER_MAPPINGS = [...OTHER_MAPPINGS];',
+    ],
+  ],
+  [
+    'non-relative import',
+    [
+      'import path from "node:path";',
+      'export const CAST_CLEANUP_CONTENT_OWNER_MAPPINGS = [path.sep];',
+    ],
+  ],
+  [
+    'dynamic import',
+    [
+      'const other = await import("./other.mjs");',
+      'export const CAST_CLEANUP_CONTENT_OWNER_MAPPINGS = [other];',
+    ],
+  ],
+  [
+    'top-level call',
+    ['registerCoverageOwner();', 'export const CAST_CLEANUP_CONTENT_OWNER_MAPPINGS = [];'],
+  ],
+  ['computed mapping', ['export const CAST_CLEANUP_CONTENT_OWNER_MAPPINGS = createMappings([]);']],
+  [
+    'computed property',
+    ['export const CAST_CLEANUP_CONTENT_OWNER_MAPPINGS = [{ [ownerKey]: "content" }];'],
+  ],
+])('fails an allowlisted map-only change with %s', async (_label, sourceLines) => {
+  const root = createTempRoot('focused-owner-map-inventory-composer-');
+  writeFile(root, FOCUSED_OWNER_MAP_INVENTORY, [...sourceLines, ''].join('\n'));
+
+  const step = await withCwd(root, async () =>
+    collectHarnessFreshnessStep(
+      {
+        harnessTargetFiles: [FOCUSED_OWNER_MAP_INVENTORY],
+        harnessInventoryTargetFiles: [FOCUSED_OWNER_MAP_INVENTORY],
+        harnessVerificationTargetFiles: [],
+      },
+      vi.fn(),
+      'qa:checkpoint',
+      (context) =>
+        collectHarnessInventoryViolations(context, {
+          focusedCoverageOwnerMapInventoryValidator: (files) =>
+            collectFocusedCoverageOwnerMapInventoryViolations(files, { root }),
+          focusedCoverageOwnerMapValidator: () => [],
+        })
+    )
+  );
+
+  expect(step).toMatchObject({
+    status: 'failed',
+    violations: [
+      {
+        file: FOCUSED_OWNER_MAP_INVENTORY,
+        rule: 'focused-coverage-owner-map-inventory-declarative-shape',
+      },
+    ],
+  });
 });

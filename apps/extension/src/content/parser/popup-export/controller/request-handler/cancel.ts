@@ -1,4 +1,4 @@
-import type { PopupSendResponse } from '../../helpers';
+import type { PopupSendResponse } from '../../helpers/messaging';
 import { resetPopupExportState } from '../state';
 import type { PopupExportRequestHandlerRuntime, PopupExportRunner } from '../types';
 

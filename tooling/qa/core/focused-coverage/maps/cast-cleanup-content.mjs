@@ -2,8 +2,8 @@ export const CAST_CLEANUP_CONTENT_OWNER_MAPPINGS = [
   {
     owner: 'content-popup-export-request-boundaries',
     productionPrefix: 'apps/extension/src/content/parser/popup-export/helpers/request/',
-    reason: 'Popup export request parsing is covered by popup export helper tests.',
-    testFiles: ['apps/extension/src/content/parser/popup-export/helpers/root.test.ts'],
+    reason: 'Popup export request boundaries are covered by focused parser tests.',
+    testFiles: ['apps/extension/src/content/parser/popup-export/helpers/request/parse.test.ts'],
   },
   {
     owner: 'content-popup-export-request-options',

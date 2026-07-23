@@ -3,11 +3,16 @@ import {
   HARNESS_QA_GUIDANCE,
   hasHarnessQaTargets,
   hasHarnessVerificationQaTargets,
+  isFocusedCoverageOwnerMapInventoryFile,
 } from './qa-scope.mjs';
 import { assertFreshHarnessState } from './verify-harness.state.helpers.mjs';
 import { verifyTechnicalDebtReport } from './technical-debt-report.mjs';
 import { runOssReleaseSurfaceCheck } from './verify-oss-release-surface.mjs';
 import { collectCoverageRolloutInventoryViolations } from './verify-test-coverage.registry.mjs';
+import {
+  collectFocusedCoverageOwnerMapInventoryViolations,
+  collectFocusedCoverageOwnerMappingViolations,
+} from './focused-coverage-owner-map.mjs';
 
 const TECHNICAL_DEBT_INVENTORY = 'tooling/configs/qa/technical-debt.data.json';
 const OSS_RELEASE_CONSUMER_INVENTORY = 'tooling/configs/qa/oss-release-consumers.data.json';
@@ -17,11 +22,16 @@ export function collectHarnessInventoryViolations(
   context,
   {
     coverageInventoryValidator = collectCoverageRolloutInventoryViolations,
+    focusedCoverageOwnerMapInventoryValidator = collectFocusedCoverageOwnerMapInventoryViolations,
+    focusedCoverageOwnerMapValidator = collectFocusedCoverageOwnerMappingViolations,
     ossInventoryValidator = runOssReleaseSurfaceCheck,
     technicalDebtInventoryValidator = verifyTechnicalDebtReport,
   } = {}
 ) {
   const inventoryTargets = new Set(context.harnessInventoryTargetFiles ?? []);
+  const focusedCoverageOwnerMapTargets = [...inventoryTargets].filter(
+    isFocusedCoverageOwnerMapInventoryFile
+  );
   return [
     ...(inventoryTargets.has(TECHNICAL_DEBT_INVENTORY)
       ? technicalDebtInventoryValidator().map((message) => ({
@@ -43,6 +53,12 @@ export function collectHarnessInventoryViolations(
           file: COVERAGE_ROLLOUT_INVENTORY,
           message,
         }))
+      : []),
+    ...(focusedCoverageOwnerMapTargets.length > 0
+      ? [
+          ...focusedCoverageOwnerMapInventoryValidator(focusedCoverageOwnerMapTargets),
+          ...focusedCoverageOwnerMapValidator(),
+        ]
       : []),
   ];
 }

@@ -2989,13 +2989,11 @@
         "apps/extension/src/content/parser/popup-export/helpers/archive/blob.ts",
         "apps/extension/src/content/parser/popup-export/helpers/archive/fallback.ts",
         "apps/extension/src/content/parser/popup-export/helpers/archive/persist.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/index.ts",
         "apps/extension/src/content/parser/popup-export/helpers/messaging.ts",
         "apps/extension/src/content/parser/popup-export/helpers/preview.ts",
         "apps/extension/src/content/parser/popup-export/helpers/request/options.ts",
         "apps/extension/src/content/parser/popup-export/helpers/request/parse.ts",
         "apps/extension/src/content/parser/popup-export/helpers/request/types.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/result.ts",
         "apps/extension/src/content/parser/popup-export/index.ts",
         "apps/extension/src/content/parser/popup-export/preview-url.ts",
         "apps/extension/src/content/parser/rich-text-content/index.ts",
@@ -3697,13 +3695,11 @@
         "apps/extension/src/content/parser/popup-export/helpers/archive/blob.ts",
         "apps/extension/src/content/parser/popup-export/helpers/archive/fallback.ts",
         "apps/extension/src/content/parser/popup-export/helpers/archive/persist.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/index.ts",
         "apps/extension/src/content/parser/popup-export/helpers/messaging.ts",
         "apps/extension/src/content/parser/popup-export/helpers/preview.ts",
         "apps/extension/src/content/parser/popup-export/helpers/request/options.ts",
         "apps/extension/src/content/parser/popup-export/helpers/request/parse.ts",
         "apps/extension/src/content/parser/popup-export/helpers/request/types.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/result.ts",
         "apps/extension/src/content/parser/popup-export/index.ts",
         "apps/extension/src/content/parser/popup-export/preview-url.ts",
         "apps/extension/src/content/runtime/tab-capture-fallback/helpers.ts",
@@ -14588,7 +14584,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs",
-        "contentHash": "18f7429d99f3ce97d4cb6979160408e23a3d4bb6a50f23a7007a387fd5bacbdf"
+        "contentHash": "f40e887d32cb01cbba23be458966ac7e95aefb7d43a0413bef1f492d01ebb4ae"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs",
@@ -16186,6 +16182,34 @@
       ]
     },
     {
+      "id": "policy.source.git-head-sources-mjs.92f8de0e45",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/git-head-sources.mjs",
+        "contentHash": "fbb9e61f6ccd7acb54a670130bde90561b1ccb41ce6a27c539e8609fe2a080d6"
+      },
+      "consumers": [
+        "tooling/qa/core/git-head-sources.mjs",
+        "tooling/qa/core/git-head-sources.test.ts",
+        "tooling/qa/core/product-proof-risk-hints.mjs",
+        "tooling/qa/core/verify-build.deleted-closure.mjs",
+        "tooling/qa/core/verify-build.deleted-dead-export.mjs",
+        "tooling/qa/core/verify-domain-fixture-realism.mjs",
+        "tooling/qa/core/verify-interface-surfaces.mjs",
+        "tooling/qa/core/verify-interface-surfaces.return-bags.helpers.mjs",
+        "tooling/qa/core/verify-structural-risk.mjs",
+        "tooling/qa/guards/quality/verify-manual-mock-export-parity.targets.helpers.mjs"
+      ],
+      "surfaces": [
+        "binding:HEAD_CODE_GLOBS",
+        "property:runHeadQuery/files"
+      ]
+    },
+    {
       "id": "policy.source.gitleaks-baseline-mjs.376ae85ff5",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -17671,7 +17695,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "7bf6f86e840646f26422df8067fb67f5f9a3a87c76533cb139bea817ec718626"
+        "contentHash": "4e28fcf130a59f2c055fceb17a22570efbe61a352f2d49898567286b7901ff82"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -17699,6 +17723,7 @@
         "tooling/qa/wrappers/release.mjs"
       ],
       "surfaces": [
+        "binding:FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES",
         "binding:HARNESS_INVENTORY_ONLY_FILES",
         "binding:QA_SUITES",
         "binding:SHARED_CONTROL_FILES",
@@ -18775,6 +18800,7 @@
         "tooling/qa/core/git-object-store.test.ts",
         "tooling/qa/core/guardrail-preflight-report.test.ts",
         "tooling/qa/core/guardrail-preflight-report.topology.test.ts",
+        "tooling/qa/core/harness-freshness-step.test.ts",
         "tooling/qa/core/import-only-diff.mock.test.ts",
         "tooling/qa/core/import-only-diff.specifiers.test.ts",
         "tooling/qa/core/import-only-diff.test.ts",
@@ -18801,6 +18827,7 @@
         "tooling/qa/core/verify-boundary-casts.test.ts",
         "tooling/qa/core/verify-build.deleted-aggregate.test.ts",
         "tooling/qa/core/verify-build.deleted-closure.test.ts",
+        "tooling/qa/core/verify-build.deleted-dead-export.test.ts",
         "tooling/qa/core/verify-build.deleted-package-closure.test.ts",
         "tooling/qa/core/verify-build.state.test.ts",
         "tooling/qa/core/verify-build.test-profiles.test.ts",
@@ -19597,7 +19624,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.deleted-aggregate.mjs",
-        "contentHash": "bee6dfae4d2e531906fe0001120291101b2ec87a6aaa26dbec8bc7100f38feec"
+        "contentHash": "87d6f12392a5146f5ca8d2be4c53c785e1b87a17ea3c8740c3c8b3f47c386fb1"
       },
       "consumers": [
         "tooling/qa/core/verify-build.deleted-aggregate.mjs",
@@ -19616,13 +19643,15 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.deleted-closure.mjs",
-        "contentHash": "d1e185f4d130f9a5df1e58c71e89a2d8ce543974a3f3bd682fb0506b4e795965"
+        "contentHash": "aa2cc44ad53c3144a971294f2c8856f3ae04b666447e15cfdf57695490795ff9"
       },
       "consumers": [
         "tooling/qa/core/verify-build.deleted-closure.mjs",
         "tooling/qa/core/verify-build.scope.mjs"
       ],
       "surfaces": [
+        "property:collectDeletedTargetSuccessors/deletedFiles",
+        "property:collectDeletedTargetSuccessors/files",
         "property:collectHeadCandidateImporters/candidates",
         "property:collectHeadCandidateImporters/candidates[1]",
         "property:collectHeadCandidateImporters/candidates[2]",
@@ -19638,8 +19667,7 @@
         "property:collectPackageExportTokens/tokens[2]",
         "property:collectPreviousConsumerFrontier/frontier",
         "property:collectPreviousConsumerFrontier/frontier[1]",
-        "property:collectPreviousConsumerFrontier/frontier[2]",
-        "property:runHeadPathQuery/files"
+        "property:collectPreviousConsumerFrontier/frontier[2]"
       ]
     },
     {
@@ -19655,6 +19683,7 @@
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",
+        "tooling/qa/core/verify-build.deleted-dead-export.test.ts",
         "tooling/qa/core/verify-build.execution.mjs",
         "tooling/qa/core/verify-build.scope.mjs",
         "tooling/qa/core/verify-build.scope.test.ts",

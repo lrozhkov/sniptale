@@ -1,6 +1,9 @@
+import fs from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { createTempRoot, importFresh, withCwd } from './test-helpers';
+import { collectFocusedCoverageOwnerMapInventoryViolations } from './focused-coverage-owner-map.mjs';
 
 it('routes harness-owned policy and shared guidance without blind spots', async () => {
   const root = createTempRoot('qa-scope-guidance-');
@@ -44,6 +47,36 @@ it('separates generated inventories from executable harness changes', async () =
       )
     ).toBe(false);
     expect(
+      module.isHarnessVerificationQaFile(
+        'tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isFocusedCoverageOwnerMapInventoryFile(
+        'tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs'
+      )
+    ).toBe(true);
+    expect(
+      module.isFocusedCoverageOwnerMapInventoryFile(
+        'tooling/qa/core/focused-coverage/maps/cast-cleanup.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isFocusedCoverageOwnerMapInventoryFile(
+        'tooling/qa/core/focused-coverage/maps/index.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isFocusedCoverageOwnerMapInventoryFile(
+        'tooling/qa/core/focused-coverage/maps/unregistered-owner-map.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isHarnessVerificationQaFile(
+        'tooling/qa/core/focused-coverage/maps/unregistered-owner-map.mjs'
+      )
+    ).toBe(true);
+    expect(
       module.isHarnessVerificationQaFile('tooling/qa/core/verify-test-coverage.registry.mjs')
     ).toBe(true);
     expect(module.isHarnessVerificationQaFile('tooling/configs/qa/quality-baseline.json')).toBe(
@@ -51,6 +84,22 @@ it('separates generated inventories from executable harness changes', async () =
     );
     expect(module.isHarnessVerificationQaFile('tooling/qa/core/qa-scope.mjs')).toBe(true);
   });
+});
+
+it('registers exactly the current leaf focused owner maps as inventory-only', async () => {
+  const module = await importFresh<typeof import('./qa-scope.mjs')>('./qa-scope.mjs');
+  const mapRoot = 'tooling/qa/core/focused-coverage/maps';
+  const mapFiles = fs
+    .readdirSync(mapRoot)
+    .filter((file) => file.endsWith('.mjs'))
+    .sort();
+
+  for (const file of mapFiles) {
+    const relativePath = `${mapRoot}/${file}`;
+    const composesOtherMaps =
+      collectFocusedCoverageOwnerMapInventoryViolations([relativePath]).length > 0;
+    expect(module.isFocusedCoverageOwnerMapInventoryFile(relativePath)).toBe(!composesOtherMaps);
+  }
 });
 
 describe('shared QA controls', () => {

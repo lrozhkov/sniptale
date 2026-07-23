@@ -208,6 +208,7 @@ export function createDeletedAggregateAnalyzer(readHeadSource) {
 export function collectDeletedAggregateProviders({
   analyzeAggregate,
   file,
+  isDeletedDeadExport = () => false,
   readHeadSource,
   root,
   targets,
@@ -226,8 +227,9 @@ export function collectDeletedAggregateProviders({
       if (dependency === null) return false;
       if (fs.existsSync(path.join(root, dependency))) {
         providers.add(dependency);
-      } else if (!targets.has(dependency) || !visit(dependency)) {
-        return false;
+      } else {
+        if (!targets.has(dependency)) return false;
+        if (!visit(dependency) && !isDeletedDeadExport(dependency)) return false;
       }
       if (providers.size > MAX_AGGREGATE_PROVIDERS) return false;
     }

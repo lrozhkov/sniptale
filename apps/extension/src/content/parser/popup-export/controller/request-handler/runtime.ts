@@ -1,4 +1,5 @@
-import { parsePopupExportRequest, type PopupSendResponse } from '../../helpers';
+import type { PopupSendResponse } from '../../helpers/messaging';
+import { parsePopupExportRequest } from '../../helpers/request/parse';
 import { dispatchPopupExportRequest } from './dispatch';
 import type { PopupExportRequestHandlerRuntime } from '../types';
 
