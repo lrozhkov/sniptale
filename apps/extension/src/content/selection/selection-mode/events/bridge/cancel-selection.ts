@@ -4,7 +4,7 @@ import type { SelectionModeEventsBridgeArgs } from './types';
 
 export function createSelectionModeCancelSelection(args: SelectionModeEventsBridgeArgs) {
   return () => {
-    const rejectCallback = args.getRejectCallback();
+    const rejectCallback = args.runtimeArgs.state.rejectCallback;
 
     logSelectionModeDiag('cancelSelection.start', {
       hasRejectCallback: Boolean(rejectCallback),

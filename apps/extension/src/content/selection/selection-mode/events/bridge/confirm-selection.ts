@@ -5,8 +5,8 @@ import type { SelectionModeEventsBridgeArgs } from './types';
 
 export function createSelectionModeConfirmSelection(args: SelectionModeEventsBridgeArgs) {
   return () => {
-    const area = buildSelectionCaptureArea(args.currentSelection());
-    const resolveCallback = args.getResolveCallback();
+    const area = buildSelectionCaptureArea(args.runtimeArgs.state.currentSelection);
+    const resolveCallback = args.runtimeArgs.state.resolveCallback;
 
     logSelectionModeDiag('confirmSelection.start', {
       area,

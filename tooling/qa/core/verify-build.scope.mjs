@@ -7,7 +7,8 @@ import { collectDeletedTargetSuccessors } from './verify-build.deleted-closure.m
 import { resolveBuildTestProfile } from './verify-build.test-profiles.mjs';
 export { BUILD_TEST_PROFILE_LIMITS } from './verify-build.test-profiles.mjs';
 
-const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
+const TEST_FILE_PATTERN =
+  /(?:^|\/)(?:__tests__|__fixtures__|test|test-support|fixtures)(?:\/|$)|(?:^|\/)(?:test-support|test-helpers|fixtures)\.[cm]?[jt]sx?$|\.(?:test|spec|test-support|test\.helpers|test\.fixtures|fixtures)\.[cm]?[jt]sx?$/u;
 const RUNTIME_ENTRYPOINT_PATTERN = new RegExp(
   '^(?:apps/extension/src/' +
     '(?:background|camera-recorder|content|design-system|gallery|offscreen|' +
@@ -83,7 +84,7 @@ const BUILD_SCOPE_FAMILIES = [
   {
     name: 'storage-persistence',
     matches(file) {
-      return /(?:storage|persistence|db)/u.test(file);
+      return /(?:storage|persistence)/u.test(file) || /(?:^|[./-])db(?:[./-]|$)/u.test(file);
     },
     collectPrefixes(file) {
       return collectFamilyPrefixes(file, [

@@ -7,7 +7,7 @@ export const HARNESS_QA_SUITE = 'harness';
 export const ALL_QA_SUITE = 'all';
 export const HARNESS_QA_GUIDANCE = [
   'run npm run qa:release-harness for executable tooling/**, QA-affecting root configuration,',
-  'hooks, .agents/**, AGENTS.md, or active tooling guidance; generated inventory-only changes',
+  'hooks, .agents/**, AGENTS.md, or active tooling guidance; machine-owned inventory-only changes',
   'use their owner validators without a fresh harness stamp',
 ].join(' ');
 
@@ -16,6 +16,7 @@ const HARNESS_ROOT_PATTERN = /^tooling\//u;
 const HARNESS_INVENTORY_ONLY_FILES = new Set([
   'tooling/configs/qa/oss-release-consumers.data.json',
   'tooling/configs/qa/technical-debt.data.json',
+  'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs',
 ]);
 const SHARED_CONTROL_PATTERNS = [/^\.github\/workflows\//u, /^\.husky\//u, /^docs\/tooling\//u];
 const VITE_CONFIG_PATTERN = /(?:^|\/)vite\.config\.[cm]?[jt]s$/u;

@@ -3395,8 +3395,6 @@
         "apps/extension/src/content/selection/region-selector/types.ts",
         "apps/extension/src/content/selection/selection-mode/controller/actions.ts",
         "apps/extension/src/content/selection/selection-mode/controller/index.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/index.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/runtime.ts",
         "apps/extension/src/content/selection/selection-mode/diag.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/cancel-selection.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/cleanup.ts",
@@ -3440,18 +3438,13 @@
         "apps/extension/src/content/selection/selection-mode/public-api/index.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/capture-area.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/cleanup.ts",
+        "apps/extension/src/content/selection/selection-mode/runtime/composition.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/drag.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/element.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/hover.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/index.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/runtime.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/extension-ui.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/facade/api.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/facade/index.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/facade/setup.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/facade/types.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/facade/ui.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/graph-bindings.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/index.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/setup/index.ts",
         "apps/extension/src/content/selection/selection-mode/session/index.ts",
@@ -3842,8 +3835,6 @@
         "apps/extension/src/content/selection/region-selector/types.ts",
         "apps/extension/src/content/selection/selection-mode/controller/actions.ts",
         "apps/extension/src/content/selection/selection-mode/controller/index.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/index.ts",
-        "apps/extension/src/content/selection/selection-mode/controller/runtime-bindings/runtime.ts",
         "apps/extension/src/content/selection/selection-mode/diag.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/cancel-selection.ts",
         "apps/extension/src/content/selection/selection-mode/events/bridge/cleanup.ts",
@@ -3887,18 +3878,13 @@
         "apps/extension/src/content/selection/selection-mode/public-api/index.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/capture-area.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/cleanup.ts",
+        "apps/extension/src/content/selection/selection-mode/runtime/composition.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/drag.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/element.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/hover.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/index.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/drag/runtime.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/extension-ui.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/facade/api.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/facade/index.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/facade/setup.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/facade/types.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/facade/ui.ts",
-        "apps/extension/src/content/selection/selection-mode/runtime/graph-bindings.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/index.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/setup/index.ts",
         "apps/extension/src/content/selection/selection-mode/session/index.ts",
@@ -12759,13 +12745,14 @@
       "remediation": "Remove or narrow the exclusion and assign the target to its real coverage owner.",
       "exactSource": {
         "path": "tooling/qa/core/verify-test-coverage.registry.mjs",
-        "contentHash": "c5f5abc378c015d5e31898b677a38e7f5c786fba2732520a63e8f42b8f6e005d"
+        "contentHash": "6f3dc847f35750df6051d2ed56c7172cce6dfd3799d1350e60611695deb23f11"
       },
       "consumers": [
         "tooling/qa/core/coverage-audit-report.mjs",
         "tooling/qa/core/focused-coverage-owner-resolver.mjs",
         "tooling/qa/core/focused-coverage/production-targets.mjs",
         "tooling/qa/core/guardrail-preflight-scope.mjs",
+        "tooling/qa/core/harness-freshness-step.mjs",
         "tooling/qa/core/verify-test-coverage.mjs",
         "tooling/qa/core/verify-test-coverage.registry.mjs",
         "tooling/qa/core/verify-test-coverage.test.ts",
@@ -12773,12 +12760,10 @@
       ],
       "surfaces": [
         "binding:COVERAGE_EXCLUDE_PATTERNS",
+        "binding:COVERAGE_ROLLOUT_EXACT_GROUPS",
         "binding:COVERAGE_ROLLOUT_GROUPS",
         "binding:COVERAGE_THRESHOLDS",
         "property:core",
-        "property:files",
-        "property:files[1]",
-        "property:files[2]",
         "property:prefixes",
         "property:prefixes[1]",
         "property:prefixes[2]",
@@ -17024,26 +17009,6 @@
       ]
     },
     {
-      "id": "policy.source.nh5-rollout-files-mjs.442ada6456",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/qa/core/focused-coverage/nh5-rollout-files.mjs",
-        "contentHash": "5f9ab8d2d3d0eeb6fde04985412dbdcf9e099bcda202958b260e3877c5d62dcb"
-      },
-      "consumers": [
-        "tooling/qa/core/focused-coverage/nh5-rollout-files.mjs",
-        "tooling/qa/core/verify-test-coverage.registry.mjs"
-      ],
-      "surfaces": [
-        "binding:NH5_CONTENT_PARSER_ROLLOUT_FILES",
-        "binding:NH5_CORE_ROLLOUT_FILES"
-      ]
-    },
-    {
       "id": "policy.source.npm-audit-mjs.0340f80faa",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -17735,7 +17700,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "5c84e0d055b33395d76f6784a3e2fe1b9dbb3445d5901ed6daca9a41bf870b48"
+        "contentHash": "7bf6f86e840646f26422df8067fb67f5f9a3a87c76533cb139bea817ec718626"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -19658,7 +19623,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scope.mjs",
-        "contentHash": "e23ff051ebf50246f0a7e9f5fd7eadcd1e70736d1c98481f2c5b35f4882a0c9f"
+        "contentHash": "7fe3dac4dfe8738e1ba949815314df2c3a3aeaeeb6d6a41c505190fd2ce2068c"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",
@@ -21045,6 +21010,29 @@
         "property:runTestCoverageCheck/files",
         "property:runTestCoverageCheck/violations",
         "property:runTestCoverageCheck/violations[1]"
+      ]
+    },
+    {
+      "id": "policy.source.verify-test-coverage-rollout-files-data-mjs.874769bf14",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/verify-test-coverage.rollout-files.data.mjs",
+        "contentHash": "14ed757c504761c1a8e65402ec023b1fe33ac29e24fb0a7496a006f6b7170534"
+      },
+      "consumers": [
+        "tooling/qa/core/verify-test-coverage.registry.mjs",
+        "tooling/qa/core/verify-test-coverage.rollout-files.data.mjs"
+      ],
+      "surfaces": [
+        "binding:COVERAGE_ROLLOUT_EXACT_FILES",
+        "property:contentHighlighterAndQuickEdit",
+        "property:contentParserExport",
+        "property:contentSelectionAndCapture",
+        "property:coreRuntimeOwners"
       ]
     },
     {

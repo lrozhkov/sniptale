@@ -23,12 +23,6 @@ function createSetupFixture() {
     ...handlers,
     minSelectionSize: 32,
     session,
-    setCleanupEventListeners: (cleanup) => {
-      session.cleanupEventListeners = cleanup;
-    },
-    setCleanupScrollListeners: (cleanup) => {
-      session.cleanupScrollListeners = cleanup;
-    },
     updateFinalFrame: vi.fn(() => {
       order.push(`update:${session.currentState}`);
     }),

@@ -18,8 +18,6 @@ export interface SelectionModeRuntimeSetupArgs extends SelectionModeRuntimePoint
   getMaxSelectionWidth: () => number;
   minSelectionSize: number;
   session: SelectionModeSession;
-  setCleanupEventListeners: (cleanup: (() => void) | null) => void;
-  setCleanupScrollListeners: (cleanup: (() => void) | null) => void;
   updateFinalFrame: () => void;
   zIndexBase: number;
 }
@@ -32,8 +30,12 @@ export function createSelectionModeRuntimeSetup(args: SelectionModeRuntimeSetupA
     getMaxSelectionHeight: args.getMaxSelectionHeight,
     getMaxSelectionWidth: args.getMaxSelectionWidth,
     minSelectionSize: args.minSelectionSize,
-    setCleanupEventListeners: args.setCleanupEventListeners,
-    setCleanupScrollListeners: args.setCleanupScrollListeners,
+    setCleanupEventListeners: (cleanup: (() => void) | null) => {
+      args.session.cleanupEventListeners = cleanup;
+    },
+    setCleanupScrollListeners: (cleanup: (() => void) | null) => {
+      args.session.cleanupScrollListeners = cleanup;
+    },
     setupListenerHandlers: createListenerHandlers(args),
     showFinalFrame: () => {
       args.createFinalElements();

@@ -72,6 +72,40 @@ it('does not let an unrelated changed test authorize deletion proof', () => {
   expect(scope.relatedFiles).toEqual([]);
 });
 
+it.each([
+  'controller/index.test-support.ts',
+  'controller/test-support.ts',
+  'controller/test-support/session.ts',
+  'controller/fixtures.ts',
+  'controller/fixtures/session.ts',
+  'controller/index.test.helpers.ts',
+  'controller/index.test.fixtures.ts',
+])('does not treat deleted proof file %s as unavailable production code', (proofPath) => {
+  const owner = 'apps/extension/src/content/selection/selection-mode/controller/index.ts';
+  const ownerTest = 'apps/extension/src/content/selection/selection-mode/controller/index.test.ts';
+  const deletedSupport = `apps/extension/src/content/selection/selection-mode/${proofPath}`;
+  const scope = resolveBuildTestScope({
+    targetFiles: [deletedSupport, owner, ownerTest],
+    codeFiles: [owner, ownerTest],
+    repoCodeFiles: [owner, ownerTest],
+    ownerTestResolver: (file) => (file === owner ? [ownerTest] : []),
+  });
+
+  expect(scope.fullSuite).not.toBe(true);
+  expect(scope.directTestFiles).toEqual([ownerTest]);
+  expect(scope.detail).not.toContain('unavailable production target');
+});
+
+it('does not infer storage risk from the handbook name', () => {
+  const scope = resolveBuildTestScope({
+    targetFiles: ['docs/tooling/operator-handbook.md'],
+    codeFiles: [],
+    repoCodeFiles: [],
+  });
+
+  expect(scope.matchedFamilies).not.toContain('storage-persistence');
+});
+
 it('uses a changed replacement owner and its direct test for a consolidated deleted subtree', () => {
   const owner = 'apps/extension/src/content/selection/selection-mode/session/index.ts';
   const ownerTest = 'apps/extension/src/content/selection/selection-mode/session/index.test.ts';

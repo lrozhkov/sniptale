@@ -59,7 +59,7 @@ Structural enforcement analyzes behavioral files in the current diff and compare
 
 Plan architecture work by owner/change-reason cluster and classify each candidate as `Split`, `Consolidate`, or `Keep`. Optimize the number of navigation transitions required to understand one operation, not the raw file count: retain explicit runtime, owner, adapter, and public-contract boundaries. Before and after a topology wave, compare navigation transitions, forwarding/proxy layers, public contract surface, state authorities, effects/recovery placement, and cohesion. A split or consolidation must include negative proof for cycles, dual authority, cross-owner imports, broad facade/state/props bags, forwarding-only layers, dead exports, generic helpers, and UI mixed with privileged, persistence, or transport effects.
 
-Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has executable harness/shared-control targets. This includes executable `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. Exact machine-generated inventory-only files classified by `tooling/qa/core/qa-scope.mjs` use checkpoint owner validators and do not require a fresh harness stamp; `qa:build` still requires that fresh checkpoint. Policy JSON, baselines, allowlists, and executable registries remain harness targets.
+Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has executable harness/shared-control targets. This includes executable `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. Exact machine-owned inventory-only files classified by `tooling/qa/core/qa-scope.mjs` use checkpoint owner validators and do not require a fresh harness stamp; `qa:build` still requires that fresh checkpoint. Policy JSON, baselines, allowlists, and executable registries remain harness targets.
 
 Run `npm run qa:checkpoint` after each substantial coherent implementation wave. It owns supported non-Markdown formatting, advisory state, focused static checks, typecheck, focused tests, and diff coverage; it does not build, stage, or commit.
 
@@ -87,7 +87,7 @@ Normal implementation flow:
 6. apply one consolidated correction and rerun only invalidated proof/review
 7. run `npm run qa:closeout -- -m "<commit message>"`
 
-`qa:closeout` reuses a fresh matching checkpoint or runs one, invokes `qa:build`, validates the unchanged diff and task-artifact policy, stages allowed changes, and commits only after the build is green. It requires a fresh harness stamp whenever the live diff has executable harness/shared-control targets; exact generated inventory-only targets are validated by their owner checks instead.
+`qa:closeout` reuses a fresh matching checkpoint or runs one, invokes `qa:build`, validates the unchanged diff and task-artifact policy, stages allowed changes, and commits only after the build is green. It requires a fresh harness stamp whenever the live diff has executable harness/shared-control targets; exact machine-owned inventory-only targets are validated by their owner checks instead.
 
 Do not run a manual closeout chain, manually stage the candidate, start another blocking wrapper while closeout runs, stage `tasks/**`, or amend an existing commit unless the user explicitly requests it.
 

@@ -21,7 +21,7 @@ Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGE
 | Wrapper statistics | `npm run qa:stats -- [--wrapper <id>] [--task <id>]` | Reads structured run records. |
 | WSL setup/recovery | [wsl-setup.md](wsl-setup.md) | Environment setup only. |
 
-The live harness/shared-control classifier is `tooling/qa/core/qa-scope.mjs`; this table summarizes it.
+The live harness/shared-control classifier is `tooling/qa/core/qa-scope.mjs`; this table summarizes it. Machine-owned files explicitly marked inventory-only, including exact coverage rollout paths, use checkpoint owner validation without a fresh harness stamp. Changing matching, thresholds, traversal, or wrapper behavior still requires release-harness proof.
 
 Checkpoint and closeout choose unit-test profiles automatically. Small low-risk diffs with complete focused owner mappings run exact direct tests; high-risk, public/shared, transitive, ambiguous, or over-budget diffs retain Vitest affected-consumer discovery. The focused owner-expansion budget bounds transitively selected owner tests, while every changed direct test remains mandatory proof and does not consume that expansion budget. Inspect the `Unit tests` detail in the run log for `profile=...`; do not add a manual force-narrow flag.
 

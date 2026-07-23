@@ -7,24 +7,40 @@ import {
 import { assertFreshHarnessState } from './verify-harness.state.helpers.mjs';
 import { verifyTechnicalDebtReport } from './technical-debt-report.mjs';
 import { runOssReleaseSurfaceCheck } from './verify-oss-release-surface.mjs';
+import { collectCoverageRolloutInventoryViolations } from './verify-test-coverage.registry.mjs';
 
 const TECHNICAL_DEBT_INVENTORY = 'tooling/configs/qa/technical-debt.data.json';
 const OSS_RELEASE_CONSUMER_INVENTORY = 'tooling/configs/qa/oss-release-consumers.data.json';
+const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs';
 
-function collectInventoryViolations(context) {
+export function collectHarnessInventoryViolations(
+  context,
+  {
+    coverageInventoryValidator = collectCoverageRolloutInventoryViolations,
+    ossInventoryValidator = runOssReleaseSurfaceCheck,
+    technicalDebtInventoryValidator = verifyTechnicalDebtReport,
+  } = {}
+) {
   const inventoryTargets = new Set(context.harnessInventoryTargetFiles ?? []);
   return [
     ...(inventoryTargets.has(TECHNICAL_DEBT_INVENTORY)
-      ? verifyTechnicalDebtReport().map((message) => ({
+      ? technicalDebtInventoryValidator().map((message) => ({
           rule: 'technical-debt-inventory',
           file: TECHNICAL_DEBT_INVENTORY,
           message,
         }))
       : []),
     ...(inventoryTargets.has(OSS_RELEASE_CONSUMER_INVENTORY)
-      ? runOssReleaseSurfaceCheck().violations.map((message) => ({
+      ? ossInventoryValidator().violations.map((message) => ({
           rule: 'oss-release-consumer-inventory',
           file: OSS_RELEASE_CONSUMER_INVENTORY,
+          message,
+        }))
+      : []),
+    ...(inventoryTargets.has(COVERAGE_ROLLOUT_INVENTORY)
+      ? coverageInventoryValidator().map((message) => ({
+          rule: 'coverage-rollout-inventory',
+          file: COVERAGE_ROLLOUT_INVENTORY,
           message,
         }))
       : []),
@@ -35,7 +51,7 @@ export function collectHarnessFreshnessStep(
   context,
   harnessStateAsserter = assertFreshHarnessState,
   consumerLabel = 'qa:checkpoint',
-  inventoryViolationCollector = collectInventoryViolations
+  inventoryViolationCollector = collectHarnessInventoryViolations
 ) {
   if (!hasHarnessQaTargets(context)) {
     return null;

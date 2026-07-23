@@ -14,7 +14,7 @@ The live scope classifier is `tooling/qa/core/qa-scope.mjs`.
 - Harness targets include `tooling/**` plus shared controls.
 - Shared controls participate in both scopes: `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/lock/TypeScript/Vite configuration, and active `docs/tooling/**` guidance.
 
-Whenever the current diff has executable harness targets, run `npm run qa:release-harness` before a consumer wrapper that requires its freshness stamp. Exact machine-generated technical-debt and OSS-consumer inventories are data-only targets: checkpoint runs their owner validators without requiring a fresh harness stamp. Generated inventories are never treated as execution evidence for another policy file. Policy JSON, baselines, allowlists, and executable registries are not data-only. Documentation lists the categories; the classifier remains authoritative.
+Whenever the current diff has executable harness targets, run `npm run qa:release-harness` before a consumer wrapper that requires its freshness stamp. Exact machine-owned technical-debt, OSS-consumer, and coverage-rollout inventories are data-only targets: checkpoint runs their owner validators without requiring a fresh harness stamp. The exemption belongs only to exact files classified by `qa-scope`, including an author-maintained data module when it has an explicit owner validator; it is never execution evidence for another policy file. Policy JSON, baselines, allowlists, and executable registries are not data-only. Documentation lists the categories; the classifier remains authoritative.
 
 ## Diff And Freshness Model
 
@@ -44,7 +44,7 @@ Manual report-only architecture-maintenance snapshot over repository code. It co
 
 ### `qa:release-harness`
 
-Blocking harness/shared-control proof. It runs the harness-owned formatting/static/type/test contract and writes the harness freshness state consumed by checkpoint, build, release, and closeout paths. An inventory-only scope skips this wrapper and uses the checkpoint owner validators instead; a standalone build still requires that fresh checkpoint. It does not run product coverage or commit.
+Blocking harness/shared-control proof. It runs the harness-owned formatting/static/type/test contract and writes the harness freshness state consumed by checkpoint, build, release, and closeout paths. Exact machine-owned technical-debt, OSS-consumer, and coverage-rollout inventories skip this wrapper only when `qa-scope` classifies them as inventory-only and their checkpoint owner validators pass; author-maintained data modules receive no broader exemption. A standalone build still requires that fresh checkpoint. It does not run product coverage or commit.
 
 ### `qa:checkpoint`
 

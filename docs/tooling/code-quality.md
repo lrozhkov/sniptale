@@ -33,11 +33,13 @@ The machine authority is source and policy, not prose. This mapping identifies t
 | Structural risk and allowances | `tooling/qa/core/structural-risk/**`, `tooling/qa/core/verify-structural-risk.mjs`, `tooling/configs/qa/structural-risk-allowances.data.json` |
 | Manual topology/fragmentation maintenance | `tooling/qa/core/topology-fragmentation*.mjs`, `tooling/qa/wrappers/structural-audit.mjs` |
 | Readability, AI hygiene, naming, suppression, and logging | `tooling/qa/core/quality.config.mjs`, `tooling/qa/core/verify-ai-hygiene.mjs`, `tooling/qa/guards/quality/**`, focused verifier definitions |
-| Coverage rollout, unit-test profiles, and thresholds | `tooling/qa/core/verify-test-coverage.registry.mjs`, `tooling/qa/core/verify-test-coverage.thresholds.mjs`, `tooling/qa/core/verify-build.test-profiles.mjs`, focused owner maps |
+| Coverage rollout, unit-test profiles, and thresholds | `tooling/qa/core/verify-test-coverage.registry.mjs`, exact-path inventory in `tooling/qa/core/verify-test-coverage.rollout-files.data.mjs`, `tooling/qa/core/verify-test-coverage.thresholds.mjs`, `tooling/qa/core/verify-build.test-profiles.mjs`, focused owner maps |
 | Audit requiredness and structured skips | `tooling/configs/qa/audit-profiles.data.json`, `tooling/qa/audits/profiles/**` |
 | Baselines, exceptions, and technical debt | `tooling/configs/qa/*baseline*`, `tooling/configs/qa/technical-debt.data.json`, owner-specific policy registries |
 
 `qa:checkpoint` and broader lanes consume these authorities; documentation summarizes them and must not create a competing list of exact executable steps.
+
+Exact coverage rollout paths live separately from the executable resolver so rename/object-list maintenance remains inventory-only. A change limited to `verify-test-coverage.rollout-files.data.mjs` is validated by checkpoint owner checks and does not require a fresh release-harness stamp; changes to thresholds, prefix matching, exclusions, traversal, or resolver behavior remain executable harness changes.
 
 ## Enforced Families
 

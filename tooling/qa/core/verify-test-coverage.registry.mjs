@@ -1,9 +1,13 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { posix } from 'node:path';
-import {
-  NH5_CONTENT_PARSER_ROLLOUT_FILES,
-  NH5_CORE_ROLLOUT_FILES,
-} from './focused-coverage/nh5-rollout-files.mjs';
+import { COVERAGE_ROLLOUT_EXACT_FILES } from './verify-test-coverage.rollout-files.data.mjs';
+
+const COVERAGE_ROLLOUT_EXACT_GROUPS = [
+  'coreRuntimeOwners',
+  'contentParserExport',
+  'contentHighlighterAndQuickEdit',
+  'contentSelectionAndCapture',
+];
 
 export const COVERAGE_THRESHOLDS = {
   core: { branches: 70, lines: 80 },
@@ -54,7 +58,7 @@ export const COVERAGE_ROLLOUT_GROUPS = [
       'apps/extension/src/video-editor/state/',
       'apps/extension/src/video-editor/project/state/',
     ],
-    files: NH5_CORE_ROLLOUT_FILES,
+    files: COVERAGE_ROLLOUT_EXACT_FILES?.coreRuntimeOwners,
   },
   {
     id: 'ui-product-surfaces',
@@ -82,13 +86,7 @@ export const COVERAGE_ROLLOUT_GROUPS = [
       'apps/extension/src/content/parser/parsers/generic/',
       'apps/extension/src/content/parser/parsers/gwt/',
     ],
-    files: [
-      ...NH5_CONTENT_PARSER_ROLLOUT_FILES,
-      'apps/extension/src/content/parser/export-manager/formats/froala.ts',
-      'apps/extension/src/content/parser/dom-tree-parser/index.ts',
-      'apps/extension/src/content/parser/dom-tree-parser/ai/format.ts',
-      'apps/extension/src/content/parser/parsers/types.ts',
-    ],
+    files: COVERAGE_ROLLOUT_EXACT_FILES?.contentParserExport,
   },
   {
     id: 'content-ai-pick',
@@ -102,7 +100,7 @@ export const COVERAGE_ROLLOUT_GROUPS = [
       'apps/extension/src/content/selection/highlighter-runtime/',
       'apps/extension/src/content/selection/quick-edit-runtime/',
     ],
-    files: ['apps/extension/src/content/selection/highlighter-runtime/controller.types.ts'],
+    files: COVERAGE_ROLLOUT_EXACT_FILES?.contentHighlighterAndQuickEdit,
   },
   {
     id: 'content-selection-and-capture',
@@ -118,14 +116,7 @@ export const COVERAGE_ROLLOUT_GROUPS = [
       'apps/extension/src/content/overlay/video-annotations/',
       'apps/extension/src/content/overlay/video-clicks/',
     ],
-    files: [
-      'apps/extension/src/content/selection/locker/index.ts',
-      'apps/extension/src/content/selection/selection-mode/controller/index.ts',
-      'apps/extension/src/content/selection/selection-mode/runtime/graph-bindings.ts',
-      'apps/extension/src/content/parser/dom-utils/dom-helpers-selectors.ts',
-      'apps/extension/src/content/parser/dom-utils/dom-helpers-text.ts',
-      'apps/extension/src/content/parser/dom-utils/id-generator.ts',
-    ],
+    files: COVERAGE_ROLLOUT_EXACT_FILES?.contentSelectionAndCapture,
   },
 ];
 
@@ -168,6 +159,69 @@ export function isCoverageTargetFile(relativePath) {
 
 export function isCoverageExcluded(relativePath) {
   return matchesAny(relativePath, COVERAGE_EXCLUDE_PATTERNS);
+}
+
+function collectExactCoverageFileViolations({ file, fileExists, group, seenFiles }) {
+  if (typeof file !== 'string' || file.trim().length === 0) {
+    return [`Exact coverage rollout group ${group} contains a non-path entry.`];
+  }
+
+  const violations = [];
+  if (!isCoverageTargetFile(file)) {
+    violations.push(`Exact coverage rollout path is outside product TypeScript scope: ${file}`);
+  }
+  if (!fileExists(file)) {
+    violations.push(`Exact coverage rollout path does not exist: ${file}`);
+  }
+
+  const previousGroup = seenFiles.get(file);
+  if (previousGroup != null) {
+    violations.push(`Duplicate exact coverage rollout path: ${file} (${previousGroup}, ${group})`);
+  } else {
+    seenFiles.set(file, group);
+  }
+  return violations;
+}
+
+function collectExactCoverageGroupViolations({ exactFiles, fileExists, group, seenFiles }) {
+  const files = exactFiles[group];
+  if (!Array.isArray(files)) {
+    return [`Exact coverage rollout group ${group} must be an array.`];
+  }
+
+  return [
+    ...(files.length === 0 ? [`Exact coverage rollout group ${group} must not be empty.`] : []),
+    ...files.flatMap((file) =>
+      collectExactCoverageFileViolations({ file, fileExists, group, seenFiles })
+    ),
+  ];
+}
+
+export function collectCoverageRolloutInventoryViolations({
+  exactFiles = COVERAGE_ROLLOUT_EXACT_FILES,
+  fileExists = existsSync,
+} = {}) {
+  if (exactFiles == null || typeof exactFiles !== 'object' || Array.isArray(exactFiles)) {
+    return ['Exact coverage rollout inventory must export an object keyed by rollout group.'];
+  }
+
+  const violations = [];
+  const expectedGroups = new Set(COVERAGE_ROLLOUT_EXACT_GROUPS);
+  const seenFiles = new Map();
+
+  violations.push(
+    ...Object.keys(exactFiles)
+      .filter((group) => !expectedGroups.has(group))
+      .map((group) => `Unexpected exact coverage rollout group: ${group}`)
+  );
+
+  for (const group of COVERAGE_ROLLOUT_EXACT_GROUPS) {
+    violations.push(
+      ...collectExactCoverageGroupViolations({ exactFiles, fileExists, group, seenFiles })
+    );
+  }
+
+  return violations;
 }
 
 export function findCoverageRolloutGroup(relativePath, { exactOnly = false } = {}) {

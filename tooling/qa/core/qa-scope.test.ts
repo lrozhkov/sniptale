@@ -38,6 +38,14 @@ it('separates generated inventories from executable harness changes', async () =
     expect(module.isHarnessVerificationQaFile('tooling/configs/qa/technical-debt.data.json')).toBe(
       false
     );
+    expect(
+      module.isHarnessVerificationQaFile(
+        'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isHarnessVerificationQaFile('tooling/qa/core/verify-test-coverage.registry.mjs')
+    ).toBe(true);
     expect(module.isHarnessVerificationQaFile('tooling/configs/qa/quality-baseline.json')).toBe(
       true
     );
