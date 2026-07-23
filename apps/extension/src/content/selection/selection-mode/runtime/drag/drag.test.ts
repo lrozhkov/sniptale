@@ -27,7 +27,7 @@ import {
   updateSelectionModeDragSelection,
   updateSelectionModeFinalFrame,
   finalizeSelectionModeDragSelection,
-} from '.';
+} from './index';
 
 function createSetupListenerHandlers() {
   return {
@@ -104,7 +104,7 @@ function createDragRuntime() {
   return {
     constrainSelection: vi.fn(() => ({ x: 0, y: 0, width: 60, height: 50 })),
     finalizeDragSelection: vi.fn(() => ({
-      aspectRatio: 1.5,
+      aspectRatio: 1.5 as number | null,
       currentState: 'confirmed',
       shouldShowFinalFrame: true,
       skipNextClick: true,
@@ -223,9 +223,30 @@ function registerRuntimeFlowTest() {
   });
 }
 
+function registerSuppressedOutputTest() {
+  it('does not resize without a direction or show a frame for an invalid selection', () => {
+    const args = createArgs();
+    const dragRuntime = createDragRuntime();
+    dragRuntime.finalizeDragSelection.mockReturnValue({
+      aspectRatio: null,
+      currentState: 'idle',
+      shouldShowFinalFrame: false,
+      skipNextClick: false,
+    });
+    applySelectionModeDragSelectionMock.mockReturnValue(dragRuntime);
+
+    handleSelectionModeResizeMove(args, { clientX: 220, clientY: 210 } as MouseEvent);
+    finalizeSelectionModeDragSelection(args);
+
+    expect(dragRuntime.handleResizeMove).not.toHaveBeenCalled();
+    expect(args.showFinalFrame).not.toHaveBeenCalled();
+  });
+}
+
 describe('selection-mode runtime drag lifecycle', () => {
   registerHoverLifecycleTest();
   registerElementSelectionTest();
   registerDragResultTest();
   registerRuntimeFlowTest();
+  registerSuppressedOutputTest();
 });

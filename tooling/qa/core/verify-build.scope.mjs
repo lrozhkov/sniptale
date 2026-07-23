@@ -246,6 +246,8 @@ export function resolveBuildTestScope({
   const behavioralTargetFiles = filterImportOrMockOnlyDiffFiles(targetFiles);
   const behavioralRiskTargetFiles = filterImportOrMockOnlyDiffFiles(riskTargetFiles);
   const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
+  const productChangedTargetFiles = targetFiles.filter(isProductQaFile);
+  const productChangedCodeFiles = codeFiles.filter(isProductQaFile);
   const productTargetFiles = behavioralTargetFiles.filter(isProductQaFile);
   const productRiskTargetFiles = behavioralRiskTargetFiles.filter(isProductQaFile);
   const productCodeFiles = behavioralCodeFiles.filter(isProductQaFile);
@@ -254,6 +256,12 @@ export function resolveBuildTestScope({
   const directTestFiles = uniqueSorted(productCodeFiles.filter(isTestFile));
   const productionCodeFiles = productCodeFiles.filter((file) => !isTestFile(file));
   const productionTargetFiles = productTargetFiles.filter(
+    (file) => !isTestFile(file) && (isCodeFile(file) || file === 'apps/extension/manifest.json')
+  );
+  const changedProductionCodeFiles = productChangedCodeFiles.filter(
+    (file) => !isTestFile(file) && isCodeFile(file)
+  );
+  const changedProductionTargetFiles = productChangedTargetFiles.filter(
     (file) => !isTestFile(file) && (isCodeFile(file) || file === 'apps/extension/manifest.json')
   );
   const existingNonCodeProductionFiles = productionTargetFiles.filter(
@@ -271,8 +279,8 @@ export function resolveBuildTestScope({
     unavailableProductionFiles.length === 0
       ? new Map()
       : deletedSuccessorResolver({
-          productionCodeFiles,
-          productionTargetFiles,
+          productionCodeFiles: changedProductionCodeFiles,
+          productionTargetFiles: changedProductionTargetFiles,
         });
   const unavailableProductionScopes = unavailableProductionFiles.map((file) => ({
     changedSuccessorFiles: Array.isArray(deletedSuccessorsByFile.get(file))
