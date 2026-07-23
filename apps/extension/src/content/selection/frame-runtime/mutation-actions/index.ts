@@ -1,31 +1,83 @@
-import type { Root } from 'react-dom/client';
-import type {
-  BlurSettings,
-  EffectMode,
-  FocusSettings,
-  FrameData,
-  HighlighterSettings,
-} from '../../../../features/highlighter/contracts';
-import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
-import type { FrameMutations } from '../contracts';
-import { buildFrameMutationActions } from './dom';
+import { createLogger } from '@sniptale/platform/observability/logger';
+import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
+import {
+  createAddFrameHandler,
+  createCalculateFrameCoords,
+  createGenerateFrameId,
+} from './frame-factory';
+import {
+  createAddAutoBlurFramesHandler,
+  createClearAutoBlurFramesHandler,
+  createSyncAutoBlurFramesHandler,
+} from './auto-blur';
+import { createClearFramesHandler } from './clear';
+import { createRemoveFrameHandler } from './remove';
+import { createUpdateFrameHandler } from './update';
+import type { UseFrameMutationActionHelperOptions } from './types';
 
-interface UseFrameMutationActionsOptions {
-  setFrames: React.Dispatch<React.SetStateAction<FrameData[]>>;
-  framesRef: React.MutableRefObject<FrameData[]>;
-  linkedElementsRef: React.MutableRefObject<Map<string, HTMLElement>>;
-  containerRef: React.MutableRefObject<HTMLDivElement | null>;
-  rootsRef: React.MutableRefObject<Map<string, Root>>;
-  isClearingRef: React.MutableRefObject<boolean>;
-  globalEffectModeRef: React.MutableRefObject<EffectMode>;
-  globalStepBadgeAutoModeRef: React.MutableRefObject<boolean>;
-  sessionBlurSettingsRef: React.MutableRefObject<BlurSettings>;
-  sessionFocusSettingsRef: React.MutableRefObject<FocusSettings>;
-  sessionStepBadgeTemplateRef: React.MutableRefObject<StepBadgeSettings | null>;
-  highlighterSettingsCacheRef: React.MutableRefObject<HighlighterSettings | null>;
-  recalculateStepBadgesRef: React.MutableRefObject<(excludeFrameId?: string) => void>;
+type FrameSetter = React.Dispatch<React.SetStateAction<FrameData[]>>;
+const logger = createLogger({ namespace: 'ContentFrameMutations' });
+
+function createSyncFocusOpacityHandler(setFrames: FrameSetter) {
+  return (sourceFrameId: string, newOpacity: number) => {
+    setFrames((prev) => {
+      const focusFrames = prev.filter((frame) => frame.effectMode === 'focus');
+      if (focusFrames.length <= 1) {
+        return prev.map((frame) =>
+          frame.id === sourceFrameId
+            ? { ...frame, focusSettings: { ...frame.focusSettings, opacity: newOpacity } }
+            : frame
+        );
+      }
+
+      logger.log('Syncing focus opacity across frames', focusFrames.length, newOpacity);
+      return prev.map((frame) =>
+        frame.effectMode === 'focus'
+          ? { ...frame, focusSettings: { ...frame.focusSettings, opacity: newOpacity } }
+          : frame
+      );
+    });
+  };
 }
 
-export function useFrameMutationActions(options: UseFrameMutationActionsOptions): FrameMutations {
-  return buildFrameMutationActions(options);
+export function createUpdateFrameEffectHandler({
+  globalEffectModeRef,
+  sessionBlurSettingsRef,
+  sessionFocusSettingsRef,
+  setFrames,
+}: Pick<
+  UseFrameMutationActionHelperOptions,
+  'globalEffectModeRef' | 'sessionBlurSettingsRef' | 'sessionFocusSettingsRef' | 'setFrames'
+>) {
+  return (frameId: string, mode: EffectMode) => {
+    globalEffectModeRef.current = mode;
+    setFrames((prev) => {
+      const targetFrame = prev.find((frame) => frame.id === frameId);
+      if (targetFrame?.blurSettings) {
+        sessionBlurSettingsRef.current = { ...targetFrame.blurSettings };
+      }
+      if (targetFrame?.focusSettings) {
+        sessionFocusSettingsRef.current = { ...targetFrame.focusSettings };
+      }
+
+      return prev.map((frame) => (frame.id === frameId ? { ...frame, effectMode: mode } : frame));
+    });
+  };
+}
+
+export function buildFrameMutationActions(options: UseFrameMutationActionHelperOptions) {
+  const generateFrameId = createGenerateFrameId();
+  const calculateFrameCoords = createCalculateFrameCoords(generateFrameId);
+
+  return {
+    addAutoBlurFrames: createAddAutoBlurFramesHandler(options),
+    clearAutoBlurFrames: createClearAutoBlurFramesHandler(options),
+    syncAutoBlurFrames: createSyncAutoBlurFramesHandler(options),
+    syncFocusOpacity: createSyncFocusOpacityHandler(options.setFrames),
+    addFrame: createAddFrameHandler({ ...options, calculateFrameCoords }),
+    updateFrame: createUpdateFrameHandler(options),
+    removeFrame: createRemoveFrameHandler(options),
+    clearFrames: createClearFramesHandler(options),
+    updateFrameEffect: createUpdateFrameEffectHandler(options),
+  };
 }

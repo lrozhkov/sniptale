@@ -15,15 +15,16 @@ const mocks = vi.hoisted(() => ({
     updateFrame: vi.fn(),
     updateFrameEffect: vi.fn(),
   },
-  useFrameMutationActions: vi.fn(() => mocks.mutations),
+  buildFrameMutationActions: vi.fn(() => mocks.mutations),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => mocks.logger,
 }));
 
-vi.mock('../mutation-actions', () => ({
-  useFrameMutationActions: mocks.useFrameMutationActions,
+vi.mock('../mutation-actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../mutation-actions')>()),
+  buildFrameMutationActions: mocks.buildFrameMutationActions,
 }));
 
 import { useFrameManagerMutations } from './useFrameManagerMutations';
@@ -72,7 +73,7 @@ function Harness() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.logger.log.mockClear();
-  mocks.useFrameMutationActions.mockClear();
+  mocks.buildFrameMutationActions.mockClear();
 });
 
 afterEach(() => {
@@ -100,7 +101,7 @@ describe('frame-manager-mutations-hook', () => {
       root?.render(<Harness />);
     });
 
-    expect(mocks.useFrameMutationActions).toHaveBeenCalledWith(
+    expect(mocks.buildFrameMutationActions).toHaveBeenCalledWith(
       expect.objectContaining({
         containerRef: currentArgs.refs.containerRef,
         highlighterSettingsCacheRef: currentArgs.refs.highlighterSettingsCacheRef,
