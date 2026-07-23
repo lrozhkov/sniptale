@@ -1,5 +1,5 @@
 import { bindRegionSelectorRootEvents } from './events';
-import { buildRegionSelectorMarkup } from './markup.helpers';
+import { buildRegionSelectorMarkup } from './markup';
 import { buildRecordingOverlayNode } from './recording-overlay.helpers';
 import { updateRegionDisplay } from './runtime';
 import { createRegionSelectorTooltip } from './tooltip';

@@ -5,7 +5,7 @@ import {
 } from '@sniptale/ui/content-size-tooltip/dom';
 import { calculateContentSizeTooltipPosition } from '@sniptale/ui/content-size-tooltip/core';
 import { MIN_REGION_SELECTOR_SIZE, type RegionBounds } from './helpers';
-import { updateOverlayMask } from './markup.helpers';
+import { updateOverlayMask } from './markup';
 
 export function updateRegionDisplay(
   regionSelectorContainer: HTMLDivElement | null,

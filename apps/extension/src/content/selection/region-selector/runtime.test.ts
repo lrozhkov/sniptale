@@ -29,7 +29,8 @@ vi.mock('@sniptale/ui/content-size-tooltip/core', () => ({
   mergeStyleRecords: vi.fn(),
 }));
 
-vi.mock('./markup.helpers', () => ({
+vi.mock('./markup', () => ({
+  buildRegionSelectorMarkup: vi.fn(),
   updateOverlayMask: updateOverlayMaskMock,
 }));
 

@@ -28,8 +28,9 @@ vi.mock('./events', () => ({
   bindRegionSelectorRootEvents: bindRegionSelectorRootEventsMock,
 }));
 
-vi.mock('./markup.helpers', () => ({
+vi.mock('./markup', () => ({
   buildRegionSelectorMarkup: buildRegionSelectorMarkupMock,
+  updateOverlayMask: vi.fn(),
 }));
 
 vi.mock('./recording-overlay.helpers', () => ({
