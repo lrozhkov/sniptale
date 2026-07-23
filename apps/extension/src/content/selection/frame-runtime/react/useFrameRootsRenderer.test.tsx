@@ -160,6 +160,21 @@ async function expectStableActionRefsDoNotRetriggerRootRendering() {
   expect(domMocks.renderInteractiveFrames).toHaveBeenCalledTimes(1);
 }
 
+async function expectPreparedRootsRenderThroughDomOwner() {
+  const props = createProps();
+
+  await renderHarness(props);
+
+  expect(domMocks.renderInteractiveFrames).toHaveBeenCalledWith(
+    expect.objectContaining({
+      container: hostContainer,
+      currentFrames: props.frames,
+      currentFrameStates: props.frameStates,
+      InteractiveFrameComponent,
+    })
+  );
+}
+
 async function expectEquivalentFrameClonesDoNotRetriggerRootRendering() {
   const props = createProps();
 
@@ -202,6 +217,10 @@ async function expectUnmountCleanupDoesNotCreateAContainerWhenRuntimeNeverMounte
 }
 
 describe('useFrameRootsRenderer', () => {
+  it(
+    'renders prepared frame roots through the DOM owner',
+    expectPreparedRootsRenderThroughDomOwner
+  );
   it(
     'does not rerender frame roots when only action callback identities change',
     expectStableActionRefsDoNotRetriggerRootRendering

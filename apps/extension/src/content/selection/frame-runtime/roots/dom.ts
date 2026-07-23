@@ -10,7 +10,6 @@ import { createInteractiveFrameElement, type FrameRootActionRefs } from './eleme
 const logger = createLogger({ namespace: 'ContentFrameIframeDiag' });
 
 export function renderInteractiveFrames({
-  cancelled,
   container,
   InteractiveFrameComponent,
   currentFrames,
@@ -19,7 +18,6 @@ export function renderInteractiveFrames({
   actionRefs,
   globalEffectModeRef,
 }: {
-  cancelled: boolean;
   container: HTMLDivElement;
   InteractiveFrameComponent: InteractiveFrameComponent;
   currentFrames: FrameData[];
@@ -28,13 +26,13 @@ export function renderInteractiveFrames({
   actionRefs: FrameRootActionRefs;
   globalEffectModeRef: MutableRefObject<EffectMode>;
 }) {
-  if (cancelled || !container.isConnected) {
+  if (!container.isConnected) {
     return;
   }
 
   const framesWithZIndex = getSortedFramesWithZIndex(currentFrames, currentFrameStates);
   framesWithZIndex.forEach((frameWithZIndex) => {
-    if (cancelled || !container.isConnected) {
+    if (!container.isConnected) {
       return;
     }
 

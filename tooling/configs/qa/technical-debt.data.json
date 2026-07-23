@@ -3195,7 +3195,6 @@
         "apps/extension/src/content/selection/frame-runtime/roots/scroll/iframe-observer.ts",
         "apps/extension/src/content/selection/frame-runtime/roots/scroll/iframe-registration.ts",
         "apps/extension/src/content/selection/frame-runtime/roots/scroll/linked-elements.ts",
-        "apps/extension/src/content/selection/frame-runtime/roots/sync.ts",
         "apps/extension/src/content/selection/frame-runtime/selection-frame-visual.ts",
         "apps/extension/src/content/selection/frame-runtime/session/callout-defaults.ts",
         "apps/extension/src/content/selection/frame-runtime/session/callout-handlers.ts",
