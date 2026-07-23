@@ -1,10 +1,7 @@
 import { VIDEO_RECORDING_LEASE_OWNER_MAPPINGS } from './video-recording-lease.mjs';
 import { VIDEO_RECORDING_RUNTIME_ROUTING_OWNER_MAPPINGS } from './video-runtime-routing.mjs';
 import { SHARED_CONTRACT_OWNER_MAPPINGS } from './video-recording-shared-contract.mjs';
-
-const POPUP_RUNTIME_ROOT = 'apps/extension/src/popup/shell/runtime';
-const POPUP_BOOTSTRAP_ROOT = 'apps/extension/src/popup/shell/bootstrap';
-const POPUP_LIFECYCLE_ROOT = 'apps/extension/src/popup/shell/lifecycle';
+import { POPUP_RECORDING_OWNER_MAPPINGS } from './popup-recording.mjs';
 
 export const VIDEO_RECORDING_OWNER_MAPPINGS = [
   ...VIDEO_RECORDING_LEASE_OWNER_MAPPINGS,
@@ -179,55 +176,6 @@ export const VIDEO_RECORDING_OWNER_MAPPINGS = [
       'apps/extension/src/background/media/video/manager/start-owner.test.ts',
     ],
   },
-  {
-    owner: 'popup-recording-start',
-    productionFile: `${POPUP_RUNTIME_ROOT}/start-recording.ts`,
-    exclusive: true,
-    reason:
-      'Popup recording start message construction and response handling are covered by focused start suites.',
-    testFiles: [
-      `${POPUP_RUNTIME_ROOT}/start-recording.test.ts`,
-      `${POPUP_RUNTIME_ROOT}/start-recording.capability.test.ts`,
-      `${POPUP_RUNTIME_ROOT}/start-recording.multi-source.test.ts`,
-      `${POPUP_RUNTIME_ROOT}/start-recording.webcam.test.ts`,
-    ],
-  },
-  {
-    owner: 'popup-recording-control-capability',
-    productionPrefix: POPUP_RUNTIME_ROOT,
-    reason:
-      'Popup recording control capability propagation is covered by start, effect, and transport suites.',
-    testFiles: [
-      `${POPUP_RUNTIME_ROOT}/effects.test.tsx`,
-      `${POPUP_RUNTIME_ROOT}/actions.test.tsx`,
-      `${POPUP_RUNTIME_ROOT}/start-recording.test.ts`,
-      `${POPUP_RUNTIME_ROOT}/start-recording.capability.test.ts`,
-      `${POPUP_RUNTIME_ROOT}/start-recording.multi-source.test.ts`,
-      `${POPUP_RUNTIME_ROOT}/start-recording.webcam.test.ts`,
-      `${POPUP_RUNTIME_ROOT}/state.test.tsx`,
-      `${POPUP_RUNTIME_ROOT}/start/params.test.ts`,
-      `${POPUP_RUNTIME_ROOT}/transport/pause.test.tsx`,
-      `${POPUP_RUNTIME_ROOT}/transport/stop.test.tsx`,
-    ],
-  },
-  {
-    owner: 'popup-recording-bootstrap-capability',
-    productionPrefix: POPUP_BOOTSTRAP_ROOT,
-    reason: 'Popup bootstrap recording capability hydration is covered by bootstrap suites.',
-    testFiles: [
-      `${POPUP_BOOTSTRAP_ROOT}/index.test.ts`,
-      `${POPUP_LIFECYCLE_ROOT}/bootstrap.test.ts`,
-    ],
-  },
-  {
-    owner: 'popup-recording-lifecycle-capability',
-    productionPrefix: POPUP_LIFECYCLE_ROOT,
-    reason: 'Popup lifecycle capability hydration is covered by bootstrap/setup/index suites.',
-    testFiles: [
-      `${POPUP_LIFECYCLE_ROOT}/bootstrap.test.ts`,
-      `${POPUP_LIFECYCLE_ROOT}/index.test.ts`,
-      `${POPUP_LIFECYCLE_ROOT}/setup.test.ts`,
-    ],
-  },
+  ...POPUP_RECORDING_OWNER_MAPPINGS,
   ...SHARED_CONTRACT_OWNER_MAPPINGS,
 ];

@@ -25,6 +25,25 @@ it('keeps the sender policy on its dedicated focused owner suite', async () => {
   ).toEqual(['apps/extension/src/background/media/video/runtime/sender-policy.test.ts']);
 });
 
+it('keeps popup runtime owners on their adjacent proof instead of the broad popup fallback', async () => {
+  const module = await importOwnerMap();
+  const runtimeRoot = 'apps/extension/src/popup/shell/runtime';
+
+  expect(module.resolveMappedCoverageOwnerTests(`${runtimeRoot}/start/run.ts`)).toEqual([
+    `${runtimeRoot}/start.test.tsx`,
+  ]);
+  expect(module.resolveMappedCoverageOwnerTests(`${runtimeRoot}/actions.ts`)).toEqual([
+    `${runtimeRoot}/actions.test.tsx`,
+  ]);
+  expect(module.resolveMappedCoverageOwnerTests(`${runtimeRoot}/effects.ts`)).toEqual([
+    `${runtimeRoot}/effects.test.tsx`,
+    `${runtimeRoot}/media-device-effects.test.tsx`,
+  ]);
+  expect(module.resolveMappedCoverageOwnerTests(`${runtimeRoot}/state.ts`)).toEqual([
+    `${runtimeRoot}/state.test.tsx`,
+  ]);
+});
+
 it('keeps a migration prefix non-exclusive so exact owner proof remains authoritative', async () => {
   const module = await importOwnerMap();
   const file = 'apps/extension/src/composition/persistence/projects/index.ts';

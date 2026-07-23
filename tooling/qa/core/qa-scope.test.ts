@@ -63,6 +63,11 @@ it('separates generated inventories from executable harness changes', async () =
       )
     ).toBe(true);
     expect(
+      module.isHarnessVerificationQaFile(
+        'tooling/qa/core/focused-coverage/maps/popup-recording.mjs'
+      )
+    ).toBe(false);
+    expect(
       module.isFocusedCoverageOwnerMapInventoryFile(
         'tooling/qa/core/focused-coverage/maps/cast-cleanup.mjs'
       )

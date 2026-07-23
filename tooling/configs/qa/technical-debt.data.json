@@ -9214,8 +9214,6 @@
         "apps/extension/src/popup/shell/runtime/recording-navigation-effect.ts",
         "apps/extension/src/popup/shell/runtime/services.ts",
         "apps/extension/src/popup/shell/runtime/start-recording.ts",
-        "apps/extension/src/popup/shell/runtime/start/guard.ts",
-        "apps/extension/src/popup/shell/runtime/start/params.ts",
         "apps/extension/src/popup/shell/runtime/start/run.ts",
         "apps/extension/src/popup/shell/runtime/state.ts",
         "apps/extension/src/popup/shell/runtime/test-support/state.ts",
@@ -9478,8 +9476,6 @@
         "apps/extension/src/popup/shell/runtime/recording-navigation-effect.ts",
         "apps/extension/src/popup/shell/runtime/services.ts",
         "apps/extension/src/popup/shell/runtime/start-recording.ts",
-        "apps/extension/src/popup/shell/runtime/start/guard.ts",
-        "apps/extension/src/popup/shell/runtime/start/params.ts",
         "apps/extension/src/popup/shell/runtime/start/run.ts",
         "apps/extension/src/popup/shell/runtime/state.ts",
         "apps/extension/src/popup/shell/runtime/test-support/state.ts",
@@ -17418,6 +17414,33 @@
       ]
     },
     {
+      "id": "policy.source.popup-recording-mjs.4368b402cd",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
+        "contentHash": "a79069a11beafe00818b72f14faefc86d4132a4caca422cfb6a4192f09026161"
+      },
+      "consumers": [
+        "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
+        "tooling/qa/core/focused-coverage/maps/video-recording.mjs"
+      ],
+      "surfaces": [
+        "binding:POPUP_RECORDING_OWNER_MAPPINGS",
+        "property:testFiles",
+        "property:testFiles[1]",
+        "property:testFiles[2]",
+        "property:testFiles[3]",
+        "property:testFiles[4]",
+        "property:testFiles[5]",
+        "property:testFiles[6]",
+        "property:testFiles[7]"
+      ]
+    },
+    {
       "id": "policy.source.postcss-config-js.2cba0c4f01",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -17669,7 +17692,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "2a1cc38dcf75146e4f9ea8af113b89f67f1bc46d1912e292b89d81f4bde962ba"
+        "contentHash": "39ec9586b6f45314b2e9b9c5f4751cd38d2289d08b2289c3640d4c443f763e0e"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -21281,7 +21304,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/video-recording.mjs",
-        "contentHash": "3f3cbd6599bfd400ecb127dead969dfdecf8f15c653fedeaf64706e089362153"
+        "contentHash": "ad73528c4f6445493f338caebb6537c07cb17a2c5f8f3c30f14024ab1f39bb45"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -21297,10 +21320,6 @@
         "property:testFiles[13]",
         "property:testFiles[14]",
         "property:testFiles[15]",
-        "property:testFiles[16]",
-        "property:testFiles[17]",
-        "property:testFiles[18]",
-        "property:testFiles[19]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
