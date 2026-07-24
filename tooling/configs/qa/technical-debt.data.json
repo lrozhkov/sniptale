@@ -16929,7 +16929,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/owner-classifier.mjs",
-        "contentHash": "6fd85c4d9d67d926b5c0c1c3eb8184079deb32bf78a394584f42919ede844263"
+        "contentHash": "51bd67e826e0e8a1707006056c42251cbde86976bcf4551d925cb63626e1bb07"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -18364,7 +18364,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/structural-audit.mjs",
-        "contentHash": "ac2c14ee17fd951a0d964799afde589734b7fd2b60aacd2ccc2d2c16c9f586fa"
+        "contentHash": "76059de33b305db44d9ff14a724958372a4099614e267620a8aaaeec55ba9e86"
       },
       "consumers": [
         "tooling/qa/wrappers/structural-audit.mjs",
@@ -18772,7 +18772,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/topology-fragmentation.mjs",
-        "contentHash": "89fb76e8670ccfb5b84691ccb5e37ff675b02cb1073a307dea08275b50f9a073"
+        "contentHash": "4bb2b7d5581a8f38eb651eb90f5b4b9fd649a3be05d334a6e85f93544db43c43"
       },
       "consumers": [
         "tooling/qa/core/topology-fragmentation.mjs",
@@ -18780,6 +18780,8 @@
         "tooling/qa/wrappers/structural-audit.mjs"
       ],
       "surfaces": [
+        "property:buildForwardingEdgeClusters/anonymous-303/forwardingFiles",
+        "property:buildForwardingEdgeClusters/anonymous-303/signals",
         "property:collectTopologyFragmentationReport/summary"
       ]
     },
@@ -18792,7 +18794,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/topology-fragmentation.policy.mjs",
-        "contentHash": "2052c46c7c5f9217990dbeaa73cc9de3022d15ce5f637f0f1d65898846ec4df5"
+        "contentHash": "2fc73ca213b530bfc150bbb6dfec65740196e0139ecfe486e0932656b4181ffa"
       },
       "consumers": [
         "tooling/qa/core/topology-fragmentation.mjs",
@@ -18802,6 +18804,11 @@
       "surfaces": [
         "binding:PRODUCTION_REASONS",
         "property:createConsolidationDecision/reasons",
+        "property:decideForwardingEdgeCandidate/reasons",
+        "property:decideForwardingEdgeCandidate/reasons[1]",
+        "property:decideForwardingEdgeCandidate/reasons[2]",
+        "property:decideForwardingEdgeCandidate/reasons[3]",
+        "property:decideForwardingEdgeCandidate/reasons[4]",
         "property:decideTopologyCluster/reasons",
         "property:decideTopologyCluster/reasons[1]",
         "property:decideTopologyCluster/reasons[2]",
@@ -19424,7 +19431,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.deleted-aggregate.mjs",
-        "contentHash": "87d6f12392a5146f5ca8d2be4c53c785e1b87a17ea3c8740c3c8b3f47c386fb1"
+        "contentHash": "c1f8ef6447fb49ddfe86deb6707115e3ac8293c21f18e6fc90a476ba74e98006"
       },
       "consumers": [
         "tooling/qa/core/verify-build.deleted-aggregate.mjs",
@@ -19443,7 +19450,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.deleted-closure.mjs",
-        "contentHash": "8a150ec6a93859866bc6bb7ae7ed38d6c2e08848cbe843db51e3e0f64513d14d"
+        "contentHash": "7faec59fbfbeb2ad07e7644a1832e3e1ea46765d5062ac4482ad84e69f267524"
       },
       "consumers": [
         "tooling/qa/core/verify-build.deleted-closure.mjs",

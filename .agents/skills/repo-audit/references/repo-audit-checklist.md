@@ -14,6 +14,7 @@
 - Required review follows green proof, remains independent/read-only, and receives no inherited context.
 - Baselines, allowlists, dispositions, and policy registries are narrow, justified, consumed, and validated.
 - Manual, report-only, external, optional, or skip-capable tools state their risk and do not masquerade as normal closeout gates. `qa:structural-audit` remains operator-invoked architecture maintenance outside PR, agent, closeout, and `qa:audit` flows; its bounded schema-v2 artifact reports owner/change-reason clusters as `Split`, `Consolidate`, or `Keep` without turning file count into a goal.
+- The manual topology artifact distinguishes disjoint path-owner partitions from overlapping forwarding-edge candidates, exposes both counts, retains a complete compact edge inventory beside sampled rich evidence, and classifies every forwarding-only single-production-consumer edge as `Consolidate` or explicit public-contract/runtime/cross-owner/unresolved `Keep`. A zero consolidation count is not accepted when unclassified strong edges remain.
 - Obsolete wrappers, scripts, migration scaffolds, path literals, and agent helpers are removed or retained only as explicit negative guards/history.
 
 ## Documentation

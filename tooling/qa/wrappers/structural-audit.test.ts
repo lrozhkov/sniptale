@@ -94,12 +94,95 @@ it('writes parseable private byte-bounded artifacts after deep sanitization', ()
   expect(artifact.functions[0].stateAuthorityNames).toHaveLength(50);
   expect(artifact.summary).toMatchObject({
     totalClusters: 25,
+    partitionClusters: 25,
+    forwardingEdgeCandidates: 0,
     candidateClusters: 20,
     reportedClusters: artifact.clusters.length,
+    reportedForwardingEdges: 0,
   });
+  expect(artifact.forwardingEdges).toEqual([]);
   expect(artifact.clusters).toHaveLength(20);
   expect(artifact.clusters.every((cluster) => cluster.fileMetrics == null)).toBe(true);
   expect(fs.statSync(outputPath).mode & 0o777).toBe(0o600);
+});
+
+it('keeps a complete compact forwarding-edge inventory when rich sections are trimmed', () => {
+  const root = createTempRoot('structural-audit-forwarding-edges-');
+  const outputPath = path.join(root, 'report.json');
+  const forwardingEdges = Array.from({ length: 600 }, (_, index) => ({
+    id: `forwarding:apps/extension/src/content/demo/facade-${index}.ts`,
+    clusterKind: 'forwarding-edge',
+    decision: index % 2 === 0 ? 'Consolidate' : 'Keep',
+    confidence: 'medium',
+    maximumStructuralScore: index % 8,
+    forwardingFiles: [`apps/extension/src/content/demo/facade-${index}.ts`],
+    consumerFile: `apps/extension/src/content/demo/consumer-${index}.ts`,
+    targetFiles: [
+      `apps/extension/src/content/demo/provider-${index}.ts`,
+      `apps/extension/src/content/demo/policy-${index}.ts`,
+    ],
+    mergeTarget: index % 2 === 0 ? `apps/extension/src/content/demo/consumer-${index}.ts` : null,
+    mergeTargetBlockedAt:
+      index % 2 === 0 ? null : `apps/extension/src/content/demo/bridge-${index}.ts`,
+    mergeTargetBlockReason: index % 2 === 0 ? null : 'multiple-production-consumers',
+    reasons:
+      index % 2 === 0
+        ? ['forwarding', 'single-production-consumer']
+        : ['unresolved-forwarding-target'],
+  }));
+
+  writeStructuralAuditArtifact(
+    { scope: 'repo-wide-audit', files: [], functions: [], advisories: [] },
+    {
+      outputPath,
+      maximumBytes: STRUCTURAL_AUDIT_MAX_BYTES,
+      sanitizerOptions: { repositoryRoot: root, sensitiveValues: [] },
+      fragmentationReport: {
+        clusters: forwardingEdges,
+        summary: {
+          totalClusters: forwardingEdges.length,
+          partitionClusters: 0,
+          forwardingEdgeCandidates: forwardingEdges.length,
+          candidateClusters: forwardingEdges.length,
+          split: 0,
+          consolidate: 300,
+          keep: 300,
+        },
+      },
+    }
+  );
+
+  const text = fs.readFileSync(outputPath, 'utf8');
+  const artifact = JSON.parse(text);
+  expect(Buffer.byteLength(text)).toBeLessThanOrEqual(STRUCTURAL_AUDIT_MAX_BYTES);
+  expect(artifact.forwardingEdges).toHaveLength(forwardingEdges.length);
+  expect(artifact.summary.reportedForwardingEdges).toBe(forwardingEdges.length);
+  expect(new Set(artifact.forwardingEdges.map((edge) => edge.id)).size).toBe(
+    forwardingEdges.length
+  );
+  expect(artifact.forwardingEdges.every((edge) => edge.targetFiles.length === 2)).toBe(true);
+});
+
+it('fails instead of silently truncating an incomplete forwarding-edge inventory', () => {
+  expect(() =>
+    writeStructuralAuditArtifact(
+      { scope: 'repo-wide-audit', files: [], functions: [], advisories: [] },
+      {
+        outputPath: path.join(createTempRoot('structural-audit-incomplete-edges-'), 'report.json'),
+        fragmentationReport: {
+          clusters: [],
+          summary: {
+            totalClusters: 1,
+            forwardingEdgeCandidates: 1,
+            candidateClusters: 1,
+            split: 0,
+            consolidate: 1,
+            keep: 0,
+          },
+        },
+      }
+    )
+  ).toThrow(/forwarding-edge inventory is incomplete/u);
 });
 
 it('retains structural and topology evidence when every artifact section exceeds its budget', () => {
@@ -233,7 +316,7 @@ it('keeps topology, artifact location, and a bounded structural preview visible'
   expect(output.indexOf('Topology fragmentation')).toBeLessThan(output.indexOf('Artifact:'));
   expect(output.indexOf('Artifact:')).toBeLessThan(output.indexOf('Structural risk'));
   expect(output.match(/- \[watch\]/gu)).toHaveLength(12);
-  expect(output).toContain('... 8 more structural findings in artifact');
+  expect(output).toContain('... 8 more structural findings not shown');
 });
 
 it('does not claim an audit artifact for bounded diff-scoped output', () => {

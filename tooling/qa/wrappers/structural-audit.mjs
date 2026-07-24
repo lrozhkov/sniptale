@@ -63,6 +63,23 @@ function sanitizeMetric(metric, sanitizerOptions, { omitFunctions = false } = {}
   );
 }
 
+function sanitizeForwardingEdge(cluster, sanitizerOptions) {
+  const sanitizeString = (value) =>
+    value == null ? null : sanitizeArtifactValue(value, sanitizerOptions);
+  return {
+    id: sanitizeString(cluster.id),
+    decision: sanitizeString(cluster.decision),
+    confidence: sanitizeString(cluster.confidence),
+    forwardingFile: sanitizeString(cluster.forwardingFiles?.[0]),
+    consumerFile: sanitizeString(cluster.consumerFile),
+    targetFiles: (cluster.targetFiles ?? []).map(sanitizeString),
+    mergeTarget: sanitizeString(cluster.mergeTarget),
+    mergeTargetBlockedAt: sanitizeString(cluster.mergeTargetBlockedAt),
+    mergeTargetBlockReason: sanitizeString(cluster.mergeTargetBlockReason),
+    reasons: (cluster.reasons ?? []).map(sanitizeString),
+  };
+}
+
 function serializedArtifactBytes(artifact) {
   return Buffer.byteLength(`${JSON.stringify(artifact, null, 2)}\n`);
 }
@@ -116,6 +133,7 @@ function boundAuditArtifact(artifact, maximumBytes) {
   artifact.summary.reportedFunctions = artifact.functions.length;
   artifact.summary.reportedFindings = artifact.findings.length;
   artifact.summary.reportedClusters = artifact.clusters.length;
+  artifact.summary.reportedForwardingEdges = artifact.forwardingEdges.length;
   return artifact;
 }
 
@@ -152,6 +170,17 @@ export function createStructuralAuditArtifact(
   const clusters = interleaveAuditClusters(fragmentationReport.clusters)
     .slice(0, ARTIFACT_ITEM_LIMIT)
     .map((cluster) => sanitizeMetric(cluster, sanitizerOptions, { omitFunctions: true }));
+  const forwardingEdges = fragmentationReport.clusters
+    .filter((cluster) => cluster.clusterKind === 'forwarding-edge')
+    .map((cluster) => sanitizeForwardingEdge(cluster, sanitizerOptions));
+  const expectedForwardingEdges =
+    fragmentationReport.summary.forwardingEdgeCandidates ?? forwardingEdges.length;
+  if (forwardingEdges.length !== expectedForwardingEdges) {
+    throw new Error(
+      `Structural audit forwarding-edge inventory is incomplete: ` +
+        `${forwardingEdges.length}/${expectedForwardingEdges}.`
+    );
+  }
   return boundAuditArtifact(
     {
       schemaVersion: 2,
@@ -165,6 +194,11 @@ export function createStructuralAuditArtifact(
         totalFindings: report.advisories.length,
         reportedFindings: findings.length,
         totalClusters: fragmentationReport.summary.totalClusters,
+        partitionClusters:
+          fragmentationReport.summary.partitionClusters ??
+          fragmentationReport.summary.totalClusters,
+        forwardingEdgeCandidates: fragmentationReport.summary.forwardingEdgeCandidates ?? 0,
+        reportedForwardingEdges: forwardingEdges.length,
         candidateClusters: fragmentationReport.summary.candidateClusters,
         reportedClusters: clusters.length,
         split: fragmentationReport.summary.split,
@@ -175,6 +209,7 @@ export function createStructuralAuditArtifact(
       functions,
       findings,
       clusters,
+      forwardingEdges,
     },
     maximumBytes
   );
@@ -245,7 +280,7 @@ export function runStructuralAuditWrapper(options = {}) {
         consoleOutput:
           formatTopologyFragmentationConsole(fragmentationReport) +
           `Artifact: ${STRUCTURAL_AUDIT_REPORT_PATH}\n` +
-          formatStructuralRiskConsole(report, { limit: 12, remainderLocation: 'in artifact' }),
+          formatStructuralRiskConsole(report, { limit: 12 }),
         advisories: report.advisories,
       },
     ],

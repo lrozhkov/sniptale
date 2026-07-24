@@ -211,6 +211,24 @@ describe('structural report delta policy', () => {
 });
 
 describe('effectful cluster architecture levels', () => {
+  it('classifies Fabric canvas mutations as DOM/UI state effects', () => {
+    const mutation = analyzeStructuralSource(
+      'apps/extension/src/editor/controller/public-actions/scene/browser-frame/mutation.ts',
+      `export function replaceLayer(canvas, previous, next) {
+        canvas.remove(previous);
+        canvas.add(next);
+        canvas.moveObjectTo(next, 1);
+        canvas.setActiveObject(next);
+        canvas.requestRenderAll();
+        canvas?.setDimensions({ width: 100, height: 100 });
+        options.canvas?.requestRenderAll();
+      }`
+    );
+
+    expect(mutation.effectFamilies).toContain('dom-ui');
+    expect(mutation.functions[0]?.effectFamilies).toContain('dom-ui');
+  });
+
   it('allows a narrow adapter but identifies mixed UI/application effects', () => {
     const adapter = analyzeStructuralSource(
       'apps/extension/src/platform/browser/download-adapter.ts',

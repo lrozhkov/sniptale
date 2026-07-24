@@ -15,6 +15,7 @@
 - Review the owner/change-reason cluster, not raw files in isolation. A valid `Split`, `Consolidate`, or `Keep` result reduces cognitive/navigation load without erasing runtime, owner, adapter, or public-contract boundaries. Fewer files alone is not evidence.
 - Structural pressure is interpreted with ownership and cohesion. A registered transaction/workflow owner may legitimately coordinate validation, commit, rollback, publication, state, and effects through narrow adapters; flag it only when responsibilities cross domains, UI authority leaks in, or arbitrary branching erodes the boundary.
 - Compare before/after file transitions, facade/proxy/pass-through layers, public contract size, state authorities, effects/recovery placement, cohesion, and independent change reasons. Consolidation stays within one owner and shared change reason.
+- Treat a supplied forwarding-only plus single-production-consumer edge as a direct consolidation candidate, even when fixed path-depth clusters place its modules separately. Require a stable non-forwarding merge target or explicit public-contract, runtime, cross-owner, unresolved-topology, or independent-change-reason `Keep` proof.
 - Shared placement is proven by consumer symmetry. Runtime-specific UI, controller, effect, storage, or authority concerns remain with their runtime owner or behind a narrow shared contract and runtime adapter.
 
 ## Contracts And Boundaries

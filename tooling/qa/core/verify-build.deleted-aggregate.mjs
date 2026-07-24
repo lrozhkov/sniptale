@@ -205,7 +205,7 @@ export function createDeletedAggregateAnalyzer(readHeadSource) {
   };
 }
 
-export function collectDeletedAggregateProviders({
+export function resolveDeletedAggregateProviderSet({
   analyzeAggregate,
   file,
   isDeletedDeadExport = () => false,
@@ -237,5 +237,9 @@ export function collectDeletedAggregateProviders({
     return true;
   }
 
-  return visit(file) && providers.size > 0 ? [...providers].sort() : [];
+  const complete = visit(file);
+  return {
+    complete,
+    providers: complete ? [...providers].sort() : [],
+  };
 }

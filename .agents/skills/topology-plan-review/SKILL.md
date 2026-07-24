@@ -24,7 +24,7 @@ The orchestrator must spawn a new independent read-only reviewer with `fork_turn
 ## Workflow
 
 1. Read `AGENTS.md`, `docs/engineering/implementation-rules.md`, `docs/architecture/repository-overview.md`, `docs/architecture/code-organization.md`, the supplied bundle, and the required checklist.
-2. Verify that the scope is one coherent ownership result and that the manifest covers the complete selected root/seam rather than a representative sample. Treat the owner/change-reason cluster as the unit, classify each candidate as `Split`, `Consolidate`, or `Keep`, record the independent change reason for every proposed owner, and test whether the form remains stable under the likely next changes.
+2. Verify that the scope is one coherent ownership result and that the manifest covers the complete selected root/seam rather than a representative sample. Treat the owner/change-reason cluster as the unit, classify each candidate as `Split`, `Consolidate`, or `Keep`, record the independent change reason for every proposed owner, and test whether the form remains stable under the likely next changes. When supplied maintenance evidence includes overlapping forwarding-edge candidates, verify every forwarding-only single-production-consumer edge instead of trusting a path-partition `Consolidate: 0` summary.
 3. Verify that the manifest is bounded by the frozen acceptance criteria and does not promise unrelated hardening or stronger runtime guarantees.
 4. Classify affected paths as major areas, owned seams, owner-local roles, platform/contract owners, compatibility facades, or legacy debt.
 5. Verify consumers, import directions, mocks, source-reading paths, docs, registries, policy, focused-proof maps, build inputs, collisions, rollback, and negative proof.

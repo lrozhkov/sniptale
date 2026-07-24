@@ -90,6 +90,12 @@ it('detects forwarding, pass-through, and delegation-only test syntax without ex
       '  expect(adapter).toHaveBeenCalled();',
       '});',
     ].join('\n'),
+    'tooling/example/run.test-support.ts': [
+      'export function assertDelegation() {',
+      '  run();',
+      '  expect(adapter).toHaveBeenCalled();',
+      '}',
+    ].join('\n'),
   };
   const graph = collectTopologyModuleGraph({
     files: Object.keys(sources),
@@ -101,4 +107,5 @@ it('detects forwarding, pass-through, and delegation-only test syntax without ex
   expect(modules['tooling/example/index.ts'].forwardingOnly).toBe(true);
   expect(modules['tooling/example/run.ts'].passThrough).toBe(true);
   expect(modules['tooling/example/run.test.ts'].delegationOnlyTest).toBe(true);
+  expect(modules['tooling/example/run.test-support.ts'].delegationOnlyTest).toBe(true);
 });

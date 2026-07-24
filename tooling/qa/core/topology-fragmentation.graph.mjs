@@ -1,7 +1,6 @@
 import { collectModuleImportGraph } from './module-import-graph.mjs';
+import { isBuildTestFile } from './build-test-file-classifier.mjs';
 import { createSourceFile, ts } from './structural-risk/ast.mjs';
-
-const TEST_FILE_PATTERN = /(?:^|\/)(?:__tests__\/|test\/)|\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 
 function hasExportModifier(node) {
   if (!ts.canHaveModifiers(node)) return false;
@@ -64,7 +63,7 @@ function collectSyntaxSignals(file, sourceFile, source) {
     declarationsOnly &&
     functions.every(isTrivialDelegation);
   const delegationOnlyTest =
-    TEST_FILE_PATTERN.test(file) &&
+    isBuildTestFile(file) &&
     /(?:toHaveBeenCalled|toHaveBeenCalledWith|toHaveReturned|mock\.calls)/u.test(source) &&
     !/(?:rollback|cleanup|failure|throws|rejects|ordering|invariant)/iu.test(source);
   return { forwardingOnly, passThrough, delegationOnlyTest };

@@ -1,8 +1,8 @@
 import path from 'node:path';
 
+import { isBuildTestFile } from './build-test-file-classifier.mjs';
 import { isOrchestrationReviewExempt } from './structural-risk/score.mjs';
 
-const TEST_PATTERN = /(?:^|\/)(?:__tests__\/|test\/)|\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const CONTRACT_PATTERN =
   /(?:^|\/)(?:contracts?|schemas?|types?)(?:\/|\.)|(?:^|\/)types?\.[cm]?[jt]sx?$/u;
 const PROXY_PATTERN =
@@ -16,7 +16,7 @@ export function isTopologyProxyPath(file) {
 }
 
 export function classifyTopologyChangeReason(file, metric, publicFiles) {
-  if (TEST_PATTERN.test(file)) return 'test-proof';
+  if (isBuildTestFile(file)) return 'test-proof';
   if (publicFiles.has(file) || CONTRACT_PATTERN.test(file)) return 'contract';
   if (metric.architecturalLayer === 'adapter') return 'effect-adapter';
   if (metric.functions.some((fn) => fn.profile === 'orchestration')) return 'orchestration';
@@ -83,7 +83,7 @@ function safeMergeTarget(cluster, publicFiles, moduleByFile, incoming) {
     const module = moduleByFile.get(file);
     return (
       reason === expectedReason &&
-      !TEST_PATTERN.test(file) &&
+      !isBuildTestFile(file) &&
       !/^index\.[cm]?[jt]sx?$/u.test(path.posix.basename(file)) &&
       !module.forwardingOnly &&
       !publicFiles.has(file)
@@ -118,6 +118,43 @@ export function decideTopologyCluster(cluster, context) {
     return { decision: 'Keep', confidence: 'medium', reasons: ['contract-or-adapter-boundary'] };
   }
   return createConsolidationDecision(cluster, context);
+}
+
+export function decideForwardingEdgeCandidate(candidate) {
+  if (candidate.forwarderIsPublicOrContract) {
+    return {
+      decision: 'Keep',
+      confidence: 'high',
+      reasons: ['proven-public-or-contract-forwarder'],
+    };
+  }
+  if (candidate.forwarderOwner !== candidate.consumerOwner) {
+    return {
+      decision: 'Keep',
+      confidence: 'high',
+      reasons: ['cross-owner-forwarding-edge'],
+    };
+  }
+  if (candidate.forwarderUnresolvedEdges > 0 || candidate.targetFiles.length === 0) {
+    return {
+      decision: 'Keep',
+      confidence: 'low',
+      reasons: ['unresolved-forwarding-edge'],
+    };
+  }
+  if (!candidate.mergeTarget) {
+    return {
+      decision: 'Keep',
+      confidence: 'low',
+      reasons: ['unresolved-forwarding-target'],
+    };
+  }
+  return {
+    decision: 'Consolidate',
+    confidence: 'medium',
+    reasons: ['forwarding', 'single-production-consumer'],
+    mergeTarget: candidate.mergeTarget,
+  };
 }
 
 function collectSplitReasons(cluster) {

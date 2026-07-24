@@ -1,16 +1,17 @@
 import path from 'node:path';
 
+import { isBuildTestFile } from './build-test-file-classifier.mjs';
 import { getRuntimeTopology } from './runtime-topology.mjs';
 import { collectTopologyModuleGraph } from './topology-fragmentation.graph.mjs';
 import {
   classifyTopologyChangeReason,
+  decideForwardingEdgeCandidate,
   decideTopologyCluster,
   isTopologyProxyPath,
 } from './topology-fragmentation.policy.mjs';
 
 const APP_PUBLIC_ROOT_PATTERN =
   /^apps\/extension\/src\/(?:composition|contracts|features|foundation|platform|ui|workflows)(?:\/|$)/u;
-
 function runtimeFor(file, runtimes) {
   return runtimes.find(({ root }) => file === root || file.startsWith(`${root}/`)) ?? null;
 }
@@ -33,6 +34,20 @@ function boundedOwnerKey(file, root, depth) {
   const relativeDirectory = directory === root ? '' : directory.slice(root.length + 1);
   const segments = relativeDirectory ? relativeDirectory.split('/').slice(0, depth) : [];
   return segments.length > 0 ? `${root}/${segments.join('/')}` : root;
+}
+
+function operationOwnerKey(file, runtimes) {
+  const runtime = runtimeFor(file, runtimes);
+  if (runtime) {
+    const owner = file.slice(runtime.root.length + 1).split('/')[0] || 'root';
+    return `${runtime.root}/${owner}`;
+  }
+  const appMatch = file.match(/^apps\/extension\/src\/([^/]+)/u);
+  if (appMatch) return `apps/extension/src/${appMatch[1]}`;
+  const packageMatch = file.match(/^packages\/[^/]+\/src/u);
+  if (packageMatch) return packageMatch[0];
+  const [root = 'root', owner = 'root'] = file.split('/');
+  return `${root}/${owner}`;
 }
 
 function exactPackageExportTargets(graph, readFile) {
@@ -83,6 +98,14 @@ function collectPublicContractFiles(graph, runtimes, readFile) {
 function collectIncomingConsumers(graph) {
   const incoming = new Map(graph.files.map((file) => [file, new Set()]));
   graph.codeEdges.forEach((edge) => incoming.get(edge.target)?.add(edge.importer));
+  return incoming;
+}
+
+function collectProductionIncomingConsumers(graph) {
+  const incoming = new Map(graph.files.map((file) => [file, new Set()]));
+  graph.codeEdges.forEach((edge) => {
+    if (!isBuildTestFile(edge.importer)) incoming.get(edge.target)?.add(edge.importer);
+  });
   return incoming;
 }
 
@@ -243,6 +266,92 @@ function buildCluster(key, metrics, context) {
   return { ...cluster, ...decideTopologyCluster(cluster, context) };
 }
 
+function resolveStableMergeTarget(consumer, context) {
+  const visited = new Set();
+  let current = consumer;
+  while (context.moduleByFile.get(current)?.forwardingOnly) {
+    if (visited.has(current) || context.cycleFiles.has(current)) {
+      return { blockedAt: current, blockReason: 'forwarding-cycle', mergeTarget: null };
+    }
+    visited.add(current);
+    if (context.graph.unresolvedEdges.some((edge) => edge.importer === current)) {
+      return { blockedAt: current, blockReason: 'unresolved-intermediate-edge', mergeTarget: null };
+    }
+    const consumers = [...(context.productionIncoming.get(current) ?? [])];
+    if (consumers.length !== 1) {
+      return {
+        blockedAt: current,
+        blockReason:
+          consumers.length === 0 ? 'forwarding-terminal' : 'multiple-production-consumers',
+        mergeTarget: null,
+      };
+    }
+    const next = consumers[0];
+    if (
+      operationOwnerKey(next, context.runtimes) !== operationOwnerKey(current, context.runtimes)
+    ) {
+      return { blockedAt: current, blockReason: 'cross-owner-ladder', mergeTarget: null };
+    }
+    current = next;
+  }
+  return { blockedAt: null, blockReason: null, mergeTarget: current };
+}
+
+function buildForwardingEdgeClusters(context, metricsByFile) {
+  return context.graph.modules
+    .filter(({ file, forwardingOnly }) => forwardingOnly && !isBuildTestFile(file))
+    .flatMap((module) => {
+      const consumers = [...(context.productionIncoming.get(module.file) ?? [])];
+      if (consumers.length !== 1) return [];
+      const consumerFile = consumers[0];
+      const targetFiles = [
+        ...new Set(
+          context.graph.codeEdges
+            .filter((edge) => edge.importer === module.file && edge.edgeKind === 're-export')
+            .map((edge) => edge.target)
+        ),
+      ].sort();
+      const mergeTargetResolution = resolveStableMergeTarget(consumerFile, context);
+      const { mergeTarget } = mergeTargetResolution;
+      const files = [
+        ...new Set([module.file, consumerFile, mergeTarget, ...targetFiles].filter(Boolean)),
+      ].sort();
+      const metrics = files.map((file) => metricsByFile.get(file)).filter(Boolean);
+      if (metrics.length === 0) return [];
+      const base = buildCluster(`forwarding:${module.file}`, metrics, context);
+      const forwardingMetric = metricsByFile.get(module.file);
+      const forwarderReason = classifyTopologyChangeReason(
+        module.file,
+        forwardingMetric,
+        context.publicFiles
+      );
+      const candidate = {
+        ...base,
+        clusterKind: 'forwarding-edge',
+        partitionOverlap: true,
+        forwardingFiles: [module.file],
+        consumerFile,
+        targetFiles,
+        mergeTarget,
+        mergeTargetBlockedAt: mergeTargetResolution.blockedAt,
+        mergeTargetBlockReason: mergeTargetResolution.blockReason,
+        forwarderOwner: operationOwnerKey(module.file, context.runtimes),
+        consumerOwner: operationOwnerKey(consumerFile, context.runtimes),
+        forwarderIsPublicOrContract:
+          context.publicFiles.has(module.file) || forwarderReason === 'contract',
+        forwarderUnresolvedEdges: context.graph.unresolvedEdges.filter(
+          (edge) => edge.importer === module.file
+        ).length,
+        signals: {
+          ...base.signals,
+          forwardingOnlyFiles: 1,
+          singleConsumerSmallFiles: Number((forwardingMetric?.lines ?? Infinity) <= 60),
+        },
+      };
+      return [{ ...candidate, ...decideForwardingEdgeCandidate(candidate) }];
+    });
+}
+
 export function collectTopologyFragmentationReport({ files, structuralReport, root, readFile }) {
   const graph = collectTopologyModuleGraph({ files, root, readFile });
   const metricsByFile = new Map(structuralReport.files.map((metric) => [metric.file, metric]));
@@ -253,6 +362,7 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
   const moduleByFile = new Map(graph.modules.map((module) => [module.file, module]));
   const publicFiles = collectPublicContractFiles(graph, runtimes, readFile);
   const incoming = collectIncomingConsumers(graph);
+  const productionIncoming = collectProductionIncomingConsumers(graph);
   const cycleFiles = collectReExportCycleFiles(graph);
   const grouped = new Map();
   for (const metric of eligibleMetrics) {
@@ -264,8 +374,16 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
   const findingFiles = new Set(
     [...structuralReport.violations, ...structuralReport.advisories].map((finding) => finding.file)
   );
-  const context = { graph, runtimes, moduleByFile, publicFiles, incoming, cycleFiles };
-  const allClusters = [...grouped.entries()]
+  const context = {
+    graph,
+    runtimes,
+    moduleByFile,
+    publicFiles,
+    incoming,
+    productionIncoming,
+    cycleFiles,
+  };
+  const partitionClusters = [...grouped.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, metrics]) =>
       buildCluster(
@@ -274,13 +392,15 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
         context
       )
     );
-  const clusters = allClusters.filter(
+  const forwardingEdgeClusters = buildForwardingEdgeClusters(context, metricsByFile);
+  const partitionCandidates = partitionClusters.filter(
     (cluster) =>
       cluster.decision === 'Split' ||
       cluster.reExportCycle ||
       Object.values(cluster.signals).some((value) => value > 0) ||
       cluster.files.some((file) => findingFiles.has(file))
   );
+  const clusters = [...partitionCandidates, ...forwardingEdgeClusters];
   const decisions = Object.fromEntries(
     ['Split', 'Consolidate', 'Keep'].map((decision) => [
       decision.toLowerCase(),
@@ -288,14 +408,16 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
     ])
   );
   return {
-    schemaVersion: 1,
-    clusterStrategy: 'path-depth-v2',
+    schemaVersion: 2,
+    clusterStrategy: 'path-depth-v2+forwarding-edge-v1',
     scannedFiles: graph.files.length,
     partitionedFiles: eligibleMetrics.length,
     unresolvedEdges: graph.unresolvedEdges.length,
     clusters,
     summary: {
-      totalClusters: allClusters.length,
+      totalClusters: partitionClusters.length + forwardingEdgeClusters.length,
+      partitionClusters: partitionClusters.length,
+      forwardingEdgeCandidates: forwardingEdgeClusters.length,
       candidateClusters: clusters.length,
       ...decisions,
     },
@@ -303,19 +425,30 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
 }
 
 export function formatTopologyFragmentationConsole(report, { limit = 12 } = {}) {
-  const ordered = [...report.clusters].sort(
-    (left, right) =>
-      ({ Split: 0, Consolidate: 1, Keep: 2 })[left.decision] -
-        { Split: 0, Consolidate: 1, Keep: 2 }[right.decision] ||
-      right.maximumStructuralScore - left.maximumStructuralScore ||
-      left.id.localeCompare(right.id)
-  );
+  const groups = new Map(['Split', 'Consolidate', 'Keep'].map((decision) => [decision, []]));
+  for (const cluster of report.clusters) groups.get(cluster.decision)?.push(cluster);
+  for (const group of groups.values()) {
+    group.sort(
+      (left, right) =>
+        right.maximumStructuralScore - left.maximumStructuralScore ||
+        left.id.localeCompare(right.id)
+    );
+  }
+  const ordered = [];
+  const maximumLength = Math.max(0, ...[...groups.values()].map((group) => group.length));
+  for (let index = 0; index < maximumLength; index += 1) {
+    for (const decision of ['Split', 'Consolidate', 'Keep']) {
+      const cluster = groups.get(decision)[index];
+      if (cluster) ordered.push(cluster);
+    }
+  }
   const summary = [
     `clusters=${report.summary.totalClusters}`,
     `candidates=${report.summary.candidateClusters}`,
     `split=${report.summary.split}`,
     `consolidate=${report.summary.consolidate}`,
     `keep=${report.summary.keep}`,
+    `forwarding-edges=${report.summary.forwardingEdgeCandidates ?? 0}`,
     `unresolved=${report.unresolvedEdges}`,
   ].join(', ');
   const lines = ['Topology fragmentation (manual report-only)', summary];
@@ -329,7 +462,11 @@ export function formatTopologyFragmentationConsole(report, { limit = 12 } = {}) 
       ].join(' ')
     );
   }
-  if (ordered.length > limit)
-    lines.push(`... ${ordered.length - limit} more candidate clusters in artifact`);
+  if (ordered.length > limit) {
+    lines.push(
+      `... ${ordered.length - limit} more candidate clusters not shown; ` +
+        'complete forwarding-edge inventory is in artifact'
+    );
+  }
   return `${lines.join('\n')}\n`;
 }

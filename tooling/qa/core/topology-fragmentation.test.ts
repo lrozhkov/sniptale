@@ -159,6 +159,136 @@ it('partitions every file once and consolidates only corroborated one-owner frag
   expect(report.clusters.some((candidate) => candidate.id === 'tooling/quiet/owner')).toBe(false);
 });
 
+it('classifies single-consumer forwarding edges with explicit safety vetoes', () => {
+  const sources = {
+    'apps/extension/src/content/overlay/demo/consumer.ts':
+      "import { run } from './facade'; export const result = run();",
+    'apps/extension/src/content/overlay/demo/facade.test.ts':
+      "import { run } from './facade'; it('runs', () => expect(run()).toBe(true));",
+    'apps/extension/src/content/overlay/demo/facade.test-support.ts':
+      "import { run } from './facade'; export const runFixture = run;",
+    'apps/extension/src/content/overlay/demo/fixtures/facade.ts':
+      "import { run } from '../facade'; export const fixtureResult = run();",
+    'apps/extension/src/content/overlay/demo/facade.ts': "export { run } from './run';",
+    'apps/extension/src/content/overlay/demo/run.ts': 'export function run() { return true; }',
+    'apps/extension/src/content/overlay/cross-owner/consumer.ts':
+      "import { parse } from '../../parser/demo/facade'; export const parsed = parse();",
+    'apps/extension/src/content/parser/demo/facade.ts': "export { parse } from './parse';",
+    'apps/extension/src/content/parser/demo/parse.ts': 'export function parse() { return true; }',
+    'apps/extension/src/content/selection/demo/index.tsx':
+      "import type { Props } from './types'; export const View = (_props: Props) => null;",
+    'apps/extension/src/content/selection/demo/source.ts': 'export type Props = { label: string };',
+    'apps/extension/src/content/selection/demo/types.ts': "export type { Props } from './source';",
+  };
+  const report = collect(
+    sources,
+    Object.keys(sources).map((file) => metric(file))
+  );
+  const edges = report.clusters.filter((cluster) => cluster.clusterKind === 'forwarding-edge');
+
+  expect(report.summary.forwardingEdgeCandidates).toBe(3);
+  expect(edges).toHaveLength(3);
+  expect(
+    edges.find((cluster) =>
+      cluster.forwardingFiles.includes('apps/extension/src/content/overlay/demo/facade.ts')
+    )
+  ).toMatchObject({
+    decision: 'Consolidate',
+    confidence: 'medium',
+    mergeTarget: 'apps/extension/src/content/overlay/demo/consumer.ts',
+    reasons: ['forwarding', 'single-production-consumer'],
+  });
+  expect(
+    edges.find((cluster) =>
+      cluster.forwardingFiles.includes('apps/extension/src/content/parser/demo/facade.ts')
+    )
+  ).toMatchObject({
+    decision: 'Keep',
+    confidence: 'high',
+    reasons: ['cross-owner-forwarding-edge'],
+  });
+  expect(
+    edges.find((cluster) =>
+      cluster.forwardingFiles.includes('apps/extension/src/content/selection/demo/types.ts')
+    )
+  ).toMatchObject({
+    decision: 'Keep',
+    confidence: 'high',
+    reasons: ['proven-public-or-contract-forwarder'],
+  });
+});
+
+it('resolves forwarding ladders to a stable non-forwarding merge target', () => {
+  const sources = {
+    'apps/extension/src/content/selection/demo/actions.ts':
+      "import { run } from './selection'; export const result = run();",
+    'apps/extension/src/content/selection/demo/selection.ts': "export { run } from './frame';",
+    'apps/extension/src/content/selection/demo/frame.ts': "export { run } from './run';",
+    'apps/extension/src/content/selection/demo/run.ts': 'export function run() { return true; }',
+  };
+  const report = collect(
+    sources,
+    Object.keys(sources).map((file) => metric(file))
+  );
+  const frame = report.clusters.find(
+    (cluster) =>
+      cluster.clusterKind === 'forwarding-edge' &&
+      cluster.forwardingFiles.includes('apps/extension/src/content/selection/demo/frame.ts')
+  );
+
+  expect(frame).toMatchObject({
+    decision: 'Consolidate',
+    mergeTarget: 'apps/extension/src/content/selection/demo/actions.ts',
+  });
+});
+
+it('keeps forwarding ladders without a stable non-forwarding target', () => {
+  const sources = {
+    'apps/extension/src/content/overlay/branch/facade.ts': "export { run } from './run';",
+    'apps/extension/src/content/overlay/branch/bridge.ts': "export { run } from './facade';",
+    'apps/extension/src/content/overlay/branch/first.ts':
+      "import { run } from './bridge'; export const first = run();",
+    'apps/extension/src/content/overlay/branch/second.ts':
+      "import { run } from './bridge'; export const second = run();",
+    'apps/extension/src/content/overlay/branch/run.ts': 'export function run() { return true; }',
+    'apps/extension/src/content/overlay/cycle/a.ts': "export { value } from './b';",
+    'apps/extension/src/content/overlay/cycle/b.ts': "export { value } from './a';",
+    'apps/extension/src/content/overlay/cross/facade.ts': "export { run } from './run';",
+    'apps/extension/src/content/overlay/cross/bridge.ts': "export { run } from './facade';",
+    'apps/extension/src/content/overlay/cross/run.ts': 'export function run() { return true; }',
+    'apps/extension/src/content/parser/cross/consumer.ts':
+      "import { run } from '../../overlay/cross/bridge'; export const result = run();",
+  };
+  const report = collect(
+    sources,
+    Object.keys(sources).map((file) => metric(file))
+  );
+  const edge = (file: string) =>
+    report.clusters.find(
+      (cluster) =>
+        cluster.clusterKind === 'forwarding-edge' && cluster.forwardingFiles.includes(file)
+    );
+
+  expect(edge('apps/extension/src/content/overlay/branch/facade.ts')).toMatchObject({
+    decision: 'Keep',
+    mergeTarget: null,
+    mergeTargetBlockReason: 'multiple-production-consumers',
+    reasons: ['unresolved-forwarding-target'],
+  });
+  expect(edge('apps/extension/src/content/overlay/cycle/a.ts')).toMatchObject({
+    decision: 'Keep',
+    mergeTarget: null,
+    mergeTargetBlockReason: 'forwarding-cycle',
+    reasons: ['unresolved-forwarding-target'],
+  });
+  expect(edge('apps/extension/src/content/overlay/cross/facade.ts')).toMatchObject({
+    decision: 'Keep',
+    mergeTarget: null,
+    mergeTargetBlockReason: 'cross-owner-ladder',
+    reasons: ['unresolved-forwarding-target'],
+  });
+});
+
 it('keeps nested change-reason owners separate from unrelated adapter boundaries', () => {
   const sources = {
     'apps/extension/src/content/demo/owner/operation/core.ts':
@@ -335,4 +465,36 @@ it('downgrades mixed-declaration re-export cycles and prints explicit summaries'
       summary: { totalClusters: 0, candidateClusters: 0, split: 0, consolidate: 0, keep: 0 },
     })
   ).toContain('candidates=0, split=0, consolidate=0, keep=0');
+});
+
+it('keeps every decision family visible in a bounded console preview', () => {
+  const clusters = ['Split', 'Consolidate', 'Keep'].flatMap((decision) =>
+    Array.from({ length: 8 }, (_, index) => ({
+      decision,
+      confidence: 'medium',
+      id: `${decision.toLowerCase()}-${index}`,
+      fileCount: 2,
+      navigationTransitions: 1,
+      reasons: ['fixture'],
+      maximumStructuralScore: 8 - index,
+    }))
+  );
+  const output = formatTopologyFragmentationConsole(
+    {
+      clusters,
+      unresolvedEdges: 0,
+      summary: {
+        totalClusters: clusters.length,
+        candidateClusters: clusters.length,
+        split: 8,
+        consolidate: 8,
+        keep: 8,
+      },
+    },
+    { limit: 6 }
+  );
+
+  expect(output).toContain('Split/medium');
+  expect(output).toContain('Consolidate/medium');
+  expect(output).toContain('Keep/medium');
 });

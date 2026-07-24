@@ -27,6 +27,10 @@ const EFFECT_FAMILIES = [
     /\b(?:document\.|setState|dispatch\(|classList\.|appendChild|removeChild|createElement|getElementById|querySelector)\b/u,
   ],
   [
+    'dom-ui',
+    /\b(?:canvas|fabricCanvas|editorCanvas)(?:\?\.|\.)(?:add|remove|moveObjectTo|bringObjectToFront|setActiveObject|discardActiveObject|requestRenderAll|renderAll|setDimensions)\b/u,
+  ],
+  [
     'media',
     /\b(?:MediaRecorder|getUserMedia|getDisplayMedia|AudioContext|HTMLVideoElement|captureStream)\b/u,
   ],

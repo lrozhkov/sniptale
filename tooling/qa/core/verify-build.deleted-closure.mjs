@@ -12,8 +12,8 @@ import { collectModuleImportGraph } from './module-import-graph.mjs';
 import { isCodeFile } from './shared.mjs';
 import { classifyOwnerGroup } from './structural-risk/owner-classifier.mjs';
 import {
-  collectDeletedAggregateProviders,
   createDeletedAggregateAnalyzer,
+  resolveDeletedAggregateProviderSet,
 } from './verify-build.deleted-aggregate.mjs';
 import { createDeletedDeadExportAnalyzer } from './verify-build.deleted-dead-export.mjs';
 
@@ -292,25 +292,15 @@ function resolveChangedConsumerProof(frontier, currentEdges, currentFiles) {
 }
 
 function resolveAggregateProviderProof({
-  analyzeAggregate,
-  file,
+  aggregateProviderSet,
   frontier,
-  isDeletedDeadExport,
   productionCodeFiles,
   providerOwnerTestResolver,
-  readHeadSource,
   root,
-  targetFiles,
 }) {
-  const providers = collectDeletedAggregateProviders({
-    analyzeAggregate,
-    file,
-    isDeletedDeadExport,
-    readHeadSource,
-    root,
-    targets: targetFiles,
-  });
-  return providers.length > 0 &&
+  const { complete, providers } = aggregateProviderSet;
+  return complete &&
+    providers.length > 0 &&
     providers.every((provider) => providerOwnerTestResolver(provider).length > 0) &&
     hasCurrentProviderRedirect(frontier, providers, productionCodeFiles, root)
     ? { files: providers, proofKind: 'aggregate-providers' }
@@ -364,22 +354,30 @@ export function collectDeletedTargetSuccessors({
       successorsByFile.set(file, changedConsumerProof);
       continue;
     }
-    const aggregateProviderProof = resolveAggregateProviderProof({
+    const aggregateProviderSet = resolveDeletedAggregateProviderSet({
       analyzeAggregate,
       file,
-      frontier: frontier.frontier,
       isDeletedDeadExport,
-      productionCodeFiles,
-      providerOwnerTestResolver,
       readHeadSource,
       root,
-      targetFiles,
+      targets: targetFiles,
+    });
+    const aggregateProviderProof = resolveAggregateProviderProof({
+      aggregateProviderSet,
+      frontier: frontier.frontier,
+      productionCodeFiles,
+      providerOwnerTestResolver,
+      root,
     });
     if (aggregateProviderProof) {
       successorsByFile.set(file, aggregateProviderProof);
       continue;
     }
-    if (frontier.frontier.length === 0 && analyzeAggregate(file).eligible) {
+    if (
+      frontier.frontier.length === 0 &&
+      aggregateProviderSet.complete &&
+      aggregateProviderSet.providers.length === 0
+    ) {
       successorsByFile.set(file, { files: [], proofKind: 'dead-export' });
       continue;
     }

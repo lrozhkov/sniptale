@@ -2342,6 +2342,24 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
+      "tool": "verify-build.deleted-aggregate.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-build.deleted-closure.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-build.deleted-dead-export.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
       "tool": "verify-build.execution.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -2589,6 +2607,12 @@
     },
     {
       "tool": "verify-i18n.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-instance-ownership.inventory-owner.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."

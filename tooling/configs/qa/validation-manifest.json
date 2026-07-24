@@ -436,6 +436,43 @@
       ]
     },
     {
+      "tool": "verify-build.deleted-aggregate.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-build.deleted-aggregate.test.ts",
+        "tooling/qa/core/verify-build.deleted-closure.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-build.deleted-closure.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-build.deleted-aggregate.test.ts",
+        "tooling/qa/core/verify-build.deleted-closure.test.ts",
+        "tooling/qa/core/verify-build.deleted-dead-export.test.ts",
+        "tooling/qa/core/verify-build.deleted-package-closure.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-build.deleted-dead-export.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-build.deleted-dead-export.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
       "tool": "verify-build.execution.mjs",
       "validationMode": "fixture-test",
       "testFiles": [
@@ -850,6 +887,17 @@
         "pass",
         "fail",
         "skip"
+      ]
+    },
+    {
+      "tool": "verify-instance-ownership.inventory-owner.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-instance-ownership.inventory-owner.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
       ]
     },
     {

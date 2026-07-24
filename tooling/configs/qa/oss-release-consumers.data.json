@@ -44,12 +44,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "3fdface47c97eb61c5f10f76a566977fdd7b9e0c3b94d8b84581a4b43b0c2d0c"
+      "sha256": "72c625d1431f38c1aa4c57a837df08b4b74fe36e13062b7ad12baae0ba299f11"
     },
     {
       "category": "validator-integration",
       "path": "tooling/configs/qa/validation-manifest.json",
-      "sha256": "3fdface47c97eb61c5f10f76a566977fdd7b9e0c3b94d8b84581a4b43b0c2d0c"
+      "sha256": "72c625d1431f38c1aa4c57a837df08b4b74fe36e13062b7ad12baae0ba299f11"
     },
     {
       "category": "validator-integration",
