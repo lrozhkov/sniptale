@@ -10292,7 +10292,6 @@
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/types.ts",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/update-padding.ts",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/validation.ts",
-        "apps/extension/src/settings/sections/highlighter/section/actions.ts",
         "apps/extension/src/settings/sections/highlighter/section/blur-controls.tsx",
         "apps/extension/src/settings/sections/highlighter/section/content.tsx",
         "apps/extension/src/settings/sections/highlighter/section/crud-actions.ts",
@@ -10587,7 +10586,6 @@
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/types.ts",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/update-padding.ts",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/validation.ts",
-        "apps/extension/src/settings/sections/highlighter/section/actions.ts",
         "apps/extension/src/settings/sections/highlighter/section/blur-controls.tsx",
         "apps/extension/src/settings/sections/highlighter/section/content.tsx",
         "apps/extension/src/settings/sections/highlighter/section/crud-actions.ts",
@@ -16533,7 +16531,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "9fe2afd1409eae78e605777dc3ef77778af15647b622f46e92bdf9090f677af1"
+        "contentHash": "845f5b74b14aa093bde7867712740823c218d288062e27bdb1a69bd11aa4b6d0"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",

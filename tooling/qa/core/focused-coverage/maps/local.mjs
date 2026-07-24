@@ -368,10 +368,11 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'settings-highlighter-hook-facade',
+    owner: 'settings-highlighter-section-composition',
     productionFile:
       'apps/extension/src/settings/sections/highlighter/section/useHighlighterSection.ts',
-    reason: 'Highlighter hook facade composition is covered by the hook surface suite.',
+    reason:
+      'Highlighter section composition keeps disposable UI state separate from its persistence session.',
     testFiles: [
       'apps/extension/src/settings/sections/highlighter/section/useHighlighterSection.test.tsx',
     ],

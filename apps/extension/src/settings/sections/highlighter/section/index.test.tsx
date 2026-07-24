@@ -74,8 +74,10 @@ afterEach(() => {
 describe('HighlighterSection', () => {
   it('renders the loading state while the section is still initializing', async () => {
     useHighlighterSectionSpy.mockReturnValue({
-      isLoading: true,
-      settings: null,
+      status: {
+        isLoading: true,
+        settings: null,
+      },
     });
 
     await renderSection();
@@ -86,8 +88,10 @@ describe('HighlighterSection', () => {
 
   it('renders the translated error state when settings failed to load', async () => {
     useHighlighterSectionSpy.mockReturnValue({
-      isLoading: false,
-      settings: null,
+      status: {
+        isLoading: false,
+        settings: null,
+      },
     });
 
     await renderSection();
@@ -97,18 +101,23 @@ describe('HighlighterSection', () => {
   });
 
   it('renders content with the loaded settings state', async () => {
-    const state = {
-      isLoading: false,
-      settings: { enabled: true },
+    const controller = {
+      effects: { handleUpdateBlurSettings: vi.fn() },
+      presets: { handleAddPreset: vi.fn() },
+      status: {
+        isLoading: false,
+        settings: { enabled: true },
+      },
     };
 
-    useHighlighterSectionSpy.mockReturnValue(state);
+    useHighlighterSectionSpy.mockReturnValue(controller);
 
     await renderSection();
 
     expect(highlighterContentPropsSpy).toHaveBeenCalledWith({
-      settings: state.settings,
-      state,
+      effects: controller.effects,
+      presets: controller.presets,
+      settings: controller.status.settings,
     });
   });
 });

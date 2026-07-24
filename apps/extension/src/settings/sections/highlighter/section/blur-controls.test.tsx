@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import type { SetStateAction } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -48,7 +47,7 @@ vi.mock('../../../section-surface', async (importOriginal) => ({
 }));
 
 import { HighlighterBlurControls } from './blur-controls';
-import type { HighlighterSectionState } from './useHighlighterSection';
+import type { HighlighterEffectActions } from './useHighlighterSection';
 
 type HighlighterBlurControlsProps = React.ComponentProps<typeof HighlighterBlurControls>;
 
@@ -64,10 +63,6 @@ function setInputValue(input: HTMLInputElement, value: string) {
 
 function commitRangeValue(input: HTMLInputElement) {
   input.dispatchEvent(new Event('pointerup', { bubbles: true }));
-}
-
-function createStateSetterMock<T>() {
-  return vi.fn<(value: SetStateAction<T>) => void>();
 }
 
 function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
@@ -108,32 +103,8 @@ function createSettings(overrides: Partial<HighlighterSettings> = {}): Highlight
   };
 }
 
-function createState(settings: HighlighterSettings): HighlighterSectionState {
+function createEffects(): HighlighterEffectActions {
   return {
-    draggedId: null,
-    dragOverId: null,
-    editingPreset: undefined,
-    hoveredPresetId: null,
-    isEditorOpen: false,
-    isLoading: false,
-    setDraggedId: createStateSetterMock<string | null>(),
-    setDragOverId: createStateSetterMock<string | null>(),
-    setEditingPreset: createStateSetterMock<BorderPreset | undefined>(),
-    setHoveredPresetId: createStateSetterMock<string | null>(),
-    setIsEditorOpen: createStateSetterMock<boolean>(),
-    setSettings: createStateSetterMock<HighlighterSettings | null>(),
-    settings,
-    handleAddPreset: vi.fn<() => void>(),
-    handleDeletePreset: vi.fn<(preset: BorderPreset) => Promise<void>>(),
-    handleDragEnd: vi.fn<() => void>(),
-    handleDragLeave: vi.fn<() => void>(),
-    handleDragOver: vi.fn<(event: React.DragEvent, presetId: string) => void>(),
-    handleDragStart: vi.fn<(event: React.DragEvent, presetId: string) => void>(),
-    handleDrop: vi.fn<(event: React.DragEvent, targetId: string) => Promise<void>>(),
-    handleEditPreset: vi.fn<(preset: BorderPreset) => void>(),
-    handleSavePreset: vi.fn<(preset: BorderPreset) => Promise<void>>(),
-    handleSetDefaultPreset: vi.fn<(presetId: string) => Promise<void>>(),
-    handleTogglePresetEnabled: vi.fn<(presetId: string) => Promise<void>>(),
     handleUpdateBlurSettings:
       vi.fn<(blurSettings: HighlighterSettings['defaultBlurSettings']) => Promise<void>>(),
     handleUpdateFocusSettings:
@@ -145,8 +116,8 @@ function createProps(): HighlighterBlurControlsProps {
   const settings = createSettings();
 
   return {
+    effects: createEffects(),
     settings,
-    state: createState(settings),
   };
 }
 
@@ -199,17 +170,17 @@ describe('HighlighterBlurControls', () => {
       toggle?.click();
     });
 
-    expect(props.state.handleUpdateBlurSettings).toHaveBeenCalledWith({
+    expect(props.effects.handleUpdateBlurSettings).toHaveBeenCalledWith({
       amount: 9,
       blurType: 'gaussian',
       showBorder: false,
     });
-    expect(props.state.handleUpdateBlurSettings).toHaveBeenCalledWith({
+    expect(props.effects.handleUpdateBlurSettings).toHaveBeenCalledWith({
       amount: 4,
       blurType: 'distortion',
       showBorder: false,
     });
-    expect(props.state.handleUpdateBlurSettings).toHaveBeenCalledWith({
+    expect(props.effects.handleUpdateBlurSettings).toHaveBeenCalledWith({
       amount: 4,
       blurType: 'gaussian',
       showBorder: true,

@@ -6,7 +6,7 @@ import { HighlighterPresetsPanel } from './presets-panel';
 import type { HighlighterSectionContentProps } from './types';
 
 export function HighlighterSectionContent(props: HighlighterSectionContentProps) {
-  const { state } = props;
+  const { presets } = props;
 
   return (
     <div className={settingsSectionClassName}>
@@ -15,14 +15,14 @@ export function HighlighterSectionContent(props: HighlighterSectionContentProps)
         kicker={translate('settings.navigation.highlighter')}
       />
 
-      <HighlighterPresetsPanel {...props} />
-      <HighlighterEffectsPanel {...props} />
+      <HighlighterPresetsPanel presets={presets} settings={props.settings} />
+      <HighlighterEffectsPanel effects={props.effects} settings={props.settings} />
 
       <BorderPresetEditor
-        isOpen={state.isEditorOpen}
-        onClose={() => state.setIsEditorOpen(false)}
-        onSave={state.handleSavePreset}
-        {...(state.editingPreset === undefined ? {} : { preset: state.editingPreset })}
+        isOpen={presets.isEditorOpen}
+        onClose={presets.handleCloseEditor}
+        onSave={presets.handleSavePreset}
+        {...(presets.editingPreset === undefined ? {} : { preset: presets.editingPreset })}
       />
     </div>
   );

@@ -4,10 +4,10 @@ import { DelayedSettingsCenteredLoadingState } from '../../../section-surface/lo
 import { useHighlighterSection } from './useHighlighterSection';
 
 export function HighlighterSection() {
-  const state = useHighlighterSection();
-  const { settings } = state;
+  const controller = useHighlighterSection();
+  const { settings } = controller.status;
 
-  if (state.isLoading) {
+  if (controller.status.isLoading) {
     return <DelayedSettingsCenteredLoadingState />;
   }
 
@@ -22,5 +22,11 @@ export function HighlighterSection() {
     );
   }
 
-  return <HighlighterSectionContent settings={settings} state={state} />;
+  return (
+    <HighlighterSectionContent
+      effects={controller.effects}
+      presets={controller.presets}
+      settings={settings}
+    />
+  );
 }

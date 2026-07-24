@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import type { SetStateAction } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -34,16 +33,12 @@ vi.mock('../../../section-surface/panel-controls', () => ({
 }));
 
 import { HighlighterPresetsPanel } from './presets-panel';
-import type { HighlighterSectionState } from './useHighlighterSection';
+import type { HighlighterPresetController } from './useHighlighterSection';
 
 type HighlighterPresetsPanelProps = React.ComponentProps<typeof HighlighterPresetsPanel>;
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
-
-function createStateSetterMock<T>() {
-  return vi.fn<(value: SetStateAction<T>) => void>();
-}
 
 function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
   return {
@@ -83,22 +78,15 @@ function createSettings(overrides: Partial<HighlighterSettings> = {}): Highlight
   };
 }
 
-function createState(settings: HighlighterSettings): HighlighterSectionState {
+function createPresets(): HighlighterPresetController {
   return {
     draggedId: 'preset-custom',
     dragOverId: 'preset-custom',
     editingPreset: undefined,
     hoveredPresetId: 'preset-custom',
     isEditorOpen: false,
-    isLoading: false,
-    setDraggedId: createStateSetterMock<string | null>(),
-    setDragOverId: createStateSetterMock<string | null>(),
-    setEditingPreset: createStateSetterMock<BorderPreset | undefined>(),
-    setHoveredPresetId: createStateSetterMock<string | null>(),
-    setIsEditorOpen: createStateSetterMock<boolean>(),
-    setSettings: createStateSetterMock<HighlighterSettings | null>(),
-    settings,
     handleAddPreset: vi.fn<() => void>(),
+    handleCloseEditor: vi.fn<() => void>(),
     handleDeletePreset: vi.fn<(preset: BorderPreset) => Promise<void>>(),
     handleDragEnd: vi.fn<() => void>(),
     handleDragLeave: vi.fn<() => void>(),
@@ -106,13 +94,10 @@ function createState(settings: HighlighterSettings): HighlighterSectionState {
     handleDragStart: vi.fn<(event: React.DragEvent, presetId: string) => void>(),
     handleDrop: vi.fn<(event: React.DragEvent, targetId: string) => Promise<void>>(),
     handleEditPreset: vi.fn<(preset: BorderPreset) => void>(),
+    handlePresetHoverChange: vi.fn<(presetId: string | null) => void>(),
     handleSavePreset: vi.fn<(preset: BorderPreset) => Promise<void>>(),
     handleSetDefaultPreset: vi.fn<(presetId: string) => Promise<void>>(),
     handleTogglePresetEnabled: vi.fn<(presetId: string) => Promise<void>>(),
-    handleUpdateBlurSettings:
-      vi.fn<(blurSettings: HighlighterSettings['defaultBlurSettings']) => Promise<void>>(),
-    handleUpdateFocusSettings:
-      vi.fn<(focusSettings: HighlighterSettings['defaultFocusSettings']) => Promise<void>>(),
   };
 }
 
@@ -137,8 +122,8 @@ function createProps(): HighlighterPresetsPanelProps {
   });
 
   return {
+    presets: createPresets(),
     settings,
-    state: createState(settings),
   };
 }
 
@@ -224,18 +209,18 @@ describe('HighlighterPresetsPanel', () => {
     expect(container?.textContent).toContain('highlighter.section.defaultBadge');
     expect(container?.textContent).toContain('highlighter.section.systemBadge');
     expect(container?.textContent).toContain('highlighter.section.countFew');
-    expect(props.state.handleAddPreset).toHaveBeenCalledOnce();
-    expect(props.state.handleSetDefaultPreset).toHaveBeenCalledWith('preset-custom');
-    expect(props.state.handleEditPreset).toHaveBeenCalledWith(
+    expect(props.presets.handleAddPreset).toHaveBeenCalledOnce();
+    expect(props.presets.handleSetDefaultPreset).toHaveBeenCalledWith('preset-custom');
+    expect(props.presets.handleEditPreset).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'preset-custom' })
     );
-    expect(props.state.handleDragStart).toHaveBeenCalled();
-    expect(props.state.handleDragOver).toHaveBeenCalled();
-    expect(props.state.handleDragLeave).toHaveBeenCalled();
-    expect(props.state.handleDrop).toHaveBeenCalled();
-    expect(props.state.handleDragEnd).toHaveBeenCalled();
-    expect(props.state.setHoveredPresetId).toHaveBeenCalledWith('preset-default');
-    expect(props.state.setHoveredPresetId).toHaveBeenCalledWith(null);
+    expect(props.presets.handleDragStart).toHaveBeenCalled();
+    expect(props.presets.handleDragOver).toHaveBeenCalled();
+    expect(props.presets.handleDragLeave).toHaveBeenCalled();
+    expect(props.presets.handleDrop).toHaveBeenCalled();
+    expect(props.presets.handleDragEnd).toHaveBeenCalled();
+    expect(props.presets.handlePresetHoverChange).toHaveBeenCalledWith('preset-default');
+    expect(props.presets.handlePresetHoverChange).toHaveBeenCalledWith(null);
     expect(controls.disabledEditButton?.hasAttribute('disabled')).toBe(true);
   });
 });

@@ -140,6 +140,7 @@ async function saveHighlighterPreset(state: HighlighterCrudActionsState, preset:
 export function createHighlighterCrudActions(state: HighlighterCrudActionsState) {
   return {
     handleAddPreset: () => openHighlighterEditor(state),
+    handleCloseEditor: () => state.setIsEditorOpen(false),
     handleDeletePreset: async (preset: BorderPreset) => deleteHighlighterPreset(state, preset),
     handleEditPreset: (preset: BorderPreset) => openHighlighterEditor(state, preset),
     handleSavePreset: async (preset: BorderPreset) => saveHighlighterPreset(state, preset),
