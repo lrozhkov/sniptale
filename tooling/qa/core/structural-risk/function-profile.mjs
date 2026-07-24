@@ -52,6 +52,47 @@ function functionBindingName(node) {
   return ts.isFunctionDeclaration(node) && node.name ? node.name.text : null;
 }
 
+const TEST_FIXTURE_BUILDER_PATTERN = /^(?:create|build|make)[A-Z]|(?:Fixture|Mock)$/u;
+
+function unwrapReturnedExpression(node) {
+  let current = node;
+  while (
+    current &&
+    (ts.isParenthesizedExpression(current) ||
+      ts.isAsExpression(current) ||
+      ts.isTypeAssertionExpression(current) ||
+      current.kind === ts.SyntaxKind.SatisfiesExpression)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+export function getDeclarativeTestFixtureRoot(relativePath, symbol, node, metrics = null) {
+  if (!TEST_FILE_PATTERN.test(relativePath) || !TEST_FIXTURE_BUILDER_PATTERN.test(symbol)) {
+    return null;
+  }
+  if (
+    metrics &&
+    (metrics.effectFamilies.length > 0 ||
+      metrics.stateAuthorities > 0 ||
+      metrics.recoveryPressure > 0)
+  ) {
+    return null;
+  }
+  let returned = node.body;
+  if (returned && ts.isBlock(returned)) {
+    if (returned.statements.length !== 1 || !ts.isReturnStatement(returned.statements[0])) {
+      return null;
+    }
+    returned = returned.statements[0].expression;
+  }
+  const root = returned ? unwrapReturnedExpression(returned) : null;
+  return root && (ts.isObjectLiteralExpression(root) || ts.isArrayLiteralExpression(root))
+    ? root
+    : null;
+}
+
 function collectModifiedBindings(statement, exported) {
   if (!hasExportModifier(statement)) return;
   if (statement.name && ts.isIdentifier(statement.name)) exported.add(statement.name.text);
@@ -100,6 +141,7 @@ function isExportedFunction(node, exportedBindings) {
 }
 
 function chooseProfile(relativePath, symbol, node, metrics, exportedBindings) {
+  if (getDeclarativeTestFixtureRoot(relativePath, symbol, node, metrics)) return 'test-fixture';
   if (TEST_FILE_PATTERN.test(relativePath)) return 'test';
   if (isGeneratedDataFile(relativePath)) return 'generated-data';
   if (isEntrypointOwner(relativePath) && isExportedFunction(node, exportedBindings)) {

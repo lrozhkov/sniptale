@@ -18,6 +18,10 @@ function isNarrowAdapter(metric) {
   );
 }
 
+function isTestProfile(metric) {
+  return metric.profile === 'test' || metric.profile === 'test-fixture';
+}
+
 function scoreFileScale(metric) {
   let score = 0;
   if (metric.lines > 400) score += 1;
@@ -37,7 +41,7 @@ function scoreFileSurface(metric) {
 }
 
 function scoreFileRuntime(metric) {
-  if (metric.profile === 'test') return 0;
+  if (isTestProfile(metric)) return 0;
   return (
     (metric.effectCount > 3 ? 3 : 0) +
     (!isNarrowAdapter(metric) && metric.stateAuthorities > 2 ? 3 : 0) +
@@ -47,7 +51,7 @@ function scoreFileRuntime(metric) {
 
 function scoreLowCohesion(metric) {
   if (
-    metric.profile !== 'test' &&
+    !isTestProfile(metric) &&
     metric.classifiedCallCount >= 5 &&
     metric.cohesion < STRUCTURAL_RISK_LIMITS.cohesion.low
   )
@@ -79,7 +83,7 @@ export function scoreFunction(metric) {
   if (exceeds(metric.stateAuthorities, limits.state)) score += 3;
   if (exceeds(metric.ownerGroupCount, limits.owners)) score += 2;
   if (
-    metric.profile !== 'test' &&
+    !isTestProfile(metric) &&
     metric.classifiedCallCount >= 5 &&
     metric.cohesion < STRUCTURAL_RISK_LIMITS.cohesion.low
   )

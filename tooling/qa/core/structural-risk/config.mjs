@@ -77,6 +77,18 @@ export const FUNCTION_PROFILES = {
     owners: 8,
     recovery: null,
   },
+  'test-fixture': {
+    lines: [130, 250],
+    statements: 100,
+    cyclomatic: 5,
+    cognitive: 10,
+    nesting: 3,
+    params: 8,
+    effects: null,
+    state: null,
+    owners: 8,
+    recovery: null,
+  },
   adapter: {
     lines: [70, 140],
     statements: 60,

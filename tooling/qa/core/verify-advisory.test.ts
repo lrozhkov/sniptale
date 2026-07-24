@@ -246,6 +246,77 @@ it('keeps visual proof advisory for view-bearing modal changes', async () => {
   );
 });
 
+it('does not request visual proof for callback-only JSX rewiring', async () => {
+  const root = createTempRoot('verify-advisory-callback-only-jsx-');
+  const viewFile = 'apps/extension/src/content/overlay/ai/modal/shell/dialog.tsx';
+  initGitRepo(root);
+  writeFile(
+    root,
+    viewFile,
+    'export function Dialog({ setOpen }) { return <button onClick={() => setOpen(false)}>Close</button>; }\n'
+  );
+  runGit(root, 'add', viewFile);
+  runGit(root, 'commit', '-m', 'initial view');
+  writeFile(
+    root,
+    viewFile,
+    'export function Dialog({ handleClose }) { return <button onClick={handleClose}>Close</button>; }\n'
+  );
+
+  const findings = await collectAdvisoryFindings(root, [viewFile]);
+
+  expect(findings.filter((finding) => finding.id === 'advisory.ui-proof-gap')).toEqual([]);
+});
+
+it('keeps imperative render changes visible inside an event callback', async () => {
+  const root = createTempRoot('verify-advisory-event-render-jsx-');
+  const viewFile = 'apps/extension/src/content/overlay/ai/modal/shell/dialog.tsx';
+  initGitRepo(root);
+  writeFile(
+    root,
+    viewFile,
+    'export function Dialog({ close }) { return <button onClick={() => close()}>Close</button>; }\n'
+  );
+  runGit(root, 'add', viewFile);
+  runGit(root, 'commit', '-m', 'initial view');
+  writeFile(
+    root,
+    viewFile,
+    'export function Dialog({ close }) { return <button onClick={() => { ' +
+      'close(); render(Confirmation()); }}>Close</button>; }\n'
+  );
+
+  const findings = await collectAdvisoryFindings(root, [viewFile]);
+
+  expect(findings).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'advisory.ui-proof-gap', severity: 'watch' }),
+    ])
+  );
+});
+
+it('keeps visual proof for presentation attribute changes', async () => {
+  const root = createTempRoot('verify-advisory-presentation-jsx-');
+  const viewFile = 'apps/extension/src/content/overlay/ai/modal/shell/dialog.tsx';
+  initGitRepo(root);
+  writeFile(
+    root,
+    viewFile,
+    "export function Dialog() { return <section className='closed' />; }\n"
+  );
+  runGit(root, 'add', viewFile);
+  runGit(root, 'commit', '-m', 'initial view');
+  writeFile(root, viewFile, "export function Dialog() { return <section className='open' />; }\n");
+
+  const findings = await collectAdvisoryFindings(root, [viewFile]);
+
+  expect(findings).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'advisory.ui-proof-gap', severity: 'watch' }),
+    ])
+  );
+});
+
 it('keeps visual proof advisory for imperative render changes without JSX', async () => {
   const root = createTempRoot('verify-advisory-imperative-render-');
   const viewFile = 'apps/extension/src/content/overlay/ai/modal/shell/render.ts';
@@ -297,12 +368,12 @@ it('prints advisory check coverage so the wrapper explains what it inspects', as
   writeSpy.mockRestore();
 
   const output = stdoutChunks.join('');
-  expect(output).toContain('Advisory checks:');
+  expect(output).toContain('Non-blocking advisory checks:');
   expect(output).toContain('structural file pressure');
   expect(output).toContain('structural function pressure');
   expect(output).toContain('UI proof gaps');
   expect(output).toContain('detached this-sensitive method references');
-  expect(output).toContain('Advisory: attention=0, watch=0');
+  expect(output).toContain('Advisory (non-blocking): attention=0, watch=0');
 });
 
 it('keeps the advisory catalog exact and separate from blocking guard IDs', async () => {

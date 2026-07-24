@@ -13,7 +13,10 @@ import {
   classifyImportedOwner,
   classifyOwnerGroup,
 } from './owner-classifier.mjs';
-import { createFunctionProfileClassifier } from './function-profile.mjs';
+import {
+  createFunctionProfileClassifier,
+  getDeclarativeTestFixtureRoot,
+} from './function-profile.mjs';
 import { createFunctionLineageHasher } from './lineage.mjs';
 
 const RECOVERY_PATTERN =
@@ -207,7 +210,13 @@ function collectCallSignals(current, sourceFile, importOwners, relativePath, sig
   );
 }
 
-function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
+function collectControlMetrics(
+  node,
+  sourceFile,
+  importOwners,
+  relativePath,
+  { declarativeFixtureRoot = null } = {}
+) {
   let statements = 0;
   let cyclomatic = 1;
   let cognitive = 0;
@@ -223,7 +232,7 @@ function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
     ownerCalls: [],
   };
 
-  function visit(current, nesting = 0) {
+  function visit(current, nesting = 0, insideDeclarativeFixture = false) {
     if (current !== node && isFunctionNode(current)) return;
     if (ts.isStatement(current) && !ts.isBlock(current)) statements += 1;
 
@@ -233,7 +242,11 @@ function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
       cognitive += 1 + nesting;
       maxNesting = Math.max(maxNesting, nesting + 1);
     }
-    if (isLogicalExpression(current)) {
+    const isDeclarativeNullishFallback =
+      insideDeclarativeFixture &&
+      ts.isBinaryExpression(current) &&
+      current.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken;
+    if (isLogicalExpression(current) && !isDeclarativeNullishFallback) {
       cyclomatic += 1;
       cognitive += 1;
     }
@@ -243,7 +256,9 @@ function collectControlMetrics(node, sourceFile, importOwners, relativePath) {
     collectCallSignals(current, sourceFile, importOwners, relativePath, signals);
 
     const nextNesting = isBranch ? nesting + 1 : nesting;
-    ts.forEachChild(current, (child) => visit(child, nextNesting));
+    const nextInsideDeclarativeFixture =
+      insideDeclarativeFixture || current === declarativeFixtureRoot;
+    ts.forEachChild(current, (child) => visit(child, nextNesting, nextInsideDeclarativeFixture));
   }
   visit(node.body ?? node);
 
@@ -280,8 +295,13 @@ export function collectFunctionMetrics(sourceFile, relativePath) {
   return collectFunctionNodes(sourceFile).map(({ node, symbol }) => {
     const line = getNodeLine(sourceFile, node);
     const endLine = getNodeEndLine(sourceFile, node);
-    const controls = collectControlMetrics(node, sourceFile, importOwners, relativePath);
+    let controls = collectControlMetrics(node, sourceFile, importOwners, relativePath);
     const profile = classifyProfile(symbol, node, controls);
+    if (profile === 'test-fixture') {
+      controls = collectControlMetrics(node, sourceFile, importOwners, relativePath, {
+        declarativeFixtureRoot: getDeclarativeTestFixtureRoot(relativePath, symbol, node, controls),
+      });
+    }
     const normalizedHashes = createNormalizedNodeHashes(node, sourceFile, symbol);
     return {
       file: relativePath,

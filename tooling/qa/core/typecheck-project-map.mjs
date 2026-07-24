@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 
+import { readHeadFileText } from './git-head-sources.mjs';
 import { fromRelativePath } from './shared-paths.mjs';
-import { isProductSourcePath } from './src-production-targets.mjs';
 import {
   FULL_TYPECHECK_PROJECT_IDS,
   OWNER_TEST_TYPECHECK_PROJECTS,
@@ -74,6 +74,11 @@ function isBroadSharedFile(file) {
   return BROAD_SHARED_PREFIXES.some((prefix) => file.startsWith(prefix));
 }
 
+function matchesRootPrefix(file, rootPrefix) {
+  const directoryPrefix = rootPrefix.endsWith('/') ? rootPrefix : `${rootPrefix}/`;
+  return file.startsWith(directoryPrefix);
+}
+
 function projectExists(projectId) {
   return PROJECT_BY_ID.has(projectId);
 }
@@ -118,7 +123,7 @@ function resolveDirectProjectId(file) {
   }
 
   const matchingProductionProject = PRODUCTION_TYPECHECK_PROJECTS.find((project) =>
-    project.rootPrefixes.some((prefix) => file.startsWith(prefix))
+    project.rootPrefixes.some((prefix) => matchesRootPrefix(file, prefix))
   );
   if (!matchingProductionProject) {
     return null;
@@ -126,7 +131,7 @@ function resolveDirectProjectId(file) {
 
   if (isOwnerTestSource(file) || file.includes('/test-support/')) {
     const matchingRoot = matchingProductionProject.rootPrefixes.find((prefix) =>
-      file.startsWith(prefix)
+      matchesRootPrefix(file, prefix)
     );
     return matchingRoot ? (OWNER_TEST_PROJECT_BY_ROOT.get(matchingRoot) ?? null) : null;
   }
@@ -146,7 +151,13 @@ export function getTypecheckProject(projectId) {
   return PROJECT_BY_ID.get(projectId) ?? null;
 }
 
-export function resolveAffectedTypecheckProjects(targetFiles = []) {
+export function resolveAffectedTypecheckProjects(
+  targetFiles = [],
+  {
+    fileExists = (file) => fs.existsSync(fromRelativePath(file)),
+    headSourceResolver = readHeadFileText,
+  } = {}
+) {
   const normalizedFiles = [...new Set(targetFiles.map(normalizePath))].sort();
   const sourceFiles = normalizedFiles.filter(isTypeScriptSource);
 
@@ -162,12 +173,6 @@ export function resolveAffectedTypecheckProjects(targetFiles = []) {
     };
   }
 
-  if (
-    sourceFiles.some((file) => isProductSourcePath(file) && !fs.existsSync(fromRelativePath(file)))
-  ) {
-    return createFullResolution('deleted or missing TypeScript source target');
-  }
-
   if (sourceFiles.some(isBroadSharedFile)) {
     return createFullResolution('broad shared contract owner changed');
   }
@@ -176,6 +181,9 @@ export function resolveAffectedTypecheckProjects(targetFiles = []) {
     const projectId = resolveDirectProjectId(file);
     if (!projectId) {
       return createFullResolution(`unmapped TypeScript target: ${file}`);
+    }
+    if (!fileExists(file) && headSourceResolver(file) === null) {
+      return createFullResolution(`missing TypeScript target without HEAD deletion: ${file}`);
     }
 
     directProjectIds.add(projectId);

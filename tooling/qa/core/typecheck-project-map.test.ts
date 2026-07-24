@@ -59,14 +59,52 @@ it('keeps cross-owner test-helper consumers in the conservative closure', () => 
   );
 });
 
-it('keeps a missing content source on the full fail-safe path', () => {
+it('keeps a deleted owner-local source inside its mapped affected closure', () => {
+  expect(
+    resolveAffectedTypecheckProjects(
+      ['apps/extension/src/settings/sections/example/deleted-actions.ts'],
+      {
+        fileExists: () => false,
+        headSourceResolver: () => 'export const deleted = true;\n',
+      }
+    )
+  ).toEqual({
+    mode: 'affected',
+    projectIds: ['settings', 'settings-tests'],
+    reason: 'changed owner projects',
+  });
+});
+
+it('keeps unproven missing, broad shared, and unmapped targets on the full fail-safe path', () => {
+  expect(
+    resolveAffectedTypecheckProjects(
+      ['apps/extension/src/settings/sections/example/missing-actions.ts'],
+      { fileExists: () => false, headSourceResolver: () => null }
+    )
+  ).toMatchObject({
+    mode: 'full',
+    reason: expect.stringContaining('without HEAD deletion'),
+  });
   expect(
     resolveAffectedTypecheckProjects([
-      'apps/extension/src/content/selection/missing-runtime-owner.ts',
+      'apps/extension/src/composition/persistence/deleted-session.ts',
     ])
   ).toMatchObject({
     mode: 'full',
-    reason: 'deleted or missing TypeScript source target',
+    reason: 'broad shared contract owner changed',
+  });
+  expect(resolveAffectedTypecheckProjects(['unknown/deleted-owner.ts'])).toMatchObject({
+    mode: 'full',
+    reason: 'unmapped TypeScript target: unknown/deleted-owner.ts',
+  });
+  expect(
+    resolveAffectedTypecheckProjects(['apps/extension/src/settings-old/deleted-owner.ts'], {
+      fileExists: () => false,
+      headSourceResolver: () => 'export {};\n',
+    })
+  ).toMatchObject({
+    mode: 'full',
+    reason: 'unmapped TypeScript target: apps/extension/src/settings-old/deleted-owner.ts',
   });
 });
 

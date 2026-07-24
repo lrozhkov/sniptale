@@ -14010,14 +14010,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/authority-aliases.mjs",
-        "contentHash": "b2f97ae2e1caa99a190c8d9c2ba3cd6a9dd3ec157c584531451e0c60862380c2"
+        "contentHash": "748c98e24e4b039a32deb9d45c1a2ea8acfb11313d97aebdd018e2cb3b42273c"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/authority-aliases.mjs",
         "tooling/qa/core/structural-risk/file-metrics.mjs"
       ],
       "surfaces": [
-        "property:collectCallsByFunction/anonymous-121/calls"
+        "property:collectCallsByFunction/anonymous-122/calls"
       ]
     },
     {
@@ -14686,7 +14686,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/config.mjs",
-        "contentHash": "0881c920e852d55ce9afd729d8efbd1f256d39274872db95d525fae7a5eeb746"
+        "contentHash": "864adef6be6217affb51a7b1e60c792e03bbbd362e8d41be3b972987002b9274"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/config.mjs",
@@ -14718,10 +14718,12 @@
         "property:lines[4]",
         "property:lines[5]",
         "property:lines[6]",
+        "property:lines[7]",
         "property:orchestration",
         "property:pure",
         "property:react",
-        "property:test"
+        "property:test",
+        "property:test-fixture"
       ]
     },
     {
@@ -15891,7 +15893,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/function-metrics.mjs",
-        "contentHash": "ebab1c00191522584b60afc3781348a093c8afbf021429398db264c1965a0a33"
+        "contentHash": "44f24cb7a07415ecf56001fb3d65ee5f527b1df29a91f59e5ba62fda51ef3bec"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -15923,7 +15925,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/function-profile.mjs",
-        "contentHash": "2463e1369c511f836165ad4c223f0c72ef8c433c2e3cd573d7592e21bb66b4f1"
+        "contentHash": "cc5104c1b6bf559f2b993bacdcb96fc72cdb8dd6ce10bdb6536c7ac8936d8531"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/function-metrics.mjs",
@@ -16023,6 +16025,7 @@
         "tooling/qa/core/git-head-sources.mjs",
         "tooling/qa/core/git-head-sources.test.ts",
         "tooling/qa/core/product-proof-risk-hints.mjs",
+        "tooling/qa/core/typecheck-project-map.mjs",
         "tooling/qa/core/verify-build.deleted-closure.mjs",
         "tooling/qa/core/verify-build.deleted-dead-export.mjs",
         "tooling/qa/core/verify-domain-fixture-realism.mjs",
@@ -17565,7 +17568,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/product-proof-risk-hints.mjs",
-        "contentHash": "274f332b1ff31f0d2572f2bd659a42291bf56a2522eac26c947df5e6a2715b0b"
+        "contentHash": "ecb06ea1c44820a9c6ca78402eb7a0e9247b7d8f72a20a3d874ffeda4ccdb919"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-report.mjs",
@@ -17733,6 +17736,7 @@
       },
       "consumers": [
         "tooling/qa/core/structural-risk/authority-aliases.test.ts",
+        "tooling/qa/core/structural-risk/authority-session-aliases.test.ts",
         "tooling/qa/core/structural-risk/function-profile.test.ts",
         "tooling/qa/core/structural-risk/lineage.test.ts",
         "tooling/qa/core/structural-risk/remediation.test.ts",
@@ -18996,7 +19000,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/typecheck-project-map.mjs",
-        "contentHash": "3ffc60ba978320c157cae606be86be831a00e8ee4468c4c17d53c34362a641f8"
+        "contentHash": "a46c867b34a8442c919ed110ac9eddd233966e988a56c095ce6670c8554938c1"
       },
       "consumers": [
         "tooling/qa/core/typecheck-project-map.mjs",
@@ -19208,7 +19212,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-advisory.report.helpers.mjs",
-        "contentHash": "521224bea04da10fd9ece4de76db8afbfc5b45e560c073b4853be676269a452e"
+        "contentHash": "966991d38661c82d0f4287c6ed488df2b90c995b60f8b8eb8eb83aa98ffd8db7"
       },
       "consumers": [
         "tooling/qa/core/verify-advisory.collectors.helpers.mjs",

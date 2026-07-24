@@ -102,7 +102,7 @@ export function collectPreflightReportLines(report, context, guardrailReport) {
     'Relevant docs:',
     ...formatList(report.relevantDocs),
     '',
-    'Structural pressure:',
+    'Additional structural context (findings excluded):',
     ...formatList(report.structuralPressure ?? []),
     '',
     ...collectContractLines(report),
@@ -113,7 +113,7 @@ export function collectPreflightReportLines(report, context, guardrailReport) {
     'Build forecast:',
     ...formatList([...new Set(guardrailReport.buildScopeForecast ?? [])]),
     '',
-    'Advisory:',
+    'Non-blocking advisory findings:',
     ...formatAdvisoryFindings(report.advisoryFindings ?? []),
   ];
 }

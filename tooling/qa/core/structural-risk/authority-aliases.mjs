@@ -1,4 +1,5 @@
 import { createLexicalBindingKey, getTransparentExpressionRoot, ts } from './ast.mjs';
+import { collectCompositeSessionAliases } from './composite-session-aliases.mjs';
 import { collectReactRefBindings } from './react-ref-provenance.mjs';
 
 function unwrapExpression(node) {
@@ -302,18 +303,40 @@ function resolveAuthorityKey(key, context, visitedAliases = new Set()) {
     : new Set([canonicalAuthorityKey(key, context.reactRefBindings)]);
 }
 
+function resolveCompositeAuthorityKey(key, context, visitedAliases = new Set()) {
+  const compositeBase = splitBindingKey(key, context.compositeSessionAliases.keys());
+  if (!compositeBase) return new Set([key]);
+  const aliasId = `composite-session:${compositeBase}`;
+  if (visitedAliases.has(aliasId)) return new Set([key]);
+  const suffix = key.slice(compositeBase.length);
+  const target = `${context.compositeSessionAliases.get(compositeBase)}${suffix}`;
+  const nextVisitedAliases = new Set(visitedAliases).add(aliasId);
+  return new Set(
+    [...resolveAuthorityKey(target, context)].flatMap((authority) => [
+      ...resolveCompositeAuthorityKey(authority, context, nextVisitedAliases),
+    ])
+  );
+}
+
 export function resolveFileStateAuthorityKeys(sourceFile, keys) {
   const localFunctions = collectLocalFunctions(sourceFile);
   const callsByFunction = collectCallsByFunction(sourceFile, localFunctions);
   const context = {
     sourceFile,
     constAliases: collectConstAliases(sourceFile),
+    compositeSessionAliases: collectCompositeSessionAliases(sourceFile, localFunctions, (node) =>
+      expressionBindingKey(node, sourceFile)
+    ),
     parameterAliases: collectParameterAliases(sourceFile, callsByFunction),
     reactRefBindings: collectReactRefBindings(sourceFile),
   };
   const resolved = new Set();
   for (const key of keys) {
-    for (const authority of resolveAuthorityKey(key, context)) resolved.add(authority);
+    for (const authority of resolveAuthorityKey(key, context)) {
+      for (const compositeAuthority of resolveCompositeAuthorityKey(authority, context)) {
+        resolved.add(compositeAuthority);
+      }
+    }
   }
   return [...resolved].sort();
 }

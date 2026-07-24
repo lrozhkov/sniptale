@@ -63,39 +63,103 @@ function collectProductionCodeFiles(codeFiles) {
   return codeFiles.filter((file) => !TEST_FILE_PATTERN.test(file));
 }
 
-function readDiffSource(file) {
+function readCurrentSource(file) {
   try {
     return fs.readFileSync(file, 'utf8');
   } catch {
-    return readHeadFileText(file);
+    return null;
   }
 }
 
-function hasViewBearingSyntax(file) {
-  if (file.endsWith('.css')) return true;
-  const source = readDiffSource(file);
-  if (source === null) return false;
-  const sourceFile = createSourceFile(file, source);
-  let viewBearing = false;
-  function visit(node) {
-    if (
-      ts.isJsxElement(node) ||
-      ts.isJsxSelfClosingElement(node) ||
-      ts.isJsxFragment(node) ||
-      (ts.isCallExpression(node) &&
-        /(?:^|\.)(?:createElement|createPortal|render)$/u.test(
-          node.expression.getText(sourceFile)
-        )) ||
-      (ts.isTaggedTemplateExpression(node) &&
-        /^(?:css|styled(?:\.|$))/u.test(node.tag.getText(sourceFile)))
-    ) {
-      viewBearing = true;
-      return;
+function normalizeViewText(value) {
+  return value.replace(/\s+/gu, ' ').trim();
+}
+
+function appendJsxContainerSignature(node, sourceFile, signature) {
+  if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+    signature.push(`jsx:${node.tagName.getText(sourceFile)}`);
+  } else if (ts.isJsxFragment(node)) {
+    signature.push('jsx:fragment');
+  }
+}
+
+function collectNestedImperativeViewSignatures(node, sourceFile, signature) {
+  if (appendImperativeViewSignature(node, sourceFile, signature)) return;
+  ts.forEachChild(node, (child) =>
+    collectNestedImperativeViewSignatures(child, sourceFile, signature)
+  );
+}
+
+function appendJsxAttributeSignature(node, sourceFile, signature) {
+  if (ts.isJsxAttribute(node)) {
+    const name = node.name.getText(sourceFile);
+    if (/^on[A-Z]/u.test(name)) {
+      ts.forEachChild(node, (child) =>
+        collectNestedImperativeViewSignatures(child, sourceFile, signature)
+      );
+    } else {
+      signature.push(
+        `attr:${name}=${normalizeViewText(node.initializer?.getText(sourceFile) ?? '')}`
+      );
     }
+    return true;
+  }
+  if (!ts.isJsxSpreadAttribute(node)) return false;
+  signature.push(`spread:${normalizeViewText(node.expression.getText(sourceFile))}`);
+  return true;
+}
+
+function appendJsxContentSignature(node, sourceFile, signature) {
+  if (ts.isJsxText(node)) {
+    const text = normalizeViewText(node.text);
+    if (text) signature.push(`text:${text}`);
+    return true;
+  }
+  if (!ts.isJsxExpression(node)) return false;
+  const expression = node.expression?.getText(sourceFile);
+  if (expression) signature.push(`expression:${normalizeViewText(expression)}`);
+  return true;
+}
+
+function appendImperativeViewSignature(node, sourceFile, signature) {
+  const isRenderCall =
+    ts.isCallExpression(node) &&
+    /(?:^|\.)(?:createElement|createPortal|render)$/u.test(node.expression.getText(sourceFile));
+  if (isRenderCall) {
+    signature.push(`render:${normalizeViewText(node.getText(sourceFile))}`);
+    return true;
+  }
+  const isStyleTemplate =
+    ts.isTaggedTemplateExpression(node) &&
+    /^(?:css|styled(?:\.|$))/u.test(node.tag.getText(sourceFile));
+  if (!isStyleTemplate) return false;
+  signature.push(`style:${normalizeViewText(node.getText(sourceFile))}`);
+  return true;
+}
+
+function createViewSignature(file, source) {
+  if (source === null) return [];
+  if (file.endsWith('.css')) return [`css:${normalizeViewText(source)}`];
+  const sourceFile = createSourceFile(file, source);
+  const signature = [];
+  function visit(node) {
+    if (appendJsxAttributeSignature(node, sourceFile, signature)) return;
+    if (appendJsxContentSignature(node, sourceFile, signature)) return;
+    if (appendImperativeViewSignature(node, sourceFile, signature)) return;
+    appendJsxContainerSignature(node, sourceFile, signature);
     ts.forEachChild(node, visit);
   }
   visit(sourceFile);
-  return viewBearing;
+  return signature;
+}
+
+function hasViewBearingChange(file, getPreviousSource) {
+  const currentSignature = createViewSignature(file, readCurrentSource(file));
+  const previousSignature = createViewSignature(file, getPreviousSource(file));
+  return (
+    (currentSignature.length > 0 || previousSignature.length > 0) &&
+    JSON.stringify(currentSignature) !== JSON.stringify(previousSignature)
+  );
 }
 
 function collectUiOwnerFiles(codeFiles) {
@@ -104,8 +168,10 @@ function collectUiOwnerFiles(codeFiles) {
   );
 }
 
-function collectUiSurfaceFiles(codeFiles) {
-  return collectUiOwnerFiles(collectProductionCodeFiles(codeFiles)).filter(hasViewBearingSyntax);
+function collectUiSurfaceFiles(codeFiles, getPreviousSource = readHeadFileText) {
+  return collectUiOwnerFiles(collectProductionCodeFiles(codeFiles)).filter((file) =>
+    hasViewBearingChange(file, getPreviousSource)
+  );
 }
 
 function createRiskHint(label, detail) {
@@ -151,8 +217,10 @@ export function collectRiskChecklistHints({
   return hints;
 }
 
-export function collectVisualProofHints({ codeFiles = [] }) {
-  const uiFiles = collectUiSurfaceFiles(codeFiles).filter((file) => FLOATING_UI_PATTERN.test(file));
+export function collectVisualProofHints({ codeFiles = [], getPreviousSource = readHeadFileText }) {
+  const uiFiles = collectUiSurfaceFiles(codeFiles, getPreviousSource).filter((file) =>
+    FLOATING_UI_PATTERN.test(file)
+  );
   if (uiFiles.length === 0) {
     return [];
   }

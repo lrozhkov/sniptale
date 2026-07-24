@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { analyzeStructuralSource } from './report.mjs';
+import { scoreFunction } from './score.mjs';
 
 describe('function profile classification', () => {
   it('uses the entrypoint profile only for an exported entrypoint binding', () => {
@@ -60,5 +61,69 @@ describe('function profile classification', () => {
     );
 
     expect(metric.functions[0]?.profile).toBe('pure');
+  });
+
+  it('does not count declarative fixture property fallbacks as test branching', () => {
+    const metric = analyzeStructuralSource(
+      'apps/extension/src/settings/section.test.ts',
+      `function createPreset(overrides = {}) {
+        return {
+          id: overrides.id ?? 'preset-1',
+          name: overrides.name ?? 'Preset',
+          width: overrides.width ?? 4,
+          color: overrides.color ?? '#ff6600',
+          radius: overrides.radius ?? 8,
+          shadow: overrides.shadow ?? 30,
+          opacity: overrides.opacity ?? 80,
+          fillColor: overrides.fillColor ?? '#00000000',
+          fillOpacity: overrides.fillOpacity ?? 0,
+          inheritCustomCss: overrides.inheritCustomCss ?? false,
+          strokeOpacity: overrides.strokeOpacity ?? 100,
+        };
+      }`
+    ).functions[0];
+
+    expect(metric).toMatchObject({
+      cognitive: 0,
+      cyclomatic: 1,
+      profile: 'test-fixture',
+    });
+    expect(scoreFunction(metric)).toBe(0);
+  });
+
+  it('keeps real control flow in test fixture helpers on the normal test profile', () => {
+    const metric = analyzeStructuralSource(
+      'apps/extension/src/settings/section.test.ts',
+      `function createPreset(overrides = {}) {
+        if (!overrides.id) throw new Error('missing id');
+        return { id: overrides.id ?? 'preset-1' };
+      }`
+    ).functions[0];
+
+    expect(metric).toMatchObject({ profile: 'test' });
+    expect(metric.cognitive).toBeGreaterThan(1);
+    expect(metric.cyclomatic).toBeGreaterThan(2);
+  });
+
+  it('retains logical gating inside a declarative test fixture', () => {
+    const metric = analyzeStructuralSource(
+      'apps/extension/src/settings/section.test.ts',
+      `function createPreset(flags) {
+        return {
+          alpha: flags.alpha && buildAlpha(),
+          beta: flags.beta && buildBeta(),
+          gamma: flags.gamma && buildGamma(),
+          delta: flags.delta && buildDelta(),
+          epsilon: flags.epsilon && buildEpsilon(),
+        };
+      }`
+    ).functions[0];
+
+    expect(metric).toMatchObject({
+      cognitive: 5,
+      cyclomatic: 6,
+      profile: 'test-fixture',
+    });
+    expect(scoreFunction(metric)).toBe(2);
   });
 });

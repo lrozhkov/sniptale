@@ -36,10 +36,10 @@ export function formatAdvisoryReport({ findings }) {
   const attention = findings.filter((finding) => finding.severity === 'attention');
   const watch = findings.filter((finding) => finding.severity !== 'attention');
   return `${[
-    `Advisory checks: ${ADVISORY_CHECK_DESCRIPTIONS.join(', ')}`,
-    ...formatFindingSection('Attention', attention),
-    ...formatFindingSection('Watch', watch),
-    `Advisory: attention=${attention.length}, watch=${watch.length}`,
+    `Non-blocking advisory checks: ${ADVISORY_CHECK_DESCRIPTIONS.join(', ')}`,
+    ...formatFindingSection('Attention (non-blocking)', attention),
+    ...formatFindingSection('Review signals', watch),
+    `Advisory (non-blocking): attention=${attention.length}, watch=${watch.length}`,
   ].join('\n')}\n`;
 }
 
