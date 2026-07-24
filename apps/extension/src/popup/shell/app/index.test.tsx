@@ -14,12 +14,6 @@ const popupAppMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../runtime', () => ({
-  PopupCommandPaletteRuntime: {},
-  PopupExportRuntime: {},
-  PopupHomeRuntime: {},
-  PopupRuntimeNavigationControls: {},
-  PopupTabsRuntime: {},
-  PopupVideoSetupRuntime: {},
   usePopupRuntime: popupAppMocks.usePopupRuntimeMock,
 }));
 

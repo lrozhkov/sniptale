@@ -1,23 +1,15 @@
-import type { PopupCommandPaletteRuntime } from '../runtime/types/command-palette';
-import type { PopupExportRuntime } from '../runtime/types/export-runtime';
-import type { PopupHomeRuntime } from '../runtime/types/home-runtime';
-import type { PopupVideoSetupRuntime } from '../runtime/types/video-setup';
+import type { PopupRuntimeState } from '../runtime/types/state';
 import { CommandPaletteLayer } from './command-palette-layer';
 import { PopupAppContent } from './content/view';
 import { FooterLayer } from './footer-layer';
 import { TabsLayer } from './tabs-layer';
-
-type PopupAppShellRuntime = PopupHomeRuntime &
-  PopupExportRuntime &
-  PopupVideoSetupRuntime &
-  PopupCommandPaletteRuntime;
 
 export function PopupAppShell({
   runtime,
   commandPaletteOpen,
   onCloseCommandPalette,
 }: {
-  runtime: PopupAppShellRuntime;
+  runtime: PopupRuntimeState;
   commandPaletteOpen: boolean;
   onCloseCommandPalette: () => void;
 }) {

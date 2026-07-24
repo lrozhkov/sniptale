@@ -1,24 +1,13 @@
 import { Suspense } from 'react';
 
 import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
-import type { PopupCommandPaletteRuntime } from '../../runtime/types/command-palette';
-import type { PopupExportRuntime } from '../../runtime/types/export-runtime';
-import type { PopupHomeRuntime } from '../../runtime/types/home-runtime';
-import type { PopupVideoSetupRuntime } from '../../runtime/types/video-setup';
+import type { PopupRuntimeState } from '../../runtime/types/state';
 import { LazyExportPage } from '../../lazy-chunks';
 import { PopupHomePage } from '../../home/page-shell';
 import { PopupRouteLoadingFallback } from '../route-loading-fallback';
 import { PopupVideoSetup } from '../video-setup';
 
-type PopupAppHomeRuntime = PopupHomeRuntime & PopupCommandPaletteRuntime;
-
-type PopupAppExportRuntime = PopupExportRuntime;
-
-type PopupAppVideoRuntime = PopupVideoSetupRuntime;
-
-type PopupAppContentRuntime = PopupAppHomeRuntime & PopupAppExportRuntime & PopupAppVideoRuntime;
-
-export function PopupAppContent({ runtime }: { runtime: PopupAppContentRuntime }) {
+export function PopupAppContent({ runtime }: { runtime: PopupRuntimeState }) {
   if (runtime.navigation.page === 'video') {
     return <PopupVideoSetup runtime={runtime} />;
   }
