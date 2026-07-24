@@ -79,6 +79,14 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'content-auto-blur-controller',
+    productionPrefix: 'apps/extension/src/content/overlay/auto-blur/controller/',
+    exclusive: true,
+    reason:
+      'Auto-blur session transitions, effects, and workflows have one owner-level behavior suite.',
+    testFiles: ['apps/extension/src/content/overlay/auto-blur/controller/index.test.tsx'],
+  },
+  {
     owner: 'popup-export-page-content',
     productionFile: 'apps/extension/src/popup/shell/export/pages/content.tsx',
     reason:

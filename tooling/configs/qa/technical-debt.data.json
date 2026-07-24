@@ -2555,9 +2555,7 @@
         "apps/extension/src/content/overlay/auto-blur/controller/effects.ts",
         "apps/extension/src/content/overlay/auto-blur/controller/index.ts",
         "apps/extension/src/content/overlay/auto-blur/controller/operations.ts",
-        "apps/extension/src/content/overlay/auto-blur/controller/selection-actions.ts",
         "apps/extension/src/content/overlay/auto-blur/controller/state.ts",
-        "apps/extension/src/content/overlay/auto-blur/controller/types.ts",
         "apps/extension/src/content/overlay/auto-blur/modal/category-labels.ts",
         "apps/extension/src/content/overlay/auto-blur/modal/controls.tsx",
         "apps/extension/src/content/overlay/auto-blur/modal/index.tsx",
@@ -16642,7 +16640,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "3699b594bbb611223bd785320984e539ca6fc0d73ede63cd034756d31253850b"
+        "contentHash": "03a7590937ee786a42ac5c1af7528e26c73bfd7bb69aef6c998cefc70a286362"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16683,6 +16681,7 @@
         "property:testFiles[36]",
         "property:testFiles[37]",
         "property:testFiles[38]",
+        "property:testFiles[39]",
         "property:testFiles[4]",
         "property:testFiles[5]",
         "property:testFiles[6]",
