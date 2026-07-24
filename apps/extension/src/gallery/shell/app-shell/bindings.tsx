@@ -1,9 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
-import type { GalleryViewMode } from '../app/types';
+import type { GalleryAppStateController, GalleryViewMode } from '../../state/types';
 import type { GalleryItem } from '../../library/items';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
-import type { GalleryAppStateController } from '../app/types';
 import { GalleryAppLayout } from './layout';
 
 interface GalleryAppBindingsProps {

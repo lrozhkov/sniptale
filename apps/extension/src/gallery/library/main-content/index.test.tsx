@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createMediaItem } from '../actions/test-support';
+import { createMediaItem } from '../actions/test-support/index';
 
 const { bannerPropsMock, gridPropsMock, selectionBarPropsMock } = vi.hoisted(() => ({
   bannerPropsMock: vi.fn(),

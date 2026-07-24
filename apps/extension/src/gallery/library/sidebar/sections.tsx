@@ -3,8 +3,11 @@ import { translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { SIDEBAR_FOLDERS } from '../constants';
 import { FOLDER_LABELS, getGalleryFolderIcon } from '../ui';
-import { cx } from './helpers';
 import type { GallerySidebarProps } from './types';
+
+function cx(...values: Array<string | false | null | undefined>): string {
+  return values.filter(Boolean).join(' ');
+}
 
 export function GalleryFolderList({
   counts,

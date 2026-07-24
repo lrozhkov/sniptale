@@ -8,7 +8,8 @@ import {
   isGalleryVideoProjectItem,
 } from '../items';
 import type { PreviewPanelProps } from './types';
-import { PreviewActions, PreviewMedia, PreviewMetadataCards, PreviewTagEditor } from './views';
+import { PreviewMedia } from './media';
+import { PreviewActions, PreviewMetadataCards, PreviewTagEditor } from './sidebar-sections';
 import { formatDate, getGalleryItemKindLabel } from '../ui';
 
 function isMetadataEditable(item: PreviewPanelProps['item']) {

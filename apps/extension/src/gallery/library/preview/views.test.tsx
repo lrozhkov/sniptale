@@ -22,7 +22,8 @@ vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   formatBytes: formatBytesMock,
 }));
 
-import { PreviewActions, PreviewMedia, PreviewMetadataCards, PreviewTagEditor } from './views';
+import { PreviewMedia } from './media';
+import { PreviewActions, PreviewMetadataCards, PreviewTagEditor } from './sidebar-sections';
 import type { PreviewPanelProps } from './types';
 import type { GalleryMediaItem } from '../items';
 let root: Root | null = null;
