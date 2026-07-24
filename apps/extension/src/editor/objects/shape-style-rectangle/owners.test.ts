@@ -1,10 +1,17 @@
 import { expect, it, vi } from 'vitest';
-import { restoreRectangleCenter } from './center';
-import { clampRectangleGeometry, resolveRectangleDimension, resolveRectangleScale } from './math';
-import { resolveRectangleIntentRadius, resolveRectangleRenderRadius } from './radius';
-import { captureRectangleVisualState } from './visual-state';
+import {
+  clampRectangleGeometry,
+  resolveRectangleDimension,
+  resolveRectangleRenderRadius,
+  resolveRectangleScale,
+} from './geometry';
+import {
+  captureRectangleVisualState,
+  resolveRectangleIntentRadius,
+  restoreRectangleCenter,
+} from './visual-state';
 
-it('keeps rectangle scale and dimension math in the math owner', () => {
+it('keeps pure rectangle calculations in the geometry owner', () => {
   expect(resolveRectangleScale(0)).toBe(1);
   expect(resolveRectangleScale(-2)).toBe(2);
   expect(resolveRectangleDimension(Number.NaN)).toBe(0);
@@ -51,7 +58,7 @@ it('keeps rectangle visual-state capture separate from mutation owners', () => {
   ).toEqual({ x: 3, y: 2 });
 });
 
-it('keeps rectangle radius intent and render clamping in the radius owner', () => {
+it('separates rectangle radius intent from geometry clamping', () => {
   expect(
     resolveRectangleIntentRadius({ sniptaleShapeRadius: Number.NaN, rx: -2, ry: 6 } as never)
   ).toBe(0);
@@ -59,7 +66,7 @@ it('keeps rectangle radius intent and render clamping in the radius owner', () =
   expect(resolveRectangleRenderRadius(20, 10, 30)).toBe(5);
 });
 
-it('keeps center restoration fallback in the center owner', () => {
+it('keeps center restoration with rectangle visual state', () => {
   const rect = {
     height: 20,
     scaleX: 2,

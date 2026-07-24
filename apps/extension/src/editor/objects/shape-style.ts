@@ -1,2 +1,2 @@
 export { applyShapeSettings } from './shape-style-apply';
-export { normalizeScaledRectangleTarget } from './shape-style-rectangle';
+export { normalizeScaledRectangleTarget } from './shape-style-rectangle/normalize';

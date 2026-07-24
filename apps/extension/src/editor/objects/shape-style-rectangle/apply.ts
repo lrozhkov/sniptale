@@ -1,9 +1,15 @@
 import type { EditorShapeSettings } from '../../../features/editor/document/types';
-import { restoreRectangleCenter } from './center';
-import { clampRectangleGeometry, resolveRectangleScale } from './math';
-import { resolveRectangleRenderRadius } from './radius';
-import type { RectangleLike, RectangleVisualState } from './types';
-import { captureRectangleVisualState } from './visual-state';
+import {
+  clampRectangleGeometry,
+  resolveRectangleRenderRadius,
+  resolveRectangleScale,
+} from './geometry';
+import {
+  captureRectangleVisualState,
+  restoreRectangleCenter,
+  type RectangleLike,
+  type RectangleVisualState,
+} from './visual-state';
 
 export function applyRectangleShapeGeometry(
   object: RectangleLike,

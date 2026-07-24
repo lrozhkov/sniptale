@@ -158,6 +158,21 @@ export const EDITOR_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'editor-rectangle-shape-geometry',
+    productionPrefix: 'apps/extension/src/editor/objects/shape-style-rectangle/',
+    reason: 'Rectangle shape geometry is covered by owner, root contract, and scaling consumers.',
+    testFiles: [
+      'apps/extension/src/editor/controller/events/runtime.object-scaling.test.ts',
+      'apps/extension/src/editor/controller/layer-actions/state/resize.test.ts',
+      'apps/extension/src/editor/objects/facade.contract.test.ts',
+      'apps/extension/src/editor/objects/shape-style-apply.test.ts',
+      'apps/extension/src/editor/objects/shape-style-rectangle.test.ts',
+      'apps/extension/src/editor/objects/shape-style-rectangle/owners.test.ts',
+      'apps/extension/src/editor/objects/shape-style.extra.test.ts',
+      'apps/extension/src/editor/objects/shape-style.normalize.test.ts',
+    ],
+  },
+  {
     owner: 'editor-magnet-manager',
     productionFile: 'apps/extension/src/editor/controller/magnet/manager.ts',
     reason: 'Magnet manager behavior is covered by focused manager tests.',

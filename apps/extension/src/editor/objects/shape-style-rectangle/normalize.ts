@@ -1,9 +1,20 @@
 import type { FabricObject } from 'fabric';
-import { restoreRectangleCenter } from './center';
-import { clampRectangleGeometry, resolveRectangleDimension, resolveRectangleScale } from './math';
-import { resolveRectangleIntentRadius, resolveRectangleRenderRadius } from './radius';
-import { isEditorRectangleTarget } from './target';
-import { captureRectangleVisualState } from './visual-state';
+import {
+  clampRectangleGeometry,
+  resolveRectangleDimension,
+  resolveRectangleRenderRadius,
+  resolveRectangleScale,
+} from './geometry';
+import {
+  captureRectangleVisualState,
+  resolveRectangleIntentRadius,
+  restoreRectangleCenter,
+  type RectangleLike,
+} from './visual-state';
+
+function isEditorRectangleTarget(object: FabricObject): object is RectangleLike {
+  return object.sniptaleRole === 'annotation' && object.sniptaleType === 'rectangle';
+}
 
 export function normalizeScaledRectangleTarget(object: FabricObject): boolean {
   if (!isEditorRectangleTarget(object)) {
