@@ -1,7 +1,7 @@
 import { Path } from 'fabric';
 import { expect, it } from 'vitest';
 
-import { applyArrowObjectState } from './state';
+import { applyArrowObjectState } from './state/apply';
 import type { ArrowPathInstance } from './controls.types';
 
 it('persists line style and sketch parameters while hiding controls during drawing', () => {

@@ -1,10 +1,7 @@
 import { Path } from 'fabric';
 import { expect, it } from 'vitest';
-import {
-  applyArrowObjectState,
-  pickArrowPointUpdateOptions,
-  resolveArrowUpdatePoints,
-} from './state';
+import { pickArrowPointUpdateOptions, resolveArrowUpdatePoints } from './state-points';
+import { applyArrowObjectState } from './state/apply';
 
 const settings = {
   color: '#123456',

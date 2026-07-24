@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveArrowUpdatePoints } from './state';
+import { resolveArrowUpdatePoints } from './state-points';
 
 const elbowSettings = {
   arrowType: 'elbow',

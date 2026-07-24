@@ -35,11 +35,8 @@ vi.mock('fabric', () => ({
 }));
 
 import { Path, Shadow } from 'fabric';
-import {
-  applyArrowObjectState,
-  pickArrowPointUpdateOptions,
-  resolveArrowUpdatePoints,
-} from './state';
+import { pickArrowPointUpdateOptions, resolveArrowUpdatePoints } from './state-points';
+import { applyArrowObjectState } from './state/apply';
 
 function registerResolveHandlePointTest() {
   it('resolves arrow update points from start, control, and end handles', () => {

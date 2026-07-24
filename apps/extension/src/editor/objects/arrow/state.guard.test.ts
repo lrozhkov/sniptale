@@ -30,7 +30,8 @@ vi.mock('fabric', () => ({
 }));
 
 import { Path } from 'fabric';
-import { applyArrowObjectState, resolveArrowUpdatePoints } from './state';
+import { resolveArrowUpdatePoints } from './state-points';
+import { applyArrowObjectState } from './state/apply';
 
 const straightSettings = {
   color: '#09f',

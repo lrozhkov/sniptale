@@ -121,6 +121,43 @@ export const EDITOR_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'editor-arrow-point-edit-contract',
+    productionPrefix: 'apps/extension/src/editor/objects/arrow/point-edit/',
+    reason: 'Arrow point-edit geometry is covered by aggregate and owner-focused suites.',
+    testFiles: [
+      'apps/extension/src/editor/objects/arrow/point-edit.test.ts',
+      'apps/extension/src/editor/objects/arrow/point-edit/owners.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-arrow-state-contract',
+    productionPrefix: 'apps/extension/src/editor/objects/arrow/state/',
+    reason: 'Arrow state application is covered by state, point-update, and leaf owner suites.',
+    testFiles: [
+      'apps/extension/src/editor/objects/arrow/state.appearance.test.ts',
+      'apps/extension/src/editor/objects/arrow/state.coverage-extra.test.ts',
+      'apps/extension/src/editor/objects/arrow/state.dynamic-width.test.ts',
+      'apps/extension/src/editor/objects/arrow/state.elbow.test.ts',
+      'apps/extension/src/editor/objects/arrow/state.extra.test.ts',
+      'apps/extension/src/editor/objects/arrow/state.guard.test.ts',
+      'apps/extension/src/editor/objects/arrow/state.test.ts',
+      'apps/extension/src/editor/objects/arrow/state/appearance.test.ts',
+      'apps/extension/src/editor/objects/arrow/state/apply.test.ts',
+      'apps/extension/src/editor/objects/arrow/state/metadata.test.ts',
+      'apps/extension/src/editor/objects/arrow/state/style.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-arrow-head-builders-contract',
+    productionPrefix: 'apps/extension/src/editor/objects/arrow/visual/heads-builders/',
+    reason: 'Arrow-head path builders are covered by leaf and composed head suites.',
+    testFiles: [
+      'apps/extension/src/editor/objects/arrow/visual/heads.test.ts',
+      'apps/extension/src/editor/objects/arrow/visual/heads-builders/builders.test.ts',
+      'apps/extension/src/editor/objects/arrow/visual/heads-builders/open.test.ts',
+    ],
+  },
+  {
     owner: 'editor-magnet-manager',
     productionFile: 'apps/extension/src/editor/controller/magnet/manager.ts',
     reason: 'Magnet manager behavior is covered by focused manager tests.',
