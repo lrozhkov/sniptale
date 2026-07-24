@@ -33,9 +33,12 @@ vi.mock('../../../../platform/frame', () => ({
   resolveIframeEventTarget: resolveIframeEventTargetMock,
 }));
 
-vi.mock('..', () => ({
+vi.mock('../commands', () => ({
   handleSelectionModeClick: handleSelectionModeClickMock,
   handleSelectionModeKeyDown: handleSelectionModeKeyDownMock,
+}));
+
+vi.mock('../pointer-handlers', () => ({
   handleSelectionModeMouseDown: handleSelectionModeMouseDownMock,
   handleSelectionModeMouseLeave: handleSelectionModeMouseLeaveMock,
   handleSelectionModeMouseMove: handleSelectionModeMouseMoveMock,

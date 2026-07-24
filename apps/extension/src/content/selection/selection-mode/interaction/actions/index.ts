@@ -1,17 +1,21 @@
 import type { Selection } from '../../types';
-import type { ResizeDirection } from '../../ui';
 import {
   constrainSelection as constrainSelectionState,
-  finalizeDragSelection as finalizeDragSelectionState,
-  handleDragMove as handleDragMoveState,
-  handleResizeMove as handleResizeMoveState,
   resetToIdleState as resetToIdleStateState,
   selectElement as selectElementState,
+} from '../frame/selection';
+import { handleResizeMove as handleResizeMoveState } from '../frame/resize';
+import {
+  finalizeDragSelection as finalizeDragSelectionState,
+  handleDragMove as handleDragMoveState,
   startDragSelection as startDragSelectionState,
-  updateDragFrame as updateDragFrameState,
   updateDragSelection as updateDragSelectionState,
+} from '../selection/drag';
+import {
+  type ResizeDirection,
+  updateDragFrame as updateDragFrameState,
   updateFinalFrame as updateFinalFrameState,
-} from '../selection';
+} from '../../ui';
 
 function createResizeSelectionMoveArgs(
   args: Parameters<typeof applySelectionModeDragSelection>[0]

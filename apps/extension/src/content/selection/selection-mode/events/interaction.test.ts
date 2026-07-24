@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 
 import { expect, it, vi } from 'vitest';
-import {
-  handleSelectionModeClick,
-  handleSelectionModeMouseMove,
-  handleSelectionModeMouseDown,
-} from '.';
+import { handleSelectionModeClick } from './commands';
+import { handleSelectionModeMouseMove, handleSelectionModeMouseDown } from './pointer-handlers';
 import type { SelectionModeInteractionState } from './types';
 
 function createInteractionState(): SelectionModeInteractionState {
@@ -79,22 +76,41 @@ function createIframeSelectionFixture() {
   return { iframe, innerTarget, options, state };
 }
 
+function createSelectionModeMouseEvent({
+  clientX = 0,
+  clientY = 0,
+  path,
+  target,
+  type,
+}: {
+  clientX?: number;
+  clientY?: number;
+  path?: EventTarget[];
+  target: EventTarget;
+  type: string;
+}): MouseEvent {
+  const event = new MouseEvent(type, { cancelable: true, clientX, clientY });
+  Object.defineProperties(event, {
+    composedPath: { configurable: true, value: () => path ?? [target] },
+    target: { configurable: true, value: target },
+  });
+  vi.spyOn(event, 'preventDefault');
+  vi.spyOn(event, 'stopPropagation');
+  vi.spyOn(event, 'stopImmediatePropagation');
+  return event;
+}
+
 function createIframePointerEvent(target: HTMLIFrameElement): MouseEvent {
-  return {
+  return createSelectionModeMouseEvent({
     clientX: 18,
     clientY: 10,
     target,
-    composedPath: () => [target],
-  } as unknown as MouseEvent;
+    type: 'mousemove',
+  });
 }
 
 function createIframeClickEvent(target: HTMLIFrameElement): MouseEvent {
-  return {
-    ...createIframePointerEvent(target),
-    preventDefault: vi.fn(),
-    stopPropagation: vi.fn(),
-    stopImmediatePropagation: vi.fn(),
-  };
+  return createSelectionModeMouseEvent({ clientX: 18, clientY: 10, target, type: 'click' });
 }
 
 it('allows click-through for the shared confirm button', () => {
@@ -105,13 +121,11 @@ it('allows click-through for the shared confirm button', () => {
   target.className = 'sniptale-selection-size-confirm-button';
   host.appendChild(target);
 
-  const event = {
-    composedPath: () => [target, host],
+  const event = createSelectionModeMouseEvent({
+    path: [target, host],
     target: host,
-    preventDefault: vi.fn(),
-    stopPropagation: vi.fn(),
-    stopImmediatePropagation: vi.fn(),
-  } as unknown as MouseEvent;
+    type: 'click',
+  });
 
   handleSelectionModeClick(event, state, options);
 
@@ -127,14 +141,12 @@ it('does not start drag or resize when pressing the shared confirm button', () =
   const target = document.createElement('button');
   target.className = 'sniptale-selection-size-confirm-button';
 
-  const event = {
+  const event = createSelectionModeMouseEvent({
     clientX: 220,
     clientY: 140,
     target,
-    preventDefault: vi.fn(),
-    stopPropagation: vi.fn(),
-    stopImmediatePropagation: vi.fn(),
-  } as unknown as MouseEvent;
+    type: 'mousedown',
+  });
 
   handleSelectionModeMouseDown(event, state, options);
 
@@ -154,15 +166,13 @@ it('captures the current selection as resize start state when dragging a handle'
   target.setAttribute('data-direction', 's');
   host.appendChild(target);
 
-  const event = {
+  const event = createSelectionModeMouseEvent({
     clientX: 220,
     clientY: 240,
-    composedPath: () => [target, host],
+    path: [target, host],
     target: host,
-    preventDefault: vi.fn(),
-    stopPropagation: vi.fn(),
-    stopImmediatePropagation: vi.fn(),
-  } as unknown as MouseEvent;
+    type: 'mousedown',
+  });
 
   handleSelectionModeMouseDown(event, state, options);
 
@@ -181,14 +191,12 @@ it('starts dragging when pressing the confirmed frame body', () => {
   const target = document.createElement('div');
   target.className = 'sniptale-selection-final-frame';
 
-  const event = {
+  const event = createSelectionModeMouseEvent({
     clientX: 180,
     clientY: 120,
     target,
-    preventDefault: vi.fn(),
-    stopPropagation: vi.fn(),
-    stopImmediatePropagation: vi.fn(),
-  } as unknown as MouseEvent;
+    type: 'mousedown',
+  });
 
   handleSelectionModeMouseDown(event, state, options);
 

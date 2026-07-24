@@ -26,16 +26,25 @@ const {
   updateFinalFrameStateMock: vi.fn(),
 }));
 
-vi.mock('../selection', () => ({
+vi.mock('../frame/selection', () => ({
   constrainSelection: constrainSelectionStateMock,
-  finalizeDragSelection: finalizeDragSelectionStateMock,
-  handleDragMove: handleDragMoveStateMock,
-  handleResizeMove: handleResizeMoveStateMock,
   resetToIdleState: resetToIdleStateStateMock,
   selectElement: selectElementStateMock,
+}));
+
+vi.mock('../frame/resize', () => ({
+  handleResizeMove: handleResizeMoveStateMock,
+}));
+
+vi.mock('../selection/drag', () => ({
+  finalizeDragSelection: finalizeDragSelectionStateMock,
+  handleDragMove: handleDragMoveStateMock,
   startDragSelection: startDragSelectionStateMock,
-  updateDragFrame: updateDragFrameStateMock,
   updateDragSelection: updateDragSelectionStateMock,
+}));
+
+vi.mock('../../ui', () => ({
+  updateDragFrame: updateDragFrameStateMock,
   updateFinalFrame: updateFinalFrameStateMock,
 }));
 

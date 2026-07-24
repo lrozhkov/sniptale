@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { constrainSelection, selectElement } from '.';
+import { constrainSelection, selectElement } from './selection';
 
 const originalWindow = globalThis.window;
 

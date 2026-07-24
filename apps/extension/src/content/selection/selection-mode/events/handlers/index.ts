@@ -2,14 +2,13 @@ import { getContentEventTargetElement } from '../../../../platform/dom-host';
 import { resolveIframeEventTarget } from '../../../../platform/frame';
 import { logSelectionModeRuntime } from '../../diag';
 import type { SelectionModeInteractionState } from '../types';
+import { handleSelectionModeClick, handleSelectionModeKeyDown } from '../commands';
 import {
-  handleSelectionModeClick,
-  handleSelectionModeKeyDown,
   handleSelectionModeMouseDown,
   handleSelectionModeMouseLeave,
   handleSelectionModeMouseMove,
   handleSelectionModeMouseUp,
-} from '..';
+} from '../pointer-handlers';
 
 type SelectionModeEventHandlersDeps = {
   cancelSelection: () => void;

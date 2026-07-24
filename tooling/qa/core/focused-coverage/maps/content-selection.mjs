@@ -20,7 +20,7 @@ export const CONTENT_SELECTION_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/content/selection/selection-mode/events/commands.test.ts',
       'apps/extension/src/content/selection/selection-mode/events/handlers/index.test.ts',
-      'apps/extension/src/content/selection/selection-mode/events/index.test.ts',
+      'apps/extension/src/content/selection/selection-mode/events/interaction.test.ts',
       'apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-down.test.ts',
       'apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-leave.test.ts',
       'apps/extension/src/content/selection/selection-mode/events/pointer-handlers/mouse-move.test.ts',
