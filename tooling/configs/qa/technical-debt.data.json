@@ -364,7 +364,6 @@
         "apps/extension/src/background/capture/editor/index.ts",
         "apps/extension/src/background/capture/full-page/capture-parts.ts",
         "apps/extension/src/background/capture/full-page/helpers.ts",
-        "apps/extension/src/background/capture/full-page/index.ts",
         "apps/extension/src/background/capture/full-page/lifecycle.ts",
         "apps/extension/src/background/capture/full-page/stitch.ts",
         "apps/extension/src/background/capture/full-page/types.ts",
@@ -446,7 +445,6 @@
         "apps/extension/src/background/capture/routing/route/download-adapter.ts",
         "apps/extension/src/background/capture/routing/route/export-adapter.ts",
         "apps/extension/src/background/capture/routing/route/gallery-adapter.ts",
-        "apps/extension/src/background/capture/routing/route/index.ts",
         "apps/extension/src/background/capture/routing/route/quick-action-adapter.ts",
         "apps/extension/src/background/capture/routing/route/screenshot-adapter.ts",
         "apps/extension/src/background/capture/routing/route/types.ts",
@@ -987,7 +985,6 @@
         "apps/extension/src/background/capture/editor/index.ts",
         "apps/extension/src/background/capture/full-page/capture-parts.ts",
         "apps/extension/src/background/capture/full-page/helpers.ts",
-        "apps/extension/src/background/capture/full-page/index.ts",
         "apps/extension/src/background/capture/full-page/lifecycle.ts",
         "apps/extension/src/background/capture/full-page/stitch.ts",
         "apps/extension/src/background/capture/full-page/types.ts",
@@ -1069,7 +1066,6 @@
         "apps/extension/src/background/capture/routing/route/download-adapter.ts",
         "apps/extension/src/background/capture/routing/route/export-adapter.ts",
         "apps/extension/src/background/capture/routing/route/gallery-adapter.ts",
-        "apps/extension/src/background/capture/routing/route/index.ts",
         "apps/extension/src/background/capture/routing/route/quick-action-adapter.ts",
         "apps/extension/src/background/capture/routing/route/screenshot-adapter.ts",
         "apps/extension/src/background/capture/routing/route/types.ts",
@@ -21382,7 +21378,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/web-snapshot.mjs",
-        "contentHash": "8f008ab014b0c2ecadb3debd4028070b8bfce9258e65b8eaf33f440be0815a5e"
+        "contentHash": "7787451b27bd0fc373cd57af09ddd8bd40a4642e06712c3e1e343928f16442f1"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",
@@ -21399,7 +21395,6 @@
         "property:testFiles[14]",
         "property:testFiles[15]",
         "property:testFiles[16]",
-        "property:testFiles[17]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
