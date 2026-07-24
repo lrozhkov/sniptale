@@ -4,7 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { PageStyleTemplate } from '@sniptale/runtime-contracts/page-style';
-import { TemplateStatusBanner, useTemplateActionRunner } from './status';
+import { ActionStatusBanner } from '../action-status-banner';
+import { useTemplateActionRunner } from './status';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -21,7 +22,7 @@ const template: PageStyleTemplate = {
 
 function Harness() {
   latest = useTemplateActionRunner();
-  return <TemplateStatusBanner status={latest.status} />;
+  return <ActionStatusBanner status={latest.status} />;
 }
 
 function renderHarness() {

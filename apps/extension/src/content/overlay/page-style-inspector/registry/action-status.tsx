@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
 import { translate } from '../../../../platform/i18n';
-import { ActionStatusBanner } from '../action-status-banner';
 import type { PageStyleInspectorActionOutcome } from '../types';
 
 type RegistryActionState = 'error' | 'pending' | 'success' | 'warning';
@@ -47,8 +46,4 @@ export function useRegistryActionRunner() {
   );
 
   return { run, status };
-}
-
-export function RegistryActionStatusBanner(props: { status: RegistryActionStatus | null }) {
-  return <ActionStatusBanner status={props.status} />;
 }

@@ -1,5 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
-import { Section } from '../fields';
+import { Section } from '../section';
 import { NumericField } from '../numeric-field';
 import { LinkedSideFields, SIDE_ORDER, createSideProperty } from '../side-fields';
 import { changedSummary, countModified, fieldState } from '../helpers';

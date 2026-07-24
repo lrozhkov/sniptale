@@ -2581,13 +2581,10 @@
         "apps/extension/src/content/overlay/page-style-inspector/property-controls/choice-fields.tsx",
         "apps/extension/src/content/overlay/page-style-inspector/property-controls/css-length.ts",
         "apps/extension/src/content/overlay/page-style-inspector/property-controls/field-shell.tsx",
-        "apps/extension/src/content/overlay/page-style-inspector/property-controls/fields.tsx",
         "apps/extension/src/content/overlay/page-style-inspector/property-controls/file-field.tsx",
         "apps/extension/src/content/overlay/page-style-inspector/property-controls/helpers.tsx",
-        "apps/extension/src/content/overlay/page-style-inspector/property-controls/image-preview.tsx",
         "apps/extension/src/content/overlay/page-style-inspector/property-controls/image-section.tsx",
         "apps/extension/src/content/overlay/page-style-inspector/property-controls/numeric-field.tsx",
-        "apps/extension/src/content/overlay/page-style-inspector/property-controls/retention-toggle.tsx",
         "apps/extension/src/content/overlay/page-style-inspector/property-controls/section.tsx",
         "apps/extension/src/content/overlay/page-style-inspector/property-controls/sections/appearance.tsx",
         "apps/extension/src/content/overlay/page-style-inspector/property-controls/sections/frame.tsx",
@@ -16640,7 +16637,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "03a7590937ee786a42ac5c1af7528e26c73bfd7bb69aef6c998cefc70a286362"
+        "contentHash": "3bb3ea7fd9641382afc18675bd221f059ccbd749d1b5c6d135e7568aa15752ff"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16683,6 +16680,9 @@
         "property:testFiles[38]",
         "property:testFiles[39]",
         "property:testFiles[4]",
+        "property:testFiles[40]",
+        "property:testFiles[41]",
+        "property:testFiles[42]",
         "property:testFiles[5]",
         "property:testFiles[6]",
         "property:testFiles[7]",

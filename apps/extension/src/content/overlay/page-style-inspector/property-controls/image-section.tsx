@@ -1,8 +1,9 @@
 import { translate } from '../../../../platform/i18n';
-import { CssTextField, Section, SelectField } from './fields';
+import { SelectField } from './choice-fields';
 import { FileField } from './file-field';
 import { changedSummary, countModified, fieldState } from './helpers';
-import { ImageSelectionPreview } from './image-preview';
+import { Section } from './section';
+import { CssTextField } from './text-fields';
 import type { PageStyleInspectorActions, PageStyleInspectorViewState } from '../types';
 
 type ImageSectionProps = {
@@ -19,6 +20,29 @@ function getObjectFitOptions() {
     { value: 'none', label: translate('content.pageStyleInspector.optionNone') },
     { value: 'scale-down', label: translate('content.pageStyleInspector.optionScaleDown') },
   ];
+}
+
+function ImageSelectionPreview(props: { state: PageStyleInspectorViewState }) {
+  const element = props.state.selection?.element;
+  if (!(element instanceof HTMLImageElement) || (!element.currentSrc && !element.src)) {
+    return null;
+  }
+
+  return (
+    <div
+      className={[
+        'relative aspect-[16/9] overflow-hidden rounded-[10px] border',
+        'border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)]',
+      ].join(' ')}
+    >
+      <img
+        alt=""
+        className="h-full w-full object-contain"
+        draggable={false}
+        src={element.currentSrc || element.src}
+      />
+    </div>
+  );
 }
 
 export function ImageSection({ actions, disabled, state }: ImageSectionProps) {

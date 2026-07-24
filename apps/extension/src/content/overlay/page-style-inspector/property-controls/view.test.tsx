@@ -111,12 +111,22 @@ afterEach(() => {
 });
 
 it('keeps image editing focused on image, frame, and appearance controls', () => {
-  renderControls(createState('image'));
+  const state = createState('image');
+  const image = state.selection?.element;
+  if (!(image instanceof HTMLImageElement)) {
+    throw new Error('Expected image selection');
+  }
+  image.src = 'https://example.test/preview.png';
+
+  renderControls(state);
 
   expect(document.body.textContent).toContain('Изображение');
   expect(document.body.textContent).toContain('Кадр');
   expect(document.body.textContent).toContain('Оформление');
   expect(document.body.textContent).not.toContain('Начертание');
+  expect(document.querySelector<HTMLImageElement>('img')?.src).toBe(
+    'https://example.test/preview.png'
+  );
 });
 
 it('keeps text editing focused on text, frame, and appearance controls', () => {

@@ -87,6 +87,43 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/overlay/auto-blur/controller/index.test.tsx'],
   },
   {
+    owner: 'content-page-style-property-fields-predecessor',
+    productionFile:
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/fields.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason:
+      'The removed property-field re-export ladder is covered by the owner surfaces that now import its contracts directly.',
+    testFiles: [
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/field-matrix.test.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/file-field.test.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/text-controls.test.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/save/panel.test.tsx',
+    ],
+  },
+  {
+    owner: 'content-page-style-image-preview-predecessor',
+    productionFile:
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/image-preview.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason:
+      'The removed single-consumer image preview is covered through the property-control composition that now owns it.',
+    testFiles: [
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
+    ],
+  },
+  {
+    owner: 'content-page-style-retention-toggle-predecessor',
+    productionFile:
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/retention-toggle.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed single-consumer retention toggle is covered through its save-panel owner.',
+    testFiles: ['apps/extension/src/content/overlay/page-style-inspector/save/panel.test.tsx'],
+  },
+  {
     owner: 'popup-export-page-content',
     productionFile: 'apps/extension/src/popup/shell/export/pages/content.tsx',
     reason:

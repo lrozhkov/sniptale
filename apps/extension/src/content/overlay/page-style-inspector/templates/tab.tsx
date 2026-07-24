@@ -1,10 +1,11 @@
 import { translate } from '../../../../platform/i18n';
+import { ActionStatusBanner } from '../action-status-banner';
 import { InspectorEmptyList, InspectorSearchInput } from '../list-controls';
 import type { PageStyleInspectorActions, PageStyleInspectorViewState } from '../types';
 import { RegistryStatusNotice } from '../registry/status';
 import { templateMatchesQuery } from './model';
 import { TemplateRow } from './row';
-import { TemplateStatusBanner, useTemplateActionRunner } from './status';
+import { useTemplateActionRunner } from './status';
 
 export function TemplatesTab(props: {
   actions: PageStyleInspectorActions;
@@ -33,7 +34,7 @@ export function TemplatesTab(props: {
         placeholder={translate('content.pageStyleInspector.searchTemplates')}
         onChange={props.actions.setTemplateQuery}
       />
-      <TemplateStatusBanner status={actionRunner.status} />
+      <ActionStatusBanner status={actionRunner.status} />
       {templates.length === 0 ? (
         <InspectorEmptyList copy={translate('content.pageStyleInspector.noTemplatesMatched')} />
       ) : (

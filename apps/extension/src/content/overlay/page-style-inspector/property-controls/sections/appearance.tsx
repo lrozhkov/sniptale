@@ -1,6 +1,7 @@
 import { translate } from '../../../../../platform/i18n';
 import { PAGE_STYLE_ASSET_KINDS } from '@sniptale/runtime-contracts/page-style';
-import { ColorField, Section } from '../fields';
+import { ColorField } from '../choice-fields';
+import { Section } from '../section';
 import {
   LinkedSideFields,
   SIDE_ORDER,

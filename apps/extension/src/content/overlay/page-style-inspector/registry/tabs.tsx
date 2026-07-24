@@ -1,9 +1,10 @@
 import { Power, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
+import { ActionStatusBanner } from '../action-status-banner';
 import { InspectorEmptyList, InspectorSearchInput } from '../list-controls';
 import type { PageStyleInspectorActions, PageStyleInspectorViewState } from '../types';
-import { RegistryActionStatusBanner, useRegistryActionRunner } from './action-status';
+import { useRegistryActionRunner } from './action-status';
 import { RegistryStatusNotice } from './status';
 export { TemplatesTab } from '../templates/tab';
 
@@ -138,7 +139,7 @@ export function RulesTab(props: {
         placeholder={translate('content.pageStyleInspector.searchRules')}
         onChange={props.actions.setRuleQuery}
       />
-      <RegistryActionStatusBanner status={actionRunner.status} />
+      <ActionStatusBanner status={actionRunner.status} />
       <div className="grid max-h-[360px] gap-2 overflow-y-auto pr-1">
         {rules.map((rule) => (
           <RuleRow key={rule.id} actions={props.actions} actionRunner={actionRunner} rule={rule} />
