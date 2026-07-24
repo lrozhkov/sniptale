@@ -78,7 +78,8 @@ vi.mock('../stream', async (importOriginal) => {
   };
 });
 
-import { finalizeRecordingBootstrap, handleRecordingStartError } from './helpers';
+import { finalizeRecordingBootstrap } from './recorder';
+import { handleRecordingStartError } from './session';
 import { recordingContext } from '../context';
 import { createDurationTracker } from '../duration';
 
@@ -189,7 +190,7 @@ async function verifyUnscopedStartErrorNotification() {
   );
 }
 
-describe('offscreen-recording-start-helpers notification traces', () => {
+describe('offscreen-recording-start notification traces', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.assign(globalThis, {

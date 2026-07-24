@@ -1,6 +1,7 @@
 import { sendRuntimeMessageBestEffort } from '../runtime-messaging/best-effort';
 import { recordingContext } from './context';
-import { cleanupResources, startRecording as startRecordingImpl } from './start/index';
+import { cleanupResources } from './start/cleanup';
+import { startRecording as startRecordingImpl } from './start/index';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../platform/i18n';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';

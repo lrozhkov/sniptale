@@ -28,10 +28,12 @@ vi.mock('./start/index', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./start/index')>();
   return {
     ...actual,
-    cleanupResources: cleanupResourcesMock,
     startRecording: startRecordingImplMock,
   };
 });
+vi.mock('./start/cleanup', () => ({
+  cleanupResources: cleanupResourcesMock,
+}));
 
 vi.mock('./multi-source', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./multi-source')>();

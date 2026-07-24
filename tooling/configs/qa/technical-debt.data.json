@@ -8629,10 +8629,10 @@
         "apps/extension/src/offscreen/recording/signals/static-frame.ts",
         "apps/extension/src/offscreen/recording/start/cleanup.ts",
         "apps/extension/src/offscreen/recording/start/error-reporting.ts",
-        "apps/extension/src/offscreen/recording/start/helpers.ts",
         "apps/extension/src/offscreen/recording/start/index.ts",
         "apps/extension/src/offscreen/recording/start/mime.ts",
         "apps/extension/src/offscreen/recording/start/recorder.ts",
+        "apps/extension/src/offscreen/recording/start/session.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer-graph.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer.ts",
         "apps/extension/src/offscreen/recording/stream/index.ts",
@@ -8825,10 +8825,10 @@
         "apps/extension/src/offscreen/recording/signals/static-frame.ts",
         "apps/extension/src/offscreen/recording/start/cleanup.ts",
         "apps/extension/src/offscreen/recording/start/error-reporting.ts",
-        "apps/extension/src/offscreen/recording/start/helpers.ts",
         "apps/extension/src/offscreen/recording/start/index.ts",
         "apps/extension/src/offscreen/recording/start/mime.ts",
         "apps/extension/src/offscreen/recording/start/recorder.ts",
+        "apps/extension/src/offscreen/recording/start/session.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer-graph.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer.ts",
         "apps/extension/src/offscreen/recording/stream/index.ts",
@@ -20354,7 +20354,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs",
-        "contentHash": "26dd45e7d7b4bd10bac778c1e4cf82312e7b76090c8b4eefba9ffeadfecf8e48"
+        "contentHash": "1fa8c2779061b9385252625043540d60c23ae2fef0cd6a758659ce8fccda068a"
       },
       "consumers": [
         "tooling/qa/core/harness-freshness-step.mjs",

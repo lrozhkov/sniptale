@@ -40,15 +40,19 @@ vi.mock('../sidecar', async (importOriginal) => {
   };
 });
 
-vi.mock('./helpers', () => ({
+vi.mock('./cleanup', () => ({
   cleanupResources: cleanupResourcesMock,
+}));
+vi.mock('./recorder', () => ({
   finalizeRecordingBootstrap: finalizeRecordingBootstrapMock,
+}));
+vi.mock('./session', () => ({
   handleRecordingStartError: handleRecordingStartErrorMock,
   initializeRecordingSession: initializeRecordingSessionMock,
 }));
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { createSettings } from './helpers.test-support';
-import { cleanupResources, startRecording } from './index';
+import { startRecording } from './index';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -56,10 +60,6 @@ beforeEach(() => {
   recordingContextMock.durationTracker = durationTrackerMock;
   recordingContextMock.lifecycleState = 'starting';
   initializeSidecarRecordersMock.mockResolvedValue(undefined);
-});
-
-it('re-exports cleanupResources from the local helper seam', () => {
-  expect(cleanupResources).toBe(cleanupResourcesMock);
 });
 
 it('omits undefined optional params when delegating into prepareRecordingStream', async () => {

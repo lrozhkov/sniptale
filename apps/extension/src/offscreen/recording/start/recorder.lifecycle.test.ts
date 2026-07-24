@@ -154,6 +154,7 @@ function registerCleanFinalizeTest() {
     recordingContext.videoStream = createVideoStream();
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');
+    recordingContext.recordedChunks = [new Blob(['stale'])];
     const resolveStop = vi.fn();
     const rejectStop = vi.fn();
     recordingContext.stopRecordingResolve = resolveStop;
@@ -161,6 +162,9 @@ function registerCleanFinalizeTest() {
 
     bootstrapRecorder();
 
+    expect(recordingContext.recordedChunks).toEqual([]);
+    expect(getLastMediaRecorderInstance()?.start).toHaveBeenCalledWith(1000);
+    expect(startActiveSidecarRecordersMock).toHaveBeenCalledWith(1000);
     getLastMediaRecorderInstance()?.ondataavailable?.({ data: { size: 10 } });
     await getLastMediaRecorderInstance()?.onstop?.();
 

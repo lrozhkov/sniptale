@@ -4,6 +4,7 @@ type MediaRecorderMockInstance = {
   ondataavailable: ((event: { data?: { size: number } }) => void) | null;
   onerror: ((event: { error?: Error }) => void) | null;
   onstop: (() => Promise<void>) | null;
+  start: ReturnType<typeof vi.fn>;
 };
 
 let lastMediaRecorderInstance: MediaRecorderMockInstance | null = null;

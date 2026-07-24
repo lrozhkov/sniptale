@@ -13,8 +13,8 @@ function inventory(waves: OwnershipWave[]) {
   return `${JSON.stringify({ schemaVersion: 1, waves }, null, 2)}\n`;
 }
 
-function wave(files: string[], rule = 'facade-default-owner'): OwnershipWave {
-  return { id: `wave-${rule}`, files, rule };
+function wave(files: string[], rule = 'facade-default-owner', id = `wave-${rule}`): OwnershipWave {
+  return { id, files, rule };
 }
 
 function validateInventory({
@@ -73,6 +73,56 @@ it('accepts a retired target removal while preserving the remaining census', () 
       liveFiles: [retained],
     })
   ).toEqual([]);
+});
+
+it('accepts a one-for-one retired path replacement inside the same ownership wave', () => {
+  const retired = 'apps/extension/src/offscreen/recording/start/helpers.ts';
+  const successor = 'apps/extension/src/offscreen/recording/start/session.ts';
+
+  expect(
+    validateInventory({
+      current: inventory([wave([successor], 'no-top-level-mutable-runtime-state')]),
+      head: inventory([wave([retired], 'no-top-level-mutable-runtime-state')]),
+      liveFiles: [successor],
+    })
+  ).toEqual([]);
+});
+
+it('requires harness verification when a retired target moves across owner directories', () => {
+  const retired = 'apps/extension/src/offscreen/recording/start/helpers.ts';
+  const successor = 'apps/extension/src/offscreen/runtime/session.ts';
+
+  expect(
+    validateInventory({
+      current: inventory([wave([successor], 'no-top-level-mutable-runtime-state')]),
+      head: inventory([wave([retired], 'no-top-level-mutable-runtime-state')]),
+      liveFiles: [successor],
+    })
+  ).toMatchObject([{ rule: 'instance-ownership-inventory-addition-requires-harness' }]);
+});
+
+it('requires harness verification when a retired target is replaced by a missing successor', () => {
+  const retired = 'apps/extension/src/offscreen/recording/start/helpers.ts';
+  const missingSuccessor = 'apps/extension/src/offscreen/recording/start/missing.ts';
+
+  expect(
+    validateInventory({
+      current: inventory([wave([missingSuccessor], 'no-top-level-mutable-runtime-state')]),
+      head: inventory([wave([retired], 'no-top-level-mutable-runtime-state')]),
+    })
+  ).toMatchObject([{ rule: 'instance-ownership-inventory-addition-requires-harness' }]);
+});
+
+it('requires harness verification when an unchanged target moves between ownership waves', () => {
+  const target = 'apps/extension/src/offscreen/recording/start/session.ts';
+
+  expect(
+    validateInventory({
+      current: inventory([wave([target], 'no-top-level-mutable-runtime-state', 'current-wave')]),
+      head: inventory([wave([target], 'no-top-level-mutable-runtime-state', 'head-wave')]),
+      liveFiles: [target],
+    })
+  ).toMatchObject([{ rule: 'instance-ownership-inventory-addition-requires-harness' }]);
 });
 
 it('rejects live target removal and census collapse', () => {

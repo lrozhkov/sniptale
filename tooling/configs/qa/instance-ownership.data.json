@@ -95,7 +95,7 @@
       "id": "offscreen-owned-runtime-seams",
       "files": [
         "apps/extension/src/offscreen/recording/setup/desktop-media/controller.ts",
-        "apps/extension/src/offscreen/recording/start/helpers.ts",
+        "apps/extension/src/offscreen/recording/start/session.ts",
         "apps/extension/src/offscreen/project-export/service/index.ts"
       ],
       "rule": "no-top-level-mutable-runtime-state"

@@ -1,11 +1,9 @@
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import type { VideoCursorCaptureMode } from '../../../features/video/project/types/interaction';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { sendRuntimeMessageBestEffort } from '../../runtime-messaging/best-effort';
 import { recordingContext } from '../context';
 import { cleanupResources } from './cleanup';
-import { finalizeRecordingBootstrap as bootstrapRecorder } from './recorder';
 import { markRecordingStartErrorReported } from './error-reporting';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingStart' });
@@ -36,34 +34,6 @@ export function initializeRecordingSession(params: {
   return resolvedRecordingId;
 }
 
-export function finalizeRecordingBootstrap({
-  resolvedRecordingId,
-  settings,
-  captureWidth,
-  captureHeight,
-  cursorCaptureMode,
-  trackSettings,
-  durationTracker,
-}: {
-  resolvedRecordingId: string;
-  settings: VideoRecordingSettings;
-  captureWidth: number | undefined;
-  captureHeight: number | undefined;
-  cursorCaptureMode?: VideoCursorCaptureMode | null;
-  trackSettings: MediaTrackSettings;
-  durationTracker: typeof recordingContext.durationTracker;
-}) {
-  bootstrapRecorder({
-    resolvedRecordingId,
-    settings,
-    captureWidth,
-    captureHeight,
-    ...(cursorCaptureMode === undefined ? {} : { cursorCaptureMode }),
-    trackSettings,
-    durationTracker,
-  });
-}
-
 export function handleRecordingStartError(error: unknown, recordingId?: string) {
   const scopedRecordingId = recordingId ?? recordingContext.currentRecordingId ?? undefined;
   const payload =
@@ -92,5 +62,3 @@ export function handleRecordingStartError(error: unknown, recordingId?: string) 
   cleanupResources();
   return markRecordingStartErrorReported(error);
 }
-
-export { cleanupResources } from './cleanup';

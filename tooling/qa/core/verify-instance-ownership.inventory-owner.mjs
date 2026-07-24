@@ -138,18 +138,23 @@ function readCurrentInventory(root) {
 
 function readHeadInventory(headSourceResolver) {
   const jsonSource = headSourceResolver(INSTANCE_OWNERSHIP_INVENTORY);
-  if (jsonSource != null) return parseInventoryJson(jsonSource);
+  if (jsonSource != null) return { ...parseInventoryJson(jsonSource), sourceKind: 'json' };
   const legacySource = headSourceResolver(LEGACY_INSTANCE_OWNERSHIP_SOURCE);
   if (legacySource == null) return null;
   const sourceFile = createSourceFile(LEGACY_INSTANCE_OWNERSHIP_SOURCE, legacySource);
   const parsed = parseNamedDeclarativeConstArray(sourceFile, 'OWNERSHIP_WAVES');
-  return parsed == null ? null : validateInventoryValue({ schemaVersion: 1, waves: parsed.value });
+  return parsed == null
+    ? null
+    : {
+        ...validateInventoryValue({ schemaVersion: 1, waves: parsed.value }),
+        sourceKind: 'legacy',
+      };
 }
 
 function indexTargets(waves) {
   return new Map(
     waves.flatMap((wave) =>
-      wave.files.map((file) => [`${wave.rule}:${file}`, { file, rule: wave.rule }])
+      wave.files.map((file) => [`${wave.rule}:${file}`, { file, rule: wave.rule, waveId: wave.id }])
     )
   );
 }
@@ -158,9 +163,43 @@ function isLiveTarget(root, file) {
   return file.startsWith('@') || fs.existsSync(path.join(root, file));
 }
 
-function collectPopulationViolations(currentWaves, headWaves, root) {
+function collectRetiredPathReplacementKeys(currentTargets, headTargets, root) {
+  const retiredTargets = [...headTargets.entries()].filter(
+    ([key, target]) => !currentTargets.has(key) && !isLiveTarget(root, target.file)
+  );
+  const consumedRetiredKeys = new Set();
+  const replacementKeys = new Set();
+
+  for (const [key, target] of currentTargets) {
+    if (headTargets.has(key) || !isLiveTarget(root, target.file)) continue;
+    const replacement = retiredTargets.find(
+      ([retiredKey, retiredTarget]) =>
+        !consumedRetiredKeys.has(retiredKey) &&
+        retiredTarget.rule === target.rule &&
+        retiredTarget.waveId === target.waveId &&
+        path.dirname(retiredTarget.file) === path.dirname(target.file)
+    );
+    if (!replacement) continue;
+    consumedRetiredKeys.add(replacement[0]);
+    replacementKeys.add(key);
+  }
+
+  return replacementKeys;
+}
+
+function collectPopulationViolations(
+  currentWaves,
+  headWaves,
+  root,
+  { compareWaveIds = true } = {}
+) {
   const currentTargets = indexTargets(currentWaves);
   const headTargets = indexTargets(headWaves);
+  const retiredPathReplacementKeys = collectRetiredPathReplacementKeys(
+    currentTargets,
+    headTargets,
+    root
+  );
   const issues = [];
   if (headTargets.size > 0 && currentTargets.size === 0) {
     issues.push(
@@ -181,7 +220,17 @@ function collectPopulationViolations(currentWaves, headWaves, root) {
     }
   }
   for (const [key, target] of currentTargets) {
-    if (!headTargets.has(key)) {
+    const headTarget = headTargets.get(key);
+    if (compareWaveIds && headTarget != null && headTarget.waveId !== target.waveId) {
+      issues.push(
+        violation(
+          'instance-ownership-inventory-addition-requires-harness',
+          `Moving ${target.rule} target between ownership waves requires harness verification: ${target.file}.`
+        )
+      );
+      continue;
+    }
+    if (!headTargets.has(key) && !retiredPathReplacementKeys.has(key)) {
       issues.push(
         violation(
           'instance-ownership-inventory-addition-requires-harness',
@@ -216,5 +265,7 @@ export function collectInstanceOwnershipInventoryViolations({
       ),
     ];
   }
-  return collectPopulationViolations(current.waves, head.waves, root);
+  return collectPopulationViolations(current.waves, head.waves, root, {
+    compareWaveIds: head.sourceKind === 'json',
+  });
 }
