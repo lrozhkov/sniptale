@@ -25,3 +25,8 @@ export function attachBlurRenderer(
   };
   object.sniptaleBlurRenderAttached = true;
 }
+
+export function refreshBlurRendering(object: BlurRuntimeObject): void {
+  object.dirty = true;
+  object.canvas?.requestRenderAll();
+}

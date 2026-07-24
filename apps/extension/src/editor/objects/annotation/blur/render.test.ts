@@ -21,8 +21,7 @@ vi.mock('./effects', () => ({
   drawSolidBlur: mocks.drawSolidBlurMock,
 }));
 
-import { attachBlurRenderer } from './render/attach';
-import { refreshBlurRendering } from './render/refresh';
+import { attachBlurRenderer, refreshBlurRendering } from './render/lifecycle';
 import type { BlurRuntimeObject } from './types';
 
 function createObject(): BlurRuntimeObject {

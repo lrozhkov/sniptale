@@ -2,7 +2,7 @@
 
 import { beforeEach, expect, it, vi } from 'vitest';
 
-import { captureBlurBackdrop } from './backdrop';
+import { captureBlurBackdrop } from './backdrop/capture';
 import type { BlurRuntimeObject } from './types';
 
 function installCanvasElementMock(backdropContext: CanvasRenderingContext2D) {

@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { clipBlurArea, resolveBlurRenderArea } from './area';
 import { renderBlurFrame } from './frame';
-import { refreshBlurRendering } from './refresh';
+import { refreshBlurRendering } from './lifecycle';
 
 function createContext() {
   return {

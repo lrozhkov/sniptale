@@ -1,6 +1,11 @@
 import type { BlurSettings } from '../../../../../features/highlighter/contracts';
 import type { BlurRuntimeObject } from '../types';
-import type { BlurRenderArea } from './types';
+
+type BlurRenderArea = {
+  height: number;
+  radius: number;
+  width: number;
+};
 
 export function resolveBlurRenderArea(
   object: BlurRuntimeObject,

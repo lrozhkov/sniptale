@@ -173,6 +173,29 @@ export const EDITOR_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'editor-blur-render-lifecycle',
+    productionPrefix: 'apps/extension/src/editor/objects/annotation/blur/render/',
+    reason: 'Blur rendering is covered by lifecycle, owner, and public rendering suites.',
+    testFiles: [
+      'apps/extension/src/editor/objects/annotation/blur-rendering.test.ts',
+      'apps/extension/src/editor/objects/annotation/blur/render.test.ts',
+      'apps/extension/src/editor/objects/annotation/blur/render/owners.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-blur-backdrop-capture',
+    productionPrefix: 'apps/extension/src/editor/objects/annotation/blur/backdrop/',
+    reason: 'Blur backdrop capture is covered by bounds, canvas, capture, and render integration.',
+    testFiles: [
+      'apps/extension/src/editor/objects/annotation/blur/backdrop.test.ts',
+      'apps/extension/src/editor/objects/annotation/blur/backdrop/bounds.test.ts',
+      'apps/extension/src/editor/objects/annotation/blur/backdrop/canvas.test.ts',
+      'apps/extension/src/editor/objects/annotation/blur/backdrop/canvas/owners.test.ts',
+      'apps/extension/src/editor/objects/annotation/blur/backdrop/capture.test.ts',
+      'apps/extension/src/editor/objects/annotation/blur/render.test.ts',
+    ],
+  },
+  {
     owner: 'editor-magnet-manager',
     productionFile: 'apps/extension/src/editor/controller/magnet/manager.ts',
     reason: 'Magnet manager behavior is covered by focused manager tests.',
