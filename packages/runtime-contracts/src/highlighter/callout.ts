@@ -5,6 +5,11 @@ export type CalloutSide = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 export type CalloutVariant = 'bubble' | 'rect' | 'text-only';
 export type CalloutFontFamily = 'sans' | 'serif' | 'mono';
 
+export interface CalloutManualPlacement {
+  centerOffsetX: number;
+  centerOffsetY: number;
+}
+
 export interface CalloutSettings {
   enabled: boolean;
   htmlContent: string;
@@ -18,4 +23,8 @@ export interface CalloutSettings {
   fontWeight: 'normal' | 'bold';
   fontSize: number;
   maxWidth: number;
+  manualPlacement?: CalloutManualPlacement | undefined;
+  tailBasePosition?: number | undefined;
+  tailBaseWidth?: number | undefined;
+  tailFramePosition?: number | undefined;
 }

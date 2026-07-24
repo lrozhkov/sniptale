@@ -5,9 +5,9 @@ import {
   getAnchorPosition,
   getCalloutPosition,
   getPreferredSideFromAnchor,
-  getTailOffset,
   pickBestSide,
 } from './utils';
+import { getDynamicTailState, type ConnectorSide } from './dynamic-tail';
 
 type RegionRect = { x: number; y: number; width: number; height: number };
 
@@ -17,6 +17,7 @@ export function getCalloutLayoutState(args: {
   isEditing: boolean;
   settings: CalloutSettings;
   zIndex: number;
+  previousConnectorSide?: ConnectorSide;
 }) {
   const anchorPos = getAnchorPosition(args.settings.anchor, args.frameRect);
   const effectiveDimensions =
@@ -31,31 +32,58 @@ export function getCalloutLayoutState(args: {
     args.settings.side === 'auto'
       ? pickBestSide(anchorPos, effectiveDimensions, args.settings.tailSize, preferredSide)
       : args.settings.side;
-  const calloutPos =
-    args.dimensions.width > 0 && args.dimensions.height > 0
-      ? getCalloutPosition(resolvedSide, anchorPos, args.dimensions, args.settings.tailSize)
-      : getCalloutPosition(resolvedSide, anchorPos, effectiveDimensions, args.settings.tailSize);
-  const dimensionsForTail =
+  const positionDimensions =
     args.dimensions.width > 0 && args.dimensions.height > 0 ? args.dimensions : effectiveDimensions;
-  const tailOffset =
-    args.settings.variant === 'bubble'
-      ? getTailOffset(
-          resolvedSide,
-          anchorPos,
-          calloutPos,
-          dimensionsForTail,
-          args.settings.tailSize
-        )
-      : 0;
+  const calloutPos = args.settings.manualPlacement
+    ? getManualCalloutPosition(args.frameRect, positionDimensions, args.settings.manualPlacement)
+    : getCalloutPosition(resolvedSide, anchorPos, positionDimensions, args.settings.tailSize);
   const effectiveZIndex = args.isEditing ? 2147483647 : args.zIndex;
+  const dynamicTail =
+    args.settings.variant === 'bubble'
+      ? getDynamicTailState({
+          anchorPoint: anchorPos,
+          bubbleRect: { ...calloutPos, ...positionDimensions },
+          frameRect: args.frameRect,
+          ...(args.settings.tailBasePosition === undefined
+            ? {}
+            : { tailBasePosition: args.settings.tailBasePosition }),
+          ...(args.settings.tailBaseWidth === undefined
+            ? {}
+            : { tailBaseWidth: args.settings.tailBaseWidth }),
+          ...(args.settings.tailFramePosition === undefined
+            ? {}
+            : { tailFramePosition: args.settings.tailFramePosition }),
+          tailSize: args.settings.tailSize,
+          ...(args.settings.manualPlacement ? {} : { preferredSide: resolvedSide }),
+          ...(args.previousConnectorSide ? { previousSide: args.previousConnectorSide } : {}),
+        })
+      : null;
 
   return {
     effectiveZIndex,
     resolvedSide,
-    tailOffset,
+    dynamicTail,
+    calloutPos,
+    calloutDimensions: positionDimensions,
     wrapperStyle: getCalloutWrapperStyle(args.settings, calloutPos, effectiveZIndex),
     cloudStyle: getCalloutCloudStyle(args.settings, args.isEditing),
     editableStyle: getCalloutEditableStyle(args.isEditing),
+  };
+}
+
+function getManualCalloutPosition(
+  frameRect: RegionRect,
+  dimensions: { width: number; height: number },
+  placement: NonNullable<CalloutSettings['manualPlacement']>
+) {
+  const margin = 8;
+  const desiredX =
+    frameRect.x + frameRect.width / 2 + placement.centerOffsetX - dimensions.width / 2;
+  const desiredY =
+    frameRect.y + frameRect.height / 2 + placement.centerOffsetY - dimensions.height / 2;
+  return {
+    x: Math.max(margin, Math.min(desiredX, window.innerWidth - dimensions.width - margin)),
+    y: Math.max(margin, Math.min(desiredY, window.innerHeight - dimensions.height - margin)),
   };
 }
 
@@ -94,15 +122,16 @@ function getCalloutCloudStyle(settings: CalloutSettings, isEditing: boolean): CS
     lineHeight: 1.4,
     cursor: isEditing ? 'text' : 'pointer',
     isolation: 'isolate',
+    zIndex: 1,
     overflow: 'visible',
     transition: 'transform 0.1s ease-out',
   };
 }
 
-function getCalloutEditableStyle(isEditing: boolean): CSSProperties {
+function getCalloutEditableStyle(_isEditing: boolean): CSSProperties {
   return {
     outline: 'none',
-    minHeight: isEditing ? 24 : 'auto',
+    minHeight: 'auto',
     wordWrap: 'break-word',
     whiteSpace: 'pre-wrap',
   };

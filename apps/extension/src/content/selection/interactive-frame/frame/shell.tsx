@@ -11,13 +11,14 @@ interface InteractiveFrameFrameShellProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   frameStyle: React.CSSProperties;
   frameZIndex: number;
-  state: 'idle' | 'hover' | 'editing';
+  state: import('../../../../features/highlighter/contracts').FrameState;
+  isResizeHovered: boolean;
   borderColor: string;
   borderWidth: number;
   borderShadow?: NonNullable<FrameData['borderSettings']>['shadow'];
   tempFrame: FrameData;
-  handleMouseDown: (event: React.MouseEvent) => void;
-  handleResizeStart: (event: React.MouseEvent, direction: ResizeDirection) => void;
+  handleMouseDown: (event: React.PointerEvent) => void;
+  handleResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 }
 
 /** Renders the fixed frame container, resize handles, and optional step badge. */
@@ -31,7 +32,7 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
       <div
         ref={props.frameRef as React.RefObject<HTMLDivElement>}
         className="sniptale-interactive-frame"
-        onMouseDown={props.handleMouseDown}
+        onPointerDown={props.handleMouseDown}
         style={{
           ...props.frameStyle,
           position: 'relative',
@@ -42,8 +43,10 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
       >
         <InteractiveFrameResizeHandles
           state={props.state}
+          isResizeHovered={props.isResizeHovered}
           tempFrame={props.tempFrame}
           borderColor={props.borderColor}
+          borderWidth={props.borderWidth}
           onResizeStart={props.handleResizeStart}
         />
         {props.frame.stepBadge?.enabled && props.frame.stepBadge.value && (

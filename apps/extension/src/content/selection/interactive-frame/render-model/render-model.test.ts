@@ -93,6 +93,24 @@ function expectEditingBlueSelectionBorder() {
   expect(display.frameZIndex).toBe(2147483644);
 }
 
+function expectResizingKeepsInstalledBorder() {
+  const frame: FrameData = {
+    ...baseFrame,
+    borderSettings: { ...baseFrame.borderSettings!, color: '#f97316' },
+  };
+  const display = getInteractiveFrameDisplay({
+    frame,
+    currentFrame: frame,
+    effectMode: 'border',
+    state: 'resizing',
+    zIndex: 3,
+  });
+
+  expect(display.borderColor).toBe('#f97316');
+  expect(display.borderWidth).toBe(5);
+  expect(display.frameStyle.border).toBe('5px dashed rgba(249, 115, 22, 0.4)');
+}
+
 describe('interactive-frame render model', () => {
   it('builds border display from frame settings in idle mode', expectIdleBorderDisplay);
   it(
@@ -102,5 +120,9 @@ describe('interactive-frame render model', () => {
   it(
     'uses the fixed blue selection border while editing even in blur mode',
     expectEditingBlueSelectionBorder
+  );
+  it(
+    'keeps the installed frame visual during transient resize',
+    expectResizingKeepsInstalledBorder
   );
 });

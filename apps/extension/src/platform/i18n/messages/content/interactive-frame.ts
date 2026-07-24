@@ -37,6 +37,30 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Редактировать',
     en: 'Edit',
   },
+  decreaseFrame: {
+    ru: 'Уменьшить рамку на 5 px с каждой стороны',
+    en: 'Shrink frame by 5 px on each side',
+  },
+  increaseFrame: {
+    ru: 'Увеличить рамку на 5 px с каждой стороны',
+    en: 'Expand frame by 5 px on each side',
+  },
+  moveComment: {
+    ru: 'Переместить комментарий',
+    en: 'Move comment',
+  },
+  moveCommentTail: {
+    ru: 'Изменить ширину основания указателя: начальная точка',
+    en: 'Adjust pointer base width: start point',
+  },
+  moveCommentTailBaseEnd: {
+    ru: 'Изменить ширину основания указателя: конечная точка',
+    en: 'Adjust pointer base width: end point',
+  },
+  moveCommentTailEnd: {
+    ru: 'Сместить конец указателя вдоль границы рамки',
+    en: 'Move the pointer end along the frame edge',
+  },
   deleteButton: {
     ru: 'Удалить (Delete)',
     en: 'Delete (Delete)',

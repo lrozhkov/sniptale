@@ -3,7 +3,17 @@ import {
   ProductGlassToolbarButton,
   ProductGlassToolbarDivider,
 } from '@sniptale/ui/product-glass-toolbar';
-import { Droplet, Focus, ListOrdered, MessageSquare, Pencil, Square, Trash2 } from 'lucide-react';
+import {
+  Droplet,
+  Focus,
+  ListOrdered,
+  MessageSquare,
+  Minus,
+  Pencil,
+  Plus,
+  Square,
+  Trash2,
+} from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { InteractiveFrameToolbarProps } from './types';
 
@@ -104,10 +114,30 @@ export function InteractiveFrameToolbarActionButtons(props: {
   handleButtonMouseDown: (event: React.MouseEvent) => void;
   handleEditClick: (event: React.MouseEvent) => void;
   handleDeleteClick: (event: React.MouseEvent) => void;
+  handleDecreaseClick: (event: React.MouseEvent) => void;
+  handleIncreaseClick: (event: React.MouseEvent) => void;
+  canDecrease: boolean;
 }) {
   return (
     <>
       <ProductGlassToolbarDivider />
+      <ProductGlassToolbarButton
+        onClick={props.handleDecreaseClick}
+        onMouseDown={props.handleButtonMouseDown}
+        disabled={!props.canDecrease}
+        title={translate('content.interactiveFrame.decreaseFrame')}
+        aria-label={translate('content.interactiveFrame.decreaseFrame')}
+      >
+        <Minus size={18} />
+      </ProductGlassToolbarButton>
+      <ProductGlassToolbarButton
+        onClick={props.handleIncreaseClick}
+        onMouseDown={props.handleButtonMouseDown}
+        title={translate('content.interactiveFrame.increaseFrame')}
+        aria-label={translate('content.interactiveFrame.increaseFrame')}
+      >
+        <Plus size={18} />
+      </ProductGlassToolbarButton>
       <ProductGlassToolbarButton
         onClick={props.handleEditClick}
         onMouseDown={props.handleButtonMouseDown}

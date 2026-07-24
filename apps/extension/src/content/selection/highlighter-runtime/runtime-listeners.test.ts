@@ -26,21 +26,14 @@ const iframeListenerMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('../../platform/frame', () => ({
+vi.mock('../../platform/frame', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/frame')>()),
   addEventListenerToAllWindowsDynamic: iframeListenerMocks.addEventListenerToAllWindowsDynamicMock,
   addScrollListenersToAllWindows: iframeListenerMocks.addScrollListenersToAllWindowsMock,
 }));
 
 import { registerHighlighterRuntimeListeners } from './runtime-listeners';
-
-function createHoverControllerStub() {
-  return {
-    handleClick: vi.fn(),
-    handleMouseLeave: vi.fn(),
-    handleMouseMove: vi.fn(),
-    hideHoverOverlay: vi.fn(),
-  };
-}
+import { createHoverControllerStub } from './controller.test-support';
 
 beforeEach(() => {
   iframeListenerMocks.cleanupFns.length = 0;
@@ -55,7 +48,7 @@ describe('registerHighlighterRuntimeListeners', () => {
     const disableHighlighterMode = vi.fn();
     const cleanup = registerHighlighterRuntimeListeners({
       disableHighlighterMode,
-      hoverController: hoverController as never,
+      hoverController,
       isAnyFrameEditing: () => false,
     });
 
@@ -74,6 +67,21 @@ describe('registerHighlighterRuntimeListeners', () => {
       hoverController.handleClick,
       { capture: true }
     );
+    expect(iframeListenerMocks.addEventListenerToAllWindowsDynamicMock).toHaveBeenCalledWith(
+      'pointerdown',
+      hoverController.handlePointerDown,
+      { capture: true }
+    );
+    expect(iframeListenerMocks.addEventListenerToAllWindowsDynamicMock).toHaveBeenCalledWith(
+      'pointermove',
+      hoverController.handlePointerMove,
+      { capture: true }
+    );
+    expect(iframeListenerMocks.addEventListenerToAllWindowsDynamicMock).toHaveBeenCalledWith(
+      'pointerup',
+      hoverController.handlePointerUp,
+      { capture: true }
+    );
     expect(iframeListenerMocks.addScrollListenersToAllWindowsMock).toHaveBeenCalledTimes(1);
     expect(iframeListenerMocks.addEventListenerToAllWindowsDynamicMock).toHaveBeenCalledWith(
       'keydown',
@@ -83,7 +91,25 @@ describe('registerHighlighterRuntimeListeners', () => {
 
     cleanup();
 
-    expect(iframeListenerMocks.cleanupFns).toHaveLength(5);
+    expect(iframeListenerMocks.cleanupFns).toHaveLength(9);
     expect(iframeListenerMocks.cleanupFns.every((fn) => fn.mock.calls.length === 1)).toBe(true);
+  });
+
+  it('cancels drawing and hover state together when the pointer leaves the viewport', () => {
+    const hoverController = createHoverControllerStub();
+    const cleanup = registerHighlighterRuntimeListeners({
+      disableHighlighterMode: vi.fn(),
+      hoverController,
+      isAnyFrameEditing: () => false,
+    });
+    const mouseLeave = iframeListenerMocks.registrations.find(
+      (registration) => registration.event === 'mouseleave'
+    );
+
+    mouseLeave?.handler(new MouseEvent('mouseleave'));
+
+    expect(hoverController.cancelDrawing).toHaveBeenCalledWith('mouseleave');
+    expect(hoverController.handleMouseLeave).toHaveBeenCalledOnce();
+    cleanup();
   });
 });

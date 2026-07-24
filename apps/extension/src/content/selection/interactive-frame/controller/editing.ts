@@ -17,6 +17,8 @@ interface UseInteractiveFrameEditingParams {
   containerRef: React.RefObject<HTMLDivElement | null>;
   frameId: string;
   effectMode: EffectMode;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
+  onUpdate: (frame: FrameData) => void;
 }
 
 export function useInteractiveFrameEditing({
@@ -26,42 +28,60 @@ export function useInteractiveFrameEditing({
   containerRef,
   frameId,
   effectMode,
+  setState,
+  onUpdate,
 }: UseInteractiveFrameEditingParams): {
-  handleMouseDown: (event: React.MouseEvent) => void;
-  handleResizeStart: (event: React.MouseEvent, direction: ResizeDirection) => void;
+  abortPointerSession: () => boolean;
+  handleMouseDown: (event: React.PointerEvent) => void;
+  handleResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 } {
   const session = useInteractiveFrameSessionState(tempFrame, effectMode, state);
-  useInteractiveFrameEditingLifecycle({
+  const { activity, current, origin } = session.pointer;
+  const abortPointerSession = useInteractiveFrameEditingLifecycle({
     tempFrame,
     effectMode,
     state,
-    tempFrameRef: session.tempFrameRef,
-    effectModeRef: session.effectModeRef,
+    tempFrameRef: current.tempFrameRef,
+    effectModeRef: current.effectModeRef,
     stateRef: session.stateRef,
     containerRef,
     frameId,
     setTempFrame,
-    isDraggingRef: session.isDraggingRef,
-    isResizingRef: session.isResizingRef,
-    resizeDirectionRef: session.resizeDirectionRef,
-    startXRef: session.startXRef,
-    startYRef: session.startYRef,
-    startFrameRef: session.startFrameRef,
+    isDraggingRef: activity.isDraggingRef,
+    isResizingRef: activity.isResizingRef,
+    resizeDirectionRef: activity.resizeDirectionRef,
+    startXRef: origin.startXRef,
+    startYRef: origin.startYRef,
+    startFrameRef: origin.startFrameRef,
+    pointerIdRef: activity.pointerIdRef,
+    resizeOriginStateRef: activity.resizeOriginStateRef,
+    resizeRafIdRef: activity.resizeRafIdRef,
+    latestResizeSampleRef: activity.latestResizeSampleRef,
+    setState,
+    onUpdate,
   });
   const { handleMouseDown, handleResizeStart } = useInteractiveFrameEditingHandlers(
     createInteractiveFrameHandlerConfig({
       state,
-      isDraggingRef: session.isDraggingRef,
-      isResizingRef: session.isResizingRef,
-      resizeDirectionRef: session.resizeDirectionRef,
-      startXRef: session.startXRef,
-      startYRef: session.startYRef,
-      startFrameRef: session.startFrameRef,
-      tempFrameRef: session.tempFrameRef,
+      isDraggingRef: activity.isDraggingRef,
+      isResizingRef: activity.isResizingRef,
+      resizeDirectionRef: activity.resizeDirectionRef,
+      startXRef: origin.startXRef,
+      startYRef: origin.startYRef,
+      startFrameRef: origin.startFrameRef,
+      tempFrameRef: current.tempFrameRef,
+      pointerIdRef: activity.pointerIdRef,
+      resizeOriginStateRef: activity.resizeOriginStateRef,
+      resizeRafIdRef: activity.resizeRafIdRef,
+      latestResizeSampleRef: activity.latestResizeSampleRef,
+      stateRef: session.stateRef,
+      setState,
+      setTempFrame,
     })
   );
 
   return {
+    abortPointerSession,
     handleMouseDown,
     handleResizeStart,
   };

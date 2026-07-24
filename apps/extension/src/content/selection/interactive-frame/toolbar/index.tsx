@@ -12,7 +12,12 @@ export function InteractiveFrameToolbar(
 ): React.ReactElement | null {
   useAppLocale();
   const portalTheme = useContentPortalTheme();
-  if (props.state === 'editing' || props.state === 'idle' || !isHighlighterEnabled()) {
+  if (
+    props.state === 'editing' ||
+    props.state === 'resizing' ||
+    props.state === 'idle' ||
+    !isHighlighterEnabled()
+  ) {
     return null;
   }
 
@@ -22,6 +27,7 @@ export function InteractiveFrameToolbar(
     <InteractiveFrameToolbarPortal
       portalTheme={portalTheme}
       toolbarCoords={props.toolbarCoords}
+      frameRect={props.frame}
       onWrapperMouseDown={surfaceHandlers.onWrapperMouseDown}
       onWrapperClick={surfaceHandlers.onWrapperClick}
       onToolbarMouseDown={surfaceHandlers.onToolbarMouseDown}

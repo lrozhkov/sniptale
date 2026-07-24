@@ -36,6 +36,7 @@ export interface InteractiveFrameFloatingUiProps {
   handleSave: () => void;
   handleCancel: () => void;
   handleDelete: () => void;
+  onUpdate: (frame: FrameData) => void;
 }
 
 /** Renders floating toolbar, size panel, and overlays for the interactive frame. */
@@ -65,6 +66,7 @@ function getToolbarProps(props: InteractiveFrameFloatingUiProps) {
     handleEffectButtonClick: props.handleEffectButtonClick,
     handleStartEditing: props.handleStartEditing,
     handleDelete: props.handleDelete,
+    onUpdate: props.onUpdate,
     hideTooltip: props.hideTooltip,
   };
 }

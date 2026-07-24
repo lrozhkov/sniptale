@@ -1,24 +1,64 @@
 import { escapeCssIdentifier } from '@sniptale/platform/browser/iframe-selectors/css';
 
-export function getIframeSelector(iframe: HTMLIFrameElement): string {
+function getNthOfTypeSegment(element: Element): string {
+  const parent = element.parentElement;
+  if (!parent) return element.localName;
+  const sameTypeSiblings = Array.from(parent.children).filter(
+    (sibling) => sibling.localName === element.localName
+  );
+  return `${element.localName}:nth-of-type(${sameTypeSiblings.indexOf(element) + 1})`;
+}
+
+function isUniqueSelector(rootDocument: Document, selector: string, element: Element): boolean {
+  try {
+    const matches = rootDocument.querySelectorAll(selector);
+    return matches.length === 1 && matches[0] === element;
+  } catch {
+    return false;
+  }
+}
+
+function getScopedStructuralSelector(iframe: HTMLIFrameElement, rootDocument: Document): string {
+  const segments = [getNthOfTypeSegment(iframe)];
+  let current = iframe.parentElement;
+
+  while (current) {
+    const selector = segments.join(' > ');
+    if (isUniqueSelector(rootDocument, selector, iframe)) return selector;
+    segments.unshift(
+      current.id
+        ? `${current.localName}#${escapeCssIdentifier(current.id)}`
+        : getNthOfTypeSegment(current)
+    );
+    current = current.parentElement;
+  }
+
+  return segments.join(' > ');
+}
+
+export function getIframeSelector(
+  iframe: HTMLIFrameElement,
+  rootDocument: Document = iframe.ownerDocument
+): string {
   if (iframe.id) {
-    return `iframe#${escapeCssIdentifier(iframe.id)}`;
+    const selector = `iframe#${escapeCssIdentifier(iframe.id)}`;
+    if (isUniqueSelector(rootDocument, selector, iframe)) return selector;
   }
 
   const src = iframe.src || '';
   if (src && !src.startsWith('about:')) {
     const srcMatch = src.match(/[^/]+$/);
     if (srcMatch) {
-      return `iframe[src*="${srcMatch[0]}"]`;
+      const selector = `iframe[src*="${srcMatch[0]}"]`;
+      if (isUniqueSelector(rootDocument, selector, iframe)) return selector;
     }
   }
 
   const appCode = iframe.getAttribute('data-application-code');
   if (appCode) {
-    return `iframe[data-application-code="${appCode}"]`;
+    const selector = `iframe[data-application-code="${appCode}"]`;
+    if (isUniqueSelector(rootDocument, selector, iframe)) return selector;
   }
 
-  const iframes = document.querySelectorAll('iframe');
-  const index = Array.from(iframes).indexOf(iframe);
-  return `iframe:nth-of-type(${index + 1})`;
+  return getScopedStructuralSelector(iframe, rootDocument);
 }

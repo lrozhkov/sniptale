@@ -8,12 +8,13 @@ import type {
   Ref,
   RefObject,
 } from 'react';
-import type { AppTheme } from '../../../ui/theme';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import { resolveContentPortalTarget } from '../interactive-frame/layout/portal';
 import { resolveCalloutThemeOwner } from './dom';
-import { renderCalloutFloatingToolbar, renderCalloutTail } from './views';
+import { renderCalloutFloatingToolbar, renderDynamicCalloutTail } from './views';
+import type { getDynamicTailState } from './dynamic-tail';
+import { renderCalloutInteractionHandles, type CalloutInteractionHandleProps } from './handles';
 
 function createCalloutContentProps(props: CalloutBodyProps) {
   return {
@@ -32,23 +33,21 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
   return (
     <>
       <div
+        ref={props.wrapperRef as Ref<HTMLDivElement>}
         className="sniptale-callout"
         data-theme={props.portalTheme ?? undefined}
         style={mergeThemeScopedStyle(props.portalTheme, props.wrapperStyle)}
         onClick={props.handleClick}
         onMouseDown={(event) => event.stopPropagation()}
+        onMouseEnter={props.handleMouseEnter}
+        onMouseLeave={props.handleMouseLeave}
       >
+        {renderDynamicCalloutTail(props.dynamicTail, props.settings.bgColor)}
         <div ref={props.containerRef as Ref<HTMLDivElement>} style={props.cloudStyle}>
           <div {...createCalloutContentProps(props)} />
-          {renderCalloutTail({
-            bgColor: props.settings.bgColor,
-            resolvedSide: props.resolvedSide,
-            tailOffset: props.tailOffset,
-            tailSize: props.settings.tailSize,
-            variant: props.settings.variant,
-          })}
         </div>
       </div>
+      {renderCalloutInteractionHandles(props)}
       {renderCalloutFloatingToolbar({
         applyFormatting: props.applyFormatting,
         effectiveZIndex: props.effectiveZIndex,
@@ -61,7 +60,7 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
   );
 }
 
-type CalloutBodyProps = {
+type CalloutBodyProps = CalloutInteractionHandleProps & {
   applyFormatting: (command: string, event: MouseEvent) => void;
   cloudStyle: CSSProperties;
   contentEditableRef: RefObject<HTMLDivElement | null>;
@@ -73,13 +72,11 @@ type CalloutBodyProps = {
   handleInput: () => void;
   handleKeyDown: (event: KeyboardEvent) => void;
   handlePaste: (event: ClipboardEvent) => void;
-  isEditing: boolean;
-  portalTheme: AppTheme | null;
-  resolvedSide: 'top' | 'right' | 'bottom' | 'left';
   settings: CalloutSettings;
-  tailOffset: number;
   wrapperStyle: CSSProperties;
   containerRef: RefObject<HTMLDivElement | null>;
+  wrapperRef: RefObject<HTMLDivElement | null>;
+  dynamicTail: ReturnType<typeof getDynamicTailState> | null;
 };
 
 export function CalloutBody(props: CalloutBodyProps) {

@@ -6,14 +6,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addCalloutPopoverSettingsChangedListener } from '../../platform/page-context/frame-events';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { useCalloutSettingsPopoverState } from './state';
+import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let latestState: ReturnType<typeof useCalloutSettingsPopoverState> | null = null;
 let isOpen = true;
+let settings: CalloutSettings | undefined;
 
 function Harness() {
-  latestState = useCalloutSettingsPopoverState({ frameId: 'frame-1', isOpen });
+  latestState = useCalloutSettingsPopoverState({
+    frameId: 'frame-1',
+    isOpen,
+    ...(settings ? { settings } : {}),
+  });
   return null;
 }
 
@@ -35,6 +41,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   latestState = null;
   isOpen = true;
+  settings = undefined;
 });
 
 afterEach(() => {
@@ -74,6 +81,48 @@ describe('useCalloutSettingsPopoverState', () => {
 
     renderHarness(false);
     expect(commitTransactionSpy).toHaveBeenCalledWith('callout-settings:frame-1');
+  });
+
+  it('clears manual placement when an anchor or side is selected', () => {
+    settings = {
+      anchor: 'top-center',
+      bgColor: '#fff',
+      enabled: true,
+      fontFamily: 'sans',
+      fontSize: 14,
+      fontWeight: 'normal',
+      htmlContent: 'Comment',
+      maxWidth: 200,
+      manualPlacement: { centerOffsetX: 60, centerOffsetY: -30 },
+      tailBasePosition: 0.75,
+      tailBaseWidth: 0.2,
+      tailFramePosition: 0.25,
+      side: 'auto',
+      tailSize: 8,
+      textColor: '#111',
+      variant: 'bubble',
+    };
+    const listener = vi.fn();
+    const cleanup = addCalloutPopoverSettingsChangedListener(listener);
+    renderHarness();
+
+    act(() => latestState?.handleSettingChange('side', 'right'));
+
+    expect(listener).toHaveBeenCalledWith({
+      frameId: 'frame-1',
+      settings: {
+        side: 'right',
+        manualPlacement: undefined,
+        tailBasePosition: undefined,
+        tailBaseWidth: undefined,
+        tailFramePosition: undefined,
+      },
+    });
+    expect(latestState?.localSettings.manualPlacement).toBeUndefined();
+    expect(latestState?.localSettings.tailBasePosition).toBeUndefined();
+    expect(latestState?.localSettings.tailBaseWidth).toBeUndefined();
+    expect(latestState?.localSettings.tailFramePosition).toBeUndefined();
+    cleanup();
   });
 
   it('cancels an open history transaction when the popover unmounts mid-session', () => {

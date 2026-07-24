@@ -1,6 +1,6 @@
 import { resumeHighlighter } from '../../highlighter';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
-import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
+import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
 
 function mergeFrameEffectSettings(frame: FrameData, effectMode: EffectMode): FrameData {
   return {
@@ -16,7 +16,7 @@ export function saveInteractiveFrame(params: {
   effectMode: EffectMode;
   frame: FrameData;
   onUpdate: (frame: FrameData) => void;
-  setState: React.Dispatch<React.SetStateAction<'idle' | 'hover' | 'editing'>>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
 }) {
   resumeHighlighter();
   params.onUpdate(mergeFrameEffectSettings(params.tempFrame, params.effectMode));
@@ -30,7 +30,7 @@ export function cancelInteractiveFrameEditing(params: {
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   onUpdate: (frame: FrameData) => void;
   onCancel?: () => void;
-  setState: React.Dispatch<React.SetStateAction<'idle' | 'hover' | 'editing'>>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
 }) {
   resumeHighlighter();
   const savedFrame = params.startFrameRef.current;
@@ -44,7 +44,7 @@ export function cancelInteractiveFrameEditing(params: {
 
 export function deleteInteractiveFrame(params: {
   onDelete: () => void;
-  setState: React.Dispatch<React.SetStateAction<'idle' | 'hover' | 'editing'>>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
 }) {
   resumeHighlighter();
   params.onDelete();

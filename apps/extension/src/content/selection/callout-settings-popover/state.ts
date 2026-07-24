@@ -4,12 +4,8 @@ import { dispatchCalloutPopoverSettingsChanged } from '../../platform/page-conte
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { normalizeCalloutSettings } from './helpers';
 
-function dispatchCalloutSettingsChange(
-  frameId: string,
-  key: keyof CalloutSettings,
-  value: unknown
-) {
-  dispatchCalloutPopoverSettingsChanged({ frameId, settings: { [key]: value } });
+function dispatchCalloutSettingsChange(frameId: string, settings: Partial<CalloutSettings>) {
+  dispatchCalloutPopoverSettingsChanged({ frameId, settings });
 }
 
 function useCalloutSettingsTransaction(args: {
@@ -73,9 +69,31 @@ export function useCalloutSettingsPopoverState(args: {
   }, [args.isOpen, args.settings]);
 
   const handleSettingChange = (key: keyof CalloutSettings, value: unknown) => {
-    const nextSettings = { ...localSettings, [key]: value };
+    const resetsManualPlacement = key === 'anchor' || key === 'side';
+    const nextSettings = {
+      ...localSettings,
+      [key]: value,
+      ...(resetsManualPlacement
+        ? {
+            manualPlacement: undefined,
+            tailBasePosition: undefined,
+            tailBaseWidth: undefined,
+            tailFramePosition: undefined,
+          }
+        : {}),
+    };
     setLocalSettings(nextSettings);
-    dispatchCalloutSettingsChange(args.frameId, key, value);
+    dispatchCalloutSettingsChange(args.frameId, {
+      [key]: value,
+      ...(resetsManualPlacement
+        ? {
+            manualPlacement: undefined,
+            tailBasePosition: undefined,
+            tailBaseWidth: undefined,
+            tailFramePosition: undefined,
+          }
+        : {}),
+    });
   };
 
   return {

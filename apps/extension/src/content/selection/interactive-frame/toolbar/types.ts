@@ -16,5 +16,6 @@ export interface InteractiveFrameToolbarProps {
   handleEffectButtonClick: (mode: EffectMode) => void;
   handleStartEditing: () => void;
   handleDelete: () => void;
+  onUpdate: (frame: FrameData) => void;
   hideTooltip: (frameId: string) => void;
 }

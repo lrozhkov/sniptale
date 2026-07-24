@@ -12,12 +12,21 @@ export function useCalloutMeasureEffect(args: {
   const { containerRef, setDimensions, settingsKey } = args;
 
   useEffect(() => {
-    if (!containerRef.current) {
-      return;
-    }
-
-    const rect = containerRef.current.getBoundingClientRect();
-    setDimensions({ width: rect.width, height: rect.height });
+    const element = containerRef.current;
+    if (!element) return;
+    const measure = () => {
+      const rect = element.getBoundingClientRect();
+      setDimensions((current) =>
+        current.width === rect.width && current.height === rect.height
+          ? current
+          : { width: rect.width, height: rect.height }
+      );
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
   }, [containerRef, setDimensions, settingsKey]);
 }
 

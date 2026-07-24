@@ -1,6 +1,7 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { calculateFrameOffsetFromElement, calculateFrameViewportCoords } from '../manager/coords';
+import { updateDocumentPagePlacement } from '../../../platform/frame';
 
 const logger = createLogger({ namespace: 'ContentFrameMutationUpdate' });
 
@@ -61,8 +62,15 @@ function resolveCoordsUpdatedFrame(args: {
         h: args.newFrame.height,
       },
     });
+    const pagePlacement = args.frame.pagePlacement
+      ? updateDocumentPagePlacement(args.frame.pagePlacement, args.newFrame.x, args.newFrame.y, {
+          x: args.frame.x,
+          y: args.frame.y,
+        })
+      : null;
     return {
       ...mergeFrameOverlayState(args.frame, args.newFrame),
+      ...(pagePlacement ? { pagePlacement } : {}),
     };
   }
 

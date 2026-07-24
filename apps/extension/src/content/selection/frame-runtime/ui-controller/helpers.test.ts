@@ -18,7 +18,7 @@ vi.mock('../../highlighter', async () => {
   };
 });
 
-import { processFrameHover } from './helpers';
+import { createThrottledMouseMoveHandler, processFrameHover } from './helpers';
 
 function createFrame(): FrameData {
   return {
@@ -56,6 +56,7 @@ function createRect(args: { bottom: number; left: number; right: number; top: nu
 function processActiveFrameHover(args: { x: number; y: number }) {
   const hideTooltip = vi.fn();
   const showTooltip = vi.fn();
+  const setResizeFrame = vi.fn();
 
   processFrameHover({
     activeFrameId: 'frame-1',
@@ -63,11 +64,12 @@ function processActiveFrameHover(args: { x: number; y: number }) {
     hideTooltip,
     popoverFrameId: null,
     showTooltip,
+    setResizeFrame,
     x: args.x,
     y: args.y,
   });
 
-  return { hideTooltip, showTooltip };
+  return { hideTooltip, showTooltip, setResizeFrame };
 }
 
 beforeEach(() => {
@@ -78,6 +80,7 @@ beforeEach(() => {
 afterEach(() => {
   document.body.replaceChildren();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('processFrameHover', () => {
@@ -107,5 +110,58 @@ describe('processFrameHover', () => {
     const { hideTooltip } = processActiveFrameHover({ x: 520, y: 520 });
 
     expect(hideTooltip).toHaveBeenCalledWith('frame-1');
+  });
+
+  it('tracks resize proximity independently from the action toolbar zone', () => {
+    const { setResizeFrame } = processActiveFrameHover({ x: 300, y: 160 });
+
+    expect(setResizeFrame).toHaveBeenCalledWith('frame-1');
+  });
+
+  it('tracks resize proximity in standard cursor mode without opening the action toolbar', () => {
+    highlighterMocks.isHighlighterEnabled.mockReturnValue(false);
+    const hideTooltip = vi.fn();
+    const showTooltip = vi.fn();
+    const setResizeFrame = vi.fn();
+
+    processFrameHover({
+      activeFrameId: null,
+      frames: [createFrame()],
+      hideTooltip,
+      popoverFrameId: null,
+      showTooltip,
+      setResizeFrame,
+      x: 300,
+      y: 160,
+    });
+
+    expect(setResizeFrame).toHaveBeenCalledWith('frame-1');
+    expect(showTooltip).not.toHaveBeenCalled();
+  });
+
+  it('keeps the proximity mouse tracker active in standard cursor mode', () => {
+    highlighterMocks.isHighlighterEnabled.mockReturnValue(false);
+    const handleMouseMove = vi.fn();
+    let scheduled: FrameRequestCallback | undefined;
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        scheduled = callback;
+        return 1;
+      })
+    );
+    const handler = createThrottledMouseMoveHandler({
+      handleMouseMove,
+      lastMouseX: { current: -1 },
+      lastMouseY: { current: -1 },
+      lastProcessTime: { current: 0 },
+      rafId: { current: null },
+    });
+    const event = new MouseEvent('mousemove', { clientX: 300, clientY: 160 });
+
+    handler(event);
+    scheduled?.(0);
+
+    expect(handleMouseMove).toHaveBeenCalledWith(event, undefined);
   });
 });

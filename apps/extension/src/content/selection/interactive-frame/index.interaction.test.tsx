@@ -119,6 +119,20 @@ afterEach(() => {
 });
 
 describe('InteractiveFrame size edit interactions', () => {
+  it('applies one five-pixel expansion from the hover toolbar', () => {
+    const { frame, onUpdate } = renderFrame();
+    act(() => useFrameUIStore.getState().showTooltip(frame.id));
+
+    act(() => {
+      findToolbarButton(/Increase frame size|Увеличить рамку/).click();
+    });
+
+    expect(onUpdate).toHaveBeenCalledOnce();
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 115, y: 75, width: 330, height: 190 })
+    );
+  });
+
   it('keeps the highlighter frame visible when the width input is cleared', () => {
     const { onDelete } = renderFrame();
     const { frameContainer, widthInput } = openFrameSizeEditor();

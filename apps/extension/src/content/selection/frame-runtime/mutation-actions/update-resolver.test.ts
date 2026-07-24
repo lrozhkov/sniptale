@@ -8,6 +8,7 @@ import {
   createFrameDataFixture,
   createStepBadgeSettingsFixture,
 } from '../react/test-support';
+import { resolveDocumentPagePlacement } from '../../../platform/frame';
 import { resolveUpdatedFrame } from './update-resolver';
 
 const coordsMocks = vi.hoisted(() => ({
@@ -148,6 +149,55 @@ describe('frame-mutation-actions-update-resolver', () => {
     'preserves existing overlay state when a disconnected update omits linked-element data',
     expectResolverPreservesCalloutWithoutLinkedElement
   );
+  it('updates the authoritative page placement when a free frame is resized', () => {
+    const frame = createFrameDataFixture('free-frame', {
+      pagePlacement: { iframePath: [], pageX: 10, pageY: 20 },
+    });
+    const updated = resolveUpdatedFrame({
+      frame,
+      frameId: frame.id,
+      newFrame: { ...frame, x: 25, y: 35, width: 180, height: 140 },
+    });
+
+    expect(updated).toMatchObject({
+      x: 25,
+      y: 35,
+      width: 180,
+      height: 140,
+      pagePlacement: { iframePath: [], pageX: 25, pageY: 35 },
+    });
+  });
+  it('keeps a resized iframe placement authoritative while the iframe is inaccessible', () => {
+    const frame = createFrameDataFixture('free-frame', {
+      x: 120,
+      y: 80,
+      pagePlacement: {
+        iframePath: ['iframe#recovering-frame'],
+        pageX: 20,
+        pageY: 30,
+      },
+    });
+
+    const updated = resolveUpdatedFrame({
+      frame,
+      frameId: frame.id,
+      newFrame: { ...frame, x: 135, y: 95, width: 180, height: 140 },
+    });
+
+    expect(updated.pagePlacement).toEqual({
+      iframePath: ['iframe#recovering-frame'],
+      pageX: 35,
+      pageY: 45,
+    });
+
+    const iframe = document.createElement('iframe');
+    iframe.id = 'recovering-frame';
+    document.body.append(iframe);
+    vi.spyOn(iframe, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 50, 400, 300));
+
+    expect(resolveDocumentPagePlacement(updated.pagePlacement!)).toEqual({ x: 135, y: 95 });
+    iframe.remove();
+  });
   it(
     'recalculates frame offset when coordinates change on a connected linked element',
     expectResolverRecalculatesOffsetForConnectedCoordChanges

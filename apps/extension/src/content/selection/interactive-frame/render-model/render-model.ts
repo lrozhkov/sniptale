@@ -1,5 +1,5 @@
 import React from 'react';
-import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
+import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import {
   colorToRgba,
   resolveBorderPresetVisual,
@@ -11,10 +11,7 @@ import { getInteractiveFrameStyle } from '../layout/style';
 const HIGHLIGHT_BORDER_WIDTH = 3;
 const Z_INDEX_FRAMES = 2147483644;
 
-function resolveInteractiveFrameBorderVisual(
-  frame: FrameData,
-  state: 'idle' | 'hover' | 'editing'
-) {
+function resolveInteractiveFrameBorderVisual(frame: FrameData, state: FrameState) {
   if (state === 'editing') {
     return getSelectionFrameVisual();
   }
@@ -25,7 +22,7 @@ function resolveInteractiveFrameBorderVisual(
 function shouldShowInteractiveFrameBorder(params: {
   effectMode: EffectMode;
   frame: FrameData;
-  state: 'idle' | 'hover' | 'editing';
+  state: FrameState;
 }) {
   if (params.state === 'editing') {
     return true;
@@ -72,7 +69,7 @@ export function getInteractiveFrameDisplay(params: {
   frame: FrameData;
   currentFrame: FrameData;
   effectMode: EffectMode;
-  state: 'idle' | 'hover' | 'editing';
+  state: FrameState;
   zIndex: number;
 }) {
   const { frame, currentFrame, effectMode, state, zIndex } = params;

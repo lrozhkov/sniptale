@@ -3,8 +3,39 @@ import {
   dispatchFrameCalloutChanged,
   dispatchFrameStepBadgeChanged,
 } from '../../../platform/page-context/frame-events';
+import { MIN_FRAME_SIZE } from '../layout/portal';
 
-function stopToolbarEvent(event: React.MouseEvent) {
+const FRAME_SIZE_STEP = 5;
+
+export interface ToolbarClickEvent {
+  nativeEvent: { stopImmediatePropagation(): void };
+  preventDefault(): void;
+  stopPropagation(): void;
+}
+
+export function canDecreaseFrameSize(frame: InteractiveFrameToolbarProps['frame']) {
+  return (
+    frame.width - FRAME_SIZE_STEP * 2 >= MIN_FRAME_SIZE &&
+    frame.height - FRAME_SIZE_STEP * 2 >= MIN_FRAME_SIZE
+  );
+}
+
+export function resizeFrameByStep(
+  frame: InteractiveFrameToolbarProps['frame'],
+  direction: 'increase' | 'decrease'
+) {
+  if (direction === 'decrease' && !canDecreaseFrameSize(frame)) return frame;
+  const delta = direction === 'increase' ? FRAME_SIZE_STEP : -FRAME_SIZE_STEP;
+  return {
+    ...frame,
+    x: frame.x - delta,
+    y: frame.y - delta,
+    width: frame.width + delta * 2,
+    height: frame.height + delta * 2,
+  };
+}
+
+function stopToolbarEvent(event: ToolbarClickEvent) {
   event.preventDefault();
   event.stopPropagation();
   event.nativeEvent.stopImmediatePropagation();
@@ -21,25 +52,34 @@ export function dispatchCalloutEnable(frameId: string) {
 export function createSharedToolbarClickHandlers(props: InteractiveFrameToolbarProps) {
   return {
     handleEffectClick:
-      (mode: InteractiveFrameToolbarProps['effectMode']) => (event: React.MouseEvent) => {
+      (mode: InteractiveFrameToolbarProps['effectMode']) => (event: ToolbarClickEvent) => {
         stopToolbarEvent(event);
         props.setIsStepBadgePopoverOpen(false);
         props.setIsCalloutPopoverOpen(false);
         props.handleEffectButtonClick(mode);
       },
-    handleEditClick: (event: React.MouseEvent) => {
+    handleEditClick: (event: ToolbarClickEvent) => {
       stopToolbarEvent(event);
       props.setIsStepBadgePopoverOpen(false);
       props.setIsCalloutPopoverOpen(false);
       props.handleStartEditing();
     },
-    handleDeleteClick: (event: React.MouseEvent) => {
+    handleDeleteClick: (event: ToolbarClickEvent) => {
       stopToolbarEvent(event);
       props.setIsStepBadgePopoverOpen(false);
       props.setIsCalloutPopoverOpen(false);
       props.handleDelete();
     },
-    handleButtonMouseDown: (event: React.MouseEvent) => {
+    handleDecreaseClick: (event: ToolbarClickEvent) => {
+      stopToolbarEvent(event);
+      const nextFrame = resizeFrameByStep(props.frame, 'decrease');
+      if (nextFrame !== props.frame) props.onUpdate(nextFrame);
+    },
+    handleIncreaseClick: (event: ToolbarClickEvent) => {
+      stopToolbarEvent(event);
+      props.onUpdate(resizeFrameByStep(props.frame, 'increase'));
+    },
+    handleButtonMouseDown: (event: ToolbarClickEvent) => {
       event.preventDefault();
       event.stopPropagation();
     },

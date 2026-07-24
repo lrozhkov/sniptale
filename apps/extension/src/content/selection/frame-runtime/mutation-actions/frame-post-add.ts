@@ -12,13 +12,15 @@ import type { MutableRef } from './types';
 const logger = createLogger({ namespace: 'ContentFrameMutations' });
 
 export function applyAddedFrameSideEffects(args: {
-  element: HTMLElement;
+  element?: HTMLElement;
   frameData: FrameData;
   isAutoMode: boolean;
   linkedElementsRef: MutableRef<Map<string, HTMLElement>>;
   recalculateStepBadgesRef: MutableRef<(excludeFrameId?: string) => void>;
 }) {
-  args.linkedElementsRef.current.set(args.frameData.id, args.element);
+  if (args.element) {
+    args.linkedElementsRef.current.set(args.frameData.id, args.element);
+  }
   invalidateFrameCache();
   queueStepBadgeRecalculation(args.frameData, args.isAutoMode, args.recalculateStepBadgesRef);
   logAddedFrame(

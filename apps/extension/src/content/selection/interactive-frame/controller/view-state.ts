@@ -55,6 +55,7 @@ function useInteractiveFrameLocalState(params: {
 function useInteractiveFrameStoreState() {
   const activeFrameId = useFrameUIStore((s) => s.activeFrameId);
   const popoverFrameId = useFrameUIStore((s) => s.popoverFrameId);
+  const resizeFrameId = useFrameUIStore((s) => s.resizeFrameId);
   const openPopover = useFrameUIStore((s) => s.openPopover);
   const closePopover = useFrameUIStore((s) => s.closePopover);
   const hideTooltip = useFrameUIStore((s) => s.hideTooltip);
@@ -65,6 +66,7 @@ function useInteractiveFrameStoreState() {
     hideTooltip,
     openPopover,
     popoverFrameId,
+    resizeFrameId,
   };
 }
 
@@ -118,10 +120,12 @@ function createInteractiveFrameStoreState(params: {
   hideTooltip: FrameUIState['hideTooltip'];
   openPopover: FrameUIState['openPopover'];
   popoverFrameId: string | null;
+  resizeFrameId: string | null;
 }) {
   return {
     activeFrameId: params.activeFrameId,
     popoverFrameId: params.popoverFrameId,
+    resizeFrameId: params.resizeFrameId,
     openPopover: params.openPopover,
     closePopover: params.closePopover,
     hideTooltip: params.hideTooltip,

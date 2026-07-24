@@ -18,7 +18,7 @@ function removeSelectorTerminator(value: string): string {
 
 function readCaptureHiddenSelectors(stylesheet: string): string[] {
   const selectors: string[] = [];
-  const selectorPrefix = 'body.sniptale-capture-ui-hidden ';
+  const selectorPrefix = ':host(.sniptale-capture-ui-hidden) ';
 
   for (const line of stylesheet.split('\n')) {
     const trimmedLine = line.trim();
@@ -38,7 +38,7 @@ function readCaptureHiddenSelectors(stylesheet: string): string[] {
 const captureHiddenSelectors = readCaptureHiddenSelectors(runtimeEffectsStylesheet);
 
 function expectCaptureHiddenSelector(selector: string): void {
-  expect(captureHiddenSelectors).toContain(`body.sniptale-capture-ui-hidden ${selector}`);
+  expect(captureHiddenSelectors).toContain(`:host(.sniptale-capture-ui-hidden) ${selector}`);
 }
 
 it('hides transient app UI during screenshot capture without hiding captured annotations', () => {
@@ -54,23 +54,28 @@ it('hides transient app UI during screenshot capture without hiding captured ann
     '.sniptale-blocking-overlay',
     '.sniptale-editing-blocking-overlay',
     '.sniptale-resize-handle',
+    '.sniptale-callout-drag-handle',
+    '.sniptale-callout-tail-handle',
+    '.sniptale-free-frame-draft-portal',
     '.sniptale-quick-edit-hover',
   ].forEach(expectCaptureHiddenSelector);
 
   expect(captureHiddenSelectors).not.toContain(
-    'body.sniptale-capture-ui-hidden .sniptale-frame-container'
+    ':host(.sniptale-capture-ui-hidden) .sniptale-frame-container'
   );
   expect(captureHiddenSelectors).not.toContain(
-    'body.sniptale-capture-ui-hidden .sniptale-interactive-frame'
+    ':host(.sniptale-capture-ui-hidden) .sniptale-interactive-frame'
   );
   expect(captureHiddenSelectors).not.toContain(
-    'body.sniptale-capture-ui-hidden .sniptale-step-badge'
-  );
-  expect(captureHiddenSelectors).not.toContain('body.sniptale-capture-ui-hidden .sniptale-callout');
-  expect(captureHiddenSelectors).not.toContain(
-    'body.sniptale-capture-ui-hidden .sniptale-blur-overlay'
+    ':host(.sniptale-capture-ui-hidden) .sniptale-step-badge'
   );
   expect(captureHiddenSelectors).not.toContain(
-    'body.sniptale-capture-ui-hidden .sniptale-focus-overlay'
+    ':host(.sniptale-capture-ui-hidden) .sniptale-callout'
+  );
+  expect(captureHiddenSelectors).not.toContain(
+    ':host(.sniptale-capture-ui-hidden) .sniptale-blur-overlay'
+  );
+  expect(captureHiddenSelectors).not.toContain(
+    ':host(.sniptale-capture-ui-hidden) .sniptale-focus-overlay'
   );
 });

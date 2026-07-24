@@ -8,7 +8,7 @@ export function useInteractiveFrameSessionState(
   state: FrameState
 ) {
   return {
-    ...useInteractiveFramePointerSession(tempFrame, effectMode),
+    pointer: useInteractiveFramePointerSession(tempFrame, effectMode),
     stateRef: useRef(state),
   };
 }

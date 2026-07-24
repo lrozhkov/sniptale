@@ -83,8 +83,14 @@ function appendFrameOverlayFixture(overlayRoot: HTMLElement): void {
   const toolbar = document.createElement('div');
   toolbar.className = 'sniptale-toolbar-portal-wrapper';
   toolbar.textContent = 'Runtime toolbar';
+  const calloutHandle = document.createElement('button');
+  calloutHandle.className = 'sniptale-callout-drag-handle';
+  calloutHandle.textContent = 'Runtime callout handle';
+  const freeDraft = document.createElement('div');
+  freeDraft.className = 'sniptale-free-frame-draft-portal';
+  freeDraft.textContent = 'Runtime free-frame draft';
 
-  overlayRoot.append(framesContainer, blur, focus, callout, toolbar);
+  overlayRoot.append(framesContainer, blur, focus, callout, toolbar, calloutHandle, freeDraft);
 }
 
 function setCurrentSrc(element: Element | null, value: string): void {
@@ -155,6 +161,8 @@ function registerOverlaySnapshotTests(): void {
     expect(result.html).toContain('Prepared callout');
     expect(result.html).not.toContain('sniptale-resize-handle');
     expect(result.html).not.toContain('Runtime toolbar');
+    expect(result.html).not.toContain('Runtime callout handle');
+    expect(result.html).not.toContain('Runtime free-frame draft');
   });
 }
 

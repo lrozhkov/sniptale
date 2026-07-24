@@ -9,6 +9,7 @@ export interface InteractiveFramePopoversProps {
   frame: FrameData;
   currentFrame: FrameData;
   frameZIndex: number;
+  borderWidth: number;
   effectMode: EffectMode;
   isPopoverOpen: boolean;
   isStepBadgePopoverOpen: boolean;
@@ -95,6 +96,7 @@ function renderCalloutOverlay(props: InteractiveFramePopoversProps) {
       frame={props.frame}
       currentFrame={props.currentFrame}
       frameZIndex={props.frameZIndex}
+      borderWidth={props.borderWidth}
       isCalloutEditing={props.isCalloutEditing}
       setIsCalloutEditing={props.setIsCalloutEditing}
       setTempFrame={props.setTempFrame}

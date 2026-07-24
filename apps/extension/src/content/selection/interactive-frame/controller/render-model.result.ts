@@ -47,6 +47,7 @@ export function createInteractiveFrameRenderResult(
     toolbarCoords: runtime.toolbarCoords,
     sizePanelCoords: runtime.sizePanelCoords,
     isPopoverOpen: runtime.isPopoverOpen,
+    isResizeHovered: runtime.isResizeHovered,
     isFrameActive:
       runtime.isTooltipVisible ||
       runtime.isPopoverOpen ||

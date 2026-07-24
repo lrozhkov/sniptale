@@ -31,6 +31,7 @@ type ScreenshotControllerMockArgs = {
 const runtimeMocks = vi.hoisted(() => {
   const frameManager = {
     addFrame: vi.fn(),
+    addFreeFrame: vi.fn(),
     clearFrames: vi.fn(),
     frames: [],
     hasFrameForElement: vi.fn(() => false),
@@ -256,18 +257,29 @@ it('applies preparation viewport commands to mode state without taking screensho
   expect(runtimeMocks.handleTakeScreenshot).not.toHaveBeenCalled();
 });
 
-it('keeps frame creation and hover eligibility inside accepted host elements', () => {
+it('keeps linked and free-frame creation plus hover eligibility inside accepted host elements', () => {
   renderSurface();
-  const [addFrame, _removeFrame, _clearFrames, hasFrameForElement] =
+  const [addFrame, addFreeFrame, _removeFrame, _clearFrames, hasFrameForElement] =
     runtimeMocks.registerFrameCallbacks.mock.calls.at(-1)!;
   const acceptedTarget = iframe!.contentDocument!.createElement('button');
   const outsideTarget = document.createElement('button');
+  const freeFrame = {
+    x: 20,
+    y: 30,
+    width: 80,
+    height: 40,
+    pagePlacement: { iframePath: [], pageX: 20, pageY: 30 },
+  };
 
   addFrame(acceptedTarget);
   addFrame(outsideTarget);
+  addFreeFrame(freeFrame, acceptedTarget);
+  addFreeFrame(freeFrame, outsideTarget);
 
   expect(runtimeMocks.frameManager.addFrame).toHaveBeenCalledTimes(1);
   expect(runtimeMocks.frameManager.addFrame).toHaveBeenCalledWith(acceptedTarget);
+  expect(runtimeMocks.frameManager.addFreeFrame).toHaveBeenCalledTimes(1);
+  expect(runtimeMocks.frameManager.addFreeFrame).toHaveBeenCalledWith(freeFrame);
   expect(hasFrameForElement(acceptedTarget)).toBe(false);
   expect(hasFrameForElement(outsideTarget)).toBe(true);
 });

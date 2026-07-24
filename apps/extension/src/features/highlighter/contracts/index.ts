@@ -51,6 +51,11 @@ export interface FrameData {
   y: number;
   width: number;
   height: number;
+  pagePlacement?: {
+    iframePath: string[];
+    pageX: number;
+    pageY: number;
+  };
   linkedElementSelector?: string;
   createdBy?: 'auto-blur';
   linkedElement?: HTMLElement; // Ссылка на элемент для синхронизации при скролле
@@ -73,7 +78,13 @@ export interface FrameData {
   };
 }
 
-export type FrameState = 'idle' | 'hover' | 'editing';
+export type FrameState = 'idle' | 'hover' | 'editing' | 'resizing';
+
+export type FreeFrameInput = Pick<FrameData, 'x' | 'y' | 'width' | 'height'> & {
+  pagePlacement: NonNullable<FrameData['pagePlacement']>;
+};
+
+export type AddFreeFrameCallback = (input: FreeFrameInput, sourceElement: HTMLElement) => void;
 
 export type ResizeDirection = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 

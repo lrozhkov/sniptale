@@ -18,6 +18,7 @@ it('creates a fresh runtime state with cleared callbacks and flags', () => {
   expect(createHighlighterRuntimeState()).toEqual({
     callbacks: {
       addFrame: null,
+      addFreeFrame: null,
       clearFrames: null,
       hasFrameForElement: null,
       removeFrame: null,
@@ -34,14 +35,20 @@ it('exposes live callback and state accessors to the hover owner', () => {
   const state = createHighlighterRuntimeState();
   const addFrame = vi.fn();
   const hasFrameForElement = vi.fn();
+  const addFreeFrame = vi.fn();
   state.callbacks.addFrame = addFrame;
+  state.callbacks.addFreeFrame = addFreeFrame;
   state.callbacks.hasFrameForElement = hasFrameForElement;
   state.isModeEnabled = true;
   state.isPaused = true;
   state.isFrameEditing = true;
   state.isTooltipVisible = true;
 
-  expect(createHighlighterCallbacks(state)()).toEqual({ addFrame, hasFrameForElement });
+  expect(createHighlighterCallbacks(state)()).toEqual({
+    addFrame,
+    addFreeFrame,
+    hasFrameForElement,
+  });
   expect(createHighlighterStateGetters(state).isModeEnabled()).toBe(true);
   expect(createHighlighterStateGetters(state).isPaused()).toBe(true);
   expect(createHighlighterStateGetters(state).isFrameEditing()).toBe(true);
@@ -62,8 +69,10 @@ it('routes frame operations through registered callbacks', () => {
   const removeFrame = vi.fn();
   const clearFrames = vi.fn();
   const hasFrameForElement = vi.fn();
+  const addFreeFrame = vi.fn();
   registerHighlighterFrameCallbacks(state, {
     addFrame,
+    addFreeFrame,
     clearFrames,
     hasFrameForElement,
     removeFrame,
@@ -85,6 +94,7 @@ it('applies the shared hover teardown policy', () => {
   resetHighlighterHoverUi(hoverController);
 
   expect(hoverController.cancelPendingHoverFrame).toHaveBeenCalledTimes(1);
+  expect(hoverController.cancelDrawing).toHaveBeenCalledWith('teardown');
   expect(hoverController.clearHoverTracking).toHaveBeenCalledTimes(1);
   expect(hoverController.removeHoverOverlay).toHaveBeenCalledTimes(1);
   expect(hoverController.removeOverlayContainer).toHaveBeenCalledTimes(1);

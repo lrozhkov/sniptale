@@ -15,6 +15,7 @@ export type NavigationLockerDeps = {
   subscribeBeforeUnload: (listener: BeforeUnloadHandler) => void;
   syncNavigationLockOverlay: typeof syncNavigationLockOverlay;
   toggleBodyClass: (className: string, enabled: boolean) => void;
+  toggleContentHostClass: (className: string, enabled: boolean) => void;
   walkAllDocuments: typeof walkAllDocuments;
   unsubscribeBeforeUnload: (listener: BeforeUnloadHandler) => void;
 };

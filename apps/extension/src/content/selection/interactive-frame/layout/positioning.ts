@@ -9,14 +9,17 @@ export function calculateInteractiveFrameSizePanelPosition(frameRect: {
   return calculateContentSizeTooltipPosition({ anchorRect: frameRect });
 }
 
-export function calculateInteractiveFrameToolbarPosition(frameRect: {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}) {
-  const toolbarHeight = 45;
-  const toolbarWidth = 200;
+export function calculateInteractiveFrameToolbarPosition(
+  frameRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  },
+  toolbarSize: { width: number; height: number } = { width: 420, height: 50 }
+) {
+  const toolbarHeight = toolbarSize.height;
+  const toolbarWidth = Math.min(toolbarSize.width, Math.max(0, window.innerWidth - 16));
   const margin = 10;
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
@@ -44,9 +47,12 @@ export function calculateInteractiveFrameToolbarPosition(frameRect: {
   if (y >= frameRect.y && y < frameRect.y + frameRect.height) {
     const spaceRight = viewportWidth - frameRect.x - frameRect.width;
     if (spaceRight >= toolbarWidth + margin) {
-      x = frameRect.x + frameRect.width - toolbarWidth - margin;
+      x = frameRect.x + frameRect.width + margin;
     }
   }
+
+  x = Math.max(margin, Math.min(x, viewportWidth - toolbarWidth - margin));
+  y = Math.max(margin, Math.min(y, viewportHeight - toolbarHeight - margin));
 
   return { x, y };
 }

@@ -16,6 +16,8 @@ export function useFrameUIController({ frames, onActiveFrameChange }: UseFrameUI
   const closePopover = useFrameUIStore((state) => state.closePopover);
   const activeFrameId = useFrameUIStore((state) => state.activeFrameId);
   const popoverFrameId = useFrameUIStore((state) => state.popoverFrameId);
+  const resizeFrameId = useFrameUIStore((state) => state.resizeFrameId);
+  const setResizeFrame = useFrameUIStore((state) => state.setResizeFrame);
   const framesRef = useRef<FrameData[]>(frames);
   const activeFrameIdRef = useRef<string | null>(activeFrameId);
   const popoverFrameIdRef = useRef<string | null>(popoverFrameId);
@@ -44,14 +46,15 @@ export function useFrameUIController({ frames, onActiveFrameChange }: UseFrameUI
         popoverFrameId: popoverFrameIdRef.current,
         showTooltip,
         hideTooltip,
+        setResizeFrame,
         x: point.x,
         y: point.y,
       });
     },
-    [showTooltip, hideTooltip]
+    [showTooltip, hideTooltip, setResizeFrame]
   );
 
   useFrameUiMouseTracking({ handleMouseMove, lastMouseX, lastMouseY, lastProcessTime, rafId });
 
-  return { activeFrameId, popoverFrameId, showTooltip, hideTooltip, closePopover };
+  return { activeFrameId, popoverFrameId, resizeFrameId, showTooltip, hideTooltip, closePopover };
 }

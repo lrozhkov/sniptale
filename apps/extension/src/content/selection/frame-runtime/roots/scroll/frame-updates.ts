@@ -4,6 +4,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { invalidateFrameCache } from '../../../highlighter';
 import { applyFrameOffsetToElement, calculateFrameViewportCoords } from '../../manager/coords';
 import { shouldDropLinkedElement } from './linked-elements';
+import { resolveDocumentPagePlacement } from '../../../../platform/frame';
 
 const logger = createLogger({ namespace: 'ContentFrameScrollSync' });
 
@@ -52,7 +53,12 @@ export function syncFramePositionOnScroll({
   linkedElementsRef: MutableRefObject<Map<string, HTMLElement>>;
   setFrames: Dispatch<SetStateAction<FrameData[]>>;
 }) {
-  if (frameState === 'editing' || !linkedElement) {
+  if (frameState === 'editing' || frameState === 'resizing') {
+    return;
+  }
+
+  if (!linkedElement) {
+    syncFreeFramePosition(frame, setFrames);
     return;
   }
 
@@ -85,6 +91,17 @@ export function syncFramePositionOnScroll({
             ...nextFrameCoords,
           }
         : currentFrame
+    )
+  );
+}
+
+function syncFreeFramePosition(frame: FrameData, setFrames: Dispatch<SetStateAction<FrameData[]>>) {
+  if (!frame.pagePlacement) return;
+  const point = resolveDocumentPagePlacement(frame.pagePlacement);
+  if (!point || (frame.x === point.x && frame.y === point.y)) return;
+  setFrames((prev) =>
+    prev.map((currentFrame) =>
+      currentFrame.id === frame.id ? { ...currentFrame, x: point.x, y: point.y } : currentFrame
     )
   );
 }

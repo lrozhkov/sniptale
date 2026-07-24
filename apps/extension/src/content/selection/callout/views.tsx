@@ -5,7 +5,7 @@ import type { AppTheme } from '../../../ui/theme';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
 import { ProductGlassToolbar, ProductGlassToolbarButton } from '@sniptale/ui/product-glass-toolbar';
 import { resolveContentPortalTarget } from '../interactive-frame/layout/portal';
-import { getTailSvgState } from './utils';
+import type { getDynamicTailState } from './dynamic-tail';
 
 function getCalloutToolbarWrapperStyle(rect: DOMRect, zIndex: number): React.CSSProperties {
   return {
@@ -67,28 +67,28 @@ export function renderCalloutFloatingToolbar(props: {
   );
 }
 
-export function renderCalloutTail(props: {
-  bgColor: string;
-  resolvedSide: 'top' | 'right' | 'bottom' | 'left';
-  tailOffset: number;
-  tailSize: number;
-  variant: string;
-}) {
-  if (props.variant !== 'bubble') {
-    return null;
-  }
-
-  const tailState = getTailSvgState(props.resolvedSide, props.tailSize, props.tailOffset);
-
+export function renderDynamicCalloutTail(
+  tail: ReturnType<typeof getDynamicTailState> | null,
+  bgColor: string
+) {
+  if (!tail) return null;
   return (
     <svg
+      className="sniptale-callout-dynamic-tail"
       aria-hidden="true"
       focusable="false"
-      preserveAspectRatio="none"
-      style={tailState.style}
-      viewBox={tailState.viewBox}
+      preserveAspectRatio="xMinYMin meet"
+      style={tail.style}
+      viewBox={tail.viewBox}
     >
-      <path d={tailState.path} fill={props.bgColor} />
+      <path
+        d={tail.path}
+        fill="none"
+        pointerEvents="stroke"
+        stroke="transparent"
+        strokeWidth={18}
+      />
+      <path d={tail.path} fill={bgColor} pointerEvents="none" />
     </svg>
   );
 }

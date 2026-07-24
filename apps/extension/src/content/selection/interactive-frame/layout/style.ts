@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { FrameData } from '../../../../features/highlighter/contracts';
+import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 
 export function getInteractiveFrameStyle(params: {
   currentFrame: FrameData;
@@ -11,7 +11,7 @@ export function getInteractiveFrameStyle(params: {
   fillColor: string;
   boxShadow?: string;
   customCssStyles?: React.CSSProperties;
-  state: 'idle' | 'hover' | 'editing';
+  state: FrameState;
 }) {
   return {
     border: params.shouldShowBorder
@@ -30,7 +30,7 @@ export function getInteractiveFrameStyle(params: {
     boxSizing: 'content-box',
     margin: 0,
     padding: 0,
-    pointerEvents: params.state === 'editing' ? 'auto' : 'none',
+    pointerEvents: params.state === 'editing' || params.state === 'resizing' ? 'auto' : 'none',
     cursor: params.state === 'editing' ? 'move' : 'default',
   } satisfies React.CSSProperties;
 }
