@@ -2428,7 +2428,6 @@
         "apps/extension/src/content/overlay/ai/pick/controller/lifecycle.ts",
         "apps/extension/src/content/overlay/ai/pick/controller/mode.ts",
         "apps/extension/src/content/overlay/ai/pick/controller/submit/apply.ts",
-        "apps/extension/src/content/overlay/ai/pick/controller/submit/feedback.ts",
         "apps/extension/src/content/overlay/ai/pick/controller/submit/gate.ts",
         "apps/extension/src/content/overlay/ai/pick/controller/submit/history.ts",
         "apps/extension/src/content/overlay/ai/pick/controller/submit/index.ts",
@@ -2436,7 +2435,6 @@
         "apps/extension/src/content/overlay/ai/pick/controller/submit/payload.ts",
         "apps/extension/src/content/overlay/ai/pick/controller/submit/preconditions.ts",
         "apps/extension/src/content/overlay/ai/pick/controller/submit/request.ts",
-        "apps/extension/src/content/overlay/ai/pick/controller/submit/types.ts",
         "apps/extension/src/content/overlay/ai/pick/controller/test-support.ts",
         "apps/extension/src/content/overlay/ai/pick/controller/types.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/chrome/content-runner.ts",
@@ -16637,7 +16635,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "3bb3ea7fd9641382afc18675bd221f059ccbd749d1b5c6d135e7568aa15752ff"
+        "contentHash": "f508a685e4a369dda9acc5aeda99f80469cd4c7af815b00cc6fd1023d3a1ca86"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16683,6 +16681,8 @@
         "property:testFiles[40]",
         "property:testFiles[41]",
         "property:testFiles[42]",
+        "property:testFiles[43]",
+        "property:testFiles[44]",
         "property:testFiles[5]",
         "property:testFiles[6]",
         "property:testFiles[7]",

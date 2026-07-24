@@ -4,9 +4,20 @@ import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { applyAiResponseChanges } from './apply';
 import { canSubmitAiPickPrompt } from './preconditions';
 import { requestAiResponse } from './request';
-import type { AiPickSubmitContext } from './types';
+import type { AiPickControllerContext } from '../types';
 
 const logger = createLogger({ namespace: 'ContentAiPickSubmit' });
+
+type AiPickSubmitContext = Pick<
+  AiPickControllerContext,
+  | 'isAILoading'
+  | 'requestGate'
+  | 'resumeAiPickMode'
+  | 'setIsAILoading'
+  | 'setIsAIModalOpen'
+  | 'setTreeData'
+  | 'treeData'
+>;
 
 function validateAiPickSubmission(
   context: AiPickSubmitContext,

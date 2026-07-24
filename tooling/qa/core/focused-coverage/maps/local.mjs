@@ -87,6 +87,28 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/overlay/auto-blur/controller/index.test.tsx'],
   },
   {
+    owner: 'content-ai-pick-submit-feedback-predecessor',
+    productionFile: 'apps/extension/src/content/overlay/ai/pick/controller/submit/feedback.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason:
+      'The removed feedback-only leaf is covered through the apply transaction that now owns its user-visible outcomes.',
+    testFiles: ['apps/extension/src/content/overlay/ai/pick/controller/submit/apply.test.ts'],
+  },
+  {
+    owner: 'content-ai-pick-submit-types-predecessor',
+    productionFile: 'apps/extension/src/content/overlay/ai/pick/controller/submit/types.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason:
+      'The removed local type bag is covered by the narrowed apply, submit, and request owner contracts.',
+    testFiles: [
+      'apps/extension/src/content/overlay/ai/pick/controller/submit/apply.test.ts',
+      'apps/extension/src/content/overlay/ai/pick/controller/submit/index.test.ts',
+      'apps/extension/src/content/overlay/ai/pick/controller/submit/request.test.ts',
+    ],
+  },
+  {
     owner: 'content-page-style-property-fields-predecessor',
     productionFile:
       'apps/extension/src/content/overlay/page-style-inspector/property-controls/fields.tsx',

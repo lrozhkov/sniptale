@@ -104,6 +104,16 @@ async function expectMissingModelRejection() {
   expect(requestAiResponseMock).not.toHaveBeenCalled();
 }
 
+async function expectLoadingSubmissionIgnored() {
+  const context = { ...createContext(), isAILoading: true };
+
+  await submitAiPickPrompt(context, 'Summarize selected fields', '{"selected":true}', 'model-1');
+
+  expect(showToastMock).not.toHaveBeenCalled();
+  expect(context.setIsAILoading).not.toHaveBeenCalled();
+  expect(requestAiResponseMock).not.toHaveBeenCalled();
+}
+
 async function expectSuccessfulSubmission() {
   const context = createContext();
 
@@ -177,6 +187,8 @@ describe('submitAiPickPrompt', () => {
   it('rejects missing tree data before sending the runtime message', expectMissingTreeRejection);
 
   it('rejects submissions that do not have a selected model', expectMissingModelRejection);
+
+  it('ignores duplicate submissions while a request is loading', expectLoadingSubmissionIgnored);
 
   it(
     'requests ai output for selected data, applies changes, and clears loading',
