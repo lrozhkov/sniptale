@@ -1,7 +1,7 @@
 import { Control } from 'fabric';
 import { expect, it, vi } from 'vitest';
 
-import { applyEditorObjectInteractionControls } from './interaction-controls';
+import { applyEditorObjectInteractionControls } from './interaction-controls/apply';
 
 function createControlSet() {
   return {

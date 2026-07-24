@@ -1,1 +1,0 @@
-export { applyEditorDocumentToCanvas } from './orchestrate';

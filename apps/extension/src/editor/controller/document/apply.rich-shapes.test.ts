@@ -50,7 +50,7 @@ vi.mock('../viewport', async (importOriginal) => ({
   applyEditorViewportZoom: mocks.applyViewportZoomMock,
 }));
 
-import { applyEditorDocumentToCanvas } from './apply';
+import { applyEditorDocumentToCanvas } from './apply/orchestrate';
 
 beforeEach(() => {
   vi.clearAllMocks();

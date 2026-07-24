@@ -34,12 +34,12 @@ vi.mock('../viewport', async (importOriginal) => ({
   getEditorViewportMetrics: mocks.getEditorViewportMetricsMock,
 }));
 
+import { sendEditorFrameObjectsToBack } from './visibility/frame-stack';
 import {
   ensureEditorObjectReachable,
   ensureEditorObjectsReachable,
-  focusEditorObjectInViewport,
-  sendEditorFrameObjectsToBack,
-} from './visibility';
+} from './visibility/reachability';
+import { focusEditorObjectInViewport } from './visibility/viewport-focus';
 
 beforeEach(() => {
   vi.clearAllMocks();

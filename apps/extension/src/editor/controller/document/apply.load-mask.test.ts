@@ -43,7 +43,7 @@ vi.mock('../viewport', async (importOriginal) => ({
   applyEditorViewportZoom: mocks.applyViewportZoomMock,
 }));
 
-import { applyEditorDocumentToCanvas } from './apply';
+import { applyEditorDocumentToCanvas } from './apply/orchestrate';
 
 it('masks the canvas element with the workspace color while the document is loading', async () => {
   const style = { backgroundColor: 'initial-mask' };

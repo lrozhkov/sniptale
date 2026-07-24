@@ -40,7 +40,7 @@ vi.mock('../viewport', async (importOriginal) => ({
   applyEditorViewportZoom: mocks.applyViewportZoomMock,
 }));
 
-import { applyEditorDocumentToCanvas } from './apply';
+import { applyEditorDocumentToCanvas } from './apply/orchestrate';
 
 it('keeps browser page zoom compensation advisory when applying a document', async () => {
   const canvas = {

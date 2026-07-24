@@ -67,12 +67,12 @@ vi.mock('../viewport', async (importOriginal) => ({
 }));
 
 import { ensureEditorSourceLayer, syncSourceStateFromObject } from './source';
+import { sendEditorFrameObjectsToBack } from './visibility/frame-stack';
 import {
   ensureEditorObjectReachable,
   ensureEditorObjectsReachable,
-  focusEditorObjectInViewport,
-  sendEditorFrameObjectsToBack,
-} from './visibility';
+} from './visibility/reachability';
+import { focusEditorObjectInViewport } from './visibility/viewport-focus';
 
 function registerSourceStateTests() {
   it('syncs source state from source-image objects and preserves unrelated objects', () => {

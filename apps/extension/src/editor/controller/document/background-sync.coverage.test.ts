@@ -38,7 +38,7 @@ vi.mock('../viewport', async (importOriginal) => ({
   applyEditorViewportZoom: mocks.applyViewportZoom,
 }));
 
-import { applyEditorDocumentToCanvas } from './apply';
+import { applyEditorDocumentToCanvas } from './apply/orchestrate';
 
 it('syncs legacy frame background against the prepared canvas size during document apply', async () => {
   const canvas = {
