@@ -1,11 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { finalizeSidecarRecordingMock } = vi.hoisted(() => ({
+  finalizeSidecarRecordingMock: vi.fn(),
+}));
+
+vi.mock('../finalizer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../finalizer')>()),
+  finalizeSidecarRecording: finalizeSidecarRecordingMock,
+}));
+
 import {
   WebcamFrameRatePreset,
   WebcamResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import {
   cleanupActiveSidecarRecorders,
+  finalizeActiveSidecarRecordings,
   getActiveSidecarWebcamSettings,
   hasActiveSidecarSession,
   pauseActiveSidecarRecorders,
@@ -125,6 +135,45 @@ function registerSidecarConstraintTests() {
         width: { ideal: 1920 },
       },
     });
+  });
+}
+
+function registerSidecarFinalizationTests() {
+  it('does nothing when no sidecar session is active', async () => {
+    await finalizeActiveSidecarRecordings(false);
+
+    expect(finalizeSidecarRecordingMock).not.toHaveBeenCalled();
+  });
+
+  it('finalizes active webcam sidecars with stable save metadata', async () => {
+    installSidecarNavigator();
+    await initializeSidecarRecorders({
+      baseRecordingId: 'rec-1',
+      settings: createSettings(),
+    });
+    FakeMediaRecorder.instances[0]?.requestData();
+
+    await finalizeActiveSidecarRecordings(true);
+
+    expect(finalizeSidecarRecordingMock).toHaveBeenCalledWith({
+      chunks: [expect.any(Blob)],
+      discard: true,
+      filenameSuffix: 'webcam',
+      mimeType: 'video/webm',
+      recordingId: 'rec-1-webcam',
+    });
+  });
+
+  it('surfaces sidecar finalization failures to the recording owner', async () => {
+    installSidecarNavigator();
+    await initializeSidecarRecorders({
+      baseRecordingId: 'rec-1',
+      settings: createSettings(),
+    });
+    FakeMediaRecorder.instances[0]?.requestData();
+    finalizeSidecarRecordingMock.mockRejectedValueOnce(new Error('sidecar finalize failed'));
+
+    await expect(finalizeActiveSidecarRecordings(false)).rejects.toThrow('sidecar finalize failed');
   });
 }
 
@@ -288,6 +337,7 @@ function registerSidecarCreationFailureTests() {
 describe('offscreen recording sidecar', () => {
   registerSidecarInitializationTests();
   registerSidecarConstraintTests();
+  registerSidecarFinalizationTests();
   registerSidecarControlTests();
   registerSidecarStopTests();
   registerSidecarCleanupStateTests();

@@ -5,14 +5,25 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { WebcamActualSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { pickNumericWebcamActualSettings } from '@sniptale/runtime-contracts/video/types/webcam-actual-settings';
+import { finalizeSidecarRecording } from '../finalizer';
 import { createWebcamSidecarRecorder } from './webcam';
-import { getActiveSidecarSession, hasActiveSidecarSession, setActiveSidecarSession } from './state';
 import type { RecordingSidecarRecorder, RecordingSidecarSession } from './types';
-export { finalizeActiveSidecarRecordings } from './finalize';
 export { createWebcamSidecarRecorder };
-export { hasActiveSidecarSession };
 
 const logger = createLogger({ namespace: 'OffscreenRecordingSidecar' });
+let activeSidecarSession: RecordingSidecarSession | null = null;
+
+function getActiveSidecarSession(): RecordingSidecarSession | null {
+  return activeSidecarSession;
+}
+
+function setActiveSidecarSession(session: RecordingSidecarSession | null): void {
+  activeSidecarSession = session;
+}
+
+export function hasActiveSidecarSession(): boolean {
+  return activeSidecarSession !== null;
+}
 
 function stopSidecarStreams(recorders: RecordingSidecarRecorder[]): void {
   recorders.forEach((sidecar) => {
@@ -92,6 +103,25 @@ export function getActiveSidecarWebcamSettings(): WebcamActualSettings | null {
   }
 
   return pickNumericWebcamActualSettings(webcam.trackSettings);
+}
+
+export async function finalizeActiveSidecarRecordings(discard: boolean): Promise<void> {
+  const session = getActiveSidecarSession();
+  if (!session) {
+    return;
+  }
+
+  await Promise.all(
+    session.recorders.map((sidecar) =>
+      finalizeSidecarRecording({
+        chunks: sidecar.chunks,
+        discard,
+        filenameSuffix: sidecar.filenameSuffix,
+        mimeType: sidecar.recorder.mimeType,
+        recordingId: sidecar.recordingId,
+      })
+    )
+  );
 }
 
 function createSidecarStopPromise(session: RecordingSidecarSession): Promise<void> {
