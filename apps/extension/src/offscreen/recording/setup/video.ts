@@ -10,9 +10,12 @@ import {
   buildMicrophoneAudioConstraints,
   resolveMicrophoneGain,
 } from '@sniptale/runtime-contracts/video/types/microphone-processing';
-import { createDerivedRecordingStream, resolveViewportSizeInPixels } from './video-derived';
-import type { RecordingViewport } from './video.types';
-export type { RecordingViewport } from './video.types';
+import {
+  createDerivedRecordingStream,
+  resolveViewportSizeInPixels,
+  type RecordingViewport,
+} from './video-derived';
+export type { RecordingViewport } from './video-derived';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingSetup' });
 type RecordingVideoStreamParams = {
