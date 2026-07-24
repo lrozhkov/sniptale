@@ -1,7 +1,8 @@
 import React from 'react';
 
 import { ViewportSelector, type ViewportSelectorRef } from '../../viewport-selector';
-import { CaptureActionDropdown, TimerDropdown } from './dropdowns';
+import { CaptureActionDropdown } from './action-dropdown';
+import { TimerDropdown } from './timer-dropdown';
 import { ToolbarTimerToggle } from './timer-toggle';
 import { ToolbarCaptureActionToggle } from './toggle';
 import type { ToolbarCapturePopoverMenu, ToolbarPopoverMenu } from '../state/menu';

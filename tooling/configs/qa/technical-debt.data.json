@@ -2536,7 +2536,6 @@
         "apps/extension/src/content/overlay/app/mode/index.ts",
         "apps/extension/src/content/overlay/app/view-state/helpers.ts",
         "apps/extension/src/content/overlay/app/view-state/hook.ts",
-        "apps/extension/src/content/overlay/app/view-state/index.ts",
         "apps/extension/src/content/overlay/app/view-state/types.ts",
         "apps/extension/src/content/overlay/app/view/index.tsx",
         "apps/extension/src/content/overlay/auto-blur/controller/actions.ts",
@@ -2634,7 +2633,6 @@
         "apps/extension/src/content/overlay/scenario/auto-click-capture/types.ts",
         "apps/extension/src/content/overlay/scenario/capture/source.ts",
         "apps/extension/src/content/overlay/scenario/controller.ts",
-        "apps/extension/src/content/overlay/scenario/effects.ts",
         "apps/extension/src/content/overlay/scenario/mutation/index.ts",
         "apps/extension/src/content/overlay/scenario/mutation/mode.ts",
         "apps/extension/src/content/overlay/scenario/mutation/project.ts",
@@ -2683,7 +2681,6 @@
         "apps/extension/src/content/overlay/state/ai-modal.store.ts",
         "apps/extension/src/content/overlay/toolbar/capture/action-dropdown.tsx",
         "apps/extension/src/content/overlay/toolbar/capture/dropdown.shared.tsx",
-        "apps/extension/src/content/overlay/toolbar/capture/dropdowns.tsx",
         "apps/extension/src/content/overlay/toolbar/capture/group.tsx",
         "apps/extension/src/content/overlay/toolbar/capture/history.tsx",
         "apps/extension/src/content/overlay/toolbar/capture/index.tsx",
@@ -16429,7 +16426,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "845f5b74b14aa093bde7867712740823c218d288062e27bdb1a69bd11aa4b6d0"
+        "contentHash": "1989134ebc5f71e3397d50914a0f3178db5e70fbf635e88caf9e00d94b5cd265"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16479,6 +16476,9 @@
         "property:testFiles[44]",
         "property:testFiles[45]",
         "property:testFiles[46]",
+        "property:testFiles[47]",
+        "property:testFiles[48]",
+        "property:testFiles[49]",
         "property:testFiles[5]",
         "property:testFiles[6]",
         "property:testFiles[7]",

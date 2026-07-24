@@ -146,6 +146,30 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/overlay/page-style-inspector/save/panel.test.tsx'],
   },
   {
+    owner: 'content-overlay-app-layout-projection',
+    productionFile: 'apps/extension/src/content/overlay/app-layout/props.ts',
+    exclusive: true,
+    reason:
+      'The app layout projection is exercised through the app composition that builds and renders its scenario, toolbar, and dialog sections.',
+    testFiles: ['apps/extension/src/content/overlay/app/view/index.test.tsx'],
+  },
+  {
+    owner: 'content-overlay-scenario-controller',
+    productionFile: 'apps/extension/src/content/overlay/scenario/controller.ts',
+    exclusive: true,
+    reason:
+      'Scenario controller state, runtime, view-state, and effect composition execute through its direct orchestration suite.',
+    testFiles: ['apps/extension/src/content/overlay/scenario/controller.test.tsx'],
+  },
+  {
+    owner: 'content-overlay-toolbar-capture-menus',
+    productionFile: 'apps/extension/src/content/overlay/toolbar/capture/menus.tsx',
+    exclusive: true,
+    reason:
+      'Toolbar capture menu visibility and exact dropdown/viewport composition execute through its direct owner suite.',
+    testFiles: ['apps/extension/src/content/overlay/toolbar/capture/menus.test.tsx'],
+  },
+  {
     owner: 'popup-export-page-content',
     productionFile: 'apps/extension/src/popup/shell/export/pages/content.tsx',
     reason:

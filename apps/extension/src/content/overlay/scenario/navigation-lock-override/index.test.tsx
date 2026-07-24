@@ -103,6 +103,34 @@ async function expectScreenshotModeExitSkipsRelock() {
   );
 }
 
+async function expectDisabledLockRemainsDisabled() {
+  const props = createProps({ navigationLockEnabled: false });
+
+  await renderHarness(props);
+  await renderHarness({
+    ...props,
+    scenarioEnabled: false,
+  });
+
+  expect(helperMocks.restoreNavigationLockState).not.toHaveBeenCalled();
+}
+
+async function expectManualModeExitRestoresLock() {
+  const props = createProps();
+
+  await renderHarness(props);
+  await renderHarness({
+    ...props,
+    navigationLockEnabled: false,
+    scenarioCaptureMode: 'manual',
+  });
+
+  expect(helperMocks.restoreNavigationLockState).toHaveBeenLastCalledWith(
+    true,
+    props.setNavigationLockEnabled
+  );
+}
+
 describe('useScenarioNavigationLockOverride', () => {
   it(
     'disables and then restores navigation lock for scenario by-click mode',
@@ -111,5 +139,10 @@ describe('useScenarioNavigationLockOverride', () => {
   it(
     'does not relock navigation when screenshot mode already exited before cleanup',
     expectScreenshotModeExitSkipsRelock
+  );
+  it('preserves a navigation lock that was already disabled', expectDisabledLockRemainsDisabled);
+  it(
+    'restores navigation lock when by-click capture returns to manual mode',
+    expectManualModeExitRestoresLock
   );
 });
