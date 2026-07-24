@@ -86,6 +86,26 @@ export const EDITOR_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/editor/controller/selection/coverage.test.ts'],
   },
   {
+    owner: 'editor-scene-resize-dimensions',
+    productionFile:
+      'apps/extension/src/editor/controller/public-actions/scene/resize/dimensions.ts',
+    reason: 'Scene dimension mutations are covered by the resize and public action suites.',
+    testFiles: [
+      'apps/extension/src/editor/controller/public-actions/index.test.ts',
+      'apps/extension/src/editor/controller/public-actions/scene/resize.coverage.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-scene-resize-geometry',
+    productionFile:
+      'apps/extension/src/editor/controller/public-actions/scene/resize/geometry.ts',
+    reason: 'Scene geometry classification is covered directly and through resize actions.',
+    testFiles: [
+      'apps/extension/src/editor/controller/public-actions/scene/resize.coverage.test.ts',
+      'apps/extension/src/editor/controller/public-actions/scene/resize/geometry.test.ts',
+    ],
+  },
+  {
     owner: 'editor-rich-shape-callout-controls-contract',
     productionPrefix: 'apps/extension/src/editor/objects/rich-shape/callout-controls/',
     reason: 'Callout-control behavior is covered by the complete owner-local control suite.',

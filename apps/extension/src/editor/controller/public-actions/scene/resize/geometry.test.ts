@@ -1,6 +1,13 @@
+import type { Canvas } from 'fabric';
 import { describe, expect, it } from 'vitest';
+
 import type { EditorFrameSettings } from '../../../../../features/editor/document/types';
-import { doesFrameGeometryChange } from './frame-geometry';
+
+import { doesFrameGeometryChange, hasBrowserFrameLayer } from './geometry';
+
+function createCanvas(objects?: Array<{ sniptaleType: string }>): Canvas {
+  return (objects ? { getObjects: () => objects } : {}) as Canvas;
+}
 
 function createFrame(overrides: Partial<EditorFrameSettings> = {}): EditorFrameSettings {
   return {
@@ -23,7 +30,18 @@ function createFrame(overrides: Partial<EditorFrameSettings> = {}): EditorFrameS
   };
 }
 
-describe('scene resize frame geometry detection', () => {
+describe('scene resize geometry', () => {
+  it('detects browser frame objects on the canvas', () => {
+    const canvas = createCanvas([{ sniptaleType: 'shape' }, { sniptaleType: 'browser-frame' }]);
+
+    expect(hasBrowserFrameLayer(canvas)).toBe(true);
+  });
+
+  it('treats missing canvas objects as no browser frame layer', () => {
+    expect(hasBrowserFrameLayer(null)).toBe(false);
+    expect(hasBrowserFrameLayer(createCanvas())).toBe(false);
+  });
+
   it('ignores visual-only frame changes', () => {
     expect(doesFrameGeometryChange(createFrame(), createFrame({ backgroundColor: '#000' }))).toBe(
       false

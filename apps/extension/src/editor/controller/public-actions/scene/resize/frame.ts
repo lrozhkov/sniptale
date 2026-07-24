@@ -3,9 +3,8 @@ import {
   shouldPreserveCanvasForBrowserFrame,
 } from '../../../../browser-frame/layout';
 
-import { hasBrowserFrameLayer } from './browser-frame';
 import { finalizeSceneResizeMutation } from './finalize';
-import { doesFrameGeometryChange } from './frame-geometry';
+import { doesFrameGeometryChange, hasBrowserFrameLayer } from './geometry';
 import type { FrameSceneSettingsOptions } from './types';
 
 export function applyEditorFrameSceneSettings(options: FrameSceneSettingsOptions): void {

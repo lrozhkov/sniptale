@@ -1,4 +1,11 @@
+import type { Canvas } from 'fabric';
+
 import type { EditorFrameSettings } from '../../../../../features/editor/document/types';
+import { isBrowserFrameObject } from '../../../../document/model';
+
+export function hasBrowserFrameLayer(canvas: Canvas | null): boolean {
+  return (canvas?.getObjects?.() ?? []).some((object) => isBrowserFrameObject(object));
+}
 
 export function doesFrameGeometryChange(
   currentFrame: EditorFrameSettings,
