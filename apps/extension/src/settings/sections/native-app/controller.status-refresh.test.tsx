@@ -74,7 +74,7 @@ async function renderSection() {
   });
 }
 
-it('refreshes transient reconnect status from the current runtime query', async () => {
+it('refreshes transient reconnect status through the current controller request', async () => {
   await renderSection();
   vi.useFakeTimers();
   mocks.sendRuntimeMessage

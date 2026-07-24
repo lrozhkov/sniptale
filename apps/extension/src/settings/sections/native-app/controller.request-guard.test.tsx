@@ -72,7 +72,7 @@ async function renderSection() {
   });
 }
 
-it('does not let an older settings save success overwrite a newer action result', async () => {
+it('keeps an older settings save success from overwriting a newer action result', async () => {
   const save = createDeferred<void>();
   mocks.saveVideoSettings.mockReturnValueOnce(save.promise);
   await renderSection();
@@ -119,6 +119,28 @@ it('does not let an older settings save failure overwrite a newer action result'
   expect(hasExactText('span', 'Нет подключения')).toBe(true);
   expect(container?.textContent).not.toContain(
     'Не удалось выполнить действие приложения Sniptale.'
+  );
+});
+
+it('rolls back an optimistic settings change when the current save fails', async () => {
+  const save = createDeferred<void>();
+  mocks.saveVideoSettings.mockReturnValueOnce(save.promise);
+  await renderSection();
+  const switchButton = container?.querySelector<HTMLButtonElement>('button[role="switch"]');
+
+  expect(switchButton?.getAttribute('aria-checked')).toBe('true');
+  await clickFirstNativeSettingSwitch();
+  expect(switchButton?.getAttribute('aria-checked')).toBe('false');
+
+  await act(async () => {
+    save.reject(new Error('save failed'));
+    await Promise.resolve();
+  });
+
+  expect(switchButton?.getAttribute('aria-checked')).toBe('true');
+  expect(container?.textContent).toContain('Не удалось выполнить действие приложения Sniptale.');
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalledWith(
+    expect.objectContaining({ operation: 'sync-settings' })
   );
 });
 
