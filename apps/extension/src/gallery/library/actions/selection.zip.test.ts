@@ -3,7 +3,7 @@
 import JSZip from 'jszip';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createController, createMediaItem, runBusyAction } from './test-support/index';
-import { createSelectionZipAction } from './helpers';
+import { createSelectionZipAction } from './selection';
 
 const nativeCreateElement = document.createElement.bind(document);
 

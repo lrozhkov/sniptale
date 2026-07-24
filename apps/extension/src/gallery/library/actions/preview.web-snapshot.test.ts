@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { openInEditor } from './helpers';
+import { openInEditor } from './preview';
 import { createMediaItem } from './test-support/index';
 
 const openWebSnapshotViewerPageMock = vi.hoisted(() => vi.fn());

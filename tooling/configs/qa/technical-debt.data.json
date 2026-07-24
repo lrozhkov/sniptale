@@ -8299,7 +8299,6 @@
         "apps/extension/src/gallery/index.tsx",
         "apps/extension/src/gallery/library/actions/backup.ts",
         "apps/extension/src/gallery/library/actions/controller-types.ts",
-        "apps/extension/src/gallery/library/actions/helpers.ts",
         "apps/extension/src/gallery/library/actions/preview.ts",
         "apps/extension/src/gallery/library/actions/selection.ts",
         "apps/extension/src/gallery/library/actions/shared.ts",
@@ -8370,7 +8369,6 @@
         "apps/extension/src/gallery/index.tsx",
         "apps/extension/src/gallery/library/actions/backup.ts",
         "apps/extension/src/gallery/library/actions/controller-types.ts",
-        "apps/extension/src/gallery/library/actions/helpers.ts",
         "apps/extension/src/gallery/library/actions/preview.ts",
         "apps/extension/src/gallery/library/actions/selection.ts",
         "apps/extension/src/gallery/library/actions/shared.ts",
@@ -15948,7 +15946,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/gallery-backup.mjs",
-        "contentHash": "5fdb8cd8e6478f65571659893ec874006eb2fbe55415764483a117b450d5d66f"
+        "contentHash": "3f22f93a205da1a02958f75105456d9ba93fee084f628cf4ae91611477aa054f"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/gallery-backup.mjs",
@@ -15964,7 +15962,6 @@
         "property:testFiles[13]",
         "property:testFiles[14]",
         "property:testFiles[15]",
-        "property:testFiles[16]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",

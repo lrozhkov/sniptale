@@ -12,25 +12,29 @@ import type {
 } from './controller-types';
 import type { GalleryItem } from '../items';
 import {
-  copyPreviewItem,
-  createApplySelectionTagAction,
-  createBusyActionRunner,
   createClosePendingExportAction,
-  createClosePreviewAction,
   createConfirmExportBackupAction,
-  createDeleteManyAction,
   createExportBackupAction,
   createInspectExportBackupAction,
   createImportAction,
   createImportSelectedFileAction,
+} from './backup';
+import {
+  copyPreviewItem,
+  createClosePreviewAction,
   createSaveMetadataAction,
-  createSelectionZipAction,
-  createStorageCleanupAction,
   downloadPreviewItem,
-  openSnapshotScreenshotInEditor,
   openInEditor,
   resetPreviewChanges,
-} from './helpers';
+} from './preview';
+import {
+  createApplySelectionTagAction,
+  createDeleteManyAction,
+  createSelectionZipAction,
+  createStorageCleanupAction,
+} from './selection';
+import { createBusyActionRunner } from './shared';
+import { openSnapshotScreenshotInEditor } from './snapshot-screenshot';
 import type { UseGalleryAppActionsResult } from './useGalleryAppActions.types';
 
 function createGalleryBackupActions(

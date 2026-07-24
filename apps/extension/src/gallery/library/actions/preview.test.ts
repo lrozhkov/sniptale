@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createClosePreviewAction, resetPreviewChanges } from './helpers';
+import { createClosePreviewAction, createSaveMetadataAction, resetPreviewChanges } from './preview';
 import {
   createController,
   createMediaItem,
@@ -104,6 +104,36 @@ function verifyPreviewDraftResetFlow() {
   expect(getState().preview.draft.tags).toEqual(['flow']);
 }
 
+async function verifyPreviewMetadataSaveFlow() {
+  const previewItem = createMediaItem({
+    filename: 'first.png',
+    id: 'asset-1',
+  });
+  const { controller, getState } = createController({
+    filenameDraft: '  renamed.png  ',
+    previewItem,
+    tagDrafts: ['tag-1'],
+  });
+
+  await createSaveMetadataAction(controller)(runBusyAction);
+
+  expect(updateMediaLibraryEntrySafelyMock).toHaveBeenCalledWith('asset-1', {
+    filename: 'renamed.png',
+    tags: ['tag-1'],
+  });
+  expect(getState().preview.session.item).toEqual(previewItem);
+  expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
+}
+
+async function verifyMissingPreviewMetadataNoop() {
+  const { controller } = createController();
+
+  await createSaveMetadataAction(controller)(runBusyAction);
+
+  expect(updateMediaLibraryEntrySafelyMock).not.toHaveBeenCalled();
+  expect(updateScenarioProjectRecordMetadataMock).not.toHaveBeenCalled();
+}
+
 describe('gallery app preview and shared actions', () => {
   it('persists media draft metadata when closing the preview', verifyPreviewMetadataCloseFlow);
   it(
@@ -111,4 +141,9 @@ describe('gallery app preview and shared actions', () => {
     verifyScenarioPreviewMetadataCloseFlow
   );
   it('resets preview draft edits back to the item snapshot', verifyPreviewDraftResetFlow);
+  it(
+    'saves normalized preview metadata through the media-library owner',
+    verifyPreviewMetadataSaveFlow
+  );
+  it('skips metadata persistence without a preview item', verifyMissingPreviewMetadataNoop);
 });

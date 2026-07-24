@@ -6,12 +6,6 @@ export const GALLERY_BACKUP_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/gallery/library/actions/backup.test.ts'],
   },
   {
-    owner: 'gallery-backup-actions',
-    productionFile: 'apps/extension/src/gallery/library/actions/helpers.ts',
-    reason: 'Gallery action facade backup exports are covered by backup action tests.',
-    testFiles: ['apps/extension/src/gallery/library/actions/backup.test.ts'],
-  },
-  {
     owner: 'gallery-selection-archive',
     productionFile: 'apps/extension/src/gallery/library/actions/selection.ts',
     reason: 'Gallery selection archive entry naming is covered by selection action tests.',
@@ -27,10 +21,10 @@ export const GALLERY_BACKUP_OWNER_MAPPINGS = [
     owner: 'gallery-backup-action-test-support',
     productionFile: 'apps/extension/src/gallery/library/actions/test-support/index.ts',
     reason:
-      'Gallery action test support state setters are covered by backup and helper action suites.',
+      'Gallery action test support state setters are covered by backup and selection action suites.',
     testFiles: [
       'apps/extension/src/gallery/library/actions/backup.test.ts',
-      'apps/extension/src/gallery/library/actions/helpers.test.ts',
+      'apps/extension/src/gallery/library/actions/selection.test.ts',
     ],
   },
   {
@@ -40,7 +34,7 @@ export const GALLERY_BACKUP_OWNER_MAPPINGS = [
       'Gallery action test support fixtures and grouped controller mocks are covered by action suites.',
     testFiles: [
       'apps/extension/src/gallery/library/actions/backup.test.ts',
-      'apps/extension/src/gallery/library/actions/helpers.test.ts',
+      'apps/extension/src/gallery/library/actions/selection.test.ts',
       'apps/extension/src/gallery/library/actions/useGalleryAppActions.test.ts',
     ],
   },

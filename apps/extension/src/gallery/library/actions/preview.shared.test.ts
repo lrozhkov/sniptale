@@ -1,12 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  copyPreviewItem,
-  createBusyActionRunner,
-  downloadPreviewItem,
-  openInEditor,
-} from './helpers';
+import { copyPreviewItem, downloadPreviewItem, openInEditor } from './preview';
+import { createBusyActionRunner } from './shared';
 import {
   createController,
   createMediaItem,

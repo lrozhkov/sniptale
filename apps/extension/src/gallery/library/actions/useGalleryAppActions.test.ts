@@ -9,7 +9,7 @@ import {
 } from './test-support/index';
 import { useGalleryAppActions } from './useGalleryAppActions';
 
-const helperMocks = vi.hoisted(() => ({
+const actionMocks = vi.hoisted(() => ({
   copyPreviewItemMock: vi.fn(async () => undefined),
   createApplySelectionTagActionMock: vi.fn(),
   createBusyActionRunnerMock: vi.fn(),
@@ -30,41 +30,54 @@ const helperMocks = vi.hoisted(() => ({
   resetPreviewChangesMock: vi.fn(),
 }));
 
-vi.mock('./helpers', () => ({
-  copyPreviewItem: helperMocks.copyPreviewItemMock,
-  createApplySelectionTagAction: helperMocks.createApplySelectionTagActionMock,
-  createBusyActionRunner: helperMocks.createBusyActionRunnerMock,
-  createClosePendingExportAction: helperMocks.createClosePendingExportActionMock,
-  createClosePreviewAction: helperMocks.createClosePreviewActionMock,
-  createConfirmExportBackupAction: helperMocks.createConfirmExportBackupActionMock,
-  createDeleteManyAction: helperMocks.createDeleteManyActionMock,
-  createExportBackupAction: helperMocks.createExportBackupActionMock,
-  createInspectExportBackupAction: helperMocks.createInspectExportBackupActionMock,
-  createImportAction: helperMocks.createImportActionMock,
-  createImportSelectedFileAction: helperMocks.createImportSelectedFileActionMock,
-  createSaveMetadataAction: helperMocks.createSaveMetadataActionMock,
-  createSelectionZipAction: helperMocks.createSelectionZipActionMock,
-  createStorageCleanupAction: helperMocks.createStorageCleanupActionMock,
-  downloadPreviewItem: helperMocks.downloadPreviewItemMock,
-  openInEditor: helperMocks.openInEditorMock,
-  openSnapshotScreenshotInEditor: helperMocks.openSnapshotScreenshotInEditorMock,
-  resetPreviewChanges: helperMocks.resetPreviewChangesMock,
+vi.mock('./backup', () => ({
+  createClosePendingExportAction: actionMocks.createClosePendingExportActionMock,
+  createConfirmExportBackupAction: actionMocks.createConfirmExportBackupActionMock,
+  createExportBackupAction: actionMocks.createExportBackupActionMock,
+  createImportAction: actionMocks.createImportActionMock,
+  createImportSelectedFileAction: actionMocks.createImportSelectedFileActionMock,
+  createInspectExportBackupAction: actionMocks.createInspectExportBackupActionMock,
+}));
+
+vi.mock('./preview', () => ({
+  copyPreviewItem: actionMocks.copyPreviewItemMock,
+  createClosePreviewAction: actionMocks.createClosePreviewActionMock,
+  createSaveMetadataAction: actionMocks.createSaveMetadataActionMock,
+  downloadPreviewItem: actionMocks.downloadPreviewItemMock,
+  openInEditor: actionMocks.openInEditorMock,
+  resetPreviewChanges: actionMocks.resetPreviewChangesMock,
+}));
+
+vi.mock('./selection', () => ({
+  createApplySelectionTagAction: actionMocks.createApplySelectionTagActionMock,
+  createDeleteManyAction: actionMocks.createDeleteManyActionMock,
+  createSelectionZipAction: actionMocks.createSelectionZipActionMock,
+  createStorageCleanupAction: actionMocks.createStorageCleanupActionMock,
+}));
+
+vi.mock('./shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./shared')>()),
+  createBusyActionRunner: actionMocks.createBusyActionRunnerMock,
+}));
+
+vi.mock('./snapshot-screenshot', () => ({
+  openSnapshotScreenshotInEditor: actionMocks.openSnapshotScreenshotInEditorMock,
 }));
 
 function prepareActionFactoryMocks() {
-  helperMocks.createBusyActionRunnerMock.mockReturnValue(runBusyAction);
-  helperMocks.createDeleteManyActionMock.mockReturnValue(vi.fn(async () => undefined));
-  helperMocks.createStorageCleanupActionMock.mockReturnValue(vi.fn(async () => undefined));
-  helperMocks.createClosePendingExportActionMock.mockReturnValue(vi.fn());
-  helperMocks.createConfirmExportBackupActionMock.mockReturnValue(vi.fn(async () => undefined));
-  helperMocks.createExportBackupActionMock.mockReturnValue(vi.fn(async () => undefined));
-  helperMocks.createInspectExportBackupActionMock.mockReturnValue(vi.fn(async () => ({})));
-  helperMocks.createImportSelectedFileActionMock.mockReturnValue(vi.fn(async () => undefined));
-  helperMocks.createImportActionMock.mockReturnValue(vi.fn(async () => undefined));
-  helperMocks.createClosePreviewActionMock.mockReturnValue(vi.fn(async () => undefined));
-  helperMocks.createSelectionZipActionMock.mockReturnValue(vi.fn(async () => undefined));
-  helperMocks.createSaveMetadataActionMock.mockReturnValue(vi.fn(async () => undefined));
-  helperMocks.createApplySelectionTagActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createBusyActionRunnerMock.mockReturnValue(runBusyAction);
+  actionMocks.createDeleteManyActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createStorageCleanupActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createClosePendingExportActionMock.mockReturnValue(vi.fn());
+  actionMocks.createConfirmExportBackupActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createExportBackupActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createInspectExportBackupActionMock.mockReturnValue(vi.fn(async () => ({})));
+  actionMocks.createImportSelectedFileActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createImportActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createClosePreviewActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createSelectionZipActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createSaveMetadataActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createApplySelectionTagActionMock.mockReturnValue(vi.fn(async () => undefined));
 }
 
 describe('useGalleryAppActions', () => {
@@ -98,15 +111,15 @@ describe('useGalleryAppActions', () => {
     actions.preview.openSnapshotScreenshotInEditor();
     actions.preview.openInEditor(createMediaItem({ id: 'asset-3' }));
 
-    expect(helperMocks.createBusyActionRunnerMock).toHaveBeenCalledWith(controller);
-    expect(helperMocks.createInspectExportBackupActionMock).toHaveBeenCalledTimes(1);
-    expect(helperMocks.copyPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
-    expect(helperMocks.downloadPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
-    expect(helperMocks.openSnapshotScreenshotInEditorMock).toHaveBeenCalledWith(
+    expect(actionMocks.createBusyActionRunnerMock).toHaveBeenCalledWith(controller);
+    expect(actionMocks.createInspectExportBackupActionMock).toHaveBeenCalledTimes(1);
+    expect(actionMocks.copyPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
+    expect(actionMocks.downloadPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
+    expect(actionMocks.openSnapshotScreenshotInEditorMock).toHaveBeenCalledWith(
       controller,
       runBusyAction
     );
-    expect(helperMocks.openInEditorMock).toHaveBeenCalledWith(
+    expect(actionMocks.openInEditorMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'asset-3' })
     );
   });
