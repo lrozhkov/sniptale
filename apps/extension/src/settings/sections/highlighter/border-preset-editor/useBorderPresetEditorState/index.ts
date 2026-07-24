@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 
 import { buildBorderPresetPreviewStyle } from '../state/helpers';
-import { useBorderPresetDraftSetters } from './draft-setters';
 import { useBorderPresetDraftState } from './draft-state';
 import { useBorderPresetInitialization } from './initialization';
 import { useBorderPresetResize } from './resize';
@@ -11,8 +10,7 @@ import { useBorderPresetUpdatePadding } from './update-padding';
 import type { BorderPresetEditorProps } from './types';
 
 export function useBorderPresetEditorState({ isOpen, onSave, preset }: BorderPresetEditorProps) {
-  const draft = useBorderPresetDraftState();
-  const setters = useBorderPresetDraftSetters(draft);
+  const { draft, setters } = useBorderPresetDraftState();
   useBorderPresetInitialization(
     preset === undefined ? { isOpen, setters } : { isOpen, preset, setters }
   );

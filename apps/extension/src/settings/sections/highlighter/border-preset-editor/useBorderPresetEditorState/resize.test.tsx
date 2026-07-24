@@ -14,7 +14,7 @@ let latestTextareaHeight = 0;
 let root: Root | null = null;
 
 function Harness() {
-  const draft = useBorderPresetDraftState();
+  const { draft } = useBorderPresetDraftState();
   const handleResizeStart = useBorderPresetResize({ ...draft, isOpen: true });
 
   useEffect(() => {

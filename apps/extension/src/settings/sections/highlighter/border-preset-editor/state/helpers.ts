@@ -4,10 +4,6 @@ import { colorToRgba, resolveBorderShadowVisual } from '../../../../../features/
 import type { BorderPreset } from '../../../../../features/highlighter/contracts';
 import type { BorderPresetDraftSetters } from '../useBorderPresetEditorState/types';
 
-export function pickBorderPresetDraftSetters(setters: BorderPresetDraftSetters) {
-  return setters;
-}
-
 export function applyBorderPresetDraftState(
   nextPreset: BorderPreset,
   setters: BorderPresetDraftSetters

@@ -4,7 +4,6 @@ import type { BorderPreset } from '../../../../../features/highlighter/contracts
 import {
   applyBorderPresetDraftState,
   buildBorderPresetPreviewStyle,
-  pickBorderPresetDraftSetters,
   resetBorderPresetDraftState,
 } from './helpers';
 import type { BorderPresetDraftSetters } from '../useBorderPresetEditorState/types';
@@ -61,8 +60,6 @@ describe('border-preset-editor-state draft setters', () => {
       inheritCustomCss: true,
       customCss: 'color: red;',
     };
-
-    expect(pickBorderPresetDraftSetters(setters)).toBe(setters);
 
     applyBorderPresetDraftState(preset, setters);
     resetBorderPresetDraftState(setters);
