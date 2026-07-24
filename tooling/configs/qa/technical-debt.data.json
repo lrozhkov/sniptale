@@ -327,7 +327,6 @@
         "apps/extension/src/background/ai/settings/secret-unlock-route-state.ts",
         "apps/extension/src/background/ai/settings/secret-unlock-route-submit.ts",
         "apps/extension/src/background/ai/settings/secret-unlock-route.ts",
-        "apps/extension/src/background/application/policy-state/index.ts",
         "apps/extension/src/background/application/privacy-erasure/composition.ts",
         "apps/extension/src/background/application/privacy-erasure/page-local-storage.ts",
         "apps/extension/src/background/application/privacy-erasure/ports.ts",
@@ -412,7 +411,6 @@
         "apps/extension/src/background/capture/quick-actions/flow/debugger.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
         "apps/extension/src/background/capture/quick-actions/flow/flows.ts",
-        "apps/extension/src/background/capture/quick-actions/flow/index.ts",
         "apps/extension/src/background/capture/quick-actions/flow/load.ts",
         "apps/extension/src/background/capture/quick-actions/flow/process.ts",
         "apps/extension/src/background/capture/quick-actions/flow/shared.ts",
@@ -948,7 +946,6 @@
         "apps/extension/src/background/ai/settings/secret-unlock-route-state.ts",
         "apps/extension/src/background/ai/settings/secret-unlock-route-submit.ts",
         "apps/extension/src/background/ai/settings/secret-unlock-route.ts",
-        "apps/extension/src/background/application/policy-state/index.ts",
         "apps/extension/src/background/application/privacy-erasure/composition.ts",
         "apps/extension/src/background/application/privacy-erasure/page-local-storage.ts",
         "apps/extension/src/background/application/privacy-erasure/ports.ts",
@@ -1033,7 +1030,6 @@
         "apps/extension/src/background/capture/quick-actions/flow/debugger.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
         "apps/extension/src/background/capture/quick-actions/flow/flows.ts",
-        "apps/extension/src/background/capture/quick-actions/flow/index.ts",
         "apps/extension/src/background/capture/quick-actions/flow/load.ts",
         "apps/extension/src/background/capture/quick-actions/flow/process.ts",
         "apps/extension/src/background/capture/quick-actions/flow/shared.ts",
@@ -13515,7 +13511,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/architecture-guardrails.policy-state.mjs",
-        "contentHash": "1f4f78d7fc56b522b051bb5fe4b5c0b05cc8608e70386cfa1a6a14a89d91e7f3"
+        "contentHash": "bd5485fe301c97b65a38149454c33b2f669c1d12dab812300d35550535de2700"
       },
       "consumers": [
         "tooling/qa/core/architecture-guardrails.policy-state.mjs",

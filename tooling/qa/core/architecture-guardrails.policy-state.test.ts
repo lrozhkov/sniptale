@@ -42,6 +42,15 @@ it('blocks new authority state files without policy-state ids', async () => {
   );
   writeFile(
     root,
+    'apps/extension/src/background/application/policy-state/session-capability.ts',
+    [
+      'const createPrivilegedSyncMemoryDomain = () => ({ clear() {} });',
+      'const sessions = createPrivilegedSyncMemoryDomain("application.sessions");',
+      'export function resetSessionsForTests() { sessions.clear(); }',
+    ].join('\n')
+  );
+  writeFile(
+    root,
     'apps/extension/src/background/legacy/session-capability.ts',
     'const sessions = new Map();\n'
   );
@@ -51,15 +60,23 @@ it('blocks new authority state files without policy-state ids', async () => {
   expect(
     module.collectPolicyStateDescriptorViolations(
       [
+        'apps/extension/src/background/application/policy-state/session-capability.ts',
         'apps/extension/src/background/new-owner/session-capability.ts',
         'apps/extension/src/background/legacy/session-capability.ts',
       ],
       {
-        newFiles: new Set(['apps/extension/src/background/new-owner/session-capability.ts']),
+        newFiles: new Set([
+          'apps/extension/src/background/application/policy-state/session-capability.ts',
+          'apps/extension/src/background/new-owner/session-capability.ts',
+        ]),
         root,
       }
     )
   ).toEqual([
+    expect.objectContaining({
+      file: 'apps/extension/src/background/application/policy-state/session-capability.ts',
+      rule: 'policy-state-descriptor-required',
+    }),
     expect.objectContaining({
       file: 'apps/extension/src/background/new-owner/session-capability.ts',
       rule: 'policy-state-descriptor-required',

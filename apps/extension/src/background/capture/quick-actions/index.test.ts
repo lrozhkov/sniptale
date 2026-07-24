@@ -27,8 +27,8 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   }),
 }));
 
-vi.mock('./flow/index', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./flow/index')>()),
+vi.mock('./flow/process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./flow/process')>()),
   processQuickAction: processQuickActionMock,
 }));
 

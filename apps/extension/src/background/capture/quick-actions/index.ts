@@ -1,5 +1,5 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { processQuickAction } from './flow/index';
+import { processQuickAction } from './flow/process';
 import { assertQuickActionSupported } from './capability';
 import { notifyDuplicateCapture, notifyQuickActionError } from './notifications';
 import type { HandleQuickActionArgs } from './types';
