@@ -84,7 +84,7 @@ vi.mock('./editor', async (importOriginal) => ({
   },
 }));
 
-import { PresetsSectionContent } from './section-content';
+import { PresetsSectionContent } from './section-content/content';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;

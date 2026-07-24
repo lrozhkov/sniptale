@@ -5,7 +5,7 @@ import type { ViewportPreset } from '../../../../contracts/settings';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductField, ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
-import { settingsModalFieldSurfaceClassName } from './surface/classes';
+import { settingsModalFieldSurfaceClassName } from '../../../section-surface/panel-controls';
 import { clampViewportDimension, resolveViewportPresetSubmitLabel } from './helpers';
 
 function ViewportPresetNameField(props: {

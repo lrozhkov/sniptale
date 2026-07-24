@@ -9,7 +9,7 @@ const { presetsSectionContentSpy, useViewportPresetsSectionSpy } = vi.hoisted(()
   useViewportPresetsSectionSpy: vi.fn(),
 }));
 
-vi.mock('./section-content', () => ({
+vi.mock('./section-content/content', () => ({
   PresetsSectionContent: (props: unknown) => {
     presetsSectionContentSpy(props);
     return <div data-testid="presets-section-content" />;

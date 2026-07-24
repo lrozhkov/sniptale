@@ -1,4 +1,4 @@
-import { PresetsSectionContent } from './section-content';
+import { PresetsSectionContent } from './section-content/content';
 import { useViewportPresetsSection } from './controller';
 
 export function PresetsSection() {

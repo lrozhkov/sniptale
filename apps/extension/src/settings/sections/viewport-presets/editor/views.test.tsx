@@ -45,7 +45,7 @@ vi.mock('@sniptale/ui/product-modal', async (importOriginal) => ({
   ProductModalFooter: (props: { children: React.ReactNode }) => <div>{props.children}</div>,
 }));
 
-vi.mock('./surface/classes', () => ({
+vi.mock('../../../section-surface/panel-controls', () => ({
   settingsModalFieldSurfaceClassName: 'field-surface',
 }));
 
@@ -118,6 +118,7 @@ function verifyViewportPresetEditorContent() {
   expect(setWidth).toHaveBeenCalledWith(3840);
   expect(setHeight).toHaveBeenCalledWith(1);
   expect(onSubmit).toHaveBeenCalled();
+  expect(container?.querySelectorAll('.field-surface')).toHaveLength(2);
 }
 
 function verifyViewportPresetEditorFooter() {
