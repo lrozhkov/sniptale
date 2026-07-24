@@ -128,7 +128,7 @@ vi.mock('../../objects/arrow', async (importOriginal) => ({
 }));
 
 import { Rect } from 'fabric';
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 function registerBrushSyncTest() {
   it('syncs brush settings with parsed color and smoothing fallbacks', () => {

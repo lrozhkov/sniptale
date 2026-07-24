@@ -1,2 +1,2 @@
-export { applySelectionToolSettingsToObjects } from './apply';
-export { syncSelectionToolSettingsFromObject } from './sync';
+export { applySelectionToolSettingsToObjects } from './apply/dispatch';
+export { syncSelectionToolSettingsFromObject } from './sync/dispatch';

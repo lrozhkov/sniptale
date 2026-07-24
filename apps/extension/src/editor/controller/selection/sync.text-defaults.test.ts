@@ -141,7 +141,7 @@ vi.mock('../../objects/annotation/blur/object', async (importOriginal) => ({
   isBlurObject: mocks.isBlurObjectMock,
 }));
 
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 function registerFallbackTextDefaultsTest() {
   it('falls back to canonical text defaults when textbox metadata is incomplete', () => {

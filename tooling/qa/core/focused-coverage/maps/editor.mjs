@@ -42,6 +42,12 @@ export const EDITOR_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/editor/controller/freehand/recognition.test.ts'],
   },
   {
+    owner: 'editor-selection-root-contract',
+    productionFile: 'apps/extension/src/editor/controller/selection/index.ts',
+    reason: 'The selection root contract is covered by the combined apply and sync owner suite.',
+    testFiles: ['apps/extension/src/editor/controller/selection/coverage.test.ts'],
+  },
+  {
     owner: 'editor-magnet-manager',
     productionFile: 'apps/extension/src/editor/controller/magnet/manager.ts',
     reason: 'Magnet manager behavior is covered by focused manager tests.',

@@ -128,7 +128,7 @@ vi.mock('../../objects', async (importOriginal) => ({
 
 import { Rect } from 'fabric';
 import { resolveShapeFillColor, resolveShapeStrokeColor } from './shape-fill';
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 function expectLatestShapeSettings(values: Record<string, unknown>) {
   expect(mocks.updateSelectionShapeSettingsMock).toHaveBeenLastCalledWith(

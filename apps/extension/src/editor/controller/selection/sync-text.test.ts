@@ -39,7 +39,7 @@ vi.mock('../../state/useEditorStore', () => ({
   },
 }));
 
-import { syncTextSelectionSettings } from './sync-text';
+import { syncTextSelectionSettings } from './sync-text/dispatch';
 
 beforeEach(() => {
   vi.clearAllMocks();

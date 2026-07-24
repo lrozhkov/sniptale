@@ -45,7 +45,7 @@ vi.mock('../../objects', () => ({
   normalizeTextLayoutMode: (value: unknown) => (value === 'auto' ? 'auto' : 'fixed-width'),
 }));
 
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 beforeEach(() => {
   vi.clearAllMocks();

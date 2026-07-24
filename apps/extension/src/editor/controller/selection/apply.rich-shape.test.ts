@@ -9,7 +9,7 @@ vi.mock('../../objects/rich-shape', async (importOriginal) => ({
   updateRichShapeObjectStyle: mocks.updateRichShapeObjectStyleMock,
 }));
 
-import { applySelectionToolSettingsToObjects } from './apply';
+import { applySelectionToolSettingsToObjects } from './apply/dispatch';
 
 it('projects selection style changes through the rich shape factory seam', () => {
   const shape = { kind: 'rich-shape' };

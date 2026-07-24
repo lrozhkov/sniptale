@@ -30,7 +30,7 @@ vi.mock('../../objects/line', async (importOriginal) => ({
   isLineObject: mocks.isLineObjectMock,
 }));
 
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 import { syncArrowSelectionSettings, syncLineSelectionSettings } from './sync-linear';
 
 it('syncs arrow type, dynamic width, heads, and style settings', () => {

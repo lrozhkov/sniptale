@@ -128,7 +128,7 @@ vi.mock('../../objects/arrow', async (importOriginal) => ({
   isArrowObject: mocks.isArrowObjectMock,
 }));
 
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 function registerBrushSyncTest() {
   it('syncs brush selections through their owner-specific fallbacks', () => {

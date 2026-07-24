@@ -153,7 +153,7 @@ vi.mock('../../objects/annotation/blur/object', async (importOriginal) => ({
   isBlurObject: mocks.isBlurObjectMock,
 }));
 
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 function registerTextSyncTest() {
   it('syncs text settings into the editor store', () => {
