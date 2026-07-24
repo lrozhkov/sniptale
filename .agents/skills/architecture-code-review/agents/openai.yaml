@@ -1,4 +1,4 @@
 interface:
   display_name: 'Architecture Code Review'
   short_description: 'Review Sniptale architecture risks'
-  default_prompt: 'Use $architecture-code-review as an independent read-only reviewer without inherited context for the supplied complete green candidate; evaluate its owner/change-reason clusters as Split, Consolidate, or Keep, including cognitive navigation load, mixed ownership, cohesion, and distributed god-object checks.'
+  default_prompt: 'Use $architecture-code-review in a new reviewer spawned with fork_turns: "none"; require an explicit bounded manifest, exact diff scope, and green QA results, then evaluate owner/change-reason clusters as Split, Consolidate, or Keep.'

@@ -13,7 +13,7 @@ Read [`references/repo-audit-checklist.md`](references/repo-audit-checklist.md) 
 
 ## Invocation And Evidence
 
-Run as an independent read-only agent without inherited context. Receive the explicit audit scope, acceptance criteria, supplied QA/audit results, known exclusions, and relevant repository state; do not receive intended conclusions.
+The orchestrator must spawn a new independent read-only auditor with `fork_turns: "none"` and must not reuse an agent that saw the audited implementation context. The initial task must contain the explicit bounded audit manifest, exact repository/diff scope, acceptance criteria, supplied QA/audit results, known exclusions, and relevant repository state; do not receive intended conclusions.
 
 Read `AGENTS.md`, `docs/architecture/repository-overview.md`, `docs/engineering/implementation-rules.md`, `docs/security/data-handling.md`, `docs/tooling/code-quality.md`, `docs/tooling/wrapper-summary.md`, and the required checklist. Historical documents are evidence, never current authority.
 

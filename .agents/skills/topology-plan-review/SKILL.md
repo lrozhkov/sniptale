@@ -19,7 +19,7 @@ Read [`references/topology-plan-review-checklist.md`](references/topology-plan-r
 
 ## Inputs
 
-Run as an independent read-only agent without inherited context. Receive the selected root/seam, current inventory, target owner map, complete old-to-new manifest, collision/facade decisions, consumer/dependent-map inventory, rollback, proof map, mode, and supplied QA results. Do not receive intended conclusions.
+The orchestrator must spawn a new independent read-only reviewer with `fork_turns: "none"` and must not reuse an agent that saw planning or implementation context. The initial task must contain the selected root/seam, exact current diff scope, bounded current or old-to-new manifest, target owner map, collision/facade decisions, consumer/dependent-map inventory, rollback, proof map, mode, and supplied QA results or an explicit `not run` for planning mode. Do not receive intended conclusions.
 
 ## Workflow
 

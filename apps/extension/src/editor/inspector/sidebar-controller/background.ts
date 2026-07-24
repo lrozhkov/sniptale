@@ -8,9 +8,9 @@ import type {
 } from '../../../features/editor/document/types';
 import type { EditorToolSettings } from '../../../features/editor/document/tool-settings-types';
 import { createEditorFrameGradientPatch } from '../../../features/editor/document/frame-gradient';
+import { readFileAsDataUrl } from '../../document/file-actions/file-reader';
 import { assertEditorRasterImageFileCanBeRead } from '../../document/file-actions/raster-intake';
 import type { getFrameGradientPresets } from '../sidebar-shared';
-import { readFileAsDataUrl } from '../sidebar-shared';
 
 interface SidebarBackgroundUtilityArgs {
   borderPresets: BorderPreset[];

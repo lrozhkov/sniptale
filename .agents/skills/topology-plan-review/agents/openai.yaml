@@ -1,4 +1,4 @@
 interface:
   display_name: 'Topology Plan Review'
   short_description: 'Plan or review a bounded Sniptale topology move'
-  default_prompt: 'Use $topology-plan-review without inherited context to validate the supplied pre-move bundle or independently review the supplied complete green candidate; classify owner/change-reason clusters as Split, Consolidate, or Keep and verify cognitive navigation load, explicit boundaries, and negative architecture proof.'
+  default_prompt: 'Use $topology-plan-review in a new reviewer spawned with fork_turns: "none" and supplied an explicit bounded manifest, exact diff scope, and QA results; classify owner/change-reason clusters as Split, Consolidate, or Keep.'

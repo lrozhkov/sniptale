@@ -8,14 +8,9 @@ const { readFileAsDataUrlMock } = vi.hoisted(() => ({
   readFileAsDataUrlMock: vi.fn(),
 }));
 
-vi.mock('../sidebar-shared', async () => {
-  const actual = await vi.importActual<typeof import('../sidebar-shared')>('../sidebar-shared');
-
-  return {
-    ...actual,
-    readFileAsDataUrl: readFileAsDataUrlMock,
-  };
-});
+vi.mock('../../document/file-actions/file-reader', () => ({
+  readFileAsDataUrl: readFileAsDataUrlMock,
+}));
 
 import { buildSidebarBackgroundActions } from './background';
 

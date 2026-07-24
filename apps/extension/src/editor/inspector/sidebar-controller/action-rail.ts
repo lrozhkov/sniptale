@@ -12,9 +12,9 @@ import {
   assertEditorSessionFileCanBeRead,
   parseImportedEditorDocument,
 } from '../../document/file-actions/import-session';
+import { readFileAsDataUrl, readFileAsText } from '../../document/file-actions/file-reader';
 import type { ImageEditorController } from '../../controller';
 import { assertEditorRasterImageFileCanBeRead } from '../../document/file-actions/raster-intake';
-import { readFileAsDataUrl, readFileAsText } from '../sidebar-shared';
 
 type EditorActionRailController = Pick<
   ImageEditorController,

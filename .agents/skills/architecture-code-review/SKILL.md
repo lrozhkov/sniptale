@@ -15,7 +15,7 @@ Read [`references/architecture-review-checklist.md`](references/architecture-rev
 
 ## Inputs And Timing
 
-Required closeout review starts only after the supplied bounded manifest is complete and applicable harness proof plus `qa:checkpoint` are green. Run as an independent read-only agent without inherited context. Receive explicit files/diff, completion matrix, preflight shape, QA result, known failures, and affected consumers; do not receive intended conclusions.
+Required closeout review starts only after the supplied bounded manifest is complete and applicable harness proof plus `qa:checkpoint` are green. The orchestrator must spawn a new independent read-only reviewer with `fork_turns: "none"` and must not reuse an agent that saw implementation context. The initial task must contain the explicit bounded manifest/completion matrix, exact current diff scope, preflight shape, QA results, known failures, and affected consumers; do not receive intended conclusions.
 
 ## Workflow
 

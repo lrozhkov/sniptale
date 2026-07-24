@@ -27,6 +27,5 @@ export {
   pushRecentColor,
   type BackgroundGradientPreset,
 } from './options';
-export { readFileAsDataUrl, readFileAsText } from './file-reader';
 export { DimensionInput } from './dimension-input';
 export { toNumber } from './helpers';
