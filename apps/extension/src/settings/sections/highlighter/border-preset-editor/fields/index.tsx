@@ -1,13 +1,11 @@
 import { translate } from '../../../../../platform/i18n';
 import { editorInputClassName } from '../constants';
 import type { EditorState } from './types';
-import {
-  EditorBasicSettings,
-  EditorCustomCssField,
-  EditorPaddingFields,
-  EditorPreview,
-  EditorShadowField,
-} from './sections';
+import { EditorBasicSettings } from './sections/basic-settings';
+import { EditorCustomCssField } from './sections/custom-css-field';
+import { EditorPaddingFields } from './sections/padding-fields';
+import { EditorPreview } from './sections/preview';
+import { EditorShadowField } from './sections/shadow-buttons';
 
 export function BorderPresetEditorFields({ state }: { state: EditorState }) {
   return (

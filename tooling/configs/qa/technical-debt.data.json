@@ -10298,7 +10298,6 @@
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/index.tsx",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/basic-settings.tsx",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/custom-css-field.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/index.tsx",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/padding-fields.tsx",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/preview.tsx",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/shadow-buttons.tsx",
@@ -10387,7 +10386,6 @@
         "apps/extension/src/settings/sections/permissions/useSettingsPermissions/requests/use-permission-revokes.ts",
         "apps/extension/src/settings/sections/permissions/useSettingsPermissions/types.ts",
         "apps/extension/src/settings/sections/privacy/index.tsx",
-        "apps/extension/src/settings/sections/quick-actions/actions.ts",
         "apps/extension/src/settings/sections/quick-actions/controller.ts",
         "apps/extension/src/settings/sections/quick-actions/crud/editing.ts",
         "apps/extension/src/settings/sections/quick-actions/crud/index.ts",
@@ -10411,7 +10409,6 @@
         "apps/extension/src/settings/sections/quick-actions/section/helpers.ts",
         "apps/extension/src/settings/sections/quick-actions/state.test-helpers.ts",
         "apps/extension/src/settings/sections/quick-actions/state.ts",
-        "apps/extension/src/settings/sections/quick-actions/views.tsx",
         "apps/extension/src/settings/sections/save-presets/actions/defaults.ts",
         "apps/extension/src/settings/sections/save-presets/actions/dialogs.ts",
         "apps/extension/src/settings/sections/save-presets/actions/index.ts",
@@ -10451,7 +10448,6 @@
         "apps/extension/src/settings/sections/save-presets/surface/list/root.tsx",
         "apps/extension/src/settings/sections/save-presets/surface/list/row-class-name.ts",
         "apps/extension/src/settings/sections/save-presets/surface/overlays.tsx",
-        "apps/extension/src/settings/sections/save-presets/surface/views.tsx",
         "apps/extension/src/settings/sections/templates/actions.ts",
         "apps/extension/src/settings/sections/templates/content.sections.tsx",
         "apps/extension/src/settings/sections/templates/content.tsx",
@@ -10597,7 +10593,6 @@
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/index.tsx",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/basic-settings.tsx",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/custom-css-field.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/index.tsx",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/padding-fields.tsx",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/preview.tsx",
         "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/shadow-buttons.tsx",
@@ -10686,7 +10681,6 @@
         "apps/extension/src/settings/sections/permissions/useSettingsPermissions/requests/use-permission-revokes.ts",
         "apps/extension/src/settings/sections/permissions/useSettingsPermissions/types.ts",
         "apps/extension/src/settings/sections/privacy/index.tsx",
-        "apps/extension/src/settings/sections/quick-actions/actions.ts",
         "apps/extension/src/settings/sections/quick-actions/controller.ts",
         "apps/extension/src/settings/sections/quick-actions/crud/editing.ts",
         "apps/extension/src/settings/sections/quick-actions/crud/index.ts",
@@ -10710,7 +10704,6 @@
         "apps/extension/src/settings/sections/quick-actions/section/helpers.ts",
         "apps/extension/src/settings/sections/quick-actions/state.test-helpers.ts",
         "apps/extension/src/settings/sections/quick-actions/state.ts",
-        "apps/extension/src/settings/sections/quick-actions/views.tsx",
         "apps/extension/src/settings/sections/save-presets/actions/defaults.ts",
         "apps/extension/src/settings/sections/save-presets/actions/dialogs.ts",
         "apps/extension/src/settings/sections/save-presets/actions/index.ts",
@@ -10750,7 +10743,6 @@
         "apps/extension/src/settings/sections/save-presets/surface/list/root.tsx",
         "apps/extension/src/settings/sections/save-presets/surface/list/row-class-name.ts",
         "apps/extension/src/settings/sections/save-presets/surface/overlays.tsx",
-        "apps/extension/src/settings/sections/save-presets/surface/views.tsx",
         "apps/extension/src/settings/sections/templates/actions.ts",
         "apps/extension/src/settings/sections/templates/content.sections.tsx",
         "apps/extension/src/settings/sections/templates/content.tsx",
@@ -17621,7 +17613,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "c77c12fcaa0d94441bf6de063cc90ba9c0b6e9c9442ab6c5ab51313a7e04873a"
+        "contentHash": "0590ccfba94ecc41dae89d1207d1437a7b69db65f2da308b4786501c73fb0c89"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -18280,7 +18272,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/settings.mjs",
-        "contentHash": "a110c29508175292f461ae817542f7e6771657c907a4da92955a96e7074b9a6e"
+        "contentHash": "735ed530b5fcadb2130e4ea1b75f121450bcdb3e3f7751eea54ce5a75fc34e5b"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18288,20 +18280,20 @@
       ],
       "surfaces": [
         "binding:SETTINGS_OWNER_MAPPINGS",
-        "property:productionFiles",
-        "property:productionFiles[1]",
-        "property:productionFiles[2]",
-        "property:productionFiles[3]",
-        "property:productionFiles[4]",
-        "property:productionFiles[5]",
-        "property:productionFiles[6]",
         "property:testFiles",
         "property:testFiles[1]",
+        "property:testFiles[10]",
+        "property:testFiles[11]",
+        "property:testFiles[12]",
+        "property:testFiles[13]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
-        "property:testFiles[6]"
+        "property:testFiles[6]",
+        "property:testFiles[7]",
+        "property:testFiles[8]",
+        "property:testFiles[9]"
       ]
     },
     {

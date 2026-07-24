@@ -8,9 +8,9 @@ import {
   CaptureActionCard,
   DefaultPresetsCard,
   GalleryToggleCard,
-  PresetsList,
   SavePresetsHeader,
-} from './views';
+} from './cards';
+import { PresetsList } from './list/root';
 import type { SavePresetsListProps, SavePresetsRowHandlers } from '../state/types';
 
 type SavePresetsSectionContentProps = {
