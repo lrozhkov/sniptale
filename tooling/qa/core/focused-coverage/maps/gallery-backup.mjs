@@ -84,12 +84,6 @@ export const GALLERY_BACKUP_OWNER_MAPPINGS = [
   },
   {
     owner: 'gallery-backup-modal',
-    productionFile: 'apps/extension/src/gallery/library/modals/index.tsx',
-    reason: 'Backup export modal facade wiring is covered by the gallery modal facade test.',
-    testFiles: ['apps/extension/src/gallery/library/modals/gallery-modals.test.tsx'],
-  },
-  {
-    owner: 'gallery-backup-modal',
     productionFile: 'apps/extension/src/gallery/library/modals/types.ts',
     reason: 'Backup export modal prop contracts are covered by focused modal tests.',
     testFiles: ['apps/extension/src/gallery/library/modals/backup-export-content.test.tsx'],

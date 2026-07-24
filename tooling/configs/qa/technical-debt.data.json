@@ -8324,7 +8324,6 @@
         "apps/extension/src/gallery/library/modals/backup-export-content.tsx",
         "apps/extension/src/gallery/library/modals/frame.tsx",
         "apps/extension/src/gallery/library/modals/import-conflict-content.tsx",
-        "apps/extension/src/gallery/library/modals/index.tsx",
         "apps/extension/src/gallery/library/modals/storage-manager-content.tsx",
         "apps/extension/src/gallery/library/modals/types.ts",
         "apps/extension/src/gallery/library/preview/index.tsx",
@@ -8394,7 +8393,6 @@
         "apps/extension/src/gallery/library/modals/backup-export-content.tsx",
         "apps/extension/src/gallery/library/modals/frame.tsx",
         "apps/extension/src/gallery/library/modals/import-conflict-content.tsx",
-        "apps/extension/src/gallery/library/modals/index.tsx",
         "apps/extension/src/gallery/library/modals/storage-manager-content.tsx",
         "apps/extension/src/gallery/library/modals/types.ts",
         "apps/extension/src/gallery/library/preview/index.tsx",
@@ -15946,7 +15944,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/gallery-backup.mjs",
-        "contentHash": "3f22f93a205da1a02958f75105456d9ba93fee084f628cf4ae91611477aa054f"
+        "contentHash": "349b4f2877e1c8ed501e54270cd11aa86010e806b71c3a9caf91b51b0bf85153"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/gallery-backup.mjs",
@@ -15961,7 +15959,6 @@
         "property:testFiles[12]",
         "property:testFiles[13]",
         "property:testFiles[14]",
-        "property:testFiles[15]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
