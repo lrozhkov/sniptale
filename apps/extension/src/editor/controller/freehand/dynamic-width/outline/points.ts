@@ -1,5 +1,5 @@
 import type { FreehandPointRecord } from '../../points';
-import { isSharpCorner } from '../smoothing';
+import { isSharpCorner } from '../smoothing/corners';
 import type { DynamicStrokePoint } from '../types';
 import { buildCapPoints } from './caps';
 import { invertNormal, resolveNormal, resolveSegmentNormal, resolveTangent } from './geometry';

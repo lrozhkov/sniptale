@@ -1,5 +1,5 @@
 import type { EditableElement } from '../../../features/highlighter/contracts';
-import type { QuickEditOverlayState } from './helpers';
+import type { QuickEditOverlayState } from './overlay.state';
 
 export interface QuickEditModeEventHandlers {
   handleBlur: (event: FocusEvent, iframe?: HTMLIFrameElement) => void;

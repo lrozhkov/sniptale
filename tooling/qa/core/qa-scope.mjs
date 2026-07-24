@@ -6,12 +6,57 @@ export const PRODUCT_QA_SUITE = 'product';
 export const HARNESS_QA_SUITE = 'harness';
 export const ALL_QA_SUITE = 'all';
 export const HARNESS_QA_GUIDANCE = [
-  'run npm run qa:release-harness for tooling/**, QA-affecting root configuration,',
-  'hooks, .agents/**, AGENTS.md, or active tooling guidance',
+  'run npm run qa:release-harness for executable tooling/**, QA-affecting root configuration,',
+  'hooks, .agents/**, AGENTS.md, or active tooling guidance; machine-owned inventory-only changes',
+  'use their owner validators without a fresh harness stamp',
 ].join(' ');
 
 const JS_LIKE_FILE_PATTERN = /\.(?:ts|tsx|js|mjs|cjs)$/u;
 const HARNESS_ROOT_PATTERN = /^tooling\//u;
+const HARNESS_INVENTORY_ONLY_FILES = new Set([
+  'tooling/configs/qa/oss-release-consumers.data.json',
+  'tooling/configs/qa/technical-debt.data.json',
+  'tooling/configs/qa/instance-ownership.data.json',
+  'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs',
+]);
+const FOCUSED_COVERAGE_OWNER_MAP_PREFIX = 'tooling/qa/core/focused-coverage/maps/';
+const FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES = new Set([
+  'ai.mjs',
+  'archive.mjs',
+  'as-never.mjs',
+  'audit-media.mjs',
+  'audit-storage.mjs',
+  'audit.mjs',
+  'background-storage.mjs',
+  'cast-cleanup-content.mjs',
+  'cast-cleanup-shared.mjs',
+  'content-selection.mjs',
+  'editor.mjs',
+  'extension-ui-entrypoints.mjs',
+  'gallery-backup.mjs',
+  'har-export.mjs',
+  'local.mjs',
+  'media-hub-backup-package.mjs',
+  'media-hub-backup-privacy-export.mjs',
+  'media-hub-backup-privacy-restore.mjs',
+  'media-hub-backup-restore.mjs',
+  'media-hub.mjs',
+  'messaging.mjs',
+  'page-style.mjs',
+  'popup-page-access.mjs',
+  'popup-recording.mjs',
+  'privacy-erasure-runtime.mjs',
+  'privacy-erasure-video-preview.mjs',
+  'scenario-ai.mjs',
+  'scenario-export.mjs',
+  'scenario-stage.mjs',
+  'settings.mjs',
+  'shared-facade.mjs',
+  'video-project-export.mjs',
+  'video-recording-lease.mjs',
+  'video-runtime-routing.mjs',
+  'web-snapshot.mjs',
+]);
 const SHARED_CONTROL_PATTERNS = [/^\.github\/workflows\//u, /^\.husky\//u, /^docs\/tooling\//u];
 const VITE_CONFIG_PATTERN = /(?:^|\/)vite\.config\.[cm]?[jt]s$/u;
 const SHARED_CONTROL_FILES = new Set([
@@ -43,6 +88,23 @@ export function isSharedControlQaFile(file) {
 
 export function isHarnessQaFile(file) {
   return HARNESS_ROOT_PATTERN.test(file) || isSharedControlQaFile(file);
+}
+
+export function isHarnessInventoryOnlyFile(file) {
+  return HARNESS_INVENTORY_ONLY_FILES.has(file) || isFocusedCoverageOwnerMapInventoryFile(file);
+}
+
+export function isFocusedCoverageOwnerMapInventoryFile(file) {
+  if (!file.startsWith(FOCUSED_COVERAGE_OWNER_MAP_PREFIX) || !file.endsWith('.mjs')) {
+    return false;
+  }
+
+  const basename = file.slice(FOCUSED_COVERAGE_OWNER_MAP_PREFIX.length);
+  return !basename.includes('/') && FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES.has(basename);
+}
+
+export function isHarnessVerificationQaFile(file) {
+  return isHarnessQaFile(file) && !isHarnessInventoryOnlyFile(file);
 }
 
 export function isProductQaFile(file) {
@@ -80,45 +142,106 @@ export function createQaScopeFingerprint(files = []) {
   return createFileContentFingerprint(files);
 }
 
+function selectSuiteFiles(suite, partitionedFiles, allFiles) {
+  if (suite === HARNESS_QA_SUITE) return partitionedFiles.harnessFiles;
+  if (suite === PRODUCT_QA_SUITE) return partitionedFiles.productFiles;
+  return allFiles;
+}
+
+function collectHarnessInventoryScope(partitionedTargets, partitionedExistingTargets) {
+  return {
+    harnessInventoryTargetFiles: partitionedTargets.harnessFiles.filter(isHarnessInventoryOnlyFile),
+    harnessInventoryExistingTargetFiles: partitionedExistingTargets.harnessFiles.filter(
+      isHarnessInventoryOnlyFile
+    ),
+    harnessVerificationTargetFiles: partitionedTargets.harnessFiles.filter(
+      isHarnessVerificationQaFile
+    ),
+    harnessVerificationExistingTargetFiles: partitionedExistingTargets.harnessFiles.filter(
+      isHarnessVerificationQaFile
+    ),
+  };
+}
+
+function collectQualityScope(context, { allTargetFiles, targetFiles, existingTargetFiles }) {
+  const targetFileSet = new Set(targetFiles);
+  const existingTargetFileSet = new Set(existingTargetFiles);
+  const codeFiles = existingTargetFiles.length > 0 ? collectCodeFiles(existingTargetFiles) : [];
+  const jsLikeFiles = existingTargetFiles.filter((file) => JS_LIKE_FILE_PATTERN.test(file));
+  return {
+    codeFiles,
+    jsLikeFiles,
+    qualityTargetFiles: (context.qualityTargetFiles ?? allTargetFiles).filter((file) =>
+      targetFileSet.has(file)
+    ),
+    qualityCodeFiles: (context.qualityCodeFiles ?? codeFiles).filter((file) =>
+      existingTargetFileSet.has(file)
+    ),
+    qualityJsLikeFiles: (context.qualityJsLikeFiles ?? jsLikeFiles).filter((file) =>
+      existingTargetFileSet.has(file)
+    ),
+  };
+}
+
 export function createScopedQaContext(context, { suite = PRODUCT_QA_SUITE } = {}) {
   const resolvedSuite = normalizeQaSuite(suite);
   const allTargetFiles = context.allTargetFiles ?? context.targetFiles ?? [];
   const allExistingTargetFiles =
     context.allExistingTargetFiles ?? context.existingTargetFiles ?? [];
+  const allQualityTargetFiles =
+    context.allQualityTargetFiles ?? context.qualityTargetFiles ?? allTargetFiles;
+  const allQualityCodeFiles =
+    context.allQualityCodeFiles ??
+    context.qualityCodeFiles ??
+    collectCodeFiles(allExistingTargetFiles);
+  const allQualityJsLikeFiles =
+    context.allQualityJsLikeFiles ??
+    context.qualityJsLikeFiles ??
+    allExistingTargetFiles.filter((file) => JS_LIKE_FILE_PATTERN.test(file));
   const partitionedTargets = partitionQaScopeFiles(allTargetFiles);
   const partitionedExistingTargets = partitionQaScopeFiles(allExistingTargetFiles);
-  const targetFiles =
-    resolvedSuite === HARNESS_QA_SUITE
-      ? partitionedTargets.harnessFiles
-      : resolvedSuite === PRODUCT_QA_SUITE
-        ? partitionedTargets.productFiles
-        : allTargetFiles;
-  const existingTargetFiles =
-    resolvedSuite === HARNESS_QA_SUITE
-      ? partitionedExistingTargets.harnessFiles
-      : resolvedSuite === PRODUCT_QA_SUITE
-        ? partitionedExistingTargets.productFiles
-        : allExistingTargetFiles;
+  const inventoryScope = collectHarnessInventoryScope(
+    partitionedTargets,
+    partitionedExistingTargets
+  );
+  const targetFiles = selectSuiteFiles(resolvedSuite, partitionedTargets, allTargetFiles);
+  const existingTargetFiles = selectSuiteFiles(
+    resolvedSuite,
+    partitionedExistingTargets,
+    allExistingTargetFiles
+  );
+  const qualityScope = collectQualityScope(context, {
+    allTargetFiles,
+    targetFiles,
+    existingTargetFiles,
+  });
 
   return {
     ...context,
     suite: resolvedSuite,
     allTargetFiles,
     allExistingTargetFiles,
+    allQualityTargetFiles,
+    allQualityCodeFiles,
+    allQualityJsLikeFiles,
     allFingerprint: createQaScopeFingerprint(allTargetFiles),
     productTargetFiles: partitionedTargets.productFiles,
     productExistingTargetFiles: partitionedExistingTargets.productFiles,
     harnessTargetFiles: partitionedTargets.harnessFiles,
     harnessExistingTargetFiles: partitionedExistingTargets.harnessFiles,
-    harnessFingerprint: createQaScopeFingerprint(partitionedTargets.harnessFiles),
+    ...inventoryScope,
+    harnessFingerprint: createQaScopeFingerprint(inventoryScope.harnessVerificationTargetFiles),
     targetFiles,
     existingTargetFiles,
-    codeFiles: existingTargetFiles.length > 0 ? collectCodeFiles(existingTargetFiles) : [],
-    jsLikeFiles: existingTargetFiles.filter((file) => JS_LIKE_FILE_PATTERN.test(file)),
+    ...qualityScope,
     fingerprint: createQaScopeFingerprint(targetFiles),
   };
 }
 
 export function hasHarnessQaTargets(context) {
   return (context.harnessTargetFiles ?? []).length > 0;
+}
+
+export function hasHarnessVerificationQaTargets(context) {
+  return (context.harnessVerificationTargetFiles ?? context.harnessTargetFiles ?? []).length > 0;
 }

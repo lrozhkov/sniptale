@@ -87,7 +87,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 720 });
 });
 
-function registerDragFrameUpdateTest() {
+describe('selection-mode ui frame updates', () => {
   it('creates and reuses the drag-size label while updating frame geometry', () => {
     const dom = createDom();
 
@@ -102,9 +102,7 @@ function registerDragFrameUpdateTest() {
     expect(labels).toHaveLength(1);
     expect(labels[0]?.textContent).toBe('150 × 91');
   });
-}
 
-function registerFinalFrameUpdateTest() {
   it('syncs tooltip values, frame geometry, overlay shades, and panel position', () => {
     const dom = createDom();
 
@@ -138,9 +136,7 @@ function registerFinalFrameUpdateTest() {
       dom.finalOverlay?.querySelector('.sniptale-shade-right')?.getAttribute('style')
     ).toContain('width: 940px');
   });
-}
 
-function registerMissingDomGuardTest() {
   it('returns early when final-frame dependencies are missing', () => {
     const dom = createDom();
     dom.sizePanel = null;
@@ -150,9 +146,7 @@ function registerMissingDomGuardTest() {
     expect(syncContentSizeTooltipValuesMock).not.toHaveBeenCalled();
     expect(setContentSizeTooltipPositionMock).not.toHaveBeenCalled();
   });
-}
 
-function registerCleanupTests() {
   it('removes final elements and fully clears the owned DOM references', () => {
     const dom = createDom();
     const cancelButton = dom.cancelButton;
@@ -181,11 +175,4 @@ function registerCleanupTests() {
     expect(dom.cancelButton).toBeNull();
     expect(dom.dragEventCatcher).toBeNull();
   });
-}
-
-describe('selection-mode ui frame updates', () => {
-  registerDragFrameUpdateTest();
-  registerFinalFrameUpdateTest();
-  registerMissingDomGuardTest();
-  registerCleanupTests();
 });

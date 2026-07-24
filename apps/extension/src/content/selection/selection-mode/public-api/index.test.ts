@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { disableSelectionModeApi, enableSelectionModeApi, isSelectionModeActiveApi } from '.';
 import { disableNavigationLock, enableNavigationLock } from '../../locker';
+import { createSelectionModeSession, resetSelectionModeSession } from '../session';
 
 vi.mock('../../locker', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -8,23 +9,16 @@ vi.mock('../../locker', async (importOriginal) => ({
   enableNavigationLock: vi.fn(),
 }));
 
-type SelectionBox = { x: number; y: number; width: number; height: number };
-
 function createEnableApiFixture() {
-  let isActive = true;
-  let resolveCallback: ((value: SelectionBox) => void) | null = null;
-  let rejectCallback: ((reason?: unknown) => void) | null = null;
+  const session = createSelectionModeSession();
+  session.isActive = true;
   const cleanup = vi.fn(() => {
-    isActive = false;
+    resetSelectionModeSession(session);
   });
   const createHoverElements = vi.fn();
   const createOverlayContainer = vi.fn();
   const enableCursor = vi.fn();
   const prepareUi = vi.fn(async () => undefined);
-  const setCurrentState = vi.fn();
-  const setIsActive = vi.fn((value: boolean) => {
-    isActive = value;
-  });
   const setupEventListeners = vi.fn();
 
   return {
@@ -33,41 +27,32 @@ function createEnableApiFixture() {
       createHoverElements,
       createOverlayContainer,
       enableCursor,
-      getIsActive: () => isActive,
       prepareUi,
-      setCurrentState,
-      setIsActive,
-      setRejectCallback: (callback: ((reason?: unknown) => void) | null) => {
-        rejectCallback = callback;
-      },
-      setResolveCallback: (callback: ((value: SelectionBox) => void) | null) => {
-        resolveCallback = callback;
-      },
+      session,
       setupEventListeners,
     },
     createHoverElements,
     createOverlayContainer,
     cleanup,
     enableCursor,
-    getRejectCallback: () => rejectCallback,
-    getResolveCallback: () => resolveCallback,
     prepareUi,
-    setCurrentState,
-    setIsActive,
+    session,
     setupEventListeners,
   };
 }
 
-function createDisableApiFixture() {
+function createDisableApiFixture(rejectCallback: ((reason?: unknown) => void) | null = null) {
+  const session = createSelectionModeSession();
+  session.aspectRatio = 2;
+  session.currentSelection = { x: 1, y: 2, width: 3, height: 4 };
+  session.currentState = 'confirmed';
+  session.isActive = true;
+  session.maintainAspectRatio = true;
+  session.rejectCallback = rejectCallback;
+  session.resolveCallback = vi.fn();
   return {
-    cleanup: vi.fn(),
-    setAspectRatio: vi.fn(),
-    setCurrentSelection: vi.fn(),
-    setCurrentState: vi.fn(),
-    setIsActive: vi.fn(),
-    setMaintainAspectRatio: vi.fn(),
-    setResolveCallback: vi.fn(),
-    setRejectCallback: vi.fn(),
+    cleanup: vi.fn(() => resetSelectionModeSession(session)),
+    session,
   };
 }
 
@@ -78,18 +63,18 @@ function registerEnableApiTest() {
     await Promise.resolve();
 
     expect(fixture.cleanup).toHaveBeenCalledTimes(1);
-    expect(fixture.setIsActive).toHaveBeenCalledWith(true);
-    expect(fixture.setCurrentState).toHaveBeenCalledWith('idle');
+    expect(fixture.session.isActive).toBe(true);
+    expect(fixture.session.currentState).toBe('idle');
     expect(enableNavigationLock).toHaveBeenCalledWith(true);
     expect(fixture.prepareUi).toHaveBeenCalledTimes(1);
     expect(fixture.createOverlayContainer).toHaveBeenCalledTimes(1);
     expect(fixture.createHoverElements).toHaveBeenCalledTimes(1);
     expect(fixture.enableCursor).toHaveBeenCalledTimes(1);
     expect(fixture.setupEventListeners).toHaveBeenCalledTimes(1);
-    expect(fixture.getResolveCallback()).toBeTypeOf('function');
-    expect(fixture.getRejectCallback()).toBeTypeOf('function');
+    expect(fixture.session.resolveCallback).toBeTypeOf('function');
+    expect(fixture.session.rejectCallback).toBeTypeOf('function');
 
-    fixture.getResolveCallback()?.({ x: 1, y: 2, width: 3, height: 4 });
+    fixture.session.resolveCallback?.({ x: 1, y: 2, width: 3, height: 4 });
 
     await expect(pendingSelection).resolves.toEqual({ x: 1, y: 2, width: 3, height: 4 });
   });
@@ -106,39 +91,36 @@ function registerEnableApiTest() {
 
     expect(disableNavigationLock).toHaveBeenCalledTimes(1);
     expect(fixture.cleanup).toHaveBeenCalledTimes(2);
-    expect(fixture.setIsActive).toHaveBeenLastCalledWith(false);
-    expect(fixture.setCurrentState).toHaveBeenLastCalledWith('idle');
-    expect(fixture.getResolveCallback()).toBeNull();
-    expect(fixture.getRejectCallback()).toBeNull();
+    expect(fixture.session.isActive).toBe(false);
+    expect(fixture.session.currentState).toBe('idle');
+    expect(fixture.session.resolveCallback).toBeNull();
+    expect(fixture.session.rejectCallback).toBeNull();
   });
 }
 
 function registerDisableApiRejectTest() {
   it('rejects the pending selection promise and removes navigation lock on external disable', () => {
     const rejectCallback = vi.fn();
-    const fixture = createDisableApiFixture();
+    const fixture = createDisableApiFixture(rejectCallback);
 
     disableSelectionModeApi({
       cleanup: fixture.cleanup,
-      getRejectCallback: () => rejectCallback,
-      setAspectRatio: fixture.setAspectRatio,
-      setCurrentSelection: fixture.setCurrentSelection,
-      setCurrentState: fixture.setCurrentState,
-      setIsActive: fixture.setIsActive,
-      setMaintainAspectRatio: fixture.setMaintainAspectRatio,
-      setRejectCallback: fixture.setRejectCallback,
-      setResolveCallback: fixture.setResolveCallback,
+      session: fixture.session,
     });
 
     expect(fixture.cleanup).toHaveBeenCalledTimes(1);
     expect(disableNavigationLock).toHaveBeenCalledTimes(1);
-    expect(fixture.setIsActive).toHaveBeenCalledWith(false);
-    expect(fixture.setCurrentState).toHaveBeenCalledWith('idle');
-    expect(fixture.setCurrentSelection).toHaveBeenCalledWith({ x: 0, y: 0, width: 0, height: 0 });
-    expect(fixture.setAspectRatio).toHaveBeenCalledWith(null);
-    expect(fixture.setMaintainAspectRatio).toHaveBeenCalledWith(false);
-    expect(fixture.setResolveCallback).toHaveBeenCalledWith(null);
-    expect(fixture.setRejectCallback).toHaveBeenCalledWith(null);
+    expect(fixture.session).toEqual(
+      expect.objectContaining({
+        aspectRatio: null,
+        currentSelection: { x: 0, y: 0, width: 0, height: 0 },
+        currentState: 'idle',
+        isActive: false,
+        maintainAspectRatio: false,
+        rejectCallback: null,
+        resolveCallback: null,
+      })
+    );
     expect(rejectCallback).toHaveBeenCalledTimes(1);
     expect(rejectCallback.mock.calls[0]?.[0]).toMatchObject({ message: 'Cancelled by user' });
   });
@@ -150,19 +132,12 @@ function registerDisableApiNoRejectTest() {
 
     disableSelectionModeApi({
       cleanup: fixture.cleanup,
-      getRejectCallback: () => null,
-      setAspectRatio: fixture.setAspectRatio,
-      setCurrentSelection: fixture.setCurrentSelection,
-      setCurrentState: fixture.setCurrentState,
-      setIsActive: fixture.setIsActive,
-      setMaintainAspectRatio: fixture.setMaintainAspectRatio,
-      setRejectCallback: fixture.setRejectCallback,
-      setResolveCallback: fixture.setResolveCallback,
+      session: fixture.session,
     });
 
     expect(fixture.cleanup).toHaveBeenCalledTimes(1);
     expect(disableNavigationLock).toHaveBeenCalledTimes(1);
-    expect(fixture.setRejectCallback).toHaveBeenCalledWith(null);
+    expect(fixture.session.rejectCallback).toBeNull();
   });
 }
 

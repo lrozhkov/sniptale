@@ -1,5 +1,9 @@
 import { createOkStep, createSkippedStep } from '../core/focused-qa-results.mjs';
-import { HARNESS_QA_GUIDANCE, hasHarnessQaTargets } from '../core/qa-scope.mjs';
+import {
+  HARNESS_QA_GUIDANCE,
+  hasHarnessQaTargets,
+  hasHarnessVerificationQaTargets,
+} from '../core/qa-scope.mjs';
 import { collectOptionalCommitSteps } from './build.commit-steps.mjs';
 
 function createBuildResult(context, steps, skipped = false, scopeDetail = '', executionMode) {
@@ -30,21 +34,37 @@ function collectNoProductBuild(context, options, dependencies) {
       'no-targets'
     );
   }
-  dependencies.harnessStateAsserter(context, 'qa:build');
+  if (hasHarnessVerificationQaTargets(context)) {
+    dependencies.harnessStateAsserter(context, 'qa:build');
+  }
+  dependencies.checkpointStateAsserter(context, 'qa:build');
   if (!options.shouldCommit) {
     return createBuildResult(
       context,
-      [createOkStep('QA build', 'no product targets; fresh harness stamp')],
+      [
+        createOkStep(
+          'QA build',
+          hasHarnessVerificationQaTargets(context)
+            ? 'no product targets; fresh harness stamp and checkpoint'
+            : 'no product targets; fresh checkpoint with data-only inventory owner validation'
+        ),
+      ],
       false,
       '',
       'control-validate'
     );
   }
-  dependencies.checkpointStateAsserter(context, 'qa:build');
   return createBuildResult(
     context,
     commitSteps(
-      [createOkStep('Build', `no product targets; ${HARNESS_QA_GUIDANCE}`)],
+      [
+        createOkStep(
+          'Build',
+          hasHarnessVerificationQaTargets(context)
+            ? `no product targets; ${HARNESS_QA_GUIDANCE}`
+            : 'no product targets; fresh checkpoint validated the data-only inventory without a harness stamp'
+        ),
+      ],
       options,
       dependencies,
       'control-commit'

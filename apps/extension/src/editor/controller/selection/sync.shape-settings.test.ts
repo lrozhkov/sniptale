@@ -85,7 +85,7 @@ vi.mock('../../objects', async () => ({
 }));
 
 import { Rect } from 'fabric';
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 beforeEach(() => {
   vi.clearAllMocks();

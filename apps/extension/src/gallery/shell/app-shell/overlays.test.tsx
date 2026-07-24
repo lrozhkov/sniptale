@@ -26,13 +26,19 @@ vi.mock('@sniptale/ui/product-feedback/confirm-dialog', async (importOriginal) =
   },
 }));
 
-vi.mock('../../library/modals', () => ({
-  BackupExportModal: () => null,
-  ImportConflictModal: (props: unknown) => {
+vi.mock('../../library/modals/backup-export-content', () => ({
+  BackupExportModalContent: () => null,
+}));
+
+vi.mock('../../library/modals/import-conflict-content', () => ({
+  ImportConflictModalContent: (props: unknown) => {
     importConflictPropsMock(props);
     return <div data-ui="test.import-modal" />;
   },
-  StorageManagerModal: (props: unknown) => {
+}));
+
+vi.mock('../../library/modals/storage-manager-content', () => ({
+  StorageManagerModalContent: (props: unknown) => {
     storageManagerPropsMock(props);
     return <div data-ui="test.storage-modal" />;
   },

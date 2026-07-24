@@ -2,7 +2,6 @@ import type { MutableRefObject } from 'react';
 
 import type { CaptureActionType, QuickActionOverlay } from '../../../contracts/settings';
 import { isLockEnabled, setUIHidden } from '../../selection/locker';
-import type { CountdownLockSession } from './countdown/controller';
 import { restoreNavigationLockState } from './countdown/controller';
 import type { ScreenshotControllerScenarioBridge } from './scenario';
 import type {
@@ -11,6 +10,7 @@ import type {
   ScreenshotControllerRuntime,
   ScreenshotStartContext,
 } from './types';
+import type { ScreenshotControllerSession } from './session/state';
 
 const STALE_SCREENSHOT_RUN_ERROR_NAME = 'StaleScreenshotRunError';
 
@@ -110,7 +110,7 @@ export function closeQuickActionCapture(
     return;
   }
 
-  const navigationLockEnabledBeforeScreenshot = runtime.navigationLockStateBeforeScreenshot.current;
+  const navigationLockEnabledBeforeScreenshot = runtime.session.navigationLockBaseline;
 
   clearQuickActionOverlay(params);
   params.setScreenshotMode(false);
@@ -127,18 +127,18 @@ export function closeQuickActionCapture(
 export function cancelQuickActionCountdown(
   params: ScreenshotControllerParams,
   runtime: ScreenshotControllerRuntime,
-  countdownLockSessionRef: MutableRefObject<CountdownLockSession | null>
+  session: Pick<ScreenshotControllerSession, 'countdownLock'>
 ): void {
-  countdownLockSessionRef.current = null;
+  session.countdownLock = null;
   closeQuickActionCapture(params, runtime);
 }
 
 export function prepareScreenshotMode(
   params: ScreenshotControllerParams,
-  navigationLockStateBeforeScreenshot: MutableRefObject<boolean>,
+  session: Pick<ScreenshotControllerSession, 'navigationLockBaseline'>,
   startContext: ScreenshotStartContext = {}
 ): void {
-  navigationLockStateBeforeScreenshot.current = resolveNavigationLockBaseline(params, startContext);
+  session.navigationLockBaseline = resolveNavigationLockBaseline(params, startContext);
   disableEditingModes(params);
   params.setNavigationLockEnabled(isLockEnabled());
 }
@@ -150,9 +150,9 @@ function clearQuickActionOverlay(
 }
 
 export function beginScreenshotRun(runtime: ScreenshotControllerRuntime): number {
-  runtime.screenshotRunGenerationRef.current += 1;
-  runtime.screenshotRunActiveRef.current = true;
-  return runtime.screenshotRunGenerationRef.current;
+  runtime.session.runGeneration += 1;
+  runtime.session.runActive = true;
+  return runtime.session.runGeneration;
 }
 
 export function completeScreenshotRun(
@@ -160,19 +160,19 @@ export function completeScreenshotRun(
   runToken: number | undefined
 ): void {
   if (isCurrentScreenshotRun(runtime, runToken)) {
-    runtime.screenshotRunActiveRef.current = false;
+    runtime.session.runActive = false;
   }
 }
 
 export function isCurrentScreenshotRun(
-  runtime: Pick<ScreenshotControllerRuntime, 'screenshotRunGenerationRef'>,
+  runtime: Pick<ScreenshotControllerRuntime, 'session'>,
   runToken: number | undefined
 ): boolean {
-  return runToken === undefined || runtime.screenshotRunGenerationRef.current === runToken;
+  return runToken === undefined || runtime.session.runGeneration === runToken;
 }
 
 export function assertCurrentScreenshotRun(
-  runtime: Pick<ScreenshotControllerRuntime, 'screenshotRunGenerationRef'>,
+  runtime: Pick<ScreenshotControllerRuntime, 'session'>,
   runToken: number | undefined
 ): void {
   if (!isCurrentScreenshotRun(runtime, runToken)) {

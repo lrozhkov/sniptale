@@ -15,8 +15,10 @@ const {
 }));
 
 vi.mock('./start/index', () => ({
-  cleanupResources: cleanupResourcesMock,
   startRecording: startRecordingImplMock,
+}));
+vi.mock('./start/cleanup', () => ({
+  cleanupResources: cleanupResourcesMock,
 }));
 vi.mock('./multi-source', () => ({
   cancelPendingMultiSourceRecordingStart: cancelPendingMultiSourceRecordingStartMock,

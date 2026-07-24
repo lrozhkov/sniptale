@@ -20,7 +20,12 @@ import {
   type AiPrivacyProof,
 } from '../../../../../../features/ai/privacy';
 import { createAllowlistedAiEditablePayload } from './payload';
-import type { AiSubmitRequest } from './types';
+
+type AiSubmitRequest = {
+  jsonData: string;
+  modelId?: string | null;
+  prompt: string;
+};
 
 const logger = createLogger({ namespace: 'ContentAiPickSubmit' });
 

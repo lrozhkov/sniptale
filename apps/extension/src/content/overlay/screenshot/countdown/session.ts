@@ -1,16 +1,12 @@
 import { disableNavigationLock, enableNavigationLock } from '../../../selection/locker';
-
-export type CountdownLockSession = {
-  navigationLockEnabledBeforeCountdown: boolean;
-};
+import type { ScreenshotControllerSession } from '../session/state';
 
 export function beginCountdownLockSession(args: {
-  countdownLockSessionRef: { current: CountdownLockSession | null };
-  navigationLockStateBeforeScreenshot: { current: boolean };
+  session: Pick<ScreenshotControllerSession, 'countdownLock' | 'navigationLockBaseline'>;
   setNavigationLockEnabled: (enabled: boolean) => void;
 }): void {
-  args.countdownLockSessionRef.current = {
-    navigationLockEnabledBeforeCountdown: args.navigationLockStateBeforeScreenshot.current,
+  args.session.countdownLock = {
+    navigationLockEnabledBeforeCountdown: args.session.navigationLockBaseline,
   };
   disableNavigationLock();
   args.setNavigationLockEnabled(false);
@@ -30,20 +26,19 @@ export function restoreNavigationLockState(
 }
 
 export function restoreCountdownLockOnCancel(args: {
-  countdownLockSessionRef: { current: CountdownLockSession | null };
-  navigationLockStateBeforeScreenshot: { current: boolean };
+  session: Pick<ScreenshotControllerSession, 'countdownLock' | 'navigationLockBaseline'>;
   setNavigationLockEnabled: (enabled: boolean) => void;
 }): void {
   const enabled =
-    args.countdownLockSessionRef.current?.navigationLockEnabledBeforeCountdown ??
-    args.navigationLockStateBeforeScreenshot.current;
+    args.session.countdownLock?.navigationLockEnabledBeforeCountdown ??
+    args.session.navigationLockBaseline;
 
-  clearCountdownLockSession(args.countdownLockSessionRef);
+  clearCountdownLockSession(args.session);
   restoreNavigationLockState(enabled, args.setNavigationLockEnabled);
 }
 
-export function clearCountdownLockSession(countdownLockSessionRef: {
-  current: CountdownLockSession | null;
-}): void {
-  countdownLockSessionRef.current = null;
+export function clearCountdownLockSession(
+  session: Pick<ScreenshotControllerSession, 'countdownLock'>
+): void {
+  session.countdownLock = null;
 }

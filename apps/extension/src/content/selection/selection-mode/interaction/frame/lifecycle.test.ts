@@ -12,7 +12,8 @@ vi.mock('../selection/helpers', () => ({
 }));
 
 import * as selectionUi from '../../ui';
-import { handleResizeMove, resetToIdleState, updateDragFrame, updateFinalFrame } from '.';
+import { handleResizeMove } from './resize';
+import { resetToIdleState } from './selection';
 
 function createDom(): SelectionModeDom {
   return {
@@ -62,25 +63,6 @@ function registerResetTest() {
   });
 }
 
-function registerUiDelegationTest() {
-  it('forwards drag-frame and final-frame updates to the UI helpers', () => {
-    const dom = createDom();
-    const rect = { x: 20, y: 30, width: 160, height: 90 };
-    const updateDragFrameSpy = vi
-      .spyOn(selectionUi, 'updateDragFrame')
-      .mockImplementation(() => {});
-    const updateFinalFrameSpy = vi
-      .spyOn(selectionUi, 'updateFinalFrame')
-      .mockImplementation(() => {});
-
-    updateDragFrame(dom, rect);
-    updateFinalFrame(dom, rect);
-
-    expect(updateDragFrameSpy).toHaveBeenCalledWith(dom, rect);
-    expect(updateFinalFrameSpy).toHaveBeenCalledWith(dom, rect);
-  });
-}
-
 function registerResizeDelegationTest() {
   it('passes resize calculations through the interaction helper', () => {
     const event = { clientX: 280, clientY: 220 } as MouseEvent;
@@ -115,6 +97,5 @@ function registerResizeDelegationTest() {
 
 describe('selection-mode frame lifecycle', () => {
   registerResetTest();
-  registerUiDelegationTest();
   registerResizeDelegationTest();
 });

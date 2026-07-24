@@ -40,7 +40,8 @@ vi.mock('../../diagnostics/public/har-export', async (importOriginal) => ({
   stopPreauthorizedExportHarSession: stopPreauthorizedExportHarSessionMock,
 }));
 
-import { handleExecuteSave, handleExportStartHar, handleExportStopHar } from './actions';
+import { handleExecuteSave } from './actions.download';
+import { handleExportStartHar, handleExportStopHar } from './actions.export';
 
 beforeEach(() => {
   vi.clearAllMocks();

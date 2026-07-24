@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSelectionModeEventsBridge } from '.';
+import { createSelectionModeSession } from '../../session';
 import { disableNavigationLock } from '../../../locker';
 import { logSelectionModeError } from '../../diag';
 import {
@@ -16,7 +17,7 @@ import {
   startSelectionModeDragSelection,
   updateSelectionModeDragSelection,
   updateSelectionModeFinalFrame,
-} from '../../interaction/actions/runtime';
+} from '../../runtime/drag';
 import {
   buildSelectionCaptureArea,
   cleanupSelectionModeRuntime,
@@ -45,7 +46,7 @@ vi.mock('../../runtime', () => ({
   isSelectionModeExtensionUiElement: vi.fn(),
 }));
 
-vi.mock('../../interaction/actions/runtime', () => ({
+vi.mock('../../runtime/drag', () => ({
   constrainSelectionModeSelection: vi.fn(),
   finalizeSelectionModeDragSelection: vi.fn(),
   handleSelectionModeDragMove: vi.fn(),
@@ -62,13 +63,12 @@ vi.mock('../../interaction/actions/runtime', () => ({
 function createBridge(
   overrides: Partial<Parameters<typeof createSelectionModeEventsBridge>[0]> = {}
 ) {
-  const runtimeArgs = { state: { currentState: 'idle' } } as never;
+  const state = createSelectionModeSession();
+  state.currentSelection = { x: 10.2, y: 20.7, width: 30.4, height: 40.8 };
+  const runtimeArgs = { state } as never;
   return createSelectionModeEventsBridge({
     cleanupEvent: vi.fn(),
-    currentSelection: () => ({ x: 10.2, y: 20.7, width: 30.4, height: 40.8 }),
     disableCursor: vi.fn(),
-    getRejectCallback: () => null,
-    getResolveCallback: () => null,
     handleKeyDown: vi.fn(),
     runtimeArgs,
     ...overrides,
@@ -78,18 +78,17 @@ function createBridge(
 function registerResolveTest(): void {
   it('resolves the selection even if cleanup clears the stored callback', () => {
     const resolveCallback = vi.fn();
-    let currentResolve: typeof resolveCallback | null = resolveCallback;
+    const state = createSelectionModeSession();
+    state.currentSelection = { x: 10.2, y: 20.7, width: 30.4, height: 40.8 };
+    state.resolveCallback = resolveCallback;
 
     const bridge = createSelectionModeEventsBridge({
       cleanupEvent: () => {
-        currentResolve = null;
+        state.resolveCallback = null;
       },
-      currentSelection: () => ({ x: 10.2, y: 20.7, width: 30.4, height: 40.8 }),
       disableCursor: vi.fn(),
-      getRejectCallback: () => null,
-      getResolveCallback: () => currentResolve,
       handleKeyDown: vi.fn(),
-      runtimeArgs: {} as never,
+      runtimeArgs: { state } as never,
     });
 
     bridge.confirmSelection();
@@ -102,18 +101,16 @@ function registerResolveTest(): void {
 function registerRejectTest(): void {
   it('rejects the selection even if cleanup clears the stored callback', () => {
     const rejectCallback = vi.fn();
-    let currentReject: typeof rejectCallback | null = rejectCallback;
+    const state = createSelectionModeSession();
+    state.rejectCallback = rejectCallback;
 
     const bridge = createSelectionModeEventsBridge({
       cleanupEvent: () => {
-        currentReject = null;
+        state.rejectCallback = null;
       },
-      currentSelection: () => ({ x: 0, y: 0, width: 0, height: 0 }),
       disableCursor: vi.fn(),
-      getRejectCallback: () => currentReject,
-      getResolveCallback: () => null,
       handleKeyDown: vi.fn(),
-      runtimeArgs: {} as never,
+      runtimeArgs: { state } as never,
     });
 
     bridge.cancelSelection();
@@ -128,7 +125,8 @@ function registerCleanupTest(): void {
   it('cleans up runtime state and disables the cursor through the bridge cleanup action', () => {
     const disableCursor = vi.fn();
     const handleKeyDown = vi.fn();
-    const state = { currentState: 'dragging' };
+    const state = createSelectionModeSession();
+    state.currentState = 'drag';
     const runtimeArgs = { state } as never;
     const bridge = createBridge({
       disableCursor,
@@ -147,7 +145,9 @@ function registerRuntimeActionsTest(): void {
   it('delegates runtime event actions to the selection-mode helpers', () => {
     vi.mocked(isSelectionModeExtensionUiElement).mockReturnValue(true);
 
-    const runtimeArgs = { state: { currentState: 'hover' } } as never;
+    const state = createSelectionModeSession();
+    state.currentState = 'hover';
+    const runtimeArgs = { state } as never;
     const bridge = createBridge({ runtimeArgs });
     const dragEvent = new MouseEvent('mousemove');
     const resizeEvent = new MouseEvent('mousemove');

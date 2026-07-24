@@ -9,7 +9,11 @@ import {
   resolvePreviewDownloadHref,
 } from '../diagnostics/dom-driver';
 import type { ExportDiagnosticsSource } from '../diagnostics/source';
-import { generateFilename, isIntermediateDownloadPageUrl, isValidDownloadUrl } from './utils';
+import {
+  generateFilename,
+  isIntermediateDownloadPageUrl,
+  isValidDownloadUrl,
+} from './download-utils';
 export { collectFroalaImageResources } from '../formats/froala';
 export { downloadFileResources } from './download';
 

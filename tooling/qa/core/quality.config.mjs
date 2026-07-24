@@ -5,10 +5,9 @@
 export const QUALITY_LIMITS = {
   preferredWrapWidth: 100,
   maxLineLength: 120,
-  maxFileLines: 300,
-  maxFunctionLines: 50,
-  maxLogicTokens: 1800,
-  maxStaticLineLength: 500,
+  maxModuleSpecifierLength: 200,
+  maxClassifiedLiteralLength: 240,
+  maxGeneratedDataLineLength: 1000,
   deadCommentRunLength: 6,
 };
 
@@ -50,36 +49,6 @@ export const DATA_FILE_PATTERNS = [
   /^apps\/extension\/src\/design-system\/catalog\/registry\/index\.ts$/,
   /^apps\/extension\/manifest\.json$/,
   /^apps\/extension\/build\/.*\.data\.json$/,
-];
-
-export const TOKEN_BUDGET_EXCLUDE_PATTERNS = [
-  /^tooling\/qa\/core\/focused-coverage\/maps\//,
-  /\.d\.ts$/,
-  /\.test\.[cm]?[jt]sx?$/,
-  /\.spec\.[cm]?[jt]sx?$/,
-  /\.types\.[cm]?[jt]sx?$/,
-  /\.constants\.[cm]?[jt]sx?$/,
-  /\.data\.[cm]?[jt]sx?$/,
-  /^packages\/ui\/src\//,
-  /^apps\/extension\/src\/platform\/i18n\//,
-];
-
-export const TOKEN_BUDGET_INCLUDE_PATTERNS = [
-  /^tooling\/qa\//,
-  /^apps\/extension\/build\//,
-  /^apps\/extension\/src\/background\//,
-  /^apps\/extension\/src\/offscreen\//,
-  /^apps\/extension\/src\/content\/(?:hooks|logic|store)\//,
-  /^apps\/extension\/src\/editor\/(?:controller|document|objects|browser-frame|runtime|state)\//,
-  /^apps\/extension\/src\/video-editor\/(?:runtime|state|project)\//,
-  /^apps\/extension\/src\/video-editor\/library\/effects-dock\b/,
-  /^apps\/extension\/src\/video-editor\/preview\/(?:placement|stage\/(?:geometry|motion-area))\b/,
-  /^apps\/extension\/src\/video-editor\/preview\/stage\/(?:import-handlers|runtime)\b/,
-  /^apps\/extension\/src\/effect-runtime-sandbox\//,
-  /^apps\/extension\/src\/video-editor\/timeline\/previews\.ts$/,
-  /^apps\/extension\/src\/video-editor\/timeline\/project\/(?:effect-lanes|interaction-state)\//,
-  /^apps\/extension\/src\/(?:composition|contracts|features|foundation|platform|ui|workflows)\//,
-  /^packages\/(?:foundation|runtime-contracts|platform)\/src\//,
 ];
 
 export const SECURITY_IGNORE_PATTERNS = [

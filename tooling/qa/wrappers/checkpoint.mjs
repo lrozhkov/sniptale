@@ -4,6 +4,7 @@
 
 import { isExecutedAsScript, loadBaseline } from '../core/shared.mjs';
 import { collectAndPersistAdvisoryReport } from '../core/advisory-report.helpers.mjs';
+import { formatAdvisoryReport } from '../core/verify-advisory.report.helpers.mjs';
 import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
 import { collectFocusedStepResults } from '../core/verify-focused.execution.mjs';
 import { FOCUSED_CODE_VIOLATION_STEPS } from '../core/verify-focused.code-steps.mjs';
@@ -86,8 +87,34 @@ async function collectFormatStep(context) {
 
 function collectAdvisoryStep(context, { producerRunId } = {}) {
   return timeSyncStep(() => {
-    collectAndPersistAdvisoryReport(context, { printReport: false, producerRunId });
-    return createOkStep('Advisory report', `changed files=${context.targetFiles.length}`);
+    const report = collectAndPersistAdvisoryReport(context, {
+      printReport: false,
+      producerRunId,
+    });
+    const attention = report.findings.filter((finding) => finding.severity === 'attention').length;
+    return {
+      ...createOkStep(
+        'Advisory report',
+        `attention=${attention}, watch=${report.findings.length - attention}`
+      ),
+      consoleOutput: formatAdvisoryReport(report),
+      advisories: report.findings,
+    };
+  });
+}
+
+function deduplicateAdvisoryCoveredConsoleOutput(advisoryStep, focusedSteps) {
+  if (!advisoryStep.consoleOutput) {
+    return focusedSteps;
+  }
+
+  return focusedSteps.map((step) => {
+    if (step.label !== 'Structural risk' || !step.consoleOutput) {
+      return step;
+    }
+    const withoutDuplicate = { ...step };
+    delete withoutDuplicate.consoleOutput;
+    return withoutDuplicate;
   });
 }
 
@@ -106,7 +133,11 @@ async function collectCheckpointVerificationSteps({
     shouldRunManifestPermissions,
     shouldRunRuntimeTopology,
   });
-  return [formatStep, advisoryStep, ...focusedSteps];
+  return [
+    formatStep,
+    advisoryStep,
+    ...deduplicateAdvisoryCoveredConsoleOutput(advisoryStep, focusedSteps),
+  ];
 }
 
 function createCheckpointContext(contextCollector) {

@@ -57,7 +57,7 @@ const PRODUCT_PROOF_CODE_FILES = [
 ];
 function writeProductProofRiskFixture(root) {
   const sources = new Map([
-    [PRODUCT_PROOF_CODE_FILES[0], 'export function ToolbarControllerState() { return null; }\n'],
+    [PRODUCT_PROOF_CODE_FILES[0], 'export function Toolbar() { return <button />; }\n'],
     [
       PRODUCT_PROOF_CODE_FILES[1],
       'export function useHiddenFileInputController() { return null; }\n',
@@ -109,7 +109,7 @@ it('reports path-sensitive registry hints for missing moved paths referenced in 
   );
 });
 
-it('reports deleted internal aggregates, thin shell drift, owner-local proof gaps, and residual seams', async () => {
+it('reports deleted internal aggregates, thin shell drift, and owner-local proof gaps', async () => {
   const root = createTempRoot('guardrail-seam-audits-');
   writeDragSeamFixture(root);
 
@@ -137,14 +137,46 @@ it('reports deleted internal aggregates, thin shell drift, owner-local proof gap
   expect(report.ownerLocalProof).toEqual(
     expect.arrayContaining([expect.stringContaining('owner-local proof may be missing')])
   );
-  expect(report.residualSeams).toEqual(
-    expect.arrayContaining([
-      expect.stringContaining('apps/extension/src/content/overlay/ai/template-list-drag.ts'),
-    ])
+});
+
+it('keeps same-directory fragmentation context when only one family file changed', async () => {
+  const root = createTempRoot('guardrail-bounded-owner-directory-');
+  const controller = 'apps/extension/src/content/overlay/example/controller.ts';
+  const sibling = 'apps/extension/src/content/overlay/example/controller-state.ts';
+  const operation = 'apps/extension/src/content/overlay/example/operation-step.ts';
+  const operationSibling = 'apps/extension/src/content/overlay/example/operation-result.ts';
+  writeFile(
+    root,
+    controller,
+    [
+      'export function createController() {',
+      ...Array.from({ length: 121 }, (_, index) => `  const value${index} = ${index};`),
+      '  return null;',
+      '}',
+      '',
+    ].join('\n')
+  );
+  writeFile(root, sibling, 'export const state = {};\n');
+  writeFile(root, operation, 'export const step = {};\n');
+  writeFile(root, operationSibling, 'export const result = {};\n');
+
+  const report = await collectReport(root, {
+    targetFiles: [controller, operation],
+    codeFiles: [controller, operation],
+  });
+
+  expect(report.thinShells).toEqual(
+    expect.arrayContaining([expect.stringContaining('thin-shell candidate still owns local logic')])
+  );
+  expect(report.ownerLocalProof).toEqual(
+    expect.arrayContaining([expect.stringContaining('owner-local proof may be missing')])
+  );
+  expect(report.topologyQuestions).toEqual(
+    expect.arrayContaining([expect.stringContaining('same-family seams')])
   );
 });
 
-it('forecasts broad qa:build scope and related test budget risks', async () => {
+it('forecasts broad qa:build scope without test-size budgets', async () => {
   const root = createTempRoot('guardrail-build-scope-');
   writeFile(
     root,
@@ -169,12 +201,29 @@ it('forecasts broad qa:build scope and related test budget risks', async () => {
 
   expect(report.buildScopeForecast).toEqual(
     expect.arrayContaining([
-      expect.stringContaining('trigger families: messaging-runtime, package-and-app-core'),
+      expect.stringContaining('bounded owner and affected-consumer discovery required'),
       expect.stringContaining('broad transitive scope expected'),
     ])
   );
-  expect(report.buildScopeBudgetRisks).toEqual(
-    expect.arrayContaining([expect.stringContaining('client.test.ts: 245 lines')])
+  expect(report.buildScopeForecast[0]).not.toContain('broader related tests');
+  expect(report).not.toHaveProperty('buildScopeBudgetRisks');
+});
+
+it('does not claim an exact selected scope for bounded manifest forecasting', async () => {
+  const root = createTempRoot('guardrail-build-manifest-scope-');
+  writeFile(root, 'apps/extension/manifest.json', '{}\n');
+
+  const report = await collectReport(root, {
+    targetFiles: ['apps/extension/manifest.json'],
+    codeFiles: [],
+  });
+
+  expect(report.buildScopeForecast[0]).toContain(
+    'selected unit-test scope=consumer-discovery-required'
+  );
+  expect(report.buildScopeForecast[0]).not.toContain('skipped');
+  expect(report.buildScopeForecast).toEqual(
+    expect.arrayContaining([expect.stringContaining('broad transitive scope expected')])
   );
 });
 
@@ -238,7 +287,34 @@ it('forecasts the full-suite fallback for a deleted owner without surviving proo
   expect(report.buildScopeForecast[0]).toContain('selected unit-test scope=full-suite');
 });
 
-it('reports product proof risk checklist and changed test shape hints', async () => {
+it('uses the full diff for build forecasting while behavioral hints stay diff-filtered', async () => {
+  const root = createTempRoot('guardrail-build-full-diff-');
+  const deleted = 'apps/extension/src/content/selection/example/events.ts';
+  const owner = 'apps/extension/src/content/selection/example/runtime.events.ts';
+  const ownerTest = 'apps/extension/src/content/selection/example/runtime.events.test.ts';
+  writeFile(root, owner, 'export const createRuntimeEvents = () => ({});\n');
+  writeFile(root, ownerTest, "it('covers runtime events', () => {});\n");
+
+  const report = await collectReport(root, {
+    targetFiles: [deleted, ownerTest],
+    codeFiles: [ownerTest],
+    buildScopeContext: {
+      targetFiles: [deleted, owner, ownerTest],
+      codeFiles: [owner, ownerTest],
+      addedFiles: [],
+    },
+    buildScopeOptions: {
+      deletedSuccessorResolver: () => new Map([[deleted, [owner]]]),
+      ownerTestResolver: (file) => (file === owner ? [ownerTest] : []),
+    },
+  });
+
+  expect(report.buildScopeForecast[0]).toContain('graph-closed successor owner proof');
+  expect(report.buildScopeForecast[0]).not.toContain('full product test suite');
+  expect(report.clusters).toEqual(['apps/extension/src=2']);
+});
+
+it('reports product proof risk checklist without test-size hints', async () => {
   const root = createTempRoot('guardrail-product-proof-risk-');
   writeProductProofRiskFixture(root);
   writeFile(
@@ -265,7 +341,32 @@ it('reports product proof risk checklist and changed test shape hints', async ()
       expect.stringContaining('risk checklist: untracked tests'),
       expect.stringContaining('visual proof plan recommended'),
       expect.stringContaining('capability-loss risk'),
-      expect.stringContaining('test shape risk'),
+    ])
+  );
+  expect(report.hints).not.toEqual(
+    expect.arrayContaining([expect.stringContaining('test shape risk')])
+  );
+});
+
+it('recommends behavioral wiring proof without visual states for state-only UI code', async () => {
+  const root = createTempRoot('guardrail-state-only-ui-proof-');
+  const controller = 'apps/extension/src/content/overlay/ai/modal/session/controller.ts';
+  const controllerTest = 'apps/extension/src/content/overlay/ai/modal/session/controller.test.tsx';
+  writeFile(root, controller, 'export function useModalController() { return {}; }\n');
+  writeFile(root, controllerTest, "it('binds state', () => {});\n");
+
+  const report = await collectReport(root, {
+    targetFiles: [controller, controllerTest],
+    codeFiles: [controller, controllerTest],
+  });
+
+  expect(report.hints).toEqual(
+    expect.arrayContaining([expect.stringContaining('risk checklist: UI wiring')])
+  );
+  expect(report.hints).not.toEqual(
+    expect.arrayContaining([
+      expect.stringContaining('risk checklist: visual states'),
+      expect.stringContaining('visual proof plan recommended'),
     ])
   );
 });

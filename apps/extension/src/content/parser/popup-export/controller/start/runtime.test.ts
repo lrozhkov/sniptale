@@ -108,11 +108,13 @@ function createSuccessfulStartContext() {
 function startPopupExport(
   runtime: ReturnType<typeof createSuccessfulStartContext>['runtime'],
   sendResponse: ReturnType<typeof createSuccessfulStartContext>['sendResponse'],
-  state: PopupExportState
+  state: PopupExportState,
+  contentIntentGrant?: { grantToken: string }
 ): boolean {
   return handlePopupExportStartRuntime({
     ...runtime,
     request: {
+      ...(contentIntentGrant === undefined ? {} : { contentIntentGrant }),
       options: createExportOptions(),
       requestId: 'req-1',
       type: MessageType.EXPORT_POPUP_START,
@@ -164,16 +166,38 @@ it('runs the export flow and emits the result when the export settles', async ()
     })
   );
   expect(persistArchive).toHaveBeenCalledTimes(1);
-  expect(emitMessage).toHaveBeenCalledWith(
-    expect.objectContaining({
-      requestId: 'req-1',
-      type: MessageType.EXPORT_POPUP_RESULT,
-      result: expect.objectContaining({ success: true }),
-    })
-  );
+  expect(emitMessage).toHaveBeenCalledWith({
+    requestId: 'req-1',
+    result: createExportResult(),
+    type: MessageType.EXPORT_POPUP_RESULT,
+  });
   expect(state).toEqual({
     activeExportRequestId: null,
     isExportRunning: false,
+  });
+});
+
+it('acknowledges before starting work and forwards the content intent grant', () => {
+  const { runtime, state } = createSuccessfulStartContext();
+  const events: string[] = [];
+  const sendResponse = vi.fn(() => events.push('acknowledge'));
+
+  runtime.exportRunner.onProgress = vi.fn(() => {
+    events.push('observe-progress');
+  });
+  runtime.exportRunner.export = vi.fn(() => {
+    events.push('export');
+    return new Promise<ExportResult>(() => undefined);
+  });
+
+  expect(startPopupExport(runtime, sendResponse, state, { grantToken: 'grant-start' })).toBe(true);
+
+  expect(events).toEqual(['acknowledge', 'observe-progress', 'export']);
+  expect(runtime.exportRunner.export).toHaveBeenCalledWith(createExportOptions(), {
+    contentIntentSource: {
+      grantToken: 'grant-start',
+      kind: 'background-auto-start',
+    },
   });
 });
 

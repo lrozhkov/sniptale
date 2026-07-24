@@ -30,6 +30,16 @@ it('discovers every supported release consumer category and ignores tests', asyn
   write(root, 'tooling/qa/core/focused.test.ts', "import './verify-oss-release-surface.mjs';\n");
   write(
     root,
+    'tooling/configs/qa/control-dispositions.data.json',
+    'verify-oss-release-surface.mjs package-dist.mjs\n'
+  );
+  write(
+    root,
+    'tooling/configs/qa/technical-debt.data.json',
+    'verify-oss-release-surface.mjs package-dist.mjs\n'
+  );
+  write(
+    root,
     'tasks/local-plan.json',
     'package-dist.mjs verify-oss-release-surface.mjs manrope-latin-wght-normal.woff2\n'
   );

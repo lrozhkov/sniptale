@@ -1,7 +1,7 @@
 import type { Logger } from '@sniptale/platform/observability/logger/types';
 import type { AIEditChange, ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import { applyTableEdit } from '../table';
-import { findTableRowElementById } from '../../target-resolution';
+import { findTableRowElementById } from '../../target-resolution/table-row-search';
 import { updateTextPreservingStructure } from '../structure';
 
 export function applyTableRowChange(

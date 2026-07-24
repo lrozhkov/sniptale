@@ -4,13 +4,24 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createActionsSpy, useSectionStateSpy } = vi.hoisted(() => ({
-  createActionsSpy: vi.fn(),
-  useSectionStateSpy: vi.fn(),
+const { createCrudActionsSpy, createDragActionsSpy, createSettingsActionsSpy, useSectionStateSpy } =
+  vi.hoisted(() => ({
+    createCrudActionsSpy: vi.fn(),
+    createDragActionsSpy: vi.fn(),
+    createSettingsActionsSpy: vi.fn(),
+    useSectionStateSpy: vi.fn(),
+  }));
+
+vi.mock('./crud-actions', () => ({
+  createHighlighterCrudActions: (state: unknown) => createCrudActionsSpy(state),
 }));
 
-vi.mock('./actions', () => ({
-  createHighlighterSectionActions: (state: unknown) => createActionsSpy(state),
+vi.mock('./drag-actions', () => ({
+  createHighlighterDragActions: (state: unknown) => createDragActionsSpy(state),
+}));
+
+vi.mock('./persistence-actions', () => ({
+  createHighlighterSettingsActions: (state: unknown) => createSettingsActionsSpy(state),
 }));
 
 vi.mock('./state', () => ({
@@ -42,7 +53,9 @@ async function renderHarness() {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  createActionsSpy.mockReset();
+  createCrudActionsSpy.mockReset();
+  createDragActionsSpy.mockReset();
+  createSettingsActionsSpy.mockReset();
   useSectionStateSpy.mockReset();
 });
 
@@ -58,26 +71,83 @@ afterEach(() => {
 });
 
 describe('useHighlighterSection', () => {
-  it('merges state and action owners into a single section model', async () => {
-    const state = {
+  it('keeps persistence private and composes disposable UI state with narrow action owners', async () => {
+    const persistenceState = {
       isLoading: false,
       settings: { enabled: true },
+      settingsPersistenceSession: {},
       setSettings: vi.fn(),
     };
-    const actions = {
+    const crudActions = {
       handleAddPreset: vi.fn(),
+      handleCloseEditor: vi.fn(),
+    };
+    const dragActions = {
+      handleDragEnd: vi.fn(),
+    };
+    const settingsActions = {
       handleSetDefaultPreset: vi.fn(),
+      handleTogglePresetEnabled: vi.fn(),
+      handleUpdateBlurSettings: vi.fn(),
+      handleUpdateFocusSettings: vi.fn(),
     };
 
-    useSectionStateSpy.mockReturnValue(state);
-    createActionsSpy.mockReturnValue(actions);
+    useSectionStateSpy.mockReturnValue(persistenceState);
+    createCrudActionsSpy.mockReturnValue(crudActions);
+    createDragActionsSpy.mockReturnValue(dragActions);
+    createSettingsActionsSpy.mockReturnValue(settingsActions);
 
     await renderHarness();
 
-    expect(createActionsSpy).toHaveBeenCalledWith(state);
-    expect(latestState).toEqual({
-      ...state,
-      ...actions,
+    expect(createCrudActionsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...persistenceState,
+        setEditingPreset: expect.any(Function),
+        setIsEditorOpen: expect.any(Function),
+      })
+    );
+    expect(createDragActionsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...persistenceState,
+        draggedId: null,
+        setDraggedId: expect.any(Function),
+        setDragOverId: expect.any(Function),
+      })
+    );
+    expect(createSettingsActionsSpy).toHaveBeenCalledWith(persistenceState);
+    expect(latestState).toEqual(
+      expect.objectContaining({
+        effects: {
+          handleUpdateBlurSettings: settingsActions.handleUpdateBlurSettings,
+          handleUpdateFocusSettings: settingsActions.handleUpdateFocusSettings,
+        },
+        presets: expect.objectContaining({
+          ...crudActions,
+          ...dragActions,
+          draggedId: null,
+          dragOverId: null,
+          editingPreset: undefined,
+          hoveredPresetId: null,
+          isEditorOpen: false,
+          handleSetDefaultPreset: settingsActions.handleSetDefaultPreset,
+          handleTogglePresetEnabled: settingsActions.handleTogglePresetEnabled,
+          handlePresetHoverChange: expect.any(Function),
+        }),
+        status: {
+          isLoading: false,
+          settings: persistenceState.settings,
+        },
+      })
+    );
+    expect(latestState).not.toHaveProperty('settingsPersistenceSession');
+    expect(latestState?.presets).not.toHaveProperty('setSettings');
+    expect(latestState?.presets).not.toHaveProperty('setDraggedId');
+    expect(latestState?.presets).not.toHaveProperty('setEditingPreset');
+
+    await act(async () => {
+      latestState?.presets.handlePresetHoverChange('preset-1');
     });
+
+    expect(latestState?.presets.hoveredPresetId).toBe('preset-1');
   });
 });

@@ -7,7 +7,7 @@ import {
   splitCssLength,
   stepCssLength,
 } from './css-length';
-import { Field } from './fields';
+import { Field } from './field-shell';
 
 const NUMERIC_STEPPER_CLASS_NAME = [
   'absolute right-1 top-1/2 grid h-8 w-6 -translate-y-1/2 overflow-hidden rounded-[7px]',

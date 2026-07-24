@@ -47,24 +47,36 @@ vi.mock('./handlers', () => ({
   handleVisibleCaptureForCrop: handleVisibleCaptureForCropMock,
 }));
 
-vi.mock('./actions', () => ({
+vi.mock('./actions.download', () => ({
+  handleExecuteSave: handleExecuteSaveMock,
+  handleOpenEditorWithImage: vi.fn(),
+  handleReleaseRecordingDownload: vi.fn(),
+  handleSaveRecordingForDownload: vi.fn(),
+  handleStageRecordingDownloadChunk: vi.fn(),
+}));
+
+vi.mock('./actions.export', () => ({
   handleExportCaptureFullPage: handleExportCaptureFullPageMock,
   handleExportStartHar: handleExportStartHarMock,
   handleExportStopHar: handleExportStopHarMock,
-  handleExecuteSave: handleExecuteSaveMock,
-  handleFetchWebSnapshotAsset: vi.fn(),
-  handleOpenEditorWithImage: vi.fn(),
-  handleRegisterWebSnapshotAssets: vi.fn(),
-  handleRequestGalleryImageUpdateCapability: vi.fn(),
   handleRequestExportHarStartCapability: handleRequestExportHarStartCapabilityMock,
-  handleReleaseRecordingDownload: vi.fn(),
-  handleSaveRecordingForDownload: vi.fn(),
+}));
+
+vi.mock('./actions.gallery-update', () => ({
+  handleRequestGalleryImageUpdateCapability: vi.fn(),
   handleSaveScreenshotToGallery: vi.fn(),
-  handleSaveWebSnapshotToGallery: vi.fn(),
-  handleStageRecordingDownloadChunk: vi.fn(),
-  handleStageWebSnapshotBlobChunk: vi.fn(),
-  handleTriggerQuickAction: vi.fn(),
   handleUpdateGalleryImageAsset: vi.fn(),
+}));
+
+vi.mock('./actions.quick-action', () => ({
+  handleTriggerQuickAction: vi.fn(),
+}));
+
+vi.mock('./actions.web-snapshot', () => ({
+  handleFetchWebSnapshotAsset: vi.fn(),
+  handleRegisterWebSnapshotAssets: vi.fn(),
+  handleSaveWebSnapshotToGallery: vi.fn(),
+  handleStageWebSnapshotBlobChunk: vi.fn(),
 }));
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { get: browserTabsGetMock },

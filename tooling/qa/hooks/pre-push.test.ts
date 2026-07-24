@@ -66,6 +66,15 @@ it('uses the empty tree as the base for new branch pushes', () => {
   ]);
 });
 
+it('uses changed-range checkpoint and build proof for new branch pushes', () => {
+  const commands = resolvePrePushCommands({
+    prePushInput: `refs/heads/feature ${LOCAL_SHA} refs/heads/feature ${ZERO_SHA}\n`,
+    gitRunner: () => ({ stdout: 'src/example.ts\n' }),
+  });
+
+  expect(commands).toEqual(['qa:checkpoint', 'qa:build']);
+});
+
 it('runs release harness when pushed commits include tooling changes from a clean tree', () => {
   const commands = resolvePrePushCommands({
     prePushInput: `refs/heads/main ${LOCAL_SHA} refs/heads/main ${REMOTE_SHA}\n`,
@@ -82,6 +91,15 @@ it('runs release harness for shared controls that affect product and harness aut
   });
 
   expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:build']);
+});
+
+it('skips release harness for a generated inventory-only push', () => {
+  const commands = resolvePrePushCommands({
+    prePushInput: `refs/heads/main ${LOCAL_SHA} refs/heads/main ${REMOTE_SHA}\n`,
+    gitRunner: () => ({ stdout: 'tooling/configs/qa/technical-debt.data.json\n' }),
+  });
+
+  expect(commands).toEqual(['qa:checkpoint', 'qa:build']);
 });
 
 it('rejects malformed hook input instead of silently weakening pushed-range proof', () => {

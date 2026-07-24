@@ -53,8 +53,11 @@ vi.mock('./model', (_importOriginal) => ({
   shouldShowFooter: shouldShowFooterMock,
 }));
 
-vi.mock('./effects', (_importOriginal) => ({
+vi.mock('./actions', (_importOriginal) => ({
   usePopupRuntimeActions: usePopupRuntimeActionsMock,
+}));
+
+vi.mock('./effects', (_importOriginal) => ({
   usePopupRuntimeEffects: usePopupRuntimeEffectsMock,
 }));
 

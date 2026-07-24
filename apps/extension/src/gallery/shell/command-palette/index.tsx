@@ -1,7 +1,7 @@
 import { CommandPalette } from '../../../ui/command-palette';
 import type { CommandPaletteAction } from '../../../ui/command-palette/types';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
-import type { GalleryAppStateController } from '../app/types';
+import type { GalleryAppStateController } from '../../state/types';
 import { buildGalleryCommandPaletteActions } from './actions';
 
 interface GalleryCommandPaletteProps {

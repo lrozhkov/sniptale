@@ -1,5 +1,5 @@
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
-import type { SelectionModeState } from '../session/state';
+import type { SelectionModeSession } from '../session';
 import {
   createDragFrame as createDragFrameDom,
   createFinalElements as createFinalElementsDom,
@@ -8,7 +8,7 @@ import {
 } from '.';
 
 type SelectionModeUiRuntimeConfig = {
-  getDom: () => SelectionModeState['dom'];
+  getDom: () => SelectionModeSession['dom'];
   getVisual: () => ResolvedBorderPresetVisual;
   getMaxSelectionHeight: () => number;
   getMaxSelectionWidth: () => number;

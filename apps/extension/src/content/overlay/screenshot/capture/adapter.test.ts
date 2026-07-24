@@ -60,9 +60,11 @@ function createRuntime(): ScreenshotControllerRuntime {
       sessionActivePresetId: null,
       setSaveDialogState: vi.fn(),
     },
-    navigationLockStateBeforeScreenshot: { current: false },
-    screenshotRunActiveRef: { current: false },
-    screenshotRunGenerationRef: { current: 1 },
+    session: {
+      navigationLockBaseline: false,
+      runActive: false,
+      runGeneration: 1,
+    },
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
@@ -200,7 +202,7 @@ async function expectStaleViewerAdapterCaptureSkipsPersistenceAndFeedback() {
   runtime.captureAdapter = {
     captureSelection: vi.fn(),
     captureViewport: vi.fn().mockImplementation(async () => {
-      runtime.screenshotRunGenerationRef.current = 2;
+      runtime.session.runGeneration = 2;
       return 'data:image/png;base64,stale-viewer';
     }),
   };

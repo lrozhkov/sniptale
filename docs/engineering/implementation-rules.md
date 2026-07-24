@@ -1,16 +1,16 @@
 # Implementation Rules
 
-Updated: 2026-07-16
+Updated: 2026-07-22
 
 This document owns Sniptale implementation decisions: topology, boundaries, state, security, code shape, and proof shape. Workflow order belongs in [AGENTS.md](../../AGENTS.md), quality policy in [code-quality.md](../tooling/code-quality.md), and wrapper behavior in [wrapper-summary.md](../tooling/wrapper-summary.md).
 
 ## Preflight Shape
 
-Before editing a non-trivial task, identify the owner seam and runtime boundary, target files/folders, likely next `2-3` related expansions, authoritative/advisory/disposable state, public consumers, and required failure/rollback/stale-result proof. Account for near-capacity files, long functions/tests, changed-line width, import-depth fallout, dead exports, cycles, i18n/design-system fallout, and test-support growth.
+Before editing a non-trivial task, identify the owner seam and runtime boundary, target files/folders, likely next `2-3` related expansions, authoritative/advisory/disposable state, public consumers, and required failure/rollback/stale-result proof. Account for mixed ownership, low cohesion, effect and state-authority concentration, changed-line width, import-depth fallout, dead exports, cycles, i18n/design-system fallout, and test-support growth.
 
 Freeze the original acceptance criteria, explicit non-goals, and bounded manifest before implementation. Do not add stronger manifest guarantees merely because a broader redesign is possible. Classify later findings as current-wave regressions, direct acceptance blockers, provable security issues, or pre-existing hardening; only the first three categories belong in the current correction, while pre-existing hardening is recorded as follow-up debt.
 
-If the task would extend a broad public surface, flat sibling scatter, repeated-prefix family, root-facade implementation owner, near-capacity hotspot, or owner with several independent growth vectors, refactor the shape first in the same change set unless the user explicitly chooses a narrower tradeoff. Metrics inform that decision but do not define the architecture.
+If the task would extend a broad public surface, flat sibling scatter, repeated-prefix family, root-facade implementation owner, structurally pressured owner, or owner with several independent growth vectors, refactor the shape first in the same change set unless the user explicitly chooses a narrower tradeoff. Metrics inform that decision but do not define the architecture.
 
 If a correction begins to change new runtime contracts, every persistence writer, or dozens of owners outside the manifest, return to preflight and find the minimal correction class inside the original seam. Expand the manifest only with evidence that the frozen acceptance criteria cannot be met otherwise.
 
@@ -58,7 +58,19 @@ Floating/portaled UI has one owner for semantic and visual placement, pointer bl
 
 ## Code Shape
 
-Target `<= 300` lines per file, `<= 50` lines per function/method/test body/`describe` callback/local test helper, and `<= 120` characters for new or changed code lines outside canonical data carriers. Do not compress logic or split mechanically to satisfy a metric while preserving the same broad contract.
+Treat code shape as a combination of responsibility, ownership, dependency edges, exported surface, effect families, state authorities, control-flow/recovery pressure, and cohesion. Token count is not a quality signal. Physical length is supporting evidence and a safety cap, not the architectural boundary.
+
+The diff-scoped structural guard analyzes the complete current AST of behaviorally changed files and compares existing files with `HEAD`. Unchanged, import-only, mock-only, and rename-only files are excluded. New owners must satisfy the absolute policy; existing owners are primarily governed by worsened structural delta and newly crossed hard caps. A registered orchestration/workflow owner may coordinate effects, state, recovery, and narrow adapters without failing only because of a high composite score when it remains cohesive, excludes UI effects, and avoids arbitrary branching.
+
+The unit of architecture analysis is an owner/change-reason cluster, not an individual file. Classify each candidate as `Split`, `Consolidate`, or `Keep`. Optimize for the minimum navigation transitions needed to understand one operation while retaining explicit runtime, owner, adapter, and public-contract boundaries; neither fewer files nor more files is a success criterion. Before and after a wave, compare files and transitions, facade/proxy/pass-through layers, public contract size, state authorities, effect/recovery placement, cohesion, and independence of change reasons.
+
+Keep changed ordinary lines at `<= 120` characters, module specifiers at `<= 200`, classified URL/regex/hash/protocol/snapshot literals at `<= 240`, and generated/data/fixture lines at `<= 1000`. Untouched legacy lines are not checked. Structural allowances require an exact rule, file/symbol, normalized AST-body hash, symbol-signature hash, owner, reason, removal condition, and review date; formatting changes alone must not invalidate them.
+
+Do not compress logic, scatter one owner across mechanically named helpers, or distribute a god-object across neighboring files merely to reduce a metric. A valid split creates stable change reasons, narrower dependency direction, and explicit state/effect ownership. Consolidation is valid only inside one owner and one shared change reason; forwarding-only modules, getter/setter/ref/sync proxy families, facade/re-export ladders, single-consumer files without an independent contract, and delegation-only tests are review candidates, not automatic merge instructions.
+
+For manual maintenance triage, a forwarding-only module with exactly one production consumer supplies two corroborating signals on one graph edge. Follow forwarding ladders to a stable non-forwarding merge target, then classify the edge as `Consolidate` or record an explicit public-contract, runtime, cross-owner, unresolved-topology, or independent-change-reason `Keep` veto. Do not let fixed path-depth clustering hide these overlapping operation candidates.
+
+After a split or consolidation, prove that the result adds no cycle, dual state authority, cross-owner import, broad facade/state/props bag, forwarding-only layer, dead export, generic helper, or UI owner mixed with privileged, persistence, or transport effects. Structural pressure must not worsen, and affected tests must preserve ordering, failure, rollback, cleanup, and other business invariants.
 
 Prefer vertical composition and stable roles over dense expressions, `*.helpers` scatter, or broad controller/state/props bags mixing view, actions, transport, persistence, workspace, and derived state. Multi-message, multi-transport, or multi-persistence transitions need a named orchestration owner rather than a generic helper.
 

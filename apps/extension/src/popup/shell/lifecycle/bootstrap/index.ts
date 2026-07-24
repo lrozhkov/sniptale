@@ -1,1 +1,0 @@
-export { bootstrapPopupLifecycle } from './run';

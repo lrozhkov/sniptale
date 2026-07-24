@@ -2,7 +2,7 @@ import { Download, Save } from 'lucide-react';
 
 import { translate } from '../../../../../../platform/i18n';
 import type { BuildEditorDocumentActionGroupsParams } from '../../types';
-import type { EditorDocumentActionCommandBuilders } from '../../commands.types';
+import type { EditorDocumentActionCommandBuilders } from '../../types';
 
 function createSaveImageCommand(
   params: BuildEditorDocumentActionGroupsParams

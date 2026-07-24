@@ -5,7 +5,7 @@ import { translate } from '../../../../platform/i18n';
 import { SettingsSwitch } from '../../../section-surface/panel-controls';
 import { SettingsRangeField, settingsToggleRowClassName } from '../../../section-surface';
 import { useRangeDraftValue } from './range-draft';
-import type { HighlighterSectionContentProps } from './types';
+import type { HighlighterEffectsProps } from './types';
 import {
   ACTIVE_BLUR_BACKGROUND_CLASS_NAME,
   ACTIVE_BLUR_BORDER_CLASS_NAME,
@@ -68,25 +68,25 @@ function BlurTypeOptionButton({
   );
 }
 
-function createBlurAmountCommitHandler(props: HighlighterSectionContentProps) {
+function createBlurAmountCommitHandler(props: HighlighterEffectsProps) {
   return (value: number) =>
-    props.state.handleUpdateBlurSettings({
+    props.effects.handleUpdateBlurSettings({
       ...props.settings.defaultBlurSettings,
       amount: value,
     });
 }
 
-function createBlurTypeChangeHandler(props: HighlighterSectionContentProps) {
+function createBlurTypeChangeHandler(props: HighlighterEffectsProps) {
   return (blurType: BlurType) =>
-    props.state.handleUpdateBlurSettings({
+    props.effects.handleUpdateBlurSettings({
       ...props.settings.defaultBlurSettings,
       blurType,
     });
 }
 
-function createShowBorderChangeHandler(props: HighlighterSectionContentProps) {
+function createShowBorderChangeHandler(props: HighlighterEffectsProps) {
   return (checked: boolean) =>
-    props.state.handleUpdateBlurSettings({
+    props.effects.handleUpdateBlurSettings({
       ...props.settings.defaultBlurSettings,
       showBorder: checked,
     });
@@ -111,8 +111,8 @@ function BlurTypeOptionsList(props: {
   );
 }
 
-export function HighlighterBlurControls({ settings, state }: HighlighterSectionContentProps) {
-  const props = { settings, state };
+export function HighlighterBlurControls({ effects, settings }: HighlighterEffectsProps) {
+  const props = { effects, settings };
   const [blurAmountDraft, setBlurAmountDraft] = useRangeDraftValue(
     settings.defaultBlurSettings.amount
   );

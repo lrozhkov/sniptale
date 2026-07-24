@@ -5,23 +5,23 @@ import { HighlighterBlurControls } from './blur-controls';
 import { settingsCardClassName, SettingsSwitch } from '../../../section-surface/panel-controls';
 import { SettingsRangeField, settingsToggleRowClassName } from '../../../section-surface';
 import { useRangeDraftValue } from './range-draft';
-import type { HighlighterSectionContentProps } from './types';
+import type { HighlighterEffectsProps } from './types';
 
 const highlighterSettingsCardClassName = [settingsCardClassName, 'p-4'].join(' ');
 
-function BlurSettingsPanel({ settings, state }: HighlighterSectionContentProps) {
+function BlurSettingsPanel({ effects, settings }: HighlighterEffectsProps) {
   return (
     <div className={`mb-8 ${highlighterSettingsCardClassName}`}>
       <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
         <PenTool size={14} className="text-[var(--sniptale-color-success)]" />
         {translate('highlighter.section.blurTitle')}
       </h3>
-      <HighlighterBlurControls settings={settings} state={state} />
+      <HighlighterBlurControls effects={effects} settings={settings} />
     </div>
   );
 }
 
-function FocusSettingsPanel({ settings, state }: HighlighterSectionContentProps) {
+function FocusSettingsPanel({ effects, settings }: HighlighterEffectsProps) {
   const [focusOpacityDraft, setFocusOpacityDraft] = useRangeDraftValue(
     settings.defaultFocusSettings.opacity * 100
   );
@@ -40,7 +40,7 @@ function FocusSettingsPanel({ settings, state }: HighlighterSectionContentProps)
           value={focusOpacityDraft}
           onChange={(event) => setFocusOpacityDraft(parseInt(event.target.value))}
           onValueCommit={(value) =>
-            state.handleUpdateFocusSettings({
+            effects.handleUpdateFocusSettings({
               ...settings.defaultFocusSettings,
               opacity: value / 100,
             })
@@ -58,7 +58,7 @@ function FocusSettingsPanel({ settings, state }: HighlighterSectionContentProps)
           <SettingsSwitch
             checked={settings.defaultFocusSettings.showBorder ?? false}
             onClick={() =>
-              state.handleUpdateFocusSettings({
+              effects.handleUpdateFocusSettings({
                 ...settings.defaultFocusSettings,
                 showBorder: !(settings.defaultFocusSettings.showBorder ?? false),
               })
@@ -70,7 +70,7 @@ function FocusSettingsPanel({ settings, state }: HighlighterSectionContentProps)
   );
 }
 
-export function HighlighterEffectsPanel(props: HighlighterSectionContentProps) {
+export function HighlighterEffectsPanel(props: HighlighterEffectsProps) {
   return (
     <>
       <BlurSettingsPanel {...props} />

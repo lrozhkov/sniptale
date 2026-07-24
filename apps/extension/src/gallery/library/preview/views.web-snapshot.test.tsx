@@ -2,7 +2,8 @@
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
-import { PreviewActions, PreviewMedia } from './views';
+import { PreviewMedia } from './media';
+import { PreviewActions } from './sidebar-sections';
 import type { PreviewPanelProps } from './types';
 import type { GalleryMediaItem } from '../items';
 

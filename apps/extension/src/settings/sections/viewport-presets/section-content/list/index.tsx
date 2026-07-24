@@ -1,1 +1,0 @@
-export { PresetsList } from './view';

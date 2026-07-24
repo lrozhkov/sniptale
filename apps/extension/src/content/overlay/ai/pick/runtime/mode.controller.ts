@@ -5,15 +5,13 @@ import {
 import { parsePageSnapshotAfterIframePreflight } from '../../../../parser/dom-tree-parser/snapshot';
 import {
   createAiPickModeDisabler,
-  createAiPickModeState,
-  createClickHandler,
   createEnableAiPickMode,
-  createKeyDownHandler,
-  createMouseLeaveHandler,
-  createMouseMoveHandler,
-  createPointerDownHandler,
   createRefreshAiPickSnapshot,
-} from './mode.runtime';
+} from './mode.enable';
+import { createMouseLeaveHandler, createMouseMoveHandler } from './mode.handlers/hover';
+import { createKeyDownHandler } from './mode.handlers/keyboard';
+import { createClickHandler, createPointerDownHandler } from './mode.handlers/selection';
+import { createAiPickModeState } from './mode.state';
 import type { AiPickModeController, AiPickModeControllerDeps } from './mode.types';
 
 export function createAiPickModeController(deps: AiPickModeControllerDeps): AiPickModeController {

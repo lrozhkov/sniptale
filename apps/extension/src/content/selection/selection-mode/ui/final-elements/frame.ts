@@ -1,8 +1,10 @@
 import type { ResizeDirection } from '../dom-types';
-import type { FinalElementsOptions } from './types';
+import type { SelectionModeFinalElementsOptions } from '../types';
 import { getSelectionFinalFrameStyle } from '../style';
 
-export function createSelectionModeFinalFrame(options: FinalElementsOptions): HTMLElement {
+export function createSelectionModeFinalFrame(
+  options: SelectionModeFinalElementsOptions
+): HTMLElement {
   const finalFrame = document.createElement('div');
   finalFrame.className = 'sniptale-selection-final-frame';
   finalFrame.style.cssText = getSelectionFinalFrameStyle(options.visual, options.zIndexBase);

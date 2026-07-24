@@ -1,16 +1,13 @@
 import { useEffect, type MutableRefObject } from 'react';
 import type { AutoBlurSettings } from '../../../../features/highlighter/contracts/auto-blur';
-import {
-  DEFAULT_AUTO_BLUR_SETTINGS,
-  getLoadedAutoBlurSettingsSnapshot,
-  loadAutoBlurSettings,
-} from '../persistence';
-import type { TranslationKey } from '../../../../platform/i18n';
+import { DEFAULT_AUTO_BLUR_SETTINGS, getLoadedAutoBlurSettingsSnapshot } from '../persistence';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { scanAutoBlurTargets, type AutoBlurMatch } from '../../../selection/auto-blur-runtime';
-import { applyAutoBlurWithSettings } from './operations';
-import { cloneSettings } from './state';
-import type { AutoBlurStatus, FrameManager } from './types';
+import {
+  applyAutoBlurWithSettings,
+  loadSettingsOrDefault,
+  type AutoBlurFrameManager,
+} from './operations';
 
 const logger = createLogger({ namespace: 'ContentAutoBlur' });
 const AUTO_APPLY_DEBOUNCE_MS = 300;
@@ -21,19 +18,10 @@ type AutoApplyRuntimeState = {
   timeoutId: number | null;
 };
 
-async function loadSettingsSafely(): Promise<AutoBlurSettings> {
-  try {
-    return await loadAutoBlurSettings();
-  } catch (error) {
-    logger.warn('Failed to load auto-blur settings, falling back to defaults', error);
-    return cloneSettings(DEFAULT_AUTO_BLUR_SETTINGS);
-  }
-}
-
 export function useAutoBlurAutoApplyEffect(args: {
   autoApplyAllowed: boolean;
   autoApplyEnabled: boolean;
-  frameManager: FrameManager;
+  frameManager: AutoBlurFrameManager;
   isApplying: boolean;
   isOpen: boolean;
 }) {
@@ -62,7 +50,7 @@ export function useAutoBlurAutoApplyEffect(args: {
 }
 
 async function runAutoApply(args: {
-  frameManager: FrameManager;
+  frameManager: AutoBlurFrameManager;
   runtimeState: AutoApplyRuntimeState;
 }) {
   if (args.runtimeState.running) {
@@ -71,7 +59,7 @@ async function runAutoApply(args: {
 
   args.runtimeState.running = true;
   try {
-    const settings = await loadSettingsSafely();
+    const settings = await loadSettingsOrDefault();
     if (args.runtimeState.cancelled || !settings.autoApplyEnabled) {
       return;
     }
@@ -90,7 +78,7 @@ async function runAutoApply(args: {
 }
 
 function scheduleAutoApply(args: {
-  frameManager: FrameManager;
+  frameManager: AutoBlurFrameManager;
   runtimeState: AutoApplyRuntimeState;
 }) {
   if (args.runtimeState.timeoutId !== null) {
@@ -118,7 +106,7 @@ export function useAutoBlurSettingsBootstrapEffect(args: {
   useEffect(() => {
     let cancelled = false;
 
-    void loadSettingsSafely().then((settings) => {
+    void loadSettingsOrDefault().then((settings) => {
       if (!cancelled) {
         resetSelection(settings);
       }
@@ -131,56 +119,47 @@ export function useAutoBlurSettingsBootstrapEffect(args: {
 }
 
 export function useAutoBlurScanEffect(args: {
-  frames: FrameManager['frames'];
+  completeScan: (settings: AutoBlurSettings, matches: AutoBlurMatch[]) => void;
+  failScan: () => void;
+  frames: AutoBlurFrameManager['frames'];
   isOpen: boolean;
-  resetSelection: (settings: AutoBlurSettings) => void;
   scanVersionRef: MutableRefObject<number>;
-  setErrorMessage: (message: TranslationKey | null) => void;
-  setMatches: (matches: AutoBlurMatch[]) => void;
-  setStatus: (status: AutoBlurStatus) => void;
+  startScan: (settings: AutoBlurSettings) => void;
 }) {
-  const { frames, isOpen, resetSelection, scanVersionRef } = args;
-  const { setErrorMessage, setMatches, setStatus } = args;
+  const { completeScan, failScan, frames, isOpen, scanVersionRef, startScan } = args;
 
   useEffect(() => {
     if (!isOpen) return;
 
     const scanVersion = ++scanVersionRef.current;
     const snapshot = getLoadedAutoBlurSettingsSnapshot() ?? DEFAULT_AUTO_BLUR_SETTINGS;
-    resetSelection(snapshot);
-    setStatus('loading');
-    setErrorMessage(null);
+    startScan(snapshot);
 
-    void Promise.all([loadSettingsSafely(), scanAutoBlurTargets({ frames })])
+    void Promise.all([loadSettingsOrDefault(), scanAutoBlurTargets({ frames })])
       .then(([settings, result]) => {
         if (scanVersion !== scanVersionRef.current) return;
 
-        resetSelection(settings);
-        setMatches(result.matches);
-        setStatus(result.matches.length > 0 ? 'ready' : 'empty');
+        completeScan(settings, result.matches);
       })
       .catch((error: unknown) => {
         if (scanVersion !== scanVersionRef.current) return;
 
         logger.error('Failed to scan auto-blur targets', error);
-        setMatches([]);
-        setStatus('error');
+        failScan();
       });
-  }, [frames, isOpen, resetSelection, scanVersionRef, setErrorMessage, setMatches, setStatus]);
+  }, [completeScan, failScan, frames, isOpen, scanVersionRef, startScan]);
 }
 
 export function useHighlighterModeCloseEffect(args: {
+  closeForMode: () => void;
   highlighterMode: boolean;
   isOpen: boolean;
-  scanVersionRef: MutableRefObject<number>;
-  setIsOpen: (isOpen: boolean) => void;
 }) {
-  const { highlighterMode, isOpen, scanVersionRef, setIsOpen } = args;
+  const { closeForMode, highlighterMode, isOpen } = args;
 
   useEffect(() => {
     if (!highlighterMode && isOpen) {
-      scanVersionRef.current += 1;
-      setIsOpen(false);
+      closeForMode();
     }
-  }, [highlighterMode, isOpen, scanVersionRef, setIsOpen]);
+  }, [closeForMode, highlighterMode, isOpen]);
 }

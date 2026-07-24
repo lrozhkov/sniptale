@@ -3,13 +3,11 @@ import {
   createDefaultPresetChangeAction,
   createToggleSaveToGalleryAction,
 } from './defaults';
-import {
-  createConfirmDeletePresetAction,
-  createDeletePresetGuard,
-  createDropPresetAction,
-  createSavePresetAction,
-  createTogglePresetEnabledAction,
-} from './preset';
+import { createConfirmDeletePresetAction } from './preset/confirm-delete';
+import { createDeletePresetGuard } from './preset/delete-guard';
+import { createDropPresetAction } from './preset/drop';
+import { createSavePresetAction } from './preset/save';
+import { createTogglePresetEnabledAction } from './preset/toggle-enabled';
 import type {
   SavePresetsDialogState,
   SavePresetsDragState,

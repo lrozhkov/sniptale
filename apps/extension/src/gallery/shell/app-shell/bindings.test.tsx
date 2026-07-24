@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createController, createMediaItem } from '../../library/actions/test-support/index';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
-import type { GalleryViewMode } from '../app/types';
+import type { GalleryViewMode } from '../../state/types';
 import { createLocalBackupSummary } from './backup-export.test-support';
 
 const { layoutPropsMock } = vi.hoisted(() => ({

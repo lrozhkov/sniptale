@@ -1,27 +1,21 @@
-import { useCallback, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { PromptTemplate } from '../../../../../contracts/settings';
 import { useTemplateDragState } from '../drag';
-import { findTemplateIdUnderPoint } from '../drag/targets';
 import type { TemplateListProps } from '../types';
-import {
-  useTemplateDeleteActions,
-  useTemplateListDerivedState,
-  useTemplateMenuDismiss,
-  useTemplateOrderState,
-} from './hooks';
+import { useTemplateDeleteActions } from './delete';
+import { useTemplateListDerivedState } from './derived';
+import { useTemplateMenuDismiss } from './menu';
+import { useTemplateOrderState } from './order';
 
 export function useTemplateListState({ templates }: Pick<TemplateListProps, 'templates'>) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const pillRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const { orderedIds, setOrderedIds } = useTemplateOrderState(templates);
+  const { orderedIds, reorder } = useTemplateOrderState(templates);
   const derived = useTemplateListDerivedState({ orderedIds, showAll, templates });
-  const findIdUnderPoint = useCallback((x: number, y: number): string | null => {
-    return findTemplateIdUnderPoint(pillRefs.current, x, y);
-  }, []);
 
-  const drag = useTemplateDragState(findIdUnderPoint, setOrderedIds);
+  const drag = useTemplateDragState(pillRefs, reorder);
   useTemplateMenuDismiss(openMenuId, setOpenMenuId, menuRef);
   const deleteActions = useTemplateDeleteActions();
 

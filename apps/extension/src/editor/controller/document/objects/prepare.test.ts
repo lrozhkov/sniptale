@@ -32,8 +32,8 @@ vi.mock('../../../objects/annotation/text/callout/lifecycle', async (importOrigi
   applyTextCalloutRendering: mocks.applyTextCalloutRendering,
 }));
 
-vi.mock('../interaction-controls', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../interaction-controls')>()),
+vi.mock('../interaction-controls/apply', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../interaction-controls/apply')>()),
   applyEditorObjectInteractionControls: mocks.applyEditorObjectInteractionControls,
 }));
 

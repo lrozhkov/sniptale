@@ -3,9 +3,13 @@ import type {
   BorderPreset,
   FocusSettings,
 } from '../../../../features/highlighter/contracts';
-import { useFrameSettingsPopoverBindings } from './bindings';
-import { createFrameSettingsPopoverStateResult } from './result';
-import { useFrameSettingsPopoverValues } from './values';
+import { setDefaultBorderPreset } from '../../../../composition/persistence/highlighter';
+import {
+  createFrameBlurHandlers,
+  createFrameFocusHandlers,
+  createFrameSettingsPresetHandler,
+} from './helpers';
+import { useFrameSettingsPopoverLifecycle } from './lifecycle';
 
 type FrameSettingsPopoverStateArgs = {
   blurSettings?: BlurSettings;
@@ -20,48 +24,45 @@ type FrameSettingsPopoverStateArgs = {
   }) => void;
 };
 
-function createFrameSettingsPopoverBindingArgs(
-  args: FrameSettingsPopoverStateArgs,
-  values: ReturnType<typeof useFrameSettingsPopoverValues>
-) {
-  return {
+export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs) {
+  const session = useFrameSettingsPopoverLifecycle({
     frameId: args.frameId,
     isOpen: args.isOpen,
-    localBlurSettings: values.localBlurSettings,
-    localFocusSettings: values.localFocusSettings,
-    onApplyToFrame: args.onApplyToFrame,
-    setGlobalSettings: values.setGlobalSettings,
-    setLocalBlurSettings: values.setLocalBlurSettings,
-    setLocalFocusSettings: values.setLocalFocusSettings,
-    setSelectedPresetId: values.setSelectedPresetId,
     ...(args.blurSettings === undefined ? {} : { blurSettings: args.blurSettings }),
     ...(args.borderSettings === undefined ? {} : { borderSettings: args.borderSettings }),
     ...(args.focusSettings === undefined ? {} : { focusSettings: args.focusSettings }),
-  };
-}
-
-export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs) {
-  const values = useFrameSettingsPopoverValues();
-
-  const {
-    handleBlurChange,
-    handleBlurShowBorderChange,
-    handleBlurTypeChange,
-    handleFocusChange,
-    handleFocusShowBorderChange,
-    handleSelectPreset,
-  } = useFrameSettingsPopoverBindings(createFrameSettingsPopoverBindingArgs(args, values));
-
-  return createFrameSettingsPopoverStateResult({
-    globalSettings: values.globalSettings,
-    handleBlurChange,
-    handleBlurShowBorderChange,
-    handleBlurTypeChange,
-    handleFocusChange,
-    handleFocusShowBorderChange,
-    handleSelectPreset,
-    localBlurSettings: values.localBlurSettings,
-    localFocusSettings: values.localFocusSettings,
-    selectedPresetId: values.selectedPresetId,
   });
+  const handleSelectPreset = createFrameSettingsPresetHandler({
+    onApplyToFrame: args.onApplyToFrame,
+    setDefaultBorderPreset,
+    setSelectedPresetId: session.selectPreset,
+  });
+  const blurHandlers = createFrameBlurHandlers({
+    localBlurSettings: session.localBlurSettings,
+    onApplyToFrame: args.onApplyToFrame,
+    setLocalBlurSettings: session.applyBlurSettingsFromUser,
+  });
+  const focusHandlers = createFrameFocusHandlers({
+    frameId: args.frameId,
+    localFocusSettings: session.localFocusSettings,
+    onApplyToFrame: args.onApplyToFrame,
+    setLocalFocusSettings: session.applyFocusSettingsFromUser,
+  });
+
+  return {
+    handlers: {
+      handleBlurChange: blurHandlers.handleBlurChange,
+      handleBlurShowBorderChange: blurHandlers.handleBlurShowBorderChange,
+      handleBlurTypeChange: blurHandlers.handleBlurTypeChange,
+      handleFocusChange: focusHandlers.handleFocusChange,
+      handleFocusShowBorderChange: focusHandlers.handleFocusShowBorderChange,
+      handleSelectPreset,
+    },
+    settings: {
+      global: session.globalSettings,
+      localBlur: session.localBlurSettings,
+      localFocus: session.localFocusSettings,
+      selectedPresetId: session.selectedPresetId,
+    },
+  };
 }

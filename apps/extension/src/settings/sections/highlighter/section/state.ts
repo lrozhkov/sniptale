@@ -9,7 +9,7 @@ import {
   loadHighlighterSettings,
 } from '../../../../composition/persistence/highlighter';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
-import type { BorderPreset, HighlighterSettings } from '../../../../features/highlighter/contracts';
+import type { HighlighterSettings } from '../../../../features/highlighter/contracts';
 import {
   createHighlighterSettingsPersistenceSession,
   syncHighlighterSettingsSnapshot,
@@ -130,11 +130,6 @@ export function useHighlighterSectionState() {
   const settingsPersistenceSessionRef = useRef(createHighlighterSettingsPersistenceSession());
   const [settings, setSettings] = useState<HighlighterSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [editingPreset, setEditingPreset] = useState<BorderPreset | undefined>(undefined);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   useHighlighterSettingsStorageSync({
     settingsPersistenceSession: settingsPersistenceSessionRef.current,
@@ -143,18 +138,8 @@ export function useHighlighterSectionState() {
   });
 
   return {
-    draggedId,
-    dragOverId,
-    editingPreset,
-    hoveredPresetId,
-    isEditorOpen,
     isLoading,
     settingsPersistenceSession: settingsPersistenceSessionRef.current,
-    setDraggedId,
-    setDragOverId,
-    setEditingPreset,
-    setHoveredPresetId,
-    setIsEditorOpen,
     setSettings,
     settings,
   };

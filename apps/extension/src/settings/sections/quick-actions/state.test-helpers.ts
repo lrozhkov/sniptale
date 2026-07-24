@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 
 import type { QuickAction } from '../../../contracts/settings';
-import type { QuickActionsSectionState } from './section';
+import type { QuickActionsSectionState } from './controller';
 
 type QuickActionsSectionCoreState = {
   actions: QuickAction[];

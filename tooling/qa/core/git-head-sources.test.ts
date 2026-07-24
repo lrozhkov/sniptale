@@ -1,6 +1,10 @@
 import { expect, it, vi } from 'vitest';
 
-import { createHeadFileTextResolver, readHeadFileTexts } from './git-head-sources.mjs';
+import {
+  createHeadFileTextResolver,
+  readHeadFileText,
+  readHeadFileTexts,
+} from './git-head-sources.mjs';
 
 it('reads HEAD file text without stdin-driven git batch mode', () => {
   const spawnSyncImpl = vi
@@ -37,4 +41,10 @@ it('exposes a resolver that returns null for missing HEAD files', () => {
   expect(resolver('src/new-file.ts')).toBeNull();
   expect(resolver('src/existing.ts')).toBe('existing source');
   expect(resolver('src/unknown.ts')).toBeNull();
+});
+
+it('reads one HEAD source through the same neutral owner', () => {
+  const spawnSyncImpl = vi.fn().mockReturnValue({ status: 0, stdout: 'source' });
+
+  expect(readHeadFileText('src/example.ts', { spawnSyncImpl })).toBe('source');
 });

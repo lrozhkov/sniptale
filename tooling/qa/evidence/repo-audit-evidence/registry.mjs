@@ -1,6 +1,10 @@
 import { collectQaStepDefinitionsByLane } from '../../core/qa-steps/definitions.mjs';
 
-export { ADVISORY_SCRIPT_IDS, REPO_AUDIT_REPORT_DEFINITIONS } from './registry.data.mjs';
+export {
+  ADVISORY_SCRIPT_IDS,
+  REPO_AUDIT_REPORT_DEFINITIONS,
+  STRUCTURAL_AUDIT_SCRIPT_IDS,
+} from './registry.data.mjs';
 
 function compact(occurrence) {
   return {
@@ -48,6 +52,7 @@ export function collectWrapperStepDefinitions() {
     e2e: collectLane(lanes, 'e2e'),
     audit: collectLane(lanes, 'audit'),
     advisory: collectLane(lanes, 'advisory'),
+    structuralAudit: collectLane(lanes, 'structural-audit'),
     manual: collectLane(lanes, 'manual'),
   };
 }

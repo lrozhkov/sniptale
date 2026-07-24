@@ -6,7 +6,7 @@ import {
   handleSelectionModeMouseLeave,
   handleSelectionModeMouseMove,
   handleSelectionModeMouseUp,
-} from './pointer';
+} from './pointer-handlers';
 import type { SelectionModeEventOptions, SelectionModeInteractionState } from './types';
 
 function createState(

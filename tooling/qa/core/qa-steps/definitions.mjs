@@ -13,6 +13,7 @@ import {
   FULL_VIOLATION_STEP_TOOLS,
   HARNESS_STEPS,
   RELEASE_DIRECT_STEPS,
+  STRUCTURAL_AUDIT_STEPS,
   WRAPPER_LIFECYCLE_STEPS,
 } from './definitions.data.mjs';
 import { REPO_AUDIT_REPORT_DEFINITIONS } from '../../evidence/repo-audit-evidence/registry.data.mjs';
@@ -96,6 +97,7 @@ const NON_MANUAL_STEP_OCCURRENCES = Object.freeze([
   ...createTupleOccurrences(E2E_STEPS, 'e2e', 'tool'),
   ...createTupleOccurrences(AUDIT_STEPS, 'audit', 'tool'),
   ...createTupleOccurrences(ADVISORY_STEPS, 'advisory', 'advisory'),
+  ...createTupleOccurrences(STRUCTURAL_AUDIT_STEPS, 'structural-audit', 'manual'),
 ]);
 
 export const QA_STEP_OCCURRENCES = Object.freeze([

@@ -5,12 +5,9 @@ import { OFFSCREEN_RECORDING_START_TIMEOUT_MS } from '@sniptale/runtime-contract
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { appendRecordingViewportParams } from '../params';
 import { initializeSidecarRecorders } from '../sidecar';
-import {
-  cleanupResources,
-  finalizeRecordingBootstrap,
-  handleRecordingStartError,
-  initializeRecordingSession,
-} from './helpers';
+import { cleanupResources } from './cleanup';
+import { finalizeRecordingBootstrap } from './recorder';
+import { handleRecordingStartError, initializeRecordingSession } from './session';
 
 type StartRecordingParams = {
   streamId: string;
@@ -103,5 +100,3 @@ async function startRecordingInternal(
     durationTracker,
   });
 }
-
-export { cleanupResources };

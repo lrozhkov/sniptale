@@ -1,10 +1,12 @@
 import { mountStyleInAccessibleDocuments } from '../../../platform/frame';
-import type { SelectionModeState } from '../session/state';
+import type { SelectionModeSession } from '../session';
 
 const SELECTION_CURSOR_STROKE_FALLBACK = '#3b82f6';
 const SELECTION_CURSOR_STYLE_ID = 'sniptale-crosshair-cursor';
 
-export function enableSelectionModeCursor(state: SelectionModeState): void {
+type SelectionModeCursorSession = Pick<SelectionModeSession, 'cursorStyleCleanup'>;
+
+export function enableSelectionModeCursor(state: SelectionModeCursorSession): void {
   const cursor = createCrosshairCursor();
   state.cursorStyleCleanup?.();
   state.cursorStyleCleanup = mountStyleInAccessibleDocuments({
@@ -30,7 +32,7 @@ export function enableSelectionModeCursor(state: SelectionModeState): void {
   });
 }
 
-export function disableSelectionModeCursor(state: SelectionModeState): void {
+export function disableSelectionModeCursor(state: SelectionModeCursorSession): void {
   state.cursorStyleCleanup?.();
   state.cursorStyleCleanup = null;
 }

@@ -1,11 +1,10 @@
-import type { MutableRefObject } from 'react';
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { executeCountdownScreenshot } from './elapsed';
 import type { ScreenshotControllerRuntime } from '../types';
-import type { CountdownLockSession, ScreenshotType } from '../countdown/controller';
 import { StaleScreenshotRunError, type ScreenshotControllerParams } from '../mode';
+import { createScreenshotControllerSession } from './state';
+import type { ScreenshotControllerSession } from './state';
 
 const {
   showToastMock,
@@ -93,16 +92,14 @@ function createParams(
   };
 }
 
-function createRuntime(): ScreenshotControllerRuntime {
+function createRuntime(session: ScreenshotControllerSession): ScreenshotControllerRuntime {
   return {
     capturePersistence: {
       sessionActivePresetId: null,
       setSaveDialogState: vi.fn(),
     },
     captureActionRef: { current: 'download_default' },
-    navigationLockStateBeforeScreenshot: { current: true },
-    screenshotRunActiveRef: { current: false },
-    screenshotRunGenerationRef: { current: 1 },
+    session,
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
@@ -110,18 +107,16 @@ function createRuntime(): ScreenshotControllerRuntime {
 }
 
 function createArgs(overrides: Partial<ActionArgs> = {}): ActionArgs {
+  const session = overrides.session ?? createScreenshotControllerSession(true);
+  if (session.runGeneration === 0) {
+    session.runGeneration = 1;
+  }
+  session.pendingType ??= 'visible';
+
   return {
     params: createParams(),
-    refs: {
-      countdownLockSessionRef: { current: null } as MutableRefObject<CountdownLockSession | null>,
-      countdownRunTokenRef: { current: null } as MutableRefObject<number | null>,
-      countdownTimeoutRef: {
-        current: null,
-      } as MutableRefObject<ReturnType<typeof setTimeout> | null>,
-      navigationLockStateBeforeScreenshot: { current: true },
-      pendingScreenshotType: { current: 'visible' } as MutableRefObject<ScreenshotType | null>,
-    },
-    runtime: createRuntime(),
+    runtime: createRuntime(session),
+    session,
     setCountdown: vi.fn(),
     ...overrides,
   };
@@ -162,23 +157,15 @@ async function expectCountdownQuickActionSuccessClosesOverlayAndShowsToast() {
   expect(showToastMock).toHaveBeenCalledWith('Copied', 'success');
   expect(restoreVisibleUiStateMock).not.toHaveBeenCalled();
   expect(args.setCountdown).toHaveBeenCalledWith(null);
-  expect(args.refs.pendingScreenshotType.current).toBeNull();
+  expect(args.session.pendingType).toBeNull();
 }
 
 async function expectCountdownSelectionFailureRestoresUiAndReportsSelectionError() {
   const error = new Error('selection failed');
   runSelectionScreenshotMock.mockRejectedValue(error);
-  const args = createArgs({
-    refs: {
-      countdownLockSessionRef: { current: null } as MutableRefObject<CountdownLockSession | null>,
-      countdownRunTokenRef: { current: null } as MutableRefObject<number | null>,
-      countdownTimeoutRef: {
-        current: null,
-      } as MutableRefObject<ReturnType<typeof setTimeout> | null>,
-      navigationLockStateBeforeScreenshot: { current: true },
-      pendingScreenshotType: { current: 'selection' } as MutableRefObject<ScreenshotType | null>,
-    },
-  });
+  const session = createScreenshotControllerSession(true);
+  session.pendingType = 'selection';
+  const args = createArgs({ session });
 
   await executeCountdownScreenshot('selection', args, 1);
 
@@ -186,10 +173,12 @@ async function expectCountdownSelectionFailureRestoresUiAndReportsSelectionError
   expect(showScreenshotErrorMock).not.toHaveBeenCalled();
   expect(restoreVisibleUiStateMock).toHaveBeenCalledWith(args.runtime, 1);
   expect(args.setCountdown).toHaveBeenCalledWith(null);
-  expect(args.refs.pendingScreenshotType.current).toBeNull();
+  expect(args.session.pendingType).toBeNull();
 }
 
 async function expectStaleCountdownRunDoesNotCaptureOrRestore() {
+  const session = createScreenshotControllerSession(true);
+  session.runGeneration = 2;
   const args = createArgs({
     params: createParams({
       quickActionOverlayRef: {
@@ -201,10 +190,7 @@ async function expectStaleCountdownRunDoesNotCaptureOrRestore() {
         },
       },
     }),
-    runtime: {
-      ...createRuntime(),
-      screenshotRunGenerationRef: { current: 2 },
-    },
+    session,
   });
 
   await executeCountdownScreenshot('visible', args, 1);
@@ -216,25 +202,22 @@ async function expectStaleCountdownRunDoesNotCaptureOrRestore() {
   expect(showToastMock).not.toHaveBeenCalled();
   expect(restoreVisibleUiStateMock).not.toHaveBeenCalled();
   expect(args.setCountdown).toHaveBeenCalledWith(null);
-  expect(args.refs.pendingScreenshotType.current).toBeNull();
+  expect(args.session.pendingType).toBeNull();
 }
 
 async function expectStaleCountdownRunDoesNotClearNewerCountdown() {
-  const args = createArgs({
-    runtime: {
-      ...createRuntime(),
-      screenshotRunGenerationRef: { current: 2 },
-    },
-  });
-  args.refs.countdownRunTokenRef.current = 2;
-  args.refs.pendingScreenshotType.current = 'full';
+  const session = createScreenshotControllerSession(true);
+  session.runGeneration = 2;
+  const args = createArgs({ session });
+  args.session.countdownRunToken = 2;
+  args.session.pendingType = 'full';
 
   await executeCountdownScreenshot('visible', args, 1);
 
   expect(syncCaptureActionMock).not.toHaveBeenCalled();
   expect(args.setCountdown).not.toHaveBeenCalled();
-  expect(args.refs.countdownRunTokenRef.current).toBe(2);
-  expect(args.refs.pendingScreenshotType.current).toBe('full');
+  expect(args.session.countdownRunToken).toBe(2);
+  expect(args.session.pendingType).toBe('full');
 }
 
 async function expectStaleCountdownCaptureDoesNotShowFeedback() {
@@ -253,7 +236,7 @@ async function expectStaleCountdownCaptureDoesNotShowFeedback() {
     }),
   });
   runViewportScreenshotMock.mockImplementation(async () => {
-    args.runtime.screenshotRunGenerationRef.current = 2;
+    args.session.runGeneration = 2;
     throw new StaleScreenshotRunError();
   });
 
@@ -264,7 +247,7 @@ async function expectStaleCountdownCaptureDoesNotShowFeedback() {
   expect(showScreenshotErrorMock).not.toHaveBeenCalled();
   expect(restoreVisibleUiStateMock).toHaveBeenCalledWith(args.runtime, 1);
   expect(args.setCountdown).toHaveBeenCalledWith(null);
-  expect(args.refs.pendingScreenshotType.current).toBeNull();
+  expect(args.session.pendingType).toBeNull();
 }
 
 describe('screenshot-controller-action-elapsed', () => {

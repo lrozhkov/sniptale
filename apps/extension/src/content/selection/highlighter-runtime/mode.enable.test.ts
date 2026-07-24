@@ -27,19 +27,28 @@ vi.mock('../../platform/page-context/frame-events', async (importOriginal) => ({
   },
 }));
 
-vi.mock('./runtime.helpers', () => ({
+vi.mock('./runtime-document-mode', () => ({
   applyHighlighterDocumentMode: enableMocks.applyHighlighterDocumentModeMock,
-  dispatchHighlighterModeChanged: enableMocks.dispatchHighlighterModeChangedMock,
+}));
+
+vi.mock('./runtime-cursor-style', () => ({
   mountHighlighterCursorStyle: enableMocks.mountHighlighterCursorStyleMock,
+  removeHighlighterCursorStyle: vi.fn(),
+}));
+
+vi.mock('./runtime-listeners', () => ({
+  createHighlighterRuntimeEscapeKeyHandler: vi.fn(),
   registerHighlighterRuntimeListeners: enableMocks.registerHighlighterRuntimeListenersMock,
 }));
 
-vi.mock('./mode.disable', () => ({
-  disableHighlighterRuntime: vi.fn(),
+vi.mock('../../platform/page-context/mode-events', async (importOriginal) => ({
+  ...(await importOriginal()),
+  dispatchHighlighterModeChanged: enableMocks.dispatchHighlighterModeChangedMock,
 }));
 
-import { createHoverControllerStub } from './controller.test.helpers';
-import { enableHighlighterRuntime } from './mode.enable';
+import { enableHighlighterRuntime } from './mode';
+import { createHoverControllerStub } from './controller.test-support';
+import { createHighlighterRuntimeState } from './state';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,13 +56,7 @@ beforeEach(() => {
 });
 
 function createDisabledState() {
-  return {
-    cleanupEventListeners: null as (() => void) | null,
-    isFrameEditing: false,
-    isModeEnabled: false,
-    isPaused: false,
-    isTooltipVisible: false,
-  };
+  return createHighlighterRuntimeState();
 }
 
 function bootstrapEnabledRuntime() {
@@ -65,7 +68,7 @@ function bootstrapEnabledRuntime() {
   enableMocks.registerHighlighterRuntimeListenersMock.mockReturnValue(cleanupRuntimeListeners);
   enableMocks.addHighlighterSettingsChangedListenerMock.mockReturnValue(cleanupSettingsChanged);
 
-  enableHighlighterRuntime(state as never, hoverController as never);
+  enableHighlighterRuntime(state, hoverController);
 
   return {
     cleanupRuntimeListeners,
@@ -81,7 +84,7 @@ describe('highlighter mode enable bootstrap', () => {
 
     expect(enableMocks.deactivateOtherContentModesMock).toHaveBeenCalledWith('highlighter');
     expect(enableMocks.setContentModeEnabledMock).toHaveBeenCalledWith('highlighter', true);
-    expect(enableMocks.dispatchHighlighterModeChangedMock).toHaveBeenCalledWith(true);
+    expect(enableMocks.dispatchHighlighterModeChangedMock).toHaveBeenCalledWith({ enabled: true });
     expect(hoverController.createOverlayContainer).toHaveBeenCalledTimes(1);
     expect(hoverController.createHoverOverlay).toHaveBeenCalledTimes(1);
     expect(enableMocks.applyHighlighterDocumentModeMock).toHaveBeenCalledWith(true);
@@ -106,6 +109,24 @@ describe('highlighter mode enable bootstrap', () => {
 });
 
 describe('highlighter mode enable guards', () => {
+  it('retains runtime cleanup when settings-listener registration throws', () => {
+    const cleanupRuntimeListeners = vi.fn();
+    const hoverController = createHoverControllerStub();
+    const state = createDisabledState();
+    enableMocks.registerHighlighterRuntimeListenersMock.mockReturnValue(cleanupRuntimeListeners);
+    enableMocks.addHighlighterSettingsChangedListenerMock.mockImplementationOnce(() => {
+      throw new Error('settings listener failed');
+    });
+
+    expect(() => enableHighlighterRuntime(state, hoverController)).toThrow(
+      'settings listener failed'
+    );
+    expect(state.cleanupEventListeners).toBe(cleanupRuntimeListeners);
+
+    state.cleanupEventListeners?.();
+    expect(cleanupRuntimeListeners).toHaveBeenCalledTimes(1);
+  });
+
   it('invalidates hover settings through the shared listener seam', () => {
     const hoverController = createHoverControllerStub();
     const state = createDisabledState();
@@ -113,7 +134,7 @@ describe('highlighter mode enable guards', () => {
     enableMocks.registerHighlighterRuntimeListenersMock.mockReturnValue(vi.fn());
     enableMocks.addHighlighterSettingsChangedListenerMock.mockReturnValue(vi.fn());
 
-    enableHighlighterRuntime(state as never, hoverController as never);
+    enableHighlighterRuntime(state, hoverController);
     settingsChangedHandler?.({ defaultBorderPresetId: 'preset-2' });
 
     expect(hoverController.invalidateSettingsCache).toHaveBeenCalledWith({
@@ -123,15 +144,10 @@ describe('highlighter mode enable guards', () => {
 
   it('does nothing when the runtime is already enabled', () => {
     const hoverController = createHoverControllerStub();
-    const state = {
-      cleanupEventListeners: null as (() => void) | null,
-      isFrameEditing: false,
-      isModeEnabled: true,
-      isPaused: false,
-      isTooltipVisible: false,
-    };
+    const state = createDisabledState();
+    state.isModeEnabled = true;
 
-    enableHighlighterRuntime(state as never, hoverController as never);
+    enableHighlighterRuntime(state, hoverController);
 
     expect(enableMocks.deactivateOtherContentModesMock).not.toHaveBeenCalled();
     expect(enableMocks.registerHighlighterRuntimeListenersMock).not.toHaveBeenCalled();

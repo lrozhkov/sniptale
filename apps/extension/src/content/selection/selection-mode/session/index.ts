@@ -1,37 +1,87 @@
-import { createSelectionModeLocalsSnapshot } from './locals-contract';
-import type { SelectionModeState } from './state';
-import type { SelectionModeSession } from './locals/contract';
-import { createSelectionModeSessionLocalSetters } from './locals/setters';
+import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
+import { createSelectionModeDom } from '../ui/container';
+import type { ResizeDirection, SelectionModeDom } from '../ui/dom-types';
+import type { Point, Selection, SelectionState } from '../types';
+
+export interface SelectionModeSession {
+  aspectRatio: number | null;
+  cleanupEventListeners: (() => void) | null;
+  cleanupScrollListeners: (() => void) | null;
+  currentSelection: Selection;
+  currentState: SelectionState;
+  cursorStyleCleanup: (() => void) | null;
+  dom: SelectionModeDom;
+  dragStartPoint: Point;
+  dragThreshold: number;
+  hasMovedEnough: boolean;
+  hoveredElement: HTMLElement | null;
+  isActive: boolean;
+  isDragging: boolean;
+  isResizing: boolean;
+  maintainAspectRatio: boolean;
+  mouseDownPoint: Point | null;
+  rejectCallback: ((error: Error) => void) | null;
+  resizeDirection: ResizeDirection | null;
+  resolveCallback: ((area: CaptureArea) => void) | null;
+  selectionAtDragStart: Selection;
+  skipNextClick: boolean;
+}
 
 /**
- * Creates mutable session locals from the current selection-mode state snapshot.
+ * Creates the single mutable state authority for one selection-mode controller instance.
  */
-export function createSelectionModeSession(state: SelectionModeState): SelectionModeSession {
-  return createSelectionModeLocalsSnapshot(state);
+export function createSelectionModeSession(): SelectionModeSession {
+  return {
+    aspectRatio: null,
+    cleanupEventListeners: null,
+    cleanupScrollListeners: null,
+    currentSelection: emptySelection(),
+    currentState: 'idle',
+    cursorStyleCleanup: null,
+    dom: createSelectionModeDom(),
+    dragStartPoint: { x: 0, y: 0 },
+    dragThreshold: 5,
+    hasMovedEnough: false,
+    hoveredElement: null,
+    isActive: false,
+    isDragging: false,
+    isResizing: false,
+    maintainAspectRatio: false,
+    mouseDownPoint: null,
+    rejectCallback: null,
+    resizeDirection: null,
+    resolveCallback: null,
+    selectionAtDragStart: emptySelection(),
+    skipNextClick: false,
+  };
 }
 
 /**
  * Resets mutable session locals back to the idle selection-mode baseline.
  */
 export function resetSelectionModeSession(session: SelectionModeSession): void {
-  const setters = createSelectionModeSessionLocalSetters(session);
+  Object.assign(session, {
+    aspectRatio: null,
+    cleanupEventListeners: null,
+    cleanupScrollListeners: null,
+    currentSelection: emptySelection(),
+    currentState: 'idle',
+    dragStartPoint: { x: 0, y: 0 },
+    hasMovedEnough: false,
+    hoveredElement: null,
+    isActive: false,
+    isDragging: false,
+    isResizing: false,
+    maintainAspectRatio: false,
+    mouseDownPoint: null,
+    rejectCallback: null,
+    resizeDirection: null,
+    resolveCallback: null,
+    selectionAtDragStart: emptySelection(),
+    skipNextClick: false,
+  } satisfies Partial<SelectionModeSession>);
+}
 
-  setters.setAspectRatio(null);
-  setters.setCleanupEventListeners(null);
-  setters.setCleanupScrollListeners(null);
-  setters.setCurrentSelection({ x: 0, y: 0, width: 0, height: 0 });
-  setters.setCurrentState('idle');
-  setters.setDragStartPoint({ x: 0, y: 0 });
-  setters.setHasMovedEnough(false);
-  setters.setHoveredElement(null);
-  setters.setIsActive(false);
-  setters.setIsDragging(false);
-  setters.setIsResizing(false);
-  setters.setMaintainAspectRatio(false);
-  setters.setMouseDownPoint(null);
-  setters.setRejectCallback(null);
-  setters.setResolveCallback(null);
-  setters.setResizeDirection(null);
-  setters.setSelectionAtDragStart({ x: 0, y: 0, width: 0, height: 0 });
-  setters.setSkipNextClick(false);
+function emptySelection(): Selection {
+  return { x: 0, y: 0, width: 0, height: 0 };
 }

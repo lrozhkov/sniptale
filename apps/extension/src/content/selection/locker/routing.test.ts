@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { routeLockInteractionEvent } from './routing';
 
-vi.mock('../../application/mode-session', () => ({
-  isContentModeEnabled: vi.fn(() => false),
+const modeSession = vi.hoisted(() => ({
+  isContentModeEnabled: vi.fn((_mode: string) => false),
 }));
+
+vi.mock('../../application/mode-session', () => modeSession);
 
 function createCancelableClick(): MouseEvent {
   return new MouseEvent('click', {
@@ -115,9 +117,59 @@ function shouldAllowOwnedShadowToolbarTargetsInFullLockMode(): void {
   expect(event.defaultPrevented).toBe(false);
 }
 
+function shouldAllowQuickEditTextTargets(): void {
+  const target = document.createElement('span');
+  target.textContent = 'Editable text';
+  document.body.appendChild(target);
+  const event = createCancelableClick();
+  target.dispatchEvent(event);
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'quick-edit');
+
+  routeLockInteractionEvent(event, {
+    isFullLockMode: false,
+    isNavigationLocked: true,
+    isUIHidden: false,
+  });
+
+  expect(event.defaultPrevented).toBe(false);
+}
+
+function shouldBlockQuickEditInteractiveTargets(): void {
+  const target = document.createElement('button');
+  document.body.appendChild(target);
+  const event = createCancelableClick();
+  target.dispatchEvent(event);
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'quick-edit');
+
+  routeLockInteractionEvent(event, {
+    isFullLockMode: false,
+    isNavigationLocked: true,
+    isUIHidden: false,
+  });
+
+  expect(event.defaultPrevented).toBe(true);
+}
+
+function shouldAllowEditingTargets(): void {
+  const target = document.createElement('div');
+  target.classList.add('sniptale-editing');
+  document.body.appendChild(target);
+  const event = createCancelableClick();
+  target.dispatchEvent(event);
+
+  routeLockInteractionEvent(event, {
+    isFullLockMode: true,
+    isNavigationLocked: true,
+    isUIHidden: false,
+  });
+
+  expect(event.defaultPrevented).toBe(false);
+}
+
 describe('locker routing', () => {
   beforeEach(() => {
     document.body.replaceChildren();
+    modeSession.isContentModeEnabled.mockReturnValue(false);
   });
 
   it(
@@ -134,4 +186,7 @@ describe('locker routing', () => {
     'allows owned shadow toolbar targets in full-lock mode',
     shouldAllowOwnedShadowToolbarTargetsInFullLockMode
   );
+  it('allows quick-edit text targets', shouldAllowQuickEditTextTargets);
+  it('blocks quick-edit interactive targets', shouldBlockQuickEditInteractiveTargets);
+  it('allows editing targets', shouldAllowEditingTargets);
 });

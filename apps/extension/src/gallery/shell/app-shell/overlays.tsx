@@ -1,5 +1,7 @@
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
-import { BackupExportModal, ImportConflictModal, StorageManagerModal } from '../../library/modals';
+import { BackupExportModalContent } from '../../library/modals/backup-export-content';
+import { ImportConflictModalContent } from '../../library/modals/import-conflict-content';
+import { StorageManagerModalContent } from '../../library/modals/storage-manager-content';
 import { PreviewPanel } from '../../library/preview';
 import type { GalleryAppLayoutProps } from './types';
 
@@ -11,7 +13,7 @@ function GalleryStorageOverlay(
   }
 
   return (
-    <StorageManagerModal
+    <StorageManagerModalContent
       report={props.state.storage.cleanupReport}
       onClose={props.onStorageManagerClose}
       onRun={async (group) => props.onStorageCleanup(group)}
@@ -27,7 +29,7 @@ function GalleryImportOverlay(
   }
 
   return (
-    <ImportConflictModal
+    <ImportConflictModalContent
       summary={props.state.storage.pendingImport.summary}
       onClose={props.onPendingImportClose}
       onImport={async (strategy) => props.onImport(strategy)}
@@ -46,7 +48,7 @@ function GalleryBackupExportOverlay(
   }
 
   return (
-    <BackupExportModal
+    <BackupExportModalContent
       options={props.state.storage.pendingExport.options}
       summary={props.state.storage.pendingExport.summary}
       onClose={props.onPendingExportClose}

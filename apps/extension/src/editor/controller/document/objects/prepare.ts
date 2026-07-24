@@ -6,7 +6,7 @@ import {
   isArrowObject,
 } from '../../../objects/arrow';
 import { applyTextCalloutRendering } from '../../../objects/annotation/text/callout/lifecycle';
-import { applyEditorObjectInteractionControls } from '../interaction-controls';
+import { applyEditorObjectInteractionControls } from '../interaction-controls/apply';
 import { refreshPreparedObjectGeometry } from './geometry-refresh';
 import { applyBaseInteractionPatch } from './interaction-patches';
 import { applyLineLikeRichShapeControls } from './rich-shape-controls';

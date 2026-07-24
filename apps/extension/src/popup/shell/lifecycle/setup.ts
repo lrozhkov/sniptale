@@ -2,31 +2,35 @@ import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 
 import { subscribeToRecordingMessages } from '../message-sync';
 import { getPopupRuntimeErrorMessage } from '../../diagnostics/runtime-errors';
-import { bootstrapPopupLifecycle } from './bootstrap/run';
+import { bootstrapPopupLifecycle } from './bootstrap-workflow';
 import { createMediaHubListener } from './media-hub-listener';
 import { registerPopupLifecycleBrowserListeners } from './browser-listeners';
-import type { PopupLifecycleParamsGetter } from './types';
+import type { PopupLifecycleParamsGetter } from './contracts';
 
 export function setupPopupLifecycle(getParams: PopupLifecycleParamsGetter): () => void {
   let cancelled = false;
 
-  const unsubscribeMediaHub = subscribeToMediaHubEvents(createMediaHubListener(getParams));
-  const browserListeners = registerPopupLifecycleBrowserListeners(getParams);
+  const unsubscribeMediaHub = subscribeToMediaHubEvents(
+    createMediaHubListener(() => getParams().mediaHub)
+  );
+  const browserListeners = registerPopupLifecycleBrowserListeners(() => getParams().browser);
   const unsubscribeMessages = subscribeToRecordingMessages({
     onRecordingState: (state) => {
       if (cancelled) return;
-      getParams().setRecordingState(state);
+      getParams().recording.setRecordingState(state);
     },
     onRecordingStartFailed: (error) => {
       if (cancelled) return;
-      const params = getParams();
-      params.setStartError(getPopupRuntimeErrorMessage(error, 'popup.video.startRecordingError'));
-      params.setIsStartPending(false);
+      const recording = getParams().recording;
+      recording.setStartError(
+        getPopupRuntimeErrorMessage(error, 'popup.video.startRecordingError')
+      );
+      recording.setIsStartPending(false);
     },
   });
   void bootstrapPopupLifecycle({
     cancelledRef: () => cancelled,
-    getParams,
+    getParams: () => getParams().bootstrap,
   });
 
   return () => {

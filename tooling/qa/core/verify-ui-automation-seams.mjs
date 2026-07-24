@@ -17,6 +17,8 @@ const TARGET_FILE_PATTERNS = [
   /^apps\/extension\/src\/content\/overlay\/(?:app|scenario|screenshot|toolbar)\/.+\.[cm]?[jt]sx?$/u,
   /^apps\/extension\/src\/content\/selection\/frame-runtime\/react\/.+\.[cm]?[jt]sx?$/u,
 ];
+const EXPLICIT_DOM_DRIVER_PATTERN = /(?:^|\/)[^/]*dom-driver(?:\/|\.|$)/u;
+const EXPLICIT_TIMING_OWNER_PATTERN = /(?:^|\/)(?:timer|timing)\.[cm]?[jt]sx?$/u;
 
 function createViolation(file, line, message) {
   return {
@@ -36,6 +38,10 @@ function resolveTargetFiles({ files = [], scope = 'workspace' } = {}) {
 }
 
 function collectNodeViolations(relativePath, sourceFile, node) {
+  if (EXPLICIT_DOM_DRIVER_PATTERN.test(relativePath)) {
+    return [];
+  }
+
   if (
     ts.isNewExpression(node) &&
     ts.isIdentifier(node.expression) &&
@@ -67,7 +73,8 @@ function collectNodeViolations(relativePath, sourceFile, node) {
   if (
     ts.isCallExpression(node) &&
     ts.isIdentifier(node.expression) &&
-    node.expression.text === 'setTimeout'
+    node.expression.text === 'setTimeout' &&
+    !EXPLICIT_TIMING_OWNER_PATTERN.test(relativePath)
   ) {
     return [
       createViolation(

@@ -1,4 +1,4 @@
-import { collectAiLimitReport } from './ai-limit-utils.mjs';
+import { collectAiHygieneReport } from './ai-hygiene-utils.mjs';
 import { filterImportOnlyDiffFiles, filterImportOrMockOnlyDiffFiles } from './import-only-diff.mjs';
 import {
   createFailureStep,
@@ -21,6 +21,7 @@ import { runManifestPermissionsCheck } from '../guards/architecture/verify-manif
 import { runRuntimeTopologyCheck } from '../guards/architecture/verify-runtime-topology.mjs';
 import { runSecurityCheck } from '../guards/security/verify-security.mjs';
 import { runSonarjsCheck } from './verify-sonarjs.mjs';
+import { runStructuralRiskCheck } from './verify-structural-risk.mjs';
 import { timeAsyncStep, timeSyncStep } from './step-timing.helpers.mjs';
 
 async function runEslintStep(jsLikeFiles) {
@@ -43,20 +44,33 @@ async function runEslintStep(jsLikeFiles) {
   });
 }
 
-function runAiLimitsStep(codeFiles, baseline) {
+function runAiHygieneStep(codeFiles, baseline) {
   const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
-  const aiResult =
+  const result =
     behavioralCodeFiles.length === 0
       ? { skipped: true, violations: [] }
       : {
           skipped: false,
           violations: filterAllowedViolations(
-            collectAiLimitReport(behavioralCodeFiles).violations,
+            collectAiHygieneReport(behavioralCodeFiles).violations,
             baseline
           ),
         };
 
-  return createViolationStep('AI limits', 'AI limit violations found:', aiResult);
+  return createViolationStep('AI hygiene', 'AI hygiene violations found:', result);
+}
+
+function runStructuralRiskStep(codeFiles) {
+  const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
+  return createViolationStep(
+    'Structural risk',
+    'Structural risk violations found:',
+    runStructuralRiskCheck({
+      files: behavioralCodeFiles,
+      reportScope: 'current-diff',
+      enforce: true,
+    })
+  );
 }
 
 function runManualMockExportParityStep(targetFiles) {
@@ -190,7 +204,8 @@ export async function collectFocusedStepResults({
     await timeAsyncStep(() => runEslintStep(qualityJsLikeFiles)),
     await timeAsyncStep(() => runSonarjsStep(qualityCodeFiles)),
     timeSyncStep(() => runChangedLineReadabilityStep(qualityCodeFiles)),
-    timeSyncStep(() => runAiLimitsStep(qualityCodeFiles, baseline)),
+    timeSyncStep(() => runAiHygieneStep(qualityCodeFiles, baseline)),
+    timeSyncStep(() => runStructuralRiskStep(qualityCodeFiles)),
     timeSyncStep(() => runManualMockExportParityStep(qualityTargetFiles)),
     ...runFocusedCodeSteps(qualityCodeFiles),
     ...(await runFocusedTriggeredChecks({

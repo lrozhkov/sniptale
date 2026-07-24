@@ -4,7 +4,7 @@ import type {
   useAIModalResizeState,
   useAIModalSettingsState,
 } from './locals';
-import type { PromptTemplatesState } from './prompt-template-state';
+import type { PromptTemplatesState } from '../../../../../features/prompt-templates/hooks/use-prompt-templates';
 
 function buildAIModalTemplateState(props: {
   handleAddTemplate: () => void;

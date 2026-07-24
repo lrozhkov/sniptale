@@ -2,7 +2,9 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { applyAIChanges, findAIChangeTargets, markSelectedInTree } from '.';
+import { findAIChangeTargets } from '../target-resolution/change-targets';
+import { applyAIChanges } from './apply';
+import { markSelectedInTree } from './marking';
 
 afterEach(() => {
   document.body.replaceChildren();

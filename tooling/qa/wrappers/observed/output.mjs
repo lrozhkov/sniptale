@@ -75,15 +75,25 @@ function structuredLocations(step) {
     line: null,
     message: String(failure),
   }));
-  return [...violations, ...failures];
+  const advisories = (step.advisories ?? []).map((finding) => {
+    const id = finding.id ?? finding.family ?? 'advisory';
+    const reason = finding.reason ?? finding.message ?? 'review requested';
+    return {
+      file: finding.file ?? '<repository>',
+      line: finding.line ?? null,
+      message: `${id}: ${reason}`,
+    };
+  });
+  return [...violations, ...failures, ...advisories];
 }
 
 function createStructuredDiagnostic(step, definition, failed) {
   const evidence = step.evidence ?? [];
-  if (!failed && evidence.length === 0) return null;
+  const locations = structuredLocations(step);
+  if (!failed && evidence.length === 0 && locations.length === 0) return null;
   return {
     summary: step.summary ?? step.detail ?? (failed ? 'step failed' : null),
-    locations: structuredLocations(step),
+    locations,
     remediation: step.advice ?? definition.remediation,
     ruleDoc: definition.ruleDoc,
     evidence,

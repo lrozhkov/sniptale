@@ -1,14 +1,13 @@
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import { createPopupExportState, resetPopupExportState } from '../state';
-import { createPopupExportRequestHandler } from '../request-handler';
-import type { PopupExportRunner } from '../request-handler/types/runtime';
-import type { PopupExportState } from '../types';
+import { createPopupExportRequestHandler } from '../request-handler/runtime';
+import type { PopupExportRunner, PopupExportState } from '../types';
 
 type PopupExportControllerRuntimeProps = {
-  emitMessage: typeof import('../../helpers').emitPopupExportMessage;
+  emitMessage: typeof import('../../helpers/messaging').emitPopupExportMessage;
   exportRunner: PopupExportRunner;
   parseTree: (contextLabel: string) => Promise<ParsedDOMTree>;
-  persistArchive: typeof import('../../helpers').persistPopupExportArchive;
+  persistArchive: typeof import('../../helpers/archive/persist').persistPopupExportArchive;
 };
 
 type PopupExportControllerRuntime = PopupExportControllerRuntimeProps & {

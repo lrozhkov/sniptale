@@ -71,6 +71,22 @@ describe('observability storage', () => {
     expect(fs.readdirSync(path.dirname(filePath))).toEqual(['run.json']);
   });
 
+  it('preserves the prior JSON record and cleans up after rename failure', () => {
+    const root = createTempRoot('qa-observability-atomic-json-');
+    const filePath = path.join(root, '.tmp/qa-observability/runs/run.json');
+    writeJsonAtomic(filePath, { version: 1 });
+    const rename = vi.spyOn(fs, 'renameSync').mockImplementationOnce(() => {
+      throw new Error('injected JSON rename failure');
+    });
+
+    expect(() => writeJsonAtomic(filePath, { version: 2 })).toThrow(
+      /injected JSON rename failure/u
+    );
+    rename.mockRestore();
+    expect(JSON.parse(fs.readFileSync(filePath, 'utf8'))).toEqual({ version: 1 });
+    expect(fs.readdirSync(path.dirname(filePath))).toEqual(['run.json']);
+  });
+
   it('replaces a bounded log atomically and preserves the prior log on rename failure', () => {
     const root = createTempRoot('qa-observability-atomic-log-');
     const logPath = path.join(root, '.tmp/qa-logs/run.log');

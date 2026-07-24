@@ -28,6 +28,7 @@ const UI_RUNTIME_NAMES = new Set([
 const SOURCE_FILE_PATTERN = /^(?:src|apps\/extension\/src)\//u;
 const SHARED_RUNTIME_FILE_PATTERN =
   /^(?:src|apps\/extension\/src)\/shared\/(?:browser|messages|runtime|transport)\//u;
+const CONTENT_PARSER_OWNER_PATTERN = /^(?:src|apps\/extension\/src)\/content\/parser\//u;
 
 function hasAny(files, predicate) {
   return files.some(predicate);
@@ -67,11 +68,7 @@ function collectArchitectureDocs(targetFiles) {
   ) {
     docs.push('docs/architecture/i18n-architecture.md');
   }
-  if (
-    hasAny(targetFiles, (file) =>
-      /^(?:src|apps\/extension\/src)\/content\/.*(?:parser|snapshot|profile|export)/u.test(file)
-    )
-  ) {
+  if (hasAny(targetFiles, (file) => CONTENT_PARSER_OWNER_PATTERN.test(file))) {
     docs.push('docs/architecture/parser-architecture.md');
   }
   if (hasAny(targetFiles, (file) => isUiFile(file) && /\.(?:tsx|css)$/u.test(file))) {

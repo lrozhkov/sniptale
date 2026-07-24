@@ -35,6 +35,23 @@ export const QA_WRAPPER_CLI_CONTRACTS = Object.freeze({
     description: 'Collect non-blocking advisory evidence for the current diff.',
     options: NO_OPTIONS,
   },
+  'qa:structural-audit': {
+    command: 'qa:structural-audit',
+    entrypoint: 'tooling/qa/wrappers/structural-audit.mjs',
+    lifecycleLabel: 'QA structural audit',
+    scripts: ['qa:structural-audit'],
+    usage: 'npm run qa:structural-audit -- [--verbose]',
+    description:
+      'Generate a manual, report-only structural and owner/change-reason topology snapshot.',
+    options: [
+      {
+        name: '--verbose',
+        kind: 'flag',
+        key: 'verbose',
+        description: 'Print observed step diagnostics in addition to the report summary.',
+      },
+    ],
+  },
   'qa:checkpoint': {
     command: 'qa:checkpoint',
     entrypoint: 'tooling/qa/wrappers/checkpoint.mjs',

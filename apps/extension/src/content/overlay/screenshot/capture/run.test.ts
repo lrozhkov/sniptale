@@ -85,9 +85,11 @@ function createRuntime(actionType: 'download_default' | 'scenario'): ScreenshotC
       setSaveDialogState: vi.fn(),
     },
     captureActionRef: { current: actionType },
-    navigationLockStateBeforeScreenshot: { current: false },
-    screenshotRunActiveRef: { current: false },
-    screenshotRunGenerationRef: { current: 1 },
+    session: {
+      navigationLockBaseline: false,
+      runActive: false,
+      runGeneration: 1,
+    },
     scenario: {
       buildCapturePayload: vi.fn(() => createScenarioPayload()),
       ensureCaptureReady: vi.fn(async () => undefined),

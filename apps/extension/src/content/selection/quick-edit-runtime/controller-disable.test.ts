@@ -3,7 +3,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createQuickEditModeHelpers } from './controller-disable';
-import { buildEditableElementRecord, createQuickEditOverlayState } from './helpers';
+import { buildEditableElementRecord } from './elements';
+import { createQuickEditOverlayState } from './overlay.state';
 
 function createEditingElements() {
   return new Map([

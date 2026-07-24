@@ -1,4 +1,4 @@
-import type { QuickActionsSectionState } from '../section';
+import type { QuickActionsSectionState } from '../controller';
 
 export function getQuickActionRowStateClassName(props: {
   action: QuickActionsSectionState['actions'][number];

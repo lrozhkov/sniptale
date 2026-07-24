@@ -9,7 +9,7 @@ import {
   settingsAddButtonClassName,
   settingsEmptyStateClassName,
 } from '../../section-surface/panel-controls';
-import { type QuickActionsSectionState } from './section';
+import { type QuickActionsSectionState } from './controller';
 
 function QuickActionsListEmptyState(props: { editingId: string | null; isLoading: boolean }) {
   if (props.isLoading) {

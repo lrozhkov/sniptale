@@ -33,8 +33,10 @@ vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) =>
   showToast: showToastMock,
 }));
 
-vi.mock('../../../../../parser/dom-tree-parser/ai/format', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../parser/dom-tree-parser/ai/format')>()),
+vi.mock('../../../../../parser/dom-tree-parser/ai/editable-format', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../../parser/dom-tree-parser/ai/editable-format')
+  >()),
   formatDataForAIJSON: formatDataForAIJSONMock,
 }));
 
@@ -99,6 +101,16 @@ async function expectMissingModelRejection() {
   await submitAiPickPrompt(context, 'Summarize selected fields');
 
   expect(showToastMock).toHaveBeenCalledWith('background.runtime.llmModelMissing', 'warning');
+  expect(requestAiResponseMock).not.toHaveBeenCalled();
+}
+
+async function expectLoadingSubmissionIgnored() {
+  const context = { ...createContext(), isAILoading: true };
+
+  await submitAiPickPrompt(context, 'Summarize selected fields', '{"selected":true}', 'model-1');
+
+  expect(showToastMock).not.toHaveBeenCalled();
+  expect(context.setIsAILoading).not.toHaveBeenCalled();
   expect(requestAiResponseMock).not.toHaveBeenCalled();
 }
 
@@ -175,6 +187,8 @@ describe('submitAiPickPrompt', () => {
   it('rejects missing tree data before sending the runtime message', expectMissingTreeRejection);
 
   it('rejects submissions that do not have a selected model', expectMissingModelRejection);
+
+  it('ignores duplicate submissions while a request is loading', expectLoadingSubmissionIgnored);
 
   it(
     'requests ai output for selected data, applies changes, and clears loading',

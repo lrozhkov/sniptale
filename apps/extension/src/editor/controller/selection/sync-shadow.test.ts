@@ -41,7 +41,7 @@ vi.mock('../../objects/line', async (importOriginal) => ({
   isLineObject: mocks.isLineObject,
 }));
 
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 describe('selection shadow sync', () => {
   it('syncs canonical arrow shadow fallbacks and ignores mismatched line objects', () => {

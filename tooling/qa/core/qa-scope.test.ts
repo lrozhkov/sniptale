@@ -1,6 +1,9 @@
+import fs from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { createTempRoot, importFresh, withCwd } from './test-helpers';
+import { collectFocusedCoverageOwnerMapInventoryViolations } from './focused-coverage-owner-map.mjs';
 
 it('routes harness-owned policy and shared guidance without blind spots', async () => {
   const root = createTempRoot('qa-scope-guidance-');
@@ -23,6 +26,110 @@ it('routes harness-owned policy and shared guidance without blind spots', async 
       ],
     });
   });
+});
+
+it('separates generated inventories from executable harness changes', async () => {
+  const root = createTempRoot('qa-scope-inventory-only-');
+
+  await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./qa-scope.mjs')>('./qa-scope.mjs');
+
+    expect(module.isHarnessQaFile('tooling/configs/qa/technical-debt.data.json')).toBe(true);
+    expect(module.isHarnessInventoryOnlyFile('tooling/configs/qa/technical-debt.data.json')).toBe(
+      true
+    );
+    expect(module.isHarnessVerificationQaFile('tooling/configs/qa/technical-debt.data.json')).toBe(
+      false
+    );
+    expect(
+      module.isHarnessVerificationQaFile(
+        'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isHarnessInventoryOnlyFile('tooling/configs/qa/instance-ownership.data.json')
+    ).toBe(true);
+    expect(
+      module.isHarnessVerificationQaFile('tooling/qa/core/verify-instance-ownership.data.mjs')
+    ).toBe(true);
+    expect(
+      module.isHarnessVerificationQaFile(
+        'tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isFocusedCoverageOwnerMapInventoryFile(
+        'tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs'
+      )
+    ).toBe(true);
+    expect(
+      module.isHarnessVerificationQaFile(
+        'tooling/qa/core/focused-coverage/maps/popup-recording.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isHarnessVerificationQaFile(
+        'tooling/qa/core/focused-coverage/maps/popup-page-access.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isHarnessVerificationQaFile(
+        'tooling/qa/core/focused-coverage/maps/content-selection.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isHarnessVerificationQaFile('tooling/qa/core/focused-coverage/maps/local.mjs')
+    ).toBe(false);
+    expect(
+      module.isFocusedCoverageOwnerMapInventoryFile(
+        'tooling/qa/core/focused-coverage/maps/cast-cleanup.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isFocusedCoverageOwnerMapInventoryFile(
+        'tooling/qa/core/focused-coverage/maps/index.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isFocusedCoverageOwnerMapInventoryFile(
+        'tooling/qa/core/focused-coverage/maps/unregistered-owner-map.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isHarnessVerificationQaFile(
+        'tooling/qa/core/focused-coverage/maps/unregistered-owner-map.mjs'
+      )
+    ).toBe(true);
+    expect(
+      module.isHarnessInventoryOnlyFile('tooling/qa/core/focused-coverage/maps/shared-facade.mjs')
+    ).toBe(true);
+    expect(
+      module.isHarnessInventoryOnlyFile('tooling/qa/core/focused-coverage/maps/settings.mjs')
+    ).toBe(true);
+    expect(
+      module.isHarnessVerificationQaFile('tooling/qa/core/verify-test-coverage.registry.mjs')
+    ).toBe(true);
+    expect(module.isHarnessVerificationQaFile('tooling/configs/qa/quality-baseline.json')).toBe(
+      true
+    );
+    expect(module.isHarnessVerificationQaFile('tooling/qa/core/qa-scope.mjs')).toBe(true);
+  });
+});
+
+it('registers exactly the current leaf focused owner maps as inventory-only', async () => {
+  const module = await importFresh<typeof import('./qa-scope.mjs')>('./qa-scope.mjs');
+  const mapRoot = 'tooling/qa/core/focused-coverage/maps';
+  const mapFiles = fs
+    .readdirSync(mapRoot)
+    .filter((file) => file.endsWith('.mjs'))
+    .sort();
+
+  for (const file of mapFiles) {
+    const relativePath = `${mapRoot}/${file}`;
+    const composesOtherMaps =
+      collectFocusedCoverageOwnerMapInventoryViolations([relativePath]).length > 0;
+    expect(module.isFocusedCoverageOwnerMapInventoryFile(relativePath)).toBe(!composesOtherMaps);
+  }
 });
 
 describe('shared QA controls', () => {

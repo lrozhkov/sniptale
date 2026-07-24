@@ -1,7 +1,7 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { isOwnedSnapshotViewerPage } from '../../../../features/tab-capabilities/url';
 import { createRouteErrorResponse } from '../../../routing-contracts/response';
-import { handleTriggerQuickAction } from '../actions';
+import { handleTriggerQuickAction } from '../actions.quick-action';
 import type { CaptureRouteAdapterContext } from './types';
 
 export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boolean {

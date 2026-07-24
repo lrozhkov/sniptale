@@ -1,3 +1,5 @@
+import type { Canvas } from 'fabric';
+
 import { applyEditorViewportZoom } from '../../../viewport';
 import type { CloseEditorControllerCanvasOptions } from './types';
 
@@ -22,4 +24,8 @@ export function resetClosedEditorCanvas(options: CloseEditorControllerCanvasRese
     options.zoomLevel,
     options.viewportDevicePixelRatioBaseline
   );
+}
+
+export function renderClosedEditorCanvas(canvas: Canvas): void {
+  canvas.requestRenderAll();
 }

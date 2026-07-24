@@ -7,6 +7,7 @@ import type {
 } from '../../../../../features/highlighter/contracts';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { scheduleStepBadgeRecalculation } from '../../../frame-dom-driver/timing';
+import type { UpdateGlobalStepBadgeSettings } from '../../contracts';
 
 const DEFAULT_STEP_BADGE_SETTINGS: StepBadgeSettings = {
   enabled: false,
@@ -81,7 +82,7 @@ export function createUpdateFrameStepBadge(params: {
 export function createUpdateGlobalStepBadgeSettings(params: {
   globalStepBadgeSettingsRef: MutableRefObject<GlobalStepBadgeSettings>;
   recalculateStepBadges: () => void;
-}) {
+}): UpdateGlobalStepBadgeSettings {
   const { globalStepBadgeSettingsRef, recalculateStepBadges } = params;
 
   return (settings: Partial<GlobalStepBadgeSettings>) => {

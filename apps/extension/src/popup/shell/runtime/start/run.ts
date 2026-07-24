@@ -1,21 +1,25 @@
 import { useCallback } from 'react';
+import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupRuntimeStateSlice } from '../state';
 import { startRecordingHandler } from '../start-recording';
-import { canStartPopupRecording } from './guard';
-import { createPopupStartRecordingParams } from './params';
 
 export function useStartRecordingHandler(state: PopupRuntimeStateSlice) {
   return useCallback(async () => {
     if (
-      !canStartPopupRecording({
-        isStartPending: state.recording.isStartPending,
-        recordingStatus: state.recording.recordingState.status,
-      })
+      state.recording.isStartPending ||
+      state.recording.recordingState.status !== VideoRecordingStatus.IDLE
     ) {
       return;
     }
 
     state.recording.clearStartError();
-    await startRecordingHandler(createPopupStartRecordingParams(state));
+    await startRecordingHandler({
+      captureMode: state.presets.videoCaptureMode,
+      setIsStartPending: state.recording.setIsStartPending,
+      setRecordingControlCapability: state.recording.setRecordingControlCapability,
+      setStartError: state.recording.setStartError,
+      videoSettings: state.recording.videoSettings,
+      viewportPreset: null,
+    });
   }, [state]);
 }

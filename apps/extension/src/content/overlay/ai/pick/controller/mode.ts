@@ -2,7 +2,7 @@ import { translate } from '../../../../../platform/i18n';
 import { clearAllSniptaleIds } from '../../../../platform/frame';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
-import { markSelectedInTree } from '../runtime/dom-apply';
+import { markSelectedInTree } from '../runtime/dom-apply/marking';
 import {
   disableAiPickModeIfLoaded,
   enableAiPickModeDeferred,

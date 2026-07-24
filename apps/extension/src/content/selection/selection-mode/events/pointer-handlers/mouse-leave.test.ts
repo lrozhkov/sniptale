@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { handleSelectionModeMouseLeave } from './mouse-leave';
+import { handleSelectionModeMouseLeave } from '.';
 import type { SelectionModeEventOptions, SelectionModeInteractionState } from '../types';
 
 vi.mock('../../diag', async (importOriginal) => ({

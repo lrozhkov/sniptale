@@ -2,20 +2,27 @@ import { useSettingsStore } from '../../runtime/store/useSettingsStore';
 import { translate } from '../../../platform/i18n';
 import { getQuickActionDisplayName } from '../../../features/quick-actions-presets/catalog';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
-import { settingsSectionClassName } from '../../section-surface';
-import {
-  QuickActionsDisplayModeCard,
-  QuickActionsEditor,
-  QuickActionsHeader,
-  QuickActionsList,
-} from './views';
-import { useQuickActionsSection } from './section';
+import { SettingsSectionHeader, settingsSectionClassName } from '../../section-surface';
+import { QuickActionsDisplayModeCard, QuickActionsEditor } from './editor';
+import { SettingsInlineConfirmation } from './inline-confirmation';
+import { QuickActionsList } from './list';
+import { useQuickActionsController as useQuickActionsSection } from './controller';
 
 function getDeleteActionMessage(name: string | undefined): string {
   return [
     translate('settings.quickActions.deleteActionMessagePrefix'),
     `"${name ?? ''}"${translate('settings.quickActions.deleteActionMessageSuffix')}`,
   ].join(' ');
+}
+
+function QuickActionsHeader({ confirmationMessage }: { confirmationMessage: string | null }) {
+  return (
+    <SettingsSectionHeader
+      description={translate('settings.quickActions.subtitle')}
+      kicker={translate('settings.navigation.quickactions')}
+      aside={<SettingsInlineConfirmation message={confirmationMessage} />}
+    />
+  );
 }
 
 export function QuickActionsSection() {

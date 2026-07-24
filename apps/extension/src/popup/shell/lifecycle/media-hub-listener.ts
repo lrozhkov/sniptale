@@ -1,6 +1,6 @@
 import { translate } from '../../../platform/i18n';
 
-import type { PopupLifecycleMediaHubParamsGetter } from './types';
+import type { PopupLifecycleMediaHubParamsGetter } from './contracts';
 
 export function createMediaHubListener(getParams: PopupLifecycleMediaHubParamsGetter) {
   return (event: { type: string }) => {

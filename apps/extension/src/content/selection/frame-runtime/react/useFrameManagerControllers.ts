@@ -6,7 +6,7 @@ import type {
   FrameSetter,
   FrameStateSetter,
   WithHistoryCommit,
-} from '../manager/types';
+} from '../contracts';
 import { useFrameManagerMutations } from './useFrameManagerMutations';
 import { useFrameManagerPublicResult } from './useFrameManagerPublicResult';
 import { useFrameManagerRuntimeSyncEffects } from './useFrameManagerRuntimeSyncEffects';

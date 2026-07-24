@@ -9,7 +9,7 @@ import type {
   UpdateFrameStepBadge,
   UpdateGlobalStepBadgeSettings,
   WithHistoryCommit,
-} from '../types';
+} from '../../contracts';
 
 export function useStepBadgeControllers(
   setFrames: FrameSetter,

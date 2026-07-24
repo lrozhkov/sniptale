@@ -1,6 +1,6 @@
 import { Path } from 'fabric';
 import { expect, it } from 'vitest';
-import { applyArrowObjectState } from './state';
+import { applyArrowObjectState } from './state/apply';
 
 it('derives legacy dynamic width metadata when new arrow flags are absent', () => {
   const arrow = new Path('M 0 0 L 0 0') as any;

@@ -1,6 +1,6 @@
 import { mountStyleInAccessibleDocuments, walkAllDocuments } from '../../platform/frame';
 import { QUICK_EDIT_CURSOR_STYLE_ID, QUICK_EDIT_CURSOR_URL } from './style.constants';
-import type { QuickEditOverlayState } from './overlay.helpers';
+import type { QuickEditOverlayState } from './overlay.state';
 
 export function enableQuickEditCursor(state: QuickEditOverlayState): void {
   walkAllDocuments((doc) => {

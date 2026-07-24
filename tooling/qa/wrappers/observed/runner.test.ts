@@ -166,3 +166,44 @@ describe('observed wrapper secret handling', () => {
     output.mockRestore();
   });
 });
+
+describe('observed wrapper console output', () => {
+  it('prints one sanitized bounded report block before the summary and records it in the log', async () => {
+    const root = createTempRoot('observed-wrapper-console-');
+    initGitRepo(root);
+    const writes: string[] = [];
+    const output = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    await withCwd(root, async () => {
+      const result = await runObservedWrapper({
+        wrapperId: 'qa:advisory',
+        label: 'QA advisory',
+        argv: [],
+        contractValidator: ignoreStepContract,
+        environment: createPrivateEnvironment(root),
+        execute: async () => ({
+          steps: [
+            {
+              label: 'Advisory report',
+              status: 'ok',
+              consoleOutput: `attention=0, watch=0 ${PRIVATE_VALUES.secret}\n${'x'.repeat(20_000)}`,
+            },
+          ],
+        }),
+      });
+      const stdout = writes.join('');
+      const log = fs.readFileSync(`${root}/${result.record.log.path}`, 'utf8');
+      expect(stdout).not.toContain(PRIVATE_VALUES.secret);
+      expect(log).not.toContain(PRIVATE_VALUES.secret);
+      expect(stdout.match(/attention=0, watch=0/gu)).toHaveLength(1);
+      expect(stdout.match(/console output truncated/gu)).toHaveLength(1);
+      expect(stdout.indexOf('attention=0, watch=0')).toBeLessThan(
+        stdout.indexOf('QA advisory: all passed')
+      );
+      expect(log).toContain('[Advisory report.console]');
+    });
+    output.mockRestore();
+  });
+});

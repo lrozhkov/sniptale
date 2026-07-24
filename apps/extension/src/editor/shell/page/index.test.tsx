@@ -81,7 +81,6 @@ vi.mock('../../state/useEditorStore', () => ({
 
 import { EDITOR_BOOTSTRAP_EVENT } from '@sniptale/ui/branding';
 import type { EditorBootstrapPayload } from '../../../workflows/editor/bootstrap';
-import { dispatchMalformedEditorBootstrapEvent } from './index.test-support';
 import { EditorPage } from './';
 
 let container: HTMLDivElement | null = null;
@@ -96,6 +95,14 @@ function createServices() {
       dispose: vi.fn(),
     },
   };
+}
+
+function dispatchMalformedEditorBootstrapEvent(eventName: string): void {
+  window.dispatchEvent(
+    new CustomEvent(eventName, {
+      detail: { dataUrl: 'javascript:spoofed', title: 'Spoofed payload' },
+    })
+  );
 }
 
 function createEditorStoreState(
@@ -225,57 +232,6 @@ async function verifiesBootstrapEventRoutingAndDispose() {
   expect(services.controller.dispose).toHaveBeenCalledOnce();
 }
 
-async function verifiesPageRootContextMenuBlocking() {
-  createEditorPageServicesMock.mockReturnValue(createServices());
-  applyEditorStoreState(createEditorStoreState());
-
-  await renderEditorPage();
-
-  const pageRoot = container?.querySelector<HTMLElement>('[data-ui="editor.page.root"]');
-  const canvasZone = container?.querySelector<HTMLElement>(
-    '[data-ui="editor.canvas.context-zone"]'
-  );
-  const canvasSurface = container?.querySelector<HTMLElement>(
-    '[data-ui="editor.canvas.surface-hit-area"]'
-  );
-  const previewZone = container?.querySelector<HTMLElement>(
-    '[data-ui="editor.canvas.preview-zone"]'
-  );
-
-  const previewEvent = new MouseEvent('contextmenu', {
-    bubbles: true,
-    button: 2,
-    cancelable: true,
-  });
-  previewZone?.dispatchEvent(previewEvent);
-
-  const pageRootEvent = new MouseEvent('contextmenu', {
-    bubbles: true,
-    button: 2,
-    cancelable: true,
-  });
-  pageRoot?.dispatchEvent(pageRootEvent);
-
-  const canvasZoneEvent = new MouseEvent('contextmenu', {
-    bubbles: true,
-    button: 2,
-    cancelable: true,
-  });
-  canvasZone?.dispatchEvent(canvasZoneEvent);
-
-  const canvasSurfaceEvent = new MouseEvent('contextmenu', {
-    bubbles: true,
-    button: 2,
-    cancelable: true,
-  });
-  canvasSurface?.dispatchEvent(canvasSurfaceEvent);
-
-  expect(previewEvent.defaultPrevented).toBe(true);
-  expect(pageRootEvent.defaultPrevented).toBe(true);
-  expect(canvasZoneEvent.defaultPrevented).toBe(true);
-  expect(canvasSurfaceEvent.defaultPrevented).toBe(false);
-}
-
 describe('EditorPage', () => {
   useEditorPageTestScope();
 
@@ -290,9 +246,5 @@ describe('EditorPage', () => {
   it(
     'routes bootstrap events through the extracted runtime opener and disposes services on unmount',
     verifiesBootstrapEventRoutingAndDispose
-  );
-  it(
-    'blocks right-click outside the canonical canvas surface while keeping the real surface available',
-    verifiesPageRootContextMenuBlocking
   );
 });

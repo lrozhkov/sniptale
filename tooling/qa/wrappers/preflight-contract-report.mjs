@@ -1,9 +1,7 @@
-import fs from 'node:fs';
-
-import { QUALITY_LIMITS } from '../core/quality.config.mjs';
-import { fromRelativePath } from '../core/shared.mjs';
+import { getRuntimeRoots } from '../core/runtime-topology.mjs';
 
 const BOUNDARY_TARGET_PATTERN = /^(?:apps\/extension\/src|packages\/[^/]+\/src)\//u;
+const RUNTIME_ROOTS = getRuntimeRoots();
 const BOUNDARY_ROLE_TOKENS = [
   'contracts',
   'custom-shapes',
@@ -20,7 +18,6 @@ const BOUNDARY_ROLE_TOKENS = [
   'web-snapshot',
   'zip',
 ];
-const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:ts|tsx)$/u;
 
 function isBoundaryTarget(file) {
   return (
@@ -37,9 +34,7 @@ export function collectContractChecklist(context) {
     /^apps\/extension\/src\/(?:contracts|composition\/persistence|features)\//u.test(file)
   );
   const runtimeBoundaries = context.codeFiles.filter((file) =>
-    /^(?:src\/(?:background|content|offscreen)|apps\/extension\/src\/web-snapshot-viewer)\//u.test(
-      file
-    )
+    RUNTIME_ROOTS.some((root) => file === root || file.startsWith(`${root}/`))
   );
   const importBoundaries = context.codeFiles.filter((file) =>
     /(?:import|zip|file-actions|custom-shapes|effect-bundle|effect-runtime|web-snapshot)/u.test(
@@ -67,6 +62,12 @@ export function collectTransitiveConsumerHints(context) {
     )
   ) {
     hints.push('messaging contracts: check runtime route maps, sender policies, and callsites');
+  }
+
+  if (hints.length > 0) {
+    hints.push(
+      'consumer discovery is a planning prompt only; pin a bounded manifest before claiming a complete consumer set'
+    );
   }
   if (
     context.codeFiles.some((file) =>
@@ -146,30 +147,4 @@ export function collectTypecheckBlastRadius(context) {
   }
 
   return [...new Set(hints)];
-}
-
-export function collectTargetTestSizeWarnings(targetFiles) {
-  const warningLimit = Math.floor(QUALITY_LIMITS.maxFileLines * 0.9);
-  return targetFiles
-    .filter((file) => TEST_FILE_PATTERN.test(file))
-    .map((file) => {
-      const absolutePath = fromRelativePath(file);
-      try {
-        return { file, lines: fs.readFileSync(absolutePath, 'utf8').split(/\r?\n/u).length };
-      } catch (error) {
-        if (
-          error &&
-          typeof error === 'object' &&
-          (error.code === 'ENOENT' || error.code === 'EISDIR')
-        ) {
-          return null;
-        }
-        throw error;
-      }
-    })
-    .filter((entry) => entry && entry.lines >= warningLimit)
-    .map(
-      (entry) =>
-        `${entry.file}: ${entry.lines} lines; split boundary/roundtrip/fixture cases owner-locally`
-    );
 }

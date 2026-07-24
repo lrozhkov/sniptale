@@ -1,11 +1,10 @@
-import type { MutableRefObject } from 'react';
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createHandleCancelCountdown } from './cancel';
 import type { ScreenshotControllerRuntime } from '../types';
-import type { CountdownLockSession, ScreenshotType } from '../countdown/controller';
 import type { ScreenshotControllerParams } from '../mode';
+import { createScreenshotControllerSession } from './state';
+import type { ScreenshotControllerSession } from './state';
 
 const {
   cancelQuickActionCountdownMock,
@@ -71,42 +70,28 @@ function createParams(
   };
 }
 
-function createRuntime(): ScreenshotControllerRuntime {
+function createRuntime(session: ScreenshotControllerSession): ScreenshotControllerRuntime {
   return {
     capturePersistence: {
       sessionActivePresetId: null,
       setSaveDialogState: vi.fn(),
     },
     captureActionRef: { current: 'download_default' },
-    navigationLockStateBeforeScreenshot: { current: true },
-    screenshotRunActiveRef: { current: false },
-    screenshotRunGenerationRef: { current: 1 },
+    session,
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
   };
 }
 
-function createRefs(overrides: Partial<FactoryArgs['refs']> = {}): FactoryArgs['refs'] {
-  return {
-    countdownLockSessionRef: { current: null } as MutableRefObject<CountdownLockSession | null>,
-    countdownRunTokenRef: { current: null } as MutableRefObject<number | null>,
-    countdownTimeoutRef: {
-      current: null,
-    } as MutableRefObject<ReturnType<typeof setTimeout> | null>,
-    navigationLockStateBeforeScreenshot: { current: true },
-    pendingScreenshotType: { current: null } as MutableRefObject<ScreenshotType | null>,
-    ...overrides,
-  };
-}
-
 function createArgs(overrides: Partial<FactoryArgs> = {}) {
   const setCountdown = vi.fn();
+  const session = overrides.session ?? createScreenshotControllerSession(true);
 
   const args: FactoryArgs = {
     params: createParams(),
-    refs: createRefs(),
-    runtime: createRuntime(),
+    runtime: createRuntime(session),
+    session,
     setCountdown,
     ...overrides,
   };
@@ -120,6 +105,8 @@ beforeEach(() => {
 
 function verifyQuickActionCancelBranch() {
   const timeoutId = setTimeout(() => undefined, 1_000);
+  const session = createScreenshotControllerSession(true);
+  session.countdownTimeout = timeoutId;
   const { args, setCountdown } = createArgs({
     params: createParams({
       quickActionOverlayRef: {
@@ -131,11 +118,7 @@ function verifyQuickActionCancelBranch() {
         },
       },
     }),
-    refs: createRefs({
-      countdownTimeoutRef: {
-        current: timeoutId,
-      } as MutableRefObject<ReturnType<typeof setTimeout> | null>,
-    }),
+    session,
   });
 
   createHandleCancelCountdown(args)();
@@ -143,27 +126,24 @@ function verifyQuickActionCancelBranch() {
 
   expect(setCountdown).not.toHaveBeenCalledWith(null);
   expect(resetCountdownRuntimeStateMock).toHaveBeenCalledWith({
-    countdownTimeoutRef: args.refs.countdownTimeoutRef,
-    pendingScreenshotType: args.refs.pendingScreenshotType,
+    session: args.session,
     setCountdown,
   });
   expect(setUIHiddenMock).toHaveBeenCalledWith(false);
   expect(cancelQuickActionCountdownMock).toHaveBeenCalledWith(
     args.params,
     args.runtime,
-    args.refs.countdownLockSessionRef
+    args.session
   );
   expect(restoreCountdownLockOnCancelMock).not.toHaveBeenCalled();
 }
 
 function verifyStandardCancelBranch() {
   const timeoutId = setTimeout(() => undefined, 1_000);
+  const session = createScreenshotControllerSession(true);
+  session.countdownTimeout = timeoutId;
   const { args, setCountdown } = createArgs({
-    refs: createRefs({
-      countdownTimeoutRef: {
-        current: timeoutId,
-      } as MutableRefObject<ReturnType<typeof setTimeout> | null>,
-    }),
+    session,
   });
 
   createHandleCancelCountdown(args)();
@@ -171,13 +151,11 @@ function verifyStandardCancelBranch() {
 
   expect(setCountdown).not.toHaveBeenCalledWith(null);
   expect(resetCountdownRuntimeStateMock).toHaveBeenCalledWith({
-    countdownTimeoutRef: args.refs.countdownTimeoutRef,
-    pendingScreenshotType: args.refs.pendingScreenshotType,
+    session: args.session,
     setCountdown,
   });
   expect(restoreCountdownLockOnCancelMock).toHaveBeenCalledWith({
-    countdownLockSessionRef: args.refs.countdownLockSessionRef,
-    navigationLockStateBeforeScreenshot: args.refs.navigationLockStateBeforeScreenshot,
+    session: args.session,
     setNavigationLockEnabled: args.params.setNavigationLockEnabled,
   });
   expect(args.params.setIsToolbarVisible).toHaveBeenCalledWith(true);

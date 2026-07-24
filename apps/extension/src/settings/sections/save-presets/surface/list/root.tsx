@@ -1,4 +1,5 @@
-import { PresetsListBody, PresetsListHeader } from '.';
+import { PresetsListBody } from './body';
+import { PresetsListHeader } from './header';
 import { pickPresetsListBodyProps } from './props';
 import { PresetsListOverlays } from '../overlays';
 import type { SavePresetsListProps } from '../../state/types';

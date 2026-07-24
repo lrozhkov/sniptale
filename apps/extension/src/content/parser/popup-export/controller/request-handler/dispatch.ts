@@ -4,8 +4,14 @@ import { respondWithPopupPreview } from '../preview';
 import { handlePopupExportBuildPackageRuntime } from '../package';
 import { handlePopupExportStartRuntime } from '../start/runtime';
 import { handlePopupExportCancelRuntime } from './cancel';
-import type { PopupExportRequestHandlerProps } from './types/request';
-import type { PopupSendResponse } from '../../helpers';
+import type { PopupSendResponse } from '../../helpers/messaging';
+import type { PopupExportRequest } from '../../helpers/request/types';
+import type { PopupExportRequestHandlerRuntime } from '../types';
+
+type PopupExportRequestHandlerProps = PopupExportRequestHandlerRuntime & {
+  request: PopupExportRequest;
+  sendResponse: PopupSendResponse;
+};
 
 type PopupWebSnapshotRequest = Extract<
   PopupExportRequestHandlerProps['request'],
@@ -16,7 +22,7 @@ function handleLazyPopupWebSnapshotRuntime(
   sendResponse: PopupSendResponse,
   request: PopupWebSnapshotRequest
 ): boolean {
-  void import('../snapshot')
+  void import('../web-snapshot-runtime')
     .then(({ handlePopupWebSnapshotRuntime }) =>
       handlePopupWebSnapshotRuntime(
         sendResponse,

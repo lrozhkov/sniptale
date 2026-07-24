@@ -26,9 +26,11 @@ function createRuntime(): ScreenshotControllerRuntime {
       sessionActivePresetId: null,
       setSaveDialogState: vi.fn(),
     },
-    navigationLockStateBeforeScreenshot: { current: false },
-    screenshotRunActiveRef: { current: false },
-    screenshotRunGenerationRef: { current: 1 },
+    session: {
+      navigationLockBaseline: false,
+      runActive: false,
+      runGeneration: 1,
+    },
     scenario: {
       buildCapturePayload: vi.fn(createScenarioPayload),
     },

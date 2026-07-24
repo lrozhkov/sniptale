@@ -51,9 +51,11 @@ function createRuntime(): ScreenshotControllerRuntime {
       setSaveDialogState: vi.fn(),
     },
     captureActionRef: { current: 'download_default' },
-    navigationLockStateBeforeScreenshot: { current: false },
-    screenshotRunActiveRef: { current: true },
-    screenshotRunGenerationRef: { current: 1 },
+    session: {
+      navigationLockBaseline: false,
+      runActive: true,
+      runGeneration: 1,
+    },
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
@@ -119,14 +121,14 @@ async function expectSelectionCapturePassesFreshnessGuardToLazySelection() {
   const isCurrent = enableSelectionModeDeferredIfCurrentMock.mock.calls[0]?.[0];
   expect(isCurrent).toBeTypeOf('function');
   expect(isCurrent?.()).toBe(true);
-  runtime.screenshotRunGenerationRef.current = 2;
+  runtime.session.runGeneration = 2;
   expect(isCurrent?.()).toBe(false);
 }
 
 async function expectStaleLazySelectionRejectionNormalizesToStaleRun() {
   const runtime = createRuntime();
   enableSelectionModeDeferredIfCurrentMock.mockImplementationOnce(async () => {
-    runtime.screenshotRunGenerationRef.current = 2;
+    runtime.session.runGeneration = 2;
     throw new Error('Selection mode activation was superseded.');
   });
 
@@ -145,7 +147,7 @@ async function expectStaleLazySelectionRejectionNormalizesToStaleRun() {
 async function expectStaleSelectionCancelNormalizesToStaleRun() {
   const runtime = createRuntime();
   enableSelectionModeDeferredIfCurrentMock.mockImplementationOnce(async () => {
-    runtime.screenshotRunGenerationRef.current = 2;
+    runtime.session.runGeneration = 2;
     throw new Error('Cancelled by user');
   });
 
@@ -186,7 +188,7 @@ async function expectStaleSelectionSkipsFrameDispatchAfterIntentAwait() {
   });
 
   await settleCaptureTimers();
-  runtime.screenshotRunGenerationRef.current = 2;
+  runtime.session.runGeneration = 2;
   capability.resolve({
     contentIntent: { requestId: 'request-1', token: 'capability-1' },
     success: true,

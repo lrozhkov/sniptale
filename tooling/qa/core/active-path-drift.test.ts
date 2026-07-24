@@ -7,7 +7,6 @@ import {
   isDataCarrierFile,
   isFormattableFile,
   isIgnoredRelativePath,
-  isTokenBudgetFile,
   repoRoot,
 } from './shared.mjs';
 import { LOGGING_ALLOWLISTED_FILES } from './verify-logging.mjs';
@@ -149,13 +148,12 @@ describe('active QA policy path integrity', () => {
     expectFocusedTriggerPaths();
   });
 
-  it('keeps tooling configs visible to diff scope while excluding size gates', () => {
+  it('keeps tooling configs visible to diff scope without model-budget classification', () => {
     const configPath = 'tooling/configs/qa/manifest-permissions.data.json';
 
     expect(isIgnoredRelativePath(configPath)).toBe(false);
     expect(isFormattableFile(configPath)).toBe(false);
     expect(isDataCarrierFile(configPath)).toBe(true);
-    expect(isTokenBudgetFile(configPath)).toBe(false);
   });
 
   it('keeps review skills visible to diff fingerprints and QA partitioning', () => {

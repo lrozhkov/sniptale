@@ -1,10 +1,9 @@
 import fs from 'node:fs';
-import ts from 'typescript';
 
-import { fromRelativePath } from './shared.mjs';
-import { QUALITY_LIMITS } from './quality.config.mjs';
+import { readHeadFileText } from './git-head-sources.mjs';
+import { createSourceFile, ts } from './structural-risk/ast.mjs';
 
-const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:ts|tsx)$/u;
+const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const UI_SURFACE_OWNERS = [
   'content',
   'popup',
@@ -44,7 +43,7 @@ const RUNTIME_SECURITY_PREFIXES = [
 ];
 const BOUNDARY_PAYLOAD_PATTERN =
   /(?:runtime|message|schema|contract|parser|import|backup|manifest|zip|package|snapshot|payload)/u;
-const UI_SURFACE_FILE_PATTERN = /\.(?:ts|tsx|css)$/u;
+const UI_SOURCE_FILE_PATTERN = /\.(?:[jt]sx?|css)$/u;
 
 function hasOwnerPrefix(file, owners) {
   return owners.some(
@@ -56,18 +55,122 @@ function isRuntimeSecurityFile(file) {
   return RUNTIME_SECURITY_PREFIXES.some((prefix) => file.startsWith(prefix));
 }
 
-function existingFile(relativePath) {
-  const absolutePath = fromRelativePath(relativePath);
-  return fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile();
-}
-
 function collectChangedTests(targetFiles) {
-  return targetFiles.filter((file) => TEST_FILE_PATTERN.test(file));
+  return targetFiles.filter((file) => TEST_FILE_PATTERN.test(file) && fs.existsSync(file));
 }
 
-function collectUiSurfaceFiles(codeFiles) {
+function collectProductionCodeFiles(codeFiles) {
+  return codeFiles.filter((file) => !TEST_FILE_PATTERN.test(file));
+}
+
+function readCurrentSource(file) {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+function normalizeViewText(value) {
+  return value.replace(/\s+/gu, ' ').trim();
+}
+
+function appendJsxContainerSignature(node, sourceFile, signature) {
+  if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+    signature.push(`jsx:${node.tagName.getText(sourceFile)}`);
+  } else if (ts.isJsxFragment(node)) {
+    signature.push('jsx:fragment');
+  }
+}
+
+function collectNestedImperativeViewSignatures(node, sourceFile, signature) {
+  if (appendImperativeViewSignature(node, sourceFile, signature)) return;
+  ts.forEachChild(node, (child) =>
+    collectNestedImperativeViewSignatures(child, sourceFile, signature)
+  );
+}
+
+function appendJsxAttributeSignature(node, sourceFile, signature) {
+  if (ts.isJsxAttribute(node)) {
+    const name = node.name.getText(sourceFile);
+    if (/^on[A-Z]/u.test(name)) {
+      ts.forEachChild(node, (child) =>
+        collectNestedImperativeViewSignatures(child, sourceFile, signature)
+      );
+    } else {
+      signature.push(
+        `attr:${name}=${normalizeViewText(node.initializer?.getText(sourceFile) ?? '')}`
+      );
+    }
+    return true;
+  }
+  if (!ts.isJsxSpreadAttribute(node)) return false;
+  signature.push(`spread:${normalizeViewText(node.expression.getText(sourceFile))}`);
+  return true;
+}
+
+function appendJsxContentSignature(node, sourceFile, signature) {
+  if (ts.isJsxText(node)) {
+    const text = normalizeViewText(node.text);
+    if (text) signature.push(`text:${text}`);
+    return true;
+  }
+  if (!ts.isJsxExpression(node)) return false;
+  const expression = node.expression?.getText(sourceFile);
+  if (expression) signature.push(`expression:${normalizeViewText(expression)}`);
+  return true;
+}
+
+function appendImperativeViewSignature(node, sourceFile, signature) {
+  const isRenderCall =
+    ts.isCallExpression(node) &&
+    /(?:^|\.)(?:createElement|createPortal|render)$/u.test(node.expression.getText(sourceFile));
+  if (isRenderCall) {
+    signature.push(`render:${normalizeViewText(node.getText(sourceFile))}`);
+    return true;
+  }
+  const isStyleTemplate =
+    ts.isTaggedTemplateExpression(node) &&
+    /^(?:css|styled(?:\.|$))/u.test(node.tag.getText(sourceFile));
+  if (!isStyleTemplate) return false;
+  signature.push(`style:${normalizeViewText(node.getText(sourceFile))}`);
+  return true;
+}
+
+function createViewSignature(file, source) {
+  if (source === null) return [];
+  if (file.endsWith('.css')) return [`css:${normalizeViewText(source)}`];
+  const sourceFile = createSourceFile(file, source);
+  const signature = [];
+  function visit(node) {
+    if (appendJsxAttributeSignature(node, sourceFile, signature)) return;
+    if (appendJsxContentSignature(node, sourceFile, signature)) return;
+    if (appendImperativeViewSignature(node, sourceFile, signature)) return;
+    appendJsxContainerSignature(node, sourceFile, signature);
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return signature;
+}
+
+function hasViewBearingChange(file, getPreviousSource) {
+  const currentSignature = createViewSignature(file, readCurrentSource(file));
+  const previousSignature = createViewSignature(file, getPreviousSource(file));
+  return (
+    (currentSignature.length > 0 || previousSignature.length > 0) &&
+    JSON.stringify(currentSignature) !== JSON.stringify(previousSignature)
+  );
+}
+
+function collectUiOwnerFiles(codeFiles) {
   return codeFiles.filter(
-    (file) => hasOwnerPrefix(file, UI_SURFACE_OWNERS) && UI_SURFACE_FILE_PATTERN.test(file)
+    (file) => hasOwnerPrefix(file, UI_SURFACE_OWNERS) && UI_SOURCE_FILE_PATTERN.test(file)
+  );
+}
+
+function collectUiSurfaceFiles(codeFiles, getPreviousSource = readHeadFileText) {
+  return collectUiOwnerFiles(collectProductionCodeFiles(codeFiles)).filter((file) =>
+    hasViewBearingChange(file, getPreviousSource)
   );
 }
 
@@ -85,17 +188,24 @@ export function collectRiskChecklistHints({
   }
 
   const hints = [];
-  if (codeFiles.some((file) => STATE_AUTHORITY_PATTERN.test(file))) {
+  const productionCodeFiles = collectProductionCodeFiles(codeFiles);
+  const uiOwnerFiles = collectUiOwnerFiles(productionCodeFiles);
+  const uiSurfaceFiles = collectUiSurfaceFiles(productionCodeFiles);
+  if (productionCodeFiles.some((file) => STATE_AUTHORITY_PATTERN.test(file))) {
     hints.push(createRiskHint('state authority', 'name authoritative/advisory/disposable state'));
   }
-  if (collectUiSurfaceFiles(codeFiles).length > 0) {
+  if (uiSurfaceFiles.length > 0) {
     hints.push(createRiskHint('UI parity', 'map old behavior to new surface and proof'));
     hints.push(createRiskHint('visual states', 'cover hover/active/disabled/open/empty/overflow'));
+  } else if (uiOwnerFiles.some((file) => STATE_AUTHORITY_PATTERN.test(file))) {
+    hints.push(
+      createRiskHint('UI wiring', 'prove state, action, and lifecycle bindings behaviorally')
+    );
   }
-  if (codeFiles.some((file) => HIDDEN_INPUT_PATTERN.test(file))) {
+  if (productionCodeFiles.some((file) => HIDDEN_INPUT_PATTERN.test(file))) {
     hints.push(createRiskHint('hidden inputs', 'prove hidden inputs/dialogs stay mounted'));
   }
-  if (codeFiles.some((file) => PUBLIC_API_PATTERN.test(file))) {
+  if (productionCodeFiles.some((file) => PUBLIC_API_PATTERN.test(file))) {
     hints.push(createRiskHint('public API', 'include consumers and tests'));
   }
 
@@ -107,8 +217,10 @@ export function collectRiskChecklistHints({
   return hints;
 }
 
-export function collectVisualProofHints({ codeFiles = [] }) {
-  const uiFiles = collectUiSurfaceFiles(codeFiles).filter((file) => FLOATING_UI_PATTERN.test(file));
+export function collectVisualProofHints({ codeFiles = [], getPreviousSource = readHeadFileText }) {
+  const uiFiles = collectUiSurfaceFiles(codeFiles, getPreviousSource).filter((file) =>
+    FLOATING_UI_PATTERN.test(file)
+  );
   if (uiFiles.length === 0) {
     return [];
   }
@@ -119,7 +231,9 @@ export function collectVisualProofHints({ codeFiles = [] }) {
 }
 
 export function collectCapabilityLossHints({ targetFiles = [], codeFiles = [] }) {
-  const capabilityFiles = codeFiles.filter((file) => CAPABILITY_SURFACE_PATTERN.test(file));
+  const capabilityFiles = collectProductionCodeFiles(codeFiles).filter((file) =>
+    CAPABILITY_SURFACE_PATTERN.test(file)
+  );
   if (capabilityFiles.length === 0) {
     return [];
   }
@@ -134,67 +248,14 @@ export function collectCapabilityLossHints({ targetFiles = [], codeFiles = [] })
   ];
 }
 
-function nodeLineSpan(sourceFile, node) {
-  const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-  const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
-  return end - start + 1;
-}
-
-function isNamedTestCall(node) {
-  return (
-    ts.isCallExpression(node) &&
-    ts.isIdentifier(node.expression) &&
-    ['it', 'test', 'describe'].includes(node.expression.text)
-  );
-}
-
-function collectLongTestBodies(sourceFile) {
-  const limit = Math.floor(QUALITY_LIMITS.maxFunctionLines * 0.8);
-  const findings = [];
-
-  function visit(node) {
-    if (isNamedTestCall(node) && nodeLineSpan(sourceFile, node) >= limit) {
-      const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-      findings.push(`test body near size limit at line ${line}`);
-    }
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return findings.slice(0, 2);
-}
-
-export function collectTestShapeHints({ targetFiles = [] }) {
-  const warningFileLines = Math.floor(QUALITY_LIMITS.maxFileLines * 0.8);
-  const hints = [];
-
-  for (const file of collectChangedTests(targetFiles)) {
-    if (!existingFile(file)) {
-      continue;
-    }
-
-    const sourceText = fs.readFileSync(fromRelativePath(file), 'utf8');
-    const lineCount = sourceText.split(/\r?\n/u).length;
-    if (lineCount >= warningFileLines) {
-      hints.push(`test shape risk: ${file}: ${lineCount} lines`);
-    }
-
-    const sourceFile = ts.createSourceFile(file, sourceText, ts.ScriptTarget.Latest, true);
-    hints.push(
-      ...collectLongTestBodies(sourceFile).map((detail) => `test shape risk: ${file}: ${detail}`)
-    );
-  }
-
-  return hints.slice(0, 6);
-}
-
 export function collectDeterministicProofHints({ codeFiles = [] }) {
   if (codeFiles.length === 0) {
     return [];
   }
 
   const hints = [];
-  if (codeFiles.some(isRuntimeSecurityFile)) {
+  const productionCodeFiles = collectProductionCodeFiles(codeFiles);
+  if (productionCodeFiles.some(isRuntimeSecurityFile)) {
     hints.push(
       createRiskHint(
         'runtime/security proof',
@@ -202,7 +263,7 @@ export function collectDeterministicProofHints({ codeFiles = [] }) {
       )
     );
   }
-  if (codeFiles.some((file) => BOUNDARY_PAYLOAD_PATTERN.test(file))) {
+  if (productionCodeFiles.some((file) => BOUNDARY_PAYLOAD_PATTERN.test(file))) {
     hints.push(
       createRiskHint(
         'boundary payload proof',
@@ -210,7 +271,7 @@ export function collectDeterministicProofHints({ codeFiles = [] }) {
       )
     );
   }
-  if (codeFiles.some((file) => hasOwnerPrefix(file, UX_DEFERRED_OWNERS))) {
+  if (productionCodeFiles.some((file) => hasOwnerPrefix(file, UX_DEFERRED_OWNERS))) {
     hints.push(
       createRiskHint(
         'UX-deferred proof',

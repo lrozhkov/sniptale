@@ -5,7 +5,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   extractFilenameFromContentDisposition,
   resolveCredentialedDownloadUrl,
-} from '../../export-manager/files/utils';
+} from '../../export-manager/files/download-utils';
 import { listFroalaIframes, resolveFroalaIframeBody } from './driver';
 import { extractFullImageUrls as extractPopupImageUrls } from './popup';
 import { cloneRichTextContent, sanitizeRichTextToText } from '../../rich-text-content';

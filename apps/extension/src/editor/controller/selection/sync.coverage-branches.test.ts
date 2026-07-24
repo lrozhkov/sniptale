@@ -66,7 +66,7 @@ vi.mock('./rich-shape-sync', () => ({
   syncRichShapeSelectionSettings: mocks.syncRichShapeSelectionSettingsMock,
 }));
 
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 describe('editor-controller selection sync remaining branch coverage', () => {
   beforeEach(() => {

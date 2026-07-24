@@ -10,8 +10,8 @@ const {
   handleStageRecordingDownloadChunkMock: vi.fn(),
 }));
 
-vi.mock('../actions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../actions')>()),
+vi.mock('../actions.download', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../actions.download')>()),
   handleReleaseRecordingDownload: handleReleaseRecordingDownloadMock,
   handleSaveRecordingForDownload: handleSaveRecordingForDownloadMock,
   handleStageRecordingDownloadChunk: handleStageRecordingDownloadChunkMock,

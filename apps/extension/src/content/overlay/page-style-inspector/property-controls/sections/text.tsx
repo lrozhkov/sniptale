@@ -1,5 +1,6 @@
 import { translate } from '../../../../../platform/i18n';
-import { ColorField, Section } from '../fields';
+import { ColorField } from '../choice-fields';
+import { Section } from '../section';
 import { NumericField } from '../numeric-field';
 import { changedSummary, countModified, fieldState } from '../helpers';
 import { TextAlignButtons, TextModeButtons } from '../text/buttons';

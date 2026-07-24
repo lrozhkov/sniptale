@@ -8,7 +8,7 @@ import type {
   HighlighterSettings,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
-import type { WithHistoryCommit } from '../manager/types';
+import type { WithHistoryCommit } from '../contracts';
 import {
   createCalloutDeleteHandler,
   createCalloutPopoverSettingsHandler,

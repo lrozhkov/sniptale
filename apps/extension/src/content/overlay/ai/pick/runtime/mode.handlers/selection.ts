@@ -1,4 +1,4 @@
-import { getDataIdsForElement, getNearestDataElement } from '../dom-helpers';
+import { getDataIdsForElement, getNearestDataElement } from '../dom-lookup';
 import { isExtensionUIElement, isNonDataInteractiveElement } from '../guards';
 import type { AiPickModeState } from '../mode.types';
 import { aiPickModeLogger, blockAiPickPointerEvent } from './shared';

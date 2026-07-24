@@ -3,6 +3,8 @@ import { isExecutedAsScript } from '../core/shared.mjs';
 import { assertQaResultContract } from '../core/qa-steps/contract.mjs';
 import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
 import { assertFreshCheckpointState } from '../core/verify-checkpoint.state.helpers.mjs';
+import { readAdvisoryState } from '../core/verify-advisory.state.helpers.mjs';
+import { formatAdvisoryReport } from '../core/verify-advisory.report.helpers.mjs';
 import { assertFreshBuildState } from '../core/verify-build.state.helpers.mjs';
 import { PRODUCT_QA_SUITE, createScopedQaContext, hasHarnessQaTargets } from '../core/qa-scope.mjs';
 import { runCheckpoint } from './checkpoint.mjs';
@@ -48,6 +50,13 @@ export function parseCloseoutOptions(argv = []) {
 
 function createFreshCheckpointReuseResult(context) {
   const readyForBuild = context.targetFiles.length > 0 || hasHarnessQaTargets(context);
+  const advisoryState = readAdvisoryState();
+  const findings =
+    advisoryState?.version === 'agent-advisory-v2' &&
+    advisoryState.success === true &&
+    advisoryState.diffFingerprint === context.fingerprint
+      ? advisoryState.findings
+      : [];
   return {
     context,
     executionMode:
@@ -58,7 +67,13 @@ function createFreshCheckpointReuseResult(context) {
           : 'no-targets',
     readyForBuild,
     skipped: !readyForBuild,
-    steps: [createSkippedStep('QA checkpoint', 'fresh green checkpoint state')],
+    steps: [
+      {
+        ...createSkippedStep('QA checkpoint', 'fresh green checkpoint state'),
+        consoleOutput: formatAdvisoryReport({ findings }),
+        advisories: findings,
+      },
+    ],
   };
 }
 

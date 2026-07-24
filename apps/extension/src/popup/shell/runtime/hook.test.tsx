@@ -152,6 +152,12 @@ it('sends pause and resume runtime messages based on the recording status', asyn
     expect.objectContaining({
       environment: expect.objectContaining({
         galleryStatus: null,
+        pageAccess: expect.objectContaining({
+          handleRequest: expect.any(Function),
+        }),
+      }),
+      home: expect.objectContaining({
+        quickActionsReady: true,
       }),
       navigation: expect.objectContaining({
         isReady: true,
@@ -193,10 +199,38 @@ it('exposes lifecycle clearing for applied viewport authority', async () => {
 
   await renderHarness();
   const lifecycleParams = usePopupLifecycleEffectMock.mock.calls[0]?.[0]?.();
-  lifecycleParams.clearAppliedViewportAuthority();
+  lifecycleParams.browser.clearAppliedViewportAuthority();
 
   expect(setAppliedViewportPresetId).toHaveBeenCalledWith(null);
   expect(setAppliedViewportTabId).toHaveBeenCalledWith(null);
+});
+
+it('groups lifecycle roles while preserving one setter authority', async () => {
+  const setStartError = vi.fn();
+  usePopupRuntimeStateMock.mockReturnValueOnce(createRuntimeState({ setStartError }));
+
+  await renderHarness();
+  const lifecycleParams = usePopupLifecycleEffectMock.mock.calls[0]?.[0]?.();
+
+  expect(Object.keys(lifecycleParams).sort()).toEqual([
+    'bootstrap',
+    'browser',
+    'mediaHub',
+    'recording',
+  ]);
+  expect(lifecycleParams).not.toHaveProperty('setStartError');
+  expect(lifecycleParams.bootstrap.setStartError).toBe(setStartError);
+  expect(lifecycleParams.recording.setStartError).toBe(setStartError);
+});
+
+it('keeps recording setter authority connected through the runtime projection', async () => {
+  const setStartError = vi.fn();
+  usePopupRuntimeStateMock.mockReturnValueOnce(createRuntimeState({ setStartError }));
+
+  await renderHarness();
+  latestRuntime?.recording.setStartError('viewport failed');
+
+  expect(setStartError).toHaveBeenCalledWith('viewport failed');
 });
 
 it('logs pause state failures through the popup runtime logger', async () => {

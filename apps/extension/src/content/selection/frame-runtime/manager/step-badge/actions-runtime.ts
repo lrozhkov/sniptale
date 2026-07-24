@@ -5,7 +5,7 @@ import type {
   FrameSetter,
   RecalculateStepBadges,
   WithHistoryCommit,
-} from '../types';
+} from '../../contracts';
 
 export function createHistoryWrappedStepBadgeActions(args: {
   globalStepBadgeSettingsRef: FrameManagerRefs['globalStepBadgeSettingsRef'];

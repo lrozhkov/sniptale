@@ -5,8 +5,8 @@ import type { EffectMode, FrameData, FrameState } from '../../../../features/hig
 import type { InteractiveFrameComponent } from '../roots/component';
 import type { FrameRenderDescriptor } from '../roots/descriptors';
 import type { FrameRootActionRefs } from '../roots/element';
+import { renderInteractiveFrames } from '../roots/dom';
 import { prepareFrameRootsRender } from '../roots/prepare';
-import { renderPreparedFrameRoots } from '../roots/sync';
 
 type UseFrameRootsRendererArgs = {
   containerRef: MutableRefObject<HTMLDivElement | null>;
@@ -118,13 +118,16 @@ function useFrameRootsRenderEffect(args: {
       return undefined;
     }
 
-    return renderPreparedFrameRoots({
+    renderInteractiveFrames({
       actionRefs: args.actionRefs,
+      container: renderState.container,
+      currentFrames: renderState.currentFrames,
+      currentFrameStates: renderState.currentFrameStates,
       globalEffectModeRef: args.globalEffectModeRef,
       InteractiveFrameComponent: args.InteractiveFrameComponent,
-      renderState,
       rootsRef: args.rootsRef,
     });
+    return undefined;
   }, [
     args.actionRefs,
     args.currentFrameStates,

@@ -5,26 +5,14 @@ import {
   createStopAreaSelection,
   type AreaSelectionRuntimeDeps,
 } from './controller';
-import {
-  completeAreaSelection,
-  createSelectionElement,
-  handleAreaSelectionTimeout,
-  hideSelectionElement,
-  removeAreaSelectionTooltip,
-  showAreaSelectionTooltip,
-  updateSelectionBox,
-} from './helpers';
+import { areaSelectionResultOwner, type AreaSelectionResultOwner } from './result';
+import { areaSelectionSurface, type AreaSelectionSurface } from './surface';
 
 interface AreaSelectionControllerDeps {
-  createSelectionElement?: () => HTMLDivElement;
-  completeAreaSelection?: typeof completeAreaSelection;
-  handleAreaSelectionTimeout?: typeof handleAreaSelectionTimeout;
-  hideSelectionElement?: typeof hideSelectionElement;
-  removeAreaSelectionTooltip?: typeof removeAreaSelectionTooltip;
-  showAreaSelectionTooltip?: typeof showAreaSelectionTooltip;
-  updateSelectionBox?: typeof updateSelectionBox;
-  scheduleTimeout?: (callback: () => void, delay: number) => ReturnType<typeof setTimeout>;
   clearScheduledTimeout?: (timeoutId: ReturnType<typeof setTimeout>) => void;
+  result?: AreaSelectionResultOwner;
+  scheduleTimeout?: (callback: () => void, delay: number) => ReturnType<typeof setTimeout>;
+  surface?: AreaSelectionSurface;
   targetDocument?: Document;
 }
 
@@ -42,15 +30,10 @@ export function createAreaSelectionController(
 ): AreaSelectionController {
   const runtimeDeps: AreaSelectionRuntimeDeps = {
     clearScheduledTimeout: deps.clearScheduledTimeout ?? globalThis.clearTimeout.bind(globalThis),
-    completeAreaSelection: deps.completeAreaSelection ?? completeAreaSelection,
-    createSelectionElement: deps.createSelectionElement ?? createSelectionElement,
-    handleAreaSelectionTimeout: deps.handleAreaSelectionTimeout ?? handleAreaSelectionTimeout,
-    hideSelectionElement: deps.hideSelectionElement ?? hideSelectionElement,
-    removeAreaSelectionTooltip: deps.removeAreaSelectionTooltip ?? removeAreaSelectionTooltip,
+    result: deps.result ?? areaSelectionResultOwner,
     scheduleTimeout: deps.scheduleTimeout ?? globalThis.setTimeout.bind(globalThis),
-    showAreaSelectionTooltip: deps.showAreaSelectionTooltip ?? showAreaSelectionTooltip,
+    surface: deps.surface ?? areaSelectionSurface,
     targetDocument: deps.targetDocument ?? document,
-    updateSelectionBox: deps.updateSelectionBox ?? updateSelectionBox,
   };
   const state = createAreaSelectionState();
   const stopAreaSelection = createStopAreaSelection(state, runtimeDeps);

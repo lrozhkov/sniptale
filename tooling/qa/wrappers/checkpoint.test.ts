@@ -1,9 +1,10 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { createTempRoot, importFresh, withCwd, writeJson } from '../core/test-helpers';
 import { parseCheckpointOptions } from './checkpoint.mjs';
 
 const ignoreExecutionContract = () => {};
+const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs';
 
 function createCheckpointTempRoot(prefix: string) {
   const root = createTempRoot(prefix);
@@ -230,6 +231,68 @@ it('keeps harness-only checkpoint ready for build after a fresh harness stamp', 
     expect(result.executionMode).toBe('harness-only');
     expect(result.readyForBuild).toBe(true);
   });
+});
+
+it.each([
+  {
+    exactFiles: null,
+    expectedMessage: 'must export an object keyed by rollout group',
+    name: 'an invalid top-level schema',
+  },
+  {
+    exactFiles: { coreRuntimeOwners: 'not-an-array' },
+    expectedMessage: 'group coreRuntimeOwners must be an array',
+    name: 'missing and non-array rollout groups',
+  },
+])('rejects $name through the checkpoint inventory owner path', async (scenario) => {
+  const root = createCheckpointTempRoot('qa-checkpoint-coverage-inventory-invalid-');
+  const harnessStateAsserter = vi.fn(() => {
+    throw new Error('inventory-only scope must not consult harness state');
+  });
+  vi.doMock('../core/verify-test-coverage.rollout-files.data.mjs', () => ({
+    COVERAGE_ROLLOUT_EXACT_FILES: scenario.exactFiles,
+  }));
+
+  try {
+    await withCwd(root, async () => {
+      const module = await importFresh<typeof import('./checkpoint.mjs')>(
+        './checkpoint.mjs',
+        import.meta.url
+      );
+      const result = await module.runCheckpoint({
+        producerRunId: 'checkpoint-invalid-coverage-inventory',
+        contextCollector: () => ({
+          codeFiles: [COVERAGE_ROLLOUT_INVENTORY],
+          existingTargetFiles: [COVERAGE_ROLLOUT_INVENTORY],
+          fingerprint: 'invalid-coverage-inventory',
+          jsLikeFiles: [COVERAGE_ROLLOUT_INVENTORY],
+          targetFiles: [COVERAGE_ROLLOUT_INVENTORY],
+        }),
+        executionContractAsserter: ignoreExecutionContract,
+        formatStepCollector: () => okStep('Format'),
+        harnessStateAsserter,
+        stateWriter: () => {},
+      });
+
+      expect(result.steps.map((step) => [step.label, step.status])).toEqual([
+        ['Format', 'ok'],
+        ['Harness QA', 'failed'],
+      ]);
+      expect(result.steps[1]).toMatchObject({
+        violations: expect.arrayContaining([
+          expect.objectContaining({ rule: 'coverage-rollout-inventory' }),
+        ]),
+      });
+      expect(result.steps[1]?.violations?.map((violation) => violation.message)).toEqual(
+        expect.arrayContaining([expect.stringContaining(scenario.expectedMessage)])
+      );
+      expect(result.readyForBuild).toBe(false);
+    });
+  } finally {
+    vi.doUnmock('../core/verify-test-coverage.rollout-files.data.mjs');
+  }
+
+  expect(harnessStateAsserter).not.toHaveBeenCalled();
 });
 
 it('records a deterministic clean-tree skip with the dedicated wrapper marker contract', async () => {

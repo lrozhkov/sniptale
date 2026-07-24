@@ -1,10 +1,10 @@
 import { createContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
 import { getSelectionModeSizePanelCopy } from '../constants';
-import type { FinalElementsOptions } from './types';
+import type { SelectionModeFinalElementsOptions } from '../types';
 
 export function createSelectionModeFinalSizeTooltip(
   mountInto: HTMLElement,
-  options: FinalElementsOptions
+  options: SelectionModeFinalElementsOptions
 ) {
   return createContentSizeTooltipDom({
     copy: getSelectionModeSizePanelCopy(),
@@ -19,7 +19,7 @@ export function createSelectionModeFinalSizeTooltip(
 
 export function wireSelectionModeFinalSizeTooltipActions(
   sizeTooltip: ReturnType<typeof createContentSizeTooltipDom>,
-  options: FinalElementsOptions
+  options: SelectionModeFinalElementsOptions
 ): void {
   sizeTooltip.cancelButton.addEventListener('click', (event) => {
     event.preventDefault();

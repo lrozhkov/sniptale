@@ -22,8 +22,10 @@ const {
 
 vi.mock('./start/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./start/index')>()),
-  cleanupResources: vi.fn(),
   startRecording: startRecordingImplMock,
+}));
+vi.mock('./start/cleanup', () => ({
+  cleanupResources: vi.fn(),
 }));
 
 vi.mock('./multi-source', async (importOriginal) => ({

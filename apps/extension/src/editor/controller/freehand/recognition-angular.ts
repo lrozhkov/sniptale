@@ -1,5 +1,6 @@
-import { measureCentroid, measurePolylineError } from './fit-geometry';
 import type { ModeledFreehandStroke } from './modeling';
+import { measureCentroid } from './oriented-geometry';
+import { measurePolylineError } from './polyline-geometry/error';
 import { resolveQuadCandidate } from './quad-fit/resolve';
 import { detectCornerProfile } from './recognition-corners';
 import { MIN_CLOSED_CONFIDENCE } from './recognition-closed-constants';

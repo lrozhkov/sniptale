@@ -14,7 +14,7 @@ export function runFocusedOxlintStep(jsLikeFiles) {
     return strictStep;
   }
 
-  const importOnlyStep = runOxlint({ files: importOnlyFiles, sizeRules: false }).step;
+  const importOnlyStep = runOxlint({ files: importOnlyFiles }).step;
   if (importOnlyStep.status === 'failed') {
     return importOnlyStep;
   }

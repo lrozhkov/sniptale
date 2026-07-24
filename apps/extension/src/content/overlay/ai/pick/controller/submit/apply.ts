@@ -1,14 +1,56 @@
 import { clearAllSniptaleIds } from '../../../../../platform/frame';
+import { translate } from '../../../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { AIEditChange, ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { findAIChangeTargets } from '../../runtime/dom-apply';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { findAIChangeTargets } from '../../runtime/target-resolution/change-targets';
 import { flashAppliedAiTargets } from '../../runtime/dom-apply/highlight';
 import { parsePageSnapshotAfterIframePreflight } from '../../../../../parser/dom-tree-parser/snapshot';
-import { showAiApplyToast, showAiNoChangesInfo, showAiParseErrors } from './feedback';
 import { applyAiChangesWithHistory } from './history';
-import type { AiPickSubmitContext } from './types';
+import type { AiPickControllerContext } from '../types';
 
 const logger = createLogger({ namespace: 'ContentAiPickSubmit' });
+
+type AiPickApplyContext = Pick<
+  AiPickControllerContext,
+  'requestGate' | 'resumeAiPickMode' | 'setIsAIModalOpen' | 'setTreeData'
+>;
+
+function showAiParseErrors(errors: string[]) {
+  if (errors.length === 0) {
+    return;
+  }
+
+  showToast(`${translate('content.toolbar.aiParseErrorsPrefix')} ${errors.join('; ')}`, 'warning');
+}
+
+function showAiNoChangesInfo() {
+  showToast(translate('content.toolbar.aiNoChanges'), 'info');
+}
+
+function showAiApplyToast(appliedCount: number, notFoundCount: number) {
+  if (notFoundCount > 0) {
+    showToast(
+      [
+        translate('content.toolbar.aiAppliedWithMissingPrefix'),
+        appliedCount,
+        translate('content.toolbar.aiAppliedWithMissingMiddle'),
+        notFoundCount,
+      ].join(''),
+      'warning'
+    );
+    return;
+  }
+
+  showToast(
+    [
+      translate('content.toolbar.aiAppliedSuccessPrefix'),
+      appliedCount,
+      translate('content.toolbar.aiAppliedSuccessSuffix'),
+    ].join(''),
+    'success'
+  );
+}
 
 function collectConnectedTargets(targets: Element[]) {
   return targets.filter((target, index, allTargets) => {
@@ -49,7 +91,7 @@ async function resolveAppliedHighlightTargets(args: {
 export async function applyAiResponseChanges(
   parsedResponse: { changes: AIEditChange[]; errors: string[] },
   treeData: ParsedDOMTree,
-  context: AiPickSubmitContext,
+  context: AiPickApplyContext,
   requestId: number
 ) {
   const { changes, errors } = parsedResponse;

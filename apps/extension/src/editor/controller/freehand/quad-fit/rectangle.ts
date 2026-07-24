@@ -2,10 +2,10 @@ import {
   buildRectangleVertices,
   measureCentroid,
   measureOrientedBounds,
-  measurePolylineError,
-} from '../fit-geometry';
+} from '../oriented-geometry';
 import type { ModeledFreehandStroke } from '../modeling';
 import type { FreehandPointRecord } from '../points';
+import { measurePolylineError } from '../polyline-geometry/error';
 import type { FreehandRecognitionCandidate } from '../recognition-types';
 import { resolveRectangleRotation } from './angles';
 import { measureRightAngleScore } from './scoring';

@@ -28,6 +28,13 @@ function getQualityScriptEntries(packageJson) {
           entryKind: 'advisory',
         };
       }
+      if (script === 'qa:structural-audit') {
+        return {
+          script,
+          tool: 'verify-structural-risk.mjs',
+          entryKind: 'report-only',
+        };
+      }
 
       void command;
       return null;
@@ -44,6 +51,7 @@ function collectVerificationArrays(packageJson, validationManifest, wrappers) {
   const buildWrapperTools = collectWrapperTools(wrappers.build);
   const auditWrapperTools = collectWrapperTools(wrappers.audit);
   const advisoryWrapperTools = collectWrapperTools(wrappers.advisory);
+  const structuralAuditWrapperTools = collectWrapperTools(wrappers.structuralAudit);
   const manualAuditTools = collectWrapperTools(wrappers.manual);
   const closeoutWrapperTools = collectWrapperTools(wrappers.closeout);
   const lifecycleTools = collectWrapperTools(wrappers.lifecycle);
@@ -64,6 +72,7 @@ function collectVerificationArrays(packageJson, validationManifest, wrappers) {
   });
   return {
     advisoryWrapperTools,
+    structuralAuditWrapperTools,
     auditWrapperTools,
     buildWrapperTools,
     closeoutWrapperTools,
@@ -156,6 +165,7 @@ function createLaneEvidence(input) {
     buildWrapperSteps: wrappers.build,
     auditWrapperSteps: wrappers.audit,
     advisoryWrapperSteps: wrappers.advisory,
+    structuralAuditWrapperSteps: wrappers.structuralAudit,
     manualAuditSteps: wrappers.manual,
     closeoutWrapperSteps: wrappers.closeout,
     lifecycleSteps: wrappers.lifecycle,
@@ -165,6 +175,7 @@ function createLaneEvidence(input) {
     buildWrapperTools: input.buildWrapperTools,
     auditWrapperTools: input.auditWrapperTools,
     advisoryWrapperTools: input.advisoryWrapperTools,
+    structuralAuditWrapperTools: input.structuralAuditWrapperTools,
     manualAuditTools: input.manualAuditTools,
     closeoutWrapperTools: input.closeoutWrapperTools,
     lifecycleTools: input.lifecycleTools,

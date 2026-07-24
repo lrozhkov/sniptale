@@ -36,7 +36,7 @@ function createRuntime() {
 it('does not load content-only web snapshot capture code for ordinary export routes', async () => {
   const handlePopupExportStartRuntime = vi.fn(() => true);
   vi.doMock('../start/runtime', () => ({ handlePopupExportStartRuntime }));
-  vi.doMock('../snapshot', () => {
+  vi.doMock('../web-snapshot-runtime', () => {
     throw new Error('content-only snapshot branch loaded');
   });
 

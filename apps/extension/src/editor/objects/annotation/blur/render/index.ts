@@ -1,2 +1,1 @@
-export { attachBlurRenderer } from './attach';
-export { refreshBlurRendering } from './refresh';
+export { attachBlurRenderer, refreshBlurRendering } from './lifecycle';

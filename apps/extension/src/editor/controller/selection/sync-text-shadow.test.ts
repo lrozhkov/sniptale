@@ -36,7 +36,7 @@ vi.mock('../core/helpers', async (importOriginal) => ({
   isTextbox: vi.fn((object: { kind?: string }) => object.kind === 'textbox'),
 }));
 
-import { syncTextSelectionSettings } from './sync-text';
+import { syncTextSelectionSettings } from './sync-text/dispatch';
 
 describe('syncTextSelectionSettings shadow metadata', () => {
   it('uses stored shadow values and settings fallbacks without losing hidden colors', () => {

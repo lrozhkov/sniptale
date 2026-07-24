@@ -1,8 +1,8 @@
 import { useCallback, useState, type SetStateAction } from 'react';
 
 import { selectLastPrompt, useAIModalStore } from '../../../state/ai-modal.store';
+import { usePromptTemplates } from '../../../../../features/prompt-templates/hooks/use-prompt-templates';
 import { useAIModalEditorState, useAIModalResizeState, useAIModalSettingsState } from './locals';
-import { usePromptTemplates } from './prompt-template-state';
 import { useAIModalTotalTokens } from './tokens';
 
 export function useAIModalCoreState() {

@@ -4,17 +4,16 @@ import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useBorderPresetDraftState, useBorderPresetDraftSetters } from './draft-state';
+import { useBorderPresetDraftState } from './draft-state';
 
-type DraftState = ReturnType<typeof useBorderPresetDraftState>;
+type DraftState = ReturnType<typeof useBorderPresetDraftState>['draft'];
 
 let container: HTMLDivElement | null = null;
 let latestDraft: DraftState | null = null;
 let root: Root | null = null;
 
 function DraftStateHarness() {
-  const draft = useBorderPresetDraftState();
-  useBorderPresetDraftSetters(draft);
+  const { draft } = useBorderPresetDraftState();
 
   useEffect(() => {
     latestDraft = draft;
@@ -63,6 +62,7 @@ describe('useBorderPresetDraftState', () => {
     await renderHarness();
 
     expect(getDraft().name).toBe('');
+    expect(getDraft().shadow).toBe(0);
     expect(getDraft().width).toBe(3);
 
     act(() => {

@@ -2,7 +2,7 @@ import { FileJson2, FileOutput } from 'lucide-react';
 
 import { translate } from '../../../../../../platform/i18n';
 import type { BuildEditorDocumentActionGroupsParams } from '../../types';
-import type { EditorDocumentActionCommandBuilders } from '../../commands.types';
+import type { EditorDocumentActionCommandBuilders } from '../../types';
 
 function createExportSessionCommand(
   params: BuildEditorDocumentActionGroupsParams,

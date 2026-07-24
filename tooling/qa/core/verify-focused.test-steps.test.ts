@@ -190,6 +190,26 @@ it('excludes import-only product test diffs from focused direct tests', async ()
   expect(result).toEqual([]);
 });
 
+it('keeps deleted product tests in the diff fingerprint but out of executable direct tests', async () => {
+  const root = createTempRoot('focused-deleted-test-');
+  const productTestFile = 'apps/extension/src/content/overlay/example/controller.test.ts';
+  initGitRepo(root);
+  writeFile(root, productTestFile, "it('covers the old owner', () => {});\n");
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'baseline');
+  runGit(root, 'rm', productTestFile);
+
+  const result = await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./verify-focused.test-steps.mjs')>(
+      './verify-focused.test-steps.mjs',
+      import.meta.url
+    );
+    return module.collectFocusedDiffTestFiles([productTestFile]);
+  });
+
+  expect(result).toEqual([]);
+});
+
 it('does not require focused owner proof for import-only production diffs', async () => {
   const root = createTempRoot('focused-import-only-code-');
   initGitRepo(root);

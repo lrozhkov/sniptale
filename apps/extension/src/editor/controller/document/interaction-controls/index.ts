@@ -1,1 +1,0 @@
-export { applyEditorObjectInteractionControls } from './apply';

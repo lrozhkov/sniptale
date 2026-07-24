@@ -17,7 +17,8 @@ import { IDLE_RECORDING_STATE, type PopupPage } from '../navigation/actions';
 import { type MicrophoneOption } from '../../recording/microphone';
 import { type WebcamOption } from '../../recording/webcam';
 import { isRecordingActive, resolveSelectedPreset, shouldShowFooter } from './model';
-import { usePopupRuntimeActions, usePopupRuntimeEffects } from './effects';
+import { usePopupRuntimeActions } from './actions';
+import { usePopupRuntimeEffects } from './effects';
 import type { RecordingControlCapability } from './recording-control-capability';
 import type {
   PopupRuntimeCoreState,

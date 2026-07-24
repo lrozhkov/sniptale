@@ -112,6 +112,19 @@ it('surfaces template creation success from the save card', async () => {
   expect(document.body.textContent).toContain('Шаблон сохранен');
 });
 
+it('keeps the template retention toggle bound to the save owner', async () => {
+  const actions = renderSavePanel();
+  await openTemplateSaveCard();
+
+  await act(async () => {
+    document
+      .querySelector<HTMLButtonElement>('[aria-label="Включить все вычисленные свойства"]')
+      ?.click();
+  });
+
+  expect(actions.setIncludeComputedInTemplate).toHaveBeenCalledWith(true);
+});
+
 it('surfaces template creation failures from the save card', async () => {
   const actions = createActions(
     vi.fn(async () => {

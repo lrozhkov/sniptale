@@ -12,9 +12,19 @@ describe('freehand polyline geometry role owners', () => {
       { x: 10, y: 10 },
     ];
 
+    expect(measureProgressRatios([])).toEqual([]);
     expect(measureProgressRatios(points)).toEqual([0, 0.5, 1]);
+    expect(
+      measureProgressRatios([
+        { x: 0, y: 0 },
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+      ])
+    ).toEqual([0, 0, 1]);
+    expect(samplePolylineAtProgress([], 0.5)).toEqual({ x: 0, y: 0 });
     expect(samplePolylineAtProgress(points, 0.75)).toEqual({ x: 10, y: 5 });
     expect(samplePolylineAtProgress([{ x: 2, y: 3 }], 0.5)).toEqual({ x: 2, y: 3 });
+    expect(samplePolylineAtProgress(points, 1.5)).toEqual({ x: 10, y: 10 });
   });
 
   it('keeps polygon area and outline error roles separate', () => {
@@ -27,6 +37,8 @@ describe('freehand polyline geometry role owners', () => {
     ];
 
     expect(measureSignedPolygonArea(outline.slice(0, -1))).toBeGreaterThan(0);
+    expect(measureSignedPolygonArea(outline.slice(0, 2))).toBe(0);
+    expect(measurePolylineError([], outline)).toBe(Number.POSITIVE_INFINITY);
     expect(measurePolylineError([{ x: 5, y: 0 }], outline)).toBe(0);
     expect(
       measurePolylineError(

@@ -1,7 +1,28 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
-import { bindRegionSelectorRootEvents } from './events';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  updateDraggingRegion: vi.fn(),
+  updateResizingRegion: vi.fn(),
+}));
+
+vi.mock('./helpers', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./helpers')>()),
+  updateDraggingRegion: mocks.updateDraggingRegion,
+  updateResizingRegion: mocks.updateResizingRegion,
+}));
+
+import {
+  bindRegionSelectorRootEvents,
+  createRegionSelectorDocumentHandlers,
+  detachRegionSelectorListeners,
+} from './events';
+import { createDefaultRegionSelectorState } from './types';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('region-selector root events', () => {
   function createCancelFixture() {
@@ -84,5 +105,80 @@ describe('region-selector region events', () => {
 
     expect(onResizeStart).toHaveBeenCalledWith(expect.any(MouseEvent), 'se');
     expect(onDragStart).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('region-selector document events', () => {
+  it('updates dragging state, handles escape, and detaches the complete listener lifecycle', () => {
+    const state = createDefaultRegionSelectorState();
+    const handleRegionCancelled = vi.fn();
+    const updateUi = vi.fn();
+    const nextRegion = { x: 20, y: 30, width: 300, height: 180 };
+    state.isDragging = true;
+    mocks.updateDraggingRegion.mockReturnValue(nextRegion);
+    const handlers = createRegionSelectorDocumentHandlers({
+      handleRegionCancelled,
+      state,
+      updateUi,
+    });
+
+    handlers.bindDocumentEvents();
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 40, clientY: 50 }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(mocks.updateDraggingRegion).toHaveBeenCalledWith(
+      state.initialRegion,
+      expect.any(Object),
+      state.dragStart,
+      expect.any(MouseEvent)
+    );
+    expect(state.currentRegion).toBe(nextRegion);
+    expect(updateUi).toHaveBeenCalledOnce();
+    expect(handleRegionCancelled).toHaveBeenCalledOnce();
+
+    document.dispatchEvent(new MouseEvent('mouseup'));
+    expect(state.isDragging).toBe(false);
+    detachRegionSelectorListeners({
+      handleKeyDown: handlers.handleKeyDown,
+      handleMouseMove: handlers.handleMouseMove,
+      handleMouseUp: handlers.handleMouseUp,
+      handlePointerMove: handlers.handlePointerMove,
+      handlePointerUp: handlers.handlePointerUp,
+      state,
+    });
+    expect(state.keyDownHandler).toBeNull();
+
+    state.isDragging = true;
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 60, clientY: 70 }));
+    document.dispatchEvent(new MouseEvent('pointermove', { clientX: 80, clientY: 90 }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(mocks.updateDraggingRegion).toHaveBeenCalledOnce();
+    expect(handleRegionCancelled).toHaveBeenCalledOnce();
+  });
+
+  it('routes resize movement through the resize geometry owner', () => {
+    const state = createDefaultRegionSelectorState();
+    const nextRegion = { x: 10, y: 15, width: 320, height: 200 };
+    const updateUi = vi.fn();
+    state.isResizing = true;
+    state.resizeCorner = 'se';
+    mocks.updateResizingRegion.mockReturnValue(nextRegion);
+    const handlers = createRegionSelectorDocumentHandlers({
+      handleRegionCancelled: vi.fn(),
+      state,
+      updateUi,
+    });
+
+    handlers.handlePointerMove(new MouseEvent('pointermove', { clientX: 80, clientY: 90 }));
+
+    expect(mocks.updateResizingRegion).toHaveBeenCalledWith(
+      state.initialRegion,
+      expect.any(Object),
+      state.dragStart,
+      'se',
+      expect.any(MouseEvent)
+    );
+    expect(state.currentRegion).toBe(nextRegion);
+    expect(updateUi).toHaveBeenCalledOnce();
   });
 });

@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { applyAIChanges } from '.';
+import { applyAIChanges } from './apply';
 
 afterEach(() => {
   document.body.replaceChildren();

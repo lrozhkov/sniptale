@@ -1,6 +1,5 @@
 import { runArchitectureGuardrailCheck } from './verify-architecture-guardrails.mjs';
 import { runExportArtifactBoundaryCheck } from './verify-export-artifact-boundaries.mjs';
-import { runHotspotRegressionCheck } from './verify-hotspot-regression.mjs';
 import { runRuntimeListenerSeamCheck } from './verify-runtime-listener-seams.mjs';
 import {
   NETWORK_POLICY_VIOLATION_STEP,
@@ -10,7 +9,6 @@ import {
 } from './verify-quality-contract-step-definitions.mjs';
 
 export const QUALITY_CONTRACT_VIOLATION_STEPS = [
-  ['Hotspot regression', 'Hotspot regression violations found:', runHotspotRegressionCheck],
   [
     'Architecture guardrails',
     'Architecture guardrail violations found:',

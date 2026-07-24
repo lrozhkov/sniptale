@@ -41,13 +41,11 @@ vi.mock('../../../../../section-surface', async (importOriginal) => ({
   ),
 }));
 
-import {
-  EditorBasicSettings,
-  EditorCustomCssField,
-  EditorPaddingFields,
-  EditorPreview,
-  EditorShadowField,
-} from '.';
+import { EditorBasicSettings } from './basic-settings';
+import { EditorCustomCssField } from './custom-css-field';
+import { EditorPaddingFields } from './padding-fields';
+import { EditorPreview } from './preview';
+import { EditorShadowField } from './shadow-buttons';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;

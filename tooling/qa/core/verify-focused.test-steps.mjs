@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+
 import { recordSuccessfulUnitTestPlan } from './unit-test-cache.mjs';
 import { createProcessStep, createSkippedStep } from './focused-qa-results.mjs';
 import { timeAsyncStep, timeSyncStep } from './step-timing.helpers.mjs';
@@ -9,6 +11,7 @@ import { filterImportOnlyDiffFiles, filterImportOrMockOnlyDiffFiles } from './im
 import { createFocusedCoverageResult } from './verify-focused.coverage-result.helpers.mjs';
 import { createFocusedEarlyExitSteps } from './verify-focused.blocked-steps.helpers.mjs';
 import { createImportOnlyCodeFocusedSteps } from './verify-focused.import-only-steps.helpers.mjs';
+import { fromRelativePath } from './shared.mjs';
 
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 
@@ -18,7 +21,12 @@ export function resolveFocusedCoverageTargetFiles(files = []) {
 
 export function collectFocusedDiffTestFiles(files = []) {
   return filterImportOrMockOnlyDiffFiles(
-    files.filter((file) => isProductQaFile(file) && TEST_FILE_PATTERN.test(file))
+    files.filter(
+      (file) =>
+        isProductQaFile(file) &&
+        TEST_FILE_PATTERN.test(file) &&
+        fs.existsSync(fromRelativePath(file))
+    )
   );
 }
 

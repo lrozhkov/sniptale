@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { PageStyleTemplate } from '@sniptale/runtime-contracts/page-style';
 import { translate } from '../../../../platform/i18n';
-import { ActionStatusBanner } from '../action-status-banner';
 import {
   TEMPLATE_ACTION_SUCCESS_KEYS,
   type TemplateActionKind,
@@ -53,8 +52,4 @@ export function useTemplateActionRunner() {
   );
 
   return { run, status };
-}
-
-export function TemplateStatusBanner(props: { status: TemplateActionStatus | null }) {
-  return <ActionStatusBanner status={props.status} />;
 }

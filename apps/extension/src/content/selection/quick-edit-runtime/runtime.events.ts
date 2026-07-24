@@ -1,11 +1,11 @@
+import { handleQuickEditKeyDown } from './keydown';
 import {
   handleQuickEditBlur,
   handleQuickEditClick,
-  handleQuickEditKeyDown,
   handleQuickEditMouseLeave,
   handleQuickEditMouseMove,
   handleQuickEditOutsideClick,
-} from './events';
+} from './pointer';
 
 type QuickEditRuntimeEventsProps = {
   cancelEditing: (element: HTMLElement) => void;

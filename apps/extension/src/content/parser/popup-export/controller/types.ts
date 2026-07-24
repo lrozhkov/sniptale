@@ -5,19 +5,34 @@ import type {
   ExportResult,
 } from '@sniptale/runtime-contracts/export';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import type { PopupSendResponse } from '../helpers';
-import type { emitPopupExportMessage, persistPopupExportArchive } from '../helpers';
+import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
+import type { persistPopupExportArchive } from '../helpers/archive/persist';
+import type { emitPopupExportMessage, PopupSendResponse } from '../helpers/messaging';
 
-type PopupExportRunner = {
-  buildPackage: (options: ExportOptions) => Promise<ExportPagePackage>;
+export type PopupExportRunner = {
+  buildPackage: (
+    options: ExportOptions,
+    context?: { contentIntentSource?: ContentPrivilegedActionIntentSource | undefined }
+  ) => Promise<ExportPagePackage>;
   cancel: () => void;
-  export: (options: ExportOptions) => Promise<ExportResult>;
+  export: (
+    options: ExportOptions,
+    context?: { contentIntentSource?: ContentPrivilegedActionIntentSource | undefined }
+  ) => Promise<ExportResult>;
   onProgress: (callback: (progress: ExportProgress) => void) => void;
 };
 
 export type PopupExportState = {
   activeExportRequestId: string | null;
   isExportRunning: boolean;
+};
+
+export type PopupExportRequestHandlerRuntime = {
+  emitMessage: typeof emitPopupExportMessage;
+  exportRunner: PopupExportRunner;
+  parseTree: (contextLabel: string) => Promise<ParsedDOMTree>;
+  persistArchive: typeof persistPopupExportArchive;
+  state: PopupExportState;
 };
 
 export interface PopupExportControllerDeps {

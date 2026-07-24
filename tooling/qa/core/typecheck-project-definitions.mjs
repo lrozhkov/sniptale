@@ -132,7 +132,6 @@ function createOwnerTestProject(project) {
     background: ['tooling/test/support/*.ts'],
     content: ['tooling/test/support/content/**/*'],
     editor: ['tooling/test/harness/editor/ownership/**/*'],
-    'web-snapshot-viewer': ['apps/extension/src/content/**/*'],
   }[project.id];
 
   return {

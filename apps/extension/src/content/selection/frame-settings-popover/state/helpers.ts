@@ -41,7 +41,6 @@ export function createFrameSettingsPresetHandler(args: {
 }
 
 export function createFrameBlurHandlers(args: {
-  blurDebounceRef: { current: number | null };
   localBlurSettings: BlurSettings;
   onApplyToFrame: (settings: { blurSettings?: BlurSettings }) => void;
   setLocalBlurSettings: (settings: BlurSettings) => void;
@@ -71,7 +70,6 @@ export function createFrameBlurHandlers(args: {
 }
 
 export function createFrameFocusHandlers(args: {
-  focusDebounceRef: { current: number | null };
   frameId: string;
   localFocusSettings: FocusSettings;
   onApplyToFrame: (settings: { focusSettings?: FocusSettings }) => void;

@@ -77,8 +77,8 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
   }),
 }));
 
-vi.mock('../runtime/dom-apply', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../runtime/dom-apply')>()),
+vi.mock('../runtime/dom-apply/marking', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/dom-apply/marking')>()),
   markSelectedInTree: markSelectedInTreeMock,
 }));
 

@@ -6,7 +6,7 @@ import type { ScenarioAutoClickCaptureTransport } from '../../../content/overlay
 import type { ScenarioAutoClickListenerRegistry } from '../../../content/overlay/scenario/auto-click-capture/types';
 import type { ScenarioCaptureSourceAdapter } from '../../../content/overlay/scenario/capture/source';
 import type { ScreenshotCaptureAdapter } from '../../../content/overlay/screenshot/types';
-import type { PopupSendResponse } from '../../../content/parser/popup-export/helpers';
+import type { PopupSendResponse } from '../../../content/parser/popup-export/helpers/messaging';
 import type { PageSnapshotSource } from '../../../content/parser/page-snapshot/source';
 import type {
   ViewerPopupExportMessage,

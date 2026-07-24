@@ -1,4 +1,4 @@
-import type { ViewportState } from './flow/index';
+import type { ViewportState } from './flow/shared';
 import type { WebSnapshotViewerPorts } from '../page-preparation/viewer-ports';
 import type { PageAccessPort } from '../../routing-contracts/page-access-port';
 

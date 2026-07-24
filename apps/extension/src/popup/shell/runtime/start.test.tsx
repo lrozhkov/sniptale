@@ -123,6 +123,7 @@ describe('usePopupRuntime successful start recording', () => {
   it('starts recording only from the idle state when no start is pending', async () => {
     const clearStartError = vi.fn();
     const setIsStartPending = vi.fn();
+    const setRecordingControlCapability = vi.fn();
     const setStartError = vi.fn();
 
     usePopupRuntimeStateMock.mockReturnValueOnce(
@@ -132,6 +133,7 @@ describe('usePopupRuntime successful start recording', () => {
         recordingState: createRuntimeRecordingState(VideoRecordingStatus.IDLE),
         selectedPreset: { id: 'preset-1', height: 720, label: 'Preset', width: 1280 },
         setIsStartPending,
+        setRecordingControlCapability,
         setStartError,
       })
     );
@@ -148,6 +150,7 @@ describe('usePopupRuntime successful start recording', () => {
       expect.objectContaining({
         captureMode: CaptureMode.TAB,
         setIsStartPending,
+        setRecordingControlCapability,
         setStartError,
         viewportPreset: null,
       })

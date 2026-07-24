@@ -1,7 +1,7 @@
-import { getNearestDataElement } from '../dom-helpers';
+import { getNearestDataElement } from '../dom-lookup';
 import { isExtensionUIElement, isNonDataInteractiveElement } from '../guards';
 import type { AiPickModeState } from '../mode.types';
-import type { AiPickOverlayController } from '../overlay';
+import type { AiPickOverlayController } from '../overlay.controller';
 import { aiPickModeLogger } from './shared';
 import { resolveScopedAiPickTarget } from './target';
 

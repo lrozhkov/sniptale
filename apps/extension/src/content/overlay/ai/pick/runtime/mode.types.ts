@@ -1,6 +1,6 @@
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import type { AiPickDomState } from './dom-state';
-import type { AiPickOverlayController } from './overlay';
+import type { AiPickOverlayController } from './overlay.controller';
 import type {
   deactivateOtherContentModes,
   setContentModeEnabled,

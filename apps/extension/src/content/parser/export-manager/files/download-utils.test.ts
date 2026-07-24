@@ -12,7 +12,6 @@ import {
   resolveCredentialedDownloadUrl,
   shouldSkipHtmlDownloadResponse,
 } from './download-utils';
-import { extractFilenameFromContentDisposition as extractFilenameFromFileUtils } from './utils';
 
 const pageUrl = 'https://example.com/current-page';
 
@@ -32,11 +31,6 @@ it('extracts ids and filenames from download metadata', () => {
   ).toBe('secret_x.html');
   expect(
     extractFilenameFromContentDisposition(
-      'attachment; filename="=?UTF-8?Q?fb37b492-1927-376c-4212-00006126a3d7.png?="'
-    )
-  ).toBe('fb37b492-1927-376c-4212-00006126a3d7.png');
-  expect(
-    extractFilenameFromFileUtils(
       'attachment; filename="=?UTF-8?Q?fb37b492-1927-376c-4212-00006126a3d7.png?="'
     )
   ).toBe('fb37b492-1927-376c-4212-00006126a3d7.png');

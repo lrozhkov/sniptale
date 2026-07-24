@@ -1,6 +1,6 @@
 # Operator Handbook
 
-Updated: 2026-07-16
+Updated: 2026-07-24
 
 Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), quality policy in [code-quality.md](code-quality.md), and wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md).
 
@@ -12,15 +12,17 @@ Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGE
 | In-progress product proof | `npm run qa:checkpoint` | Focused current-diff gate; does not build or commit. |
 | Harness/shared-control proof | `npm run qa:release-harness` | Required for `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/config files, and active `docs/tooling/**` guidance. |
 | Normal implementation closeout | `npm run qa:closeout -- -m "message"` | Owns checkpoint/build handoff, staging, task-artifact guard, and commit. |
+| Publish committed changes | `git push` | The pre-push hook proves the immutable pushed range with checkpoint/build and applicable harness verification; it never promotes a new branch push to `qa:release` or `build:release`. |
 | Release-grade product proof | `npm run qa:release` | Release preparation or explicit audit-grade proof. |
 | Unpacked release-mode build | `npm run build:release` | Runs only Vite in release mode and writes `dist/`; does not typecheck, run QA, or package an archive. |
 | Package current release build | `npm run release:package-only` | Debug/package-only path; does not replace `qa:release`. |
 | Repository audit | `npm run qa:audit` | Manual audit profiles, full coverage, evidence, supply-chain checks, and external engines. |
+| Structural/topology maintenance snapshot | `npm run qa:structural-audit` | Manual report-only path-owner plus forwarding-edge fragmentation snapshot; not a PR, agent, closeout, or `qa:audit` gate. |
 | Extension smoke | `npm run qa:e2e` | Separate Playwright runtime acceptance path. |
 | Wrapper statistics | `npm run qa:stats -- [--wrapper <id>] [--task <id>]` | Reads structured run records. |
 | WSL setup/recovery | [wsl-setup.md](wsl-setup.md) | Environment setup only. |
 
-The live harness/shared-control classifier is `tooling/qa/core/qa-scope.mjs`; this table summarizes it.
+The live harness/shared-control classifier is `tooling/qa/core/qa-scope.mjs`; this table summarizes it. Machine-owned files explicitly marked inventory-only, including exact coverage rollout paths, use checkpoint owner validation without a fresh harness stamp. Changing matching, thresholds, traversal, or wrapper behavior still requires release-harness proof.
 
 Checkpoint and closeout choose unit-test profiles automatically. Small low-risk diffs with complete focused owner mappings run exact direct tests; high-risk, public/shared, transitive, ambiguous, or over-budget diffs retain Vitest affected-consumer discovery. The focused owner-expansion budget bounds transitively selected owner tests, while every changed direct test remains mandatory proof and does not consume that expansion budget. Inspect the `Unit tests` detail in the run log for `profile=...`; do not add a manual force-narrow flag.
 
@@ -59,9 +61,10 @@ Use direct commands only to investigate a specific wrapper failure or answer an 
 | Design system | `node tooling/qa/core/verify-design-system.mjs` |
 | Canonical facades | `node tooling/qa/core/verify-canonical-facades.mjs` |
 | Line length | `node tooling/qa/guards/quality/verify-line-length.mjs` |
+| Diff structural risk | `node tooling/qa/core/verify-structural-risk.mjs` |
 | Task artifacts | `node tooling/qa/core/verify-task-artifacts.mjs` |
 
-Repo-wide report-only inventory belongs in `qa:audit` unless a failed stage requires a direct adapter. Successful inventory steps break down their finding families and atomically replace sanitized complete artifacts at `.tmp/repo-audit/evidence.json` and `.tmp/repo-audit/topology.json`; Semgrep and npm evidence is written to `.tmp/semgrep/results.json`, `.tmp/npm-audit/results.json`, and `.tmp/npm-audit/signatures.json`. Findings remain visible without turning report-only naming or heuristic controls into hard-fail gates. Raw binary entrypoints are finite `qa:raw:*` package scripts; inspect `package.json` rather than assuming an arbitrary wildcard command exists.
+Repo-wide audit inventory belongs in `qa:audit` unless a failed stage requires a direct adapter. Successful inventory steps break down their finding families and atomically replace sanitized complete artifacts at `.tmp/repo-audit/evidence.json` and `.tmp/repo-audit/topology.json`; Semgrep and npm evidence is written to `.tmp/semgrep/results.json`, `.tmp/npm-audit/results.json`, and `.tmp/npm-audit/signatures.json`. Structural debt is deliberately separate: an operator may run `qa:structural-audit` for periodic architecture maintenance, but agents do not run it as implementation proof and its report never blocks. Its path-owner partition and overlapping forwarding-edge candidates have separate counts; every forwarding-only single-production-consumer edge is either `Consolidate` or an explicit `Keep` veto. Neither inventory collects model-token hotspots. Raw binary entrypoints are finite `qa:raw:*` package scripts; inspect `package.json` rather than assuming an arbitrary wildcard command exists.
 
 ## Environment Rules
 

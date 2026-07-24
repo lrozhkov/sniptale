@@ -40,9 +40,13 @@ vi.mock('./sidecar', async (importOriginal) => {
   };
 });
 
-vi.mock('./start/helpers', () => ({
+vi.mock('./start/cleanup', () => ({
   cleanupResources: cleanupResourcesMock,
+}));
+vi.mock('./start/recorder', () => ({
   finalizeRecordingBootstrap: finalizeRecordingBootstrapMock,
+}));
+vi.mock('./start/session', () => ({
   handleRecordingStartError: handleRecordingStartErrorMock,
   initializeRecordingSession: initializeRecordingSessionMock,
 }));

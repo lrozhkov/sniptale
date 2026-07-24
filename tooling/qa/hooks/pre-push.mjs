@@ -7,7 +7,7 @@ import {
   repoRoot,
   runCommand,
 } from '../core/shared.mjs';
-import { createScopedQaContext, hasHarnessQaTargets } from '../core/qa-scope.mjs';
+import { createScopedQaContext, hasHarnessVerificationQaTargets } from '../core/qa-scope.mjs';
 import { runGit } from '../runtime/git-command.helpers.mjs';
 import {
   assertWorkspaceMatchesPushedTree,
@@ -104,17 +104,14 @@ export function createPrePushContext({
 }
 
 export function resolvePrePushCommands({ prePushInput = '', gitRunner = runGit } = {}) {
-  const updates = parsePrePushUpdates(prePushInput).filter(
-    (update) => !ZERO_SHA_PATTERN.test(update.localSha)
-  );
   const context = createPrePushContext({
     pushedFiles: collectPushedFiles(prePushInput, gitRunner),
   });
-  const initialPush = updates.some((update) => ZERO_SHA_PATTERN.test(update.remoteSha));
 
   return [
-    ...(hasHarnessQaTargets(context) ? ['qa:release-harness'] : []),
-    ...(initialPush ? ['qa:release', 'build:release'] : ['qa:checkpoint', 'qa:build']),
+    ...(hasHarnessVerificationQaTargets(context) ? ['qa:release-harness'] : []),
+    'qa:checkpoint',
+    'qa:build',
   ];
 }
 

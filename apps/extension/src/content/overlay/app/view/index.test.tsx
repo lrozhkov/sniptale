@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentAppLayoutProps } from '../../app-layout/types';
-import type { ContentAppViewModel } from '../view-state';
+import type { ContentAppViewModel } from '../view-state/types';
 
 const {
   contentAppLayoutMock,

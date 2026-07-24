@@ -1,6 +1,8 @@
-import type { FinalElementsOptions } from './types';
+import type { SelectionModeFinalElementsOptions } from '../types';
 
-export function createSelectionModeFinalOverlay(options: FinalElementsOptions): HTMLElement {
+export function createSelectionModeFinalOverlay(
+  options: SelectionModeFinalElementsOptions
+): HTMLElement {
   const finalOverlay = document.createElement('div');
   finalOverlay.className = 'sniptale-selection-final-overlay';
   finalOverlay.style.cssText = `
@@ -43,7 +45,7 @@ function createShade(direction: string, overlayBackground: string): HTMLElement 
   return shade;
 }
 
-function createEventCatcher(options: FinalElementsOptions): HTMLElement {
+function createEventCatcher(options: SelectionModeFinalElementsOptions): HTMLElement {
   const eventCatcher = document.createElement('div');
   eventCatcher.className = 'sniptale-selection-event-catcher';
   eventCatcher.style.cssText = `

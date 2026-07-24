@@ -49,6 +49,7 @@ it('publishes actual webcam settings on recording start', () => {
     settings: createSettings(),
     captureWidth: 1280,
     captureHeight: 720,
+    cursorCaptureMode: 'separate',
     trackSettings: { displaySurface: 'window', frameRate: 30, height: 720, width: 1280 },
     durationTracker: recordingContext.durationTracker,
   });
@@ -58,6 +59,7 @@ it('publishes actual webcam settings on recording start', () => {
       payload: {
         type: VideoMessageType.OFFSCREEN_RECORDING_STARTED,
         recordingId: 'recording-webcam',
+        cursorCaptureMode: 'separate',
         displaySurface: 'window',
         webcamSettings: { height: 720, width: 1280 },
       },

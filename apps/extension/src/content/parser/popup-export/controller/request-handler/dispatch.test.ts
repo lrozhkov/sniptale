@@ -21,7 +21,7 @@ vi.mock('../package', () => ({
   handlePopupExportBuildPackageRuntime: handlePopupExportBuildPackageRuntimeMock,
 }));
 
-vi.mock('../snapshot', () => ({
+vi.mock('../web-snapshot-runtime', () => ({
   handlePopupWebSnapshotRuntime: handlePopupWebSnapshotRuntimeMock,
 }));
 

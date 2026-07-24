@@ -19,7 +19,7 @@ import {
   QuickActionsEditorPrimaryOutputField,
   QuickActionsEditorToggleRow,
 } from './editor-output';
-import { type QuickActionsSectionState } from './section';
+import { type QuickActionsSectionState } from './controller';
 import { settingsModalFieldSurfaceClassName } from '../../section-surface/panel-controls';
 
 const displayModeCardClassName = [settingsModalFieldSurfaceClassName, 'mb-6'].join(' ');

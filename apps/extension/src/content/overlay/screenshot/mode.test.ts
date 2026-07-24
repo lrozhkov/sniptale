@@ -14,7 +14,7 @@ import {
   isLockEnabled,
   setUIHidden,
 } from '../../selection/locker';
-import type { CountdownLockSession } from './countdown/controller';
+import { createScreenshotControllerSession } from './session/state';
 
 vi.mock('../../selection/locker', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../selection/locker')>()),
@@ -80,9 +80,11 @@ function createScreenshotRuntime(): ScreenshotControllerRuntime {
       setSaveDialogState: vi.fn(),
     },
     captureActionRef: { current: 'download_default' },
-    navigationLockStateBeforeScreenshot: { current: true },
-    screenshotRunActiveRef: { current: false },
-    screenshotRunGenerationRef: { current: 1 },
+    session: {
+      navigationLockBaseline: true,
+      runActive: false,
+      runGeneration: 1,
+    },
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
@@ -92,16 +94,13 @@ function createScreenshotRuntime(): ScreenshotControllerRuntime {
 function expectQuickActionCancelTearsDownWithoutRelock() {
   const params = createScreenshotParams();
   const runtime = createScreenshotRuntime();
-  const countdownLockSessionRef = {
-    current: {
-      navigationLockEnabledBeforeCountdown: true,
-    },
-  } as { current: CountdownLockSession | null };
+  const session = createScreenshotControllerSession(true);
+  session.countdownLock = { navigationLockEnabledBeforeCountdown: true };
 
-  cancelQuickActionCountdown(params, runtime, countdownLockSessionRef);
+  cancelQuickActionCountdown(params, runtime, session);
 
   expect(enableNavigationLock).toHaveBeenCalledWith(false);
-  expect(countdownLockSessionRef.current).toBeNull();
+  expect(session.countdownLock).toBeNull();
   expect(params.quickActionOverlayRef.current).toBeNull();
   expect(params.setScreenshotMode).toHaveBeenCalledWith(false);
   expect(params.setTimerDelay).toHaveBeenCalledWith(0);
@@ -128,12 +127,12 @@ function expectPrepareScreenshotModeDisablesEditingModes() {
       quickEditMode: true,
     },
   };
-  const navigationLockStateBeforeScreenshot = { current: false };
+  const session = createScreenshotControllerSession(false);
   vi.mocked(isLockEnabled).mockReturnValueOnce(false);
 
-  prepareScreenshotMode(params, navigationLockStateBeforeScreenshot);
+  prepareScreenshotMode(params, session);
 
-  expect(navigationLockStateBeforeScreenshot.current).toBe(false);
+  expect(session.navigationLockBaseline).toBe(false);
   expect(params.editingModes.disableQuickEditMode).toHaveBeenCalledOnce();
   expect(params.editingModes.setQuickEditMode).toHaveBeenCalledWith(false);
   expect(params.editingModes.disableHighlighterMode).toHaveBeenCalledOnce();
@@ -145,12 +144,12 @@ function expectPrepareScreenshotModeDisablesEditingModes() {
 
 function expectPrepareScreenshotModeCapturesUserLockBaseline() {
   const params = createScreenshotParams();
-  const navigationLockStateBeforeScreenshot = { current: false };
+  const session = createScreenshotControllerSession(false);
   vi.mocked(isLockEnabled).mockReturnValueOnce(true).mockReturnValueOnce(true);
 
-  prepareScreenshotMode(params, navigationLockStateBeforeScreenshot);
+  prepareScreenshotMode(params, session);
 
-  expect(navigationLockStateBeforeScreenshot.current).toBe(true);
+  expect(session.navigationLockBaseline).toBe(true);
   expect(params.editingModes.disableHighlighterMode).not.toHaveBeenCalled();
   expect(params.editingModes.disableAiPickMode).not.toHaveBeenCalled();
   expect(params.setNavigationLockEnabled).toHaveBeenCalledWith(true);
@@ -158,21 +157,21 @@ function expectPrepareScreenshotModeCapturesUserLockBaseline() {
 
 function expectPrepareScreenshotModeUsesAutoStartBaseline() {
   const params = createScreenshotParams();
-  const navigationLockStateBeforeScreenshot = { current: true };
+  const session = createScreenshotControllerSession(true);
   vi.mocked(isLockEnabled).mockReturnValueOnce(true);
 
-  prepareScreenshotMode(params, navigationLockStateBeforeScreenshot, {
+  prepareScreenshotMode(params, session, {
     navigationLockBaseline: false,
   });
 
-  expect(navigationLockStateBeforeScreenshot.current).toBe(false);
+  expect(session.navigationLockBaseline).toBe(false);
   expect(params.setNavigationLockEnabled).toHaveBeenCalledWith(true);
 }
 
 function expectQuickActionCloseRestoresUnlockedBaseline() {
   const params = createScreenshotParams();
   const runtime = createScreenshotRuntime();
-  runtime.navigationLockStateBeforeScreenshot.current = false;
+  runtime.session.navigationLockBaseline = false;
 
   closeQuickActionCapture(params, runtime, 1);
 
@@ -185,7 +184,7 @@ function expectQuickActionCloseRestoresUnlockedBaseline() {
 function expectQuickActionCloseRestoresPreLockedBaseline() {
   const params = createScreenshotParams();
   const runtime = createScreenshotRuntime();
-  runtime.navigationLockStateBeforeScreenshot.current = true;
+  runtime.session.navigationLockBaseline = true;
 
   closeQuickActionCapture(params, runtime, 1);
 
@@ -197,7 +196,7 @@ function expectQuickActionCloseRestoresPreLockedBaseline() {
 function expectStaleQuickActionCloseDoesNotRestoreLock() {
   const params = createScreenshotParams();
   const runtime = createScreenshotRuntime();
-  runtime.screenshotRunGenerationRef.current = 2;
+  runtime.session.runGeneration = 2;
 
   closeQuickActionCapture(params, runtime, 1);
 

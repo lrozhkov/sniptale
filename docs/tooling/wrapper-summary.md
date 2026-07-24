@@ -1,6 +1,6 @@
 # Wrapper Summary
 
-Updated: 2026-07-14
+Updated: 2026-07-24
 
 This document owns wrapper lifecycle, scope/freshness state, locks, handoffs, and observability. Workflow belongs in [AGENTS.md](../../AGENTS.md), quality policy in [code-quality.md](code-quality.md), and command lookup in [operator-handbook.md](operator-handbook.md).
 
@@ -14,11 +14,11 @@ The live scope classifier is `tooling/qa/core/qa-scope.mjs`.
 - Harness targets include `tooling/**` plus shared controls.
 - Shared controls participate in both scopes: `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/lock/TypeScript/Vite configuration, and active `docs/tooling/**` guidance.
 
-Whenever the current diff has harness targets, run `npm run qa:release-harness` before a consumer wrapper that requires its freshness stamp. Documentation lists the categories; the classifier remains authoritative.
+Whenever the current diff has executable harness targets, run `npm run qa:release-harness` before a consumer wrapper that requires its freshness stamp. Exact machine-owned technical-debt, OSS-consumer, and coverage-rollout inventories are data-only targets: checkpoint runs their owner validators without requiring a fresh harness stamp. The exemption belongs only to exact files classified by `qa-scope`, including an author-maintained data module when it has an explicit owner validator; it is never execution evidence for another policy file. Policy JSON, baselines, allowlists, and executable registries are not data-only. Documentation lists the categories; the classifier remains authoritative.
 
 ## Diff And Freshness Model
 
-`qa:preflight`, `qa:advisory`, `qa:checkpoint`, `qa:closeout`, `qa:build`, and `qa:release-harness` resolve the current workspace state according to their contracts. Focused/checkpoint/build/closeout commands do not accept an explicit file scope; preflight alone accepts `--files <paths...>` for pre-edit planning.
+`qa:preflight`, `qa:advisory`, `qa:checkpoint`, `qa:closeout`, `qa:build`, and `qa:release-harness` resolve the current workspace state according to their contracts. Focused/checkpoint/build/closeout commands do not accept an explicit file scope; preflight alone accepts `--files <paths...>` for a read-only pre-edit structural snapshot. `qa:structural-audit` is a distinct manual repository-maintenance report, not an enforcement scope.
 
 Freshness states bind proof to the relevant content fingerprint rather than a mutable claim:
 
@@ -28,27 +28,33 @@ Freshness states bind proof to the relevant content fingerprint rather than a mu
 
 Changing the relevant diff invalidates reuse. `qa:closeout` may reuse fresh matching checkpoint/build state; otherwise it executes the required child wrapper.
 
+The pre-push hook materializes each immutable pushed range and runs applicable harness verification followed by `qa:checkpoint` and `qa:build` for both new and existing remote refs. Creating a remote branch does not imply release preparation: pre-push never invokes `qa:release` or `build:release`. It also rejects proof-time mutations or untracked inputs that are absent from the pushed object.
+
 ## Wrapper Lifecycles
 
 ### `qa:preflight`
 
-Read-only context collection. It reports relevant documents, target files, seam clusters, likely build scope, budget risks, advisory hints, and proof areas. It does not format, write proof state, acquire the blocking lock, build, stage, or commit. Use `--verbose` for inline detail and `-- --files <paths...>` before a diff exists.
+Read-only context collection. It reports scope, canonical owner/runtime, relevant documents, additional structural context excluding catalog findings, contracts/consumer-discovery needs, proof, build forecast, and explicitly non-blocking advisory findings. Current-diff mode uses behavioral files; `-- --files <paths...>` produces a non-blocking explicit planning snapshot without writing advisory/checkpoint state. Forecast and topology context stay bounded to the diff, exact mapped/adjacent owner tests, same-directory owner siblings, and direct HEAD import candidates; they do not build a repository-wide production index or claim complete consumer discovery without a bounded chain. Large path lists render a bounded head and tail with the total count and a full-list digest so later sections remain visible and the omitted middle remains comparable. It does not format, acquire the blocking lock, build, stage, or commit.
 
 ### `qa:advisory`
 
-Optional non-blocking diagnosis over the current diff. It emits structured heuristic findings and does not replace blocking proof. Normal implementation receives advisory state through `qa:checkpoint`; do not add advisory as a routine extra gate.
+Optional non-blocking diagnosis over the current diff. Its machine catalog contains only structural file/function pressure, UI proof gaps, and detached this-sensitive methods. UI visual-proof findings require a changed normalized view signature; callback-identity JSX event rewiring, test files, and state/controller-only wiring do not create screenshot guidance, while imperative render/style changes remain visible even inside handlers. Findings are always printed under an explicitly non-blocking heading and saved as sanitized diagnostic locations plus bounded advisory state v2. Normal implementation receives the same advisory block through `qa:checkpoint`; do not add advisory as a routine extra gate.
+
+### `qa:structural-audit`
+
+Manual report-only architecture-maintenance snapshot over repository code. It combines structural concentration with a disjoint deterministic path-owner partition and explicitly overlapping forwarding-edge operation candidates. A forwarding-only module with one production consumer receives `Consolidate` with a stable merge target or a concrete `Keep` veto. Console output interleaves `Split`, `Consolidate`, and `Keep`, then prints the artifact location and a bounded structural preview so the observed 16 KiB limit cannot hide a decision family. The bounded sanitized schema-v2 artifact records partition and forwarding-edge counts, a complete compact forwarding-edge inventory, and sampled rich structural/cluster evidence at `.tmp/structural-audit/report.json`; it fails instead of silently truncating the compact inventory. The goal is fewer transitions without removing explicit runtime, owner, adapter, or contract boundaries. Findings never become a blocking result, and the lane is not part of PR gates, normal agent workflow, closeout, or `qa:audit`. It does not collect model-token or token-hotspot inventories.
 
 ### `qa:release-harness`
 
-Blocking harness/shared-control proof. It runs the harness-owned formatting/static/type/test contract and writes the harness freshness state consumed by checkpoint, build, release, and closeout paths. It does not run product coverage or commit.
+Blocking harness/shared-control proof. It runs the harness-owned formatting/static/type/test contract and writes the harness freshness state consumed by checkpoint, build, release, and closeout paths. Exact machine-owned technical-debt, OSS-consumer, and coverage-rollout inventories skip this wrapper only when `qa-scope` classifies them as inventory-only and their checkpoint owner validators pass; author-maintained data modules receive no broader exemption. A standalone build still requires that fresh checkpoint. It does not run product coverage or commit.
 
 ### `qa:checkpoint`
 
-Blocking in-progress product proof over the current diff. It verifies required harness freshness, formats supported non-Markdown product targets, records advisory state, runs focused static/architecture/security controls, typecheck when required, directly changed and owner-selected tests, and eligible diff coverage. Successful unit-test steps identify their `checkpoint-owner` or `checkpoint-direct` profile in the diagnostic log. It writes checkpoint state and does not build, stage, or commit.
+Blocking in-progress product proof over the current diff. It verifies required harness freshness, formats supported non-Markdown product targets, prints and records advisory state, runs diff-scoped structural risk plus focused static/architecture/security controls, typechecks the affected owner-project and declared reverse-consumer closure when possible, runs directly changed and owner-selected tests, and checks eligible diff coverage. HEAD-proven deleted owner-local TypeScript paths with a path-segment-safe project match remain in their mapped closure; unproven missing or unmapped paths, broad shared contracts, and typecheck/configuration changes retain the full-workspace fallback. Successful unit-test steps identify their `checkpoint-owner` or `checkpoint-direct` profile in the diagnostic log. It writes checkpoint state and does not build, stage, or commit.
 
 ### `qa:build`
 
-Blocking broader product/build proof. It requires fresh matching checkpoint state and applicable harness state, runs broader checks/tests not owned by focused proof, produces the artifact build, and writes build state. Unit-test scope is selected automatically by `tooling/qa/core/verify-build.test-profiles.mjs`: small low-risk changes with complete owner-test proof use `owner-direct`; runtime, persistence, messaging, parser/export, package/public, deleted, ambiguous, or over-budget changes use `related-transitive`; test-only changes use `direct-changed`; changes without product test targets use `skip`. A deleted production target uses surviving related or deterministic owner proof and falls back to the full product suite only when neither exists. Full-suite product tests otherwise remain release/audit proof. Direct commit flags are operator/debug surfaces; normal commits use `qa:closeout`.
+Blocking broader product/build proof. It requires fresh matching checkpoint state and applicable harness state, runs broader checks/tests not owned by focused proof, produces the artifact build, and writes build state. Unit-test scope is selected automatically by `tooling/qa/core/verify-build.test-profiles.mjs`: small low-risk changes with complete owner-test proof use `owner-direct`; runtime, persistence, messaging, parser/export, package/public, deleted, ambiguous, or over-budget changes use `related-transitive`; test-only changes use `direct-changed`; changes without product test targets use `skip`. Deleted tests stay fingerprinted but are not executable. A deleted production chain uses bounded surviving proof only when its complete HEAD consumer closure and current redirect closure resolve inside one changed owner group with existing deterministic owner tests; partial, cross-owner, missing, or ambiguous closure falls back to the full product suite. Full-suite product tests otherwise remain release/audit proof. Direct commit flags are operator/debug surfaces; normal commits use `qa:closeout`.
 
 ### `qa:closeout`
 
@@ -74,7 +80,7 @@ A live process consuming CPU is not a hang merely because output is quiet. `qa:a
 
 ## Observability
 
-Canonical wrappers write one structured run record and one bounded sanitized diagnostic log per invocation under `.tmp`. Default terminal output stays concise: overall result, duration, problem/control identifiers, the JSON run-record path, and the sanitized diagnostic-log path. The diagnostic log is live evidence: wrappers may append bounded progress before final steps are known, and each append refreshes the run record's log metadata. When a wrapper failure contains structured child-run evidence, the summary also prints every unique child diagnostic-log path so the actionable nested output is directly reachable. `--verbose` is wrapper-specific; use the diagnostic logs for detail.
+Canonical wrappers write one structured run record and one bounded sanitized diagnostic log per invocation under `.tmp`. Advisory, preflight, checkpoint/closeout advisory reuse, and standalone structural steps expose a `consoleOutput` block before the summary; the common sanitizer removes secrets and workspace paths, caps the block at `16 KiB`, and marks truncation. Preflight labels non-finding structural context separately from non-blocking advisory findings, and advisory output renders watch-count findings as review signals so neither is mistaken for the blocking structural result. A wrapper renders each finding family once: checkpoint and closeout advisory output owns structural watches, while the structural step retains its blocking result and standalone/harness output without repeating the watch block. The zero case is explicit as `attention=0, watch=0`, and `--verbose` does not duplicate the block. Successful advisory findings are also stored as sanitized diagnostic locations. Other default output stays concise: overall result, duration, problem/control identifiers, the JSON run-record path, and the sanitized diagnostic-log path.
 
 `npm run qa:stats -- [--wrapper <id>] [--task <id>]` aggregates records by wrapper, mode, root run, task, step, control, problem, and skip reason. Legacy JSONL timing files are read-only fallback and receive no new writes.
 

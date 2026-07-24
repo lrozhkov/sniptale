@@ -2,18 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { fromRelativePath } from './shared.mjs';
-import { QUALITY_LIMITS } from './quality.config.mjs';
 import { OWNER_LOCAL_SCOPES } from './verify-all.scope.mjs';
 import { resolveBuildCloseoutScope } from './verify-build.scope.mjs';
 import { findCoverageRolloutGroup } from './verify-test-coverage.registry.mjs';
 import { resolveCoverageThreshold } from './verify-test-coverage.thresholds.mjs';
 import { expandRelatedTestScope } from './unit-test-plan.mjs';
 
-const COVERAGE_HINT_FILE_PATTERN = /\.(?:ts|tsx)$/u;
-const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:ts|tsx)$/u;
+const COVERAGE_HINT_FILE_PATTERN = /\.[cm]?[jt]sx?$/u;
+const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const BROAD_BUILD_SCOPE_FAMILIES = new Set([
+  'manifest-owned',
   'package-and-app-core',
   'messaging-runtime',
+  'parser-snapshot-export',
   'storage-persistence',
 ]);
 
@@ -89,51 +90,44 @@ export function collectScopeHints(targetFiles, codeFiles) {
   return hints;
 }
 
-function countFileLines(file) {
-  const absolutePath = fromRelativePath(file);
-  try {
-    return fs.readFileSync(absolutePath, 'utf8').split(/\r?\n/u).length;
-  } catch (error) {
-    if (
-      error &&
-      typeof error === 'object' &&
-      (error.code === 'ENOENT' || error.code === 'EISDIR')
-    ) {
-      return 0;
-    }
-    throw error;
-  }
-}
-
-function collectRelatedTestBudgetRisks(files) {
-  const warningLimit = Math.floor(QUALITY_LIMITS.maxFileLines * 0.8);
-  return files
-    .filter((file) => TEST_FILE_PATTERN.test(file))
-    .map((file) => ({ file, lines: countFileLines(file) }))
-    .filter((entry) => entry.lines >= warningLimit)
-    .sort((left, right) => right.lines - left.lines || left.file.localeCompare(right.file))
-    .slice(0, 6)
-    .map((entry) => `related test near size limit: ${entry.file}: ${entry.lines} lines`);
-}
-
-export function collectBuildScopeForecast({ targetFiles, codeFiles, addedFiles = [] }) {
-  if (targetFiles.length === 0) return { budgetRisks: [], details: [] };
-  const { testScope } = resolveBuildCloseoutScope({ targetFiles, codeFiles, addedFiles });
+export function collectBuildScopeForecast(
+  { targetFiles, riskTargetFiles = targetFiles, codeFiles, addedFiles = [] },
+  buildScopeOptions = {}
+) {
+  if (targetFiles.length === 0) return { details: [] };
+  const { testScope } = resolveBuildCloseoutScope(
+    { targetFiles, riskTargetFiles, qualityTargetFiles: riskTargetFiles, codeFiles, addedFiles },
+    { repoCodeFiles: codeFiles, ...buildScopeOptions }
+  );
   const selectedUnitFiles =
     testScope.directTestFiles.length > 0
       ? testScope.directTestFiles
       : expandRelatedTestScope(testScope.relatedFiles);
-  const selectedScopeDetail = testScope.fullSuite ? 'full-suite' : selectedUnitFiles.length;
-  const details = [
-    `qa:build forecast: ${testScope.detail}; selected unit-test scope=${selectedScopeDetail}`,
-  ];
   const broadFamilies = testScope.matchedFamilies.filter((family) =>
     BROAD_BUILD_SCOPE_FAMILIES.has(family)
   );
+  const selectedScopeDetail = testScope.fullSuite
+    ? 'full-suite'
+    : testScope.profile === 'related-transitive' && broadFamilies.length > 0
+      ? 'consumer-discovery-required'
+      : selectedUnitFiles.length;
+  const forecastScopeDetail =
+    testScope.profile === 'related-transitive' && broadFamilies.length > 0
+      ? [
+          `profile=${testScope.profile}`,
+          'bounded owner and affected-consumer discovery required',
+          testScope.profileReason ? `reason=${testScope.profileReason}` : '',
+        ]
+          .filter(Boolean)
+          .join('; ')
+      : testScope.detail;
+  const details = [
+    `qa:build forecast: ${forecastScopeDetail}; selected unit-test scope=${selectedScopeDetail}`,
+  ];
   if (testScope.profile === 'related-transitive' && broadFamilies.length > 0) {
     details.push(
       `broad transitive scope expected for ${broadFamilies.join(', ')}: check related mocks and tests before closeout`
     );
   }
-  return { budgetRisks: collectRelatedTestBudgetRisks(selectedUnitFiles), details };
+  return { details };
 }

@@ -1,4 +1,4 @@
-import { buildDiamondVertices, buildRectangleVertices } from '../fit-geometry';
+import { buildDiamondVertices, buildRectangleVertices } from '../oriented-geometry';
 import type { FreehandPointRecord } from '../points';
 import type { FreehandRecognitionCandidate } from '../recognition-types';
 import { prepareClosedPath } from './alignment';

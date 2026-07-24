@@ -1,27 +1,27 @@
 import fs from 'node:fs';
 import ts from 'typescript';
 
-import { collectCodeFiles, fromRelativePath, readText } from './shared.mjs';
+import { fromRelativePath, readText } from './shared.mjs';
 import { collectDeletedWorkspaceFiles, fileExists } from './guardrail-seam-audit-helpers.mjs';
 import { resolveImportCandidates, resolveRelativeImport } from './path-import-helpers.mjs';
 import { isProductSourcePath } from './src-production-targets.mjs';
 
 const PRODUCT_SOURCE_ROOT = '(?:src|apps/extension/src)';
 const ROOT_OWNER_FILE_PATTERN = new RegExp(
-  `^${PRODUCT_SOURCE_ROOT}/[^/]+/[^/]+\\.(?:ts|tsx|js|mjs|cjs)$`,
+  `^${PRODUCT_SOURCE_ROOT}/[^/]+/[^/]+\\.[cm]?[jt]sx?$`,
   'u'
 );
 const SAME_OWNER_DEEP_FILE_PATTERN = new RegExp(
-  `^${PRODUCT_SOURCE_ROOT}/([^/]+)/.+/([^/]+)\\.(?:ts|tsx|js|mjs|cjs)$`,
+  `^${PRODUCT_SOURCE_ROOT}/([^/]+)/.+/([^/]+)\\.[cm]?[jt]sx?$`,
   'u'
 );
 const ROOT_FILE_PATTERN = new RegExp(
-  `^${PRODUCT_SOURCE_ROOT}/([^/]+)/([^/]+)\\.(?:ts|tsx|js|mjs|cjs)$`,
+  `^${PRODUCT_SOURCE_ROOT}/([^/]+)/([^/]+)\\.[cm]?[jt]sx?$`,
   'u'
 );
-const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:ts|tsx)$/u;
+const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const SUPPORT_FILE_PATTERN =
-  /\.(?:test-helpers|test-support|fixtures|test\.fixtures|test\.helpers)\.(?:ts|tsx)$/u;
+  /\.(?:test-helpers|test-support|fixtures|test\.fixtures|test\.helpers)\.[cm]?[jt]sx?$/u;
 const REGISTRY_EXACT_FILES = new Set([
   'tooling/configs/qa/validation-manifest.json',
   'tooling/configs/qa/manifest-permissions.data.json',
@@ -79,7 +79,6 @@ export function collectFalsePublicSeamHints(codeFiles) {
       .filter(Boolean)
       .map((match) => `${match[1]}:${match[2]}`)
   );
-  const allCodeFiles = collectCodeFiles();
   const hints = [];
 
   for (const rootFile of rootFiles) {
@@ -88,14 +87,14 @@ export function collectFalsePublicSeamHints(codeFiles) {
       continue;
     }
 
-    const importers = allCodeFiles.filter(
+    const importers = codeFiles.filter(
       (file) =>
         file !== rootFile && !TEST_FILE_PATTERN.test(file) && fileImportsTarget(file, rootFile)
     );
 
     if (importers.length === 0) {
       hints.push(
-        `root facade candidate has no importer graph: ${rootFile} looks deletable, not public`
+        `root facade candidate needs bounded consumer discovery: ${rootFile} has no importer in the current diff`
       );
     }
   }

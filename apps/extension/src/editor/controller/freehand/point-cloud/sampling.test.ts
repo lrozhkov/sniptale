@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { resamplePointCloud } from './sampling';
 
 it('resamples open point clouds and pads zero-length strokes', () => {
+  expect(resamplePointCloud([], 4)).toEqual([]);
   expect(
     resamplePointCloud(
       [

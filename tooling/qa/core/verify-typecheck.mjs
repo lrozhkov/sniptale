@@ -44,7 +44,7 @@ function writeJsonFile(filePath, value) {
 
 function collectProjectIncludes(project) {
   const include = [...(project.include ?? [])];
-  if (project.id === 'web-snapshot-viewer' || project.id === 'web-snapshot-viewer-tests') {
+  if (project.id === 'web-snapshot-viewer') {
     include.push('apps/extension/src/content/public/preparation-surface/**/*');
   }
   if (project.testProject) {

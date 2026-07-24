@@ -1,1 +1,0 @@
-export { readLineSettings } from './read';

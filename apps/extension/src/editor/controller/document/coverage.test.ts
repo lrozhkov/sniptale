@@ -69,7 +69,7 @@ vi.mock('../../document/model', async (importOriginal) => ({
   isFrameObject: mocks.isFrameObjectMock,
 }));
 
-import { applyEditorDocumentToCanvas } from './apply';
+import { applyEditorDocumentToCanvas } from './apply/orchestrate';
 import { applyEditorControllerDocument } from './lifecycle/apply/run';
 import { closeEditorControllerDocument } from './lifecycle/close/run';
 import { openEditorControllerImage } from './lifecycle/open/image/run';

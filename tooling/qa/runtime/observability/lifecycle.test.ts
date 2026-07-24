@@ -54,6 +54,22 @@ describe('successful observability run persistence', () => {
       expect(fs.statSync(run.logPath).mode & 0o777).toBe(0o600);
     }
   });
+
+  it('uses normalized AST/report console bounds without breaking UTF-8', () => {
+    const root = createRepository('qa-observability-console-');
+    const run = createObservabilityRun({ wrapperId: 'qa.advisory', rootDir: root });
+    run.addSensitiveValues(['private-console-value']);
+    const output = run.sanitizeConsoleOutput(
+      `${root} private-console-value ${'с'.repeat(20_000)}`,
+      1024
+    );
+    expect(Buffer.byteLength(output)).toBeLessThanOrEqual(1024);
+    expect(output).toContain('<repo>');
+    expect(output).toContain('<redacted>');
+    expect(output).not.toContain('\ufffd');
+    expect(output).toContain('console output truncated');
+    run.finalize();
+  });
 });
 
 describe('failed observability run persistence', () => {

@@ -1,10 +1,10 @@
 import type { QuickEditModeToggleProps } from './controller.contracts';
+import { createQuickEditModeHelpers } from './controller-disable';
+import { createQuickEditModeHandlers } from './controller-guards';
 import {
   createQuickEditModeListenerProps,
   createQuickEditModeListenerRegistration,
-  createQuickEditModeHandlers,
-  createQuickEditModeHelpers,
-} from './controller.helpers';
+} from './controller-listeners';
 import type { QuickEditRuntimeModeSurface } from './types';
 
 export function createQuickEditModeToggles(

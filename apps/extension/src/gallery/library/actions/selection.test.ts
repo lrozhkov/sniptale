@@ -12,10 +12,9 @@ import {
 import {
   createApplySelectionTagAction,
   createDeleteManyAction,
-  createSaveMetadataAction,
   createSelectionZipAction,
   createStorageCleanupAction,
-} from './helpers';
+} from './selection';
 
 const {
   addMediaLibraryEntryTagsSafelyMock,
@@ -24,9 +23,7 @@ const {
   deleteScenarioProjectRecordMock,
   deleteStorageCleanupCandidatesSafelyMock,
   getMediaAssetBlobMock,
-  getMediaLibraryEntryMock,
   updateScenarioProjectRecordMetadataMock,
-  updateMediaLibraryEntrySafelyMock,
 } = vi.hoisted(() => ({
   addMediaLibraryEntryTagsSafelyMock: vi.fn(),
   deleteMediaLibraryAssetsBatchSafelyMock: vi.fn(),
@@ -34,9 +31,7 @@ const {
   deleteScenarioProjectRecordMock: vi.fn(),
   deleteStorageCleanupCandidatesSafelyMock: vi.fn(),
   getMediaAssetBlobMock: vi.fn(),
-  getMediaLibraryEntryMock: vi.fn(),
   updateScenarioProjectRecordMetadataMock: vi.fn(),
-  updateMediaLibraryEntrySafelyMock: vi.fn(),
 }));
 
 vi.mock('../../../workflows/media-hub/store', async (importOriginal) => ({
@@ -44,7 +39,6 @@ vi.mock('../../../workflows/media-hub/store', async (importOriginal) => ({
   addMediaLibraryEntryTagsSafely: addMediaLibraryEntryTagsSafelyMock,
   deleteMediaLibraryAssetsBatchSafely: deleteMediaLibraryAssetsBatchSafelyMock,
   deleteStorageCleanupCandidatesSafely: deleteStorageCleanupCandidatesSafelyMock,
-  updateMediaLibraryEntrySafely: updateMediaLibraryEntrySafelyMock,
 }));
 
 vi.mock('../../../workflows/media-hub/video-projects', () => ({
@@ -64,7 +58,6 @@ vi.mock(
   async (importOriginal) => ({
     ...(await importOriginal()),
     getMediaAssetBlob: getMediaAssetBlobMock,
-    getMediaLibraryEntry: getMediaLibraryEntryMock,
   })
 );
 
@@ -88,19 +81,16 @@ describe('gallery app action no-op branches', () => {
     expect(deleteStorageCleanupCandidatesSafelyMock).not.toHaveBeenCalled();
   });
 
-  it('skips zip, metadata, and tag updates when selection or preview state is missing', async () => {
+  it('skips zip and tag updates when selection state is missing', async () => {
     const { controller, getState } = createController({
       selectedItems: [],
       selectionTagDraft: 'existing',
     });
 
     await createSelectionZipAction(controller)(runBusyAction);
-    await createSaveMetadataAction(controller)(runBusyAction);
     await createApplySelectionTagAction(controller)(runBusyAction);
 
     expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
-    expect(getMediaLibraryEntryMock).not.toHaveBeenCalled();
-    expect(updateMediaLibraryEntrySafelyMock).not.toHaveBeenCalled();
     expect(getState().selection.selectionTagDraft).toBe('existing');
   });
 });
@@ -111,23 +101,28 @@ describe('gallery app selection cleanup and delete flows', () => {
   });
 
   it('deletes selected media, scenarios, and video projects through their lifecycle owners', async () => {
-    const { controller, getConfirmDialog } = createController();
     const mediaItem = createMediaItem({ entityId: 'asset-1', id: 'asset-1' });
     const scenarioItem = createScenarioItem({ entityId: 'scenario-1', id: 'scenario:scenario-1' });
     const videoProjectItem = createVideoProjectItem({
       entityId: 'video-project-1',
       id: 'video-project:video-project-1',
     });
+    const selectedItems = [mediaItem, scenarioItem, videoProjectItem];
+    const { controller, getConfirmDialog, getState } = createController({
+      previewItem: mediaItem,
+      selectedIds: new Set(selectedItems.map((item) => item.id)),
+      selectedItems,
+    });
 
-    await createDeleteManyAction(controller)(
-      [mediaItem, scenarioItem, videoProjectItem],
-      runBusyAction
-    );
+    await createDeleteManyAction(controller)(selectedItems, runBusyAction);
     await getConfirmDialog()?.onConfirm();
 
     expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledWith(['asset-1']);
     expect(deleteScenarioProjectRecordMock).toHaveBeenCalledWith('scenario-1');
     expect(deletePersistedVideoProjectMock).toHaveBeenCalledWith('video-project-1');
+    expect(getState().selection.selectedIds.size).toBe(0);
+    expect(getState().preview.session.item).toBeNull();
+    expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
   });
 
   it('passes typed cleanup candidates to the storage cleanup lifecycle owner', async () => {
@@ -149,6 +144,7 @@ describe('gallery app selection cleanup and delete flows', () => {
     await getConfirmDialog()?.onConfirm();
 
     expect(deleteStorageCleanupCandidatesSafelyMock).toHaveBeenCalledWith(group.items);
+    expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -161,6 +157,7 @@ describe('gallery app selection metadata and archive flows', () => {
     const { controller, getState } = createController({
       selectedItems: [
         createMediaItem({ entityId: 'asset-1', tags: [] }),
+        createMediaItem({ entityId: 'asset-2', tags: ['demo'] }),
         createScenarioItem({ entityId: 'scenario-1', tags: [] }),
       ],
       selectionTagDraft: ' demo ',
@@ -169,9 +166,47 @@ describe('gallery app selection metadata and archive flows', () => {
     await createApplySelectionTagAction(controller)(runBusyAction);
 
     expect(addMediaLibraryEntryTagsSafelyMock).toHaveBeenCalledWith('asset-1', ['demo']);
+    expect(addMediaLibraryEntryTagsSafelyMock).toHaveBeenCalledTimes(1);
     expect(updateScenarioProjectRecordMetadataMock).toHaveBeenCalledWith('scenario-1', {
       tags: ['demo'],
     });
     expect(getState().selection.selectionTagDraft).toBe('');
+    expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts independent selection tag updates before either update completes', async () => {
+    let firstStarted = false;
+    let secondStarted = false;
+    let resolveFirstUpdate!: () => void;
+    const firstUpdateGate = new Promise<void>((resolve) => {
+      resolveFirstUpdate = resolve;
+    });
+
+    addMediaLibraryEntryTagsSafelyMock.mockImplementation((assetId: string) => {
+      if (assetId === 'asset-1') {
+        firstStarted = true;
+        return firstUpdateGate;
+      }
+
+      secondStarted = true;
+      return Promise.resolve();
+    });
+
+    const { controller } = createController({
+      selectedItems: [
+        createMediaItem({ entityId: 'asset-1', tags: [] }),
+        createMediaItem({ entityId: 'asset-2', tags: [] }),
+      ],
+      selectionTagDraft: 'batch-tag',
+    });
+
+    const pending = createApplySelectionTagAction(controller)(runBusyAction);
+    await Promise.resolve();
+
+    expect(firstStarted).toBe(true);
+    expect(secondStarted).toBe(true);
+
+    resolveFirstUpdate();
+    await pending;
   });
 });

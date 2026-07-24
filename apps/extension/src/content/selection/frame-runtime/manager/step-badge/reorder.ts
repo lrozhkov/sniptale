@@ -1,5 +1,6 @@
 import type { FrameData } from '../../../../../features/highlighter/contracts';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import type { ReorderStepBadge } from '../../contracts';
 import { scheduleStepBadgeRecalculation } from './update';
 import { sortFramesByStoredStepBadgeOrder } from './order';
 
@@ -28,7 +29,7 @@ export function createReorderStepBadge(params: {
   setFrames: FrameSetter;
   stepBadgeOrderRef: MutableRefObject<Map<string, number>>;
   recalculateStepBadgesRef: MutableRefObject<() => void>;
-}) {
+}): ReorderStepBadge {
   const { setFrames, stepBadgeOrderRef, recalculateStepBadgesRef } = params;
 
   return (frameId: string, direction: 'up' | 'down') => {

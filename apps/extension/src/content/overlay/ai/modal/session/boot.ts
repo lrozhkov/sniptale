@@ -1,7 +1,14 @@
 import { useRef } from 'react';
-import type { AIModalBootEffectProps } from './boot-props';
+import type { AIModalOpenBootstrapEffectProps } from './open';
 import { useAIModalOpenBootstrapEffect } from './open';
 import { useAIModalPromptPersistenceEffect } from './prompt-persistence';
+
+interface AIModalBootEffectProps extends Omit<
+  AIModalOpenBootstrapEffectProps,
+  'bootedWhileOpenRef'
+> {
+  setLastPrompt: (prompt: string) => void;
+}
 
 export function useAIModalBootEffect(props: AIModalBootEffectProps) {
   const {

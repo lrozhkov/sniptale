@@ -33,7 +33,7 @@ import {
   resolveLockTargets,
   shouldAllowQuickEditTarget,
   shouldBlockQuickEditInteractiveTarget,
-} from './routing.guards';
+} from './routing';
 
 afterEach(() => {
   vi.restoreAllMocks();

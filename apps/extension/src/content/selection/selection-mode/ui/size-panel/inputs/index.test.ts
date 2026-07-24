@@ -2,58 +2,11 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  bindSelectionHeightInput,
-  bindSelectionWidthInput,
-  resizeSelectionHeight,
-  resizeSelectionWidth,
-} from '.';
+import { bindSelectionHeightInput, bindSelectionWidthInput } from '.';
 
 beforeEach(() => {
   vi.clearAllMocks();
   document.body.replaceChildren();
-});
-
-describe('selection-mode size-panel resizing', () => {
-  it('clamps width changes and updates height when aspect ratio is locked', () => {
-    const selection = { x: 100, y: 80, width: 200, height: 100 };
-
-    expect(
-      resizeSelectionWidth(selection, {
-        nextValue: 700,
-        minSelectionSize: 100,
-        maxWidth: 500,
-        maxHeight: 260,
-        maintainAspectRatio: true,
-        aspectRatio: 2,
-      })
-    ).toEqual({
-      x: -50,
-      y: 5,
-      width: 500,
-      height: 250,
-    });
-  });
-
-  it('clamps height changes and updates width when aspect ratio is locked', () => {
-    const selection = { x: 120, y: 100, width: 180, height: 120 };
-
-    expect(
-      resizeSelectionHeight(selection, {
-        nextValue: 50,
-        minSelectionSize: 100,
-        maxWidth: 260,
-        maxHeight: 500,
-        maintainAspectRatio: true,
-        aspectRatio: 1.5,
-      })
-    ).toEqual({
-      x: 135,
-      y: 110,
-      width: 150,
-      height: 100,
-    });
-  });
 });
 
 describe('selection-mode size-panel inputs', () => {
@@ -117,5 +70,34 @@ describe('selection-mode size-panel height input', () => {
       height: 100,
     });
     expect(heightInput.value).toBe('100');
+  });
+
+  it('syncs the paired width input when aspect ratio is maintained', () => {
+    const heightInput = document.createElement('input');
+    const widthInput = document.createElement('input');
+    let currentSelection = { x: 100, y: 120, width: 300, height: 150 };
+    const syncSelection = vi.fn((selection) => {
+      currentSelection = selection;
+    });
+
+    bindSelectionHeightInput(heightInput, widthInput, syncSelection, {
+      minSelectionSize: 100,
+      maxWidth: 900,
+      maxHeight: 700,
+      getCurrentSelection: () => currentSelection,
+      getMaintainAspectRatio: () => true,
+      getAspectRatio: () => 2,
+    });
+
+    heightInput.value = '200';
+    heightInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(syncSelection).toHaveBeenCalledWith({
+      x: 50,
+      y: 95,
+      width: 400,
+      height: 200,
+    });
+    expect(widthInput.value).toBe('400');
   });
 });

@@ -96,6 +96,10 @@ async function captureSaveFailure(): Promise<unknown> {
   return caughtError;
 }
 
+it('distinguishes generic runtime errors from storage prompt failures', () => {
+  expect(editorFileSave.isEditorStoragePromptError(new Error('boom'))).toBe(false);
+});
+
 it('throws a typed storage prompt error when gallery save fails', async () => {
   mockSendRuntimeMessage.mockResolvedValueOnce({
     success: true,

@@ -119,6 +119,10 @@ function expectFinalElementsShape(
   expect(dom.finalOverlay?.querySelectorAll('.sniptale-shade')).toHaveLength(4);
   expect(dom.finalOverlay?.querySelector('.sniptale-selection-event-catcher')).not.toBeNull();
   expect(dom.finalFrame?.querySelectorAll('.sniptale-resize-handle')).toHaveLength(8);
+  expect(dom.finalOverlay?.parentElement).toBe(dom.overlayContainer);
+  expect(dom.finalFrame?.parentElement).toBe(dom.overlayContainer);
+  expect(dom.finalOverlay?.nextElementSibling).toBe(dom.finalFrame);
+  expect(dom.sizeTooltip).toBe(tooltip);
   expect(dom.sizePanel).toBe(tooltip.root);
   expect(dom.widthInput).toBe(tooltip.widthInput);
   expect(dom.heightInput).toBe(tooltip.heightInput);

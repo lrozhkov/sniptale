@@ -3,7 +3,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CaptureActionDropdown, TimerDropdown } from './dropdowns';
+import { CaptureActionDropdown } from './action-dropdown';
+import { TimerDropdown } from './timer-dropdown';
 
 vi.mock('../../../../platform/i18n', () => ({
   translate: (key: string) => key,

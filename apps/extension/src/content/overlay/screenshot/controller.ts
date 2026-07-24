@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { createScreenshotControllerActions } from './session/actions';
-import { type CountdownLockSession, type ScreenshotType } from './countdown/controller';
-import type { ScreenshotControllerRuntime, ScreenshotStartContext } from './types';
+import { createHandleCancelCountdown } from './session/cancel';
+import { createHandleTakeScreenshot } from './session/capture';
+import { createScreenshotControllerSession } from './session/state';
+import type { ScreenshotControllerSession } from './session/state';
+import type { ScreenshotControllerRuntime, ScreenshotStartContext, ScreenshotType } from './types';
 import { type ScreenshotControllerParams as UseScreenshotControllerParams } from './mode';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import { disableSelectionModeIfLoaded } from '../../selection/selection-mode/lazy';
@@ -20,10 +22,8 @@ interface UseScreenshotControllerResult {
 }
 
 function createScreenshotRuntime(args: {
-  navigationLockStateBeforeScreenshot: { current: boolean };
   params: UseScreenshotControllerParams;
-  screenshotRunActiveRef: { current: boolean };
-  screenshotRunGenerationRef: { current: number };
+  session: ScreenshotControllerSession;
 }): ScreenshotControllerRuntime {
   return {
     ...(args.params.captureAdapter === undefined
@@ -31,9 +31,7 @@ function createScreenshotRuntime(args: {
       : { captureAdapter: args.params.captureAdapter }),
     capturePersistence: args.params.capturePersistence,
     captureActionRef: args.params.captureActionRef,
-    navigationLockStateBeforeScreenshot: args.navigationLockStateBeforeScreenshot,
-    screenshotRunActiveRef: args.screenshotRunActiveRef,
-    screenshotRunGenerationRef: args.screenshotRunGenerationRef,
+    session: args.session,
     setIsCompletelyHidden: args.params.setIsCompletelyHidden,
     setIsToolbarVisible: args.params.setIsToolbarVisible,
     setNavigationLockEnabled: args.params.setNavigationLockEnabled,
@@ -42,73 +40,58 @@ function createScreenshotRuntime(args: {
 }
 
 function invalidateScreenshotRuns(args: {
-  countdownLockSessionRef: { current: CountdownLockSession | null };
-  countdownRunTokenRef: { current: number | null };
-  countdownTimeoutRef: { current: ReturnType<typeof setTimeout> | null };
-  navigationLockStateBeforeScreenshot: { current: boolean };
-  pendingScreenshotType: { current: ScreenshotType | null };
-  screenshotRunActiveRef: { current: boolean };
-  screenshotRunGenerationRef: { current: number };
+  session: ScreenshotControllerSession;
   setCountdown: (value: number | null) => void;
   setIsCompletelyHidden: (hidden: boolean) => void;
 }): ScreenshotStartContext | undefined {
-  const startContext = args.screenshotRunActiveRef.current
-    ? { navigationLockBaseline: args.navigationLockStateBeforeScreenshot.current }
+  const startContext = args.session.runActive
+    ? { navigationLockBaseline: args.session.navigationLockBaseline }
     : undefined;
-  resetInvalidatedCountdownState(args);
-  args.screenshotRunGenerationRef.current += 1;
-  args.screenshotRunActiveRef.current = false;
+  resetInvalidatedCountdownState(args.session, args.setCountdown);
+  args.session.runGeneration += 1;
+  args.session.runActive = false;
   setUIHidden(false);
   args.setIsCompletelyHidden(false);
   disableSelectionModeIfLoaded();
   return startContext;
 }
 
-function resetInvalidatedCountdownState(args: {
-  countdownLockSessionRef: { current: CountdownLockSession | null };
-  countdownRunTokenRef: { current: number | null };
-  countdownTimeoutRef: { current: ReturnType<typeof setTimeout> | null };
-  pendingScreenshotType: { current: ScreenshotType | null };
-  setCountdown: (value: number | null) => void;
-}): void {
-  if (args.countdownTimeoutRef.current) {
-    clearTimeout(args.countdownTimeoutRef.current);
+function resetInvalidatedCountdownState(
+  session: ScreenshotControllerSession,
+  setCountdown: (value: number | null) => void
+): void {
+  if (session.countdownTimeout) {
+    clearTimeout(session.countdownTimeout);
   }
-  args.countdownLockSessionRef.current = null;
-  args.countdownRunTokenRef.current = null;
-  args.countdownTimeoutRef.current = null;
-  args.pendingScreenshotType.current = null;
-  args.setCountdown(null);
+  session.countdownLock = null;
+  session.countdownRunToken = null;
+  session.countdownTimeout = null;
+  session.pendingType = null;
+  setCountdown(null);
 }
 
 export function useScreenshotController(
   params: UseScreenshotControllerParams
 ): UseScreenshotControllerResult {
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [session] = useState(() => createScreenshotControllerSession(params.navigationLockEnabled));
   const handleCancelCountdownRef = useRef<(() => void) | null>(null);
-  const { refs, screenshotRunActiveRef, screenshotRunGenerationRef } = useScreenshotControllerRefs(
-    params.navigationLockEnabled
-  );
   const runtime = createScreenshotRuntime({
-    navigationLockStateBeforeScreenshot: refs.navigationLockStateBeforeScreenshot,
     params,
-    screenshotRunActiveRef,
-    screenshotRunGenerationRef,
+    session,
   });
 
-  const { handleCancelCountdown, handleTakeScreenshot } = createScreenshotControllerActions({
+  const actionArgs = {
     params,
-    refs,
     runtime,
+    session,
     setCountdown,
-  });
+  };
+  const handleCancelCountdown = createHandleCancelCountdown(actionArgs);
+  const handleTakeScreenshot = createHandleTakeScreenshot(actionArgs);
   handleCancelCountdownRef.current = handleCancelCountdown;
 
-  useCancelCountdownOnUnmount(
-    refs.countdownTimeoutRef,
-    refs.countdownLockSessionRef,
-    handleCancelCountdownRef
-  );
+  useCancelCountdownOnUnmount(session, handleCancelCountdownRef);
 
   return {
     countdown,
@@ -116,55 +99,27 @@ export function useScreenshotController(
     handleTakeScreenshot,
     invalidateScreenshotRuns: () =>
       invalidateScreenshotRuns({
-        ...refs,
-        screenshotRunActiveRef,
-        screenshotRunGenerationRef,
+        session,
         setCountdown,
         setIsCompletelyHidden: params.setIsCompletelyHidden,
       }),
   };
 }
 
-function useScreenshotControllerRefs(navigationLockEnabled: boolean) {
-  const countdownLockSessionRef = useRef<CountdownLockSession | null>(null);
-  const countdownRunTokenRef = useRef<number | null>(null);
-  const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const navigationLockStateBeforeScreenshot = useRef(navigationLockEnabled);
-  const pendingScreenshotType = useRef<ScreenshotType | null>(null);
-  const screenshotRunActiveRef = useRef(false);
-  const screenshotRunGenerationRef = useRef(0);
-
-  return {
-    refs: {
-      countdownLockSessionRef,
-      countdownRunTokenRef,
-      countdownTimeoutRef,
-      navigationLockStateBeforeScreenshot,
-      pendingScreenshotType,
-    },
-    screenshotRunActiveRef,
-    screenshotRunGenerationRef,
-  };
-}
-
 function useCancelCountdownOnUnmount(
-  countdownTimeoutRef: { current: ReturnType<typeof setTimeout> | null },
-  countdownLockSessionRef: { current: CountdownLockSession | null },
+  session: ScreenshotControllerSession,
   handleCancelCountdownRef: { current: (() => void) | null }
 ): void {
   useEffect(() => {
     const handleCancelCountdown = handleCancelCountdownRef.current;
     return () => {
-      if (hasActiveCountdownSession(countdownTimeoutRef, countdownLockSessionRef)) {
+      if (hasActiveCountdownSession(session)) {
         handleCancelCountdown?.();
       }
     };
-  }, [countdownLockSessionRef, countdownTimeoutRef, handleCancelCountdownRef]);
+  }, [handleCancelCountdownRef, session]);
 }
 
-function hasActiveCountdownSession(
-  countdownTimeoutRef: { current: ReturnType<typeof setTimeout> | null },
-  countdownLockSessionRef: { current: CountdownLockSession | null }
-) {
-  return Boolean(countdownTimeoutRef.current || countdownLockSessionRef.current);
+function hasActiveCountdownSession(session: ScreenshotControllerSession) {
+  return Boolean(session.countdownTimeout || session.countdownLock);
 }

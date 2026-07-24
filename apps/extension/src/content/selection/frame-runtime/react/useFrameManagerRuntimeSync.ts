@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import type { InteractiveFrameComponent } from '../roots/component';
 import type { useFrameManagerRefs } from './useFrameManagerRefs';
-import type { useFrameMutationActions } from '../mutation-actions';
+import type { FrameMutations } from '../contracts';
 import { useFrameEffectOverlays } from './useFrameEffectOverlays';
 import { useFrameRootsRenderer } from './useFrameRootsRenderer';
 import { useFrameScrollSync } from './useFrameScrollSync';
@@ -27,7 +27,7 @@ interface FrameManagerRuntimeSyncRefs {
 interface FrameManagerRuntimeSyncEffects {
   getOrCreateContainer: () => HTMLDivElement;
   InteractiveFrameComponent: InteractiveFrameComponent;
-  mutations: ReturnType<typeof useFrameMutationActions>;
+  mutations: FrameMutations;
 }
 
 /**

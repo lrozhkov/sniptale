@@ -2,7 +2,7 @@ import { AlignCenter, AlignJustify, AlignLeft, AlignRight } from 'lucide-react';
 import { Bold, Italic, Strikethrough, Underline } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../../../platform/i18n';
-import { FieldResetButton } from '../fields';
+import { FieldResetButton } from '../field-shell';
 import type { PageStyleInspectorActions, PageStyleInspectorViewState } from '../../types';
 import { propertyDefaultValue, propertyModified, propertyValue } from '../../value-editing/values';
 import { hasTextDecorationLine, toggleTextDecorationLine } from './decoration';

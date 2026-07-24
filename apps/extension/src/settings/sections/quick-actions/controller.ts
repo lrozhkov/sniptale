@@ -88,3 +88,5 @@ export function useQuickActionsController() {
     uiState,
   });
 }
+
+export type QuickActionsSectionState = ReturnType<typeof useQuickActionsController>;

@@ -2,15 +2,14 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PreparedSnapshotWarningKind } from '../snapshot';
+import { createLocalHtmlSavePickerOptions, isWritableLocalHtmlPage } from './eligibility';
+import { savePreparedLocalHtml } from './service';
 import {
-  createLocalHtmlSavePickerOptions,
-  isWritableLocalHtmlPage,
   PagePreparationLocalSaveResultKind,
-  savePreparedLocalHtml,
   type LocalHtmlFileSystemAccess,
   type LocalHtmlSaveLocation,
   type WritableLocalHtmlFileHandle,
-} from '.';
+} from './types';
 
 const LOCAL_HTML_LOCATION: LocalHtmlSaveLocation = {
   href: 'file:///Users/test/prepared.html',

@@ -45,7 +45,6 @@ import {
   loadRecentColors,
   pushRecentColor,
 } from './options';
-import { readFileAsDataUrl } from './file-reader';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -75,41 +74,6 @@ it('falls back to stored colors when a pushed color is invalid', async () => {
 
   await expect(pushRecentColor('oops')).resolves.toEqual(['#abcdef']);
   expect(storageMocks.set).not.toHaveBeenCalled();
-});
-
-it('reads files as data urls and surfaces reader errors', async () => {
-  class SuccessFileReader {
-    error: DOMException | null = null;
-    onerror: (() => void) | null = null;
-    onload: (() => void) | null = null;
-    result: string | null = 'data:text/plain;base64,Zm9v';
-
-    readAsDataURL() {
-      this.onload?.();
-    }
-  }
-
-  vi.stubGlobal('FileReader', SuccessFileReader);
-  await expect(readFileAsDataUrl(new File(['foo'], 'demo.txt'))).resolves.toBe(
-    'data:text/plain;base64,Zm9v'
-  );
-
-  class ErrorFileReader {
-    error = new DOMException('failed');
-    onerror: (() => void) | null = null;
-    onload: (() => void) | null = null;
-    result: string | null = null;
-
-    readAsDataURL() {
-      this.onerror?.();
-    }
-  }
-
-  vi.stubGlobal('FileReader', ErrorFileReader);
-  await expect(readFileAsDataUrl(new File(['foo'], 'demo.txt'))).rejects.toBeInstanceOf(
-    DOMException
-  );
-  vi.unstubAllGlobals();
 });
 
 it('returns localized option labels and bounded grid sizes', () => {

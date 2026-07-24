@@ -145,7 +145,6 @@ function collectPolicyStateDescriptorViolationsForFile(
 function shouldSkipPolicyStateDescriptorScan(root, file) {
   return (
     !architectureFileExists(root, file) ||
-    file.startsWith('apps/extension/src/background/application/policy-state/') ||
     file.startsWith('apps/extension/src/background/routing-contracts/policy-state/') ||
     file.startsWith('apps/extension/src/background/routing-contracts/capabilities/policy/')
   );

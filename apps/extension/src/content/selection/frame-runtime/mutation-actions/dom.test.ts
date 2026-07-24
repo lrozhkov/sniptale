@@ -32,7 +32,6 @@ vi.mock('../state/frame-ui.store', () => ({
 
 import { createClearFramesHandler } from './clear';
 import { createRemoveFrameHandler } from './remove';
-import { createUpdateFrameEffectHandler } from './dom';
 
 function createFrame(frameId: string, withStepBadge = false) {
   return createFrameDataFixture(frameId, {
@@ -199,55 +198,7 @@ function verifyClearFramesUnmountsRootsAndOverlays() {
   expect(scenario.isClearingRef.current).toBe(false);
 }
 
-function verifyUpdateFrameEffectPersistsTargetSettings() {
-  let currentFrames = [createFrame('frame-1'), createFrame('frame-2')];
-  const setFrames = vi.fn<React.Dispatch<React.SetStateAction<typeof currentFrames>>>((updater) => {
-    currentFrames = typeof updater === 'function' ? updater(currentFrames) : updater;
-  });
-  const tempFrame = createFrame('temp');
-  if (!tempFrame.blurSettings || !tempFrame.focusSettings) {
-    throw new Error('expected fixture effect settings');
-  }
-  const sessionBlurSettingsRef = { current: tempFrame.blurSettings };
-  const sessionFocusSettingsRef = { current: tempFrame.focusSettings };
-  const globalEffectModeRef = { current: 'border' as const };
-  const targetFrame = currentFrames[1];
-  if (!targetFrame) {
-    throw new Error('expected second frame');
-  }
-  currentFrames[1] = {
-    ...targetFrame,
-    blurSettings: {
-      amount: 32,
-      blurType: 'solid',
-      showBorder: false,
-    },
-    focusSettings: {
-      opacity: 0.8,
-      showBorder: true,
-    },
-  };
-
-  const updateFrameEffect = createUpdateFrameEffectHandler({
-    globalEffectModeRef,
-    sessionBlurSettingsRef,
-    sessionFocusSettingsRef,
-    setFrames,
-  });
-
-  updateFrameEffect('frame-2', 'focus');
-  const updatedFrame = currentFrames[1];
-  if (!updatedFrame) {
-    throw new Error('expected updated frame');
-  }
-
-  expect(globalEffectModeRef.current).toBe('focus');
-  expect(sessionBlurSettingsRef.current).toEqual(updatedFrame.blurSettings);
-  expect(sessionFocusSettingsRef.current).toEqual(updatedFrame.focusSettings);
-  expect(updatedFrame.effectMode).toBe('focus');
-}
-
-describe('frame mutation action dom cleanup', () => {
+describe('frame mutation DOM cleanup', () => {
   it(
     'removes frames, clears linked elements, and recalculates step badges for numbered frames',
     verifyRemoveFrameResetsUiAndRecalculatesBadges
@@ -256,10 +207,5 @@ describe('frame mutation action dom cleanup', () => {
   it(
     'clears the frame runtime by resetting UI state, unmounting roots, and removing overlays',
     verifyClearFramesUnmountsRootsAndOverlays
-  );
-
-  it(
-    'persists target blur and focus settings when changing the active effect mode',
-    verifyUpdateFrameEffectPersistsTargetSettings
   );
 });

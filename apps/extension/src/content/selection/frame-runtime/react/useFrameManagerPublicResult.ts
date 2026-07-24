@@ -1,6 +1,28 @@
 import { useMemo, useRef } from 'react';
-import { buildFrameManagerResult } from '../manager/public-result';
-import type { FrameManagerPublicResultParams } from '../manager/public-result.types';
+import type {
+  FrameData,
+  GlobalStepBadgeSettings,
+  StepBadgeSettings,
+} from '../../../../features/highlighter/contracts';
+import type { FrameMutations, RecalculateStepBadges } from '../contracts';
+
+interface FrameManagerPublicResultParams {
+  addAutoBlurFrames: FrameMutations['addAutoBlurFrames'];
+  addFrame: FrameMutations['addFrame'];
+  clearAutoBlurFrames: FrameMutations['clearAutoBlurFrames'];
+  clearFrames: FrameMutations['clearFrames'];
+  frames: FrameData[];
+  getGlobalStepBadgeSettings: () => GlobalStepBadgeSettings;
+  hasFrameForElement: (element: HTMLElement) => boolean;
+  recalculateStepBadges: RecalculateStepBadges;
+  removeFrame: FrameMutations['removeFrame'];
+  syncAutoBlurFrames: FrameMutations['syncAutoBlurFrames'];
+  syncFocusOpacity: FrameMutations['syncFocusOpacity'];
+  updateFrame: FrameMutations['updateFrame'];
+  updateFrameEffect: FrameMutations['updateFrameEffect'];
+  updateFrameStepBadge: (frameId: string, settings: Partial<StepBadgeSettings>) => void;
+  updateGlobalStepBadgeSettings: (settings: Partial<GlobalStepBadgeSettings>) => void;
+}
 
 export function useFrameManagerPublicResult(params: FrameManagerPublicResultParams) {
   const stableParams = useStablePublicResultParams(params);
@@ -38,4 +60,24 @@ function arePublicResultParamsEqual(
     prev.updateFrameStepBadge === next.updateFrameStepBadge &&
     prev.updateGlobalStepBadgeSettings === next.updateGlobalStepBadgeSettings
   );
+}
+
+function buildFrameManagerResult(params: FrameManagerPublicResultParams) {
+  return {
+    frames: params.frames,
+    addAutoBlurFrames: params.addAutoBlurFrames,
+    addFrame: params.addFrame,
+    clearAutoBlurFrames: params.clearAutoBlurFrames,
+    removeFrame: params.removeFrame,
+    clearFrames: params.clearFrames,
+    syncAutoBlurFrames: params.syncAutoBlurFrames,
+    updateFrame: params.updateFrame,
+    updateFrameEffect: params.updateFrameEffect,
+    syncFocusOpacity: params.syncFocusOpacity,
+    hasFrameForElement: params.hasFrameForElement,
+    updateFrameStepBadge: params.updateFrameStepBadge,
+    updateGlobalStepBadgeSettings: params.updateGlobalStepBadgeSettings,
+    recalculateStepBadges: params.recalculateStepBadges,
+    getGlobalStepBadgeSettings: params.getGlobalStepBadgeSettings,
+  };
 }

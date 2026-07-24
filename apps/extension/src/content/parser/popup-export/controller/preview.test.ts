@@ -4,8 +4,8 @@ import { respondWithPopupPreview } from './preview';
 
 const buildPopupExportPreviewMock = vi.hoisted(() => vi.fn(() => ({ preview: true })));
 
-vi.mock('../helpers', async () => {
-  const actual = await vi.importActual<typeof import('../helpers')>('../helpers/index');
+vi.mock('../helpers/preview', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../helpers/preview')>();
   return {
     ...actual,
     buildPopupExportPreview: buildPopupExportPreviewMock,

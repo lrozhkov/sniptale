@@ -4,6 +4,7 @@ export {
 } from '../../core/qa-steps/definitions.data.mjs';
 
 export const ADVISORY_SCRIPT_IDS = new Set(['qa:advisory']);
+export const STRUCTURAL_AUDIT_SCRIPT_IDS = new Set(['qa:structural-audit']);
 
 export const HARNESS_GUARDRAIL_TOOLS = new Set(['verify-qa-rule-coverage-contract.mjs']);
 

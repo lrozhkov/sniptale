@@ -16,7 +16,11 @@ const mocks = vi.hoisted(() => ({
     fragment.appendChild(overlay);
     return fragment;
   }),
-  createRegionSelectorTooltipMock: vi.fn(() => ({ root: document.createElement('div') })),
+  calculateContentSizeTooltipPositionMock: vi.fn(() => ({ left: 12, top: 24 })),
+  createRegionSelectorTooltipMock: vi.fn(() => ({
+    aspectRatioButton: document.createElement('button'),
+    root: document.createElement('div'),
+  })),
   getRecordingOverlayMetricsMock: vi.fn(() => ({
     cssHeight: 40,
     cssWidth: 30,
@@ -26,23 +30,32 @@ const mocks = vi.hoisted(() => ({
   })),
   getRecordingOverlayRootStyleMock: vi.fn(() => 'recording-style'),
   getRegionSelectorRootStyleMock: vi.fn(() => 'selector-style'),
-  updateRegionDisplayMock: vi.fn(),
+  setContentSizeTooltipPositionMock: vi.fn(),
+  syncContentSizeTooltipValuesMock: vi.fn(),
+  updateOverlayMaskMock: vi.fn(),
 }));
 
-vi.mock('./events', () => ({
+vi.mock('@sniptale/ui/content-size-tooltip/core', () => ({
+  calculateContentSizeTooltipPosition: mocks.calculateContentSizeTooltipPositionMock,
+}));
+
+vi.mock('@sniptale/ui/content-size-tooltip/dom', () => ({
+  setContentSizeTooltipPosition: mocks.setContentSizeTooltipPositionMock,
+  syncContentSizeTooltipValues: mocks.syncContentSizeTooltipValuesMock,
+}));
+
+vi.mock('./events', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./events')>()),
   bindRegionSelectorRootEvents: mocks.bindRegionSelectorRootEventsMock,
 }));
 
-vi.mock('./markup.helpers', () => ({
+vi.mock('./markup', () => ({
   buildRegionSelectorMarkup: mocks.buildRegionSelectorMarkupMock,
+  updateOverlayMask: mocks.updateOverlayMaskMock,
 }));
 
 vi.mock('./recording-overlay.helpers', () => ({
   buildRecordingOverlayNode: mocks.buildRecordingOverlayNodeMock,
-}));
-
-vi.mock('./runtime', () => ({
-  updateRegionDisplay: mocks.updateRegionDisplayMock,
 }));
 
 vi.mock('./tooltip', () => ({
@@ -159,6 +172,7 @@ it('shows region selectors once and renders the surface with tooltip wiring', ()
   expect(mocks.applyRegionSelectorThemeMock).toHaveBeenCalledOnce();
   expect(mocks.createRegionSelectorTooltipMock).toHaveBeenCalledOnce();
   expect(mocks.bindRegionSelectorRootEventsMock).toHaveBeenCalledOnce();
-  expect(mocks.updateRegionDisplayMock).toHaveBeenCalledOnce();
+  expect(mocks.updateOverlayMaskMock).toHaveBeenCalledOnce();
+  expect(mocks.syncContentSizeTooltipValuesMock).toHaveBeenCalledOnce();
   expect(bindDocumentEvents).toHaveBeenCalledOnce();
 });

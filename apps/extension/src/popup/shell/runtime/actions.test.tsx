@@ -5,10 +5,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
+import { getTabCapabilities } from '../../../features/tab-capabilities/capabilities';
 import type { StoragePressureLevel } from '../../../features/media-hub/storage-capacity';
 import type { MicrophoneOption } from '../../recording/microphone';
 import type { WebcamOption } from '../../recording/webcam';
-import { usePopupRuntimeActions } from './effects';
+import { usePopupRuntimeActions } from './actions';
 
 const {
   browserTabsQueryMock,
@@ -59,6 +60,8 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let latestActions: ReturnType<typeof usePopupRuntimeActions> | null = null;
 let setActiveTabCapabilitiesSpy: ReturnType<typeof vi.fn>;
+let microphoneDevices: MicrophoneOption[] = [];
+let webcamDevices: WebcamOption[] = [];
 
 let setActiveTabCapabilitiesMock: Dispatch<SetStateAction<ActiveTabCapabilities>>;
 let setGalleryStatusMock: Dispatch<
@@ -75,8 +78,8 @@ function createDispatchMock<T>() {
 
 function ActionsHarness() {
   latestActions = usePopupRuntimeActions({
-    microphoneDevices: [],
-    webcamDevices: [],
+    microphoneDevices,
+    webcamDevices,
     setActiveTabCapabilities: setActiveTabCapabilitiesMock,
     setGalleryStatus: setGalleryStatusMock,
     setIsLoadingMicrophones: setIsLoadingMicrophonesMock,
@@ -103,6 +106,8 @@ async function renderHarness() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   latestActions = null;
+  microphoneDevices = [];
+  webcamDevices = [];
   setActiveTabCapabilitiesMock = createDispatchMock<ActiveTabCapabilities>();
   setGalleryStatusMock = createDispatchMock<{
     text: string;
@@ -162,5 +167,64 @@ describe('usePopupRuntimeActions', () => {
       'Failed to resolve active tab capabilities',
       expect.any(Error)
     );
+    expect(setActiveTabCapabilitiesSpy).toHaveBeenCalledWith(getTabCapabilities(null));
+  });
+
+  it('refreshes devices from the latest rerendered lists', async () => {
+    microphoneDevices = [{ deviceId: 'microphone-1', label: 'Microphone 1' }];
+    webcamDevices = [{ deviceId: 'webcam-1', label: 'Webcam 1' }];
+    await renderHarness();
+
+    await act(async () => {
+      await latestActions?.refreshMicrophones();
+      await latestActions?.refreshWebcams();
+    });
+
+    expect(refreshMicrophoneDevicesMock).toHaveBeenLastCalledWith(
+      setIsLoadingMicrophonesMock,
+      setMicrophoneDevicesMock,
+      microphoneDevices,
+      undefined
+    );
+    expect(refreshWebcamDevicesMock).toHaveBeenLastCalledWith(
+      setIsLoadingWebcamsMock,
+      setWebcamDevicesMock,
+      webcamDevices,
+      undefined
+    );
+
+    const nextMicrophones = [{ deviceId: 'microphone-2', label: 'Microphone 2' }];
+    const nextWebcams = [{ deviceId: 'webcam-2', label: 'Webcam 2' }];
+    microphoneDevices = nextMicrophones;
+    webcamDevices = nextWebcams;
+    await renderHarness();
+
+    await act(async () => {
+      await latestActions?.refreshMicrophones();
+      await latestActions?.refreshWebcams();
+    });
+
+    expect(refreshMicrophoneDevicesMock).toHaveBeenLastCalledWith(
+      setIsLoadingMicrophonesMock,
+      setMicrophoneDevicesMock,
+      nextMicrophones,
+      undefined
+    );
+    expect(refreshWebcamDevicesMock).toHaveBeenLastCalledWith(
+      setIsLoadingWebcamsMock,
+      setWebcamDevicesMock,
+      nextWebcams,
+      undefined
+    );
+  });
+
+  it('preserves the gallery status updater as a runtime refresh action', async () => {
+    const refreshGalleryStatus = vi.fn();
+    useGalleryStatusUpdaterMock.mockReturnValue(refreshGalleryStatus);
+
+    await renderHarness();
+
+    expect(useGalleryStatusUpdaterMock).toHaveBeenCalledWith(setGalleryStatusMock);
+    expect(latestActions?.refreshGalleryStatus).toBe(refreshGalleryStatus);
   });
 });

@@ -3,7 +3,7 @@ import { usePageLocaleMetadata } from '../../../platform/i18n';
 import { useCommandPaletteHotkey } from '../../../ui/command-palette/hotkey';
 import { GalleryCommandPalette } from '../command-palette';
 import { useGalleryAppActions } from '../../library/actions/useGalleryAppActions';
-import type { GalleryViewMode } from '../app/types';
+import type { GalleryViewMode } from '../../state/types';
 import { GalleryAppBindings } from './bindings';
 import { useGalleryAppState } from '../../state';
 

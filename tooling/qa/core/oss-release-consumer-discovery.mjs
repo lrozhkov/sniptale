@@ -22,7 +22,9 @@ const TEXT_FILE_EXTENSIONS = new Set([
 const TEST_FILE_PATTERN = /(?:^|\/)[^/]+\.(?:test|spec)(?:-support)?\.[cm]?[jt]sx?$/u;
 const SELF_PATHS = new Set([
   OSS_RELEASE_CONSUMER_MANIFEST_PATH,
+  'tooling/configs/qa/control-dispositions.data.json',
   'tooling/configs/qa/oss-release.data.json',
+  'tooling/configs/qa/technical-debt.data.json',
   'tooling/qa/core/oss-release-consumer-discovery.mjs',
   'tooling/qa/core/oss-release-inventory.mjs',
   'tooling/qa/core/oss-release-validation.docs.mjs',

@@ -1,6 +1,6 @@
 const FULL_DIFF_SCOPED_TOOLS = new Set([
   'verify-line-length.mjs',
-  'verify-hotspot-regression.mjs',
+  'verify-structural-risk.mjs',
   'verify-instance-ownership.mjs',
   'verify-read-path-side-effects.mjs',
   'verify-read-safe-naming.mjs',
@@ -24,11 +24,11 @@ function collectCoverageState(
   focusedWrapperTools,
   triggerTools
 ) {
-  if (entryKind === 'advisory') {
+  if (entryKind === 'advisory' || entryKind === 'report-only') {
     return {
       fullScope: null,
       focusedScope: null,
-      manualOnly: false,
+      manualOnly: entryKind === 'report-only',
     };
   }
 

@@ -1,10 +1,12 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { storeHelperFns } from './store.helpers';
 import {
-  createHistoryStoreInternals,
+  applyHistoryEntry,
+  createHistoryStoreState,
+  publishHistoryState,
+  readHistoryState,
   type HistoryListener,
-  type HistoryStoreInternals,
-} from './store.internals';
+  type HistoryStoreRuntimeState,
+} from './store-state';
 import { createHistoryStoreCommitApi } from './transactions';
 import type { PagePreparationHistoryBridge, PagePreparationHistoryState } from './types';
 
@@ -16,17 +18,17 @@ export function addPagePreparationHistoryAppliedListener(listener: () => void): 
   return () => window.removeEventListener(HISTORY_APPLIED_EVENT, listener);
 }
 
-function createHistoryStoreMutationApi(state: HistoryStoreInternals) {
+function createHistoryStoreMutationApi(state: HistoryStoreRuntimeState) {
   return {
     ...createHistoryStoreStateApi(state),
     ...createHistoryStoreCommitApi(state),
   };
 }
 
-function createHistoryStoreStateApi(state: HistoryStoreInternals) {
+function createHistoryStoreStateApi(state: HistoryStoreRuntimeState) {
   return {
     getState(): PagePreparationHistoryState {
-      return storeHelperFns.getHistoryState(state);
+      return readHistoryState(state);
     },
     hasOpenTransactions(): boolean {
       return state.transactions.size > 0;
@@ -37,7 +39,7 @@ function createHistoryStoreStateApi(state: HistoryStoreInternals) {
   };
 }
 
-function createHistoryStoreNavigationApi(state: HistoryStoreInternals) {
+function createHistoryStoreNavigationApi(state: HistoryStoreRuntimeState) {
   return {
     redo(): void {
       const previousPast = state.past;
@@ -49,13 +51,13 @@ function createHistoryStoreNavigationApi(state: HistoryStoreInternals) {
 
       state.future = previousFuture.slice(1);
       state.past = [...previousPast, next];
-      if (!storeHelperFns.applyEntry('redo', HISTORY_APPLIED_EVENT, next, state)) {
+      if (!applyHistoryEntry('redo', HISTORY_APPLIED_EVENT, next, state)) {
         state.future = previousFuture;
         state.past = previousPast;
         return;
       }
 
-      storeHelperFns.publishState(state);
+      publishHistoryState(state);
     },
     undo(): void {
       const previousPast = state.past;
@@ -67,18 +69,18 @@ function createHistoryStoreNavigationApi(state: HistoryStoreInternals) {
 
       state.past = previousPast.slice(0, -1);
       state.future = [next, ...previousFuture];
-      if (!storeHelperFns.applyEntry('undo', HISTORY_APPLIED_EVENT, next, state)) {
+      if (!applyHistoryEntry('undo', HISTORY_APPLIED_EVENT, next, state)) {
         state.past = previousPast;
         state.future = previousFuture;
         return;
       }
 
-      storeHelperFns.publishState(state);
+      publishHistoryState(state);
     },
   };
 }
 
-function createHistoryStoreSubscriptionApi(state: HistoryStoreInternals) {
+function createHistoryStoreSubscriptionApi(state: HistoryStoreRuntimeState) {
   return {
     addPagePreparationHistoryAppliedListener,
     registerBridge(nextBridge: PagePreparationHistoryBridge): void {
@@ -102,7 +104,7 @@ function createHistoryStoreSubscriptionApi(state: HistoryStoreInternals) {
 }
 
 export function createPagePreparationHistoryStore() {
-  const state = createHistoryStoreInternals();
+  const state = createHistoryStoreState();
 
   return {
     ...createHistoryStoreMutationApi(state),

@@ -3,7 +3,11 @@ import { collectFullVerifyStepResults } from '../core/verify-all.execution.mjs';
 import { resolveFullVerifyScope } from '../core/verify-all.scope.mjs';
 import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
 import { assertFreshHarnessState } from '../core/verify-harness.state.helpers.mjs';
-import { ALL_QA_SUITE, createScopedQaContext, hasHarnessQaTargets } from '../core/qa-scope.mjs';
+import {
+  ALL_QA_SUITE,
+  createScopedQaContext,
+  hasHarnessVerificationQaTargets,
+} from '../core/qa-scope.mjs';
 import { runObservedWrapper } from './observed/runner.mjs';
 
 export async function runReleaseWrapper({
@@ -13,7 +17,7 @@ export async function runReleaseWrapper({
   fullVerifyCollector = collectFullVerifyStepResults,
 } = {}) {
   const currentContext = createScopedQaContext(contextCollector(), { suite: ALL_QA_SUITE });
-  if (hasHarnessQaTargets(currentContext)) {
+  if (hasHarnessVerificationQaTargets(currentContext)) {
     harnessStateAsserter(currentContext, 'qa:release');
   }
 

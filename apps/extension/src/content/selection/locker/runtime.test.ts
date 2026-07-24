@@ -56,9 +56,10 @@ function createWindowListenerFactory(listeners: ReturnType<typeof createListener
 
 function createLockerDeps(classList: ReturnType<typeof createClassListHarness>, doc: Document) {
   const listeners = createListenerHarness();
+  const addEventListenerToAllWindowsDynamic = createWindowListenerFactory(listeners);
 
   const deps: NavigationLockerDeps = {
-    addEventListenerToAllWindowsDynamic: createWindowListenerFactory(listeners),
+    addEventListenerToAllWindowsDynamic,
     addSelectStartListener: listeners.addSelectStartListener,
     logger: listeners.logger,
     removeNavigationLockOverlay: listeners.removeNavigationLockOverlay,
@@ -74,7 +75,7 @@ function createLockerDeps(classList: ReturnType<typeof createClassListHarness>, 
     },
   };
 
-  return { deps, listeners };
+  return { addEventListenerToAllWindowsDynamic, deps, listeners };
 }
 
 function createLockerHarness() {
@@ -84,9 +85,10 @@ function createLockerHarness() {
     body: { classList } as unknown as HTMLBodyElement,
     removeEventListener: vi.fn(),
   } as unknown as Document;
-  const { deps, listeners } = createLockerDeps(classList, doc);
+  const { addEventListenerToAllWindowsDynamic, deps, listeners } = createLockerDeps(classList, doc);
 
   return {
+    addEventListenerToAllWindowsDynamic,
     deps,
     doc,
     locker: createNavigationLocker(deps),
@@ -126,6 +128,32 @@ function shouldCleanUpRuntimeListenersWhenDisabled(): void {
   expect(harness.listeners.keydownCleanup).toHaveBeenCalledOnce();
   expect(harness.listeners.unsubscribeBeforeUnload).toHaveBeenCalledOnce();
   expect(harness.listeners.removeNavigationLockOverlay).toHaveBeenCalledOnce();
+}
+
+function shouldPreserveSurfaceListenerAndCleanupOrdering(): void {
+  const harness = createLockerHarness();
+
+  harness.locker.enableNavigationLock();
+
+  const enabledSurfaceOrder =
+    harness.listeners.syncNavigationLockOverlay.mock.invocationCallOrder[0]!;
+  const listenerOrder = harness.addEventListenerToAllWindowsDynamic.mock.invocationCallOrder[0]!;
+  const beforeUnloadOrder = harness.listeners.subscribeBeforeUnload.mock.invocationCallOrder[0]!;
+  expect(enabledSurfaceOrder).toBeLessThan(listenerOrder);
+  expect(listenerOrder).toBeLessThan(beforeUnloadOrder);
+
+  harness.locker.disableNavigationLock();
+
+  const disabledSurfaceOrder =
+    harness.listeners.syncNavigationLockOverlay.mock.invocationCallOrder[1]!;
+  const listenerCleanupOrder = harness.listeners.pointerCleanup.mock.invocationCallOrder[0]!;
+  const beforeUnloadCleanupOrder =
+    harness.listeners.unsubscribeBeforeUnload.mock.invocationCallOrder[0]!;
+  const overlayCleanupOrder =
+    harness.listeners.removeNavigationLockOverlay.mock.invocationCallOrder[0]!;
+  expect(disabledSurfaceOrder).toBeLessThan(listenerCleanupOrder);
+  expect(listenerCleanupOrder).toBeLessThan(beforeUnloadCleanupOrder);
+  expect(beforeUnloadCleanupOrder).toBeLessThan(overlayCleanupOrder);
 }
 
 function shouldToggleTextSelectionBlockingThroughDomBridge(): void {
@@ -209,6 +237,10 @@ describe('createNavigationLocker', () => {
   it(
     'cleans up all runtime listeners and removes the overlay when disabled',
     shouldCleanUpRuntimeListenersWhenDisabled
+  );
+  it(
+    'preserves surface, listener, before-unload, and overlay cleanup ordering',
+    shouldPreserveSurfaceListenerAndCleanupOrdering
   );
   it(
     'toggles text-selection blocking through the injected DOM bridge',

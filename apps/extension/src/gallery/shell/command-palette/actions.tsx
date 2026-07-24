@@ -20,8 +20,8 @@ import {
   getCommandPaletteDisabledContextReason,
 } from '../../../ui/command-palette/action-builders';
 import type { CommandPaletteAction } from '../../../ui/command-palette/types';
-import { SIDEBAR_FOLDERS } from '../app/constants';
-import type { GalleryCommandPaletteController, SortMode } from '../app/types';
+import { SIDEBAR_FOLDERS } from '../../library/constants';
+import type { GalleryCommandPaletteController, SortMode } from '../../state/types';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
 import { FOLDER_LABELS, getKindIcon } from '../../library/ui';
 

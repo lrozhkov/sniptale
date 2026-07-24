@@ -208,6 +208,83 @@ function verifyInterleavedDeferredCommitUndoRedoTimeline() {
   expect(bridge.getCurrentSnapshot().frames[0]?.id).toBe('frame-d');
 }
 
+function verifyHostElementAttributesAreRestored() {
+  const bridge = createSnapshotBridge();
+  const target = document.createElement('div');
+  target.id = 'history-attributes-target';
+  target.className = 'before';
+  target.setAttribute('title', 'Before');
+  target.textContent = 'before';
+  document.body.append(target);
+
+  bridge.store.beginTransaction('attribute-batch');
+  const beforeStates = captureDomStateMap([target]);
+
+  target.className = 'after';
+  target.setAttribute('title', 'After');
+  target.textContent = 'after';
+  bridge.setCurrentSnapshot(createSnapshot('b'));
+  bridge.store.commitTransaction('attribute-batch', createDomMutationBatch([target], beforeStates));
+
+  bridge.store.undo();
+  expect(target.className).toBe('before');
+  expect(target.getAttribute('title')).toBe('Before');
+
+  bridge.store.redo();
+  expect(target.className).toBe('after');
+  expect(target.getAttribute('title')).toBe('After');
+}
+
+function verifyUndoRollbackOnSnapshotFailure() {
+  const bridge = createSnapshotBridge();
+  const target = document.createElement('div');
+  target.id = 'history-rollback-target';
+  target.textContent = 'before';
+  document.body.append(target);
+
+  bridge.store.beginTransaction('rollback-batch');
+  const beforeStates = captureDomStateMap([target]);
+
+  target.textContent = 'after';
+  bridge.setCurrentSnapshot(createSnapshot('b'));
+  bridge.store.commitTransaction('rollback-batch', createDomMutationBatch([target], beforeStates));
+
+  bridge.store.registerBridge({
+    applySnapshot: () => {
+      throw new Error('bridge failed');
+    },
+    captureSnapshot: () => cloneSnapshot(bridge.getCurrentSnapshot()),
+  });
+
+  bridge.store.undo();
+
+  expect(target.textContent).toBe('after');
+  expect(bridge.store.getState()).toMatchObject({ canRedo: false, canUndo: true });
+}
+
+function verifyUndoSkipsMissingDomTargets() {
+  const bridge = createSnapshotBridge();
+  const target = document.createElement('div');
+  target.id = 'history-missing-target';
+  target.textContent = 'before';
+  document.body.append(target);
+
+  bridge.store.beginTransaction('missing-target-batch');
+  const beforeStates = captureDomStateMap([target]);
+
+  target.textContent = 'after';
+  bridge.setCurrentSnapshot(createSnapshot('b'));
+  bridge.store.commitTransaction(
+    'missing-target-batch',
+    createDomMutationBatch([target], beforeStates)
+  );
+
+  target.remove();
+  bridge.store.undo();
+
+  expect(bridge.store.getState()).toMatchObject({ canRedo: false, canUndo: true });
+}
+
 describe('pagePreparationHistory store', () => {
   it('tracks commit, undo, redo, and clears redo after a new branch', verifyCommitUndoRedoOrder);
   it('does not record nested commits while an undo or redo apply is in progress', verifyApplyGuard);
@@ -226,5 +303,17 @@ describe('pagePreparationHistory store', () => {
   it(
     'replays deferred commits and transaction entries in a stable undo redo timeline',
     verifyInterleavedDeferredCommitUndoRedoTimeline
+  );
+  it(
+    'restores host element attributes during grouped DOM history replay',
+    verifyHostElementAttributesAreRestored
+  );
+  it(
+    'rolls back DOM history changes when snapshot restoration fails',
+    verifyUndoRollbackOnSnapshotFailure
+  );
+  it(
+    'keeps undo state stable when DOM history targets are missing',
+    verifyUndoSkipsMissingDomTargets
   );
 });

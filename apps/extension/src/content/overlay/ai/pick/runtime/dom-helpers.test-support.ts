@@ -2,8 +2,8 @@
 
 import { expect } from 'vitest';
 import type { FieldNode, ParsedDOMTree, TableNode } from '@sniptale/runtime-contracts/dom-tree';
-import type { buildElementMaps } from './dom-helpers';
-import { getDataCount, getDataIdsForElement, getElementCount } from './dom-helpers';
+import type { buildElementMaps } from './dom-registration';
+import { getDataCount, getDataIdsForElement, getElementCount } from './dom-lookup';
 
 export function createIframeTarget() {
   const iframe = document.createElement('iframe');

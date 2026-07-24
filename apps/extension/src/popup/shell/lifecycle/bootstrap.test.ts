@@ -20,7 +20,7 @@ vi.mock('../bootstrap', (_importOriginal) => ({
   bootstrapPopupState: mocks.bootstrapPopupStateMock,
 }));
 
-import { bootstrapPopupLifecycle } from './bootstrap/run';
+import { bootstrapPopupLifecycle } from './bootstrap-workflow';
 
 function createParams() {
   return {
@@ -64,6 +64,7 @@ function createBootstrapState() {
     quickActions: [{ id: 'copy', enabled: true, type: 'copy-to-clipboard' as const }],
     quickActionsMode: 'grid' as const,
     recordingControlCapability: null,
+    recordingStatusError: 'recording state unavailable',
     recordingState: { status: 'idle' } as const,
     selectedPresetId: 'preset-1',
     videoSettings: { microphoneId: 'mic-1' },
@@ -92,7 +93,9 @@ function expectBootstrappedStateApplied(
     state.recordingControlCapability
   );
   expect(params.setRecordingState).toHaveBeenCalledWith(state.recordingState);
+  expect(params.setStartError).toHaveBeenCalledWith(state.recordingStatusError);
   expect(params.setMicrophoneDevices).toHaveBeenCalledWith(state.microphones);
+  expect(params.setWebcamDevices).toHaveBeenCalledWith(state.webcams);
   expect(params.setIsReady).toHaveBeenCalledWith(true);
   expect(params.refreshActiveTabCapabilities).toHaveBeenCalledTimes(1);
   expect(params.refreshGalleryStatus).toHaveBeenCalledTimes(1);
@@ -131,6 +134,20 @@ it('surfaces bootstrap failures through popup error state', async () => {
   expect(params.setIsReady).toHaveBeenCalledWith(true);
 });
 
+it('logs but does not surface a bootstrap failure after cancellation', async () => {
+  const params = createParams();
+  mocks.bootstrapPopupStateMock.mockRejectedValue(new Error('boom'));
+
+  await bootstrapPopupLifecycle({
+    cancelledRef: () => true,
+    getParams: () => params,
+  });
+
+  expect(mocks.errorMock).toHaveBeenCalledWith('Failed to bootstrap popup', expect.any(Error));
+  expect(params.setStartError).not.toHaveBeenCalled();
+  expect(params.setIsReady).not.toHaveBeenCalled();
+});
+
 it('logs secondary refresh failures without blocking ready state', async () => {
   const params = createParams();
   const state = createBootstrapState();
@@ -146,10 +163,29 @@ it('logs secondary refresh failures without blocking ready state', async () => {
 
   expect(params.setViewportPresets).toHaveBeenCalledWith(state.viewportPresets);
   expect(params.setIsReady).toHaveBeenCalledWith(true);
+  expect(params.refreshActiveTabCapabilities).toHaveBeenCalledTimes(1);
+  expect(params.refreshGalleryStatus).toHaveBeenCalledTimes(1);
   expect(mocks.errorMock).toHaveBeenCalledWith(
     'Failed to refresh popup secondary state',
     expect.any(Error)
   );
+});
+
+it('skips secondary refresh and readiness when cancelled after state application', async () => {
+  const params = createParams();
+  const state = createBootstrapState();
+  const cancelledRef = vi.fn().mockReturnValueOnce(false).mockReturnValue(true);
+  mocks.bootstrapPopupStateMock.mockResolvedValue(state);
+
+  await bootstrapPopupLifecycle({
+    cancelledRef,
+    getParams: () => params,
+  });
+
+  expect(params.setViewportPresets).toHaveBeenCalledWith(state.viewportPresets);
+  expect(params.refreshActiveTabCapabilities).not.toHaveBeenCalled();
+  expect(params.refreshGalleryStatus).not.toHaveBeenCalled();
+  expect(params.setIsReady).not.toHaveBeenCalled();
 });
 
 it('waits for secondary refresh before marking the popup ready', async () => {

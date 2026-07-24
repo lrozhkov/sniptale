@@ -1,33 +1,46 @@
 import type {
   ExportOptions,
-  ExportProgress,
   ExportResult,
   PopupExportResult,
 } from '@sniptale/runtime-contracts/export';
 import type { ContentPrivilegedActionIntentSource } from '../../../../platform/privileged-action-intent/client';
+import { translate } from '../../../../../platform/i18n';
 import { resetPopupExportState } from '../state';
-import type { PopupExportState } from '../types';
-import { createPopupExportFailureResult } from './failure';
-import { createPopupExportResult } from './result';
+import type { PopupExportRequestHandlerRuntime, PopupExportRunner } from '../types';
 
-type PopupExportRunner = {
-  export: (
-    options: ExportOptions,
-    context?: { contentIntentSource?: ContentPrivilegedActionIntentSource | undefined }
-  ) => Promise<ExportResult>;
-  onProgress: (callback: (progress: ExportProgress) => void) => void;
-};
-
-type PopupExportPersistArchive = (result: ExportResult) => Promise<string[]>;
-
-export type PopupExportStartSettlementProps = {
+type PopupExportStartSettlementProps = Pick<
+  PopupExportRequestHandlerRuntime,
+  'persistArchive' | 'state'
+> & {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
-  exportRunner: PopupExportRunner;
+  exportRunner: Pick<PopupExportRunner, 'export'>;
   options: ExportOptions;
-  persistArchive: PopupExportPersistArchive;
   requestId: string;
-  state: PopupExportState;
 };
+
+function createPopupExportFailureResult(error: unknown): PopupExportResult {
+  return {
+    success: false,
+    errors: [error instanceof Error ? error.message : translate('content.runtime.exportFailed')],
+    stats: {
+      sectionsCount: 0,
+      rowsCount: 0,
+      filesCount: 0,
+      filesFailed: 0,
+    },
+  };
+}
+
+function createPopupExportResult(result: ExportResult, persistErrors: string[]): PopupExportResult {
+  const errors = [...result.errors, ...persistErrors];
+
+  return {
+    success: result.success && errors.length === 0,
+    errors,
+    stats: result.stats,
+    ...(result.filename === undefined ? {} : { filename: result.filename }),
+  };
+}
 
 export async function settlePopupExportStartFlow(
   props: PopupExportStartSettlementProps

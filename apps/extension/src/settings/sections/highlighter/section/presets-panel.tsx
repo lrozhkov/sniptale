@@ -14,9 +14,9 @@ import {
   SettingsDragHandle,
   SettingsSwitch,
 } from '../../../section-surface/panel-controls';
-import type { HighlighterSectionContentProps } from './types';
+import type { HighlighterPresetsProps } from './types';
 
-type BorderPresetItem = HighlighterSectionContentProps['settings']['borderPresets'][number];
+type BorderPresetItem = HighlighterPresetsProps['settings']['borderPresets'][number];
 type HighlighterPresetRowState = {
   isDefault: boolean;
   isDragOver: boolean;
@@ -63,13 +63,13 @@ function MakeDefaultPresetButton(props: { disabled: boolean; onClick: () => void
 function HighlighterPresetActions({
   isDefault,
   preset,
-  state,
+  presets,
 }: {
   isDefault: boolean;
   preset: BorderPresetItem;
-  state: HighlighterSectionContentProps['state'];
+  presets: HighlighterPresetsProps['presets'];
 }) {
-  const isVisible = state.hoveredPresetId === preset.id;
+  const isVisible = presets.hoveredPresetId === preset.id;
   const { deleteTitle, editTitle } = getHighlighterPresetActionTitles(preset.isSystemDefault);
 
   return (
@@ -77,17 +77,17 @@ function HighlighterPresetActions({
       <SettingsSwitch
         checked={preset.enabled !== false}
         size="sm"
-        onClick={() => void state.handleTogglePresetEnabled(preset.id)}
+        onClick={() => void presets.handleTogglePresetEnabled(preset.id)}
         title={getHighlighterPresetSwitchTitle(preset.enabled)}
       />
       {!isDefault ? (
         <MakeDefaultPresetButton
           disabled={preset.enabled === false}
-          onClick={() => state.handleSetDefaultPreset(preset.id)}
+          onClick={() => presets.handleSetDefaultPreset(preset.id)}
         />
       ) : null}
       <button
-        onClick={() => state.handleEditPreset(preset)}
+        onClick={() => presets.handleEditPreset(preset)}
         disabled={preset.isSystemDefault}
         className={settingsInfoIconButtonClassName}
         title={editTitle}
@@ -95,7 +95,7 @@ function HighlighterPresetActions({
         <Pencil size={14} />
       </button>
       <button
-        onClick={() => state.handleDeletePreset(preset)}
+        onClick={() => presets.handleDeletePreset(preset)}
         disabled={preset.isSystemDefault}
         className={settingsDangerIconButtonClassName}
         title={deleteTitle}
@@ -121,13 +121,13 @@ function getHighlighterPresetActionTitles(isSystemDefault: boolean | undefined) 
 
 function getHighlighterPresetRowState(
   preset: BorderPresetItem,
-  props: HighlighterSectionContentProps
+  props: HighlighterPresetsProps
 ): HighlighterPresetRowState {
   return {
     isDefault: props.settings.defaultBorderPresetId === preset.id,
-    isDragOver: props.state.dragOverId === preset.id,
-    isDragging: props.state.draggedId === preset.id,
-    isHovered: props.state.hoveredPresetId === preset.id,
+    isDragOver: props.presets.dragOverId === preset.id,
+    isDragging: props.presets.draggedId === preset.id,
+    isHovered: props.presets.hoveredPresetId === preset.id,
   };
 }
 
@@ -163,21 +163,21 @@ function AddHighlighterPresetButton(props: { onClick: () => void }) {
 function HighlighterPresetRow({
   preset,
   settings,
-  state,
-}: HighlighterSectionContentProps & { preset: BorderPresetItem }) {
-  const rowState = getHighlighterPresetRowState(preset, { settings, state });
+  presets,
+}: HighlighterPresetsProps & { preset: BorderPresetItem }) {
+  const rowState = getHighlighterPresetRowState(preset, { presets, settings });
   const rowClassName = getHighlighterPresetRowClassName(rowState);
 
   return (
     <div
       draggable={true}
-      onDragStart={(e) => state.handleDragStart(e, preset.id)}
-      onDragOver={(e) => state.handleDragOver(e, preset.id)}
-      onDragLeave={state.handleDragLeave}
-      onDrop={(e) => state.handleDrop(e, preset.id)}
-      onDragEnd={state.handleDragEnd}
-      onMouseEnter={() => state.setHoveredPresetId(preset.id)}
-      onMouseLeave={() => state.setHoveredPresetId(null)}
+      onDragStart={(e) => presets.handleDragStart(e, preset.id)}
+      onDragOver={(e) => presets.handleDragOver(e, preset.id)}
+      onDragLeave={presets.handleDragLeave}
+      onDrop={(e) => presets.handleDrop(e, preset.id)}
+      onDragEnd={presets.handleDragEnd}
+      onMouseEnter={() => presets.handlePresetHoverChange(preset.id)}
+      onMouseLeave={() => presets.handlePresetHoverChange(null)}
       className={rowClassName}
     >
       <div className="flex w-full min-w-0 items-start gap-3">
@@ -191,13 +191,17 @@ function HighlighterPresetRow({
             <HighlighterPresetBadge tone="neutral" copyKey="highlighter.section.systemBadge" />
           ) : null}
         </div>
-        <HighlighterPresetActions isDefault={rowState.isDefault} preset={preset} state={state} />
+        <HighlighterPresetActions
+          isDefault={rowState.isDefault}
+          preset={preset}
+          presets={presets}
+        />
       </div>
     </div>
   );
 }
 
-export function HighlighterPresetsPanel({ settings, state }: HighlighterSectionContentProps) {
+export function HighlighterPresetsPanel({ presets, settings }: HighlighterPresetsProps) {
   return (
     <div className="mb-8">
       <div className="mb-4 flex items-center justify-between">
@@ -212,11 +216,16 @@ export function HighlighterPresetsPanel({ settings, state }: HighlighterSectionC
 
       <div className="mb-4 space-y-2">
         {settings.borderPresets.map((preset) => (
-          <HighlighterPresetRow key={preset.id} preset={preset} settings={settings} state={state} />
+          <HighlighterPresetRow
+            key={preset.id}
+            preset={preset}
+            presets={presets}
+            settings={settings}
+          />
         ))}
       </div>
 
-      <AddHighlighterPresetButton onClick={state.handleAddPreset} />
+      <AddHighlighterPresetButton onClick={presets.handleAddPreset} />
     </div>
   );
 }

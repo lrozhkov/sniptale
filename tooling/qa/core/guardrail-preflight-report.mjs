@@ -4,13 +4,11 @@ import {
   collectOwnerLocalProofHints,
   collectThinShellHints,
 } from './guardrail-seam-hints.mjs';
-import { collectResidualSeamHints } from './guardrail-seam-residuals.mjs';
 import { collectTopologyPreflightQuestions } from './guardrail-topology-questions.mjs';
 import {
   collectCapabilityLossHints,
   collectDeterministicProofHints,
   collectRiskChecklistHints,
-  collectTestShapeHints,
   collectVisualProofHints,
 } from './product-proof-risk-hints.mjs';
 import {
@@ -25,10 +23,11 @@ export function collectFocusedGuardrailReport({
   codeFiles = [],
   addedFiles = [],
   untrackedFiles = [],
+  buildScopeContext = { targetFiles, codeFiles, addedFiles },
+  buildScopeOptions = {},
 } = {}) {
-  const buildScopeForecast = collectBuildScopeForecast({ targetFiles, codeFiles, addedFiles });
+  const buildScopeForecast = collectBuildScopeForecast(buildScopeContext, buildScopeOptions);
   const clusters = summarizeClusterKeys(targetFiles);
-  const residualSeams = collectResidualSeamHints(codeFiles);
   const deletedInternalAggregates = collectDeletedInternalAggregateHints({
     targetFiles,
     codeFiles,
@@ -43,17 +42,14 @@ export function collectFocusedGuardrailReport({
       targetFiles,
       codeFiles,
       clusters,
-      residualSeams,
       thinShells,
       falsePublicSeams,
       pathAudits,
     }),
-    residualSeams,
     hints: [
       ...collectRiskChecklistHints({ targetFiles, codeFiles, untrackedFiles }),
       ...collectVisualProofHints({ codeFiles }),
       ...collectCapabilityLossHints({ targetFiles, codeFiles }),
-      ...collectTestShapeHints({ targetFiles }),
       ...collectDeterministicProofHints({ codeFiles }),
       ...collectCoverageSensitiveHints(codeFiles),
       ...collectScopeHints(targetFiles, codeFiles),
@@ -64,7 +60,6 @@ export function collectFocusedGuardrailReport({
     falsePublicSeams,
     pathAudits,
     buildScopeForecast: buildScopeForecast.details,
-    buildScopeBudgetRisks: buildScopeForecast.budgetRisks,
   };
 }
 
@@ -79,7 +74,6 @@ function printAdvisoryLine(label, details = []) {
 export function printFocusedGuardrailReport(report) {
   printAdvisoryLine('Seam clusters', report.clusters);
   printAdvisoryLine('Topology first questions', report.topologyQuestions);
-  printAdvisoryLine('Residual seams', report.residualSeams);
   printAdvisoryLine('Preflight hints', report.hints);
   printAdvisoryLine('Deleted internal aggregates', report.deletedInternalAggregates);
   printAdvisoryLine('Thin shell hints', report.thinShells);
@@ -87,5 +81,4 @@ export function printFocusedGuardrailReport(report) {
   printAdvisoryLine('False public seams', report.falsePublicSeams);
   printAdvisoryLine('Path-sensitive audits', report.pathAudits);
   printAdvisoryLine('Build scope forecast', report.buildScopeForecast);
-  printAdvisoryLine('Build scope budget', report.buildScopeBudgetRisks);
 }

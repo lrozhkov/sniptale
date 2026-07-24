@@ -159,8 +159,12 @@ it('opens editor, saves presets, and deletes non-system presets', async () => {
   expect(state.isEditorOpen).toBe(true);
   expect(state.editingPreset).toBeUndefined();
 
+  crud.handleCloseEditor();
+  expect(state.isEditorOpen).toBe(false);
+
   crud.handleEditPreset(secondPreset);
   expect(state.editingPreset).toEqual(secondPreset);
+  expect(state.isEditorOpen).toBe(true);
 
   const createdPreset = createPreset({ id: 'preset-3', name: 'Preset 3', order: 2 });
   await crud.handleSavePreset(createdPreset);

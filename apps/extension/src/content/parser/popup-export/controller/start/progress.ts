@@ -1,20 +1,16 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ExportProgress } from '@sniptale/runtime-contracts/export';
-import type { PopupExportState } from '../types';
-import type { PopupExportStartEmitMessage } from './emit';
+import type { PopupExportRequestHandlerRuntime, PopupExportRunner } from '../types';
 
-type PopupExportProgressEmitterProps = {
-  emitMessage: PopupExportStartEmitMessage;
+type PopupExportProgressEmitterProps = Pick<
+  PopupExportRequestHandlerRuntime,
+  'emitMessage' | 'state'
+> & {
   requestId: string;
-  state: PopupExportState;
-};
-
-type PopupExportProgressListener = {
-  onProgress: (callback: (progress: ExportProgress) => void) => void;
 };
 
 type PopupExportStartProgressProps = PopupExportProgressEmitterProps & {
-  exportRunner: PopupExportProgressListener;
+  exportRunner: Pick<PopupExportRunner, 'onProgress'>;
 };
 
 export function createPopupExportProgressEmitter({

@@ -1,5 +1,5 @@
 import { saveCurrentPageWebSnapshot } from '../../web-snapshot/save';
-import type { PopupSendResponse } from '../helpers';
+import type { PopupSendResponse } from '../helpers/messaging';
 
 export function handlePopupWebSnapshotRuntime(
   sendResponse: PopupSendResponse,

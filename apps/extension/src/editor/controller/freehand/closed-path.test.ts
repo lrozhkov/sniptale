@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildClosedCandidatePath } from './closed-path';
+import { buildClosedCandidatePath } from './closed-path/dispatch';
 
 function createClosedPathPoints() {
   return [

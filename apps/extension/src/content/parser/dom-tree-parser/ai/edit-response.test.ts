@@ -79,4 +79,54 @@ describe('parseAiEditResponseJson malformed structures', () => {
       errors: ['Ошибка парсинга JSON: некорректная структура ответа'],
     });
   });
+
+  it('filters blank field and table edits', () => {
+    expect(
+      parseAiEditResponseJson(
+        JSON.stringify({
+          i: 'Edit page',
+          f: [
+            { id: 'field-name', n: 'Name', c: 'Alice', new: '   ' },
+            { id: 'field-note', n: 'Note', c: 'None', new: 'Updated' },
+          ],
+          t: [
+            {
+              ttl: 'Devices',
+              r: [{ id: 'row-1', d: { Name: 'Laptop' }, new: { Name: '   ' } }],
+            },
+          ],
+        })
+      )
+    ).toEqual({
+      changes: [
+        {
+          fieldId: 'field-note',
+          fieldName: 'Note',
+          newValue: 'Updated',
+          type: 'field',
+        },
+      ],
+      errors: [],
+    });
+  });
+
+  it('rejects malformed nested table edits', () => {
+    expect(
+      parseAiEditResponseJson(
+        JSON.stringify({
+          i: 'Edit page',
+          f: [],
+          t: [
+            {
+              ttl: 'Devices',
+              r: [{ id: 'row-1', d: { Name: 'Laptop' }, new: { Name: 1 } }],
+            },
+          ],
+        })
+      )
+    ).toEqual({
+      changes: [],
+      errors: ['Ошибка парсинга JSON: некорректная структура ответа'],
+    });
+  });
 });

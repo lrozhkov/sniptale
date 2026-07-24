@@ -9,7 +9,7 @@ const { bodyPropsSpy, listPropsSpy } = vi.hoisted(() => ({
   listPropsSpy: vi.fn(),
 }));
 
-vi.mock('./views', () => ({
+vi.mock('./cards', () => ({
   addButtonClassName: 'add-button',
   CaptureActionCard: (props: unknown) => {
     bodyPropsSpy({ type: 'capture', props });
@@ -24,6 +24,9 @@ vi.mock('./views', () => ({
     return <div data-testid="gallery-card" />;
   },
   SavePresetsHeader: () => <div data-testid="header">header</div>,
+}));
+
+vi.mock('./list/root', () => ({
   PresetsList: (props: unknown) => {
     listPropsSpy(props);
     return <div data-testid="presets-list" />;

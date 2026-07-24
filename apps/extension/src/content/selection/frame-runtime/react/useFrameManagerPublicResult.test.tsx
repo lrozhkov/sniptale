@@ -70,7 +70,23 @@ describe('frame-manager-public-result-hook', () => {
       root?.render(<Harness />);
     });
 
-    expect(latestPublicResult).not.toBeNull();
+    expect(latestPublicResult).toEqual({
+      addAutoBlurFrames: currentArgs.addAutoBlurFrames,
+      addFrame: currentArgs.addFrame,
+      clearAutoBlurFrames: currentArgs.clearAutoBlurFrames,
+      clearFrames: currentArgs.clearFrames,
+      frames: currentArgs.frames,
+      getGlobalStepBadgeSettings: currentArgs.getGlobalStepBadgeSettings,
+      hasFrameForElement: currentArgs.hasFrameForElement,
+      recalculateStepBadges: currentArgs.recalculateStepBadges,
+      removeFrame: currentArgs.removeFrame,
+      syncAutoBlurFrames: currentArgs.syncAutoBlurFrames,
+      syncFocusOpacity: currentArgs.syncFocusOpacity,
+      updateFrame: currentArgs.updateFrame,
+      updateFrameEffect: currentArgs.updateFrameEffect,
+      updateFrameStepBadge: currentArgs.updateFrameStepBadge,
+      updateGlobalStepBadgeSettings: currentArgs.updateGlobalStepBadgeSettings,
+    });
     latestPublicResult?.addAutoBlurFrames({
       blurSettings: { amount: 8, blurType: 'solid' },
       targets: [],
@@ -94,5 +110,30 @@ describe('frame-manager-public-result-hook', () => {
       autoMode: false,
     });
     expect(currentArgs.getGlobalStepBadgeSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves result identity until a public member changes', async () => {
+    currentArgs = createArgs();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(<Harness />);
+    });
+    const initialResult = latestPublicResult;
+
+    currentArgs = { ...currentArgs };
+    await act(async () => {
+      root?.render(<Harness />);
+    });
+    expect(latestPublicResult).toBe(initialResult);
+
+    currentArgs = { ...currentArgs, removeFrame: vi.fn() };
+    await act(async () => {
+      root?.render(<Harness />);
+    });
+    expect(latestPublicResult).not.toBe(initialResult);
+    expect(latestPublicResult?.removeFrame).toBe(currentArgs.removeFrame);
   });
 });

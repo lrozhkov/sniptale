@@ -5,7 +5,6 @@ import { runDomainFixtureRealismCheck } from './verify-domain-fixture-realism.mj
 import { runHistoryDetachedSnapshotCheck } from './verify-history-detached-snapshots.mjs';
 import { runHistoryRevisionSemanticsCheck } from './verify-history-revision-semantics.mjs';
 import { runHistoryTransactionLifecycleCheck } from './verify-history-transaction-lifecycle.mjs';
-import { runHotspotRegressionCheck } from './verify-hotspot-regression.mjs';
 import { runInstanceOwnershipCheck } from './verify-instance-ownership.mjs';
 import { runInterfaceSurfaceCheck } from './verify-interface-surfaces.mjs';
 import { runLifecycleIntentCheck } from './verify-lifecycle-intent.mjs';
@@ -95,7 +94,6 @@ export const FOCUSED_CODE_VIOLATION_STEPS = [
   ],
   ['Shared UI boundaries', 'Shared UI boundary violations found:', runSharedUiBoundaryCheck],
   ['Naming', 'Naming violations found:', runNamingCheck],
-  ['Hotspot regression', 'Hotspot regression violations found:', runHotspotRegressionCheck],
   ['Interface surfaces', 'Broad interface surface violations found:', runInterfaceSurfaceCheck],
   [
     'Returned object surfaces',

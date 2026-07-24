@@ -18,7 +18,7 @@ import type {
   AiPickSelectionCallback,
   AiPickSourceAdapter,
 } from './mode.types';
-import type { AiPickOverlayController } from './overlay';
+import type { AiPickOverlayController } from './overlay.controller';
 import type { parsePageSnapshotAfterIframePreflight } from '../../../../parser/dom-tree-parser/snapshot';
 
 const logger = createLogger({ namespace: 'ContentAiPick' });

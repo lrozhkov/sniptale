@@ -14,9 +14,10 @@
       ]
     },
     {
-      "tool": "verify-ai-limits.mjs",
+      "tool": "verify-ai-hygiene.mjs",
       "validationMode": "fixture-test",
       "testFiles": [
+        "tooling/qa/core/verify-ai-hygiene.test.ts",
         "tooling/qa/core/verify-quality-gates-core.test.ts"
       ],
       "states": [
@@ -435,6 +436,43 @@
       ]
     },
     {
+      "tool": "verify-build.deleted-aggregate.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-build.deleted-aggregate.test.ts",
+        "tooling/qa/core/verify-build.deleted-closure.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-build.deleted-closure.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-build.deleted-aggregate.test.ts",
+        "tooling/qa/core/verify-build.deleted-closure.test.ts",
+        "tooling/qa/core/verify-build.deleted-dead-export.test.ts",
+        "tooling/qa/core/verify-build.deleted-package-closure.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-build.deleted-dead-export.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-build.deleted-dead-export.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
       "tool": "verify-build.execution.mjs",
       "validationMode": "fixture-test",
       "testFiles": [
@@ -817,18 +855,6 @@
       ]
     },
     {
-      "tool": "verify-hotspot-regression.mjs",
-      "validationMode": "fixture-test",
-      "testFiles": [
-        "tooling/qa/core/verify-hotspot-regression.test.ts"
-      ],
-      "states": [
-        "pass",
-        "fail",
-        "skip"
-      ]
-    },
-    {
       "tool": "verify-hot-path-cleanups.mjs",
       "validationMode": "fixture-test",
       "testFiles": [
@@ -861,6 +887,17 @@
         "pass",
         "fail",
         "skip"
+      ]
+    },
+    {
+      "tool": "verify-instance-ownership.inventory-owner.mjs",
+      "validationMode": "fixture-test",
+      "testFiles": [
+        "tooling/qa/core/verify-instance-ownership.inventory-owner.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
       ]
     },
     {
@@ -1487,6 +1524,7 @@
       "validationMode": "canonical-control-fixture",
       "testFiles": [
         "tooling/qa/core/verify-wrapper-contract.test.ts",
+        "tooling/qa/wrappers/checkpoint.output.test.ts",
         "tooling/qa/wrappers/checkpoint.test.ts"
       ],
       "states": [
@@ -1786,7 +1824,6 @@
         "tooling/qa/core/qa-steps/runtime-registry.test.ts",
         "tooling/qa/core/repo-scoped-typescript-scan.test.ts",
         "tooling/qa/core/retired-controls/validation.test.ts",
-        "tooling/qa/core/residual-seams.helpers.test.ts",
         "tooling/qa/core/runtime-seam-test-helpers.test.ts",
         "tooling/qa/core/scoped-rule-cli.test.ts",
         "tooling/qa/core/shared-baseline.test.ts",
@@ -1795,7 +1832,6 @@
         "tooling/qa/core/src-production-targets.test.ts",
         "tooling/qa/core/step-timing.helpers.test.ts",
         "tooling/qa/core/surface-growth.helpers.test.ts",
-        "tooling/qa/core/target-snapshots.test.ts",
         "tooling/qa/core/technical-debt-registry.test.ts",
         "tooling/qa/core/typecheck-project-map.test.ts",
         "tooling/qa/core/typescript-ast-helpers.test.ts",
@@ -1853,7 +1889,8 @@
         "tooling/qa/core/verify-history-revision-semantics.test.ts",
         "tooling/qa/core/verify-history-transaction-lifecycle.test.ts",
         "tooling/qa/core/verify-hot-path-cleanups.test.ts",
-        "tooling/qa/core/verify-hotspot-regression.test.ts",
+        "tooling/qa/core/verify-structural-risk.diff.test.ts",
+        "tooling/qa/core/verify-structural-risk.test.ts",
         "tooling/qa/core/verify-instance-ownership.test.ts",
         "tooling/qa/core/verify-interface-surfaces.broad-public.test.ts",
         "tooling/qa/core/verify-interface-surfaces.return-bags.test.ts",
@@ -1964,6 +2001,22 @@
       "states": [
         "pass",
         "fail"
+      ]
+    },
+    {
+      "tool": "verify-structural-risk.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/topology-fragmentation.graph.test.ts",
+        "tooling/qa/core/topology-fragmentation.test.ts",
+        "tooling/qa/core/verify-structural-risk.diff.test.ts",
+        "tooling/qa/core/verify-structural-risk.test.ts",
+        "tooling/qa/wrappers/structural-audit.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail",
+        "skip"
       ]
     }
   ]

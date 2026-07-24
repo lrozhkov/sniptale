@@ -1,26 +1,16 @@
-import type { MutableRefObject } from 'react';
-
 import {
   beginCountdownLockSession,
   clearCountdownLockSession,
   restoreCountdownLockOnCancel,
   restoreNavigationLockState,
-  type CountdownLockSession,
 } from './session';
-import {
-  resetScreenshotCountdownRuntimeState,
-  startScreenshotCountdownTimer,
-  type ScreenshotType,
-} from './timer';
-
-export type { CountdownLockSession, ScreenshotType };
+import { resetScreenshotCountdownRuntimeState, startScreenshotCountdownTimer } from './timer';
+import type { ScreenshotControllerSession } from '../session/state';
+import type { ScreenshotType } from '../types';
 
 export function startCountdown(args: {
-  countdownLockSessionRef: MutableRefObject<CountdownLockSession | null>;
-  countdownTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
-  navigationLockStateBeforeScreenshot: MutableRefObject<boolean>;
   onElapsed: () => void;
-  pendingScreenshotType: { current: ScreenshotType | null };
+  session: ScreenshotControllerSession;
   setCountdown: (value: number | null) => void;
   setIsToolbarVisible: (visible: boolean) => void;
   setNavigationLockEnabled: (enabled: boolean) => void;
@@ -28,18 +18,16 @@ export function startCountdown(args: {
   type: ScreenshotType;
 }): void {
   beginCountdownLockSession({
-    countdownLockSessionRef: args.countdownLockSessionRef,
-    navigationLockStateBeforeScreenshot: args.navigationLockStateBeforeScreenshot,
+    session: args.session,
     setNavigationLockEnabled: args.setNavigationLockEnabled,
   });
   args.setIsToolbarVisible(false);
   startScreenshotCountdownTimer({
-    countdownTimeoutRef: args.countdownTimeoutRef,
     onElapsed: () => {
-      clearCountdownLockSession(args.countdownLockSessionRef);
+      clearCountdownLockSession(args.session);
       args.onElapsed();
     },
-    pendingScreenshotType: args.pendingScreenshotType,
+    session: args.session,
     setCountdown: args.setCountdown,
     timerDelay: args.timerDelay,
     type: args.type,

@@ -1,11 +1,7 @@
 import { buildEllipseOutline } from './ellipse-outline';
-import {
-  measureCentroid,
-  measureOrientedBounds,
-  measurePolylineError,
-  measurePrincipalAxis,
-} from './fit-geometry';
+import { measureCentroid, measureOrientedBounds, measurePrincipalAxis } from './oriented-geometry';
 import type { ModeledFreehandStroke } from './modeling';
+import { measurePolylineError } from './polyline-geometry/error';
 import { detectCornerProfile } from './recognition-corners';
 import { MIN_CLOSED_CONFIDENCE } from './recognition-closed-constants';
 import type { FreehandRecognitionCandidate } from './recognition-types';

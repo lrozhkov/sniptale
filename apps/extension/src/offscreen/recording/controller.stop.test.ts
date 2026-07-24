@@ -6,13 +6,9 @@ const { cleanupResourcesMock, loggerDebugMock, sendRuntimeMessageMock } = vi.hoi
   sendRuntimeMessageMock: vi.fn(),
 }));
 
-vi.mock('./start/index', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./start/index')>();
-  return {
-    ...actual,
-    cleanupResources: cleanupResourcesMock,
-  };
-});
+vi.mock('./start/cleanup', () => ({
+  cleanupResources: cleanupResourcesMock,
+}));
 
 vi.mock('../../platform/runtime-messaging/index', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../platform/runtime-messaging/index')>();

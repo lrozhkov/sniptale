@@ -1,6 +1,6 @@
 import type { EditableElement } from '../../../features/highlighter/contracts';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { buildEditableElementRecord } from './helpers';
+import { buildEditableElementRecord } from './elements';
 import { createQuickEditHistoryTracker } from './history';
 import { cancelEditableElement, finishEditableElement } from './editing-session';
 import { activateEditableElement, clearEditableElementState } from './session';

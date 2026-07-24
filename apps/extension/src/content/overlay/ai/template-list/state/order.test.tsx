@@ -5,25 +5,20 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PromptTemplate } from '../../../../../contracts/settings';
 
-const { isContentEventWithinElementMock, loadSavedTemplateOrderMock, syncOrderedIdsMock } =
-  vi.hoisted(() => ({
-    isContentEventWithinElementMock: vi.fn(),
-    loadSavedTemplateOrderMock: vi.fn(),
-    syncOrderedIdsMock: vi.fn(),
-  }));
-
-vi.mock('../../../../platform/dom-host', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/dom-host')>()),
-  isContentEventWithinElement: isContentEventWithinElementMock,
+const { loadTemplateOrderMock, saveTemplateOrderMock } = vi.hoisted(() => ({
+  loadTemplateOrderMock: vi.fn(),
+  saveTemplateOrderMock: vi.fn(),
 }));
 
-vi.mock('./helpers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./helpers')>()),
-  loadSavedTemplateOrder: loadSavedTemplateOrderMock,
-  syncOrderedIds: syncOrderedIdsMock,
+vi.mock('../../../../../composition/persistence/prompt-templates', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../../composition/persistence/prompt-templates')
+  >()),
+  loadTemplateOrder: loadTemplateOrderMock,
+  saveTemplateOrder: saveTemplateOrderMock,
 }));
 
-import { useTemplateMenuDismiss, useTemplateOrderState } from './order';
+import { useTemplateOrderState } from './order';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -33,17 +28,6 @@ const templates = [{ content: 'one', id: 'template-1', name: 'One' }] as PromptT
 
 function OrderStateHarness(props: { templates: PromptTemplate[] }) {
   latestOrderState = useTemplateOrderState(props.templates);
-  return null;
-}
-
-type MenuDismissHarnessProps = {
-  menuRef: Parameters<typeof useTemplateMenuDismiss>[2];
-  openMenuId: Parameters<typeof useTemplateMenuDismiss>[0];
-  setOpenMenuId: Parameters<typeof useTemplateMenuDismiss>[1];
-};
-
-function MenuDismissHarness(props: MenuDismissHarnessProps) {
-  useTemplateMenuDismiss(props.openMenuId, props.setOpenMenuId, props.menuRef);
   return null;
 }
 
@@ -66,14 +50,9 @@ beforeAll(() => {
 
 beforeEach(() => {
   latestOrderState = null;
-  isContentEventWithinElementMock.mockReset();
-  loadSavedTemplateOrderMock.mockReset();
-  loadSavedTemplateOrderMock.mockImplementation(async (setOrderedIds, setOrderLoaded) => {
-    setOrderedIds(['saved-template']);
-    setOrderLoaded(true);
-  });
-  syncOrderedIdsMock.mockReset();
-  syncOrderedIdsMock.mockReturnValue(['synced-template']);
+  loadTemplateOrderMock.mockReset();
+  loadTemplateOrderMock.mockResolvedValue(['template-1']);
+  saveTemplateOrderMock.mockReset();
 });
 
 afterEach(() => {
@@ -89,38 +68,38 @@ describe('useTemplateOrderState', () => {
   it('loads saved order once and syncs it against current templates after bootstrap', async () => {
     await renderHarness(<OrderStateHarness templates={templates} />);
 
-    expect(loadSavedTemplateOrderMock).toHaveBeenCalledTimes(1);
-    expect(syncOrderedIdsMock).toHaveBeenCalledWith(['saved-template'], templates);
-    expect(latestOrderState?.orderedIds).toEqual(['synced-template']);
-  });
-});
-
-describe('useTemplateMenuDismiss', () => {
-  it('dismisses the menu when document clicks fall outside the menu surface', async () => {
-    const setOpenMenuId = vi.fn();
-    const menuRef = { current: document.createElement('div') };
-    isContentEventWithinElementMock.mockReturnValue(false);
-
-    await renderHarness(
-      <MenuDismissHarness openMenuId="template-1" setOpenMenuId={setOpenMenuId} menuRef={menuRef} />
-    );
-
-    document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-
-    expect(setOpenMenuId).toHaveBeenCalledWith(null);
+    expect(loadTemplateOrderMock).toHaveBeenCalledTimes(1);
+    expect(latestOrderState?.orderedIds).toEqual(['template-1']);
   });
 
-  it('does not register dismissal work when no menu is open', async () => {
-    const setOpenMenuId = vi.fn();
-    const menuRef = { current: document.createElement('div') };
+  it('preserves existing ids and appends newly available templates', async () => {
+    loadTemplateOrderMock.mockResolvedValueOnce(['template-2', 'missing', 'template-1']);
+    const availableTemplates = [
+      { content: 'one', id: 'template-1', name: 'One' },
+      { content: 'two', id: 'template-2', name: 'Two' },
+      { content: 'three', id: 'template-3', name: 'Three' },
+    ] satisfies PromptTemplate[];
 
-    await renderHarness(
-      <MenuDismissHarness openMenuId={null} setOpenMenuId={setOpenMenuId} menuRef={menuRef} />
-    );
+    await renderHarness(<OrderStateHarness templates={availableTemplates} />);
 
-    document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(latestOrderState?.orderedIds).toEqual(['template-2', 'template-1', 'template-3']);
+  });
 
-    expect(isContentEventWithinElementMock).not.toHaveBeenCalled();
-    expect(setOpenMenuId).not.toHaveBeenCalled();
+  it('keeps the reordered local ids even if advisory persistence later rejects', async () => {
+    saveTemplateOrderMock.mockRejectedValueOnce(new Error('storage offline'));
+    const reorderTemplates = [
+      { content: 'one', id: 'template-1', name: 'One' },
+      { content: 'two', id: 'template-2', name: 'Two' },
+    ] satisfies PromptTemplate[];
+    loadTemplateOrderMock.mockResolvedValueOnce(['template-1', 'template-2']);
+    await renderHarness(<OrderStateHarness templates={reorderTemplates} />);
+
+    act(() => {
+      latestOrderState?.reorder('template-1', 'template-2');
+    });
+    await saveTemplateOrderMock.mock.results[0]?.value?.catch(() => undefined);
+
+    expect(latestOrderState?.orderedIds).toEqual(['template-2', 'template-1']);
+    expect(saveTemplateOrderMock).toHaveBeenCalledWith(['template-2', 'template-1']);
   });
 });

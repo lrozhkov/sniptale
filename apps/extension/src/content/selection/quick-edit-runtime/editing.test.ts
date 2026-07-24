@@ -21,8 +21,8 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   createLogger: () => ({ log: mocks.loggerLog }),
 }));
 
-vi.mock('./helpers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./helpers')>()),
+vi.mock('./elements', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./elements')>()),
   buildEditableElementRecord: mocks.buildEditableElementRecord,
 }));
 

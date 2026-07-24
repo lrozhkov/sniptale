@@ -1,6 +1,6 @@
 import { Path } from 'fabric';
 import { expect, it } from 'vitest';
-import { applyArrowObjectState } from './state';
+import { applyArrowObjectState } from './state/apply';
 
 function applyState(dynamicWidth: boolean | undefined, variant: 'standard' | 'tapered') {
   const arrow = new Path('M 0 0 L 0 0') as any;

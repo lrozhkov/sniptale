@@ -24,8 +24,7 @@ vi.mock('../ui', async (importOriginal) => ({
   getGalleryItemKindLabel: getGalleryItemKindLabelMock,
 }));
 
-vi.mock('./views', () => ({
-  PreviewActions: () => <div data-ui="preview.actions" />,
+vi.mock('./media', () => ({
   PreviewMedia: (props: Pick<PreviewPanelProps, 'item' | 'onClose' | 'previewUrl'>) => (
     <div data-ui="preview.media">
       {props.item.filename}:{props.previewUrl ?? 'no-preview'}
@@ -34,6 +33,10 @@ vi.mock('./views', () => ({
       </button>
     </div>
   ),
+}));
+
+vi.mock('./sidebar-sections', () => ({
+  PreviewActions: () => <div data-ui="preview.actions" />,
   PreviewMetadataCards: (props: Pick<PreviewPanelProps, 'item'>) => (
     <div data-ui="preview.metadata">{props.item.mimeType}</div>
   ),

@@ -4,10 +4,10 @@ export type {
   EditorDocumentActionCommandBuilders,
   EditorDocumentActionCommands,
   EditorDocumentActionContentBuilders,
-} from './commands.types';
+} from './types';
 export { buildDocumentActionCommandBuilders } from './commands.command-builders';
 export { buildDocumentActionContentBuilders } from './commands.content-builders';
-import type { EditorDocumentActionCommands } from './commands.types';
+import type { EditorDocumentActionCommands } from './types';
 import { buildDocumentActionCommandBuilders } from './commands.command-builders';
 import { buildDocumentActionContentBuilders } from './commands.content-builders';
 

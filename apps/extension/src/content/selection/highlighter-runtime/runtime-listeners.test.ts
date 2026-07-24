@@ -26,18 +26,9 @@ const iframeListenerMocks = vi.hoisted(() => {
   };
 });
 
-const escapeKeyMocks = vi.hoisted(() => ({
-  createHighlighterRuntimeEscapeKeyHandlerMock: vi.fn(() => vi.fn()),
-}));
-
 vi.mock('../../platform/frame', () => ({
   addEventListenerToAllWindowsDynamic: iframeListenerMocks.addEventListenerToAllWindowsDynamicMock,
   addScrollListenersToAllWindows: iframeListenerMocks.addScrollListenersToAllWindowsMock,
-}));
-
-vi.mock('./runtime-escape-key', () => ({
-  createHighlighterRuntimeEscapeKeyHandler:
-    escapeKeyMocks.createHighlighterRuntimeEscapeKeyHandlerMock,
 }));
 
 import { registerHighlighterRuntimeListeners } from './runtime-listeners';
@@ -56,7 +47,6 @@ beforeEach(() => {
   iframeListenerMocks.registrations.length = 0;
   iframeListenerMocks.addEventListenerToAllWindowsDynamicMock.mockClear();
   iframeListenerMocks.addScrollListenersToAllWindowsMock.mockClear();
-  escapeKeyMocks.createHighlighterRuntimeEscapeKeyHandlerMock.mockClear();
 });
 
 describe('registerHighlighterRuntimeListeners', () => {
@@ -85,11 +75,11 @@ describe('registerHighlighterRuntimeListeners', () => {
       { capture: true }
     );
     expect(iframeListenerMocks.addScrollListenersToAllWindowsMock).toHaveBeenCalledTimes(1);
-    expect(escapeKeyMocks.createHighlighterRuntimeEscapeKeyHandlerMock).toHaveBeenCalledWith({
-      disableHighlighterMode,
-      hoverController,
-      isAnyFrameEditing: expect.any(Function),
-    });
+    expect(iframeListenerMocks.addEventListenerToAllWindowsDynamicMock).toHaveBeenCalledWith(
+      'keydown',
+      expect.any(Function),
+      { capture: true }
+    );
 
     cleanup();
 

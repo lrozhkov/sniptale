@@ -1,4 +1,4 @@
-import type { ContentAppViewModel } from '../app/view-state';
+import type { ContentAppViewModel } from '../app/view-state/types';
 import type {
   ContentAppLayoutDialogsProps,
   ContentAppLayoutProps,

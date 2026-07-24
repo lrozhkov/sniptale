@@ -24,7 +24,7 @@ const {
   downloadVisibleCaptureMock: vi.fn(),
 }));
 
-vi.mock('./full-page/index', () => ({
+vi.mock('./full-page/workflow', () => ({
   captureFullPage: captureFullPageMock,
   captureFullPageTransaction: captureFullPageTransactionMock,
 }));

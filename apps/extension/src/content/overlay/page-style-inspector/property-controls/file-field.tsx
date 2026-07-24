@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type RefObject } from 'react';
 import { Upload } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
-import { Field } from './fields';
+import { Field } from './field-shell';
 import type { PageStyleInspectorActionOutcome } from '../types';
 import { isPageStyleAssetCleanupError } from '../action-errors';
 

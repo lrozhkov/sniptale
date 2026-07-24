@@ -1,6 +1,7 @@
 import { translate } from '../../../../platform/i18n';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { buildPopupExportPreview, type PopupSendResponse } from '../helpers';
+import type { PopupSendResponse } from '../helpers/messaging';
+import { buildPopupExportPreview } from '../helpers/preview';
 
 type PopupExportParseTree = (contextLabel: string) => Promise<ParsedDOMTree>;
 

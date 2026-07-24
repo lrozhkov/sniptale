@@ -1,5 +1,10 @@
-import { storeHelperFns } from './store.helpers';
-import type { HistoryStoreInternals } from './store.internals';
+import {
+  captureHistorySnapshot,
+  normalizeHistoryDomBatch,
+  publishHistoryState,
+  pushHistoryEntry,
+  type HistoryStoreRuntimeState,
+} from './store-state';
 import type {
   FrameSessionSnapshot,
   PageDomMutationBatch,
@@ -13,11 +18,11 @@ type HistoryEntryArgs = {
 };
 
 function createEntryFromArgs(
-  state: HistoryStoreInternals,
+  state: HistoryStoreRuntimeState,
   args: HistoryEntryArgs
 ): PagePreparationHistoryEntry | null {
-  const before = args.before ?? storeHelperFns.captureSnapshot(state);
-  const after = args.after ?? storeHelperFns.captureSnapshot(state);
+  const before = args.before ?? captureHistorySnapshot(state);
+  const after = args.after ?? captureHistorySnapshot(state);
   if (!before || !after) {
     return null;
   }
@@ -25,16 +30,16 @@ function createEntryFromArgs(
   return {
     after,
     before,
-    domBatch: storeHelperFns.normalizeDomBatch(args.domBatch),
+    domBatch: normalizeHistoryDomBatch(args.domBatch),
   };
 }
 
-function beginDeferredCommitBoundary(state: HistoryStoreInternals): number | null {
+function beginDeferredCommitBoundary(state: HistoryStoreRuntimeState): number | null {
   if (state.isApplying) {
     return null;
   }
 
-  const before = storeHelperFns.captureSnapshot(state);
+  const before = captureHistorySnapshot(state);
   if (!before) {
     return null;
   }
@@ -50,10 +55,10 @@ function beginDeferredCommitBoundary(state: HistoryStoreInternals): number | nul
 function commitTransactionEntry(args: {
   domBatch?: PageDomMutationBatch | null;
   key: string;
-  state: HistoryStoreInternals;
+  state: HistoryStoreRuntimeState;
 }): PagePreparationHistoryEntry | null {
   const transaction = args.state.transactions.get(args.key);
-  const after = storeHelperFns.captureSnapshot(args.state);
+  const after = captureHistorySnapshot(args.state);
   args.state.transactions.delete(args.key);
 
   if (!transaction || !after) {
@@ -63,14 +68,14 @@ function commitTransactionEntry(args: {
   return {
     after,
     before: transaction.before,
-    domBatch: storeHelperFns.normalizeDomBatch(args.domBatch ?? transaction.domBatch),
+    domBatch: normalizeHistoryDomBatch(args.domBatch ?? transaction.domBatch),
   };
 }
 
 function finalizeDeferredEntry(args: {
   domBatch?: PageDomMutationBatch | null;
   id: number;
-  state: HistoryStoreInternals;
+  state: HistoryStoreRuntimeState;
 }): PagePreparationHistoryEntry | null {
   if (args.state.isApplying) {
     args.state.deferredCommits.delete(args.id);
@@ -78,7 +83,7 @@ function finalizeDeferredEntry(args: {
   }
 
   const deferred = args.state.deferredCommits.get(args.id);
-  const after = storeHelperFns.captureSnapshot(args.state);
+  const after = captureHistorySnapshot(args.state);
   args.state.deferredCommits.delete(args.id);
 
   if (!deferred || !after) {
@@ -88,12 +93,12 @@ function finalizeDeferredEntry(args: {
   return {
     after,
     before: deferred.before,
-    domBatch: storeHelperFns.normalizeDomBatch(args.domBatch),
+    domBatch: normalizeHistoryDomBatch(args.domBatch),
   };
 }
 
 function beginHistoryTransaction(
-  state: HistoryStoreInternals,
+  state: HistoryStoreRuntimeState,
   key: string,
   domBatch: PageDomMutationBatch | null = null
 ): void {
@@ -101,26 +106,26 @@ function beginHistoryTransaction(
     return;
   }
 
-  const before = storeHelperFns.captureSnapshot(state);
+  const before = captureHistorySnapshot(state);
   if (!before) {
     return;
   }
 
   state.transactions.set(key, { before, domBatch });
-  storeHelperFns.publishState(state);
+  publishHistoryState(state);
 }
 
-function cancelHistoryTransaction(state: HistoryStoreInternals, key: string): void {
+function cancelHistoryTransaction(state: HistoryStoreRuntimeState, key: string): void {
   if (!state.transactions.has(key)) {
     return;
   }
 
   state.transactions.delete(key);
-  storeHelperFns.publishState(state);
+  publishHistoryState(state);
 }
 
 function commitHistoryTransaction(
-  state: HistoryStoreInternals,
+  state: HistoryStoreRuntimeState,
   key: string,
   domBatch: PageDomMutationBatch | null = null
 ): void {
@@ -131,18 +136,18 @@ function commitHistoryTransaction(
   const hadTransaction = state.transactions.has(key);
   const entry = commitTransactionEntry({ domBatch, key, state });
   if (entry) {
-    if (!storeHelperFns.pushEntry(state, entry)) {
-      storeHelperFns.publishState(state);
+    if (!pushHistoryEntry(state, entry)) {
+      publishHistoryState(state);
     }
     return;
   }
 
   if (hadTransaction) {
-    storeHelperFns.publishState(state);
+    publishHistoryState(state);
   }
 }
 
-function createDeferredCommitApi(state: HistoryStoreInternals) {
+function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
   return {
     beginDeferredCommit(): number | null {
       return beginDeferredCommitBoundary(state);
@@ -153,13 +158,13 @@ function createDeferredCommitApi(state: HistoryStoreInternals) {
     finalizeDeferredCommit(id: number, domBatch: PageDomMutationBatch | null = null): void {
       const entry = finalizeDeferredEntry({ domBatch, id, state });
       if (entry) {
-        storeHelperFns.pushEntry(state, entry);
+        pushHistoryEntry(state, entry);
       }
     },
   };
 }
 
-function createTransactionCommitApi(state: HistoryStoreInternals) {
+function createTransactionCommitApi(state: HistoryStoreRuntimeState) {
   return {
     beginTransaction(key: string, domBatch: PageDomMutationBatch | null = null): void {
       beginHistoryTransaction(state, key, domBatch);
@@ -172,7 +177,7 @@ function createTransactionCommitApi(state: HistoryStoreInternals) {
       state.future = [];
       state.deferredCommits.clear();
       state.transactions.clear();
-      storeHelperFns.publishState(state);
+      publishHistoryState(state);
     },
     commitEntry(args: HistoryEntryArgs): void {
       if (state.isApplying) {
@@ -181,7 +186,7 @@ function createTransactionCommitApi(state: HistoryStoreInternals) {
 
       const entry = createEntryFromArgs(state, args);
       if (entry) {
-        storeHelperFns.pushEntry(state, entry);
+        pushHistoryEntry(state, entry);
       }
     },
     commitTransaction(key: string, domBatch: PageDomMutationBatch | null = null): void {
@@ -190,7 +195,7 @@ function createTransactionCommitApi(state: HistoryStoreInternals) {
   };
 }
 
-export function createHistoryStoreCommitApi(state: HistoryStoreInternals) {
+export function createHistoryStoreCommitApi(state: HistoryStoreRuntimeState) {
   return {
     ...createDeferredCommitApi(state),
     ...createTransactionCommitApi(state),

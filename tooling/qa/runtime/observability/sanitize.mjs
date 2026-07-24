@@ -156,3 +156,12 @@ export function truncateUtf8(value, maximumBytes) {
   while (end > 0 && (bytes[end] & 0xc0) === 0x80) end -= 1;
   return { text: bytes.subarray(0, end).toString('utf8'), truncated: true };
 }
+
+export function sanitizeBoundedConsoleOutput(value, options = {}, maximumBytes = 16 * 1024) {
+  const marker = '\n[qa-observability: console output truncated]\n';
+  const sanitized = sanitizeLogText(value, options);
+  const bounded = truncateUtf8(sanitized, maximumBytes);
+  if (!bounded.truncated) return bounded.text;
+  const contentBytes = Math.max(0, maximumBytes - Buffer.byteLength(marker));
+  return truncateUtf8(sanitized, contentBytes).text + marker;
+}

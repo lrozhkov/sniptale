@@ -1,10 +1,8 @@
 import type { CaptureActionType } from '../../../contracts/settings';
 import type { ScenarioSessionState } from '@sniptale/runtime-contracts/scenario/types/session';
-import {
-  useScenarioAutoClickCapture,
-  useScenarioNavigationLockOverride,
-  useScenarioSuggestedEventLogging,
-} from './effects';
+import { useScenarioAutoClickCapture } from './auto-click-capture';
+import { useScenarioNavigationLockOverride } from './navigation-lock-override';
+import { useScenarioSuggestedEventLogging } from './suggested-event-logging';
 import type { BuildScenarioCapturePayload } from './auto-click-capture/shared';
 import type {
   ScenarioAutoClickCaptureTransport,

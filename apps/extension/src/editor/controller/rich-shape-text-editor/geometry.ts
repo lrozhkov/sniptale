@@ -1,5 +1,5 @@
 import { Point, type Canvas } from 'fabric';
-import { resolveRichShapeTextFrame } from '../../objects/rich-shape/text-frame';
+import { resolveRichShapeTextFrame } from '../../objects/rich-shape/text-frame/frame';
 import type { RichShapeGroup } from '../../objects/rich-shape';
 
 export interface RichShapeTextEditorFrame {

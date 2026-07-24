@@ -128,7 +128,7 @@ vi.mock('../../objects/arrow', async (importOriginal) => ({
   getArrowSettings: mocks.getArrowSettingsMock,
   isArrowObject: mocks.isArrowObjectMock,
 }));
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 function runSelectionSyncExtendedSuite() {
   beforeEach(() => {

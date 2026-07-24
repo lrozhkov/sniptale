@@ -50,6 +50,26 @@ describe('editor-controller-document.lifecycle.close.run', () => {
     expect(options.setZoomLevel).toHaveBeenCalledWith(1);
     expect(options.canvas.clear).toHaveBeenCalledOnce();
     expect(options.canvas.requestRenderAll).toHaveBeenCalledOnce();
+
+    const stateResetOrder = [
+      options.setDrawSession,
+      options.setCropState,
+      options.setSource,
+      options.setOriginalDocument,
+      options.setHistory,
+      options.setActiveTool,
+      options.setZoomLevel,
+      options.setPanSession,
+    ].map((mock) => mock.mock.invocationCallOrder[0]);
+
+    expect(stateResetOrder).toEqual([...stateResetOrder].sort((left, right) => left - right));
+    expect(options.canvas.clear.mock.invocationCallOrder[0]).toBeLessThan(stateResetOrder[0]);
+    expect(options.setPanSession.mock.invocationCallOrder[0]).toBeLessThan(
+      storeState.resetDocumentState.mock.invocationCallOrder[0]!
+    );
+    expect(storeState.resetDocumentState.mock.invocationCallOrder[0]!).toBeLessThan(
+      options.canvas.requestRenderAll.mock.invocationCallOrder[0]
+    );
   });
 
   it('resets store-only state when no canvas is mounted yet', () => {

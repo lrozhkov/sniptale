@@ -31,6 +31,7 @@ describe('canonical wrapper inventory', () => {
       'qa:preflight',
       'qa:release',
       'qa:release-harness',
+      'qa:structural-audit',
     ]);
   });
 
@@ -59,6 +60,7 @@ describe('canonical wrapper argument contracts', () => {
     ['qa:closeout', ['-m', 'chore: proof']],
     ['qa:audit', ['--profile', 'security']],
     ['qa:e2e', ['--suite=critical', '--headed']],
+    ['qa:structural-audit', ['--verbose']],
   ])('parses declared arguments for %s', (wrapperId, argv) => {
     expect(() => parseWrapperArguments(wrapperId, argv)).not.toThrow();
   });

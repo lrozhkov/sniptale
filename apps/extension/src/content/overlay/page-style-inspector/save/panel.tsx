@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../../../platform/i18n';
 import { isPageStyleRulesUiEnabled } from '../../../../platform/config/page-style-rules-access';
 import { CompactInput } from '../../../../ui/compact-inspector-controls';
-import { RetentionToggle } from '../property-controls/fields';
+import { ActionStatusBanner } from '../action-status-banner';
 import type { PageStyleInspectorActions, PageStyleInspectorViewState } from '../types';
 
 function PanelAction(props: {
@@ -62,6 +63,26 @@ function SaveExpandButton(props: { children: ReactNode; disabled: boolean; onCli
   );
 }
 
+function RetentionToggle(props: {
+  checked: boolean;
+  disabled: boolean;
+  label: string;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-xs text-[var(--sniptale-color-text-secondary)]">
+      <span>{props.label}</span>
+      <ProductToggle
+        checked={props.checked}
+        disabled={props.disabled}
+        size="sm"
+        aria-label={props.label}
+        onClick={() => props.onChange(!props.checked)}
+      />
+    </div>
+  );
+}
+
 function SavePanelButtons(props: {
   disabled: boolean;
   onToggle: (panel: 'rule' | 'template') => void;
@@ -112,7 +133,7 @@ function TemplateSaveCard(props: {
         label={translate('content.pageStyleInspector.includeComputedInTemplate')}
         onChange={props.actions.setIncludeComputedInTemplate}
       />
-      <SaveCardStatus status={saveRunner.status} />
+      <ActionStatusBanner status={saveRunner.status} />
       <PanelAction
         disabled={props.disabled || saveRunner.status?.state === 'pending'}
         onClick={() =>
@@ -161,26 +182,6 @@ function useSaveCardActionRunner() {
   }, []);
 
   return { run, status };
-}
-
-function SaveCardStatus(props: { status: SaveCardActionStatus | null }) {
-  if (!props.status) {
-    return null;
-  }
-
-  const tone = {
-    error: 'border-[var(--sniptale-color-danger)] text-[var(--sniptale-color-danger)]',
-    pending:
-      'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
-    success:
-      'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
-  }[props.status.state];
-
-  return (
-    <div className={['rounded-[8px] border px-2 py-1.5 text-[11px] font-semibold', tone].join(' ')}>
-      {props.status.message}
-    </div>
-  );
 }
 
 function RuleSaveCard(props: {

@@ -1,7 +1,6 @@
-import type { PopupSendResponse } from '../../helpers';
+import type { PopupSendResponse } from '../../helpers/messaging';
 import { resetPopupExportState } from '../state';
-import type { PopupExportRunner } from './types/runtime';
-import type { PopupExportRequestHandlerRuntime } from './types/runtime';
+import type { PopupExportRequestHandlerRuntime, PopupExportRunner } from '../types';
 
 type PopupExportCancelRequestHandlerProps = Pick<PopupExportRequestHandlerRuntime, 'state'> & {
   exportRunner: Pick<PopupExportRunner, 'cancel'>;

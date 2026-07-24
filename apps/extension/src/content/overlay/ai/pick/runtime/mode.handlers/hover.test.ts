@@ -14,7 +14,7 @@ const {
   resolveAiPickInteractionTargetMock: vi.fn(),
 }));
 
-vi.mock('../dom-helpers', async (importOriginal) => ({
+vi.mock('../dom-lookup', async (importOriginal) => ({
   ...(await importOriginal()),
   getNearestDataElement: getNearestDataElementMock,
 }));

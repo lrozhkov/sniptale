@@ -8,16 +8,23 @@ import {
 } from './layout';
 
 const currentSource = {
+  dataUrl: 'data:image/png;base64,source',
   displayHeight: 480,
   displayWidth: 640,
+  id: 'source-1',
+  intrinsicHeight: 480,
+  intrinsicWidth: 640,
   left: 20,
+  locked: false,
+  name: null,
   top: 50,
+  visible: true,
 };
 
 it('resolves browser-frame source deltas into layer position', () => {
   expect(
     resolveNextBrowserFramePosition({
-      currentSource: currentSource as never,
+      currentSource,
       existingLayer: null,
       nextSource: { left: 30, top: 100 },
     })
@@ -25,7 +32,7 @@ it('resolves browser-frame source deltas into layer position', () => {
 
   expect(
     resolveNextBrowserFramePosition({
-      currentSource: currentSource as never,
+      currentSource,
       existingLayer: { left: 100, top: 80 } as never,
       nextSource: { left: 35, top: 75 },
     })
@@ -33,7 +40,7 @@ it('resolves browser-frame source deltas into layer position', () => {
 
   expect(
     resolveNextBrowserFramePosition({
-      currentSource: currentSource as never,
+      currentSource,
       existingLayer: {} as never,
       nextSource: { left: 35, top: 75 },
     })
@@ -43,30 +50,37 @@ it('resolves browser-frame source deltas into layer position', () => {
 it('resolves browser-frame size changes into layer width', () => {
   expect(
     hasBrowserFrameSourceSizeChange({
-      currentSource: currentSource as never,
+      currentSource,
       nextSource: { height: 480, width: 800 },
     })
   ).toBe(true);
   expect(
     hasBrowserFrameSourceSizeChange({
-      currentSource: currentSource as never,
+      currentSource,
       nextSource: { height: 480, width: 640 },
     })
   ).toBe(false);
   expect(
     resolveNextBrowserFrameWidth({
-      currentSource: currentSource as never,
+      currentSource,
       existingLayer: null,
       nextSource: { height: 720, width: 1280 },
     })
   ).toBe(1280);
   expect(
     resolveNextBrowserFrameWidth({
-      currentSource: currentSource as never,
+      currentSource,
       existingLayer: { getScaledWidth: () => 700 } as never,
       nextSource: { height: 480, width: 640 },
     })
   ).toBe(700);
+  expect(
+    resolveNextBrowserFrameWidth({
+      currentSource,
+      existingLayer: null,
+      nextSource: { height: 480, width: 640 },
+    })
+  ).toBe(640);
 });
 
 it('maps browser-frame modes to relayout options', () => {
@@ -99,7 +113,7 @@ it('resolves browser-frame scene layout with default relayout flags', () => {
       canvasMode: 'resize',
       contentMode: 'push-down',
     } as never,
-    currentSource: currentSource as never,
+    currentSource,
     options: {
       canvasDocumentSize: { height: 600, width: 800 },
       store: {

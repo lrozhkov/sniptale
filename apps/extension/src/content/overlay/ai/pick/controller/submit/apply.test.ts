@@ -10,18 +10,14 @@ const {
   findAIChangeTargetsMock,
   flashAppliedAiTargetsMock,
   parsePageSnapshotAfterIframePreflightMock,
-  showAiApplyToastMock,
-  showAiNoChangesInfoMock,
-  showAiParseErrorsMock,
+  showToastMock,
 } = vi.hoisted(() => ({
   applyAiChangesWithHistoryMock: vi.fn(),
   clearAllSniptaleIdsMock: vi.fn(),
   findAIChangeTargetsMock: vi.fn(),
   flashAppliedAiTargetsMock: vi.fn(),
   parsePageSnapshotAfterIframePreflightMock: vi.fn(),
-  showAiApplyToastMock: vi.fn(),
-  showAiNoChangesInfoMock: vi.fn(),
-  showAiParseErrorsMock: vi.fn(),
+  showToastMock: vi.fn(),
 }));
 
 vi.mock('../../../../../../platform/i18n', async (importOriginal) => ({
@@ -41,25 +37,24 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
   }),
 }));
 
+vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sniptale/ui/product-feedback/toast-service')>()),
+  showToast: showToastMock,
+}));
+
 vi.mock('../../runtime/dom-apply/highlight', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/dom-apply/highlight')>()),
   flashAppliedAiTargets: flashAppliedAiTargetsMock,
 }));
 
-vi.mock('../../runtime/dom-apply', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../runtime/dom-apply')>()),
+vi.mock('../../runtime/target-resolution/change-targets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/target-resolution/change-targets')>()),
   findAIChangeTargets: findAIChangeTargetsMock,
 }));
 
 vi.mock('../../../../../parser/dom-tree-parser/snapshot', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../parser/dom-tree-parser/snapshot')>()),
   parsePageSnapshotAfterIframePreflight: parsePageSnapshotAfterIframePreflightMock,
-}));
-
-vi.mock('./feedback', () => ({
-  showAiApplyToast: showAiApplyToastMock,
-  showAiNoChangesInfo: showAiNoChangesInfoMock,
-  showAiParseErrors: showAiParseErrorsMock,
 }));
 
 vi.mock('./history', () => ({
@@ -126,7 +121,8 @@ async function expectNoChangeInfoBranch() {
     requestId
   );
 
-  expect(showAiNoChangesInfoMock).toHaveBeenCalledTimes(1);
+  expect(showToastMock).toHaveBeenCalledTimes(1);
+  expect(showToastMock).toHaveBeenCalledWith('content.toolbar.aiNoChanges', 'info');
   expect(applyAiChangesWithHistoryMock).not.toHaveBeenCalled();
   expect(context.setIsAIModalOpen).not.toHaveBeenCalled();
 }
@@ -151,7 +147,10 @@ async function expectWarningAndCommitBranch() {
     requestId
   );
 
-  expect(showAiParseErrorsMock).toHaveBeenCalledWith(['bad json fragment']);
+  expect(showToastMock).toHaveBeenCalledWith(
+    'content.toolbar.aiParseErrorsPrefix bad json fragment',
+    'warning'
+  );
   expect(applyAiChangesWithHistoryMock).toHaveBeenCalledWith(
     context.treeData,
     defaultParsedChanges
@@ -163,7 +162,10 @@ async function expectWarningAndCommitBranch() {
   expect(findAIChangeTargetsMock).toHaveBeenCalledWith(context.treeData, defaultParsedChanges);
   expect(parsePageSnapshotAfterIframePreflightMock).not.toHaveBeenCalled();
   expect(flashAppliedAiTargetsMock).toHaveBeenCalledWith(targets);
-  expect(showAiApplyToastMock).toHaveBeenCalledWith(1, 2);
+  expect(showToastMock).toHaveBeenCalledWith(
+    'content.toolbar.aiAppliedWithMissingPrefix1content.toolbar.aiAppliedWithMissingMiddle2',
+    'warning'
+  );
 }
 
 async function expectFreshTargetFallbackBranch() {
@@ -192,6 +194,10 @@ async function expectFreshTargetFallbackBranch() {
   expect(parsePageSnapshotAfterIframePreflightMock).toHaveBeenCalledWith('ai-pick-apply-highlight');
   expect(findAIChangeTargetsMock).toHaveBeenNthCalledWith(2, refreshedTree, defaultParsedChanges);
   expect(flashAppliedAiTargetsMock).toHaveBeenCalledWith(refreshedTargets);
+  expect(showToastMock).toHaveBeenCalledWith(
+    'content.toolbar.aiAppliedSuccessPrefix1content.toolbar.aiAppliedSuccessSuffix',
+    'success'
+  );
 }
 
 async function expectMixedConnectedAndReplacedTargetBranch() {
@@ -250,7 +256,7 @@ async function expectStaleRequestAfterHighlightResolutionToAbortUiCommit() {
   expect(context.setTreeData).not.toHaveBeenCalled();
   expect(context.resumeAiPickMode).not.toHaveBeenCalled();
   expect(flashAppliedAiTargetsMock).not.toHaveBeenCalled();
-  expect(showAiApplyToastMock).not.toHaveBeenCalled();
+  expect(showToastMock).not.toHaveBeenCalled();
 }
 
 describe('ai-pick-controller-submit-apply', () => {

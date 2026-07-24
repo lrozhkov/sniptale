@@ -1,5 +1,5 @@
 import { measureAngleBetweenVectors, measureDistance } from './metrics';
-import { resamplePointCloud } from './point-cloud';
+import { resamplePointCloud } from './point-cloud/sampling';
 import type { FreehandPointRecord } from './points';
 
 interface FreehandCornerProfile {

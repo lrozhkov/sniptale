@@ -76,6 +76,36 @@ it('ignores non-targeted production files', () => {
   expect(collectUiAutomationSeamViolations([file])).toEqual([]);
 });
 
+it('allows automation primitives inside an explicit DOM-driver owner', () => {
+  const root = createTempRoot();
+  const file = writeFile(
+    root,
+    'apps/extension/src/content/overlay/scenario/auto-click-capture/dom-driver.ts',
+    ['setTimeout(() => {}, 10);', 'target.click();'].join('\n')
+  );
+
+  expect(collectUiAutomationSeamViolations([file])).toEqual([]);
+});
+
+it('allows scheduling but not DOM automation inside an explicit timing owner', () => {
+  const root = createTempRoot();
+  const file = writeFile(
+    root,
+    'apps/extension/src/content/overlay/screenshot/countdown/timer.ts',
+    ['setTimeout(() => {}, 10);', 'target.click();'].join('\n')
+  );
+
+  expect(collectUiAutomationSeamViolations([file])).toEqual([
+    expect.objectContaining({
+      file: expect.stringContaining(
+        'apps/extension/src/content/overlay/screenshot/countdown/timer.ts'
+      ),
+      line: 2,
+      rule: 'ui-automation-seams',
+    }),
+  ]);
+});
+
 it('provides a changed-file runner for focused and full verify wiring', () => {
   const root = createTempRoot();
   writeFile(root, 'package.json', '{"name":"verify-ui-automation-seams-temp"}\n');

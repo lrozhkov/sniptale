@@ -8,7 +8,7 @@ import {
   shouldExitAfterQuickActionCapture,
 } from '../mode';
 import type { CreateScreenshotControllerActionsArgs } from './action-types';
-import type { ScreenshotType } from '../countdown/controller';
+import type { ScreenshotType } from '../types';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 
 export async function runImmediateScreenshot(

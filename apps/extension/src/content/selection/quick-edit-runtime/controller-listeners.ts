@@ -1,4 +1,4 @@
-import { enableQuickEditCursor } from './helpers';
+import { enableQuickEditCursor } from './cursor';
 import type {
   QuickEditModeEventHandlers,
   QuickEditModeListenerRegistrationProps,

@@ -77,32 +77,42 @@ function createPreset() {
 
 function createProps() {
   const preset = createPreset();
-  const state = {
+  const presets = {
     editingPreset: preset,
+    handleCloseEditor: vi.fn(),
     handleSavePreset: vi.fn(),
     isEditorOpen: true,
-    setIsEditorOpen: vi.fn(),
   };
 
   return {
     preset,
     props: {
+      effects: {
+        handleUpdateBlurSettings: vi.fn(),
+        handleUpdateFocusSettings: vi.fn(),
+      },
+      presets: presets as never,
       settings: {} as never,
-      state: state as never,
     },
-    state,
+    presets,
   };
 }
 
-function verifyRenderedState({ preset, props, state }: ReturnType<typeof createProps>) {
+function verifyRenderedState({ preset, presets, props }: ReturnType<typeof createProps>) {
   expect(container?.textContent).toContain('settings.navigation.highlighter');
   expect(container?.textContent).toContain('highlighter.section.subtitle');
-  expect(presetsPanelPropsSpy).toHaveBeenCalledWith(props);
-  expect(effectsPanelPropsSpy).toHaveBeenCalledWith(props);
+  expect(presetsPanelPropsSpy).toHaveBeenCalledWith({
+    presets: props.presets,
+    settings: props.settings,
+  });
+  expect(effectsPanelPropsSpy).toHaveBeenCalledWith({
+    effects: props.effects,
+    settings: props.settings,
+  });
   expect(borderPresetEditorPropsSpy).toHaveBeenCalledWith(
     expect.objectContaining({
       isOpen: true,
-      onSave: state.handleSavePreset,
+      onSave: presets.handleSavePreset,
       preset,
     })
   );
@@ -138,15 +148,15 @@ describe('HighlighterSectionContent', () => {
     };
     borderProps.onClose();
 
-    expect(rendered.state.setIsEditorOpen).toHaveBeenCalledWith(false);
+    expect(rendered.presets.handleCloseEditor).toHaveBeenCalledOnce();
   });
 
   it('omits the preset prop when the editor is open for a new preset', async () => {
     const rendered = createProps();
     const props = {
       ...rendered.props,
-      state: {
-        ...rendered.state,
+      presets: {
+        ...rendered.presets,
         editingPreset: undefined,
       },
     } as unknown as Parameters<typeof HighlighterSectionContent>[0];
@@ -156,7 +166,7 @@ describe('HighlighterSectionContent', () => {
     expect(borderPresetEditorPropsSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         isOpen: true,
-        onSave: rendered.state.handleSavePreset,
+        onSave: rendered.presets.handleSavePreset,
       })
     );
     expect(borderPresetEditorPropsSpy.mock.calls.at(-1)?.[0]).not.toHaveProperty('preset');

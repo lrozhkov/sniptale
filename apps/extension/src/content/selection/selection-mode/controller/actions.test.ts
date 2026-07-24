@@ -25,9 +25,9 @@ beforeEach(() => {
 });
 
 describe('selection-mode controller actions', () => {
-  it('wires enable, disable, active, and cleanup actions to the runtime facade', async () => {
+  it('wires enable, disable, active, and cleanup actions to the runtime contract', async () => {
     const cleanup = vi.fn();
-    const runtimeFacade = {
+    const runtime = {
       disableSelectionMode: vi.fn(),
       enableSelectionMode: vi.fn(() => Promise.resolve('area')),
       isSelectionModeActive: vi.fn(() => true),
@@ -35,7 +35,7 @@ describe('selection-mode controller actions', () => {
 
     const actions = createSelectionModeControllerActions({
       cleanup,
-      runtimeFacade,
+      runtime,
     });
 
     await expect(actions.enableSelectionMode()).resolves.toBe('area');

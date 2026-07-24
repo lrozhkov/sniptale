@@ -1,11 +1,11 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
-import type { SelectionModeMutableRefs } from './session/locals-contract';
+import type { SelectionModeSession } from './session';
 
 const diagLogger = createLogger({ namespace: 'ContentSelectionMode:Diag' });
 const runtimeLogger = createLogger({ namespace: 'ContentSelectionMode:Runtime' });
 
 type SelectionModeInteractionState = Pick<
-  SelectionModeMutableRefs,
+  SelectionModeSession,
   | 'currentSelection'
   | 'isDragging'
   | 'isResizing'

@@ -1,10 +1,8 @@
 import { Rect } from 'fabric';
 import { expect, it } from 'vitest';
 
-import {
-  applyRectangleShapeGeometry,
-  normalizeScaledRectangleTarget,
-} from './shape-style-rectangle';
+import { applyRectangleShapeGeometry } from './shape-style-rectangle/apply';
+import { normalizeScaledRectangleTarget } from './shape-style-rectangle/normalize';
 
 it('normalizes scaled annotation rectangle geometry while preserving visual radius intent', () => {
   const rect = new Rect({ height: 20, left: 10, scaleX: -2, scaleY: 0, top: 20, width: 40 });

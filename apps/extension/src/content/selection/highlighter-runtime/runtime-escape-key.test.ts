@@ -22,7 +22,7 @@ vi.mock('../../platform/page-context/mode-events', async (importOriginal) => ({
   dispatchExitFrameEditing: contentModeEventsMocks.dispatchExitFrameEditingMock,
 }));
 
-import { createHighlighterRuntimeEscapeKeyHandler } from './runtime-escape-key';
+import { createHighlighterRuntimeEscapeKeyHandler } from './runtime-listeners';
 
 beforeEach(() => {
   loggerMock.debug.mockClear();

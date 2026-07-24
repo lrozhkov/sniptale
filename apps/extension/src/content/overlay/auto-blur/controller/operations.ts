@@ -10,10 +10,14 @@ import {
 } from '../persistence';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { scanAutoBlurTargets, type AutoBlurMatch } from '../../../selection/auto-blur-runtime';
-import { cloneSettings } from './state';
-import type { FrameManager } from './types';
+import type { useContentAppBindings } from '../../app/bindings';
 
 const logger = createLogger({ namespace: 'ContentAutoBlur' });
+
+export type AutoBlurFrameManager = Pick<
+  ReturnType<typeof useContentAppBindings>,
+  'clearAutoBlurFrames' | 'frames' | 'syncAutoBlurFrames'
+>;
 
 export function createTargets(matches: AutoBlurMatch[]) {
   return matches.map((match) => ({
@@ -21,6 +25,14 @@ export function createTargets(matches: AutoBlurMatch[]) {
     id: match.id,
     rect: match.rect,
   }));
+}
+
+function cloneSettings(settings: AutoBlurSettings): AutoBlurSettings {
+  return {
+    autoApplyEnabled: settings.autoApplyEnabled,
+    blurSettings: { ...settings.blurSettings },
+    selectedCategories: [...settings.selectedCategories],
+  };
 }
 
 export async function loadSettingsOrDefault(): Promise<AutoBlurSettings> {
@@ -34,8 +46,8 @@ export async function loadSettingsOrDefault(): Promise<AutoBlurSettings> {
 
 export async function applyAutoBlurWithSettings(args: {
   blurSettings: BlurSettings;
-  frameManager: FrameManager;
-  frames: FrameManager['frames'];
+  frameManager: AutoBlurFrameManager;
+  frames: AutoBlurFrameManager['frames'];
   selectedCategories: Iterable<AutoBlurCategory>;
 }) {
   const selectedCategories = new Set(args.selectedCategories);

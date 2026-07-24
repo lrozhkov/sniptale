@@ -3,4 +3,4 @@ export {
   previewEditorBrowserFrameSettings,
   removeEditorBrowserFrameSettings,
   previewRemoveEditorBrowserFrameSettings,
-} from './actions';
+} from './mutation';

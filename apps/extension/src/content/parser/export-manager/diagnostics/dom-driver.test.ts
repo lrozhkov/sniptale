@@ -2,8 +2,9 @@
 
 import { afterEach, expect, it, vi } from 'vitest';
 
-vi.mock('../files/utils', async () => {
-  const actual = await vi.importActual<typeof import('../files/utils')>('../files/utils');
+vi.mock('../files/modal-utils', async () => {
+  const actual =
+    await vi.importActual<typeof import('../files/modal-utils')>('../files/modal-utils');
   return {
     ...actual,
     closeModal: vi.fn(async () => undefined),
@@ -12,7 +13,7 @@ vi.mock('../files/utils', async () => {
   };
 });
 
-import * as fileUtils from '../files/utils';
+import * as modalUtils from '../files/modal-utils';
 import {
   dismissPreviewModal,
   listDirectDownloadLinks,
@@ -20,9 +21,9 @@ import {
   resolvePreviewDownloadHref,
 } from './dom-driver';
 
-const closeModalMock = vi.mocked(fileUtils.closeModal);
-const delayMock = vi.mocked(fileUtils.delay);
-const waitForElementMock = vi.mocked(fileUtils.waitForElement);
+const closeModalMock = vi.mocked(modalUtils.closeModal);
+const delayMock = vi.mocked(modalUtils.delay);
+const waitForElementMock = vi.mocked(modalUtils.waitForElement);
 
 function createVisibleModal(downloadUrl?: string): HTMLElement {
   const modal = document.createElement('div');

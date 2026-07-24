@@ -11,6 +11,7 @@ import {
   FULL_VIOLATION_STEP_TOOLS,
   HARNESS_STEPS,
   RELEASE_DIRECT_STEPS,
+  STRUCTURAL_AUDIT_STEPS,
   WRAPPER_LIFECYCLE_STEPS,
 } from './definitions.data.mjs';
 import { createQaStepOccurrence } from './policy/index.mjs';
@@ -42,6 +43,7 @@ const occurrences = [
   ...E2E_STEPS.map((tuple) => fromTuple(tuple, 'e2e')),
   ...AUDIT_STEPS.map((tuple) => fromTuple(tuple, 'audit')),
   ...ADVISORY_STEPS.map((tuple) => fromTuple(tuple, 'advisory', 'advisory')),
+  ...STRUCTURAL_AUDIT_STEPS.map((tuple) => fromTuple(tuple, 'structural-audit', 'manual')),
 ];
 
 export const OBSERVED_QA_RULES = Object.freeze(

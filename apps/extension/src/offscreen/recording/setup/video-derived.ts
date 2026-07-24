@@ -5,7 +5,12 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { recordingContext } from '../context';
 import { applyCanvasCrop, createViewportPresetStream } from '../stream';
-import type { RecordingViewport } from './video.types';
+
+export type RecordingViewport = {
+  width: number;
+  height: number;
+  devicePixelRatio?: number;
+};
 
 type DerivedRecordingStreamParams = {
   captureMode?: CaptureMode;

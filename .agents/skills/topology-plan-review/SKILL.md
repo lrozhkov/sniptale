@@ -19,12 +19,12 @@ Read [`references/topology-plan-review-checklist.md`](references/topology-plan-r
 
 ## Inputs
 
-Run as an independent read-only agent without inherited context. Receive the selected root/seam, current inventory, target owner map, complete old-to-new manifest, collision/facade decisions, consumer/dependent-map inventory, rollback, proof map, mode, and supplied QA results. Do not receive intended conclusions.
+The orchestrator must spawn a new independent read-only reviewer with `fork_turns: "none"` and must not reuse an agent that saw planning or implementation context. The initial task must contain the selected root/seam, exact current diff scope, bounded current or old-to-new manifest, target owner map, collision/facade decisions, consumer/dependent-map inventory, rollback, proof map, mode, and supplied QA results or an explicit `not run` for planning mode. Do not receive intended conclusions.
 
 ## Workflow
 
 1. Read `AGENTS.md`, `docs/engineering/implementation-rules.md`, `docs/architecture/repository-overview.md`, `docs/architecture/code-organization.md`, the supplied bundle, and the required checklist.
-2. Verify that the scope is one coherent ownership result and that the manifest covers the complete selected root/seam rather than a representative sample.
+2. Verify that the scope is one coherent ownership result and that the manifest covers the complete selected root/seam rather than a representative sample. Treat the owner/change-reason cluster as the unit, classify each candidate as `Split`, `Consolidate`, or `Keep`, record the independent change reason for every proposed owner, and test whether the form remains stable under the likely next changes. When supplied maintenance evidence includes overlapping forwarding-edge candidates, verify every forwarding-only single-production-consumer edge instead of trusting a path-partition `Consolidate: 0` summary.
 3. Verify that the manifest is bounded by the frozen acceptance criteria and does not promise unrelated hardening or stronger runtime guarantees.
 4. Classify affected paths as major areas, owned seams, owner-local roles, platform/contract owners, compatibility facades, or legacy debt.
 5. Verify consumers, import directions, mocks, source-reading paths, docs, registries, policy, focused-proof maps, build inputs, collisions, rollback, and negative proof.
@@ -38,6 +38,6 @@ Run as an independent read-only agent without inherited context. Receive the sel
 
 ## Output Contract
 
-List findings first, highest severity first, with evidence, violated invariant, reproducible failure/risk, and minimal correction class. Then state manifest completeness, topology posture, move-mechanic/proof-map posture, residual assumptions, and one decision: `Approve`, `Approve with comments`, or `Request changes`.
+List findings first, highest severity first, with evidence, violated invariant, reproducible failure/risk, and minimal correction class. Compare before/after navigation transitions, facade/proxy/pass-through layers, public surface, state authorities, effects/recovery, cohesion, and independent change reasons. Treat a mechanical line-count split or a set of neighboring files that still share one broad state/effect contract as a distributed god-object, not a completed topology improvement; also reject consolidation that minimizes file count by erasing explicit architectural boundaries. Then state manifest completeness, topology posture, move-mechanic/proof-map posture, residual assumptions, and one decision: `Approve`, `Approve with comments`, or `Request changes`.
 
 Planning approval means the bundle is complete enough to implement without discovering predictable path, collision, consumer, or proof fallout through wrappers. Candidate approval means the diff matches that bundle and the supplied proof is green. Classify findings as current-wave regressions, direct acceptance blockers, provable security issues, or pre-existing hardening; only the first three may produce `Request changes`. Do not demand unrelated next-phase work. If correction would add new runtime contracts, touch all persistence writers, or spread across dozens of additional owners, require a return to the minimal correction class rather than automatic scope growth.

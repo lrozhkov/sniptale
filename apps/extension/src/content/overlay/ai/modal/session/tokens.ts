@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { AIModel } from '../../../../../contracts/settings';
-import { estimateTokens } from '../../../../parser/dom-tree-parser/ai/format';
+import { estimateTokens } from '../../../../parser/dom-tree-parser/ai/markdown';
 
 function resolveSelectedModelSystemPrompt(
   availableModels: AIModel[],

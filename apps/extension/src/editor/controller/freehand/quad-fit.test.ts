@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createModeledFreehandStroke } from './modeling';
-import { resolveQuadCandidate } from './quad-fit';
+import { resolveQuadCandidate } from './quad-fit/resolve';
 
 function registerRectangleAndSquareTest() {
   it('recognizes rectangles and squares from stable quad corners', () => {

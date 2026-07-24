@@ -2,13 +2,8 @@ import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-
 import { setContentModeEnabled } from '../../../application/mode-session';
 import { logSelectionModeDiag, logSelectionModeError } from '../diag';
 import { createSelectionModeControllerActions } from './actions';
-import {
-  createSelectionModeFacadeBindings,
-  createSelectionModeRuntimeBindings,
-} from './runtime-bindings';
-import { createSelectionModeSessionMutableRefs } from '../session/locals/helpers';
+import { createSelectionModeRuntime } from '../runtime/composition';
 import { createSelectionModeSession, resetSelectionModeSession } from '../session';
-import { createSelectionModeState } from '../session/state';
 
 interface SelectionModeController {
   cleanup: () => void;
@@ -18,20 +13,18 @@ interface SelectionModeController {
 }
 
 /**
- * Creates a selection-mode controller with instance-owned state, session locals, and runtime graph.
+ * Creates a selection-mode controller with instance-owned state and one runtime composition.
  */
 export function createSelectionModeController(): SelectionModeController {
-  const state = createSelectionModeState();
-  const session = createSelectionModeSession(state);
-  const mutableRefs = createSelectionModeSessionMutableRefs(session);
-  let runtimeGraph: ReturnType<typeof createSelectionModeRuntimeBindings>;
+  const session = createSelectionModeSession();
+  let runtime: ReturnType<typeof createSelectionModeRuntime>;
 
   const cleanup = () => {
     logSelectionModeDiag('cleanup.start');
     let cleanupError: unknown;
 
     try {
-      runtimeGraph.selectionModeEvents.cleanup();
+      runtime.cleanupEffects();
     } catch (error) {
       cleanupError = error;
     } finally {
@@ -47,25 +40,13 @@ export function createSelectionModeController(): SelectionModeController {
     logSelectionModeDiag('cleanup.complete');
   };
 
-  const runtimeFacade = createSelectionModeFacadeBindings({
+  runtime = createSelectionModeRuntime({
     cleanup,
-    getRuntimeArgs: () => runtimeGraph.selectionModeRuntimeArgs,
-    getRuntimeEvents: () => runtimeGraph.selectionModeEvents,
     session,
-    state,
-  });
-
-  runtimeGraph = createSelectionModeRuntimeBindings({
-    cleanup,
-    mutableRefs,
-    runtimeFacade,
-    session,
-    state,
-    updateFinalFrame: () => runtimeGraph.selectionModeEvents.updateFinalFrame(),
   });
 
   return createSelectionModeControllerActions({
     cleanup,
-    runtimeFacade,
+    runtime,
   });
 }

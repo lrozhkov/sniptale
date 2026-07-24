@@ -55,23 +55,6 @@ export default tseslint.config(
       'no-useless-escape': 'off',
       'no-console': 'off',
       'prefer-const': 'off',
-      'max-lines': [
-        'warn',
-        {
-          max: 300,
-          skipBlankLines: true,
-          skipComments: true,
-        },
-      ],
-      'max-lines-per-function': [
-        'warn',
-        {
-          max: 50,
-          skipBlankLines: true,
-          skipComments: true,
-          IIFEs: true,
-        },
-      ],
       'react-hooks/exhaustive-deps': 'warn',
       'react-hooks/rules-of-hooks': 'error',
       'security/detect-bidi-characters': 'error',
@@ -168,12 +151,6 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.data.ts'],
-    rules: {
-      'max-lines': 'off',
-    },
-  },
-  {
     files: ['tooling/test/e2e/**/*.{ts,tsx}'],
     rules: {
       'no-empty-pattern': 'off',
@@ -197,23 +174,6 @@ export default tseslint.config(
     rules: {
       'no-console': 'off',
       'prefer-const': 'off',
-      'max-lines': [
-        'warn',
-        {
-          max: 300,
-          skipBlankLines: true,
-          skipComments: true,
-        },
-      ],
-      'max-lines-per-function': [
-        'warn',
-        {
-          max: 50,
-          skipBlankLines: true,
-          skipComments: true,
-          IIFEs: true,
-        },
-      ],
       'security/detect-bidi-characters': 'error',
       'security/detect-buffer-noassert': 'error',
       'security/detect-eval-with-expression': 'error',

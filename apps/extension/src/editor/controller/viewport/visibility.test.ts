@@ -52,12 +52,12 @@ vi.mock('../input/pan', () => ({
   shouldStartViewportPan: mocks.shouldStartViewportPanMock,
 }));
 
+import { sendEditorFrameObjectsToBack } from '../document/visibility/frame-stack';
 import {
-  focusEditorObjectInViewport,
-  sendEditorFrameObjectsToBack,
   ensureEditorObjectReachable,
   ensureEditorObjectsReachable,
-} from '../document/visibility';
+} from '../document/visibility/reachability';
+import { focusEditorObjectInViewport } from '../document/visibility/viewport-focus';
 import {
   finishEditorViewportPan,
   moveEditorViewportPan,

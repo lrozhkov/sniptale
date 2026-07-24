@@ -5,14 +5,14 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import type { PromptTemplate } from '../../../../../contracts/settings';
 
 const {
-  findTemplateIdUnderPointMock,
+  reorderMock,
   useTemplateDeleteActionsMock,
   useTemplateDragStateMock,
   useTemplateListDerivedStateMock,
   useTemplateMenuDismissMock,
   useTemplateOrderStateMock,
 } = vi.hoisted(() => ({
-  findTemplateIdUnderPointMock: vi.fn(() => 'template-hit'),
+  reorderMock: vi.fn(),
   useTemplateDeleteActionsMock: vi.fn(),
   useTemplateDragStateMock: vi.fn(),
   useTemplateListDerivedStateMock: vi.fn(),
@@ -20,18 +20,23 @@ const {
   useTemplateOrderStateMock: vi.fn(),
 }));
 
-vi.mock('../drag/targets', () => ({
-  findTemplateIdUnderPoint: findTemplateIdUnderPointMock,
-}));
-
 vi.mock('../drag', () => ({
   useTemplateDragState: useTemplateDragStateMock,
 }));
 
-vi.mock('./hooks', () => ({
+vi.mock('./delete', () => ({
   useTemplateDeleteActions: useTemplateDeleteActionsMock,
+}));
+
+vi.mock('./derived', () => ({
   useTemplateListDerivedState: useTemplateListDerivedStateMock,
+}));
+
+vi.mock('./menu', () => ({
   useTemplateMenuDismiss: useTemplateMenuDismissMock,
+}));
+
+vi.mock('./order', () => ({
   useTemplateOrderState: useTemplateOrderStateMock,
 }));
 
@@ -66,13 +71,12 @@ beforeAll(() => {
 
 beforeEach(() => {
   latestState = null;
-  findTemplateIdUnderPointMock.mockReset();
-  findTemplateIdUnderPointMock.mockReturnValue('template-hit');
+  reorderMock.mockReset();
   useTemplateMenuDismissMock.mockReset();
   useTemplateOrderStateMock.mockReset();
   useTemplateOrderStateMock.mockReturnValue({
     orderedIds: ['template-1'],
-    setOrderedIds: vi.fn(),
+    reorder: reorderMock,
   });
   useTemplateListDerivedStateMock.mockReset();
   useTemplateListDerivedStateMock.mockReturnValue({
@@ -106,21 +110,21 @@ afterEach(() => {
 });
 
 describe('useTemplateListState', () => {
-  it('delegates pill hit-testing to the canonical target owner and exposes drag state', async () => {
+  it('composes drag drops through the canonical order owner and exposes drag state', async () => {
     await renderHarness({ templates });
 
     const dragArgs = useTemplateDragStateMock.mock.calls[0];
-    const findIdUnderPoint = dragArgs?.[0] as ((x: number, y: number) => string | null) | undefined;
+    const dragPillRefs = dragArgs?.[0];
+    const onDrop = dragArgs?.[1] as ((sourceId: string, targetId: string) => void) | undefined;
 
-    if (!findIdUnderPoint || !latestState) {
+    if (!onDrop || !latestState) {
       throw new Error('Expected template-list state to initialize');
     }
 
-    const pill = document.createElement('div');
-    latestState.pillRefs.current.set('template-1', pill);
+    onDrop('template-1', 'template-2');
 
-    expect(findIdUnderPoint(20, 30)).toBe('template-hit');
-    expect(findTemplateIdUnderPointMock).toHaveBeenCalledWith(latestState.pillRefs.current, 20, 30);
+    expect(dragPillRefs).toBe(latestState.pillRefs);
+    expect(reorderMock).toHaveBeenCalledWith('template-1', 'template-2');
     expect(latestState.draggedId).toBe('template-dragged');
     expect(latestState.dragOverId).toBe('template-over');
   });

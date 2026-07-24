@@ -37,7 +37,7 @@ vi.mock('../../state/useEditorStore', () => ({
   },
 }));
 
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 describe('shape selection shadow sync', () => {
   it('syncs canonical shape shadow metadata and fallback values', () => {

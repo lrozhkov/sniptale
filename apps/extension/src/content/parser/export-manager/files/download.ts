@@ -8,7 +8,7 @@ import {
   resolveCredentialedDownloadUrl,
   sanitizeArchiveEntryFilename,
   shouldSkipHtmlDownloadResponse,
-} from './utils';
+} from './download-utils';
 
 const MAX_EXPORT_DOWNLOAD_BYTES = 100 * 1024 * 1024;
 

@@ -6,22 +6,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   armCleanupState,
-  createScreenshotControllerActionsMock,
+  createHandleCancelCountdownMock,
+  createHandleTakeScreenshotMock,
   disableSelectionModeIfLoadedMock,
   handleCancelCountdownMock,
   handleTakeScreenshotMock,
   setUIHiddenMock,
 } = vi.hoisted(() => ({
   armCleanupState: { current: false },
-  createScreenshotControllerActionsMock: vi.fn(),
+  createHandleCancelCountdownMock: vi.fn(),
+  createHandleTakeScreenshotMock: vi.fn(),
   disableSelectionModeIfLoadedMock: vi.fn(),
   handleCancelCountdownMock: vi.fn(),
   handleTakeScreenshotMock: vi.fn(),
   setUIHiddenMock: vi.fn(),
 }));
 
-vi.mock('./session/actions', () => ({
-  createScreenshotControllerActions: createScreenshotControllerActionsMock,
+vi.mock('./session/cancel', () => ({
+  createHandleCancelCountdown: createHandleCancelCountdownMock,
+}));
+
+vi.mock('./session/capture', () => ({
+  createHandleTakeScreenshot: createHandleTakeScreenshotMock,
 }));
 
 vi.mock('../../selection/selection-mode/lazy', async (importOriginal) => ({
@@ -35,10 +41,11 @@ vi.mock('../../selection/locker', async (importOriginal) => ({
 }));
 
 import { useScreenshotController } from './controller';
+import type { CreateScreenshotControllerActionsArgs } from './session/action-types';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
-let latestActionArgs: Parameters<typeof createScreenshotControllerActionsMock>[0] | null = null;
+let latestActionArgs: CreateScreenshotControllerActionsArgs | null = null;
 let latestControllerResult: ReturnType<typeof useScreenshotController> | null = null;
 
 function createParams() {
@@ -92,22 +99,23 @@ async function renderHarness(armCleanup: boolean) {
 }
 
 function configureActionMock() {
-  createScreenshotControllerActionsMock.mockImplementation((args) => {
+  createHandleCancelCountdownMock.mockImplementation((args) => {
     latestActionArgs = args;
     const handleCancelCountdown = vi.fn(() => {
       handleCancelCountdownMock();
     });
 
     if (armCleanupState.current) {
-      args.refs.countdownLockSessionRef.current = {
+      args.session.countdownLock = {
         navigationLockEnabledBeforeCountdown: true,
       };
     }
 
-    return {
-      handleCancelCountdown,
-      handleTakeScreenshot: handleTakeScreenshotMock,
-    };
+    return handleCancelCountdown;
+  });
+  createHandleTakeScreenshotMock.mockImplementation((args) => {
+    latestActionArgs = args;
+    return handleTakeScreenshotMock;
   });
 }
 
@@ -133,26 +141,27 @@ async function expectInvalidationReturnsActiveRunBaselineAndCleansSelection() {
   await renderHarness(false);
   expect(latestActionArgs).not.toBeNull();
   expect(latestControllerResult).not.toBeNull();
-  latestActionArgs!.refs.navigationLockStateBeforeScreenshot.current = false;
-  latestActionArgs!.refs.countdownLockSessionRef.current = {
+  expect(latestActionArgs!.runtime.session).toBe(latestActionArgs!.session);
+  latestActionArgs!.session.navigationLockBaseline = false;
+  latestActionArgs!.session.countdownLock = {
     navigationLockEnabledBeforeCountdown: false,
   };
-  latestActionArgs!.refs.countdownRunTokenRef.current = 1;
-  latestActionArgs!.refs.countdownTimeoutRef.current = setTimeout(vi.fn(), 1000);
-  latestActionArgs!.refs.pendingScreenshotType.current = 'selection';
-  latestActionArgs!.runtime.screenshotRunActiveRef.current = true;
+  latestActionArgs!.session.countdownRunToken = 1;
+  latestActionArgs!.session.countdownTimeout = globalThis.setTimeout(vi.fn(), 1000);
+  latestActionArgs!.session.pendingType = 'selection';
+  latestActionArgs!.session.runActive = true;
 
   const startContext = latestControllerResult!.invalidateScreenshotRuns();
 
   expect(startContext).toEqual({ navigationLockBaseline: false });
   expect(setUIHiddenMock).toHaveBeenCalledWith(false);
   expect(latestActionArgs!.params.setIsCompletelyHidden).toHaveBeenCalledWith(false);
-  expect(latestActionArgs!.refs.countdownLockSessionRef.current).toBeNull();
-  expect(latestActionArgs!.refs.countdownRunTokenRef.current).toBeNull();
-  expect(latestActionArgs!.refs.countdownTimeoutRef.current).toBeNull();
-  expect(latestActionArgs!.refs.pendingScreenshotType.current).toBeNull();
-  expect(latestActionArgs!.runtime.screenshotRunActiveRef.current).toBe(false);
-  expect(latestActionArgs!.runtime.screenshotRunGenerationRef.current).toBe(1);
+  expect(latestActionArgs!.session.countdownLock).toBeNull();
+  expect(latestActionArgs!.session.countdownRunToken).toBeNull();
+  expect(latestActionArgs!.session.countdownTimeout).toBeNull();
+  expect(latestActionArgs!.session.pendingType).toBeNull();
+  expect(latestActionArgs!.session.runActive).toBe(false);
+  expect(latestActionArgs!.session.runGeneration).toBe(1);
   expect(disableSelectionModeIfLoadedMock).toHaveBeenCalledOnce();
 }
 

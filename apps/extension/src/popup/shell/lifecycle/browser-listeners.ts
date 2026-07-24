@@ -1,6 +1,6 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 
-import type { PopupLifecycleBrowserListenerParamsGetter } from './types';
+import type { PopupLifecycleBrowserListenerParamsGetter } from './contracts';
 
 export function registerPopupLifecycleBrowserListeners(
   getParams: PopupLifecycleBrowserListenerParamsGetter

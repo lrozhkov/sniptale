@@ -33,9 +33,12 @@ vi.mock('../../../../platform/frame', () => ({
   resolveIframeEventTarget: resolveIframeEventTargetMock,
 }));
 
-vi.mock('..', () => ({
+vi.mock('../commands', () => ({
   handleSelectionModeClick: handleSelectionModeClickMock,
   handleSelectionModeKeyDown: handleSelectionModeKeyDownMock,
+}));
+
+vi.mock('../pointer-handlers', () => ({
   handleSelectionModeMouseDown: handleSelectionModeMouseDownMock,
   handleSelectionModeMouseLeave: handleSelectionModeMouseLeaveMock,
   handleSelectionModeMouseMove: handleSelectionModeMouseMoveMock,
@@ -151,6 +154,39 @@ function expectPointerHandlerLifecycle() {
   expect(handleSelectionModeMouseLeaveMock).toHaveBeenCalledWith(state, selectionModeEvents);
 }
 
+function expectIframeTargetShortCircuit() {
+  const { handlers } = createHandlersFixture();
+  const iframeTarget = document.createElement('article');
+  const fallbackTarget = document.createElement('section');
+  resolveIframeEventTargetMock.mockReturnValue(iframeTarget);
+  getContentEventTargetElementMock.mockReturnValue(fallbackTarget);
+
+  handlers.handleMouseDown(new MouseEvent('mousedown'));
+
+  expect(resolveIframeEventTargetMock).toHaveBeenCalledTimes(1);
+  expect(getContentEventTargetElementMock).not.toHaveBeenCalled();
+  expect(logSelectionModeRuntimeMock).toHaveBeenCalledWith('MouseDown received', {
+    currentState: 'hover',
+    tagName: 'ARTICLE',
+  });
+}
+
+function expectContentTargetFallback() {
+  const { handlers } = createHandlersFixture();
+  const fallbackTarget = document.createElement('section');
+  resolveIframeEventTargetMock.mockReturnValue(null);
+  getContentEventTargetElementMock.mockReturnValue(fallbackTarget);
+
+  handlers.handleMouseDown(new MouseEvent('mousedown'));
+
+  expect(resolveIframeEventTargetMock).toHaveBeenCalledTimes(1);
+  expect(getContentEventTargetElementMock).toHaveBeenCalledTimes(1);
+  expect(logSelectionModeRuntimeMock).toHaveBeenCalledWith('MouseDown received', {
+    currentState: 'hover',
+    tagName: 'SECTION',
+  });
+}
+
 describe('selection-mode activation handlers', () => {
   it(
     'logs and delegates click and keyboard activation through the event seam',
@@ -163,4 +199,10 @@ describe('selection-mode pointer handlers', () => {
     'logs pointer target changes and delegates pointer lifecycle handlers',
     expectPointerHandlerLifecycle
   );
+  it('short-circuits content target lookup when iframe resolution succeeds', () => {
+    expectIframeTargetShortCircuit();
+  });
+  it('uses the content target exactly once when iframe resolution misses', () => {
+    expectContentTargetFallback();
+  });
 });

@@ -38,7 +38,7 @@ vi.mock('../core/helpers', async (importOriginal) => ({
   parseColorForStore: mocks.parseColorForStoreMock,
 }));
 
-import { syncSelectionToolSettingsFromObject } from './sync';
+import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
 beforeEach(() => {
   vi.clearAllMocks();

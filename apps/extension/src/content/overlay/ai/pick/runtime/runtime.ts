@@ -1,7 +1,7 @@
 import { createLazyContentDefaultOwner } from '../../../../application/default-owner';
 import { registerContentMode } from '../../../../application/mode-session';
 import { createAiPickModeController } from './mode.controller';
-import { createAiPickOverlayController } from './overlay';
+import { createAiPickOverlayController } from './overlay.controller';
 import type { AiPickEnableOptions } from './mode.types';
 
 export { resolveAiPickInteractionTarget } from './interaction-target';

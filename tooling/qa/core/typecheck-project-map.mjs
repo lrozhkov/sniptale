@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 
+import { readHeadFileText } from './git-head-sources.mjs';
 import { fromRelativePath } from './shared-paths.mjs';
-import { isProductSourcePath } from './src-production-targets.mjs';
 import {
   FULL_TYPECHECK_PROJECT_IDS,
   OWNER_TEST_TYPECHECK_PROJECTS,
@@ -37,7 +37,6 @@ const BROAD_SHARED_PREFIXES = [
   'packages/platform/src/',
   'packages/ui/src/',
 ];
-const FULL_TYPECHECK_SOURCE_PREFIXES = ['apps/extension/src/content/'];
 const FULL_TYPECHECK_TRIGGER_FILES = new Set([
   'package.json',
   'package-lock.json',
@@ -56,6 +55,8 @@ const FULL_TYPECHECK_TRIGGER_FILES = new Set([
 ]);
 const TS_SOURCE_PATTERN = /\.(?:ts|tsx|cts|mts)$/u;
 const TEST_SOURCE_PATTERN = /\.(?:test|spec|test-support)\.(?:ts|tsx)$/u;
+const CONTENT_TEST_HELPER_PATTERN =
+  /^apps\/extension\/src\/content\/.*\.test\.helpers\.(?:ts|tsx)$/u;
 
 function normalizePath(file) {
   return file.replaceAll('\\', '/');
@@ -65,8 +66,17 @@ function isTypeScriptSource(file) {
   return TS_SOURCE_PATTERN.test(file);
 }
 
+function isOwnerTestSource(file) {
+  return TEST_SOURCE_PATTERN.test(file) || CONTENT_TEST_HELPER_PATTERN.test(file);
+}
+
 function isBroadSharedFile(file) {
   return BROAD_SHARED_PREFIXES.some((prefix) => file.startsWith(prefix));
+}
+
+function matchesRootPrefix(file, rootPrefix) {
+  const directoryPrefix = rootPrefix.endsWith('/') ? rootPrefix : `${rootPrefix}/`;
+  return file.startsWith(directoryPrefix);
 }
 
 function projectExists(projectId) {
@@ -113,15 +123,15 @@ function resolveDirectProjectId(file) {
   }
 
   const matchingProductionProject = PRODUCTION_TYPECHECK_PROJECTS.find((project) =>
-    project.rootPrefixes.some((prefix) => file.startsWith(prefix))
+    project.rootPrefixes.some((prefix) => matchesRootPrefix(file, prefix))
   );
   if (!matchingProductionProject) {
     return null;
   }
 
-  if (TEST_SOURCE_PATTERN.test(file) || file.includes('/test-support/')) {
+  if (isOwnerTestSource(file) || file.includes('/test-support/')) {
     const matchingRoot = matchingProductionProject.rootPrefixes.find((prefix) =>
-      file.startsWith(prefix)
+      matchesRootPrefix(file, prefix)
     );
     return matchingRoot ? (OWNER_TEST_PROJECT_BY_ROOT.get(matchingRoot) ?? null) : null;
   }
@@ -141,7 +151,13 @@ export function getTypecheckProject(projectId) {
   return PROJECT_BY_ID.get(projectId) ?? null;
 }
 
-export function resolveAffectedTypecheckProjects(targetFiles = []) {
+export function resolveAffectedTypecheckProjects(
+  targetFiles = [],
+  {
+    fileExists = (file) => fs.existsSync(fromRelativePath(file)),
+    headSourceResolver = readHeadFileText,
+  } = {}
+) {
   const normalizedFiles = [...new Set(targetFiles.map(normalizePath))].sort();
   const sourceFiles = normalizedFiles.filter(isTypeScriptSource);
 
@@ -157,28 +173,17 @@ export function resolveAffectedTypecheckProjects(targetFiles = []) {
     };
   }
 
-  if (
-    sourceFiles.some((file) => isProductSourcePath(file) && !fs.existsSync(fromRelativePath(file)))
-  ) {
-    return createFullResolution('deleted or missing TypeScript source target');
-  }
-
   if (sourceFiles.some(isBroadSharedFile)) {
     return createFullResolution('broad shared contract owner changed');
   }
-  if (
-    sourceFiles.some((file) =>
-      FULL_TYPECHECK_SOURCE_PREFIXES.some((prefix) => file.startsWith(prefix))
-    )
-  ) {
-    return createFullResolution('broad content owner changed');
-  }
-
   const directProjectIds = new Set();
   for (const file of sourceFiles) {
     const projectId = resolveDirectProjectId(file);
     if (!projectId) {
       return createFullResolution(`unmapped TypeScript target: ${file}`);
+    }
+    if (!fileExists(file) && headSourceResolver(file) === null) {
+      return createFullResolution(`missing TypeScript target without HEAD deletion: ${file}`);
     }
 
     directProjectIds.add(projectId);

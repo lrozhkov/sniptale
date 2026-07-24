@@ -1,9 +1,23 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
-import { createHoverElements, hideHoverFrame, showHoverFrame } from './hover';
+import {
+  createHoverElements,
+  createSelectionModeHoverFrameHandlers,
+  hideHoverFrame,
+  showHoverFrame,
+} from './hover';
 import type { SelectionModeDom } from './dom-types';
+
+const { logSelectionModeRuntime } = vi.hoisted(() => ({
+  logSelectionModeRuntime: vi.fn(),
+}));
+
+vi.mock('../diag', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../diag')>()),
+  logSelectionModeRuntime,
+}));
 
 function createSelectionModeDomFixture(): SelectionModeDom {
   const overlayContainer = document.createElement('div');
@@ -50,6 +64,7 @@ function createSelectionVisual(
 }
 
 afterEach(() => {
+  logSelectionModeRuntime.mockClear();
   document.body.replaceChildren();
 });
 
@@ -82,5 +97,42 @@ describe('selection-mode hover frame', () => {
 
     expect(dom.hoverFrame?.style.display).toBe('none');
     expect(dom.hoverSizeLabel?.style.display).toBe('none');
+  });
+
+  it('uses the latest session DOM identity for runtime hover effects', () => {
+    const initialDom = createSelectionModeDomFixture();
+    const latestDom = createSelectionModeDomFixture();
+    createHoverElements(initialDom, createSelectionVisual(), 100);
+    createHoverElements(latestDom, createSelectionVisual(), 100);
+    const session = { currentState: 'hover' as const, dom: initialDom, isActive: true };
+    const handlers = createSelectionModeHoverFrameHandlers(session);
+    session.dom = latestDom;
+
+    handlers.showHoverFrameDom(document.createElement('section'));
+
+    expect(initialDom.hoverFrame?.style.display).not.toBe('block');
+    expect(latestDom.hoverFrame?.style.display).toBe('block');
+    handlers.hideHoverFrame();
+    expect(latestDom.hoverFrame?.style.display).toBe('none');
+  });
+
+  it('reports missing current DOM without applying hover effects', () => {
+    const session = { currentState: 'idle' as const, dom: null, isActive: true };
+    const handlers = createSelectionModeHoverFrameHandlers(session);
+    const element = document.createElement('button');
+
+    handlers.showHoverFrameDom(element);
+    handlers.hideHoverFrame();
+
+    expect(logSelectionModeRuntime).toHaveBeenNthCalledWith(
+      1,
+      'Missing DOM during showHoverFrame',
+      { currentState: 'idle', isActive: true, tagName: 'BUTTON' }
+    );
+    expect(logSelectionModeRuntime).toHaveBeenNthCalledWith(
+      2,
+      'Missing DOM during hideHoverFrame',
+      { currentState: 'idle', isActive: true }
+    );
   });
 });

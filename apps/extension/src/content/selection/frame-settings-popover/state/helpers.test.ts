@@ -78,7 +78,6 @@ it('dispatches session blur settings changes through the shared event seam', () 
     showBorder: false,
   };
   const handlers = createFrameBlurHandlers({
-    blurDebounceRef: { current: null },
     localBlurSettings,
     onApplyToFrame: vi.fn(),
     setLocalBlurSettings: vi.fn(),
@@ -100,7 +99,6 @@ it('dispatches session focus and opacity changes through the shared event seam',
   const cleanupOpacity = addFocusOpacityChangedListener(opacityListener);
   const localFocusSettings: FocusSettings = { opacity: 0.4, showBorder: false };
   const handlers = createFrameFocusHandlers({
-    focusDebounceRef: { current: null },
     frameId: 'frame-1',
     localFocusSettings,
     onApplyToFrame: vi.fn(),

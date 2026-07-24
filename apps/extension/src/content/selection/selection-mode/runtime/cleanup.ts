@@ -1,7 +1,3 @@
-import {
-  createSelectionModeSessionCleanupCallbackSetters,
-  createSelectionModeSessionCleanupSetters,
-} from '../session/locals/setters';
 import { cleanupSelectionModeDom, removeDragEventCatcher } from '../ui';
 import type { ResizeDirection, SelectionModeDom } from '../ui/dom-types';
 import { createSelectionModeDom } from '../ui';
@@ -29,7 +25,6 @@ function normalizeSelectionModeCleanupError(error: unknown): Error {
 }
 
 function runSelectionModeCleanupCallbacks(state: CleanupCallbackState): Error | null {
-  const stateSetters = createSelectionModeSessionCleanupCallbackSetters(state);
   let cleanupError: Error | null = null;
 
   try {
@@ -37,7 +32,7 @@ function runSelectionModeCleanupCallbacks(state: CleanupCallbackState): Error | 
   } catch (error) {
     cleanupError = normalizeSelectionModeCleanupError(error);
   } finally {
-    stateSetters.setCleanupEventListeners(null);
+    state.cleanupEventListeners = null;
   }
 
   try {
@@ -45,7 +40,7 @@ function runSelectionModeCleanupCallbacks(state: CleanupCallbackState): Error | 
   } catch (error) {
     cleanupError ??= normalizeSelectionModeCleanupError(error);
   } finally {
-    stateSetters.setCleanupScrollListeners(null);
+    state.cleanupScrollListeners = null;
   }
 
   return cleanupError;
@@ -55,7 +50,6 @@ export function cleanupSelectionModeRuntime(
   state: CleanupRuntimeState,
   handleKeyDown: (event: KeyboardEvent) => void
 ): void {
-  const stateSetters = createSelectionModeSessionCleanupSetters(state);
   let cleanupError = runSelectionModeCleanupCallbacks(state);
 
   try {
@@ -68,15 +62,15 @@ export function cleanupSelectionModeRuntime(
   } catch (error) {
     cleanupError ??= normalizeSelectionModeCleanupError(error);
   } finally {
-    stateSetters.setDom(createSelectionModeDom());
-    stateSetters.setIsActive(false);
-    stateSetters.setCurrentState('idle');
-    stateSetters.setIsDragging(false);
-    stateSetters.setIsResizing(false);
-    stateSetters.setResizeDirection(null);
-    stateSetters.setHoveredElement(null);
-    stateSetters.setMouseDownPoint(null);
-    stateSetters.setHasMovedEnough(false);
+    state.dom = createSelectionModeDom();
+    state.isActive = false;
+    state.currentState = 'idle';
+    state.isDragging = false;
+    state.isResizing = false;
+    state.resizeDirection = null;
+    state.hoveredElement = null;
+    state.mouseDownPoint = null;
+    state.hasMovedEnough = false;
   }
 
   if (cleanupError) {

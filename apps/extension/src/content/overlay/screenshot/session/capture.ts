@@ -1,10 +1,10 @@
-import { startCountdown, type ScreenshotType } from '../countdown/controller';
+import { startCountdown } from '../countdown/controller';
 import { executeCountdownScreenshot } from './elapsed';
 import { runImmediateScreenshot } from './immediate';
 import { beginScreenshotRun, prepareScreenshotMode, syncCaptureAction } from '../mode';
 import type { CreateScreenshotControllerActionsArgs } from './action-types';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
-import type { ScreenshotStartContext } from '../types';
+import type { ScreenshotStartContext, ScreenshotType } from '../types';
 
 export function createHandleTakeScreenshot(args: CreateScreenshotControllerActionsArgs) {
   return async (
@@ -13,7 +13,7 @@ export function createHandleTakeScreenshot(args: CreateScreenshotControllerActio
     startContext?: ScreenshotStartContext
   ) => {
     await syncCaptureAction(args.params);
-    prepareScreenshotMode(args.params, args.refs.navigationLockStateBeforeScreenshot, startContext);
+    prepareScreenshotMode(args.params, args.session, startContext);
     const runToken = beginScreenshotRun(args.runtime);
 
     if (args.params.timerDelay > 0) {
@@ -36,15 +36,12 @@ function startScreenshotCountdown(
   runToken: number,
   contentIntentSource: ContentPrivilegedActionIntentSource | undefined
 ) {
-  args.refs.countdownRunTokenRef.current = runToken;
+  args.session.countdownRunToken = runToken;
   startCountdown({
-    countdownLockSessionRef: args.refs.countdownLockSessionRef,
-    countdownTimeoutRef: args.refs.countdownTimeoutRef,
-    navigationLockStateBeforeScreenshot: args.refs.navigationLockStateBeforeScreenshot,
     onElapsed: () => {
       void executeCountdownScreenshot(type, args, runToken, contentIntentSource);
     },
-    pendingScreenshotType: args.refs.pendingScreenshotType,
+    session: args.session,
     setCountdown: args.setCountdown,
     setIsToolbarVisible: args.params.setIsToolbarVisible,
     setNavigationLockEnabled: args.params.setNavigationLockEnabled,

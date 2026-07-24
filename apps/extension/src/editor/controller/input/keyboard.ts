@@ -1,9 +1,13 @@
 import type { EditorKeyboardAction, EditorKeyboardResolverOptions } from './keyboard-types';
 import { resolveEditorKeyboardNudge } from './keyboard-nudge';
-import { resolveTextStyleKeyboardAction } from './keyboard-text-style';
-import { resolveEditorHistoryKeyboardAction } from './keyboard-history';
-import { resolveEditorEnterKeyboardAction } from './keyboard-enter';
-import { resolveEditorFallbackKeyboardAction } from './keyboard-fallback';
+import {
+  resolveEditorEnterKeyboardAction,
+  resolveEditorFallbackKeyboardAction,
+} from './keyboard-editing';
+import {
+  resolveEditorHistoryKeyboardAction,
+  resolveTextStyleKeyboardAction,
+} from './keyboard-shortcuts';
 
 export function resolveEditorKeyboardAction(
   options: EditorKeyboardResolverOptions

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { expect, it, vi } from 'vitest';
-import { handleSelectionModeMouseMove } from './mouse-move';
+import { handleSelectionModeMouseMove } from '.';
 import type { SelectionModeEventOptions, SelectionModeInteractionState } from '../types';
 
 vi.mock('./target', () => ({

@@ -41,9 +41,9 @@ Read deeper docs only when the task touches their area:
 
 Run `npm run qa:preflight` when scope is unclear or non-trivial. Use `npm run qa:preflight -- --files <paths...>` for pre-edit planning before a diff exists.
 
-Record the owner seam, runtime boundary, target topology, likely next `2-3` seam expansions, state authorities, risk families, size pressure, transitive consumers, and expected negative/user-visible proof before editing. For a broad topology move, pin a bounded manifest with the owner/import boundary, public contracts, complete consumer set, typecheck blast radius, collision handling, rollback, negative proof, acceptance proof, and near-limit files/tests.
+Record the owner seam, runtime boundary, target topology, likely next `2-3` seam expansions, state authorities, risk families, structural pressure, transitive consumers, and expected negative/user-visible proof before editing. For a broad topology move, pin a bounded manifest with the owner/import boundary, public contracts, complete consumer set, typecheck blast radius, collision handling, rollback, negative proof, acceptance proof, and structurally pressured files/functions.
 
-If preflight shows a near-capacity owner, broad public surface, flat sibling scatter, repeated-prefix names, root-facade drift, or multiple independent reasons for the same file to change, fix the shape before adding behavior. Metrics are signals, not architecture boundaries.
+If preflight shows mixed ownership, low cohesion, a broad public surface, flat sibling scatter, repeated-prefix names, root-facade drift, or multiple independent reasons for the same file to change, fix the shape before adding behavior. Metrics are signals, not architecture boundaries. Token counts are not a quality signal, and a mechanical or distributed split is not a fix when the same broad owner contract remains.
 
 Return to preflight and the minimal correction class when a proposed fix starts changing new runtime contracts, all persistence writers, or dozens of additional owners beyond the accepted manifest. Expand the task only when those changes are proved necessary for the frozen acceptance criteria.
 
@@ -55,7 +55,13 @@ For runtime route changes, keep the action-kernel route registry, authorization 
 
 Implement a coherent wave before running blocking QA. Use targeted commands only to investigate a specific wrapper failure, answer a focused debugging question, or satisfy an explicit user request.
 
-Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has harness/shared-control targets. This includes `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. The live classifier is `tooling/qa/core/qa-scope.mjs`.
+Structural enforcement analyzes behavioral files in the current diff and compares their current AST shape with `HEAD`; unchanged, import-only, mock-only, and rename-only files are not candidates. A cohesive registered orchestration owner may legitimately coordinate state, effects, recovery, and narrow adapters, but must not absorb unrelated UI or arbitrary branching. `qa:preflight -- --files ...` is a read-only planning snapshot, while `qa:structural-audit` is a manual report-only maintenance tool and is not a routine agent or PR gate.
+
+Plan architecture work by owner/change-reason cluster and classify each candidate as `Split`, `Consolidate`, or `Keep`. Optimize the number of navigation transitions required to understand one operation, not the raw file count: retain explicit runtime, owner, adapter, and public-contract boundaries. Before and after a topology wave, compare navigation transitions, forwarding/proxy layers, public contract surface, state authorities, effects/recovery placement, and cohesion. A split or consolidation must include negative proof for cycles, dual authority, cross-owner imports, broad facade/state/props bags, forwarding-only layers, dead exports, generic helpers, and UI mixed with privileged, persistence, or transport effects.
+
+When an explicitly requested manual topology snapshot reports forwarding-only modules with one production consumer, treat them as overlapping edge-derived operation candidates rather than path-partition owners. Before declaring an area complete, require the artifact's complete compact edge inventory and classify every such candidate as `Consolidate` or retain it with explicit contract, runtime, cross-owner, unresolved-topology, or independent-change-reason `Keep` evidence. A zero `Consolidate` count is not proof that fragmentation is absent unless this edge inventory is empty or fully vetoed.
+
+Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has executable harness/shared-control targets. This includes executable `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. Exact machine-owned inventory-only files classified by `tooling/qa/core/qa-scope.mjs` use checkpoint owner validators and do not require a fresh harness stamp; `qa:build` still requires that fresh checkpoint. Policy JSON, baselines, allowlists, and executable registries remain harness targets.
 
 Run `npm run qa:checkpoint` after each substantial coherent implementation wave. It owns supported non-Markdown formatting, advisory state, focused static checks, typecheck, focused tests, and diff coverage; it does not build, stage, or commit.
 
@@ -65,11 +71,11 @@ Subagents may perform read-only investigation, diagnosis, or disjoint implementa
 
 Run `$security-code-review` only when the current diff actually changes a trust boundary, authorization decision, privileged API use, sanitization/import-export policy, secret handling, retention, privacy behavior, manifest permission, or MV3 lifecycle authority. Run `$architecture-code-review` only when the current diff actually changes runtime ownership, state/public contracts, dependency direction, parser semantics, UI/i18n/design-system ownership, or notable topology. Low-risk owner-local extraction, test/proof-only changes, literal clone removal, and mechanical moves that preserve those seams do not require independent review; report `not required: low-risk change`. Use `$topology-plan-review` before implementation to validate a large move plan or after green proof to review the completed move.
 
-Required closeout review runs only after the complete candidate, deterministic negative proof, applicable green harness proof, and green `qa:checkpoint` exist. Invoke it as an independent read-only agent without inherited context. Supply explicit scope, bounded manifest/completion matrix, preflight shape, and QA result; do not pass intended conclusions.
+Required closeout review runs only after the complete candidate, deterministic negative proof, applicable green harness proof, and green `qa:checkpoint` exist. Spawn a new independent read-only reviewer with `fork_turns: "none"`; do not reuse an agent that saw implementation context. The initial review task must supply the explicit bounded manifest/completion matrix, exact current diff scope, preflight shape, and QA results; do not pass intended conclusions.
 
 Collect all findings, classify them with the four finding categories, confirm blockers against evidence and the frozen acceptance criteria, and apply one consolidated correction. A reviewer may not turn an unrelated test wish or stronger guarantee into a blocker. Do not repeat review after mechanical cleanup unless the correction changed the reviewed behavior, owner, public contract, dependency direction, parser semantics, or security seam. Rerun only proof invalidated by the correction.
 
-Expect QA or review to reject dual authority, write-on-read repair, blind overwrites, stale async results, missing rollback/failure surfacing, raw privileged effects outside canonical owners, unsafe boundary casts, broad controller/state/props bags, hidden multi-transport orchestration, topology-only line splitting, dead exports/cycles, i18n/design-system bypasses, and success-only proof for failure-prone seams.
+Expect QA or review to reject dual authority, write-on-read repair, blind overwrites, stale async results, missing rollback/failure surfacing, raw privileged effects outside canonical owners, unsafe boundary casts, broad controller/state/props bags, hidden multi-transport orchestration, topology-only line splitting, distributed god-objects, dead exports/cycles, i18n/design-system bypasses, and success-only proof for failure-prone seams.
 
 ## Closeout
 
@@ -83,7 +89,7 @@ Normal implementation flow:
 6. apply one consolidated correction and rerun only invalidated proof/review
 7. run `npm run qa:closeout -- -m "<commit message>"`
 
-`qa:closeout` reuses a fresh matching checkpoint or runs one, invokes `qa:build`, validates the unchanged diff and task-artifact policy, stages allowed changes, and commits only after the build is green. It requires a fresh harness stamp whenever the live diff has harness/shared-control targets.
+`qa:closeout` reuses a fresh matching checkpoint or runs one, invokes `qa:build`, validates the unchanged diff and task-artifact policy, stages allowed changes, and commits only after the build is green. It requires a fresh harness stamp whenever the live diff has executable harness/shared-control targets; exact machine-owned inventory-only targets are validated by their owner checks instead.
 
 Do not run a manual closeout chain, manually stage the candidate, start another blocking wrapper while closeout runs, stage `tasks/**`, or amend an existing commit unless the user explicitly requests it.
 

@@ -7,7 +7,7 @@ import type { QuickAction, QuickActionDelay, ViewportPreset } from '../../../con
 import { HotkeyInput } from './hotkey-input';
 import { allowedQuickActionIcons, delayOptions, quickActionIconMap } from './section/constants';
 import { settingsMetaLabelClassName } from '../../section-surface';
-import { type QuickActionsSectionState } from './section';
+import { type QuickActionsSectionState } from './controller';
 
 const iconPickerClassName = [
   'flex flex-wrap gap-1 rounded-md border p-2',

@@ -149,11 +149,54 @@ it('expands parser and export seams to broader related owner files in qa:build',
   expect(scope.matchedFamilies).toContain('parser-snapshot-export');
   expect(scope.profile).toBe('related-transitive');
   expect(scope.relatedFiles).toEqual([
-    'apps/extension/src/content/parser/dom-tree-parser/index.ts',
     'apps/extension/src/content/parser/dom-tree-parser/traversal/section-titles.helpers.ts',
     'apps/extension/src/offscreen/project-export/runtime.ts',
     'apps/extension/src/offscreen/project-export/service/runner.ts',
   ]);
+});
+
+it('bounds parser-family expansion to the closest behavioral owner', () => {
+  const aiOwner = 'apps/extension/src/content/parser/dom-tree-parser/ai/editable-format.ts';
+  const aiSibling = 'apps/extension/src/content/parser/dom-tree-parser/ai/response-markdown.ts';
+  const importOnlyConsumer = 'apps/extension/src/content/parser/popup-export/helpers/preview.ts';
+  const unrelatedDomTreeOwner =
+    'apps/extension/src/content/parser/dom-tree-parser/traversal/index.ts';
+  const unrelatedParserOwner =
+    'apps/extension/src/content/parser/page-preparation/snapshot/index.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [aiOwner, importOnlyConsumer],
+    riskTargetFiles: [aiOwner],
+    codeFiles: [aiOwner, importOnlyConsumer],
+    repoCodeFiles: [
+      aiOwner,
+      aiSibling,
+      importOnlyConsumer,
+      unrelatedDomTreeOwner,
+      unrelatedParserOwner,
+    ],
+  });
+
+  expect(scope.matchedFamilies).toContain('parser-snapshot-export');
+  expect(scope.relatedFiles).toEqual([aiOwner, aiSibling, importOnlyConsumer]);
+  expect(scope.relatedFiles).not.toContain(unrelatedDomTreeOwner);
+  expect(scope.relatedFiles).not.toContain(unrelatedParserOwner);
+});
+
+it('does not classify owner-local snapshot helpers as parser or export seams', () => {
+  const file = 'apps/extension/src/content/selection/session/snapshots.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [file],
+    codeFiles: [file],
+    repoCodeFiles: [file],
+    focusedScopeResolver: () => ({
+      detail: 'local owner tests=1; coverageTargets=1',
+      testFiles: ['apps/extension/src/content/selection/session/index.test.ts'],
+      verdict: 'run-local-coverage',
+    }),
+    ownerTestResolver: () => ['apps/extension/src/content/selection/session/index.test.ts'],
+  });
+
+  expect(scope.matchedFamilies).not.toContain('parser-snapshot-export');
 });
 
 it('falls back to direct changed tests when qa:build has no changed code files', () => {
@@ -215,7 +258,8 @@ it('keeps deleted high-risk targets on the related profile', () => {
 
   expect(scope.profile).toBe('related-transitive');
   expect(scope.matchedFamilies).toEqual(['messaging-runtime', 'package-and-app-core']);
-  expect(scope.relatedFiles).toEqual(['apps/extension/src/platform/runtime-messaging/client.ts']);
+  expect(scope.fullSuite).toBe(true);
+  expect(scope.relatedFiles).toEqual([]);
 });
 
 it('keeps high-risk runtime diffs on the transitive related profile', () => {
@@ -233,6 +277,52 @@ it('keeps high-risk runtime diffs on the transitive related profile', () => {
   expect(scope.profile).toBe('related-transitive');
   expect(scope.directTestFiles).toEqual([]);
   expect(scope.relatedFiles).toEqual(['apps/extension/src/background/runtime/session.ts']);
+});
+
+it('does not classify owner-local runtime naming as a messaging transport seam', () => {
+  const sourceFile = 'apps/extension/src/content/selection/quick-edit-runtime/runtime.events.ts';
+  const sourceTest =
+    'apps/extension/src/content/selection/quick-edit-runtime/runtime.events.test.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [sourceFile, sourceTest],
+    codeFiles: [sourceFile, sourceTest],
+    repoCodeFiles: [sourceFile, sourceTest],
+    focusedScopeResolver: () => ({
+      detail: 'local owner tests=1; coverageTargets=1',
+      testFiles: [sourceTest],
+      verdict: 'run-local-coverage',
+    }),
+    ownerTestResolver: () => [sourceTest],
+  });
+
+  expect(scope.matchedFamilies).not.toContain('messaging-runtime');
+  expect(scope.profile).toBe('owner-direct');
+  expect(scope.directTestFiles).toEqual([sourceTest]);
+});
+
+it.each([
+  'apps/extension/src/content/overlay/app/message-bridge/index.ts',
+  'apps/extension/src/content/runtime/bridge/core.ts',
+  'apps/extension/src/content/runtime/shim/transport/quick-action.ts',
+  'apps/extension/src/effect-runtime-sandbox/broker/worker-message-boundary.ts',
+  'apps/extension/src/popup/shell/export/runtime/tab-message-routing.ts',
+])('keeps canonical messaging boundary %s on the transitive profile', (sourceFile) => {
+  const sourceTest = sourceFile.replace(/\.ts$/u, '.test.ts');
+  const scope = resolveBuildTestScope({
+    targetFiles: [sourceFile, sourceTest],
+    codeFiles: [sourceFile, sourceTest],
+    repoCodeFiles: [sourceFile, sourceTest],
+    focusedScopeResolver: () => ({
+      detail: 'local owner tests=1; coverageTargets=1',
+      testFiles: [sourceTest],
+      verdict: 'run-local-coverage',
+    }),
+    ownerTestResolver: () => [sourceTest],
+  });
+
+  expect(scope.matchedFamilies).toContain('messaging-runtime');
+  expect(scope.profile).toBe('related-transitive');
+  expect(scope.directTestFiles).toEqual([]);
 });
 
 it('falls back to related tests when a small owner scope is ambiguous', () => {

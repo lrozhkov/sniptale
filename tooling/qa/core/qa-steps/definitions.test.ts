@@ -45,6 +45,7 @@ it('records every canonical wrapper and decision lane', () => {
     'manual',
     'release-direct',
     'release-guardrail',
+    'structural-audit',
     'wrapper-lifecycle',
   ]);
 });

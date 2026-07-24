@@ -1,7 +1,10 @@
 import fs from 'node:fs';
-import { fromRelativePath } from './shared.mjs';
+import path from 'node:path';
+import { fromRelativePath, repoRoot } from './shared.mjs';
 import { FOCUSED_COVERAGE_OWNER_MAPPINGS } from './focused-coverage/maps/index.mjs';
 import { collectMappingProductionTargetViolations } from './focused-coverage/production-targets.mjs';
+import { parseDeclarativeConstArrayModule } from './declarative-inventory.mjs';
+import { createSourceFile } from './structural-risk/ast.mjs';
 
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 export { FOCUSED_COVERAGE_OWNER_MAPPINGS };
@@ -39,6 +42,34 @@ function mappingMatchesFile(mapping, file) {
 
 function createMappingViolation(rule, file, message) {
   return { file, message, rule };
+}
+
+export function collectFocusedCoverageOwnerMapInventoryViolations(
+  files = [],
+  { root = repoRoot } = {}
+) {
+  return files.flatMap((file) => {
+    const absolutePath = path.join(root, file);
+    if (!fs.existsSync(absolutePath)) {
+      return [
+        createMappingViolation(
+          'focused-coverage-owner-map-inventory-missing',
+          file,
+          'Inventory-only focused owner map does not exist.'
+        ),
+      ];
+    }
+    const sourceFile = createSourceFile(file, fs.readFileSync(absolutePath, 'utf8'));
+    return parseDeclarativeConstArrayModule(sourceFile) != null
+      ? []
+      : [
+          createMappingViolation(
+            'focused-coverage-owner-map-inventory-declarative-shape',
+            file,
+            'Inventory-only focused owner maps require one exported const array of static literal data.'
+          ),
+        ];
+  });
 }
 
 function validateMappingShape(mapping) {

@@ -1,3 +1,64 @@
-export { resizeSelectionHeight, resizeSelectionWidth } from './resize-core';
-export { bindSelectionHeightInput } from './height-binding';
-export { bindSelectionWidthInput } from './width-binding';
+import type { Selection } from '../../../types';
+import { bindDimensionInput } from './dimension-commit';
+import { resizeSelectionHeight, resizeSelectionWidth } from './resize-core';
+import type { InputBindingOptions } from './types';
+
+export { resizeSelectionHeight, resizeSelectionWidth };
+
+export function bindSelectionWidthInput(
+  widthInput: HTMLInputElement,
+  heightInput: HTMLInputElement,
+  syncSelection: (selection: Selection) => void,
+  options: InputBindingOptions
+): void {
+  bindDimensionInput({
+    input: widthInput,
+    pairedInput: heightInput,
+    maxValue: options.maxWidth,
+    minSelectionSize: options.minSelectionSize,
+    getSelection: options.getCurrentSelection,
+    getCurrentValue: (selection) => selection.width,
+    getShouldSyncPairedInput: () =>
+      options.getMaintainAspectRatio() && Boolean(options.getAspectRatio()),
+    getPairedValue: (selection) => selection.height,
+    apply: (selection, value) =>
+      resizeSelectionWidth(selection, {
+        nextValue: value,
+        minSelectionSize: options.minSelectionSize,
+        maxWidth: options.maxWidth,
+        maxHeight: options.maxHeight,
+        maintainAspectRatio: options.getMaintainAspectRatio(),
+        aspectRatio: options.getAspectRatio(),
+      }),
+    syncSelection,
+  });
+}
+
+export function bindSelectionHeightInput(
+  heightInput: HTMLInputElement,
+  widthInput: HTMLInputElement,
+  syncSelection: (selection: Selection) => void,
+  options: InputBindingOptions
+): void {
+  bindDimensionInput({
+    input: heightInput,
+    pairedInput: widthInput,
+    maxValue: options.maxHeight,
+    minSelectionSize: options.minSelectionSize,
+    getSelection: options.getCurrentSelection,
+    getCurrentValue: (selection) => selection.height,
+    getShouldSyncPairedInput: () =>
+      options.getMaintainAspectRatio() && Boolean(options.getAspectRatio()),
+    getPairedValue: (selection) => selection.width,
+    apply: (selection, value) =>
+      resizeSelectionHeight(selection, {
+        nextValue: value,
+        minSelectionSize: options.minSelectionSize,
+        maxWidth: options.maxWidth,
+        maxHeight: options.maxHeight,
+        maintainAspectRatio: options.getMaintainAspectRatio(),
+        aspectRatio: options.getAspectRatio(),
+      }),
+    syncSelection,
+  });
+}

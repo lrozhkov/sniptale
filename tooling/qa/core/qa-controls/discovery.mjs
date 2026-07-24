@@ -14,6 +14,19 @@ const SOURCE_EXTENSIONS = /\.(?:[cm]?[jt]s|tsx|json)$/u;
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.(?:[cm]?[jt]s|tsx)$/u;
 const POLICY_FILE_PATTERN = /\.(?:json|ya?ml|toml)$/u;
 const EXECUTABLE_FILE_PATTERN = /\.(?:[cm]?[jt]s)$/u;
+const GENERATED_INVENTORY_SOURCE_FILES = new Set([
+  CONTROL_POLICY_PATH,
+  'tooling/configs/qa/oss-release-consumers.data.json',
+  'tooling/configs/qa/technical-debt.data.json',
+]);
+
+export function isPolicyConsumerEvidenceFile(file) {
+  return (
+    SOURCE_EXTENSIONS.test(file) &&
+    !TEST_FILE_PATTERN.test(file) &&
+    !GENERATED_INVENTORY_SOURCE_FILES.has(file)
+  );
+}
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(fromRelativePath(relativePath), 'utf8'));
@@ -103,10 +116,7 @@ function collectPolicyFiles() {
 
 function collectPolicyConsumers(policyFiles) {
   const sources = [
-    ...collectRepoFiles(
-      'tooling',
-      (file) => SOURCE_EXTENSIONS.test(file) && !TEST_FILE_PATTERN.test(file)
-    ),
+    ...collectRepoFiles('tooling', isPolicyConsumerEvidenceFile),
     'package.json',
   ].map((file) => ({ file, source: fs.readFileSync(fromRelativePath(file), 'utf8') }));
 

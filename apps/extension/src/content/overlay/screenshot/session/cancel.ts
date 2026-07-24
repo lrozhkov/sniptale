@@ -5,27 +5,25 @@ import type { CreateScreenshotControllerActionsArgs } from './action-types';
 
 export function createHandleCancelCountdown(args: CreateScreenshotControllerActionsArgs) {
   return () => {
-    if (args.refs.countdownTimeoutRef.current) {
+    if (args.session.countdownTimeout) {
       resetCountdownRuntimeState({
-        countdownTimeoutRef: args.refs.countdownTimeoutRef,
-        pendingScreenshotType: args.refs.pendingScreenshotType,
+        session: args.session,
         setCountdown: args.setCountdown,
       });
     } else {
       args.setCountdown(null);
-      args.refs.pendingScreenshotType.current = null;
+      args.session.pendingType = null;
     }
     setUIHidden(false);
     completeScreenshotRun(args.runtime, undefined);
 
     if (args.params.quickActionOverlayRef.current) {
-      cancelQuickActionCountdown(args.params, args.runtime, args.refs.countdownLockSessionRef);
+      cancelQuickActionCountdown(args.params, args.runtime, args.session);
       return;
     }
 
     restoreCountdownLockOnCancel({
-      countdownLockSessionRef: args.refs.countdownLockSessionRef,
-      navigationLockStateBeforeScreenshot: args.refs.navigationLockStateBeforeScreenshot,
+      session: args.session,
       setNavigationLockEnabled: args.params.setNavigationLockEnabled,
     });
     args.params.setIsToolbarVisible(true);

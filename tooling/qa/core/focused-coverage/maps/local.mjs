@@ -79,6 +79,109 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'content-auto-blur-controller',
+    productionPrefix: 'apps/extension/src/content/overlay/auto-blur/controller/',
+    exclusive: true,
+    reason:
+      'Auto-blur session transitions, effects, and workflows have one owner-level behavior suite.',
+    testFiles: ['apps/extension/src/content/overlay/auto-blur/controller/index.test.tsx'],
+  },
+  {
+    owner: 'content-ai-pick-submit-feedback-predecessor',
+    productionFile: 'apps/extension/src/content/overlay/ai/pick/controller/submit/feedback.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason:
+      'The removed feedback-only leaf is covered through the apply transaction that now owns its user-visible outcomes.',
+    testFiles: ['apps/extension/src/content/overlay/ai/pick/controller/submit/apply.test.ts'],
+  },
+  {
+    owner: 'content-ai-pick-submit-types-predecessor',
+    productionFile: 'apps/extension/src/content/overlay/ai/pick/controller/submit/types.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason:
+      'The removed local type bag is covered by the narrowed apply, submit, and request owner contracts.',
+    testFiles: [
+      'apps/extension/src/content/overlay/ai/pick/controller/submit/apply.test.ts',
+      'apps/extension/src/content/overlay/ai/pick/controller/submit/index.test.ts',
+      'apps/extension/src/content/overlay/ai/pick/controller/submit/request.test.ts',
+    ],
+  },
+  {
+    owner: 'content-page-style-property-fields-predecessor',
+    productionFile:
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/fields.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason:
+      'The removed property-field re-export ladder is covered by the owner surfaces that now import its contracts directly.',
+    testFiles: [
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/field-matrix.test.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/file-field.test.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/text-controls.test.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/save/panel.test.tsx',
+    ],
+  },
+  {
+    owner: 'content-page-style-image-preview-predecessor',
+    productionFile:
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/image-preview.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason:
+      'The removed single-consumer image preview is covered through the property-control composition that now owns it.',
+    testFiles: [
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
+    ],
+  },
+  {
+    owner: 'content-page-style-retention-toggle-predecessor',
+    productionFile:
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/retention-toggle.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed single-consumer retention toggle is covered through its save-panel owner.',
+    testFiles: ['apps/extension/src/content/overlay/page-style-inspector/save/panel.test.tsx'],
+  },
+  {
+    owner: 'content-overlay-app-layout-projection',
+    productionFile: 'apps/extension/src/content/overlay/app-layout/props.ts',
+    exclusive: true,
+    reason:
+      'The app layout projection is exercised through the app composition that builds and renders its scenario, toolbar, and dialog sections.',
+    testFiles: ['apps/extension/src/content/overlay/app/view/index.test.tsx'],
+  },
+  {
+    owner: 'content-overlay-scenario-controller',
+    productionFile: 'apps/extension/src/content/overlay/scenario/controller.ts',
+    exclusive: true,
+    reason:
+      'Scenario controller state, runtime, view-state, and effect composition execute through its direct orchestration suite.',
+    testFiles: ['apps/extension/src/content/overlay/scenario/controller.test.tsx'],
+  },
+  {
+    owner: 'content-overlay-toolbar-capture-menus',
+    productionFile: 'apps/extension/src/content/overlay/toolbar/capture/menus.tsx',
+    exclusive: true,
+    reason:
+      'Toolbar capture menu visibility and exact dropdown/viewport composition execute through its direct owner suite.',
+    testFiles: ['apps/extension/src/content/overlay/toolbar/capture/menus.test.tsx'],
+  },
+  {
+    owner: 'content-page-preparation-local-save-hook',
+    productionFile:
+      'apps/extension/src/content/parser/page-preparation/local-save/hook/index.ts',
+    exclusive: true,
+    reason:
+      'The page-preparation local-save hook executes through the toolbar visibility, history, result, and retry behavior suites.',
+    testFiles: [
+      'apps/extension/src/content/overlay/toolbar/capture/local-save.file.test.tsx',
+      'apps/extension/src/content/overlay/toolbar/capture/local-save.test.tsx',
+    ],
+  },
+  {
     owner: 'popup-export-page-content',
     productionFile: 'apps/extension/src/popup/shell/export/pages/content.tsx',
     reason:
@@ -86,11 +189,48 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/popup/shell/export/pages/content.test.tsx'],
   },
   {
-    owner: 'content-selection-mode-controller-runtime',
-    productionFile: 'apps/extension/src/content/selection/selection-mode/controller/runtime.ts',
+    owner: 'popup-runtime-recording-data-predecessor',
+    productionFile: 'apps/extension/src/popup/shell/runtime/assembly/recording-data.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
     reason:
-      'Selection-mode controller runtime facade delegates to the owner-local runtime-state args assembler.',
-    testFiles: ['apps/extension/src/content/selection/selection-mode/controller/runtime.test.ts'],
+      'The removed recording-data projection is covered through the public runtime hook assembly.',
+    testFiles: ['apps/extension/src/popup/shell/runtime/hook.test.tsx'],
+  },
+  {
+    owner: 'popup-runtime-recording-projection-predecessor',
+    productionFile: 'apps/extension/src/popup/shell/runtime/assembly/recording.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed recording projection is covered through the public runtime hook assembly.',
+    testFiles: ['apps/extension/src/popup/shell/runtime/hook.test.tsx'],
+  },
+  {
+    owner: 'content-area-selection-controller',
+    productionFile: 'apps/extension/src/content/selection/area-selector/controller.ts',
+    reason:
+      'Area-selection listener, settlement, and cleanup ownership is exercised through its public controller suite.',
+    testFiles: ['apps/extension/src/content/selection/area-selector/index.test.ts'],
+  },
+  {
+    owner: 'content-highlighter-runtime-listeners',
+    productionFile: 'apps/extension/src/content/selection/highlighter-runtime/runtime-listeners.ts',
+    reason:
+      'Highlighter listener registration and Escape policy are split across two owner-local behavior suites.',
+    testFiles: [
+      'apps/extension/src/content/selection/highlighter-runtime/runtime-escape-key.test.ts',
+      'apps/extension/src/content/selection/highlighter-runtime/runtime-listeners.test.ts',
+    ],
+  },
+  {
+    owner: 'content-highlighter-runtime-mode',
+    productionFile: 'apps/extension/src/content/selection/highlighter-runtime/mode.ts',
+    reason:
+      'Highlighter enable and disable lifecycle transactions retain separate owner-local behavior suites.',
+    testFiles: [
+      'apps/extension/src/content/selection/highlighter-runtime/mode.disable.test.ts',
+      'apps/extension/src/content/selection/highlighter-runtime/mode.enable.test.ts',
+    ],
   },
   {
     owner: 'content-frame-runtime-contracts',
@@ -108,8 +248,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'content-frame-runtime-state',
     productionPrefix: 'apps/extension/src/content/selection/frame-runtime/state/',
     reason:
-      'Frame UI store state was moved under the frame-runtime state owner and remains covered by ' +
-      'frame history, mutation, and UI-controller suites.',
+      'Frame UI store state has owner-local frame history, mutation, and UI-controller coverage.',
     testFiles: [
       'apps/extension/src/content/selection/frame-runtime/history/bridge.test.ts',
       'apps/extension/src/content/selection/frame-runtime/mutation-actions/clear.test.ts',
@@ -119,11 +258,60 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'content-frame-settings-popover-bindings',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/bindings.ts',
+    reason:
+      'Frame-settings popover binding and close ordering are exercised through the public surface suite.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
+  },
+  {
+    owner: 'content-frame-settings-popover-state',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/state/index.ts',
+    reason:
+      'Frame-settings session state is exercised by the public surface, lifecycle, and action suites.',
+    testFiles: [
+      'apps/extension/src/content/selection/frame-settings-popover/index.test.tsx',
+      'apps/extension/src/content/selection/frame-settings-popover/state/helpers.test.ts',
+      'apps/extension/src/content/selection/frame-settings-popover/state/lifecycle.test.tsx',
+    ],
+  },
+  {
+    owner: 'content-frame-settings-popover-surface',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/index.tsx',
+    exclusive: true,
+    reason:
+      'Frame-settings controller, portal shell, and view wiring have one public surface proof.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
+  },
+  {
+    owner: 'content-frame-settings-popover-body-predecessor',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/body.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed body forwarding layer is consolidated into the public popover surface.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
+  },
+  {
+    owner: 'content-frame-settings-popover-portal-predecessor',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/surface.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed portal forwarding layer is consolidated into the public popover surface.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
+  },
+  {
+    owner: 'content-frame-settings-popover-shell-predecessor',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/surface-shell.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed shell forwarding layer is consolidated into the public popover surface.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
+  },
+  {
     owner: 'gallery-library-types',
     productionFile: 'apps/extension/src/gallery/library/types.ts',
     reason:
-      'Gallery library filter, grid, and preview type contracts are exercised through state type, ' +
-      'selector, and gallery surface suites.',
+      'Gallery filter, grid, and preview contracts have state, selector, and surface coverage.',
     testFiles: [
       'apps/extension/src/gallery/state/types.test.ts',
       'apps/extension/src/gallery/state/selectors.test.ts',
@@ -216,10 +404,11 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'settings-highlighter-hook-facade',
+    owner: 'settings-highlighter-section-composition',
     productionFile:
       'apps/extension/src/settings/sections/highlighter/section/useHighlighterSection.ts',
-    reason: 'Highlighter hook facade composition is covered by the hook surface suite.',
+    reason:
+      'Highlighter section composition keeps disposable UI state separate from its persistence session.',
     testFiles: [
       'apps/extension/src/settings/sections/highlighter/section/useHighlighterSection.test.tsx',
     ],

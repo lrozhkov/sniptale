@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { collectCoverageViolations, resolveCoverageTargetFiles } from './verify-test-coverage.mjs';
 import {
+  collectCoverageRolloutInventoryViolations,
   collectCoverageRolloutFiles,
   COVERAGE_ROLLOUT_GROUPS,
   COVERAGE_THRESHOLDS,
@@ -85,6 +86,38 @@ it('references only existing exact rollout files', () => {
   for (const file of EXACT_ROLLOUT_FILES) {
     expect(existsSync(file)).toBe(true);
   }
+});
+
+it('owner-validates the exact rollout inventory', () => {
+  expect(collectCoverageRolloutInventoryViolations()).toEqual([]);
+});
+
+it('rejects malformed, missing, duplicate, and out-of-scope exact rollout entries', () => {
+  const violations = collectCoverageRolloutInventoryViolations({
+    exactFiles: {
+      contentHighlighterAndQuickEdit: [],
+      contentParserExport: ['docs/not-product-code.ts'],
+      contentSelectionAndCapture: ['apps/extension/src/content/missing.ts'],
+      coreRuntimeOwners: [
+        'apps/extension/src/background/missing.ts',
+        'apps/extension/src/background/missing.ts',
+        42,
+      ],
+      unexpectedGroup: [],
+    },
+    fileExists: () => false,
+  });
+
+  expect(violations).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining('Unexpected exact coverage rollout group'),
+      expect.stringContaining('must not be empty'),
+      expect.stringContaining('outside product TypeScript scope'),
+      expect.stringContaining('does not exist'),
+      expect.stringContaining('Duplicate exact coverage rollout path'),
+      expect.stringContaining('contains a non-path entry'),
+    ])
+  );
 });
 
 it('does not enumerate duplicate rollout files from the registry', () => {

@@ -96,6 +96,34 @@ describe('offscreen-recording-context', () => {
     verifyIllegalLifecycleTransition
   );
 
+  it('tracks discard-aware stop requests and clears their handlers explicitly', () => {
+    const resolve = vi.fn();
+    const reject = vi.fn();
+
+    recordingContext.beginRecordingSession('recording-1');
+    recordingContext.activateRecorder({ state: 'recording' } as MediaRecorder);
+    recordingContext.beginStopRequest({ discard: true, resolve, reject });
+
+    expect(recordingContext.discardOnStop).toBe(true);
+    expect(recordingContext.clearStopRequest()).toEqual({ resolve, reject });
+    expect(recordingContext.stopRecordingResolve).toBeNull();
+    expect(recordingContext.stopRecordingReject).toBeNull();
+  });
+
+  it('treats lifecycle and active media resources as recording-session ownership signals', () => {
+    expect(recordingContext.hasActiveRecordingSession()).toBe(false);
+
+    recordingContext.sourceStream = {} as MediaStream;
+    expect(recordingContext.hasActiveRecordingSession()).toBe(true);
+
+    recordingContext.sourceStream = null;
+    recordingContext.beginRecordingSession('recording-2');
+    expect(recordingContext.hasActiveRecordingSession()).toBe(true);
+
+    recordingContext.resetRecordingSession();
+    expect(recordingContext.hasActiveRecordingSession()).toBe(false);
+  });
+
   it('publishes duration updates through the shared runtime transport', async () => {
     sendRuntimeMessageMock.mockRejectedValueOnce(new Error('popup closed'));
     recordingContext.beginRecordingSession('rec-1');

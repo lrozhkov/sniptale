@@ -1,4 +1,4 @@
-import { captureFullPage, captureFullPageTransaction } from './full-page/index';
+import { captureFullPage, captureFullPageTransaction } from './full-page/workflow';
 import { downloadFullPageCapture, downloadVisibleCapture } from './download/flow';
 import {
   captureViewportWithClip,
@@ -17,7 +17,7 @@ export {
   captureViewportWithClip,
   captureViewportWithClipTransaction,
 };
-export { captureFullPage, captureFullPageTransaction } from './full-page/index';
+export { captureFullPage, captureFullPageTransaction } from './full-page/workflow';
 
 export async function captureAndDownloadVisible(tabId: number): Promise<void> {
   const capture = await captureVisibleTabTransaction(tabId);
