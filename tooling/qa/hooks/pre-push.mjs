@@ -104,17 +104,14 @@ export function createPrePushContext({
 }
 
 export function resolvePrePushCommands({ prePushInput = '', gitRunner = runGit } = {}) {
-  const updates = parsePrePushUpdates(prePushInput).filter(
-    (update) => !ZERO_SHA_PATTERN.test(update.localSha)
-  );
   const context = createPrePushContext({
     pushedFiles: collectPushedFiles(prePushInput, gitRunner),
   });
-  const initialPush = updates.some((update) => ZERO_SHA_PATTERN.test(update.remoteSha));
 
   return [
     ...(hasHarnessVerificationQaTargets(context) ? ['qa:release-harness'] : []),
-    ...(initialPush ? ['qa:release', 'build:release'] : ['qa:checkpoint', 'qa:build']),
+    'qa:checkpoint',
+    'qa:build',
   ];
 }
 

@@ -5,13 +5,15 @@ import { resolvePrePushCommands, resolvePrePushNodeOptions } from './pre-push.mj
 const LOCAL_SHA = '1234567890123456789012345678901234567890';
 const ZERO_SHA = '0000000000000000000000000000000000000000';
 
-it('uses the full release lane for an initial repository push', () => {
+it('keeps an initial branch push on changed-range proof without a release lane', () => {
   const commands = resolvePrePushCommands({
     prePushInput: `refs/heads/main ${LOCAL_SHA} refs/heads/main ${ZERO_SHA}\n`,
     gitRunner: () => ({ stdout: 'tooling/qa/hooks/pre-push.mjs\n' }),
   });
 
-  expect(commands).toEqual(['qa:release-harness', 'qa:release', 'build:release']);
+  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint', 'qa:build']);
+  expect(commands).not.toContain('qa:release');
+  expect(commands).not.toContain('build:release');
 });
 
 it('gives only a changed-file checkpoint the larger pre-push heap budget', () => {

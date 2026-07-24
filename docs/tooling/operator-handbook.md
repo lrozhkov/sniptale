@@ -1,6 +1,6 @@
 # Operator Handbook
 
-Updated: 2026-07-22
+Updated: 2026-07-24
 
 Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), quality policy in [code-quality.md](code-quality.md), and wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md).
 
@@ -12,6 +12,7 @@ Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGE
 | In-progress product proof | `npm run qa:checkpoint` | Focused current-diff gate; does not build or commit. |
 | Harness/shared-control proof | `npm run qa:release-harness` | Required for `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/config files, and active `docs/tooling/**` guidance. |
 | Normal implementation closeout | `npm run qa:closeout -- -m "message"` | Owns checkpoint/build handoff, staging, task-artifact guard, and commit. |
+| Publish committed changes | `git push` | The pre-push hook proves the immutable pushed range with checkpoint/build and applicable harness verification; it never promotes a new branch push to `qa:release` or `build:release`. |
 | Release-grade product proof | `npm run qa:release` | Release preparation or explicit audit-grade proof. |
 | Unpacked release-mode build | `npm run build:release` | Runs only Vite in release mode and writes `dist/`; does not typecheck, run QA, or package an archive. |
 | Package current release build | `npm run release:package-only` | Debug/package-only path; does not replace `qa:release`. |

@@ -17259,7 +17259,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/hooks/pre-push.mjs",
-        "contentHash": "d636bc544f9e2f348e2b41e8762f1f784a275d0139bb96850c45f3d2303089c0"
+        "contentHash": "4dfe60ca7a8faf6f4ff7ed72d3ea4cea5d0be0d1a39b3cb0fc04b3394a6b3755"
       },
       "consumers": [
         "tooling/qa/hooks/pre-push-command-policy.test.ts",

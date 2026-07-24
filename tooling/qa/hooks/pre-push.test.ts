@@ -66,6 +66,15 @@ it('uses the empty tree as the base for new branch pushes', () => {
   ]);
 });
 
+it('uses changed-range checkpoint and build proof for new branch pushes', () => {
+  const commands = resolvePrePushCommands({
+    prePushInput: `refs/heads/feature ${LOCAL_SHA} refs/heads/feature ${ZERO_SHA}\n`,
+    gitRunner: () => ({ stdout: 'src/example.ts\n' }),
+  });
+
+  expect(commands).toEqual(['qa:checkpoint', 'qa:build']);
+});
+
 it('runs release harness when pushed commits include tooling changes from a clean tree', () => {
   const commands = resolvePrePushCommands({
     prePushInput: `refs/heads/main ${LOCAL_SHA} refs/heads/main ${REMOTE_SHA}\n`,

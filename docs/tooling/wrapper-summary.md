@@ -1,6 +1,6 @@
 # Wrapper Summary
 
-Updated: 2026-07-22
+Updated: 2026-07-24
 
 This document owns wrapper lifecycle, scope/freshness state, locks, handoffs, and observability. Workflow belongs in [AGENTS.md](../../AGENTS.md), quality policy in [code-quality.md](code-quality.md), and command lookup in [operator-handbook.md](operator-handbook.md).
 
@@ -27,6 +27,8 @@ Freshness states bind proof to the relevant content fingerprint rather than a mu
 - build state proves the current build closure
 
 Changing the relevant diff invalidates reuse. `qa:closeout` may reuse fresh matching checkpoint/build state; otherwise it executes the required child wrapper.
+
+The pre-push hook materializes each immutable pushed range and runs applicable harness verification followed by `qa:checkpoint` and `qa:build` for both new and existing remote refs. Creating a remote branch does not imply release preparation: pre-push never invokes `qa:release` or `build:release`. It also rejects proof-time mutations or untracked inputs that are absent from the pushed object.
 
 ## Wrapper Lifecycles
 
