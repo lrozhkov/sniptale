@@ -379,6 +379,10 @@ export function collectDeletedTargetSuccessors({
       successorsByFile.set(file, aggregateProviderProof);
       continue;
     }
+    if (frontier.frontier.length === 0 && analyzeAggregate(file).eligible) {
+      successorsByFile.set(file, { files: [], proofKind: 'dead-export' });
+      continue;
+    }
     if (isDeletedDeadExport(file)) {
       successorsByFile.set(file, { files: [], proofKind: 'dead-export' });
     }

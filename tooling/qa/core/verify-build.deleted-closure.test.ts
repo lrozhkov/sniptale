@@ -26,6 +26,11 @@ async function collectSuccessors(
   });
 }
 
+function commitBaselineAndRemove(root: string, ...files: string[]) {
+  runGit(root, 'add', '.');
+  runGit(root, 'commit', '-m', 'baseline');
+  runGit(root, 'rm', ...files);
+}
 function prepareCrossOwnerAggregate(root: string) {
   const facade = 'apps/extension/src/shared/facade.ts';
   const provider = 'apps/extension/src/shared/provider.ts';
@@ -45,9 +50,7 @@ function prepareCrossOwnerAggregate(root: string) {
     popupOwner,
     "import { value } from '../../../shared/facade';\nexport const popup = value;\n"
   );
-  runGit(root, 'add', '.');
-  runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', facade);
+  commitBaselineAndRemove(root, facade);
   return { contentOwner, facade, popupOwner, provider };
 }
 
@@ -60,9 +63,7 @@ it('keeps ambiguous cross-owner deleted successors on the full-suite fallback', 
   writeFile(root, deleted, 'export const value = 1;\n');
   writeFile(root, contentOwner, "import '../../../shared/deleted';\nexport const content = 1;\n");
   writeFile(root, popupOwner, "import '../../../shared/deleted';\nexport const popup = 1;\n");
-  runGit(root, 'add', '.');
-  runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', deleted);
+  commitBaselineAndRemove(root, deleted);
   writeFile(root, contentOwner, 'export const content = 2;\n');
   writeFile(root, popupOwner, 'export const popup = 2;\n');
 
@@ -118,9 +119,7 @@ it('ignores test-support importers when closing a deleted production aggregate',
     testSupport,
     "import { value } from './facade';\nexport const fixture = value;\n"
   );
-  runGit(root, 'add', '.');
-  runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', facade);
+  commitBaselineAndRemove(root, facade);
   writeFile(
     root,
     controller,
@@ -167,9 +166,7 @@ it('closes a deleted re-export and pass-through chain onto its narrow provider',
     "import { parse } from './edit-response';\nexport function parseJson() { return parse(); }\n"
   );
   writeFile(root, facade, "export { parseJson } from './response-json';\n");
-  runGit(root, 'add', '.');
-  runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', facade, adapter);
+  commitBaselineAndRemove(root, facade, adapter);
 
   const successors = await collectSuccessors(root, [facade, adapter], []);
 
@@ -183,6 +180,21 @@ it('closes a deleted re-export and pass-through chain onto its narrow provider',
   });
 });
 
+it('treats an unreferenced strict facade as dead when its provider is also consolidated', async () => {
+  const root = createTempRoot('build-deleted-unreferenced-facade-');
+  const ownerRoot = 'apps/extension/src/popup/shell/lifecycle/bootstrap';
+  const facade = `${ownerRoot}/index.ts`;
+  const provider = `${ownerRoot}/run.ts`;
+  initGitRepo(root);
+  writeFile(root, provider, 'export function run() { return true; }\n');
+  writeFile(root, facade, "export { run } from './run';\n");
+  commitBaselineAndRemove(root, facade, provider);
+
+  const successors = await collectSuccessors(root, [facade, provider], []);
+
+  expect(successors.get(facade)).toEqual({ files: [], proofKind: 'dead-export' });
+});
+
 it('rejects partial deleted chains with an uncovered terminal facade', async () => {
   const root = createTempRoot('build-deleted-partial-');
   const ownerRoot = 'apps/extension/src/content/overlay/example';
@@ -193,9 +205,7 @@ it('rejects partial deleted chains with an uncovered terminal facade', async () 
   writeFile(root, deleted, 'export const value = 1;\n');
   writeFile(root, terminalFacade, "import './leaf';\nexport const facade = 1;\n");
   writeFile(root, controller, "import './leaf';\nexport const controller = 1;\n");
-  runGit(root, 'add', '.');
-  runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', deleted, terminalFacade);
+  commitBaselineAndRemove(root, deleted, terminalFacade);
   writeFile(root, controller, 'export const controller = 2;\n');
 
   const successors = await collectSuccessors(
@@ -217,9 +227,7 @@ it('closes deleted chains through dotted TypeScript module stems', async () => {
   writeFile(root, dottedLeaf, 'export const helper = true;\n');
   writeFile(root, eventFacade, "import './events.helpers';\nexport const event = true;\n");
   writeFile(root, controller, "import './events';\nexport const controller = 1;\n");
-  runGit(root, 'add', '.');
-  runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', dottedLeaf, eventFacade);
+  commitBaselineAndRemove(root, dottedLeaf, eventFacade);
   writeFile(root, controller, 'export const controller = 2;\n');
 
   const successors = await collectSuccessors(
@@ -244,9 +252,7 @@ it('closes converging deleted chains without treating a visited importer as unco
   writeFile(root, adapter, "import './leaf';\nexport const adapter = true;\n");
   writeFile(root, facade, "import './leaf';\nimport './adapter';\nexport const facade = true;\n");
   writeFile(root, controller, "import './facade';\nexport const controller = 1;\n");
-  runGit(root, 'add', '.');
-  runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', leaf, adapter, facade);
+  commitBaselineAndRemove(root, leaf, adapter, facade);
   writeFile(root, controller, 'export const controller = 2;\n');
 
   const successors = await collectSuccessors(
@@ -306,9 +312,7 @@ it('rejects a deleted chain when an unchanged HEAD importer remains outside the 
   writeFile(root, deleted, 'export const value = 1;\n');
   writeFile(root, controller, "import './leaf';\nexport const controller = 1;\n");
   writeFile(root, unchangedImporter, "import './leaf';\nexport const orphan = 1;\n");
-  runGit(root, 'add', '.');
-  runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', deleted);
+  commitBaselineAndRemove(root, deleted);
   writeFile(root, controller, 'export const controller = 2;\n');
 
   const successors = await collectSuccessors(root, [deleted, controller], [controller]);
@@ -336,9 +340,7 @@ it('does not bypass an unchanged consumer through aggregate provider proof', asy
     unchangedOwner,
     "import { value } from '../../../shared/facade';\nexport const popup = value;\n"
   );
-  runGit(root, 'add', '.');
-  runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', facade);
+  commitBaselineAndRemove(root, facade);
   writeFile(
     root,
     changedOwner,
@@ -365,9 +367,7 @@ it('keeps full-suite proof when HEAD consumer discovery is incomplete', async ()
     unchangedOwner,
     "import { value } from '../../../shared/facade';\nexport const content = value;\n"
   );
-  runGit(root, 'add', '.');
-  runGit(root, 'commit', '-m', 'baseline');
-  runGit(root, 'rm', facade);
+  commitBaselineAndRemove(root, facade);
 
   const result = await withCwd(root, async () => {
     const closureModule = await importFresh<typeof import('./verify-build.deleted-closure.mjs')>(

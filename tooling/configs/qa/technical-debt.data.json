@@ -9130,12 +9130,7 @@
         "apps/extension/src/popup/shell/home/quick-actions/block.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
         "apps/extension/src/popup/shell/lazy-chunks/index.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/apply-bootstrap-success.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/handle-popup-bootstrap-error.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/index.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/logger.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/refresh-popup-secondary-state.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/run.ts",
+        "apps/extension/src/popup/shell/lifecycle/bootstrap-workflow.ts",
         "apps/extension/src/popup/shell/lifecycle/browser-listeners.ts",
         "apps/extension/src/popup/shell/lifecycle/contracts.ts",
         "apps/extension/src/popup/shell/lifecycle/effect.ts",
@@ -9384,12 +9379,7 @@
         "apps/extension/src/popup/shell/home/quick-actions/block.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
         "apps/extension/src/popup/shell/lazy-chunks/index.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/apply-bootstrap-success.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/handle-popup-bootstrap-error.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/index.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/logger.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/refresh-popup-secondary-state.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap/run.ts",
+        "apps/extension/src/popup/shell/lifecycle/bootstrap-workflow.ts",
         "apps/extension/src/popup/shell/lifecycle/browser-listeners.ts",
         "apps/extension/src/popup/shell/lifecycle/contracts.ts",
         "apps/extension/src/popup/shell/lifecycle/effect.ts",
@@ -19625,7 +19615,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.deleted-closure.mjs",
-        "contentHash": "aa2cc44ad53c3144a971294f2c8856f3ae04b666447e15cfdf57695490795ff9"
+        "contentHash": "8a150ec6a93859866bc6bb7ae7ed38d6c2e08848cbe843db51e3e0f64513d14d"
       },
       "consumers": [
         "tooling/qa/core/verify-build.deleted-closure.mjs",
@@ -19634,6 +19624,7 @@
       "surfaces": [
         "property:collectDeletedTargetSuccessors/deletedFiles",
         "property:collectDeletedTargetSuccessors/files",
+        "property:collectDeletedTargetSuccessors/files[1]",
         "property:collectHeadCandidateImporters/candidates",
         "property:collectHeadCandidateImporters/candidates[1]",
         "property:collectHeadCandidateImporters/candidates[2]",

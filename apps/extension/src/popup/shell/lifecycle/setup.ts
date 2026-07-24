@@ -2,7 +2,7 @@ import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 
 import { subscribeToRecordingMessages } from '../message-sync';
 import { getPopupRuntimeErrorMessage } from '../../diagnostics/runtime-errors';
-import { bootstrapPopupLifecycle } from './bootstrap/run';
+import { bootstrapPopupLifecycle } from './bootstrap-workflow';
 import { createMediaHubListener } from './media-hub-listener';
 import { registerPopupLifecycleBrowserListeners } from './browser-listeners';
 import type { PopupLifecycleParamsGetter } from './contracts';
