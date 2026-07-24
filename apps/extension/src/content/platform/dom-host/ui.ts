@@ -26,6 +26,14 @@ function resolveContentHost(): HTMLElement | null {
 }
 
 /**
+ * Mirrors runtime visibility state onto the Shadow DOM host so owned styles can cross the host
+ * boundary without depending on light-DOM ancestor selectors.
+ */
+export function toggleContentHostClass(className: string, enabled: boolean): void {
+  resolveContentHost()?.classList.toggle(className, enabled);
+}
+
+/**
  * Returns the live content-script shadow root when the content runtime has bootstrapped.
  */
 export function resolveContentShadowRoot(): ShadowRoot | null {

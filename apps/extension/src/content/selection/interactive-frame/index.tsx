@@ -41,6 +41,7 @@ export const InteractiveFrame: React.FC<InteractiveFrameProps> = React.memo((pro
     frameZIndex: model.frameZIndex,
     isPopoverOpen: model.isPopoverOpen,
     isFrameActive: model.isFrameActive,
+    isResizeHovered: model.isResizeHovered,
     borderColor: model.borderColor,
     borderWidth: model.borderWidth,
     state: model.viewState.state,

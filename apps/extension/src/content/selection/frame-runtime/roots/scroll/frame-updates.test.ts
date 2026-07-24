@@ -154,6 +154,26 @@ describe('syncFramePositionOnScroll updates', () => {
     'drops stale linked elements and invalidates the frame cache',
     expectStaleLinkedElementDropped
   );
+  it('moves a free frame with its document placement', () => {
+    const linkedElementsRef = { current: new Map<string, HTMLElement>() };
+    const setFrames = vi.fn();
+    const frame = createFrameDataFixture('free-frame', {
+      x: 100,
+      y: 120,
+      pagePlacement: { iframePath: [], pageX: 100, pageY: 220 },
+    });
+    vi.spyOn(window, 'scrollY', 'get').mockReturnValue(40);
+
+    syncFramePositionOnScroll({
+      frame,
+      frameState: undefined,
+      linkedElement: undefined,
+      linkedElementsRef,
+      setFrames,
+    });
+
+    expect(runSetter(setFrames, [frame])[0]).toMatchObject({ x: 100, y: 180 });
+  });
   it(
     'updates frame position through offset-aware coordinate calculation',
     expectOffsetAwarePositionUpdate

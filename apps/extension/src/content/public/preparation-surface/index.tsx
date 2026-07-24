@@ -75,15 +75,33 @@ function usePreparationFrameCallbacks(
     },
     [acceptsElement, frameManager]
   );
+  const addFreeFrame = useCallback(
+    (
+      input: import('../../../features/highlighter/contracts').FreeFrameInput,
+      sourceElement: HTMLElement
+    ) => {
+      if (acceptsElement(sourceElement)) {
+        frameManager.addFreeFrame(input);
+      }
+    },
+    [acceptsElement, frameManager]
+  );
 
   useEffect(() => {
     registerFrameCallbacks(
       addFrame,
+      addFreeFrame,
       frameManager.removeFrame,
       frameManager.clearFrames,
       hasFrameForElement
     );
-  }, [addFrame, frameManager.clearFrames, frameManager.removeFrame, hasFrameForElement]);
+  }, [
+    addFrame,
+    addFreeFrame,
+    frameManager.clearFrames,
+    frameManager.removeFrame,
+    hasFrameForElement,
+  ]);
 }
 
 function usePreparationFrameManager(modeState: ContentAppModeState): FrameManager {

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   runtimeMutations: {
     addAutoBlurFrames: vi.fn(),
     addFrame: vi.fn(),
+    addFreeFrame: vi.fn(),
     clearAutoBlurFrames: vi.fn(),
     clearFrames: vi.fn(),
     removeFrame: vi.fn(),
@@ -49,6 +50,7 @@ function createArgs(): Parameters<typeof useFrameManagerRuntimeSyncEffects>[0] {
   const mutations = {
     addAutoBlurFrames: vi.fn(),
     addFrame: vi.fn(),
+    addFreeFrame: vi.fn(),
     clearAutoBlurFrames: vi.fn(),
     clearFrames: vi.fn(),
     removeFrame: vi.fn(),

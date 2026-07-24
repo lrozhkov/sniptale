@@ -18,13 +18,14 @@ export function disableHighlighterMode(): void {
 
 export function registerFrameCallbacks(
   addFrame: (element: HTMLElement) => void,
+  addFreeFrame: import('../../../features/highlighter/contracts').AddFreeFrameCallback,
   removeFrame: (frameId: string) => void,
   clearFrames: () => void,
   hasFrameForElement?: (element: HTMLElement) => boolean
 ): void {
   highlighterControllerOwner
     .getOwner()
-    .registerFrameCallbacks(addFrame, removeFrame, clearFrames, hasFrameForElement);
+    .registerFrameCallbacks(addFrame, addFreeFrame, removeFrame, clearFrames, hasFrameForElement);
 }
 
 export function clearAllHighlights(): void {

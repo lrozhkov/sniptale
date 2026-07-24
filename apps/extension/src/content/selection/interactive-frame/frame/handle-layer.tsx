@@ -8,20 +8,22 @@ export function InteractiveFrameResizeHandleLayer(props: {
   directions: ResizeDirection[];
   tempFrame: FrameData;
   handleSize: number;
-  offset: number;
+  borderWidth: number;
   borderColor?: string;
-  onResizeStart: (event: React.MouseEvent, direction: ResizeDirection) => void;
+  onResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 }) {
-  const { directions, tempFrame, handleSize, offset, borderColor, onResizeStart } = props;
+  const { directions, tempFrame, handleSize, borderWidth, borderColor, onResizeStart } = props;
   const resolvedBorderColor = borderColor ?? 'var(--sniptale-color-accent)';
 
   const baseStyle: CSSProperties = {
     position: 'fixed',
     width: `${handleSize}px`,
     height: `${handleSize}px`,
-    backgroundColor: 'var(--sniptale-color-surface-base)',
-    border: `1px solid ${resolvedBorderColor}`,
-    borderRadius: '2px',
+    boxSizing: 'border-box',
+    backgroundColor: '#ffffff',
+    border: `1px solid color-mix(in srgb, ${resolvedBorderColor} 46%, var(--sniptale-color-border-soft))`,
+    borderRadius: '50%',
+    boxShadow: '0 1px 4px color-mix(in srgb, var(--sniptale-color-shadow-strong) 22%, transparent)',
     zIndex: Z_INDEX_FLOATING_UI,
     pointerEvents: 'auto',
   };
@@ -35,10 +37,11 @@ export function InteractiveFrameResizeHandleLayer(props: {
           data-direction={dir}
           style={{
             ...baseStyle,
-            ...getResizeHandleStyle(dir, tempFrame, handleSize, offset),
+            ...getResizeHandleStyle(dir, tempFrame, handleSize, borderWidth),
             cursor: getCursorForDirection(dir),
           }}
-          onMouseDown={(event) => onResizeStart(event, dir)}
+          aria-hidden="true"
+          onPointerDown={(event) => onResizeStart(event, dir)}
         />
       ))}
     </>

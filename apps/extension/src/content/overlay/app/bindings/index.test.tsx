@@ -19,6 +19,7 @@ const {
   registerFrameCallbacksMock: vi.fn(),
   useFrameManagerMock: vi.fn(() => ({
     addFrame: vi.fn(),
+    addFreeFrame: vi.fn(),
     clearFrames: vi.fn(),
     frames: [],
     hasFrameForElement: vi.fn(),
@@ -180,16 +181,25 @@ async function expectLatestFrameManagerCallbackRouting() {
 
   expect(registerFrameCallbacksMock).toHaveBeenCalledTimes(1);
 
-  const [addFrame, removeFrame, clearFrames, hasFrameForElement] =
+  const [addFrame, addFreeFrame, removeFrame, clearFrames, hasFrameForElement] =
     registerFrameCallbacksMock.mock.calls[0] ?? [];
+  const freeFrame = {
+    document: window.document,
+    height: 40,
+    width: 80,
+    x: 20,
+    y: 30,
+  };
 
   addFrame?.(element);
+  addFreeFrame?.(freeFrame);
   removeFrame?.('frame-1');
   clearFrames?.();
   expect(hasFrameForElement?.(element)).toBe(true);
 
   expectLatestFrameManagerActions({
     element,
+    freeFrame,
     ...frameMocks,
   });
 }
@@ -197,10 +207,12 @@ async function expectLatestFrameManagerCallbackRouting() {
 function createFrameManagerCallbackMocks() {
   return {
     initialAddFrame: vi.fn(),
+    initialAddFreeFrame: vi.fn(),
     initialClearFrames: vi.fn(),
     initialHasFrameForElement: vi.fn(() => false),
     initialRemoveFrame: vi.fn(),
     nextAddFrame: vi.fn(),
+    nextAddFreeFrame: vi.fn(),
     nextClearFrames: vi.fn(),
     nextHasFrameForElement: vi.fn(() => true),
     nextRemoveFrame: vi.fn(),
@@ -213,6 +225,7 @@ function configureFrameManagerLatestPair(
   useFrameManagerMock
     .mockReturnValueOnce({
       addFrame: mocks.initialAddFrame,
+      addFreeFrame: mocks.initialAddFreeFrame,
       clearFrames: mocks.initialClearFrames,
       frames: [],
       hasFrameForElement: mocks.initialHasFrameForElement,
@@ -220,6 +233,7 @@ function configureFrameManagerLatestPair(
     })
     .mockReturnValueOnce({
       addFrame: mocks.nextAddFrame,
+      addFreeFrame: mocks.nextAddFreeFrame,
       clearFrames: mocks.nextClearFrames,
       frames: [],
       hasFrameForElement: mocks.nextHasFrameForElement,
@@ -229,27 +243,41 @@ function configureFrameManagerLatestPair(
 
 function expectLatestFrameManagerActions({
   element,
+  freeFrame,
   initialAddFrame,
+  initialAddFreeFrame,
   initialClearFrames,
   initialHasFrameForElement,
   initialRemoveFrame,
   nextAddFrame,
+  nextAddFreeFrame,
   nextClearFrames,
   nextHasFrameForElement,
   nextRemoveFrame,
 }: {
   element: Element;
+  freeFrame: {
+    document: Document;
+    height: number;
+    width: number;
+    x: number;
+    y: number;
+  };
   initialAddFrame: ReturnType<typeof vi.fn>;
+  initialAddFreeFrame: ReturnType<typeof vi.fn>;
   initialClearFrames: ReturnType<typeof vi.fn>;
   initialHasFrameForElement: ReturnType<typeof vi.fn>;
   initialRemoveFrame: ReturnType<typeof vi.fn>;
   nextAddFrame: ReturnType<typeof vi.fn>;
+  nextAddFreeFrame: ReturnType<typeof vi.fn>;
   nextClearFrames: ReturnType<typeof vi.fn>;
   nextHasFrameForElement: ReturnType<typeof vi.fn>;
   nextRemoveFrame: ReturnType<typeof vi.fn>;
 }) {
   expect(initialAddFrame).not.toHaveBeenCalled();
   expect(nextAddFrame).toHaveBeenCalledWith(element);
+  expect(initialAddFreeFrame).not.toHaveBeenCalled();
+  expect(nextAddFreeFrame).toHaveBeenCalledWith(freeFrame);
   expect(initialRemoveFrame).not.toHaveBeenCalled();
   expect(nextRemoveFrame).toHaveBeenCalledWith('frame-1');
   expect(initialClearFrames).not.toHaveBeenCalled();

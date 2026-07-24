@@ -69,14 +69,19 @@
   pointer-events: none;
 }
 
-.sniptale-glass-toolbar-button:hover {
+.sniptale-glass-toolbar-button:hover:not(:disabled) {
   background: color-mix(in srgb, var(--sniptale-color-surface-panel) 82%, transparent);
   border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 74%, transparent);
   color: var(--sniptale-color-text-primary-strong);
 }
 
-.sniptale-glass-toolbar-button:active {
+.sniptale-glass-toolbar-button:active:not(:disabled) {
   transform: translateY(1px);
+}
+
+.sniptale-glass-toolbar-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
 }
 
 .sniptale-glass-toolbar-button--active {

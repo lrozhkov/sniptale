@@ -22,6 +22,7 @@ function createArgs(): Parameters<typeof useFrameManagerPublicResult>[0] {
   return {
     addAutoBlurFrames: vi.fn(),
     addFrame: vi.fn(),
+    addFreeFrame: vi.fn(),
     clearAutoBlurFrames: vi.fn(),
     clearFrames: vi.fn(),
     frames: [],
@@ -73,6 +74,7 @@ describe('frame-manager-public-result-hook', () => {
     expect(latestPublicResult).toEqual({
       addAutoBlurFrames: currentArgs.addAutoBlurFrames,
       addFrame: currentArgs.addFrame,
+      addFreeFrame: currentArgs.addFreeFrame,
       clearAutoBlurFrames: currentArgs.clearAutoBlurFrames,
       clearFrames: currentArgs.clearFrames,
       frames: currentArgs.frames,

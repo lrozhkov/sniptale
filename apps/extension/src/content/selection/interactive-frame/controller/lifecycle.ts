@@ -152,32 +152,39 @@ export function useInteractiveFrameEditingEffects(params: {
 export function useInteractiveFrameExternalExitEffects(params: {
   state: FrameState;
   handleCancel: () => void;
+  abortPointerSession: () => boolean;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
 }) {
-  const { state, handleCancel } = params;
+  const { state, handleCancel, abortPointerSession, setState } = params;
   React.useEffect(() => {
     const handleExitEditing = () => {
+      const abortedPointerSession = abortPointerSession();
       if (state === 'editing') {
         handleCancel();
+      } else if (abortedPointerSession) {
+        setState('idle');
       }
     };
 
     return addExitFrameEditingListener(handleExitEditing);
-  }, [state, handleCancel]);
+  }, [state, handleCancel, abortPointerSession, setState]);
 
   React.useEffect(() => {
     const handleHighlighterDisabled = (enabled: boolean) => {
-      if (!enabled && state === 'editing') {
-        handleCancel();
-      }
+      if (enabled) return;
+      const abortedPointerSession = abortPointerSession();
+      if (state === 'editing') handleCancel();
+      else if (abortedPointerSession) setState('idle');
     };
 
     return addHighlighterModeChangedListener(({ enabled }) => {
       handleHighlighterDisabled(enabled);
     });
-  }, [state, handleCancel]);
+  }, [state, handleCancel, abortPointerSession, setState]);
 }
 
 export function useInteractiveFrameHistoryApplyReset(params: {
+  abortPointerSession: () => boolean;
   defaultEffectMode: EffectMode;
   frame: FrameData;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
@@ -188,6 +195,7 @@ export function useInteractiveFrameHistoryApplyReset(params: {
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
 }) {
   const {
+    abortPointerSession,
     defaultEffectMode,
     frame,
     setEffectMode,
@@ -203,6 +211,7 @@ export function useInteractiveFrameHistoryApplyReset(params: {
 
   React.useEffect(() => {
     return addPagePreparationHistoryAppliedListener(() => {
+      abortPointerSession();
       cancelFrameHistoryTransactions(frameRef.current.id);
       setState('idle');
       setIsCalloutEditing(false);
@@ -217,6 +226,7 @@ export function useInteractiveFrameHistoryApplyReset(params: {
       });
     });
   }, [
+    abortPointerSession,
     setEffectMode,
     setIsCalloutEditing,
     setIsCalloutPopoverOpen,

@@ -13,14 +13,46 @@ import {
 import { InteractiveFrameCalloutOverlay } from './callout';
 
 vi.mock('../../callout', () => ({
-  Callout: (props: { onContentChange: (html: string) => void }) => (
-    <button
-      data-ui="callout-change"
-      onClick={() => props.onContentChange('<p>updated</p>')}
-      type="button"
-    >
-      update
-    </button>
+  Callout: (props: {
+    frameRect: { width: number; height: number };
+    onContentChange: (html: string) => void;
+    onPositionChange: (placement: { centerOffsetX: number; centerOffsetY: number }) => void;
+    onTailBaseRangeChange: (position: number, width: number) => void;
+    onTailFramePositionChange: (position: number) => void;
+  }) => (
+    <>
+      <button
+        data-ui="callout-change"
+        onClick={() => props.onContentChange('<p>updated</p>')}
+        type="button"
+      >
+        update
+      </button>
+      <button
+        data-ui="callout-tail-move"
+        onClick={() => props.onTailBaseRangeChange(0.75, 0.2)}
+        type="button"
+      >
+        move tail
+      </button>
+      <button
+        data-ui="callout-tail-frame-move"
+        onClick={() => props.onTailFramePositionChange(0.25)}
+        type="button"
+      >
+        move tail end
+      </button>
+      <output data-ui="callout-frame-size">
+        {props.frameRect.width}×{props.frameRect.height}
+      </output>
+      <button
+        data-ui="callout-move"
+        onClick={() => props.onPositionChange({ centerOffsetX: 70, centerOffsetY: -20 })}
+        type="button"
+      >
+        move
+      </button>
+    </>
   ),
 }));
 
@@ -76,6 +108,7 @@ describe('interactive frame callout overlay', () => {
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
+        borderWidth={3}
         isCalloutEditing
         setIsCalloutEditing={vi.fn()}
         setTempFrame={setTempFrame}
@@ -100,5 +133,115 @@ describe('interactive frame callout overlay', () => {
 
     expect(setTempFrame).toHaveBeenCalledWith(expectedFrame);
     expect(onUpdate).toHaveBeenCalledWith(expectedFrame);
+  });
+
+  it('commits a manual callout placement as one merged frame update', () => {
+    const frame = createFrame();
+    const onUpdate = vi.fn();
+
+    renderNode(
+      <InteractiveFrameCalloutOverlay
+        frame={frame}
+        currentFrame={frame}
+        frameZIndex={100}
+        borderWidth={3}
+        isCalloutEditing={false}
+        setIsCalloutEditing={vi.fn()}
+        setTempFrame={vi.fn()}
+        onUpdate={onUpdate}
+      />
+    );
+
+    act(() => {
+      container?.querySelector<HTMLButtonElement>('[data-ui="callout-move"]')?.click();
+    });
+
+    expect(onUpdate).toHaveBeenCalledOnce();
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callout: expect.objectContaining({
+          manualPlacement: { centerOffsetX: 70, centerOffsetY: -20 },
+        }),
+      })
+    );
+  });
+
+  it('commits a manual tail-base position as one merged frame update', () => {
+    const frame = createFrame();
+    const onUpdate = vi.fn();
+
+    renderNode(
+      <InteractiveFrameCalloutOverlay
+        frame={frame}
+        currentFrame={frame}
+        frameZIndex={100}
+        borderWidth={3}
+        isCalloutEditing={false}
+        setIsCalloutEditing={vi.fn()}
+        setTempFrame={vi.fn()}
+        onUpdate={onUpdate}
+      />
+    );
+
+    act(() => {
+      container?.querySelector<HTMLButtonElement>('[data-ui="callout-tail-move"]')?.click();
+    });
+
+    expect(onUpdate).toHaveBeenCalledOnce();
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callout: expect.objectContaining({ tailBasePosition: 0.75, tailBaseWidth: 0.2 }),
+      })
+    );
+  });
+
+  it('commits a manual frame-end position as one merged frame update', () => {
+    const frame = createFrame();
+    const onUpdate = vi.fn();
+
+    renderNode(
+      <InteractiveFrameCalloutOverlay
+        frame={frame}
+        currentFrame={frame}
+        frameZIndex={100}
+        borderWidth={3}
+        isCalloutEditing={false}
+        setIsCalloutEditing={vi.fn()}
+        setTempFrame={vi.fn()}
+        onUpdate={onUpdate}
+      />
+    );
+
+    act(() => {
+      container?.querySelector<HTMLButtonElement>('[data-ui="callout-tail-frame-move"]')?.click();
+    });
+
+    expect(onUpdate).toHaveBeenCalledOnce();
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callout: expect.objectContaining({ tailFramePosition: 0.25 }),
+      })
+    );
+  });
+
+  it('connects the callout to the outer content-box border', () => {
+    const frame = createFrame();
+
+    renderNode(
+      <InteractiveFrameCalloutOverlay
+        frame={frame}
+        currentFrame={frame}
+        frameZIndex={100}
+        borderWidth={3}
+        isCalloutEditing={false}
+        setIsCalloutEditing={vi.fn()}
+        setTempFrame={vi.fn()}
+        onUpdate={vi.fn()}
+      />
+    );
+
+    expect(container?.querySelector('[data-ui="callout-frame-size"]')?.textContent).toBe(
+      `${frame.width + 6}×${frame.height + 6}`
+    );
   });
 });

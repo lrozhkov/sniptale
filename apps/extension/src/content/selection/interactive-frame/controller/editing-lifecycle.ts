@@ -16,12 +16,16 @@ export function useInteractiveFrameEditingLifecycle(
       state: params.state,
       tempFrameRef: params.tempFrameRef,
       effectModeRef: params.effectModeRef,
+      pointerIdRef: params.pointerIdRef,
+      resizeOriginStateRef: params.resizeOriginStateRef,
+      setState: params.setState,
+      onUpdate: params.onUpdate,
       stateRef: params.stateRef,
       containerRef: params.containerRef,
     })
   );
 
-  useInteractiveFramePointerListeners(
+  return useInteractiveFramePointerListeners(
     createInteractiveFrameListenerConfig({
       containerRef: params.containerRef,
       frameId: params.frameId,
@@ -33,7 +37,14 @@ export function useInteractiveFrameEditingLifecycle(
       startXRef: params.startXRef,
       startYRef: params.startYRef,
       startFrameRef: params.startFrameRef,
+      tempFrameRef: params.tempFrameRef,
       effectModeRef: params.effectModeRef,
+      pointerIdRef: params.pointerIdRef,
+      resizeOriginStateRef: params.resizeOriginStateRef,
+      resizeRafIdRef: params.resizeRafIdRef,
+      latestResizeSampleRef: params.latestResizeSampleRef,
+      setState: params.setState,
+      onUpdate: params.onUpdate,
     })
   );
 }

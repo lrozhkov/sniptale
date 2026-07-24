@@ -33,6 +33,11 @@ export type FrameRenderDescriptor = {
   calloutTailSize: number | undefined;
   calloutTextColor: string | undefined;
   calloutVariant: string | undefined;
+  calloutManualX: number | undefined;
+  calloutManualY: number | undefined;
+  calloutTailBasePosition: number | undefined;
+  calloutTailBaseWidth: number | undefined;
+  calloutTailFramePosition: number | undefined;
   effectMode: FrameData['effectMode'];
   focusOpacity: number | undefined;
   focusShowBorder: boolean | undefined;
@@ -42,6 +47,9 @@ export type FrameRenderDescriptor = {
   offsetWidth: number | undefined;
   offsetX: number | undefined;
   offsetY: number | undefined;
+  pagePlacementPath: string;
+  pagePlacementX: number | undefined;
+  pagePlacementY: number | undefined;
   state: FrameState | undefined;
   stepBadgeAlphabet: string | undefined;
   stepBadgeAnchor: string | undefined;
@@ -76,6 +84,7 @@ function buildFrameRenderDescriptor(
   return {
     ...buildFrameBorderDescriptor(frame),
     ...buildFrameOffsetDescriptor(frame),
+    ...buildFramePagePlacementDescriptor(frame),
     ...buildFrameStepBadgeDescriptor(frame),
     ...buildFrameCalloutDescriptor(frame),
     blurAmount: frame.blurSettings?.amount,
@@ -90,6 +99,14 @@ function buildFrameRenderDescriptor(
     width: frame.width,
     x: frame.x,
     y: frame.y,
+  };
+}
+
+function buildFramePagePlacementDescriptor(frame: FrameData) {
+  return {
+    pagePlacementPath: (frame.pagePlacement?.iframePath ?? []).join(' => '),
+    pagePlacementX: frame.pagePlacement?.pageX,
+    pagePlacementY: frame.pagePlacement?.pageY,
   };
 }
 
@@ -158,5 +175,10 @@ function buildFrameCalloutDescriptor(frame: FrameData) {
     calloutTailSize: callout?.tailSize,
     calloutTextColor: callout?.textColor,
     calloutVariant: callout?.variant,
+    calloutManualX: callout?.manualPlacement?.centerOffsetX,
+    calloutManualY: callout?.manualPlacement?.centerOffsetY,
+    calloutTailBasePosition: callout?.tailBasePosition,
+    calloutTailBaseWidth: callout?.tailBaseWidth,
+    calloutTailFramePosition: callout?.tailFramePosition,
   };
 }

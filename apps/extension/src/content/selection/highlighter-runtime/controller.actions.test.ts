@@ -59,6 +59,7 @@ it('warns when frame actions run before callbacks are registered', () => {
 it('registers callbacks and routes frame actions through them', () => {
   const addFrame = vi.fn();
   const removeFrame = vi.fn();
+  const addFreeFrame = vi.fn();
   const clearFrames = vi.fn();
   const hasFrameForElement = vi.fn();
   const logger = createLoggerStub();
@@ -68,7 +69,13 @@ it('registers callbacks and routes frame actions through them', () => {
     state: createHighlighterRuntimeState(),
   });
 
-  actions.registerFrameCallbacks(addFrame, removeFrame, clearFrames, hasFrameForElement);
+  actions.registerFrameCallbacks(
+    addFrame,
+    addFreeFrame,
+    removeFrame,
+    clearFrames,
+    hasFrameForElement
+  );
   actions.addHighlight(document.createElement('div'));
   actions.removeHighlight('frame-1');
   actions.clearAllHighlights();

@@ -25,6 +25,7 @@ function EditingHandlersHarness(props: { onContentChange: (html: string) => void
       contentEditable
       data-ui="callout-editable"
       onInput={handlers.handleInput}
+      onPaste={handlers.handlePaste}
       suppressContentEditableWarning
     />
   );
@@ -68,4 +69,40 @@ it('sanitizes contenteditable input before publishing callout content changes', 
   });
 
   expect(onContentChange).toHaveBeenCalledWith('<strong>bold</strong>');
+});
+
+it('inserts pasted text into the callout when the document selection escaped to the page body', () => {
+  const onContentChange = vi.fn();
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+
+  act(() => {
+    root?.render(<EditingHandlersHarness onContentChange={onContentChange} />);
+  });
+
+  const editable = container.querySelector<HTMLDivElement>('[data-ui="callout-editable"]');
+  expect(editable).toBeInstanceOf(HTMLDivElement);
+  editable!.textContent = 'comment: ';
+  const pageTarget = document.createElement('div');
+  pageTarget.textContent = 'page body';
+  container.append(pageTarget);
+  const selection = window.getSelection();
+  const escapedRange = document.createRange();
+  escapedRange.selectNodeContents(pageTarget);
+  escapedRange.collapse(false);
+  selection?.removeAllRanges();
+  selection?.addRange(escapedRange);
+  const pasteEvent = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+  Object.defineProperty(pasteEvent, 'clipboardData', {
+    value: { getData: (type: string) => (type === 'text/plain' ? 'pasted text' : '') },
+  });
+
+  act(() => {
+    editable?.dispatchEvent(pasteEvent);
+  });
+
+  expect(pageTarget.textContent).toBe('page body');
+  expect(editable?.textContent).toBe('comment: pasted text');
+  expect(onContentChange).toHaveBeenCalledWith('comment: pasted text');
 });

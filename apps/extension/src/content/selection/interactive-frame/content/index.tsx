@@ -16,8 +16,9 @@ interface InteractiveFrameContentProps
   borderColor: string;
   borderWidth: number;
   borderShadow?: NonNullable<FrameData['borderSettings']>['shadow'];
-  handleMouseDown: (event: React.MouseEvent) => void;
-  handleResizeStart: (event: React.MouseEvent, direction: ResizeDirection) => void;
+  isResizeHovered: boolean;
+  handleMouseDown: (event: React.PointerEvent) => void;
+  handleResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 }
 
 /** Renders the frame chrome and all floating controls while preserving existing content-script contracts. */
@@ -64,6 +65,7 @@ function getInteractiveFrameFloatingUiProps(props: InteractiveFrameContentProps)
     handleSave: props.handleSave,
     handleCancel: props.handleCancel,
     handleDelete: props.handleDelete,
+    onUpdate: props.onUpdate,
   };
 }
 
@@ -85,6 +87,7 @@ function getInteractiveFramePopoverProps(props: InteractiveFrameContentProps) {
     setTempFrame: props.setTempFrame,
     closePopover: props.closePopover,
     frameZIndex: props.frameZIndex,
+    borderWidth: props.borderWidth,
     onUpdate: props.onUpdate,
   };
 }

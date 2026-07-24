@@ -61,17 +61,20 @@ function usePagePreparationHistoryReset(screenshotMode: boolean) {
 
 function useFrameCallbackRegistration(args: {
   addFrame: (element: HTMLElement) => void;
+  addFreeFrame: ReturnType<typeof useFrameManager>['addFreeFrame'];
   clearFrames: () => void;
   hasFrameForElement: (element: HTMLElement) => boolean;
   removeFrame: (frameId: string) => void;
 }) {
-  const { addFrame, clearFrames, hasFrameForElement, removeFrame } = args;
+  const { addFrame, addFreeFrame, clearFrames, hasFrameForElement, removeFrame } = args;
   const addFrameRef = useRef(addFrame);
+  const addFreeFrameRef = useRef(addFreeFrame);
   const removeFrameRef = useRef(removeFrame);
   const clearFramesRef = useRef(clearFrames);
   const hasFrameForElementRef = useRef(hasFrameForElement);
 
   addFrameRef.current = addFrame;
+  addFreeFrameRef.current = addFreeFrame;
   removeFrameRef.current = removeFrame;
   clearFramesRef.current = clearFrames;
   hasFrameForElementRef.current = hasFrameForElement;
@@ -79,6 +82,7 @@ function useFrameCallbackRegistration(args: {
   useEffect(() => {
     registerFrameCallbacks(
       (...args) => addFrameRef.current(...args),
+      (input) => addFreeFrameRef.current(input),
       (...args) => removeFrameRef.current(...args),
       () => clearFramesRef.current(),
       (...args) => hasFrameForElementRef.current(...args)
@@ -108,6 +112,7 @@ export function useContentAppBindings(params: ContentAppBindingsParams) {
   usePagePreparationHistoryReset(params.modeFlags.screenshotMode);
   useFrameCallbackRegistration({
     addFrame: frameManager.addFrame,
+    addFreeFrame: frameManager.addFreeFrame,
     clearFrames: frameManager.clearFrames,
     hasFrameForElement: frameManager.hasFrameForElement,
     removeFrame: frameManager.removeFrame,

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
+import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import {
   calculateInteractiveFrameSizePanelPosition,
   calculateInteractiveFrameToolbarPosition,
@@ -37,13 +37,15 @@ function cloneFrameData(frame: FrameData, options?: { omitLinkedElement?: boolea
     ...(frame.stepBadge === undefined ? {} : { stepBadge: frame.stepBadge }),
     ...(frame.callout === undefined ? {} : { callout: frame.callout }),
     ...(frame.offset === undefined ? {} : { offset: frame.offset }),
+    ...(frame.pagePlacement === undefined ? {} : { pagePlacement: frame.pagePlacement }),
   };
 }
 
 export function useInteractiveFrameRuntime(params: {
   frame: FrameData;
   defaultEffectMode: EffectMode;
-  onStateChange: ((newState: 'idle' | 'hover' | 'editing') => void) | undefined;
+  onStateChange: ((newState: FrameState) => void) | undefined;
+  onUpdate: (frame: FrameData) => void;
 }) {
   const viewState = useInteractiveFrameViewState({
     frame: params.frame,
@@ -74,6 +76,8 @@ export function useInteractiveFrameRuntime(params: {
       containerRef: refs.containerRef,
       frameId: params.frame.id,
       effectMode: viewState.effectMode,
+      setState: viewState.setState,
+      onUpdate: params.onUpdate,
     }),
   };
 }
@@ -104,6 +108,7 @@ function useInteractiveFrameRuntimeState(params: {
     toolbarCoords,
     sizePanelCoords,
     isTooltipVisible: params.viewState.activeFrameId === params.frame.id,
+    isResizeHovered: params.viewState.resizeFrameId === params.frame.id,
     isPopoverOpen: params.viewState.popoverFrameId === params.frame.id,
   };
 }
@@ -131,7 +136,7 @@ function useInteractiveFrameRuntimeSyncs(params: {
   defaultEffectMode: EffectMode;
   frame: FrameData;
   isTooltipVisible: boolean;
-  onStateChange: ((newState: 'idle' | 'hover' | 'editing') => void) | undefined;
+  onStateChange: ((newState: FrameState) => void) | undefined;
   viewState: ReturnType<typeof useInteractiveFrameViewState>;
 }) {
   useInteractiveFrameStateSync(
@@ -174,6 +179,7 @@ export function useInteractiveFrameEditLifecycle(
     handleDeleteRef: runtime.refs.handleDeleteRef,
   });
   useInteractiveFrameHistoryApplyReset({
+    abortPointerSession: runtime.editing.abortPointerSession,
     defaultEffectMode,
     frame,
     setEffectMode: runtime.viewState.setEffectMode,
@@ -184,7 +190,9 @@ export function useInteractiveFrameEditLifecycle(
     setTempFrame: runtime.viewState.setTempFrame,
   });
   useInteractiveFrameExternalExitEffects({
+    abortPointerSession: runtime.editing.abortPointerSession,
     state: runtime.viewState.state,
     handleCancel,
+    setState: runtime.viewState.setState,
   });
 }

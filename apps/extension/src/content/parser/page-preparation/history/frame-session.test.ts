@@ -1,0 +1,47 @@
+// @vitest-environment jsdom
+
+import { describe, expect, it } from 'vitest';
+import { createFrameDataFixture } from '../../../selection/frame-runtime/test-support';
+import { captureFrameSessionSnapshot } from './frame-session';
+
+describe('captureFrameSessionSnapshot', () => {
+  it('deep-clones manual callout placement and free page placement', () => {
+    const frame = createFrameDataFixture('free-frame', {
+      callout: {
+        anchor: 'top-center',
+        bgColor: '#fff',
+        enabled: true,
+        fontFamily: 'sans',
+        fontSize: 14,
+        fontWeight: 'normal',
+        htmlContent: 'Comment',
+        maxWidth: 200,
+        manualPlacement: { centerOffsetX: 80, centerOffsetY: -40 },
+        side: 'auto',
+        tailSize: 8,
+        textColor: '#111',
+        variant: 'bubble',
+      },
+      pagePlacement: { iframePath: ['iframe#content'], pageX: 120, pageY: 240 },
+    });
+    const snapshot = captureFrameSessionSnapshot({
+      frames: [frame],
+      globalEffectMode: 'border',
+      globalStepBadgeSettings: { autoMode: true },
+      sessionBlurSettings: { amount: 10, blurType: 'gaussian', showBorder: true },
+      sessionCalloutStyle: null,
+      sessionFocusSettings: { opacity: 0.4, showBorder: false },
+      sessionStepBadgeTemplate: null,
+      stepBadgeOrder: new Map(),
+    });
+    const saved = snapshot.frames[0]!;
+
+    expect(saved.callout?.manualPlacement).not.toBe(frame.callout?.manualPlacement);
+    expect(saved.pagePlacement).not.toBe(frame.pagePlacement);
+    expect(saved.pagePlacement?.iframePath).not.toBe(frame.pagePlacement?.iframePath);
+    expect(saved).toMatchObject({
+      callout: { manualPlacement: { centerOffsetX: 80, centerOffsetY: -40 } },
+      pagePlacement: { iframePath: ['iframe#content'], pageX: 120, pageY: 240 },
+    });
+  });
+});

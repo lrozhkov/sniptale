@@ -4,7 +4,7 @@ import React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import type { FrameData } from '../../../../features/highlighter/contracts';
+import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 
 import {
   dispatchExitFrameEditing,
@@ -20,6 +20,8 @@ import {
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let handleCancelSpy: Mock<() => void> | null = null;
+let abortPointerSessionSpy: Mock<() => boolean> | null = null;
+let setStateSpy: Mock<(state: FrameState) => void> | null = null;
 const frame: FrameData = {
   id: 'frame-1',
   x: 10,
@@ -29,12 +31,18 @@ const frame: FrameData = {
   effectMode: 'focus' as const,
 };
 
-function renderHarness(state: 'idle' | 'hover' | 'editing') {
+function renderHarness(state: FrameState, hasPointerSession = false) {
   handleCancelSpy = vi.fn<() => void>();
+  abortPointerSessionSpy = vi.fn<() => boolean>(() => hasPointerSession);
+  setStateSpy = vi.fn<(state: FrameState) => void>();
 
   function Harness() {
     useInteractiveFrameExternalExitEffects({
+      abortPointerSession: () => abortPointerSessionSpy?.() ?? false,
       handleCancel: () => handleCancelSpy?.(),
+      setState: (nextState) => {
+        if (typeof nextState !== 'function') setStateSpy?.(nextState);
+      },
       state,
     });
     return null;
@@ -65,6 +73,8 @@ afterEach(() => {
   container?.remove();
   container = null;
   handleCancelSpy = null;
+  abortPointerSessionSpy = null;
+  setStateSpy = null;
   vi.useRealTimers();
 });
 
@@ -97,6 +107,19 @@ describe('useInteractiveFrameExternalExitEffects', () => {
     });
 
     expect(handleCancelSpy).not.toHaveBeenCalled();
+    expect(abortPointerSessionSpy).not.toHaveBeenCalled();
+  });
+
+  it('aborts a transient resize when highlighter mode is disabled', () => {
+    renderHarness('resizing', true);
+
+    act(() => {
+      dispatchHighlighterModeChanged({ enabled: false });
+    });
+
+    expect(abortPointerSessionSpy).toHaveBeenCalledOnce();
+    expect(setStateSpy).toHaveBeenCalledWith('idle');
+    expect(handleCancelSpy).not.toHaveBeenCalled();
   });
 
   it('ignores exit events while the frame is not being edited', () => {
@@ -112,7 +135,7 @@ describe('useInteractiveFrameExternalExitEffects', () => {
 });
 
 function HistoryApplyHarness(props: { frame: FrameData }) {
-  const [state, setState] = React.useState<'idle' | 'hover' | 'editing'>('editing');
+  const [state, setState] = React.useState<FrameState>('editing');
   const [tempFrame, setTempFrame] = React.useState<FrameData>({ ...props.frame, x: 200 });
   const [effectMode, setEffectMode] = React.useState<'border' | 'blur' | 'focus'>('blur');
   const [isStepBadgePopoverOpen, setIsStepBadgePopoverOpen] = React.useState(true);
@@ -120,6 +143,7 @@ function HistoryApplyHarness(props: { frame: FrameData }) {
   const [isCalloutEditing, setIsCalloutEditing] = React.useState(true);
 
   useInteractiveFrameHistoryApplyReset({
+    abortPointerSession: () => abortPointerSessionSpy?.() ?? false,
     defaultEffectMode: 'border',
     frame: props.frame,
     setEffectMode,
@@ -143,6 +167,7 @@ function HistoryApplyHarness(props: { frame: FrameData }) {
 }
 
 function renderHistoryApplyHarness(initialFrame: FrameData = frame) {
+  abortPointerSessionSpy = vi.fn<() => boolean>(() => true);
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -225,6 +250,7 @@ describe('useInteractiveFrameHistoryApplyReset', () => {
     expect(node?.getAttribute('data-step-open')).toBe('false');
     expect(node?.getAttribute('data-callout-open')).toBe('false');
     expect(node?.getAttribute('data-callout-editing')).toBe('false');
+    expect(abortPointerSessionSpy).toHaveBeenCalledOnce();
     expect(pagePreparationHistory.cancelTransaction).toHaveBeenCalledWith(
       'callout-editing:frame-1'
     );

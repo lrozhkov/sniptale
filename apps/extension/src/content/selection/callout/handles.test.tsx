@@ -1,0 +1,68 @@
+// @vitest-environment jsdom
+
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it, vi } from 'vitest';
+import { renderCalloutInteractionHandles, type CalloutInteractionHandleProps } from './handles';
+
+function createProps(
+  overrides: Partial<CalloutInteractionHandleProps> = {}
+): CalloutInteractionHandleProps {
+  return {
+    dragHandleStyle: { left: 100, top: 100 },
+    handleDragPointerDown: vi.fn(),
+    handleDragKeyDown: vi.fn(),
+    handleHandleBlur: vi.fn(),
+    handleHandleFocus: vi.fn(),
+    handleMouseEnter: vi.fn(),
+    handleMouseLeave: vi.fn(),
+    handleTailPointerDown: vi.fn(),
+    handleTailKeyDown: vi.fn(),
+    handleTailBaseEndPointerDown: vi.fn(),
+    handleTailBaseEndKeyDown: vi.fn(),
+    handleTailFramePointerDown: vi.fn(),
+    handleTailFrameKeyDown: vi.fn(),
+    isDragging: false,
+    isEditing: false,
+    isHandleVisible: true,
+    isTailDragging: false,
+    isTailBaseEndDragging: false,
+    isTailFrameDragging: false,
+    portalTheme: null,
+    tailHandleCursor: 'ew-resize',
+    tailHandleStyle: { left: 120, top: 140 },
+    tailBaseEndHandleStyle: { left: 140, top: 140 },
+    tailFrameHandleStyle: { left: 160, top: 180 },
+    ...overrides,
+  };
+}
+
+describe('callout interaction handles', () => {
+  it('renders the comment grip and boundary-constrained tail point', () => {
+    const markup = renderToStaticMarkup(renderCalloutInteractionHandles(createProps()));
+
+    expect(markup).toContain('sniptale-callout-drag-handle');
+    expect(markup).toContain('sniptale-callout-tail-handle');
+    expect(markup).toContain('sniptale-callout-tail-base-start-handle');
+    expect(markup).toContain('sniptale-callout-tail-base-end-handle');
+    expect(markup).toContain('sniptale-callout-tail-frame-handle');
+    expect(markup).toContain('cursor:ew-resize');
+    expect(markup).toContain('background:#ffffff');
+  });
+
+  it('hides both transient handles while text is being edited', () => {
+    const markup = renderToStaticMarkup(
+      renderCalloutInteractionHandles(createProps({ isEditing: true }))
+    );
+
+    expect(markup).toBe('');
+  });
+
+  it('removes invisible handles from pointer hit testing until hover or focus reveals them', () => {
+    const markup = renderToStaticMarkup(
+      renderCalloutInteractionHandles(createProps({ isHandleVisible: false }))
+    );
+
+    expect(markup).toContain('opacity:0');
+    expect(markup).toContain('pointer-events:none');
+  });
+});

@@ -1,6 +1,6 @@
 import { expect, expectTypeOf, it } from 'vitest';
 
-import type { CalloutAnchor, CalloutSettings } from './callout';
+import type { CalloutAnchor, CalloutManualPlacement, CalloutSettings } from './callout';
 import { CYRILLIC_ALPHABET, LATIN_ALPHABET } from './step-badge';
 import type { StepBadgeAnchor, StepBadgeSettings } from './step-badge';
 
@@ -11,5 +11,12 @@ it('keeps highlighter alphabets and shared anchors canonical', () => {
   expect(new Set(LATIN_ALPHABET).size).toBe(LATIN_ALPHABET.length);
   expectTypeOf<CalloutAnchor>().toEqualTypeOf<StepBadgeAnchor>();
   expectTypeOf<CalloutSettings>().toMatchTypeOf<{ enabled: boolean; htmlContent: string }>();
+  expectTypeOf<CalloutSettings['tailBasePosition']>().toEqualTypeOf<number | undefined>();
+  expectTypeOf<CalloutSettings['tailBaseWidth']>().toEqualTypeOf<number | undefined>();
+  expectTypeOf<CalloutSettings['tailFramePosition']>().toEqualTypeOf<number | undefined>();
+  expectTypeOf<CalloutManualPlacement>().toEqualTypeOf<{
+    centerOffsetX: number;
+    centerOffsetY: number;
+  }>();
   expectTypeOf<StepBadgeSettings>().toMatchTypeOf<{ enabled: boolean; value: string }>();
 });

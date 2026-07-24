@@ -78,6 +78,7 @@ function useOwnedFrameManagerPublicResult(args: {
   return useFrameManagerPublicResult({
     addAutoBlurFrames: args.mutations.addAutoBlurFrames,
     addFrame: args.mutations.addFrame,
+    addFreeFrame: args.mutations.addFreeFrame,
     clearAutoBlurFrames: args.mutations.clearAutoBlurFrames,
     clearFrames: args.mutations.clearFrames,
     frames: args.frames,

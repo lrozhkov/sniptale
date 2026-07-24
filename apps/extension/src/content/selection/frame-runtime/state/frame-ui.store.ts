@@ -17,11 +17,13 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 export interface FrameUIState {
   activeFrameId: string | null;
   popoverFrameId: string | null;
+  resizeFrameId: string | null;
   showTooltip: (frameId: string) => void;
   hideTooltip: (frameId: string) => void;
   forceHideTooltip: () => void;
   openPopover: (frameId: string) => void;
   closePopover: () => void;
+  setResizeFrame: (frameId: string | null) => void;
   reset: () => void;
 }
 
@@ -94,11 +96,18 @@ function createFrameUIVisibilityActions(set: FrameStoreSet, get: FrameStoreGet) 
       set({ popoverFrameId: null });
     },
 
+    setResizeFrame: (frameId: string | null) => {
+      if (get().resizeFrameId !== frameId) {
+        set({ resizeFrameId: frameId });
+      }
+    },
+
     reset: () => {
       logger.debug('reset');
       set({
         activeFrameId: null,
         popoverFrameId: null,
+        resizeFrameId: null,
       });
     },
   };
@@ -107,5 +116,6 @@ function createFrameUIVisibilityActions(set: FrameStoreSet, get: FrameStoreGet) 
 export const useFrameUIStore = create<FrameUIState>((set, get) => ({
   activeFrameId: null,
   popoverFrameId: null,
+  resizeFrameId: null,
   ...createFrameUIVisibilityActions(set, get),
 }));

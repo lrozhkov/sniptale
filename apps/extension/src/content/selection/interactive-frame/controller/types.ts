@@ -11,7 +11,7 @@ export interface InteractiveFrameActionParams {
   frameWithoutLinkedElement: FrameData;
   tempFrame: FrameData;
   effectMode: EffectMode;
-  setState: React.Dispatch<React.SetStateAction<'idle' | 'hover' | 'editing'>>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   closePopover: () => void;
@@ -44,6 +44,10 @@ export interface InteractiveFrameSyncConfig {
   state: FrameState;
   tempFrameRef: React.MutableRefObject<FrameData>;
   effectModeRef: React.MutableRefObject<EffectMode>;
+  pointerIdRef: React.MutableRefObject<number | null>;
+  resizeOriginStateRef: React.MutableRefObject<FrameState>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
+  onUpdate: (frame: FrameData) => void;
   stateRef: React.MutableRefObject<FrameState>;
   containerRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -59,7 +63,14 @@ export interface InteractiveFrameListenerConfig {
   startXRef: React.MutableRefObject<number>;
   startYRef: React.MutableRefObject<number>;
   startFrameRef: React.MutableRefObject<FrameData>;
+  tempFrameRef: React.MutableRefObject<FrameData>;
   effectModeRef: React.MutableRefObject<EffectMode>;
+  pointerIdRef: React.MutableRefObject<number | null>;
+  resizeOriginStateRef: React.MutableRefObject<FrameState>;
+  resizeRafIdRef: React.MutableRefObject<number | null>;
+  latestResizeSampleRef: React.MutableRefObject<InteractiveFramePointerSample | null>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
+  onUpdate: (frame: FrameData) => void;
 }
 
 export interface InteractiveFrameHandlerConfig {
@@ -71,4 +82,17 @@ export interface InteractiveFrameHandlerConfig {
   startYRef: React.MutableRefObject<number>;
   startFrameRef: React.MutableRefObject<FrameData>;
   tempFrameRef: React.MutableRefObject<FrameData>;
+  pointerIdRef: React.MutableRefObject<number | null>;
+  resizeOriginStateRef: React.MutableRefObject<FrameState>;
+  resizeRafIdRef: React.MutableRefObject<number | null>;
+  latestResizeSampleRef: React.MutableRefObject<InteractiveFramePointerSample | null>;
+  stateRef: React.MutableRefObject<FrameState>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
+  setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
+}
+
+export interface InteractiveFramePointerSample {
+  clientX: number;
+  clientY: number;
+  pointerId: number;
 }

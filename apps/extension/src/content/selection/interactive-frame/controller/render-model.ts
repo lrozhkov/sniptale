@@ -21,7 +21,7 @@ export function useInteractiveFrameRenderModel({
   onEffectChange,
   defaultEffectMode = 'border',
 }: InteractiveFrameProps) {
-  const runtime = useInteractiveFrameRuntime({ frame, defaultEffectMode, onStateChange });
+  const runtime = useInteractiveFrameRuntime({ frame, defaultEffectMode, onStateChange, onUpdate });
   const actions = useInteractiveFrameRenderActions({
     frame,
     runtime,

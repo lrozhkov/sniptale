@@ -38,7 +38,7 @@ export function createHighlighterFrameActions(props: {
 }) {
   return {
     addHighlight: (element: HTMLElement) => {
-      props.hoverController.createOverlayContainer();
+      props.hoverController.overlay.createContainer();
       if (!addHighlighterFrame(props.state, element)) {
         props.logger.warn('Cannot add highlight before frame callbacks are registered');
       }
@@ -53,12 +53,14 @@ export function createHighlighterFrameActions(props: {
     },
     registerFrameCallbacks: (
       addFrame: (element: HTMLElement) => void,
+      addFreeFrame: import('../../../features/highlighter/contracts').AddFreeFrameCallback,
       removeFrame: (frameId: string) => void,
       clearFrames: () => void,
       hasFrameForElement?: (element: HTMLElement) => boolean
     ) => {
       registerHighlighterFrameCallbacks(props.state, {
         addFrame,
+        addFreeFrame,
         removeFrame,
         clearFrames,
         ...(hasFrameForElement === undefined ? {} : { hasFrameForElement }),
@@ -108,14 +110,14 @@ export function createHighlighterStateActions(props: {
 }
 
 export function createHighlighterInvalidateActions(
-  hoverController: Pick<HoverController, 'invalidateFrameCache' | 'invalidateSettingsCache'>
+  hoverController: Pick<HoverController, 'invalidation'>
 ) {
   return {
     invalidateFrameCache: () => {
-      hoverController.invalidateFrameCache();
+      hoverController.invalidation.frameCache();
     },
     invalidateSettingsCache: () => {
-      hoverController.invalidateSettingsCache();
+      hoverController.invalidation.settingsCache();
     },
   };
 }

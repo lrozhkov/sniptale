@@ -1,14 +1,15 @@
 import type { createLogger } from '@sniptale/platform/observability/logger';
-import type { createHighlighterHoverController } from '../highlighter-hover-preview';
+import type { HoverController } from '../highlighter-hover-preview';
 import type { HighlighterRuntimeState } from './state';
 
-export type HoverController = ReturnType<typeof createHighlighterHoverController>;
+export type { HoverController };
 export type HighlighterLogger = Pick<ReturnType<typeof createLogger>, 'log' | 'warn'>;
 
 export interface HighlighterControllerDeps {
   createHoverController?: (
     getCallbacks: () => {
       addFrame: ((element: HTMLElement) => void) | null;
+      addFreeFrame: import('../../../features/highlighter/contracts').AddFreeFrameCallback | null;
       hasFrameForElement: ((element: HTMLElement) => boolean) | null;
     },
     getState: {
@@ -41,6 +42,7 @@ export interface HighlighterController {
   pause: () => void;
   registerFrameCallbacks: (
     addFrame: (element: HTMLElement) => void,
+    addFreeFrame: import('../../../features/highlighter/contracts').AddFreeFrameCallback,
     removeFrame: (frameId: string) => void,
     clearFrames: () => void,
     hasFrameForElement?: (element: HTMLElement) => boolean

@@ -10,6 +10,7 @@ import {
   useCalloutEditingFocusEffect,
   useCalloutEscapeCaptureEffect,
 } from './editing.effects';
+import { useCalloutEditing } from './editing';
 
 function FocusEffectHarness(props: {
   htmlContent: string;
@@ -65,6 +66,28 @@ function EscapeCaptureHarness(props: {
       contentEditable
       suppressContentEditableWarning
     />
+  );
+}
+
+function RestoredContentMeasureHarness(props: { htmlContent: string }) {
+  const editing = useCalloutEditing({
+    frameId: 'restored-frame',
+    htmlContent: props.htmlContent,
+    isEditing: false,
+    onContentChange: vi.fn(),
+    onDelete: vi.fn(),
+    onStartEditing: vi.fn(),
+    onStopEditing: vi.fn(),
+    settingsKey: 'restored-callout',
+  });
+
+  return (
+    <>
+      <div ref={editing.containerRef} data-ui="restored-callout">
+        <div ref={editing.contentEditableRef} />
+      </div>
+      <output data-ui="measured-width">{editing.dimensions.width}</output>
+    </>
   );
 }
 
@@ -213,5 +236,29 @@ describe('useCalloutBlurRequestEffect', () => {
 
     expect(finishEditing).toHaveBeenCalledWith(editable);
     expect(blurSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('restored callout measurement', () => {
+  it('measures restored HTML after synchronizing it into the callout DOM', () => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function getRestoredContentRect(this: HTMLElement) {
+        const width = this.textContent?.includes('restored comment') ? 180 : 40;
+        return new DOMRect(0, 0, width, 48);
+      });
+
+    act(() => {
+      root?.render(<RestoredContentMeasureHarness htmlContent="<b>restored comment</b>" />);
+    });
+
+    expect(container.querySelector('[data-ui="restored-callout"]')?.textContent).toContain(
+      'restored comment'
+    );
+    expect(container.querySelector('[data-ui="measured-width"]')?.textContent).toBe('180');
+    rectSpy.mockRestore();
   });
 });
