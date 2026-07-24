@@ -170,6 +170,18 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/overlay/toolbar/capture/menus.test.tsx'],
   },
   {
+    owner: 'content-page-preparation-local-save-hook',
+    productionFile:
+      'apps/extension/src/content/parser/page-preparation/local-save/hook/index.ts',
+    exclusive: true,
+    reason:
+      'The page-preparation local-save hook executes through the toolbar visibility, history, result, and retry behavior suites.',
+    testFiles: [
+      'apps/extension/src/content/overlay/toolbar/capture/local-save.file.test.tsx',
+      'apps/extension/src/content/overlay/toolbar/capture/local-save.test.tsx',
+    ],
+  },
+  {
     owner: 'popup-export-page-content',
     productionFile: 'apps/extension/src/popup/shell/export/pages/content.tsx',
     reason:

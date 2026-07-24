@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { translate } from '../../../../platform/i18n';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
-import { PagePreparationLocalSaveResultKind } from '../../../parser/page-preparation/local-save';
+import { PagePreparationLocalSaveResultKind } from '../../../parser/page-preparation/local-save/types';
 import { ToolbarLocalSaveControl } from './local-save';
 
 const savePreparedLocalHtmlMock = vi.hoisted(() => vi.fn());
@@ -17,8 +17,8 @@ vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) =>
   showToast: showToastMock,
 }));
 
-vi.mock('../../../parser/page-preparation/local-save', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../parser/page-preparation/local-save')>()),
+vi.mock('../../../parser/page-preparation/local-save/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../parser/page-preparation/local-save/service')>()),
   savePreparedLocalHtml: savePreparedLocalHtmlMock,
 }));
 

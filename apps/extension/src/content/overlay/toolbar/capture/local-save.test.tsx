@@ -7,8 +7,8 @@ import { ToolbarLocalSaveControl } from './local-save';
 
 const savePreparedLocalHtmlMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../parser/page-preparation/local-save', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../parser/page-preparation/local-save')>()),
+vi.mock('../../../parser/page-preparation/local-save/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../parser/page-preparation/local-save/service')>()),
   savePreparedLocalHtml: savePreparedLocalHtmlMock,
 }));
 

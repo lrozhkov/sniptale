@@ -22,7 +22,7 @@ function handleLazyPopupWebSnapshotRuntime(
   sendResponse: PopupSendResponse,
   request: PopupWebSnapshotRequest
 ): boolean {
-  void import('../snapshot')
+  void import('../web-snapshot-runtime')
     .then(({ handlePopupWebSnapshotRuntime }) =>
       handlePopupWebSnapshotRuntime(
         sendResponse,

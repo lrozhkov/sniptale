@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { translate } from '../../../../../platform/i18n';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { isWritableLocalHtmlPage } from '../eligibility';
+import { savePreparedLocalHtml } from '../service';
 import {
-  isWritableLocalHtmlPage,
   PagePreparationLocalSaveResultKind,
-  savePreparedLocalHtml,
   type SavePreparedLocalHtmlResult,
   type WritableLocalHtmlFileHandle,
-} from '..';
+} from '../types';
 import { pagePreparationHistory } from '../../history';
 
 export const PagePreparationLocalSaveStatus = {

@@ -2859,7 +2859,6 @@
         "apps/extension/src/content/parser/page-preparation/history/types.ts",
         "apps/extension/src/content/parser/page-preparation/local-save/eligibility.ts",
         "apps/extension/src/content/parser/page-preparation/local-save/hook/index.ts",
-        "apps/extension/src/content/parser/page-preparation/local-save/index.ts",
         "apps/extension/src/content/parser/page-preparation/local-save/service.ts",
         "apps/extension/src/content/parser/page-preparation/local-save/types.ts",
         "apps/extension/src/content/parser/page-preparation/snapshot/builder.ts",
@@ -2955,7 +2954,6 @@
         "apps/extension/src/content/parser/popup-export/controller/request-handler/cancel.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/dispatch.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/runtime.ts",
-        "apps/extension/src/content/parser/popup-export/controller/snapshot.ts",
         "apps/extension/src/content/parser/popup-export/controller/start/progress.ts",
         "apps/extension/src/content/parser/popup-export/controller/start/runtime.ts",
         "apps/extension/src/content/parser/popup-export/controller/start/settle.ts",
@@ -3612,7 +3610,6 @@
         "apps/extension/src/content/parser/popup-export/controller/request-handler/cancel.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/dispatch.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/runtime.ts",
-        "apps/extension/src/content/parser/popup-export/controller/snapshot.ts",
         "apps/extension/src/content/parser/popup-export/controller/start/progress.ts",
         "apps/extension/src/content/parser/popup-export/controller/start/runtime.ts",
         "apps/extension/src/content/parser/popup-export/controller/start/settle.ts",
@@ -16426,7 +16423,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "1989134ebc5f71e3397d50914a0f3178db5e70fbf635e88caf9e00d94b5cd265"
+        "contentHash": "039a8f8f8cff1134f044a60f00bdfbb7d20b1839df6780a07e62a0891afaaa57"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16480,6 +16477,7 @@
         "property:testFiles[48]",
         "property:testFiles[49]",
         "property:testFiles[5]",
+        "property:testFiles[50]",
         "property:testFiles[6]",
         "property:testFiles[7]",
         "property:testFiles[8]",
@@ -21262,7 +21260,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/web-snapshot.mjs",
-        "contentHash": "ccbe9b9bbde020f562c7186ea291a4e5824cde990a0ca82bd1e460b58bec013e"
+        "contentHash": "83689e379ec38c2cb652f62296d97499e4dee60311556edec532ade0a4a04e6e"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",

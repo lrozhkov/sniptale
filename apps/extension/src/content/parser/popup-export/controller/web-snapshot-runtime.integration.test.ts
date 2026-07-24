@@ -3,7 +3,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { installContentRuntimeMessagingMock } from '../../../platform/runtime-services/services.test-support';
-import { handlePopupWebSnapshotRuntime } from './snapshot';
+import { handlePopupWebSnapshotRuntime } from './web-snapshot-runtime';
 
 const mocks = vi.hoisted(() => ({
   buildCurrentPageWebSnapshot: vi.fn(),

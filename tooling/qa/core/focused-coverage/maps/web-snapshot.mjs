@@ -59,9 +59,13 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
   },
   {
     owner: 'web-snapshot-popup-transfer',
-    productionFile: 'apps/extension/src/content/parser/popup-export/controller/snapshot.ts',
+    productionFile:
+      'apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.ts',
     reason: 'Popup web snapshot staged handoff is covered by focused controller tests.',
-    testFiles: ['apps/extension/src/content/parser/popup-export/controller/snapshot.test.ts'],
+    testFiles: [
+      'apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.integration.test.ts',
+      'apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.test.ts',
+    ],
   },
   {
     owner: 'web-snapshot-background-transfer',
