@@ -1,5 +1,5 @@
 import { translate } from '../../../../platform/i18n';
-import type { PopupLifecycleParams } from '../types';
+import type { PopupLifecycleParams } from '../contracts';
 import { popupLifecycleBootstrapLogger } from './logger';
 
 export function handlePopupBootstrapError(

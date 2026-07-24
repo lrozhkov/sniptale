@@ -1,5 +1,5 @@
 import type { PopupBootstrapResult } from '../../bootstrap';
-import type { PopupLifecycleBootstrapParams } from '../types';
+import type { PopupLifecycleBootstrapParams } from '../contracts';
 
 export function applyBootstrapSuccess(
   params: PopupLifecycleBootstrapParams,

@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { PopupLifecycleParams } from './types';
+import type { PopupLifecycleParams } from './contracts';
 
 const mocks = vi.hoisted(() => ({
   activatedListener: undefined as (() => void) | undefined,

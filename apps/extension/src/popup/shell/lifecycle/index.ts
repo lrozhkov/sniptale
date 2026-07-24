@@ -1,2 +1,2 @@
-export type { PopupLifecycleParams } from './types';
+export type { PopupLifecycleParams } from './contracts';
 export { setupPopupLifecycle } from './setup';

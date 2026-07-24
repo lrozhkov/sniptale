@@ -52,7 +52,7 @@ vi.mock('../message-sync', (_importOriginal) => ({
 }));
 
 import { setupPopupLifecycle } from './setup';
-import type { PopupLifecycleParams } from './types';
+import type { PopupLifecycleParams } from './contracts';
 
 function createParams(): PopupLifecycleParams {
   return {

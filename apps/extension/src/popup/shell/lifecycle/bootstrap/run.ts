@@ -1,6 +1,6 @@
 import { bootstrapPopupState } from '../../bootstrap';
 
-import type { PopupLifecycleBootstrapParamsGetter } from '../types';
+import type { PopupLifecycleBootstrapParamsGetter } from '../contracts';
 import { applyBootstrapSuccess } from './apply-bootstrap-success';
 import { handlePopupBootstrapError } from './handle-popup-bootstrap-error';
 import { refreshPopupSecondaryState } from './refresh-popup-secondary-state';
