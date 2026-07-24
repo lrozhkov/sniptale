@@ -55,26 +55,44 @@ import { setupPopupLifecycle } from './setup';
 import type { PopupLifecycleParams } from './contracts';
 
 function createParams(): PopupLifecycleParams {
+  const refreshActiveTabCapabilities = vi.fn(async () => undefined);
+  const refreshGalleryStatus = vi.fn(async () => undefined);
+  const setRecordingState = vi.fn();
+  const setStartError = vi.fn();
+
   return {
-    clearAppliedViewportAuthority: vi.fn(),
-    refreshActiveTabCapabilities: vi.fn(async () => undefined),
-    refreshGalleryStatus: vi.fn(async () => undefined),
-    setDisplayMode: vi.fn(),
-    setGalleryStatus: vi.fn(),
-    setHomeError: vi.fn(),
-    setIsReady: vi.fn(),
-    setIsStartPending: vi.fn(),
-    setMicrophoneDevices: vi.fn(),
-    setQuickActions: vi.fn(),
-    setQuickActionsReady: vi.fn(),
-    setRecordingControlCapability: vi.fn(),
-    setRecordingState: vi.fn(),
-    setSelectedPresetId: vi.fn(),
-    setStartError: vi.fn(),
-    setVideoCaptureMode: vi.fn(),
-    setVideoSettings: vi.fn(),
-    setViewportPresets: vi.fn(),
-    setWebcamDevices: vi.fn(),
+    bootstrap: {
+      refreshActiveTabCapabilities,
+      refreshGalleryStatus,
+      setDisplayMode: vi.fn(),
+      setHomeError: vi.fn(),
+      setIsReady: vi.fn(),
+      setMicrophoneDevices: vi.fn(),
+      setQuickActions: vi.fn(),
+      setQuickActionsReady: vi.fn(),
+      setRecordingControlCapability: vi.fn(),
+      setRecordingState,
+      setSelectedPresetId: vi.fn(),
+      setStartError,
+      setVideoCaptureMode: vi.fn(),
+      setVideoSettings: vi.fn(),
+      setViewportPresets: vi.fn(),
+      setWebcamDevices: vi.fn(),
+    },
+    browser: {
+      clearAppliedViewportAuthority: vi.fn(),
+      refreshActiveTabCapabilities,
+      refreshGalleryStatus,
+    },
+    mediaHub: {
+      refreshGalleryStatus,
+      setGalleryStatus: vi.fn(),
+    },
+    recording: {
+      setIsStartPending: vi.fn(),
+      setRecordingState,
+      setStartError,
+    },
   };
 }
 
@@ -93,8 +111,10 @@ it('normalizes async recording start failures through popup-owned error text', (
   setupPopupLifecycle(() => params);
   mocks.recordingHandlers?.onRecordingStartFailed('Запуск записи занял слишком много времени.');
 
-  expect(params.setStartError).toHaveBeenCalledWith('translated:popup.video.startRecordingTimeout');
-  expect(params.setIsStartPending).toHaveBeenCalledWith(false);
+  expect(params.recording.setStartError).toHaveBeenCalledWith(
+    'translated:popup.video.startRecordingTimeout'
+  );
+  expect(params.recording.setIsStartPending).toHaveBeenCalledWith(false);
 });
 
 it('ignores late async recording start failures after lifecycle cleanup', () => {
@@ -104,6 +124,6 @@ it('ignores late async recording start failures after lifecycle cleanup', () => 
   cleanup();
   mocks.recordingHandlers?.onRecordingStartFailed('Запуск записи занял слишком много времени.');
 
-  expect(params.setStartError).not.toHaveBeenCalled();
-  expect(params.setIsStartPending).not.toHaveBeenCalled();
+  expect(params.recording.setStartError).not.toHaveBeenCalled();
+  expect(params.recording.setIsStartPending).not.toHaveBeenCalled();
 });

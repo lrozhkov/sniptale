@@ -14,10 +14,9 @@ import type {
 import type { MicrophoneOption } from '../../recording/microphone';
 import type { WebcamOption } from '../../recording/webcam';
 
-export type PopupLifecycleParams = {
+export type PopupLifecycleBootstrapParams = {
   refreshActiveTabCapabilities: () => Promise<void>;
   refreshGalleryStatus: () => Promise<void>;
-  clearAppliedViewportAuthority: () => void;
   setHomeError: Dispatch<SetStateAction<string | null>>;
   setViewportPresets: Dispatch<SetStateAction<ViewportPreset[]>>;
   setQuickActions: Dispatch<SetStateAction<QuickAction[]>>;
@@ -32,48 +31,40 @@ export type PopupLifecycleParams = {
   setRecordingState: Dispatch<SetStateAction<VideoRecordingRuntimeState>>;
   setMicrophoneDevices: Dispatch<SetStateAction<MicrophoneOption[]>>;
   setWebcamDevices: Dispatch<SetStateAction<WebcamOption[]>>;
+  setIsReady: Dispatch<SetStateAction<boolean>>;
+  setStartError: Dispatch<SetStateAction<string | null>>;
+};
+
+export type PopupLifecycleBootstrapParamsGetter = () => PopupLifecycleBootstrapParams;
+
+type PopupLifecycleBrowserListenerParams = {
+  clearAppliedViewportAuthority: () => void;
+  refreshActiveTabCapabilities: () => Promise<void>;
+  refreshGalleryStatus: () => Promise<void>;
+};
+
+export type PopupLifecycleBrowserListenerParamsGetter = () => PopupLifecycleBrowserListenerParams;
+
+type PopupLifecycleMediaHubParams = {
+  refreshGalleryStatus: () => Promise<void>;
   setGalleryStatus: Dispatch<
     SetStateAction<{ text: string; pressure: StoragePressureLevel } | null>
   >;
-  setIsReady: Dispatch<SetStateAction<boolean>>;
+};
+
+export type PopupLifecycleMediaHubParamsGetter = () => PopupLifecycleMediaHubParams;
+
+type PopupLifecycleRecordingParams = {
+  setRecordingState: Dispatch<SetStateAction<VideoRecordingRuntimeState>>;
   setStartError: Dispatch<SetStateAction<string | null>>;
   setIsStartPending: Dispatch<SetStateAction<boolean>>;
 };
 
+export type PopupLifecycleParams = {
+  bootstrap: PopupLifecycleBootstrapParams;
+  browser: PopupLifecycleBrowserListenerParams;
+  mediaHub: PopupLifecycleMediaHubParams;
+  recording: PopupLifecycleRecordingParams;
+};
+
 export type PopupLifecycleParamsGetter = () => PopupLifecycleParams;
-
-export type PopupLifecycleBootstrapParams = Pick<
-  PopupLifecycleParams,
-  | 'setHomeError'
-  | 'refreshActiveTabCapabilities'
-  | 'refreshGalleryStatus'
-  | 'setViewportPresets'
-  | 'setQuickActions'
-  | 'setQuickActionsReady'
-  | 'setDisplayMode'
-  | 'setVideoSettings'
-  | 'setSelectedPresetId'
-  | 'setVideoCaptureMode'
-  | 'setRecordingControlCapability'
-  | 'setRecordingState'
-  | 'setMicrophoneDevices'
-  | 'setWebcamDevices'
-  | 'setIsReady'
-  | 'setStartError'
->;
-
-export type PopupLifecycleBootstrapParamsGetter = () => PopupLifecycleBootstrapParams;
-
-type PopupLifecycleBrowserListenerParams = Pick<
-  PopupLifecycleParams,
-  'clearAppliedViewportAuthority' | 'refreshActiveTabCapabilities' | 'refreshGalleryStatus'
->;
-
-export type PopupLifecycleBrowserListenerParamsGetter = () => PopupLifecycleBrowserListenerParams;
-
-type PopupLifecycleMediaHubParams = Pick<
-  PopupLifecycleParams,
-  'refreshGalleryStatus' | 'setGalleryStatus'
->;
-
-export type PopupLifecycleMediaHubParamsGetter = () => PopupLifecycleMediaHubParams;

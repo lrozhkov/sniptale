@@ -10,31 +10,44 @@ const { setupPopupLifecycleMock } = vi.hoisted(() => ({
   setupPopupLifecycleMock: vi.fn(),
 }));
 
-vi.mock('./index', (_importOriginal) => ({
+vi.mock('./setup', (_importOriginal) => ({
   setupPopupLifecycle: setupPopupLifecycleMock,
 }));
 
 function createLifecycleParams() {
   return {
-    clearAppliedViewportAuthority: vi.fn(),
-    refreshActiveTabCapabilities: vi.fn(async () => undefined),
-    refreshGalleryStatus: vi.fn(async () => undefined),
-    setHomeError: vi.fn(),
-    setViewportPresets: vi.fn(),
-    setQuickActions: vi.fn(),
-    setQuickActionsReady: vi.fn(),
-    setDisplayMode: vi.fn(),
-    setVideoSettings: vi.fn(),
-    setSelectedPresetId: vi.fn(),
-    setVideoCaptureMode: vi.fn(),
-    setRecordingState: vi.fn(),
-    setMicrophoneDevices: vi.fn(),
-    setWebcamDevices: vi.fn(),
-    setGalleryStatus: vi.fn(),
-    setIsReady: vi.fn(),
-    setStartError: vi.fn(),
-    setIsStartPending: vi.fn(),
-    setRecordingControlCapability: vi.fn(),
+    bootstrap: {
+      refreshActiveTabCapabilities: vi.fn(async () => undefined),
+      refreshGalleryStatus: vi.fn(async () => undefined),
+      setHomeError: vi.fn(),
+      setViewportPresets: vi.fn(),
+      setQuickActions: vi.fn(),
+      setQuickActionsReady: vi.fn(),
+      setDisplayMode: vi.fn(),
+      setVideoSettings: vi.fn(),
+      setSelectedPresetId: vi.fn(),
+      setVideoCaptureMode: vi.fn(),
+      setRecordingState: vi.fn(),
+      setMicrophoneDevices: vi.fn(),
+      setWebcamDevices: vi.fn(),
+      setIsReady: vi.fn(),
+      setStartError: vi.fn(),
+      setRecordingControlCapability: vi.fn(),
+    },
+    browser: {
+      clearAppliedViewportAuthority: vi.fn(),
+      refreshActiveTabCapabilities: vi.fn(async () => undefined),
+      refreshGalleryStatus: vi.fn(async () => undefined),
+    },
+    mediaHub: {
+      refreshGalleryStatus: vi.fn(async () => undefined),
+      setGalleryStatus: vi.fn(),
+    },
+    recording: {
+      setRecordingState: vi.fn(),
+      setStartError: vi.fn(),
+      setIsStartPending: vi.fn(),
+    },
   };
 }
 

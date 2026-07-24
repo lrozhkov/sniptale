@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { setupPopupLifecycle, type PopupLifecycleParams } from './index';
+import type { PopupLifecycleParams } from './contracts';
+import { setupPopupLifecycle } from './setup';
 
 export function usePopupLifecycleEffect(getParams: () => PopupLifecycleParams): void {
   const paramsRef = useRef(getParams);

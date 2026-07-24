@@ -9139,7 +9139,6 @@
         "apps/extension/src/popup/shell/lifecycle/browser-listeners.ts",
         "apps/extension/src/popup/shell/lifecycle/contracts.ts",
         "apps/extension/src/popup/shell/lifecycle/effect.ts",
-        "apps/extension/src/popup/shell/lifecycle/index.ts",
         "apps/extension/src/popup/shell/lifecycle/media-hub-listener.ts",
         "apps/extension/src/popup/shell/lifecycle/setup.ts",
         "apps/extension/src/popup/shell/message-sync/index.ts",
@@ -9394,7 +9393,6 @@
         "apps/extension/src/popup/shell/lifecycle/browser-listeners.ts",
         "apps/extension/src/popup/shell/lifecycle/contracts.ts",
         "apps/extension/src/popup/shell/lifecycle/effect.ts",
-        "apps/extension/src/popup/shell/lifecycle/index.ts",
         "apps/extension/src/popup/shell/lifecycle/media-hub-listener.ts",
         "apps/extension/src/popup/shell/lifecycle/setup.ts",
         "apps/extension/src/popup/shell/message-sync/index.ts",
@@ -17407,7 +17405,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
-        "contentHash": "a79069a11beafe00818b72f14faefc86d4132a4caca422cfb6a4192f09026161"
+        "contentHash": "fcaf98d44c0fe040b1bca84d7be280c7fb150ae028459e83dbfbb9bed7ddad3e"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",

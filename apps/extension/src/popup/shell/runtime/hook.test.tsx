@@ -199,10 +199,28 @@ it('exposes lifecycle clearing for applied viewport authority', async () => {
 
   await renderHarness();
   const lifecycleParams = usePopupLifecycleEffectMock.mock.calls[0]?.[0]?.();
-  lifecycleParams.clearAppliedViewportAuthority();
+  lifecycleParams.browser.clearAppliedViewportAuthority();
 
   expect(setAppliedViewportPresetId).toHaveBeenCalledWith(null);
   expect(setAppliedViewportTabId).toHaveBeenCalledWith(null);
+});
+
+it('groups lifecycle roles while preserving one setter authority', async () => {
+  const setStartError = vi.fn();
+  usePopupRuntimeStateMock.mockReturnValueOnce(createRuntimeState({ setStartError }));
+
+  await renderHarness();
+  const lifecycleParams = usePopupLifecycleEffectMock.mock.calls[0]?.[0]?.();
+
+  expect(Object.keys(lifecycleParams).sort()).toEqual([
+    'bootstrap',
+    'browser',
+    'mediaHub',
+    'recording',
+  ]);
+  expect(lifecycleParams).not.toHaveProperty('setStartError');
+  expect(lifecycleParams.bootstrap.setStartError).toBe(setStartError);
+  expect(lifecycleParams.recording.setStartError).toBe(setStartError);
 });
 
 it('keeps recording setter authority connected through the runtime projection', async () => {

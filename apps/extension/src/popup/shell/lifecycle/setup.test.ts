@@ -70,26 +70,44 @@ function createBootstrapState() {
 }
 
 function createParams(): PopupLifecycleParams {
+  const refreshActiveTabCapabilities = vi.fn(async () => undefined);
+  const refreshGalleryStatus = vi.fn(async () => undefined);
+  const setRecordingState = vi.fn();
+  const setStartError = vi.fn();
+
   return {
-    clearAppliedViewportAuthority: vi.fn(),
-    refreshActiveTabCapabilities: vi.fn(async () => undefined),
-    refreshGalleryStatus: vi.fn(async () => undefined),
-    setDisplayMode: vi.fn(),
-    setGalleryStatus: vi.fn(),
-    setHomeError: vi.fn(),
-    setIsReady: vi.fn(),
-    setIsStartPending: vi.fn(),
-    setMicrophoneDevices: vi.fn(),
-    setWebcamDevices: vi.fn(),
-    setQuickActions: vi.fn(),
-    setQuickActionsReady: vi.fn(),
-    setRecordingControlCapability: vi.fn(),
-    setRecordingState: vi.fn(),
-    setSelectedPresetId: vi.fn(),
-    setStartError: vi.fn(),
-    setVideoCaptureMode: vi.fn(),
-    setVideoSettings: vi.fn(),
-    setViewportPresets: vi.fn(),
+    bootstrap: {
+      refreshActiveTabCapabilities,
+      refreshGalleryStatus,
+      setDisplayMode: vi.fn(),
+      setHomeError: vi.fn(),
+      setIsReady: vi.fn(),
+      setMicrophoneDevices: vi.fn(),
+      setQuickActions: vi.fn(),
+      setQuickActionsReady: vi.fn(),
+      setRecordingControlCapability: vi.fn(),
+      setRecordingState,
+      setSelectedPresetId: vi.fn(),
+      setStartError,
+      setVideoCaptureMode: vi.fn(),
+      setVideoSettings: vi.fn(),
+      setViewportPresets: vi.fn(),
+      setWebcamDevices: vi.fn(),
+    },
+    browser: {
+      clearAppliedViewportAuthority: vi.fn(),
+      refreshActiveTabCapabilities,
+      refreshGalleryStatus,
+    },
+    mediaHub: {
+      refreshGalleryStatus,
+      setGalleryStatus: vi.fn(),
+    },
+    recording: {
+      setIsStartPending: vi.fn(),
+      setRecordingState,
+      setStartError,
+    },
   };
 }
 
@@ -113,22 +131,22 @@ function expectBootstrappedStateApplied(
   params: PopupLifecycleParams,
   state: ReturnType<typeof createBootstrapState>
 ) {
-  expect(params.setViewportPresets).toHaveBeenCalledWith(state.viewportPresets);
-  expect(params.setQuickActions).toHaveBeenCalledWith(state.quickActions);
-  expect(params.setQuickActionsReady).toHaveBeenCalledWith(true);
-  expect(params.setDisplayMode).toHaveBeenCalledWith(state.quickActionsMode);
-  expect(params.setHomeError).toHaveBeenCalledWith(null);
-  expect(params.setVideoSettings).toHaveBeenCalledWith(state.videoSettings);
-  expect(params.setSelectedPresetId).toHaveBeenCalledWith(state.selectedPresetId);
-  expect(params.setVideoCaptureMode).toHaveBeenCalledWith(state.captureMode);
-  expect(params.setRecordingControlCapability).toHaveBeenCalledWith(
+  expect(params.bootstrap.setViewportPresets).toHaveBeenCalledWith(state.viewportPresets);
+  expect(params.bootstrap.setQuickActions).toHaveBeenCalledWith(state.quickActions);
+  expect(params.bootstrap.setQuickActionsReady).toHaveBeenCalledWith(true);
+  expect(params.bootstrap.setDisplayMode).toHaveBeenCalledWith(state.quickActionsMode);
+  expect(params.bootstrap.setHomeError).toHaveBeenCalledWith(null);
+  expect(params.bootstrap.setVideoSettings).toHaveBeenCalledWith(state.videoSettings);
+  expect(params.bootstrap.setSelectedPresetId).toHaveBeenCalledWith(state.selectedPresetId);
+  expect(params.bootstrap.setVideoCaptureMode).toHaveBeenCalledWith(state.captureMode);
+  expect(params.bootstrap.setRecordingControlCapability).toHaveBeenCalledWith(
     state.recordingControlCapability
   );
-  expect(params.setRecordingState).toHaveBeenCalledWith(state.recordingState);
-  expect(params.setMicrophoneDevices).toHaveBeenCalledWith(state.microphones);
-  expect(params.setIsReady).toHaveBeenCalledWith(true);
-  expect(params.refreshActiveTabCapabilities).toHaveBeenCalledTimes(1);
-  expect(params.refreshGalleryStatus).toHaveBeenCalledTimes(1);
+  expect(params.bootstrap.setRecordingState).toHaveBeenCalledWith(state.recordingState);
+  expect(params.bootstrap.setMicrophoneDevices).toHaveBeenCalledWith(state.microphones);
+  expect(params.bootstrap.setIsReady).toHaveBeenCalledWith(true);
+  expect(params.bootstrap.refreshActiveTabCapabilities).toHaveBeenCalledTimes(1);
+  expect(params.bootstrap.refreshGalleryStatus).toHaveBeenCalledTimes(1);
 }
 
 function expectLifecycleCleanup() {
@@ -213,19 +231,23 @@ describe('setupPopupLifecycle', () => {
 
     expectBootstrappedStateApplied(params, state);
 
-    vi.mocked(params.refreshActiveTabCapabilities).mockClear();
-    vi.mocked(params.refreshGalleryStatus).mockClear();
+    vi.mocked(params.bootstrap.refreshActiveTabCapabilities).mockClear();
+    vi.mocked(params.bootstrap.refreshGalleryStatus).mockClear();
 
     triggerPopupLifecycleEvents();
-    expect(params.setRecordingState).toHaveBeenLastCalledWith({ status: 'recording' });
-    expect(params.setStartError).toHaveBeenCalledWith('translated:popup.video.startRecordingError');
-    expect(params.setIsStartPending).toHaveBeenCalledWith(false);
-    expect(params.setGalleryStatus).toHaveBeenCalledWith({
+    expect(params.recording.setRecordingState).toHaveBeenLastCalledWith({
+      status: 'recording',
+    });
+    expect(params.recording.setStartError).toHaveBeenCalledWith(
+      'translated:popup.video.startRecordingError'
+    );
+    expect(params.recording.setIsStartPending).toHaveBeenCalledWith(false);
+    expect(params.mediaHub.setGalleryStatus).toHaveBeenCalledWith({
       pressure: 'critical',
       text: 'translated:popup.common.galleryStatusAttention',
     });
-    expect(params.refreshGalleryStatus).toHaveBeenCalledTimes(2);
-    expect(params.refreshActiveTabCapabilities).toHaveBeenCalledTimes(4);
+    expect(params.bootstrap.refreshGalleryStatus).toHaveBeenCalledTimes(2);
+    expect(params.bootstrap.refreshActiveTabCapabilities).toHaveBeenCalledTimes(4);
 
     cleanup();
     expectLifecycleCleanup();
@@ -242,10 +264,10 @@ describe('setupPopupLifecycle', () => {
     deferred.resolve(createBootstrapState());
     await flushAsyncWork();
 
-    expect(params.setViewportPresets).not.toHaveBeenCalled();
-    expect(params.setIsReady).not.toHaveBeenCalled();
-    expect(params.refreshActiveTabCapabilities).not.toHaveBeenCalled();
-    expect(params.refreshGalleryStatus).not.toHaveBeenCalled();
+    expect(params.bootstrap.setViewportPresets).not.toHaveBeenCalled();
+    expect(params.bootstrap.setIsReady).not.toHaveBeenCalled();
+    expect(params.bootstrap.refreshActiveTabCapabilities).not.toHaveBeenCalled();
+    expect(params.bootstrap.refreshGalleryStatus).not.toHaveBeenCalled();
   });
 });
 
@@ -263,8 +285,10 @@ describe('setupPopupLifecycle error handling', () => {
       'Failed to bootstrap popup',
       expect.any(Error)
     );
-    expect(params.setStartError).toHaveBeenCalledWith('translated:popup.video.loadingPopupError');
-    expect(params.setIsReady).toHaveBeenCalledWith(true);
+    expect(params.bootstrap.setStartError).toHaveBeenCalledWith(
+      'translated:popup.video.loadingPopupError'
+    );
+    expect(params.bootstrap.setIsReady).toHaveBeenCalledWith(true);
   });
 
   it('logs secondary refresh failures after bootstrap without breaking popup readiness', async () => {
@@ -272,7 +296,7 @@ describe('setupPopupLifecycle error handling', () => {
     const state = createBootstrapState();
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mocks.bootstrapPopupStateMock.mockResolvedValue(state);
-    vi.mocked(params.refreshGalleryStatus).mockRejectedValueOnce(
+    vi.mocked(params.bootstrap.refreshGalleryStatus).mockRejectedValueOnce(
       new Error('gallery refresh failed')
     );
 
@@ -280,7 +304,7 @@ describe('setupPopupLifecycle error handling', () => {
     await flushAsyncWork();
     await flushAsyncWork();
 
-    expect(params.setIsReady).toHaveBeenCalledWith(true);
+    expect(params.bootstrap.setIsReady).toHaveBeenCalledWith(true);
     expect(errorSpy).toHaveBeenCalledWith(
       '[PopupLifecycle]',
       'Failed to refresh popup secondary state',

@@ -75,10 +75,9 @@ export const POPUP_RECORDING_OWNER_MAPPINGS = [
   {
     owner: 'popup-recording-lifecycle-capability',
     productionPrefix: 'apps/extension/src/popup/shell/lifecycle',
-    reason: 'Popup lifecycle capability hydration is covered by bootstrap/setup/index suites.',
+    reason: 'Popup lifecycle capability hydration is covered by bootstrap and setup suites.',
     testFiles: [
       'apps/extension/src/popup/shell/lifecycle/bootstrap.test.ts',
-      'apps/extension/src/popup/shell/lifecycle/index.test.ts',
       'apps/extension/src/popup/shell/lifecycle/setup.test.ts',
     ],
   },
