@@ -1,6 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
-import type { EditorDocumentActionCommands } from '../commands.types';
-import type { EditorDocumentActionGroup } from '../types';
+import type { EditorDocumentActionCommands, EditorDocumentActionGroup } from '../types';
 
 export function buildScenarioDocumentActionGroupList(
   commands: EditorDocumentActionCommands

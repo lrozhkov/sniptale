@@ -1,5 +1,5 @@
 import type { BuildEditorDocumentActionGroupsParams } from '../types';
-import type { EditorDocumentActionCommandBuilders } from '../commands.types';
+import type { EditorDocumentActionCommandBuilders } from '../types';
 import { buildCopyOpenCloseCommandBuilders } from './copy-open-close';
 import { buildSaveSessionCommandBuilders } from './save-session';
 

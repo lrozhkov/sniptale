@@ -1,5 +1,5 @@
 import type { Translate } from '../../../../../platform/i18n';
-import type { EditorDocumentActionContentBuilders } from '../commands.types';
+import type { EditorDocumentActionContentBuilders } from '../types';
 import type { BuildEditorDocumentActionGroupsParams } from '../types';
 
 export function buildSaveToFolderContent(
