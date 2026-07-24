@@ -21,6 +21,27 @@ export const EDITOR_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/editor/controller/core/base.instance-ownership.test.ts'],
   },
   {
+    owner: 'editor-freehand-dynamic-width-outline',
+    productionFile:
+      'apps/extension/src/editor/controller/freehand/dynamic-width/outline/points.ts',
+    reason: 'Dynamic-width outline assembly is covered by the outline owner suite.',
+    testFiles: [
+      'apps/extension/src/editor/controller/freehand/dynamic-width/outline/owners.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-freehand-point-cloud-modeling',
+    productionFile: 'apps/extension/src/editor/controller/freehand/modeling.ts',
+    reason: 'Freehand stroke modeling is covered by the focused modeling suite.',
+    testFiles: ['apps/extension/src/editor/controller/freehand/modeling.test.ts'],
+  },
+  {
+    owner: 'editor-freehand-recognition-corners',
+    productionFile: 'apps/extension/src/editor/controller/freehand/recognition-corners.ts',
+    reason: 'Corner-profile behavior is exercised through the focused recognition suite.',
+    testFiles: ['apps/extension/src/editor/controller/freehand/recognition.test.ts'],
+  },
+  {
     owner: 'editor-magnet-manager',
     productionFile: 'apps/extension/src/editor/controller/magnet/manager.ts',
     reason: 'Magnet manager behavior is covered by focused manager tests.',

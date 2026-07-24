@@ -1,5 +1,5 @@
 import { measureBounds, measureDistance, measurePathLength, type Bounds } from './metrics';
-import { resamplePointCloud } from './point-cloud';
+import { resamplePointCloud } from './point-cloud/sampling';
 import type { FreehandPointRecord } from './points';
 
 const CLOSED_STROKE_RATIO = 0.18;
