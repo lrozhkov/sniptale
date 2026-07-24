@@ -10,7 +10,7 @@ import { formatHotkey } from '../../../../features/keyboard-shortcuts/hotkey-for
 import type { HotkeyConfig, ViewportPreset } from '../../../../contracts/settings';
 import { afterCaptureLabels, quickActionIconMap, screenshotModeLabels } from '../section/constants';
 import { getDelayLabel, getEmulationLabel } from '../section/helpers';
-import type { QuickActionsSectionState } from '../section';
+import type { QuickActionsSectionState } from '../controller';
 import {
   getSettingsHoverActionsClassName,
   settingsDangerIconButtonClassName,

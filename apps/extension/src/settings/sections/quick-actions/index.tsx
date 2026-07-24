@@ -9,7 +9,7 @@ import {
   QuickActionsHeader,
   QuickActionsList,
 } from './views';
-import { useQuickActionsSection } from './section';
+import { useQuickActionsController as useQuickActionsSection } from './controller';
 
 function getDeleteActionMessage(name: string | undefined): string {
   return [

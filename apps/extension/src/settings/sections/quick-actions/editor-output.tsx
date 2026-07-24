@@ -4,7 +4,7 @@ import type { CaptureActionType, QuickAction } from '../../../contracts/settings
 import { afterCaptureLabels, qualityOptions } from './section/constants';
 import { SettingsSwitch } from '../../section-surface/panel-controls';
 import { settingsMetaLabelClassName, settingsToggleRowClassName } from '../../section-surface';
-import { type QuickActionsSectionState } from './section';
+import { type QuickActionsSectionState } from './controller';
 
 type QuickActionsEditorOutputState = Pick<QuickActionsSectionState, 'editForm' | 'updateFormField'>;
 

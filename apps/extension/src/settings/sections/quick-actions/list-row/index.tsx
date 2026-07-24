@@ -1,5 +1,5 @@
 import type { HotkeyConfig, ViewportPreset } from '../../../../contracts/settings';
-import type { QuickActionsSectionState } from '../section';
+import type { QuickActionsSectionState } from '../controller';
 import { getQuickActionRowStateClassName } from './state-class';
 import {
   quickActionRowClassName,
