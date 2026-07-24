@@ -48,6 +48,39 @@ export const EDITOR_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/editor/controller/selection/coverage.test.ts'],
   },
   {
+    owner: 'editor-rich-shape-callout-controls-contract',
+    productionPrefix: 'apps/extension/src/editor/objects/rich-shape/callout-controls/',
+    reason: 'Callout-control behavior is covered by the complete owner-local control suite.',
+    testFiles: [
+      'apps/extension/src/editor/objects/rich-shape/callout-controls.test.ts',
+      'apps/extension/src/editor/objects/rich-shape/callout-controls/coordinates.test.ts',
+      'apps/extension/src/editor/objects/rich-shape/callout-controls/factory.test.ts',
+      'apps/extension/src/editor/objects/rich-shape/callout-controls/handlers.test.ts',
+      'apps/extension/src/editor/objects/rich-shape/callout-controls/patch.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-rich-shape-mutation-contract',
+    productionPrefix: 'apps/extension/src/editor/objects/rich-shape/mutation/',
+    reason: 'Rich-shape mutation behavior is covered by the root, mutation, and callout suites.',
+    testFiles: [
+      'apps/extension/src/editor/objects/rich-shape/callout-object-mutation.test.ts',
+      'apps/extension/src/editor/objects/rich-shape/index.test.ts',
+      'apps/extension/src/editor/objects/rich-shape/mutation.test.ts',
+      'apps/extension/src/editor/objects/rich-shape/mutation/owners.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-rich-shape-text-frame-contract',
+    productionPrefix: 'apps/extension/src/editor/objects/rich-shape/text-frame/',
+    reason: 'Text-frame behavior is covered at the object owner and controller projection seams.',
+    testFiles: [
+      'apps/extension/src/editor/controller/rich-shape-text-editor/geometry.test.ts',
+      'apps/extension/src/editor/objects/rich-shape/text-frame.test.ts',
+      'apps/extension/src/editor/objects/rich-shape/text-frame/owners.test.ts',
+    ],
+  },
+  {
     owner: 'editor-magnet-manager',
     productionFile: 'apps/extension/src/editor/controller/magnet/manager.ts',
     reason: 'Magnet manager behavior is covered by focused manager tests.',

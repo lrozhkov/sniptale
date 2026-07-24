@@ -1,1 +1,0 @@
-export { resolveRichShapeTextFrame } from './frame';
