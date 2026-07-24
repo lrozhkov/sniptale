@@ -1,8 +1,3 @@
-const popupRuntimePageAccessTests = [
-  'apps/extension/src/popup/shell/runtime/hook.test.tsx',
-  'apps/extension/src/popup/shell/runtime/page-access.test.tsx',
-];
-
 export const POPUP_PAGE_ACCESS_OWNER_MAPPINGS = [
   {
     allowCrossOwner: true,
@@ -31,21 +26,32 @@ export const POPUP_PAGE_ACCESS_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/popup/shell/runtime/index.ts',
     exclusive: true,
     reason: 'Popup runtime page-access assembly is covered by hook suites.',
-    testFiles: popupRuntimePageAccessTests,
+    testFiles: [
+      'apps/extension/src/popup/shell/runtime/hook.test.tsx',
+      'apps/extension/src/popup/shell/runtime/page-access.test.tsx',
+    ],
   },
   {
     owner: 'popup-runtime-page-access-assembly',
     productionFile: 'apps/extension/src/popup/shell/runtime/assembly/index.ts',
     exclusive: true,
     reason: 'Popup runtime page-access assembly is covered by hook suites.',
-    testFiles: popupRuntimePageAccessTests,
+    testFiles: [
+      'apps/extension/src/popup/shell/runtime/hook.test.tsx',
+      'apps/extension/src/popup/shell/runtime/page-access.test.tsx',
+    ],
   },
   {
     owner: 'popup-runtime-page-access-assembly',
     productionFile: 'apps/extension/src/popup/shell/runtime/assembly/view.ts',
     exclusive: true,
-    reason: 'Popup runtime page-access view assembly is covered by runtime assembly tests.',
-    testFiles: popupRuntimePageAccessTests,
+    allowMissingProductionTarget: true,
+    reason:
+      'The removed page-access view projection is consolidated into the runtime assembly owner.',
+    testFiles: [
+      'apps/extension/src/popup/shell/runtime/hook.test.tsx',
+      'apps/extension/src/popup/shell/runtime/page-access.test.tsx',
+    ],
   },
   {
     owner: 'popup-command-palette-page-access-type',

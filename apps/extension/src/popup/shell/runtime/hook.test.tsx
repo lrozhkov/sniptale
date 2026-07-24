@@ -152,6 +152,12 @@ it('sends pause and resume runtime messages based on the recording status', asyn
     expect.objectContaining({
       environment: expect.objectContaining({
         galleryStatus: null,
+        pageAccess: expect.objectContaining({
+          handleRequest: expect.any(Function),
+        }),
+      }),
+      home: expect.objectContaining({
+        quickActionsReady: true,
       }),
       navigation: expect.objectContaining({
         isReady: true,
@@ -197,6 +203,16 @@ it('exposes lifecycle clearing for applied viewport authority', async () => {
 
   expect(setAppliedViewportPresetId).toHaveBeenCalledWith(null);
   expect(setAppliedViewportTabId).toHaveBeenCalledWith(null);
+});
+
+it('keeps recording setter authority connected through the runtime projection', async () => {
+  const setStartError = vi.fn();
+  usePopupRuntimeStateMock.mockReturnValueOnce(createRuntimeState({ setStartError }));
+
+  await renderHarness();
+  latestRuntime?.recording.setStartError('viewport failed');
+
+  expect(setStartError).toHaveBeenCalledWith('viewport failed');
 });
 
 it('logs pause state failures through the popup runtime logger', async () => {

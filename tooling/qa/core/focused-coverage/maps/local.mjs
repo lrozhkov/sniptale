@@ -153,6 +153,23 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/popup/shell/export/pages/content.test.tsx'],
   },
   {
+    owner: 'popup-runtime-recording-data-predecessor',
+    productionFile: 'apps/extension/src/popup/shell/runtime/assembly/recording-data.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason:
+      'The removed recording-data projection is covered through the public runtime hook assembly.',
+    testFiles: ['apps/extension/src/popup/shell/runtime/hook.test.tsx'],
+  },
+  {
+    owner: 'popup-runtime-recording-projection-predecessor',
+    productionFile: 'apps/extension/src/popup/shell/runtime/assembly/recording.ts',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed recording projection is covered through the public runtime hook assembly.',
+    testFiles: ['apps/extension/src/popup/shell/runtime/hook.test.tsx'],
+  },
+  {
     owner: 'content-area-selection-controller',
     productionFile: 'apps/extension/src/content/selection/area-selector/controller.ts',
     reason:

@@ -9150,9 +9150,6 @@
         "apps/extension/src/popup/shell/navigation/actions.tsx",
         "apps/extension/src/popup/shell/runtime/actions.ts",
         "apps/extension/src/popup/shell/runtime/assembly/index.ts",
-        "apps/extension/src/popup/shell/runtime/assembly/recording-data.ts",
-        "apps/extension/src/popup/shell/runtime/assembly/recording.ts",
-        "apps/extension/src/popup/shell/runtime/assembly/view.ts",
         "apps/extension/src/popup/shell/runtime/effects.ts",
         "apps/extension/src/popup/shell/runtime/handlers.ts",
         "apps/extension/src/popup/shell/runtime/index.ts",
@@ -9412,9 +9409,6 @@
         "apps/extension/src/popup/shell/navigation/actions.tsx",
         "apps/extension/src/popup/shell/runtime/actions.ts",
         "apps/extension/src/popup/shell/runtime/assembly/index.ts",
-        "apps/extension/src/popup/shell/runtime/assembly/recording-data.ts",
-        "apps/extension/src/popup/shell/runtime/assembly/recording.ts",
-        "apps/extension/src/popup/shell/runtime/assembly/view.ts",
         "apps/extension/src/popup/shell/runtime/effects.ts",
         "apps/extension/src/popup/shell/runtime/handlers.ts",
         "apps/extension/src/popup/shell/runtime/index.ts",
@@ -16635,7 +16629,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "f508a685e4a369dda9acc5aeda99f80469cd4c7af815b00cc6fd1023d3a1ca86"
+        "contentHash": "9fe2afd1409eae78e605777dc3ef77778af15647b622f46e92bdf9090f677af1"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16683,6 +16677,8 @@
         "property:testFiles[42]",
         "property:testFiles[43]",
         "property:testFiles[44]",
+        "property:testFiles[45]",
+        "property:testFiles[46]",
         "property:testFiles[5]",
         "property:testFiles[6]",
         "property:testFiles[7]",
@@ -17389,7 +17385,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/popup-page-access.mjs",
-        "contentHash": "42fbd3419322e518aae14cfa7d9a4576baf79e76fdf5890fbe61b5915b65898a"
+        "contentHash": "d42e8655f2469ff927bdee6974364fb175b365b21d8ffcc6f20deb0a996c9ff2"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/page-access.mjs",
@@ -17397,15 +17393,17 @@
       ],
       "surfaces": [
         "binding:POPUP_PAGE_ACCESS_OWNER_MAPPINGS",
-        "binding:popupRuntimePageAccessTests",
         "property:testFiles",
         "property:testFiles[1]",
+        "property:testFiles[10]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
         "property:testFiles[6]",
-        "property:testFiles[7]"
+        "property:testFiles[7]",
+        "property:testFiles[8]",
+        "property:testFiles[9]"
       ]
     },
     {
@@ -17687,7 +17685,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "6a036a07f82101c3dd07fb0af83e3a96dd6738b4b0176ff04717fa8134f14fb0"
+        "contentHash": "d1ce2a12421ab11927411197bf4de29c2743d4b090e5a02a355e6448f6dee1bf"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",

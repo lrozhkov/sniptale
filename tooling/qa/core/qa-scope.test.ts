@@ -69,6 +69,11 @@ it('separates generated inventories from executable harness changes', async () =
     ).toBe(false);
     expect(
       module.isHarnessVerificationQaFile(
+        'tooling/qa/core/focused-coverage/maps/popup-page-access.mjs'
+      )
+    ).toBe(false);
+    expect(
+      module.isHarnessVerificationQaFile(
         'tooling/qa/core/focused-coverage/maps/content-selection.mjs'
       )
     ).toBe(false);
