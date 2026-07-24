@@ -1,1 +1,0 @@
-export { createLineRoughFillPattern } from './pattern';
