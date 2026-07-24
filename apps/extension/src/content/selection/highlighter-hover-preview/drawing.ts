@@ -224,6 +224,9 @@ function canStartDrawing(props: {
 
 function cancelDrawing(props: FreeFrameDrawingProps, reason: DrawingCancelReason = 'teardown') {
   const gesture = props.session.freeDraw.gesture;
+  if (gesture && (reason === 'mouseleave' || reason === 'scroll')) {
+    return false;
+  }
   const hadGesture = gesture !== null;
   if (reason === 'escape' && gesture) {
     props.session.freeDraw.clickSuppression = {

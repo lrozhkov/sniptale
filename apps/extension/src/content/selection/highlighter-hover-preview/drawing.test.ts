@@ -300,6 +300,49 @@ describe('free frame drawing gesture', () => {
     expect(showHoverOverlay).toHaveBeenCalledWith(target);
   });
 
+  it.each(['sniptale-frame-toolbar', 'sniptale-hover-overlay'])(
+    'keeps an active draw alive across a mouseleave into %s UI',
+    (uiClassName) => {
+      const { addFreeFrame, handlers, session } = createFixture();
+      const pageTarget = document.createElement('section');
+      const uiTarget = document.createElement('div');
+      uiTarget.className = uiClassName;
+
+      handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20, pageTarget));
+      handlers.handlePointerMove(createPointerEvent('pointermove', 40, 40, pageTarget));
+
+      expect(handlers.cancelDrawing('mouseleave')).toBe(false);
+      expect(session.freeDraw.gesture?.isDrawing).toBe(true);
+
+      handlers.handlePointerMove(createPointerEvent('pointermove', 70, 70, uiTarget));
+      handlers.handlePointerUp(createPointerEvent('pointerup', 70, 70, uiTarget));
+
+      expect(addFreeFrame).toHaveBeenCalledOnce();
+      expect(addFreeFrame).toHaveBeenCalledWith(
+        expect.objectContaining({ x: 20, y: 20, width: 50, height: 50 }),
+        pageTarget
+      );
+      expect(session.freeDraw.gesture).toBeNull();
+    }
+  );
+
+  it('keeps an active draw alive across scroll until pointerup', () => {
+    const { addFreeFrame, handlers, session } = createFixture();
+    const target = document.createElement('section');
+
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20, target));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 40, 40, target));
+
+    expect(handlers.cancelDrawing('scroll')).toBe(false);
+    expect(session.freeDraw.gesture?.isDrawing).toBe(true);
+
+    handlers.handlePointerMove(createPointerEvent('pointermove', 70, 70, target));
+    handlers.handlePointerUp(createPointerEvent('pointerup', 70, 70, target));
+
+    expect(addFreeFrame).toHaveBeenCalledOnce();
+    expect(session.freeDraw.gesture).toBeNull();
+  });
+
   it('commits an exact 10 by 10 gesture without padding its geometry', () => {
     const { addFreeFrame, handlers } = createFixture();
     handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 30));
