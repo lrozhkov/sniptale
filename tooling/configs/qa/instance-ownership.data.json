@@ -85,7 +85,6 @@
     {
       "id": "offscreen-runtime-facades",
       "files": [
-        "apps/extension/src/offscreen/recording/context/index.ts",
         "apps/extension/src/offscreen/recording/setup/desktop-media/index.ts",
         "apps/extension/src/offscreen/project-export/index.ts"
       ],
@@ -94,6 +93,7 @@
     {
       "id": "offscreen-owned-runtime-seams",
       "files": [
+        "apps/extension/src/offscreen/recording/context/index.ts",
         "apps/extension/src/offscreen/recording/setup/desktop-media/controller.ts",
         "apps/extension/src/offscreen/recording/start/session.ts",
         "apps/extension/src/offscreen/project-export/service/index.ts"

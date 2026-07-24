@@ -140,7 +140,13 @@ function collectFacadeDefaultOwnerViolations(relativePath, sourceFile) {
   return violations;
 }
 
-export function collectOwnershipViolationsFromSources(entries) {
+export function collectOwnershipViolationsFromSources(
+  entries,
+  {
+    ownershipFacadeFiles = OWNERSHIP_FACADE_FILES,
+    ownershipStateFiles = OWNERSHIP_STATE_FILES,
+  } = {}
+) {
   const violations = [];
 
   for (const entry of entries) {
@@ -166,11 +172,11 @@ export function collectOwnershipViolationsFromSources(entries) {
       );
     }
 
-    if (OWNERSHIP_STATE_FILES.has(relativePath) || OWNERSHIP_FACADE_FILES.has(relativePath)) {
+    if (ownershipStateFiles.has(relativePath) || ownershipFacadeFiles.has(relativePath)) {
       violations.push(...collectTopLevelMutableStateViolations(relativePath, sourceFile));
     }
 
-    if (OWNERSHIP_FACADE_FILES.has(relativePath)) {
+    if (ownershipFacadeFiles.has(relativePath)) {
       violations.push(...collectFacadeDefaultOwnerViolations(relativePath, sourceFile));
     }
   }

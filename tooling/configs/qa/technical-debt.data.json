@@ -8588,9 +8588,7 @@
         "apps/extension/src/offscreen/project-export/service/state.ts",
         "apps/extension/src/offscreen/project-export/timing.ts",
         "apps/extension/src/offscreen/project-export/types.ts",
-        "apps/extension/src/offscreen/recording/context/facade.ts",
         "apps/extension/src/offscreen/recording/context/index.ts",
-        "apps/extension/src/offscreen/recording/context/state.ts",
         "apps/extension/src/offscreen/recording/controller.ts",
         "apps/extension/src/offscreen/recording/dimensions.ts",
         "apps/extension/src/offscreen/recording/duration.ts",
@@ -8784,9 +8782,7 @@
         "apps/extension/src/offscreen/project-export/service/state.ts",
         "apps/extension/src/offscreen/project-export/timing.ts",
         "apps/extension/src/offscreen/project-export/types.ts",
-        "apps/extension/src/offscreen/recording/context/facade.ts",
         "apps/extension/src/offscreen/recording/context/index.ts",
-        "apps/extension/src/offscreen/recording/context/state.ts",
         "apps/extension/src/offscreen/recording/controller.ts",
         "apps/extension/src/offscreen/recording/dimensions.ts",
         "apps/extension/src/offscreen/recording/duration.ts",
@@ -20354,7 +20350,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs",
-        "contentHash": "1fa8c2779061b9385252625043540d60c23ae2fef0cd6a758659ce8fccda068a"
+        "contentHash": "f0406eda2a6b7208c5164adeb0b28481fb37ac18cb0583b9f56af67e3c567199"
       },
       "consumers": [
         "tooling/qa/core/harness-freshness-step.mjs",
@@ -20365,6 +20361,9 @@
       "surfaces": [
         "binding:OWNERSHIP_RULES",
         "binding:WAVE_KEYS",
+        "property:collectInstanceOwnershipInventoryReview/reclassifications",
+        "property:collectInstanceOwnershipInventoryReview/reclassifications[1]",
+        "property:collectInstanceOwnershipInventoryReview/violations",
         "property:parseInventoryJson/violations",
         "property:parseInventoryJson/waves",
         "property:readCurrentInventory/violations",

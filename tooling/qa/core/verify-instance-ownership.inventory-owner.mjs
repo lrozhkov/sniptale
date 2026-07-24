@@ -138,17 +138,12 @@ function readCurrentInventory(root) {
 
 function readHeadInventory(headSourceResolver) {
   const jsonSource = headSourceResolver(INSTANCE_OWNERSHIP_INVENTORY);
-  if (jsonSource != null) return { ...parseInventoryJson(jsonSource), sourceKind: 'json' };
+  if (jsonSource != null) return parseInventoryJson(jsonSource);
   const legacySource = headSourceResolver(LEGACY_INSTANCE_OWNERSHIP_SOURCE);
   if (legacySource == null) return null;
   const sourceFile = createSourceFile(LEGACY_INSTANCE_OWNERSHIP_SOURCE, legacySource);
   const parsed = parseNamedDeclarativeConstArray(sourceFile, 'OWNERSHIP_WAVES');
-  return parsed == null
-    ? null
-    : {
-        ...validateInventoryValue({ schemaVersion: 1, waves: parsed.value }),
-        sourceKind: 'legacy',
-      };
+  return parsed == null ? null : validateInventoryValue({ schemaVersion: 1, waves: parsed.value });
 }
 
 function indexTargets(waves) {
@@ -163,6 +158,10 @@ function isLiveTarget(root, file) {
   return file.startsWith('@') || fs.existsSync(path.join(root, file));
 }
 
+function isLocalLiveTarget(root, file) {
+  return !file.startsWith('@') && isLiveTarget(root, file);
+}
+
 function collectRetiredPathReplacementKeys(currentTargets, headTargets, root) {
   const retiredTargets = [...headTargets.entries()].filter(
     ([key, target]) => !currentTargets.has(key) && !isLiveTarget(root, target.file)
@@ -171,7 +170,9 @@ function collectRetiredPathReplacementKeys(currentTargets, headTargets, root) {
   const replacementKeys = new Set();
 
   for (const [key, target] of currentTargets) {
-    if (headTargets.has(key) || !isLiveTarget(root, target.file)) continue;
+    if (headTargets.has(key) || !isLocalLiveTarget(root, target.file)) {
+      continue;
+    }
     const replacement = retiredTargets.find(
       ([retiredKey, retiredTarget]) =>
         !consumedRetiredKeys.has(retiredKey) &&
@@ -187,15 +188,38 @@ function collectRetiredPathReplacementKeys(currentTargets, headTargets, root) {
   return replacementKeys;
 }
 
-function collectPopulationViolations(
-  currentWaves,
-  headWaves,
-  root,
-  { compareWaveIds = true } = {}
-) {
+function collectLiveTargetReclassificationKeys(currentTargets, headTargets, root) {
+  const removedTargets = [...headTargets.entries()].filter(
+    ([key, target]) => !currentTargets.has(key) && isLocalLiveTarget(root, target.file)
+  );
+  const consumedRemovedKeys = new Set();
+  const currentKeys = new Set();
+  const headKeys = new Set();
+
+  for (const [key, target] of currentTargets) {
+    if (headTargets.has(key) || !isLocalLiveTarget(root, target.file)) continue;
+    const replacement = removedTargets.find(
+      ([removedKey, removedTarget]) =>
+        !consumedRemovedKeys.has(removedKey) && removedTarget.file === target.file
+    );
+    if (!replacement) continue;
+    consumedRemovedKeys.add(replacement[0]);
+    headKeys.add(replacement[0]);
+    currentKeys.add(key);
+  }
+
+  return { currentKeys, headKeys };
+}
+
+function collectPopulationReview(currentWaves, headWaves, root) {
   const currentTargets = indexTargets(currentWaves);
   const headTargets = indexTargets(headWaves);
   const retiredPathReplacementKeys = collectRetiredPathReplacementKeys(
+    currentTargets,
+    headTargets,
+    root
+  );
+  const liveTargetReclassificationKeys = collectLiveTargetReclassificationKeys(
     currentTargets,
     headTargets,
     root
@@ -210,7 +234,11 @@ function collectPopulationViolations(
     );
   }
   for (const [key, target] of headTargets) {
-    if (!currentTargets.has(key) && isLiveTarget(root, target.file)) {
+    if (
+      !currentTargets.has(key) &&
+      !liveTargetReclassificationKeys.headKeys.has(key) &&
+      isLiveTarget(root, target.file)
+    ) {
       issues.push(
         violation(
           'instance-ownership-inventory-live-removal',
@@ -220,17 +248,11 @@ function collectPopulationViolations(
     }
   }
   for (const [key, target] of currentTargets) {
-    const headTarget = headTargets.get(key);
-    if (compareWaveIds && headTarget != null && headTarget.waveId !== target.waveId) {
-      issues.push(
-        violation(
-          'instance-ownership-inventory-addition-requires-harness',
-          `Moving ${target.rule} target between ownership waves requires harness verification: ${target.file}.`
-        )
-      );
-      continue;
-    }
-    if (!headTargets.has(key) && !retiredPathReplacementKeys.has(key)) {
+    if (
+      !headTargets.has(key) &&
+      !retiredPathReplacementKeys.has(key) &&
+      !liveTargetReclassificationKeys.currentKeys.has(key)
+    ) {
       issues.push(
         violation(
           'instance-ownership-inventory-addition-requires-harness',
@@ -239,7 +261,12 @@ function collectPopulationViolations(
       );
     }
   }
-  return issues;
+  return {
+    reclassifications: [...liveTargetReclassificationKeys.currentKeys].map((key) =>
+      currentTargets.get(key)
+    ),
+    violations: issues,
+  };
 }
 
 export function loadInstanceOwnershipInventory({ root = DEFAULT_INVENTORY_ROOT } = {}) {
@@ -250,22 +277,29 @@ export function loadInstanceOwnershipInventory({ root = DEFAULT_INVENTORY_ROOT }
   return current.waves;
 }
 
-export function collectInstanceOwnershipInventoryViolations({
+export function collectInstanceOwnershipInventoryReview({
   root = DEFAULT_INVENTORY_ROOT,
   headSourceResolver = (file) => readHeadFileText(file, { root }),
 } = {}) {
   const current = readCurrentInventory(root);
-  if (current.violations.length > 0) return current.violations;
+  if (current.violations.length > 0) {
+    return { reclassifications: [], violations: current.violations };
+  }
   const head = readHeadInventory(headSourceResolver);
   if (head == null || head.violations.length > 0) {
-    return [
-      violation(
-        'instance-ownership-inventory-head-proof',
-        'Cannot prove the HEAD ownership census for an inventory-only change.'
-      ),
-    ];
+    return {
+      reclassifications: [],
+      violations: [
+        violation(
+          'instance-ownership-inventory-head-proof',
+          'Cannot prove the HEAD ownership census for an inventory-only change.'
+        ),
+      ],
+    };
   }
-  return collectPopulationViolations(current.waves, head.waves, root, {
-    compareWaveIds: head.sourceKind === 'json',
-  });
+  return collectPopulationReview(current.waves, head.waves, root);
+}
+
+export function collectInstanceOwnershipInventoryViolations(options = {}) {
+  return collectInstanceOwnershipInventoryReview(options).violations;
 }

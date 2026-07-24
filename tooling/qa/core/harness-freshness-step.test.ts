@@ -5,6 +5,7 @@ import { collectFocusedCoverageOwnerMapInventoryViolations } from './focused-cov
 import {
   collectHarnessFreshnessStep,
   collectHarnessInventoryViolations,
+  collectInstanceOwnershipInventoryGuardViolations,
 } from './harness-freshness-step.mjs';
 
 const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs';
@@ -89,6 +90,35 @@ it('owner-validates instance ownership inventory without consulting a harness st
   });
   expect(instanceOwnershipInventoryValidator).toHaveBeenCalledOnce();
   expect(harnessStateAsserter).not.toHaveBeenCalled();
+});
+
+it('validates an unchanged live target under its new ownership rule', () => {
+  const root = createTempRoot('instance-ownership-reclassification-');
+  const target = 'apps/extension/src/content/selection/highlighter/index.ts';
+  writeFile(
+    root,
+    target,
+    [
+      "import { createHighlighterController } from './controller';",
+      'const highlighterController = createHighlighterController();',
+      '',
+    ].join('\n')
+  );
+
+  expect(
+    collectInstanceOwnershipInventoryGuardViolations({
+      root,
+      inventoryReviewer: () => ({
+        reclassifications: [{ file: target, rule: 'facade-default-owner', waveId: 'facades' }],
+        violations: [],
+      }),
+    })
+  ).toMatchObject([
+    {
+      file: target,
+      rule: 'facade-default-owner',
+    },
+  ]);
 });
 
 it('fails the harness step when the exact coverage rollout owner validator rejects data', () => {

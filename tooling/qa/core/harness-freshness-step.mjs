@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { createOkStep, createViolationStep } from './focused-qa-results.mjs';
 import {
   HARNESS_QA_GUIDANCE,
@@ -14,13 +17,41 @@ import {
   collectFocusedCoverageOwnerMappingViolations,
 } from './focused-coverage-owner-map.mjs';
 import {
-  collectInstanceOwnershipInventoryViolations,
+  collectInstanceOwnershipInventoryReview,
   INSTANCE_OWNERSHIP_INVENTORY,
 } from './verify-instance-ownership.inventory-owner.mjs';
+import { collectOwnershipViolationsFromSources } from './verify-instance-ownership.mjs';
 
 const TECHNICAL_DEBT_INVENTORY = 'tooling/configs/qa/technical-debt.data.json';
 const OSS_RELEASE_CONSUMER_INVENTORY = 'tooling/configs/qa/oss-release-consumers.data.json';
 const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs';
+
+export function collectInstanceOwnershipInventoryGuardViolations({
+  root = process.cwd(),
+  inventoryReviewer = collectInstanceOwnershipInventoryReview,
+} = {}) {
+  const review = inventoryReviewer({ root });
+  if (review.violations.length > 0 || review.reclassifications.length === 0) {
+    return review.violations;
+  }
+
+  const ownershipFacadeFiles = new Set();
+  const ownershipStateFiles = new Set();
+  for (const target of review.reclassifications) {
+    const registry =
+      target.rule === 'facade-default-owner' ? ownershipFacadeFiles : ownershipStateFiles;
+    registry.add(target.file);
+  }
+
+  return collectOwnershipViolationsFromSources(
+    review.reclassifications.map((target) => ({
+      filePath: path.join(root, target.file),
+      relativePath: target.file,
+      source: fs.readFileSync(path.join(root, target.file), 'utf8'),
+    })),
+    { ownershipFacadeFiles, ownershipStateFiles }
+  );
+}
 
 export function collectHarnessInventoryViolations(
   context,
@@ -28,7 +59,7 @@ export function collectHarnessInventoryViolations(
     coverageInventoryValidator = collectCoverageRolloutInventoryViolations,
     focusedCoverageOwnerMapInventoryValidator = collectFocusedCoverageOwnerMapInventoryViolations,
     focusedCoverageOwnerMapValidator = collectFocusedCoverageOwnerMappingViolations,
-    instanceOwnershipInventoryValidator = collectInstanceOwnershipInventoryViolations,
+    instanceOwnershipInventoryValidator = collectInstanceOwnershipInventoryGuardViolations,
     ossInventoryValidator = runOssReleaseSurfaceCheck,
     technicalDebtInventoryValidator = verifyTechnicalDebtReport,
   } = {}

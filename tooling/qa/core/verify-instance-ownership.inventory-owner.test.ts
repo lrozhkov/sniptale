@@ -113,7 +113,7 @@ it('requires harness verification when a retired target is replaced by a missing
   ).toMatchObject([{ rule: 'instance-ownership-inventory-addition-requires-harness' }]);
 });
 
-it('requires harness verification when an unchanged target moves between ownership waves', () => {
+it('accepts moving an unchanged target between ownership waves', () => {
   const target = 'apps/extension/src/offscreen/recording/start/session.ts';
 
   expect(
@@ -122,7 +122,7 @@ it('requires harness verification when an unchanged target moves between ownersh
       head: inventory([wave([target], 'no-top-level-mutable-runtime-state', 'head-wave')]),
       liveFiles: [target],
     })
-  ).toMatchObject([{ rule: 'instance-ownership-inventory-addition-requires-harness' }]);
+  ).toEqual([]);
 });
 
 it('rejects live target removal and census collapse', () => {
@@ -139,7 +139,7 @@ it('rejects live target removal and census collapse', () => {
   ]);
 });
 
-it('rejects changing the rule of a live protected target', () => {
+it('accepts reclassifying a live target under another ownership rule', () => {
   const target = 'apps/extension/src/content/runtime/index.ts';
   const violations = validateInventory({
     current: inventory([wave([target], 'no-top-level-mutable-runtime-state')]),
@@ -147,9 +147,32 @@ it('rejects changing the rule of a live protected target', () => {
     liveFiles: [target],
   });
 
+  expect(violations).toEqual([]);
+});
+
+it('rejects reclassifying a package selector that has no local source to validate', () => {
+  const target = '@sniptale/ui/product-feedback/toast-service';
+  const violations = validateInventory({
+    current: inventory([wave([target], 'no-top-level-mutable-runtime-state')]),
+    head: inventory([wave([target])]),
+  });
+
   expect(violations.map((item) => item.rule)).toEqual([
     'instance-ownership-inventory-live-removal',
     'instance-ownership-inventory-addition-requires-harness',
+  ]);
+});
+
+it('requires harness verification when another rule is added without reclassification', () => {
+  const target = 'apps/extension/src/content/runtime/index.ts';
+  const violations = validateInventory({
+    current: inventory([wave([target]), wave([target], 'no-top-level-mutable-runtime-state')]),
+    head: inventory([wave([target])]),
+    liveFiles: [target],
+  });
+
+  expect(violations).toMatchObject([
+    { rule: 'instance-ownership-inventory-addition-requires-harness' },
   ]);
 });
 
