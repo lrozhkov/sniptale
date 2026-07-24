@@ -36,8 +36,8 @@ vi.mock('../handlers', async (importOriginal) => ({
   handleVisibleCapture: handleVisibleCaptureMock,
 }));
 
-vi.mock('../actions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../actions')>()),
+vi.mock('../actions.quick-action', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../actions.quick-action')>()),
   handleTriggerQuickAction: handleTriggerQuickActionMock,
 }));
 

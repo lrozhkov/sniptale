@@ -59,24 +59,36 @@ vi.mock('./handlers', () => ({
   handleVisibleCaptureForCrop: handleVisibleCaptureForCropMock,
 }));
 
-vi.mock('./actions', () => ({
+vi.mock('./actions.download', () => ({
   handleExecuteSave: handleExecuteSaveMock,
+  handleOpenEditorWithImage: handleOpenEditorWithImageMock,
+  handleReleaseRecordingDownload: handleReleaseRecordingDownloadMock,
+  handleSaveRecordingForDownload: handleSaveRecordingForDownloadMock,
+  handleStageRecordingDownloadChunk: handleStageRecordingDownloadChunkMock,
+}));
+
+vi.mock('./actions.export', () => ({
   handleExportCaptureFullPage: handleExportCaptureFullPageMock,
   handleExportStartHar: handleExportStartHarMock,
   handleExportStopHar: handleExportStopHarMock,
-  handleFetchWebSnapshotAsset: handleFetchWebSnapshotAssetMock,
-  handleOpenEditorWithImage: handleOpenEditorWithImageMock,
-  handleRegisterWebSnapshotAssets: handleRegisterWebSnapshotAssetsMock,
-  handleRequestGalleryImageUpdateCapability: handleRequestGalleryImageUpdateCapabilityMock,
   handleRequestExportHarStartCapability: handleRequestExportHarStartCapabilityMock,
-  handleReleaseRecordingDownload: handleReleaseRecordingDownloadMock,
-  handleSaveRecordingForDownload: handleSaveRecordingForDownloadMock,
+}));
+
+vi.mock('./actions.gallery-update', () => ({
+  handleRequestGalleryImageUpdateCapability: handleRequestGalleryImageUpdateCapabilityMock,
   handleSaveScreenshotToGallery: handleSaveScreenshotToGalleryMock,
-  handleSaveWebSnapshotToGallery: handleSaveWebSnapshotToGalleryMock,
-  handleStageRecordingDownloadChunk: handleStageRecordingDownloadChunkMock,
-  handleStageWebSnapshotBlobChunk: handleStageWebSnapshotBlobChunkMock,
-  handleTriggerQuickAction: handleTriggerQuickActionMock,
   handleUpdateGalleryImageAsset: handleUpdateGalleryImageAssetMock,
+}));
+
+vi.mock('./actions.quick-action', () => ({
+  handleTriggerQuickAction: handleTriggerQuickActionMock,
+}));
+
+vi.mock('./actions.web-snapshot', () => ({
+  handleFetchWebSnapshotAsset: handleFetchWebSnapshotAssetMock,
+  handleRegisterWebSnapshotAssets: handleRegisterWebSnapshotAssetsMock,
+  handleSaveWebSnapshotToGallery: handleSaveWebSnapshotToGalleryMock,
+  handleStageWebSnapshotBlobChunk: handleStageWebSnapshotBlobChunkMock,
 }));
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { get: browserTabsGetMock },

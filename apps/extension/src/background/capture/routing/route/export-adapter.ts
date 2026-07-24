@@ -4,7 +4,7 @@ import {
   handleExportStartHar,
   handleExportStopHar,
   handleRequestExportHarStartCapability,
-} from '../actions';
+} from '../actions.export';
 import type { RouteCaptureMessageArgs } from './types';
 
 export function routeExportMessage(args: RouteCaptureMessageArgs): boolean {

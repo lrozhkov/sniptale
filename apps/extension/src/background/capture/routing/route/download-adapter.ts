@@ -7,7 +7,7 @@ import {
   handleReleaseRecordingDownload,
   handleSaveRecordingForDownload,
   handleStageRecordingDownloadChunk,
-} from '../actions';
+} from '../actions.download';
 import type { RouteCaptureMessageArgs } from './types';
 
 function resolveRecordingDownloadOwner(

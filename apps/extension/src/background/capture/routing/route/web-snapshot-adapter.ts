@@ -4,7 +4,7 @@ import {
   handleRegisterWebSnapshotAssets,
   handleSaveWebSnapshotToGallery,
   handleStageWebSnapshotBlobChunk,
-} from '../actions';
+} from '../actions.web-snapshot';
 import type { RouteCaptureMessageArgs } from './types';
 
 export function routeWebSnapshotMessage(args: RouteCaptureMessageArgs): boolean {

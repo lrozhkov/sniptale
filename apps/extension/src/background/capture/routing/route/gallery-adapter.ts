@@ -3,7 +3,7 @@ import {
   handleRequestGalleryImageUpdateCapability,
   handleSaveScreenshotToGallery,
   handleUpdateGalleryImageAsset,
-} from '../actions';
+} from '../actions.gallery-update';
 import type { RouteCaptureMessageArgs } from './types';
 
 export function routeGalleryMessage(args: RouteCaptureMessageArgs): boolean {

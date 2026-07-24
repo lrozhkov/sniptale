@@ -85,15 +85,6 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
   },
   {
     owner: 'web-snapshot-background-transfer',
-    productionFile: 'apps/extension/src/background/capture/routing/actions.ts',
-    reason: 'Capture action facade wiring is covered by focused route tests.',
-    testFiles: [
-      'apps/extension/src/background/capture/routing/route/dispatcher.test.ts',
-      'apps/extension/src/background/capture/routing/web-snapshot-asset-route.test.ts',
-    ],
-  },
-  {
-    owner: 'web-snapshot-background-transfer',
     productionFile: 'apps/extension/src/background/capture/routing/types.ts',
     reason: 'Capture route staged web snapshot typing is covered by focused route tests.',
     testFiles: [

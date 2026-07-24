@@ -423,7 +423,6 @@
         "apps/extension/src/background/capture/routing/actions.gallery-update.ts",
         "apps/extension/src/background/capture/routing/actions.gallery.ts",
         "apps/extension/src/background/capture/routing/actions.quick-action.ts",
-        "apps/extension/src/background/capture/routing/actions.ts",
         "apps/extension/src/background/capture/routing/actions.web-snapshot.ts",
         "apps/extension/src/background/capture/routing/authorization/content-action.ts",
         "apps/extension/src/background/capture/routing/authorization/gallery-update.ts",
@@ -1042,7 +1041,6 @@
         "apps/extension/src/background/capture/routing/actions.gallery-update.ts",
         "apps/extension/src/background/capture/routing/actions.gallery.ts",
         "apps/extension/src/background/capture/routing/actions.quick-action.ts",
-        "apps/extension/src/background/capture/routing/actions.ts",
         "apps/extension/src/background/capture/routing/actions.web-snapshot.ts",
         "apps/extension/src/background/capture/routing/authorization/content-action.ts",
         "apps/extension/src/background/capture/routing/authorization/gallery-update.ts",
@@ -21374,7 +21372,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/web-snapshot.mjs",
-        "contentHash": "7787451b27bd0fc373cd57af09ddd8bd40a4642e06712c3e1e343928f16442f1"
+        "contentHash": "ccbe9b9bbde020f562c7186ea291a4e5824cde990a0ca82bd1e460b58bec013e"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",
@@ -21390,7 +21388,6 @@
         "property:testFiles[13]",
         "property:testFiles[14]",
         "property:testFiles[15]",
-        "property:testFiles[16]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
