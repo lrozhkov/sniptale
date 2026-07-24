@@ -1,10 +1,7 @@
 import { measureDistance } from './metrics';
 import type { FreehandPointRecord } from './points';
-import {
-  resolvePairForRightWing,
-  resolveWingMetrics,
-  type ArrowWingPair,
-} from './arrow-wing-candidates';
+import { resolveWingMetrics } from './arrow-wing-metrics';
+import { resolvePairForRightWing, type ArrowWingPair } from './arrow-wing-pairs';
 
 const MAX_HEAD_LENGTH_RATIO = 0.45;
 const MIN_HEAD_LENGTH_RATIO = 0.05;

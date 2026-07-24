@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { resolvePairForRightWing, resolveWingMetrics } from './arrow-wing-candidates';
+import { resolveWingMetrics } from './arrow-wing-metrics';
+import { resolvePairForRightWing } from './arrow-wing-pairs';
 
 function createLeftMetrics() {
   const leftMetrics = resolveWingMetrics({

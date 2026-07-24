@@ -1,9 +1,9 @@
 import { resolveTipIndices } from './arrow-fit';
-import { resolveArrowWingPair } from './arrow-wings';
-import { measurePolylineError } from './fit-geometry';
+import { resolveArrowWingPair } from './arrow-wing-search';
 import type { ModeledFreehandStroke } from './modeling';
 import { measureDistance, measurePathLength } from './metrics';
 import type { FreehandPointRecord } from './points';
+import { measurePolylineError } from './polyline-geometry/error';
 import type { FreehandRecognitionCandidate } from './recognition-types';
 
 const LINE_DIRECTNESS_THRESHOLD = 0.94;

@@ -1,7 +1,8 @@
-import { measureCentroid, measurePolylineError } from '../fit-geometry';
 import type { ModeledFreehandStroke } from '../modeling';
 import { measureDistance } from '../metrics';
+import { measureCentroid } from '../oriented-geometry';
 import type { FreehandPointRecord } from '../points';
+import { measurePolylineError } from '../polyline-geometry/error';
 import type { FreehandRecognitionCandidate } from '../recognition-types';
 import { measureSegmentAngle } from './angles';
 import { measureDiamondScore } from './scoring';

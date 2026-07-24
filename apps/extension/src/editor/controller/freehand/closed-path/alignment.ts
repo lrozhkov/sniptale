@@ -1,4 +1,4 @@
-import { measureSignedPolygonArea } from '../fit-geometry';
+import { measureSignedPolygonArea } from '../polyline-geometry/area';
 import type { FreehandPointRecord } from '../points';
 
 export function alignClosedPathDirection(

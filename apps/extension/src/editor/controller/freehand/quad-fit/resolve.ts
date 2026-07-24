@@ -1,5 +1,5 @@
-import { orderVerticesClockwise } from '../fit-geometry';
 import type { ModeledFreehandStroke } from '../modeling';
+import { orderVerticesClockwise } from '../oriented-geometry';
 import type { FreehandPointRecord } from '../points';
 import type { FreehandRecognitionCandidate } from '../recognition-types';
 import { buildDiamondCandidate } from './diamond';

@@ -1,5 +1,5 @@
 import { buildEllipseOutline } from '../ellipse-outline';
-import { measureCentroid, measureOrientedBounds, measurePrincipalAxis } from '../fit-geometry';
+import { measureCentroid, measureOrientedBounds, measurePrincipalAxis } from '../oriented-geometry';
 import type { FreehandPointRecord } from '../points';
 import type { FreehandRecognitionCandidate } from '../recognition-types';
 import { prepareClosedPath } from './alignment';
