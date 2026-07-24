@@ -9009,9 +9009,6 @@
         "apps/extension/src/popup/shell/app-shell/applied-styles-actions.ts",
         "apps/extension/src/popup/shell/app-shell/applied-styles-entrypoint.ts",
         "apps/extension/src/popup/shell/app-shell/command-palette-layer.tsx",
-        "apps/extension/src/popup/shell/app-shell/content/export.tsx",
-        "apps/extension/src/popup/shell/app-shell/content/home.tsx",
-        "apps/extension/src/popup/shell/app-shell/content/video-setup.tsx",
         "apps/extension/src/popup/shell/app-shell/content/view.tsx",
         "apps/extension/src/popup/shell/app-shell/footer-layer.tsx",
         "apps/extension/src/popup/shell/app-shell/index.tsx",
@@ -9258,9 +9255,6 @@
         "apps/extension/src/popup/shell/app-shell/applied-styles-actions.ts",
         "apps/extension/src/popup/shell/app-shell/applied-styles-entrypoint.ts",
         "apps/extension/src/popup/shell/app-shell/command-palette-layer.tsx",
-        "apps/extension/src/popup/shell/app-shell/content/export.tsx",
-        "apps/extension/src/popup/shell/app-shell/content/home.tsx",
-        "apps/extension/src/popup/shell/app-shell/content/video-setup.tsx",
         "apps/extension/src/popup/shell/app-shell/content/view.tsx",
         "apps/extension/src/popup/shell/app-shell/footer-layer.tsx",
         "apps/extension/src/popup/shell/app-shell/index.tsx",
@@ -17665,7 +17659,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "d1ce2a12421ab11927411197bf4de29c2743d4b090e5a02a355e6448f6dee1bf"
+        "contentHash": "c77c12fcaa0d94441bf6de063cc90ba9c0b6e9c9442ab6c5ab51313a7e04873a"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -18380,7 +18374,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/shared-facade.mjs",
-        "contentHash": "d95413cef52097203da118710ddd1311f048f98164795790c88f812f049ba8e8"
+        "contentHash": "e6947cccd707557a500d8f34249b8b6f56468a85bde5c4d9bf627a4edefc6034"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18399,6 +18393,7 @@
         "property:testFiles[16]",
         "property:testFiles[17]",
         "property:testFiles[18]",
+        "property:testFiles[19]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",

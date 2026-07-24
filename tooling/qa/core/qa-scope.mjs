@@ -50,6 +50,7 @@ const FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES = new Set([
   'scenario-ai.mjs',
   'scenario-export.mjs',
   'scenario-stage.mjs',
+  'shared-facade.mjs',
   'video-project-export.mjs',
   'video-recording-lease.mjs',
   'video-runtime-routing.mjs',

@@ -101,6 +101,9 @@ it('separates generated inventories from executable harness changes', async () =
       )
     ).toBe(true);
     expect(
+      module.isHarnessInventoryOnlyFile('tooling/qa/core/focused-coverage/maps/shared-facade.mjs')
+    ).toBe(true);
+    expect(
       module.isHarnessVerificationQaFile('tooling/qa/core/verify-test-coverage.registry.mjs')
     ).toBe(true);
     expect(module.isHarnessVerificationQaFile('tooling/configs/qa/quality-baseline.json')).toBe(
