@@ -21,6 +21,44 @@ export const EDITOR_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/editor/controller/core/base.instance-ownership.test.ts'],
   },
   {
+    owner: 'editor-input-window-events',
+    productionFile: 'apps/extension/src/editor/controller/input/window-events.ts',
+    reason: 'Window input adaptation is covered by focused, public facade, and integration suites.',
+    testFiles: [
+      'apps/extension/src/editor/controller/input/index.test.ts',
+      'apps/extension/src/editor/controller/input/keyboard-actions.test.ts',
+      'apps/extension/src/editor/controller/input/keyboard.integration.test.ts',
+      'apps/extension/src/editor/controller/input/legacy.test.ts',
+      'apps/extension/src/editor/controller/input/window-events.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-input-keyboard-editing',
+    productionFile: 'apps/extension/src/editor/controller/input/keyboard-editing.ts',
+    reason: 'Editing-key precedence is covered by focused resolver and composed keyboard suites.',
+    testFiles: [
+      'apps/extension/src/editor/controller/input/index.test.ts',
+      'apps/extension/src/editor/controller/input/keyboard-actions.test.ts',
+      'apps/extension/src/editor/controller/input/keyboard-editing.test.ts',
+      'apps/extension/src/editor/controller/input/keyboard.integration.test.ts',
+      'apps/extension/src/editor/controller/input/keyboard.test.ts',
+      'apps/extension/src/editor/controller/input/legacy.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-input-keyboard-shortcuts',
+    productionFile: 'apps/extension/src/editor/controller/input/keyboard-shortcuts.ts',
+    reason: 'Modifier shortcut precedence is covered by focused and composed keyboard suites.',
+    testFiles: [
+      'apps/extension/src/editor/controller/input/index.test.ts',
+      'apps/extension/src/editor/controller/input/keyboard-actions.test.ts',
+      'apps/extension/src/editor/controller/input/keyboard-shortcuts.test.ts',
+      'apps/extension/src/editor/controller/input/keyboard.integration.test.ts',
+      'apps/extension/src/editor/controller/input/keyboard.test.ts',
+      'apps/extension/src/editor/controller/input/legacy.test.ts',
+    ],
+  },
+  {
     owner: 'editor-freehand-dynamic-width-outline',
     productionFile:
       'apps/extension/src/editor/controller/freehand/dynamic-width/outline/points.ts',

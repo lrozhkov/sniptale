@@ -1,10 +1,11 @@
 import type { Canvas } from 'fabric';
-import { isInteractiveShortcutTarget, isTextbox } from '../core/helpers';
+
 import { isEditableObject } from '../../document/model';
+import { isInteractiveShortcutTarget, isTextbox } from '../core/helpers';
 import { isTextTarget } from '../events/text-target';
-import { resolveEditorKeyboardAction } from './keyboard';
 import { applyEditorKeyboardAction } from './keyboard-action-runner/dispatch';
 import type { EditorKeyboardCommandCallbacks } from './keyboard-action-runner/types';
+import { isEditorSpaceKey, resolveEditorKeyboardAction } from './keyboard';
 
 type EditorWindowKeyDownOptions = EditorKeyboardCommandCallbacks & {
   canvas: Canvas | null;
@@ -20,6 +21,10 @@ type EditorWindowKeyDownOptions = EditorKeyboardCommandCallbacks & {
   hasCropGuide: boolean;
   hasDrawSession?: boolean;
 };
+
+export function handleEditorWindowBlur(options: { finalizeSelectionNudge?: () => void }): void {
+  options.finalizeSelectionNudge?.();
+}
 
 export function handleEditorWindowKeyDown(options: EditorWindowKeyDownOptions): {
   preventDefault: boolean;
@@ -66,4 +71,16 @@ export function handleEditorWindowKeyDown(options: EditorWindowKeyDownOptions): 
     ...(options.completeDrawSession ? { completeDrawSession: options.completeDrawSession } : {}),
     syncRuntimeState: options.syncRuntimeState ?? (() => undefined),
   });
+}
+
+export function handleEditorWindowKeyUp(options: {
+  code: string;
+  finalizeSelectionNudge?: (code: string) => void;
+}): { nextSpacePressed?: boolean } {
+  options.finalizeSelectionNudge?.(options.code);
+  return isEditorSpaceKey(options.code) ? { nextSpacePressed: false } : {};
+}
+
+export function resolveEditorSpaceKeyUp(code: string): boolean {
+  return isEditorSpaceKey(code);
 }

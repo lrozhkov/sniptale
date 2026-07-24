@@ -1,4 +1,7 @@
 export { handleEditorDoubleClick } from './double-click';
-export { handleEditorWindowBlur } from './window-blur';
-export { handleEditorWindowKeyDown } from './window-keydown';
-export { handleEditorWindowKeyUp, resolveEditorSpaceKeyUp } from './window-keyup';
+export {
+  handleEditorWindowBlur,
+  handleEditorWindowKeyDown,
+  handleEditorWindowKeyUp,
+  resolveEditorSpaceKeyUp,
+} from './window-events';

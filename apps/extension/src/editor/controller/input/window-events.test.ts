@@ -33,8 +33,7 @@ vi.mock('./keyboard-action-runner/dispatch', async (importOriginal) => ({
   applyEditorKeyboardAction: mocks.applyEditorKeyboardAction,
 }));
 
-import { handleEditorWindowKeyDown } from './window-keydown';
-import { handleEditorWindowKeyUp } from './window-keyup';
+import { handleEditorWindowKeyDown, handleEditorWindowKeyUp } from './window-events';
 
 function createKeyDownOptions(overrides: Record<string, unknown> = {}) {
   const activeObject = { isEditing: true, sniptaleId: 'text-1' };
