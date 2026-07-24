@@ -3196,15 +3196,12 @@
         "apps/extension/src/content/selection/frame-runtime/ui-controller/helpers.ts",
         "apps/extension/src/content/selection/frame-runtime/ui-controller/index.ts",
         "apps/extension/src/content/selection/frame-settings-popover/bindings.ts",
-        "apps/extension/src/content/selection/frame-settings-popover/body.tsx",
         "apps/extension/src/content/selection/frame-settings-popover/controller.ts",
         "apps/extension/src/content/selection/frame-settings-popover/helpers.tsx",
         "apps/extension/src/content/selection/frame-settings-popover/index.tsx",
         "apps/extension/src/content/selection/frame-settings-popover/state/helpers.ts",
         "apps/extension/src/content/selection/frame-settings-popover/state/index.ts",
         "apps/extension/src/content/selection/frame-settings-popover/state/lifecycle.ts",
-        "apps/extension/src/content/selection/frame-settings-popover/surface-shell.tsx",
-        "apps/extension/src/content/selection/frame-settings-popover/surface.tsx",
         "apps/extension/src/content/selection/frame-settings-popover/sync.ts",
         "apps/extension/src/content/selection/frame-settings-popover/types.ts",
         "apps/extension/src/content/selection/frame-settings-popover/views.tsx",
@@ -16645,7 +16642,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "b8e8d7ea0a9f82380e40a6df969bd2776890a43af71d2aa5ad5ba251ec3a6c02"
+        "contentHash": "3699b594bbb611223bd785320984e539ca6fc0d73ede63cd034756d31253850b"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16682,6 +16679,10 @@
         "property:testFiles[32]",
         "property:testFiles[33]",
         "property:testFiles[34]",
+        "property:testFiles[35]",
+        "property:testFiles[36]",
+        "property:testFiles[37]",
+        "property:testFiles[38]",
         "property:testFiles[4]",
         "property:testFiles[5]",
         "property:testFiles[6]",
@@ -17687,7 +17688,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "8dabc3a03bcc0c81a85b7ae7e0d1dea23e3ef0361feff6d0d307be3b70e577a2"
+        "contentHash": "6a036a07f82101c3dd07fb0af83e3a96dd6738b4b0176ff04717fa8134f14fb0"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",

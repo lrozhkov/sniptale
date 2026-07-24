@@ -1,28 +1,51 @@
-import { FrameSettingsPopoverBody } from './body';
-import type { FrameSettingsPopoverBodyProps } from './types';
+import type React from 'react';
+import { createPortal } from 'react-dom';
+import {
+  getThemedPortalStyle,
+  resolveContentPortalTarget,
+} from '../interactive-frame/layout/portal';
+import { useFrameSettingsPopoverController } from './controller';
+import type { FrameSettingsPopoverProps } from './types';
+import { FrameSettingsPopoverContent } from './views';
 
-export function FrameSettingsPopover({
-  isOpen,
-  onClose,
-  effectMode,
-  frameId,
-  borderSettings,
-  blurSettings,
-  focusSettings,
-  onApplyToFrame,
-  anchorEl,
-}: FrameSettingsPopoverBodyProps) {
-  const bodyProps = {
-    anchorEl,
-    effectMode,
-    frameId,
-    isOpen,
-    onApplyToFrame,
-    onClose,
-    ...(blurSettings === undefined ? {} : { blurSettings }),
-    ...(borderSettings === undefined ? {} : { borderSettings }),
-    ...(focusSettings === undefined ? {} : { focusSettings }),
-  };
+function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
+  event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
+}
 
-  return <FrameSettingsPopoverBody {...bodyProps} />;
+export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
+  const state = useFrameSettingsPopoverController(props);
+
+  if (!props.isOpen) {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      ref={state.surface.popoverRef}
+      className="sniptale-frame-settings-popover sniptale-glass-popover sniptale-content-popover"
+      data-theme={state.surface.portalTheme ?? undefined}
+      data-frame-id={props.frameId}
+      onMouseDown={stopPopoverPropagation}
+      onClick={stopPopoverPropagation}
+      style={getThemedPortalStyle(state.surface.portalTheme, state.surface.getPopoverStyle())}
+    >
+      <div className="sniptale-content-popover-body">
+        <FrameSettingsPopoverContent
+          effectMode={props.effectMode}
+          globalSettings={state.settings.global}
+          handleBlurChange={state.handlers.handleBlurChange}
+          handleBlurShowBorderChange={state.handlers.handleBlurShowBorderChange}
+          handleBlurTypeChange={state.handlers.handleBlurTypeChange}
+          handleFocusChange={state.handlers.handleFocusChange}
+          handleFocusShowBorderChange={state.handlers.handleFocusShowBorderChange}
+          handleSelectPreset={state.handlers.handleSelectPreset}
+          localBlurSettings={state.settings.localBlur}
+          localFocusSettings={state.settings.localFocus}
+          selectedPresetId={state.settings.selectedPresetId}
+        />
+      </div>
+    </div>,
+    resolveContentPortalTarget(props.anchorEl)
+  );
 }

@@ -35,6 +35,7 @@ const FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES = new Set([
   'extension-ui-entrypoints.mjs',
   'gallery-backup.mjs',
   'har-export.mjs',
+  'local.mjs',
   'media-hub-backup-package.mjs',
   'media-hub-backup-privacy-export.mjs',
   'media-hub-backup-privacy-restore.mjs',

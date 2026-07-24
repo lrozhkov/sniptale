@@ -128,8 +128,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'content-frame-runtime-state',
     productionPrefix: 'apps/extension/src/content/selection/frame-runtime/state/',
     reason:
-      'Frame UI store state was moved under the frame-runtime state owner and remains covered by ' +
-      'frame history, mutation, and UI-controller suites.',
+      'Frame UI store state has owner-local frame history, mutation, and UI-controller coverage.',
     testFiles: [
       'apps/extension/src/content/selection/frame-runtime/history/bridge.test.ts',
       'apps/extension/src/content/selection/frame-runtime/mutation-actions/clear.test.ts',
@@ -142,26 +141,57 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'content-frame-settings-popover-bindings',
     productionFile: 'apps/extension/src/content/selection/frame-settings-popover/bindings.ts',
     reason:
-      'Frame-settings popover binding and close ordering are exercised through the owner-level body suite.',
-    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/body.test.tsx'],
+      'Frame-settings popover binding and close ordering are exercised through the public surface suite.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
   },
   {
     owner: 'content-frame-settings-popover-state',
     productionFile: 'apps/extension/src/content/selection/frame-settings-popover/state/index.ts',
     reason:
-      'Frame-settings session state is exercised by the body, lifecycle, and action behavior suites.',
+      'Frame-settings session state is exercised by the public surface, lifecycle, and action suites.',
     testFiles: [
-      'apps/extension/src/content/selection/frame-settings-popover/body.test.tsx',
+      'apps/extension/src/content/selection/frame-settings-popover/index.test.tsx',
       'apps/extension/src/content/selection/frame-settings-popover/state/helpers.test.ts',
       'apps/extension/src/content/selection/frame-settings-popover/state/lifecycle.test.tsx',
     ],
   },
   {
+    owner: 'content-frame-settings-popover-surface',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/index.tsx',
+    exclusive: true,
+    reason:
+      'Frame-settings controller, portal shell, and view wiring have one public surface proof.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
+  },
+  {
+    owner: 'content-frame-settings-popover-body-predecessor',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/body.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed body forwarding layer is consolidated into the public popover surface.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
+  },
+  {
+    owner: 'content-frame-settings-popover-portal-predecessor',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/surface.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed portal forwarding layer is consolidated into the public popover surface.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
+  },
+  {
+    owner: 'content-frame-settings-popover-shell-predecessor',
+    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/surface-shell.tsx',
+    exclusive: true,
+    allowMissingProductionTarget: true,
+    reason: 'The removed shell forwarding layer is consolidated into the public popover surface.',
+    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
+  },
+  {
     owner: 'gallery-library-types',
     productionFile: 'apps/extension/src/gallery/library/types.ts',
     reason:
-      'Gallery library filter, grid, and preview type contracts are exercised through state type, ' +
-      'selector, and gallery surface suites.',
+      'Gallery filter, grid, and preview contracts have state, selector, and surface coverage.',
     testFiles: [
       'apps/extension/src/gallery/state/types.test.ts',
       'apps/extension/src/gallery/state/selectors.test.ts',

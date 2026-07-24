@@ -36,7 +36,7 @@ import {
   DEFAULT_BLUR_SETTINGS,
   DEFAULT_BORDER_PRESET,
 } from '../../../features/highlighter/style/defaults';
-import { FrameSettingsPopoverBody } from './body';
+import { FrameSettingsPopover } from '.';
 
 let anchorEl: HTMLButtonElement | null = null;
 let container: HTMLDivElement | null = null;
@@ -117,14 +117,12 @@ function setRangeInputValue(input: HTMLInputElement, value: string) {
   });
 }
 
-function renderBody(
-  overrides: Partial<React.ComponentProps<typeof FrameSettingsPopoverBody>> = {}
-) {
+function renderPopover(overrides: Partial<React.ComponentProps<typeof FrameSettingsPopover>> = {}) {
   if (!anchorEl || !container) {
     throw new Error('Frame settings popover test scope is not initialized');
   }
 
-  const props: React.ComponentProps<typeof FrameSettingsPopoverBody> = {
+  const props: React.ComponentProps<typeof FrameSettingsPopover> = {
     anchorEl,
     effectMode: 'border',
     frameId: 'frame-1',
@@ -134,7 +132,7 @@ function renderBody(
   };
 
   act(() => {
-    root?.render(<FrameSettingsPopoverBody {...{ ...props, ...overrides }} />);
+    root?.render(<FrameSettingsPopover {...{ ...props, ...overrides }} />);
   });
 }
 
@@ -182,13 +180,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('FrameSettingsPopoverBody loading state', () => {
+describe('FrameSettingsPopover loading state', () => {
   it('renders default settings while persisted settings are still loading', () => {
     storageMocks.loadHighlighterSettings.mockReturnValue(
       new Promise<HighlighterSettings>(() => undefined)
     );
 
-    renderBody();
+    renderPopover();
 
     expect(document.querySelector('.sniptale-frame-settings-popover')).not.toBeNull();
     expect(document.body.textContent).toContain(DEFAULT_BORDER_PRESET.name);
@@ -198,7 +196,7 @@ describe('FrameSettingsPopoverBody loading state', () => {
     const error = new Error('storage offline');
     storageMocks.loadHighlighterSettings.mockRejectedValue(error);
 
-    renderBody();
+    renderPopover();
     await flushAsyncEffects();
 
     expect(loggerMocks.error).toHaveBeenCalledWith(
@@ -211,20 +209,50 @@ describe('FrameSettingsPopoverBody loading state', () => {
   it('updates the visible preset list when persisted settings load', async () => {
     storageMocks.loadHighlighterSettings.mockResolvedValue(createPersistedSettings());
 
-    renderBody();
+    renderPopover();
     await flushAsyncEffects();
 
     expect(document.body.textContent).toContain('Persisted preset');
   });
+
+  it('keeps the portal shell metadata and host-event isolation on one public surface', () => {
+    storageMocks.loadHighlighterSettings.mockReturnValue(
+      new Promise<HighlighterSettings>(() => undefined)
+    );
+    anchorEl?.setAttribute('data-theme', 'dark');
+    const hostClick = vi.fn();
+    document.body.addEventListener('click', hostClick);
+
+    renderPopover();
+
+    const popover = document.querySelector<HTMLElement>('.sniptale-frame-settings-popover');
+    expect(popover?.classList).toContain('sniptale-glass-popover');
+    expect(popover?.classList).toContain('sniptale-content-popover');
+    expect(popover?.dataset['frameId']).toBe('frame-1');
+    expect(popover?.dataset['theme']).toBe('dark');
+    expect(popover?.querySelector('.sniptale-content-popover-body')).not.toBeNull();
+    popover?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(hostClick).not.toHaveBeenCalled();
+
+    document.body.removeEventListener('click', hostClick);
+  });
+
+  it('keeps the portal detached while the popover is closed', () => {
+    storageMocks.loadHighlighterSettings.mockResolvedValue(createPersistedSettings());
+
+    renderPopover({ isOpen: false });
+
+    expect(document.querySelector('.sniptale-frame-settings-popover')).toBeNull();
+  });
 });
 
-describe('FrameSettingsPopoverBody pending blur edits', () => {
+describe('FrameSettingsPopover pending blur edits', () => {
   it('keeps a local blur edit when persisted defaults resolve later', async () => {
     const deferredSettings = createDeferred<HighlighterSettings>();
     const onApplyToFrame = vi.fn();
     storageMocks.loadHighlighterSettings.mockReturnValue(deferredSettings.promise);
 
-    renderBody({ effectMode: 'blur', onApplyToFrame });
+    renderPopover({ effectMode: 'blur', onApplyToFrame });
     setRangeInputValue(getRangeInput(), '7');
 
     expect(onApplyToFrame).toHaveBeenLastCalledWith({
@@ -245,13 +273,13 @@ describe('FrameSettingsPopoverBody pending blur edits', () => {
   });
 });
 
-describe('FrameSettingsPopoverBody pending focus edits', () => {
+describe('FrameSettingsPopover pending focus edits', () => {
   it('keeps a local focus edit when persisted defaults resolve later', async () => {
     const deferredSettings = createDeferred<HighlighterSettings>();
     const onApplyToFrame = vi.fn();
     storageMocks.loadHighlighterSettings.mockReturnValue(deferredSettings.promise);
 
-    renderBody({ effectMode: 'focus', onApplyToFrame });
+    renderPopover({ effectMode: 'focus', onApplyToFrame });
     setRangeInputValue(getRangeInput(), '30');
 
     expect(onApplyToFrame).toHaveBeenLastCalledWith({
@@ -272,7 +300,7 @@ describe('FrameSettingsPopoverBody pending focus edits', () => {
   });
 });
 
-describe('FrameSettingsPopoverBody preset close ordering', () => {
+describe('FrameSettingsPopover preset close ordering', () => {
   it('closes after the selected preset persistence attempt completes', async () => {
     const deferredPersistence = createDeferred<void>();
     const onApplyToFrame = vi.fn();
@@ -282,7 +310,7 @@ describe('FrameSettingsPopoverBody preset close ordering', () => {
     );
     storageMocks.setDefaultBorderPreset.mockReturnValue(deferredPersistence.promise);
 
-    renderBody({ onApplyToFrame, onClose });
+    renderPopover({ onApplyToFrame, onClose });
 
     act(() => {
       getPresetButton(DEFAULT_BORDER_PRESET.name).click();
