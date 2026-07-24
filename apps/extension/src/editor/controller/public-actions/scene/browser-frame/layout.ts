@@ -6,7 +6,10 @@ import { BROWSER_HEADER_HEIGHT } from '../../../../document/model';
 import type { SourceState } from '../../../../document/model/source-state';
 import type { RelayoutOptions } from '../helpers';
 import type { BrowserFrameActionOptions } from './types';
-import { resolveBrowserFrameWidth } from './layer';
+
+function resolveBrowserFrameWidth(existingLayer: FabricObject | null, source: SourceState): number {
+  return existingLayer ? existingLayer.getScaledWidth() : source.displayWidth;
+}
 
 export function hasBrowserFrameSourceSizeChange(args: {
   currentSource: SourceState;

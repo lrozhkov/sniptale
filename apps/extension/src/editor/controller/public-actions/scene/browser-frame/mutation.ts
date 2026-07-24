@@ -1,7 +1,10 @@
+import type { Canvas, FabricObject } from 'fabric';
+
 import type { BrowserFrameState } from '../../../../../features/editor/document/types';
 import { createBrowserFrameLayerObject } from '../../../../objects/browser-frame';
+import { isBrowserFrameObject } from '../../../../document/model';
 import { readCurrentBrowserFrameSourceState } from '../../../browser-frame/source-state';
-import { findBrowserFrameLayer, replaceBrowserFrameLayer } from './layer';
+
 import {
   resolveBrowserFrameRelayoutOptions,
   resolveBrowserFrameScene,
@@ -10,7 +13,29 @@ import {
 } from './layout';
 import type { BrowserFrameActionOptions } from './types';
 
-export async function upsertBrowserFrameLayer(
+export async function applyEditorBrowserFrameSettings(
+  options: BrowserFrameActionOptions & { browserFrame: BrowserFrameState }
+): Promise<void> {
+  const nextBrowserFrame = { ...options.store.getBrowserFrame(), ...options.browserFrame };
+  options.store.setBrowserFrame(nextBrowserFrame);
+
+  const applied = await upsertBrowserFrameLayer(options, nextBrowserFrame);
+  if (!applied) {
+    options.syncRuntimeState();
+    return;
+  }
+
+  options.commitHistory();
+  options.syncRuntimeState();
+}
+
+export async function previewEditorBrowserFrameSettings(_options?: unknown): Promise<void> {}
+
+export async function removeEditorBrowserFrameSettings(_options?: unknown): Promise<void> {}
+
+export async function previewRemoveEditorBrowserFrameSettings(_options?: unknown): Promise<void> {}
+
+async function upsertBrowserFrameLayer(
   options: BrowserFrameActionOptions,
   browserFrame: BrowserFrameState
 ): Promise<boolean> {
@@ -56,4 +81,28 @@ export async function upsertBrowserFrameLayer(
   options.ensureBrowserFrameOnTop();
   canvas.requestRenderAll();
   return true;
+}
+
+function findBrowserFrameLayer(canvas: Canvas): FabricObject | null {
+  return canvas.getObjects?.().find((object) => isBrowserFrameObject(object)) ?? null;
+}
+
+function replaceBrowserFrameLayer(
+  canvas: Canvas,
+  previous: FabricObject | null,
+  next: FabricObject
+): void {
+  const previousIndex = previous ? (canvas.getObjects?.() ?? []).indexOf(previous) : -1;
+  if (previous) {
+    canvas.remove(previous);
+  }
+
+  canvas.add(next);
+  if (previousIndex >= 0) {
+    canvas.moveObjectTo(next, previousIndex);
+  } else {
+    canvas.bringObjectToFront(next);
+  }
+  canvas.setActiveObject(next);
+  next.setCoords();
 }

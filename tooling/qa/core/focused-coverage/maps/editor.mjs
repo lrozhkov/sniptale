@@ -106,6 +106,27 @@ export const EDITOR_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'editor-scene-browser-frame-layout',
+    productionFile:
+      'apps/extension/src/editor/controller/public-actions/scene/browser-frame/layout.ts',
+    reason: 'Browser-frame layout policy is covered by pure scene and composed mutation suites.',
+    testFiles: [
+      'apps/extension/src/editor/controller/public-actions/scene/browser-frame/mutation.test.ts',
+      'apps/extension/src/editor/controller/public-actions/scene/browser-frame/scene.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-scene-browser-frame-mutation',
+    productionFile:
+      'apps/extension/src/editor/controller/public-actions/scene/browser-frame/mutation.ts',
+    reason: 'Browser-frame mutation ordering is covered directly and through scene actions.',
+    testFiles: [
+      'apps/extension/src/editor/controller/public-actions/scene/browser-frame/mutation.test.ts',
+      'apps/extension/src/editor/controller/public-actions/scene/index.test.ts',
+      'apps/extension/src/editor/controller/public-api/scene-actions/owners.test.ts',
+    ],
+  },
+  {
     owner: 'editor-rich-shape-callout-controls-contract',
     productionPrefix: 'apps/extension/src/editor/objects/rich-shape/callout-controls/',
     reason: 'Callout-control behavior is covered by the complete owner-local control suite.',
