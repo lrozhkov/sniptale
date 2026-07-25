@@ -98,4 +98,26 @@ describe('areInteractiveFramePropsEqual', () => {
 
     expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
   });
+
+  it('treats a manual step-badge boundary move as render-critical', () => {
+    const prevProps = createProps();
+    prevProps.frame.stepBadge = {
+      enabled: true,
+      manualPlacement: { position: 0.25, side: 'top' },
+      type: 'number',
+      value: '1',
+    };
+    const nextProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        stepBadge: {
+          ...prevProps.frame.stepBadge,
+          manualPlacement: { position: 0.75, side: 'bottom' },
+        },
+      },
+    };
+
+    expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
+  });
 });

@@ -15,13 +15,17 @@ interface CalloutProps {
   frameRect: { x: number; y: number; width: number; height: number };
   zIndex: number;
   isEditing: boolean;
+  isSettingsOpen: boolean;
   onStartEditing: () => void;
   onStopEditing: () => void;
   onContentChange: (htmlContent: string) => void;
   onDelete: () => void;
+  onSettingsClick: () => void;
   onPositionChange: (placement: NonNullable<CalloutSettings['manualPlacement']>) => void;
   onTailBaseRangeChange: (position: number, width: number) => void;
   onTailFramePositionChange: (position: number) => void;
+  settingsAnchorRef: React.RefObject<HTMLButtonElement | null>;
+  showSettingsHandle: boolean;
 }
 
 /**
@@ -34,13 +38,17 @@ export const Callout: React.FC<CalloutProps> = ({
   frameRect,
   zIndex,
   isEditing,
+  isSettingsOpen,
   onStartEditing,
   onStopEditing,
   onContentChange,
   onDelete,
+  onSettingsClick,
   onPositionChange,
   onTailBaseRangeChange,
   onTailFramePositionChange,
+  settingsAnchorRef,
+  showSettingsHandle,
 }) => {
   useAppLocale();
   const portalTheme = useResolvedPortalTheme(resolveCalloutThemeOwner());
@@ -59,6 +67,7 @@ export const Callout: React.FC<CalloutProps> = ({
     dimensions: editing.dimensions,
     frameRect,
     isEditing,
+    isSettingsOpen,
     onPositionChange,
     onTailBaseRangeChange,
     onTailFramePositionChange,
@@ -69,87 +78,102 @@ export const Callout: React.FC<CalloutProps> = ({
 
   return (
     <CalloutBody
-      {...createCalloutBodyProps(
+      {...createCalloutBodyProps({
+        drag: interaction.drag,
         editing,
         isEditing,
-        interaction.layout,
+        layout: interaction.layout,
+        onSettingsClick,
         portalTheme,
-        interaction.effectiveSettings,
-        interaction.drag,
-        interaction.tailBaseStartDrag,
-        interaction.tailBaseEndDrag,
-        interaction.tailFrameDrag
-      )}
+        settings: interaction.effectiveSettings,
+        settingsAnchorRef,
+        showSettingsHandle,
+        tailBaseEndDrag: interaction.tailBaseEndDrag,
+        tailBaseStartDrag: interaction.tailBaseStartDrag,
+        tailFrameDrag: interaction.tailFrameDrag,
+      })}
       wrapperRef={wrapperRef}
     />
   );
 };
 
-function createCalloutBodyProps(
-  editing: ReturnType<typeof useCalloutEditing>,
-  isEditing: boolean,
-  layout: ReturnType<typeof useCalloutInteractionLayout>['layout'],
-  portalTheme: ReturnType<typeof useResolvedPortalTheme>,
-  settings: CalloutSettings,
-  drag: ReturnType<typeof useCalloutInteractionLayout>['drag'],
-  tailBaseStartDrag: ReturnType<typeof useCalloutInteractionLayout>['tailBaseStartDrag'],
-  tailBaseEndDrag: ReturnType<typeof useCalloutInteractionLayout>['tailBaseEndDrag'],
-  tailFrameDrag: ReturnType<typeof useCalloutInteractionLayout>['tailFrameDrag']
-) {
-  const tailBaseStartPoint = layout.dynamicTail?.attachment.baseEdgeA;
-  const tailBaseEndPoint = layout.dynamicTail?.attachment.baseEdgeB;
-  const tailFramePoint = layout.dynamicTail?.attachment.tipPoint;
+function createCalloutBodyProps(args: {
+  editing: ReturnType<typeof useCalloutEditing>;
+  isEditing: boolean;
+  layout: ReturnType<typeof useCalloutInteractionLayout>['layout'];
+  portalTheme: ReturnType<typeof useResolvedPortalTheme>;
+  settings: CalloutSettings;
+  drag: ReturnType<typeof useCalloutInteractionLayout>['drag'];
+  tailBaseStartDrag: ReturnType<typeof useCalloutInteractionLayout>['tailBaseStartDrag'];
+  tailBaseEndDrag: ReturnType<typeof useCalloutInteractionLayout>['tailBaseEndDrag'];
+  tailFrameDrag: ReturnType<typeof useCalloutInteractionLayout>['tailFrameDrag'];
+  onSettingsClick: () => void;
+  settingsAnchorRef: React.RefObject<HTMLButtonElement | null>;
+  showSettingsHandle: boolean;
+}) {
+  const tailBaseStartPoint = args.layout.dynamicTail?.attachment.baseEdgeA;
+  const tailBaseEndPoint = args.layout.dynamicTail?.attachment.baseEdgeB;
+  const tailFramePoint = args.layout.dynamicTail?.attachment.tipPoint;
   return {
-    applyFormatting: editing.applyFormatting,
-    cloudStyle: layout.cloudStyle,
-    containerRef: editing.containerRef,
-    contentEditableRef: editing.contentEditableRef,
-    editableStyle: layout.editableStyle,
-    effectiveZIndex: layout.effectiveZIndex,
-    floatingToolbarRect: editing.floatingToolbarRect,
-    handleBlur: editing.handleBlur,
-    handleClick: editing.handleClick,
-    handleInput: editing.handleInput,
-    handleKeyDown: editing.handleKeyDown,
-    handlePaste: editing.handlePaste,
-    isEditing,
-    portalTheme,
-    settings,
-    dynamicTail: layout.dynamicTail,
+    applyFormatting: args.editing.applyFormatting,
+    cloudStyle: args.layout.cloudStyle,
+    containerRef: args.editing.containerRef,
+    contentEditableRef: args.editing.contentEditableRef,
+    editableStyle: args.layout.editableStyle,
+    effectiveZIndex: args.layout.effectiveZIndex,
+    floatingToolbarRect: args.editing.floatingToolbarRect,
+    handleBlur: args.editing.handleBlur,
+    handleClick: args.editing.handleClick,
+    handleInput: args.editing.handleInput,
+    handleKeyDown: args.editing.handleKeyDown,
+    handlePaste: args.editing.handlePaste,
+    isEditing: args.isEditing,
+    portalTheme: args.portalTheme,
+    settings: args.settings,
+    dynamicTail: args.layout.dynamicTail,
     dragHandleStyle: {
       position: 'fixed' as const,
-      left: layout.calloutPos.x + editing.dimensions.width - 9,
-      top: layout.calloutPos.y - 9,
-      zIndex: layout.effectiveZIndex + 1,
+      left: args.layout.calloutPos.x + args.editing.dimensions.width - 9,
+      top: args.layout.calloutPos.y - 9,
+      zIndex: args.layout.effectiveZIndex + 1,
     },
-    handleDragPointerDown: drag.handlePointerDown,
-    handleDragKeyDown: drag.handleKeyDown,
-    handleHandleBlur: drag.handleBlur,
-    handleHandleFocus: drag.handleFocus,
-    handleTailPointerDown: tailBaseStartDrag.handlePointerDown,
-    handleTailKeyDown: tailBaseStartDrag.handleKeyDown,
-    handleTailBaseEndPointerDown: tailBaseEndDrag.handlePointerDown,
-    handleTailBaseEndKeyDown: tailBaseEndDrag.handleKeyDown,
-    handleTailFramePointerDown: tailFrameDrag.handlePointerDown,
-    handleTailFrameKeyDown: tailFrameDrag.handleKeyDown,
-    handleMouseEnter: drag.handleMouseEnter,
-    handleMouseLeave: drag.handleMouseLeave,
-    isDragging: drag.isDragging,
+    settingsHandleStyle: {
+      position: 'fixed' as const,
+      left: args.layout.calloutPos.x + args.editing.dimensions.width + 13,
+      top: args.layout.calloutPos.y - 9,
+      zIndex: args.layout.effectiveZIndex + 1,
+    },
+    settingsAnchorRef: args.settingsAnchorRef,
+    showSettingsHandle: args.showSettingsHandle,
+    handleSettingsClick: args.onSettingsClick,
+    handleDragPointerDown: args.drag.handlePointerDown,
+    handleDragKeyDown: args.drag.handleKeyDown,
+    handleHandleBlur: args.drag.handleBlur,
+    handleHandleFocus: args.drag.handleFocus,
+    handleTailPointerDown: args.tailBaseStartDrag.handlePointerDown,
+    handleTailKeyDown: args.tailBaseStartDrag.handleKeyDown,
+    handleTailBaseEndPointerDown: args.tailBaseEndDrag.handlePointerDown,
+    handleTailBaseEndKeyDown: args.tailBaseEndDrag.handleKeyDown,
+    handleTailFramePointerDown: args.tailFrameDrag.handlePointerDown,
+    handleTailFrameKeyDown: args.tailFrameDrag.handleKeyDown,
+    handleMouseEnter: args.drag.handleMouseEnter,
+    handleMouseLeave: args.drag.handleMouseLeave,
+    isDragging: args.drag.isDragging,
     isHandleVisible:
-      drag.isHandleVisible ||
-      tailBaseStartDrag.isDragging ||
-      tailBaseEndDrag.isDragging ||
-      tailFrameDrag.isDragging,
-    isTailDragging: tailBaseStartDrag.isDragging,
-    isTailBaseEndDragging: tailBaseEndDrag.isDragging,
-    isTailFrameDragging: tailFrameDrag.isDragging,
-    tailHandleCursor: getCalloutTailDragCursor(layout.dynamicTail?.side ?? null),
+      args.drag.isHandleVisible ||
+      args.tailBaseStartDrag.isDragging ||
+      args.tailBaseEndDrag.isDragging ||
+      args.tailFrameDrag.isDragging,
+    isTailDragging: args.tailBaseStartDrag.isDragging,
+    isTailBaseEndDragging: args.tailBaseEndDrag.isDragging,
+    isTailFrameDragging: args.tailFrameDrag.isDragging,
+    tailHandleCursor: getCalloutTailDragCursor(args.layout.dynamicTail?.side ?? null),
     tailHandleStyle: tailBaseStartPoint
       ? {
           position: 'fixed' as const,
           left: tailBaseStartPoint.x - 6,
           top: tailBaseStartPoint.y - 6,
-          zIndex: layout.effectiveZIndex + 1,
+          zIndex: args.layout.effectiveZIndex + 1,
         }
       : null,
     tailBaseEndHandleStyle: tailBaseEndPoint
@@ -157,7 +181,7 @@ function createCalloutBodyProps(
           position: 'fixed' as const,
           left: tailBaseEndPoint.x - 6,
           top: tailBaseEndPoint.y - 6,
-          zIndex: layout.effectiveZIndex + 1,
+          zIndex: args.layout.effectiveZIndex + 1,
         }
       : null,
     tailFrameHandleStyle: tailFramePoint
@@ -165,9 +189,9 @@ function createCalloutBodyProps(
           position: 'fixed' as const,
           left: tailFramePoint.x - 6,
           top: tailFramePoint.y - 6,
-          zIndex: layout.effectiveZIndex + 1,
+          zIndex: args.layout.effectiveZIndex + 1,
         }
       : null,
-    wrapperStyle: layout.wrapperStyle,
+    wrapperStyle: args.layout.wrapperStyle,
   };
 }

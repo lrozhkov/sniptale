@@ -31,6 +31,9 @@ export function applyHistorySnapshotToFrameManager(args: {
     ? {
         ...args.snapshot.sessionStepBadgeTemplate,
         offsetDirections: [...(args.snapshot.sessionStepBadgeTemplate.offsetDirections ?? [])],
+        ...(args.snapshot.sessionStepBadgeTemplate.manualPlacement
+          ? { manualPlacement: { ...args.snapshot.sessionStepBadgeTemplate.manualPlacement } }
+          : {}),
       }
     : null;
   args.refs.sessionCalloutStyleRef.current = args.snapshot.sessionCalloutStyle

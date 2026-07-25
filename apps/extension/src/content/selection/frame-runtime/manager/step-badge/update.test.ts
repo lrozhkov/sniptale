@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../../features/highlighter/contracts';
-import { createFrameDataFixture } from '../../test-support';
+import { createFrameDataFixture, createStepBadgeSettingsFixture } from '../../test-support';
 import {
   createUpdateFrameStepBadge,
   createUpdateGlobalStepBadgeSettings,
@@ -30,6 +30,35 @@ it(
   'updates global auto-mode settings and recalculates only on false -> true transition',
   expectGlobalStepBadgeSettingsUpdate
 );
+
+it('persists manual boundary placement through the authoritative step-badge owner', () => {
+  let frames = [
+    createFrameDataFixture('frame-1', {
+      stepBadge: createStepBadgeSettingsFixture({ value: '1' }),
+    }),
+  ];
+  const sessionStepBadgeTemplateRef = {
+    current: null as ReturnType<typeof createStepBadgeSettingsFixture> | null,
+  };
+  const updateFrameStepBadge = createUpdateFrameStepBadge({
+    globalStepBadgeSettingsRef: { current: { autoMode: true } },
+    recalculateStepBadgesRef: { current: vi.fn() },
+    sessionStepBadgeTemplateRef,
+    setFrames: (update) => {
+      frames = typeof update === 'function' ? update(frames) : update;
+    },
+  });
+
+  updateFrameStepBadge('frame-1', {
+    manualPlacement: { position: 0.7, side: 'bottom' },
+  });
+
+  expect(frames[0]?.stepBadge?.manualPlacement).toEqual({ position: 0.7, side: 'bottom' });
+  expect(sessionStepBadgeTemplateRef.current?.manualPlacement).toEqual({
+    position: 0.7,
+    side: 'bottom',
+  });
+});
 
 it(
   'detects the step-badge transitions that require auto recalculation',

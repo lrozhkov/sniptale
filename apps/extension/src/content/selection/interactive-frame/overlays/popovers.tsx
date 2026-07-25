@@ -71,24 +71,26 @@ function createFrameSettingsProps(props: InteractiveFramePopoversProps) {
 }
 
 function createStepBadgeProps(props: InteractiveFramePopoversProps) {
+  const stepBadge = props.currentFrame.stepBadge ?? props.frame.stepBadge;
   return {
-    isOpen: props.isSelected && props.isStepBadgePopoverOpen && !!props.frame.stepBadge?.enabled,
+    isOpen: props.isStepBadgePopoverOpen && !!stepBadge?.enabled,
     onClose: props.closePopover,
     frameId: props.frame.id,
     frameRect: props.currentFrame,
     anchorEl: props.stepBadgePopoverAnchorRef.current,
-    ...(props.frame.stepBadge === undefined ? {} : { stepBadge: props.frame.stepBadge }),
+    ...(stepBadge === undefined ? {} : { stepBadge }),
   };
 }
 
 function createCalloutSettingsProps(props: InteractiveFramePopoversProps) {
+  const callout = props.currentFrame.callout ?? props.frame.callout;
   return {
-    isOpen: props.isSelected && props.isCalloutPopoverOpen && !!props.frame.callout?.enabled,
+    isOpen: props.isCalloutPopoverOpen && !!callout?.enabled,
     onClose: props.closePopover,
     frameId: props.frame.id,
     frameRect: props.currentFrame,
     anchorEl: props.calloutPopoverAnchorRef.current,
-    ...(props.frame.callout === undefined ? {} : { settings: props.frame.callout }),
+    ...(callout === undefined ? {} : { settings: callout }),
   };
 }
 
@@ -100,6 +102,8 @@ function renderCalloutOverlay(props: InteractiveFramePopoversProps) {
       frameZIndex={props.frameZIndex}
       borderWidth={props.borderWidth}
       isCalloutEditing={props.isCalloutEditing}
+      isCalloutPopoverOpen={props.isCalloutPopoverOpen}
+      calloutPopoverAnchorRef={props.calloutPopoverAnchorRef}
       setIsCalloutEditing={props.setIsCalloutEditing}
       setTempFrame={props.setTempFrame}
       onUpdate={props.onUpdate}

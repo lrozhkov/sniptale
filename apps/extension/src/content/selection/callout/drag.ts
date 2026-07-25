@@ -1,7 +1,7 @@
 import React from 'react';
 import type { CalloutManualPlacement } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCalloutKeyboardDelta, type CalloutHandleKeyboardEvent } from './keyboard';
-import { useCalloutHandleVisibility } from './handle-visibility';
+import { useTransientControlVisibility } from '../interactive-frame/overlays/transient-control-visibility';
 
 type Rect = { x: number; y: number; width: number; height: number };
 
@@ -37,6 +37,7 @@ export function useCalloutDrag(args: {
   frameRect: Rect;
   dimensions: { width: number; height: number };
   isEditing: boolean;
+  isHandlePinned?: boolean;
   manualPlacement: CalloutManualPlacement | undefined;
   onPositionChange: (placement: CalloutManualPlacement) => void;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
@@ -47,7 +48,9 @@ export function useCalloutDrag(args: {
   const pointerOffsetRef = React.useRef({ x: 0, y: 0 });
   const draftRef = React.useRef<CalloutManualPlacement | null>(null);
   const startPlacementRef = React.useRef<CalloutManualPlacement | null>(null);
-  const handleVisibility = useCalloutHandleVisibility(isDragging);
+  const handleVisibility = useTransientControlVisibility(
+    isDragging || Boolean(args.isHandlePinned)
+  );
 
   React.useEffect(() => {
     if (!isDragging) setDraftPlacement(null);

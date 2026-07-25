@@ -1,5 +1,7 @@
 import React from 'react';
 import type { FrameData, ResizeDirection } from '../../../../features/highlighter/contracts';
+import { dispatchFrameStepBadgeChanged } from '../../../platform/page-context/frame-events';
+import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 import { StepBadge } from '../../step-badge';
 import { InteractiveFrameResizeHandles } from './handles';
 import { getInteractiveFrameContainerStyle } from '../layout/style';
@@ -16,6 +18,8 @@ interface InteractiveFrameFrameShellProps {
   borderColor: string;
   borderWidth: number;
   borderShadow?: NonNullable<FrameData['borderSettings']>['shadow'];
+  isStepBadgePopoverOpen: boolean;
+  stepBadgePopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   tempFrame: FrameData;
   handleMouseDown: (event: React.PointerEvent) => void;
   handleResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
@@ -23,6 +27,8 @@ interface InteractiveFrameFrameShellProps {
 
 /** Renders the fixed frame container, resize handles, and optional step badge. */
 export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProps) {
+  const isAnyFrameSelected = useFrameUIStore((state) => state.selectedFrameId !== null);
+  const toggleQuickPopover = useFrameUIStore((state) => state.toggleQuickPopover);
   return (
     <div
       ref={props.containerRef as React.RefObject<HTMLDivElement>}
@@ -51,11 +57,22 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
           borderWidth={props.borderWidth}
           onResizeStart={props.handleResizeStart}
         />
-        {props.frame.stepBadge?.enabled && props.frame.stepBadge.value && (
+        {props.currentFrame.stepBadge?.enabled && props.currentFrame.stepBadge.value && (
           <StepBadge
-            settings={props.frame.stepBadge}
+            settings={props.currentFrame.stepBadge}
             borderColor={props.borderColor}
             borderWidth={props.borderWidth}
+            frameRect={props.currentFrame}
+            isSettingsOpen={props.isStepBadgePopoverOpen}
+            onPositionChange={(manualPlacement) => {
+              dispatchFrameStepBadgeChanged({
+                frameId: props.frame.id,
+                settings: { manualPlacement },
+              });
+            }}
+            onSettingsClick={() => toggleQuickPopover(props.frame.id, 'step-badge')}
+            settingsAnchorRef={props.stepBadgePopoverAnchorRef}
+            showSettingsHandle={!isAnyFrameSelected}
             zIndex={props.frameZIndex}
             {...(props.borderShadow === undefined ? {} : { shadow: props.borderShadow })}
           />

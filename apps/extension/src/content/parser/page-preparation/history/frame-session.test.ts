@@ -23,6 +23,12 @@ describe('captureFrameSessionSnapshot', () => {
         variant: 'bubble',
       },
       pagePlacement: { iframePath: ['iframe#content'], pageX: 120, pageY: 240 },
+      stepBadge: {
+        enabled: true,
+        manualPlacement: { position: 0.72, side: 'bottom' },
+        type: 'number',
+        value: '3',
+      },
     });
     const snapshot = captureFrameSessionSnapshot({
       frames: [frame],
@@ -39,9 +45,11 @@ describe('captureFrameSessionSnapshot', () => {
     expect(saved.callout?.manualPlacement).not.toBe(frame.callout?.manualPlacement);
     expect(saved.pagePlacement).not.toBe(frame.pagePlacement);
     expect(saved.pagePlacement?.iframePath).not.toBe(frame.pagePlacement?.iframePath);
+    expect(saved.stepBadge?.manualPlacement).not.toBe(frame.stepBadge?.manualPlacement);
     expect(saved).toMatchObject({
       callout: { manualPlacement: { centerOffsetX: 80, centerOffsetY: -40 } },
       pagePlacement: { iframePath: ['iframe#content'], pageX: 120, pageY: 240 },
+      stepBadge: { manualPlacement: { position: 0.72, side: 'bottom' } },
     });
   });
 });

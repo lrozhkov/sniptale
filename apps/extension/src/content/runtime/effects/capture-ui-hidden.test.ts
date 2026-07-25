@@ -58,6 +58,8 @@ it('hides transient app UI during screenshot capture without hiding captured ann
     '.sniptale-resize-handle',
     '.sniptale-callout-drag-handle',
     '.sniptale-callout-tail-handle',
+    '.sniptale-callout-settings-handle',
+    '.sniptale-step-badge-controls',
     '.sniptale-free-frame-draft-portal',
     '.sniptale-quick-edit-hover',
   ].forEach(expectCaptureHiddenSelector);

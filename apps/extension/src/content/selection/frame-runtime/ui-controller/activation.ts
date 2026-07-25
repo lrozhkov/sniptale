@@ -11,12 +11,17 @@ const OWNED_FLOATING_SELECTORS = [
   '.sniptale-toolbar-portal-wrapper',
   '.sniptale-frame-toolbar-trigger',
   '.sniptale-frame-toolbar-bridge',
+  '.sniptale-frame-quick-action',
   '.sniptale-resize-handle',
   '.sniptale-frame-settings-popover',
   '.sniptale-step-badge-popover',
   '.sniptale-callout-settings-popover',
   '.sniptale-callout',
   '.sniptale-callout-format-toolbar',
+  '.sniptale-callout-drag-handle',
+  '.sniptale-callout-tail-handle',
+  '.sniptale-callout-settings-handle',
+  '.sniptale-step-badge-controls',
   '.sniptale-content-size-tooltip',
 ];
 

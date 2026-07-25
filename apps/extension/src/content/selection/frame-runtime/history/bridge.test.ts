@@ -70,6 +70,7 @@ function createAppliedSnapshot() {
       enabled: true,
       anchor: 'top-left' as const,
       offsetDirections: ['up' as const],
+      manualPlacement: { position: 0.4, side: 'top' as const },
       type: 'number' as const,
       alphabet: 'cyrillic' as const,
       value: '',
@@ -102,6 +103,9 @@ function expectAppliedSnapshotState(args: {
   );
   expect(args.refs.sessionStepBadgeTemplateRef.current).not.toBe(
     args.snapshot.sessionStepBadgeTemplate
+  );
+  expect(args.refs.sessionStepBadgeTemplateRef.current?.manualPlacement).not.toBe(
+    args.snapshot.sessionStepBadgeTemplate.manualPlacement
   );
   expect(args.refs.sessionCalloutStyleRef.current).toEqual(args.snapshot.sessionCalloutStyle);
   expect(args.refs.sessionCalloutStyleRef.current).not.toBe(args.snapshot.sessionCalloutStyle);

@@ -1,6 +1,12 @@
 import React from 'react';
 import { translate } from '../../../platform/i18n';
-import type { StepBadgeSettings } from '../../../features/highlighter/contracts';
+import type {
+  StepBadgeManualPlacement,
+  StepBadgeSettings,
+} from '../../../features/highlighter/contracts';
+import { StepBadgeControls } from './controls';
+import { useStepBadgeInteraction } from './interaction';
+import type { StepBadgeFrameRect } from './placement';
 import { getStepBadgeStyle, StepBadgeValue } from './views';
 
 interface StepBadgeProps {
@@ -9,43 +15,60 @@ interface StepBadgeProps {
   borderWidth: number;
   shadow?: number;
   zIndex: number;
+  frameRect?: StepBadgeFrameRect;
+  isSettingsOpen?: boolean;
   onClick?: () => void;
+  onPositionChange?: (placement: StepBadgeManualPlacement) => void;
+  onSettingsClick?: () => void;
+  settingsAnchorRef?: React.RefObject<HTMLButtonElement | null>;
+  showSettingsHandle?: boolean;
 }
 
-export const StepBadge: React.FC<StepBadgeProps> = ({
-  settings,
-  borderColor,
-  borderWidth,
-  shadow,
-  zIndex,
-  onClick,
-}) => {
-  if (!settings.enabled || !settings.value) {
-    return null;
-  }
-
-  const tooltip = `${translate('content.stepBadge.tooltipPrefix')} ${settings.value}`;
-  const shadowProps = shadow === undefined ? {} : { shadow };
+export const StepBadge: React.FC<StepBadgeProps> = (props) => {
+  const interaction = useStepBadgeInteraction({
+    borderWidth: props.borderWidth,
+    frameRect: props.frameRect,
+    isSettingsOpen: props.isSettingsOpen,
+    onPositionChange: props.onPositionChange,
+    settings: props.settings,
+  });
+  if (!props.settings.enabled || !props.settings.value) return null;
 
   return (
-    <div
-      className="sniptale-step-badge"
-      onClick={(e) => {
-        e.stopPropagation();
-        e.nativeEvent.stopImmediatePropagation();
-        onClick?.();
-      }}
-      style={getStepBadgeStyle({
-        settings,
-        borderColor,
-        borderWidth,
-        zIndex,
-        clickable: Boolean(onClick),
-        ...shadowProps,
-      })}
-      title={tooltip}
-    >
-      <StepBadgeValue value={settings.value} />
-    </div>
+    <>
+      <div
+        ref={interaction.badgeRef}
+        className="sniptale-step-badge"
+        onClick={(event) => {
+          event.stopPropagation();
+          event.nativeEvent.stopImmediatePropagation();
+          props.onClick?.();
+        }}
+        onMouseEnter={interaction.hasControls ? interaction.visibility.handleMouseEnter : undefined}
+        onMouseLeave={interaction.hasControls ? interaction.visibility.handleMouseLeave : undefined}
+        style={getStepBadgeStyle({
+          settings: interaction.effectiveSettings,
+          borderColor: props.borderColor,
+          borderWidth: props.borderWidth,
+          zIndex: props.zIndex,
+          clickable: Boolean(props.onClick),
+          isDragging: interaction.drag.isDragging,
+          ...(props.shadow === undefined ? {} : { shadow: props.shadow }),
+        })}
+        title={`${translate('content.stepBadge.tooltipPrefix')} ${props.settings.value}`}
+      >
+        <StepBadgeValue value={props.settings.value} />
+      </div>
+      {interaction.hasControls ? (
+        <StepBadgeControls
+          drag={interaction.drag}
+          visibility={interaction.visibility}
+          position={interaction.controlPosition}
+          showSettingsHandle={Boolean(props.showSettingsHandle)}
+          {...(props.onSettingsClick ? { onSettingsClick: props.onSettingsClick } : {})}
+          {...(props.settingsAnchorRef ? { settingsAnchorRef: props.settingsAnchorRef } : {})}
+        />
+      ) : null}
+    </>
   );
 };

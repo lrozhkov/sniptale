@@ -3,7 +3,7 @@
  *
  * Архитектура:
  * - Hover winner и selected frame — независимые состояния
- * - Popover всегда принадлежит selected frame
+ * - Toolbar-popover принадлежит selected frame; quick-popover может жить без selection
  *
  * Принципы:
  * - Store управляет только transient UI состоянием рамок
@@ -29,6 +29,10 @@ export interface FrameUIState {
   dismissFrame: (frameId: string) => void;
   dismissFrameUi: () => void;
   togglePopover: (frameId: string, kind: FramePopoverKind) => void;
+  toggleQuickPopover: (
+    frameId: string,
+    kind: Extract<FramePopoverKind, 'step-badge' | 'callout-settings'>
+  ) => void;
   closePopover: () => void;
   setResizeFrame: (frameId: string | null) => void;
   reset: () => void;
@@ -152,6 +156,20 @@ function createFrameUIVisibilityActions(set: FrameStoreSet, get: FrameStoreGet) 
         return;
       }
       createOpenPopoverAction(set, get)(frameId, kind);
+    },
+
+    toggleQuickPopover: (
+      frameId: string,
+      kind: Extract<FramePopoverKind, 'step-badge' | 'callout-settings'>
+    ) => {
+      const state = get();
+      const activePopover = state.activePopover;
+      if (state.selectedFrameId !== null) return;
+      if (activePopover?.frameId === frameId && activePopover.kind === kind) {
+        set({ activePopover: null });
+        return;
+      }
+      set({ activePopover: { frameId, kind } });
     },
 
     closePopover: () => {

@@ -104,6 +104,26 @@ function expectPlacementChangesInvalidateDescriptors() {
   ).toBe(false);
 }
 
+function expectStepBadgePlacementChangesInvalidateDescriptors() {
+  const initialFrame = createFrame('frame-1');
+  initialFrame.stepBadge = {
+    enabled: true,
+    manualPlacement: { position: 0.25, side: 'top' },
+    type: 'number',
+    value: '1',
+  };
+  const changedFrame = structuredClone(initialFrame);
+  changedFrame.stepBadge!.manualPlacement = { position: 0.75, side: 'bottom' };
+  const frameStates = createFrameStates([['frame-1', 'idle']]);
+
+  expect(
+    areFrameRenderDescriptorsEqual(
+      buildFrameRenderDescriptors([initialFrame], frameStates),
+      buildFrameRenderDescriptors([changedFrame], frameStates)
+    )
+  ).toBe(false);
+}
+
 function expectTailBaseChangesInvalidateDescriptors() {
   const initialFrame = createFrame('frame-1');
   initialFrame.callout = {
@@ -187,6 +207,10 @@ describe('frame-roots-renderer-dom descriptors', () => {
   it(
     'treats free-frame and manual-callout placement as render invalidation',
     expectPlacementChangesInvalidateDescriptors
+  );
+  it(
+    'treats manual step-badge placement as render invalidation',
+    expectStepBadgePlacementChangesInvalidateDescriptors
   );
   it(
     'treats tail-base position and width changes as render invalidation',

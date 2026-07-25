@@ -21,6 +21,7 @@ const HIGHLIGHTER_EXTENSION_UI_CLASSES = [
   'sniptale-toolbar-portal-wrapper',
   'sniptale-frame-toolbar-trigger',
   'sniptale-frame-toolbar-bridge',
+  'sniptale-frame-quick-action',
   'sniptale-effect-toggle',
   'sniptale-resize-handle',
   'sniptale-focus-overlay',
@@ -30,6 +31,10 @@ const HIGHLIGHTER_EXTENSION_UI_CLASSES = [
   'sniptale-step-badge',
   'sniptale-callout',
   'sniptale-callout-format-toolbar',
+  'sniptale-callout-drag-handle',
+  'sniptale-callout-tail-handle',
+  'sniptale-callout-settings-handle',
+  'sniptale-step-badge-controls',
 ] as const;
 
 const HIGHLIGHTER_EXTENSION_UI_SELECTOR = [
@@ -37,6 +42,7 @@ const HIGHLIGHTER_EXTENSION_UI_SELECTOR = [
   '.sniptale-toolbar-portal-wrapper',
   '.sniptale-frame-toolbar-trigger',
   '.sniptale-frame-toolbar-bridge',
+  '.sniptale-frame-quick-action',
   '.sniptale-effect-toggle',
   '.sniptale-resize-handle',
   '.sniptale-frame-settings-popover',
@@ -45,6 +51,10 @@ const HIGHLIGHTER_EXTENSION_UI_SELECTOR = [
   '.sniptale-step-badge',
   '.sniptale-callout',
   '.sniptale-callout-format-toolbar',
+  '.sniptale-callout-drag-handle',
+  '.sniptale-callout-tail-handle',
+  '.sniptale-callout-settings-handle',
+  '.sniptale-step-badge-controls',
 ].join(', ');
 
 function collectFrameCacheEntries(): Array<readonly [string, HoverFrameCacheEntry]> {

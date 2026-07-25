@@ -61,6 +61,9 @@ function cloneFrameSettings(frame: FrameData): SerializableFrameData {
           stepBadge: {
             ...frame.stepBadge,
             offsetDirections: [...(frame.stepBadge.offsetDirections ?? [])],
+            ...(frame.stepBadge.manualPlacement
+              ? { manualPlacement: { ...frame.stepBadge.manualPlacement } }
+              : {}),
           },
         }
       : {}),
@@ -88,6 +91,9 @@ export function captureFrameSessionSnapshot(args: {
       ? {
           ...args.sessionStepBadgeTemplate,
           offsetDirections: [...(args.sessionStepBadgeTemplate.offsetDirections ?? [])],
+          ...(args.sessionStepBadgeTemplate.manualPlacement
+            ? { manualPlacement: { ...args.sessionStepBadgeTemplate.manualPlacement } }
+            : {}),
         }
       : null,
     stepBadgeOrder: Array.from(args.stepBadgeOrder.entries()),

@@ -53,6 +53,18 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Переместить комментарий',
     en: 'Move comment',
   },
+  calloutSettings: {
+    ru: 'Настройки комментария',
+    en: 'Comment settings',
+  },
+  stepBadgeSettings: {
+    ru: 'Настройки нумерации',
+    en: 'Numbering settings',
+  },
+  moveStepBadge: {
+    ru: 'Переместить номер вдоль границы рамки',
+    en: 'Move the number along the frame border',
+  },
   moveCommentTail: {
     ru: 'Изменить ширину основания указателя: начальная точка',
     en: 'Adjust pointer base width: start point',

@@ -15,6 +15,7 @@ function createProps(
     handleHandleFocus: vi.fn(),
     handleMouseEnter: vi.fn(),
     handleMouseLeave: vi.fn(),
+    handleSettingsClick: vi.fn(),
     handleTailPointerDown: vi.fn(),
     handleTailKeyDown: vi.fn(),
     handleTailBaseEndPointerDown: vi.fn(),
@@ -28,6 +29,9 @@ function createProps(
     isTailBaseEndDragging: false,
     isTailFrameDragging: false,
     portalTheme: null,
+    settingsAnchorRef: { current: null },
+    settingsHandleStyle: { left: 124, top: 100 },
+    showSettingsHandle: true,
     tailHandleCursor: 'ew-resize',
     tailHandleStyle: { left: 120, top: 140 },
     tailBaseEndHandleStyle: { left: 140, top: 140 },
@@ -41,6 +45,7 @@ describe('callout interaction handles', () => {
     const markup = renderToStaticMarkup(renderCalloutInteractionHandles(createProps()));
 
     expect(markup).toContain('sniptale-callout-drag-handle');
+    expect(markup).toContain('sniptale-callout-settings-handle');
     expect(markup).toContain('sniptale-callout-tail-handle');
     expect(markup).toContain('sniptale-callout-tail-base-start-handle');
     expect(markup).toContain('sniptale-callout-tail-base-end-handle');
@@ -55,6 +60,15 @@ describe('callout interaction handles', () => {
     );
 
     expect(markup).toBe('');
+  });
+
+  it('keeps movement controls but hides quick settings while a main toolbar is open', () => {
+    const markup = renderToStaticMarkup(
+      renderCalloutInteractionHandles(createProps({ showSettingsHandle: false }))
+    );
+
+    expect(markup).toContain('sniptale-callout-drag-handle');
+    expect(markup).not.toContain('sniptale-callout-settings-handle');
   });
 
   it('removes invisible handles from pointer hit testing until hover or focus reveals them', () => {

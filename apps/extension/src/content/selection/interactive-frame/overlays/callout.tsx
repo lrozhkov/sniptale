@@ -1,5 +1,6 @@
 import React from 'react';
 import type { FrameData } from '../../../../features/highlighter/contracts';
+import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 import { Callout } from '../../callout';
 
 interface InteractiveFrameCalloutOverlayProps {
@@ -8,6 +9,8 @@ interface InteractiveFrameCalloutOverlayProps {
   frameZIndex: number;
   borderWidth: number;
   isCalloutEditing: boolean;
+  isCalloutPopoverOpen: boolean;
+  calloutPopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   onUpdate: (frame: FrameData) => void;
@@ -15,6 +18,8 @@ interface InteractiveFrameCalloutOverlayProps {
 
 /** Renders the editable callout overlay and keeps its update/delete behavior local to the callout seam. */
 export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOverlayProps) {
+  const isAnyFrameSelected = useFrameUIStore((state) => state.selectedFrameId !== null);
+  const toggleQuickPopover = useFrameUIStore((state) => state.toggleQuickPopover);
   const callout = props.currentFrame.callout ?? props.frame.callout;
   if (!callout?.enabled) {
     return null;
@@ -41,6 +46,7 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
       }}
       zIndex={props.frameZIndex + 1}
       isEditing={props.isCalloutEditing}
+      isSettingsOpen={props.isCalloutPopoverOpen}
       onStartEditing={() => props.setIsCalloutEditing(true)}
       onStopEditing={() => props.setIsCalloutEditing(false)}
       onContentChange={(htmlContent) => {
@@ -50,6 +56,7 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
         applyCalloutFrameUpdate({ ...callout, enabled: false });
         props.setIsCalloutEditing(false);
       }}
+      onSettingsClick={() => toggleQuickPopover(props.frame.id, 'callout-settings')}
       onPositionChange={(manualPlacement) => {
         applyCalloutFrameUpdate({ ...callout, manualPlacement });
       }}
@@ -59,6 +66,8 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
       onTailFramePositionChange={(tailFramePosition) => {
         applyCalloutFrameUpdate({ ...callout, tailFramePosition });
       }}
+      settingsAnchorRef={props.calloutPopoverAnchorRef}
+      showSettingsHandle={!isAnyFrameSelected}
     />
   );
 }
