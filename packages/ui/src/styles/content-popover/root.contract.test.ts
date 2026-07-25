@@ -90,6 +90,27 @@ describe('content-popover surface contract', () => {
     'keeps content popover range active fill visible in the highlighter popover',
     verifyRangeActiveFillContract
   );
+
+  it('provides a compact density without shrinking readable text', () => {
+    expect(readRuleBlock('.sniptale-content-popover--compact {')).toContain('padding: 8px;');
+    expect(
+      readRuleBlock('.sniptale-content-popover--compact .sniptale-content-popover-body')
+    ).toContain('gap: 8px;');
+    const sectionBlock = readRuleBlock(
+      '.sniptale-content-popover--compact .sniptale-content-popover-section'
+    );
+    expect(sectionBlock).toContain('gap: 6px;');
+    expect(sectionBlock).toContain('padding: 8px 10px;');
+    expect(readRuleBlock('.sniptale-content-popover--compact .sniptale-glass-chip')).toContain(
+      'min-height: 28px;'
+    );
+    expect(
+      readRuleBlock('.sniptale-content-popover--compact .sniptale-glass-range-meta')
+    ).not.toContain('font-size:');
+    expect(readRuleBlock('.sniptale-content-popover-range-grid {')).toContain(
+      'grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));'
+    );
+  });
 });
 
 describe('content-popover destructive action contract', () => {

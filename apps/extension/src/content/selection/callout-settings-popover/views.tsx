@@ -119,13 +119,16 @@ export function CalloutTypographySection(props: {
         onFontWeightToggle={props.onFontWeightToggle}
       />
 
-      <CalloutFontSizeRange fontSize={props.fontSize} onFontSizeChange={props.onFontSizeChange} />
-
-      <CalloutMaxWidthRange maxWidth={props.maxWidth} onMaxWidthChange={props.onMaxWidthChange} />
-
-      {!props.isTextOnly ? (
-        <CalloutTailSizeRange tailSize={props.tailSize} onTailSizeChange={props.onTailSizeChange} />
-      ) : null}
+      <div className="sniptale-content-popover-range-grid">
+        <CalloutFontSizeRange fontSize={props.fontSize} onFontSizeChange={props.onFontSizeChange} />
+        <CalloutMaxWidthRange maxWidth={props.maxWidth} onMaxWidthChange={props.onMaxWidthChange} />
+        {!props.isTextOnly ? (
+          <CalloutTailSizeRange
+            tailSize={props.tailSize}
+            onTailSizeChange={props.onTailSizeChange}
+          />
+        ) : null}
+      </div>
     </ContentPopoverSection>
   );
 }

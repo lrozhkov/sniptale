@@ -28,8 +28,23 @@ function PositionHarness(props: {
   anchorEl: HTMLElement;
   fallbackHeight?: number;
   frameRect?: { x: number; y: number; width: number; height: number };
+  layoutHeight?: number;
+  transformedHeight?: number;
 }) {
   const popoverRef = React.useRef<HTMLDivElement | null>(null);
+  const setPopoverRef = React.useCallback(
+    (element: HTMLDivElement | null) => {
+      popoverRef.current = element;
+      if (!element || props.layoutHeight === undefined) return;
+      Object.defineProperties(element, {
+        offsetHeight: { configurable: true, value: props.layoutHeight },
+        offsetWidth: { configurable: true, value: 160 },
+      });
+      element.getBoundingClientRect = () =>
+        new DOMRect(0, 0, 160, props.transformedHeight ?? props.layoutHeight);
+    },
+    [props.layoutHeight, props.transformedHeight]
+  );
   const style = useFramePopoverPosition({
     anchorEl: props.anchorEl,
     fallbackSize: { width: 160, height: props.fallbackHeight ?? 80 },
@@ -41,7 +56,7 @@ function PositionHarness(props: {
 
   return (
     <div
-      ref={popoverRef}
+      ref={setPopoverRef}
       data-left={style.left}
       data-max-height={style.maxHeight}
       data-overflow={style.overflow}
@@ -109,6 +124,34 @@ describe('frame popover positioning', () => {
     const top = Number(popover.dataset['top']);
     expect(left).toBe(182);
     expect(top + 80).toBeLessThanOrEqual(500);
+  });
+
+  it('uses untransformed layout height so an animated popover stays clear above the toolbar', () => {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sniptale-toolbar-portal-wrapper';
+    toolbar.dataset['frameId'] = 'frame-1';
+    setRect(toolbar, new DOMRect(200, 500, 200, 48));
+    document.body.append(toolbar);
+
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(250, 505, 24, 24));
+    toolbar.append(anchor);
+
+    act(() =>
+      root.render(
+        <PositionHarness
+          anchorEl={anchor}
+          fallbackHeight={80}
+          layoutHeight={220}
+          transformedHeight={176}
+        />
+      )
+    );
+
+    const popover = container.firstElementChild as HTMLElement;
+    const top = Number(popover.dataset['top']);
+    expect(top).toBe(270);
+    expect(top + 220).toBe(490);
   });
 
   it('keeps the canonical bottom side even when the selected frame is below the toolbar', () => {

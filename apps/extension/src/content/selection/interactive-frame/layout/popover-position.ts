@@ -70,7 +70,8 @@ export function useFramePopoverPosition(params: {
     const update = () => refresh();
     const cleanupPosition = bindFloatingInteractionPositionListeners(params.anchorEl, update);
     const popover = params.popoverRef.current;
-    if (typeof ResizeObserver === 'undefined' || !popover) return cleanupPosition;
+    if (!popover) return cleanupPosition;
+    if (typeof ResizeObserver === 'undefined') return cleanupPosition;
     let layoutRafId: number | null = null;
     const updateAfterLayout = () => {
       if (layoutRafId !== null) return;
@@ -102,10 +103,10 @@ export function useFramePopoverPosition(params: {
   ]);
 
   if (!params.anchorEl) return getHiddenStyle();
-  const measured = params.popoverRef.current?.getBoundingClientRect();
+  const popover = params.popoverRef.current;
   const size =
-    measured && measured.width > 0 && measured.height > 0
-      ? { width: measured.width, height: measured.height }
+    popover && popover.offsetWidth > 0 && popover.offsetHeight > 0
+      ? { width: popover.offsetWidth, height: popover.offsetHeight }
       : params.fallbackSize;
   const anchorRect = toRect(params.anchorEl.getBoundingClientRect());
   const toolbarRect = getToolbarRect(params.frameId);

@@ -250,3 +250,50 @@
 .sniptale-content-popover .sniptale-step-badge-group {
   margin-top: 2px;
 }
+
+.sniptale-content-popover--compact .sniptale-glass-icon-button {
+  width: 28px;
+  height: 28px;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-chip {
+  min-height: 28px;
+  padding: 5px 8px;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-bold-button {
+  width: 30px;
+  height: 28px;
+  margin-left: 2px;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-grid-3 {
+  gap: 4px;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-arrow-grid {
+  grid-template-columns: repeat(3, 28px);
+  grid-template-rows: repeat(3, 28px);
+  gap: 4px;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-range {
+  height: 22px;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-range-meta {
+  margin-top: 0;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-input {
+  min-height: 30px;
+  padding: 6px 8px;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-color-trigger {
+  min-height: 32px;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-destructive {
+  min-height: 32px;
+}
