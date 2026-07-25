@@ -74,6 +74,22 @@ describe('highlighter hover mouse lifecycle', () => {
     expect(session.lastHoverTarget).toBe(target);
   });
 
+  it('clears pending hover work without resolving the page below an open settings popover', () => {
+    const { handlers, hideHoverOverlay, session } = createFixture();
+    session.hoverRafId = 42;
+    session.lastHoverTarget = document.createElement('div');
+    targetPolicy.hasBlockingHighlighterPopover.mockReturnValue(true);
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+
+    handlers.handleMouseMove(new MouseEvent('mousemove', { clientX: 10, clientY: 12 }));
+
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(42);
+    expect(session.hoverRafId).toBeNull();
+    expect(session.lastHoverTarget).toBeNull();
+    expect(hideHoverOverlay).toHaveBeenCalledOnce();
+    expect(targetResolver.resolvePagePreparationTarget).not.toHaveBeenCalled();
+  });
+
   it('cancels pending work and clears the target on mouse leave', () => {
     const { handlers, hideHoverOverlay, session } = createFixture();
     session.hoverRafId = 42;

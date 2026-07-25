@@ -106,3 +106,47 @@ it('inserts pasted text into the callout when the document selection escaped to 
   expect(editable?.textContent).toBe('comment: pasted text');
   expect(onContentChange).toHaveBeenCalledWith('comment: pasted text');
 });
+
+it('inserts pasted text at the caret owned by the callout shadow root', () => {
+  const onContentChange = vi.fn();
+  container = document.createElement('div');
+  document.body.append(container);
+  const shadowRoot = container!.attachShadow({ mode: 'open' });
+  const shadowContainer = document.createElement('div');
+  shadowRoot.append(shadowContainer);
+  root = createRoot(shadowContainer);
+
+  act(() => {
+    root?.render(<EditingHandlersHarness onContentChange={onContentChange} />);
+  });
+
+  const editable = shadowRoot.querySelector<HTMLDivElement>('[data-ui="callout-editable"]');
+  expect(editable).toBeInstanceOf(HTMLDivElement);
+  editable!.textContent = 'before after';
+  const caret = document.createRange();
+  caret.setStart(editable!.firstChild!, 7);
+  caret.collapse(true);
+  const selection = document.getSelection();
+  if (!selection) throw new Error('Expected a document selection fixture');
+  const lightDomRange = document.createRange();
+  lightDomRange.selectNodeContents(container!);
+  selection.removeAllRanges();
+  selection.addRange(lightDomRange);
+  vi.spyOn(selection, 'getRangeAt').mockReturnValue(caret);
+  Object.defineProperty(shadowRoot, 'getSelection', {
+    configurable: true,
+    value: () => selection,
+  });
+  vi.spyOn(window, 'getSelection').mockReturnValue(null);
+  const pasteEvent = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+  Object.defineProperty(pasteEvent, 'clipboardData', {
+    value: { getData: (type: string) => (type === 'text/plain' ? 'middle ' : '') },
+  });
+
+  act(() => {
+    editable?.dispatchEvent(pasteEvent);
+  });
+
+  expect(editable?.textContent).toBe('before middle after');
+  expect(onContentChange).toHaveBeenCalledWith('before middle after');
+});

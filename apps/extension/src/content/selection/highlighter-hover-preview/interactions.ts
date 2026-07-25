@@ -127,6 +127,10 @@ function processScheduledHoverTarget(props: {
   y: number;
 }): void {
   if (!props.getState.isModeEnabled() || props.getState.isPaused()) return;
+  if (hasBlockingHighlighterPopover()) {
+    hideHoverPreview(props.session, props.hideHoverOverlay);
+    return;
+  }
   if (shouldSuppressHoverTarget(props.session, props.target, props.x, props.y)) {
     hideHoverPreview(props.session, props.hideHoverOverlay);
     return;
@@ -238,6 +242,14 @@ function createHoverClickHandler(props: HoverInteractionProps) {
 function createHoverMouseMoveHandler(props: HoverInteractionProps) {
   return (event: MouseEvent, iframe?: HTMLIFrameElement) => {
     if (props.session.freeDraw.gesture) return;
+    if (hasBlockingHighlighterPopover()) {
+      if (props.session.hoverRafId !== null) {
+        cancelAnimationFrame(props.session.hoverRafId);
+        props.session.hoverRafId = null;
+      }
+      hideHoverPreview(props.session, props.overlayActions.hideHoverOverlay);
+      return;
+    }
     if (
       shouldSkipHoverProcessing({
         event,

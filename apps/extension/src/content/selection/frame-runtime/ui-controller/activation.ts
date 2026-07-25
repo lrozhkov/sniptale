@@ -35,7 +35,7 @@ function hasActiveFrameInteraction() {
   );
 }
 
-function isOwnedFloatingEvent(event: Event): boolean {
+export function isFrameUiOwnedFloatingEvent(event: Event): boolean {
   const path = typeof event.composedPath === 'function' ? event.composedPath() : [event.target];
   return path.some(
     (target) =>
@@ -85,7 +85,7 @@ export function createFrameSelectionEventHandlers(params: {
 }) {
   return {
     pointerDown: (event: PointerEvent, iframe?: HTMLIFrameElement) => {
-      if (!params.selectedFrameIdRef.current || isOwnedFloatingEvent(event)) return;
+      if (!params.selectedFrameIdRef.current || isFrameUiOwnedFloatingEvent(event)) return;
       const hit = resolveBorderHit({
         event,
         frames: params.framesRef.current,
@@ -96,7 +96,7 @@ export function createFrameSelectionEventHandlers(params: {
       if (!hit) params.clearSelection();
     },
     click: (event: MouseEvent, iframe?: HTMLIFrameElement) => {
-      if (isOwnedFloatingEvent(event)) return;
+      if (isFrameUiOwnedFloatingEvent(event)) return;
       const directControl = resolveFrameControlHit(event);
       if (directControl?.kind === 'trigger') return;
       const hit = resolveBorderHit({

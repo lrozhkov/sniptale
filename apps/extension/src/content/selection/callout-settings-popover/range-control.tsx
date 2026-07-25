@@ -1,8 +1,4 @@
-import {
-  ProductGlassRange,
-  ProductGlassRangeMeta,
-  ProductGlassSectionLabel,
-} from '@sniptale/ui/product-glass-controls';
+import { ProductGlassRange, ProductGlassSectionLabel } from '@sniptale/ui/product-glass-controls';
 import { translate } from '../../../platform/i18n';
 
 export function CalloutRangeControl(props: {
@@ -12,10 +8,9 @@ export function CalloutRangeControl(props: {
   onChange: (value: number) => void;
   step: number;
   value: number;
-  values: [string, string, string];
 }) {
   return (
-    <div>
+    <div className="sniptale-content-popover-range-field">
       <ProductGlassSectionLabel>
         {props.label} {props.value}
         {translate('content.callout.unitPxSuffix')}
@@ -28,11 +23,6 @@ export function CalloutRangeControl(props: {
         value={props.value}
         onChange={(event) => props.onChange(Number(event.target.value))}
       />
-      <ProductGlassRangeMeta>
-        <span>{props.values[0]}</span>
-        <span>{props.values[1]}</span>
-        <span>{props.values[2]}</span>
-      </ProductGlassRangeMeta>
     </div>
   );
 }

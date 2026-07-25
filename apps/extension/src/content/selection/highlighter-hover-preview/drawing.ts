@@ -15,7 +15,7 @@ import {
 import type { FreeFrameInput } from '../../../features/highlighter/contracts';
 import type { HighlighterCallbacks, HighlighterStateGetters } from './interactions';
 import { getCurrentBorderPreset, type HoverSession } from './session';
-import { isHighlighterExtensionUiElement } from './targets';
+import { hasBlockingHighlighterPopover, isHighlighterExtensionUiElement } from './targets';
 import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 
 const DRAW_THRESHOLD = 5;
@@ -213,7 +213,8 @@ function canStartDrawing(props: {
     props.event.button !== 0 ||
     !props.getState.isModeEnabled() ||
     props.getState.isPaused() ||
-    props.getState.isFrameEditing()
+    props.getState.isFrameEditing() ||
+    hasBlockingHighlighterPopover()
   ) {
     return null;
   }

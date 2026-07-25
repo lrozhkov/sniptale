@@ -12,7 +12,6 @@ export function CalloutFontSizeRange(props: {
       max={36}
       step={1}
       value={props.fontSize}
-      values={['10', '18', '36']}
       onChange={(value) => props.onFontSizeChange(Math.max(10, Math.min(36, value)))}
     />
   );
@@ -29,7 +28,6 @@ export function CalloutMaxWidthRange(props: {
       max={500}
       step={50}
       value={props.maxWidth}
-      values={['100', '300', '500']}
       onChange={(value) => props.onMaxWidthChange(Math.max(100, Math.min(500, value)))}
     />
   );

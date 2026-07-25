@@ -28,6 +28,7 @@ function PositionHarness(props: {
   anchorEl: HTMLElement;
   fallbackHeight?: number;
   frameRect?: { x: number; y: number; width: number; height: number };
+  isOpen?: boolean;
   layoutHeight?: number;
   transformedHeight?: number;
 }) {
@@ -50,7 +51,7 @@ function PositionHarness(props: {
     fallbackSize: { width: 160, height: props.fallbackHeight ?? 80 },
     frameId: 'frame-1',
     frameRect: props.frameRect ?? { x: 200, y: 20, width: 200, height: 60 },
-    isOpen: true,
+    isOpen: props.isOpen ?? true,
     popoverRef,
   });
 
@@ -199,7 +200,7 @@ describe('frame popover positioning', () => {
     });
   });
 
-  it('repositions after the toolbar layout changes', () => {
+  it('keeps its opening position when the annotation toolbar moves underneath it', () => {
     const observed: Element[] = [];
     let notifyResize: (() => void) | undefined;
     let scheduledLayout: FrameRequestCallback | undefined;
@@ -242,6 +243,42 @@ describe('frame popover positioning', () => {
     expect(Number(popover.dataset['top'])).toBe(158);
     act(() => scheduledLayout?.(0));
 
-    expect(Number(popover.dataset['top'])).toBe(238);
+    expect(Number(popover.dataset['top'])).toBe(158);
+  });
+
+  it('keeps a quick-control popover fixed when its annotation anchor moves', () => {
+    let anchorTop = 105;
+    const anchor = document.createElement('button');
+    anchor.getBoundingClientRect = vi.fn(() => new DOMRect(250, anchorTop, 24, 24));
+    document.body.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['top'])).toBe(139);
+
+    anchorTop = 285;
+    act(() =>
+      root.render(
+        <PositionHarness anchorEl={anchor} frameRect={{ x: 300, y: 280, width: 200, height: 60 }} />
+      )
+    );
+
+    expect(Number(popover.dataset['top'])).toBe(139);
+  });
+
+  it('starts a fresh placement session when the popover is reopened', () => {
+    let anchorTop = 105;
+    const anchor = document.createElement('button');
+    anchor.getBoundingClientRect = vi.fn(() => new DOMRect(250, anchorTop, 24, 24));
+    document.body.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+    expect(Number((container.firstElementChild as HTMLElement).dataset['top'])).toBe(139);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} isOpen={false} />));
+    anchorTop = 285;
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+
+    expect(Number((container.firstElementChild as HTMLElement).dataset['top'])).toBe(319);
   });
 });

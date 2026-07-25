@@ -64,6 +64,30 @@ export function useFramePopoverPosition(params: {
   popoverRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const [, refresh] = React.useReducer((value) => value + 1, 0);
+  const placementSessionRef = React.useRef<{
+    anchorEl: HTMLElement;
+    anchorRect: FloatingRect;
+    frameId: string;
+    surfaceRect: FloatingRect;
+  } | null>(null);
+  const placementSession = placementSessionRef.current;
+
+  if (!params.isOpen) {
+    placementSessionRef.current = null;
+  } else if (
+    params.anchorEl &&
+    (!placementSession ||
+      placementSession.anchorEl !== params.anchorEl ||
+      placementSession.frameId !== params.frameId)
+  ) {
+    const anchorRect = toRect(params.anchorEl.getBoundingClientRect());
+    placementSessionRef.current = {
+      anchorEl: params.anchorEl,
+      anchorRect,
+      frameId: params.frameId,
+      surfaceRect: getToolbarRect(params.frameId) ?? anchorRect,
+    };
+  }
 
   React.useLayoutEffect(() => {
     if (!params.isOpen) return;
@@ -103,16 +127,16 @@ export function useFramePopoverPosition(params: {
   ]);
 
   if (!params.anchorEl) return getHiddenStyle();
+  const activePlacementSession = placementSessionRef.current;
+  if (!activePlacementSession) return getHiddenStyle();
   const popover = params.popoverRef.current;
   const size =
     popover && popover.offsetWidth > 0 && popover.offsetHeight > 0
       ? { width: popover.offsetWidth, height: popover.offsetHeight }
       : params.fallbackSize;
-  const anchorRect = toRect(params.anchorEl.getBoundingClientRect());
-  const toolbarRect = getToolbarRect(params.frameId);
   const rect = calculateCanonicalPopoverRect({
-    anchorRect,
-    surfaceRect: toolbarRect ?? anchorRect,
+    anchorRect: activePlacementSession.anchorRect,
+    surfaceRect: activePlacementSession.surfaceRect,
     size,
     viewport: { width: window.innerWidth, height: window.innerHeight },
   });

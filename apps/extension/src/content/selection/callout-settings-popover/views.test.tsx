@@ -35,7 +35,7 @@ describe('CalloutAppearanceSection', () => {
     expect(markup).toContain('sniptale-glass-destructive');
   });
 
-  it('groups typography ranges into one compact adaptive row', () => {
+  it('stacks typography ranges compactly without redundant scale labels', () => {
     const markup = renderToStaticMarkup(
       <CalloutTypographySection
         fontFamily="sans"
@@ -53,5 +53,7 @@ describe('CalloutAppearanceSection', () => {
     );
 
     expect(markup).toContain('sniptale-content-popover-range-grid');
+    expect(markup.match(/sniptale-content-popover-range-field/g)).toHaveLength(3);
+    expect(markup).not.toContain('sniptale-glass-range-meta');
   });
 });

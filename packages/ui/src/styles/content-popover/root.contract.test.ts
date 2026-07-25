@@ -107,9 +107,15 @@ describe('content-popover surface contract', () => {
     expect(
       readRuleBlock('.sniptale-content-popover--compact .sniptale-glass-range-meta')
     ).not.toContain('font-size:');
-    expect(readRuleBlock('.sniptale-content-popover-range-grid {')).toContain(
-      'grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));'
+    const rangeGridBlock = readRuleBlock('.sniptale-content-popover-range-grid {');
+    expect(rangeGridBlock).toContain('display: flex;');
+    expect(rangeGridBlock).toContain('flex-direction: column;');
+    expect(rangeGridBlock).toContain('gap: 4px;');
+    const inlineColorLabelBlock = readRuleBlock(
+      '.sniptale-content-popover .sniptale-glass-color-label--inline {'
     );
+    expect(inlineColorLabelBlock).toContain('width: auto;');
+    expect(inlineColorLabelBlock).toContain('white-space: nowrap;');
   });
 });
 

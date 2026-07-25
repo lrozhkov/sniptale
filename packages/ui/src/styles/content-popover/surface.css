@@ -127,8 +127,19 @@
 }
 
 .sniptale-content-popover-range-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
-  gap: 8px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sniptale-content-popover-range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sniptale-content-popover .sniptale-glass-color-label--inline {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }

@@ -12,7 +12,6 @@ export function CalloutTailSizeRange(props: {
       max={20}
       step={1}
       value={props.tailSize}
-      values={['4', '12', '20']}
       onChange={(value) => props.onTailSizeChange(Math.max(4, Math.min(20, value)))}
     />
   );

@@ -17,13 +17,14 @@ const domHost = vi.hoisted(() => ({
   ]),
   queryContentUiElement: vi.fn(() => null),
 }));
+const targetPolicy = vi.hoisted(() => ({
+  hasBlockingHighlighterPopover: vi.fn(() => false),
+  isHighlighterExtensionUiElement: vi.fn(() => false),
+  isNearExistingFrameBorder: vi.fn(() => false),
+}));
 
 vi.mock('../../parser/page-preparation/target', () => targetResolver);
-vi.mock('./targets', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./targets')>()),
-  hasBlockingHighlighterPopover: () => false,
-  isHighlighterExtensionUiElement: () => false,
-}));
+vi.mock('./targets', () => targetPolicy);
 vi.mock('../../platform/frame', () => framePlatform);
 vi.mock('../../platform/dom-host', () => domHost);
 vi.mock('../../platform/dom-host/isolated', () => ({
@@ -121,9 +122,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vi.clearAllMocks();
+  targetPolicy.hasBlockingHighlighterPopover.mockReturnValue(false);
+  targetPolicy.isHighlighterExtensionUiElement.mockReturnValue(false);
+  targetPolicy.isNearExistingFrameBorder.mockReturnValue(false);
 });
 
 describe('free frame drawing gesture', () => {
+  it('does not start a page gesture through an open settings popover', () => {
+    const { handlers, session } = createFixture();
+    targetPolicy.hasBlockingHighlighterPopover.mockReturnValue(true);
+
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20));
+
+    expect(session.freeDraw.gesture).toBeNull();
+    expect(targetResolver.resolvePagePreparationTarget).not.toHaveBeenCalled();
+  });
+
   it('hides every other frame control as soon as drawing takes ownership', () => {
     const { handlers } = createFixture();
     useFrameUIStore.getState().hoverFrame('other-frame');
