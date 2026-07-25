@@ -138,6 +138,24 @@ describe('ContentSizeTooltipContent rendering', () => {
     );
     expect(container?.textContent).toContain('Cancel');
     expect(container?.textContent).toContain('Apply size');
+    const actionButtons = Array.from(container?.querySelectorAll('button') ?? []).filter(
+      (button) => button.textContent === 'Cancel' || button.textContent === 'Apply size'
+    );
+    actionButtons.forEach((button) => {
+      expect(button.hasAttribute('aria-label')).toBe(false);
+      expect(button.hasAttribute('title')).toBe(false);
+    });
+  });
+
+  it('uses localized icon actions in the compact frame-edit toolbar', () => {
+    renderTooltip({ variant: 'frame-edit' });
+
+    expect(getButton('Cancel')).toBeTruthy();
+    expect(getButton('Apply size')).toBeTruthy();
+    expect(getButton('Cancel')?.textContent).toBe('');
+    expect(getButton('Apply size')?.textContent).toBe('');
+    expect(getButton('Cancel')?.style.width).toBe('32px');
+    expect(getButton('Apply size')?.style.width).toBe('32px');
   });
 });
 

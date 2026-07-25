@@ -121,6 +121,16 @@ describe('ContentSizeTooltip', () => {
       expect.objectContaining({ canToggleAspectRatio: false })
     );
   });
+
+  it('renders the frame-edit variant as a compact toolbar surface', () => {
+    renderTooltip({ variant: 'frame-edit' });
+
+    const surface = getTooltipSurface();
+
+    expect(surface?.dataset['variant']).toBe('frame-edit');
+    expect(surface?.style.width).toBe('290px');
+    expect(surface?.style.minWidth).toBe('290px');
+  });
 });
 
 describe('ContentSizeTooltip interactions', () => {

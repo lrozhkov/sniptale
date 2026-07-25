@@ -1,4 +1,8 @@
-import { CONTENT_SIZE_TOOLTIP_DIMENSIONS } from './core';
+import {
+  CONTENT_SIZE_TOOLTIP_DIMENSIONS,
+  CONTENT_SIZE_TOOLTIP_FRAME_EDIT_DIMENSIONS,
+} from './core';
+import type { ContentSizeTooltipVariant } from './types';
 
 type StyleRecord = Record<string, string | number>;
 
@@ -68,6 +72,29 @@ export const CONTENT_SIZE_TOOLTIP_SURFACE_STYLE: StyleRecord = {
   zIndex: 2147483647,
   boxSizing: 'border-box',
 };
+
+export function getContentSizeTooltipSurfaceStyle(
+  variant: ContentSizeTooltipVariant = 'default'
+): StyleRecord {
+  if (variant !== 'frame-edit') {
+    return CONTENT_SIZE_TOOLTIP_SURFACE_STYLE;
+  }
+
+  return mergeStyleRecords(CONTENT_SIZE_TOOLTIP_SURFACE_STYLE, {
+    width: `${CONTENT_SIZE_TOOLTIP_FRAME_EDIT_DIMENSIONS.width}px`,
+    minWidth: `${CONTENT_SIZE_TOOLTIP_FRAME_EDIT_DIMENSIONS.width}px`,
+    minHeight: `${CONTENT_SIZE_TOOLTIP_FRAME_EDIT_DIMENSIONS.height}px`,
+    gap: '4px',
+    padding: '5px',
+    background: 'var(--sniptale-color-surface-panel)',
+    border: '1px solid var(--sniptale-color-border-soft)',
+    borderRadius: 'var(--sniptale-radius-md)',
+    boxShadow: [
+      '0 18px 40px -22px color-mix(in srgb, var(--sniptale-color-shadow-strong) 36%, transparent)',
+      '0 8px 18px -12px color-mix(in srgb, var(--sniptale-color-shadow-strong) 22%, transparent)',
+    ].join(', '),
+  });
+}
 
 export const CONTENT_SIZE_TOOLTIP_STEPPER_STYLE: StyleRecord = {
   position: 'relative',
@@ -160,10 +187,23 @@ const CONTENT_SIZE_TOOLTIP_ACTION_BUTTON_STYLE: StyleRecord = {
   transition: 'background 120ms ease, color 120ms ease, border-color 120ms ease',
 };
 
-export function getContentSizeTooltipActionButtonStyle(tone: 'neutral' | 'accent'): StyleRecord {
+export function getContentSizeTooltipActionButtonStyle(
+  tone: 'neutral' | 'accent',
+  variant: ContentSizeTooltipVariant = 'default'
+): StyleRecord {
+  const baseStyle =
+    variant === 'frame-edit'
+      ? mergeStyleRecords(CONTENT_SIZE_TOOLTIP_ACTION_BUTTON_STYLE, {
+          width: '32px',
+          minWidth: '32px',
+          padding: '0',
+          lineHeight: 0,
+        })
+      : CONTENT_SIZE_TOOLTIP_ACTION_BUTTON_STYLE;
+
   if (tone === 'accent') {
     return {
-      ...CONTENT_SIZE_TOOLTIP_ACTION_BUTTON_STYLE,
+      ...baseStyle,
       border: '1px solid color-mix(in srgb, var(--sniptale-color-accent) 28%, transparent)',
       background:
         'color-mix(in srgb, var(--sniptale-color-accent) 9%, var(--sniptale-color-surface-hover) 91%)',
@@ -172,7 +212,7 @@ export function getContentSizeTooltipActionButtonStyle(tone: 'neutral' | 'accent
   }
 
   return {
-    ...CONTENT_SIZE_TOOLTIP_ACTION_BUTTON_STYLE,
+    ...baseStyle,
     background: 'color-mix(in srgb, var(--sniptale-color-surface-hover) 58%, transparent)',
     color: 'var(--sniptale-color-text-primary)',
   };

@@ -72,9 +72,31 @@ function expectAdditionalCssOverride() {
   expect(display.frameStyle.outlineOffset).toBe('3px');
 }
 
-function expectEditingBlueSelectionBorder() {
+function expectEditingKeepsInstalledBorder() {
   const frame: FrameData = {
     ...baseFrame,
+    borderSettings: { ...baseFrame.borderSettings!, color: '#f97316' },
+  };
+
+  const display = getInteractiveFrameDisplay({
+    frame,
+    currentFrame: frame,
+    effectMode: 'border',
+    state: 'editing',
+    zIndex: 3,
+  });
+
+  expect(display.borderColor).toBe('#f97316');
+  expect(display.borderWidth).toBe(5);
+  expect(display.frameStyle.border).toBe('5px dashed rgba(249, 115, 22, 0.4)');
+  expect(display.frameStyle.backgroundColor).toBe('rgba(22, 163, 74, 0.25)');
+  expect(display.frameZIndex).toBe(2147483644);
+}
+
+function expectEditingKeepsHiddenEffectBorderHidden() {
+  const frame: FrameData = {
+    ...baseFrame,
+    borderSettings: { ...baseFrame.borderSettings!, color: '#f97316' },
     blurSettings: { amount: 8, blurType: 'gaussian', showBorder: false },
   };
 
@@ -86,11 +108,9 @@ function expectEditingBlueSelectionBorder() {
     zIndex: 3,
   });
 
-  expect(display.borderColor).toBe('#2563eb');
-  expect(display.borderWidth).toBe(2);
-  expect(display.frameStyle.border).toBe('2px solid rgba(37, 99, 235, 1)');
-  expect(display.frameStyle.backgroundColor).toBe('rgba(0, 0, 0, 0)');
-  expect(display.frameZIndex).toBe(2147483644);
+  expect(display.borderColor).toBe('#f97316');
+  expect(display.borderWidth).toBe(5);
+  expect(display.frameStyle.border).toBe('none');
 }
 
 function expectResizingKeepsInstalledBorder() {
@@ -117,10 +137,8 @@ describe('interactive-frame render model', () => {
     'lets additional css override the installed-frame visual contract',
     expectAdditionalCssOverride
   );
-  it(
-    'uses the fixed blue selection border while editing even in blur mode',
-    expectEditingBlueSelectionBorder
-  );
+  it('keeps the installed frame visual while editing', expectEditingKeepsInstalledBorder);
+  it('keeps an effect border hidden while editing', expectEditingKeepsHiddenEffectBorderHidden);
   it(
     'keeps the installed frame visual during transient resize',
     expectResizingKeepsInstalledBorder

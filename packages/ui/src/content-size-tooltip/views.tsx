@@ -1,5 +1,5 @@
 import { useRef, type CSSProperties } from 'react';
-import { ChevronDown, ChevronUp, Link2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Link2, X } from 'lucide-react';
 import type { ContentSizeTooltipProps } from './types';
 import {
   CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE,
@@ -183,30 +183,37 @@ function TooltipAspectRatioButton(props: {
   );
 }
 
-function TooltipActions(props: Pick<ContentSizeTooltipProps, 'copy' | 'onCancel' | 'onConfirm'>) {
+function TooltipActions(
+  props: Pick<ContentSizeTooltipProps, 'copy' | 'onCancel' | 'onConfirm' | 'variant'>
+) {
+  const variant = props.variant ?? 'default';
+  const compact = variant === 'frame-edit';
+
   return (
     <div style={CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE as CSSProperties}>
       <button
         type="button"
+        {...(compact ? { 'aria-label': props.copy.cancel, title: props.copy.cancel } : {})}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
           props.onCancel();
         }}
-        style={getContentSizeTooltipActionButtonStyle('neutral') as CSSProperties}
+        style={getContentSizeTooltipActionButtonStyle('neutral', variant) as CSSProperties}
       >
-        {props.copy.cancel}
+        {compact ? <X size={15} strokeWidth={2.2} /> : props.copy.cancel}
       </button>
       <button
         type="button"
+        {...(compact ? { 'aria-label': props.copy.confirm, title: props.copy.confirm } : {})}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
           props.onConfirm();
         }}
-        style={getContentSizeTooltipActionButtonStyle('accent') as CSSProperties}
+        style={getContentSizeTooltipActionButtonStyle('accent', variant) as CSSProperties}
       >
-        {props.copy.confirm}
+        {compact ? <Check size={15} strokeWidth={2.2} /> : props.copy.confirm}
       </button>
     </div>
   );
@@ -248,7 +255,12 @@ export function ContentSizeTooltipContent(
         value={props.heightValue}
       />
       <TooltipDivider />
-      <TooltipActions copy={props.copy} onCancel={props.onCancel} onConfirm={props.onConfirm} />
+      <TooltipActions
+        copy={props.copy}
+        onCancel={props.onCancel}
+        onConfirm={props.onConfirm}
+        variant={props.variant ?? 'default'}
+      />
     </>
   );
 }

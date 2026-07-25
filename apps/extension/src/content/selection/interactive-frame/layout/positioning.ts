@@ -1,4 +1,4 @@
-import { calculateContentSizeTooltipPosition } from '@sniptale/ui/content-size-tooltip/core';
+import { CONTENT_SIZE_TOOLTIP_FRAME_EDIT_DIMENSIONS } from '@sniptale/ui/content-size-tooltip/core';
 import {
   calculateFrameFloatingPlacement,
   type FloatingRect,
@@ -11,7 +11,17 @@ export function calculateInteractiveFrameSizePanelPosition(frameRect: {
   width: number;
   height: number;
 }) {
-  return calculateContentSizeTooltipPosition({ anchorRect: frameRect });
+  const placement = calculateFrameFloatingPlacement({
+    anchorPoint: {
+      x: frameRect.x + frameRect.width / 2,
+      y: frameRect.y + frameRect.height / 2,
+    },
+    anchorRect: frameRect,
+    avoidanceRect: frameRect,
+    preferredSide: 'top',
+    size: CONTENT_SIZE_TOOLTIP_FRAME_EDIT_DIMENSIONS,
+  });
+  return { x: placement.rect.x, y: placement.rect.y };
 }
 
 export function calculateInteractiveFrameToolbarPosition(

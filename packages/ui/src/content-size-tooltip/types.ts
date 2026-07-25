@@ -1,5 +1,7 @@
 import type { ContentSizeTooltipCopy } from './core';
 
+export type ContentSizeTooltipVariant = 'default' | 'frame-edit';
+
 export interface ContentSizeTooltipProps {
   copy: ContentSizeTooltipCopy;
   heightMax: number;
@@ -20,6 +22,7 @@ export interface ContentSizeTooltipProps {
   onWidthDecrease: () => void;
   onWidthIncrease: () => void;
   portalTheme?: 'light' | 'dark' | null;
+  variant?: ContentSizeTooltipVariant;
   widthMax: number;
   widthMin: number;
   widthValue: number;

@@ -5,29 +5,16 @@ import {
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../../features/highlighter/style';
-import { getSelectionFrameVisual } from '../../frame-runtime/selection-frame-visual';
 import { getInteractiveFrameStyle } from '../layout/style';
 
 const HIGHLIGHT_BORDER_WIDTH = 3;
 const Z_INDEX_FRAMES = 2147483644;
 
-function resolveInteractiveFrameBorderVisual(frame: FrameData, state: FrameState) {
-  if (state === 'editing') {
-    return getSelectionFrameVisual();
-  }
-
+function resolveInteractiveFrameBorderVisual(frame: FrameData) {
   return frame.borderSettings ? resolveBorderPresetVisual(frame.borderSettings) : null;
 }
 
-function shouldShowInteractiveFrameBorder(params: {
-  effectMode: EffectMode;
-  frame: FrameData;
-  state: FrameState;
-}) {
-  if (params.state === 'editing') {
-    return true;
-  }
-
+function shouldShowInteractiveFrameBorder(params: { effectMode: EffectMode; frame: FrameData }) {
   if (params.effectMode === 'blur') {
     return params.frame.blurSettings?.showBorder ?? false;
   }
@@ -73,7 +60,7 @@ export function getInteractiveFrameDisplay(params: {
   zIndex: number;
 }) {
   const { frame, currentFrame, effectMode, state, zIndex } = params;
-  const borderVisual = resolveInteractiveFrameBorderVisual(frame, state);
+  const borderVisual = resolveInteractiveFrameBorderVisual(frame);
   const borderWidth = borderVisual?.strokeWidth ?? HIGHLIGHT_BORDER_WIDTH;
   const borderColor = borderVisual?.strokeColor ?? 'var(--sniptale-color-accent)';
   const borderCssColor = borderVisual
@@ -92,7 +79,7 @@ export function getInteractiveFrameDisplay(params: {
     borderShadow: frame.borderSettings?.shadow,
     frameStyle: getInteractiveFrameStyle({
       currentFrame,
-      shouldShowBorder: shouldShowInteractiveFrameBorder({ effectMode, frame, state }),
+      shouldShowBorder: shouldShowInteractiveFrameBorder({ effectMode, frame }),
       borderWidth,
       borderStyle: borderVisual?.strokeStyle ?? 'solid',
       borderColor: borderCssColor,

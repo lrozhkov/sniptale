@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { calculateInteractiveFrameToolbarPosition } from './positioning';
+import {
+  calculateInteractiveFrameSizePanelPosition,
+  calculateInteractiveFrameToolbarPosition,
+} from './positioning';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -46,5 +49,25 @@ describe('calculateInteractiveFrameToolbarPosition', () => {
     );
 
     expect(position).toEqual({ x: 350, y: 410, side: 'bottom' });
+  });
+});
+
+describe('calculateInteractiveFrameSizePanelPosition', () => {
+  it('centers the compact editing toolbar above the frame', () => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(700);
+
+    expect(
+      calculateInteractiveFrameSizePanelPosition({ x: 120, y: 180, width: 240, height: 120 })
+    ).toEqual({ x: 95, y: 126 });
+  });
+
+  it('flips the compact editing toolbar below the frame instead of covering it', () => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(700);
+
+    expect(
+      calculateInteractiveFrameSizePanelPosition({ x: 120, y: 18, width: 240, height: 120 })
+    ).toEqual({ x: 95, y: 148 });
   });
 });
