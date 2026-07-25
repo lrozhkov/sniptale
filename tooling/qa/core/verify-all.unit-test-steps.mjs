@@ -66,6 +66,7 @@ function recordPassedRelatedUnitTestPlan({ cacheSource, coveragePlan, pool, suit
     coverageMode: getCoverageMode(coveragePlan),
     coverageTargets: coveragePlan.coverageTargetFiles,
     pool,
+    requireTests: coveragePlan.requireRelatedTests,
     source: cacheSource,
     suite,
   });
@@ -79,6 +80,7 @@ function resolveReusableRelatedUnitTestPlan({ coveragePlan, pool, suite, targetF
     coverageMode: getCoverageMode(coveragePlan),
     coverageTargets: coveragePlan.coverageTargetFiles,
     pool,
+    requireTests: coveragePlan.requireRelatedTests,
     suite,
   });
 }
@@ -91,6 +93,7 @@ async function runRelatedUnitTests({ coveragePlan, pool, suite }) {
       coverageTargets: coveragePlan.coverageTargetFiles,
       pool,
       relatedFiles: coveragePlan.relatedFiles,
+      requireTests: coveragePlan.requireRelatedTests,
       suite,
     })
   );
@@ -233,6 +236,7 @@ export async function collectUnitTestAndCoverageStepResults({
   coverageDetailOverride,
   directFilesOverride = [],
   fullSuiteOverride = false,
+  requireRelatedTestsOverride = false,
   relatedFilesOverride,
   releaseMode,
   pool = null,
@@ -246,6 +250,7 @@ export async function collectUnitTestAndCoverageStepResults({
     coverageEnabled,
     directFilesOverride,
     fullSuiteOverride,
+    requireRelatedTestsOverride,
     relatedFilesOverride,
     releaseMode,
   });

@@ -23,26 +23,11 @@ const { browserTabsGetMock, ensureActivePageAccessRuntimeMock } = vi.hoisted(() 
   ensureActivePageAccessRuntimeMock: vi.fn(),
 }));
 
-vi.mock('./handlers', () => ({
-  CaptureRouteContext: undefined,
-  CaptureMessageType: {
-    CAPTURE_VISIBLE: 'CAPTURE_VISIBLE',
-    CAPTURE_VISIBLE_FOR_CROP: 'CAPTURE_VISIBLE_FOR_CROP',
-    CAPTURE_FULL: 'CAPTURE_FULL',
-  },
-  MessageType: {
-    EXECUTE_SAVE: 'EXECUTE_SAVE',
-    EXPORT_START_HAR: 'EXPORT_START_HAR',
-    EXPORT_STOP_HAR: 'EXPORT_STOP_HAR',
-    EXPORT_CAPTURE_FULL_PAGE: 'EXPORT_CAPTURE_FULL_PAGE',
-    OPEN_EDITOR_WITH_IMAGE: 'OPEN_EDITOR_WITH_IMAGE',
-    REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY: 'REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY',
-    SAVE_SCREENSHOT_TO_GALLERY: 'SAVE_SCREENSHOT_TO_GALLERY',
-    SAVE_WEB_SNAPSHOT_TO_GALLERY: 'SAVE_WEB_SNAPSHOT_TO_GALLERY',
-    STAGE_WEB_SNAPSHOT_BLOB_CHUNK: 'STAGE_WEB_SNAPSHOT_BLOB_CHUNK',
-    UPDATE_GALLERY_IMAGE_ASSET: 'UPDATE_GALLERY_IMAGE_ASSET',
-  },
+vi.mock('./handlers.full', () => ({
   handleFullCapture: handleFullCaptureMock,
+}));
+
+vi.mock('./handlers.visible', () => ({
   handleVisibleCapture: handleVisibleCaptureMock,
   handleVisibleCaptureForCrop: handleVisibleCaptureForCropMock,
 }));

@@ -1,5 +1,5 @@
 import { isTabModeMessage } from '../../message-guards/guards/tab';
-import { routeTabModeMessage } from '../../../tab-mode-router';
+import { routeTabModeMessage } from '../../../tab-mode-router/router';
 import { routeWithPageAccess } from './page-access-guard';
 import { rejectUnauthorizedRouteSender } from './sender-rejection';
 import type { ResolvedTabRouteArgs } from './types';

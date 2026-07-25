@@ -31,13 +31,17 @@ export function expandRelatedTestScope(relatedFiles = []) {
   return [...new Set([...relatedFiles, ...collectOwnerLocalTestFiles(relatedFiles)])];
 }
 
-export function createUnitTestPlan({ relatedFiles = [], coverage = false } = {}) {
+export function createUnitTestPlan({
+  relatedFiles = [],
+  coverage = false,
+  requireTests = false,
+} = {}) {
   const expandedRelatedFiles = expandRelatedTestScope(relatedFiles);
   return {
     mode: expandedRelatedFiles.length > 0 ? 'related' : 'full-suite',
     relatedFiles: [...relatedFiles],
     expandedRelatedFiles,
-    allowNoTests: !requiresRelatedUnitTests(expandedRelatedFiles),
+    allowNoTests: !requireTests && !requiresRelatedUnitTests(expandedRelatedFiles),
     coverage,
   };
 }

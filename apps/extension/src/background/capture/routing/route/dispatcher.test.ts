@@ -54,28 +54,11 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
   },
 }));
 
-vi.mock('../handlers', () => ({
-  CaptureRouteContext: undefined,
-  CaptureMessageType: {
-    CAPTURE_VISIBLE: 'CAPTURE_VISIBLE',
-    CAPTURE_VISIBLE_FOR_CROP: 'CAPTURE_VISIBLE_FOR_CROP',
-    CAPTURE_FULL: 'CAPTURE_FULL',
-  },
-  MessageType: {
-    EXECUTE_SAVE: 'EXECUTE_SAVE',
-    EXPORT_START_HAR: 'EXPORT_START_HAR',
-    EXPORT_STOP_HAR: 'EXPORT_STOP_HAR',
-    EXPORT_CAPTURE_FULL_PAGE: 'EXPORT_CAPTURE_FULL_PAGE',
-    FETCH_WEB_SNAPSHOT_ASSET: 'FETCH_WEB_SNAPSHOT_ASSET',
-    OPEN_EDITOR_WITH_IMAGE: 'OPEN_EDITOR_WITH_IMAGE',
-    REGISTER_WEB_SNAPSHOT_ASSETS: 'REGISTER_WEB_SNAPSHOT_ASSETS',
-    SAVE_SCREENSHOT_TO_GALLERY: 'SAVE_SCREENSHOT_TO_GALLERY',
-    SAVE_WEB_SNAPSHOT_TO_GALLERY: 'SAVE_WEB_SNAPSHOT_TO_GALLERY',
-    STAGE_WEB_SNAPSHOT_BLOB_CHUNK: 'STAGE_WEB_SNAPSHOT_BLOB_CHUNK',
-    REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY: 'REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY',
-    UPDATE_GALLERY_IMAGE_ASSET: 'UPDATE_GALLERY_IMAGE_ASSET',
-  },
+vi.mock('../handlers.full', () => ({
   handleFullCapture: handleFullCaptureMock,
+}));
+
+vi.mock('../handlers.visible', () => ({
   handleVisibleCapture: handleVisibleCaptureMock,
   handleVisibleCaptureForCrop: handleVisibleCaptureForCropMock,
 }));

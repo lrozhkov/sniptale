@@ -18,5 +18,5 @@ export const tabModeRouteDescriptor = {
     MessageType.SET_VIEWPORT,
     MessageType.GET_VIEWPORT_STATUS,
   ],
-  ownerModule: 'apps/extension/src/background/runtime/tab-mode-router/index.ts',
+  ownerModule: 'apps/extension/src/background/runtime/tab-mode-router/router.ts',
 } as const;

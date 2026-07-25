@@ -52,9 +52,11 @@ const { browserTabsGetMock, ensureActivePageAccessRuntimeMock } = vi.hoisted(() 
   ensureActivePageAccessRuntimeMock: vi.fn(),
 }));
 
-vi.mock('./handlers', () => ({
-  CaptureRouteContext: undefined,
+vi.mock('./handlers.full', () => ({
   handleFullCapture: handleFullCaptureMock,
+}));
+
+vi.mock('./handlers.visible', () => ({
   handleVisibleCapture: handleVisibleCaptureMock,
   handleVisibleCaptureForCrop: handleVisibleCaptureForCropMock,
 }));

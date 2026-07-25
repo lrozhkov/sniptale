@@ -118,6 +118,7 @@ export function runUnitTests({
   maxWorkers = null,
   pool = null,
   relatedFiles = [],
+  requireTests = false,
   suite = PRODUCT_QA_SUITE,
   cwd,
 } = {}) {
@@ -138,7 +139,7 @@ export function runUnitTests({
     });
   }
 
-  const plan = createUnitTestPlan({ relatedFiles, coverage });
+  const plan = createUnitTestPlan({ relatedFiles, coverage, requireTests });
   const args = createUnitTestArgs({
     allowNoTests: plan.allowNoTests,
     coverage: plan.coverage,

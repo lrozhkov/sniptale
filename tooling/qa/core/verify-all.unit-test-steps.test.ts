@@ -111,3 +111,26 @@ it('executes graph-closed deletion proof as direct tests without related discove
   );
   expect(mockedRunUnitTests.mock.calls[0]?.[0]).not.toHaveProperty('relatedFiles');
 });
+
+it('requires at least one related test for graph-closed deletion successor proof', async () => {
+  mockedRunUnitTests.mockClear();
+  const successor = 'apps/extension/src/background/example/non-rollout-owner.ts';
+
+  await collectUnitTestAndCoverageStepResults({
+    codeFiles: [],
+    coverageEnabled: false,
+    directFilesOverride: [],
+    relatedFilesOverride: [successor],
+    requireRelatedTestsOverride: true,
+    releaseMode: false,
+    targetFiles: ['apps/extension/src/background/example/deleted-facade.ts'],
+  });
+
+  expect(mockedRunUnitTests).toHaveBeenCalledWith(
+    expect.objectContaining({
+      relatedFiles: [successor],
+      requireTests: true,
+      suite: 'product',
+    })
+  );
+});

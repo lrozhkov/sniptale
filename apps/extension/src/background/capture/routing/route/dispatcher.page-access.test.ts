@@ -30,9 +30,13 @@ vi.mock('../../../../features/tab-capabilities/url', async (importOriginal) => (
   isOwnedSnapshotViewerPage: (...args: unknown[]) => isOwnedSnapshotViewerPageMock(...args),
 }));
 
-vi.mock('../handlers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../handlers')>()),
+vi.mock('../handlers.full', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../handlers.full')>()),
   handleFullCapture: handleFullCaptureMock,
+}));
+
+vi.mock('../handlers.visible', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../handlers.visible')>()),
   handleVisibleCapture: handleVisibleCaptureMock,
 }));
 

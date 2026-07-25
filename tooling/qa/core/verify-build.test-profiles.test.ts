@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 
+import { createUnitTestPlan } from './unit-test-plan.mjs';
 import { resolveBuildTestScope } from './verify-build.scope.mjs';
 import {
   createTempRoot,
@@ -172,6 +173,58 @@ it('retains affected-consumer discovery for graph-closed deletions across owners
   expect(scope.profile).toBe('related-transitive');
   expect(scope.directTestFiles).toEqual([]);
   expect(scope.relatedFiles).toEqual([selectionOwner, selectionTest, popupOwner, popupTest].sort());
+});
+
+it('uses bounded related discovery when graph-closed changed consumers lack adjacent owner tests', () => {
+  const captureDeleted = 'apps/extension/src/background/capture/routing/handlers.ts';
+  const captureSuccessor =
+    'apps/extension/src/background/capture/routing/route/screenshot-adapter.ts';
+  const runtimeDeleted = 'apps/extension/src/background/runtime/tab-mode-router/index.ts';
+  const runtimeSuccessor =
+    'apps/extension/src/background/runtime/routing/tab-dispatch/adapters/tab-mode-adapter.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [captureDeleted, captureSuccessor, runtimeDeleted, runtimeSuccessor],
+    codeFiles: [captureSuccessor, runtimeSuccessor],
+    repoCodeFiles: [captureSuccessor, runtimeSuccessor],
+    ownerTestResolver: () => [],
+    deletedSuccessorResolver: () =>
+      new Map([
+        [captureDeleted, [captureSuccessor]],
+        [runtimeDeleted, [runtimeSuccessor]],
+      ]),
+  });
+
+  expect(scope.profile).toBe('related-transitive');
+  expect(scope.fullSuite).not.toBe(true);
+  expect(scope.directTestFiles).toEqual([]);
+  expect(scope.relatedFiles).toEqual([captureSuccessor, runtimeSuccessor].sort());
+  expect(scope.requireRelatedTests).toBe(true);
+  expect(scope.detail).toContain('graph-closed successor owner proof');
+});
+
+it('keeps mixed changed-consumer and dead-export deletion proof fail-closed', () => {
+  const changedConsumerDeleted = 'apps/extension/src/background/example/facade.ts';
+  const deadExportDeleted = 'apps/extension/src/background/example/unused.ts';
+  const successor = 'apps/extension/src/background/example/runtime.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [changedConsumerDeleted, deadExportDeleted, successor],
+    codeFiles: [successor],
+    repoCodeFiles: [successor],
+    ownerTestResolver: () => [],
+    deletedSuccessorResolver: () =>
+      new Map([
+        [changedConsumerDeleted, [successor]],
+        [deadExportDeleted, { files: [], proofKind: 'dead-export' }],
+      ]),
+  });
+  const plan = createUnitTestPlan({
+    relatedFiles: scope.relatedFiles,
+    requireTests: scope.requireRelatedTests,
+  });
+
+  expect(scope.fullSuite).not.toBe(true);
+  expect(scope.requireRelatedTests).toBe(true);
+  expect(plan.allowNoTests).toBe(false);
 });
 
 it('retains affected-consumer discovery when another changed production file lacks owner proof', () => {

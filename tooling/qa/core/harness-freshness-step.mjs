@@ -26,6 +26,17 @@ const TECHNICAL_DEBT_INVENTORY = 'tooling/configs/qa/technical-debt.data.json';
 const OSS_RELEASE_CONSUMER_INVENTORY = 'tooling/configs/qa/oss-release-consumers.data.json';
 const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/core/verify-test-coverage.rollout-files.data.mjs';
 
+function normalizeInventoryViolation(violation, fallback) {
+  if (!violation || typeof violation !== 'object' || Array.isArray(violation)) {
+    return { ...fallback, message: String(violation) };
+  }
+  return {
+    rule: typeof violation.rule === 'string' ? violation.rule : fallback.rule,
+    file: typeof violation.file === 'string' ? violation.file : fallback.file,
+    message: typeof violation.message === 'string' ? violation.message : JSON.stringify(violation),
+  };
+}
+
 export function collectInstanceOwnershipInventoryGuardViolations({
   root = process.cwd(),
   inventoryReviewer = collectInstanceOwnershipInventoryReview,
@@ -70,11 +81,12 @@ export function collectHarnessInventoryViolations(
   );
   return [
     ...(inventoryTargets.has(TECHNICAL_DEBT_INVENTORY)
-      ? technicalDebtInventoryValidator().map((message) => ({
-          rule: 'technical-debt-inventory',
-          file: TECHNICAL_DEBT_INVENTORY,
-          message,
-        }))
+      ? technicalDebtInventoryValidator().map((violation) =>
+          normalizeInventoryViolation(violation, {
+            rule: 'technical-debt-inventory',
+            file: TECHNICAL_DEBT_INVENTORY,
+          })
+        )
       : []),
     ...(inventoryTargets.has(OSS_RELEASE_CONSUMER_INVENTORY)
       ? ossInventoryValidator().violations.map((message) => ({

@@ -1,1 +1,0 @@
-export { routeTabModeMessage } from './router';

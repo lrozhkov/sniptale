@@ -431,7 +431,6 @@
         "apps/extension/src/background/capture/routing/guard.ts",
         "apps/extension/src/background/capture/routing/handlers.full.ts",
         "apps/extension/src/background/capture/routing/handlers.shared.ts",
-        "apps/extension/src/background/capture/routing/handlers.ts",
         "apps/extension/src/background/capture/routing/handlers.visible.ts",
         "apps/extension/src/background/capture/routing/index.ts",
         "apps/extension/src/background/capture/routing/recording-download/staged-recording-validation.ts",
@@ -824,7 +823,6 @@
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/status.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/viewport.ts",
         "apps/extension/src/background/runtime/tab-mode-router/editing.ts",
-        "apps/extension/src/background/runtime/tab-mode-router/index.ts",
         "apps/extension/src/background/runtime/tab-mode-router/route-descriptors.ts",
         "apps/extension/src/background/runtime/tab-mode-router/router.ts",
         "apps/extension/src/background/runtime/tab-mode-router/screenshot.ts",
@@ -1049,7 +1047,6 @@
         "apps/extension/src/background/capture/routing/guard.ts",
         "apps/extension/src/background/capture/routing/handlers.full.ts",
         "apps/extension/src/background/capture/routing/handlers.shared.ts",
-        "apps/extension/src/background/capture/routing/handlers.ts",
         "apps/extension/src/background/capture/routing/handlers.visible.ts",
         "apps/extension/src/background/capture/routing/index.ts",
         "apps/extension/src/background/capture/routing/recording-download/staged-recording-validation.ts",
@@ -1442,7 +1439,6 @@
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/status.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/viewport.ts",
         "apps/extension/src/background/runtime/tab-mode-router/editing.ts",
-        "apps/extension/src/background/runtime/tab-mode-router/index.ts",
         "apps/extension/src/background/runtime/tab-mode-router/route-descriptors.ts",
         "apps/extension/src/background/runtime/tab-mode-router/router.ts",
         "apps/extension/src/background/runtime/tab-mode-router/screenshot.ts",
@@ -18929,7 +18925,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/unit-test-cache.mjs",
-        "contentHash": "bfc6990af7d8febb9decd0cd5743ecf0beb917361c137054e1159b002da15032"
+        "contentHash": "5c1505898a88b29bdcd4b2360f3e8a1245fc9cd4aa7202a03cea6e5aa6e12024"
       },
       "consumers": [
         "tooling/qa/core/unit-test-cache.mjs",
@@ -18950,7 +18946,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/unit-test-coverage-plan.mjs",
-        "contentHash": "1a89d90e4c9f936a76002c87426cb7c7a58e0ba65a9cbee055a4bb84bcbde621"
+        "contentHash": "6657c5f82e967ea3d30c432b9ead6663cb000170249e1469eb51c8e9adb45680"
       },
       "consumers": [
         "tooling/qa/core/unit-test-coverage-plan.mjs",
@@ -18979,14 +18975,16 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/unit-test-plan.mjs",
-        "contentHash": "232488e0a2cdcec070feaaa1a081844e4e8dec2978371d9952a250fd4ee349e8"
+        "contentHash": "80ee42980649fc8458d5a874acdcf7718ec101cc3a2abe6faa9d4bd24d0d4291"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",
         "tooling/qa/core/unit-test-cache.mjs",
         "tooling/qa/core/unit-test-plan.mjs",
+        "tooling/qa/core/verify-build.test-profiles.test.ts",
         "tooling/qa/core/verify-harness.execution.mjs",
-        "tooling/qa/core/verify-unit-tests.mjs"
+        "tooling/qa/core/verify-unit-tests.mjs",
+        "tooling/qa/core/verify-unit-tests.test.ts"
       ],
       "surfaces": [
         "binding:TEST_SUFFIXES",
@@ -20993,7 +20991,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-unit-tests.mjs",
-        "contentHash": "75d8a736000b0ad7649ada61de9b149c3f0e961e4fdc0e356300417e8f405dda"
+        "contentHash": "d5e8539d11cf23510869990cbd44d4bf4093254de70c5f69fbf174fa60869b90"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",

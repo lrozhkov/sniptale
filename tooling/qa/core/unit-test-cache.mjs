@@ -21,14 +21,19 @@ function createUnitTestKeyInputs(
     coverage: plan.coverage,
     coverageMode,
     coverageTargets,
+    allowNoTests: plan.allowNoTests,
     expandedRelatedFiles: plan.expandedRelatedFiles,
     pool,
     suite: normalizeQaSuite(suite),
   };
 }
 
-export function resolveUnitTestPlan({ relatedFiles = [], coverage = false } = {}) {
-  return createUnitTestPlan({ relatedFiles, coverage });
+export function resolveUnitTestPlan({
+  relatedFiles = [],
+  coverage = false,
+  requireTests = false,
+} = {}) {
+  return createUnitTestPlan({ relatedFiles, coverage, requireTests });
 }
 
 export function recordSuccessfulUnitTestPlan({
@@ -39,10 +44,11 @@ export function recordSuccessfulUnitTestPlan({
   coverageMode = 'manual',
   coverageTargets = [],
   pool = null,
+  requireTests = false,
   source = 'unknown',
   suite = PRODUCT_QA_SUITE,
 } = {}) {
-  const plan = createUnitTestPlan({ relatedFiles, coverage });
+  const plan = createUnitTestPlan({ relatedFiles, coverage, requireTests });
 
   return {
     plan,
@@ -66,9 +72,10 @@ export function resolveReusableUnitTestPlan({
   coverageMode = 'manual',
   coverageTargets = [],
   pool = null,
+  requireTests = false,
   suite = PRODUCT_QA_SUITE,
 } = {}) {
-  const plan = createUnitTestPlan({ relatedFiles, coverage });
+  const plan = createUnitTestPlan({ relatedFiles, coverage, requireTests });
   const reusableState = resolveReusableExecution({
     cwd,
     tool: UNIT_TEST_TOOL,

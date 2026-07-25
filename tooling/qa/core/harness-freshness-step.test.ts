@@ -33,6 +33,24 @@ it('validates machine-owned inventory without consulting a harness stamp', () =>
   expect(harnessStateAsserter).not.toHaveBeenCalled();
 });
 
+it('preserves structured technical-debt inventory violation details', () => {
+  const violation = {
+    file: 'apps/extension/src/background/capture',
+    message: 'Production file exact population changed.',
+    rule: 'coverage-owner-production-drift',
+  };
+  const violations = collectHarnessInventoryViolations(
+    {
+      harnessInventoryTargetFiles: ['tooling/configs/qa/technical-debt.data.json'],
+    },
+    {
+      technicalDebtInventoryValidator: () => [violation],
+    }
+  );
+
+  expect(violations).toEqual([violation]);
+});
+
 it('keeps executable policy changes behind a fresh harness stamp', () => {
   const harnessStateAsserter = vi.fn();
   const context = {

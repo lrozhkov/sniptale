@@ -53,6 +53,7 @@ export function createPlannedCoverage({
   coverageEnabled,
   directFilesOverride,
   fullSuiteOverride,
+  requireRelatedTestsOverride = false,
   relatedFilesOverride,
   releaseMode,
 }) {
@@ -67,6 +68,7 @@ export function createPlannedCoverage({
     ...(coverageEnabled ? {} : { coverageCheckFiles: [], coverageTargetFiles: [], mode: 'skip' }),
     directFiles: [...directFilesOverride],
     forceFullSuite: fullSuiteOverride,
+    requireRelatedTests: requireRelatedTestsOverride,
     relatedFiles: relatedFilesOverride ?? coveragePlan.relatedFiles,
     detail:
       coverageDetailOverride ??

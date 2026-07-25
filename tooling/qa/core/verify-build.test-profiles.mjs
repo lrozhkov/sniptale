@@ -137,9 +137,9 @@ function resolveUnavailableProductionProfile({
       (scope) =>
         scope.successorProofKind !== 'dead-export' &&
         ((scope.changedSuccessorFiles ?? []).length === 0 ||
-          scope.ownerTests.length === 0 ||
           (scope.successorProofKind === 'aggregate-providers' &&
-            scope.ownerTestsBySuccessor.some(({ tests }) => tests.length === 0)))
+            (scope.ownerTests.length === 0 ||
+              scope.ownerTestsBySuccessor.some(({ tests }) => tests.length === 0))))
     )
   ) {
     return finalizeTestScope({
@@ -158,6 +158,9 @@ function resolveUnavailableProductionProfile({
   ]);
   const hasDeadExportProof = proofScopes.some(
     (scope) => scope.successorProofKind === 'dead-export'
+  );
+  const hasExecutableSuccessorProof = proofScopes.some(
+    (scope) => scope.successorProofKind !== 'dead-export'
   );
   const directProofFiles = [
     ...new Set([
@@ -198,6 +201,7 @@ function resolveUnavailableProductionProfile({
     relatedFiles: [...new Set([...relatedFiles, ...proofFiles])].sort(),
     matchedFamilies,
     profile: 'related-transitive',
+    requireRelatedTests: hasExecutableSuccessorProof,
     profileReason: hasDeadExportProof
       ? 'unavailable production targets have graph-closed successor/dead-export proof'
       : 'unavailable production targets have graph-closed successor owner proof',
