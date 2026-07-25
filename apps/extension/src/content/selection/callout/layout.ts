@@ -1,12 +1,12 @@
 import type { CSSProperties } from 'react';
 import type { CalloutSettings, CalloutSide } from '@sniptale/runtime-contracts/highlighter/callout';
+import { FONT_FAMILY_MAP } from './constants';
 import {
-  FONT_FAMILY_MAP,
   getAnchorPosition,
   getCalloutPosition,
   getPreferredSideFromAnchor,
   pickBestSide,
-} from './utils';
+} from './geometry';
 import { getDynamicTailState, type ConnectorSide } from './dynamic-tail';
 
 type RegionRect = { x: number; y: number; width: number; height: number };
