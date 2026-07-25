@@ -3052,6 +3052,7 @@
         "apps/extension/src/content/runtime/bridge/viewport.ts",
         "apps/extension/src/content/runtime/entrypoint/bootstrap.tsx",
         "apps/extension/src/content/runtime/entrypoint/diagnostics.ts",
+        "apps/extension/src/content/runtime/entrypoint/lifecycle.ts",
         "apps/extension/src/content/runtime/entrypoint/markers.ts",
         "apps/extension/src/content/runtime/shim/index.ts",
         "apps/extension/src/content/runtime/shim/quick-actions.ts",
