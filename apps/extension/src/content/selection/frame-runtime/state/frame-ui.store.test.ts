@@ -1,61 +1,143 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useFrameUIStore } from './frame-ui.store';
 
 beforeEach(() => {
   useFrameUIStore.getState().reset();
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('frame UI store visibility hierarchy', () => {
-  it('keeps an open popover attached to its active tooltip until the popover closes', () => {
+  it('keeps hover and selected ownership independent', () => {
     const store = useFrameUIStore.getState();
 
-    store.showTooltip('frame-a');
-    store.openPopover('frame-a');
-    store.hideTooltip('frame-a');
+    store.hoverFrame('frame-a');
+    store.selectFrame('frame-a', { x: 140, y: 90 });
+    store.hoverFrame('frame-b');
 
     expect(useFrameUIStore.getState()).toMatchObject({
-      activeFrameId: 'frame-a',
-      popoverFrameId: 'frame-a',
-    });
-
-    store.closePopover();
-    store.hideTooltip('frame-a');
-
-    expect(useFrameUIStore.getState()).toMatchObject({
-      activeFrameId: null,
-      popoverFrameId: null,
+      hoveredFrameId: 'frame-b',
+      selectedFrameId: 'frame-a',
+      toolbarAnchorOffset: { x: 140, y: 90 },
     });
   });
 
-  it('moves tooltip authority with a directly opened popover and blocks another frame', () => {
+  it('keeps an open popover attached to its selected frame until the selection closes', () => {
     const store = useFrameUIStore.getState();
 
-    store.openPopover('frame-a');
-    store.showTooltip('frame-b');
+    store.selectFrame('frame-a');
+    store.togglePopover('frame-a', 'frame-settings');
 
     expect(useFrameUIStore.getState()).toMatchObject({
-      activeFrameId: 'frame-a',
-      popoverFrameId: 'frame-a',
+      selectedFrameId: 'frame-a',
+      activePopover: { frameId: 'frame-a', kind: 'frame-settings' },
     });
+
+    store.closePopover();
+    store.clearSelection();
+
+    expect(useFrameUIStore.getState()).toMatchObject({
+      selectedFrameId: null,
+      activePopover: null,
+    });
+  });
+
+  it('moves selection authority with a directly opened popover', () => {
+    const store = useFrameUIStore.getState();
+
+    store.togglePopover('frame-a', 'step-badge');
+
+    expect(useFrameUIStore.getState()).toMatchObject({
+      selectedFrameId: 'frame-a',
+      activePopover: { frameId: 'frame-a', kind: 'step-badge' },
+    });
+  });
+
+  it('switches popover families atomically for one selected frame', () => {
+    const store = useFrameUIStore.getState();
+    store.selectFrame('frame-a');
+    store.togglePopover('frame-a', 'frame-settings');
+    store.togglePopover('frame-a', 'callout-settings');
+
+    expect(useFrameUIStore.getState()).toMatchObject({
+      selectedFrameId: 'frame-a',
+      activePopover: { frameId: 'frame-a', kind: 'callout-settings' },
+    });
+  });
+
+  it('delays hover dismissal and cancels it when the pointer reaches the trigger', () => {
+    vi.useFakeTimers();
+    const store = useFrameUIStore.getState();
+
+    store.hoverFrame('frame-a');
+    store.scheduleHoverFrameHide('frame-a');
+    store.hoverFrame('frame-a');
+
+    expect(useFrameUIStore.getState().hoveredFrameId).toBe('frame-a');
+  });
+
+  it('keeps the hover winner for the full bridge grace period', () => {
+    vi.useFakeTimers();
+    const store = useFrameUIStore.getState();
+
+    store.hoverFrame('frame-a');
+    store.scheduleHoverFrameHide('frame-a');
+    vi.advanceTimersByTime(249);
+    expect(useFrameUIStore.getState().hoveredFrameId).toBe('frame-a');
+
+    vi.advanceTimersByTime(1);
+    expect(useFrameUIStore.getState().hoveredFrameId).toBeNull();
   });
 });
 
 describe('frame UI store cleanup', () => {
-  it('clears tooltip and popover authority through force-hide and reset', () => {
+  it('drops only references owned by a removed frame', () => {
+    const store = useFrameUIStore.getState();
+    store.selectFrame('selected', { x: 20, y: 30 });
+    store.hoverFrame('removed');
+    store.setResizeFrame('removed');
+
+    store.dismissFrame('removed');
+
+    expect(useFrameUIStore.getState()).toMatchObject({
+      hoveredFrameId: null,
+      resizeFrameId: null,
+      selectedFrameId: 'selected',
+      toolbarAnchorOffset: { x: 20, y: 30 },
+    });
+  });
+
+  it('does not cancel another frame hover dismissal when an unrelated frame is removed', () => {
+    vi.useFakeTimers();
+    const store = useFrameUIStore.getState();
+    store.hoverFrame('frame-a');
+    store.scheduleHoverFrameHide('frame-a');
+
+    store.dismissFrame('frame-b');
+    vi.advanceTimersByTime(250);
+
+    expect(useFrameUIStore.getState().hoveredFrameId).toBeNull();
+  });
+
+  it('clears hover, selection and popover authority through dismiss and reset', () => {
     const store = useFrameUIStore.getState();
 
-    store.openPopover('frame-a');
-    store.forceHideTooltip();
+    store.togglePopover('frame-a', 'frame-settings');
+    store.dismissFrameUi();
     expect(useFrameUIStore.getState()).toMatchObject({
-      activeFrameId: null,
-      popoverFrameId: null,
+      hoveredFrameId: null,
+      selectedFrameId: null,
+      activePopover: null,
     });
 
-    store.openPopover('frame-b');
+    store.togglePopover('frame-b', 'callout-settings');
     store.reset();
     expect(useFrameUIStore.getState()).toMatchObject({
-      activeFrameId: null,
-      popoverFrameId: null,
+      hoveredFrameId: null,
+      selectedFrameId: null,
+      activePopover: null,
     });
   });
 });

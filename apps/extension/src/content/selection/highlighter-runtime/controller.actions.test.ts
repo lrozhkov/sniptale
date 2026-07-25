@@ -87,7 +87,7 @@ it('registers callbacks and routes frame actions through them', () => {
   expect(logger.log).toHaveBeenCalledWith('Frame callbacks registered');
 });
 
-it('owns pause, editing, and tooltip state transitions', () => {
+it('owns pause and editing state transitions', () => {
   const state = createHighlighterRuntimeState();
   const hoverController = createHoverControllerStub();
   const actions = createHighlighterStateActions({
@@ -98,18 +98,12 @@ it('owns pause, editing, and tooltip state transitions', () => {
 
   actions.pause();
   actions.setFrameEditing();
-  actions.setFrameTooltipVisible();
   expect(actions.isPausedState()).toBe(true);
-  expect(actions.isFrameTooltipVisible()).toBe(true);
-  expect(hoverController.hideHoverOverlay).toHaveBeenCalledTimes(1);
 
   actions.resume();
   actions.clearFrameEditing();
-  actions.clearFrameTooltipVisible();
   expect(actions.isPausedState()).toBe(false);
-  expect(actions.isFrameTooltipVisible()).toBe(false);
   expect(actions.isEnabled()).toBe(false);
-  expect(hoverController.clearHoverTracking).toHaveBeenCalledTimes(1);
 });
 
 it('routes cache invalidation to the hover owner', () => {

@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { usePopoverDistanceClose, usePopoverOutsideClose } from './hooks';
+import { usePopoverDistanceClose, usePopoverEscapeClose, usePopoverOutsideClose } from './hooks';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -28,6 +28,18 @@ function renderPopoverOutsideCloseHook(props: {
 }) {
   function Harness() {
     usePopoverOutsideClose(props);
+    return null;
+  }
+  renderHookHarness(<Harness />);
+}
+
+function renderPopoverEscapeCloseHook(props: {
+  anchorEl: HTMLElement | null;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  function Harness() {
+    usePopoverEscapeClose(props);
     return null;
   }
   renderHookHarness(<Harness />);
@@ -134,4 +146,21 @@ describe('popover sync hooks', () => {
     'closes when the pointer moves far enough away after the delayed listener is armed',
     verifyDistanceClose
   );
+  it('closes only the open popover layer on Escape and restores its trigger focus', () => {
+    const anchorEl = document.createElement('button');
+    document.body.append(anchorEl);
+    const onClose = vi.fn();
+    renderPopoverEscapeCloseHook({ anchorEl, isOpen: true, onClose });
+    const escape = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Escape',
+    });
+
+    act(() => window.dispatchEvent(escape));
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(escape.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(anchorEl);
+  });
 });

@@ -7,6 +7,7 @@ import {
   dispatchCalloutEnable,
   dispatchStepBadgeEnable,
 } from './dispatch';
+import type { ToolbarClickEvent } from './dispatch';
 
 export function createEffectButtons() {
   return [
@@ -23,8 +24,7 @@ export function createToolbarSurfaceHandlers(props: InteractiveFrameToolbarProps
     },
     onWrapperClick: (event: React.MouseEvent) => {
       if (event.target === event.currentTarget) {
-        props.setIsStepBadgePopoverOpen(false);
-        props.setIsCalloutPopoverOpen(false);
+        props.closePopover();
       }
     },
     onToolbarMouseDown: (event: React.MouseEvent) => {
@@ -35,8 +35,7 @@ export function createToolbarSurfaceHandlers(props: InteractiveFrameToolbarProps
       event.preventDefault();
       event.stopPropagation();
       if (event.target === event.currentTarget) {
-        props.setIsStepBadgePopoverOpen(false);
-        props.setIsCalloutPopoverOpen(false);
+        props.closePopover();
       }
     },
   };
@@ -45,34 +44,32 @@ export function createToolbarSurfaceHandlers(props: InteractiveFrameToolbarProps
 export function createInteractiveFrameToolbarActions(props: InteractiveFrameToolbarProps) {
   return {
     ...createSharedToolbarClickHandlers(props),
-    handleStepBadgeClick: (event: React.MouseEvent) => {
+    handleStepBadgeClick: (event: ToolbarClickEvent) => {
       event.preventDefault();
       event.stopPropagation();
       event.nativeEvent.stopImmediatePropagation();
-      props.setIsCalloutPopoverOpen(false);
       const enabled = props.frame.stepBadge?.enabled ?? false;
       if (!enabled) {
+        props.closePopover();
         dispatchStepBadgeEnable(props.frame.id);
         return;
       }
-      props.setIsStepBadgePopoverOpen((prev) => !prev);
+      props.togglePopover(props.frame.id, 'step-badge');
     },
-    handleCalloutClick: (event: React.MouseEvent) => {
+    handleCalloutClick: (event: ToolbarClickEvent) => {
       event.preventDefault();
       event.stopPropagation();
       event.nativeEvent.stopImmediatePropagation();
-      props.setIsStepBadgePopoverOpen(false);
       const hasCallout = props.frame.callout?.enabled ?? false;
       if (!hasCallout) {
+        props.closePopover();
         pagePreparationHistory.beginTransaction(`callout-editing:${props.frame.id}`);
         dispatchCalloutEnable(props.frame.id);
-        props.hideTooltip(props.frame.id);
         props.setState('idle');
-        props.setIsCalloutPopoverOpen(false);
         props.setIsCalloutEditing(true);
         return;
       }
-      props.setIsCalloutPopoverOpen((prev) => !prev);
+      props.togglePopover(props.frame.id, 'callout-settings');
     },
   };
 }

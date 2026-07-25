@@ -67,7 +67,6 @@ function createStateGetters() {
     isFrameEditing: () => false,
     isModeEnabled: () => true,
     isPaused: () => false,
-    isTooltipVisible: () => false,
   };
 }
 

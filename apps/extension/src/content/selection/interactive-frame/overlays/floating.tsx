@@ -3,6 +3,7 @@ import type { EffectMode, FrameData, FrameState } from '../../../../features/hig
 import { InteractiveFrameBlockingOverlays } from './blocking';
 import { InteractiveFrameSizePanel } from '../size-panel';
 import { InteractiveFrameToolbar } from '../toolbar';
+import { InteractiveFrameToolbarTrigger } from '../toolbar/trigger';
 
 export interface InteractiveFrameFloatingUiProps {
   frame: FrameData;
@@ -12,10 +13,10 @@ export interface InteractiveFrameFloatingUiProps {
   sizePanelCoords: { x: number; y: number };
   tempFrame: FrameData;
   effectMode: EffectMode;
-  isPopoverOpen: boolean;
   isFrameActive: boolean;
-  isStepBadgePopoverOpen: boolean;
-  isCalloutPopoverOpen: boolean;
+  isHovered: boolean;
+  isSelected: boolean;
+  toolbarAnchorOffset: { x: number; y: number } | null;
   isCalloutEditing: boolean;
   maintainAspectRatio: boolean;
   aspectRatio: number | null;
@@ -26,11 +27,16 @@ export interface InteractiveFrameFloatingUiProps {
   setMaintainAspectRatio: React.Dispatch<React.SetStateAction<boolean>>;
   setAspectRatio: React.Dispatch<React.SetStateAction<number | null>>;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
-  setIsStepBadgePopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsCalloutPopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  togglePopover: (
+    frameId: string,
+    kind: 'frame-settings' | 'step-badge' | 'callout-settings'
+  ) => void;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
   closePopover: () => void;
-  hideTooltip: (frameId: string) => void;
+  hoverFrame: (frameId: string) => void;
+  scheduleHoverFrameHide: (frameId: string) => void;
+  selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
+  clearSelection: () => void;
   handleEffectButtonClick: (mode: EffectMode) => void;
   handleStartEditing: () => void;
   handleSave: () => void;
@@ -44,6 +50,7 @@ export function InteractiveFrameFloatingUi(props: InteractiveFrameFloatingUiProp
   return (
     <>
       <InteractiveFrameToolbar {...getToolbarProps(props)} />
+      <InteractiveFrameToolbarTrigger {...getTriggerProps(props)} />
       <InteractiveFrameSizePanel {...getSizePanelProps(props)} />
       <InteractiveFrameBlockingOverlays {...getOverlayProps(props)} />
     </>
@@ -56,18 +63,30 @@ function getToolbarProps(props: InteractiveFrameFloatingUiProps) {
     toolbarCoords: props.toolbarCoords,
     effectMode: props.effectMode,
     frame: props.frame,
+    isSelected: props.isSelected,
+    toolbarAnchorOffset: props.toolbarAnchorOffset,
+    isCalloutEditing: props.isCalloutEditing,
     popoverAnchorRef: props.popoverAnchorRef,
     stepBadgePopoverAnchorRef: props.stepBadgePopoverAnchorRef,
     calloutPopoverAnchorRef: props.calloutPopoverAnchorRef,
-    setIsStepBadgePopoverOpen: props.setIsStepBadgePopoverOpen,
-    setIsCalloutPopoverOpen: props.setIsCalloutPopoverOpen,
+    closePopover: props.closePopover,
+    togglePopover: props.togglePopover,
     setIsCalloutEditing: props.setIsCalloutEditing,
     setState: props.setState,
     handleEffectButtonClick: props.handleEffectButtonClick,
     handleStartEditing: props.handleStartEditing,
     handleDelete: props.handleDelete,
     onUpdate: props.onUpdate,
-    hideTooltip: props.hideTooltip,
+  };
+}
+
+function getTriggerProps(props: InteractiveFrameFloatingUiProps) {
+  return {
+    frame: props.frame,
+    isVisible: props.isHovered && !props.isSelected && props.state !== 'resizing',
+    hoverFrame: props.hoverFrame,
+    scheduleHoverFrameHide: props.scheduleHoverFrameHide,
+    selectFrame: props.selectFrame,
   };
 }
 
@@ -93,15 +112,9 @@ function getOverlayProps(props: InteractiveFrameFloatingUiProps) {
     state: props.state,
     tempFrame: props.tempFrame,
     isFrameActive: props.isFrameActive,
-    isPopoverOpen: props.isPopoverOpen,
-    isStepBadgePopoverOpen: props.isStepBadgePopoverOpen,
-    isCalloutPopoverOpen: props.isCalloutPopoverOpen,
     isCalloutEditing: props.isCalloutEditing,
-    closePopover: props.closePopover,
-    hideTooltip: props.hideTooltip,
+    clearSelection: props.clearSelection,
     frameId: props.frameId,
-    setIsStepBadgePopoverOpen: props.setIsStepBadgePopoverOpen,
-    setIsCalloutPopoverOpen: props.setIsCalloutPopoverOpen,
     setIsCalloutEditing: props.setIsCalloutEditing,
   };
 }

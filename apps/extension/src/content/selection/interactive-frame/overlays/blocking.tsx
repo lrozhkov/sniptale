@@ -11,16 +11,10 @@ function createHoverOverlay(props: {
   portalTheme: 'light' | 'dark' | null;
   isCalloutEditing: boolean;
   frameId: string;
-  isPopoverOpen: boolean;
-  isStepBadgePopoverOpen: boolean;
-  isCalloutPopoverOpen: boolean;
-  closePopover: () => void;
-  hideTooltip: (frameId: string) => void;
-  setIsStepBadgePopoverOpen: Dispatch<SetStateAction<boolean>>;
-  setIsCalloutPopoverOpen: Dispatch<SetStateAction<boolean>>;
+  clearSelection: () => void;
   setIsCalloutEditing: Dispatch<SetStateAction<boolean>>;
 }) {
-  if (!props.isFrameActive || props.state === 'editing') {
+  if (!props.isFrameActive || props.state === 'editing' || !props.isCalloutEditing) {
     return null;
   }
 
@@ -29,13 +23,7 @@ function createHoverOverlay(props: {
       portalTheme={props.portalTheme}
       isCalloutEditing={props.isCalloutEditing}
       frameId={props.frameId}
-      isPopoverOpen={props.isPopoverOpen}
-      isStepBadgePopoverOpen={props.isStepBadgePopoverOpen}
-      isCalloutPopoverOpen={props.isCalloutPopoverOpen}
-      closePopover={props.closePopover}
-      hideTooltip={props.hideTooltip}
-      setIsStepBadgePopoverOpen={props.setIsStepBadgePopoverOpen}
-      setIsCalloutPopoverOpen={props.setIsCalloutPopoverOpen}
+      clearSelection={props.clearSelection}
       setIsCalloutEditing={props.setIsCalloutEditing}
     />
   );
@@ -62,15 +50,9 @@ interface BlockingOverlaysProps {
   state: FrameState;
   tempFrame: FrameData;
   isFrameActive: boolean;
-  isPopoverOpen: boolean;
-  isStepBadgePopoverOpen: boolean;
-  isCalloutPopoverOpen: boolean;
   isCalloutEditing: boolean;
-  closePopover: () => void;
-  hideTooltip: (frameId: string) => void;
+  clearSelection: () => void;
   frameId: string;
-  setIsStepBadgePopoverOpen: Dispatch<SetStateAction<boolean>>;
-  setIsCalloutPopoverOpen: Dispatch<SetStateAction<boolean>>;
   setIsCalloutEditing: Dispatch<SetStateAction<boolean>>;
 }
 
@@ -78,15 +60,9 @@ export function InteractiveFrameBlockingOverlays({
   state,
   tempFrame,
   isFrameActive,
-  isPopoverOpen,
-  isStepBadgePopoverOpen,
-  isCalloutPopoverOpen,
   isCalloutEditing,
-  closePopover,
-  hideTooltip,
+  clearSelection,
   frameId,
-  setIsStepBadgePopoverOpen,
-  setIsCalloutPopoverOpen,
   setIsCalloutEditing,
 }: BlockingOverlaysProps): React.ReactElement | null {
   const portalTheme = useContentPortalTheme();
@@ -96,13 +72,7 @@ export function InteractiveFrameBlockingOverlays({
     portalTheme,
     isCalloutEditing,
     frameId,
-    isPopoverOpen,
-    isStepBadgePopoverOpen,
-    isCalloutPopoverOpen,
-    closePopover,
-    hideTooltip,
-    setIsStepBadgePopoverOpen,
-    setIsCalloutPopoverOpen,
+    clearSelection,
     setIsCalloutEditing,
   });
 

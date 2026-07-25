@@ -3,8 +3,9 @@ import type { FrameData } from '../../../../features/highlighter/contracts';
 import { addEventListenerToAllWindowsDynamic } from '../../../platform/frame';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import { addHighlighterModeChangedListener } from '../../../platform/page-context/mode-events';
-import { clearFrameTooltipVisible, setFrameTooltipVisible } from '../../highlighter';
 import { createThrottledMouseMoveHandler, type FrameUiMouseTrackingParams } from './helpers';
+import { createFrameSelectionEventHandlers } from './activation';
+import type { ActiveFramePopover } from '../state/frame-ui.store';
 
 function cancelPendingAnimationFrame(rafId: MutableRefObject<number | null>) {
   if (rafId.current !== null) {
@@ -14,47 +15,54 @@ function cancelPendingAnimationFrame(rafId: MutableRefObject<number | null>) {
 
 interface FrameUiRefSyncParams {
   frames: FrameData[];
-  activeFrameId: string | null;
-  popoverFrameId: string | null;
-  onActiveFrameChange?: (frameId: string | null) => void;
+  hoveredFrameId: string | null;
+  selectedFrameId: string | null;
+  activePopover: ActiveFramePopover | null;
+  onSelectedFrameChange?: (frameId: string | null) => void;
   framesRef: MutableRefObject<FrameData[]>;
-  activeFrameIdRef: MutableRefObject<string | null>;
-  popoverFrameIdRef: MutableRefObject<string | null>;
+  hoveredFrameIdRef: MutableRefObject<string | null>;
+  activePopoverRef: MutableRefObject<ActiveFramePopover | null>;
+  selectedFrameIdRef: MutableRefObject<string | null>;
 }
 
 export function useFrameUiStoreSync(params: FrameUiRefSyncParams) {
   const {
     frames,
-    activeFrameId,
-    popoverFrameId,
-    onActiveFrameChange,
+    hoveredFrameId,
+    selectedFrameId,
+    activePopover,
+    onSelectedFrameChange,
     framesRef,
-    activeFrameIdRef,
-    popoverFrameIdRef,
+    hoveredFrameIdRef,
+    activePopoverRef,
+    selectedFrameIdRef,
   } = params;
 
   useFrameUiRefSync({
-    activeFrameId,
-    activeFrameIdRef,
+    hoveredFrameId,
+    hoveredFrameIdRef,
+    selectedFrameId,
+    selectedFrameIdRef,
     frames,
     framesRef,
-    popoverFrameId,
-    popoverFrameIdRef,
-    ...(onActiveFrameChange === undefined ? {} : { onActiveFrameChange }),
+    activePopover,
+    activePopoverRef,
+    ...(onSelectedFrameChange === undefined ? {} : { onSelectedFrameChange }),
   });
-  useFrameTooltipVisibility(activeFrameId);
-  useHighlighterModeTooltipSync();
+  useHighlighterModeFrameUiDismissal();
 }
 
 function useFrameUiRefSync(params: FrameUiRefSyncParams) {
   const {
-    activeFrameId,
-    activeFrameIdRef,
+    hoveredFrameId,
+    hoveredFrameIdRef,
+    selectedFrameId,
+    selectedFrameIdRef,
     frames,
     framesRef,
-    onActiveFrameChange,
-    popoverFrameId,
-    popoverFrameIdRef,
+    onSelectedFrameChange,
+    activePopover,
+    activePopoverRef,
   } = params;
 
   useEffect(() => {
@@ -62,37 +70,85 @@ function useFrameUiRefSync(params: FrameUiRefSyncParams) {
   }, [frames, framesRef]);
 
   useEffect(() => {
-    activeFrameIdRef.current = activeFrameId;
-    onActiveFrameChange?.(activeFrameId);
-  }, [activeFrameId, onActiveFrameChange, activeFrameIdRef]);
+    hoveredFrameIdRef.current = hoveredFrameId;
+  }, [hoveredFrameId, hoveredFrameIdRef]);
 
   useEffect(() => {
-    popoverFrameIdRef.current = popoverFrameId;
-  }, [popoverFrameId, popoverFrameIdRef]);
-}
+    selectedFrameIdRef.current = selectedFrameId;
+    onSelectedFrameChange?.(selectedFrameId);
+  }, [selectedFrameId, onSelectedFrameChange, selectedFrameIdRef]);
 
-function useFrameTooltipVisibility(activeFrameId: string | null) {
   useEffect(() => {
-    if (activeFrameId !== null) {
-      setFrameTooltipVisible();
-    } else {
-      clearFrameTooltipVisible();
-    }
-
-    return () => {
-      clearFrameTooltipVisible();
-    };
-  }, [activeFrameId]);
+    activePopoverRef.current = activePopover;
+  }, [activePopover, activePopoverRef]);
 }
 
-function useHighlighterModeTooltipSync() {
+function useHighlighterModeFrameUiDismissal() {
   useEffect(() => {
     return addHighlighterModeChangedListener(({ enabled }) => {
       if (!enabled) {
-        useFrameUIStore.getState().forceHideTooltip();
+        useFrameUIStore.getState().dismissFrameUi();
       }
     });
   }, []);
+}
+
+export function useFrameUiSelectionEvents(params: {
+  framesRef: MutableRefObject<FrameData[]>;
+  hoveredFrameIdRef: MutableRefObject<string | null>;
+  activePopoverRef: MutableRefObject<ActiveFramePopover | null>;
+  selectedFrameIdRef: MutableRefObject<string | null>;
+  clearSelection: () => void;
+  hoverFrame: (frameId: string) => void;
+  selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
+}) {
+  const {
+    framesRef,
+    hoveredFrameIdRef,
+    activePopoverRef,
+    selectedFrameIdRef,
+    clearSelection,
+    hoverFrame,
+    selectFrame,
+  } = params;
+  useEffect(() => {
+    const handlers = createFrameSelectionEventHandlers({
+      framesRef,
+      hoveredFrameIdRef,
+      activePopoverRef,
+      selectedFrameIdRef,
+      clearSelection,
+      hoverFrame,
+      selectFrame,
+    });
+    const cleanupPointerDown = addEventListenerToAllWindowsDynamic<PointerEvent>(
+      'pointerdown',
+      handlers.pointerDown,
+      { capture: true }
+    );
+    const cleanupClick = addEventListenerToAllWindowsDynamic<MouseEvent>('click', handlers.click, {
+      capture: true,
+    });
+    const cleanupKeyDown = addEventListenerToAllWindowsDynamic<KeyboardEvent>(
+      'keydown',
+      handlers.keyDown,
+      { capture: true }
+    );
+
+    return () => {
+      cleanupPointerDown();
+      cleanupClick();
+      cleanupKeyDown();
+    };
+  }, [
+    clearSelection,
+    framesRef,
+    hoveredFrameIdRef,
+    activePopoverRef,
+    hoverFrame,
+    selectedFrameIdRef,
+    selectFrame,
+  ]);
 }
 
 export function useFrameUiMouseTracking(params: FrameUiMouseTrackingParams) {

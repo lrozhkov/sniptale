@@ -49,6 +49,7 @@ export function InteractiveFrameResizeHandles({
   return createPortal(
     <InteractiveFrameResizeHandleLayer
       directions={directions}
+      frameId={tempFrame.id}
       tempFrame={tempFrame}
       handleSize={handleSize}
       borderWidth={borderWidth}

@@ -33,6 +33,7 @@ import {
   createClearAutoBlurFramesHandler,
   createSyncAutoBlurFramesHandler,
 } from './auto-blur';
+import { useFrameUIStore } from '../state/frame-ui.store';
 
 type HandlerArgs = Parameters<typeof createAddAutoBlurFramesHandler>[0];
 
@@ -46,11 +47,13 @@ function createHandlerScenario() {
     y: 20,
   });
   let frames: FrameData[] = [existingFrame];
+  const framesRef = { current: frames };
   const setFrames = vi.fn<Dispatch<SetStateAction<FrameData[]>>>((updater) => {
     frames = typeof updater === 'function' ? updater(frames) : updater;
+    framesRef.current = frames;
   });
   const args: HandlerArgs = {
-    framesRef: { current: frames },
+    framesRef,
     highlighterSettingsCacheRef: {
       current: {
         borderPresets: [createBorderSettingsFixture({ id: 'preset-1', color: '#ff0000' })],
@@ -137,6 +140,8 @@ function expectOnlyAutoBlurFramesCleared() {
   });
   scenario.args.linkedElementsRef.current.set(autoBlur.id, scenario.element);
   scenario.args.setFrames([manualBlur, autoBlur]);
+  useFrameUIStore.getState().selectFrame(autoBlur.id, { x: 12, y: 16 });
+  useFrameUIStore.getState().togglePopover(autoBlur.id, 'frame-settings');
 
   const clearAutoBlurFrames = createClearAutoBlurFramesHandler(scenario.args);
   const result = clearAutoBlurFrames({
@@ -152,6 +157,11 @@ function expectOnlyAutoBlurFramesCleared() {
   expect(result).toEqual({ removedCount: 1 });
   expect(scenario.getFrames()).toEqual([manualBlur]);
   expect(scenario.args.linkedElementsRef.current.has(autoBlur.id)).toBe(false);
+  expect(useFrameUIStore.getState()).toMatchObject({
+    activePopover: null,
+    selectedFrameId: null,
+    toolbarAnchorOffset: null,
+  });
 }
 
 function expectAutoBlurFramesSyncedToCurrentTargets() {
@@ -168,6 +178,8 @@ function expectAutoBlurFramesSyncedToCurrentTargets() {
   });
   scenario.args.linkedElementsRef.current.set(staleAutoBlur.id, detachedElement);
   scenario.args.setFrames([staleAutoBlur]);
+  useFrameUIStore.getState().selectFrame(staleAutoBlur.id, { x: 8, y: 10 });
+  useFrameUIStore.getState().togglePopover(staleAutoBlur.id, 'frame-settings');
 
   const syncAutoBlurFrames = createSyncAutoBlurFramesHandler(scenario.args);
   const result = syncAutoBlurFrames(createAutoBlurInput(scenario.element));
@@ -176,11 +188,17 @@ function expectAutoBlurFramesSyncedToCurrentTargets() {
   expect(scenario.getFrames().some((frame) => frame.id === staleAutoBlur.id)).toBe(false);
   expect(scenario.args.linkedElementsRef.current.has(staleAutoBlur.id)).toBe(false);
   expect(scenario.getFrames()).toHaveLength(2);
+  expect(useFrameUIStore.getState()).toMatchObject({
+    activePopover: null,
+    selectedFrameId: null,
+    toolbarAnchorOffset: null,
+  });
 }
 
 describe('createAddAutoBlurFramesHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useFrameUIStore.getState().reset();
     iframeUtilsMocks.createCompositeSelector.mockReturnValue({
       elementSelector: '#target',
       iframeSelector: null,
@@ -203,5 +221,44 @@ describe('createAddAutoBlurFramesHandler', () => {
 
   it('syncs auto-blur frames to the current scan and drops stale page frames', () => {
     expectAutoBlurFramesSyncedToCurrentTargets();
+  });
+
+  it('cleans transient UI before a deferred React frame updater is flushed', () => {
+    const element = document.createElement('span');
+    const autoBlur = createFrameDataFixture('auto-blur', {
+      createdBy: 'auto-blur',
+      linkedElement: element,
+    });
+    let committedFrames = [autoBlur];
+    const pendingUpdates: SetStateAction<FrameData[]>[] = [];
+    const framesRef = { current: committedFrames };
+    const linkedElementsRef = { current: new Map([[autoBlur.id, element]]) };
+    const setFrames = vi.fn<Dispatch<SetStateAction<FrameData[]>>>((update) => {
+      pendingUpdates.push(update);
+    });
+    useFrameUIStore.getState().selectFrame(autoBlur.id, { x: 4, y: 6 });
+    useFrameUIStore.getState().togglePopover(autoBlur.id, 'frame-settings');
+
+    const result = createClearAutoBlurFramesHandler({
+      framesRef,
+      linkedElementsRef,
+      setFrames,
+    })({ targets: [] });
+
+    expect(result).toEqual({ removedCount: 1 });
+    expect(committedFrames).toEqual([autoBlur]);
+    expect(framesRef.current).toEqual([]);
+    expect(linkedElementsRef.current.has(autoBlur.id)).toBe(false);
+    expect(useFrameUIStore.getState()).toMatchObject({
+      activePopover: null,
+      selectedFrameId: null,
+      toolbarAnchorOffset: null,
+    });
+
+    const pendingUpdate = pendingUpdates[0];
+    expect(pendingUpdate).toBeTypeOf('function');
+    committedFrames =
+      typeof pendingUpdate === 'function' ? pendingUpdate(committedFrames) : pendingUpdate!;
+    expect(committedFrames).toEqual([]);
   });
 });

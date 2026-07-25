@@ -40,8 +40,7 @@ describe('interactive frame toolbar dispatch', () => {
       handleDelete: vi.fn(),
       handleEffectButtonClick: vi.fn(),
       handleStartEditing: vi.fn(),
-      setIsCalloutPopoverOpen: vi.fn(),
-      setIsStepBadgePopoverOpen: vi.fn(),
+      closePopover: vi.fn(),
     };
     const handlers = createSharedToolbarClickHandlers(props as never);
     const event = {
@@ -53,7 +52,6 @@ describe('interactive frame toolbar dispatch', () => {
     handlers.handleEffectClick('blur')(event);
 
     expect(props.handleEffectButtonClick).toHaveBeenCalledWith('blur');
-    expect(props.setIsStepBadgePopoverOpen).toHaveBeenCalledWith(false);
-    expect(props.setIsCalloutPopoverOpen).toHaveBeenCalledWith(false);
+    expect(props.closePopover).toHaveBeenCalledOnce();
   });
 });

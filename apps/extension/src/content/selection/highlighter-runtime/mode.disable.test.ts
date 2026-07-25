@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const disableMocks = vi.hoisted(() => ({
   applyHighlighterDocumentModeMock: vi.fn(),
-  forceHideTooltipMock: vi.fn(),
+  dismissFrameUiMock: vi.fn(),
   removeHighlighterCursorStyleMock: vi.fn(),
   setContentModeEnabledMock: vi.fn(),
   dispatchHighlighterModeChangedMock: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock('../../platform/page-context/mode-events', async (importOriginal) => ({
 
 vi.mock('../frame-runtime/state/frame-ui.store', () => ({
   useFrameUIStore: {
-    getState: () => ({ forceHideTooltip: disableMocks.forceHideTooltipMock }),
+    getState: () => ({ dismissFrameUi: disableMocks.dismissFrameUiMock }),
   },
 }));
 
@@ -47,7 +47,6 @@ describe('highlighter mode disable lifecycle', () => {
       isFrameEditing: true,
       isModeEnabled: true,
       isPaused: true,
-      isTooltipVisible: true,
     };
     const hoverController = createHoverControllerStub();
 
@@ -56,10 +55,9 @@ describe('highlighter mode disable lifecycle', () => {
     expect(state.isModeEnabled).toBe(false);
     expect(state.isPaused).toBe(false);
     expect(state.isFrameEditing).toBe(false);
-    expect(state.isTooltipVisible).toBe(false);
     expect(state.cleanupEventListeners).toBeNull();
     expect(disableMocks.setContentModeEnabledMock).toHaveBeenCalledWith('highlighter', false);
-    expect(disableMocks.forceHideTooltipMock).toHaveBeenCalledTimes(1);
+    expect(disableMocks.dismissFrameUiMock).toHaveBeenCalledTimes(1);
     expect(hoverController.cancelPendingHoverFrame).toHaveBeenCalledTimes(2);
     expect(hoverController.clearHoverTracking).toHaveBeenCalledTimes(2);
     expect(cleanupEventListeners).toHaveBeenCalledTimes(1);
@@ -79,7 +77,6 @@ describe('highlighter mode disable lifecycle', () => {
         isFrameEditing: false,
         isModeEnabled: false,
         isPaused: false,
-        isTooltipVisible: false,
       } as never,
       createHoverControllerStub() as never
     );

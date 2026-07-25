@@ -5,7 +5,6 @@ import {
   registerHighlighterFrameCallbacks,
   removeHighlighterFrame,
   resetHighlighterHoverUi,
-  setHighlighterTooltipVisibility,
   type HighlighterRuntimeState,
 } from './state';
 
@@ -85,11 +84,7 @@ export function createHighlighterStateActions(props: {
       props.state.isFrameEditing = false;
       props.logger.log('Frame editing cleared');
     },
-    clearFrameTooltipVisible: () => {
-      setHighlighterTooltipVisibility(props.state, false, props.hoverController);
-    },
     isEnabled: () => props.state.isModeEnabled,
-    isFrameTooltipVisible: () => props.state.isTooltipVisible,
     isPausedState: () => props.state.isPaused,
     pause: () => {
       props.state.isPaused = true;
@@ -102,9 +97,6 @@ export function createHighlighterStateActions(props: {
     setFrameEditing: () => {
       props.state.isFrameEditing = true;
       props.logger.log('Frame editing started');
-    },
-    setFrameTooltipVisible: () => {
-      setHighlighterTooltipVisibility(props.state, true, props.hoverController);
     },
   };
 }

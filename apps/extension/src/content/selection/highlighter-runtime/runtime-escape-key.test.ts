@@ -89,6 +89,7 @@ describe('createHighlighterRuntimeEscapeKeyHandler ignored events', () => {
     const disableHighlighterMode = vi.fn();
     const handler = createHighlighterRuntimeEscapeKeyHandler({
       disableHighlighterMode,
+      hasActivePopover: () => false,
       isAnyFrameEditing: () => false,
     });
     focusCalloutActiveElement();
@@ -109,6 +110,7 @@ describe('createHighlighterRuntimeEscapeKeyHandler ignored events', () => {
     const disableHighlighterMode = vi.fn();
     const handler = createHighlighterRuntimeEscapeKeyHandler({
       disableHighlighterMode,
+      hasActivePopover: () => false,
       isAnyFrameEditing: () => true,
     });
 
@@ -129,6 +131,7 @@ describe('createHighlighterRuntimeEscapeKeyHandler active Escape events', () => 
     const handler = createHighlighterRuntimeEscapeKeyHandler({
       cancelDrawing,
       disableHighlighterMode,
+      hasActivePopover: () => false,
       isAnyFrameEditing: () => true,
     });
 
@@ -144,6 +147,7 @@ describe('createHighlighterRuntimeEscapeKeyHandler active Escape events', () => 
     const disableHighlighterMode = vi.fn();
     const handler = createHighlighterRuntimeEscapeKeyHandler({
       disableHighlighterMode,
+      hasActivePopover: () => false,
       isAnyFrameEditing: () => true,
     });
 
@@ -160,6 +164,7 @@ describe('createHighlighterRuntimeEscapeKeyHandler active Escape events', () => 
     const disableHighlighterMode = vi.fn();
     const handler = createHighlighterRuntimeEscapeKeyHandler({
       disableHighlighterMode,
+      hasActivePopover: () => false,
       isAnyFrameEditing: () => false,
     });
 

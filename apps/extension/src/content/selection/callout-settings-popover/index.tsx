@@ -8,17 +8,20 @@ import type {
 import { dispatchCalloutDelete } from '../../platform/page-context/frame-events';
 import { resolveContentPortalTarget } from '../interactive-frame/layout/portal';
 import { CalloutSettingsPopoverContent } from './body';
-import { createCalloutVariantOptions, getCalloutSettingsPopoverStyle } from './helpers';
+import { createCalloutVariantOptions, POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
+import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
 import {
   useCalloutSettingsPopoverDistanceClose,
   useCalloutSettingsPopoverOutsideClose,
 } from './sync';
 import { useCalloutSettingsPopoverState } from './state';
+import { usePopoverEscapeClose } from '../popover-sync/hooks';
 
 interface CalloutSettingsPopoverProps {
   isOpen: boolean;
   onClose: () => void;
   frameId: string;
+  frameRect: { x: number; y: number; width: number; height: number };
   settings?: CalloutSettings;
   anchorEl: HTMLElement | null;
 }
@@ -27,11 +30,20 @@ export function CalloutSettingsPopover({
   isOpen,
   onClose,
   frameId,
+  frameRect,
   settings,
   anchorEl,
 }: CalloutSettingsPopoverProps) {
   useAppLocale();
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const popoverStyle = useFramePopoverPosition({
+    anchorEl,
+    fallbackSize: { width: POPOVER_WIDTH, height: POPOVER_HEIGHT },
+    frameId,
+    frameRect,
+    isOpen,
+    popoverRef,
+  });
   const { handleSettingChange, isTextOnly, localSettings } = useCalloutSettingsPopoverState({
     frameId,
     isOpen,
@@ -40,6 +52,7 @@ export function CalloutSettingsPopover({
 
   useCalloutSettingsPopoverOutsideClose({ isOpen, onClose, popoverRef });
   useCalloutSettingsPopoverDistanceClose({ isOpen, onClose, popoverRef });
+  usePopoverEscapeClose({ anchorEl, isOpen, onClose });
 
   const handleDelete = () => {
     dispatchCalloutDelete({ frameId });
@@ -58,7 +71,7 @@ export function CalloutSettingsPopover({
         'sniptale-callout-settings-popover sniptale-glass-popover',
         'sniptale-glass-popover--wide sniptale-glass-popover-scroll',
       ].join(' ')}
-      style={getCalloutSettingsPopoverStyle(anchorEl)}
+      style={popoverStyle}
       dataUi="content.callout-settings.popover"
     >
       <CalloutSettingsPopoverContent

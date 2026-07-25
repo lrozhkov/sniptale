@@ -20,7 +20,7 @@ export function useInteractiveFrameRenderActions(params: {
     setTempFrame: params.runtime.viewState.setTempFrame,
     setEffectMode: params.runtime.viewState.setEffectMode,
     closePopover: params.runtime.viewState.closePopover,
-    openPopover: params.runtime.viewState.openPopover,
+    togglePopover: params.runtime.viewState.togglePopover,
     onUpdate: params.onUpdate,
     onDelete: params.onDelete,
     startFrameRef: params.runtime.refs.startFrameRef,
@@ -47,12 +47,16 @@ export function createInteractiveFrameRenderResult(
     toolbarCoords: runtime.toolbarCoords,
     sizePanelCoords: runtime.sizePanelCoords,
     isPopoverOpen: runtime.isPopoverOpen,
+    isStepBadgePopoverOpen: runtime.isStepBadgePopoverOpen,
+    isCalloutPopoverOpen: runtime.isCalloutPopoverOpen,
+    isHovered: runtime.isHovered,
+    isSelected: runtime.isSelected,
     isResizeHovered: runtime.isResizeHovered,
     isFrameActive:
-      runtime.isTooltipVisible ||
+      runtime.isSelected ||
       runtime.isPopoverOpen ||
-      runtime.viewState.isStepBadgePopoverOpen ||
-      runtime.viewState.isCalloutPopoverOpen ||
+      runtime.isStepBadgePopoverOpen ||
+      runtime.isCalloutPopoverOpen ||
       runtime.viewState.isCalloutEditing ||
       runtime.viewState.state === 'editing',
     ...frameDisplay,

@@ -104,6 +104,6 @@ export function getInteractiveFrameDisplay(params: {
         ? {}
         : { boxShadow: shadowVisual.frameBoxShadow }),
     }),
-    frameZIndex: state === 'idle' ? zIndex : Z_INDEX_FRAMES,
+    frameZIndex: state === 'editing' || state === 'resizing' ? Z_INDEX_FRAMES : zIndex,
   };
 }

@@ -71,7 +71,6 @@ describe('highlighter hover target/event policy', () => {
         getState: {
           isModeEnabled: () => true,
           isPaused: () => false,
-          isTooltipVisible: () => false,
         },
       })
     ).toBe(true);
@@ -84,7 +83,6 @@ describe('highlighter hover target/event policy', () => {
         getState: {
           isModeEnabled: () => true,
           isPaused: () => false,
-          isTooltipVisible: () => false,
         },
       })
     ).toBe(false);
@@ -97,7 +95,6 @@ describe('highlighter hover target/event policy', () => {
         getState: {
           isModeEnabled: () => false,
           isPaused: () => false,
-          isTooltipVisible: () => false,
         },
       })
     ).toBe(true);

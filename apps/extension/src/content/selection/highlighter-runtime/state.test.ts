@@ -10,7 +10,6 @@ import {
   registerHighlighterFrameCallbacks,
   removeHighlighterFrame,
   resetHighlighterHoverUi,
-  setHighlighterTooltipVisibility,
 } from './state';
 import { createHoverControllerStub } from './controller.test-support';
 
@@ -27,7 +26,6 @@ it('creates a fresh runtime state with cleared callbacks and flags', () => {
     isFrameEditing: false,
     isModeEnabled: false,
     isPaused: false,
-    isTooltipVisible: false,
   });
 });
 
@@ -42,7 +40,6 @@ it('exposes live callback and state accessors to the hover owner', () => {
   state.isModeEnabled = true;
   state.isPaused = true;
   state.isFrameEditing = true;
-  state.isTooltipVisible = true;
 
   expect(createHighlighterCallbacks(state)()).toEqual({
     addFrame,
@@ -52,7 +49,6 @@ it('exposes live callback and state accessors to the hover owner', () => {
   expect(createHighlighterStateGetters(state).isModeEnabled()).toBe(true);
   expect(createHighlighterStateGetters(state).isPaused()).toBe(true);
   expect(createHighlighterStateGetters(state).isFrameEditing()).toBe(true);
-  expect(createHighlighterStateGetters(state).isTooltipVisible()).toBe(true);
 });
 
 it('returns false until frame callbacks are registered', () => {
@@ -98,17 +94,4 @@ it('applies the shared hover teardown policy', () => {
   expect(hoverController.clearHoverTracking).toHaveBeenCalledTimes(1);
   expect(hoverController.removeHoverOverlay).toHaveBeenCalledTimes(1);
   expect(hoverController.removeOverlayContainer).toHaveBeenCalledTimes(1);
-});
-
-it('coordinates tooltip visibility with hover tracking', () => {
-  const state = createHighlighterRuntimeState();
-  const hoverController = createHoverControllerStub();
-
-  setHighlighterTooltipVisibility(state, true, hoverController);
-  expect(state.isTooltipVisible).toBe(true);
-  expect(hoverController.hideHoverOverlay).toHaveBeenCalledTimes(1);
-
-  setHighlighterTooltipVisibility(state, false, hoverController);
-  expect(state.isTooltipVisible).toBe(false);
-  expect(hoverController.clearHoverTracking).toHaveBeenCalledTimes(1);
 });

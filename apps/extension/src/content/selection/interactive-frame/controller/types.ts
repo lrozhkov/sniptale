@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { FrameUIState } from '../../frame-runtime/state/frame-ui.store';
 import type {
   EffectMode,
   FrameData,
@@ -15,7 +16,7 @@ export interface InteractiveFrameActionParams {
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   closePopover: () => void;
-  openPopover: (frameId: string) => void;
+  togglePopover: FrameUIState['togglePopover'];
   onUpdate: (frame: FrameData) => void;
   onDelete: () => void;
   onCancel?: () => void;
@@ -28,13 +29,7 @@ export interface InteractiveFrameHoverOverlayProps {
   portalTheme: 'light' | 'dark' | null;
   isCalloutEditing: boolean;
   frameId: string;
-  isPopoverOpen: boolean;
-  isStepBadgePopoverOpen: boolean;
-  isCalloutPopoverOpen: boolean;
-  closePopover: () => void;
-  hideTooltip: (frameId: string) => void;
-  setIsStepBadgePopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsCalloutPopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  clearSelection: () => void;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
@@ -74,6 +69,7 @@ export interface InteractiveFrameListenerConfig {
 }
 
 export interface InteractiveFrameHandlerConfig {
+  frameId: string;
   state: FrameState;
   isDraggingRef: React.MutableRefObject<boolean>;
   isResizingRef: React.MutableRefObject<boolean>;

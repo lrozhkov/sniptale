@@ -23,6 +23,7 @@ export function useInteractiveFrameEditingHandlers(params: InteractiveFrameHandl
   const handleResizeStart = useMemo(
     () =>
       createInteractiveFrameResizeStartHandler({
+        frameId: params.frameId,
         state: params.state,
         stateRef: params.stateRef,
         setState: params.setState,

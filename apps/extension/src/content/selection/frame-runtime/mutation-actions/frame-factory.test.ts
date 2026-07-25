@@ -11,7 +11,8 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import type { StepBadgeSettings } from '../../../../features/highlighter/contracts';
 import { createFrameDataFixture } from '../react/test-support';
-import { createAddFrameHandler } from './frame-factory';
+import { createAddFrameHandler, createAddFreeFrameHandler } from './frame-factory';
+import { useFrameUIStore } from '../state/frame-ui.store';
 
 const invalidateFrameCache = vi.hoisted(() => vi.fn());
 
@@ -119,6 +120,7 @@ function createOptions() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
+  useFrameUIStore.getState().reset();
 });
 
 function verifyAddFrameUsesSessionDefaultsAndBadgeAutoMode() {
@@ -174,4 +176,27 @@ describe('frame mutation action frame factory', () => {
     'skips step badge scheduling when the session does not provide a badge template',
     verifyAddFrameSkipsBadgeRecalcWithoutTemplate
   );
+
+  it('selects a newly drawn free frame and closes the previous toolbar owner', () => {
+    const { options } = createOptions();
+    useFrameUIStore.getState().selectFrame('previous-frame');
+    const { calculateFrameCoords: _calculateFrameCoords, ...freeOptions } = options;
+    const addFreeFrame = createAddFreeFrameHandler({
+      ...freeOptions,
+      generateFrameId: () => 'free-frame',
+    });
+
+    addFreeFrame({
+      x: 20,
+      y: 30,
+      width: 120,
+      height: 90,
+      pagePlacement: { pageX: 20, pageY: 30, iframePath: [] },
+    });
+
+    expect(useFrameUIStore.getState()).toMatchObject({
+      hoveredFrameId: null,
+      selectedFrameId: 'free-frame',
+    });
+  });
 });

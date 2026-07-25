@@ -54,20 +54,17 @@ export function createSharedToolbarClickHandlers(props: InteractiveFrameToolbarP
     handleEffectClick:
       (mode: InteractiveFrameToolbarProps['effectMode']) => (event: ToolbarClickEvent) => {
         stopToolbarEvent(event);
-        props.setIsStepBadgePopoverOpen(false);
-        props.setIsCalloutPopoverOpen(false);
+        props.closePopover();
         props.handleEffectButtonClick(mode);
       },
     handleEditClick: (event: ToolbarClickEvent) => {
       stopToolbarEvent(event);
-      props.setIsStepBadgePopoverOpen(false);
-      props.setIsCalloutPopoverOpen(false);
+      props.closePopover();
       props.handleStartEditing();
     },
     handleDeleteClick: (event: ToolbarClickEvent) => {
       stopToolbarEvent(event);
-      props.setIsStepBadgePopoverOpen(false);
-      props.setIsCalloutPopoverOpen(false);
+      props.closePopover();
       props.handleDelete();
     },
     handleDecreaseClick: (event: ToolbarClickEvent) => {

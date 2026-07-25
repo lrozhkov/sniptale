@@ -92,7 +92,6 @@ it('falls back to the shared hover-controller factory', () => {
       isFrameEditing: expect.any(Function),
       isModeEnabled: expect.any(Function),
       isPaused: expect.any(Function),
-      isTooltipVisible: expect.any(Function),
     })
   );
 });

@@ -20,8 +20,8 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function createClickEvent(): MouseEvent {
-  const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+function createClickEvent(clientX = 0, clientY = 0): MouseEvent {
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true, clientX, clientY });
   vi.spyOn(event, 'preventDefault');
   vi.spyOn(event, 'stopImmediatePropagation');
   vi.spyOn(event, 'stopPropagation');
@@ -41,7 +41,6 @@ function createFixture(overrides: { hasFrame?: boolean } = {}) {
       isFrameEditing: () => false,
       isModeEnabled: () => true,
       isPaused: () => false,
-      isTooltipVisible: () => false,
     },
     hoverThrottleMs: 100,
     overlayActions: { hideHoverOverlay, showHoverOverlay: vi.fn() },
@@ -71,6 +70,32 @@ describe('highlighter hover click interaction', () => {
 
     handlers.handleClick(event);
 
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('leaves an existing frame border click for the frame selection owner', () => {
+    const { addFrame, handlers } = createFixture();
+    const event = createClickEvent();
+    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(document.createElement('div'));
+    targetPolicy.isNearExistingFrameBorder.mockReturnValueOnce(true);
+
+    handlers.handleClick(event);
+
+    expect(addFrame).not.toHaveBeenCalled();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('uses top-viewport coordinates when arbitrating an iframe border click', () => {
+    const { handlers, session } = createFixture();
+    const iframe = document.createElement('iframe');
+    iframe.getBoundingClientRect = vi.fn(() => new DOMRect(100, 200, 300, 180));
+    const event = createClickEvent(12, 18);
+    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(document.createElement('div'));
+    targetPolicy.isNearExistingFrameBorder.mockReturnValueOnce(true);
+
+    handlers.handleClick(event, iframe);
+
+    expect(targetPolicy.isNearExistingFrameBorder).toHaveBeenCalledWith(session, 112, 218);
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
 

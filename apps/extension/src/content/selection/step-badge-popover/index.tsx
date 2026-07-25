@@ -4,10 +4,13 @@ import { StepBadgePopoverAdapter } from './adapter';
 import { StepBadgePopoverEnabledContent } from './enabled-content';
 import { createStepBadgeEnabledContentProps } from './props';
 import { useStepBadgePopoverState } from './state';
+import { POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
+import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
 
 interface StepBadgePopoverProps {
   anchorEl: HTMLElement | null;
   frameId: string;
+  frameRect: { x: number; y: number; width: number; height: number };
   isOpen: boolean;
   onClose: () => void;
   stepBadge?: StepBadgeSettings;
@@ -51,6 +54,7 @@ export function StepBadgePopover({
   frameId,
   stepBadge,
   anchorEl,
+  frameRect,
 }: StepBadgePopoverProps) {
   useAppLocale();
   const stepBadgeState = useStepBadgePopoverState({
@@ -60,12 +64,20 @@ export function StepBadgePopover({
     onClose,
     ...(stepBadge === undefined ? {} : { stepBadge }),
   });
-  const { getPopoverStyle, popoverRef } = stepBadgeState;
+  const { popoverRef } = stepBadgeState;
+  const popoverStyle = useFramePopoverPosition({
+    anchorEl,
+    fallbackSize: { width: POPOVER_WIDTH, height: POPOVER_HEIGHT },
+    frameId,
+    frameRect,
+    isOpen,
+    popoverRef,
+  });
   const enabledContentProps = createEnabledContentProps(frameId, stepBadgeState);
   return (
     <StepBadgePopoverAdapter
       anchorEl={anchorEl}
-      getPopoverStyle={getPopoverStyle}
+      getPopoverStyle={() => popoverStyle}
       isOpen={isOpen}
       popoverRef={popoverRef}
     >

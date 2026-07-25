@@ -29,6 +29,7 @@ declare global {
 
 export const InteractiveFrame: React.FC<InteractiveFrameProps> = React.memo((props) => {
   const model = useInteractiveFrameRenderModel(props);
+  const { isCalloutPopoverOpen, isStepBadgePopoverOpen } = model;
   const contentProps = {
     frame: props.frame,
     currentFrame: model.currentFrame,
@@ -41,6 +42,9 @@ export const InteractiveFrame: React.FC<InteractiveFrameProps> = React.memo((pro
     frameZIndex: model.frameZIndex,
     isPopoverOpen: model.isPopoverOpen,
     isFrameActive: model.isFrameActive,
+    isHovered: model.isHovered,
+    isSelected: model.isSelected,
+    toolbarAnchorOffset: model.viewState.toolbarAnchorOffset,
     isResizeHovered: model.isResizeHovered,
     borderColor: model.borderColor,
     borderWidth: model.borderWidth,
@@ -51,18 +55,20 @@ export const InteractiveFrame: React.FC<InteractiveFrameProps> = React.memo((pro
     maintainAspectRatio: model.viewState.maintainAspectRatio,
     aspectRatio: model.viewState.aspectRatio,
     effectMode: model.viewState.effectMode,
-    isStepBadgePopoverOpen: model.viewState.isStepBadgePopoverOpen,
-    isCalloutPopoverOpen: model.viewState.isCalloutPopoverOpen,
+    isStepBadgePopoverOpen,
+    isCalloutPopoverOpen,
     isCalloutEditing: model.viewState.isCalloutEditing,
     setTempFrame: model.viewState.setTempFrame,
     setMaintainAspectRatio: model.viewState.setMaintainAspectRatio,
     setAspectRatio: model.viewState.setAspectRatio,
     setState: model.viewState.setState,
-    setIsStepBadgePopoverOpen: model.viewState.setIsStepBadgePopoverOpen,
-    setIsCalloutPopoverOpen: model.viewState.setIsCalloutPopoverOpen,
+    togglePopover: model.viewState.togglePopover,
     setIsCalloutEditing: model.viewState.setIsCalloutEditing,
     closePopover: model.viewState.closePopover,
-    hideTooltip: model.viewState.hideTooltip,
+    hoverFrame: model.viewState.hoverFrame,
+    scheduleHoverFrameHide: model.viewState.scheduleHoverFrameHide,
+    selectFrame: model.viewState.selectFrame,
+    clearSelection: model.viewState.clearSelection,
     handleMouseDown: model.handleMouseDown,
     handleResizeStart: model.handleResizeStart,
     handleEffectButtonClick: model.handleEffectButtonClick,

@@ -37,10 +37,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   getStoreState.mockReturnValue({
-    activeFrameId: null,
-    popoverFrameId: null,
+    hoveredFrameId: null,
+    selectedFrameId: null,
+    activePopover: null,
     reset: vi.fn(),
-    forceHideTooltip: vi.fn(),
+    dismissFrame: vi.fn(),
+    dismissFrameUi: vi.fn(),
   });
 });
 
@@ -55,12 +57,14 @@ function expectRemoveFrameResetsUiAndRecalculatesBadges() {
       ['frame-2', document.createElement('div')],
     ]),
   };
-  const forceHideTooltip = vi.fn();
+  const dismissFrame = vi.fn();
   getStoreState.mockReturnValue({
-    activeFrameId: 'frame-1',
-    popoverFrameId: null,
+    hoveredFrameId: null,
+    selectedFrameId: 'frame-1',
+    activePopover: null,
     reset: vi.fn(),
-    forceHideTooltip,
+    dismissFrame,
+    dismissFrameUi: vi.fn(),
   });
   const recalculateRef = { current: vi.fn<(excludeFrameId?: string) => void>() };
 
@@ -75,7 +79,8 @@ function expectRemoveFrameResetsUiAndRecalculatesBadges() {
   removeFrame('frame-1');
   vi.runAllTimers();
 
-  expect(forceHideTooltip).toHaveBeenCalledTimes(1);
+  expect(dismissFrame).toHaveBeenNthCalledWith(1, 'frame-2');
+  expect(dismissFrame).toHaveBeenNthCalledWith(2, 'frame-1');
   expect(currentFrames).toEqual([]);
   expect(linkedElementsRef.current.size).toBe(0);
   expect(recalculateRef.current).toHaveBeenCalledWith('frame-1');

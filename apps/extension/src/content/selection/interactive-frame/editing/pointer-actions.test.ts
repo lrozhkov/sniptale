@@ -57,6 +57,7 @@ function createFixture() {
     stateRef,
   };
   const start = createInteractiveFrameResizeStartHandler({
+    frameId: 'frame-1',
     ...refs,
     setState,
     setTempFrame,

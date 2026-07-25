@@ -48,6 +48,7 @@ describe('registerHighlighterRuntimeListeners', () => {
     const disableHighlighterMode = vi.fn();
     const cleanup = registerHighlighterRuntimeListeners({
       disableHighlighterMode,
+      hasActivePopover: () => false,
       hoverController,
       isAnyFrameEditing: () => false,
     });
@@ -99,6 +100,7 @@ describe('registerHighlighterRuntimeListeners', () => {
     const hoverController = createHoverControllerStub();
     const cleanup = registerHighlighterRuntimeListeners({
       disableHighlighterMode: vi.fn(),
+      hasActivePopover: () => false,
       hoverController,
       isAnyFrameEditing: () => false,
     });

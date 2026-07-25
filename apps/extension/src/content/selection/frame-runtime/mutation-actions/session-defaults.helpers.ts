@@ -12,8 +12,8 @@ export function resolveSessionFrameDefaults(args: {
   fallbackBlurSettings: BlurSettings;
   fallbackFocusSettings: FocusSettings;
 }) {
-  const { activeFrameId, popoverFrameId } = useFrameUIStore.getState();
-  const sourceFrameId = popoverFrameId ?? activeFrameId;
+  const { activePopover, selectedFrameId } = useFrameUIStore.getState();
+  const sourceFrameId = activePopover?.frameId ?? selectedFrameId;
   const sourceFrame =
     (sourceFrameId ? args.existingFrames.find((frame) => frame.id === sourceFrameId) : undefined) ??
     args.existingFrames.at(-1);

@@ -45,6 +45,8 @@ it('hides transient app UI during screenshot capture without hiding captured ann
   [
     '.sniptale-action-toolbar',
     '.sniptale-toolbar-portal-wrapper',
+    '.sniptale-frame-toolbar-trigger',
+    '.sniptale-frame-toolbar-bridge',
     '.sniptale-frame-settings-popover',
     '.sniptale-step-badge-popover',
     '.sniptale-callout-settings-popover',

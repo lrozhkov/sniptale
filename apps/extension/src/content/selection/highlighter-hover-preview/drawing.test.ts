@@ -7,6 +7,7 @@ const framePlatform = vi.hoisted(() => ({
   createDocumentPagePlacement: vi.fn(() => ({ iframePath: [], pageX: 10, pageY: 20 })),
   getDocumentViewportBounds: vi.fn(() => ({ x: 0, y: 0, width: 800, height: 600 })),
   getTopViewportPoint: vi.fn((_doc: Document, x: number, y: number) => ({ x, y })),
+  getViewportClientPoint: vi.fn((x: number, y: number) => ({ x, y })),
 }));
 const domHost = vi.hoisted(() => ({
   appendToContentOverlayRoot: vi.fn((element: HTMLElement) => document.body.append(element)),
@@ -34,6 +35,7 @@ vi.mock('../../platform/dom-host/isolated', () => ({
 import { createFreeFrameDrawingHandlers, type FreeFramePointerEvent } from './drawing';
 import { createHoverInteractionHandlers } from './interactions';
 import { createHoverSession } from './session';
+import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 
 class TestPointerEvent extends MouseEvent implements FreeFramePointerEvent {
   readonly pointerId: number;
@@ -86,7 +88,6 @@ function createFixture() {
     isFrameEditing: () => false,
     isModeEnabled: () => true,
     isPaused: () => false,
-    isTooltipVisible: () => false,
   };
   const handlers = createFreeFrameDrawingHandlers({
     getCallbacks,
@@ -115,6 +116,7 @@ function createFixture() {
 }
 
 afterEach(() => {
+  useFrameUIStore.getState().reset();
   document.body.replaceChildren();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -122,6 +124,21 @@ afterEach(() => {
 });
 
 describe('free frame drawing gesture', () => {
+  it('hides every other frame control as soon as drawing takes ownership', () => {
+    const { handlers } = createFixture();
+    useFrameUIStore.getState().hoverFrame('other-frame');
+    useFrameUIStore.getState().setResizeFrame('other-frame');
+
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 40, 40));
+
+    expect(useFrameUIStore.getState()).toMatchObject({
+      hoveredFrameId: null,
+      resizeFrameId: null,
+      selectedFrameId: null,
+    });
+  });
+
   it('keeps linked frame installation working through the complete pointer and click lifecycle', () => {
     const { addFrame, addFreeFrame, handlers, interactions } = createFixture();
     const target = document.createElement('button');
@@ -221,7 +238,9 @@ describe('free frame drawing gesture', () => {
       expect(document.querySelector('.sniptale-free-frame-draft-portal')).toBeNull();
     }
   );
+});
 
+describe('free frame drawing cancellation and continuity', () => {
   it('re-arms hover on the same target after rejecting an undersized started drag', () => {
     const { addFreeFrame, handlers, interactions, session, showHoverOverlay } = createFixture();
     const target = document.createElement('button');
@@ -300,7 +319,7 @@ describe('free frame drawing gesture', () => {
     expect(showHoverOverlay).toHaveBeenCalledWith(target);
   });
 
-  it.each(['sniptale-frame-toolbar', 'sniptale-hover-overlay'])(
+  it.each(['sniptale-frame-toolbar-trigger', 'sniptale-toolbar-portal-wrapper'])(
     'keeps an active draw alive across a mouseleave into %s UI',
     (uiClassName) => {
       const { addFreeFrame, handlers, session } = createFixture();
@@ -340,6 +359,26 @@ describe('free frame drawing gesture', () => {
     handlers.handlePointerUp(createPointerEvent('pointerup', 70, 70, target));
 
     expect(addFreeFrame).toHaveBeenCalledOnce();
+    expect(session.freeDraw.gesture).toBeNull();
+  });
+
+  it('keeps an active draw alive across window blur until pointerup', () => {
+    const { addFreeFrame, handlers, session } = createFixture();
+    const target = document.createElement('section');
+
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20, target));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 40, 40, target));
+
+    expect(handlers.cancelDrawing('blur')).toBe(false);
+    expect(session.freeDraw.gesture?.isDrawing).toBe(true);
+
+    handlers.handlePointerUp(createPointerEvent('pointerup', 70, 70, target));
+
+    expect(addFreeFrame).toHaveBeenCalledOnce();
+    expect(addFreeFrame).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 20, y: 20, width: 50, height: 50 }),
+      target
+    );
     expect(session.freeDraw.gesture).toBeNull();
   });
 

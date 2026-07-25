@@ -26,11 +26,12 @@ function isCalloutEscapeTarget(event: KeyboardEvent): boolean {
 
 export function createHighlighterRuntimeEscapeKeyHandler(props: {
   disableHighlighterMode: () => void;
+  hasActivePopover: () => boolean;
   isAnyFrameEditing: () => boolean;
   cancelDrawing?: (reason: 'escape') => boolean;
 }) {
   return (event: KeyboardEvent) => {
-    if (event.key !== 'Escape' || isCalloutEscapeTarget(event)) {
+    if (event.key !== 'Escape' || isCalloutEscapeTarget(event) || props.hasActivePopover()) {
       return;
     }
 
@@ -113,6 +114,7 @@ function registerHoverListeners(hoverController: HoverController) {
 
 export function registerHighlighterRuntimeListeners(props: {
   disableHighlighterMode: () => void;
+  hasActivePopover: () => boolean;
   hoverController: HoverController;
   isAnyFrameEditing: () => boolean;
 }) {

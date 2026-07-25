@@ -3,42 +3,8 @@ import { colorToRgba, resolveBorderPresetVisual } from '../../../features/highli
 import { translate } from '../../../platform/i18n';
 import type { BlurType, BorderPreset } from '../../../features/highlighter/contracts';
 
-const POPOVER_WIDTH = 280;
-const POPOVER_HEIGHT = 360;
-const POPOVER_MARGIN = 8;
-
-export function getFrameSettingsPopoverStyle(anchorEl: HTMLElement | null): CSSProperties {
-  if (!anchorEl) {
-    return {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      visibility: 'hidden',
-      pointerEvents: 'none',
-    };
-  }
-
-  const rect = anchorEl.getBoundingClientRect();
-
-  let top = rect.bottom + POPOVER_MARGIN;
-  let left = rect.left;
-
-  if (top + POPOVER_HEIGHT > window.innerHeight) {
-    top = rect.top - POPOVER_HEIGHT - POPOVER_MARGIN;
-  }
-
-  if (left + POPOVER_WIDTH > window.innerWidth) {
-    left = window.innerWidth - POPOVER_WIDTH - POPOVER_MARGIN;
-  }
-
-  return {
-    position: 'fixed',
-    top: Math.max(POPOVER_MARGIN, top),
-    left: Math.max(POPOVER_MARGIN, left),
-    zIndex: 2147483647,
-    pointerEvents: 'auto',
-  };
-}
+export const POPOVER_WIDTH = 280;
+export const POPOVER_HEIGHT = 360;
 
 export function getBorderPresetPreviewStyle(preset: BorderPreset): CSSProperties {
   const visual = resolveBorderPresetVisual(preset);

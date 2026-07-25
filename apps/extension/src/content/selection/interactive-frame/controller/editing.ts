@@ -62,6 +62,7 @@ export function useInteractiveFrameEditing({
   });
   const { handleMouseDown, handleResizeStart } = useInteractiveFrameEditingHandlers(
     createInteractiveFrameHandlerConfig({
+      frameId,
       state,
       isDraggingRef: activity.isDraggingRef,
       isResizingRef: activity.isResizingRef,

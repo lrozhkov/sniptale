@@ -34,30 +34,14 @@ export function useInteractiveFrameIdleReset(params: {
   state: FrameState;
   frameWithoutLinkedElement: FrameData;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
-  setIsStepBadgePopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsCalloutPopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
-  const {
-    state,
-    frameWithoutLinkedElement,
-    setTempFrame,
-    setIsStepBadgePopoverOpen,
-    setIsCalloutPopoverOpen,
-  } = params;
+  const { state, frameWithoutLinkedElement, setTempFrame } = params;
 
   React.useEffect(() => {
     if (state === 'idle') {
-      setIsStepBadgePopoverOpen(false);
-      setIsCalloutPopoverOpen(false);
       setTempFrame(frameWithoutLinkedElement);
     }
-  }, [
-    state,
-    setIsStepBadgePopoverOpen,
-    setIsCalloutPopoverOpen,
-    setTempFrame,
-    frameWithoutLinkedElement,
-  ]);
+  }, [state, setTempFrame, frameWithoutLinkedElement]);
 }
 
 export function useInteractiveFrameEditingOverlayEffect(
