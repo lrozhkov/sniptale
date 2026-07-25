@@ -45,6 +45,16 @@ describe('highlighter hover target policy', () => {
     );
   });
 
+  it.each(['sniptale-frame-toolbar-trigger', 'sniptale-frame-toolbar-bridge'])(
+    'keeps %s outside click-to-anchor and free-draw targets',
+    (className) => {
+      const target = document.createElement('button');
+      target.className = className;
+
+      expect(isHighlighterExtensionUiElement(target)).toBe(true);
+    }
+  );
+
   it('detects popovers that block click handling', () => {
     contentUiRoot.queryContentUiElement.mockImplementation((selector) =>
       selector === '.sniptale-callout-settings-popover' ? document.createElement('div') : null
@@ -57,11 +67,12 @@ describe('highlighter hover target policy', () => {
     const session = createHoverSession();
     const frame = document.createElement('div');
     frame.id = 'frame-1';
-    frame.getBoundingClientRect = vi.fn(() => new DOMRect(20, 40, 20, 20));
+    frame.getBoundingClientRect = vi.fn(() => new DOMRect(20, 40, 40, 40));
     contentUiRoot.queryAllContentUiElements.mockReturnValue([frame]);
 
     expect(isNearExistingFrameBorder(session, 15, 45)).toBe(true);
-    expect(isNearExistingFrameBorder(session, 30, 50)).toBe(false);
+    expect(isNearExistingFrameBorder(session, 10, 60)).toBe(true);
+    expect(isNearExistingFrameBorder(session, 40, 60)).toBe(false);
     expect(contentUiRoot.queryAllContentUiElements).toHaveBeenCalledOnce();
   });
 });

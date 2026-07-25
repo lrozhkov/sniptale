@@ -92,6 +92,7 @@ describe('highlighter mode enable bootstrap', () => {
     expect(enableMocks.registerHighlighterRuntimeListenersMock).toHaveBeenCalledWith(
       expect.objectContaining({
         disableHighlighterMode: expect.any(Function),
+        hasActivePopover: expect.any(Function),
         hoverController,
         isAnyFrameEditing: expect.any(Function),
       })

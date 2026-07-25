@@ -1,7 +1,5 @@
-import { useCallback, useRef } from 'react';
-import type { CSSProperties } from 'react';
+import { useRef } from 'react';
 import type { BorderPreset } from '../../../features/highlighter/contracts';
-import { getFrameSettingsPopoverStyle } from './helpers';
 
 function createFrameSettingsPopoverCloseHandler(args: {
   handleSelectPreset: (preset: BorderPreset) => Promise<void>;
@@ -14,16 +12,10 @@ function createFrameSettingsPopoverCloseHandler(args: {
 }
 
 export function useFrameSettingsPopoverBindings(args: {
-  anchorEl: HTMLElement | null;
   handleSelectPreset: (preset: BorderPreset) => Promise<void>;
   onClose: () => void;
 }) {
   const popoverRef = useRef<HTMLDivElement>(null);
-
-  const getPopoverStyle = useCallback(
-    (): CSSProperties => getFrameSettingsPopoverStyle(args.anchorEl),
-    [args.anchorEl]
-  );
 
   const handleSelectPresetAndClose = createFrameSettingsPopoverCloseHandler({
     handleSelectPreset: args.handleSelectPreset,
@@ -31,7 +23,6 @@ export function useFrameSettingsPopoverBindings(args: {
   });
 
   return {
-    getPopoverStyle,
     handleSelectPresetAndClose,
     popoverRef,
   };

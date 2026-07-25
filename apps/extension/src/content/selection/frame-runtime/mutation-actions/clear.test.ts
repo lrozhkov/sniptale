@@ -30,10 +30,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   getStoreState.mockReturnValue({
-    activeFrameId: null,
-    popoverFrameId: null,
+    hoveredFrameId: null,
+    selectedFrameId: null,
+    activePopover: null,
     reset: vi.fn(),
-    forceHideTooltip: vi.fn(),
+    dismissFrame: vi.fn(),
+    dismissFrameUi: vi.fn(),
   });
   queryAllContentUiElements.mockReturnValue([]);
 });
@@ -97,10 +99,12 @@ function createClearFramesScenario() {
   });
 
   getStoreState.mockReturnValue({
-    activeFrameId: null,
-    popoverFrameId: null,
+    hoveredFrameId: null,
+    selectedFrameId: null,
+    activePopover: null,
     reset,
-    forceHideTooltip: vi.fn(),
+    dismissFrame: vi.fn(),
+    dismissFrameUi: vi.fn(),
   });
   queryAllContentUiElements.mockReturnValueOnce([overlayOne]).mockReturnValueOnce([overlayTwo]);
 

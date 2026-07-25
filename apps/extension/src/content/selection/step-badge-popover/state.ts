@@ -14,9 +14,9 @@ import {
   toggleStepBadgeOffset,
 } from './helpers';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
-import { useStepBadgePopoverLayout } from './layout';
 import { useStepBadgePopoverDistanceClose, useStepBadgePopoverOutsideClose } from './sync';
 import { dispatchFrameStepBadgeChanged } from '../../platform/page-context/frame-events';
+import { usePopoverEscapeClose } from '../popover-sync/hooks';
 
 function createStepBadgeHandlers(props: {
   frameId: string;
@@ -94,7 +94,7 @@ export function useStepBadgePopoverState(props: {
   onClose: () => void;
   stepBadge?: StepBadgeSettings;
 }) {
-  const { anchorEl, frameId, isOpen, onClose, stepBadge } = props;
+  const { frameId, isOpen, onClose, stepBadge } = props;
   const [localStepBadgeSettings, setLocalStepBadgeSettings] = useState<StepBadgeSettings>({
     ...DEFAULT_STEP_BADGE_SETTINGS,
   });
@@ -114,10 +114,9 @@ export function useStepBadgePopoverState(props: {
     );
   }, [isOpen, stepBadge]);
 
-  const getPopoverStyle = useStepBadgePopoverLayout(anchorEl);
-
   useStepBadgePopoverOutsideClose({ isOpen, onClose, popoverRef });
   useStepBadgePopoverDistanceClose({ isOpen, onClose, popoverRef });
+  usePopoverEscapeClose({ anchorEl: props.anchorEl, isOpen, onClose });
   const handlers = createStepBadgeHandlers({
     frameId,
     localStepBadgeSettings,
@@ -126,7 +125,6 @@ export function useStepBadgePopoverState(props: {
   });
 
   return {
-    getPopoverStyle,
     ...handlers,
     isAuto: localStepBadgeSettings.auto !== false,
     localStepBadgeSettings,

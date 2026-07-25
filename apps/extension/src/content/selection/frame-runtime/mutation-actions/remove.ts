@@ -1,10 +1,7 @@
-import { createLogger } from '@sniptale/platform/observability/logger';
 import { scheduleStepBadgeRecalculation } from '../../frame-dom-driver/timing';
 import { invalidateFrameCache } from '../../highlighter';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import type { UseFrameMutationActionHelperOptions } from './types';
-
-const logger = createLogger({ namespace: 'ContentFrameMutations' });
 
 export function createRemoveFrameHandler({
   framesRef,
@@ -16,7 +13,7 @@ export function createRemoveFrameHandler({
   'framesRef' | 'linkedElementsRef' | 'recalculateStepBadgesRef' | 'setFrames'
 >) {
   return (frameId: string) => {
-    resetFrameUiIfNeeded(frameId);
+    useFrameUIStore.getState().dismissFrame(frameId);
 
     const hadStepBadge = framesRef.current.find((frame) => frame.id === frameId)?.stepBadge
       ?.enabled;
@@ -28,14 +25,4 @@ export function createRemoveFrameHandler({
       scheduleStepBadgeRecalculation(recalculateStepBadgesRef, frameId);
     }
   };
-}
-
-function resetFrameUiIfNeeded(frameId: string) {
-  const storeState = useFrameUIStore.getState();
-  if (storeState.activeFrameId !== frameId && storeState.popoverFrameId !== frameId) {
-    return;
-  }
-
-  logger.log('Resetting UI store state for deleted frame', frameId);
-  storeState.forceHideTooltip();
 }

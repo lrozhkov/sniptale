@@ -135,7 +135,7 @@ function useInteractiveFrameDeleteHandler(params: InteractiveFrameActionParams) 
 }
 
 function useInteractiveFrameEffectHandler(params: InteractiveFrameActionParams) {
-  const { closePopover, effectMode, frame, onEffectChange, openPopover, setEffectMode } = params;
+  const { closePopover, effectMode, frame, onEffectChange, setEffectMode, togglePopover } = params;
 
   return React.useCallback(
     (mode: EffectMode) => {
@@ -144,14 +144,14 @@ function useInteractiveFrameEffectHandler(params: InteractiveFrameActionParams) 
         frameId: frame.id,
         effectMode,
         closePopover,
-        openPopover,
+        togglePopover,
         setEffectMode,
         ...(onEffectChange === undefined ? {} : { onEffectChange }),
       };
 
       toggleInteractiveFrameEffectMode(effectArgs);
     },
-    [closePopover, effectMode, frame.id, onEffectChange, openPopover, setEffectMode]
+    [closePopover, effectMode, frame.id, onEffectChange, setEffectMode, togglePopover]
   );
 }
 

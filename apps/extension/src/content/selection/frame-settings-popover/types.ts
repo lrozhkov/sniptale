@@ -18,6 +18,7 @@ export interface FrameSettingsPopoverProps {
   effectMode: EffectMode;
   focusSettings?: FocusSettings;
   frameId: string;
+  frameRect: { x: number; y: number; width: number; height: number };
   isOpen: boolean;
   onApplyToFrame: (settings: FrameSettingsPopoverApplySettings) => void;
   onClose: () => void;

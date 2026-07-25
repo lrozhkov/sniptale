@@ -15,7 +15,8 @@ export function InteractiveFrameToolbar(
   if (
     props.state === 'editing' ||
     props.state === 'resizing' ||
-    props.state === 'idle' ||
+    props.isCalloutEditing ||
+    !props.isSelected ||
     !isHighlighterEnabled()
   ) {
     return null;
@@ -28,6 +29,8 @@ export function InteractiveFrameToolbar(
       portalTheme={portalTheme}
       toolbarCoords={props.toolbarCoords}
       frameRect={props.frame}
+      frameId={props.frame.id}
+      anchorOffset={props.toolbarAnchorOffset}
       onWrapperMouseDown={surfaceHandlers.onWrapperMouseDown}
       onWrapperClick={surfaceHandlers.onWrapperClick}
       onToolbarMouseDown={surfaceHandlers.onToolbarMouseDown}

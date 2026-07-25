@@ -107,9 +107,21 @@ function useInteractiveFrameRuntimeState(params: {
     currentFrame: normalizedCurrentFrame,
     toolbarCoords,
     sizePanelCoords,
-    isTooltipVisible: params.viewState.activeFrameId === params.frame.id,
+    isTooltipVisible:
+      params.viewState.hoveredFrameId === params.frame.id ||
+      params.viewState.selectedFrameId === params.frame.id,
+    isHovered: params.viewState.hoveredFrameId === params.frame.id,
+    isSelected: params.viewState.selectedFrameId === params.frame.id,
     isResizeHovered: params.viewState.resizeFrameId === params.frame.id,
-    isPopoverOpen: params.viewState.popoverFrameId === params.frame.id,
+    isPopoverOpen:
+      params.viewState.activePopover?.frameId === params.frame.id &&
+      params.viewState.activePopover.kind === 'frame-settings',
+    isStepBadgePopoverOpen:
+      params.viewState.activePopover?.frameId === params.frame.id &&
+      params.viewState.activePopover.kind === 'step-badge',
+    isCalloutPopoverOpen:
+      params.viewState.activePopover?.frameId === params.frame.id &&
+      params.viewState.activePopover.kind === 'callout-settings',
   };
 }
 
@@ -145,10 +157,14 @@ function useInteractiveFrameRuntimeSyncs(params: {
       : { state: params.viewState.state, onStateChange: params.onStateChange }
   );
   useInteractiveFrameTooltipSync({
-    isTooltipVisible: params.isTooltipVisible,
+    isChromeVisible: params.isTooltipVisible,
     state: params.viewState.state,
-    isStepBadgePopoverOpen: params.viewState.isStepBadgePopoverOpen,
-    isCalloutPopoverOpen: params.viewState.isCalloutPopoverOpen,
+    isStepBadgePopoverOpen:
+      params.viewState.activePopover?.frameId === params.frame.id &&
+      params.viewState.activePopover.kind === 'step-badge',
+    isCalloutPopoverOpen:
+      params.viewState.activePopover?.frameId === params.frame.id &&
+      params.viewState.activePopover.kind === 'callout-settings',
     setState: params.viewState.setState,
   });
   useInteractiveFramePropSync({
@@ -172,8 +188,6 @@ export function useInteractiveFrameEditLifecycle(
     isCalloutEditing: runtime.viewState.isCalloutEditing,
     frameWithoutLinkedElement: runtime.frameWithoutLinkedElement,
     setTempFrame: runtime.viewState.setTempFrame,
-    setIsStepBadgePopoverOpen: runtime.viewState.setIsStepBadgePopoverOpen,
-    setIsCalloutPopoverOpen: runtime.viewState.setIsCalloutPopoverOpen,
     handleCancelRef: runtime.refs.handleCancelRef,
     handleSaveRef: runtime.refs.handleSaveRef,
     handleDeleteRef: runtime.refs.handleDeleteRef,
@@ -184,8 +198,7 @@ export function useInteractiveFrameEditLifecycle(
     frame,
     setEffectMode: runtime.viewState.setEffectMode,
     setIsCalloutEditing: runtime.viewState.setIsCalloutEditing,
-    setIsCalloutPopoverOpen: runtime.viewState.setIsCalloutPopoverOpen,
-    setIsStepBadgePopoverOpen: runtime.viewState.setIsStepBadgePopoverOpen,
+    closePopover: runtime.viewState.closePopover,
     setState: runtime.viewState.setState,
     setTempFrame: runtime.viewState.setTempFrame,
   });

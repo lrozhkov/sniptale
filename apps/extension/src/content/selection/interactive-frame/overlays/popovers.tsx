@@ -12,14 +12,13 @@ export interface InteractiveFramePopoversProps {
   borderWidth: number;
   effectMode: EffectMode;
   isPopoverOpen: boolean;
+  isSelected: boolean;
   isStepBadgePopoverOpen: boolean;
   isCalloutPopoverOpen: boolean;
   isCalloutEditing: boolean;
   popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   stepBadgePopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   calloutPopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
-  setIsStepBadgePopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsCalloutPopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   closePopover: () => void;
@@ -44,10 +43,11 @@ function applyFrameSettingsPatch(
 
 function createFrameSettingsProps(props: InteractiveFramePopoversProps) {
   return {
-    isOpen: props.isPopoverOpen,
+    isOpen: props.isSelected && props.isPopoverOpen,
     onClose: props.closePopover,
     effectMode: props.effectMode,
     frameId: props.currentFrame.id,
+    frameRect: props.currentFrame,
     onApplyToFrame: (settings: {
       borderSettings?: FrameData['borderSettings'];
       blurSettings?: FrameData['blurSettings'];
@@ -72,9 +72,10 @@ function createFrameSettingsProps(props: InteractiveFramePopoversProps) {
 
 function createStepBadgeProps(props: InteractiveFramePopoversProps) {
   return {
-    isOpen: props.isStepBadgePopoverOpen && !!props.frame.stepBadge?.enabled,
-    onClose: () => props.setIsStepBadgePopoverOpen(false),
+    isOpen: props.isSelected && props.isStepBadgePopoverOpen && !!props.frame.stepBadge?.enabled,
+    onClose: props.closePopover,
     frameId: props.frame.id,
+    frameRect: props.currentFrame,
     anchorEl: props.stepBadgePopoverAnchorRef.current,
     ...(props.frame.stepBadge === undefined ? {} : { stepBadge: props.frame.stepBadge }),
   };
@@ -82,9 +83,10 @@ function createStepBadgeProps(props: InteractiveFramePopoversProps) {
 
 function createCalloutSettingsProps(props: InteractiveFramePopoversProps) {
   return {
-    isOpen: props.isCalloutPopoverOpen && !!props.frame.callout?.enabled,
-    onClose: () => props.setIsCalloutPopoverOpen(false),
+    isOpen: props.isSelected && props.isCalloutPopoverOpen && !!props.frame.callout?.enabled,
+    onClose: props.closePopover,
     frameId: props.frame.id,
+    frameRect: props.currentFrame,
     anchorEl: props.calloutPopoverAnchorRef.current,
     ...(props.frame.callout === undefined ? {} : { settings: props.frame.callout }),
   };

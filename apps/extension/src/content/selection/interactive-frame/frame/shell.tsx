@@ -27,11 +27,13 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
     <div
       ref={props.containerRef as React.RefObject<HTMLDivElement>}
       className="sniptale-frame-container"
+      data-frame-id={props.frame.id}
       style={getInteractiveFrameContainerStyle(props.currentFrame)}
     >
       <div
         ref={props.frameRef as React.RefObject<HTMLDivElement>}
         className="sniptale-interactive-frame"
+        data-frame-id={props.frame.id}
         onPointerDown={props.handleMouseDown}
         style={{
           ...props.frameStyle,

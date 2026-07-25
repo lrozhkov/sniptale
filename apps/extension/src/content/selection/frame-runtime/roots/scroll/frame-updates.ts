@@ -1,5 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { FrameData, FrameState } from '../../../../../features/highlighter/contracts';
+import { useFrameUIStore } from '../../state/frame-ui.store';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { invalidateFrameCache } from '../../../highlighter';
 import { applyFrameOffsetToElement, calculateFrameViewportCoords } from '../../manager/coords';
@@ -63,6 +64,7 @@ export function syncFramePositionOnScroll({
   }
 
   if (shouldDropLinkedElement(linkedElement)) {
+    useFrameUIStore.getState().dismissFrame(frame.id);
     setFrames((prev) => prev.filter((currentFrame) => currentFrame.id !== frame.id));
     linkedElementsRef.current.delete(frame.id);
     invalidateFrameCache();

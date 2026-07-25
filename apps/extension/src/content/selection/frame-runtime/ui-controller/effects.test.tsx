@@ -6,25 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 
 const frameUiStoreMocks = vi.hoisted(() => ({
-  forceHideTooltipMock: vi.fn(),
-}));
-
-const highlighterMocks = vi.hoisted(() => ({
-  clearFrameTooltipVisibleMock: vi.fn(),
-  setFrameTooltipVisibleMock: vi.fn(),
+  dismissFrameUiMock: vi.fn(),
 }));
 
 vi.mock('../state/frame-ui.store', () => ({
   useFrameUIStore: {
     getState: () => ({
-      forceHideTooltip: frameUiStoreMocks.forceHideTooltipMock,
+      dismissFrameUi: frameUiStoreMocks.dismissFrameUiMock,
     }),
   },
-}));
-
-vi.mock('../../highlighter', () => ({
-  clearFrameTooltipVisible: highlighterMocks.clearFrameTooltipVisibleMock,
-  setFrameTooltipVisible: highlighterMocks.setFrameTooltipVisibleMock,
 }));
 
 import { dispatchHighlighterModeChanged } from '../../../platform/page-context/mode-events';
@@ -37,15 +27,23 @@ function createMutableRef<T>(value: T) {
   return { current: value };
 }
 
-function renderHarness(props: { activeFrameId: string | null; popoverFrameId: string | null }) {
+function renderHarness(props: {
+  selectedFrameId: string | null;
+  activePopover: { frameId: string; kind: 'frame-settings' } | null;
+}) {
   function Harness() {
     useFrameUiStoreSync({
-      activeFrameId: props.activeFrameId,
-      activeFrameIdRef: createMutableRef<string | null>(null),
+      hoveredFrameId: null,
+      hoveredFrameIdRef: createMutableRef<string | null>(null),
+      selectedFrameId: props.selectedFrameId,
+      selectedFrameIdRef: createMutableRef<string | null>(null),
       frames: [],
       framesRef: createMutableRef<FrameData[]>([]),
-      popoverFrameId: props.popoverFrameId,
-      popoverFrameIdRef: createMutableRef<string | null>(null),
+      activePopover: props.activePopover,
+      activePopoverRef: createMutableRef<{
+        frameId: string;
+        kind: 'frame-settings' | 'step-badge' | 'callout-settings';
+      } | null>(null),
     });
     return null;
   }
@@ -63,9 +61,7 @@ function renderHarness(props: { activeFrameId: string | null; popoverFrameId: st
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  frameUiStoreMocks.forceHideTooltipMock.mockReset();
-  highlighterMocks.clearFrameTooltipVisibleMock.mockReset();
-  highlighterMocks.setFrameTooltipVisibleMock.mockReset();
+  frameUiStoreMocks.dismissFrameUiMock.mockReset();
 });
 
 afterEach(() => {
@@ -79,22 +75,22 @@ afterEach(() => {
 
 describe('useFrameUiStoreSync', () => {
   it('forces tooltip hide when highlighter mode is disabled', () => {
-    renderHarness({ activeFrameId: 'frame-1', popoverFrameId: null });
+    renderHarness({ selectedFrameId: 'frame-1', activePopover: null });
 
     act(() => {
       dispatchHighlighterModeChanged({ enabled: false });
     });
 
-    expect(frameUiStoreMocks.forceHideTooltipMock).toHaveBeenCalledTimes(1);
+    expect(frameUiStoreMocks.dismissFrameUiMock).toHaveBeenCalledTimes(1);
   });
 
   it('does not force tooltip hide when highlighter mode stays enabled', () => {
-    renderHarness({ activeFrameId: 'frame-1', popoverFrameId: null });
+    renderHarness({ selectedFrameId: 'frame-1', activePopover: null });
 
     act(() => {
       dispatchHighlighterModeChanged({ enabled: true });
     });
 
-    expect(frameUiStoreMocks.forceHideTooltipMock).not.toHaveBeenCalled();
+    expect(frameUiStoreMocks.dismissFrameUiMock).not.toHaveBeenCalled();
   });
 });

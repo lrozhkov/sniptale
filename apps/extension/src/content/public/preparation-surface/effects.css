@@ -8,6 +8,8 @@
 
 :host(.sniptale-capture-ui-hidden) .sniptale-action-toolbar,
 :host(.sniptale-capture-ui-hidden) .sniptale-toolbar-portal-wrapper,
+:host(.sniptale-capture-ui-hidden) .sniptale-frame-toolbar-trigger,
+:host(.sniptale-capture-ui-hidden) .sniptale-frame-toolbar-bridge,
 :host(.sniptale-capture-ui-hidden) .sniptale-frame-settings-popover,
 :host(.sniptale-capture-ui-hidden) .sniptale-step-badge-popover,
 :host(.sniptale-capture-ui-hidden) .sniptale-callout-settings-popover,
@@ -35,6 +37,13 @@
 .sniptale-resize-handle:hover {
   border-color: var(--sniptale-color-accent) !important;
   background: #ffffff !important;
+}
+
+.sniptale-frame-toolbar-trigger:hover,
+.sniptale-frame-toolbar-trigger:focus-visible {
+  border-color: var(--sniptale-color-accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent) !important;
+  outline: none;
 }
 
 .sniptale-callout-drag-handle {

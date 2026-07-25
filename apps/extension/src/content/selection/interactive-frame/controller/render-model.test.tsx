@@ -12,11 +12,19 @@ import {
 
 const renderModelMocks = vi.hoisted(() => ({
   storeState: {
-    activeFrameId: null as string | null,
-    popoverFrameId: null as string | null,
-    openPopover: vi.fn(),
+    hoveredFrameId: null as string | null,
+    selectedFrameId: null as string | null,
+    activePopover: null as {
+      frameId: string;
+      kind: 'frame-settings' | 'step-badge' | 'callout-settings';
+    } | null,
+    resizeFrameId: null as string | null,
+    togglePopover: vi.fn(),
     closePopover: vi.fn(),
-    hideTooltip: vi.fn(),
+    hoverFrame: vi.fn(),
+    scheduleHoverFrameHide: vi.fn(),
+    selectFrame: vi.fn(),
+    clearSelection: vi.fn(),
   },
 }));
 
@@ -145,11 +153,12 @@ async function renderHarness(element: React.ReactElement) {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  renderModelMocks.storeState.activeFrameId = null;
-  renderModelMocks.storeState.popoverFrameId = null;
-  renderModelMocks.storeState.openPopover.mockReset();
+  renderModelMocks.storeState.hoveredFrameId = null;
+  renderModelMocks.storeState.selectedFrameId = null;
+  renderModelMocks.storeState.activePopover = null;
+  renderModelMocks.storeState.togglePopover.mockReset();
   renderModelMocks.storeState.closePopover.mockReset();
-  renderModelMocks.storeState.hideTooltip.mockReset();
+  renderModelMocks.storeState.clearSelection.mockReset();
 });
 
 afterEach(() => {
@@ -164,7 +173,7 @@ afterEach(() => {
 });
 
 describe('useInteractiveFrameRenderModel', () => {
-  it('never exposes default top-left toolbar coords on hover renders', async () => {
+  it('never exposes default top-left toolbar coords on selected renders', async () => {
     const snapshots: Array<{
       state: string;
       toolbarCoords: { x: number; y: number };
@@ -172,7 +181,7 @@ describe('useInteractiveFrameRenderModel', () => {
     }> = [];
     const HoverHarness = createSnapshotsHarness({ snapshots });
     const expectedToolbarCoords = calculateInteractiveFrameToolbarPosition(baseFrame);
-    renderModelMocks.storeState.activeFrameId = baseFrame.id;
+    renderModelMocks.storeState.selectedFrameId = baseFrame.id;
 
     await renderHarness(<HoverHarness />);
     await flushEffects();

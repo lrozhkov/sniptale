@@ -138,18 +138,16 @@ function HistoryApplyHarness(props: { frame: FrameData }) {
   const [state, setState] = React.useState<FrameState>('editing');
   const [tempFrame, setTempFrame] = React.useState<FrameData>({ ...props.frame, x: 200 });
   const [effectMode, setEffectMode] = React.useState<'border' | 'blur' | 'focus'>('blur');
-  const [isStepBadgePopoverOpen, setIsStepBadgePopoverOpen] = React.useState(true);
-  const [isCalloutPopoverOpen, setIsCalloutPopoverOpen] = React.useState(true);
+  const [isPopoverOpen, setIsPopoverOpen] = React.useState(true);
   const [isCalloutEditing, setIsCalloutEditing] = React.useState(true);
 
   useInteractiveFrameHistoryApplyReset({
     abortPointerSession: () => abortPointerSessionSpy?.() ?? false,
+    closePopover: () => setIsPopoverOpen(false),
     defaultEffectMode: 'border',
     frame: props.frame,
     setEffectMode,
     setIsCalloutEditing,
-    setIsCalloutPopoverOpen,
-    setIsStepBadgePopoverOpen,
     setState,
     setTempFrame,
   });
@@ -157,10 +155,9 @@ function HistoryApplyHarness(props: { frame: FrameData }) {
   return (
     <div
       data-callout-editing={String(isCalloutEditing)}
-      data-callout-open={String(isCalloutPopoverOpen)}
+      data-popover-open={String(isPopoverOpen)}
       data-effect-mode={effectMode}
       data-state={state}
-      data-step-open={String(isStepBadgePopoverOpen)}
       data-temp-x={String(tempFrame.x)}
     />
   );
@@ -247,8 +244,7 @@ describe('useInteractiveFrameHistoryApplyReset', () => {
     expect(node?.getAttribute('data-state')).toBe('idle');
     expect(node?.getAttribute('data-effect-mode')).toBe('focus');
     expect(node?.getAttribute('data-temp-x')).toBe('10');
-    expect(node?.getAttribute('data-step-open')).toBe('false');
-    expect(node?.getAttribute('data-callout-open')).toBe('false');
+    expect(node?.getAttribute('data-popover-open')).toBe('false');
     expect(node?.getAttribute('data-callout-editing')).toBe('false');
     expect(abortPointerSessionSpy).toHaveBeenCalledOnce();
     expect(pagePreparationHistory.cancelTransaction).toHaveBeenCalledWith(

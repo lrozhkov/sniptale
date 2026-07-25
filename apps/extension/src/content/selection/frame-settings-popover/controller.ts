@@ -11,6 +11,7 @@ import {
   useFrameSettingsPopoverOutsideClose,
 } from './sync';
 import { useFrameSettingsPopoverState } from './state';
+import { usePopoverEscapeClose } from '../popover-sync/hooks';
 
 export function useFrameSettingsPopoverController(args: {
   anchorEl: HTMLElement | null;
@@ -36,7 +37,6 @@ export function useFrameSettingsPopoverController(args: {
     ...(args.focusSettings === undefined ? {} : { focusSettings: args.focusSettings }),
   });
   const bindings = useFrameSettingsPopoverBindings({
-    anchorEl: args.anchorEl,
     handleSelectPreset: state.handlers.handleSelectPreset,
     onClose: args.onClose,
   });
@@ -52,6 +52,11 @@ export function useFrameSettingsPopoverController(args: {
     onClose: args.onClose,
     popoverRef: bindings.popoverRef,
   });
+  usePopoverEscapeClose({
+    anchorEl: args.anchorEl,
+    isOpen: args.isOpen,
+    onClose: args.onClose,
+  });
 
   return {
     handlers: {
@@ -60,7 +65,6 @@ export function useFrameSettingsPopoverController(args: {
     },
     settings: state.settings,
     surface: {
-      getPopoverStyle: bindings.getPopoverStyle,
       popoverRef: bindings.popoverRef,
       portalTheme,
     },

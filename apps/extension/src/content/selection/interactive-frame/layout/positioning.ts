@@ -1,4 +1,9 @@
 import { calculateContentSizeTooltipPosition } from '@sniptale/ui/content-size-tooltip/core';
+import {
+  calculateFrameFloatingPlacement,
+  type FloatingRect,
+  type FrameFloatingSide,
+} from './floating-placement';
 
 export function calculateInteractiveFrameSizePanelPosition(frameRect: {
   x: number;
@@ -16,43 +21,39 @@ export function calculateInteractiveFrameToolbarPosition(
     width: number;
     height: number;
   },
-  toolbarSize: { width: number; height: number } = { width: 420, height: 50 }
+  toolbarSize: { width: number; height: number } = { width: 420, height: 50 },
+  options?: {
+    anchorPoint?: { x: number; y: number };
+    preferredSide?: FrameFloatingSide;
+    softRects?: FloatingRect[];
+    strictRects?: FloatingRect[];
+  }
 ) {
-  const toolbarHeight = toolbarSize.height;
-  const toolbarWidth = Math.min(toolbarSize.width, Math.max(0, window.innerWidth - 16));
-  const margin = 10;
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const spaceTop = frameRect.y;
-  const spaceBottom = viewportHeight - frameRect.y - frameRect.height;
+  const preferredSide = options?.anchorPoint
+    ? getNearestFrameSide(frameRect, options.anchorPoint)
+    : options?.preferredSide;
+  const placement = calculateFrameFloatingPlacement({
+    ...(options?.anchorPoint === undefined ? {} : { anchorPoint: options.anchorPoint }),
+    anchorRect: frameRect,
+    avoidanceRect: frameRect,
+    size: toolbarSize,
+    ...(preferredSide === undefined ? {} : { preferredSide }),
+    ...(options?.softRects === undefined ? {} : { softRects: options.softRects }),
+    ...(options?.strictRects === undefined ? {} : { strictRects: options.strictRects }),
+  });
+  return { x: placement.rect.x, y: placement.rect.y, side: placement.side };
+}
 
-  let x = frameRect.x;
-  let y = frameRect.y - toolbarHeight - margin;
-
-  if (spaceTop < toolbarHeight + margin) {
-    y = frameRect.y + frameRect.height + margin;
-    if (spaceBottom < toolbarHeight + margin) {
-      y = frameRect.y + margin;
-      x = frameRect.x + margin;
-    }
-  }
-
-  if (x + toolbarWidth > viewportWidth - margin) {
-    x = viewportWidth - toolbarWidth - margin;
-  }
-  if (x < margin) {
-    x = margin;
-  }
-
-  if (y >= frameRect.y && y < frameRect.y + frameRect.height) {
-    const spaceRight = viewportWidth - frameRect.x - frameRect.width;
-    if (spaceRight >= toolbarWidth + margin) {
-      x = frameRect.x + frameRect.width + margin;
-    }
-  }
-
-  x = Math.max(margin, Math.min(x, viewportWidth - toolbarWidth - margin));
-  y = Math.max(margin, Math.min(y, viewportHeight - toolbarHeight - margin));
-
-  return { x, y };
+function getNearestFrameSide(
+  frame: { x: number; y: number; width: number; height: number },
+  point: { x: number; y: number }
+): FrameFloatingSide {
+  const distances: Array<{ distance: number; side: FrameFloatingSide }> = [
+    { distance: Math.abs(point.y - frame.y), side: 'top' },
+    { distance: Math.abs(point.y - (frame.y + frame.height)), side: 'bottom' },
+    { distance: Math.abs(point.x - frame.x), side: 'left' },
+    { distance: Math.abs(point.x - (frame.x + frame.width)), side: 'right' },
+  ];
+  distances.sort((a, b) => a.distance - b.distance);
+  return distances[0]!.side;
 }

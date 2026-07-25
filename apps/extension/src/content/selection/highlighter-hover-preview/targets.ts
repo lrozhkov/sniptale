@@ -9,6 +9,7 @@ import {
   type HoverFrameCacheEntry,
   type HoverFrameCacheSession,
 } from './session';
+import { isPointWithinFrameBorderHit } from '../frame-runtime/ui-controller/hit-test';
 
 const HIGHLIGHTER_EXTENSION_UI_CLASSES = [
   'sniptale-highlight',
@@ -17,6 +18,9 @@ const HIGHLIGHTER_EXTENSION_UI_CLASSES = [
   'sniptale-frames-container',
   'sniptale-interactive-frame',
   'sniptale-action-toolbar',
+  'sniptale-toolbar-portal-wrapper',
+  'sniptale-frame-toolbar-trigger',
+  'sniptale-frame-toolbar-bridge',
   'sniptale-effect-toggle',
   'sniptale-resize-handle',
   'sniptale-focus-overlay',
@@ -30,6 +34,9 @@ const HIGHLIGHTER_EXTENSION_UI_CLASSES = [
 
 const HIGHLIGHTER_EXTENSION_UI_SELECTOR = [
   '.sniptale-action-toolbar',
+  '.sniptale-toolbar-portal-wrapper',
+  '.sniptale-frame-toolbar-trigger',
+  '.sniptale-frame-toolbar-bridge',
   '.sniptale-effect-toggle',
   '.sniptale-resize-handle',
   '.sniptale-frame-settings-popover',
@@ -55,15 +62,16 @@ export function isNearExistingFrameBorder(
   x: number,
   y: number
 ): boolean {
-  const exclusionRadius = 30;
   const frameCache = readHoverFrameCache(session, collectFrameCacheEntries);
   for (const { rect } of frameCache.values()) {
-    const expandedLeft = rect.left - exclusionRadius;
-    const expandedRight = rect.right + exclusionRadius;
-    const expandedTop = rect.top - exclusionRadius;
-    const expandedBottom = rect.bottom + exclusionRadius;
-    if (x >= expandedLeft && x <= expandedRight && y >= expandedTop && y <= expandedBottom) {
-      return !(x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom);
+    if (
+      isPointWithinFrameBorderHit(
+        { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+        x,
+        y
+      )
+    ) {
+      return true;
     }
   }
   return false;
@@ -86,6 +94,7 @@ export function isHighlighterExtensionUiElement(target: HTMLElement): boolean {
 
 export function hasBlockingHighlighterPopover(): boolean {
   return Boolean(
+    queryContentUiElement('.sniptale-frame-settings-popover') ||
     queryContentUiElement('.sniptale-step-badge-popover') ||
     queryContentUiElement('.sniptale-callout-settings-popover')
   );

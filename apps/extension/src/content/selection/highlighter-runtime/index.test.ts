@@ -5,7 +5,6 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const facade = vi.hoisted(() => ({
   clearAllHighlights: vi.fn(),
   clearFrameEditing: vi.fn(),
-  clearFrameTooltipVisible: vi.fn(),
   createLazyOwner: vi.fn(),
   disableMode: vi.fn(),
   enableMode: vi.fn(),
@@ -19,7 +18,6 @@ const facade = vi.hoisted(() => ({
   registerFrameCallbacks: vi.fn(),
   resume: vi.fn(),
   setFrameEditing: vi.fn(),
-  setFrameTooltipVisible: vi.fn(),
 }));
 
 vi.mock('../../application/default-owner', () => ({
@@ -37,7 +35,6 @@ beforeEach(() => {
   const owner = {
     clearAllHighlights: facade.clearAllHighlights,
     clearFrameEditing: facade.clearFrameEditing,
-    clearFrameTooltipVisible: facade.clearFrameTooltipVisible,
     disableMode: facade.disableMode,
     enableMode: facade.enableMode,
     invalidateFrameCache: facade.invalidateFrameCache,
@@ -47,7 +44,6 @@ beforeEach(() => {
     registerFrameCallbacks: facade.registerFrameCallbacks,
     resume: facade.resume,
     setFrameEditing: facade.setFrameEditing,
-    setFrameTooltipVisible: facade.setFrameTooltipVisible,
   };
   facade.getOwner.mockReturnValue(owner);
   facade.getOwnerIfCreated.mockReturnValue(owner);
@@ -87,8 +83,6 @@ it('routes highlighter commands and queries through the created owner', async ()
   runtime.resumeHighlighter();
   runtime.setFrameEditing();
   runtime.clearFrameEditing();
-  runtime.setFrameTooltipVisible();
-  runtime.clearFrameTooltipVisible();
 
   expect(runtime.isHighlighterEnabled()).toBe(true);
   expect(runtime.isHighlighterPausedState()).toBe(true);
@@ -100,8 +94,6 @@ it('routes highlighter commands and queries through the created owner', async ()
   expect(facade.resume).toHaveBeenCalledOnce();
   expect(facade.setFrameEditing).toHaveBeenCalledOnce();
   expect(facade.clearFrameEditing).toHaveBeenCalledOnce();
-  expect(facade.setFrameTooltipVisible).toHaveBeenCalledOnce();
-  expect(facade.clearFrameTooltipVisible).toHaveBeenCalledOnce();
 });
 
 it('does not create an owner for disabled-state queries or cleanup', async () => {

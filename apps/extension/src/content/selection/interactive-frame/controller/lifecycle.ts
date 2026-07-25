@@ -91,26 +91,25 @@ export function useInteractiveFrameStateSync(params: {
 }
 
 export function useInteractiveFrameTooltipSync(params: {
-  isTooltipVisible: boolean;
+  isChromeVisible: boolean;
   state: FrameState;
   isStepBadgePopoverOpen: boolean;
   isCalloutPopoverOpen: boolean;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
 }) {
-  const { isTooltipVisible, state, isStepBadgePopoverOpen, isCalloutPopoverOpen, setState } =
-    params;
+  const { isChromeVisible, state, isStepBadgePopoverOpen, isCalloutPopoverOpen, setState } = params;
   React.useEffect(() => {
-    if (isTooltipVisible && state === 'idle') {
+    if (isChromeVisible && state === 'idle') {
       setState('hover');
     } else if (
-      !isTooltipVisible &&
+      !isChromeVisible &&
       state === 'hover' &&
       !isStepBadgePopoverOpen &&
       !isCalloutPopoverOpen
     ) {
       setState('idle');
     }
-  }, [isTooltipVisible, state, isStepBadgePopoverOpen, isCalloutPopoverOpen, setState]);
+  }, [isChromeVisible, state, isStepBadgePopoverOpen, isCalloutPopoverOpen, setState]);
 }
 
 export function useInteractiveFramePropSync(params: {
@@ -138,8 +137,6 @@ export function useInteractiveFrameEditingEffects(params: {
   isCalloutEditing: boolean;
   frameWithoutLinkedElement: FrameData;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
-  setIsStepBadgePopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsCalloutPopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
   handleCancelRef: React.MutableRefObject<() => void>;
   handleSaveRef: React.MutableRefObject<() => void>;
   handleDeleteRef: React.MutableRefObject<() => void>;
@@ -187,21 +184,19 @@ export function useInteractiveFrameHistoryApplyReset(params: {
   abortPointerSession: () => boolean;
   defaultEffectMode: EffectMode;
   frame: FrameData;
+  closePopover: () => void;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsCalloutPopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsStepBadgePopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
 }) {
   const {
     abortPointerSession,
+    closePopover,
     defaultEffectMode,
     frame,
     setEffectMode,
     setIsCalloutEditing,
-    setIsCalloutPopoverOpen,
-    setIsStepBadgePopoverOpen,
     setState,
     setTempFrame,
   } = params;
@@ -215,8 +210,7 @@ export function useInteractiveFrameHistoryApplyReset(params: {
       cancelFrameHistoryTransactions(frameRef.current.id);
       setState('idle');
       setIsCalloutEditing(false);
-      setIsCalloutPopoverOpen(false);
-      setIsStepBadgePopoverOpen(false);
+      closePopover();
       scheduleHistoryApplySync({
         defaultEffectModeRef,
         frameRef,
@@ -227,10 +221,9 @@ export function useInteractiveFrameHistoryApplyReset(params: {
     });
   }, [
     abortPointerSession,
+    closePopover,
     setEffectMode,
     setIsCalloutEditing,
-    setIsCalloutPopoverOpen,
-    setIsStepBadgePopoverOpen,
     setState,
     setTempFrame,
     defaultEffectModeRef,

@@ -5,6 +5,10 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Рамка',
     en: 'Border',
   },
+  openToolbar: {
+    ru: 'Открыть панель действий рамки',
+    en: 'Open frame actions',
+  },
   effectBlur: {
     ru: 'Размытие',
     en: 'Blur',

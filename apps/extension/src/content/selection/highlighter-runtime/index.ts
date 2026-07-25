@@ -56,12 +56,4 @@ export function clearFrameEditing(): void {
   highlighterControllerOwner.getOwner().clearFrameEditing();
 }
 
-export function setFrameTooltipVisible(): void {
-  highlighterControllerOwner.getOwner().setFrameTooltipVisible();
-}
-
-export function clearFrameTooltipVisible(): void {
-  highlighterControllerOwner.getOwner().clearFrameTooltipVisible();
-}
-
 registerContentMode('highlighter', disableHighlighterMode);

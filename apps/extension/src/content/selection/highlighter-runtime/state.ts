@@ -10,7 +10,6 @@ export type HighlighterRuntimeState = {
   isModeEnabled: boolean;
   isPaused: boolean;
   isFrameEditing: boolean;
-  isTooltipVisible: boolean;
   cleanupEventListeners: (() => void) | null;
   callbacks: HighlighterFrameCallbacks;
 };
@@ -26,7 +25,6 @@ export function createHighlighterRuntimeState(): HighlighterRuntimeState {
     isModeEnabled: false,
     isPaused: false,
     isFrameEditing: false,
-    isTooltipVisible: false,
     cleanupEventListeners: null,
     callbacks: {
       addFrame: null,
@@ -51,7 +49,6 @@ export function createHighlighterStateGetters(state: HighlighterRuntimeState) {
     isModeEnabled: () => state.isModeEnabled,
     isPaused: () => state.isPaused,
     isFrameEditing: () => state.isFrameEditing,
-    isTooltipVisible: () => state.isTooltipVisible,
   };
 }
 
@@ -105,19 +102,4 @@ export function resetHighlighterHoverUi(controller: HighlighterHoverUiController
   controller.tracking.clear();
   controller.overlay.removePreview();
   controller.overlay.removeContainer();
-}
-
-export function setHighlighterTooltipVisibility(
-  state: HighlighterRuntimeState,
-  isVisible: boolean,
-  controller: Pick<HighlighterHoverUiController, 'overlay' | 'tracking'>
-): void {
-  state.isTooltipVisible = isVisible;
-
-  if (isVisible) {
-    controller.overlay.hidePreview();
-    return;
-  }
-
-  controller.tracking.clear();
 }

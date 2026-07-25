@@ -16,7 +16,6 @@ export interface HighlighterControllerDeps {
       isModeEnabled: () => boolean;
       isPaused: () => boolean;
       isFrameEditing: () => boolean;
-      isTooltipVisible: () => boolean;
     }
   ) => HoverController;
   createState?: () => HighlighterRuntimeState;
@@ -30,14 +29,12 @@ export interface HighlighterController {
   addHighlight: (element: HTMLElement) => void;
   clearAllHighlights: () => void;
   clearFrameEditing: () => void;
-  clearFrameTooltipVisible: () => void;
   disableMode: () => void;
   dispose: () => void;
   enableMode: () => void;
   invalidateFrameCache: () => void;
   invalidateSettingsCache: () => void;
   isEnabled: () => boolean;
-  isFrameTooltipVisible: () => boolean;
   isPausedState: () => boolean;
   pause: () => void;
   registerFrameCallbacks: (
@@ -50,5 +47,4 @@ export interface HighlighterController {
   removeHighlight: (id: string) => void;
   resume: () => void;
   setFrameEditing: () => void;
-  setFrameTooltipVisible: () => void;
 }

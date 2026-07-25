@@ -3,6 +3,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import type { HoverOverlayActions } from './overlay';
 import type { HoverFrameCacheSession, HoverSession, HoverTrackingSession } from './session';
 import type { AddFreeFrameCallback } from '../../../features/highlighter/contracts';
+import { getViewportClientPoint } from '../../platform/frame';
 import {
   hasBlockingHighlighterPopover,
   isHighlighterExtensionUiElement,
@@ -25,7 +26,6 @@ export type HighlighterStateGetters = {
   isModeEnabled: () => boolean;
   isPaused: () => boolean;
   isFrameEditing: () => boolean;
-  isTooltipVisible: () => boolean;
 };
 
 type HoverInteractionSession = HoverTrackingSession &
@@ -50,8 +50,7 @@ export function shouldSkipHoverProcessing(props: {
   if (
     !props.getState.isModeEnabled() ||
     props.getState.isPaused() ||
-    props.getState.isFrameEditing() ||
-    props.getState.isTooltipVisible()
+    props.getState.isFrameEditing()
   ) {
     return true;
   }
@@ -81,13 +80,9 @@ export function handleFrozenHoverPreview(props: {
 
 export function shouldIgnoreHighlighterClick(props: {
   eventTarget: HTMLElement;
-  getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused' | 'isTooltipVisible'>;
+  getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused'>;
 }): boolean {
-  if (
-    !props.getState.isModeEnabled() ||
-    props.getState.isPaused() ||
-    props.getState.isTooltipVisible()
-  ) {
+  if (!props.getState.isModeEnabled() || props.getState.isPaused()) {
     return true;
   }
   if (hasBlockingHighlighterPopover()) return true;
@@ -171,6 +166,7 @@ export function scheduleHoverOverlayUpdate(props: {
     hideHoverPreview(props.session, props.hideHoverOverlay);
     return;
   }
+  const point = getViewportClientPoint(props.event.clientX, props.event.clientY, props.iframe);
 
   props.session.hoverRafId = requestAnimationFrame(() => {
     props.session.hoverRafId = null;
@@ -182,8 +178,8 @@ export function scheduleHoverOverlayUpdate(props: {
       session: props.session,
       showHoverOverlay: props.showHoverOverlay,
       target,
-      x: props.event.clientX,
-      y: props.event.clientY,
+      x: point.x,
+      y: point.y,
     });
   });
 }
@@ -197,8 +193,10 @@ function createHoverClickHandler(props: HoverInteractionProps) {
       return;
     }
     const target = resolvePagePreparationTarget(event, iframe);
+    const point = getViewportClientPoint(event.clientX, event.clientY, iframe);
     if (
       !target ||
+      isNearExistingFrameBorder(props.session, point.x, point.y) ||
       shouldIgnoreHighlighterClick({ eventTarget: target, getState: props.getState })
     ) {
       return;

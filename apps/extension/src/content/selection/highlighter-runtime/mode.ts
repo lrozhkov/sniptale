@@ -31,6 +31,7 @@ export function enableHighlighterRuntime(
   mountHighlighterCursorStyle();
   const cleanupRuntimeListeners = registerHighlighterRuntimeListeners({
     disableHighlighterMode: () => disableHighlighterRuntime(state, hoverController),
+    hasActivePopover: () => useFrameUIStore.getState().activePopover !== null,
     hoverController,
     isAnyFrameEditing: () => state.isFrameEditing,
   });
@@ -56,9 +57,8 @@ export function disableHighlighterRuntime(
   state.isModeEnabled = false;
   state.isPaused = false;
   state.isFrameEditing = false;
-  state.isTooltipVisible = false;
   setContentModeEnabled('highlighter', false);
-  useFrameUIStore.getState().forceHideTooltip();
+  useFrameUIStore.getState().dismissFrameUi();
   hoverController.tracking.cancelPendingFrame();
   hoverController.tracking.clear();
   dispatchHighlighterModeChanged(false);

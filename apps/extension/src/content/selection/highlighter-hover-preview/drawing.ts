@@ -15,7 +15,8 @@ import {
 import type { FreeFrameInput } from '../../../features/highlighter/contracts';
 import type { HighlighterCallbacks, HighlighterStateGetters } from './interactions';
 import { getCurrentBorderPreset, type HoverSession } from './session';
-import { hasBlockingHighlighterPopover, isHighlighterExtensionUiElement } from './targets';
+import { isHighlighterExtensionUiElement } from './targets';
+import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 
 const DRAW_THRESHOLD = 5;
 const MIN_DRAW_SIZE = 10;
@@ -212,9 +213,7 @@ function canStartDrawing(props: {
     props.event.button !== 0 ||
     !props.getState.isModeEnabled() ||
     props.getState.isPaused() ||
-    props.getState.isFrameEditing() ||
-    props.getState.isTooltipVisible() ||
-    hasBlockingHighlighterPopover()
+    props.getState.isFrameEditing()
   ) {
     return null;
   }
@@ -224,7 +223,7 @@ function canStartDrawing(props: {
 
 function cancelDrawing(props: FreeFrameDrawingProps, reason: DrawingCancelReason = 'teardown') {
   const gesture = props.session.freeDraw.gesture;
-  if (gesture && (reason === 'mouseleave' || reason === 'scroll')) {
+  if (gesture && (reason === 'blur' || reason === 'mouseleave' || reason === 'scroll')) {
     return false;
   }
   const hadGesture = gesture !== null;
@@ -270,6 +269,9 @@ function handlePointerDown(
 
 function enterDrawingState(props: FreeFrameDrawingProps, gesture: FreeDrawGesture) {
   gesture.isDrawing = true;
+  const frameUi = useFrameUIStore.getState();
+  frameUi.dismissFrameUi();
+  frameUi.setResizeFrame(null);
   if (props.session.hoverRafId !== null) {
     cancelAnimationFrame(props.session.hoverRafId);
     props.session.hoverRafId = null;

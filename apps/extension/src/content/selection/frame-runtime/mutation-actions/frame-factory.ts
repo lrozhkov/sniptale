@@ -7,6 +7,7 @@ import { createFrameDataFromElement } from '../manager/coords';
 import { buildFrameForAdd, buildFreeFrameForAdd } from './frame-build';
 import { applyAddedFrameSideEffects } from './frame-post-add';
 import type { UseFrameMutationActionHelperOptions } from './types';
+import { useFrameUIStore } from '../state/frame-ui.store';
 
 type CreateAddFrameHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -95,6 +96,7 @@ export function createAddFreeFrameHandler(
       linkedElementsRef: args.linkedElementsRef,
       recalculateStepBadgesRef: args.recalculateStepBadgesRef,
     });
+    useFrameUIStore.getState().selectFrame(frameData.id);
     return frameData;
   };
 }

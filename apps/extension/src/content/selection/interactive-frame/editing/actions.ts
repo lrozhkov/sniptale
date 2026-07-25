@@ -56,19 +56,16 @@ export function toggleInteractiveFrameEffectMode(params: {
   frameId: string;
   effectMode: EffectMode;
   closePopover: () => void;
-  openPopover: (frameId: string) => void;
+  togglePopover: (frameId: string, kind: 'frame-settings') => void;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   onEffectChange?: (frameId: string, mode: EffectMode) => void;
 }) {
-  const currentPopoverFrameId = useFrameUIStore.getState().popoverFrameId;
-  const isCurrentlyOpen = currentPopoverFrameId === params.frameId;
+  const activePopover = useFrameUIStore.getState().activePopover;
+  const isCurrentlyOpen =
+    activePopover?.frameId === params.frameId && activePopover.kind === 'frame-settings';
 
   if (params.effectMode === params.mode) {
-    if (isCurrentlyOpen) {
-      params.closePopover();
-    } else {
-      params.openPopover(params.frameId);
-    }
+    params.togglePopover(params.frameId, 'frame-settings');
     return;
   }
 

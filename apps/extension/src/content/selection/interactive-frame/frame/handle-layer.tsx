@@ -6,13 +6,15 @@ import { getResizeHandleStyle } from '../layout/resize-handle-position';
 
 export function InteractiveFrameResizeHandleLayer(props: {
   directions: ResizeDirection[];
+  frameId: string;
   tempFrame: FrameData;
   handleSize: number;
   borderWidth: number;
   borderColor?: string;
   onResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 }) {
-  const { directions, tempFrame, handleSize, borderWidth, borderColor, onResizeStart } = props;
+  const { directions, frameId, tempFrame, handleSize, borderWidth, borderColor, onResizeStart } =
+    props;
   const resolvedBorderColor = borderColor ?? 'var(--sniptale-color-accent)';
 
   const baseStyle: CSSProperties = {
@@ -34,6 +36,8 @@ export function InteractiveFrameResizeHandleLayer(props: {
         <div
           key={dir}
           className="sniptale-resize-handle"
+          data-frame-id={frameId}
+          data-frame-control="resize-handle"
           data-direction={dir}
           style={{
             ...baseStyle,

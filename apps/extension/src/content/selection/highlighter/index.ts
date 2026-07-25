@@ -1,7 +1,6 @@
 export {
   clearAllHighlights,
   clearFrameEditing,
-  clearFrameTooltipVisible,
   disableHighlighterMode,
   enableHighlighterMode,
   invalidateFrameCache,
@@ -11,5 +10,4 @@ export {
   registerFrameCallbacks,
   resumeHighlighter,
   setFrameEditing,
-  setFrameTooltipVisible,
 } from '../highlighter-runtime';
