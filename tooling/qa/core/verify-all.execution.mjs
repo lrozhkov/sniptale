@@ -1,7 +1,7 @@
 import { collectAiHygieneReport } from './ai-hygiene-utils.mjs';
 import { collectAuditStep, collectOptionalSecurityStep } from './full-verify-audit-steps.mjs';
 import { runDesignSystemCheck } from './verify-design-system.mjs';
-import { lintWithEslint } from './verify-eslint.mjs';
+import { lintWithEslint, summarizeEslintResults } from './verify-eslint.mjs';
 import {
   createFailureStep,
   createOkStep,
@@ -22,7 +22,7 @@ import { resolveFullVerifyScope } from './verify-all.scope.mjs';
 import { collectViolationSteps } from './full-verify-violation-steps.mjs';
 import { filterAllowedViolations, loadBaseline } from './shared.mjs';
 import { measureAsyncStep, measureSyncStep } from './step-timing.helpers.mjs';
-import { runSonarjsCheck } from './verify-sonarjs.mjs';
+import { createSonarjsEslintOverrideConfig, runSonarjsCheck } from './verify-sonarjs.mjs';
 import { runStructuralRiskCheck } from './verify-structural-risk.mjs';
 import {
   appendBuildStepOrBlock,
@@ -108,18 +108,59 @@ function collectStructuralRiskStep({ codeFiles }) {
   );
 }
 
-async function collectSonarjsReleaseStep({ releaseMode }) {
+async function collectSonarjsReleaseStep({ eslintResults = null, releaseMode }) {
   if (!releaseMode) {
     return createSkippedStep('SonarJS', 'release-only');
   }
 
   const { durationMs, value: sonarjsResult } = await measureAsyncStep(() =>
-    runSonarjsCheck({ scope: 'repo-wide' })
+    runSonarjsCheck({ eslintResults, scope: 'repo-wide' })
   );
   return withDuration(
     createViolationStep('SonarJS', 'SonarJS violations found:', sonarjsResult),
     durationMs
   );
+}
+
+function createEslintStep(eslintResult, durationMs) {
+  return eslintResult.failed
+    ? createFailureStep('ESLint', 'failed', {
+        stdout: eslintResult.output,
+        durationMs,
+      })
+    : withDuration(createOkStep('ESLint'), durationMs);
+}
+
+export async function collectReleaseLintLane(
+  context,
+  {
+    eslintProjector = summarizeEslintResults,
+    lintRunner = lintWithEslint,
+    overrideConfigFactory = createSonarjsEslintOverrideConfig,
+    securityCollector = collectOptionalSecurityStep,
+    sonarjsCollector = collectSonarjsReleaseStep,
+  } = {}
+) {
+  const { durationMs: lintDurationMs, value: combinedResult } = await measureAsyncStep(() =>
+    lintRunner({
+      files: PRODUCT_SOURCE_ROOTS,
+      overrideConfig: overrideConfigFactory(),
+      strict: false,
+    })
+  );
+  const { durationMs: projectionDurationMs, value: eslintResult } = await measureAsyncStep(() =>
+    eslintProjector(combinedResult.results, {
+      excludedRulePrefixes: ['sonarjs/'],
+      strict: true,
+    })
+  );
+  const sharedContext = { ...context, eslintResults: combinedResult.results };
+
+  return {
+    eslintStep: createEslintStep(eslintResult, lintDurationMs + projectionDurationMs),
+    sonarjsStep: await sonarjsCollector(sharedContext),
+    securityStep: await securityCollector(sharedContext),
+  };
 }
 
 function createReleaseContext({ releaseMode, verifyScope, baseline }) {
@@ -193,9 +234,12 @@ export async function collectFullVerifyLane({ context, lane, vitestMaxWorkers })
     };
   }
   if (lane === 'lint') {
+    if (context.releaseMode) {
+      return collectReleaseLintLane(context);
+    }
     return {
       eslintStep: await collectors.collectEslintStep(context),
-      sonarjsStep: context.releaseMode ? await collectors.collectSonarjsReleaseStep(context) : null,
+      sonarjsStep: null,
       securityStep: await collectors.collectSecurityStep(context),
     };
   }

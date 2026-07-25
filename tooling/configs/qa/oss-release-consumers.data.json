@@ -94,7 +94,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/verify-closeout-step-helpers.mjs",
-      "sha256": "2f76eb79bed2bef43bfa1054fab1b3c3f6862f84a7f2d006b619324deaaeae2f"
+      "sha256": "b3a00cf89d644b1f56591b5afcc2e2cdab848b9d28469a79d39d3c8a64db0319"
     },
     {
       "category": "validator-integration",

@@ -239,3 +239,76 @@ it('keeps SonarJS release-only in the full verification collector', async () => 
   expect(releaseResult.steps.map((step) => step.label)).toContain('SonarJS');
   expect(sonarjsCollector).toHaveBeenCalledTimes(1);
 });
+
+it('shares one release ESLint analysis while preserving separate gate results', async () => {
+  const module = await import('./verify-all.execution.mjs');
+  const rawResults = [{ filePath: '/repo/apps/extension/src/example.ts', messages: [] }];
+  const lintRunner = vi.fn(async () => ({
+    failed: false,
+    warningCount: 0,
+    errorCount: 0,
+    output: '',
+    results: rawResults,
+  }));
+  const eslintProjector = vi.fn(async () => ({
+    failed: false,
+    warningCount: 0,
+    errorCount: 0,
+    output: '',
+    results: rawResults,
+  }));
+  const sonarjsCollector = vi.fn(async () => ({ label: 'SonarJS', status: 'ok' as const }));
+  const securityCollector = vi.fn(async () => ({ label: 'Security', status: 'ok' as const }));
+  const overrideConfig = [{ files: ['synthetic-product-scope'] }];
+
+  const result = await module.collectReleaseLintLane(
+    {
+      codeFiles: ['apps/extension/src/example.ts'],
+      releaseMode: true,
+      targetFiles: ['apps/extension/src/example.ts'],
+    },
+    {
+      eslintProjector,
+      lintRunner,
+      overrideConfigFactory: () => overrideConfig,
+      securityCollector,
+      sonarjsCollector,
+    }
+  );
+
+  expect(lintRunner).toHaveBeenCalledTimes(1);
+  expect(lintRunner).toHaveBeenCalledWith(
+    expect.objectContaining({ overrideConfig, strict: false })
+  );
+  expect(eslintProjector).toHaveBeenCalledWith(rawResults, {
+    excludedRulePrefixes: ['sonarjs/'],
+    strict: true,
+  });
+  expect(sonarjsCollector).toHaveBeenCalledWith(
+    expect.objectContaining({ eslintResults: rawResults })
+  );
+  expect(securityCollector).toHaveBeenCalledWith(
+    expect.objectContaining({ eslintResults: rawResults })
+  );
+  expect([result.eslintStep.label, result.sonarjsStep.label, result.securityStep.label]).toEqual([
+    'ESLint',
+    'SonarJS',
+    'Security',
+  ]);
+});
+
+it('keeps non-release security repo-wide and scopes only shared release results', async () => {
+  const module = await import('./full-verify-audit-steps.mjs');
+  const securityCollector = vi.fn(async () => ({ label: 'Security', status: 'ok' as const }));
+  const codeFiles = ['tooling/qa/core/example.mjs'];
+
+  await module.collectOptionalSecurityStep(
+    { codeFiles, eslintResults: null },
+    { securityCollector }
+  );
+  expect(securityCollector).toHaveBeenLastCalledWith();
+
+  const eslintResults = [{ filePath: '/repo/tooling/qa/core/example.mjs', messages: [] }];
+  await module.collectOptionalSecurityStep({ codeFiles, eslintResults }, { securityCollector });
+  expect(securityCollector).toHaveBeenLastCalledWith({ eslintResults, files: codeFiles });
+});

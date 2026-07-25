@@ -19347,6 +19347,28 @@
       ]
     },
     {
+      "id": "policy.source.verify-all-execution-mjs.6438f3a5d6",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/verify-all.execution.mjs",
+        "contentHash": "cc87c1d6e52e1272e111eb2eda710967d6db7eb4fdad52fc4ba523796173e1b0"
+      },
+      "consumers": [
+        "tooling/qa/core/verify-all.execution.mjs",
+        "tooling/qa/core/verify-all.execution.test.ts",
+        "tooling/qa/core/verify-all.mjs",
+        "tooling/qa/core/verify-all.worker.mjs",
+        "tooling/qa/wrappers/release.mjs"
+      ],
+      "surfaces": [
+        "property:collectReleaseLintLane/anonymous-151/excludedRulePrefixes"
+      ]
+    },
+    {
       "id": "policy.source.verify-all-scheduler-mjs.487c30ac43",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -21034,7 +21056,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/guards/security/verify-security.mjs",
-        "contentHash": "0f7ea6b86e0b24c465bbeb4821a59cc39dc7f6281d30f65b0daa2d55168bb700"
+        "contentHash": "2628f4c6a93001b478ff8d2649689d281391ec0ea8c95ae4e38c12a3674c907f"
       },
       "consumers": [
         "tooling/qa/core/verify-closeout-step-helpers.mjs",
@@ -21044,7 +21066,7 @@
         "tooling/qa/guards/security/verify-security.test.ts"
       ],
       "surfaces": [
-        "property:runSecurityCheck/results"
+        "property:collectSecurityEslintResult/results"
       ]
     },
     {
@@ -21098,15 +21120,18 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-sonarjs.mjs",
-        "contentHash": "63c2da7d1f83bfc5e4ef33e51c87d81b882527cafbd72a70552276f808227764"
+        "contentHash": "efecac21f5f4a710cd716a5a857d8adbc851cc0b002aaafa914ccbea17d825a1"
       },
       "consumers": [
         "tooling/qa/core/verify-all.execution.mjs",
         "tooling/qa/core/verify-focused.execution.mjs",
-        "tooling/qa/core/verify-sonarjs.mjs"
+        "tooling/qa/core/verify-sonarjs.mjs",
+        "tooling/qa/core/verify-sonarjs.test.ts"
       ],
       "surfaces": [
         "binding:GENERATED_PATH_PATTERNS",
+        "binding:SONARJS_ESLINT_IGNORES",
+        "binding:SONARJS_RULE_ID_SET",
         "binding:SONARJS_RULE_IDS",
         "property:createEslint/ecmaFeatures",
         "property:createEslint/files",
@@ -21115,6 +21140,11 @@
         "property:createEslint/overrideConfig",
         "property:createEslint/parserOptions",
         "property:createEslint/plugins",
+        "property:createSonarjsEslintOverrideConfig/ecmaFeatures",
+        "property:createSonarjsEslintOverrideConfig/globals",
+        "property:createSonarjsEslintOverrideConfig/languageOptions",
+        "property:createSonarjsEslintOverrideConfig/parserOptions",
+        "property:createSonarjsEslintOverrideConfig/plugins",
         "property:runCli/labels",
         "property:runSonarjsCheck/files",
         "property:runSonarjsCheck/violations"

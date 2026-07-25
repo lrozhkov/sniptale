@@ -3,6 +3,7 @@ import { importFresh, withCwd, writeJson } from './test-helpers';
 export function writeSonarjsTsconfig(root: string) {
   writeJson(root, 'tsconfig.json', {
     compilerOptions: {
+      allowJs: true,
       jsx: 'react-jsx',
       module: 'ESNext',
       moduleResolution: 'Bundler',

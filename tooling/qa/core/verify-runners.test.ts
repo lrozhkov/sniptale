@@ -96,6 +96,49 @@ it('runs verify-eslint against a temporary cwd with file-scoped failures', async
   expect(result.output).toContain('unused');
 });
 
+it('projects shared ESLint results without letting excluded rules hide fatal errors', async () => {
+  const module = await import('./verify-eslint.mjs');
+  const result = await module.summarizeEslintResults(
+    [
+      {
+        errorCount: 1,
+        fatalErrorCount: 1,
+        filePath: path.join(process.cwd(), 'apps/extension/src/example.ts'),
+        fixableErrorCount: 0,
+        fixableWarningCount: 0,
+        messages: [
+          {
+            column: 1,
+            line: 1,
+            message: 'excluded finding',
+            ruleId: 'sonarjs/no-all-duplicated-branches',
+            severity: 2,
+          },
+          {
+            column: 1,
+            fatal: true,
+            line: 2,
+            message: 'parser failed',
+            ruleId: null,
+            severity: 2,
+          },
+        ],
+        suppressedMessages: [],
+        warningCount: 0,
+      },
+    ],
+    {
+      excludedRulePrefixes: ['sonarjs/'],
+      strict: true,
+    }
+  );
+
+  expect(result.failed).toBe(true);
+  expect(result.errorCount).toBe(1);
+  expect(result.output).toContain('parser failed');
+  expect(result.output).not.toContain('excluded finding');
+});
+
 it('runs verify-boundaries against a temporary source graph', async () => {
   const module = await import('../guards/architecture/verify-boundaries.mjs');
   let cruiseOptions: unknown = null;

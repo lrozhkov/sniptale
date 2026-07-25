@@ -39,13 +39,13 @@ export function collectNamingStep() {
   return collectMeasuredViolationStep('Naming', 'Naming violations found:', runNamingCheck);
 }
 
-export async function collectSecurityStep({ files } = {}) {
+export async function collectSecurityStep({ eslintResults = null, files } = {}) {
   if (Array.isArray(files) && files.length === 0) {
     return createSkippedStep('Security');
   }
 
   const { durationMs, value: securityResult } = await measureAsyncStep(() =>
-    runSecurityCheck(files)
+    runSecurityCheck(files, { eslintResults })
   );
   if (securityResult.eslintResult.failed) {
     return createFailureStep('Security', 'failed', {
