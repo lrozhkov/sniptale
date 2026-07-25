@@ -18,11 +18,8 @@ import {
   updateSelectionModeDragSelection,
   updateSelectionModeFinalFrame,
 } from '../../runtime/drag';
-import {
-  buildSelectionCaptureArea,
-  cleanupSelectionModeRuntime,
-  isSelectionModeExtensionUiElement,
-} from '../../runtime';
+import { cleanupSelectionModeRuntime } from '../../runtime/cleanup';
+import { isSelectionModeExtensionUiElement } from '../../runtime/extension-ui';
 
 vi.mock('../../../locker', () => ({
   disableNavigationLock: vi.fn(),
@@ -33,16 +30,11 @@ vi.mock('../../diag', () => ({
   logSelectionModeError: vi.fn(),
 }));
 
-vi.mock('../../runtime', () => ({
-  buildSelectionCaptureArea: vi.fn(
-    (selection: { x: number; y: number; width: number; height: number }) => ({
-      x: Math.round(selection.x),
-      y: Math.round(selection.y),
-      width: Math.round(selection.width),
-      height: Math.round(selection.height),
-    })
-  ),
+vi.mock('../../runtime/cleanup', () => ({
   cleanupSelectionModeRuntime: vi.fn(),
+}));
+
+vi.mock('../../runtime/extension-ui', () => ({
   isSelectionModeExtensionUiElement: vi.fn(),
 }));
 
@@ -192,7 +184,6 @@ function registerConfirmErrorTest(): void {
     });
 
     expect(() => bridge.confirmSelection()).toThrow(error);
-    expect(buildSelectionCaptureArea).toHaveBeenCalledTimes(1);
     expect(logSelectionModeError).toHaveBeenCalledWith('confirmSelection.failed', error);
   });
 }

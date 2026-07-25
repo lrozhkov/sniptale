@@ -28,9 +28,13 @@ vi.mock('./quick-actions', async (importOriginal) => ({
   shimQuickActionStorage: shimDependencyMocks.shimQuickActionStorage,
 }));
 
-vi.mock('./transport', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./transport')>()),
+vi.mock('./transport/quick-action', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./transport/quick-action')>()),
   triggerQuickActionFromShim: shimDependencyMocks.triggerQuickActionFromShim,
+}));
+
+vi.mock('./transport/wakeup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./transport/wakeup')>()),
   wakeContentRuntimeFromShim: shimDependencyMocks.wakeContentRuntimeFromShim,
 }));
 

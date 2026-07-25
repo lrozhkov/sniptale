@@ -1,7 +1,8 @@
 import { isFullContentRuntimeMounted } from '../entrypoint/markers';
 import { createQuickActionHotkeyRuntime } from '../../platform/quick-action-hotkeys';
 import { loadShimQuickActions, shimQuickActionStorage } from './quick-actions';
-import { triggerQuickActionFromShim, wakeContentRuntimeFromShim } from './transport';
+import { triggerQuickActionFromShim } from './transport/quick-action';
+import { wakeContentRuntimeFromShim } from './transport/wakeup';
 
 const CONTENT_RUNTIME_SHIM_CLEANUP_KEY = '__sniptaleContentRuntimeShimCleanup';
 
