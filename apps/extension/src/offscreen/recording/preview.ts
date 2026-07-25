@@ -1,8 +1,4 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
-import {
-  getFirstSupportedMediaRecorderMimeType,
-  RECORDING_MIME_TYPE_CANDIDATES,
-} from './recorder-mime';
 
 const logger = createLogger({ namespace: 'OffscreenPreview' });
 
@@ -38,8 +34,4 @@ export function createDesktopPreviewController(): DesktopPreviewController {
       return null;
     },
   };
-}
-
-export function getSupportedMimeType(): string {
-  return getFirstSupportedMediaRecorderMimeType(RECORDING_MIME_TYPE_CANDIDATES);
 }

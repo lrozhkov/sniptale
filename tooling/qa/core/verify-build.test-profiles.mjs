@@ -1,5 +1,6 @@
 import { resolveFocusedCoverageOwnerScope } from './focused-coverage-owner-resolver.mjs';
 import { resolveDeterministicFocusedCoverageOwnerTests } from './focused-coverage-owner-tests.mjs';
+import { classifyOwnerGroup } from './structural-risk/owner-classifier.mjs';
 import { isHighRiskFocusedProofFile } from './verify-focused.high-risk-proof.helpers.mjs';
 
 const TRANSITIVE_TEST_PROFILE_FAMILIES = new Set([
@@ -114,8 +115,10 @@ function finalizeTestScope(scope) {
 }
 
 function resolveUnavailableProductionProfile({
+  directTestFiles,
   matchedFamilies,
   ownerTestResolver,
+  productionCodeFiles,
   relatedFiles,
   unavailableProductionScopes,
 }) {
@@ -134,9 +137,9 @@ function resolveUnavailableProductionProfile({
       (scope) =>
         scope.successorProofKind !== 'dead-export' &&
         ((scope.changedSuccessorFiles ?? []).length === 0 ||
-          scope.ownerTests.length === 0 ||
           (scope.successorProofKind === 'aggregate-providers' &&
-            scope.ownerTestsBySuccessor.some(({ tests }) => tests.length === 0)))
+            (scope.ownerTests.length === 0 ||
+              scope.ownerTestsBySuccessor.some(({ tests }) => tests.length === 0))))
     )
   ) {
     return finalizeTestScope({
@@ -156,11 +159,49 @@ function resolveUnavailableProductionProfile({
   const hasDeadExportProof = proofScopes.some(
     (scope) => scope.successorProofKind === 'dead-export'
   );
+  const hasExecutableSuccessorProof = proofScopes.some(
+    (scope) => scope.successorProofKind !== 'dead-export'
+  );
+  const directProofFiles = [
+    ...new Set([
+      ...productionCodeFiles,
+      ...proofScopes.flatMap((scope) => scope.changedSuccessorFiles ?? []),
+    ]),
+  ].sort();
+  const directOwnerTestsByFile = directProofFiles.map((file) => ({
+    file,
+    tests: ownerTestResolver(file),
+  }));
+  const directProofOwnerGroups = new Set(
+    [...proofScopes.map((scope) => scope.file), ...directProofFiles].map(classifyOwnerGroup)
+  );
+  const hasCompleteDirectOwnerProof =
+    !hasDeadExportProof &&
+    directProofFiles.length > 0 &&
+    directProofOwnerGroups.size === 1 &&
+    directOwnerTestsByFile.every(({ tests }) => tests.length > 0);
+  const directOwnerTests = [
+    ...new Set([...directTestFiles, ...directOwnerTestsByFile.flatMap(({ tests }) => tests)]),
+  ].sort();
+  if (
+    hasCompleteDirectOwnerProof &&
+    directOwnerTests.length > 0 &&
+    directOwnerTests.length <= BUILD_TEST_PROFILE_LIMITS.ownerTests
+  ) {
+    return finalizeTestScope({
+      directTestFiles: directOwnerTests,
+      relatedFiles: [],
+      matchedFamilies,
+      profile: 'owner-direct',
+      profileReason: 'unavailable production targets have graph-closed changed-owner proof',
+    });
+  }
   return finalizeTestScope({
     directTestFiles: [],
     relatedFiles: [...new Set([...relatedFiles, ...proofFiles])].sort(),
     matchedFamilies,
     profile: 'related-transitive',
+    requireRelatedTests: hasExecutableSuccessorProof,
     profileReason: hasDeadExportProof
       ? 'unavailable production targets have graph-closed successor/dead-export proof'
       : 'unavailable production targets have graph-closed successor owner proof',
@@ -191,8 +232,10 @@ export function resolveBuildTestProfile({
 } = {}) {
   if (unavailableProductionScopes.length > 0) {
     return resolveUnavailableProductionProfile({
+      directTestFiles,
       matchedFamilies,
       ownerTestResolver,
+      productionCodeFiles,
       relatedFiles,
       unavailableProductionScopes,
     });

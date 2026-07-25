@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { collectFocusedGuardrailReport } from '../core/guardrail-preflight-report.mjs';
 import { collectCurrentDiffContext } from '../runtime/current-diff.helpers.mjs';
 import { collectAdvisoryFindings } from '../core/verify-advisory.collectors.helpers.mjs';
+import { filterImportOrMockOnlyDiffFiles } from '../core/import-only-diff.mjs';
 import {
   collectCodeFiles,
   fromRelativePath,
@@ -114,6 +115,20 @@ function collectStructuralPressure(report) {
   return [...fileSignals, ...functionSignals];
 }
 
+export function collectPreflightOwnerRuntime(context) {
+  const behavioralTargetFiles =
+    context.mode === 'explicit-files'
+      ? (context.targetFiles ?? [])
+      : filterImportOrMockOnlyDiffFiles(context.targetFiles ?? []);
+  const ownerFiles = [
+    ...new Set([
+      ...(context.codeFiles ?? []),
+      ...behavioralTargetFiles.filter((file) => JS_LIKE_FILE_PATTERN.test(file)),
+    ]),
+  ];
+  return [...new Set(ownerFiles.map(classifyOwnerGroup))].sort();
+}
+
 function collectProofHints(context, guardrailReport) {
   const hints = [];
 
@@ -188,7 +203,7 @@ export function collectPreflightReport({ files = [] } = {}) {
   return {
     context,
     relevantDocs: collectRelevantDocs(context.allTargetFiles ?? context.targetFiles),
-    ownerRuntime: [...new Set(context.codeFiles.map(classifyOwnerGroup))].sort(),
+    ownerRuntime: collectPreflightOwnerRuntime(context),
     guardrailReport,
     structuralReport: structuralResult.report,
     structuralPressure: collectStructuralPressure(structuralResult.report),

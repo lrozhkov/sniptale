@@ -157,7 +157,7 @@ vi.mock('../../../apps/extension/src/background/ai/llm/editor-router', () => ({
 vi.mock('../../../apps/extension/src/background/scenario/router', () => ({
   routeScenarioMessage: routeScenarioMessageMock,
 }));
-vi.mock('../../../apps/extension/src/background/runtime/tab-mode-router', () => ({
+vi.mock('../../../apps/extension/src/background/runtime/tab-mode-router/router', () => ({
   routeTabModeMessage: routeTabModeMessageMock,
 }));
 vi.mock('../../../apps/extension/src/background/media/video/runtime/manager/control-route', () => ({

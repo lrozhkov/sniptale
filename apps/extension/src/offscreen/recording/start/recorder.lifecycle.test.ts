@@ -4,7 +4,7 @@ const {
   cleanupResourcesMock,
   finalizeActiveSidecarRecordingsMock,
   finalizeRecordingMock,
-  getSupportedMimeTypeMock,
+  getSupportedRecordingMimeTypeMock,
   hasActiveSidecarSessionMock,
   notifyRecordingStoppedBestEffortMock,
   notifyVideoSavedToIdbBestEffortMock,
@@ -14,7 +14,7 @@ const {
   cleanupResourcesMock: vi.fn(),
   finalizeActiveSidecarRecordingsMock: vi.fn(),
   finalizeRecordingMock: vi.fn(),
-  getSupportedMimeTypeMock: vi.fn(),
+  getSupportedRecordingMimeTypeMock: vi.fn(),
   hasActiveSidecarSessionMock: vi.fn(),
   notifyRecordingStoppedBestEffortMock: vi.fn(),
   notifyVideoSavedToIdbBestEffortMock: vi.fn(),
@@ -22,15 +22,11 @@ const {
   stopActiveSidecarRecordersWithFlushMock: vi.fn(),
 }));
 
-vi.mock('../stream', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../stream')>();
+vi.mock('../recorder-mime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../recorder-mime')>();
   return {
     ...actual,
-    createDesktopPreviewController: vi.fn(() => ({
-      attachDesktopPreview: vi.fn(),
-      detachDesktopPreview: vi.fn(),
-    })),
-    getSupportedMimeType: getSupportedMimeTypeMock,
+    getSupportedRecordingMimeType: getSupportedRecordingMimeTypeMock,
   };
 });
 
@@ -107,7 +103,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   finalizeRecordingMock.mockResolvedValue(undefined);
   finalizeActiveSidecarRecordingsMock.mockResolvedValue(undefined);
-  getSupportedMimeTypeMock.mockReturnValue('video/webm');
+  getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm');
   hasActiveSidecarSessionMock.mockReturnValue(false);
   stopActiveSidecarRecordersWithFlushMock.mockResolvedValue(undefined);
   recordingContext.resetRecordingSession();
@@ -133,7 +129,7 @@ function runLifecycleBootstrapSuite() {
 
     bootstrapRecorder();
 
-    expect(getSupportedMimeTypeMock).toHaveBeenCalledOnce();
+    expect(getSupportedRecordingMimeTypeMock).toHaveBeenCalledOnce();
   });
 
   it('falls back to the canonical recorder mime type when no compatibility codec is supported', () => {
@@ -144,7 +140,7 @@ function runLifecycleBootstrapSuite() {
 
     bootstrapRecorder();
 
-    expect(getSupportedMimeTypeMock).toHaveBeenCalledOnce();
+    expect(getSupportedRecordingMimeTypeMock).toHaveBeenCalledOnce();
   });
 }
 

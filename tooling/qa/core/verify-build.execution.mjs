@@ -67,6 +67,7 @@ async function collectUnitAndCoverageSteps({ codeFiles, targetFiles, buildScope 
     directFilesOverride: buildScope.testScope.directTestFiles,
     fullSuiteOverride: buildScope.testScope.fullSuite,
     pool: resolveProductUnitTestPool(),
+    requireRelatedTestsOverride: buildScope.testScope.requireRelatedTests,
     relatedFilesOverride: buildScope.testScope.relatedFiles,
     releaseMode: false,
     suite: PRODUCT_QA_SUITE,

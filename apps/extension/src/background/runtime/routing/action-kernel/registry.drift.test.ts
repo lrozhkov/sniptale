@@ -2,7 +2,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
 
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import {
+  CaptureMessageType,
+  MessageType,
+} from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { backgroundTabMessageTypes } from '../message-guards/guards/tab';
 import { videoRuntimeMessageTypes } from '../message-guards/guards/video-runtime';
@@ -137,6 +140,18 @@ it('requires explicit owner and authorization metadata for parser-supported rout
 });
 
 it('anchors representative privileged routes to their behavior owners', () => {
+  expect(metadataFor(`tab:${CaptureMessageType.CAPTURE_VISIBLE}`)).toEqual(
+    expect.objectContaining({
+      authorityFamily: 'capture-privileged-tab-route',
+      ownerModule: 'apps/extension/src/background/capture/routing/route/screenshot-adapter.ts',
+    })
+  );
+  expect(metadataFor(`tab:${MessageType.ENABLE_SCREENSHOT_MODE}`)).toEqual(
+    expect.objectContaining({
+      authorityFamily: 'tab-mode-privileged-tab-route',
+      ownerModule: 'apps/extension/src/background/runtime/tab-mode-router/router.ts',
+    })
+  );
   expect(metadataFor(`tab:${MessageType.EXPORT_CAPTURE_FULL_PAGE}`)).toEqual(
     expect.objectContaining({
       authorityFamily: 'capture-privileged-tab-route',

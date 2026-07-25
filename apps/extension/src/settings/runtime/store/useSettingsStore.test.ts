@@ -37,7 +37,7 @@ const {
   updateSettingsRuntimeStateMock: vi.fn(),
 }));
 
-vi.mock('./settings-runtime-service', () => ({
+vi.mock('./runtime', () => ({
   DEFAULT_SETTINGS: settingsFixture,
   loadSettingsRuntimeState: loadSettingsRuntimeStateMock,
   resetSettingsRuntimeState: resetSettingsRuntimeStateMock,

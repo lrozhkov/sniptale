@@ -35,7 +35,7 @@ vi.mock('../../../features/tab-capabilities/capabilities', (_importOriginal) => 
   getTabCapabilities: getTabCapabilitiesMock,
 }));
 
-vi.mock('../navigation/actions', (_importOriginal) => ({
+vi.mock('../../recording/video/copy', (_importOriginal) => ({
   IDLE_RECORDING_STATE: {
     captureMode: CaptureMode.TAB,
     captureSource: null,

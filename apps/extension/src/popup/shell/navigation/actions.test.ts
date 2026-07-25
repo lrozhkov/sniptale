@@ -1,7 +1,5 @@
 // @vitest-environment jsdom
 
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -55,16 +53,6 @@ vi.mock('../tab-access', () => ({
 }));
 
 import {
-  DynamicIcon,
-  IDLE_RECORDING_STATE,
-  describeCaptureSource,
-  formatDuration,
-  formatHotkeyShort,
-  getCaptureModeLabels,
-  getQuickActionColor,
-  getQuickActionMeta,
-  getRecordingStatusLabel,
-  getViewportPresetLabel,
   openDesignSystem,
   openGallery,
   openGithubRepository,
@@ -76,8 +64,6 @@ import {
   triggerQuickAction,
 } from './actions';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import type { QuickAction, ViewportPreset } from '../../../contracts/settings';
-import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { installPopupRuntimeMessagingMock } from '../runtime/services.test-support';
 
 function resetPopupUtilsMocks() {
@@ -90,68 +76,6 @@ function resetPopupUtilsMocks() {
   installPopupRuntimeMessagingMock(mocks.sendRuntimeMessageMock);
   vi.restoreAllMocks();
   vi.stubGlobal('close', vi.fn());
-}
-
-function createQuickActionFixture(): {
-  action: QuickAction;
-  presets: ViewportPreset[];
-} {
-  return {
-    action: {
-      id: 'action-1',
-      name: 'Action',
-      icon: 'Camera',
-      status: true,
-      screenshotMode: 'selection',
-      hotkey: {
-        ctrlKey: true,
-        altKey: true,
-        metaKey: false,
-        shiftKey: false,
-        key: 'k',
-      },
-      delay: 3,
-      emulation: 'preset-1',
-      afterCapture: 'edit',
-      exitAfterCapture: false,
-    },
-    presets: [{ id: 'preset-1', label: 'Laptop', width: 1440, height: 900 }],
-  };
-}
-
-function verifiesDurationFormatting() {
-  expect(formatDuration(42)).toBe('00:42');
-  expect(formatDuration(3661)).toBe('01:01:01');
-}
-
-function verifiesQuickActionAndRecordingHelpers() {
-  const { action, presets } = createQuickActionFixture();
-
-  expect(formatHotkeyShort(action.hotkey)).toBe('Ctrl+Alt+K');
-  expect(getQuickActionMeta(action, presets)).toContain('Laptop 1440×900');
-  expect(getQuickActionColor(action)).toBeTruthy();
-  expect(getCaptureModeLabels()[CaptureMode.SCREEN]).toBe('t:popup.labels.captureModeScreen');
-  expect(getRecordingStatusLabel(VideoRecordingStatus.STOPPING)).toBe(
-    't:popup.labels.statusSaving'
-  );
-  expect(
-    describeCaptureSource(
-      {
-        mode: CaptureMode.TAB_CROP,
-        cropRegion: { width: 800, height: 600, x: 0, y: 0 },
-        streamId: 'stream-1',
-        tabTitle: 'Example tab',
-      },
-      CaptureMode.TAB_CROP,
-      null
-    )
-  ).toBe('Example tab • 800×600');
-  expect(
-    getViewportPresetLabel({
-      ...IDLE_RECORDING_STATE,
-      viewportPreset: { id: 'preset-1', label: 'Desktop', width: 1280, height: 720 },
-    })
-  ).toBe('Desktop 1280×720');
 }
 
 function verifiesExtensionPageNavigation() {
@@ -183,18 +107,6 @@ function verifiesExtensionPageNavigation() {
     url: 'https://github.com/lrozhkov/sniptale',
   });
   expect(window.close).toHaveBeenCalledTimes(7);
-}
-
-function verifiesDynamicIconVariants() {
-  const configuredIcon = renderToStaticMarkup(
-    createElement(DynamicIcon, { color: '#123456', name: 'Download' })
-  );
-  const fallbackIcon = renderToStaticMarkup(createElement(DynamicIcon, { name: 'Unknown' }));
-
-  expect(configuredIcon).toContain('lucide-download');
-  expect(configuredIcon).toContain('color:#123456');
-  expect(fallbackIcon).toContain('lucide-camera');
-  expect(fallbackIcon).not.toContain('style=');
 }
 
 async function verifiesRuntimeMessaging() {
@@ -252,10 +164,7 @@ async function verifiesStaleRuntimeErrors() {
 function runPopupUtilsSuite() {
   beforeEach(resetPopupUtilsMocks);
 
-  it('formats durations for minutes and hours', verifiesDurationFormatting);
-  it('formats quick-action helpers and recording labels', verifiesQuickActionAndRecordingHelpers);
   it('opens extension pages and closes the popup window', verifiesExtensionPageNavigation);
-  it('renders configured and fallback quick-action icons', verifiesDynamicIconVariants);
   it(
     'starts screenshot mode and quick actions through runtime messaging',
     verifiesRuntimeMessaging
@@ -264,4 +173,4 @@ function runPopupUtilsSuite() {
   it('normalizes stale popup runtime errors into a refresh hint', verifiesStaleRuntimeErrors);
 }
 
-describe('popup utils', runPopupUtilsSuite);
+describe('popup navigation actions', runPopupUtilsSuite);

@@ -131,7 +131,7 @@ async function verifyRuntimeResetUsesDefaultSeam() {
   expect(mockResetSettingsToDefaults).toHaveBeenCalledTimes(1);
 }
 
-function runSettingsRuntimeServiceWriteSuite() {
+function runSettingsRuntimeWriteSuite() {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -143,7 +143,7 @@ function runSettingsRuntimeServiceWriteSuite() {
   it('resets runtime settings back to the runtime defaults', verifyRuntimeResetUsesDefaultSeam);
 }
 
-function runSettingsRuntimeServiceReadSuite() {
+function runSettingsRuntimeReadSuite() {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -188,5 +188,5 @@ function runSettingsRuntimeServiceReadSuite() {
   });
 }
 
-describe('settings-runtime-service writes', runSettingsRuntimeServiceWriteSuite);
-describe('settings-runtime-service reads', runSettingsRuntimeServiceReadSuite);
+describe('settings runtime writes', runSettingsRuntimeWriteSuite);
+describe('settings runtime reads', runSettingsRuntimeReadSuite);

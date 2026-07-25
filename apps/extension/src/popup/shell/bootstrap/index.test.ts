@@ -51,7 +51,7 @@ vi.mock('../../diagnostics/performance', (_importOriginal) => ({
   trackPopupPerfAsync: mocks.trackPopupPerfAsyncMock,
 }));
 
-vi.mock('../navigation/actions', (_importOriginal) => ({
+vi.mock('../../recording/video/copy', (_importOriginal) => ({
   IDLE_RECORDING_STATE: {
     captureMode: null,
     captureSource: null,

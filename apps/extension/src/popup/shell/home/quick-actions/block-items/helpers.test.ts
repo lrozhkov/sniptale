@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../navigation/actions', (_importOriginal) => ({
+vi.mock('../meta', (_importOriginal) => ({
   formatHotkeyShort: () => 'Ctrl+Shift+S',
   getQuickActionMeta: () => '',
 }));

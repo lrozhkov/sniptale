@@ -1,6 +1,7 @@
 import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createRouteErrorResponse } from '../../../routing-contracts/response';
-import { handleFullCapture, handleVisibleCapture, handleVisibleCaptureForCrop } from '../handlers';
+import { handleFullCapture } from '../handlers.full';
+import { handleVisibleCapture, handleVisibleCaptureForCrop } from '../handlers.visible';
 import type { CaptureRouteAdapterContext } from './types';
 
 type ScreenshotCaptureHandler = (context: CaptureRouteAdapterContext['context']) => boolean;

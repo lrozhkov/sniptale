@@ -1,5 +1,5 @@
 import { AudioMixer } from '../stream/audio-mixer';
-import { normalizeRecordingStreamDimensions } from '../stream';
+import { normalizeRecordingStreamDimensions } from '../stream/normalization';
 import { recordingContext } from '../context';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {

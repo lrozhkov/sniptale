@@ -13,7 +13,7 @@ export const captureActionsRouteDescriptor = {
     CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
     CaptureMessageType.CAPTURE_FULL,
   ],
-  ownerModule: 'apps/extension/src/background/capture/routing/handlers.ts',
+  ownerModule: 'apps/extension/src/background/capture/routing/route/screenshot-adapter.ts',
 } as const;
 
 export const quickActionRouteDescriptor = {

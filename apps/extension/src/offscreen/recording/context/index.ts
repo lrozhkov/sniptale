@@ -1,7 +1,7 @@
 import type { AudioMixer } from '../stream/audio-mixer';
 import { sendRuntimeMessageBestEffort } from '../../runtime-messaging/best-effort';
 import { createDurationTracker } from '../duration';
-import type { ViewportCropUpdater, ViewportDrawStateUpdater } from '../stream';
+import type { ViewportCropUpdater, ViewportDrawStateUpdater } from '../stream/viewport';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 

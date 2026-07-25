@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 
+import { createUnitTestPlan } from './unit-test-plan.mjs';
 import { createUnitTestArgs, createUnitTestEnv } from './verify-unit-tests.mjs';
 import { requiresRelatedUnitTests } from './verify-test-coverage.thresholds.mjs';
 import { createTempRoot, importFresh, withCwd, writeFile } from './test-helpers';
@@ -131,6 +132,21 @@ it('requires related tests only for rollout-covered production seams', () => {
     false
   );
   expect(requiresRelatedUnitTests(['docs/tooling/code-quality.md'])).toBe(false);
+});
+
+it('requires executable related proof for a non-rollout deletion successor', () => {
+  const plan = createUnitTestPlan({
+    relatedFiles: ['apps/extension/src/background/example/non-rollout-owner.ts'],
+    requireTests: true,
+  });
+
+  expect(plan.allowNoTests).toBe(false);
+  expect(
+    createUnitTestArgs({
+      allowNoTests: plan.allowNoTests,
+      relatedFiles: plan.expandedRelatedFiles,
+    })
+  ).not.toContain('--passWithNoTests');
 });
 
 it('expands focused related-test scope with exact owner-local tests, not every sibling test', async () => {

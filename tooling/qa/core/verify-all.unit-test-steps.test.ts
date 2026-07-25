@@ -83,3 +83,54 @@ it('executes the full product suite when a deleted target has no affected-test s
     })
   );
 });
+
+it('executes graph-closed deletion proof as direct tests without related discovery', async () => {
+  mockedRunUnitTests.mockClear();
+  const ownerTest = 'apps/extension/src/content/selection/example/runtime.test.ts';
+
+  const steps = await collectUnitTestAndCoverageStepResults({
+    codeFiles: [],
+    coverageEnabled: false,
+    directFilesOverride: [ownerTest],
+    relatedFilesOverride: [],
+    releaseMode: false,
+    targetFiles: ['apps/extension/src/content/selection/example/facade.ts'],
+    unitTestDetailOverride:
+      'profile=owner-direct; direct tests (1); reason=graph-closed changed-owner proof',
+  });
+
+  expect(steps[0]).toMatchObject({
+    detail: 'profile=owner-direct; direct tests (1); reason=graph-closed changed-owner proof',
+    status: 'ok',
+  });
+  expect(mockedRunUnitTests).toHaveBeenCalledWith(
+    expect.objectContaining({
+      directFiles: [ownerTest],
+      suite: 'product',
+    })
+  );
+  expect(mockedRunUnitTests.mock.calls[0]?.[0]).not.toHaveProperty('relatedFiles');
+});
+
+it('requires at least one related test for graph-closed deletion successor proof', async () => {
+  mockedRunUnitTests.mockClear();
+  const successor = 'apps/extension/src/background/example/non-rollout-owner.ts';
+
+  await collectUnitTestAndCoverageStepResults({
+    codeFiles: [],
+    coverageEnabled: false,
+    directFilesOverride: [],
+    relatedFilesOverride: [successor],
+    requireRelatedTestsOverride: true,
+    releaseMode: false,
+    targetFiles: ['apps/extension/src/background/example/deleted-facade.ts'],
+  });
+
+  expect(mockedRunUnitTests).toHaveBeenCalledWith(
+    expect.objectContaining({
+      relatedFiles: [successor],
+      requireTests: true,
+      suite: 'product',
+    })
+  );
+});

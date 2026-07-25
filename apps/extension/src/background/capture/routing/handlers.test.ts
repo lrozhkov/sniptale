@@ -84,12 +84,9 @@ vi.mock('../application/scenario-capture-persistence', () => ({
   persistScenarioCaptureFromBackground: persistScenarioCaptureFromBackgroundMock,
 }));
 
-import {
-  type CaptureRouteContext,
-  handleFullCapture,
-  handleVisibleCapture,
-  handleVisibleCaptureForCrop,
-} from './handlers';
+import { handleFullCapture } from './handlers.full';
+import { handleVisibleCapture, handleVisibleCaptureForCrop } from './handlers.visible';
+import type { CaptureRouteContext } from './types';
 import { createScenarioSessionServiceStub } from '../../../../../../tooling/test/support/scenario-session-service.stub';
 import { flushCaptureHandlerPromises } from './handlers.test-support';
 

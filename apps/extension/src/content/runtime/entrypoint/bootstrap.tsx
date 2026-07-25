@@ -7,25 +7,18 @@ import {
 } from '@sniptale/platform/browser/shadow-dom';
 import { initializeAppTheme } from '../../../ui/theme';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
-import { createLogger } from '@sniptale/platform/observability/logger';
 import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 import { App } from '../../overlay/app/view';
 import { logRegionCaptureApiSupport, logTopLevelContentScriptLoad } from './diagnostics';
-import { initializeTopLevelContentRuntime, type ContentRuntimeCleanup } from '../bootstrap';
+import { initializeTopLevelContentRuntime } from '../bootstrap';
 import { installContentUiActivationBridge } from '../ui-activation-bridge';
 import { installContentToastHostAdapter } from '../../platform/dom-host/toast-host';
+import { CONTENT_RUNTIME_HOST_ID, CONTENT_RUNTIME_MARKER_ATTRIBUTE } from './markers';
 import {
-  CONTENT_RUNTIME_CLEANUP_KEY,
-  CONTENT_RUNTIME_HOST_ID,
-  CONTENT_RUNTIME_MARKER_ATTRIBUTE,
-} from './markers';
-
-const logger = createLogger({ namespace: 'ContentEntrypointBootstrap' });
-let pendingBodyReadyInitialization = false;
-
-type ContentRuntimeGlobal = typeof globalThis & {
-  [CONTENT_RUNTIME_CLEANUP_KEY]?: ContentRuntimeCleanup;
-};
+  disposeExistingContentRuntime,
+  registerContentRuntimeCleanup,
+  runWhenContentBodyReady,
+} from './lifecycle';
 
 function getContentRuntimeMarkerVersion(): string {
   if (
@@ -52,60 +45,6 @@ function readWindowViewportInfo(): ViewportInfo {
   };
 }
 
-function getContentRuntimeGlobal(): ContentRuntimeGlobal {
-  return globalThis as ContentRuntimeGlobal;
-}
-
-function disposeExistingContentRuntime(): void {
-  const runtimeGlobal = getContentRuntimeGlobal();
-  const cleanup = runtimeGlobal[CONTENT_RUNTIME_CLEANUP_KEY];
-  delete runtimeGlobal[CONTENT_RUNTIME_CLEANUP_KEY];
-
-  try {
-    cleanup?.();
-  } catch (error) {
-    logger.warn('Failed to dispose previous content runtime before reinjection', error);
-  }
-}
-
-function runWhenBodyReady(): void {
-  if (pendingBodyReadyInitialization) {
-    return;
-  }
-
-  pendingBodyReadyInitialization = true;
-  let observer: MutationObserver | null = null;
-  let domContentLoadedInstalled = false;
-  let cleanup = () => undefined;
-  const initialize = () => {
-    if (!document.body) {
-      return;
-    }
-
-    cleanup();
-    pendingBodyReadyInitialization = false;
-    initializeTopLevelContentEntry();
-  };
-  cleanup = () => {
-    observer?.disconnect();
-    if (domContentLoadedInstalled) {
-      document.removeEventListener('DOMContentLoaded', initialize);
-    }
-  };
-
-  if (document.readyState === 'loading') {
-    domContentLoadedInstalled = true;
-    document.addEventListener('DOMContentLoaded', initialize, { once: true });
-  }
-
-  if (typeof MutationObserver === 'function' && document.documentElement) {
-    observer = new MutationObserver(initialize);
-    observer.observe(document.documentElement, { childList: true });
-  }
-
-  window.setTimeout(initialize, 0);
-}
-
 /**
  * Boots the top-level content UI and wires its runtime ownership seams.
  */
@@ -122,7 +61,7 @@ export function initializeTopLevelContentEntry(): void {
   existingHost?.remove();
 
   if (!document.body) {
-    runWhenBodyReady();
+    runWhenContentBodyReady(initializeTopLevelContentEntry);
     return;
   }
 
@@ -139,16 +78,15 @@ export function initializeTopLevelContentEntry(): void {
   root.render(<App />);
   const disposeContentRuntime = initializeTopLevelContentRuntime(readWindowViewportInfo);
   const disposeToastHostAdapter = installContentToastHostAdapter();
-  getContentRuntimeGlobal()[CONTENT_RUNTIME_CLEANUP_KEY] = () => {
+  registerContentRuntimeCleanup(() => {
     try {
       disposeContentRuntime();
     } finally {
       disposeToastHostAdapter();
       root.unmount();
       host.remove();
-      delete getContentRuntimeGlobal()[CONTENT_RUNTIME_CLEANUP_KEY];
     }
-  };
+  });
 
   logTopLevelContentScriptLoad();
   logRegionCaptureApiSupport();

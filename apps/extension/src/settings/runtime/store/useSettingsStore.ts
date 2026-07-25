@@ -5,7 +5,7 @@ import {
   loadSettingsRuntimeState,
   resetSettingsRuntimeState,
   updateSettingsRuntimeState,
-} from './settings-runtime-service';
+} from './runtime';
 
 interface SettingsStore {
   settings: Settings;

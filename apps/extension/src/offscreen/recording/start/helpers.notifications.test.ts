@@ -3,7 +3,7 @@ import { createSettings, createVideoStream } from './helpers.test-support';
 
 const {
   finalizeRecordingMock,
-  getSupportedMimeTypeMock,
+  getSupportedRecordingMimeTypeMock,
   loggerDebugMock,
   loggerErrorMock,
   loggerInfoMock,
@@ -11,7 +11,7 @@ const {
   sendRuntimeMessageMock,
 } = vi.hoisted(() => ({
   finalizeRecordingMock: vi.fn(),
-  getSupportedMimeTypeMock: vi.fn(),
+  getSupportedRecordingMimeTypeMock: vi.fn(),
   loggerDebugMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerInfoMock: vi.fn(),
@@ -70,11 +70,11 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => {
   };
 });
 
-vi.mock('../stream', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../stream')>();
+vi.mock('../recorder-mime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../recorder-mime')>();
   return {
     ...actual,
-    getSupportedMimeType: getSupportedMimeTypeMock,
+    getSupportedRecordingMimeType: getSupportedRecordingMimeTypeMock,
   };
 });
 
@@ -196,7 +196,7 @@ describe('offscreen-recording-start notification traces', () => {
     Object.assign(globalThis, {
       MediaRecorder: MediaRecorderMock,
     });
-    getSupportedMimeTypeMock.mockReturnValue('video/webm;codecs=vp9');
+    getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm;codecs=vp9');
     sendRuntimeMessageMock.mockResolvedValue(undefined);
     resetRecordingBootstrapContext();
   });

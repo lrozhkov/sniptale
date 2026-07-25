@@ -15,11 +15,9 @@ import {
   updateSelectionModeDragSelection,
   updateSelectionModeFinalFrame,
 } from '../../runtime/drag';
-import {
-  buildSelectionCaptureArea,
-  cleanupSelectionModeRuntime,
-  isSelectionModeExtensionUiElement,
-} from '../../runtime';
+import { buildSelectionCaptureArea } from '../../runtime/capture-area';
+import { cleanupSelectionModeRuntime } from '../../runtime/cleanup';
+import { isSelectionModeExtensionUiElement } from '../../runtime/extension-ui';
 
 type SelectionModeEventsBridgeRuntimeArgs = SelectionModeRuntimeActionsArgs & {
   state: SelectionModeSession;

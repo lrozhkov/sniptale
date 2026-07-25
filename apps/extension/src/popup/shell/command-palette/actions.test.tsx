@@ -11,8 +11,6 @@ vi.mock('../../../platform/i18n', (_importOriginal) => ({
 }));
 
 vi.mock('../navigation/actions', (_importOriginal) => ({
-  formatHotkeyShort: vi.fn(() => 'Ctrl+Shift+1'),
-  getQuickActionMeta: vi.fn(() => 'Quick action'),
   openDesignSystem: vi.fn(),
   openGallery: vi.fn(),
   openImageEditor: vi.fn(),
@@ -22,6 +20,11 @@ vi.mock('../navigation/actions', (_importOriginal) => ({
   openGithubRepository: vi.fn(),
   openVideoEditor: vi.fn(),
   triggerQuickAction: vi.fn(),
+}));
+
+vi.mock('../home/quick-actions/meta', (_importOriginal) => ({
+  formatHotkeyShort: vi.fn(() => 'Ctrl+Shift+1'),
+  getQuickActionMeta: vi.fn(() => 'Quick action'),
 }));
 
 function setDesignSystemFlag(value: boolean | undefined) {

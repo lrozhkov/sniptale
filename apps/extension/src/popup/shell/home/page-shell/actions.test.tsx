@@ -14,26 +14,9 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => `t:${key}`,
 }));
 
-vi.mock('../../navigation/actions', () => ({
-  DynamicIcon: () => null,
-  IDLE_RECORDING_STATE: null,
-  PopupPage: {},
-  describeCaptureSource: vi.fn(),
-  formatDuration: vi.fn(),
-  formatHotkeyShort: vi.fn(),
-  getCaptureModeLabels: vi.fn(),
-  getQuickActionColor: vi.fn(),
-  getQuickActionMeta: vi.fn(),
-  getRecordingStatusLabel: vi.fn(),
-  getViewportPresetLabel: vi.fn(),
-  openDesignSystem: vi.fn(),
-  openGallery: vi.fn(),
-  openImageEditor: vi.fn(),
-  openScenarioEditor: vi.fn(),
+vi.mock('../../navigation/actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../navigation/actions')>()),
   openScreenshotMode: openScreenshotModeSpy,
-  openSettings: vi.fn(),
-  openGithubRepository: vi.fn(),
-  openVideoEditor: vi.fn(),
   triggerQuickAction: triggerQuickActionSpy,
 }));
 

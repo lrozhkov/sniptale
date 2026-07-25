@@ -2,7 +2,6 @@ import {
   initDB,
   subscribeToDbTermination,
 } from '../../composition/persistence/infrastructure/indexed-db/core';
-import { getCurrentLocale, translate } from '../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { initTracer } from '@sniptale/platform/observability/message-tracer';
 import { sendRuntimeMessage } from '../../platform/runtime-messaging/index';
@@ -51,27 +50,10 @@ async function reconcileOffscreenRuntimeState(): Promise<void> {
   await reconcileProjectExportJobs();
 }
 
-function applyOffscreenDocumentMetadata(): void {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  const locale = getCurrentLocale();
-  const statusText = document.getElementById('statusText');
-
-  document.documentElement.lang = locale;
-  document.title = translate('background.runtime.offscreenDocumentTitle', locale);
-
-  if (statusText) {
-    statusText.textContent = translate('popup.labels.statusReady', locale);
-  }
-}
-
 export function bootstrapOffscreenDocument(): void {
   const offscreenStartupId = resolveOffscreenStartupId();
   initTracer('off');
   logger.debug('Offscreen document loaded');
-  applyOffscreenDocumentMetadata();
   const runtimeReady = isPrivacyErasureOffscreenDocument()
     ? Promise.resolve()
     : initializeOffscreenDb(offscreenStartupId).then(() => reconcileOffscreenRuntimeState());

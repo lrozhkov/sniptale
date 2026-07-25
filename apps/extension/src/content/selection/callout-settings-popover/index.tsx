@@ -11,11 +11,11 @@ import { CalloutSettingsPopoverContent } from './body';
 import { createCalloutVariantOptions, POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
 import {
-  useCalloutSettingsPopoverDistanceClose,
-  useCalloutSettingsPopoverOutsideClose,
-} from './sync';
+  usePopoverDistanceClose as useCalloutSettingsPopoverDistanceClose,
+  usePopoverEscapeClose,
+  usePopoverOutsideClose as useCalloutSettingsPopoverOutsideClose,
+} from '../popover-sync/hooks';
 import { useCalloutSettingsPopoverState } from './state';
-import { usePopoverEscapeClose } from '../popover-sync/hooks';
 
 interface CalloutSettingsPopoverProps {
   isOpen: boolean;

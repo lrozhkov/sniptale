@@ -70,7 +70,8 @@ vi.mock('./scenario/index', () => ({
   persistScenarioCaptureFromBackground: vi.fn(),
 }));
 
-import { handleVisibleCapture, type CaptureRouteContext } from './handlers';
+import { handleVisibleCapture } from './handlers.visible';
+import type { CaptureRouteContext } from './types';
 import { createScenarioSessionServiceStub } from '../../../../../../tooling/test/support/scenario-session-service.stub';
 
 function createContext(): CaptureRouteContext {

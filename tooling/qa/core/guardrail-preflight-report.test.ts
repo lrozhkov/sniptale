@@ -309,7 +309,7 @@ it('uses the full diff for build forecasting while behavioral hints stay diff-fi
     },
   });
 
-  expect(report.buildScopeForecast[0]).toContain('graph-closed successor owner proof');
+  expect(report.buildScopeForecast[0]).toContain('graph-closed changed-owner proof');
   expect(report.buildScopeForecast[0]).not.toContain('full product test suite');
   expect(report.clusters).toEqual(['apps/extension/src=2']);
 });

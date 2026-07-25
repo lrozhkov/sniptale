@@ -1,6 +1,6 @@
 import { getQuickActionDisplayName } from '../../../../../features/quick-actions-presets/catalog';
 import type { QuickAction, ViewportPreset } from '../../../../../contracts/settings';
-import { formatHotkeyShort, getQuickActionMeta } from '../../../navigation/actions';
+import { formatHotkeyShort, getQuickActionMeta } from '../meta';
 
 export type QuickActionListDensity = 'regular' | 'compact' | 'dense' | 'tight';
 

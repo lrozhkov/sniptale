@@ -81,6 +81,39 @@ it(
   GIT_INTEGRATION_TIMEOUT
 );
 
+it(
+  'reports canonical owners for behavioral deleted paths',
+  async () => {
+    const root = createTempRoot('qa-preflight-deleted-owners-');
+    const runtimeFile = 'apps/extension/src/content/runtime/shim/transport.ts';
+    const selectionFile = 'apps/extension/src/content/selection/selection-mode/runtime/index.ts';
+    const typeOnlyFile = 'apps/extension/src/settings/session/deleted-types.ts';
+    initGitRepo(root);
+    writeFile(root, 'package.json', '{"name":"qa-preflight-temp"}\n');
+    writeFile(root, runtimeFile, 'export const runtimeTransport = true;\n');
+    writeFile(root, selectionFile, 'export const selectionRuntime = true;\n');
+    writeFile(root, typeOnlyFile, 'export type DeletedSettingsState = { enabled: boolean };\n');
+    runGit(root, 'add', '.');
+    runGit(root, 'commit', '-m', 'init');
+    runGit(root, 'rm', runtimeFile, selectionFile, typeOnlyFile);
+
+    const result = await withCwd(root, async () => {
+      const module = await importFresh<typeof import('./preflight.mjs')>(
+        './preflight.mjs',
+        import.meta.url
+      );
+      return module.collectPreflightReport();
+    });
+
+    expect(result.context.codeFiles).toEqual([]);
+    expect(result.ownerRuntime).toEqual([
+      'extension:content:runtime',
+      'extension:content:selection',
+    ]);
+  },
+  GIT_INTEGRATION_TIMEOUT
+);
+
 it('accepts explicit files for pre-edit planning', async () => {
   const root = createTempRoot('qa-preflight-files-');
   writeFile(

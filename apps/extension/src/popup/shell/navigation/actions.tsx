@@ -1,4 +1,3 @@
-import { Camera } from 'lucide-react';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { createSecureRandomUuid as createEditorSessionId } from '@sniptale/platform/security/secure-random-id';
@@ -7,30 +6,11 @@ import { buildEditorUrl } from '../../../platform/navigation/extension-pages/edi
 import { buildScenarioEditorUrl } from '../../../platform/navigation/extension-pages/scenario-editor';
 import { getPopupResponseErrorMessage } from '../../diagnostics/runtime-errors';
 import { getActiveTabId } from '../tab-access';
-import { ICON_MAP } from '../home/quick-actions/meta';
 import { getPopupRuntimeServices } from '../runtime/services';
-export {
-  formatHotkeyShort,
-  getQuickActionColor,
-  getQuickActionMeta,
-} from '../home/quick-actions/meta';
-export {
-  describeCaptureSource,
-  formatDuration,
-  getCaptureModeLabels,
-  getRecordingStatusLabel,
-  getViewportPresetLabel,
-  IDLE_RECORDING_STATE,
-} from '../../recording/video/copy';
 
 export type PopupPage = 'home' | 'video' | 'export';
 
 const GITHUB_REPOSITORY_URL = 'https://github.com/lrozhkov/sniptale';
-
-export function DynamicIcon({ name, color }: { name: string; color?: string }) {
-  const Icon = ICON_MAP[name] || Camera;
-  return <Icon className="h-4 w-4" style={color ? { color } : undefined} />;
-}
 
 export async function openScreenshotMode() {
   const tabId = await getActiveTabId();

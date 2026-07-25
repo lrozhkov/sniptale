@@ -14,9 +14,12 @@ import {
   toggleStepBadgeOffset,
 } from './helpers';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
-import { useStepBadgePopoverDistanceClose, useStepBadgePopoverOutsideClose } from './sync';
 import { dispatchFrameStepBadgeChanged } from '../../platform/page-context/frame-events';
-import { usePopoverEscapeClose } from '../popover-sync/hooks';
+import {
+  usePopoverDistanceClose as useStepBadgePopoverDistanceClose,
+  usePopoverEscapeClose,
+  usePopoverOutsideClose as useStepBadgePopoverOutsideClose,
+} from '../popover-sync/hooks';
 
 function createStepBadgeHandlers(props: {
   frameId: string;

@@ -7,7 +7,7 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { getSupportedMimeType } from '../stream';
+import { getSupportedRecordingMimeType } from '../recorder-mime';
 import { sendRuntimeMessageBestEffort } from '../../runtime-messaging/best-effort';
 import { recordingContext } from '../context';
 import {
@@ -62,7 +62,7 @@ function resolveRecorderMimeType(preferredMimeType: string, videoStream: MediaSt
     recordingContext.sourceStream !== null && recordingContext.sourceStream !== videoStream;
 
   return resolveRecordingStartMimeType({
-    fallbackMimeType: getSupportedMimeType,
+    fallbackMimeType: getSupportedRecordingMimeType,
     hasAudioTracks,
     preferredMimeType,
     usesDerivedVideoStream,
