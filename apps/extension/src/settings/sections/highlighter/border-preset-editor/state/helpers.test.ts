@@ -45,7 +45,6 @@ describe('border-preset-editor-state draft setters', () => {
     const preset: BorderPreset = {
       id: 'preset',
       name: 'Preset',
-      isSystemDefault: false,
       order: 1,
       width: 5,
       color: '#ff6600',

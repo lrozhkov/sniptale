@@ -254,7 +254,7 @@ it('forecasts exact owner tests without a broad transitive warning', async () =>
     addedFiles: targetFiles.filter((file) => !file.startsWith('docs/')),
   });
 
-  expect(report.buildScopeForecast).toEqual([expect.stringContaining('profile=owner-direct')]);
+  expect(report.buildScopeForecast).toEqual([expect.stringContaining('selection=owner-direct')]);
   expect(report.buildScopeForecast[0]).toContain('selected unit-test scope=4');
   expect(report.buildScopeForecast).not.toEqual(
     expect.arrayContaining([expect.stringContaining('broad transitive scope expected')])
@@ -270,7 +270,7 @@ it('reports the skip profile and zero selected tests for a non-product-test diff
     codeFiles: [],
   });
 
-  expect(report.buildScopeForecast).toEqual([expect.stringContaining('profile=skip')]);
+  expect(report.buildScopeForecast).toEqual([expect.stringContaining('selection=skip')]);
   expect(report.buildScopeForecast[0]).toContain('selected unit-test scope=0');
 });
 
@@ -282,7 +282,7 @@ it('forecasts the full-suite fallback for a deleted owner without surviving proo
   });
 
   expect(report.buildScopeForecast).toEqual([
-    expect.stringContaining('profile=related-transitive'),
+    expect.stringContaining('selection=related-transitive'),
   ]);
   expect(report.buildScopeForecast[0]).toContain('selected unit-test scope=full-suite');
 });

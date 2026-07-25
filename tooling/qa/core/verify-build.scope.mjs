@@ -7,7 +7,11 @@ import { collectCodeFiles, fromRelativePath, isCodeFile } from './shared.mjs';
 import { isBuildTestFile } from './build-test-file-classifier.mjs';
 import { collectDeletedTargetSuccessors } from './verify-build.deleted-closure.mjs';
 import { resolveBuildTestProfile } from './verify-build.test-profiles.mjs';
-export { BUILD_TEST_PROFILE_LIMITS } from './verify-build.test-profiles.mjs';
+export {
+  BUILD_TEST_EXECUTION_CLASSES,
+  BUILD_TEST_PROFILE_LIMITS,
+  SATURATED_RELATED_INPUT_LIMIT,
+} from './verify-build.test-profiles.mjs';
 
 const RUNTIME_ENTRYPOINT_PATTERN = new RegExp(
   '^(?:apps/extension/src/' +

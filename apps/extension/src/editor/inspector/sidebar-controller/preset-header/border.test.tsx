@@ -45,7 +45,7 @@ vi.mock('../../presets/preview', async (importOriginal) => ({
 
 import { useBorderPresetHeader } from './border';
 
-function createBorderPreset(id: string, color: string, enabled = true, isSystemDefault = false) {
+function createBorderPreset(id: string, color: string, enabled = true, system = false) {
   return {
     id,
     name: id,
@@ -63,9 +63,8 @@ function createBorderPreset(id: string, color: string, enabled = true, isSystemD
     fillOpacity: 0,
     inheritCustomCss: false,
     customCss: '',
-    isSystemDefault,
-    origin: isSystemDefault ? ('system' as const) : ('user' as const),
-    ...(isSystemDefault ? { systemPresetKey: 'system-default' as const, customized: true } : {}),
+    origin: system ? ('system' as const) : ('user' as const),
+    ...(system ? { systemPresetKey: 'system-default' as const, customized: true } : {}),
   };
 }
 

@@ -176,17 +176,19 @@ describe('highlighter guards border preset visual fields', () => {
   });
 
   it.each([-1, 0.5])(
-    'drops malformed revision %s without discarding changed legacy visuals',
+    'drops malformed revision %s without discarding customized system visuals',
     (revision) => {
-      const changedLegacy = createBorderPreset({
+      const changedSystem = createBorderPreset({
         basedOnRevision: revision,
+        customized: true,
         id: 'system-default',
-        isSystemDefault: true,
         name: 'My orange frame',
+        origin: 'system',
+        systemPresetKey: 'system-default',
         width: 7,
       });
       const parsed = parseStoredHighlighterSettings({
-        borderPresets: [changedLegacy],
+        borderPresets: [changedSystem],
         defaultBorderPresetId: 'system-default',
         systemPresetCatalogRevision: revision,
       });

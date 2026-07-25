@@ -1,6 +1,11 @@
 import { expect, it } from 'vitest';
 
-import { BUILD_TEST_PROFILE_LIMITS, resolveBuildTestScope } from './verify-build.scope.mjs';
+import {
+  BUILD_TEST_EXECUTION_CLASSES,
+  BUILD_TEST_PROFILE_LIMITS,
+  SATURATED_RELATED_INPUT_LIMIT,
+  resolveBuildTestScope,
+} from './verify-build.scope.mjs';
 
 it('keeps owner-local diffs narrow in qa:build', () => {
   const scope = resolveBuildTestScope({
@@ -24,7 +29,8 @@ it('keeps owner-local diffs narrow in qa:build', () => {
   expect(scope.directTestFiles).toEqual(['apps/extension/src/popup/shell/app/view.test.tsx']);
   expect(scope.relatedFiles).toEqual([]);
   expect(scope.matchedFamilies).toEqual([]);
-  expect(scope.detail).toContain('profile=owner-direct');
+  expect(scope.executionClass).toBe(BUILD_TEST_EXECUTION_CLASSES.bounded);
+  expect(scope.detail).toContain('selection=owner-direct; execution=bounded-concurrent');
 });
 
 it('uses mapped direct tests for a small mixed UI owner correction', () => {
@@ -124,6 +130,8 @@ it('expands shared public changes to the owner-local shared seam in qa:build', (
     'apps/extension/src/platform/runtime-messaging/client.ts',
     'apps/extension/src/platform/runtime-messaging/index.ts',
   ]);
+  expect(scope.executionClass).toBe(BUILD_TEST_EXECUTION_CLASSES.saturated);
+  expect(scope.detail).toContain('reason=high-fan-out-family');
 });
 
 it('expands parser and export seams to broader related owner files in qa:build', () => {
@@ -153,6 +161,7 @@ it('expands parser and export seams to broader related owner files in qa:build',
     'apps/extension/src/offscreen/project-export/runtime.ts',
     'apps/extension/src/offscreen/project-export/service/runner.ts',
   ]);
+  expect(scope.executionClass).toBe(BUILD_TEST_EXECUTION_CLASSES.saturated);
 });
 
 it('bounds parser-family expansion to the closest behavioral owner', () => {
@@ -209,6 +218,7 @@ it('falls back to direct changed tests when qa:build has no changed code files',
   expect(scope.directTestFiles).toEqual(['apps/extension/src/popup/shell/app/view.test.tsx']);
   expect(scope.relatedFiles).toEqual([]);
   expect(scope.profile).toBe('direct-changed');
+  expect(scope.executionClass).toBe(BUILD_TEST_EXECUTION_CLASSES.bounded);
 });
 
 it('filters harness files out of product qa:build test scope', () => {
@@ -222,7 +232,14 @@ it('filters harness files out of product qa:build test scope', () => {
   expect(scope.relatedFiles).toEqual([]);
   expect(scope.profile).toBe('skip');
   expect(scope.detail).toBe(
-    'profile=skip; skipped: no matching unit-test targets; reason=no product unit-test targets'
+    [
+      'selection=skip',
+      'execution=bounded-concurrent',
+      'related-inputs=0',
+      'reason=bounded-selection',
+      'skipped: no matching unit-test targets',
+      'selection-reason=no product unit-test targets',
+    ].join('; ')
   );
 });
 
@@ -341,6 +358,7 @@ it('falls back to related tests when a small owner scope is ambiguous', () => {
   expect(scope.profile).toBe('related-transitive');
   expect(scope.relatedFiles).toEqual(['apps/extension/src/popup/shell/app/view.tsx']);
   expect(scope.profileReason).toContain('ambiguous');
+  expect(scope.executionClass).toBe(BUILD_TEST_EXECUTION_CLASSES.bounded);
 });
 
 it('keeps public package changes on the related profile even with mapped tests', () => {
@@ -379,4 +397,72 @@ it('keeps large local changes on the related profile', () => {
 
   expect(scope.profile).toBe('related-transitive');
   expect(scope.relatedFiles).toEqual(codeFiles);
+  expect(scope.executionClass).toBe(BUILD_TEST_EXECUTION_CLASSES.bounded);
+});
+
+it('keeps a related closure at the measured threshold bounded and concurrent', () => {
+  const codeFiles = Array.from(
+    { length: SATURATED_RELATED_INPUT_LIMIT },
+    (_, index) => `apps/extension/src/popup/shell/threshold/view-${index}.tsx`
+  );
+  const scope = resolveBuildTestScope({
+    targetFiles: codeFiles,
+    codeFiles,
+    repoCodeFiles: codeFiles,
+    focusedScopeResolver: () => ({
+      detail: 'owner scope exceeds direct budget',
+      testFiles: [],
+      verdict: 'defer-ambiguous-existing',
+    }),
+    ownerTestResolver: () => [],
+  });
+
+  expect(scope.profile).toBe('related-transitive');
+  expect(scope.relatedFiles).toHaveLength(SATURATED_RELATED_INPUT_LIMIT);
+  expect(scope.executionClass).toBe(BUILD_TEST_EXECUTION_CLASSES.bounded);
+  expect(scope.detail).toContain('reason=related-inputs-within-limit');
+});
+
+it('classifies a real 198-input related scope as saturated exclusive', () => {
+  const codeFiles = Array.from(
+    { length: 198 },
+    (_, index) => `apps/extension/src/popup/shell/large-closure/view-${index}.tsx`
+  );
+  const scope = resolveBuildTestScope({
+    targetFiles: codeFiles,
+    codeFiles,
+    repoCodeFiles: codeFiles,
+    focusedScopeResolver: () => ({
+      detail: 'owner scope exceeds direct budget',
+      testFiles: [],
+      verdict: 'defer-ambiguous-existing',
+    }),
+    ownerTestResolver: () => [],
+  });
+
+  expect(scope.profile).toBe('related-transitive');
+  expect(scope.relatedFiles).toHaveLength(198);
+  expect(scope.executionClass).toBe(BUILD_TEST_EXECUTION_CLASSES.saturated);
+  expect(scope.detail).toContain(
+    'selection=related-transitive; execution=saturated-exclusive; related-inputs=198; reason=related-input-threshold'
+  );
+});
+
+it('does not saturate a small storage-only related scope without measured fan-out', () => {
+  const sourceFile = 'apps/extension/src/background/storage/local-owner.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [sourceFile],
+    codeFiles: [sourceFile],
+    repoCodeFiles: [sourceFile],
+    focusedScopeResolver: () => ({
+      detail: 'local owner proof is unavailable',
+      testFiles: [],
+      verdict: 'defer-ambiguous-existing',
+    }),
+    ownerTestResolver: () => [],
+  });
+
+  expect(scope.matchedFamilies).toEqual(['storage-persistence']);
+  expect(scope.profile).toBe('related-transitive');
+  expect(scope.executionClass).toBe(BUILD_TEST_EXECUTION_CLASSES.bounded);
 });

@@ -95,7 +95,7 @@ describe('buildBorderPresetSavePanel', () => {
           name: 'System',
           order: 0,
           enabled: true,
-          isSystemDefault: true,
+          origin: 'system',
           width: 2,
           color: '#000000',
           style: 'solid',

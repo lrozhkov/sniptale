@@ -7,7 +7,7 @@ import {
 } from '../../../features/highlighter/presets/catalog';
 import { normalizeHighlighterCatalogState } from './catalog-migration';
 
-function createLegacyDefault(overrides: Partial<BorderPreset> = {}): BorderPreset {
+function createRevisionlessPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
   const canonical = createSystemBorderPresetCatalog()[0]!;
   const {
     basedOnRevision: _basedOnRevision,
@@ -19,7 +19,6 @@ function createLegacyDefault(overrides: Partial<BorderPreset> = {}): BorderPrese
   return {
     ...legacy,
     name: 'Стандартная рамка',
-    isSystemDefault: true,
     ...overrides,
   };
 }
@@ -38,70 +37,29 @@ describe('highlighter system catalog migration', () => {
   });
 
   it.each(['Стандартная рамка', 'Default border'])(
-    'recognizes the untouched legacy orange preset named %s',
+    'does not recognize the revisionless preset named %s as a system preset',
     (name) => {
       const result = normalizeHighlighterCatalogState({
-        borderPresets: [createLegacyDefault({ name, order: 4 })],
+        borderPresets: [createRevisionlessPreset({ name, order: 4 })],
         defaultBorderPresetId: 'system-default',
       });
 
-      expect(result.borderPresets).toHaveLength(8);
+      expect(result.borderPresets).toHaveLength(9);
       expect(result.borderPresets[0]).toMatchObject({
-        id: 'system-default',
-        customized: false,
+        id: 'system-default-user',
         enabled: true,
         order: 4,
-        origin: 'system',
-        systemPresetKey: 'system-default',
+        origin: 'user',
       });
-      expect(result.borderPresets.slice(1).every((preset) => preset.enabled !== false)).toBe(true);
+      expect(
+        result.borderPresets
+          .filter((preset) => preset.origin === 'system')
+          .every((preset) => preset.enabled === false)
+      ).toBe(true);
+      expect(result.defaultBorderPresetId).toBe('system-default-user');
+      expect(result.catalogCustomized).toBe(true);
     }
   );
-
-  it.each([
-    ['renamed', { name: 'My orange frame' }],
-    ['visually changed', { width: 7 }],
-  ])('preserves an explicitly %s legacy system preset', (_name, overrides) => {
-    const legacy = createLegacyDefault(overrides);
-    const result = normalizeHighlighterCatalogState({
-      borderPresets: [legacy],
-      defaultBorderPresetId: legacy.id,
-    });
-
-    expect(result.borderPresets[0]).toMatchObject({
-      ...overrides,
-      customized: true,
-      origin: 'system',
-      systemPresetKey: 'system-default',
-    });
-    expect(result.borderPresets.slice(1).every((preset) => preset.enabled === false)).toBe(true);
-    expect(result.catalogCustomized).toBe(true);
-  });
-
-  it('keeps new system presets disabled when a legacy catalog already has a user preset', () => {
-    const userPreset = createLegacyDefault({
-      id: 'user-1',
-      isSystemDefault: false,
-      name: 'My preset',
-      order: 6,
-      origin: 'user',
-    });
-    const result = normalizeHighlighterCatalogState({
-      borderPresets: [createLegacyDefault(), userPreset],
-      defaultBorderPresetId: 'system-default',
-    });
-
-    expect(result.borderPresets.find((preset) => preset.id === 'system-default')?.enabled).toBe(
-      true
-    );
-    expect(result.borderPresets.find((preset) => preset.id === 'user-1')?.enabled).toBe(true);
-    expect(
-      result.borderPresets
-        .filter((preset) => preset.origin === 'system' && preset.id !== 'system-default')
-        .every((preset) => preset.enabled === false)
-    ).toBe(true);
-    expect(result.catalogCustomized).toBe(true);
-  });
 
   it('updates untouched visuals, preserves enabled/default, and restores canonical order', () => {
     const [accent, soft] = createSystemBorderPresetCatalog();

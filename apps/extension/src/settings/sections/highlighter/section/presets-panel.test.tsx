@@ -60,7 +60,6 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
   return {
     id: overrides.id ?? 'preset-1',
     name: overrides.name ?? 'Preset',
-    isSystemDefault: overrides.isSystemDefault ?? false,
     origin: overrides.origin ?? 'user',
     ...(overrides.systemPresetKey === undefined
       ? {}
@@ -129,7 +128,6 @@ function createPresets(): HighlighterPresetController {
 function createProps(): HighlighterPresetsPanelProps {
   const defaultPreset = createPreset({
     id: 'preset-default',
-    isSystemDefault: true,
     origin: 'system',
     systemPresetKey: 'system-default',
     customized: false,
@@ -138,7 +136,6 @@ function createProps(): HighlighterPresetsPanelProps {
   });
   const customPreset = createPreset({
     id: 'preset-custom',
-    isSystemDefault: false,
     name: 'Custom',
     order: 1,
     style: 'dashed',

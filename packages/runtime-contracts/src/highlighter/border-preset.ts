@@ -22,8 +22,6 @@ export interface BorderPadding {
 export interface BorderPreset {
   id: string;
   name: string;
-  /** Legacy marker retained only for backward-compatible parsing. */
-  isSystemDefault?: boolean;
   enabled?: boolean;
   order: number;
   width: number;

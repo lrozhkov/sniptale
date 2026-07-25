@@ -86,6 +86,14 @@ function isManagedPreset(
   return presetOwner !== 'rectangle' && isObject(preset) && isObject(preset['settings']);
 }
 
+function isSystemPreset(
+  preset: EditorSectionState['currentPresets'][number],
+  presetOwner: EditorSectionState['presetOwner']
+): boolean {
+  if (isRectanglePreset(preset, presetOwner)) return preset.origin === 'system';
+  return isManagedPreset(preset, presetOwner) && preset.isSystemDefault === true;
+}
+
 function PresetPreview(props: {
   preset: EditorSectionState['currentPresets'][number];
   presetOwner: EditorSectionState['presetOwner'];
@@ -107,10 +115,7 @@ function PresetActions(props: {
   state: EditorSectionState;
 }) {
   const { preset, state } = props;
-  const isSystem =
-    state.presetOwner === 'rectangle'
-      ? isRectanglePreset(preset, state.presetOwner) && preset.origin === 'system'
-      : preset.isSystemDefault === true;
+  const isSystem = isSystemPreset(preset, state.presetOwner);
   const isLastEnabledRectanglePreset =
     state.presetOwner === 'rectangle' &&
     preset.enabled !== false &&
@@ -241,11 +246,7 @@ export function PresetRow(props: {
           {renderPresetName(props.preset, props.state.presetOwner)}
           <SystemBadges
             isDefault={isDefault}
-            isSystemDefault={
-              isRectanglePreset(props.preset, props.state.presetOwner)
-                ? props.preset.origin === 'system'
-                : props.preset.isSystemDefault
-            }
+            isSystemDefault={isSystemPreset(props.preset, props.state.presetOwner)}
           />
         </div>
       </div>

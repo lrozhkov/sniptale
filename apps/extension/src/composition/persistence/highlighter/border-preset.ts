@@ -27,7 +27,6 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     !isPlainRecord(value) ||
     !isString(value['id']) ||
     !isString(value['name']) ||
-    (value['isSystemDefault'] !== undefined && !isBoolean(value['isSystemDefault'])) ||
     (value['enabled'] !== undefined && !isBoolean(value['enabled'])) ||
     (value['origin'] !== undefined && value['origin'] !== 'system' && value['origin'] !== 'user') ||
     (value['systemPresetKey'] !== undefined &&
@@ -71,9 +70,6 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     style: value['style'] as BorderPreset['style'],
     width: value['width'],
     ...(value['enabled'] === undefined ? {} : { enabled: value['enabled'] }),
-    ...(value['isSystemDefault'] === undefined
-      ? {}
-      : { isSystemDefault: value['isSystemDefault'] }),
     ...(value['origin'] === undefined ? {} : { origin: value['origin'] as 'system' | 'user' }),
     ...(value['systemPresetKey'] === undefined
       ? {}

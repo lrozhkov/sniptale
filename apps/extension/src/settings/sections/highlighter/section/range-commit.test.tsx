@@ -74,7 +74,6 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
   return {
     id: overrides.id ?? 'preset-1',
     name: overrides.name ?? 'Preset',
-    isSystemDefault: overrides.isSystemDefault ?? false,
     order: overrides.order ?? 0,
     width: overrides.width ?? 4,
     color: overrides.color ?? '#ff6600',

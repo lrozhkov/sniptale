@@ -64,7 +64,6 @@ function Harness() {
         name: 'shared.defaults.defaultBorderPresetName',
         order: 0,
         enabled: true,
-        isSystemDefault: true,
         origin: 'system',
         systemPresetKey: 'system-default',
         customized: false,

@@ -53,7 +53,8 @@ function createSettings(): HighlighterSettings {
       {
         id: 'preset-1',
         name: 'Default',
-        isSystemDefault: true,
+        origin: 'system',
+        systemPresetKey: 'system-default',
         order: 0,
         width: 2,
         color: '#ff0000',

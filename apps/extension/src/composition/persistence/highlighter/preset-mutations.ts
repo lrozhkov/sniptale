@@ -43,7 +43,6 @@ function normalizeUserPreset(preset: BorderPreset, placement: { enabled: boolean
   const {
     basedOnRevision: _basedOnRevision,
     customized: _customized,
-    isSystemDefault: _isSystemDefault,
     systemPresetKey: _systemPresetKey,
     ...candidate
   } = cloneBorderPreset(preset);
@@ -78,7 +77,7 @@ function updateSystemPreset(current: BorderPreset, incoming: BorderPreset): Bord
   const visualChanged = !editableVisualsEqual(current, incoming);
   if (!nameChanged && !visualChanged) return null;
 
-  const { isSystemDefault: _isSystemDefault, ...updated } = cloneBorderPreset(incoming);
+  const updated = cloneBorderPreset(incoming);
   return {
     ...updated,
     id: current.id,

@@ -53,7 +53,6 @@ function createHighlighterSettings(): HighlighterSettings {
       {
         id: 'preset-1',
         name: 'Orange',
-        isSystemDefault: true,
         order: 0,
         width: 3,
         color: '#ff671d',

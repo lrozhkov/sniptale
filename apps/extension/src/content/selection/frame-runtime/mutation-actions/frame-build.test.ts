@@ -33,7 +33,6 @@ function createHighlighterSettings(): HighlighterSettings {
       {
         id: 'preset-1',
         name: 'Orange',
-        isSystemDefault: true,
         order: 0,
         width: 3,
         color: '#ff671d',
@@ -78,7 +77,6 @@ function createBuildArgs() {
   const borderSettings: BorderPreset = {
     id: 'coords-border',
     name: 'Coords',
-    isSystemDefault: false,
     order: 1,
     width: 2,
     color: '#123456',

@@ -91,7 +91,6 @@ function createRectanglePreset(): RectanglePreset {
     fillOpacity: 0,
     id: 'border-default',
     inheritCustomCss: false,
-    isSystemDefault: true,
     origin: 'system',
     systemPresetKey: 'system-default',
     customized: true,

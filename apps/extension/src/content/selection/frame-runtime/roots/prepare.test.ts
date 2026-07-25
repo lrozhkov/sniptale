@@ -49,7 +49,6 @@ function createFrame(id: string) {
       inheritCustomCss: false,
       strokeOpacity: 100,
       id: 'border',
-      isSystemDefault: true,
       name: 'Default',
       opacity: 1,
       order: 0,

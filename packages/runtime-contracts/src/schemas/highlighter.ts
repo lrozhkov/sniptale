@@ -16,7 +16,6 @@ const HexColorWithOptionalAlphaSchema = z.union([
 export const BorderPresetSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(50),
-  isSystemDefault: z.boolean().optional(),
   enabled: z.boolean().optional(),
   order: z.number().int().min(0),
   width: z.number().int().min(1).max(20),

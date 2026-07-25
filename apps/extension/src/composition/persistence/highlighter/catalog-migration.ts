@@ -7,10 +7,6 @@ import {
   SYSTEM_BORDER_PRESET_CATALOG_REVISION,
 } from '../../../features/highlighter/presets/catalog';
 
-// policyStateId: highlighter-system-catalog-migration - immutable legacy-name recognition data
-// is scoped to the versioned catalog migration owner and never grants runtime authority.
-const LEGACY_SYSTEM_DEFAULT_NAMES = new Set(['Стандартная рамка', 'Default border']);
-
 interface HighlighterCatalogStateInput {
   borderPresets?: BorderPreset[];
   defaultBorderPresetId?: string;
@@ -27,7 +23,6 @@ interface MigratedHighlighterCatalogState {
 
 interface CatalogNormalizationState {
   discoveredCustomization: boolean;
-  legacyDefaultUntouched: boolean;
   normalized: BorderPreset[];
   requestedDefaultId: string | undefined;
   reservedIds: Set<string>;
@@ -35,55 +30,12 @@ interface CatalogNormalizationState {
   seenSystemKeys: Set<SystemBorderPresetKey>;
 }
 
-const visualFieldNames = [
-  'color',
-  'customCss',
-  'fillColor',
-  'fillOpacity',
-  'inheritCustomCss',
-  'opacity',
-  'padding',
-  'radius',
-  'shadow',
-  'strokeOpacity',
-  'style',
-  'width',
-] as const;
-
-function normalizeFingerprintValue(value: unknown): unknown {
-  if (typeof value === 'string' && value.startsWith('#')) return value.toLowerCase();
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, item]) => [key, normalizeFingerprintValue(item)])
-    );
-  }
-  return value;
-}
-
-function getVisualFingerprint(preset: BorderPreset): string {
-  return JSON.stringify(
-    Object.fromEntries(
-      visualFieldNames.map((field) => [field, normalizeFingerprintValue(preset[field])])
-    )
-  );
-}
-
-function isUntouchedLegacyDefault(preset: BorderPreset): boolean {
-  const canonical = getCanonicalSystemBorderPreset('system-default');
-  return (
-    LEGACY_SYSTEM_DEFAULT_NAMES.has(preset.name) &&
-    getVisualFingerprint(preset) === getVisualFingerprint(canonical)
-  );
-}
-
 function resolveSystemKey(preset: BorderPreset): SystemBorderPresetKey | null {
-  if (preset.origin === 'user') return null;
+  if (preset.origin !== 'system') return null;
   if (preset.systemPresetKey && isSystemBorderPresetKey(preset.systemPresetKey)) {
     return preset.systemPresetKey;
   }
-  return isSystemBorderPresetKey(preset.id) ? preset.id : null;
+  return null;
 }
 
 function preservePlacement(
@@ -92,7 +44,7 @@ function preservePlacement(
   customized: boolean
 ): BorderPreset {
   if (customized) {
-    const { isSystemDefault: _isSystemDefault, ...preserved } = cloneBorderPreset(current);
+    const preserved = cloneBorderPreset(current);
     return {
       ...preserved,
       id: canonical.id,
@@ -114,7 +66,6 @@ function normalizeUserPreset(preset: BorderPreset): BorderPreset {
   const {
     basedOnRevision: _basedOnRevision,
     customized: _customized,
-    isSystemDefault: _isSystemDefault,
     systemPresetKey: _systemPresetKey,
     ...userPreset
   } = cloneBorderPreset(preset);
@@ -179,7 +130,6 @@ function createCatalogNormalizationState(
 ): CatalogNormalizationState {
   return {
     discoveredCustomization: input.catalogCustomized === true,
-    legacyDefaultUntouched: false,
     normalized: [],
     requestedDefaultId: input.defaultBorderPresetId,
     reservedIds: new Set([
@@ -194,7 +144,6 @@ function createCatalogNormalizationState(
 function collectSystemPreset(
   current: BorderPreset,
   systemKey: SystemBorderPresetKey,
-  isLegacyCatalog: boolean,
   state: CatalogNormalizationState
 ): void {
   if (state.seenSystemKeys.has(systemKey)) return;
@@ -203,11 +152,7 @@ function collectSystemPreset(
 
   state.seenSystemKeys.add(systemKey);
   state.seenIds.add(canonical.id);
-  const isLegacyDefault =
-    isLegacyCatalog && systemKey === 'system-default' && current.origin !== 'system';
-  const untouchedLegacy = isLegacyDefault && isUntouchedLegacyDefault(current);
-  state.legacyDefaultUntouched ||= untouchedLegacy;
-  const customized = isLegacyDefault ? !untouchedLegacy : current.customized === true;
+  const customized = current.customized === true;
   state.discoveredCustomization ||= customized;
   state.normalized.push(preservePlacement(canonical, current, customized));
 }
@@ -226,14 +171,10 @@ function collectUserPreset(current: BorderPreset, state: CatalogNormalizationSta
   state.normalized.push(normalizeUserPreset({ ...current, id: remappedId }));
 }
 
-function collectStoredPreset(
-  current: BorderPreset,
-  isLegacyCatalog: boolean,
-  state: CatalogNormalizationState
-): void {
+function collectStoredPreset(current: BorderPreset, state: CatalogNormalizationState): void {
   const systemKey = resolveSystemKey(current);
   if (systemKey) {
-    collectSystemPreset(current, systemKey, isLegacyCatalog, state);
+    collectSystemPreset(current, systemKey, state);
     return;
   }
   collectUserPreset(current, state);
@@ -258,10 +199,9 @@ function appendMissingSystemPresets(
 }
 
 function restoreCanonicalOrderForUntouchedCatalog(
-  isLegacyCatalog: boolean,
   state: CatalogNormalizationState
 ): BorderPreset[] {
-  if (isLegacyCatalog || state.discoveredCustomization) return state.normalized;
+  if (state.discoveredCustomization) return state.normalized;
   return createSystemBorderPresetCatalog().map((canonical, order) => ({
     ...state.normalized.find((preset) => preset.systemPresetKey === canonical.systemPresetKey)!,
     order,
@@ -275,19 +215,15 @@ export function normalizeHighlighterCatalogState(
     return createFreshCatalogState();
   }
 
-  const isLegacyCatalog = input.systemPresetCatalogRevision === undefined;
   const state = createCatalogNormalizationState(input);
 
   for (const current of input.borderPresets) {
-    collectStoredPreset(current, isLegacyCatalog, state);
+    collectStoredPreset(current, state);
   }
 
-  const catalogWasUntouched =
-    input.catalogCustomized !== true &&
-    !state.discoveredCustomization &&
-    (!isLegacyCatalog || state.legacyDefaultUntouched);
+  const catalogWasUntouched = input.catalogCustomized !== true && !state.discoveredCustomization;
   appendMissingSystemPresets(catalogWasUntouched, state);
-  const ordered = restoreCanonicalOrderForUntouchedCatalog(isLegacyCatalog, state);
+  const ordered = restoreCanonicalOrderForUntouchedCatalog(state);
   const borderPresets = repairEnabledInvariant(ordered);
   return {
     borderPresets,

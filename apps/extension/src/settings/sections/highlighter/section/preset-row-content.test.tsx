@@ -54,7 +54,6 @@ describe('HighlighterPresetRowContent', () => {
       await renderRow({
         id: `preset-${item.style}`,
         name: item.name,
-        isSystemDefault: false,
         order: 0,
         width: 5,
         color: '#ff6600',

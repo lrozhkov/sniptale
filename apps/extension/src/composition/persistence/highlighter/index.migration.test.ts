@@ -41,20 +41,15 @@ describe('highlighter system catalog persistence migration', () => {
     vi.resetModules();
   });
 
-  it('persists an explicit legacy migration once and then becomes a no-op', async () => {
-    const canonical = createDefaultHighlighterSettings().borderPresets[0]!;
-    const {
-      origin: _origin,
-      systemPresetKey: _systemPresetKey,
-      basedOnRevision: _basedOnRevision,
-      customized: _customized,
-      ...legacy
-    } = canonical;
+  it('persists an older catalog revision once and then becomes a no-op', async () => {
+    const previousCatalog = createDefaultHighlighterSettings().borderPresets.map((preset) => ({
+      ...preset,
+      basedOnRevision: 0,
+    }));
     storageState.value = {
       ...createDefaultHighlighterSettings(),
-      borderPresets: [{ ...legacy, name: 'Default border', isSystemDefault: true }],
-      systemPresetCatalogRevision: undefined,
-      catalogCustomized: undefined,
+      borderPresets: previousCatalog,
+      systemPresetCatalogRevision: 0,
     };
     const module = await loadHighlighterStorage();
 

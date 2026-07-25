@@ -101,7 +101,6 @@ async function verifyExistingPresetEditBranch() {
   const preset = {
     id: 'preset-1',
     name: 'Existing border',
-    isSystemDefault: false,
     order: 3,
     width: 5,
     color: '#00aaff',

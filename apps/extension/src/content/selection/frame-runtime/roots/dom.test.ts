@@ -11,7 +11,6 @@ function createFrame(id: string): FrameData {
       fillOpacity: 0,
       id: 'border',
       inheritCustomCss: false,
-      isSystemDefault: true,
       name: 'Default Border',
       opacity: 1,
       order: 0,

@@ -80,6 +80,35 @@ it('runs build closeout build step after earlier green steps', async () => {
   expect(buildCollector).toHaveBeenCalledTimes(1);
 });
 
+it('blocks the Vite build when the Vitest step fails', async () => {
+  const module = await import('./verify-build.execution.mjs');
+  const buildCollector = vi.fn(async () => ({
+    label: 'Build',
+    status: 'ok' as const,
+    detail: '',
+    durationMs: 0,
+  }));
+
+  const result = await module.collectBuildCloseoutStepResults({
+    context: createContext(),
+    collectors: {
+      ...createBuildCollectors(),
+      collectUnitAndCoverageSteps: async () => [
+        { label: 'Unit tests', status: 'failed' as const, summary: 'Vitest failed' },
+        { label: 'Test coverage', status: 'skipped' as const },
+      ],
+      collectBuildStep: buildCollector,
+    },
+  });
+
+  expect(result.steps.at(-1)).toEqual({
+    label: 'Build',
+    status: 'blocked',
+    detail: 'earlier hardfail steps failed',
+  });
+  expect(buildCollector).not.toHaveBeenCalled();
+});
+
 it('accepts one dependency graph collector for both build graph steps', async () => {
   const module = await import('./verify-build.execution.mjs');
   const graphCollector = vi.fn(async () => [
