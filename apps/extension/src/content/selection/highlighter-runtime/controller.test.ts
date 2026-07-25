@@ -68,13 +68,14 @@ it('gives the hover owner live callback and state accessors', () => {
   });
   const addFrame = vi.fn();
   const hasFrameForElement = vi.fn();
+  const addFreeFrame = vi.fn();
 
-  controller.registerFrameCallbacks(addFrame, vi.fn(), vi.fn(), hasFrameForElement);
+  controller.registerFrameCallbacks(addFrame, addFreeFrame, vi.fn(), vi.fn(), hasFrameForElement);
   state.isModeEnabled = true;
   state.isPaused = true;
 
   const [getCallbacks, getState] = createHoverController.mock.calls[0] ?? [];
-  expect(getCallbacks?.()).toEqual({ addFrame, hasFrameForElement });
+  expect(getCallbacks?.()).toEqual({ addFrame, addFreeFrame, hasFrameForElement });
   expect(getState?.isModeEnabled()).toBe(true);
   expect(getState?.isPaused()).toBe(true);
 });
@@ -91,7 +92,6 @@ it('falls back to the shared hover-controller factory', () => {
       isFrameEditing: expect.any(Function),
       isModeEnabled: expect.any(Function),
       isPaused: expect.any(Function),
-      isTooltipVisible: expect.any(Function),
     })
   );
 });

@@ -41,7 +41,7 @@ export const glassPopoverToolbarFormLayoutStyles = `
   cursor: pointer;
 }
 
-.sniptale-glass-toolbar-button:hover {
+.sniptale-glass-toolbar-button:hover:not(:disabled) {
   background: color-mix(
     in srgb,
     var(--sniptale-color-surface-canvas) 20%,
@@ -51,7 +51,12 @@ export const glassPopoverToolbarFormLayoutStyles = `
   color: var(--sniptale-color-text-inverse);
 }
 
-.sniptale-glass-toolbar-button:active { transform: translateY(1px); }
+.sniptale-glass-toolbar-button:active:not(:disabled) { transform: translateY(1px); }
+
+.sniptale-glass-toolbar-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
 
 .sniptale-glass-toolbar-button--active {
   border-color: color-mix(in srgb, var(--sniptale-color-accent) 55%, transparent);

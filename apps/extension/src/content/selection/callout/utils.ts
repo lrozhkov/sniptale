@@ -9,4 +9,3 @@ export {
   getPreferredSideFromAnchor,
   pickBestSide,
 } from './geometry';
-export { getTailSvgState, getTailOffset } from './tail';

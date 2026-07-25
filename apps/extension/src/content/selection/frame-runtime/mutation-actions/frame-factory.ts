@@ -1,8 +1,13 @@
-import type { BorderPreset, FrameData } from '../../../../features/highlighter/contracts';
+import type {
+  BorderPreset,
+  FrameData,
+  FreeFrameInput,
+} from '../../../../features/highlighter/contracts';
 import { createFrameDataFromElement } from '../manager/coords';
-import { buildFrameForAdd } from './frame-build';
+import { buildFrameForAdd, buildFreeFrameForAdd } from './frame-build';
 import { applyAddedFrameSideEffects } from './frame-post-add';
 import type { UseFrameMutationActionHelperOptions } from './types';
+import { useFrameUIStore } from '../state/frame-ui.store';
 
 type CreateAddFrameHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -63,6 +68,35 @@ export function createAddFrameHandler({
       linkedElementsRef,
       recalculateStepBadgesRef,
     });
+    return frameData;
+  };
+}
+
+export function createAddFreeFrameHandler(
+  args: Omit<CreateAddFrameHandlerArgs, 'calculateFrameCoords'> & {
+    generateFrameId: () => string;
+  }
+) {
+  return (input: FreeFrameInput) => {
+    const frameData = buildFreeFrameForAdd({
+      framesRef: args.framesRef,
+      globalEffectModeRef: args.globalEffectModeRef,
+      globalStepBadgeAutoModeRef: args.globalStepBadgeAutoModeRef,
+      sessionBlurSettingsRef: args.sessionBlurSettingsRef,
+      sessionFocusSettingsRef: args.sessionFocusSettingsRef,
+      sessionStepBadgeTemplateRef: args.sessionStepBadgeTemplateRef,
+      highlighterSettingsCacheRef: args.highlighterSettingsCacheRef,
+      generateFrameId: args.generateFrameId,
+      input,
+    });
+    args.setFrames((prev) => [...prev, frameData]);
+    applyAddedFrameSideEffects({
+      frameData,
+      isAutoMode: args.globalStepBadgeAutoModeRef.current,
+      linkedElementsRef: args.linkedElementsRef,
+      recalculateStepBadgesRef: args.recalculateStepBadgesRef,
+    });
+    useFrameUIStore.getState().selectFrame(frameData.id);
     return frameData;
   };
 }

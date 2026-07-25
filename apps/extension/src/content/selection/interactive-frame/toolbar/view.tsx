@@ -5,6 +5,7 @@ import {
   InteractiveFrameToolbarEffectButtons,
   InteractiveFrameToolbarMiddleSection,
 } from './sections';
+import { canDecreaseFrameSize } from './dispatch';
 
 interface InteractiveFrameToolbarContentProps {
   toolbarProps: InteractiveFrameToolbarProps;
@@ -38,6 +39,9 @@ export function InteractiveFrameToolbarContent({
         handleButtonMouseDown={toolbarActions.handleButtonMouseDown}
         handleEditClick={toolbarActions.handleEditClick}
         handleDeleteClick={toolbarActions.handleDeleteClick}
+        handleDecreaseClick={toolbarActions.handleDecreaseClick}
+        handleIncreaseClick={toolbarActions.handleIncreaseClick}
+        canDecrease={canDecreaseFrameSize(toolbarProps.frame)}
       />
     </>
   );

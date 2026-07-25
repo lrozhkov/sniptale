@@ -33,4 +33,69 @@ describe('areInteractiveFramePropsEqual', () => {
 
     expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
   });
+
+  it('treats a tail-base-only change as render-critical', () => {
+    const prevProps = createProps();
+    prevProps.frame.callout = {
+      anchor: 'center',
+      bgColor: '#fff',
+      enabled: true,
+      fontFamily: 'sans',
+      fontSize: 14,
+      fontWeight: 'normal',
+      htmlContent: 'Comment',
+      maxWidth: 200,
+      side: 'top',
+      tailBasePosition: 0.25,
+      tailBaseWidth: 0.2,
+      tailSize: 8,
+      textColor: '#111',
+      variant: 'bubble',
+    };
+    const nextPositionProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        callout: { ...prevProps.frame.callout, tailBasePosition: 0.75 },
+      },
+    };
+    const nextWidthProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        callout: { ...prevProps.frame.callout, tailBaseWidth: 0.4 },
+      },
+    };
+
+    expect(areInteractiveFramePropsEqual(prevProps, nextPositionProps)).toBe(false);
+    expect(areInteractiveFramePropsEqual(prevProps, nextWidthProps)).toBe(false);
+  });
+
+  it('treats a tail-frame-only change as render-critical', () => {
+    const prevProps = createProps();
+    prevProps.frame.callout = {
+      anchor: 'center',
+      bgColor: '#fff',
+      enabled: true,
+      fontFamily: 'sans',
+      fontSize: 14,
+      fontWeight: 'normal',
+      htmlContent: 'Comment',
+      maxWidth: 200,
+      side: 'top',
+      tailFramePosition: 0.25,
+      tailSize: 8,
+      textColor: '#111',
+      variant: 'bubble',
+    };
+    const nextProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        callout: { ...prevProps.frame.callout, tailFramePosition: 0.75 },
+      },
+    };
+
+    expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
+  });
 });

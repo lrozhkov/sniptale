@@ -3,22 +3,34 @@ import type { FrameData } from '../../../../features/highlighter/contracts';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import { processFrameHover } from './helpers';
 import { getViewportClientPoint } from '../../../platform/frame';
-import { useFrameUiMouseTracking, useFrameUiStoreSync } from './effects';
+import { useFrameUiMouseTracking, useFrameUiSelectionEvents, useFrameUiStoreSync } from './effects';
+import { queryContentUiElement } from '../../../platform/dom-host';
+import { resolveFrameControlHit } from './hit-test';
 
 interface UseFrameUIControllerOptions {
   frames: FrameData[];
-  onActiveFrameChange?: (frameId: string | null) => void;
+  onSelectedFrameChange?: (frameId: string | null) => void;
 }
 
-export function useFrameUIController({ frames, onActiveFrameChange }: UseFrameUIControllerOptions) {
-  const showTooltip = useFrameUIStore((state) => state.showTooltip);
-  const hideTooltip = useFrameUIStore((state) => state.hideTooltip);
+export function useFrameUIController({
+  frames,
+  onSelectedFrameChange,
+}: UseFrameUIControllerOptions) {
+  const hoverFrame = useFrameUIStore((state) => state.hoverFrame);
+  const scheduleHoverFrameHide = useFrameUIStore((state) => state.scheduleHoverFrameHide);
+  const clearHoverFrame = useFrameUIStore((state) => state.clearHoverFrame);
+  const selectFrame = useFrameUIStore((state) => state.selectFrame);
+  const clearSelection = useFrameUIStore((state) => state.clearSelection);
   const closePopover = useFrameUIStore((state) => state.closePopover);
-  const activeFrameId = useFrameUIStore((state) => state.activeFrameId);
-  const popoverFrameId = useFrameUIStore((state) => state.popoverFrameId);
+  const hoveredFrameId = useFrameUIStore((state) => state.hoveredFrameId);
+  const selectedFrameId = useFrameUIStore((state) => state.selectedFrameId);
+  const activePopover = useFrameUIStore((state) => state.activePopover);
+  const resizeFrameId = useFrameUIStore((state) => state.resizeFrameId);
+  const setResizeFrame = useFrameUIStore((state) => state.setResizeFrame);
   const framesRef = useRef<FrameData[]>(frames);
-  const activeFrameIdRef = useRef<string | null>(activeFrameId);
-  const popoverFrameIdRef = useRef<string | null>(popoverFrameId);
+  const hoveredFrameIdRef = useRef<string | null>(hoveredFrameId);
+  const selectedFrameIdRef = useRef<string | null>(selectedFrameId);
+  const activePopoverRef = useRef(activePopover);
   const lastMouseX = useRef(-1);
   const lastMouseY = useRef(-1);
   const lastProcessTime = useRef(0);
@@ -26,12 +38,14 @@ export function useFrameUIController({ frames, onActiveFrameChange }: UseFrameUI
 
   useFrameUiStoreSync({
     frames,
-    activeFrameId,
-    popoverFrameId,
+    hoveredFrameId,
+    selectedFrameId,
+    activePopover,
     framesRef,
-    activeFrameIdRef,
-    popoverFrameIdRef,
-    ...(onActiveFrameChange === undefined ? {} : { onActiveFrameChange }),
+    hoveredFrameIdRef,
+    selectedFrameIdRef,
+    activePopoverRef,
+    ...(onSelectedFrameChange === undefined ? {} : { onSelectedFrameChange }),
   });
 
   const handleMouseMove = useCallback(
@@ -40,18 +54,40 @@ export function useFrameUIController({ frames, onActiveFrameChange }: UseFrameUI
 
       processFrameHover({
         frames: framesRef.current,
-        activeFrameId: activeFrameIdRef.current,
-        popoverFrameId: popoverFrameIdRef.current,
-        showTooltip,
-        hideTooltip,
+        directControl: resolveFrameControlHit(event),
+        hoveredFrameId: hoveredFrameIdRef.current,
+        selectedFrameId: selectedFrameIdRef.current,
+        isDrawing: Boolean(queryContentUiElement('.sniptale-free-frame-draft-portal')),
+        hoverFrame,
+        scheduleHoverFrameHide,
+        clearHoverFrame,
+        setResizeFrame,
         x: point.x,
         y: point.y,
       });
     },
-    [showTooltip, hideTooltip]
+    [clearHoverFrame, hoverFrame, scheduleHoverFrameHide, setResizeFrame]
   );
 
   useFrameUiMouseTracking({ handleMouseMove, lastMouseX, lastMouseY, lastProcessTime, rafId });
+  useFrameUiSelectionEvents({
+    framesRef,
+    hoveredFrameIdRef,
+    activePopoverRef,
+    selectedFrameIdRef,
+    clearSelection,
+    hoverFrame,
+    selectFrame,
+  });
 
-  return { activeFrameId, popoverFrameId, showTooltip, hideTooltip, closePopover };
+  return {
+    hoveredFrameId,
+    selectedFrameId,
+    activePopover,
+    resizeFrameId,
+    hoverFrame,
+    selectFrame,
+    clearSelection,
+    closePopover,
+  };
 }

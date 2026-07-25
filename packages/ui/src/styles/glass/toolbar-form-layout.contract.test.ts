@@ -11,6 +11,7 @@ describe('glass.toolbar-form-layout contract', () => {
   it('keeps toolbar shell and button chrome on the layout owner', () => {
     expect(glassToolbarFormLayoutStylesheet).toContain('.sniptale-glass-toolbar {');
     expect(glassToolbarFormLayoutStylesheet).toContain('.sniptale-glass-toolbar-button {');
+    expect(glassToolbarFormLayoutStylesheet).toContain('.sniptale-glass-toolbar-button:disabled {');
     expect(glassToolbarFormLayoutStylesheet).toContain('.sniptale-glass-toolbar-divider {');
   });
 

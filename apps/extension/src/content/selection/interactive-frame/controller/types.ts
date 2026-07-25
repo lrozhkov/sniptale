@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { FrameUIState } from '../../frame-runtime/state/frame-ui.store';
 import type {
   EffectMode,
   FrameData,
@@ -11,11 +12,11 @@ export interface InteractiveFrameActionParams {
   frameWithoutLinkedElement: FrameData;
   tempFrame: FrameData;
   effectMode: EffectMode;
-  setState: React.Dispatch<React.SetStateAction<'idle' | 'hover' | 'editing'>>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   closePopover: () => void;
-  openPopover: (frameId: string) => void;
+  togglePopover: FrameUIState['togglePopover'];
   onUpdate: (frame: FrameData) => void;
   onDelete: () => void;
   onCancel?: () => void;
@@ -28,13 +29,7 @@ export interface InteractiveFrameHoverOverlayProps {
   portalTheme: 'light' | 'dark' | null;
   isCalloutEditing: boolean;
   frameId: string;
-  isPopoverOpen: boolean;
-  isStepBadgePopoverOpen: boolean;
-  isCalloutPopoverOpen: boolean;
-  closePopover: () => void;
-  hideTooltip: (frameId: string) => void;
-  setIsStepBadgePopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsCalloutPopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  clearSelection: () => void;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
@@ -44,6 +39,10 @@ export interface InteractiveFrameSyncConfig {
   state: FrameState;
   tempFrameRef: React.MutableRefObject<FrameData>;
   effectModeRef: React.MutableRefObject<EffectMode>;
+  pointerIdRef: React.MutableRefObject<number | null>;
+  resizeOriginStateRef: React.MutableRefObject<FrameState>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
+  onUpdate: (frame: FrameData) => void;
   stateRef: React.MutableRefObject<FrameState>;
   containerRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -59,10 +58,18 @@ export interface InteractiveFrameListenerConfig {
   startXRef: React.MutableRefObject<number>;
   startYRef: React.MutableRefObject<number>;
   startFrameRef: React.MutableRefObject<FrameData>;
+  tempFrameRef: React.MutableRefObject<FrameData>;
   effectModeRef: React.MutableRefObject<EffectMode>;
+  pointerIdRef: React.MutableRefObject<number | null>;
+  resizeOriginStateRef: React.MutableRefObject<FrameState>;
+  resizeRafIdRef: React.MutableRefObject<number | null>;
+  latestResizeSampleRef: React.MutableRefObject<InteractiveFramePointerSample | null>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
+  onUpdate: (frame: FrameData) => void;
 }
 
 export interface InteractiveFrameHandlerConfig {
+  frameId: string;
   state: FrameState;
   isDraggingRef: React.MutableRefObject<boolean>;
   isResizingRef: React.MutableRefObject<boolean>;
@@ -71,4 +78,17 @@ export interface InteractiveFrameHandlerConfig {
   startYRef: React.MutableRefObject<number>;
   startFrameRef: React.MutableRefObject<FrameData>;
   tempFrameRef: React.MutableRefObject<FrameData>;
+  pointerIdRef: React.MutableRefObject<number | null>;
+  resizeOriginStateRef: React.MutableRefObject<FrameState>;
+  resizeRafIdRef: React.MutableRefObject<number | null>;
+  latestResizeSampleRef: React.MutableRefObject<InteractiveFramePointerSample | null>;
+  stateRef: React.MutableRefObject<FrameState>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
+  setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
+}
+
+export interface InteractiveFramePointerSample {
+  clientX: number;
+  clientY: number;
+  pointerId: number;
 }

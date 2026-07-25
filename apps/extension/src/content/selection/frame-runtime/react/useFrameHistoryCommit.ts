@@ -74,6 +74,7 @@ export function createHistoryWrappedFrameManager(
     ...frameManager,
     addAutoBlurFrames: withHistoryCommit(frameManager.addAutoBlurFrames),
     addFrame: withHistoryCommit(frameManager.addFrame),
+    addFreeFrame: withHistoryCommit(frameManager.addFreeFrame),
     clearAutoBlurFrames: withHistoryCommit(frameManager.clearAutoBlurFrames),
     clearFrames: withHistoryCommit(frameManager.clearFrames),
     removeFrame: withHistoryCommit(frameManager.removeFrame),

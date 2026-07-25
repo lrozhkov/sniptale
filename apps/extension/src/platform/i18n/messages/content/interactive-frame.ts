@@ -5,6 +5,10 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Рамка',
     en: 'Border',
   },
+  openToolbar: {
+    ru: 'Открыть панель действий рамки',
+    en: 'Open frame actions',
+  },
   effectBlur: {
     ru: 'Размытие',
     en: 'Blur',
@@ -36,6 +40,30 @@ export const contentInteractiveFrameMessages = defineMessageSource({
   editButton: {
     ru: 'Редактировать',
     en: 'Edit',
+  },
+  decreaseFrame: {
+    ru: 'Уменьшить рамку на 5 px с каждой стороны',
+    en: 'Shrink frame by 5 px on each side',
+  },
+  increaseFrame: {
+    ru: 'Увеличить рамку на 5 px с каждой стороны',
+    en: 'Expand frame by 5 px on each side',
+  },
+  moveComment: {
+    ru: 'Переместить комментарий',
+    en: 'Move comment',
+  },
+  moveCommentTail: {
+    ru: 'Изменить ширину основания указателя: начальная точка',
+    en: 'Adjust pointer base width: start point',
+  },
+  moveCommentTailBaseEnd: {
+    ru: 'Изменить ширину основания указателя: конечная точка',
+    en: 'Adjust pointer base width: end point',
+  },
+  moveCommentTailEnd: {
+    ru: 'Сместить конец указателя вдоль границы рамки',
+    en: 'Move the pointer end along the frame edge',
   },
   deleteButton: {
     ru: 'Удалить (Delete)',

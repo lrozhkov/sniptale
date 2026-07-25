@@ -1,5 +1,6 @@
 import { addEventListenerToAllWindowsDynamic, walkAllDocuments } from '../../platform/frame';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { toggleContentHostClass } from '../../platform/dom-host';
 import { removeNavigationLockOverlay, syncNavigationLockOverlay } from './overlay';
 import {
   createLockerKeyDownState,
@@ -134,6 +135,7 @@ const defaultNavigationLockerDeps: NavigationLockerDeps = {
   toggleBodyClass: (className, enabled) => {
     document.body?.classList.toggle(className, enabled);
   },
+  toggleContentHostClass,
   walkAllDocuments,
   unsubscribeBeforeUnload: (listener) => {
     window.removeEventListener('beforeunload', listener);
@@ -197,6 +199,7 @@ export function createNavigationLocker(deps: NavigationLockerDeps = defaultNavig
     setUIHidden: (hidden: boolean) => {
       state.isUIHidden = hidden;
       deps.toggleBodyClass('sniptale-capture-ui-hidden', hidden);
+      deps.toggleContentHostClass('sniptale-capture-ui-hidden', hidden);
       deps.logger.log('[Sniptale] UI hidden flag set to:', hidden);
     },
   };

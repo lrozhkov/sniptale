@@ -6,6 +6,7 @@ function createMutations(): FrameMutations {
   return {
     addAutoBlurFrames: vi.fn(),
     addFrame: vi.fn(),
+    addFreeFrame: vi.fn(),
     clearAutoBlurFrames: vi.fn(),
     clearFrames: vi.fn(),
     removeFrame: vi.fn(),
@@ -34,6 +35,7 @@ describe('frame-manager-runtime-mutations', () => {
     expect(runtimeMutations.clearAutoBlurFrames).toBe(mutations.clearAutoBlurFrames);
     expect(runtimeMutations.syncAutoBlurFrames).toBe(mutations.syncAutoBlurFrames);
     expect(runtimeMutations.addFrame).toBe(mutations.addFrame);
+    expect(runtimeMutations.addFreeFrame).toBe(mutations.addFreeFrame);
     expect(runtimeMutations.clearFrames).toBe(mutations.clearFrames);
   });
 });

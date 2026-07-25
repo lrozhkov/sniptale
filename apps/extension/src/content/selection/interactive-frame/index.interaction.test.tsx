@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../features/highlighter/contracts';
 import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 import { InteractiveFrame } from '.';
+import { queryAllContentUiElements, queryContentUiElement } from '../../platform/dom-host';
 
 const highlighterMocks = vi.hoisted(() => ({
   clearFrameEditing: vi.fn(),
@@ -62,8 +63,9 @@ function renderFrame(props?: Partial<React.ComponentProps<typeof InteractiveFram
 }
 
 function findToolbarButton(titlePattern: RegExp): HTMLButtonElement {
-  const button = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find((item) =>
-    titlePattern.test(item.title)
+  const button = queryAllContentUiElements('button').find(
+    (item): item is HTMLButtonElement =>
+      item instanceof HTMLButtonElement && titlePattern.test(item.title)
   );
   expect(button).toBeInstanceOf(HTMLButtonElement);
   return button as HTMLButtonElement;
@@ -78,7 +80,7 @@ function setInputValue(input: HTMLInputElement, value: string): void {
 
 function openFrameSizeEditor() {
   act(() => {
-    useFrameUIStore.getState().showTooltip('frame-1');
+    useFrameUIStore.getState().selectFrame('frame-1');
   });
 
   act(() => {
@@ -119,6 +121,56 @@ afterEach(() => {
 });
 
 describe('InteractiveFrame size edit interactions', () => {
+  it('shows only the compact trigger on hover and the full toolbar after selection', () => {
+    const { frame } = renderFrame();
+
+    act(() => useFrameUIStore.getState().hoverFrame(frame.id));
+    const trigger = queryContentUiElement('.sniptale-frame-toolbar-trigger');
+    expect(trigger).toBeInstanceOf(HTMLButtonElement);
+    expect(queryContentUiElement('.sniptale-action-toolbar')).toBeNull();
+
+    act(() => useFrameUIStore.getState().selectFrame(frame.id));
+    expect(queryContentUiElement('.sniptale-frame-toolbar-trigger')).toBeNull();
+    expect(queryContentUiElement('.sniptale-action-toolbar')).toBeInstanceOf(HTMLElement);
+  });
+
+  it('applies one five-pixel expansion from the selected toolbar', () => {
+    const { frame, onUpdate } = renderFrame();
+    act(() => useFrameUIStore.getState().selectFrame(frame.id));
+
+    act(() => {
+      findToolbarButton(/Increase frame size|Увеличить рамку/).click();
+    });
+
+    expect(onUpdate).toHaveBeenCalledOnce();
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 115, y: 75, width: 330, height: 190 })
+    );
+  });
+
+  it('keeps the selected toolbar fixed when its settings popover opens', () => {
+    const { frame } = renderFrame();
+    act(() => useFrameUIStore.getState().selectFrame(frame.id));
+    const toolbar = queryContentUiElement<HTMLElement>('.sniptale-toolbar-portal-wrapper');
+    expect(toolbar).toBeInstanceOf(HTMLElement);
+    const before = {
+      left: toolbar?.style.left,
+      side: toolbar?.dataset['placementSide'],
+      top: toolbar?.style.top,
+    };
+
+    act(() => {
+      findToolbarButton(/Border|Рамка/).click();
+    });
+
+    expect(queryContentUiElement('.sniptale-frame-settings-popover')).toBeInstanceOf(HTMLElement);
+    expect({
+      left: toolbar?.style.left,
+      side: toolbar?.dataset['placementSide'],
+      top: toolbar?.style.top,
+    }).toEqual(before);
+  });
+
   it('keeps the highlighter frame visible when the width input is cleared', () => {
     const { onDelete } = renderFrame();
     const { frameContainer, widthInput } = openFrameSizeEditor();
@@ -146,6 +198,19 @@ describe('InteractiveFrame size edit interactions', () => {
     expect(onDelete).not.toHaveBeenCalled();
     expect(widthInput.value).toBe('320');
     expect(frameContainer.style.width).toBe('320px');
+  });
+
+  it('returns the selected toolbar after Escape cancels size editing', () => {
+    const { frame } = renderFrame();
+    openFrameSizeEditor();
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    });
+
+    expect(document.querySelector('.sniptale-content-size-tooltip')).toBeNull();
+    expect(useFrameUIStore.getState().selectedFrameId).toBe(frame.id);
+    expect(queryContentUiElement('.sniptale-action-toolbar')).toBeInstanceOf(HTMLElement);
   });
 
   it('applies the width input draft when Enter is pressed', () => {

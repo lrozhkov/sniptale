@@ -50,7 +50,6 @@ vi.mock('../selection/region-selector', () => ({
 vi.mock('../selection/highlighter', () => ({
   clearAllHighlights: vi.fn(),
   clearFrameEditing: vi.fn(),
-  clearFrameTooltipVisible: vi.fn(),
   disableHighlighterMode: runtimeCleanupMocks.disableHighlighterMode,
   enableHighlighterMode: vi.fn(),
   invalidateFrameCache: vi.fn(),
@@ -60,7 +59,6 @@ vi.mock('../selection/highlighter', () => ({
   registerFrameCallbacks: vi.fn(),
   resumeHighlighter: vi.fn(),
   setFrameEditing: vi.fn(),
-  setFrameTooltipVisible: vi.fn(),
 }));
 
 vi.mock('../overlay/ai/pick/runtime/lazy', () => ({

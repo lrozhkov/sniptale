@@ -14,4 +14,5 @@ export {
   resolveContentOverlayRoot,
   resolveContentShadowRoot,
   resolveContentUiMountTarget,
+  toggleContentHostClass,
 } from './ui';

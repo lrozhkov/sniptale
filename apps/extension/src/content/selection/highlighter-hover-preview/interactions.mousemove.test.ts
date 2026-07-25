@@ -25,7 +25,6 @@ function createFixture(enabled = true) {
       isFrameEditing: () => false,
       isModeEnabled: () => enabled,
       isPaused: () => false,
-      isTooltipVisible: () => false,
     },
     hoverThrottleMs: 100,
     overlayActions: { hideHoverOverlay, showHoverOverlay },

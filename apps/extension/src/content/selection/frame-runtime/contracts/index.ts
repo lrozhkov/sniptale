@@ -5,6 +5,7 @@ import type {
   EffectMode,
   FocusSettings,
   FrameData,
+  FreeFrameInput,
   FrameState,
   HighlighterSettings,
 } from '../../../../features/highlighter/contracts';
@@ -49,6 +50,7 @@ export interface FrameMutations {
     skippedCount: number;
   };
   addFrame: (element: HTMLElement) => FrameData;
+  addFreeFrame: (input: FreeFrameInput) => FrameData;
   clearAutoBlurFrames: (input: AutoBlurClearInput) => { removedCount: number };
   clearFrames: () => void;
   removeFrame: (frameId: string) => void;

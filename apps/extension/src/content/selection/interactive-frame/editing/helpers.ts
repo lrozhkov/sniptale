@@ -21,7 +21,7 @@ export function syncInteractiveFrameContainer(
 }
 
 export function applyDragUpdate(params: {
-  event: MouseEvent;
+  event: Pick<MouseEvent, 'clientX' | 'clientY'>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   startX: number;
   startY: number;
@@ -29,6 +29,7 @@ export function applyDragUpdate(params: {
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   frameId: string;
   effectMode: EffectMode;
+  tempFrameRef?: React.MutableRefObject<FrameData>;
 }) {
   const newX = params.startFrame.x + (params.event.clientX - params.startX);
   const newY = params.startFrame.y + (params.event.clientY - params.startY);
@@ -38,7 +39,9 @@ export function applyDragUpdate(params: {
     width: params.startFrame.width,
     height: params.startFrame.height,
   });
-  params.setTempFrame((prev) => ({ ...prev, x: newX, y: newY }));
+  const nextFrame = { ...params.startFrame, x: newX, y: newY };
+  if (params.tempFrameRef) params.tempFrameRef.current = nextFrame;
+  params.setTempFrame(nextFrame);
   updateEffectOverlay(
     params.effectMode,
     params.frameId,
@@ -81,7 +84,7 @@ function getResizedFrame(
 }
 
 export function applyResizeUpdate(params: {
-  event: MouseEvent;
+  event: Pick<MouseEvent, 'clientX' | 'clientY'>;
   direction: ResizeDirection;
   containerRef: React.RefObject<HTMLDivElement | null>;
   startX: number;
@@ -90,6 +93,7 @@ export function applyResizeUpdate(params: {
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   frameId: string;
   effectMode: EffectMode;
+  tempFrameRef?: React.MutableRefObject<FrameData>;
 }) {
   const resizedFrame = getResizedFrame(
     params.direction,
@@ -98,7 +102,9 @@ export function applyResizeUpdate(params: {
     params.startFrame
   );
   syncInteractiveFrameContainer(params.containerRef.current, resizedFrame);
-  params.setTempFrame((prev) => ({ ...prev, ...resizedFrame }));
+  const nextFrame = { ...params.startFrame, ...resizedFrame };
+  if (params.tempFrameRef) params.tempFrameRef.current = nextFrame;
+  params.setTempFrame(nextFrame);
   updateEffectOverlay(
     params.effectMode,
     params.frameId,

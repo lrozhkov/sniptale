@@ -35,10 +35,27 @@ function cloneFrameSettings(frame: FrameData): SerializableFrameData {
           },
         }
       : {}),
-    ...(frame.callout ? { callout: { ...frame.callout } } : {}),
+    ...(frame.callout
+      ? {
+          callout: {
+            ...frame.callout,
+            ...(frame.callout.manualPlacement
+              ? { manualPlacement: { ...frame.callout.manualPlacement } }
+              : {}),
+          },
+        }
+      : {}),
     ...(frame.focusSettings ? { focusSettings: { ...frame.focusSettings } } : {}),
     ...(linkedElementSelector === undefined ? {} : { linkedElementSelector }),
     ...(frame.offset ? { offset: { ...frame.offset } } : {}),
+    ...(frame.pagePlacement
+      ? {
+          pagePlacement: {
+            ...frame.pagePlacement,
+            iframePath: [...frame.pagePlacement.iframePath],
+          },
+        }
+      : {}),
     ...(frame.stepBadge
       ? {
           stepBadge: {

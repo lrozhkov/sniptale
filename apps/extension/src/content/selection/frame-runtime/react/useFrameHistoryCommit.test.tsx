@@ -51,6 +51,7 @@ function createFrameManager() {
   return {
     addAutoBlurFrames: vi.fn(),
     addFrame: vi.fn(),
+    addFreeFrame: vi.fn(),
     clearAutoBlurFrames: vi.fn(),
     clearFrames: vi.fn(),
     frames: [],
@@ -149,16 +150,17 @@ function expectHistoryWrappedActions() {
 
   const wrapped = createHistoryWrappedFrameManager(frameManager, withHistoryCommit as never);
 
-  expect(withHistoryCommit).toHaveBeenCalledTimes(9);
+  expect(withHistoryCommit).toHaveBeenCalledTimes(10);
   expect(withHistoryCommit).toHaveBeenNthCalledWith(1, frameManager.addAutoBlurFrames);
   expect(withHistoryCommit).toHaveBeenNthCalledWith(2, frameManager.addFrame);
-  expect(withHistoryCommit).toHaveBeenNthCalledWith(3, frameManager.clearAutoBlurFrames);
-  expect(withHistoryCommit).toHaveBeenNthCalledWith(4, frameManager.clearFrames);
-  expect(withHistoryCommit).toHaveBeenNthCalledWith(5, frameManager.removeFrame);
-  expect(withHistoryCommit).toHaveBeenNthCalledWith(6, frameManager.syncFocusOpacity);
-  expect(withHistoryCommit).toHaveBeenNthCalledWith(7, frameManager.syncAutoBlurFrames);
-  expect(withHistoryCommit).toHaveBeenNthCalledWith(8, frameManager.updateFrame);
-  expect(withHistoryCommit).toHaveBeenNthCalledWith(9, frameManager.updateFrameEffect);
+  expect(withHistoryCommit).toHaveBeenNthCalledWith(3, frameManager.addFreeFrame);
+  expect(withHistoryCommit).toHaveBeenNthCalledWith(4, frameManager.clearAutoBlurFrames);
+  expect(withHistoryCommit).toHaveBeenNthCalledWith(5, frameManager.clearFrames);
+  expect(withHistoryCommit).toHaveBeenNthCalledWith(6, frameManager.removeFrame);
+  expect(withHistoryCommit).toHaveBeenNthCalledWith(7, frameManager.syncFocusOpacity);
+  expect(withHistoryCommit).toHaveBeenNthCalledWith(8, frameManager.syncAutoBlurFrames);
+  expect(withHistoryCommit).toHaveBeenNthCalledWith(9, frameManager.updateFrame);
+  expect(withHistoryCommit).toHaveBeenNthCalledWith(10, frameManager.updateFrameEffect);
   expect(wrapped.updateFrameStepBadge).toBe(frameManager.updateFrameStepBadge);
   expect(wrapped.updateGlobalStepBadgeSettings).toBe(frameManager.updateGlobalStepBadgeSettings);
 }

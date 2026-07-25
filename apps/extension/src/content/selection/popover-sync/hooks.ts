@@ -17,6 +17,25 @@ interface PopoverDistanceCloseProps extends PopoverSyncHookProps {
   checkThrottleMs?: number;
 }
 
+export function usePopoverEscapeClose(
+  props: Pick<PopoverSyncHookProps, 'isOpen' | 'onClose'> & { anchorEl?: HTMLElement | null }
+) {
+  const { anchorEl, isOpen, onClose } = props;
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      onClose();
+      anchorEl?.focus();
+    };
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [anchorEl, isOpen, onClose]);
+}
+
 function getPointerDistanceFromElement(event: MouseEvent, element: HTMLElement): number {
   const rect = element.getBoundingClientRect();
   const closestX = Math.max(rect.left, Math.min(event.clientX, rect.right));

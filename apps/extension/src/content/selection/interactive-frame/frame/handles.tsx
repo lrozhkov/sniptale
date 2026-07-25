@@ -10,15 +10,19 @@ import { InteractiveFrameResizeHandleLayer } from './handle-layer';
 
 interface ResizeHandlesProps {
   state: FrameState;
+  isResizeHovered: boolean;
   tempFrame: FrameData;
   borderColor?: string;
-  onResizeStart: (event: React.MouseEvent, direction: ResizeDirection) => void;
+  borderWidth: number;
+  onResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 }
 
 export function InteractiveFrameResizeHandles({
   state,
+  isResizeHovered,
   tempFrame,
   borderColor,
+  borderWidth,
   onResizeStart,
 }: ResizeHandlesProps): React.ReactElement | null {
   const portalContainer = useFixedPortalContainer(
@@ -35,20 +39,20 @@ export function InteractiveFrameResizeHandles({
     null
   );
 
-  if (state !== 'editing') {
+  if (!isResizeHovered && state !== 'editing' && state !== 'resizing') {
     return null;
   }
 
   const directions: ResizeDirection[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-  const handleSize = 10;
-  const offset = -6;
+  const handleSize = Math.min(16, Math.max(10, 8 + borderWidth));
 
   return createPortal(
     <InteractiveFrameResizeHandleLayer
       directions={directions}
+      frameId={tempFrame.id}
       tempFrame={tempFrame}
       handleSize={handleSize}
-      offset={offset}
+      borderWidth={borderWidth}
       onResizeStart={onResizeStart}
       {...(borderColor === undefined ? {} : { borderColor })}
     />,

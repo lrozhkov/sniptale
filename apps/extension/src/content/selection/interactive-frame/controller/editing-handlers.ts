@@ -15,6 +15,7 @@ export function useInteractiveFrameEditingHandlers(params: InteractiveFrameHandl
         startYRef: params.startYRef,
         startFrameRef: params.startFrameRef,
         tempFrameRef: params.tempFrameRef,
+        pointerIdRef: params.pointerIdRef,
       }),
     [params]
   );
@@ -22,12 +23,21 @@ export function useInteractiveFrameEditingHandlers(params: InteractiveFrameHandl
   const handleResizeStart = useMemo(
     () =>
       createInteractiveFrameResizeStartHandler({
+        frameId: params.frameId,
+        state: params.state,
+        stateRef: params.stateRef,
+        setState: params.setState,
+        setTempFrame: params.setTempFrame,
         isResizingRef: params.isResizingRef,
         resizeDirectionRef: params.resizeDirectionRef,
         startXRef: params.startXRef,
         startYRef: params.startYRef,
         startFrameRef: params.startFrameRef,
         tempFrameRef: params.tempFrameRef,
+        pointerIdRef: params.pointerIdRef,
+        resizeOriginStateRef: params.resizeOriginStateRef,
+        resizeRafIdRef: params.resizeRafIdRef,
+        latestResizeSampleRef: params.latestResizeSampleRef,
       }),
     [params]
   );

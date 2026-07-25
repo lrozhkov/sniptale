@@ -4,6 +4,7 @@ import type {
   EffectMode,
   FocusSettings,
   FrameData,
+  FreeFrameInput,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
 import { resolveDefaultBorderPreset } from '../../../../features/editor/document/public';
@@ -27,6 +28,52 @@ type BuildFrameForAddArgs = Pick<
 };
 
 export function buildFrameForAdd(args: BuildFrameForAddArgs) {
+  const settings = resolveFrameBuildSettings(args);
+
+  const baseFrameData = args.calculateFrameCoords(args.element, settings.borderSettings);
+  const selector = createCompositeSelector(args.element);
+  return applyFrameBuildSettings(baseFrameData, settings, {
+    linkedElementSelector: selector.iframeSelector
+      ? `${selector.iframeSelector} => ${selector.elementSelector}`
+      : selector.elementSelector,
+  });
+}
+
+export function buildFreeFrameForAdd(
+  args: Omit<BuildFrameForAddArgs, 'calculateFrameCoords' | 'element'> & {
+    generateFrameId: () => string;
+    input: FreeFrameInput;
+  }
+) {
+  const settings = resolveFrameBuildSettings(args);
+  return applyFrameBuildSettings(
+    {
+      id: args.generateFrameId(),
+      x: args.input.x,
+      y: args.input.y,
+      width: args.input.width,
+      height: args.input.height,
+      pagePlacement: {
+        ...args.input.pagePlacement,
+        iframePath: [...args.input.pagePlacement.iframePath],
+      },
+    },
+    settings
+  );
+}
+
+function resolveFrameBuildSettings(
+  args: Pick<
+    BuildFrameForAddArgs,
+    | 'framesRef'
+    | 'globalEffectModeRef'
+    | 'globalStepBadgeAutoModeRef'
+    | 'highlighterSettingsCacheRef'
+    | 'sessionBlurSettingsRef'
+    | 'sessionFocusSettingsRef'
+    | 'sessionStepBadgeTemplateRef'
+  >
+) {
   const sessionDefaults = resolveSessionFrameDefaults({
     existingFrames: args.framesRef.current,
     fallbackEffectMode: args.globalEffectModeRef.current,
@@ -34,7 +81,7 @@ export function buildFrameForAdd(args: BuildFrameForAddArgs) {
     fallbackFocusSettings: args.sessionFocusSettingsRef.current,
   });
 
-  return createFrameWithSessionSettings(args.element, {
+  return {
     borderSettings: resolveDefaultBorderPreset(
       args.highlighterSettingsCacheRef.current,
       DEFAULT_BORDER_PRESET
@@ -44,12 +91,11 @@ export function buildFrameForAdd(args: BuildFrameForAddArgs) {
     effectMode: sessionDefaults.effectMode,
     template: args.sessionStepBadgeTemplateRef.current,
     isAutoMode: args.globalStepBadgeAutoModeRef.current,
-    calculateFrameCoords: args.calculateFrameCoords,
-  });
+  };
 }
 
-function createFrameWithSessionSettings(
-  element: HTMLElement,
+function applyFrameBuildSettings(
+  baseFrameData: FrameData,
   params: {
     borderSettings: BorderPreset;
     blurSettings: BlurSettings;
@@ -57,11 +103,9 @@ function createFrameWithSessionSettings(
     effectMode: EffectMode;
     template: StepBadgeSettings | null;
     isAutoMode: boolean;
-    calculateFrameCoords: (element: HTMLElement, borderSettings?: BorderPreset) => FrameData;
-  }
+  },
+  linked?: { linkedElementSelector: string }
 ) {
-  const baseFrameData = params.calculateFrameCoords(element, params.borderSettings);
-  const selector = createCompositeSelector(element);
   const stepBadge = buildStepBadgeSettings(params.template, params.isAutoMode);
 
   return {
@@ -70,9 +114,7 @@ function createFrameWithSessionSettings(
     borderSettings: params.borderSettings,
     blurSettings: params.blurSettings,
     focusSettings: params.focusSettings,
-    linkedElementSelector: selector.iframeSelector
-      ? `${selector.iframeSelector} => ${selector.elementSelector}`
-      : selector.elementSelector,
+    ...(linked ?? {}),
     ...(stepBadge === undefined ? {} : { stepBadge }),
   } satisfies FrameData;
 }

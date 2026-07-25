@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../../features/highlighter/contracts';
 import { createFrameDataFixture, createStepBadgeSettingsFixture } from '../../test-support';
 
@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   calculateFrameOffsetFromElement: vi.fn(),
   clearAllHighlights: vi.fn(),
   clearFrameEditing: vi.fn(),
-  clearFrameTooltipVisible: vi.fn(),
   createFrameDataFromElement: vi.fn(),
   disableHighlighterMode: vi.fn(),
   enableHighlighterMode: vi.fn(),
@@ -22,7 +21,6 @@ const mocks = vi.hoisted(() => ({
   registerFrameCallbacks: vi.fn(),
   resumeHighlighter: vi.fn(),
   setFrameEditing: vi.fn(),
-  setFrameTooltipVisible: vi.fn(),
   shouldDropLinkedElement: vi.fn(),
 }));
 
@@ -33,7 +31,6 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 vi.mock('../../../highlighter', () => ({
   clearAllHighlights: mocks.clearAllHighlights,
   clearFrameEditing: mocks.clearFrameEditing,
-  clearFrameTooltipVisible: mocks.clearFrameTooltipVisible,
   disableHighlighterMode: mocks.disableHighlighterMode,
   enableHighlighterMode: mocks.enableHighlighterMode,
   invalidateFrameCache: mocks.invalidateFrameCache,
@@ -43,7 +40,6 @@ vi.mock('../../../highlighter', () => ({
   registerFrameCallbacks: mocks.registerFrameCallbacks,
   resumeHighlighter: mocks.resumeHighlighter,
   setFrameEditing: mocks.setFrameEditing,
-  setFrameTooltipVisible: mocks.setFrameTooltipVisible,
 }));
 
 vi.mock('../../manager/coords', () => ({
@@ -62,6 +58,11 @@ import {
   haveFrameCoordsChanged,
   syncFramePositionOnScroll,
 } from './frame-updates';
+import { useFrameUIStore } from '../../state/frame-ui.store';
+
+afterEach(() => {
+  useFrameUIStore.getState().reset();
+});
 
 function createFrame(id: string, stepBadge = false): FrameData {
   return createFrameDataFixture(id, {
@@ -83,6 +84,8 @@ function expectStaleLinkedElementDropped(): void {
   const setFrames = vi.fn();
   const frame = createFrame('frame-1');
   mocks.shouldDropLinkedElement.mockReturnValue(true);
+  useFrameUIStore.getState().selectFrame(frame.id, { x: 20, y: 30 });
+  useFrameUIStore.getState().togglePopover(frame.id, 'frame-settings');
 
   syncFramePositionOnScroll({
     frame,
@@ -95,6 +98,11 @@ function expectStaleLinkedElementDropped(): void {
   expect(runSetter(setFrames, [frame])).toEqual([]);
   expect(linkedElementsRef.current.has('frame-1')).toBe(false);
   expect(mocks.invalidateFrameCache).toHaveBeenCalledTimes(1);
+  expect(useFrameUIStore.getState()).toMatchObject({
+    activePopover: null,
+    selectedFrameId: null,
+    toolbarAnchorOffset: null,
+  });
 }
 
 function expectOffsetAwarePositionUpdate(): void {
@@ -154,6 +162,26 @@ describe('syncFramePositionOnScroll updates', () => {
     'drops stale linked elements and invalidates the frame cache',
     expectStaleLinkedElementDropped
   );
+  it('moves a free frame with its document placement', () => {
+    const linkedElementsRef = { current: new Map<string, HTMLElement>() };
+    const setFrames = vi.fn();
+    const frame = createFrameDataFixture('free-frame', {
+      x: 100,
+      y: 120,
+      pagePlacement: { iframePath: [], pageX: 100, pageY: 220 },
+    });
+    vi.spyOn(window, 'scrollY', 'get').mockReturnValue(40);
+
+    syncFramePositionOnScroll({
+      frame,
+      frameState: undefined,
+      linkedElement: undefined,
+      linkedElementsRef,
+      setFrames,
+    });
+
+    expect(runSetter(setFrames, [frame])[0]).toMatchObject({ x: 100, y: 180 });
+  });
   it(
     'updates frame position through offset-aware coordinate calculation',
     expectOffsetAwarePositionUpdate

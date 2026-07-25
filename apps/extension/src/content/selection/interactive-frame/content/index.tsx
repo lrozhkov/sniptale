@@ -16,8 +16,9 @@ interface InteractiveFrameContentProps
   borderColor: string;
   borderWidth: number;
   borderShadow?: NonNullable<FrameData['borderSettings']>['shadow'];
-  handleMouseDown: (event: React.MouseEvent) => void;
-  handleResizeStart: (event: React.MouseEvent, direction: ResizeDirection) => void;
+  isResizeHovered: boolean;
+  handleMouseDown: (event: React.PointerEvent) => void;
+  handleResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 }
 
 /** Renders the frame chrome and all floating controls while preserving existing content-script contracts. */
@@ -40,10 +41,10 @@ function getInteractiveFrameFloatingUiProps(props: InteractiveFrameContentProps)
     sizePanelCoords: props.sizePanelCoords,
     tempFrame: props.tempFrame,
     effectMode: props.effectMode,
-    isPopoverOpen: props.isPopoverOpen,
     isFrameActive: props.isFrameActive,
-    isStepBadgePopoverOpen: props.isStepBadgePopoverOpen,
-    isCalloutPopoverOpen: props.isCalloutPopoverOpen,
+    isHovered: props.isHovered,
+    isSelected: props.isSelected,
+    toolbarAnchorOffset: props.toolbarAnchorOffset,
     isCalloutEditing: props.isCalloutEditing,
     maintainAspectRatio: props.maintainAspectRatio,
     aspectRatio: props.aspectRatio,
@@ -54,16 +55,19 @@ function getInteractiveFrameFloatingUiProps(props: InteractiveFrameContentProps)
     setMaintainAspectRatio: props.setMaintainAspectRatio,
     setAspectRatio: props.setAspectRatio,
     setState: props.setState,
-    setIsStepBadgePopoverOpen: props.setIsStepBadgePopoverOpen,
-    setIsCalloutPopoverOpen: props.setIsCalloutPopoverOpen,
+    togglePopover: props.togglePopover,
     setIsCalloutEditing: props.setIsCalloutEditing,
     closePopover: props.closePopover,
-    hideTooltip: props.hideTooltip,
+    hoverFrame: props.hoverFrame,
+    scheduleHoverFrameHide: props.scheduleHoverFrameHide,
+    selectFrame: props.selectFrame,
+    clearSelection: props.clearSelection,
     handleEffectButtonClick: props.handleEffectButtonClick,
     handleStartEditing: props.handleStartEditing,
     handleSave: props.handleSave,
     handleCancel: props.handleCancel,
     handleDelete: props.handleDelete,
+    onUpdate: props.onUpdate,
   };
 }
 
@@ -72,6 +76,7 @@ function getInteractiveFramePopoverProps(props: InteractiveFrameContentProps) {
     frame: props.currentFrame,
     currentFrame: props.currentFrame,
     isPopoverOpen: props.isPopoverOpen,
+    isSelected: props.isSelected,
     isStepBadgePopoverOpen: props.isStepBadgePopoverOpen,
     isCalloutPopoverOpen: props.isCalloutPopoverOpen,
     isCalloutEditing: props.isCalloutEditing,
@@ -79,12 +84,11 @@ function getInteractiveFramePopoverProps(props: InteractiveFrameContentProps) {
     popoverAnchorRef: props.popoverAnchorRef,
     stepBadgePopoverAnchorRef: props.stepBadgePopoverAnchorRef,
     calloutPopoverAnchorRef: props.calloutPopoverAnchorRef,
-    setIsStepBadgePopoverOpen: props.setIsStepBadgePopoverOpen,
-    setIsCalloutPopoverOpen: props.setIsCalloutPopoverOpen,
     setIsCalloutEditing: props.setIsCalloutEditing,
     setTempFrame: props.setTempFrame,
     closePopover: props.closePopover,
     frameZIndex: props.frameZIndex,
+    borderWidth: props.borderWidth,
     onUpdate: props.onUpdate,
   };
 }

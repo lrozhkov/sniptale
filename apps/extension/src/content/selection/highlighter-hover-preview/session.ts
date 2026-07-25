@@ -29,6 +29,23 @@ export interface HoverSession {
   lastHoverY: number;
   overlayContainer: HTMLElement | null;
   settingsLoadPromise: Promise<void> | null;
+  freeDraw: {
+    clickSuppression: {
+      awaitingPointerUp: boolean;
+      pointerId: number;
+    } | null;
+    gesture: {
+      ownerDocument: Document;
+      pointerId: number;
+      sourceElement: HTMLElement;
+      startX: number;
+      startY: number;
+      viewportBounds: { x: number; y: number; width: number; height: number };
+      isDrawing: boolean;
+    } | null;
+    preview: HTMLElement | null;
+    previewRoot: HTMLElement | null;
+  };
 }
 
 export type HoverDomSession = Pick<HoverSession, 'hoverOverlay' | 'overlayContainer'>;
@@ -57,6 +74,12 @@ export function createHoverSession(): HoverSession {
     lastHoverY: -1,
     overlayContainer: null,
     settingsLoadPromise: null,
+    freeDraw: {
+      clickSuppression: null,
+      gesture: null,
+      preview: null,
+      previewRoot: null,
+    },
   };
 }
 

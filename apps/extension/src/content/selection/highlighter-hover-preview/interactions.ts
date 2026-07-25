@@ -1,7 +1,9 @@
 import { resolvePagePreparationTarget } from '../../parser/page-preparation/target';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { HoverOverlayActions } from './overlay';
-import type { HoverFrameCacheSession, HoverTrackingSession } from './session';
+import type { HoverFrameCacheSession, HoverSession, HoverTrackingSession } from './session';
+import type { AddFreeFrameCallback } from '../../../features/highlighter/contracts';
+import { getViewportClientPoint } from '../../platform/frame';
 import {
   hasBlockingHighlighterPopover,
   isHighlighterExtensionUiElement,
@@ -16,6 +18,7 @@ const interactionLogger = createLogger({
 
 export type HighlighterCallbacks = {
   addFrame: ((element: HTMLElement) => void) | null;
+  addFreeFrame?: AddFreeFrameCallback | null;
   hasFrameForElement: ((element: HTMLElement) => boolean) | null;
 };
 
@@ -23,10 +26,11 @@ export type HighlighterStateGetters = {
   isModeEnabled: () => boolean;
   isPaused: () => boolean;
   isFrameEditing: () => boolean;
-  isTooltipVisible: () => boolean;
 };
 
-type HoverInteractionSession = HoverTrackingSession & HoverFrameCacheSession;
+type HoverInteractionSession = HoverTrackingSession &
+  HoverFrameCacheSession &
+  Pick<HoverSession, 'freeDraw'>;
 
 type HoverInteractionProps = {
   getCallbacks: () => HighlighterCallbacks;
@@ -34,6 +38,7 @@ type HoverInteractionProps = {
   hoverThrottleMs: number;
   overlayActions: Pick<HoverOverlayActions, 'hideHoverOverlay' | 'showHoverOverlay'>;
   session: HoverInteractionSession;
+  consumeSuppressedClick?: (event: MouseEvent) => boolean;
 };
 
 export function shouldSkipHoverProcessing(props: {
@@ -45,8 +50,7 @@ export function shouldSkipHoverProcessing(props: {
   if (
     !props.getState.isModeEnabled() ||
     props.getState.isPaused() ||
-    props.getState.isFrameEditing() ||
-    props.getState.isTooltipVisible()
+    props.getState.isFrameEditing()
   ) {
     return true;
   }
@@ -76,13 +80,9 @@ export function handleFrozenHoverPreview(props: {
 
 export function shouldIgnoreHighlighterClick(props: {
   eventTarget: HTMLElement;
-  getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused' | 'isTooltipVisible'>;
+  getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused'>;
 }): boolean {
-  if (
-    !props.getState.isModeEnabled() ||
-    props.getState.isPaused() ||
-    props.getState.isTooltipVisible()
-  ) {
+  if (!props.getState.isModeEnabled() || props.getState.isPaused()) {
     return true;
   }
   if (hasBlockingHighlighterPopover()) return true;
@@ -166,9 +166,11 @@ export function scheduleHoverOverlayUpdate(props: {
     hideHoverPreview(props.session, props.hideHoverOverlay);
     return;
   }
+  const point = getViewportClientPoint(props.event.clientX, props.event.clientY, props.iframe);
 
   props.session.hoverRafId = requestAnimationFrame(() => {
     props.session.hoverRafId = null;
+    if (props.session.freeDraw.gesture) return;
     processScheduledHoverTarget({
       getCallbacks: props.getCallbacks,
       getState: props.getState,
@@ -176,17 +178,25 @@ export function scheduleHoverOverlayUpdate(props: {
       session: props.session,
       showHoverOverlay: props.showHoverOverlay,
       target,
-      x: props.event.clientX,
-      y: props.event.clientY,
+      x: point.x,
+      y: point.y,
     });
   });
 }
 
 function createHoverClickHandler(props: HoverInteractionProps) {
   return (event: MouseEvent, iframe?: HTMLIFrameElement) => {
+    if (props.consumeSuppressedClick?.(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      return;
+    }
     const target = resolvePagePreparationTarget(event, iframe);
+    const point = getViewportClientPoint(event.clientX, event.clientY, iframe);
     if (
       !target ||
+      isNearExistingFrameBorder(props.session, point.x, point.y) ||
       shouldIgnoreHighlighterClick({ eventTarget: target, getState: props.getState })
     ) {
       return;
@@ -227,6 +237,7 @@ function createHoverClickHandler(props: HoverInteractionProps) {
 
 function createHoverMouseMoveHandler(props: HoverInteractionProps) {
   return (event: MouseEvent, iframe?: HTMLIFrameElement) => {
+    if (props.session.freeDraw.gesture) return;
     if (
       shouldSkipHoverProcessing({
         event,

@@ -23,6 +23,8 @@ const SNIPTALE_RUNTIME_SELECTORS = [
   '#sniptale-resize-handles-portal',
   '.sniptale-app',
   '.sniptale-toolbar-portal-wrapper',
+  '.sniptale-frame-toolbar-trigger',
+  '.sniptale-frame-toolbar-bridge',
   '.sniptale-action-toolbar',
   '.sniptale-content-size-tooltip',
   '.sniptale-resize-handle',

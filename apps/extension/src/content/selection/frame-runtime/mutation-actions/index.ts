@@ -2,6 +2,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
 import {
   createAddFrameHandler,
+  createAddFreeFrameHandler,
   createCalculateFrameCoords,
   createGenerateFrameId,
 } from './frame-factory';
@@ -75,6 +76,7 @@ export function buildFrameMutationActions(options: UseFrameMutationActionHelperO
     syncAutoBlurFrames: createSyncAutoBlurFramesHandler(options),
     syncFocusOpacity: createSyncFocusOpacityHandler(options.setFrames),
     addFrame: createAddFrameHandler({ ...options, calculateFrameCoords }),
+    addFreeFrame: createAddFreeFrameHandler({ ...options, generateFrameId }),
     updateFrame: createUpdateFrameHandler(options),
     removeFrame: createRemoveFrameHandler(options),
     clearFrames: createClearFramesHandler(options),

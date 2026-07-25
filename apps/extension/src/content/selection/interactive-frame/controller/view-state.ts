@@ -22,8 +22,6 @@ function useInteractiveFrameLocalState(params: {
   defaultEffectMode: EffectMode;
 }) {
   const [state, setState] = React.useState<FrameState>('idle');
-  const [isStepBadgePopoverOpen, setIsStepBadgePopoverOpen] = React.useState(false);
-  const [isCalloutPopoverOpen, setIsCalloutPopoverOpen] = React.useState(false);
   const [isCalloutEditing, setIsCalloutEditing] = React.useState(false);
   const [tempFrame, setTempFrame] = React.useState<FrameData>(params.frame);
   const [effectMode, setEffectMode] = React.useState<EffectMode>(
@@ -36,14 +34,10 @@ function useInteractiveFrameLocalState(params: {
     aspectRatio,
     effectMode,
     isCalloutEditing,
-    isCalloutPopoverOpen,
-    isStepBadgePopoverOpen,
     maintainAspectRatio,
     setAspectRatio,
     setEffectMode,
     setIsCalloutEditing,
-    setIsCalloutPopoverOpen,
-    setIsStepBadgePopoverOpen,
     setMaintainAspectRatio,
     setState,
     setTempFrame,
@@ -53,18 +47,30 @@ function useInteractiveFrameLocalState(params: {
 }
 
 function useInteractiveFrameStoreState() {
-  const activeFrameId = useFrameUIStore((s) => s.activeFrameId);
-  const popoverFrameId = useFrameUIStore((s) => s.popoverFrameId);
-  const openPopover = useFrameUIStore((s) => s.openPopover);
+  const hoveredFrameId = useFrameUIStore((s) => s.hoveredFrameId);
+  const selectedFrameId = useFrameUIStore((s) => s.selectedFrameId);
+  const toolbarAnchorOffset = useFrameUIStore((s) => s.toolbarAnchorOffset);
+  const activePopover = useFrameUIStore((s) => s.activePopover);
+  const resizeFrameId = useFrameUIStore((s) => s.resizeFrameId);
+  const togglePopover = useFrameUIStore((s) => s.togglePopover);
   const closePopover = useFrameUIStore((s) => s.closePopover);
-  const hideTooltip = useFrameUIStore((s) => s.hideTooltip);
+  const hoverFrame = useFrameUIStore((s) => s.hoverFrame);
+  const scheduleHoverFrameHide = useFrameUIStore((s) => s.scheduleHoverFrameHide);
+  const selectFrame = useFrameUIStore((s) => s.selectFrame);
+  const clearSelection = useFrameUIStore((s) => s.clearSelection);
 
   return {
-    activeFrameId,
+    hoveredFrameId,
+    selectedFrameId,
+    toolbarAnchorOffset,
     closePopover,
-    hideTooltip,
-    openPopover,
-    popoverFrameId,
+    hoverFrame,
+    scheduleHoverFrameHide,
+    selectFrame,
+    clearSelection,
+    activePopover,
+    togglePopover,
+    resizeFrameId,
   };
 }
 
@@ -72,16 +78,12 @@ function createInteractiveFrameLocalState(params: {
   aspectRatio: number | null;
   effectMode: EffectMode;
   isCalloutEditing: boolean;
-  isCalloutPopoverOpen: boolean;
-  isStepBadgePopoverOpen: boolean;
   maintainAspectRatio: boolean;
   state: FrameState;
   tempFrame: FrameData;
 }) {
   return {
     state: params.state,
-    isStepBadgePopoverOpen: params.isStepBadgePopoverOpen,
-    isCalloutPopoverOpen: params.isCalloutPopoverOpen,
     isCalloutEditing: params.isCalloutEditing,
     tempFrame: params.tempFrame,
     effectMode: params.effectMode,
@@ -94,16 +96,12 @@ function createInteractiveFrameLocalSetters(params: {
   setAspectRatio: React.Dispatch<React.SetStateAction<number | null>>;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsCalloutPopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsStepBadgePopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setMaintainAspectRatio: React.Dispatch<React.SetStateAction<boolean>>;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
 }) {
   return {
     setState: params.setState,
-    setIsStepBadgePopoverOpen: params.setIsStepBadgePopoverOpen,
-    setIsCalloutPopoverOpen: params.setIsCalloutPopoverOpen,
     setIsCalloutEditing: params.setIsCalloutEditing,
     setTempFrame: params.setTempFrame,
     setEffectMode: params.setEffectMode,
@@ -113,17 +111,29 @@ function createInteractiveFrameLocalSetters(params: {
 }
 
 function createInteractiveFrameStoreState(params: {
-  activeFrameId: string | null;
+  hoveredFrameId: string | null;
+  selectedFrameId: string | null;
+  toolbarAnchorOffset: { x: number; y: number } | null;
   closePopover: FrameUIState['closePopover'];
-  hideTooltip: FrameUIState['hideTooltip'];
-  openPopover: FrameUIState['openPopover'];
-  popoverFrameId: string | null;
+  hoverFrame: FrameUIState['hoverFrame'];
+  scheduleHoverFrameHide: FrameUIState['scheduleHoverFrameHide'];
+  selectFrame: FrameUIState['selectFrame'];
+  clearSelection: FrameUIState['clearSelection'];
+  activePopover: FrameUIState['activePopover'];
+  togglePopover: FrameUIState['togglePopover'];
+  resizeFrameId: string | null;
 }) {
   return {
-    activeFrameId: params.activeFrameId,
-    popoverFrameId: params.popoverFrameId,
-    openPopover: params.openPopover,
+    hoveredFrameId: params.hoveredFrameId,
+    selectedFrameId: params.selectedFrameId,
+    toolbarAnchorOffset: params.toolbarAnchorOffset,
+    activePopover: params.activePopover,
+    resizeFrameId: params.resizeFrameId,
+    togglePopover: params.togglePopover,
     closePopover: params.closePopover,
-    hideTooltip: params.hideTooltip,
+    hoverFrame: params.hoverFrame,
+    scheduleHoverFrameHide: params.scheduleHoverFrameHide,
+    selectFrame: params.selectFrame,
+    clearSelection: params.clearSelection,
   };
 }

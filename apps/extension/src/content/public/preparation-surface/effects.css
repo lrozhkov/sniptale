@@ -6,19 +6,59 @@
   display: none !important;
 }
 
-body.sniptale-capture-ui-hidden .sniptale-action-toolbar,
-body.sniptale-capture-ui-hidden .sniptale-toolbar-portal-wrapper,
-body.sniptale-capture-ui-hidden .sniptale-frame-settings-popover,
-body.sniptale-capture-ui-hidden .sniptale-step-badge-popover,
-body.sniptale-capture-ui-hidden .sniptale-callout-settings-popover,
-body.sniptale-capture-ui-hidden .sniptale-callout-format-toolbar,
-body.sniptale-capture-ui-hidden .sniptale-content-size-tooltip,
-body.sniptale-capture-ui-hidden .sniptale-highlight-hover,
-body.sniptale-capture-ui-hidden .sniptale-blocking-overlay,
-body.sniptale-capture-ui-hidden .sniptale-editing-blocking-overlay,
-body.sniptale-capture-ui-hidden .sniptale-resize-handle,
-body.sniptale-capture-ui-hidden .sniptale-quick-edit-hover {
+:host(.sniptale-capture-ui-hidden) .sniptale-action-toolbar,
+:host(.sniptale-capture-ui-hidden) .sniptale-toolbar-portal-wrapper,
+:host(.sniptale-capture-ui-hidden) .sniptale-frame-toolbar-trigger,
+:host(.sniptale-capture-ui-hidden) .sniptale-frame-toolbar-bridge,
+:host(.sniptale-capture-ui-hidden) .sniptale-frame-settings-popover,
+:host(.sniptale-capture-ui-hidden) .sniptale-step-badge-popover,
+:host(.sniptale-capture-ui-hidden) .sniptale-callout-settings-popover,
+:host(.sniptale-capture-ui-hidden) .sniptale-callout-format-toolbar,
+:host(.sniptale-capture-ui-hidden) .sniptale-content-size-tooltip,
+:host(.sniptale-capture-ui-hidden) .sniptale-highlight-hover,
+:host(.sniptale-capture-ui-hidden) .sniptale-blocking-overlay,
+:host(.sniptale-capture-ui-hidden) .sniptale-editing-blocking-overlay,
+:host(.sniptale-capture-ui-hidden) .sniptale-resize-handle,
+:host(.sniptale-capture-ui-hidden) .sniptale-callout-drag-handle,
+:host(.sniptale-capture-ui-hidden) .sniptale-callout-tail-handle,
+:host(.sniptale-capture-ui-hidden) .sniptale-free-frame-draft-portal,
+:host(.sniptale-capture-ui-hidden) .sniptale-quick-edit-hover {
   display: none !important;
+}
+
+.sniptale-resize-handle {
+  touch-action: none;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.sniptale-resize-handle:hover {
+  border-color: var(--sniptale-color-accent) !important;
+  background: #ffffff !important;
+}
+
+.sniptale-frame-toolbar-trigger:hover,
+.sniptale-frame-toolbar-trigger:focus-visible {
+  border-color: var(--sniptale-color-accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent) !important;
+  outline: none;
+}
+
+.sniptale-callout-drag-handle {
+  touch-action: none;
+}
+
+.sniptale-callout-tail-handle {
+  touch-action: none;
+}
+
+.sniptale-callout-drag-handle:focus-visible,
+.sniptale-callout-tail-handle:hover,
+.sniptale-callout-tail-handle:focus-visible {
+  border-color: var(--sniptale-color-accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 20%, transparent) !important;
 }
 
 /* Highlighter Styles */

@@ -126,6 +126,7 @@ function renderPopover(overrides: Partial<React.ComponentProps<typeof FrameSetti
     anchorEl,
     effectMode: 'border',
     frameId: 'frame-1',
+    frameRect: { x: 100, y: 100, width: 180, height: 100 },
     isOpen: true,
     onApplyToFrame: vi.fn(),
     onClose: vi.fn(),

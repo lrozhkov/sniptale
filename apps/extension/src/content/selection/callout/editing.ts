@@ -75,15 +75,15 @@ function useCalloutEditingEffects(args: {
   setFloatingToolbarRect: React.Dispatch<React.SetStateAction<DOMRect | null>>;
 }) {
   const { calloutArgs, containerRef, contentEditableRef, handlers } = args;
-  useCalloutMeasureEffect({
-    containerRef,
-    setDimensions: args.setDimensions,
-    settingsKey: calloutArgs.settingsKey,
-  });
   useCalloutSyncContentEffect({
     contentEditableRef,
     htmlContent: calloutArgs.htmlContent,
     isEditing: calloutArgs.isEditing,
+  });
+  useCalloutMeasureEffect({
+    containerRef,
+    setDimensions: args.setDimensions,
+    settingsKey: calloutArgs.settingsKey,
   });
   useCalloutEditingFocusEffect({
     contentEditableRef,

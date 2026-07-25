@@ -69,6 +69,7 @@ function createLockerDeps(classList: ReturnType<typeof createClassListHarness>, 
     toggleBodyClass: (className, enabled) => {
       classList.toggle(className, enabled);
     },
+    toggleContentHostClass: vi.fn(),
     unsubscribeBeforeUnload: listeners.unsubscribeBeforeUnload,
     walkAllDocuments: (visit) => {
       visit(doc);
@@ -172,6 +173,26 @@ function shouldToggleTextSelectionBlockingThroughDomBridge(): void {
   expect(harness.listeners.removeSelectStartListener).toHaveBeenCalledOnce();
 }
 
+function shouldMirrorCaptureVisibilityOntoTheContentHost(): void {
+  const harness = createLockerHarness();
+
+  harness.locker.setUIHidden(true);
+
+  expect(harness.doc.body.classList.contains('sniptale-capture-ui-hidden')).toBe(true);
+  expect(harness.deps.toggleContentHostClass).toHaveBeenCalledWith(
+    'sniptale-capture-ui-hidden',
+    true
+  );
+
+  harness.locker.setUIHidden(false);
+
+  expect(harness.doc.body.classList.contains('sniptale-capture-ui-hidden')).toBe(false);
+  expect(harness.deps.toggleContentHostClass).toHaveBeenLastCalledWith(
+    'sniptale-capture-ui-hidden',
+    false
+  );
+}
+
 function shouldLogWhenFullLockIsRequestedWithoutActiveLock(): void {
   const harness = createLockerHarness();
 
@@ -245,6 +266,10 @@ describe('createNavigationLocker', () => {
   it(
     'toggles text-selection blocking through the injected DOM bridge',
     shouldToggleTextSelectionBlockingThroughDomBridge
+  );
+  it(
+    'mirrors capture visibility onto the content shadow host',
+    shouldMirrorCaptureVisibilityOntoTheContentHost
   );
   it(
     'logs when full-lock mode is requested without an active lock',

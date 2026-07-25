@@ -10,7 +10,6 @@ const highlighterMocks = vi.hoisted(() => ({
 
 vi.mock('../../highlighter', async () => {
   const actual = await vi.importActual<typeof import('../../highlighter')>('../../highlighter');
-
   return {
     ...actual,
     isHighlighterEnabled: highlighterMocks.isHighlighterEnabled,
@@ -18,56 +17,35 @@ vi.mock('../../highlighter', async () => {
   };
 });
 
-import { processFrameHover } from './helpers';
+import { createThrottledMouseMoveHandler, processFrameHover } from './helpers';
 
 function createFrame(): FrameData {
-  return {
-    effectMode: 'border',
-    height: 120,
-    id: 'frame-1',
-    width: 200,
-    x: 100,
-    y: 100,
+  return { effectMode: 'border', height: 120, id: 'frame-1', width: 200, x: 100, y: 100 };
+}
+
+function processHover(args: {
+  x: number;
+  y: number;
+  hoveredFrameId?: string | null;
+  isDrawing?: boolean;
+}) {
+  const actions = {
+    clearHoverFrame: vi.fn(),
+    hoverFrame: vi.fn(),
+    scheduleHoverFrameHide: vi.fn(),
+    setResizeFrame: vi.fn(),
   };
-}
-
-function appendFloatingFixture(className: string, rect: DOMRect): HTMLElement {
-  const element = document.createElement('div');
-  element.className = className;
-  element.getBoundingClientRect = () => rect;
-  document.body.append(element);
-  return element;
-}
-
-function createRect(args: { bottom: number; left: number; right: number; top: number }): DOMRect {
-  return {
-    bottom: args.bottom,
-    height: args.bottom - args.top,
-    left: args.left,
-    right: args.right,
-    toJSON: () => undefined,
-    top: args.top,
-    width: args.right - args.left,
-    x: args.left,
-    y: args.top,
-  } as DOMRect;
-}
-
-function processActiveFrameHover(args: { x: number; y: number }) {
-  const hideTooltip = vi.fn();
-  const showTooltip = vi.fn();
-
   processFrameHover({
-    activeFrameId: 'frame-1',
+    directControl: null,
     frames: [createFrame()],
-    hideTooltip,
-    popoverFrameId: null,
-    showTooltip,
+    hoveredFrameId: args.hoveredFrameId ?? null,
+    isDrawing: args.isDrawing ?? false,
+    selectedFrameId: null,
+    ...actions,
     x: args.x,
     y: args.y,
   });
-
-  return { hideTooltip, showTooltip };
+  return actions;
 }
 
 beforeEach(() => {
@@ -76,36 +54,66 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('processFrameHover', () => {
-  it('keeps the active frame while floating UI bounds are mounting', () => {
-    const { hideTooltip } = processActiveFrameHover({ x: 520, y: 520 });
+  it('shows only the border winner trigger and resize handles', () => {
+    const actions = processHover({ x: 300, y: 160 });
 
-    expect(hideTooltip).not.toHaveBeenCalled();
+    expect(actions.hoverFrame).toHaveBeenCalledWith('frame-1');
+    expect(actions.setResizeFrame).toHaveBeenCalledWith('frame-1');
   });
 
-  it('keeps hover state when the pointer is inside the callout settings popover', () => {
-    appendFloatingFixture(
-      'sniptale-callout-settings-popover',
-      createRect({ bottom: 470, left: 300, right: 460, top: 300 })
-    );
+  it('does not activate a frame from its interior', () => {
+    const actions = processHover({ x: 200, y: 160, hoveredFrameId: 'frame-1' });
 
-    const { hideTooltip } = processActiveFrameHover({ x: 340, y: 340 });
-
-    expect(hideTooltip).not.toHaveBeenCalled();
+    expect(actions.hoverFrame).not.toHaveBeenCalled();
+    expect(actions.setResizeFrame).toHaveBeenCalledWith(null);
+    expect(actions.scheduleHoverFrameHide).toHaveBeenCalledWith('frame-1');
   });
 
-  it('hides the active frame when the pointer leaves mounted floating UI bounds', () => {
-    appendFloatingFixture(
-      'sniptale-action-toolbar',
-      createRect({ bottom: 40, left: 0, right: 80, top: 0 })
+  it('suppresses every other frame control while free drawing is active', () => {
+    const actions = processHover({ x: 100, y: 160, hoveredFrameId: 'frame-1', isDrawing: true });
+
+    expect(actions.clearHoverFrame).toHaveBeenCalledOnce();
+    expect(actions.setResizeFrame).toHaveBeenCalledWith(null);
+    expect(actions.hoverFrame).not.toHaveBeenCalled();
+  });
+
+  it('tracks resize proximity in standard cursor mode without showing a trigger', () => {
+    highlighterMocks.isHighlighterEnabled.mockReturnValue(false);
+    const actions = processHover({ x: 300, y: 160 });
+
+    expect(actions.setResizeFrame).toHaveBeenCalledWith('frame-1');
+    expect(actions.hoverFrame).not.toHaveBeenCalled();
+    expect(actions.clearHoverFrame).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the proximity mouse tracker active in standard cursor mode', () => {
+    highlighterMocks.isHighlighterEnabled.mockReturnValue(false);
+    const handleMouseMove = vi.fn();
+    let scheduled: FrameRequestCallback | undefined;
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        scheduled = callback;
+        return 1;
+      })
     );
+    const handler = createThrottledMouseMoveHandler({
+      handleMouseMove,
+      lastMouseX: { current: -1 },
+      lastMouseY: { current: -1 },
+      lastProcessTime: { current: 0 },
+      rafId: { current: null },
+    });
+    const event = new MouseEvent('mousemove', { clientX: 300, clientY: 160 });
 
-    const { hideTooltip } = processActiveFrameHover({ x: 520, y: 520 });
+    handler(event);
+    scheduled?.(0);
 
-    expect(hideTooltip).toHaveBeenCalledWith('frame-1');
+    expect(handleMouseMove).toHaveBeenCalledWith(event, undefined);
   });
 });

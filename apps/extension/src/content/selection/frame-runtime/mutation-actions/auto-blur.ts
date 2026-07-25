@@ -20,6 +20,7 @@ import {
 import { shouldDropLinkedElement } from '../roots/scroll/linked-elements';
 import type { UseFrameMutationActionHelperOptions } from './types';
 import { createGenerateFrameId } from './frame-factory';
+import { useFrameUIStore } from '../state/frame-ui.store';
 
 type CreateAddAutoBlurFramesHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -118,18 +119,21 @@ function shouldPruneAutoBlurFrame(args: {
 }
 
 function removeAutoBlurFrames(
-  args: Pick<CreateAddAutoBlurFramesHandlerArgs, 'linkedElementsRef' | 'setFrames'>,
+  args: Pick<CreateAddAutoBlurFramesHandlerArgs, 'framesRef' | 'linkedElementsRef' | 'setFrames'>,
   shouldRemoveFrame: (frame: FrameData) => boolean,
   invalidateOnRemove = true
 ): string[] {
-  let removedIds: string[] = [];
+  const removedIds = args.framesRef.current.filter(shouldRemoveFrame).map((frame) => frame.id);
+  if (removedIds.length === 0) return [];
+  const removedIdSet = new Set(removedIds);
+  args.framesRef.current = args.framesRef.current.filter((frame) => !removedIdSet.has(frame.id));
 
-  args.setFrames((prev) => {
-    removedIds = prev.filter(shouldRemoveFrame).map((frame) => frame.id);
-    return removedIds.length > 0 ? prev.filter((frame) => !removedIds.includes(frame.id)) : prev;
+  args.setFrames((prev) => prev.filter((frame) => !removedIdSet.has(frame.id)));
+
+  removedIds.forEach((frameId) => {
+    args.linkedElementsRef.current.delete(frameId);
+    useFrameUIStore.getState().dismissFrame(frameId);
   });
-
-  removedIds.forEach((frameId) => args.linkedElementsRef.current.delete(frameId));
 
   if (invalidateOnRemove && removedIds.length > 0) {
     invalidateFrameCache();
@@ -182,7 +186,7 @@ export function createAddAutoBlurFramesHandler(args: CreateAddAutoBlurFramesHand
 }
 
 export function createClearAutoBlurFramesHandler(
-  args: Pick<CreateAddAutoBlurFramesHandlerArgs, 'linkedElementsRef' | 'setFrames'>
+  args: Pick<CreateAddAutoBlurFramesHandlerArgs, 'framesRef' | 'linkedElementsRef' | 'setFrames'>
 ) {
   return (input: AutoBlurClearInput) => {
     const removedIds = removeAutoBlurFrames(args, (frame) =>

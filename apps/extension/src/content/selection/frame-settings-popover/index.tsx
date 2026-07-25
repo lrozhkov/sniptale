@@ -7,6 +7,8 @@ import {
 import { useFrameSettingsPopoverController } from './controller';
 import type { FrameSettingsPopoverProps } from './types';
 import { FrameSettingsPopoverContent } from './views';
+import { POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
+import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
 
 function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
   event.stopPropagation();
@@ -15,6 +17,14 @@ function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
 
 export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   const state = useFrameSettingsPopoverController(props);
+  const popoverStyle = useFramePopoverPosition({
+    anchorEl: props.anchorEl,
+    fallbackSize: { width: POPOVER_WIDTH, height: POPOVER_HEIGHT },
+    frameId: props.frameId,
+    frameRect: props.frameRect,
+    isOpen: props.isOpen,
+    popoverRef: state.surface.popoverRef,
+  });
 
   if (!props.isOpen) {
     return null;
@@ -28,7 +38,7 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
       data-frame-id={props.frameId}
       onMouseDown={stopPopoverPropagation}
       onClick={stopPopoverPropagation}
-      style={getThemedPortalStyle(state.surface.portalTheme, state.surface.getPopoverStyle())}
+      style={getThemedPortalStyle(state.surface.portalTheme, popoverStyle)}
     >
       <div className="sniptale-content-popover-body">
         <FrameSettingsPopoverContent

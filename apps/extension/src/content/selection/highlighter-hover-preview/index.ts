@@ -12,22 +12,35 @@ import {
   invalidateHoverFrameCache,
 } from './session';
 import type { HighlighterSettingsChangedDetail } from '../../platform/page-context/frame-events';
+import { createFreeFrameDrawingHandlers, type DrawingCancelReason } from './drawing';
 
 const logger = createLogger({ namespace: 'ContentHighlighter:HoverPreview' });
 
-interface HoverController {
-  createOverlayContainer: () => void;
-  removeOverlayContainer: () => void;
-  createHoverOverlay: () => void;
-  removeHoverOverlay: () => void;
-  hideHoverOverlay: () => void;
-  invalidateFrameCache: () => void;
-  invalidateSettingsCache: (detail?: HighlighterSettingsChangedDetail) => void;
-  handleMouseMove: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
-  handleMouseLeave: () => void;
-  handleClick: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
-  cancelPendingHoverFrame: () => void;
-  clearHoverTracking: () => void;
+export interface HoverController {
+  overlay: {
+    createContainer: () => void;
+    removeContainer: () => void;
+    createPreview: () => void;
+    removePreview: () => void;
+    hidePreview: () => void;
+  };
+  invalidation: {
+    frameCache: () => void;
+    settingsCache: (detail?: HighlighterSettingsChangedDetail) => void;
+  };
+  input: {
+    mouseMove: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
+    mouseLeave: () => void;
+    click: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
+    pointerDown: (event: PointerEvent, iframe?: HTMLIFrameElement) => void;
+    pointerMove: (event: PointerEvent, iframe?: HTMLIFrameElement) => void;
+    pointerUp: (event: PointerEvent, iframe?: HTMLIFrameElement) => void;
+    cancelDrawing: (reason?: DrawingCancelReason) => boolean;
+  };
+  tracking: {
+    cancelPendingFrame: () => void;
+    clear: () => void;
+  };
 }
 
 export function createHighlighterHoverController(
@@ -36,27 +49,46 @@ export function createHighlighterHoverController(
 ): HoverController {
   const session = createHoverSession();
   const overlayActions = createHoverOverlayActions(session);
+  const drawing = createFreeFrameDrawingHandlers({
+    getCallbacks,
+    getState,
+    hideHoverOverlay: overlayActions.hideHoverOverlay,
+    session,
+  });
   const interactions = createHoverInteractionHandlers({
     getCallbacks,
     getState,
     hoverThrottleMs: 100,
     overlayActions,
     session,
+    consumeSuppressedClick: drawing.consumeSuppressedClick,
   });
 
   return {
-    createOverlayContainer: overlayActions.createOverlayContainer,
-    removeOverlayContainer: overlayActions.removeOverlayContainer,
-    createHoverOverlay: overlayActions.createHoverOverlay,
-    removeHoverOverlay: overlayActions.removeHoverOverlay,
-    hideHoverOverlay: overlayActions.hideHoverOverlay,
-    invalidateFrameCache: () => invalidateHoverFrameCache(session),
-    invalidateSettingsCache: (detail) => invalidateHighlighterSettings(session, detail),
-    handleMouseMove: interactions.handleMouseMove,
-    handleMouseLeave: interactions.handleMouseLeave,
-    handleClick: interactions.handleClick,
-    cancelPendingHoverFrame: interactions.cancelPendingHoverFrame,
-    clearHoverTracking: interactions.clearHoverTracking,
+    overlay: {
+      createContainer: overlayActions.createOverlayContainer,
+      removeContainer: overlayActions.removeOverlayContainer,
+      createPreview: overlayActions.createHoverOverlay,
+      removePreview: overlayActions.removeHoverOverlay,
+      hidePreview: overlayActions.hideHoverOverlay,
+    },
+    invalidation: {
+      frameCache: () => invalidateHoverFrameCache(session),
+      settingsCache: (detail) => invalidateHighlighterSettings(session, detail),
+    },
+    input: {
+      mouseMove: interactions.handleMouseMove,
+      mouseLeave: interactions.handleMouseLeave,
+      click: interactions.handleClick,
+      pointerDown: drawing.handlePointerDown,
+      pointerMove: drawing.handlePointerMove,
+      pointerUp: drawing.handlePointerUp,
+      cancelDrawing: drawing.cancelDrawing,
+    },
+    tracking: {
+      cancelPendingFrame: interactions.cancelPendingHoverFrame,
+      clear: interactions.clearHoverTracking,
+    },
   };
 }
 

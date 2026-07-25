@@ -36,15 +36,17 @@ beforeEach(() => {
 
 function dispatchEscape(handler: ReturnType<typeof createHighlighterRuntimeEscapeKeyHandler>) {
   const preventDefault = vi.fn();
+  const stopImmediatePropagation = vi.fn();
   const stopPropagation = vi.fn();
 
   handler({
     key: 'Escape',
     preventDefault,
+    stopImmediatePropagation,
     stopPropagation,
   } as unknown as KeyboardEvent);
 
-  return { preventDefault, stopPropagation };
+  return { preventDefault, stopImmediatePropagation, stopPropagation };
 }
 
 function dispatchEscapeFromCalloutPath(
@@ -87,6 +89,7 @@ describe('createHighlighterRuntimeEscapeKeyHandler ignored events', () => {
     const disableHighlighterMode = vi.fn();
     const handler = createHighlighterRuntimeEscapeKeyHandler({
       disableHighlighterMode,
+      hasActivePopover: () => false,
       isAnyFrameEditing: () => false,
     });
     focusCalloutActiveElement();
@@ -107,6 +110,7 @@ describe('createHighlighterRuntimeEscapeKeyHandler ignored events', () => {
     const disableHighlighterMode = vi.fn();
     const handler = createHighlighterRuntimeEscapeKeyHandler({
       disableHighlighterMode,
+      hasActivePopover: () => false,
       isAnyFrameEditing: () => true,
     });
 
@@ -121,10 +125,29 @@ describe('createHighlighterRuntimeEscapeKeyHandler ignored events', () => {
 });
 
 describe('createHighlighterRuntimeEscapeKeyHandler active Escape events', () => {
+  it('cancels a drawing sequence before changing frame or mode state', () => {
+    const cancelDrawing = vi.fn(() => true);
+    const disableHighlighterMode = vi.fn();
+    const handler = createHighlighterRuntimeEscapeKeyHandler({
+      cancelDrawing,
+      disableHighlighterMode,
+      hasActivePopover: () => false,
+      isAnyFrameEditing: () => true,
+    });
+
+    const { stopImmediatePropagation } = dispatchEscape(handler);
+
+    expect(cancelDrawing).toHaveBeenCalledWith('escape');
+    expect(stopImmediatePropagation).toHaveBeenCalledOnce();
+    expect(contentModeEventsMocks.dispatchExitFrameEditingMock).not.toHaveBeenCalled();
+    expect(disableHighlighterMode).not.toHaveBeenCalled();
+  });
+
   it('emits exit-frame-editing instead of disabling the mode when frame editing is active', () => {
     const disableHighlighterMode = vi.fn();
     const handler = createHighlighterRuntimeEscapeKeyHandler({
       disableHighlighterMode,
+      hasActivePopover: () => false,
       isAnyFrameEditing: () => true,
     });
 
@@ -141,6 +164,7 @@ describe('createHighlighterRuntimeEscapeKeyHandler active Escape events', () => 
     const disableHighlighterMode = vi.fn();
     const handler = createHighlighterRuntimeEscapeKeyHandler({
       disableHighlighterMode,
+      hasActivePopover: () => false,
       isAnyFrameEditing: () => false,
     });
 

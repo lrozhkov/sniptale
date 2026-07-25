@@ -9,6 +9,7 @@ import type { FrameMutations, RecalculateStepBadges } from '../contracts';
 interface FrameManagerPublicResultParams {
   addAutoBlurFrames: FrameMutations['addAutoBlurFrames'];
   addFrame: FrameMutations['addFrame'];
+  addFreeFrame: FrameMutations['addFreeFrame'];
   clearAutoBlurFrames: FrameMutations['clearAutoBlurFrames'];
   clearFrames: FrameMutations['clearFrames'];
   frames: FrameData[];
@@ -46,6 +47,7 @@ function arePublicResultParamsEqual(
   return (
     prev.addAutoBlurFrames === next.addAutoBlurFrames &&
     prev.addFrame === next.addFrame &&
+    prev.addFreeFrame === next.addFreeFrame &&
     prev.clearAutoBlurFrames === next.clearAutoBlurFrames &&
     prev.clearFrames === next.clearFrames &&
     prev.frames === next.frames &&
@@ -67,6 +69,7 @@ function buildFrameManagerResult(params: FrameManagerPublicResultParams) {
     frames: params.frames,
     addAutoBlurFrames: params.addAutoBlurFrames,
     addFrame: params.addFrame,
+    addFreeFrame: params.addFreeFrame,
     clearAutoBlurFrames: params.clearAutoBlurFrames,
     removeFrame: params.removeFrame,
     clearFrames: params.clearFrames,

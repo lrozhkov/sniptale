@@ -13,22 +13,31 @@ type CalloutTextInputHandlers = Pick<
   'finishEditing' | 'handleBlur' | 'handleInput' | 'handleKeyDown' | 'handlePaste'
 >;
 
-function insertPlainTextAtSelection(text: string): void {
+function isRangeWithinElement(range: Range, element: HTMLElement): boolean {
+  return element.contains(range.startContainer) && element.contains(range.endContainer);
+}
+
+function insertPlainTextAtSelection(text: string, editableElement: HTMLDivElement): void {
   const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) {
-    return;
+  const selectedRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+  const hasEditableSelection =
+    selectedRange !== null && isRangeWithinElement(selectedRange, editableElement);
+  const range = hasEditableSelection ? selectedRange.cloneRange() : document.createRange();
+  editableElement.focus({ preventScroll: true });
+  if (!hasEditableSelection) {
+    range.selectNodeContents(editableElement);
+    range.collapse(false);
   }
 
-  const range = selection.getRangeAt(0);
   range.deleteContents();
-
   const textNode = document.createTextNode(text);
   range.insertNode(textNode);
-
   range.setStartAfter(textNode);
   range.setEndAfter(textNode);
-  selection.removeAllRanges();
-  selection.addRange(range);
+  if (selection) {
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
 }
 
 function wrapSelectionWithTag(tagName: 'b' | 'i' | 'u'): void {
@@ -133,11 +142,18 @@ function useCalloutTextInputHandlers(args: CalloutEditingHandlersArgs): CalloutT
     [finishEditing]
   );
 
-  const handlePaste = useCallback((event: ClipboardEvent) => {
-    event.preventDefault();
-    const text = event.clipboardData.getData('text/plain');
-    insertPlainTextAtSelection(text);
-  }, []);
+  const handlePaste = useCallback(
+    (event: ClipboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.nativeEvent.stopImmediatePropagation();
+      const editableElement = event.currentTarget as HTMLDivElement;
+      const text = event.clipboardData.getData('text/plain');
+      insertPlainTextAtSelection(text, editableElement);
+      handleInput();
+    },
+    [handleInput]
+  );
 
   return {
     finishEditing,

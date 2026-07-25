@@ -10,7 +10,7 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import type { StepBadgeSettings } from '../../../../features/highlighter/contracts';
 import { createFrameDataFixture } from '../react/test-support';
-import { buildFrameForAdd } from './frame-build';
+import { buildFrameForAdd, buildFreeFrameForAdd } from './frame-build';
 
 function createBlurSettings(): BlurSettings {
   return {
@@ -159,4 +159,38 @@ describe('frame-mutation-actions-frame-build', () => {
     'preserves the template badge value in manual mode',
     expectBuildFramePreservesManualBadgeValue
   );
+  it('builds a free frame with session defaults and no DOM anchor', () => {
+    const args = createBuildArgs();
+    const frame = buildFreeFrameForAdd({
+      framesRef: args.framesRef,
+      globalEffectModeRef: args.globalEffectModeRef,
+      globalStepBadgeAutoModeRef: args.globalStepBadgeAutoModeRef,
+      highlighterSettingsCacheRef: args.highlighterSettingsCacheRef,
+      sessionBlurSettingsRef: args.sessionBlurSettingsRef,
+      sessionFocusSettingsRef: args.sessionFocusSettingsRef,
+      sessionStepBadgeTemplateRef: args.sessionStepBadgeTemplateRef,
+      generateFrameId: () => 'free-frame',
+      input: {
+        x: 30,
+        y: 40,
+        width: 150,
+        height: 90,
+        pagePlacement: { iframePath: [], pageX: 130, pageY: 240 },
+      },
+    });
+
+    expect(frame).toMatchObject({
+      id: 'free-frame',
+      x: 30,
+      y: 40,
+      width: 150,
+      height: 90,
+      pagePlacement: { iframePath: [], pageX: 130, pageY: 240 },
+      effectMode: 'border',
+      borderSettings: { id: 'preset-1' },
+    });
+    expect(frame.linkedElement).toBeUndefined();
+    expect(frame.linkedElementSelector).toBeUndefined();
+    expect(frame.offset).toBeUndefined();
+  });
 });

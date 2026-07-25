@@ -2,17 +2,9 @@ import type { MutableRefObject } from 'react';
 import { getViewportClientPoint } from '../../../platform/frame';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { isHighlighterEnabled, isHighlighterPausedState } from '../../highlighter';
-import {
-  getCombinedFrameFloatingUiRect,
-  getDistanceToFrameFloatingUiRect,
-} from './floating-bounds';
+import { resolveFrameHitTarget, type FrameHitTarget } from './hit-test';
 
-const HIDE_DISTANCE_THRESHOLD = 200;
-const TOP_BORDER_TOLERANCE_OUT = 10;
-const TOP_BORDER_TOLERANCE_IN = 3;
 const HOVER_THROTTLE_MS = 100;
-const TOOLTIP_ZONE_WIDTH = 300;
-const TOOLTIP_ZONE_HEIGHT = 30;
 
 export type FrameUiMouseTrackingParams = {
   handleMouseMove: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
@@ -22,56 +14,50 @@ export type FrameUiMouseTrackingParams = {
   rafId: MutableRefObject<number | null>;
 };
 
-function isInsideTooltipZone(frame: FrameData, x: number, y: number) {
-  const effectiveWidth = Math.min(frame.width, TOOLTIP_ZONE_WIDTH);
-
-  return (
-    x >= frame.x &&
-    x <= frame.x + effectiveWidth &&
-    y >= frame.y - TOP_BORDER_TOLERANCE_OUT &&
-    y <= frame.y + TOP_BORDER_TOLERANCE_IN + TOOLTIP_ZONE_HEIGHT
-  );
-}
-
 /**
- * Decides whether tooltip should open, stay, or be hidden for current mouse position.
+ * Resolves the single border/control winner for hover trigger and resize proximity.
  */
 export function processFrameHover(params: {
   frames: FrameData[];
-  activeFrameId: string | null;
-  popoverFrameId: string | null;
-  showTooltip: (frameId: string) => void;
-  hideTooltip: (frameId: string) => void;
+  directControl: FrameHitTarget | null;
+  hoveredFrameId: string | null;
+  selectedFrameId: string | null;
+  isDrawing: boolean;
+  hoverFrame: (frameId: string) => void;
+  scheduleHoverFrameHide: (frameId: string) => void;
+  clearHoverFrame: () => void;
+  setResizeFrame: (frameId: string | null) => void;
   x: number;
   y: number;
 }) {
-  const { frames, activeFrameId, popoverFrameId, showTooltip, hideTooltip, x, y } = params;
-
-  if (!isHighlighterEnabled() || isHighlighterPausedState() || frames.length === 0) {
+  if (isHighlighterPausedState() || params.frames.length === 0 || params.isDrawing) {
+    params.setResizeFrame(null);
+    params.clearHoverFrame();
     return;
   }
 
-  if (activeFrameId === null && popoverFrameId === null) {
-    for (const frame of frames) {
-      if (isInsideTooltipZone(frame, x, y)) {
-        showTooltip(frame.id);
-        return;
-      }
-    }
-  }
+  const winner = resolveFrameHitTarget({
+    directControl: params.directControl,
+    frames: params.frames,
+    hoveredFrameId: params.hoveredFrameId,
+    selectedFrameId: params.selectedFrameId,
+    x: params.x,
+    y: params.y,
+  });
+  params.setResizeFrame(winner?.kind === 'trigger' ? null : (winner?.frameId ?? null));
 
-  if (activeFrameId === null || popoverFrameId !== null) {
+  if (!isHighlighterEnabled()) {
+    params.clearHoverFrame();
     return;
   }
 
-  const combinedRect = getCombinedFrameFloatingUiRect();
-
-  if (!combinedRect) {
+  if (winner) {
+    params.hoverFrame(winner.frameId);
     return;
   }
 
-  if (getDistanceToFrameFloatingUiRect(x, y, combinedRect) >= HIDE_DISTANCE_THRESHOLD) {
-    hideTooltip(activeFrameId);
+  if (params.hoveredFrameId) {
+    params.scheduleHoverFrameHide(params.hoveredFrameId);
   }
 }
 
@@ -82,7 +68,7 @@ export function createThrottledMouseMoveHandler(params: FrameUiMouseTrackingPara
   const { handleMouseMove, lastMouseX, lastMouseY, lastProcessTime, rafId } = params;
 
   return (event: MouseEvent, iframe?: HTMLIFrameElement) => {
-    if (!isHighlighterEnabled() || isHighlighterPausedState()) {
+    if (isHighlighterPausedState()) {
       return;
     }
 

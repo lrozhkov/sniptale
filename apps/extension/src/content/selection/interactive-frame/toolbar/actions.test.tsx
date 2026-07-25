@@ -3,25 +3,46 @@
 import { describe, expect, it, vi } from 'vitest';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import { addFrameCalloutChangedListener } from '../../../platform/page-context/frame-events';
+import {
+  createCalloutSettingsFixture,
+  createFrameDataFixture,
+  createStepBadgeSettingsFixture,
+} from '../../frame-runtime/test-support';
 import { createInteractiveFrameToolbarActions } from './actions';
+import type { ToolbarClickEvent } from './dispatch';
+import type { InteractiveFrameToolbarProps } from './types';
 
-function createToolbarProps() {
+function createToolbarProps(
+  frame: InteractiveFrameToolbarProps['frame'] = createFrameDataFixture('frame-1')
+): InteractiveFrameToolbarProps {
   return {
-    frame: { id: 'frame-1' },
-    hideTooltip: vi.fn(),
+    calloutPopoverAnchorRef: { current: null },
+    closePopover: vi.fn(),
+    effectMode: 'border',
+    frame,
+    handleDelete: vi.fn(),
+    handleEffectButtonClick: vi.fn(),
+    handleStartEditing: vi.fn(),
+    isCalloutEditing: false,
+    isSelected: true,
+    onUpdate: vi.fn(),
+    popoverAnchorRef: { current: null },
     setIsCalloutEditing: vi.fn(),
-    setIsCalloutPopoverOpen: vi.fn(),
-    setIsStepBadgePopoverOpen: vi.fn(),
     setState: vi.fn(),
-  } as never;
+    state: 'hover',
+    stepBadgePopoverAnchorRef: { current: null },
+    toolbarAnchorOffset: null,
+    toolbarCoords: { x: 20, y: 20 },
+    togglePopover: vi.fn(),
+  };
 }
 
-function createToolbarEvent() {
+function createToolbarEvent(): ToolbarClickEvent {
   return {
     nativeEvent: { stopImmediatePropagation: vi.fn() },
     preventDefault: vi.fn(),
     stopPropagation: vi.fn(),
-  } as never;
+  };
 }
 
 describe('interactive frame toolbar callout actions', () => {
@@ -42,5 +63,21 @@ describe('interactive frame toolbar callout actions', () => {
     });
 
     cleanup();
+  });
+
+  it('routes enabled popover families through the single store transition', () => {
+    const props = createToolbarProps(
+      createFrameDataFixture('frame-1', {
+        stepBadge: createStepBadgeSettingsFixture(),
+        callout: createCalloutSettingsFixture(),
+      })
+    );
+    const actions = createInteractiveFrameToolbarActions(props);
+
+    actions.handleStepBadgeClick(createToolbarEvent());
+    actions.handleCalloutClick(createToolbarEvent());
+
+    expect(props.togglePopover).toHaveBeenNthCalledWith(1, 'frame-1', 'step-badge');
+    expect(props.togglePopover).toHaveBeenNthCalledWith(2, 'frame-1', 'callout-settings');
   });
 });

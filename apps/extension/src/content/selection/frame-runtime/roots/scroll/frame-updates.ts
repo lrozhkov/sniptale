@@ -1,9 +1,11 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { FrameData, FrameState } from '../../../../../features/highlighter/contracts';
+import { useFrameUIStore } from '../../state/frame-ui.store';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { invalidateFrameCache } from '../../../highlighter';
 import { applyFrameOffsetToElement, calculateFrameViewportCoords } from '../../manager/coords';
 import { shouldDropLinkedElement } from './linked-elements';
+import { resolveDocumentPagePlacement } from '../../../../platform/frame';
 
 const logger = createLogger({ namespace: 'ContentFrameScrollSync' });
 
@@ -52,11 +54,17 @@ export function syncFramePositionOnScroll({
   linkedElementsRef: MutableRefObject<Map<string, HTMLElement>>;
   setFrames: Dispatch<SetStateAction<FrameData[]>>;
 }) {
-  if (frameState === 'editing' || !linkedElement) {
+  if (frameState === 'editing' || frameState === 'resizing') {
+    return;
+  }
+
+  if (!linkedElement) {
+    syncFreeFramePosition(frame, setFrames);
     return;
   }
 
   if (shouldDropLinkedElement(linkedElement)) {
+    useFrameUIStore.getState().dismissFrame(frame.id);
     setFrames((prev) => prev.filter((currentFrame) => currentFrame.id !== frame.id));
     linkedElementsRef.current.delete(frame.id);
     invalidateFrameCache();
@@ -85,6 +93,17 @@ export function syncFramePositionOnScroll({
             ...nextFrameCoords,
           }
         : currentFrame
+    )
+  );
+}
+
+function syncFreeFramePosition(frame: FrameData, setFrames: Dispatch<SetStateAction<FrameData[]>>) {
+  if (!frame.pagePlacement) return;
+  const point = resolveDocumentPagePlacement(frame.pagePlacement);
+  if (!point || (frame.x === point.x && frame.y === point.y)) return;
+  setFrames((prev) =>
+    prev.map((currentFrame) =>
+      currentFrame.id === frame.id ? { ...currentFrame, x: point.x, y: point.y } : currentFrame
     )
   );
 }

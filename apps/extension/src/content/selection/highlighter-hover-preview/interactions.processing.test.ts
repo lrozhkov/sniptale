@@ -16,7 +16,6 @@ function createSkipProps() {
       isFrameEditing: () => false,
       isModeEnabled: () => true,
       isPaused: () => false,
-      isTooltipVisible: () => false,
     },
     hoverThrottleMs: 100,
     session: createHoverSession(),
@@ -24,19 +23,13 @@ function createSkipProps() {
 }
 
 describe('highlighter hover processing policy', () => {
-  it('skips disabled, paused, editing, and tooltip states', () => {
-    for (const state of [
-      { isModeEnabled: false },
-      { isPaused: true },
-      { isFrameEditing: true },
-      { isTooltipVisible: true },
-    ]) {
+  it('skips disabled, paused, and editing states', () => {
+    for (const state of [{ isModeEnabled: false }, { isPaused: true }, { isFrameEditing: true }]) {
       const props = createSkipProps();
       props.getState = {
         isFrameEditing: () => state.isFrameEditing ?? false,
         isModeEnabled: () => state.isModeEnabled ?? true,
         isPaused: () => state.isPaused ?? false,
-        isTooltipVisible: () => state.isTooltipVisible ?? false,
       };
       expect(shouldSkipHoverProcessing(props)).toBe(true);
     }
