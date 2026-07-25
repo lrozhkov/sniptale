@@ -13,7 +13,8 @@ import {
   CaptureMode,
   type VideoRecordingRuntimeState,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { IDLE_RECORDING_STATE, type PopupPage } from '../navigation/actions';
+import { IDLE_RECORDING_STATE } from '../../recording/video/copy';
+import type { PopupPage } from '../navigation/actions';
 import { type MicrophoneOption } from '../../recording/microphone';
 import { type WebcamOption } from '../../recording/webcam';
 import { isRecordingActive, resolveSelectedPreset, shouldShowFooter } from './model';

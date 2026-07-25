@@ -36,7 +36,7 @@ import {
   type ViewportPreset,
 } from '../../../../contracts/settings';
 
-export const ICON_MAP: Record<string, LucideIcon> = {
+const ICON_MAP: Record<string, LucideIcon> = {
   Camera,
   Monitor,
   MonitorDown,
@@ -65,6 +65,11 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   Eye,
   Images,
 };
+
+export function DynamicIcon({ name, color }: { name: string; color?: string }) {
+  const Icon = ICON_MAP[name] || Camera;
+  return <Icon className="h-4 w-4" style={color ? { color } : undefined} />;
+}
 
 function getScreenshotModeLabels(): Record<string, string> {
   return {

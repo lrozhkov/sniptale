@@ -27,27 +27,11 @@ const footerLayerMocks = vi.hoisted(() => ({
   showAppliedStylesAction: false,
 }));
 
-vi.mock('../navigation/actions', () => ({
-  DynamicIcon: () => null,
-  IDLE_RECORDING_STATE: {},
-  PopupPage: undefined,
-  describeCaptureSource: vi.fn(),
-  formatDuration: vi.fn(),
-  formatHotkeyShort: vi.fn(),
-  getCaptureModeLabels: vi.fn(),
-  getQuickActionColor: vi.fn(),
-  getQuickActionMeta: vi.fn(),
-  getRecordingStatusLabel: vi.fn(),
-  getViewportPresetLabel: vi.fn(),
+vi.mock('../navigation/actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../navigation/actions')>()),
   openDesignSystem: vi.fn(),
-  openGallery: vi.fn(),
   openGithubRepository: vi.fn(),
-  openImageEditor: vi.fn(),
-  openScenarioEditor: vi.fn(),
-  openScreenshotMode: vi.fn(),
   openSettings: vi.fn(),
-  openVideoEditor: vi.fn(),
-  triggerQuickAction: vi.fn(),
 }));
 
 vi.mock('./applied-styles-entrypoint', () => ({

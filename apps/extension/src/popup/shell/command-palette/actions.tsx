@@ -23,9 +23,8 @@ import {
 } from '../../../ui/command-palette/action-builders';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupCommandPaletteRuntime } from '../runtime/types/command-palette';
+import { formatHotkeyShort, getQuickActionMeta } from '../home/quick-actions/meta';
 import {
-  formatHotkeyShort,
-  getQuickActionMeta,
   openDesignSystem,
   openGallery,
   openGithubRepository,

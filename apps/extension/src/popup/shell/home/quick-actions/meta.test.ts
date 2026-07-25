@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
@@ -5,7 +7,7 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => `t:${key}`,
 }));
 
-import { formatHotkeyShort, getQuickActionColor, getQuickActionMeta } from './meta';
+import { DynamicIcon, formatHotkeyShort, getQuickActionColor, getQuickActionMeta } from './meta';
 import type { QuickAction, ViewportPreset } from '../../../../contracts/settings';
 
 function createQuickAction(overrides: Partial<QuickAction> = {}): QuickAction {
@@ -79,6 +81,18 @@ function verifiesQuickActionColorFallback() {
   ).toBe(getQuickActionColor(createQuickAction({ screenshotMode: 'visible' })));
 }
 
+function verifiesDynamicIconVariants() {
+  const configuredIcon = renderToStaticMarkup(
+    createElement(DynamicIcon, { color: '#123456', name: 'Download' })
+  );
+  const fallbackIcon = renderToStaticMarkup(createElement(DynamicIcon, { name: 'Unknown' }));
+
+  expect(configuredIcon).toContain('lucide-download');
+  expect(configuredIcon).toContain('color:#123456');
+  expect(fallbackIcon).toContain('lucide-camera');
+  expect(fallbackIcon).not.toContain('style=');
+}
+
 function runPopupQuickActionUtilsSuite() {
   it('formats hotkeys and empty hotkeys', verifiesHotkeyFormatting);
   it('builds quick-action meta for preset, delay, and fallback branches', verifiesQuickActionMeta);
@@ -86,6 +100,7 @@ function runPopupQuickActionUtilsSuite() {
     'falls back to the visible-mode color for unknown screenshot modes',
     verifiesQuickActionColorFallback
   );
+  it('renders configured and fallback quick-action icons', verifiesDynamicIconVariants);
 }
 
 describe('popup quick-action utils', runPopupQuickActionUtilsSuite);

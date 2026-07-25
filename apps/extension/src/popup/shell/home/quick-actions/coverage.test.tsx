@@ -20,29 +20,6 @@ vi.mock('../../../../features/quick-actions-presets/catalog', () => ({
   sanitizeQuickActionsDisplayMode: vi.fn(),
 }));
 
-vi.mock('../../navigation/actions', () => ({
-  DynamicIcon: (props: { name: string }) => <span data-testid="dynamic-icon">{props.name}</span>,
-  IDLE_RECORDING_STATE: null,
-  PopupPage: undefined,
-  describeCaptureSource: vi.fn(),
-  formatDuration: vi.fn(),
-  formatHotkeyShort: () => 'Ctrl+Shift+K',
-  getCaptureModeLabels: vi.fn(),
-  getQuickActionColor: vi.fn(),
-  getQuickActionMeta: () => 'Visible page',
-  getRecordingStatusLabel: vi.fn(),
-  getViewportPresetLabel: vi.fn(),
-  openDesignSystem: vi.fn(),
-  openGallery: vi.fn(),
-  openImageEditor: vi.fn(),
-  openScenarioEditor: vi.fn(),
-  openScreenshotMode: vi.fn(),
-  openSettings: vi.fn(),
-  openGithubRepository: vi.fn(),
-  openVideoEditor: vi.fn(),
-  triggerQuickAction: vi.fn(),
-}));
-
 vi.mock('./block-items/item', () => ({
   QuickActionListDensity: undefined,
   QuickActionListItem: (props: unknown) => {

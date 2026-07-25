@@ -7,7 +7,7 @@ import { translate } from '../../../platform/i18n';
 import type { RuntimeMessagingTransport } from '../../../platform/runtime-messaging';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRecordingRuntimeState } from '@sniptale/runtime-contracts/video/types/types';
-import { IDLE_RECORDING_STATE } from '../navigation/actions';
+import { IDLE_RECORDING_STATE } from '../../recording/video/copy';
 
 const recordingHealthSet = new Set<RecordingStateHealth>(recordingStateHealthValues);
 

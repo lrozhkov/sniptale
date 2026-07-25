@@ -2,8 +2,7 @@ import type { ReactNode } from 'react';
 
 import type { QuickAction, ViewportPreset } from '../../../../../contracts/settings';
 import { getQuickActionDisplayName } from '../../../../../features/quick-actions-presets/catalog';
-import { DynamicIcon } from '../../../navigation/actions';
-import { formatHotkeyShort } from '../../../navigation/actions';
+import { DynamicIcon, formatHotkeyShort } from '../meta';
 import {
   cx,
   disabledQuickActionListItemClassName,
