@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const offscreenMocks = vi.hoisted(() => ({
-  getCurrentLocale: vi.fn(() => 'en'),
   initDB: vi.fn(),
   logger: {
     debug: vi.fn(),
@@ -11,7 +10,6 @@ const offscreenMocks = vi.hoisted(() => ({
   sendRuntimeMessage: vi.fn(),
   subscribeToDbTermination: vi.fn(),
   reconcileProjectExportJobs: vi.fn(),
-  translate: vi.fn((key: string) => key),
 }));
 
 vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -25,12 +23,6 @@ vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (i
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/observability/logger')>()),
   createLogger: () => offscreenMocks.logger,
-}));
-
-vi.mock('../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../platform/i18n')>()),
-  getCurrentLocale: offscreenMocks.getCurrentLocale,
-  translate: offscreenMocks.translate,
 }));
 
 vi.mock('@sniptale/platform/observability/message-tracer', async (importOriginal) => ({
@@ -51,7 +43,6 @@ vi.mock('../project-export', () => ({
 }));
 
 function resetOffscreenMocks() {
-  offscreenMocks.getCurrentLocale.mockClear();
   offscreenMocks.initDB.mockReset();
   offscreenMocks.logger.debug.mockReset();
   offscreenMocks.logger.error.mockReset();
@@ -59,7 +50,6 @@ function resetOffscreenMocks() {
   offscreenMocks.sendRuntimeMessage.mockReset();
   offscreenMocks.subscribeToDbTermination.mockReset();
   offscreenMocks.reconcileProjectExportJobs.mockReset();
-  offscreenMocks.translate.mockClear();
   offscreenMocks.initDB.mockResolvedValue(undefined);
   offscreenMocks.reconcileProjectExportJobs.mockResolvedValue(undefined);
 }
@@ -95,54 +85,6 @@ async function verifyTerminationReinitFlow() {
     'DB connection terminated, reinitializing offscreen DB'
   );
   expect(offscreenMocks.initDB).toHaveBeenCalledTimes(2);
-}
-
-async function verifyLocaleMetadataBootstrap() {
-  const statusText = { textContent: '' };
-  vi.stubGlobal('document', {
-    documentElement: { lang: 'ru' },
-    getElementById: vi.fn(() => statusText),
-    title: 'initial',
-  });
-
-  const { bootstrapOffscreenDocument } = await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  await flushBootstrapTasks();
-
-  expect(offscreenMocks.getCurrentLocale).toHaveBeenCalledTimes(1);
-  expect(offscreenMocks.translate).toHaveBeenCalledWith(
-    'background.runtime.offscreenDocumentTitle',
-    'en'
-  );
-  expect(offscreenMocks.translate).toHaveBeenCalledWith('popup.labels.statusReady', 'en');
-  expect((document as { documentElement: { lang: string } }).documentElement.lang).toBe('en');
-  expect((document as { title: string }).title).toBe('background.runtime.offscreenDocumentTitle');
-  expect(statusText.textContent).toBe('popup.labels.statusReady');
-}
-
-async function verifyBootstrapWithoutStatusTextNode() {
-  vi.stubGlobal('document', {
-    documentElement: { lang: 'ru' },
-    getElementById: vi.fn(() => null),
-    title: 'initial',
-  });
-
-  const { bootstrapOffscreenDocument } = await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  await flushBootstrapTasks();
-
-  expect((document as { documentElement: { lang: string } }).documentElement.lang).toBe('en');
-  expect((document as { title: string }).title).toBe('background.runtime.offscreenDocumentTitle');
-}
-
-async function verifyBootstrapWithoutDocumentGlobals() {
-  vi.unstubAllGlobals();
-
-  const { bootstrapOffscreenDocument } = await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  await flushBootstrapTasks();
-
-  expect(offscreenMocks.getCurrentLocale).not.toHaveBeenCalled();
 }
 
 async function verifyReadyMessageIncludesStartupId() {
@@ -242,18 +184,6 @@ describe('offscreen bootstrap', () => {
   it(
     'subscribes to db termination and retries initialization after termination',
     verifyTerminationReinitFlow
-  );
-  it(
-    'skips locale metadata updates when document globals are unavailable',
-    verifyBootstrapWithoutDocumentGlobals
-  );
-  it(
-    'updates document metadata even when the status text node is missing',
-    verifyBootstrapWithoutStatusTextNode
-  );
-  it(
-    'applies locale-aware offscreen document metadata when document globals exist',
-    verifyLocaleMetadataBootstrap
   );
   it('sends OFFSCREEN_READY with the current startup id', verifyReadyMessageIncludesStartupId);
   it(

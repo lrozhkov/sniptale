@@ -27,6 +27,10 @@ export function getFirstSupportedMediaRecorderMimeType(
   return fallback;
 }
 
+export function getSupportedRecordingMimeType(): string {
+  return getFirstSupportedMediaRecorderMimeType(RECORDING_MIME_TYPE_CANDIDATES);
+}
+
 export function buildVideoMediaRecorderOptions(
   settings: VideoRecordingSettings
 ): MediaRecorderOptions {

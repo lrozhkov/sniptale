@@ -3,7 +3,7 @@ import { normalizeDisplayMediaLabel } from '../../../../platform/i18n/display-me
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { sendRuntimeMessageBestEffort } from '../../../runtime-messaging/best-effort';
-import { createDesktopPreviewController } from '../../stream';
+import { createDesktopPreviewController } from '../../preview';
 import { acquireDesktopStream } from './acquire';
 import { handleDesktopMediaRequestFailure } from './failure';
 import type { DesktopMediaRequestOptions } from './types';

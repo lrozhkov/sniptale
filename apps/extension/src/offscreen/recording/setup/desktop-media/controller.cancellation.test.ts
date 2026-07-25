@@ -38,8 +38,8 @@ vi.mock('../../../runtime-messaging/best-effort', async (importOriginal) => ({
     error instanceof Error ? error.message : String(error),
 }));
 
-vi.mock('../../stream', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../stream')>()),
+vi.mock('../../preview', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../preview')>()),
   createDesktopPreviewController: () => ({
     attachDesktopPreview: attachDesktopPreviewMock,
     detachDesktopPreview: detachDesktopPreviewMock,

@@ -15,9 +15,11 @@ vi.mock('../stream/audio-mixer', () => ({
   },
 }));
 
-vi.mock('../stream', () => ({
+vi.mock('../stream/viewport', () => ({
   applyCanvasCrop: vi.fn(),
   createViewportPresetStream: vi.fn(),
+}));
+vi.mock('../stream/normalization', () => ({
   normalizeRecordingStreamDimensions: vi.fn(async (stream) => stream),
 }));
 

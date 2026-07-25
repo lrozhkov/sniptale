@@ -8,6 +8,7 @@ import { VIDEO_QUALITY_CONFIGS } from '@sniptale/runtime-contracts/video/types/d
 import {
   buildVideoMediaRecorderOptions,
   getFirstSupportedMediaRecorderMimeType,
+  getSupportedRecordingMimeType,
   RECORDING_MIME_TYPE_CANDIDATES,
   WEBM_EXPORT_MIME_TYPE_CANDIDATES,
 } from './recorder-mime';
@@ -38,6 +39,20 @@ it('falls back when no MediaRecorder mime type candidate is supported', () => {
 
   expect(getFirstSupportedMediaRecorderMimeType(RECORDING_MIME_TYPE_CANDIDATES)).toBe('video/webm');
   expect(getFirstSupportedMediaRecorderMimeType(['video/mp4'], 'video/mp4')).toBe('video/mp4');
+});
+
+it('selects the first supported recording mime type and falls back to webm', () => {
+  const mediaRecorderMock = {
+    isTypeSupported: vi
+      .fn()
+      .mockImplementation((type: string) => type === 'video/webm;codecs=vp8,opus'),
+  };
+
+  vi.stubGlobal('MediaRecorder', mediaRecorderMock);
+  expect(getSupportedRecordingMimeType()).toBe('video/webm;codecs=vp8,opus');
+
+  mediaRecorderMock.isTypeSupported.mockReturnValue(false);
+  expect(getSupportedRecordingMimeType()).toBe('video/webm');
 });
 
 it('builds video recorder options from the supported quality configuration', () => {

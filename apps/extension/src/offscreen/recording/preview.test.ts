@@ -12,7 +12,7 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
   }),
 }));
 
-import { createDesktopPreviewController, getSupportedMimeType } from './preview';
+import { createDesktopPreviewController } from './preview';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -52,19 +52,5 @@ describe('offscreen desktop preview helpers', () => {
     playSpy.mockRestore();
     pauseSpy.mockRestore();
     removeSpy.mockRestore();
-  });
-
-  it('selects the first supported preview mime type and falls back to webm', () => {
-    const mediaRecorderMock = {
-      isTypeSupported: vi
-        .fn()
-        .mockImplementation((type: string) => type === 'video/webm;codecs=vp8,opus'),
-    };
-
-    vi.stubGlobal('MediaRecorder', mediaRecorderMock);
-    expect(getSupportedMimeType()).toBe('video/webm;codecs=vp8,opus');
-
-    mediaRecorderMock.isTypeSupported.mockReturnValue(false);
-    expect(getSupportedMimeType()).toBe('video/webm');
   });
 });

@@ -31,10 +31,13 @@ vi.mock('../stream/audio-mixer', () => ({
   },
 }));
 
-vi.mock('../stream', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../stream')>()),
+vi.mock('../stream/viewport', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../stream/viewport')>()),
   applyCanvasCrop: vi.fn(),
   createViewportPresetStream: vi.fn(),
+}));
+vi.mock('../stream/normalization', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../stream/normalization')>()),
   normalizeRecordingStreamDimensions: vi.fn(async (stream) => stream),
 }));
 

@@ -18,11 +18,11 @@ const {
   stopActiveSidecarRecordersWithFlushMock: vi.fn(),
 }));
 
-vi.mock('../stream', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../stream')>();
+vi.mock('../recorder-mime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../recorder-mime')>();
   return {
     ...actual,
-    getSupportedMimeType: vi.fn(() => 'video/webm'),
+    getSupportedRecordingMimeType: vi.fn(() => 'video/webm'),
   };
 });
 

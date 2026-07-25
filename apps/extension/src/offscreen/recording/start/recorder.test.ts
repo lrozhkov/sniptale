@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // State-machine proof: terminal recorder lifecycle emits start/failure/cancel events through owners.
-const { getSupportedMimeTypeMock, loggerDebugMock, loggerInfoMock, sendRuntimeMessageMock } =
-  vi.hoisted(() => ({
-    getSupportedMimeTypeMock: vi.fn(),
-    loggerDebugMock: vi.fn(),
-    loggerInfoMock: vi.fn(),
-    sendRuntimeMessageMock: vi.fn(),
-  }));
+const {
+  getSupportedRecordingMimeTypeMock,
+  loggerDebugMock,
+  loggerInfoMock,
+  sendRuntimeMessageMock,
+} = vi.hoisted(() => ({
+  getSupportedRecordingMimeTypeMock: vi.fn(),
+  loggerDebugMock: vi.fn(),
+  loggerInfoMock: vi.fn(),
+  sendRuntimeMessageMock: vi.fn(),
+}));
 
 vi.mock('../../runtime-messaging/best-effort', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime-messaging/best-effort')>()),
@@ -22,13 +26,9 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   }),
 }));
 
-vi.mock('../stream', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../stream')>()),
-  createDesktopPreviewController: vi.fn(() => ({
-    attachDesktopPreview: vi.fn(),
-    detachDesktopPreview: vi.fn(),
-  })),
-  getSupportedMimeType: getSupportedMimeTypeMock,
+vi.mock('../recorder-mime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../recorder-mime')>()),
+  getSupportedRecordingMimeType: getSupportedRecordingMimeTypeMock,
 }));
 
 import { recordingContext } from '../context';
@@ -141,7 +141,7 @@ function bootstrapRecorderWithSurface(displaySurface: string | undefined) {
 function registerRecorderTestSetup() {
   beforeEach(() => {
     vi.clearAllMocks();
-    getSupportedMimeTypeMock.mockReturnValue('video/webm;codecs=vp9');
+    getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm;codecs=vp9');
     recordingContext.resetRecordingSession();
     recordingContext.mediaRecorder = null;
     recordingContext.videoStream = null;
@@ -160,7 +160,7 @@ function runMimeTypeSelectionSuite() {
     bootstrapRecorder();
 
     expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp9,opus');
-    expect(getSupportedMimeTypeMock).not.toHaveBeenCalled();
+    expect(getSupportedRecordingMimeTypeMock).not.toHaveBeenCalled();
   });
 
   it('prefers compatibility recorder mime types for derived canvas streams', () => {
@@ -172,14 +172,14 @@ function runMimeTypeSelectionSuite() {
     bootstrapRecorder();
 
     expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp8');
-    expect(getSupportedMimeTypeMock).not.toHaveBeenCalled();
+    expect(getSupportedRecordingMimeTypeMock).not.toHaveBeenCalled();
   });
 }
 
 function runAudioFallbackMimeTypeSelectionSuite() {
   it('prefers plain webm for streams with mixed audio', () => {
     installMediaRecorderMock(['video/webm', 'video/webm;codecs=vp8,opus']);
-    getSupportedMimeTypeMock.mockReturnValue('video/webm');
+    getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm');
     recordingContext.audioMixer = {} as never;
     recordingContext.videoStream = createVideoStream(1);
     recordingContext.sourceStream = recordingContext.videoStream;
@@ -193,7 +193,7 @@ function runAudioFallbackMimeTypeSelectionSuite() {
 
   it('falls back to the canonical recorder mime order when audio is present', () => {
     installMediaRecorderMock(['video/webm;codecs=vp8,opus']);
-    getSupportedMimeTypeMock.mockReturnValue('video/webm;codecs=vp8,opus');
+    getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm;codecs=vp8,opus');
     recordingContext.videoStream = createVideoStream(1);
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-2');
@@ -201,7 +201,7 @@ function runAudioFallbackMimeTypeSelectionSuite() {
     bootstrapRecorder();
 
     expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp8,opus');
-    expect(getSupportedMimeTypeMock).toHaveBeenCalledOnce();
+    expect(getSupportedRecordingMimeTypeMock).toHaveBeenCalledOnce();
   });
 }
 

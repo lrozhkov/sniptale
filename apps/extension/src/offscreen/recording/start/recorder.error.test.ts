@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { finalizeRecordingMock, getSupportedMimeTypeMock, sendRuntimeMessageMock } = vi.hoisted(
-  () => ({
+const { finalizeRecordingMock, getSupportedRecordingMimeTypeMock, sendRuntimeMessageMock } =
+  vi.hoisted(() => ({
     finalizeRecordingMock: vi.fn(),
-    getSupportedMimeTypeMock: vi.fn(),
+    getSupportedRecordingMimeTypeMock: vi.fn(),
     sendRuntimeMessageMock: vi.fn(),
-  })
-);
+  }));
 
 vi.mock('../finalizer', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../finalizer')>();
@@ -30,11 +29,11 @@ vi.mock('../sidecar', async (importOriginal) => {
   };
 });
 
-vi.mock('../stream', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../stream')>();
+vi.mock('../recorder-mime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../recorder-mime')>();
   return {
     ...actual,
-    getSupportedMimeType: getSupportedMimeTypeMock,
+    getSupportedRecordingMimeType: getSupportedRecordingMimeTypeMock,
   };
 });
 
@@ -116,7 +115,7 @@ function createVideoStream() {
 beforeEach(() => {
   vi.clearAllMocks();
   installMediaRecorderMock();
-  getSupportedMimeTypeMock.mockReturnValue('video/webm;codecs=vp9');
+  getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm;codecs=vp9');
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   finalizeRecordingMock.mockResolvedValue(undefined);
   recordingContext.resetRecordingSession();
