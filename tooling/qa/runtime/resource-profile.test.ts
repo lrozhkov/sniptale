@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest';
 
-import { detectPhysicalCoreCount, resolveQaResourceProfile } from './resource-profile.mjs';
+import {
+  detectPhysicalCoreCount,
+  resolveQaReleaseResourceProfile,
+  resolveQaResourceProfile,
+} from './resource-profile.mjs';
 
 const CPU_INFO = Array.from({ length: 12 }, (_, index) => {
   return `processor : ${index}\nphysical id : 0\ncore id : ${Math.floor(index / 2)}`;
@@ -25,6 +29,32 @@ it('selects the bounded i7/WSL default profile', () => {
     physicalCoreCount: 6,
     vitestMaxWorkers: 4,
   });
+});
+
+it('gives the dedicated release test stage all bounded WSL-visible capacity', () => {
+  expect(
+    resolveQaReleaseResourceProfile({
+      cpuInfo: CPU_INFO,
+      env: {},
+      logicalCpuCount: 12,
+      totalMemoryBytes: 16 * 1024 * 1024 * 1024,
+    })
+  ).toMatchObject({
+    cpuTokens: 12,
+    memoryMiB: 15 * 1024,
+    vitestMaxWorkers: 12,
+  });
+});
+
+it('rejects a release CPU override below the non-test lane floor', () => {
+  expect(() =>
+    resolveQaReleaseResourceProfile({
+      cpuInfo: CPU_INFO,
+      env: { SNIPTALE_QA_CPU_TOKENS: '1' },
+      logicalCpuCount: 12,
+      totalMemoryBytes: 16 * 1024 * 1024 * 1024,
+    })
+  ).toThrow(/at least 2 for qa:release/u);
 });
 
 it('clamps explicit overrides to WSL-visible resources', () => {
@@ -63,28 +93,28 @@ it('keeps the smallest supported override executable and rejects unsafe memory b
       cpuInfo: CPU_INFO,
       env: {
         SNIPTALE_QA_CPU_TOKENS: '1',
-        SNIPTALE_QA_MEMORY_MIB: '4096',
+        SNIPTALE_QA_MEMORY_MIB: '6144',
       },
       logicalCpuCount: 12,
       totalMemoryBytes: 16 * 1024 * 1024 * 1024,
     })
-  ).toMatchObject({ cpuTokens: 1, memoryMiB: 4096, vitestMaxWorkers: 1 });
+  ).toMatchObject({ cpuTokens: 1, memoryMiB: 6144, vitestMaxWorkers: 1 });
 
   expect(() =>
     resolveQaResourceProfile({
       cpuInfo: CPU_INFO,
-      env: { SNIPTALE_QA_MEMORY_MIB: '3072' },
+      env: { SNIPTALE_QA_MEMORY_MIB: '4096' },
       logicalCpuCount: 12,
       totalMemoryBytes: 16 * 1024 * 1024 * 1024,
     })
-  ).toThrow(/at least 4096/u);
+  ).toThrow(/at least 6144/u);
 
   expect(() =>
     resolveQaResourceProfile({
       cpuInfo: CPU_INFO,
       env: {},
       logicalCpuCount: 12,
-      totalMemoryBytes: 4 * 1024 * 1024 * 1024,
+      totalMemoryBytes: 6 * 1024 * 1024 * 1024,
     })
-  ).toThrow(/requires at least 5120 MiB visible memory/u);
+  ).toThrow(/requires at least 7168 MiB visible memory/u);
 });

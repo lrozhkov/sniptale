@@ -5,9 +5,11 @@ const MIB = 1024 * 1024;
 const DEFAULT_CPU_TOKEN_CAP = 8;
 const DEFAULT_MEMORY_CAP_MIB = 12 * 1024;
 const RESERVED_SYSTEM_MEMORY_MIB = 3 * 1024;
-const MIN_QA_MEMORY_MIB = 4096;
+const MIN_QA_MEMORY_MIB = 6144;
 const MAX_CONCURRENT_VITEST_WORKERS = 4;
 const MAX_VITEST_WORKERS = 6;
+const MAX_RELEASE_CPU_TOKENS = 12;
+const MAX_RELEASE_VITEST_WORKERS = 12;
 
 function readCpuInfo() {
   try {
@@ -54,8 +56,7 @@ function resolveCpuTokenBudget({ env, logicalCpuCount, physicalCoreCount }) {
   );
 }
 
-function resolveMemoryBudgetMiB({ env, totalMemoryMiB }) {
-  const requested = parsePositiveInteger(env.SNIPTALE_QA_MEMORY_MIB, 'SNIPTALE_QA_MEMORY_MIB');
+function resolveMaximumMemoryMiB(totalMemoryMiB) {
   const maximum = totalMemoryMiB - 1024;
   if (maximum < MIN_QA_MEMORY_MIB) {
     throw new Error(
@@ -63,6 +64,12 @@ function resolveMemoryBudgetMiB({ env, totalMemoryMiB }) {
         `${MIN_QA_MEMORY_MIB} MiB for verification.`
     );
   }
+  return maximum;
+}
+
+function resolveMemoryBudgetMiB({ env, totalMemoryMiB }) {
+  const requested = parsePositiveInteger(env.SNIPTALE_QA_MEMORY_MIB, 'SNIPTALE_QA_MEMORY_MIB');
+  const maximum = resolveMaximumMemoryMiB(totalMemoryMiB);
   if (requested != null) {
     if (requested < MIN_QA_MEMORY_MIB) {
       throw new Error(`SNIPTALE_QA_MEMORY_MIB must be at least ${MIN_QA_MEMORY_MIB}.`);
@@ -109,6 +116,59 @@ export function resolveQaResourceProfile({
     physicalCoreCount,
     totalMemoryMiB,
     vitestMaxWorkers: resolveVitestWorkers({ cpuTokens, env }),
+  });
+}
+
+export function resolveQaReleaseResourceProfile({
+  cpuInfo = readCpuInfo(),
+  env = process.env,
+  logicalCpuCount = os.availableParallelism?.() ?? os.cpus().length,
+  totalMemoryBytes = os.totalmem(),
+} = {}) {
+  const normalizedLogicalCpuCount = Math.max(1, logicalCpuCount);
+  const totalMemoryMiB = Math.max(1024, Math.floor(totalMemoryBytes / MIB));
+  const physicalCoreCount = detectPhysicalCoreCount(cpuInfo, normalizedLogicalCpuCount);
+  if (normalizedLogicalCpuCount < 2) {
+    throw new Error('qa:release requires at least 2 WSL-visible CPU tokens.');
+  }
+  const requestedCpuTokens = parsePositiveInteger(
+    env.SNIPTALE_QA_CPU_TOKENS,
+    'SNIPTALE_QA_CPU_TOKENS'
+  );
+  if (requestedCpuTokens != null && requestedCpuTokens < 2) {
+    throw new Error('SNIPTALE_QA_CPU_TOKENS must be at least 2 for qa:release.');
+  }
+  const cpuTokens = Math.min(
+    requestedCpuTokens ?? MAX_RELEASE_CPU_TOKENS,
+    MAX_RELEASE_CPU_TOKENS,
+    normalizedLogicalCpuCount
+  );
+  const requestedMemoryMiB = parsePositiveInteger(
+    env.SNIPTALE_QA_MEMORY_MIB,
+    'SNIPTALE_QA_MEMORY_MIB'
+  );
+  if (requestedMemoryMiB != null && requestedMemoryMiB < MIN_QA_MEMORY_MIB) {
+    throw new Error(`SNIPTALE_QA_MEMORY_MIB must be at least ${MIN_QA_MEMORY_MIB}.`);
+  }
+  const maximumMemoryMiB = resolveMaximumMemoryMiB(totalMemoryMiB);
+  const memoryMiB = Math.min(requestedMemoryMiB ?? maximumMemoryMiB, maximumMemoryMiB);
+  const requestedVitestWorkers = parsePositiveInteger(
+    env.SNIPTALE_QA_VITEST_MAX_WORKERS,
+    'SNIPTALE_QA_VITEST_MAX_WORKERS'
+  );
+  const vitestMaxWorkers = Math.min(
+    requestedVitestWorkers ?? cpuTokens,
+    MAX_RELEASE_VITEST_WORKERS,
+    cpuTokens
+  );
+
+  return Object.freeze({
+    cpuTokens,
+    logicalCpuCount: normalizedLogicalCpuCount,
+    memoryMiB,
+    physicalCoreCount,
+    totalMemoryMiB,
+    vitestMaxWorkers,
   });
 }
 

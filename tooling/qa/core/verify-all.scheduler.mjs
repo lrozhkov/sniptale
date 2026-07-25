@@ -1,4 +1,8 @@
-import { formatQaResourceProfile, resolveQaResourceProfile } from '../runtime/resource-profile.mjs';
+import {
+  formatQaResourceProfile,
+  resolveQaReleaseResourceProfile,
+  resolveQaResourceProfile,
+} from '../runtime/resource-profile.mjs';
 import { parseLaneResult } from '../runtime/lane-worker-contract.mjs';
 import { runQaLaneWorker } from '../runtime/lane-worker-runner.mjs';
 import { formatTaskScheduleDetail, runBoundedTasks } from '../runtime/task-scheduler.mjs';
@@ -10,7 +14,7 @@ const LANE_RESOURCES = Object.freeze({
   targetPaths: { cpuTokens: 1, memoryMiB: 1024 },
   typecheck: { cpuTokens: 1, memoryMiB: 3072 },
   graph: { cpuTokens: 1, memoryMiB: 2048 },
-  lint: { cpuTokens: 1, memoryMiB: 3072 },
+  lint: { cpuTokens: 2, memoryMiB: 6144 },
   tests: { memoryMiB: 4096 },
   light: { cpuTokens: 1, memoryMiB: 1024 },
 });
@@ -60,11 +64,18 @@ function createTasks({ context, profile, workerRunner }) {
   return ['targetPaths', 'appOwners', 'typecheck', 'tests', 'lint', 'graph', 'light'].map(
     (lane) => {
       const resources = LANE_RESOURCES[lane];
-      const cpuTokens = lane === 'tests' ? profile.vitestMaxWorkers : resources.cpuTokens;
-      const memoryMiB = resources.memoryMiB;
+      const dedicatedReleaseTests = context.releaseMode && lane === 'tests';
+      const cpuTokens =
+        lane === 'tests'
+          ? dedicatedReleaseTests
+            ? profile.cpuTokens
+            : profile.vitestMaxWorkers
+          : resources.cpuTokens;
+      const memoryMiB = dedicatedReleaseTests ? profile.memoryMiB : resources.memoryMiB;
       return {
         id: lane,
         cpuTokens,
+        exclusive: dedicatedReleaseTests,
         memoryMiB,
         run: ({ signal }) =>
           workerRunner({
@@ -142,15 +153,26 @@ function assemble(results, releaseMode) {
 
 export async function collectScheduledFullVerifySteps(
   context,
-  {
-    profile = resolveQaResourceProfile(),
-    scheduler = runBoundedTasks,
-    workerRunner = runFullVerifyLaneWorker,
-  } = {}
+  { profile = null, scheduler = runBoundedTasks, workerRunner = runFullVerifyLaneWorker } = {}
 ) {
-  const results = await scheduler(createTasks({ context, profile, workerRunner }), { profile });
+  const selectedProfile =
+    profile ??
+    (context.releaseMode ? resolveQaReleaseResourceProfile() : resolveQaResourceProfile());
+  const tasks = createTasks({ context, profile: selectedProfile, workerRunner });
+  const results = context.releaseMode
+    ? [
+        ...(await scheduler(
+          tasks.filter(({ id }) => id !== 'tests'),
+          { profile: selectedProfile }
+        )),
+        ...(await scheduler(
+          tasks.filter(({ id }) => id === 'tests'),
+          { profile: selectedProfile }
+        )),
+      ]
+    : await scheduler(tasks, { profile: selectedProfile });
   return assemble(
-    results.map((result) => ({ ...result, value: annotate(result, profile) })),
+    results.map((result) => ({ ...result, value: annotate(result, selectedProfile) })),
     context.releaseMode
   );
 }
