@@ -14,6 +14,7 @@ import { nativeAppRouteDescriptor } from '../../native-app/route-descriptors';
 import { contentActionRouteDescriptor } from '../../../routing-contracts/capabilities/content-action/route-descriptors';
 import type { BackgroundOwnedRouteInventoryEntry } from '../../../routing-contracts/owned-route-context';
 import { pageAccessRouteDescriptor } from '../../page-access/route-descriptors';
+import { highlighterSettingsMutationRouteDescriptor } from '../../../highlighter-settings/route-descriptors';
 import { contentRuntimeWakeupRouteDescriptor } from '../../page-access/wakeup-route-descriptors';
 import { popupTabRouteCapabilityIssuanceDescriptor } from '../capabilities/popup-tab/route-descriptors';
 import type { BackgroundOwnedRouteDescriptor } from './route-descriptors';
@@ -23,6 +24,7 @@ export const backgroundOwnedRouteInventory = [
   aiSettingsQueryRouteDescriptor,
   aiSettingsMutationRouteDescriptor,
   aiSecretUnlockRouteDescriptor,
+  highlighterSettingsMutationRouteDescriptor,
   nativeAppRouteDescriptor,
   pageAccessRouteDescriptor,
   contentRuntimeWakeupRouteDescriptor,

@@ -10,8 +10,14 @@ import {
   createChromeStub,
   createChromeStubWithContextMenus,
 } from '@sniptale/platform/browser/test-fixtures';
+import {
+  installPersistenceLockManagerForTests,
+  runWithPersistenceDomainMutationLock,
+  type PersistenceLockManager,
+} from '../mutation-barrier';
 
 afterEach(() => {
+  installPersistenceLockManagerForTests(null);
   vi.unstubAllGlobals();
 });
 
@@ -64,6 +70,35 @@ describe('browser storage adapters', () => {
 
     expect(chromeStub.storage.onChanged.addListener).toHaveBeenCalledWith(listener);
     expect(chromeStub.storage.onChanged.removeListener).toHaveBeenCalledWith(listener);
+  });
+
+  it('reuses an active composite mutation permit without nesting the erasure lock', async () => {
+    const chromeStub = createChromeStub();
+    chromeStub.storage.sync.set.mockImplementation((_items: unknown, callback: () => void) =>
+      callback()
+    );
+    vi.stubGlobal('chrome', chromeStub);
+    const requestedLocks: string[] = [];
+    const lockManager: PersistenceLockManager = {
+      async request<T>(
+        name: string,
+        _options: { mode: 'exclusive' | 'shared' },
+        operation: () => T | Promise<T>
+      ): Promise<T> {
+        requestedLocks.push(name);
+        return operation();
+      },
+    };
+    installPersistenceLockManagerForTests(lockManager);
+
+    await runWithPersistenceDomainMutationLock('highlighter-settings', (permit) =>
+      browserStorage.sync.set({ demo: 42 }, permit)
+    );
+
+    expect(requestedLocks).toEqual([
+      'sniptale:persistence:privacy-erasure',
+      'sniptale:persistence:privacy-erasure:highlighter-settings',
+    ]);
   });
 });
 describe('browser downloads adapters', () => {

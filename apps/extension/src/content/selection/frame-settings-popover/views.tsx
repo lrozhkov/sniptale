@@ -14,7 +14,7 @@ import {
   ProductGlassSwitch,
   ProductGlassToggleRow,
 } from '@sniptale/ui/product-glass-controls';
-import { translate } from '../../../platform/i18n';
+import { translate, useAppLocale } from '../../../platform/i18n';
 import type {
   BlurSettings,
   BlurType,
@@ -24,6 +24,8 @@ import type {
   HighlighterSettings,
 } from '../../../features/highlighter/contracts';
 import { buildBlurTypeOptions, getBorderPresetPreviewStyle } from './helpers';
+import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
+import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
 
 function BlurTypeIcon(props: { iconName: 'droplet' | 'waves' | 'square' }) {
   if (props.iconName === 'droplet') {
@@ -85,25 +87,33 @@ function FrameBorderSection(props: {
   handleSelectPreset: (preset: BorderPreset) => void;
   selectedPresetId: string;
 }) {
+  const locale = useAppLocale();
   return (
     <ContentPopoverSection title={translate('content.overlayControls.frameStyleLabel')}>
       <ProductGlassPresetList>
-        {props.borderPresets.map((preset) => {
-          const isSelected = props.selectedPresetId === preset.id;
+        {props.borderPresets
+          .filter((preset) => preset.enabled !== false)
+          .map((preset) => {
+            const isSelected = props.selectedPresetId === preset.id;
 
-          return (
-            <ProductGlassPresetItem
-              key={preset.id}
-              onClick={() => props.handleSelectPreset(preset)}
-              active={isSelected}
-            >
-              <ProductGlassPresetPreview style={getBorderPresetPreviewStyle(preset)} />
-              <ProductGlassPresetMeta>
-                <ProductGlassPresetName>{preset.name}</ProductGlassPresetName>
-              </ProductGlassPresetMeta>
-            </ProductGlassPresetItem>
-          );
-        })}
+            return (
+              <ProductGlassPresetItem
+                key={preset.id}
+                onClick={(event) => {
+                  if (!createTrustedContentActionIntentSource(event.nativeEvent)) return;
+                  props.handleSelectPreset(preset);
+                }}
+                active={isSelected}
+              >
+                <ProductGlassPresetPreview style={getBorderPresetPreviewStyle(preset)} />
+                <ProductGlassPresetMeta>
+                  <ProductGlassPresetName>
+                    {getBorderPresetDisplayName(preset, locale)}
+                  </ProductGlassPresetName>
+                </ProductGlassPresetMeta>
+              </ProductGlassPresetItem>
+            );
+          })}
       </ProductGlassPresetList>
     </ContentPopoverSection>
   );

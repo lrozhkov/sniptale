@@ -9,6 +9,16 @@ import {
 } from '../shared/blur-controls';
 
 export const highlighterMessages = defineMessageSource({
+  systemPresets: {
+    accent: { ru: 'Акцент', en: 'Accent' },
+    softHighlight: { ru: 'Мягкое выделение', en: 'Soft highlight' },
+    marker: { ru: 'Маркер', en: 'Marker' },
+    done: { ru: 'Готово', en: 'Done' },
+    attention: { ru: 'Внимание', en: 'Attention' },
+    review: { ru: 'Ревью', en: 'Review' },
+    lightUi: { ru: 'Для светлого интерфейса', en: 'For light UI' },
+    darkUi: { ru: 'Для тёмного интерфейса', en: 'For dark UI' },
+  },
   section: {
     title: {
       ru: 'Режим выделения',
@@ -93,6 +103,18 @@ export const highlighterMessages = defineMessageSource({
     systemPresetDeleteDisabled: {
       ru: 'Системный пресет нельзя удалить',
       en: 'System preset cannot be deleted',
+    },
+    lastEnabledPresetDisabled: {
+      ru: 'Должен остаться хотя бы один включённый пресет',
+      en: 'At least one preset must remain enabled',
+    },
+    resetSystemPresetTitle: {
+      ru: 'Восстановить заводской вариант',
+      en: 'Restore factory preset',
+    },
+    presetReset: {
+      ru: 'Заводской вариант восстановлен',
+      en: 'Factory preset restored',
     },
     addButton: {
       ru: 'Добавить пресет',

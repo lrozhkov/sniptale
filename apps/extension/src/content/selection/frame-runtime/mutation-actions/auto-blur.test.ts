@@ -60,6 +60,7 @@ function createHandlerScenario() {
         defaultBlurSettings: createBlurSettingsFixture(),
         defaultBorderPresetId: 'preset-1',
         defaultEffectMode: 'border',
+        systemPresetCatalogRevision: 1,
         defaultFocusSettings: createFocusSettingsFixture(),
       },
     },

@@ -1,6 +1,6 @@
 import type { BlurSettings } from '../../../features/highlighter/contracts';
 import { isStringLiteralValue } from '@sniptale/runtime-contracts/validation/string-literals';
-import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
+import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 import { isBlurStrokeStyle } from './blur-stroke-style';
 
 type ParsedBlurSettings = {
@@ -29,7 +29,7 @@ export function parseDefaultBlurSettings(value: unknown): ParsedBlurSettings {
     return { invalidFieldCount: 0, migratedLegacyBlurFormat: false };
   }
 
-  if (!isRecord(value)) {
+  if (!isPlainRecord(value)) {
     return { invalidFieldCount: 1, migratedLegacyBlurFormat: false };
   }
 

@@ -8,7 +8,6 @@ import { appendToContentOverlayRoot, queryAllContentUiElements } from '../../pla
 import { applyIsolatedContentRootStyle } from '../../platform/dom-host/isolated';
 import {
   colorToRgba,
-  percentToUnit,
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../features/highlighter/style';
@@ -22,6 +21,16 @@ import {
 } from './session';
 
 const logger = createLogger({ namespace: 'ContentHighlighter:HoverPreview' });
+
+function getHoverPreviewTransition(): string {
+  if (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    return 'none';
+  }
+  return 'opacity 0.2s ease-out, top 0.15s ease-out, left 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out';
+}
 
 export type HoverOverlayActions = {
   createHoverOverlay: () => void;
@@ -82,13 +91,8 @@ export function ensureHoverOverlay(session: HoverDomSession, preset: BorderPrese
     margin: 0;
     padding: 0;
     pointer-events: none;
-    opacity: ${Math.min(0.6, percentToUnit(visual.strokeOpacity))};
-    transition:
-      opacity 0.2s ease-out,
-      top 0.15s ease-out,
-      left 0.15s ease-out,
-      width 0.15s ease-out,
-      height 0.15s ease-out;
+    opacity: 0.72;
+    transition: ${getHoverPreviewTransition()};
     z-index: 2147483645;
     box-shadow: ${resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none'};
     background-color: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
@@ -135,7 +139,7 @@ export function showHoverOverlay(
   hoverOverlay.style.borderStyle = visual.strokeStyle;
   hoverOverlay.style.borderColor = colorToRgba(visual.strokeColor, visual.strokeOpacity);
   hoverOverlay.style.borderRadius = `${visual.radius}px`;
-  hoverOverlay.style.opacity = String(Math.min(0.6, percentToUnit(visual.strokeOpacity)));
+  hoverOverlay.style.opacity = '0.72';
   hoverOverlay.style.boxShadow =
     resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none';
   hoverOverlay.style.backgroundColor = colorToRgba(visual.fillColor, visual.fillOpacity);

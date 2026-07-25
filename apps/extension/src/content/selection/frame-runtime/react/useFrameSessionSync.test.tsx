@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS: HighlighterSettings = {
   defaultBlurSettings: { amount: 8, blurType: 'gaussian', showBorder: true },
   defaultBorderPresetId: 'preset-1',
   defaultEffectMode: 'border',
+  systemPresetCatalogRevision: 1,
   defaultFocusSettings: { opacity: 0.5, showBorder: false },
 };
 

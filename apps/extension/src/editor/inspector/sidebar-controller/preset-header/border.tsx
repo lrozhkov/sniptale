@@ -1,8 +1,8 @@
 import type { EditorShapeSettings } from '../../../../features/editor/document/types';
-import { getEditorPresetDisplayName } from '../../../../features/editor/presets/display';
 import { sanitizeEditorShapeComparableSettings } from '../../../../features/editor/presets/settings';
 import { projectBorderPresetToEditorShapeSettings } from '../../../../features/editor/document/public';
 import type { BorderPreset } from '../../../../features/highlighter/contracts';
+import { getBorderPresetDisplayName } from '../../../../features/highlighter/presets/display-name';
 import type {
   EditorInspectorPresetHeaderState,
   EditorInspectorTemplateCardState,
@@ -37,10 +37,10 @@ function buildBorderTemplateCards(args: {
 }): EditorInspectorTemplateCardState[] {
   return args.enabledPresets.map((preset) => ({
     id: preset.id,
-    label: getEditorPresetDisplayName(preset),
+    label: getBorderPresetDisplayName(preset),
     preview: renderBorderPresetPreview(preset),
     selected: preset.id === args.selectedPresetId,
-    ...(preset.isSystemDefault ? { system: true } : {}),
+    ...(preset.origin === 'system' ? { system: true } : {}),
     onApply: createBorderPresetApplyHandler({
       applySettings: args.applySettings,
       closeSavePanel: args.closeSavePanel,
@@ -72,7 +72,7 @@ function useBorderPresetHeaderModel(args: {
   });
   const saveDraft = usePresetSaveDraft(
     getPresetBaseName('rectangle'),
-    args.borderPresets.map((preset) => preset.name)
+    args.borderPresets.map((preset) => getBorderPresetDisplayName(preset))
   );
   const { viewMode, setViewMode } = useEditorInspectorTemplateViewMode('rectangle');
   const savePanel = saveDraft.savePanelOpen

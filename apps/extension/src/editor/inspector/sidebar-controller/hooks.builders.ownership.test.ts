@@ -4,6 +4,7 @@ import {
   DEFAULT_EDITOR_WORKSPACE_SETTINGS,
 } from '../../../features/editor/document/constants';
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
+import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { createInspectorCommandParams } from '../../../../../../tooling/test/harness/editor/ownership/fixtures';
 
 const saveEditorRenderedImageMock = vi.hoisted(() => vi.fn(async () => undefined));
@@ -117,7 +118,7 @@ it('resolves tool targets and utility actions without a global singleton', async
 
   expectSelectionTargets(targetArgs);
   expect(helpers.buildBorderPresetOptions([DEFAULT_BORDER_PRESET])).toEqual([
-    { label: DEFAULT_BORDER_PRESET.name, value: DEFAULT_BORDER_PRESET.id },
+    { label: getBorderPresetDisplayName(DEFAULT_BORDER_PRESET), value: DEFAULT_BORDER_PRESET.id },
   ]);
 
   const staticOptions = helpers.createStaticSidebarOptions();

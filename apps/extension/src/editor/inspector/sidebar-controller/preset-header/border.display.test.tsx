@@ -28,6 +28,16 @@ vi.mock('../../presets/preview', async (importOriginal) => ({
   renderBorderPresetPreview: () => <span data-testid="preview" />,
 }));
 
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+  translate: (key: string) =>
+    ({
+      'editor.tools.rectangle': 'Прямоугольник',
+      'editor.scene.sceneBackgroundTitle': 'Фон сцены',
+      'editor.compact.shapePresetFallback': 'Пресет',
+    })[key] ?? key,
+}));
+
 import { useBorderPresetHeader } from './border';
 import {
   getPresetSavePanelControls,
@@ -55,6 +65,9 @@ function Harness() {
         order: 0,
         enabled: true,
         isSystemDefault: true,
+        origin: 'system',
+        systemPresetKey: 'system-default',
+        customized: false,
         color: '#111111',
         width: 4,
         style: 'solid',
@@ -181,11 +194,11 @@ function expectSceneBackgroundSnapshot() {
 }
 
 describe('useBorderPresetHeader display labels', () => {
-  it('projects the generic editor system label for rectangle templates', async () => {
+  it('projects the localized highlighter system label for rectangle templates', async () => {
     await renderBorderHarness();
 
     expect(latestState?.templates.map((template) => template.label)).toEqual([
-      'shared.defaults.defaultEditorPresetName',
+      'highlighter.systemPresets.accent',
     ]);
     expect(latestState?.groups?.map((group) => [group.id, group.templates.length])).toEqual([
       ['system', 1],

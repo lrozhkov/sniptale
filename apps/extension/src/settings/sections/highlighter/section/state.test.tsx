@@ -71,6 +71,7 @@ function createSettings(): HighlighterSettings {
     ],
     defaultBorderPresetId: 'preset-1',
     defaultEffectMode: 'border',
+    systemPresetCatalogRevision: 1,
     defaultBlurSettings: {
       amount: 4,
       blurType: 'gaussian',

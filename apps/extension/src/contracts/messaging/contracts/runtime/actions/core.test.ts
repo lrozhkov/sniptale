@@ -14,6 +14,8 @@ const runtimeTokenContract =
   runtimeActionCoreMessageContracts[MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_RUNTIME_TOKEN];
 const contentRuntimeWakeupContract =
   runtimeActionCoreMessageContracts[MessageType.CONTENT_RUNTIME_WAKEUP];
+const highlighterSettingsMutationContract =
+  runtimeActionCoreMessageContracts[MessageType.HIGHLIGHTER_SETTINGS_MUTATION];
 const offscreenPageStorageContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE];
 
@@ -127,6 +129,27 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
       reason: 'other',
       restored: true,
       success: true,
+    })
+  ).toThrow();
+});
+
+it('parses only the bounded highlighter default mutation contract', () => {
+  expect(
+    highlighterSettingsMutationContract.parseRequest({
+      operation: 'set-default-border-preset',
+      presetId: 'system-marker',
+      type: MessageType.HIGHLIGHTER_SETTINGS_MUTATION,
+    })
+  ).toEqual({
+    operation: 'set-default-border-preset',
+    presetId: 'system-marker',
+    type: MessageType.HIGHLIGHTER_SETTINGS_MUTATION,
+  });
+  expect(() =>
+    highlighterSettingsMutationContract.parseRequest({
+      operation: 'replace-catalog',
+      presetId: 'system-marker',
+      type: MessageType.HIGHLIGHTER_SETTINGS_MUTATION,
     })
   ).toThrow();
 });

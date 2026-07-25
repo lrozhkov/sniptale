@@ -115,6 +115,7 @@ function createSettings(overrides: Partial<HighlighterSettings> = {}): Highlight
     borderPresets: overrides.borderPresets ?? [createPreset()],
     defaultBorderPresetId: overrides.defaultBorderPresetId ?? 'preset-1',
     defaultEffectMode: overrides.defaultEffectMode ?? 'border',
+    systemPresetCatalogRevision: overrides.systemPresetCatalogRevision ?? 1,
     defaultBlurSettings: overrides.defaultBlurSettings ?? {
       amount: 4,
       blurType: 'gaussian',

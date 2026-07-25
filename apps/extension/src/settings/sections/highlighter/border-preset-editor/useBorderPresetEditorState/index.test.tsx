@@ -8,6 +8,7 @@ import { useBorderPresetEditorState, type BorderPresetEditorProps } from '.';
 
 vi.mock('../../../../../platform/i18n', () => ({
   translate: (key: string) => key,
+  useAppLocale: () => 'en',
 }));
 
 type EditorState = ReturnType<typeof useBorderPresetEditorState>;

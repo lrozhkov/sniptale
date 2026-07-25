@@ -33,6 +33,7 @@ function renderContent(effectMode: EffectMode) {
         borderPresets: [createBorderPreset('preset-1', 'Default')],
         defaultBorderPresetId: 'preset-1',
         defaultEffectMode: 'border',
+        systemPresetCatalogRevision: 1,
         defaultBlurSettings: { amount: 12, blurType: 'distortion', showBorder: true },
         defaultFocusSettings: { opacity: 0.65, showBorder: true },
       }}

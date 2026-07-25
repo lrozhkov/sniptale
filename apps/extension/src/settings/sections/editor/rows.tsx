@@ -5,6 +5,7 @@ import {
   renderEditorPresetPreview,
 } from '../../../features/editor/presets/preview';
 import { getEditorPresetDisplayName } from '../../../features/editor/presets/display';
+import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import {
@@ -106,6 +107,14 @@ function PresetActions(props: {
   state: EditorSectionState;
 }) {
   const { preset, state } = props;
+  const isSystem =
+    state.presetOwner === 'rectangle'
+      ? isRectanglePreset(preset, state.presetOwner) && preset.origin === 'system'
+      : preset.isSystemDefault === true;
+  const isLastEnabledRectanglePreset =
+    state.presetOwner === 'rectangle' &&
+    preset.enabled !== false &&
+    state.currentPresets.filter((item) => item.enabled !== false).length <= 1;
 
   return (
     <div className={getSettingsHoverActionsClassName(true)}>
@@ -113,11 +122,13 @@ function PresetActions(props: {
         checked={preset.enabled !== false}
         size="sm"
         title={
-          preset.enabled === false
-            ? translate('savePresets.section.toggleShownTitle')
-            : translate('savePresets.section.toggleHiddenTitle')
+          isLastEnabledRectanglePreset
+            ? translate('highlighter.section.lastEnabledPresetDisabled')
+            : preset.enabled === false
+              ? translate('savePresets.section.toggleShownTitle')
+              : translate('savePresets.section.toggleHiddenTitle')
         }
-        disabled={preset.isSystemDefault}
+        disabled={state.presetOwner === 'rectangle' ? isLastEnabledRectanglePreset : isSystem}
         onClick={() => void state.handleTogglePresetEnabled(preset.id, preset.enabled === false)}
       />
       <button
@@ -129,29 +140,43 @@ function PresetActions(props: {
       >
         <Check size={14} />
       </button>
-      <button
-        type="button"
-        className={settingsDangerIconButtonClassName}
-        title={translate('common.actions.delete')}
-        disabled={preset.isSystemDefault}
-        onClick={() => void state.handleDeletePreset(preset.id)}
-      >
-        <Trash2 size={14} />
-      </button>
+      {!isSystem ? (
+        <button
+          type="button"
+          className={settingsDangerIconButtonClassName}
+          title={translate('common.actions.delete')}
+          onClick={() => void state.handleDeletePreset(preset.id)}
+        >
+          <Trash2 size={14} />
+        </button>
+      ) : null}
     </div>
   );
 }
 
-function renderPresetName(preset: EditorSectionState['currentPresets'][number]) {
+function getSettingsPresetDisplayName(
+  preset: EditorSectionState['currentPresets'][number],
+  presetOwner: EditorSectionState['presetOwner']
+) {
+  return isRectanglePreset(preset, presetOwner)
+    ? getBorderPresetDisplayName(preset)
+    : getEditorPresetDisplayName(preset);
+}
+
+function renderPresetName(
+  preset: EditorSectionState['currentPresets'][number],
+  presetOwner: EditorSectionState['presetOwner']
+) {
+  const displayName = getSettingsPresetDisplayName(preset, presetOwner);
   return (
     <div
-      title={getEditorPresetDisplayName(preset)}
+      title={displayName}
       className={[
         'line-clamp-2 break-words text-sm font-medium leading-5',
         'text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
     >
-      {getEditorPresetDisplayName(preset)}
+      {displayName}
     </div>
   );
 }
@@ -213,8 +238,15 @@ export function PresetRow(props: {
           <PresetPreview preset={props.preset} presetOwner={props.state.presetOwner} />
         </span>
         <div className="min-w-0 flex-1">
-          {renderPresetName(props.preset)}
-          <SystemBadges isDefault={isDefault} isSystemDefault={props.preset.isSystemDefault} />
+          {renderPresetName(props.preset, props.state.presetOwner)}
+          <SystemBadges
+            isDefault={isDefault}
+            isSystemDefault={
+              isRectanglePreset(props.preset, props.state.presetOwner)
+                ? props.preset.origin === 'system'
+                : props.preset.isSystemDefault
+            }
+          />
         </div>
       </div>
       <div className="shrink-0">

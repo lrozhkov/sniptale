@@ -2,6 +2,7 @@ import type { EditorShapeSettings } from '../../../features/editor/document/type
 import { translate } from '../../../platform/i18n';
 import { DEFAULT_BORDER_PRESET } from '../../../composition/persistence/highlighter';
 import type { BorderPreset } from '../../../features/highlighter/contracts';
+import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 
 function clampPercentUnit(value: number | undefined, fallback: number): number {
   const unit = typeof value === 'number' ? value : fallback;
@@ -11,7 +12,7 @@ function clampPercentUnit(value: number | undefined, fallback: number): number {
 function createRectanglePresetName(borderPresets: BorderPreset[]): string {
   const baseName = translate('editor.tools.rectangle');
   let index = 1;
-  const presetNames = new Set(borderPresets.map((preset) => preset.name));
+  const presetNames = new Set(borderPresets.map((preset) => getBorderPresetDisplayName(preset)));
 
   while (presetNames.has(`${baseName} ${index}`)) {
     index++;
@@ -46,5 +47,6 @@ export function createBorderPresetFromShapeSettings(
     fillOpacity: clampPercentUnit(shapeSettings.fillOpacity, shapeSettings.opacity),
     inheritCustomCss: false,
     customCss: '',
+    origin: 'user',
   };
 }

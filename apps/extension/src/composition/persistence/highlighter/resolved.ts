@@ -6,12 +6,12 @@ import type {
   HighlighterSettings,
 } from '../../../features/highlighter/contracts';
 import {
-  createDefaultHighlighterSettings,
   DEFAULT_BLUR_SETTINGS,
   DEFAULT_BORDER_PRESET,
   DEFAULT_FOCUS_SETTINGS,
   DEFAULT_HIGHLIGHTER_SETTINGS,
 } from '../../../features/highlighter/style/defaults';
+import { normalizeHighlighterCatalogState } from './catalog-migration';
 
 export function warnAboutInvalidStoredSettings(args: {
   hasInvalidRoot: boolean;
@@ -48,23 +48,19 @@ export function resolveDefaultBorderPresetId(
     return defaultBorderPresetId;
   }
 
-  return borderPresets.find((preset) => preset.enabled !== false)?.id ?? DEFAULT_BORDER_PRESET.id;
+  return (
+    [...borderPresets]
+      .filter((preset) => preset.enabled !== false)
+      .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))[0]?.id ??
+    DEFAULT_BORDER_PRESET.id
+  );
 }
 
 function cloneBorderPreset(preset: BorderPreset): BorderPreset {
   return {
     ...preset,
     padding: { ...preset.padding },
-    ...(preset.isSystemDefault && preset.enabled === false ? { enabled: true } : {}),
   };
-}
-
-function normalizeLoadedBorderPresets(
-  borderPresets: BorderPreset[] | undefined,
-  fallback: BorderPreset[]
-): BorderPreset[] {
-  const presets = borderPresets && borderPresets.length > 0 ? borderPresets : fallback;
-  return presets.map(cloneBorderPreset);
 }
 
 export function reorderBorderPresets(
@@ -97,20 +93,24 @@ export function resolveLoadedHighlighterSettings(
     defaultBlurSettings?: Partial<BlurSettings> | undefined;
     defaultEffectMode?: EffectMode | undefined;
     defaultFocusSettings?: Partial<FocusSettings> | undefined;
+    systemPresetCatalogRevision?: number | undefined;
+    catalogCustomized?: boolean | undefined;
   }
 ): HighlighterSettings {
-  const defaultSettings = createDefaultHighlighterSettings();
-  const normalizedBorderPresets = normalizeLoadedBorderPresets(
-    borderPresets,
-    defaultSettings.borderPresets
-  );
+  const catalogState = normalizeHighlighterCatalogState({
+    ...(borderPresets === undefined ? {} : { borderPresets: borderPresets.map(cloneBorderPreset) }),
+    ...(defaultBorderPresetId === undefined ? {} : { defaultBorderPresetId }),
+    ...(value.systemPresetCatalogRevision === undefined
+      ? {}
+      : { systemPresetCatalogRevision: value.systemPresetCatalogRevision }),
+    ...(value.catalogCustomized === undefined
+      ? {}
+      : { catalogCustomized: value.catalogCustomized }),
+  });
 
   return {
-    borderPresets: normalizedBorderPresets,
-    defaultBorderPresetId: resolveDefaultBorderPresetId(
-      normalizedBorderPresets,
-      defaultBorderPresetId
-    ),
+    borderPresets: catalogState.borderPresets,
+    defaultBorderPresetId: catalogState.defaultBorderPresetId,
     defaultEffectMode: value.defaultEffectMode ?? DEFAULT_HIGHLIGHTER_SETTINGS.defaultEffectMode,
     defaultBlurSettings: {
       ...DEFAULT_BLUR_SETTINGS,
@@ -120,5 +120,7 @@ export function resolveLoadedHighlighterSettings(
       ...DEFAULT_FOCUS_SETTINGS,
       ...value.defaultFocusSettings,
     },
+    systemPresetCatalogRevision: catalogState.systemPresetCatalogRevision,
+    catalogCustomized: catalogState.catalogCustomized,
   };
 }

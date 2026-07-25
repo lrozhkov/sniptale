@@ -1,5 +1,6 @@
 import { browserStorage } from '../infrastructure/browser-storage';
 import type { HighlighterSettings } from '../../../features/highlighter/contracts';
+import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 
 export function cloneHighlighterSettings(settings: HighlighterSettings): HighlighterSettings {
   return {
@@ -29,9 +30,12 @@ export function createHighlighterWriteController(args: {
     return operation;
   };
 
-  const writeSettings = async (settings: HighlighterSettings): Promise<void> => {
+  const writeSettings = async (
+    settings: HighlighterSettings,
+    permit: PersistenceMutationPermit
+  ): Promise<void> => {
     const persistedSettings = cloneHighlighterSettings(settings);
-    await browserStorage.sync.set({ [args.storageKey]: persistedSettings });
+    await browserStorage.sync.set({ [args.storageKey]: persistedSettings }, permit);
     args.cacheSettings(persistedSettings);
     args.logger.debug('Saved highlighter settings');
   };

@@ -8,7 +8,6 @@ import {
 import { resolvePagePreparationTarget } from '../../parser/page-preparation/target';
 import {
   colorToRgba,
-  percentToUnit,
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../features/highlighter/style';
@@ -88,7 +87,7 @@ function ensurePreview(session: HoverSession): HTMLElement {
     )};
     border-radius: ${visual.radius}px;
     background: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
-    opacity: ${Math.min(0.78, percentToUnit(visual.strokeOpacity))};
+    opacity: 0.88;
     box-shadow: ${resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none'};
   `;
   Object.assign(preview.style, visual.customCssStyles);

@@ -1,6 +1,7 @@
 import { ensurePersistentStorage } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { cleanupOldRecordings } from '../../../../composition/persistence/recordings/index';
 import { initializeAiStorageAccess } from '../../../../composition/persistence/ai-settings/init';
+import { migrateHighlighterSystemPresetCatalog } from '../../../../composition/persistence/highlighter';
 import { cleanupExpiredProjectExportInputs } from '../../../../composition/persistence/project-export-inputs';
 import {
   cleanupCapture,
@@ -50,6 +51,10 @@ export function runStartupMaintenance(
 
   initializeAiStorageAccess().catch((error) => {
     logger.warn('AI storage initialization failed (non-critical)', error);
+  });
+
+  migrateHighlighterSystemPresetCatalog().catch((error) => {
+    logger.warn('Highlighter preset catalog migration failed (non-critical)', error);
   });
 
   resetVideoRecordingRuntimeState();

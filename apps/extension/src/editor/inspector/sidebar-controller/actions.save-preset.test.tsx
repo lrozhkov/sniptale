@@ -157,4 +157,20 @@ describe('editor sidebar save shape as highlighter preset', () => {
     expect(updateSelectionShapeSettings).not.toHaveBeenCalled();
     expect(mocks.toastErrorMock).toHaveBeenCalledOnce();
   });
+
+  it('does not mutate local editor state when the owner returns a rejected outcome', async () => {
+    const mocks = getEditorInspectorOwnershipMocks();
+    const updateSelectionShapeSettings = vi.fn();
+    Reflect.apply(mocks.addBorderPresetMock.mockResolvedValueOnce, mocks.addBorderPresetMock, [
+      false,
+    ]);
+
+    const actions = await renderSavePresetActions({ updateSelectionShapeSettings });
+
+    await actions.saveShapeAsHighlighterPreset();
+
+    expect(appendBorderPresetMock).not.toHaveBeenCalled();
+    expect(updateSelectionShapeSettings).not.toHaveBeenCalled();
+    expect(mocks.toastErrorMock).toHaveBeenCalledOnce();
+  });
 });

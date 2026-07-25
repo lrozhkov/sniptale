@@ -1,29 +1,13 @@
 import type { BlurSettings, BorderPreset, FocusSettings, HighlighterSettings } from '../contracts';
-import { DEFAULT_COLOR_ACCENT } from '@sniptale/ui/default-colors/constants';
-import { translate } from '../../../platform/i18n';
+import {
+  createSystemBorderPresetCatalog,
+  SYSTEM_BORDER_PRESET_CATALOG_REVISION,
+} from '../presets/catalog';
 
 /**
  * Дефолтный пресет рамки (системный, нельзя удалить)
  */
-export const DEFAULT_BORDER_PRESET: BorderPreset = {
-  id: 'system-default',
-  name: translate('shared.defaults.defaultBorderPresetName'),
-  isSystemDefault: true,
-  enabled: true,
-  order: 0,
-  width: 3,
-  color: DEFAULT_COLOR_ACCENT,
-  style: 'solid',
-  radius: 0,
-  padding: { top: 3, left: 3, right: 3, bottom: 3 },
-  shadow: 0,
-  opacity: 100,
-  strokeOpacity: 100,
-  fillColor: '#00000000',
-  fillOpacity: 0,
-  inheritCustomCss: false,
-  customCss: '',
-};
+export const DEFAULT_BORDER_PRESET: BorderPreset = createSystemBorderPresetCatalog()[0]!;
 
 /**
  * Дефолтные настройки blur
@@ -53,26 +37,23 @@ export const DEFAULT_FOCUS_SETTINGS: FocusSettings = {
  * Дефолтные настройки режима выделения
  */
 export const DEFAULT_HIGHLIGHTER_SETTINGS: HighlighterSettings = {
-  borderPresets: [DEFAULT_BORDER_PRESET],
+  borderPresets: createSystemBorderPresetCatalog(),
   defaultBorderPresetId: DEFAULT_BORDER_PRESET.id,
   defaultEffectMode: 'border',
   defaultBlurSettings: DEFAULT_BLUR_SETTINGS,
   defaultFocusSettings: DEFAULT_FOCUS_SETTINGS,
+  systemPresetCatalogRevision: SYSTEM_BORDER_PRESET_CATALOG_REVISION,
+  catalogCustomized: false,
 };
-
-function cloneDefaultBorderPreset(): BorderPreset {
-  return {
-    ...DEFAULT_BORDER_PRESET,
-    padding: { ...DEFAULT_BORDER_PRESET.padding },
-  };
-}
 
 export function createDefaultHighlighterSettings(): HighlighterSettings {
   return {
-    borderPresets: [cloneDefaultBorderPreset()],
+    borderPresets: createSystemBorderPresetCatalog(),
     defaultBorderPresetId: DEFAULT_BORDER_PRESET.id,
     defaultEffectMode: DEFAULT_HIGHLIGHTER_SETTINGS.defaultEffectMode,
     defaultBlurSettings: { ...DEFAULT_BLUR_SETTINGS },
     defaultFocusSettings: { ...DEFAULT_FOCUS_SETTINGS },
+    systemPresetCatalogRevision: SYSTEM_BORDER_PRESET_CATALOG_REVISION,
+    catalogCustomized: false,
   };
 }

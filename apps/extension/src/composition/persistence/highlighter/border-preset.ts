@@ -3,13 +3,18 @@ import {
   coerceBorderShadowIntensity,
   normalizeBorderPresetVisualFields,
 } from '@sniptale/ui/highlighter-style/normalize';
-import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
+import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
+import { isSystemBorderPresetKey } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 const borderStyles = new Set<BorderPreset['style']>(['solid', 'dashed', 'dotted']);
 
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNumber(value) && Number.isInteger(value) && value >= 0;
+}
+
 function isBorderPadding(value: unknown): value is BorderPadding {
   return (
-    isRecord(value) &&
+    isPlainRecord(value) &&
     isNumber(value['top']) &&
     isNumber(value['left']) &&
     isNumber(value['right']) &&
@@ -19,11 +24,15 @@ function isBorderPadding(value: unknown): value is BorderPadding {
 
 function parseBorderPreset(value: unknown): BorderPreset | null {
   if (
-    !isRecord(value) ||
+    !isPlainRecord(value) ||
     !isString(value['id']) ||
     !isString(value['name']) ||
     (value['isSystemDefault'] !== undefined && !isBoolean(value['isSystemDefault'])) ||
     (value['enabled'] !== undefined && !isBoolean(value['enabled'])) ||
+    (value['origin'] !== undefined && value['origin'] !== 'system' && value['origin'] !== 'user') ||
+    (value['systemPresetKey'] !== undefined &&
+      !isSystemBorderPresetKey(value['systemPresetKey'])) ||
+    (value['customized'] !== undefined && !isBoolean(value['customized'])) ||
     !isNumber(value['order']) ||
     !isNumber(value['width']) ||
     !isString(value['color']) ||
@@ -65,6 +74,14 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     ...(value['isSystemDefault'] === undefined
       ? {}
       : { isSystemDefault: value['isSystemDefault'] }),
+    ...(value['origin'] === undefined ? {} : { origin: value['origin'] as 'system' | 'user' }),
+    ...(value['systemPresetKey'] === undefined
+      ? {}
+      : { systemPresetKey: value['systemPresetKey'] }),
+    ...(!isNonNegativeInteger(value['basedOnRevision'])
+      ? {}
+      : { basedOnRevision: value['basedOnRevision'] }),
+    ...(value['customized'] === undefined ? {} : { customized: value['customized'] }),
   });
 }
 
@@ -86,6 +103,15 @@ export function parseBorderPresetsFromStorage(value: unknown): {
 
   return {
     borderPresets,
-    invalidFieldCount: value.length - borderPresets.length,
+    invalidFieldCount:
+      value.length - borderPresets.length + value.filter(hasInvalidBasedOnRevision).length,
   };
+}
+
+function hasInvalidBasedOnRevision(value: unknown): boolean {
+  return (
+    isPlainRecord(value) &&
+    value['basedOnRevision'] !== undefined &&
+    !isNonNegativeInteger(value['basedOnRevision'])
+  );
 }

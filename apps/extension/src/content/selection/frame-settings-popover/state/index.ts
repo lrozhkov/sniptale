@@ -3,13 +3,14 @@ import type {
   BorderPreset,
   FocusSettings,
 } from '../../../../features/highlighter/contracts';
-import { setDefaultBorderPreset } from '../../../../composition/persistence/highlighter';
 import {
   createFrameBlurHandlers,
   createFrameFocusHandlers,
   createFrameSettingsPresetHandler,
 } from './helpers';
 import { useFrameSettingsPopoverLifecycle } from './lifecycle';
+import { requestDefaultBorderPresetMutation } from './highlighter-settings-mutation';
+import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 
 type FrameSettingsPopoverStateArgs = {
   blurSettings?: BlurSettings;
@@ -34,7 +35,8 @@ export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs
   });
   const handleSelectPreset = createFrameSettingsPresetHandler({
     onApplyToFrame: args.onApplyToFrame,
-    setDefaultBorderPreset,
+    setDefaultBorderPreset: (presetId) =>
+      requestDefaultBorderPresetMutation(getContentRuntimeServices().messaging, presetId),
     setSelectedPresetId: session.selectPreset,
   });
   const blurHandlers = createFrameBlurHandlers({

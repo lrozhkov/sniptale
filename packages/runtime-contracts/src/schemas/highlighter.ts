@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SYSTEM_BORDER_PRESET_KEYS } from '../highlighter/border-preset';
 
 export const BorderPaddingSchema = z.object({
   top: z.number().int().min(0).max(50),
@@ -16,6 +17,7 @@ export const BorderPresetSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(50),
   isSystemDefault: z.boolean().optional(),
+  enabled: z.boolean().optional(),
   order: z.number().int().min(0),
   width: z.number().int().min(1).max(20),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
@@ -29,6 +31,10 @@ export const BorderPresetSchema = z.object({
   fillOpacity: z.number().int().min(0).max(100),
   inheritCustomCss: z.boolean(),
   customCss: z.string().max(1000),
+  origin: z.enum(['system', 'user']).optional(),
+  systemPresetKey: z.enum(SYSTEM_BORDER_PRESET_KEYS).optional(),
+  basedOnRevision: z.number().int().min(0).optional(),
+  customized: z.boolean().optional(),
 });
 
 export const BlurSettingsSchema = z.object({
@@ -60,6 +66,8 @@ export const HighlighterSettingsSchema = z.object({
   defaultEffectMode: z.enum(['border', 'blur', 'focus']),
   defaultBlurSettings: BlurSettingsSchema,
   defaultFocusSettings: FocusSettingsSchema,
+  systemPresetCatalogRevision: z.number().int().min(0),
+  catalogCustomized: z.boolean().optional(),
 });
 
 export type BorderPaddingSchemaType = z.infer<typeof BorderPaddingSchema>;

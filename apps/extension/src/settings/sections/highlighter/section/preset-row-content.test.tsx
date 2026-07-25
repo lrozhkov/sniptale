@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../platform/i18n', () => ({
   translate: (key: string) => key,
+  useAppLocale: () => 'en',
 }));
 
 import { HighlighterPresetRowContent } from './preset-row-content';

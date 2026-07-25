@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_EDITOR_TOOL_SETTINGS } from '../../../../features/editor/document/constants';
+import type { EditorShapeSettings } from '../../../../features/editor/document/types';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
+
+type TestMutationOutcome = 'applied' | 'rejected' | 'unchanged';
 
 const storageMocks = vi.hoisted(() => ({
-  addBorderPreset: vi.fn(async () => undefined),
-  updateBorderPreset: vi.fn(async () => undefined),
+  addBorderPresetWithOutcome: vi.fn(async (): Promise<TestMutationOutcome> => 'applied'),
+  updateBorderPresetWithOutcome: vi.fn(async (): Promise<TestMutationOutcome> => 'applied'),
 }));
 
 const toastErrorMock = vi.hoisted(() => vi.fn());
@@ -47,10 +52,17 @@ vi.mock('../border-preset', () => ({
 
 import { buildBorderPresetSavePanel } from './border-save';
 
+function createShapeSettings(overrides: Partial<EditorShapeSettings> = {}): EditorShapeSettings {
+  return {
+    ...DEFAULT_EDITOR_TOOL_SETTINGS(DEFAULT_BORDER_PRESET).rectangle,
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  storageMocks.addBorderPreset.mockResolvedValue(undefined);
-  storageMocks.updateBorderPreset.mockResolvedValue(undefined);
+  storageMocks.addBorderPresetWithOutcome.mockResolvedValue('applied');
+  storageMocks.updateBorderPresetWithOutcome.mockResolvedValue('applied');
 });
 
 describe('buildBorderPresetSavePanel', () => {
@@ -120,7 +132,7 @@ describe('buildBorderPresetSavePanel', () => {
     await Promise.resolve();
 
     expect(panel.overwriteOptions.map((option) => option.value)).toEqual(['border-1']);
-    expect(storageMocks.updateBorderPreset).toHaveBeenCalledWith(
+    expect(storageMocks.updateBorderPresetWithOutcome).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'border-1',
         name: 'Preset',
@@ -145,11 +157,11 @@ describe('buildBorderPresetSavePanel', () => {
 
   it('creates a new border preset and surfaces save failures', async () => {
     const setSelectedPresetId = vi.fn();
-    storageMocks.addBorderPreset.mockRejectedValueOnce(new Error('failed'));
+    storageMocks.addBorderPresetWithOutcome.mockRejectedValueOnce(new Error('failed'));
     const closeSavePanel = vi.fn();
     const panel = buildBorderPresetSavePanel({
       borderPresets: [],
-      currentSettings: { strokeColor: '#abcdef' } as never,
+      currentSettings: createShapeSettings({ strokeColor: '#abcdef' }),
       markClean: vi.fn(),
       saveDraft: {
         closeSavePanel,
@@ -170,7 +182,7 @@ describe('buildBorderPresetSavePanel', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(storageMocks.addBorderPreset).toHaveBeenCalledWith(
+    expect(storageMocks.addBorderPresetWithOutcome).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'generated',
         name: 'Fresh border',
@@ -219,5 +231,38 @@ describe('buildBorderPresetSavePanel', () => {
       }),
       'generated'
     );
+  });
+
+  it('does not advance editor state when the preset owner rejects the target', async () => {
+    const closeSavePanel = vi.fn();
+    const markClean = vi.fn();
+    const setSelectedPresetId = vi.fn();
+    storageMocks.addBorderPresetWithOutcome.mockResolvedValueOnce('rejected');
+    const panel = buildBorderPresetSavePanel({
+      borderPresets: [],
+      currentSettings: createShapeSettings({ strokeColor: '#abcdef' }),
+      markClean,
+      saveDraft: {
+        closeSavePanel,
+        openSavePanel: vi.fn(),
+        overwriteTargetId: '',
+        saveMode: 'create',
+        saveName: 'Rejected border',
+        savePanelOpen: true,
+        setOverwriteTargetId: vi.fn(),
+        setSaveMode: vi.fn(),
+        setSaveName: vi.fn(),
+      },
+      setSelectedPresetId,
+    });
+
+    panel.onSave();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(setSelectedPresetId).not.toHaveBeenCalled();
+    expect(markClean).not.toHaveBeenCalled();
+    expect(closeSavePanel).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith('common.states.error');
   });
 });

@@ -1,42 +1,30 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import type { BorderPreset, HighlighterSettings } from '../../../../features/highlighter/contracts';
+import { createDefaultHighlighterSettings } from '../../../../features/highlighter/style/defaults';
 import { createHighlighterSettingsActions } from './persistence-actions';
 
-const {
-  loadHighlighterSettingsMock,
-  loggerErrorMock,
-  saveHighlighterSettingsMock,
-  toastErrorMock,
-  toastSuccessMock,
-} = vi.hoisted(() => ({
-  loadHighlighterSettingsMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
-  saveHighlighterSettingsMock: vi.fn(),
-  toastErrorMock: vi.fn(),
-  toastSuccessMock: vi.fn(),
-}));
-
-vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({
-    error: loggerErrorMock,
-  }),
+const mocks = vi.hoisted(() => ({
+  load: vi.fn(),
+  saveBlur: vi.fn(),
+  saveFocus: vi.fn(),
+  setDefault: vi.fn(),
+  setEnabled: vi.fn(),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
 vi.mock('../../../../composition/persistence/highlighter', async (importOriginal) => ({
   ...(await importOriginal()),
-  loadHighlighterSettings: loadHighlighterSettingsMock,
-  saveHighlighterSettings: saveHighlighterSettingsMock,
+  loadHighlighterSettings: mocks.load,
+  saveDefaultBlurSettings: mocks.saveBlur,
+  saveDefaultFocusSettings: mocks.saveFocus,
+  setBorderPresetEnabled: mocks.setEnabled,
+  setDefaultBorderPreset: mocks.setDefault,
 }));
 
-vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
-  ...(await importOriginal()),
-  toast: {
-    error: toastErrorMock,
-    success: toastSuccessMock,
-  },
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({
+  toast: { error: mocks.toastError, success: mocks.toastSuccess },
 }));
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
@@ -44,243 +32,82 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  loadHighlighterSettingsMock.mockReset();
-});
-
-function trackPersistedSettings(settings: ReturnType<typeof createSettings>) {
-  let persistedSettings = settings;
-  loadHighlighterSettingsMock.mockImplementation(async () => persistedSettings);
-  saveHighlighterSettingsMock.mockImplementation(async (nextSettings) => {
-    persistedSettings = nextSettings;
-  });
-}
-
-function requireLoadedSettings(settings: HighlighterSettings | null): HighlighterSettings {
-  if (!settings) {
-    throw new Error('Expected loaded highlighter settings in test fixture.');
-  }
-
-  return settings;
-}
-
-function createPreset(id: string): BorderPreset {
-  return {
-    id,
-    name: id,
-    order: 0,
-    width: 2,
-    color: '#00aaee',
-    style: 'solid',
-    radius: 4,
-    padding: { top: 1, right: 1, bottom: 1, left: 1 },
-    shadow: 0,
-    opacity: 100,
-    customCss: '',
-    fillColor: '#00000000',
-    fillOpacity: 0,
-    inheritCustomCss: false,
-    strokeOpacity: 100,
-  };
-}
-
-function createSettings(): HighlighterSettings {
-  return {
-    borderPresets: [],
-    defaultBorderPresetId: 'preset-1',
-    defaultEffectMode: 'border',
-    defaultBlurSettings: {
-      amount: 4,
-      blurType: 'gaussian' as const,
-      showBorder: false,
-    },
-    defaultFocusSettings: {
-      opacity: 0.6,
-      showBorder: true,
-    },
-  };
-}
-
-function createState(settings: HighlighterSettings | null = createSettings()) {
+function createState(settings = createDefaultHighlighterSettings()) {
   const state = {
     settingsPersistenceSession: {},
     settings,
-    setSettings: vi.fn((value: HighlighterSettings | null) => {
-      state.settings = value;
-    }),
+    setSettings(value: typeof settings | null) {
+      if (value) state.settings = value;
+    },
   };
-
   return state;
 }
 
-async function runNullStateActions() {
-  const state = {
-    settingsPersistenceSession: {},
-    settings: null,
-    setSettings: vi.fn(),
-  };
-  const settingsActions = createHighlighterSettingsActions(state);
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.load.mockReset();
+  mocks.saveBlur.mockResolvedValue(true);
+  mocks.saveFocus.mockResolvedValue(true);
+  mocks.setDefault.mockResolvedValue(true);
+  mocks.setEnabled.mockResolvedValue(true);
+});
 
-  await settingsActions.handleSetDefaultPreset('preset-1');
-  await settingsActions.handleUpdateBlurSettings({
-    amount: 4,
-    blurType: 'gaussian',
-    showBorder: false,
-  });
-  await settingsActions.handleUpdateFocusSettings({
-    opacity: 0.6,
-    showBorder: true,
-  });
-}
+describe('highlighter settings canonical actions', () => {
+  it('no-ops before settings have loaded', async () => {
+    const actions = createHighlighterSettingsActions({
+      settingsPersistenceSession: {},
+      settings: null,
+      setSettings: vi.fn(),
+    });
 
-async function runFailedDefaultPresetSave(state = createState()) {
-  trackPersistedSettings(requireLoadedSettings(state.settings));
-  saveHighlighterSettingsMock.mockRejectedValueOnce(new Error('save failed'));
-  const settingsActions = createHighlighterSettingsActions(state);
-  await settingsActions.handleSetDefaultPreset('preset-2');
-  return state;
-}
-
-async function runFailedSettingsUpdates(state = createState()) {
-  const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
-  trackPersistedSettings(requireLoadedSettings(state.settings));
-  saveHighlighterSettingsMock.mockRejectedValueOnce(new Error('blur failed'));
-  saveHighlighterSettingsMock.mockRejectedValueOnce(new Error('focus failed'));
-  const settingsActions = createHighlighterSettingsActions(state);
-
-  await settingsActions.handleUpdateBlurSettings({
-    amount: 9,
-    blurType: 'distortion',
-    showBorder: false,
-  });
-  await settingsActions.handleUpdateFocusSettings({
-    opacity: 0.7,
-    showBorder: false,
+    await actions.handleSetDefaultPreset('system-default');
+    await actions.handleTogglePresetEnabled('system-default');
+    expect(mocks.setDefault).not.toHaveBeenCalled();
+    expect(mocks.setEnabled).not.toHaveBeenCalled();
   });
 
-  return { dispatchEventSpy, state };
-}
-
-async function togglePreset(state = createState(), presetId = 'preset-2') {
-  trackPersistedSettings(requireLoadedSettings(state.settings));
-  const settingsActions = createHighlighterSettingsActions(state);
-  await settingsActions.handleTogglePresetEnabled(presetId);
-  return state;
-}
-
-function registerNullStateNoOpTest() {
-  it('no-ops settings actions when settings have not loaded yet', async () => {
-    await runNullStateActions();
-
-    expect(saveHighlighterSettingsMock).not.toHaveBeenCalled();
-    expect(toastSuccessMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).not.toHaveBeenCalled();
-    expect(loggerErrorMock).not.toHaveBeenCalled();
-  });
-}
-
-function registerFailedDefaultPresetSaveTest() {
-  it('does not emit success side effects when saving the default preset fails', async () => {
-    const state = await runFailedDefaultPresetSave(
-      createState({
-        ...createSettings(),
-        borderPresets: [createPreset('preset-1'), createPreset('preset-2')],
-      })
+  it('delegates default and enable invariants to persistence then commits the reread', async () => {
+    const state = createState();
+    const confirmed = {
+      ...createDefaultHighlighterSettings(),
+      defaultBorderPresetId: 'system-soft-highlight',
+      catalogCustomized: true,
+    };
+    confirmed.borderPresets = confirmed.borderPresets.map((preset) =>
+      preset.id === 'system-default' ? { ...preset, enabled: false } : preset
     );
+    mocks.load.mockResolvedValue(confirmed);
+    const actions = createHighlighterSettingsActions(state);
 
-    expect(toastSuccessMock).not.toHaveBeenCalled();
-    expect(state.settings).toEqual(
-      expect.objectContaining({
-        borderPresets: [createPreset('preset-1'), createPreset('preset-2')],
-      })
-    );
-    expect(toastErrorMock).toHaveBeenCalledWith(
+    await actions.handleTogglePresetEnabled('system-default');
+
+    expect(mocks.setEnabled).toHaveBeenCalledWith('system-default', false);
+    expect(state.settings).toEqual(confirmed);
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('savePresets.messages.presetHidden');
+  });
+
+  it('does not emit success when the owner rejects the last-enabled toggle', async () => {
+    const state = createState();
+    mocks.setEnabled.mockResolvedValue(false);
+    mocks.load.mockResolvedValue(state.settings);
+    const actions = createHighlighterSettingsActions(state);
+
+    await actions.handleTogglePresetEnabled('system-default');
+
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it('surfaces persistence failures and leaves success feedback silent', async () => {
+    const state = createState();
+    mocks.setDefault.mockRejectedValue(new Error('failed'));
+    const actions = createHighlighterSettingsActions(state);
+
+    await actions.handleSetDefaultPreset('system-soft-highlight');
+
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+    expect(mocks.toastError).toHaveBeenCalledWith(
       'common.states.errorhighlighter.section.saveErrorSuffix'
     );
   });
-}
-
-function registerFailedSettingsUpdateTest() {
-  it('does not dispatch the settings-changed event when blur or focus persistence fails', async () => {
-    const { dispatchEventSpy, state } = await runFailedSettingsUpdates();
-
-    expect(dispatchEventSpy).not.toHaveBeenCalled();
-    expect(state.settings).toEqual(createSettings());
-  });
-}
-
-function registerMissingPresetRereadTest() {
-  it('does not persist or emit success when reread settings no longer contain the requested preset', async () => {
-    const state = createState({
-      ...createSettings(),
-      borderPresets: [createPreset('preset-1'), createPreset('preset-2')],
-    });
-    trackPersistedSettings({
-      ...createSettings(),
-      borderPresets: [createPreset('preset-1')],
-    });
-    const settingsActions = createHighlighterSettingsActions(state);
-
-    await settingsActions.handleSetDefaultPreset('preset-2');
-
-    expect(saveHighlighterSettingsMock).not.toHaveBeenCalled();
-    expect(toastSuccessMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).not.toHaveBeenCalled();
-    expect(state.settings).toEqual({
-      ...createSettings(),
-      borderPresets: [createPreset('preset-1')],
-    });
-  });
-}
-
-function registerVisibilityToggleTest() {
-  it('toggles preset visibility and falls back to another enabled preset as default', async () => {
-    const state = await togglePreset(
-      createState({
-        ...createSettings(),
-        borderPresets: [
-          { ...createPreset('preset-1'), isSystemDefault: true },
-          createPreset('preset-2'),
-        ],
-        defaultBorderPresetId: 'preset-2',
-      })
-    );
-
-    expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetHidden');
-    expect(state.settings).toMatchObject({
-      defaultBorderPresetId: 'preset-1',
-      borderPresets: [
-        { ...createPreset('preset-1'), isSystemDefault: true },
-        { ...createPreset('preset-2'), enabled: false },
-      ],
-    });
-  });
-}
-
-function registerIgnoredToggleTest() {
-  it('ignores visibility toggles for missing and system presets', async () => {
-    const state = createState({
-      ...createSettings(),
-      borderPresets: [{ ...createPreset('preset-1'), isSystemDefault: true }],
-    });
-    const settingsActions = createHighlighterSettingsActions(state);
-
-    await settingsActions.handleTogglePresetEnabled('preset-1');
-    await settingsActions.handleTogglePresetEnabled('missing');
-
-    expect(saveHighlighterSettingsMock).not.toHaveBeenCalled();
-    expect(toastSuccessMock).not.toHaveBeenCalled();
-  });
-}
-
-function registerNullStateGuardTests() {
-  registerNullStateNoOpTest();
-  registerFailedDefaultPresetSaveTest();
-  registerFailedSettingsUpdateTest();
-  registerMissingPresetRereadTest();
-  registerVisibilityToggleTest();
-  registerIgnoredToggleTest();
-}
-
-describe('highlighter settings action null-state guards', registerNullStateGuardTests);
+});

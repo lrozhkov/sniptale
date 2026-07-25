@@ -16,6 +16,7 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.ENABLE_HIGHLIGHTER_MODE,
   MessageType.DISABLE_HIGHLIGHTER_MODE,
   MessageType.HIGHLIGHTER_MODE_STATUS,
+  MessageType.HIGHLIGHTER_SETTINGS_MUTATION,
   MessageType.ENABLE_QUICK_EDIT_MODE,
   MessageType.DISABLE_QUICK_EDIT_MODE,
   MessageType.QUICK_EDIT_MODE_STATUS,

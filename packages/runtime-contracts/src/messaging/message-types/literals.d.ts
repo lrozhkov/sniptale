@@ -6,6 +6,8 @@ declare module './' {
     type ENABLE_HIGHLIGHTER_MODE = typeof import('./').MessageType.ENABLE_HIGHLIGHTER_MODE;
     type DISABLE_HIGHLIGHTER_MODE = typeof import('./').MessageType.DISABLE_HIGHLIGHTER_MODE;
     type HIGHLIGHTER_MODE_STATUS = typeof import('./').MessageType.HIGHLIGHTER_MODE_STATUS;
+    type HIGHLIGHTER_SETTINGS_MUTATION =
+      typeof import('./').MessageType.HIGHLIGHTER_SETTINGS_MUTATION;
     type ENABLE_QUICK_EDIT_MODE = typeof import('./').MessageType.ENABLE_QUICK_EDIT_MODE;
     type DISABLE_QUICK_EDIT_MODE = typeof import('./').MessageType.DISABLE_QUICK_EDIT_MODE;
     type QUICK_EDIT_MODE_STATUS = typeof import('./').MessageType.QUICK_EDIT_MODE_STATUS;

@@ -11,6 +11,7 @@ const {
   routeContentActivationKeyRequestMock,
   routeContentCapabilityRequestMock,
   routeContentRuntimeWakeupMessageMock,
+  routeHighlighterSettingsMutationMessageMock,
   routeContentProofRequestMock,
   routeContentRuntimeTokenRequestMock,
   routeLlmMessageMock,
@@ -27,6 +28,7 @@ const {
   routeContentActivationKeyRequestMock: vi.fn(),
   routeContentCapabilityRequestMock: vi.fn(),
   routeContentRuntimeWakeupMessageMock: vi.fn(),
+  routeHighlighterSettingsMutationMessageMock: vi.fn(),
   routeContentProofRequestMock: vi.fn(),
   routeContentRuntimeTokenRequestMock: vi.fn(),
   routeLlmMessageMock: vi.fn(),
@@ -73,6 +75,10 @@ vi.mock('../../page-access/wakeup-route', () => ({
 
 vi.mock('../../../application/privacy-erasure/route', () => ({
   routeLocalDataErasureMessage: routeLocalDataErasureMessageMock,
+}));
+
+vi.mock('../../../highlighter-settings/route', () => ({
+  routeHighlighterSettingsMutationMessage: routeHighlighterSettingsMutationMessageMock,
 }));
 
 vi.mock('../../../capture/popup-export/archive-route', () => ({
@@ -126,6 +132,33 @@ const contentRuntimeWakeupRouteContext = {
   },
   senderClassification: 'content-runtime-wakeup-content-script',
 } as BackgroundOwnedRouteContext;
+const highlighterSettingsMutationSenderBinding = {
+  documentId: 'document-7',
+  frameId: 0,
+  senderUrl: 'https://example.test/path',
+  tabId: 7,
+};
+const highlighterSettingsMutationRouteContext = {
+  authorityFamily: 'highlighter-settings-mutation-authority',
+  freshnessReplay: 'sync-policy-approved',
+  messageBinding: {
+    operation: 'set-default-border-preset',
+    type: MessageType.HIGHLIGHTER_SETTINGS_MUTATION,
+  },
+  ownerRoute: {
+    handlerId: 'highlighter-settings-mutation',
+    messageTypes: [MessageType.HIGHLIGHTER_SETTINGS_MUTATION],
+    ownerModule: 'apps/extension/src/background/highlighter-settings/route.ts',
+    policyStateIds: [],
+    routeAuthorityFamily: 'background-owned-ipc',
+  },
+  preauthorization: {
+    kind: 'highlighter-settings-mutation',
+    presetId: 'system-marker',
+    senderBinding: highlighterSettingsMutationSenderBinding,
+  },
+  senderClassification: 'content-tab-runtime',
+} as BackgroundOwnedRouteContext;
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -141,6 +174,27 @@ it('routes single-message background-owned handlers through their owner adapters
   primeSingleMessageRouteMocks();
   expectSingleMessageRoutesHandled();
   expectContextAwareRouteAdaptersCalled();
+});
+
+it('routes the bound highlighter preset mutation through its background owner', () => {
+  routeHighlighterSettingsMutationMessageMock.mockReturnValue(true);
+  const highlighterAction: BackgroundOwnedAction = {
+    ...action(MessageType.HIGHLIGHTER_SETTINGS_MUTATION),
+    message: {
+      operation: 'set-default-border-preset',
+      presetId: 'system-marker',
+      type: MessageType.HIGHLIGHTER_SETTINGS_MUTATION,
+    } as BackgroundOwnedAction['message'],
+  };
+
+  expect(
+    dispatchBackgroundOwnedRoute(highlighterAction, highlighterSettingsMutationRouteContext)
+  ).toEqual({ handled: true, keepChannelOpen: true });
+  expect(routeHighlighterSettingsMutationMessageMock).toHaveBeenCalledWith({
+    message: highlighterAction.message,
+    senderBinding: highlighterSettingsMutationSenderBinding,
+    sendResponse,
+  });
 });
 
 function primeSingleMessageRouteMocks() {

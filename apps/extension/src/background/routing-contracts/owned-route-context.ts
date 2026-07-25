@@ -8,6 +8,7 @@ export type BackgroundOwnedRouteHandlerId =
   | 'ai-settings-mutation'
   | 'content-action-capability-issuance'
   | 'content-runtime-wakeup'
+  | 'highlighter-settings-mutation'
   | 'llm-content-processing'
   | 'llm-scenario-editor-processing'
   | 'llm-session'
@@ -35,6 +36,11 @@ type BackgroundOwnedRoutePreauthorizationHandle =
     }
   | {
       readonly kind: 'content-runtime-wakeup';
+      readonly senderBinding: ContentSenderBinding;
+    }
+  | {
+      readonly kind: 'highlighter-settings-mutation';
+      readonly presetId: string;
       readonly senderBinding: ContentSenderBinding;
     };
 
@@ -143,6 +149,25 @@ export function getContentRuntimeWakeupSenderBinding(
     !routeContext ||
     preauthorization?.kind !== 'content-runtime-wakeup' ||
     routeContext.ownerRoute.handlerId !== 'content-runtime-wakeup' ||
+    !routeContext.ownerRoute.messageTypes.includes(message.type as MessageType) ||
+    !doesMessageBindingMatch(routeContext.messageBinding, message)
+  ) {
+    return null;
+  }
+
+  return preauthorization.senderBinding;
+}
+
+export function getHighlighterSettingsMutationSenderBinding(
+  routeContext: BackgroundOwnedRouteContext | null,
+  message: { type: string } & Record<string, unknown>
+): ContentSenderBinding | null {
+  const preauthorization = routeContext?.preauthorization;
+  if (
+    !routeContext ||
+    preauthorization?.kind !== 'highlighter-settings-mutation' ||
+    preauthorization.presetId !== message['presetId'] ||
+    routeContext.ownerRoute.handlerId !== 'highlighter-settings-mutation' ||
     !routeContext.ownerRoute.messageTypes.includes(message.type as MessageType) ||
     !doesMessageBindingMatch(routeContext.messageBinding, message)
   ) {

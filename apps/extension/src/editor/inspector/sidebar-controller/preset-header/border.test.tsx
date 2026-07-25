@@ -64,6 +64,8 @@ function createBorderPreset(id: string, color: string, enabled = true, isSystemD
     inheritCustomCss: false,
     customCss: '',
     isSystemDefault,
+    origin: isSystemDefault ? ('system' as const) : ('user' as const),
+    ...(isSystemDefault ? { systemPresetKey: 'system-default' as const, customized: true } : {}),
   };
 }
 

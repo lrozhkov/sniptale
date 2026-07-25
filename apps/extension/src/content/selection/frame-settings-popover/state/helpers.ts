@@ -18,6 +18,8 @@ const DEFAULT_FOCUS_SETTINGS: FocusSettings = {
 };
 const logger = createLogger({ namespace: 'ContentFrameSettingsPopover' });
 
+export type FrameSettingsPresetCommitOutcome = 'accepted' | 'rejected';
+
 export function getDefaultFocusSettings(): FocusSettings {
   return { ...DEFAULT_FOCUS_SETTINGS };
 }
@@ -27,15 +29,17 @@ export function createFrameSettingsPresetHandler(args: {
   setSelectedPresetId: (presetId: string) => void;
   setDefaultBorderPreset: (presetId: string) => Promise<void>;
 }) {
-  return async (preset: BorderPreset) => {
+  return async (preset: BorderPreset): Promise<FrameSettingsPresetCommitOutcome> => {
     args.setSelectedPresetId(preset.id);
     args.onApplyToFrame({ borderSettings: { ...preset } });
 
     try {
       await args.setDefaultBorderPreset(preset.id);
       dispatchHighlighterSettingsChanged({ defaultBorderPresetId: preset.id });
+      return 'accepted';
     } catch (error) {
       logger.error('Failed to save default preset', error);
+      return 'rejected';
     }
   };
 }

@@ -16,6 +16,7 @@
     "./effect-v1": "./src/effect-v1/index.ts",
     "./export": "./src/export/index.ts",
     "./highlighter/callout": "./src/highlighter/callout.ts",
+    "./highlighter/border-preset": "./src/highlighter/border-preset.ts",
     "./highlighter/step-badge": "./src/highlighter/step-badge.ts",
     "./messaging/capture-messages": "./src/messaging/capture-messages.ts",
     "./messaging/contracts/response": "./src/messaging/contracts/response.ts",

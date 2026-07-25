@@ -1,5 +1,12 @@
 import { expect, it, vi } from 'vitest';
 
+const migrateHighlighterSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
+
+vi.mock('../../../../composition/persistence/highlighter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/highlighter')>()),
+  migrateHighlighterSystemPresetCatalog,
+}));
+
 import {
   cleanupCapture,
   cleanupExpiredProjectExportInputs,
@@ -43,6 +50,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
     reconcileExportingDownload: reconcileCaptureJobDownloadOnStartup,
   });
   expect(initializeAiStorageAccess).toHaveBeenCalledOnce();
+  expect(migrateHighlighterSystemPresetCatalog).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeState).toHaveBeenCalledOnce();
   expect(logger.warn).toHaveBeenCalledWith(
     'Failed to request persistent storage',

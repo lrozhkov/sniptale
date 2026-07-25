@@ -118,6 +118,11 @@ function shouldCreateAndUpdateTheHoverOverlay(): void {
       shadow: 100,
     }
   );
+  expect(overlay.style.opacity).toBe('0.72');
+  expect(overlay.style.borderStyle).toBe('solid');
+  expect(overlay.style.borderWidth).toBe('2px');
+  expect(overlay.style.borderRadius).toBe('6px');
+  expect(overlay.style.boxShadow).not.toBe('none');
   hideHoverOverlay(state);
 
   expect(overlay.style.top).toBe('16px');
@@ -126,6 +131,26 @@ function shouldCreateAndUpdateTheHoverOverlay(): void {
   expect(overlay.style.height).toBe('30px');
   expect(overlay.style.borderColor).toBe('rgb(0, 255, 255)');
   expect(overlay.style.opacity).toBe('0');
+}
+
+function shouldPreservePresetFillAndStrokeRatiosUnderUniformOpacity(): void {
+  const state = createState();
+  const overlay = ensureHoverOverlay(state, storage.DEFAULT_BORDER_PRESET);
+
+  showHoverOverlay(
+    state,
+    { height: 10, width: 12, x: 1, y: 2 },
+    {
+      ...storage.DEFAULT_BORDER_PRESET,
+      fillColor: '#60A5FA',
+      fillOpacity: 8,
+      strokeOpacity: 65,
+    }
+  );
+
+  expect(overlay.style.opacity).toBe('0.72');
+  expect(overlay.style.borderColor).toBe('rgba(255, 255, 0, 0.65)');
+  expect(overlay.style.backgroundColor).toBe('rgba(96, 165, 250, 0.08)');
 }
 
 function shouldKeepHoverPreviewHiddenWhileCaptureUiIsHidden(): void {
@@ -137,6 +162,18 @@ function shouldKeepHoverPreviewHiddenWhileCaptureUiIsHidden(): void {
 
   expect(overlay.style.display).not.toBe('block');
   expect(overlay.style.opacity).toBe('0');
+}
+
+function shouldDisableMotionForReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({ matches: true }))
+  );
+  const state = createState();
+
+  const overlay = ensureHoverOverlay(state, storage.DEFAULT_BORDER_PRESET);
+
+  expect(overlay.style.transition).toBe('none');
 }
 
 function shouldRemoveOverlayArtifactsAndResetState(): void {
@@ -182,6 +219,14 @@ function shouldExposeOverlayActionsOverOneSession(): void {
 describe('highlighter hover overlay', () => {
   it('creates and reuses the overlay container', shouldCreateAndReuseTheOverlayContainer);
   it('creates and updates the hover overlay', shouldCreateAndUpdateTheHoverOverlay);
+  it(
+    'preserves preset fill and stroke ratios under uniform opacity',
+    shouldPreservePresetFillAndStrokeRatiosUnderUniformOpacity
+  );
+  it(
+    'disables motion for reduced-motion preference',
+    shouldDisableMotionForReducedMotionPreference
+  );
   it(
     'keeps hover preview hidden while capture UI is hidden',
     shouldKeepHoverPreviewHiddenWhileCaptureUiIsHidden

@@ -11,8 +11,10 @@ export type {
   BlurType,
   BorderPadding,
   BorderPreset,
+  BorderPresetOrigin,
   EffectMode,
   FocusSettings,
+  SystemBorderPresetKey,
 } from '@sniptale/ui/highlighter-style/types';
 
 export interface HighlightRect {
@@ -43,6 +45,8 @@ export interface HighlighterSettings {
   defaultEffectMode: EffectMode;
   defaultBlurSettings: BlurSettings;
   defaultFocusSettings: FocusSettings;
+  systemPresetCatalogRevision: number;
+  catalogCustomized?: boolean;
 }
 
 export interface FrameData {

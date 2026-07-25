@@ -214,6 +214,9 @@ describe('border preset editor save edit flow', () => {
       id: 'preset-edit',
       name: 'Existing',
       isSystemDefault: true,
+      origin: 'system',
+      systemPresetKey: 'system-default',
+      customized: false,
       order: 2,
       width: 4,
       color: '#111111',
@@ -244,7 +247,8 @@ describe('border preset editor save edit flow', () => {
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'preset-edit',
-        isSystemDefault: true,
+        origin: 'system',
+        systemPresetKey: 'system-default',
         order: 2,
         name: 'Edited',
       })

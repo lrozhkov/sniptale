@@ -15,6 +15,7 @@ export function createPreset(id: string, overrides: Record<string, unknown> = {}
     fillOpacity: 0,
     inheritCustomCss: false,
     customCss: '',
+    origin: 'user' as const,
     ...overrides,
   };
 }
@@ -40,6 +41,8 @@ export function createSettings(overrides: Record<string, unknown> = {}) {
       opacity: 0.5,
       showBorder: false,
     },
+    systemPresetCatalogRevision: 1,
+    catalogCustomized: true,
     ...overrides,
   };
 }

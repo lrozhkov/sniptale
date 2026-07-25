@@ -25,8 +25,24 @@ vi.mock('../../../section-surface/panel-controls', () => ({
   SettingsRange: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input type="range" {...props} />
   ),
-  SettingsSwitch: ({ checked, onClick }: { checked: boolean; onClick: () => void }) => (
-    <button type="button" aria-pressed={checked} onClick={onClick}>
+  SettingsSwitch: ({
+    checked,
+    disabled,
+    onClick,
+    title,
+  }: {
+    checked: boolean;
+    disabled?: boolean;
+    onClick: () => void;
+    title?: string;
+  }) => (
+    <button
+      type="button"
+      aria-pressed={checked}
+      disabled={disabled}
+      onClick={onClick}
+      title={title}
+    >
       toggle
     </button>
   ),
@@ -45,6 +61,12 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
     id: overrides.id ?? 'preset-1',
     name: overrides.name ?? 'Preset',
     isSystemDefault: overrides.isSystemDefault ?? false,
+    origin: overrides.origin ?? 'user',
+    ...(overrides.systemPresetKey === undefined
+      ? {}
+      : { systemPresetKey: overrides.systemPresetKey }),
+    ...(overrides.customized === undefined ? {} : { customized: overrides.customized }),
+    ...(overrides.enabled === undefined ? {} : { enabled: overrides.enabled }),
     order: overrides.order ?? 0,
     width: overrides.width ?? 4,
     color: overrides.color ?? '#ff6600',
@@ -75,6 +97,8 @@ function createSettings(overrides: Partial<HighlighterSettings> = {}): Highlight
       opacity: 0.6,
       showBorder: false,
     },
+    systemPresetCatalogRevision: overrides.systemPresetCatalogRevision ?? 1,
+    catalogCustomized: overrides.catalogCustomized ?? true,
   };
 }
 
@@ -95,6 +119,7 @@ function createPresets(): HighlighterPresetController {
     handleDrop: vi.fn<(event: React.DragEvent, targetId: string) => Promise<void>>(),
     handleEditPreset: vi.fn<(preset: BorderPreset) => void>(),
     handlePresetHoverChange: vi.fn<(presetId: string | null) => void>(),
+    handleResetPreset: vi.fn<(presetId: string) => Promise<void>>(),
     handleSavePreset: vi.fn<(preset: BorderPreset) => Promise<void>>(),
     handleSetDefaultPreset: vi.fn<(presetId: string) => Promise<void>>(),
     handleTogglePresetEnabled: vi.fn<(presetId: string) => Promise<void>>(),
@@ -105,6 +130,9 @@ function createProps(): HighlighterPresetsPanelProps {
   const defaultPreset = createPreset({
     id: 'preset-default',
     isSystemDefault: true,
+    origin: 'system',
+    systemPresetKey: 'system-default',
+    customized: false,
     name: 'System default',
     order: 0,
   });
@@ -212,7 +240,7 @@ describe('HighlighterPresetsPanel', () => {
     expect(props.presets.handleAddPreset).toHaveBeenCalledOnce();
     expect(props.presets.handleSetDefaultPreset).toHaveBeenCalledWith('preset-custom');
     expect(props.presets.handleEditPreset).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'preset-custom' })
+      expect.objectContaining({ id: 'preset-default', origin: 'system' })
     );
     expect(props.presets.handleDragStart).toHaveBeenCalled();
     expect(props.presets.handleDragOver).toHaveBeenCalled();
@@ -221,6 +249,35 @@ describe('HighlighterPresetsPanel', () => {
     expect(props.presets.handleDragEnd).toHaveBeenCalled();
     expect(props.presets.handlePresetHoverChange).toHaveBeenCalledWith('preset-default');
     expect(props.presets.handlePresetHoverChange).toHaveBeenCalledWith(null);
-    expect(controls.disabledEditButton?.hasAttribute('disabled')).toBe(true);
+    expect(controls.disabledEditButton).toBeUndefined();
+  });
+
+  it('disables the last enabled toggle and exposes reset without system delete', async () => {
+    const system = createPreset({
+      id: 'system-default',
+      origin: 'system',
+      systemPresetKey: 'system-default',
+      customized: true,
+      enabled: true,
+    });
+    const settings = createSettings({
+      borderPresets: [system],
+      defaultBorderPresetId: system.id,
+    });
+    const presets = createPresets();
+    presets.hoveredPresetId = system.id;
+    await renderPanel({ presets, settings });
+
+    const toggle = container?.querySelector<HTMLButtonElement>(
+      'button[title="highlighter.section.lastEnabledPresetDisabled"]'
+    );
+    const reset = container?.querySelector<HTMLButtonElement>(
+      'button[title="highlighter.section.resetSystemPresetTitle"]'
+    );
+    expect(toggle?.disabled).toBe(true);
+    expect(container?.querySelector('button[title="common.actions.delete"]')).toBeNull();
+
+    await act(async () => reset?.click());
+    expect(presets.handleResetPreset).toHaveBeenCalledWith('system-default');
   });
 });

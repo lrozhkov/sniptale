@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { BlurSettings } from '../../../features/highlighter/contracts';
 import { parseStoredHighlighterSettings } from './guards';
+import { resolveLoadedHighlighterSettings } from './resolved';
 
 function createBorderPreset(overrides: Record<string, unknown> = {}) {
   return {
@@ -152,6 +153,62 @@ describe('highlighter guards border preset visual fields', () => {
       }).value.borderPresets
     ).toEqual([preset]);
   });
+
+  it('accepts controlled catalog metadata and rejects unknown system keys', () => {
+    const valid = createBorderPreset({
+      origin: 'system',
+      systemPresetKey: 'system-review',
+      basedOnRevision: 1,
+      customized: true,
+    });
+    const parsed = parseStoredHighlighterSettings({
+      borderPresets: [valid, createBorderPreset({ systemPresetKey: 'translation.injected' })],
+      systemPresetCatalogRevision: 1,
+      catalogCustomized: true,
+    });
+
+    expect(parsed.value).toEqual({
+      borderPresets: [valid],
+      systemPresetCatalogRevision: 1,
+      catalogCustomized: true,
+    });
+    expect(parsed.invalidFieldCount).toBe(1);
+  });
+
+  it.each([-1, 0.5])(
+    'drops malformed revision %s without discarding changed legacy visuals',
+    (revision) => {
+      const changedLegacy = createBorderPreset({
+        basedOnRevision: revision,
+        id: 'system-default',
+        isSystemDefault: true,
+        name: 'My orange frame',
+        width: 7,
+      });
+      const parsed = parseStoredHighlighterSettings({
+        borderPresets: [changedLegacy],
+        defaultBorderPresetId: 'system-default',
+        systemPresetCatalogRevision: revision,
+      });
+      const [storedPreset] = parsed.value.borderPresets ?? [];
+      const resolved = resolveLoadedHighlighterSettings(
+        parsed.value.borderPresets,
+        parsed.value.defaultBorderPresetId,
+        parsed.value
+      );
+
+      expect(parsed.invalidFieldCount).toBe(2);
+      expect(parsed.value.systemPresetCatalogRevision).toBeUndefined();
+      expect(storedPreset).toMatchObject({ id: 'system-default', width: 7 });
+      expect(storedPreset).not.toHaveProperty('basedOnRevision');
+      expect(resolved.borderPresets.find((preset) => preset.id === 'system-default')).toMatchObject(
+        {
+          customized: true,
+          width: 7,
+        }
+      );
+    }
+  );
 });
 
 describe('highlighter guards minimal valid payloads', () => {

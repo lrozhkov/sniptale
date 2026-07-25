@@ -2,11 +2,12 @@ import type { EditorShapeSettings } from '../../../../features/editor/document/t
 import { sanitizeEditorShapeComparableSettings } from '../../../../features/editor/presets/settings';
 import { translate } from '../../../../platform/i18n';
 import {
-  addBorderPreset,
-  updateBorderPreset,
+  addBorderPresetWithOutcome,
+  updateBorderPresetWithOutcome,
 } from '../../../../composition/persistence/highlighter';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import type { BorderPreset } from '../../../../features/highlighter/contracts';
+import { getBorderPresetDisplayName } from '../../../../features/highlighter/presets/display-name';
 import { createBorderPresetFromShapeSettings } from '../border-preset';
 import {
   buildPresetOverwriteSavePanelState,
@@ -34,10 +35,15 @@ function createOverwritePreset(args: {
   currentSettings: EditorShapeSettings;
   overwritePreset: BorderPreset;
 }): BorderPreset {
+  const { origin: _origin, ...updatedVisuals } = createBorderPresetFromShapeSettings(
+    args.currentSettings,
+    args.borderPresets
+  );
   return {
-    ...createBorderPresetFromShapeSettings(args.currentSettings, args.borderPresets),
+    ...args.overwritePreset,
+    ...updatedVisuals,
     id: args.overwritePreset.id,
-    name: args.overwritePreset.name,
+    name: getBorderPresetDisplayName(args.overwritePreset),
     order: args.overwritePreset.order,
     enabled: args.overwritePreset.enabled ?? true,
     padding: { ...args.overwritePreset.padding },
@@ -53,13 +59,17 @@ async function saveExistingBorderPreset(args: {
   setSelectedPresetId: (presetId: string) => void;
 }) {
   try {
-    await updateBorderPreset(
+    const outcome = await updateBorderPresetWithOutcome(
       createOverwritePreset({
         borderPresets: args.borderPresets,
         currentSettings: args.currentSettings,
         overwritePreset: args.overwritePreset,
       })
     );
+    if (outcome === 'rejected') {
+      toast.error(translate('common.states.error'));
+      return;
+    }
   } catch {
     toast.error(translate('common.states.error'));
     return;
@@ -85,7 +95,11 @@ async function saveNewBorderPreset(args: {
     name: args.saveName.trim(),
   };
   try {
-    await addBorderPreset(preset);
+    const outcome = await addBorderPresetWithOutcome(preset);
+    if (outcome === 'rejected') {
+      toast.error(translate('common.states.error'));
+      return;
+    }
   } catch {
     toast.error(translate('common.states.error'));
     return;

@@ -6,6 +6,7 @@ import {
   resolveDefaultBorderPresetVisual,
 } from './highlighter-projection';
 import type { BorderPreset } from '@sniptale/ui/highlighter-style/types';
+import { createSystemBorderPresetCatalog } from '../../highlighter/presets/catalog';
 
 function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
   return {
@@ -48,6 +49,26 @@ describe('highlighter preset projection', () => {
       strokeStyle: 'dashed',
       strokeWidth: 6,
     });
+  });
+
+  it('projects every shipped preset without custom CSS drift', () => {
+    for (const preset of createSystemBorderPresetCatalog()) {
+      const projection = projectBorderPresetToEditorShapeSettings(preset);
+
+      expect(projection).toMatchObject({
+        borderPresetId: preset.id,
+        customCss: '',
+        fillColor: preset.fillColor,
+        fillOpacity: preset.fillOpacity / 100,
+        inheritCustomCss: false,
+        radius: preset.radius,
+        shadow: preset.shadow,
+        strokeColor: preset.color,
+        strokeOpacity: preset.strokeOpacity / 100,
+        strokeStyle: preset.style,
+        strokeWidth: preset.width,
+      });
+    }
   });
 });
 

@@ -170,6 +170,28 @@ function authorizeContentRuntimeWakeupRoute(
   );
 }
 
+function authorizeHighlighterSettingsMutationRoute(
+  request: BackgroundOwnedAuthorizationRequest,
+  routeEntry: BackgroundOwnedRouteInventoryEntry
+): IpcAuthorizationResult {
+  const senderDecision = authorizeContentSender(request.sender);
+  if (!senderDecision.allowed) {
+    return reject('Unauthorized highlighter settings mutation sender');
+  }
+  return authorize(
+    createBackgroundOwnedRoutePreauthorization({
+      entry: routeEntry,
+      handle: {
+        kind: 'highlighter-settings-mutation',
+        presetId: String(request.message['presetId']),
+        senderBinding: senderDecision.principal,
+      },
+      message: request.message,
+      senderClassification: 'content-tab-runtime',
+    })
+  );
+}
+
 export function authorizeBackgroundOwnedRoute(
   request: BackgroundOwnedAuthorizationRequest
 ): IpcAuthorizationResult {
@@ -211,6 +233,8 @@ function getBackgroundOwnedAuthorizationHandler(
       return authorizeContentActionCapabilityIssuance;
     case 'content-runtime-wakeup':
       return authorizeContentRuntimeWakeupRoute;
+    case 'highlighter-settings-mutation':
+      return authorizeHighlighterSettingsMutationRoute;
     case 'llm-content-processing':
       return authorizeContentLlmRoute;
     case 'llm-scenario-editor-processing':

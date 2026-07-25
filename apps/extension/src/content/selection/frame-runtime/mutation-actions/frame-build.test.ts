@@ -56,6 +56,7 @@ function createHighlighterSettings(): HighlighterSettings {
     ],
     defaultBorderPresetId: 'preset-1',
     defaultEffectMode: 'border',
+    systemPresetCatalogRevision: 1,
     defaultBlurSettings: createBlurSettings(),
     defaultFocusSettings: createFocusSettings(),
   };
