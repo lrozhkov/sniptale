@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   settings action routing proof keeps border, editor, and palette branches together */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({

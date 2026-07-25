@@ -109,6 +109,17 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'content-page-style-text-fields',
+    productionFile:
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/text-fields.tsx',
+    exclusive: true,
+    reason: 'Property-control matrix and composed-view suites cover the text-field owner.',
+    testFiles: [
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/field-matrix.test.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
+    ],
+  },
+  {
     owner: 'content-page-style-property-fields-predecessor',
     productionFile:
       'apps/extension/src/content/overlay/page-style-inspector/property-controls/fields.tsx',
@@ -171,8 +182,7 @@ export const LOCAL_OWNER_MAPPINGS = [
   },
   {
     owner: 'content-page-preparation-local-save-hook',
-    productionFile:
-      'apps/extension/src/content/parser/page-preparation/local-save/hook/index.ts',
+    productionFile: 'apps/extension/src/content/parser/page-preparation/local-save/hook/index.ts',
     exclusive: true,
     reason:
       'The page-preparation local-save hook executes through the toolbar visibility, history, result, and retry behavior suites.',

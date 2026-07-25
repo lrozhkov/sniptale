@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-/* eslint-disable max-lines-per-function -- autosave regression scenarios share one debounced lifecycle fixture */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EditorDocument } from '../../../features/editor/document/types';
 

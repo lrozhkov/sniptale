@@ -73,7 +73,7 @@ export class AudioMixer {
     } catch (error) {
       this.releaseMicrophoneStream();
       logger.error('Failed to add microphone', error);
-      throw new Error(translate('popup.video.microphoneAccessError'));
+      throw new Error(translate('popup.video.microphoneAccessError'), { cause: error });
     }
   }
 

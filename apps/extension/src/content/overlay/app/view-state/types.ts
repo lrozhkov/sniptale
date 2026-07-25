@@ -13,7 +13,7 @@ export interface ContentCoreControllers {
   screenshotController: ReturnType<typeof useScreenshotController>;
 }
 
-export interface ContentAppControllers extends ContentCoreControllers {
+interface ContentAppControllers extends ContentCoreControllers {
   autoBlurController: ReturnType<typeof useAutoBlurController>;
 }
 

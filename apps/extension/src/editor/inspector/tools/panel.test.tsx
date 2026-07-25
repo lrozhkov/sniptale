@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   tool ownership scenarios intentionally cover multiple rendered tool branches in one deterministic suite */
+
 import React, { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';

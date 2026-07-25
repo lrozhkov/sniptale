@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   exact raster interaction proof keeps down, move, and up routing together */
+
 import { Point } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEditorStore } from '../../state/useEditorStore';

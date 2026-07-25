@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function */
 import { describe, expect, it, vi } from 'vitest';
 const fabricMock = vi.hoisted(() => ({
   Path: class Path {

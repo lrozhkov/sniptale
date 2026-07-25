@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- rasterize coverage keeps the full source-state seam together */
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

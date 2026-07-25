@@ -49,7 +49,7 @@ async function reconcilePendingScenarioAssetStore(
   pendingCaptures: Map<number, PendingScenarioCapture>
 ): Promise<void> {
   const expectedTabsByAssetId = collectExpectedPendingAssetTabs(pendingCaptures);
-  let pendingAssets: PendingScenarioAssetEntry[] = [];
+  let pendingAssets: PendingScenarioAssetEntry[];
   try {
     pendingAssets = await listPendingScenarioAssets();
   } catch (error) {

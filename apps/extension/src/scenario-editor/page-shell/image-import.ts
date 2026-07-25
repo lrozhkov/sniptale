@@ -103,7 +103,8 @@ async function rollbackImportedImageAsset(assetId: string, cause: unknown): Prom
   } catch (rollbackError: unknown) {
     throw new AggregateError(
       [cause, rollbackError],
-      'Failed to insert scenario image layer and roll back image asset'
+      'Failed to insert scenario image layer and roll back image asset',
+      { cause: rollbackError }
     );
   }
 

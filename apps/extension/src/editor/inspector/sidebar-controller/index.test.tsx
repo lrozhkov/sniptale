@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- hook orchestration coverage keeps the seam proof together */
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

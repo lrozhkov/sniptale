@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { afterEach, expect, it } from 'vitest';
 
-import { loadSourceIndex } from './index.mjs';
+import { materializeSourceIndex } from './index.mjs';
 
 const roots: string[] = [];
 
@@ -39,18 +39,18 @@ it('reuses unchanged records and updates only content-digest misses', () => {
   const cachePath = path.join(root, '.tmp/index.json');
   const tsConfigFilePath = path.join(root, 'tsconfig.json');
 
-  expect(loadSourceIndex({ cachePath, tsConfigFilePath }).stats).toMatchObject({
+  expect(materializeSourceIndex({ cachePath, tsConfigFilePath }).stats).toMatchObject({
     cacheStatus: 'rebuilt',
     parsedFileCount: 2,
   });
-  expect(loadSourceIndex({ cachePath, tsConfigFilePath }).stats).toMatchObject({
+  expect(materializeSourceIndex({ cachePath, tsConfigFilePath }).stats).toMatchObject({
     cacheStatus: 'reused',
     parsedFileCount: 0,
     reusedFileCount: 2,
   });
 
   write(root, 'src/value.ts', 'export const value = 2;\n');
-  expect(loadSourceIndex({ cachePath, tsConfigFilePath }).stats).toMatchObject({
+  expect(materializeSourceIndex({ cachePath, tsConfigFilePath }).stats).toMatchObject({
     cacheStatus: 'updated',
     parsedFileCount: 1,
     reusedFileCount: 1,
@@ -61,16 +61,16 @@ it('rebuilds after corrupt cache data or a source-inventory change', () => {
   const root = createRoot();
   const cachePath = path.join(root, '.tmp/index.json');
   const tsConfigFilePath = path.join(root, 'tsconfig.json');
-  loadSourceIndex({ cachePath, tsConfigFilePath });
+  materializeSourceIndex({ cachePath, tsConfigFilePath });
 
   fs.writeFileSync(cachePath, '{broken');
-  expect(loadSourceIndex({ cachePath, tsConfigFilePath }).stats).toMatchObject({
+  expect(materializeSourceIndex({ cachePath, tsConfigFilePath }).stats).toMatchObject({
     cacheStatus: 'rebuilt',
     parsedFileCount: 2,
   });
 
   write(root, 'src/next.ts', 'export type Next = string;\n');
-  expect(loadSourceIndex({ cachePath, tsConfigFilePath }).stats).toMatchObject({
+  expect(materializeSourceIndex({ cachePath, tsConfigFilePath }).stats).toMatchObject({
     cacheStatus: 'rebuilt',
     parsedFileCount: 3,
   });
@@ -80,7 +80,7 @@ it('rebuilds instead of trusting valid JSON with corrupted derived records', () 
   const root = createRoot();
   const cachePath = path.join(root, '.tmp/index.json');
   const tsConfigFilePath = path.join(root, 'tsconfig.json');
-  loadSourceIndex({ cachePath, tsConfigFilePath });
+  materializeSourceIndex({ cachePath, tsConfigFilePath });
 
   const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
   const valueRecord = cache.records.find(
@@ -89,7 +89,7 @@ it('rebuilds instead of trusting valid JSON with corrupted derived records', () 
   valueRecord.exports = [];
   fs.writeFileSync(cachePath, `${JSON.stringify(cache)}\n`);
 
-  const rebuilt = loadSourceIndex({ cachePath, tsConfigFilePath });
+  const rebuilt = materializeSourceIndex({ cachePath, tsConfigFilePath });
   expect(rebuilt.stats).toMatchObject({ cacheStatus: 'rebuilt', parsedFileCount: 2 });
   expect(rebuilt.records.find(({ file }) => file === 'src/value.ts')?.exports).toEqual([
     { exportName: 'value', kind: 'VariableDeclaration' },
@@ -100,7 +100,7 @@ it('indexes local export lists without treating them as module edges', () => {
   const root = createRoot();
   write(root, 'src/local.ts', 'const local = 1;\nexport { local };\n');
 
-  const index = loadSourceIndex({
+  const index = materializeSourceIndex({
     cachePath: path.join(root, '.tmp/index.json'),
     tsConfigFilePath: path.join(root, 'tsconfig.json'),
   });

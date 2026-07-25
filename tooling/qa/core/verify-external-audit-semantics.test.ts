@@ -10,7 +10,7 @@ it('covers semantic hostile results for every profile-required external adapter'
 });
 
 it.each(semanticCases)('$id blocks contradictory or unclassifiable result content', ({ run }) => {
-  let blocked = false;
+  let blocked: boolean;
   try {
     const result = run();
     blocked = result.status === 'failed' || result.violations.length > 0;

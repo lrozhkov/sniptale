@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function -- lifecycle regression suite keeps related flows together */
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const lifecycleMocks = vi.hoisted(() => {
   const magnetManager = { dispose: vi.fn(), hasActiveGuides: vi.fn(() => false) };

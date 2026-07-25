@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   exact raster mutation proof keeps fill, flood, erase, and gradient mask branches together */
 
 import { describe, expect, it } from 'vitest';
 import {

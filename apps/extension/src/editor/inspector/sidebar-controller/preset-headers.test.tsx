@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function -- preset-header routing proof keeps tool and scene owner mapping together */
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

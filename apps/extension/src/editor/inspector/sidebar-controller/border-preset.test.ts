@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   border preset projection proof intentionally keeps the contract cases together */
 import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';

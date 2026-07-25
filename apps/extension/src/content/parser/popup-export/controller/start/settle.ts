@@ -45,7 +45,7 @@ function createPopupExportResult(result: ExportResult, persistErrors: string[]):
 export async function settlePopupExportStartFlow(
   props: PopupExportStartSettlementProps
 ): Promise<PopupExportResult | null> {
-  let popupResult: PopupExportResult | null = null;
+  let popupResult: PopupExportResult;
 
   try {
     const result = await props.exportRunner.export(props.options, {

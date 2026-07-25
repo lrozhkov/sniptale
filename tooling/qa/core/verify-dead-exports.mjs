@@ -9,7 +9,7 @@ import fs from 'node:fs';
 
 import { isExecutedAsScript, repoRoot } from './shared.mjs';
 import { isProductSourcePath } from './src-production-targets.mjs';
-import { loadSourceIndex } from './source-index/index.mjs';
+import { materializeSourceIndex } from './source-index/index.mjs';
 
 const EXPLICIT_IGNORE_FILES = new Set(['packages/platform/src/browser/app-facade-removal.test.ts']);
 
@@ -122,7 +122,7 @@ export function runDeadExportsCheck({
   tsConfigFilePath = path.join(repoRoot, 'tsconfig.json'),
   cachePath,
 } = {}) {
-  const index = loadSourceIndex({ cachePath, tsConfigFilePath });
+  const index = materializeSourceIndex({ cachePath, tsConfigFilePath });
   return {
     ...collectUnusedDeclarations(index.records, index.rootDir),
     sourceIndexStats: index.stats,

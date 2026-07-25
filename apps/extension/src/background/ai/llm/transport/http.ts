@@ -114,7 +114,7 @@ export async function postJsonWithTimeout(args: {
     };
   } catch (error) {
     if (isAbortError(error)) {
-      throw new Error(args.timeoutErrorMessage);
+      throw new Error(args.timeoutErrorMessage, { cause: error });
     }
 
     throw error;

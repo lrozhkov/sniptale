@@ -231,7 +231,7 @@ function createRecords({ cache, compilerOptions, rootDir, sources }) {
   return { parsedFileCount, records };
 }
 
-export function loadSourceIndex({ cachePath, tsConfigFilePath }) {
+export function materializeSourceIndex({ cachePath, tsConfigFilePath }) {
   const { compilerOptions, fileNames, rootDir } = parseTsConfig(tsConfigFilePath);
   const sources = collectSources({ fileNames, rootDir });
   const files = sources.map(({ file }) => file);

@@ -9,7 +9,6 @@ import {
 } from '@sniptale/ui/default-colors/constants';
 
 export const CALLOUT_GAP = 8;
-export const MIN_TAIL_EDGE_MARGIN = 10;
 
 export const FONT_FAMILY_MAP: Record<string, string> = {
   sans: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',

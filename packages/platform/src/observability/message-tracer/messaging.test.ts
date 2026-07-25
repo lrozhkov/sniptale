@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   exact messaging tracer proof keeps send/response and trimming behavior in one suite */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_TRACE_CONFIG, type TraceEvent } from './types';

@@ -59,6 +59,7 @@ function createFocusedWorkerContext(context) {
     qualityJsLikeFiles: context.qualityJsLikeFiles,
     qualityTargetFiles: context.qualityTargetFiles,
     shouldRunManifestPermissions: context.shouldRunManifestPermissions,
+    shouldRunFullEslint: context.shouldRunFullEslint,
     shouldRunRuntimeTopology: context.shouldRunRuntimeTopology,
     targetFiles: context.targetFiles,
   };
@@ -69,7 +70,10 @@ function createFocusedLaneTasks({ context, profile, workerRunner }) {
   const typecheckMaxConcurrency = Math.min(2, profile.cpuTokens);
   return ['targetPaths', 'appOwners', 'typecheck', 'tests', 'lint', 'graph', 'light'].map(
     (lane) => {
-      const resources = LANE_RESOURCES[lane];
+      const fullEslintClosure = lane === 'lint' && context.shouldRunFullEslint;
+      const resources = fullEslintClosure
+        ? { cpuTokens: Math.min(2, profile.cpuTokens), memoryMiB: 6144 }
+        : LANE_RESOURCES[lane];
       const cpuTokens =
         lane === 'tests'
           ? profile.vitestMaxWorkers

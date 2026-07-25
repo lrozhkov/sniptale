@@ -1,4 +1,4 @@
-import { fork, spawn } from 'node:child_process';
+import { fork, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { parseQaWorkerEnvelope } from './lane-worker-contract.mjs';
@@ -81,6 +81,19 @@ function signalProcessTree(child, signal) {
   }
 }
 
+function forceTerminateProcessTreeOnExit(child) {
+  if (!child.pid) return;
+  try {
+    if (process.platform === 'win32') {
+      spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    } else {
+      process.kill(-child.pid, 'SIGKILL');
+    }
+  } catch (error) {
+    if (error?.code !== 'ESRCH') throw error;
+  }
+}
+
 async function terminateProcessTree(child) {
   if (!child.pid) return;
   if (process.platform === 'win32') {
@@ -130,11 +143,22 @@ export function runQaLaneWorker({
     let settlementStarted = false;
 
     const removeAbortListener = () => signal?.removeEventListener('abort', onAbort);
+    const onParentExit = () => forceTerminateProcessTreeOnExit(child);
+    const removeParentExitListener = () => process.removeListener('exit', onParentExit);
     const finish = (callback) => {
       if (settlementStarted) return;
       settlementStarted = true;
       removeAbortListener();
-      void terminateProcessTree(child).then(callback, reject);
+      void terminateProcessTree(child).then(
+        () => {
+          removeParentExitListener();
+          callback();
+        },
+        (error) => {
+          removeParentExitListener();
+          reject(error);
+        }
+      );
     };
     const finishRejected = (error) => finish(() => reject(error));
     function onAbort() {
@@ -163,6 +187,7 @@ export function runQaLaneWorker({
         )
       );
     });
+    process.once('exit', onParentExit);
     signal?.addEventListener('abort', onAbort, { once: true });
     if (signal?.aborted) onAbort();
     else {

@@ -30,19 +30,27 @@ import { runSonarjsCheck } from './verify-sonarjs.mjs';
 import { runStructuralRiskCheck } from './verify-structural-risk.mjs';
 import { timeAsyncStep, timeSyncStep } from './step-timing.helpers.mjs';
 
-async function runEslintStep(jsLikeFiles) {
-  const behavioralJsLikeFiles = filterImportOnlyDiffFiles(jsLikeFiles);
+async function runEslintStep(
+  jsLikeFiles,
+  { eslintRunner = lintWithEslint, fullClosure = false } = {}
+) {
+  const behavioralJsLikeFiles = fullClosure ? ['.'] : filterImportOnlyDiffFiles(jsLikeFiles);
   if (behavioralJsLikeFiles.length === 0) {
     return createSkippedStep('ESLint');
   }
 
-  const eslintResult = await lintWithEslint({
+  const eslintResult = await eslintRunner({
     files: behavioralJsLikeFiles,
-    rulePrefix: '@typescript-eslint/',
+    rulePrefix: fullClosure ? null : '@typescript-eslint/',
     strict: true,
   });
   if (!eslintResult.failed) {
-    return createOkStep('ESLint', `type-aware rules; files=${behavioralJsLikeFiles.length}`);
+    return createOkStep(
+      'ESLint',
+      fullClosure
+        ? 'full config closure'
+        : `type-aware rules; files=${behavioralJsLikeFiles.length}`
+    );
   }
 
   return createFailureStep('ESLint', 'failed', {
@@ -150,9 +158,8 @@ function runChangedLineReadabilityStep(codeFiles) {
   );
 }
 
-function runDeadExportsStep(codeFiles) {
-  const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
-  const deadExportsResult = runFocusedDeadExportsCheck(behavioralCodeFiles);
+function runDeadExportsStep(targetFiles, { deadExportsRunner = runFocusedDeadExportsCheck } = {}) {
+  const deadExportsResult = deadExportsRunner(targetFiles);
   if (deadExportsResult.skipped) {
     return createSkippedStep('Dead exports');
   }
@@ -231,23 +238,35 @@ export function collectFocusedOwnerLane({ lane }) {
   return { ownerStep: collectOwnerGuardStep(lane) };
 }
 
-export async function collectFocusedLintLane({
-  codeFiles,
-  jsLikeFiles,
-  qualityCodeFiles = codeFiles,
-  qualityJsLikeFiles = jsLikeFiles,
-}) {
+export async function collectFocusedLintLane(
+  {
+    codeFiles,
+    jsLikeFiles,
+    qualityCodeFiles = codeFiles,
+    qualityJsLikeFiles = jsLikeFiles,
+    shouldRunFullEslint,
+  },
+  { eslintRunner = lintWithEslint } = {}
+) {
   return {
-    eslintStep: await timeAsyncStep(() => runEslintStep(qualityJsLikeFiles)),
+    eslintStep: await timeAsyncStep(() =>
+      runEslintStep(qualityJsLikeFiles, { eslintRunner, fullClosure: shouldRunFullEslint })
+    ),
     sonarjsStep: await timeAsyncStep(() => runSonarjsStep(qualityCodeFiles)),
     securityStep: await timeAsyncStep(() => runSecurityStep(codeFiles)),
   };
 }
 
-export async function collectFocusedGraphLane({ codeFiles, existingTargetFiles }) {
+export async function collectFocusedGraphLane(
+  { existingTargetFiles, targetFiles },
+  {
+    deadExportsRunner = runFocusedDeadExportsCheck,
+    dependencyGraphRunner = runDependencyGraphTriggeredChecks,
+  } = {}
+) {
   return {
-    dependencySteps: await runDependencyGraphTriggeredChecks(existingTargetFiles),
-    deadExportsStep: timeSyncStep(() => runDeadExportsStep(codeFiles)),
+    dependencySteps: await dependencyGraphRunner(existingTargetFiles),
+    deadExportsStep: timeSyncStep(() => runDeadExportsStep(targetFiles, { deadExportsRunner })),
   };
 }
 
@@ -291,6 +310,18 @@ export async function collectFocusedStepResults(context, dependencies) {
     ...context,
     shouldRunManifestPermissions: context.shouldRunManifestPermissions(context.existingTargetFiles),
     shouldRunRuntimeTopology: context.shouldRunRuntimeTopology(context.existingTargetFiles),
+    shouldRunFullEslint: requiresFullEslintClosure(context.targetFiles),
   };
   return collectScheduledFocusedStepResults(workerContext, dependencies);
+}
+
+const FULL_ESLINT_CLOSURE_FILES = new Set([
+  'eslint.config.js',
+  'package-lock.json',
+  'package.json',
+  'tooling/qa/core/verify-eslint.mjs',
+]);
+
+export function requiresFullEslintClosure(targetFiles = []) {
+  return targetFiles.some((file) => FULL_ESLINT_CLOSURE_FILES.has(file));
 }

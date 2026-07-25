@@ -14,7 +14,11 @@ const FOCUSED_LANES = ['appOwners', 'targetPaths', 'typecheck', 'tests', 'lint',
 
 export function parseFocusedWorkerInput(value) {
   const input = parseLaneWorkerInput(value, {
-    contextBooleanFields: ['shouldRunManifestPermissions', 'shouldRunRuntimeTopology'],
+    contextBooleanFields: [
+      'shouldRunFullEslint',
+      'shouldRunManifestPermissions',
+      'shouldRunRuntimeTopology',
+    ],
     contextStringArrayFields: [
       'addedFiles',
       'codeFiles',
@@ -34,6 +38,7 @@ export function parseFocusedWorkerInput(value) {
       'qualityCodeFiles',
       'qualityJsLikeFiles',
       'qualityTargetFiles',
+      'shouldRunFullEslint',
       'shouldRunManifestPermissions',
       'shouldRunRuntimeTopology',
       'targetFiles',

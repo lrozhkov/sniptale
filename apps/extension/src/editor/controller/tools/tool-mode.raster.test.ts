@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   exact tool-mode proof keeps raster and adjacent free-draw branches in one matrix */
 import { describe, expect, it, vi } from 'vitest';
 import { useEditorStore } from '../../state/useEditorStore';
 import { applyEditorToolMode } from './tool-mode';

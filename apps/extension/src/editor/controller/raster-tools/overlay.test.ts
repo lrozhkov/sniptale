@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   exact overlay proof keeps all transient raster overlays in one rendering matrix */
+
 import { Point } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEditorStore } from '../../state/useEditorStore';

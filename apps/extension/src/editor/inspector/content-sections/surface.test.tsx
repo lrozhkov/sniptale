@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- surface routing proof keeps branch coverage together */
 // @vitest-environment jsdom
 import React from 'react';
 import { act } from 'react';

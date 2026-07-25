@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- registry coverage keeps exhaustive default cases together */
 import { describe, expect, it } from 'vitest';
 import {
   createDefaultEditorRasterEffect,

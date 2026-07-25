@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   action-result proof keeps merged action contract and error surfacing together */
 import { describe, expect, it, vi } from 'vitest';
 
 const helperMocks = vi.hoisted(() => ({

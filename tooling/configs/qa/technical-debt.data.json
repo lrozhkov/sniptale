@@ -12386,7 +12386,7 @@
       "remediation": "Keep ignores file-exact and remove them with the associated compatibility proof.",
       "exactSource": {
         "path": "tooling/qa/core/verify-dead-exports.mjs",
-        "contentHash": "147cf18bd1b33c1ccc8c76f662254ba1fa10a1b50e615d123c28d4e281e48176"
+        "contentHash": "bef770145cc33661fa28061732fb8dbb0d62d33ad697f50f3546ce47b13b296b"
       },
       "consumers": [
         "tooling/qa/core/verify-closeout-step-helpers.mjs",
@@ -13381,7 +13381,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/architecture-guardrails.scc-graph.mjs",
-        "contentHash": "add697ed50f664833a21d09ca487e4e3cfcf8a7308a80199e9e8fa574f0276e1"
+        "contentHash": "aaa7a2b001c6526eff25a50ff8e283a435cb349c0a6275b415ba48172cc6a13f"
       },
       "consumers": [
         "tooling/qa/core/architecture-guardrails.scc-graph.mjs",
@@ -13487,7 +13487,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/release/artifact-security.mjs",
-        "contentHash": "2e16c4326ffe55f8f7d0daf2f935f4296c3548fb0836b289a6c07144d422968f"
+        "contentHash": "385f9f13852db836f230f7c38ef8978545e0402a8a5682b7317140a3d283b4ec"
       },
       "consumers": [
         "tooling/release/artifact-security-dynamic-sandbox-worker.test.ts",
@@ -14685,7 +14685,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/contract.mjs",
-        "contentHash": "c05996c23c48cd45694f06df9d76b7be2e0f755d3a3e45e9213e89eb18aed152"
+        "contentHash": "fb5d138342db914cd09587955dbf955a4b5f2464f631c980c2667b1a3759b9b3"
       },
       "consumers": [
         "tooling/qa/core/checkpoint-result.helpers.mjs",
@@ -14725,7 +14725,8 @@
         "property:closeoutContract/required[4]",
         "property:resolveContract/required",
         "property:resolveContract/required[1]",
-        "property:resolveContract/required[2]"
+        "property:resolveContract/required[2]",
+        "property:resolveContract/required[3]"
       ]
     },
     {
@@ -14865,7 +14866,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-        "contentHash": "697bdb3bb849d15b476c8ae52d90088fc73df43aa1e7d6cdd96f85eadf6369e2"
+        "contentHash": "bfe937a3285fb13ee24f0da7c773dcb6568d770425664ab475b9749dc248c326"
       },
       "consumers": [
         "tooling/qa/audits/profiles/schema.mjs",
@@ -15447,7 +15448,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/support/extension-browser-launch.ts",
-        "contentHash": "d4e3ba336f26c3ff88c6bb6b7c63af2b94d12a5d881d25900328a4b1c1e4048c"
+        "contentHash": "a50cf21c8d9823c529a2cdc41d59b43a1a34d13c72fcfb99b1b0b8384089459a"
       },
       "consumers": [
         "tooling/test/e2e/support/extension-browser-launch.ts",
@@ -16144,7 +16145,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/source-index/index.mjs",
-        "contentHash": "69ba20ace5773dbd328da391110c690401766db65270b99f07eb92d22706f2eb"
+        "contentHash": "f1e6b769112febf6a7d3b1d8c7a0521e2c20520491a6cfd4902e6c563e39f2a6"
       },
       "consumers": [
         "tooling/qa/core/source-index/index.mjs",
@@ -16153,7 +16154,7 @@
       ],
       "surfaces": [
         "binding:IMPLEMENTATION_PATHS",
-        "property:loadSourceIndex/stats"
+        "property:materializeSourceIndex/stats"
       ]
     },
     {
@@ -16243,7 +16244,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/audits/jscpd.mjs",
-        "contentHash": "8c542a4b54ac1e1526e957155135ab2543381415ccb2586d0f02271cbedfe26f"
+        "contentHash": "bc278a1c7f388c9c6c02bd071c2e75669341f09ac07239af39c2e91aea73aede"
       },
       "consumers": [
         "tooling/qa/audits/jscpd.mjs",
@@ -16384,12 +16385,33 @@
         "tooling/qa/core/verify-build.worker.mjs",
         "tooling/qa/core/verify-focused.scheduler.mjs",
         "tooling/qa/core/verify-focused.worker.mjs",
+        "tooling/qa/core/verify-harness.scheduler.mjs",
+        "tooling/qa/core/verify-harness.worker.mjs",
         "tooling/qa/runtime/lane-worker-contract.mjs",
         "tooling/qa/runtime/lane-worker-contract.test.ts",
         "tooling/qa/runtime/lane-worker-runner.mjs"
       ],
       "surfaces": [
         "binding:STEP_STATUSES"
+      ]
+    },
+    {
+      "id": "policy.source.lane-worker-parent-exit-fixture-mjs.226d115bb5",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/runtime/lane-worker-parent-exit.fixture.mjs",
+        "contentHash": "82ef0c7d748954b51d99e5a84b17caa9f6ef1dd3a90f1fe91afc995248957abf"
+      },
+      "consumers": [
+        "tooling/qa/runtime/lane-worker-parent-exit.fixture.mjs"
+      ],
+      "surfaces": [
+        "property:workerArguments",
+        "property:workerData"
       ]
     },
     {
@@ -16419,18 +16441,20 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/runtime/lane-worker-runner.mjs",
-        "contentHash": "456f6a36e26bc8808825413030fbeca8640f47edf06d3cae4495c66564c9bdc0"
+        "contentHash": "63e19be2eb47953790873e6cd48cce74a90e57ce5d8a6b45d68c7e7460a76cb9"
       },
       "consumers": [
         "tooling/qa/core/verify-all.scheduler.mjs",
         "tooling/qa/core/verify-build.scheduler.mjs",
         "tooling/qa/core/verify-focused.scheduler.mjs",
+        "tooling/qa/core/verify-harness.scheduler.mjs",
+        "tooling/qa/runtime/lane-worker-parent-exit.fixture.mjs",
         "tooling/qa/runtime/lane-worker-runner.mjs",
         "tooling/qa/runtime/lane-worker-runner.test.ts"
       ],
       "surfaces": [
-        "property:runQaLaneWorker/anonymous-122/env",
-        "property:runQaLaneWorker/anonymous-122/stdio"
+        "property:runQaLaneWorker/anonymous-135/env",
+        "property:runQaLaneWorker/anonymous-135/stdio"
       ]
     },
     {
@@ -16510,7 +16534,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "039a8f8f8cff1134f044a60f00bdfbb7d20b1839df6780a07e62a0891afaaa57"
+        "contentHash": "f290b780759350ea3a78a136ff469443e173b066b8014a1acc2870c7d0c7de2e"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16565,6 +16589,7 @@
         "property:testFiles[49]",
         "property:testFiles[5]",
         "property:testFiles[50]",
+        "property:testFiles[51]",
         "property:testFiles[6]",
         "property:testFiles[7]",
         "property:testFiles[8]",
@@ -19638,7 +19663,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.deleted-closure.mjs",
-        "contentHash": "7faec59fbfbeb2ad07e7644a1832e3e1ea46765d5062ac4482ad84e69f267524"
+        "contentHash": "fb7bd97f52b1fd5cc0e15c0c20ac6bc12747f33f570095fa2d623db28341231f"
       },
       "consumers": [
         "tooling/qa/core/verify-build.deleted-closure.mjs",
@@ -20196,10 +20221,11 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.dead-exports.helpers.mjs",
-        "contentHash": "2b12a348a0af29e1899abb1e29cd9c47c9559e787e4c7f08042a9d385c09425a"
+        "contentHash": "71e09186945253982ee3c137ea8e212138b26ed2f5e46653c912fb04f20ceef1"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.dead-exports.helpers.mjs",
+        "tooling/qa/core/verify-focused.dead-exports.helpers.test.ts",
         "tooling/qa/core/verify-focused.execution.mjs"
       ],
       "surfaces": [
@@ -20218,14 +20244,17 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.execution.mjs",
-        "contentHash": "2fb68edd5df42d1e571fe8ca64fe04aaab3c4f112d9347f1848e75c14db47211"
+        "contentHash": "b22aaf6e6eaec45a157923b88eb6c3d407fd805f98ed87079b943aff5032b70b"
       },
       "consumers": [
+        "tooling/qa/core/verify-focused.dead-exports.helpers.test.ts",
+        "tooling/qa/core/verify-focused.eslint-closure.test.ts",
         "tooling/qa/core/verify-focused.execution.mjs",
         "tooling/qa/core/verify-focused.worker.mjs",
         "tooling/qa/wrappers/checkpoint.mjs"
       ],
       "surfaces": [
+        "binding:FULL_ESLINT_CLOSURE_FILES",
         "property:collectFocusedLightLane/qualitySteps",
         "property:runAiHygieneStep/violations"
       ]
@@ -20239,7 +20268,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.scheduler.mjs",
-        "contentHash": "40f2bc74c79eb829f6d33ba0b451639f1ccc0db6d93248bde0be2927d1337c45"
+        "contentHash": "694f467283615b6812995575c8140b3ea963272791faa1bb3fc7a98a36dfb4c9"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.execution.mjs",
@@ -20322,7 +20351,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.worker.mjs",
-        "contentHash": "448b9350e9c8c45b559205eb1945023c9304219f7465803ad3305ba6c769538e"
+        "contentHash": "86c7c336f40e87f25634d8d7dd8414b7853b7b8a65635172afa6ea1493fec29b"
       },
       "consumers": [
         "tooling/qa/core/lane-worker-input-contracts.test.ts",
@@ -20346,16 +20375,70 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-harness.execution.mjs",
-        "contentHash": "e31af68c4ebac5873da301e2f9974230699a18868562fe1293d49be19a4def90"
+        "contentHash": "22df52b55fa7ed1c69079020c39b88136e1b8e0414f6aa64c062e82ddbe7cfe0"
       },
       "consumers": [
         "tooling/qa/core/verify-harness.execution.mjs",
         "tooling/qa/core/verify-harness.execution.test.ts",
+        "tooling/qa/core/verify-harness.worker.mjs",
         "tooling/qa/wrappers/release-harness.mjs"
       ],
       "surfaces": [
-        "property:collectAiHygieneStep/anonymous-63/violations",
-        "property:collectHarnessStepResults/steps"
+        "binding:DEPENDENCY_AUDIT_TARGETS",
+        "property:collectAiHygieneStep/anonymous-64/violations",
+        "property:collectHarnessStaticLane/steps",
+        "property:collectHarnessStepResults/steps",
+        "property:collectHarnessStepResults/steps[1]"
+      ]
+    },
+    {
+      "id": "policy.source.verify-harness-scheduler-mjs.27448bac62",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/verify-harness.scheduler.mjs",
+        "contentHash": "9f8e5b703dd445723ee1cdd5f8fd4cb65a967073246c0fe56d6733e5e1e4ae04"
+      },
+      "consumers": [
+        "tooling/qa/core/verify-harness.execution.mjs",
+        "tooling/qa/core/verify-harness.scheduler.mjs",
+        "tooling/qa/core/verify-harness.scheduler.test.ts"
+      ],
+      "surfaces": [
+        "binding:HARNESS_RESULT_SHAPES",
+        "binding:LANE_RESOURCES",
+        "property:annotate/steps",
+        "property:runHarnessLaneWorker/workerData",
+        "property:static",
+        "property:static[1]",
+        "property:tests",
+        "property:tests[1]",
+        "property:typecheck",
+        "property:typecheck[1]"
+      ]
+    },
+    {
+      "id": "policy.source.verify-harness-worker-mjs.3681e9c4e6",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/qa/core/verify-harness.worker.mjs",
+        "contentHash": "0b63cebdb8930a9aab240f4dc695ae76f6c7c691367368e446c37e321369023d"
+      },
+      "consumers": [
+        "tooling/qa/core/verify-harness.worker.mjs"
+      ],
+      "surfaces": [
+        "binding:HARNESS_LANES",
+        "property:parseHarnessWorkerInput/context",
+        "property:parseHarnessWorkerInput/contextFields",
+        "property:parseHarnessWorkerInput/contextStringArrayFields"
       ]
     },
     {
@@ -20872,6 +20955,7 @@
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.runtime.mjs",
         "tooling/qa/core/verify-focused.code-steps.mjs",
+        "tooling/qa/core/verify-harness.execution.mjs",
         "tooling/qa/core/verify-read-safe-naming.mjs",
         "tooling/qa/core/verify-read-safe-naming.test.ts"
       ],
@@ -21315,7 +21399,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-unit-tests.mjs",
-        "contentHash": "d5e8539d11cf23510869990cbd44d4bf4093254de70c5f69fbf174fa60869b90"
+        "contentHash": "772ed2e75a97bf6c69c936bd3cfc17099156218610d7d6ff41f1d15ec09d386a"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",

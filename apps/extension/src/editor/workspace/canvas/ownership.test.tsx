@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   ownership test keeps preview pointer and keyboard flow assertions in single scenarios */
+
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_EDITOR_WORKSPACE_SETTINGS } from '../../../features/editor/document/constants';

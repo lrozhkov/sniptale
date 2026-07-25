@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   compact command builder coverage stays consolidated to preserve one command-matrix assertion pass */
 
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';

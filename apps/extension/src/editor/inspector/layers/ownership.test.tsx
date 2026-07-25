@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   layer ownership test keeps drag/drop and toolbar orchestration in single focused scenarios */
 
 import React from 'react';
 import { act } from 'react';

@@ -5,7 +5,7 @@ function addEdge(graph, [from, to]) {
 
 function popComponent(node, stack, records) {
   const component = [];
-  let current = null;
+  let current;
   do {
     current = stack.pop();
     records.get(current).onStack = false;

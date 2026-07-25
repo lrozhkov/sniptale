@@ -109,7 +109,7 @@ function createBuildPackageRunner(
       return result.pagePackage;
     } catch (error) {
       const errorMessage = reportServiceFailure(state, warnings, error);
-      throw new Error(errorMessage);
+      throw new Error(errorMessage, { cause: error });
     }
   };
 }

@@ -25,7 +25,13 @@ vi.mock('../../storage/scenario/session', () => ({
   writeStoredScenarioSessions: writeStoredScenarioSessionsMock,
 }));
 
-import { hydrateScenarioSessionState } from './state';
+import {
+  getMutableScenarioSession,
+  getMutableScenarioSurface,
+  hydrateScenarioSessionState,
+  persistScenarioSessionState,
+} from './state';
+import { createDefaultScenarioSessionState, createDefaultScenarioSurfaceState } from './helpers';
 import { createStoredPendingScenarioCapture, createStoredScenarioTabState } from './test-support';
 
 function createState() {
@@ -91,4 +97,52 @@ it('keeps only pending capture assets whose id and tab match persisted state', a
   expect(state.pendingCaptures.get(12)).toEqual(pendingCapture);
   expect(deletePendingScenarioAssetMock).toHaveBeenCalledTimes(1);
   expect(deletePendingScenarioAssetMock).toHaveBeenCalledWith('wrong-tab-asset');
+});
+
+it('keeps hydrated state usable when pending-asset inventory cannot be read', async () => {
+  const stored = createStoredScenarioTabState({
+    captureMode: 'manual',
+    projectId: null,
+    projectName: null,
+  });
+  readStoredScenarioSessionsMock.mockResolvedValue(new Map([[12, stored]]));
+  listPendingScenarioAssetsMock.mockRejectedValue(new Error('inventory failed'));
+  const state = createState();
+
+  await expect(hydrateScenarioSessionState(state)).resolves.toBeUndefined();
+
+  expect(state.sessions.has(12)).toBe(true);
+  expect(deletePendingScenarioAssetMock).not.toHaveBeenCalled();
+});
+
+it('continues orphan cleanup when one pending-asset deletion fails', async () => {
+  listPendingScenarioAssetsMock.mockResolvedValue([
+    createPendingAsset('failed-asset', 7),
+    createPendingAsset('deleted-asset', 8),
+  ]);
+  deletePendingScenarioAssetMock
+    .mockRejectedValueOnce(new Error('delete failed'))
+    .mockResolvedValueOnce(undefined);
+
+  await expect(hydrateScenarioSessionState(createState())).resolves.toBeUndefined();
+
+  expect(deletePendingScenarioAssetMock).toHaveBeenCalledTimes(2);
+  expect(deletePendingScenarioAssetMock).toHaveBeenCalledWith('deleted-asset');
+});
+
+it('serializes persisted state and owns mutable session and surface creation', async () => {
+  const state = createState();
+  const existingSession = createDefaultScenarioSessionState();
+  const existingSurface = createDefaultScenarioSurfaceState();
+  state.sessions.set(1, existingSession);
+  state.surfaces.set(1, existingSurface);
+
+  expect(getMutableScenarioSession(state.sessions, 1)).toBe(existingSession);
+  expect(getMutableScenarioSurface(state.surfaces, 1)).toBe(existingSurface);
+  expect(getMutableScenarioSession(state.sessions, 2)).toBe(state.sessions.get(2));
+  expect(getMutableScenarioSurface(state.surfaces, 2)).toBe(state.surfaces.get(2));
+
+  await persistScenarioSessionState(state);
+
+  expect(writeStoredScenarioSessionsMock).toHaveBeenCalledOnce();
 });

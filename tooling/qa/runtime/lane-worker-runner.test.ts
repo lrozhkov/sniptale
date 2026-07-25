@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { fileURLToPath } from 'node:url';
 
 import { expect, it, vi } from 'vitest';
 
@@ -56,6 +59,21 @@ it('cleans up resistant descendants after a lane parent exits without a result',
   await vi.waitFor(() => expect(fs.existsSync(pidFile)).toBe(true));
   const childPid = Number(fs.readFileSync(pidFile, 'utf8'));
   await expect(result).rejects.toThrow('exited QA worker exited without a result (code 7');
+  await vi.waitFor(() => expect(() => process.kill(childPid, 0)).toThrow());
+  fs.rmSync(root, { recursive: true, force: true });
+}, 10_000);
+
+it('kills the detached lane process group when the orchestrator exits', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'qa-lane-orchestrator-exit-'));
+  const pidFile = path.join(root, 'child.pid');
+  const fixture = fileURLToPath(new URL('./lane-worker-parent-exit.fixture.mjs', import.meta.url));
+  const orchestrator = spawn(process.execPath, [fixture, pidFile], { stdio: 'ignore' });
+
+  await vi.waitFor(() => expect(fs.existsSync(pidFile)).toBe(true));
+  const childPid = Number(fs.readFileSync(pidFile, 'utf8'));
+  orchestrator.kill('SIGTERM');
+  await once(orchestrator, 'exit');
+
   await vi.waitFor(() => expect(() => process.kill(childPid, 0)).toThrow());
   fs.rmSync(root, { recursive: true, force: true });
 }, 10_000);

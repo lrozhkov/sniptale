@@ -46,6 +46,7 @@ export const HARNESS_STEPS = [
   ['changed-line-readability', 'Changed-line readability', 'verify-line-length.mjs', 'always'],
   ['ai-hygiene', 'AI hygiene', 'verify-ai-hygiene.mjs', 'always'],
   ['structural-risk', 'Structural risk', 'verify-structural-risk.mjs', 'always'],
+  ['read-safe-naming', 'Read-safe naming', 'verify-read-safe-naming.mjs', 'always'],
   [
     'qa-rule-coverage-contract',
     'QA rule coverage contract',
@@ -56,6 +57,7 @@ export const HARNESS_STEPS = [
   ['technical-debt-registry', 'Technical debt registry', 'verify-technical-debt.mjs', 'always'],
   ['retired-controls', 'Retired controls', 'retired-controls/validation.mjs', 'always'],
   ['dependency-admission', 'Dependency admission', 'verify-dependency-admission.mjs', 'always'],
+  ['audit', 'Audit', 'verify-audit.mjs', 'conditional'],
   [
     'runtime-listener-ownership',
     'Runtime listener ownership',

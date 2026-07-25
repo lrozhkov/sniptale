@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   exact route coverage keeps raster and adjacent tool branches in one owner-local proof */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { translate } from '../../../../platform/i18n';

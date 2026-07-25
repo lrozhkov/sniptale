@@ -14,15 +14,10 @@ function createSkippedResult() {
   };
 }
 
-function filterDeadExportsReport(report, focusedFileSet) {
-  return {
-    unusedTypeExports: report.unusedTypeExports.filter((item) => focusedFileSet.has(item.file)),
-    unusedValueExports: report.unusedValueExports.filter((item) => focusedFileSet.has(item.file)),
-    sourceIndexStats: report.sourceIndexStats,
-  };
-}
-
-export function runFocusedDeadExportsCheck(codeFiles) {
+export function runFocusedDeadExportsCheck(
+  codeFiles,
+  { deadExportsRunner = runDeadExportsCheck } = {}
+) {
   const tsSourceFiles = codeFiles.filter(
     (file) => isProductSourcePath(file) && /\.(?:ts|tsx)$/u.test(file)
   );
@@ -30,13 +25,12 @@ export function runFocusedDeadExportsCheck(codeFiles) {
     return createSkippedResult();
   }
 
-  const focusedFileSet = new Set(tsSourceFiles);
-  const filteredReport = filterDeadExportsReport(runDeadExportsCheck(), focusedFileSet);
+  const report = deadExportsRunner();
 
   return {
     skipped: false,
-    report: filteredReport,
-    summary: summarizeDeadExportsReport(filteredReport),
-    sourceIndexStats: filteredReport.sourceIndexStats,
+    report,
+    summary: summarizeDeadExportsReport(report),
+    sourceIndexStats: report.sourceIndexStats,
   };
 }

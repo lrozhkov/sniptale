@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   exact action-button proof keeps default and compact variant branches together */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 

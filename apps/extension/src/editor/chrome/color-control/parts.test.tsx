@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   exact color-control part proof keeps trigger and expanded panel branches together */
+
 import React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

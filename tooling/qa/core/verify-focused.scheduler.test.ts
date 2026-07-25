@@ -91,6 +91,7 @@ it('executes the serializable no-test lane in a real worker', async () => {
       qualityCodeFiles: [],
       qualityJsLikeFiles: [],
       qualityTargetFiles: [],
+      shouldRunFullEslint: false,
       shouldRunManifestPermissions: false,
       shouldRunRuntimeTopology: false,
       targetFiles: [],
@@ -126,6 +127,30 @@ it('adapts typecheck concurrency and reservation to a one-token profile', async 
   expect(scheduledTasks?.find(({ id }) => id === 'tests')).toMatchObject({ memoryMiB: 4096 });
   expect(workerRunner).toHaveBeenCalledWith(
     expect.objectContaining({ lane: 'typecheck', typecheckMaxConcurrency: 1 })
+  );
+});
+
+it('uses the release-proven lint budget for a full ESLint closure', async () => {
+  const workerRunner = vi.fn(async ({ lane }: { lane: string }) => laneValue(lane));
+  const scheduler = vi.fn(runBoundedTasks);
+  await collectScheduledFocusedStepResults(
+    {
+      codeFiles: [],
+      existingTargetFiles: [],
+      jsLikeFiles: [],
+      shouldRunFullEslint: true,
+      targetFiles: ['eslint.config.js'],
+    },
+    { profile, scheduler, workerRunner }
+  );
+
+  const scheduledTasks = scheduler.mock.calls[0]?.[0];
+  expect(scheduledTasks?.find(({ id }) => id === 'lint')).toMatchObject({
+    cpuTokens: 2,
+    memoryMiB: 6144,
+  });
+  expect(workerRunner).toHaveBeenCalledWith(
+    expect.objectContaining({ lane: 'lint', memoryMiB: 6144 })
   );
 });
 

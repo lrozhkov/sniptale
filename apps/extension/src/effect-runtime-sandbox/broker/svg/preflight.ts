@@ -145,7 +145,7 @@ function parseAttributes(tag: string, source: string): void {
     while (/\s/.test(source[cursor] ?? '')) cursor += 1;
     const quote = source[cursor];
     if (quote !== '"' && quote !== "'") throw new SvgPreflightError('attribute');
-    const valueStart = ++cursor;
+    const valueStart = cursor + 1;
     const valueEnd = source.indexOf(quote, valueStart);
     if (valueEnd < 0 || valueEnd - valueStart > getSvgAttributeCharacterLimit(name)) {
       throw new SvgPreflightError('attribute');

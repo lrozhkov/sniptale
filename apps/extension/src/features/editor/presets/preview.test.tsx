@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- preview renderer proof keeps family branches in one place */
 import ReactDOMServer from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 

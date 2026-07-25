@@ -14,6 +14,7 @@ function focusedContext() {
     qualityCodeFiles: [],
     qualityJsLikeFiles: [],
     qualityTargetFiles: [],
+    shouldRunFullEslint: false,
     shouldRunManifestPermissions: false,
     shouldRunRuntimeTopology: false,
     targetFiles: [],

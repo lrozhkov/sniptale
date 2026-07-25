@@ -128,7 +128,6 @@ async function flushPromises(): Promise<void> {
   await Promise.resolve();
 }
 
-// eslint-disable-next-line max-lines-per-function -- one route invocation matrix keeps ordered mock results auditable.
 it('handles HAR stop validation, success, and failure branches', async () => {
   const missingStopResponse = vi.fn();
   const missingTokenResponse = vi.fn();

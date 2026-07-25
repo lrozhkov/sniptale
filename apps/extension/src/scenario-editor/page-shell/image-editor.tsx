@@ -90,7 +90,8 @@ async function rollbackEditedImageAsset(assetId: string, cause: unknown): Promis
   } catch (rollbackError: unknown) {
     throw new AggregateError(
       [cause, rollbackError],
-      'Failed to save image editor document and roll back edited asset'
+      'Failed to save image editor document and roll back edited asset',
+      { cause: rollbackError }
     );
   }
 
