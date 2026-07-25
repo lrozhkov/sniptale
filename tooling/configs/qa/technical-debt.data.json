@@ -3094,7 +3094,6 @@
         "apps/extension/src/content/selection/callout/editing.handlers.ts",
         "apps/extension/src/content/selection/callout/editing.ts",
         "apps/extension/src/content/selection/callout/geometry.ts",
-        "apps/extension/src/content/selection/callout/handle-visibility.ts",
         "apps/extension/src/content/selection/callout/handles.tsx",
         "apps/extension/src/content/selection/callout/index.tsx",
         "apps/extension/src/content/selection/callout/interaction-layout.ts",
@@ -3243,6 +3242,7 @@
         "apps/extension/src/content/selection/interactive-frame/overlays/hover-surface.tsx",
         "apps/extension/src/content/selection/interactive-frame/overlays/layers.tsx",
         "apps/extension/src/content/selection/interactive-frame/overlays/popovers.tsx",
+        "apps/extension/src/content/selection/interactive-frame/overlays/transient-control-visibility.ts",
         "apps/extension/src/content/selection/interactive-frame/render-model/comparison.ts",
         "apps/extension/src/content/selection/interactive-frame/render-model/current-frame.ts",
         "apps/extension/src/content/selection/interactive-frame/render-model/render-model.ts",
@@ -3263,6 +3263,8 @@
         "apps/extension/src/content/selection/interactive-frame/toolbar/index.tsx",
         "apps/extension/src/content/selection/interactive-frame/toolbar/portal.tsx",
         "apps/extension/src/content/selection/interactive-frame/toolbar/sections.tsx",
+        "apps/extension/src/content/selection/interactive-frame/toolbar/trigger-actions.tsx",
+        "apps/extension/src/content/selection/interactive-frame/toolbar/trigger-position.ts",
         "apps/extension/src/content/selection/interactive-frame/toolbar/trigger.tsx",
         "apps/extension/src/content/selection/interactive-frame/toolbar/types.ts",
         "apps/extension/src/content/selection/interactive-frame/toolbar/view.tsx",
@@ -3394,7 +3396,11 @@
         "apps/extension/src/content/selection/step-badge-popover/props.ts",
         "apps/extension/src/content/selection/step-badge-popover/state.ts",
         "apps/extension/src/content/selection/step-badge-popover/views.tsx",
+        "apps/extension/src/content/selection/step-badge/controls.tsx",
+        "apps/extension/src/content/selection/step-badge/drag.ts",
         "apps/extension/src/content/selection/step-badge/index.tsx",
+        "apps/extension/src/content/selection/step-badge/interaction.ts",
+        "apps/extension/src/content/selection/step-badge/placement.ts",
         "apps/extension/src/content/selection/step-badge/views.tsx"
       ],
       "rolloutFiles": [
@@ -19723,7 +19729,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scheduler.mjs",
-        "contentHash": "f1f48414299a158314b79f6e41d8532129111242f29286bdf8f2a24c0e783381"
+        "contentHash": "97d470918784a614de8bca8344019745506a1830717df1470d4a20cd89136077"
       },
       "consumers": [
         "tooling/qa/core/verify-build.execution.mjs",

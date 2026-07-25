@@ -1,4 +1,8 @@
-import { formatQaResourceProfile, resolveQaResourceProfile } from '../runtime/resource-profile.mjs';
+import {
+  formatQaResourceProfile,
+  resolveQaReleaseResourceProfile,
+  resolveQaResourceProfile,
+} from '../runtime/resource-profile.mjs';
 import { parseLaneResult } from '../runtime/lane-worker-contract.mjs';
 import { runQaLaneWorker } from '../runtime/lane-worker-runner.mjs';
 import { formatTaskScheduleDetail, runBoundedTasks } from '../runtime/task-scheduler.mjs';
@@ -65,11 +69,18 @@ function createTasks({ buildScope, context, profile, workerRunner }) {
   const workerContext = createBuildWorkerContext(context);
   return ['typecheck', 'tests', 'security', 'graph', 'static'].map((lane) => {
     const resources = BUILD_LANE_RESOURCES[lane];
-    const cpuTokens = lane === 'tests' ? profile.vitestMaxWorkers : resources.cpuTokens;
-    const memoryMiB = resources.memoryMiB;
+    const dedicatedFullSuiteTests = buildScope.testScope.fullSuite && lane === 'tests';
+    const cpuTokens =
+      lane === 'tests'
+        ? dedicatedFullSuiteTests
+          ? profile.cpuTokens
+          : profile.vitestMaxWorkers
+        : resources.cpuTokens;
+    const memoryMiB = dedicatedFullSuiteTests ? profile.memoryMiB : resources.memoryMiB;
     return {
       id: lane,
       cpuTokens,
+      exclusive: dedicatedFullSuiteTests,
       memoryMiB,
       run: ({ signal }) =>
         workerRunner({
@@ -133,13 +144,41 @@ function assemble(results) {
 export async function collectScheduledBuildStepResults(
   { buildScope, context },
   {
+    fullSuiteProfileResolver = resolveQaReleaseResourceProfile,
     profile = resolveQaResourceProfile(),
     scheduler = runBoundedTasks,
     workerRunner = runBuildLaneWorker,
   } = {}
 ) {
-  const results = await scheduler(createTasks({ buildScope, context, profile, workerRunner }), {
-    profile,
+  const tasks = createTasks({ buildScope, context, profile, workerRunner });
+  if (!buildScope.testScope.fullSuite) {
+    const results = await scheduler(tasks, { profile });
+    return assemble(results.map((result) => ({ ...result, value: annotate(result, profile) })));
+  }
+
+  const prerequisiteResults = await scheduler(
+    tasks.filter(({ id }) => id !== 'tests'),
+    { profile }
+  );
+  const selectedFullSuiteProfile = fullSuiteProfileResolver();
+  const fullSuiteTasks = createTasks({
+    buildScope,
+    context,
+    profile: selectedFullSuiteProfile,
+    workerRunner,
   });
-  return assemble(results.map((result) => ({ ...result, value: annotate(result, profile) })));
+  const fullSuiteResults = await scheduler(
+    fullSuiteTasks.filter(({ id }) => id === 'tests'),
+    { profile: selectedFullSuiteProfile }
+  );
+  return assemble([
+    ...prerequisiteResults.map((result) => ({
+      ...result,
+      value: annotate(result, profile),
+    })),
+    ...fullSuiteResults.map((result) => ({
+      ...result,
+      value: annotate(result, selectedFullSuiteProfile),
+    })),
+  ]);
 }
