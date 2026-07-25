@@ -13,10 +13,15 @@ const { usePromptTemplatesMock, toastSuccessMock, toastErrorMock } = vi.hoisted(
   toastErrorMock: vi.fn(),
 }));
 
-vi.mock('./prompt-template-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./prompt-template-state')>()),
-  usePromptTemplates: usePromptTemplatesMock,
-}));
+vi.mock(
+  '../../../features/prompt-templates/hooks/use-prompt-templates',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../features/prompt-templates/hooks/use-prompt-templates')
+    >()),
+    usePromptTemplates: usePromptTemplatesMock,
+  })
+);
 
 vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/ui/product-feedback/toast-service')>()),

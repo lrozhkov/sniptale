@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTemplateActions } from './actions';
 import { useTemplateDeleteState } from './delete-state';
 import { useTemplateEditorState } from './editor-state';
-import { usePromptTemplates } from './prompt-template-state';
+import { usePromptTemplates } from '../../../features/prompt-templates/hooks/use-prompt-templates';
 
 /**
  * Owns settings prompt template CRUD, hover state, and modal flows.
