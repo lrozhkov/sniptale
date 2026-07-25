@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { calculateFrameFloatingPlacement } from './floating-placement';
+// @vitest-environment jsdom
+
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  calculateFrameFloatingPlacement,
+  collectFrameFloatingExclusions,
+} from './floating-placement';
 
 function overlap(a: { x: number; y: number; width: number; height: number }, b: typeof a) {
   return !(
@@ -9,6 +14,8 @@ function overlap(a: { x: number; y: number; width: number; height: number }, b: 
     b.y + b.height <= a.y
   );
 }
+
+afterEach(() => document.body.replaceChildren());
 
 describe('frame floating placement', () => {
   it('never clamps a toolbar back over its selected frame when another side is available', () => {
@@ -73,5 +80,24 @@ describe('frame floating placement', () => {
 
     expect(outerBorders.some((border) => overlap(placement.rect, border))).toBe(false);
     expect(placement.distanceToAnchor).toBeGreaterThan(10);
+  });
+
+  it('lets a toolbar overlap another frame while still avoiding its transient controls', () => {
+    const otherFrame = document.createElement('div');
+    otherFrame.className = 'sniptale-frame-container';
+    otherFrame.dataset['frameId'] = 'frame-6';
+    otherFrame.getBoundingClientRect = () => new DOMRect(20, 60, 230, 48);
+    const otherTrigger = document.createElement('button');
+    otherTrigger.className = 'sniptale-frame-toolbar-trigger';
+    otherTrigger.dataset['frameId'] = 'frame-6';
+    otherTrigger.getBoundingClientRect = () => new DOMRect(18, 52, 26, 26);
+    document.body.append(otherFrame, otherTrigger);
+
+    const exclusions = collectFrameFloatingExclusions('frame-7', {
+      includeFrameGeometry: false,
+    });
+
+    expect(exclusions.softRects).toEqual([]);
+    expect(exclusions.strictRects).toEqual([{ x: 18, y: 52, width: 26, height: 26 }]);
   });
 });

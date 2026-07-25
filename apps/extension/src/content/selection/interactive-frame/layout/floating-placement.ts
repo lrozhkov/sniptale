@@ -284,15 +284,22 @@ function getBorderBands(rect: FloatingRect): FloatingRect[] {
   ];
 }
 
-export function collectFrameFloatingExclusions(selectedFrameId: string) {
+export function collectFrameFloatingExclusions(
+  selectedFrameId: string,
+  options: { includeFrameGeometry?: boolean } = {}
+) {
   const strictRects: FloatingRect[] = [];
   const softRects: FloatingRect[] = [];
-  queryAllContentUiElements('.sniptale-frame-container').forEach((element) => {
-    if (!(element instanceof HTMLElement) || element.dataset['frameId'] === selectedFrameId) return;
-    const rect = toRect(element.getBoundingClientRect());
-    softRects.push(rect);
-    strictRects.push(...getBorderBands(rect));
-  });
+  if (options.includeFrameGeometry !== false) {
+    queryAllContentUiElements('.sniptale-frame-container').forEach((element) => {
+      if (!(element instanceof HTMLElement) || element.dataset['frameId'] === selectedFrameId) {
+        return;
+      }
+      const rect = toRect(element.getBoundingClientRect());
+      softRects.push(rect);
+      strictRects.push(...getBorderBands(rect));
+    });
+  }
   queryAllContentUiElements(
     '.sniptale-resize-handle, .sniptale-frame-toolbar-trigger, .sniptale-toolbar-portal-wrapper'
   ).forEach((element) => {

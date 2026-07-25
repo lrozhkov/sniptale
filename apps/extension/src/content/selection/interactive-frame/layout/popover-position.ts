@@ -42,10 +42,7 @@ function calculateCanonicalPopoverRect(params: {
     params.size.width,
     Math.max(0, params.viewport.width - VIEWPORT_MARGIN * 2)
   );
-  const height = Math.min(
-    params.size.height,
-    Math.max(0, params.viewport.height - VIEWPORT_MARGIN * 2)
-  );
+  const height = params.size.height;
   const x = clamp(
     params.anchorRect.x + params.anchorRect.width / 2 - width / 2,
     VIEWPORT_MARGIN,
@@ -53,13 +50,9 @@ function calculateCanonicalPopoverRect(params: {
   );
   const bottomY = params.surfaceRect.y + params.surfaceRect.height + POPOVER_GAP;
   const bottomAvailable = Math.max(0, params.viewport.height - VIEWPORT_MARGIN - bottomY);
-  const topAvailable = Math.max(0, params.surfaceRect.y - POPOVER_GAP - VIEWPORT_MARGIN);
   const placeBelow = height <= bottomAvailable;
-  const constrainedHeight = Math.min(height, placeBelow ? bottomAvailable : topAvailable);
-  const y = placeBelow
-    ? bottomY
-    : Math.max(VIEWPORT_MARGIN, params.surfaceRect.y - POPOVER_GAP - constrainedHeight);
-  return { x, y, width, height: constrainedHeight };
+  const y = placeBelow ? bottomY : params.surfaceRect.y - POPOVER_GAP - height;
+  return { x, y, width, height };
 }
 
 export function useFramePopoverPosition(params: {
@@ -127,8 +120,8 @@ export function useFramePopoverPosition(params: {
     top: rect.y,
     left: rect.x,
     maxWidth: 'calc(100vw - 16px)',
-    maxHeight: `${rect.height}px`,
-    overflow: 'auto',
+    maxHeight: 'none',
+    overflow: 'visible',
     zIndex: 2147483647,
     pointerEvents: 'auto',
   } satisfies CSSProperties;

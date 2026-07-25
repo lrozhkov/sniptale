@@ -44,6 +44,7 @@ function PositionHarness(props: {
       ref={popoverRef}
       data-left={style.left}
       data-max-height={style.maxHeight}
+      data-overflow={style.overflow}
       data-top={style.top}
     />
   );
@@ -135,7 +136,7 @@ describe('frame popover positioning', () => {
     expect(Number(popover.dataset['top'])).toBe(158);
   });
 
-  it('caps every family-sized popover to the space above without crossing the toolbar', () => {
+  it('keeps every family-sized popover at its natural height without internal scrolling', () => {
     const toolbar = document.createElement('div');
     toolbar.className = 'sniptale-toolbar-portal-wrapper';
     toolbar.dataset['frameId'] = 'frame-1';
@@ -149,8 +150,9 @@ describe('frame popover positioning', () => {
       act(() => root.render(<PositionHarness anchorEl={anchor} fallbackHeight={fallbackHeight} />));
       const popover = container.firstElementChild as HTMLElement;
       const top = Number(popover.dataset['top']);
-      const maxHeight = Number.parseFloat(popover.dataset['maxHeight'] ?? '0');
-      expect(top + maxHeight).toBeLessThanOrEqual(190);
+      expect(top).toBe(190 - fallbackHeight);
+      expect(popover.dataset['maxHeight']).toBe('none');
+      expect(popover.dataset['overflow']).toBe('visible');
     });
   });
 

@@ -76,7 +76,7 @@ function hideFocusOverlay({ focusOverlayRef, focusSvgRef }: OverlayRefs) {
 }
 
 function ensureFocusOverlay(opacity: number, { focusOverlayRef }: OverlayRefs) {
-  if (!focusOverlayRef.current) {
+  if (!focusOverlayRef.current?.isConnected) {
     const overlay = document.createElement('div');
     overlay.className = 'sniptale-focus-overlay';
     applyIsolatedContentRootStyle(

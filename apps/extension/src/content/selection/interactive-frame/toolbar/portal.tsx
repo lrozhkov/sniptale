@@ -59,7 +59,7 @@ export function InteractiveFrameToolbarPortal(props: {
         { x: frameX, y: frameY, width: frameWidth, height: frameHeight },
         toolbarSize,
         {
-          ...collectFrameFloatingExclusions(frameId),
+          ...collectFrameFloatingExclusions(frameId, { includeFrameGeometry: false }),
           ...(props.anchorOffset
             ? {
                 anchorPoint: {
