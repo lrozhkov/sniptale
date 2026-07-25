@@ -119,10 +119,77 @@ it('uses a changed replacement owner and its direct test for a consolidated dele
     deletedSuccessorResolver: () => new Map([[deleted, [owner]]]),
   });
 
-  expect(scope.profile).toBe('related-transitive');
+  expect(scope.profile).toBe('owner-direct');
   expect(scope.fullSuite).not.toBe(true);
-  expect(scope.relatedFiles).toEqual([ownerTest, owner]);
-  expect(scope.detail).toContain('graph-closed successor owner proof');
+  expect(scope.directTestFiles).toEqual([ownerTest]);
+  expect(scope.relatedFiles).toEqual([]);
+  expect(scope.detail).toContain('graph-closed changed-owner proof');
+});
+
+it('retains affected-consumer discovery when graph-closed deletion proof exceeds the owner budget', () => {
+  const deleted = 'apps/extension/src/content/selection/example/facade.ts';
+  const owner = 'apps/extension/src/content/selection/example/runtime.ts';
+  const ownerTests = Array.from(
+    { length: 13 },
+    (_, index) => `apps/extension/src/content/selection/example/runtime.${index}.test.ts`
+  );
+  const scope = resolveBuildTestScope({
+    targetFiles: [deleted, owner],
+    codeFiles: [owner],
+    repoCodeFiles: [owner, ...ownerTests],
+    ownerTestResolver: (file) => (file === owner ? ownerTests : []),
+    deletedSuccessorResolver: () => new Map([[deleted, [owner]]]),
+  });
+
+  expect(scope.profile).toBe('related-transitive');
+  expect(scope.directTestFiles).toEqual([]);
+  expect(scope.relatedFiles).toEqual([owner, ...ownerTests].sort());
+});
+
+it('retains affected-consumer discovery for graph-closed deletions across owners', () => {
+  const selectionDeleted = 'apps/extension/src/content/selection/example/facade.ts';
+  const selectionOwner = 'apps/extension/src/content/selection/example/runtime.ts';
+  const selectionTest = 'apps/extension/src/content/selection/example/runtime.test.ts';
+  const popupDeleted = 'apps/extension/src/popup/shell/example/facade.ts';
+  const popupOwner = 'apps/extension/src/popup/shell/example/runtime.ts';
+  const popupTest = 'apps/extension/src/popup/shell/example/runtime.test.ts';
+  const ownerTests = new Map([
+    [selectionOwner, [selectionTest]],
+    [popupOwner, [popupTest]],
+  ]);
+  const scope = resolveBuildTestScope({
+    targetFiles: [selectionDeleted, selectionOwner, popupDeleted, popupOwner],
+    codeFiles: [selectionOwner, popupOwner],
+    repoCodeFiles: [selectionOwner, selectionTest, popupOwner, popupTest],
+    ownerTestResolver: (file) => ownerTests.get(file) ?? [],
+    deletedSuccessorResolver: () =>
+      new Map([
+        [selectionDeleted, [selectionOwner]],
+        [popupDeleted, [popupOwner]],
+      ]),
+  });
+
+  expect(scope.profile).toBe('related-transitive');
+  expect(scope.directTestFiles).toEqual([]);
+  expect(scope.relatedFiles).toEqual([selectionOwner, selectionTest, popupOwner, popupTest].sort());
+});
+
+it('retains affected-consumer discovery when another changed production file lacks owner proof', () => {
+  const deleted = 'apps/extension/src/content/selection/example/facade.ts';
+  const successor = 'apps/extension/src/content/selection/example/runtime.ts';
+  const successorTest = 'apps/extension/src/content/selection/example/runtime.test.ts';
+  const uncovered = 'apps/extension/src/content/selection/example/view-state.ts';
+  const scope = resolveBuildTestScope({
+    targetFiles: [deleted, successor, uncovered],
+    codeFiles: [successor, uncovered],
+    repoCodeFiles: [successor, successorTest, uncovered],
+    ownerTestResolver: (file) => (file === successor ? [successorTest] : []),
+    deletedSuccessorResolver: () => new Map([[deleted, [successor]]]),
+  });
+
+  expect(scope.profile).toBe('related-transitive');
+  expect(scope.directTestFiles).toEqual([]);
+  expect(scope.relatedFiles).toEqual([successor, successorTest, uncovered].sort());
 });
 
 it('requires deterministic owner proof for every aggregate provider', () => {
@@ -185,7 +252,7 @@ it('does not accept a deleted adjacent test as replacement-owner proof', () => {
   expect(scope.directTestFiles).toEqual([]);
 });
 
-it('maps a deleted modal facade chain to bounded surviving owner proof', async () => {
+it('keeps a deleted modal facade chain with an untested successor on transitive proof', async () => {
   const root = createTempRoot('build-deleted-modal-chain-');
   const ownerRoot = 'apps/extension/src/content/overlay/ai/modal/session';
   const deletedFiles = [
@@ -290,7 +357,11 @@ it('maps a deleted modal facade chain to bounded surviving owner proof', async (
   });
 
   expect(result.scope.fullSuite).not.toBe(true);
-  expect(result.scope.relatedFiles).toHaveLength(11);
+  expect(result.scope.profile).toBe('related-transitive');
+  expect(result.scope.directTestFiles).toEqual([]);
+  expect(result.scope.relatedFiles).toEqual(
+    [...new Set([...survivingFiles, ...ownerTests])].sort()
+  );
   expect(result.forecast.details[0]).toContain('selected unit-test scope=11');
   expect(result.forecast.details[0]).not.toContain('full product test suite');
 });

@@ -16118,7 +16118,8 @@
         "tooling/qa/core/verify-naming.facades.mjs",
         "tooling/qa/core/verify-structural-risk.mjs",
         "tooling/qa/guards/quality/verify-manual-mock-export-parity.targets.helpers.mjs",
-        "tooling/qa/runtime/current-diff.helpers.mjs"
+        "tooling/qa/runtime/current-diff.helpers.mjs",
+        "tooling/qa/wrappers/preflight.mjs"
       ],
       "surfaces": [
         "binding:cwdScopedCaches",
@@ -16939,6 +16940,7 @@
         "tooling/qa/core/structural-risk/function-profile.mjs",
         "tooling/qa/core/structural-risk/owner-classifier.mjs",
         "tooling/qa/core/verify-build.deleted-closure.mjs",
+        "tooling/qa/core/verify-build.test-profiles.mjs",
         "tooling/qa/wrappers/preflight.mjs"
       ],
       "surfaces": [
@@ -17332,7 +17334,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/preflight.mjs",
-        "contentHash": "400e33393a73c3bbcc23d1de24b804bbbba136095e0e494a47f42fd7e8a85a76"
+        "contentHash": "64b62f399051c09efcdff05eb8815b35911015b7453136a483636b2d7464c4fe"
       },
       "consumers": [
         "tooling/qa/wrappers/preflight-render.test.ts",
