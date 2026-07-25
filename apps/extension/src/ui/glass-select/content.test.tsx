@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   exact content proof keeps the controller/overlay branches in one owner-local suite */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';

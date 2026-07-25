@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   exact snapshot-history proof keeps navigation and limit semantics together */
 import { describe, expect, it } from 'vitest';
 import { SnapshotHistory } from './snapshot-history';
 

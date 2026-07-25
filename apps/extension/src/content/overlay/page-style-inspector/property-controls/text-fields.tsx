@@ -51,31 +51,3 @@ export function CssTextField(props: {
     </Field>
   );
 }
-
-export function TextField(props: {
-  defaultValue?: string | undefined;
-  disabled: boolean;
-  label: string;
-  modified?: boolean | undefined;
-  onChange: (value: string) => void;
-  onReset?: (() => void) | undefined;
-  placeholder?: string | undefined;
-  value: string;
-}) {
-  return (
-    <Field
-      defaultValue={props.defaultValue}
-      label={props.label}
-      modified={props.modified}
-      onReset={props.onReset}
-    >
-      <CompactInput
-        aria-label={props.label}
-        disabled={props.disabled}
-        placeholder={props.placeholder}
-        value={props.value}
-        onChange={(event) => props.onChange(event.currentTarget.value)}
-      />
-    </Field>
-  );
-}

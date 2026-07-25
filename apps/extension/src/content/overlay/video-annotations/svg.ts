@@ -81,7 +81,7 @@ export function createAnnotationPath(points: Array<{ x: number; y: number }>): S
     throw new Error('Need at least 2 points for path');
   }
 
-  let pathData = '';
+  let pathData: string;
   if (points.length === 2) {
     const start = points[0];
     const end = points[1];

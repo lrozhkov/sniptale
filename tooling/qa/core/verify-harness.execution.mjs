@@ -22,8 +22,9 @@ import { expandRelatedTestScope } from './unit-test-plan.mjs';
 import { runDependencyAdmissionCheck } from '../guards/security/verify-dependency-admission.mjs';
 import { collectRuntimeListenerStep } from './verify-harness.runtime-listener-step.mjs';
 import { runStructuralRiskCheck } from './verify-structural-risk.mjs';
-
-const HARNESS_MAX_WORKERS = 6;
+import { runReadSafeNamingCheck } from './verify-read-safe-naming.mjs';
+import { collectAuditStep } from './full-verify-audit-steps.mjs';
+import { collectScheduledHarnessStepResults } from './verify-harness.scheduler.mjs';
 
 function collectMeasuredViolationStep(label, header, runner) {
   const { durationMs, value } = measureSyncStep(runner);
@@ -84,6 +85,18 @@ function collectStructuralRiskStep(context) {
       reportScope: 'current-diff',
       enforce: true,
     })
+  );
+}
+
+function collectReadSafeNamingStep(context) {
+  return collectMeasuredViolationStep(
+    'Read-safe naming',
+    'Read-safe naming violations found:',
+    () =>
+      runReadSafeNamingCheck({
+        files: context.qualityCodeFiles ?? context.codeFiles,
+        scope: 'workspace',
+      })
   );
 }
 
@@ -157,8 +170,8 @@ function collectDependencyAdmissionStep(context) {
   );
 }
 
-async function collectUnitTestStep(context) {
-  const request = createHarnessUnitTestRequest(context);
+async function collectUnitTestStep(context, { maxWorkers }) {
+  const request = createHarnessUnitTestRequest(context, { maxWorkers });
   if ((request.directFiles ?? request.relatedFiles).length === 0) {
     return createSkippedStep('Unit tests', 'no executable changed harness files');
   }
@@ -174,39 +187,82 @@ async function collectUnitTestStep(context) {
 }
 
 // Run only the affected harness test closure.
-export function createHarnessUnitTestRequest(context) {
+export function createHarnessUnitTestRequest(context, { maxWorkers = 1 } = {}) {
   const relatedFiles = context.harnessTargetFiles.filter((file) => !file.endsWith('.md'));
   const directFiles = expandRelatedTestScope(relatedFiles).filter((file) =>
     /\.(?:test|spec)\.(?:ts|tsx)$/u.test(file)
   );
   return {
     ...(directFiles.length > 0 ? { directFiles } : { relatedFiles }),
-    maxWorkers: HARNESS_MAX_WORKERS,
+    maxWorkers,
     suite: HARNESS_QA_SUITE,
   };
 }
 
-export async function collectHarnessStepResults({
-  baseline = loadBaseline(),
+const DEPENDENCY_AUDIT_TARGETS = new Set(['package-lock.json', 'package.json']);
+
+export function shouldRunHarnessAudit(targetFiles = []) {
+  return targetFiles.some((file) => DEPENDENCY_AUDIT_TARGETS.has(file));
+}
+
+function collectHarnessAuditStep(context) {
+  return shouldRunHarnessAudit(context.harnessTargetFiles)
+    ? collectAuditStep()
+    : createSkippedStep('Audit', 'dependency authority unchanged');
+}
+
+export async function collectHarnessStaticLane(
   context,
-  collectors = {},
-} = {}) {
+  { baseline = context.baseline ?? loadBaseline(), collectors = {} } = {}
+) {
   const resolvedCollectors = {
-    collectPrettierStep,
     collectOxlintStep: (nextContext) =>
       runOxlint({ files: nextContext.qualityJsLikeFiles ?? nextContext.jsLikeFiles }).step,
     collectEslintStep,
     collectLineLengthStep,
     collectAiHygieneStep,
     collectStructuralRiskStep,
+    collectReadSafeNamingStep,
     collectQaRuleCoverageContractStep,
     collectQaControlStep,
     collectTechnicalDebtStep,
-    collectTypecheckStep,
-    collectUnitTestStep,
+    collectHarnessAuditStep,
     ...collectors,
   };
 
+  return {
+    steps: [
+      resolvedCollectors.collectOxlintStep(context),
+      await resolvedCollectors.collectEslintStep(context),
+      resolvedCollectors.collectLineLengthStep(context),
+      resolvedCollectors.collectAiHygieneStep(context, baseline),
+      resolvedCollectors.collectStructuralRiskStep(context),
+      resolvedCollectors.collectReadSafeNamingStep(context),
+      resolvedCollectors.collectQaRuleCoverageContractStep(context),
+      resolvedCollectors.collectQaControlStep(),
+      resolvedCollectors.collectTechnicalDebtStep(),
+      collectRetiredControlStep(),
+      collectDependencyAdmissionStep(context),
+      resolvedCollectors.collectHarnessAuditStep(context),
+      collectRuntimeListenerStep(context),
+    ],
+  };
+}
+
+export function collectHarnessTypecheckLane(context) {
+  return { typecheckStep: collectTypecheckStep(context) };
+}
+
+export async function collectHarnessTestLane(context, { maxWorkers }) {
+  return { unitTestStep: await collectUnitTestStep(context, { maxWorkers }) };
+}
+
+export async function collectHarnessStepResults({
+  baseline = loadBaseline(),
+  context,
+  collectors = {},
+  scheduledStepCollector = collectScheduledHarnessStepResults,
+} = {}) {
   if ((context.harnessVerificationTargetFiles ?? context.harnessTargetFiles).length === 0) {
     return {
       skipped: true,
@@ -221,22 +277,12 @@ export async function collectHarnessStepResults({
     };
   }
 
-  const steps = [
-    await resolvedCollectors.collectPrettierStep(context),
-    resolvedCollectors.collectOxlintStep(context),
-    await resolvedCollectors.collectEslintStep(context),
-    resolvedCollectors.collectLineLengthStep(context),
-    resolvedCollectors.collectAiHygieneStep(context, baseline),
-    resolvedCollectors.collectStructuralRiskStep(context),
-    resolvedCollectors.collectQaRuleCoverageContractStep(context),
-    resolvedCollectors.collectQaControlStep(),
-    resolvedCollectors.collectTechnicalDebtStep(),
-    collectRetiredControlStep(),
-    collectDependencyAdmissionStep(context),
-    collectRuntimeListenerStep(context),
-    resolvedCollectors.collectTypecheckStep(context),
-    await resolvedCollectors.collectUnitTestStep(context),
-  ];
+  const formatStep = await (collectors.collectPrettierStep ?? collectPrettierStep)(context);
+  if (formatStep.status === 'failed') {
+    return { skipped: false, steps: [formatStep] };
+  }
+  const scheduledSteps = await scheduledStepCollector({ ...context, baseline });
+  const steps = [formatStep, ...scheduledSteps];
 
   return {
     skipped: false,

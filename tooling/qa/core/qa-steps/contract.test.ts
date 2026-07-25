@@ -29,6 +29,27 @@ it('accepts the complete harness population and rejects stale or unknown entries
   ).toThrow(/unexpected=.*Unregistered execution/u);
 });
 
+it('accepts a format-only harness failure without requiring later lanes', () => {
+  expect(() =>
+    assertQaExecutionContract({
+      wrapperId: 'qa:release-harness',
+      steps: steps(['Format'], 'failed'),
+    })
+  ).not.toThrow();
+});
+
+it('rejects an incomplete harness population after the format barrier passed', () => {
+  expect(() =>
+    assertQaExecutionContract({
+      wrapperId: 'qa:release-harness',
+      steps: [
+        { label: 'Format', status: 'ok' },
+        { label: 'Oxlint', status: 'failed' },
+      ],
+    })
+  ).toThrow(/missing=.*Unit tests/u);
+});
+
 it('models help and no-target outcomes as explicit wrapper modes', () => {
   expect(() =>
     assertQaExecutionContract({

@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- runtime helper regression test keeps controller helper paths together */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtimeActionMocks = vi.hoisted(() => ({

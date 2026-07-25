@@ -35,7 +35,7 @@ export async function resolveTabInfo(tabId: number): Promise<chrome.tabs.Tab> {
     return tab;
   } catch (error) {
     logger.error('Failed to get tab info', error);
-    throw new Error('Failed to get tab info');
+    throw new Error('Failed to get tab info', { cause: error });
   }
 }
 

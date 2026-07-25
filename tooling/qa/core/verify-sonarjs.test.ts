@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { expect, it } from 'vitest';
+import { ESLint } from 'eslint';
+import { expect, it, vi } from 'vitest';
 
 import { createTempRoot, withCwd, writeFile } from './test-helpers';
 import { importSonarjsVerifier, writeSonarjsTsconfig } from './verify-sonarjs.test-support';
@@ -153,4 +154,124 @@ it('keeps report-only CLI findings non-blocking', () => {
 
   expect(result.status).toBe(0);
   expect(result.stderr).toContain('sonarjs/no-all-duplicated-branches');
+});
+
+it('projects precomputed ESLint findings without hiding fatal parser errors', async () => {
+  const root = createTempRoot('verify-sonarjs-precomputed-');
+  writeSonarjsTsconfig(root);
+  const productionFile = writeFile(
+    root,
+    'apps/extension/src/example.ts',
+    'export const value = 1;\n'
+  );
+  const testFile = writeFile(
+    root,
+    'apps/extension/src/example.test.ts',
+    'export const value = 1;\n'
+  );
+  const verifier = await importSonarjsVerifier(root);
+  const lintFiles = vi.fn(async () => []);
+
+  const result = await withCwd(root, () =>
+    verifier.runSonarjsCheck({
+      eslintResults: [
+        {
+          filePath: productionFile,
+          messages: [
+            {
+              column: 1,
+              line: 1,
+              message: 'curated finding',
+              ruleId: 'sonarjs/no-all-duplicated-branches',
+              severity: 2,
+            },
+            {
+              column: 1,
+              fatal: true,
+              line: 2,
+              message: 'parser failed',
+              ruleId: null,
+              severity: 2,
+            },
+          ],
+        },
+        {
+          filePath: testFile,
+          messages: [
+            {
+              column: 1,
+              line: 1,
+              message: 'test-only finding',
+              ruleId: 'sonarjs/no-all-duplicated-branches',
+              severity: 2,
+            },
+          ],
+        },
+      ],
+      lintFiles,
+      scope: 'repo-wide',
+    })
+  );
+
+  expect(lintFiles).not.toHaveBeenCalled();
+  expect(result.violations.map((violation) => violation.rule)).toEqual([
+    'sonarjs/no-all-duplicated-branches',
+    'sonarjs-eslint',
+  ]);
+});
+
+it('adds curated SonarJS rules only to production source files', async () => {
+  const verifier = await import('./verify-sonarjs.mjs');
+  const eslint = new ESLint({
+    cwd: repoRoot,
+    overrideConfig: verifier.createSonarjsEslintOverrideConfig(),
+  });
+  const paths = [
+    'apps/extension/src/contracts/settings/index.ts',
+    'apps/extension/src/contracts/settings/index.test.ts',
+    'apps/extension/src/vendor/example.ts',
+    'apps/extension/src/feature/vendor/example.ts',
+    'apps/extension/src/generated/example.ts',
+    'apps/extension/src/feature/generated/example.ts',
+    'apps/extension/src/__generated__/example.ts',
+    'apps/extension/src/feature/__generated__/example.ts',
+    'packages/platform/src/vendor/example.ts',
+    'packages/platform/src/generated/example.ts',
+  ];
+
+  for (const file of paths) {
+    const config = await eslint.calculateConfigForFile(file);
+    const expected = verifier.isSonarjsProductionFile(file) ? 2 : undefined;
+    for (const ruleId of verifier.SONARJS_RULE_IDS) {
+      expect(config?.rules?.[ruleId]?.[0]).toBe(expected);
+    }
+  }
+});
+
+it('keeps type-aware Sonar parity for eligible JavaScript in the shared analysis', async () => {
+  const root = createTempRoot('verify-sonarjs-shared-js-');
+  writeSonarjsTsconfig(root);
+  writeFile(root, 'apps/extension/src/example.js', "export const badCompare = '1' === 1;\n");
+  const verifier = await importSonarjsVerifier(root);
+
+  const [standalone, shared] = await withCwd(root, async () => {
+    const standaloneResult = await verifier.runSonarjsCheck({ scope: 'repo-wide' });
+    const eslint = new ESLint({
+      cache: false,
+      cwd: root,
+      overrideConfig: verifier.createSonarjsEslintOverrideConfig(),
+      overrideConfigFile: true,
+    });
+    const eslintResults = await eslint.lintFiles(['apps/extension/src/example.js']);
+    const sharedResult = await verifier.runSonarjsCheck({
+      eslintResults,
+      scope: 'repo-wide',
+    });
+    return [standaloneResult, sharedResult];
+  });
+
+  expect(shared.violations).toEqual(standalone.violations);
+  expect(shared.violations).toEqual([
+    expect.objectContaining({ rule: 'sonarjs/different-types-comparison' }),
+  ]);
 });

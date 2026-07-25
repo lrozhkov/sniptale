@@ -126,11 +126,10 @@ function parseKeyValueTable(table: HTMLTableElement, ctx: TraversalContext): Fie
  * Parses data table into TableNode
  */
 function parseDataTable(table: HTMLTableElement, ctx: TraversalContext): TableNode | null {
-  let headers: string[] = [];
   const headerRow = resolveTableHeaderRow(table);
   if (!headerRow) return null;
 
-  headers = extractTableHeaders(headerRow);
+  const headers = extractTableHeaders(headerRow);
   if (headers.length === 0) return null;
 
   const rows: TableRow[] = extractDataTableRows({

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function -- utility coverage keeps related helper branches together */
+
 import { describe, expect, it } from 'vitest';
 
 import { extractBrowserVersion, parseRgbColor } from '../../color/parsing';

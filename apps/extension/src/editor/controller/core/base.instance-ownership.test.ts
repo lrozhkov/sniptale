@@ -1,6 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   controller base regression suite intentionally validates the helper delegation surface together */
-
 import type { FabricObject, Point, Rect } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {

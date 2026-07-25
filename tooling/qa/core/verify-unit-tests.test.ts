@@ -87,6 +87,7 @@ it('bounds vitest workers when requested and rejects invalid bounds', () => {
 
 it('enables wrapper timeout mode for every wrapper unit-test run', () => {
   expect(createUnitTestEnv()).toMatchObject({
+    SNIPTALE_QA_LANE_PROCESS: null,
     SNIPTALE_VITEST_TIMEOUT_MODE: 'wrapper',
     SNIPTALE_VITEST_SUITE: 'product',
   });

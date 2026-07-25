@@ -91,7 +91,9 @@ async function readPolicyJson(repoRoot) {
     return JSON.parse(await fs.readFile(policyPath, 'utf8'));
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-      throw new Error('Release artifact verifier is missing manifest permissions policy data.');
+      throw new Error('Release artifact verifier is missing manifest permissions policy data.', {
+        cause: error,
+      });
     }
     throw error;
   }

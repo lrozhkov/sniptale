@@ -101,7 +101,8 @@ async function rollbackCaptureAsset(assetId: string, cause: unknown): Promise<ne
   } catch (rollbackError: unknown) {
     throw new AggregateError(
       [cause, rollbackError],
-      'Failed to save capture project and roll back capture asset'
+      'Failed to save capture project and roll back capture asset',
+      { cause: rollbackError }
     );
   }
 

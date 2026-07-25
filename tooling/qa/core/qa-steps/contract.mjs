@@ -113,7 +113,7 @@ function closeoutContract(mode, hasFailure) {
       };
 }
 
-function resolveContract({ wrapperId, mode, hasFailure }) {
+function resolveContract({ wrapperId, mode, hasFailure, formatBarrierFailure }) {
   if (mode === 'help') return { required: ['Wrapper help'] };
   if (wrapperId === 'qa:preflight') return { required: ['QA preflight'] };
   if (wrapperId === 'qa:advisory') return { required: tupleLabels(ADVISORY_STEPS) };
@@ -121,9 +121,11 @@ function resolveContract({ wrapperId, mode, hasFailure }) {
     return { required: tupleLabels(STRUCTURAL_AUDIT_STEPS) };
   }
   if (wrapperId === 'qa:release-harness') {
-    return mode === 'no-targets'
-      ? { required: ['QA release harness'] }
-      : { required: tupleLabels(HARNESS_STEPS) };
+    if (mode === 'no-targets') return { required: ['QA release harness'] };
+    const labels = tupleLabels(HARNESS_STEPS);
+    return formatBarrierFailure
+      ? { required: ['Format'], optional: labels.filter((label) => label !== 'Format') }
+      : { required: labels };
   }
   if (wrapperId === 'qa:checkpoint') return checkpointContract(mode, hasFailure);
   if (wrapperId === 'qa:build') return buildContract(mode, hasFailure);
@@ -143,7 +145,12 @@ function countLabels(labels) {
 /** Reject both emitted-but-unregistered and registered-but-unemitted wrapper steps. */
 export function assertQaExecutionContract({ wrapperId, mode = 'default', steps, skipped = false }) {
   const hasFailure = steps.some((step) => step.status === 'failed');
-  const contract = resolveContract({ wrapperId, mode, hasFailure });
+  const formatBarrierFailure =
+    wrapperId === 'qa:release-harness' &&
+    steps.length === 1 &&
+    steps[0]?.label === 'Format' &&
+    steps[0]?.status === 'failed';
+  const contract = resolveContract({ wrapperId, mode, hasFailure, formatBarrierFailure });
   const required = [...contract.required, ...(skipped ? ['No applicable targets'] : [])];
   const actualCounts = countLabels(steps.map(({ label }) => label));
   const requiredCounts = countLabels(required);

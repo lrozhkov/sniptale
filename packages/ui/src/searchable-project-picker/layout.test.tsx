@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   layout proof keeps compact/default/empty branches together in one exact owner-local suite */
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

@@ -8,7 +8,7 @@ import { collectCodeFiles, isExecutedAsScript } from './shared.mjs';
 import { fromRelativePath, repoRoot, toRelativePath } from './shared-paths.mjs';
 import { filterSonarjsBaseline, loadSonarjsBaseline } from './sonarjs-baseline.helpers.mjs';
 import { resolveScopedTargetFiles } from '../runtime/target-files.helpers.mjs';
-import { isProductSourcePath } from './src-production-targets.mjs';
+import { isProductSourcePath, PRODUCT_SOURCE_ROOTS } from './src-production-targets.mjs';
 
 export const SONARJS_RULE_IDS = [
   'sonarjs/arguments-order',
@@ -22,7 +22,10 @@ export const SONARJS_RULE_IDS = [
   'sonarjs/reduce-initial-value',
 ];
 
-const SONARJS_RULE_CONFIG = Object.fromEntries(SONARJS_RULE_IDS.map((ruleId) => [ruleId, 'error']));
+export const SONARJS_RULE_CONFIG = Object.fromEntries(
+  SONARJS_RULE_IDS.map((ruleId) => [ruleId, 'error'])
+);
+const SONARJS_RULE_ID_SET = new Set(SONARJS_RULE_IDS);
 const SONARJS_BASELINE_PATH = 'tooling/configs/qa/sonarjs-baseline.json';
 const JS_TS_SOURCE_PATTERN = /\.(?:ts|tsx|js|mjs|cjs)$/u;
 const TEST_SUPPORT_FILE_PATTERN =
@@ -43,6 +46,46 @@ const GENERATED_PATH_PATTERNS = [
   /^apps\/extension\/src\/.*\/generated\//u,
   /^apps\/extension\/src\/.*\/__generated__\//u,
 ];
+const SONARJS_ESLINT_FILES = PRODUCT_SOURCE_ROOTS.map((root) => `${root}/**/*.{ts,tsx,js,mjs,cjs}`);
+const SONARJS_ESLINT_IGNORES = [
+  '**/*.d.ts',
+  '**/*.test.*',
+  '**/*.spec.*',
+  '**/test-support.{ts,tsx,js,mjs,cjs}',
+  '**/*.test-support.{ts,tsx,js,mjs,cjs}',
+  'apps/extension/src/**/vendor/**',
+  'apps/extension/src/*/**/generated/**',
+  'apps/extension/src/*/**/__generated__/**',
+];
+
+export function createSonarjsEslintOverrideConfig() {
+  return [
+    {
+      files: SONARJS_ESLINT_FILES,
+      ignores: SONARJS_ESLINT_IGNORES,
+      languageOptions: {
+        ecmaVersion: 'latest',
+        globals: {
+          ...globals.browser,
+          ...globals.node,
+          ...globals.serviceworker,
+          chrome: 'readonly',
+        },
+        parser: tseslint.parser,
+        parserOptions: {
+          ecmaFeatures: {
+            jsx: true,
+          },
+          projectService: true,
+          tsconfigRootDir: repoRoot,
+        },
+        sourceType: 'module',
+      },
+      plugins: { sonarjs },
+      rules: SONARJS_RULE_CONFIG,
+    },
+  ];
+}
 
 export function isSonarjsProductionFile(relativePath) {
   return (
@@ -108,11 +151,18 @@ function formatEslintMessage(result, message) {
 
 async function lintSonarjsFiles(files) {
   const results = await createEslint().lintFiles(files);
-  return results.flatMap((result) =>
-    result.messages
+  return collectSonarjsViolationsFromEslintResults(results);
+}
+
+export function collectSonarjsViolationsFromEslintResults(results) {
+  return results.flatMap((result) => {
+    const relativePath = toRelativePath(result.filePath);
+    if (!isSonarjsProductionFile(relativePath)) return [];
+    return result.messages
+      .filter((message) => message.fatal || SONARJS_RULE_ID_SET.has(message.ruleId))
       .filter((message) => message.severity === 2 || message.fatal)
-      .map((message) => formatEslintMessage(result, message))
-  );
+      .map((message) => formatEslintMessage(result, message));
+  });
 }
 
 function collectTargets({ files, scope }) {
@@ -126,6 +176,7 @@ function collectTargets({ files, scope }) {
 
 export async function runSonarjsCheck({
   baselinePath = fromRelativePath(SONARJS_BASELINE_PATH),
+  eslintResults = null,
   files = [],
   lintFiles = lintSonarjsFiles,
   scope = 'workspace',
@@ -145,7 +196,9 @@ export async function runSonarjsCheck({
     };
   }
 
-  const sonarViolations = await lintFiles(targets.files);
+  const sonarViolations = Array.isArray(eslintResults)
+    ? collectSonarjsViolationsFromEslintResults(eslintResults)
+    : await lintFiles(targets.files);
   const unbaselinedViolations = filterSonarjsBaseline(sonarViolations, baseline.entries);
 
   return {

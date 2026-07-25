@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   validation payload proof stays grouped to keep the broadcast-channel boundary explicit */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type MediaHubEventListener = (event: MessageEvent<unknown>) => void;

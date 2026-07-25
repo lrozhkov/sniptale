@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   border preset save proof keeps create/overwrite flows together */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({

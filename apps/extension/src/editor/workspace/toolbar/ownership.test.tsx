@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function -- focused ownership flows intentionally stay in single callbacks */
+
 import { act } from 'react';
 import { describe, expect, it } from 'vitest';
 import { translate } from '../../../platform/i18n';

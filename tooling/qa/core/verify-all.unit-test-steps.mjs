@@ -35,6 +35,7 @@ function createCoverageFailureStep(coverageResult, releaseMode, durationMs) {
 
 async function collectDirectUnitTestStepResult({
   coveragePlan,
+  maxWorkers,
   pool,
   suite,
   unitTestDetailOverride,
@@ -47,6 +48,7 @@ async function collectDirectUnitTestStepResult({
       directFiles: coveragePlan.directFiles,
       pool,
       suite,
+      ...(maxWorkers == null ? {} : { maxWorkers }),
     })
   );
 
@@ -85,7 +87,7 @@ function resolveReusableRelatedUnitTestPlan({ coveragePlan, pool, suite, targetF
   });
 }
 
-async function runRelatedUnitTests({ coveragePlan, pool, suite }) {
+async function runRelatedUnitTests({ coveragePlan, maxWorkers, pool, suite }) {
   return measureAsyncStep(() =>
     runUnitTests({
       coverage: hasCoverage(coveragePlan),
@@ -95,6 +97,7 @@ async function runRelatedUnitTests({ coveragePlan, pool, suite }) {
       relatedFiles: coveragePlan.relatedFiles,
       requireTests: coveragePlan.requireRelatedTests,
       suite,
+      ...(maxWorkers == null ? {} : { maxWorkers }),
     })
   );
 }
@@ -102,6 +105,7 @@ async function runRelatedUnitTests({ coveragePlan, pool, suite }) {
 async function collectRelatedUnitTestStepResult({
   cacheSource,
   coveragePlan,
+  maxWorkers,
   pool,
   suite,
   targetFiles,
@@ -122,6 +126,7 @@ async function collectRelatedUnitTestStepResult({
 
   const { durationMs, value: unitTestResult } = await runRelatedUnitTests({
     coveragePlan,
+    maxWorkers,
     pool,
     suite,
   });
@@ -146,6 +151,7 @@ async function collectRelatedUnitTestStepResult({
 async function collectUnitTestStepResult({
   cacheSource,
   coveragePlan,
+  maxWorkers,
   pool,
   releaseMode,
   suite,
@@ -168,6 +174,7 @@ async function collectUnitTestStepResult({
   if (coveragePlan.directFiles.length > 0 && coveragePlan.relatedFiles.length === 0) {
     return collectDirectUnitTestStepResult({
       coveragePlan,
+      maxWorkers,
       pool,
       suite,
       unitTestDetailOverride,
@@ -177,6 +184,7 @@ async function collectUnitTestStepResult({
   const relatedStep = await collectRelatedUnitTestStepResult({
     cacheSource,
     coveragePlan,
+    maxWorkers,
     pool,
     suite,
     targetFiles,
@@ -236,6 +244,7 @@ export async function collectUnitTestAndCoverageStepResults({
   coverageDetailOverride,
   directFilesOverride = [],
   fullSuiteOverride = false,
+  maxWorkers = null,
   requireRelatedTestsOverride = false,
   relatedFilesOverride,
   releaseMode,
@@ -257,6 +266,7 @@ export async function collectUnitTestAndCoverageStepResults({
   const unitTestStep = await collectUnitTestStepResult({
     cacheSource,
     coveragePlan: plannedCoverage,
+    maxWorkers,
     pool,
     releaseMode,
     suite,

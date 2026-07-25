@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- layer public action coverage keeps related paths together */
 import type { Canvas } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

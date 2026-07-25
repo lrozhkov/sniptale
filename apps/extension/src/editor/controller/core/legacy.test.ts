@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   exact legacy proof needs local fabric doubles and grouped migration cases to stay readable */
 import { describe, expect, it, vi } from 'vitest';
 
 const fabricMock = vi.hoisted(() => {

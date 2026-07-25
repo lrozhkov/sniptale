@@ -24,7 +24,7 @@ function resolveWebSnapshotPayloadBlobsForSave(
     return resolveWebSnapshotPayloadBlobs(payload, tabId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`resolve web snapshot payload blobs: ${message}`);
+    throw new Error(`resolve web snapshot payload blobs: ${message}`, { cause: error });
   }
 }
 

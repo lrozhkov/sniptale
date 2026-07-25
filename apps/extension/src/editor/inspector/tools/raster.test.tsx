@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   exact raster inspector proof keeps active, empty, and fill-update branches together */
+
 import React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

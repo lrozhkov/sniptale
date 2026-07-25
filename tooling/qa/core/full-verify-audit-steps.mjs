@@ -13,9 +13,14 @@ export function collectAuditStep() {
     : withDuration(createOkStep('Audit', auditResult.detail ?? ''), durationMs);
 }
 
-export async function collectOptionalSecurityStep({ codeFiles }) {
+export async function collectOptionalSecurityStep(
+  { codeFiles, eslintResults = null },
+  { securityCollector = collectSecurityStep } = {}
+) {
   if (codeFiles.length === 0) {
     return createSkippedStep('Security');
   }
-  return collectSecurityStep();
+  return Array.isArray(eslintResults)
+    ? securityCollector({ eslintResults, files: codeFiles })
+    : securityCollector();
 }

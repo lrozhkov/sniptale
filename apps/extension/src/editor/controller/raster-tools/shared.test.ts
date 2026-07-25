@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   exact shared raster proof keeps snapshot and selection ownership branches together */
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEditorRasterToolSession } from './session';
 

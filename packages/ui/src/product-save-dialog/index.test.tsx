@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   dialog proof keeps the interactive save-shell matrix inside one exact owner-local suite */
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

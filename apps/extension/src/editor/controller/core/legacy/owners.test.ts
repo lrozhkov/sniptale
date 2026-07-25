@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   local Fabric doubles keep adjacent legacy owner proof self-contained */
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const fabricMock = vi.hoisted(() => {

@@ -13,6 +13,7 @@ import { PRODUCT_QA_SUITE, normalizeQaSuite } from './qa-scope.mjs';
 import { createUnitTestPlan, expandRelatedTestScope } from './unit-test-plan.mjs';
 
 const testEnv = {
+  SNIPTALE_QA_LANE_PROCESS: null,
   TMPDIR: '/tmp',
   TMP: '/tmp',
   TEMP: '/tmp',

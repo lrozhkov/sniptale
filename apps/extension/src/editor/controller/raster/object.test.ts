@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   exact raster object proof keeps overlay and single-object replacement branches together */
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fabricMocks = vi.hoisted(() => ({

@@ -261,7 +261,7 @@ function hasCurrentProviderRedirect(frontier, providers, productionCodeFiles, ro
 
 function createHeadSourceResolver() {
   const sourcesByFile = new Map();
-  return function readHeadSource(file) {
+  return function cacheHeadSource(file) {
     if (!sourcesByFile.has(file)) {
       sourcesByFile.set(file, readHeadFileText(file));
     }
@@ -273,7 +273,7 @@ function createHeadImporterResolver({ headImporterResolver, readHeadSource, root
   const importersByFile = new Map();
   const collectImporters =
     headImporterResolver ?? ((file) => collectHeadImporters(file, root, readHeadSource));
-  return function resolveHeadImporters(file) {
+  return function cacheHeadImporters(file) {
     if (!importersByFile.has(file)) {
       const result = collectImporters(file);
       importersByFile.set(

@@ -35,7 +35,7 @@ it('skips product unit tests for a deleted type-only contract module', async () 
   expect(scope.relatedFiles).toEqual([]);
 });
 
-it('uses import-only consumer rewrites as deleted-successor topology proof', async () => {
+it('uses an import-only changed owner as direct deleted-path topology proof', async () => {
   const root = createTempRoot('build-scope-deleted-forwarder-');
   const ownerRoot = 'apps/extension/src/content/selection/example';
   const consumer = `${ownerRoot}/consumer.ts`;
@@ -73,7 +73,9 @@ it('uses import-only consumer rewrites as deleted-successor topology proof', asy
     });
   });
 
+  expect(scope.profile).toBe('owner-direct');
   expect(scope.fullSuite).not.toBe(true);
-  expect(scope.detail).toContain('graph-closed successor owner proof');
-  expect(scope.relatedFiles).toEqual(expect.arrayContaining([consumer, providerTest]));
+  expect(scope.detail).toContain('graph-closed changed-owner proof');
+  expect(scope.directTestFiles).toEqual([providerTest]);
+  expect(scope.relatedFiles).toEqual([]);
 });

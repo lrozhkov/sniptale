@@ -44,3 +44,21 @@ it('skips both focused graph steps when dependency graph is not triggered', asyn
   expect(steps.map((step) => [step.label, step.status])).toContainEqual(['Cycles', 'skipped']);
   expect(graphRunner).not.toHaveBeenCalled();
 });
+
+it('defers heavy owner guards without changing their canonical slots', async () => {
+  const module = await import('./verify-focused-triggered.execution.mjs');
+  const steps = module.runFocusedTriggeredStaticChecks({
+    deferOwnerGuards: true,
+    jsLikeFiles: [],
+    targetFiles: [],
+  });
+
+  expect(
+    steps
+      .filter(({ label }) => ['App-core owners', 'Target-only paths'].includes(label))
+      .map(({ detail, label, status }) => [label, status, detail])
+  ).toEqual([
+    ['App-core owners', 'skipped', 'scheduled in bounded owner lane'],
+    ['Target-only paths', 'skipped', 'scheduled in bounded owner lane'],
+  ]);
+});

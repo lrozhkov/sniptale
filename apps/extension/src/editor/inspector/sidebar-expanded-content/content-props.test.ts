@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   exact content-props proof keeps the pure view/action mapping assertions together */
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { createContentProps } from '../../../../../../tooling/test/harness/editor/ownership/fixtures';

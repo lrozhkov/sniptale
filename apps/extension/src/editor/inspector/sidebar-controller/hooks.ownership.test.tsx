@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   sidebar hook ownership tests keep provider-wired branches together to avoid brittle mock setup duplication */
 
 import React, { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';

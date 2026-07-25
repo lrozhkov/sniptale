@@ -24,12 +24,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "16829cda185f9bbf6dd4a20579e8a5d8b09df36dc80bc4bb0d9f03e6f128303f"
+      "sha256": "19df089b791c76fca28846161a1dc36dfef00e94762d4b4bc11e4d7afaa8f8ac"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "16829cda185f9bbf6dd4a20579e8a5d8b09df36dc80bc4bb0d9f03e6f128303f"
+      "sha256": "19df089b791c76fca28846161a1dc36dfef00e94762d4b4bc11e4d7afaa8f8ac"
     },
     {
       "category": "bundled-font",
@@ -64,12 +64,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-      "sha256": "697bdb3bb849d15b476c8ae52d90088fc73df43aa1e7d6cdd96f85eadf6369e2"
+      "sha256": "bfe937a3285fb13ee24f0da7c773dcb6568d770425664ab475b9749dc248c326"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/qa-steps/definitions.data.mjs",
-      "sha256": "697bdb3bb849d15b476c8ae52d90088fc73df43aa1e7d6cdd96f85eadf6369e2"
+      "sha256": "bfe937a3285fb13ee24f0da7c773dcb6568d770425664ab475b9749dc248c326"
     },
     {
       "category": "validator-integration",
@@ -94,12 +94,12 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/verify-closeout-step-helpers.mjs",
-      "sha256": "c33eceb1b6b8136d3a079e923c8892c06655f1268aded00728badde1e34a79a5"
+      "sha256": "b3a00cf89d644b1f56591b5afcc2e2cdab848b9d28469a79d39d3c8a64db0319"
     },
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/verify-focused-triggered.execution.mjs",
-      "sha256": "f894d55a2cd3e20f20f3ce9d1774399411639282c729990b49260978451b234e"
+      "sha256": "b2e33e985597dd501a5a4878940e553c8aa203a22ca7e3af82b7f36261d4c7b0"
     },
     {
       "category": "validator-integration",
@@ -119,7 +119,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/release/artifact-security.mjs",
-      "sha256": "2e16c4326ffe55f8f7d0daf2f935f4296c3548fb0836b289a6c07144d422968f"
+      "sha256": "385f9f13852db836f230f7c38ef8978545e0402a8a5682b7317140a3d283b4ec"
     },
     {
       "category": "bundled-font",

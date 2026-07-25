@@ -94,8 +94,8 @@ export async function collectFilesWithHarForExportManager(
 ) {
   const harSessionId = options.includeHarDomLogs ? crypto.randomUUID() : null;
   const harHandle = await tools.startHarCapture(harSessionId, warnings);
-  let collectedFiles: Awaited<ReturnType<typeof collectExportFiles>> | null = null;
-  let downloadResult: Awaited<ReturnType<typeof downloadExportFiles>> | null = null;
+  let collectedFiles: Awaited<ReturnType<typeof collectExportFiles>>;
+  let downloadResult: Awaited<ReturnType<typeof downloadExportFiles>>;
   let sessionHar: SessionHarCaptureResult = null;
 
   try {

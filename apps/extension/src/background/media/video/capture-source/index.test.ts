@@ -50,7 +50,6 @@ function createTab(tabId = 7): chrome.tabs.Tab {
   } as chrome.tabs.Tab;
 }
 
-// eslint-disable-next-line max-lines-per-function -- branch-heavy ownership coverage is easier to audit as one suite.
 describe('capture-source ownership', () => {
   beforeEach(() => {
     vi.clearAllMocks();

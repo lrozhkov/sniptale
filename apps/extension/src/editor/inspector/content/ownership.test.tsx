@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   content ownership test keeps section/render permutations in one deterministic integration-style pass */
 
 import React from 'react';
 import { act } from 'react';

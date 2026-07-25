@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   exact media-hub event proof keeps publish/subscription payload permutations in one owner-local suite */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type MediaHubEventListener = (event: MessageEvent<unknown>) => void;

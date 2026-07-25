@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function */
 import { describe, expect, it } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';

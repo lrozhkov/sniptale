@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function */
 // @vitest-environment jsdom
 
 import { act } from 'react';

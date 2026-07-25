@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   exact console tracer proof keeps observer and fallback permutations together */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { recordConsoleTrace } from './console';

@@ -176,7 +176,9 @@ export async function processMarkdownRequest(
     }
 
     logger.error('Unexpected non-Error value while processing markdown request', error);
-    throw new Error(translate('background.runtime.llmUnexpectedProcessingError'));
+    throw new Error(translate('background.runtime.llmUnexpectedProcessingError'), {
+      cause: error,
+    });
   }
 }
 

@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   ownership proof keeps canvas context-menu interaction matrix in one seam-local file */
+
 import { act } from 'react';
 import type { FabricObject } from 'fabric';
 import { describe, expect, it, vi } from 'vitest';

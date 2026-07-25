@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   exact selection workflow proof keeps marquee, lasso, and wand ownership together */
+
 import { Point } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEditorStore } from '../../state/useEditorStore';

@@ -61,7 +61,7 @@ function validateJscpdScanTargets(scanTargets) {
       stats = fs.statSync(absolutePath);
     } catch (error) {
       if (error && typeof error === 'object' && error.code === 'ENOENT') {
-        throw new Error(`jscpd scan root does not exist: ${target}`);
+        throw new Error(`jscpd scan root does not exist: ${target}`, { cause: error });
       }
       throw error;
     }

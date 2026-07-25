@@ -85,6 +85,6 @@ export async function copyImageToClipboard(
       throw error;
     }
     logger.error('Failed to copy image to clipboard', error);
-    throw new Error(translate('content.runtime.copyImageFailed'));
+    throw new Error(translate('content.runtime.copyImageFailed'), { cause: error });
   }
 }

@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- selection action coverage keeps public api routing together */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({

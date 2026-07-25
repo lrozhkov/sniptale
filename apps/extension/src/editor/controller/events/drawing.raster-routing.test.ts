@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   exact raster routing proof keeps event-binding construction and lifecycle routing together */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EditorControllerEventBindings } from './types';
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function -- direct section routing proof stays grouped per toolbar slice */
+
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';

@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- binding coverage keeps adapter view and mutators together */
 import { describe, expect, it, vi } from 'vitest';
 import { createEditorControllerPublicApiAdapter } from './bindings';
 

@@ -9,7 +9,7 @@ import {
 
 const logger = createLogger({ namespace: 'SettingsQuickActions' });
 
-export async function loadQuickActionsState() {
+async function loadQuickActionsState() {
   const [loadedActions, loadedDisplayMode] = await Promise.all([
     getQuickActions(),
     getQuickActionsDisplayMode(),

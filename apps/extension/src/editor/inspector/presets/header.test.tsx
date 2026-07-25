@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-/* eslint-disable max-lines-per-function --
-   preset template header proof keeps tab/card/save-panel interactions in one owner file */
 
 import type React from 'react';
 import { act } from 'react';

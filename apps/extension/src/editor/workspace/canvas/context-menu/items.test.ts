@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   item builder proofs keep menu contracts and async action assertions together */
 import { describe, expect, it, vi } from 'vitest';
 import { buildCanvasContextMenuItems, resolveCanvasContextMenuEnabledSnapshot } from './items';
 import type {

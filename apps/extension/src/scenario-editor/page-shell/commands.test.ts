@@ -4,6 +4,7 @@ import { createScenarioSlide } from '../../features/scenario/project/v3';
 import { translate } from '../../platform/i18n';
 import { createElementCommands, createHistoryCommands, createSlideCommands } from './commands';
 import { createCommandsProject, createCommandsTwoSlideProject } from './commands.test-support';
+import { insertImageFileIntoSelectedSlide } from './image-import';
 import type { ScenarioV3EditorSession } from './types';
 
 const imageImportMocks = vi.hoisted(() => ({
@@ -221,6 +222,32 @@ it('rolls back imported image assets when project mutation throws', async () => 
 
   expect(imageImportMocks.deleteScenarioAsset).toHaveBeenCalledWith('asset-imported');
   expect(onOperationError).toHaveBeenCalledWith(translate('scenario.editor.v3OperationFailed'));
+});
+
+it('preserves both failures when imported image rollback also fails', async () => {
+  const project = createCommandsTwoSlideProject();
+  const mutationError = new Error('mutation failed');
+  const rollbackError = new Error('rollback failed');
+  imageImportMocks.deleteScenarioAsset.mockRejectedValueOnce(rollbackError);
+
+  await expect(
+    insertImageFileIntoSelectedSlide({
+      file: new File(['image'], 'Rollback.png', { type: 'image/png' }),
+      getSession: () => ({
+        history: { future: [], past: [] },
+        project,
+        selectedElementId: null,
+        selectedSlideId: 'slide-2',
+      }),
+      projectId: project.id,
+      setSession: () => {
+        throw mutationError;
+      },
+    })
+  ).rejects.toMatchObject({
+    cause: rollbackError,
+    errors: [mutationError, rollbackError],
+  });
 });
 
 it('preserves selected elements after update and move while they remain reachable', () => {

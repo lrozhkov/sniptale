@@ -1,5 +1,3 @@
-/* eslint-disable max-lines-per-function --
-   helper proofs keep request derivation and placement assertions grouped by seam */
 import { describe, expect, it, vi } from 'vitest';
 import {
   resolveCanvasContextMenuRequest,

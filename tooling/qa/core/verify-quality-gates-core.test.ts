@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import {
   createTempRoot,
@@ -188,4 +188,65 @@ it('blocks unsafe regex warnings in the security ESLint lane', async () => {
     }),
   ]);
   expect(result.eslintResult).toEqual(expect.objectContaining({ failed: true, warningCount: 1 }));
+});
+
+it('reuses precomputed security findings for covered files', async () => {
+  const module = await import('../guards/security/verify-security.mjs');
+  const relativeFile = 'tooling/qa/core/verify-oxlint.mjs';
+  const lintRunner = vi.fn(async () => {
+    throw new Error('covered files must not be linted again');
+  });
+
+  const result = await module.runSecurityCheck([relativeFile], {
+    eslintResults: [
+      {
+        errorCount: 0,
+        fatalErrorCount: 0,
+        filePath: path.join(process.cwd(), relativeFile),
+        fixableErrorCount: 0,
+        fixableWarningCount: 0,
+        messages: [
+          {
+            column: 1,
+            line: 1,
+            message: 'unsafe regex warning',
+            ruleId: 'security/detect-unsafe-regex',
+            severity: 1,
+          },
+        ],
+        suppressedMessages: [],
+        warningCount: 1,
+      },
+    ],
+    lintRunner,
+  });
+
+  expect(lintRunner).not.toHaveBeenCalled();
+  expect(result.eslintResult).toEqual(expect.objectContaining({ failed: true, warningCount: 1 }));
+});
+
+it('lints only security files missing from shared ESLint results', async () => {
+  const module = await import('../guards/security/verify-security.mjs');
+  const missingFile = 'tooling/qa/core/verify-oxlint.mjs';
+  const lintRunner = vi.fn(async () => ({
+    errorCount: 0,
+    failed: false,
+    output: '',
+    results: [],
+    warningCount: 0,
+  }));
+
+  await module.runSecurityCheck([missingFile], {
+    eslintResults: [
+      {
+        filePath: path.join(process.cwd(), 'apps/extension/src/example.ts'),
+        messages: [],
+      },
+    ],
+    lintRunner,
+  });
+
+  expect(lintRunner).toHaveBeenCalledTimes(2);
+  expect(lintRunner).toHaveBeenNthCalledWith(1, expect.objectContaining({ files: [missingFile] }));
+  expect(lintRunner).toHaveBeenNthCalledWith(2, expect.objectContaining({ files: [missingFile] }));
 });

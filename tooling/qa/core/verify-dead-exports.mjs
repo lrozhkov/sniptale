@@ -7,15 +7,9 @@
 import path from 'node:path';
 import fs from 'node:fs';
 
-import { Project } from 'ts-morph';
-
 import { isExecutedAsScript, repoRoot } from './shared.mjs';
 import { isProductSourcePath } from './src-production-targets.mjs';
-import {
-  markDynamicImportUsage,
-  markImportUsage,
-  markReExportUsage,
-} from './verify-dead-exports.usage.mjs';
+import { materializeSourceIndex } from './source-index/index.mjs';
 
 const EXPLICIT_IGNORE_FILES = new Set(['packages/platform/src/browser/app-facade-removal.test.ts']);
 
@@ -29,10 +23,6 @@ const PUBLIC_TYPE_ONLY_SURFACE_PATTERNS = [
   /^packages\/ui\/src\//u,
   /^packages\/runtime-contracts\/src\/web-snapshot\/types\.ts$/u,
 ];
-
-function normalizePath(value) {
-  return value.replaceAll(path.sep, '/');
-}
 
 function isSourceFileInScope(relativePath) {
   return (
@@ -84,53 +74,14 @@ function isPublicDeadExportSurface(relativePath, declarationKind) {
   );
 }
 
-function getRelativeSourcePath(sourceFile, rootDir) {
-  return normalizePath(path.relative(rootDir, sourceFile.getFilePath()));
-}
-
-function isDeclarationOwnedBySourceFile(declaration, relativePath, rootDir) {
-  return getRelativeSourcePath(declaration.getSourceFile(), rootDir) === relativePath;
-}
-
-function collectExportedDeclarationsByFile(project, rootDir) {
-  const exportedDeclarationsByFile = new Map();
-
-  for (const sourceFile of project.getSourceFiles()) {
-    const relativePath = getRelativeSourcePath(sourceFile, rootDir);
-    if (!isSourceFileInScope(relativePath) || isIgnoredSourceFile(relativePath, rootDir)) {
-      continue;
-    }
-
-    const ownedExportedDeclarations = new Map();
-    for (const [exportName, declarations] of sourceFile.getExportedDeclarations()) {
-      const ownedDeclarations = declarations.filter((declaration) =>
-        isDeclarationOwnedBySourceFile(declaration, relativePath, rootDir)
-      );
-      if (ownedDeclarations.length > 0) {
-        ownedExportedDeclarations.set(exportName, ownedDeclarations);
-      }
-    }
-
-    exportedDeclarationsByFile.set(relativePath, ownedExportedDeclarations);
-  }
-
-  return exportedDeclarationsByFile;
-}
-
-function collectUsedExportsByFile(project, rootDir, exportedDeclarationsByFile) {
+function collectUsedExportsByFile(records) {
   const usedExportsByFile = new Map();
-  for (const sourceFile of project.getSourceFiles()) {
-    markImportUsage(sourceFile, rootDir, exportedDeclarationsByFile, usedExportsByFile);
-    markReExportUsage(sourceFile, rootDir, exportedDeclarationsByFile, usedExportsByFile);
-    markDynamicImportUsage(
-      project,
-      sourceFile,
-      rootDir,
-      exportedDeclarationsByFile,
-      usedExportsByFile
-    );
+  for (const record of records) {
+    for (const usage of record.usages) {
+      if (!usedExportsByFile.has(usage.target)) usedExportsByFile.set(usage.target, new Set());
+      for (const name of usage.names) usedExportsByFile.get(usage.target).add(name);
+    }
   }
-
   return usedExportsByFile;
 }
 
@@ -142,32 +93,22 @@ function sortUnusedExports(exportsList) {
   );
 }
 
-function collectUnusedDeclarations(exportedDeclarationsByFile, usedExportsByFile) {
+function collectUnusedDeclarations(records, rootDir) {
   const unusedValueExports = [];
   const unusedTypeExports = [];
+  const usedExportsByFile = collectUsedExportsByFile(records);
 
-  for (const [relativePath, exportedDeclarations] of exportedDeclarationsByFile.entries()) {
-    const usedExports = usedExportsByFile.get(relativePath) ?? new Set();
+  for (const record of records) {
+    if (!isSourceFileInScope(record.file) || isIgnoredSourceFile(record.file, rootDir)) continue;
+    const usedExports = usedExportsByFile.get(record.file) ?? new Set();
 
-    for (const [exportName, declarations] of exportedDeclarations) {
+    for (const { exportName, kind } of record.exports) {
       if (usedExports.has('*') || usedExports.has(exportName)) {
         continue;
       }
-
-      for (const declaration of declarations) {
-        const declarationKind = declaration.getKindName();
-        if (isPublicDeadExportSurface(relativePath, declarationKind)) {
-          continue;
-        }
-        const target = isTypeOnlyDeclaration(declarationKind)
-          ? unusedTypeExports
-          : unusedValueExports;
-        target.push({
-          file: relativePath,
-          exportName,
-          kind: declarationKind,
-        });
-      }
+      if (isPublicDeadExportSurface(record.file, kind)) continue;
+      const target = isTypeOnlyDeclaration(kind) ? unusedTypeExports : unusedValueExports;
+      target.push({ file: record.file, exportName, kind });
     }
   }
 
@@ -177,23 +118,15 @@ function collectUnusedDeclarations(exportedDeclarationsByFile, usedExportsByFile
   return { unusedValueExports, unusedTypeExports };
 }
 
-function collectUnusedExports(project, rootDir) {
-  const exportedDeclarationsByFile = collectExportedDeclarationsByFile(project, rootDir);
-  const usedExportsByFile = collectUsedExportsByFile(project, rootDir, exportedDeclarationsByFile);
-
-  return collectUnusedDeclarations(exportedDeclarationsByFile, usedExportsByFile);
-}
-
 export function runDeadExportsCheck({
   tsConfigFilePath = path.join(repoRoot, 'tsconfig.json'),
+  cachePath,
 } = {}) {
-  const rootDir = path.dirname(tsConfigFilePath);
-  const project = new Project({
-    tsConfigFilePath,
-    skipAddingFilesFromTsConfig: false,
-  });
-
-  return collectUnusedExports(project, rootDir);
+  const index = materializeSourceIndex({ cachePath, tsConfigFilePath });
+  return {
+    ...collectUnusedDeclarations(index.records, index.rootDir),
+    sourceIndexStats: index.stats,
+  };
 }
 
 export function summarizeDeadExportsReport(report) {

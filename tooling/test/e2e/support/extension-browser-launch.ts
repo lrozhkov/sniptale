@@ -146,7 +146,9 @@ export async function launchExtensionBrowser(): Promise<LaunchedBrowser> {
     await rm(userDataDir, { recursive: true, force: true });
     const details = stderr.trim();
     const suffix = details ? `\nChromium stderr:\n${details}` : '';
-    throw new Error(`${error instanceof Error ? error.message : String(error)}${suffix}`);
+    throw new Error(`${error instanceof Error ? error.message : String(error)}${suffix}`, {
+      cause: error,
+    });
   }
 }
 

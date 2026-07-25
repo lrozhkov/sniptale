@@ -1,6 +1,6 @@
 # Operator Handbook
 
-Updated: 2026-07-24
+Updated: 2026-07-25
 
 Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), quality policy in [code-quality.md](code-quality.md), and wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md).
 
@@ -25,6 +25,8 @@ Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGE
 The live harness/shared-control classifier is `tooling/qa/core/qa-scope.mjs`; this table summarizes it. Machine-owned files explicitly marked inventory-only, including exact coverage rollout paths, use checkpoint owner validation without a fresh harness stamp. Changing matching, thresholds, traversal, or wrapper behavior still requires release-harness proof.
 
 Checkpoint and closeout choose unit-test profiles automatically. Small low-risk diffs with complete focused owner mappings run exact direct tests; a deleted consolidation also runs exact surviving owner tests when its complete previous-consumer and current-redirect closure stays inside one owner, every surviving changed production file has deterministic proof, and the owner-test set remains bounded. High-risk, public/shared, cross-owner, transitive, ambiguous, uncovered, or over-budget diffs retain Vitest affected-consumer discovery. The focused owner-expansion budget bounds transitively selected owner tests, while every changed direct test remains mandatory proof and does not consume that expansion budget. Inspect the `Unit tests` detail in the run log for `profile=...`; do not add a manual force-narrow flag.
+
+Checkpoint formatting is always sequential and finishes before any verification lane starts. After that barrier, wrappers select a bounded WSL-visible profile. The default checkpoint/closeout caps are 8 CPU tokens, 12 GiB estimated resident memory, and 4 concurrent Vitest workers. An explicit measured Vitest override may raise that normal worker cap to 6 when the CPU budget permits. `qa:release` is intentionally different: after its non-test prerequisite phase finishes, repo-wide Vitest runs as a second exclusive phase with up to 12 WSL-visible CPU tokens, 12 workers, and all visible WSL memory except 1 GiB. Build remains exclusive after tests. Operator overrides are positive integers: `SNIPTALE_QA_CPU_TOKENS`, `SNIPTALE_QA_MEMORY_MIB`, and `SNIPTALE_QA_VITEST_MAX_WORKERS`; they can reduce release saturation when Windows is busy. Release requires at least 2 CPU tokens, while its memory budget has a 6144 MiB minimum because the scheduler retains the real heavy-lane reservations instead of relabelling them as smaller work. Overrides are clamped to resources visible inside WSL and never mean `auto`.
 
 ## Review Skills
 
@@ -70,6 +72,7 @@ Repo-wide audit inventory belongs in `qa:audit` unless a failed stage requires a
 
 - Run Linux-side `npm run ...` and `npm exec ...` from WSL; do not use Windows `cmd /c npm ...` or bare `npx ...`.
 - If temporary-directory permissions fail, retry with `TMPDIR=/tmp TMP=/tmp TEMP=/tmp`.
+- Treat `.wslconfig` CPU and memory values as VM ceilings, not dedicated resources. Windows and WSL still compete for the same physical cores, so do not set QA limits from the 12 logical-thread count alone.
 - External audit binaries use `PATH` or `SNIPTALE_SEMGREP_BIN`, `SNIPTALE_CODEQL_BIN`, `SNIPTALE_OSV_SCANNER_BIN`, and `SNIPTALE_GITLEAKS_BIN` overrides.
 - Treat DNS, proxy, TLS, registry, browser-dependency, and missing-binary failures as environment failures, not product regressions.
 - Do not manually stage the closeout candidate or stage `tasks/**`.

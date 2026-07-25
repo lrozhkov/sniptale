@@ -1,6 +1,6 @@
 # WSL Setup And Recovery
 
-Updated: 2026-07-14
+Updated: 2026-07-25
 
 Canonical environment setup for Sniptale on WSL. Workflow and QA decisions remain in `AGENTS.md`; this document only establishes and repairs the Linux toolchain.
 
@@ -112,6 +112,12 @@ npm run build
 ```
 
 Use `npm run qa:preflight` for repository context. Use `qa:release-harness`, `qa:checkpoint`, required independent review, and `qa:closeout` only for a real implementation diff according to `AGENTS.md`.
+
+Check the resource ceiling seen by WSL with `nproc`, `lscpu`, and `free -h`. A `.wslconfig` entry such as `processors=12` and `memory=16GB` permits the VM to reach those values; it does not reserve them away from Windows. On a 6-core/12-thread i7-8700K, the QA scheduler therefore defaults to 8 CPU tokens rather than treating all 12 logical threads as independent physical cores. It also leaves roughly 3 GiB outside the 12 GiB QA memory budget so Windows/WSL services do not force normal verification into swap.
+
+Use `SNIPTALE_QA_CPU_TOKENS`, `SNIPTALE_QA_MEMORY_MIB`, or `SNIPTALE_QA_VITEST_MAX_WORKERS` only for a measured operator override. Values must be positive integers, the memory budget must be at least 6144 MiB, and all values are clamped to WSL-visible ceilings. Heavy lane reservations are never reduced just to fit a smaller profile, so WSL must expose at least 7168 MiB total memory. Release requires at least 2 CPU tokens. Lower CPU tokens or Vitest workers when Windows is doing other sustained work; do not use an automatic/unbounded worker mode.
+
+`qa:release` deliberately saturates the WSL ceiling only during its exclusive repo-wide Vitest stage: on the current machine that means up to 12 CPU tokens, 12 workers, and visible memory minus 1 GiB. Windows still shares the physical processor and RAM, so use the same overrides to lower this release-only peak when interactive host work must remain responsive.
 
 `qa:audit` owns live npm audit, supply-chain inventory, full coverage, and external engines. It is not a normal environment or implementation gate. If an explicitly requested audit fails because the registry is unavailable, repair DNS/proxy/TLS/registry access rather than treating the result as a product defect.
 

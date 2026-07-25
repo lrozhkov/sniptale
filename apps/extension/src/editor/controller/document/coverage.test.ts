@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function */
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultEditorPresetStorageState } from '../../../composition/persistence/editor-presets';
