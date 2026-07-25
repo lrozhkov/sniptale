@@ -15,12 +15,12 @@ function createCheckpointTempRoot(prefix: string) {
   return root;
 }
 
-function context(fingerprint: string) {
+function context(fingerprint: string, targetFile = 'src/example.ts') {
   return {
-    targetFiles: ['src/example.ts'],
-    existingTargetFiles: ['src/example.ts'],
-    codeFiles: ['src/example.ts'],
-    jsLikeFiles: ['src/example.ts'],
+    targetFiles: [targetFile],
+    existingTargetFiles: [targetFile],
+    codeFiles: [targetFile],
+    jsLikeFiles: [targetFile],
     fingerprint,
   };
 }
@@ -45,7 +45,10 @@ function okStep(label: string) {
 }
 
 async function runGreenCheckpointFlow(module: typeof import('./checkpoint.mjs'), calls: string[]) {
-  const contexts = [context('before-format'), context('after-format')];
+  const contexts = [
+    context('before-format', 'src/before-format.ts'),
+    context('after-format', 'src/after-format.ts'),
+  ];
   const result = await module.runCheckpoint({
     producerRunId: 'checkpoint-test-run-1',
     executionContractAsserter: ignoreExecutionContract,
@@ -54,12 +57,12 @@ async function runGreenCheckpointFlow(module: typeof import('./checkpoint.mjs'),
       calls.push('format');
       return okStep('Format');
     },
-    advisoryStepCollector: () => {
-      calls.push('advisory');
+    advisoryStepCollector: (currentContext) => {
+      calls.push(`advisory:${currentContext.targetFiles.join(',')}`);
       return okStep('Advisory report');
     },
-    focusedStepCollector: async () => {
-      calls.push('focused');
+    focusedStepCollector: async (currentContext) => {
+      calls.push(`focused:${currentContext.targetFiles.join(',')}`);
       return [okStep('Oxlint'), okStep('ESLint')];
     },
   });
@@ -97,7 +100,89 @@ it('formats and reports focused steps without invoking build', async () => {
     expect(result.readyForBuild).toBe(true);
   });
 
-  expect(calls).toEqual(['format', 'advisory', 'focused']);
+  expect(calls).toEqual(['format', 'advisory:src/after-format.ts', 'focused:src/after-format.ts']);
+});
+
+it('awaits the asynchronous formatter barrier before collecting verification context', async () => {
+  const root = createCheckpointTempRoot('qa-checkpoint-format-barrier-');
+  const calls: string[] = [];
+  let releaseFormat: (step: ReturnType<typeof okStep>) => void = () => {};
+  const formatResult = new Promise<ReturnType<typeof okStep>>((resolve) => {
+    releaseFormat = resolve;
+  });
+
+  await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./checkpoint.mjs')>(
+      './checkpoint.mjs',
+      import.meta.url
+    );
+    const contexts = [
+      context('before-format', 'src/before-format.ts'),
+      context('after-format', 'src/after-format.ts'),
+    ];
+    const checkpointResult = module.runCheckpoint({
+      producerRunId: 'checkpoint-test-format-barrier',
+      executionContractAsserter: ignoreExecutionContract,
+      contextCollector: () => contexts.shift() ?? context('after-format'),
+      formatStepCollector: () => {
+        calls.push('format');
+        return formatResult;
+      },
+      advisoryStepCollector: () => {
+        calls.push('advisory');
+        return okStep('Advisory report');
+      },
+      focusedStepCollector: async (currentContext) => {
+        calls.push(`focused:${currentContext.targetFiles.join(',')}`);
+        return [okStep('Oxlint')];
+      },
+    });
+
+    expect(calls).toEqual(['format']);
+    releaseFormat(okStep('Format'));
+    await checkpointResult;
+  });
+
+  expect(calls).toEqual(['format', 'advisory', 'focused:src/after-format.ts']);
+});
+
+it('does not start focused verification when advisory collection reports failure', async () => {
+  const root = createCheckpointTempRoot('qa-checkpoint-advisory-fail-');
+  const calls: string[] = [];
+
+  await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./checkpoint.mjs')>(
+      './checkpoint.mjs',
+      import.meta.url
+    );
+    const result = await module.runCheckpoint({
+      producerRunId: 'checkpoint-test-advisory-fail',
+      executionContractAsserter: ignoreExecutionContract,
+      contextCollector: () => context('same-diff'),
+      formatStepCollector: () => okStep('Format'),
+      advisoryStepCollector: () => {
+        calls.push('advisory');
+        return {
+          label: 'Advisory report',
+          status: 'failed' as const,
+          summary: 'failed',
+          durationMs: 0,
+        };
+      },
+      focusedStepCollector: async () => {
+        calls.push('focused');
+        return [okStep('Oxlint')];
+      },
+    });
+
+    expect(result.steps.map((step) => [step.label, step.status])).toEqual([
+      ['Format', 'ok'],
+      ['Advisory report', 'failed'],
+    ]);
+    expect(result.readyForBuild).toBe(false);
+  });
+
+  expect(calls).toEqual(['advisory']);
 });
 
 it('does not run qa:build when focused checks fail', async () => {

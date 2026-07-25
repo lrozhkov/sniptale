@@ -1,6 +1,6 @@
 # Wrapper Summary
 
-Updated: 2026-07-24
+Updated: 2026-07-25
 
 This document owns wrapper lifecycle, scope/freshness state, locks, handoffs, and observability. Workflow belongs in [AGENTS.md](../../AGENTS.md), quality policy in [code-quality.md](code-quality.md), and command lookup in [operator-handbook.md](operator-handbook.md).
 
@@ -52,9 +52,13 @@ Blocking harness/shared-control proof. It runs the harness-owned formatting/stat
 
 Blocking in-progress product proof over the current diff. It verifies required harness freshness, formats supported non-Markdown product targets, prints and records advisory state, runs diff-scoped structural risk plus focused static/architecture/security controls, typechecks the affected owner-project and declared reverse-consumer closure when possible, runs directly changed and owner-selected tests, and checks eligible diff coverage. HEAD-proven deleted owner-local TypeScript paths with a path-segment-safe project match remain in their mapped closure; unproven missing or unmapped paths, broad shared contracts, and typecheck/configuration changes retain the full-workspace fallback. Successful unit-test steps identify their `checkpoint-owner` or `checkpoint-direct` profile in the diagnostic log. It writes checkpoint state and does not build, stage, or commit.
 
+Formatting is a strict sequential first barrier. Checkpoint recollects the diff only after formatting finishes, then starts independent `typecheck`, `tests`, `lint`, `graph/index`, and light-guard lanes through the bounded resource scheduler. Formatter failure starts none of those lanes. Lane completion order never changes the canonical result order or failure population.
+
 ### `qa:build`
 
 Blocking broader product/build proof. It requires fresh matching checkpoint state and applicable harness state, runs broader checks/tests not owned by focused proof, produces the artifact build, and writes build state. Unit-test scope is selected automatically by `tooling/qa/core/verify-build.test-profiles.mjs`: small low-risk changes with complete owner-test proof use `owner-direct`; runtime, persistence, messaging, parser/export, package/public, ambiguous, or over-budget changes use `related-transitive`; test-only changes use `direct-changed`; changes without product test targets use `skip`. Deleted tests stay fingerprinted but are not executable. A deleted production chain uses direct surviving owner tests only when its complete HEAD consumer closure and current redirect closure resolve inside one changed owner group, every surviving changed production file has deterministic proof, and the resulting test set is bounded; this avoids repeating Vitest graph discovery after the graph has already been closed. Partial, cross-owner, missing, uncovered, dead-export-only, or ambiguous closure falls back to affected-consumer discovery or the full product suite. Full-suite product tests otherwise remain release/audit proof. Direct commit flags are operator/debug surfaces; normal commits use `qa:closeout`.
+
+Build and release prerequisite checks use the same bounded lanes. Vite build remains exclusive: it starts only after every prerequisite lane has finished and no lane can overlap it. Release packaging starts only after the exclusive release-mode build succeeds.
 
 ### `qa:closeout`
 
@@ -81,6 +85,8 @@ A live process consuming CPU is not a hang merely because output is quiet. `qa:a
 ## Observability
 
 Canonical wrappers write one structured run record and one bounded sanitized diagnostic log per invocation under `.tmp`. Advisory, preflight, checkpoint/closeout advisory reuse, and standalone structural steps expose a `consoleOutput` block before the summary; the common sanitizer removes secrets and workspace paths, caps the block at `16 KiB`, and marks truncation. Preflight labels non-finding structural context separately from non-blocking advisory findings, and advisory output renders watch-count findings as review signals so neither is mistaken for the blocking structural result. A wrapper renders each finding family once: checkpoint and closeout advisory output owns structural watches, while the structural step retains its blocking result and standalone/harness output without repeating the watch block. The zero case is explicit as `attention=0, watch=0`, and `--verbose` does not duplicate the block. Successful advisory findings are also stored as sanitized diagnostic locations. Other default output stays concise: overall result, duration, problem/control identifiers, the JSON run-record path, and the sanitized diagnostic-log path.
+
+The first step emitted by each scheduled lane records queue time, lane wall time, CPU/memory reservation, and the selected resource profile. Dead-export steps record whether the persistent import/export index was rebuilt, incrementally updated, or reused. These values are diagnostic state; harness/checkpoint/build fingerprints remain the proof authority.
 
 `npm run qa:stats -- [--wrapper <id>] [--task <id>]` aggregates records by wrapper, mode, root run, task, step, control, problem, and skip reason. Legacy JSONL timing files are read-only fallback and receive no new writes.
 

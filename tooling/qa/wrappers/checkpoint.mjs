@@ -81,7 +81,10 @@ async function collectFormatStep(context) {
 
   return timeAsyncStep(async () => {
     const result = await runPrettierWrite(context.existingTargetFiles);
-    return createOkStep('Format', `formatted=${result.writtenFiles.length}`);
+    return createOkStep(
+      'Format',
+      `formatted=${result.writtenFiles.length}; barrier=sequential-before-verification`
+    );
   });
 }
 
@@ -127,12 +130,12 @@ async function collectCheckpointVerificationSteps({
   if (formatStep.status === 'failed' || advisoryStep.status === 'failed') {
     return [formatStep, advisoryStep];
   }
-
   const focusedSteps = await focusedStepCollector({
     ...context,
     shouldRunManifestPermissions,
     shouldRunRuntimeTopology,
   });
+
   return [
     formatStep,
     advisoryStep,

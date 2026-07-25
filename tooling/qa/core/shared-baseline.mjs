@@ -22,6 +22,24 @@ function validateAllowance(allowance, index) {
   if (hasExactLine === hasContentHash) {
     throw new Error(`${location} requires exactly one of line or contentHash`);
   }
+  const expectedKeys = ['debtId', 'file', 'rule', hasExactLine ? 'line' : 'contentHash'].sort();
+  if (JSON.stringify(Object.keys(allowance).sort()) !== JSON.stringify(expectedKeys)) {
+    throw new Error(`${location} has an invalid field population`);
+  }
+}
+
+export function parseQualityBaseline(value) {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(['allowances']) ||
+    !Array.isArray(value.allowances)
+  ) {
+    throw new Error('Quality baseline worker contract requires only an allowances array');
+  }
+  value.allowances.forEach(validateAllowance);
+  return { allowances: value.allowances.map((allowance) => ({ ...allowance })) };
 }
 
 export function loadBaseline() {
@@ -34,8 +52,7 @@ export function loadBaseline() {
   if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.allowances)) {
     throw new Error('Quality baseline requires schemaVersion 1 and an allowances array');
   }
-  parsed.allowances.forEach(validateAllowance);
-  return { allowances: parsed.allowances };
+  return parseQualityBaseline({ allowances: parsed.allowances });
 }
 
 export function isAllowedViolation(baseline, violation) {

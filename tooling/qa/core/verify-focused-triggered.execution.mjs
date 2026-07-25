@@ -20,9 +20,11 @@ import { runFileScopedTriggeredChecks } from './verify-focused-triggered.file-sc
 import { runManifestIntegrityCheck } from './verify-manifest-integrity.mjs';
 import { runOssReleaseSurfaceCheck } from './verify-oss-release-surface.mjs';
 import { runPackageBoundaryCheck } from './verify-package-boundaries.mjs';
-import { runAppCoreOwnerCheck } from './verify-app-core-owners.mjs';
-import { runTargetOnlyPathCheck } from './verify-target-only-paths.mjs';
 import { runRootSideEffectCheck } from './verify-root-side-effects.mjs';
+import {
+  collectOwnerGuardStep,
+  createDeferredOwnerGuardStep,
+} from './owner-guard-step-helpers.mjs';
 import {
   createProcessStep,
   createSkippedStep,
@@ -31,7 +33,7 @@ import {
 } from './focused-qa-results.mjs';
 import { measureAsyncStep, timeSyncStep, withStepDuration } from './step-timing.helpers.mjs';
 import { recordSuccessfulTypecheck } from './verify-typecheck-cache.mjs';
-import { runTypecheck } from './verify-typecheck.mjs';
+import { runTypecheckAsync } from './verify-typecheck.mjs';
 
 function runConditionalRepoScopedCheck({ label, shouldRun, header, runner }) {
   if (!shouldRun) {
@@ -66,7 +68,7 @@ function runCanonicalFacadeTriggeredStep(targetFiles, qualityTargetFiles) {
   );
 }
 
-function runCoreOwnerChecks(targetFiles) {
+function runCoreOwnerChecks(targetFiles, deferOwnerGuards) {
   return [
     timeSyncStep(() =>
       createViolationStep(
@@ -75,20 +77,12 @@ function runCoreOwnerChecks(targetFiles) {
         runPackageBoundaryCheck()
       )
     ),
-    timeSyncStep(() =>
-      createViolationStep(
-        'App-core owners',
-        'App-core owner violations found:',
-        runAppCoreOwnerCheck()
-      )
-    ),
-    timeSyncStep(() =>
-      createViolationStep(
-        'Target-only paths',
-        'Target-only path violations found:',
-        runTargetOnlyPathCheck()
-      )
-    ),
+    deferOwnerGuards
+      ? createDeferredOwnerGuardStep('appOwners')
+      : collectOwnerGuardStep('appOwners'),
+    deferOwnerGuards
+      ? createDeferredOwnerGuardStep('targetPaths')
+      : collectOwnerGuardStep('targetPaths'),
     timeSyncStep(() =>
       createViolationStep(
         'OSS release surface',
@@ -106,7 +100,7 @@ function runCoreOwnerChecks(targetFiles) {
   ];
 }
 
-function runRepoScopedTriggeredChecks(targetFiles, qualityTargetFiles) {
+function runRepoScopedTriggeredChecks(targetFiles, qualityTargetFiles, deferOwnerGuards) {
   return [
     timeSyncStep(() =>
       runConditionalRepoScopedCheck({
@@ -126,7 +120,7 @@ function runRepoScopedTriggeredChecks(targetFiles, qualityTargetFiles) {
       })
     ),
     timeSyncStep(() => runCanonicalFacadeTriggeredStep(targetFiles, qualityTargetFiles)),
-    ...runCoreOwnerChecks(targetFiles),
+    ...runCoreOwnerChecks(targetFiles, deferOwnerGuards),
     timeSyncStep(() =>
       shouldRunDesignSystem(targetFiles)
         ? createStringFailureStep(
@@ -174,24 +168,29 @@ export async function runDependencyGraphTriggeredChecks(
   return [boundaryStep, cycleStep];
 }
 
-function runTypecheckStep(typecheckTargetFiles) {
+export async function runFocusedTypecheckStep(typecheckTargetFiles, { maxConcurrency = 2 } = {}) {
   if (!shouldRunFocusedTypecheck(typecheckTargetFiles)) {
     return timeSyncStep(() => createSkippedStep('Typecheck'));
   }
 
-  const step = timeSyncStep(() => {
-    const result = runTypecheck({ mode: 'affected', targetFiles: typecheckTargetFiles });
-    const processStep = createProcessStep('Typecheck', result);
-    return {
-      ...processStep,
-      checkedProjectIds: result.checkedProjectIds,
-      detail:
-        processStep.status === 'ok'
-          ? `${result.typecheckMode}: ${result.checkedProjectIds.join(', ')}`
-          : processStep.detail,
-      typecheckMode: result.typecheckMode,
-    };
-  });
+  const { durationMs, value: result } = await measureAsyncStep(() =>
+    runTypecheckAsync({ maxConcurrency, mode: 'affected', targetFiles: typecheckTargetFiles })
+  );
+  const step = withStepDuration(
+    (() => {
+      const processStep = createProcessStep('Typecheck', result);
+      return {
+        ...processStep,
+        checkedProjectIds: result.checkedProjectIds,
+        detail:
+          processStep.status === 'ok'
+            ? `${result.typecheckMode}: ${result.checkedProjectIds.join(', ')}`
+            : processStep.detail,
+        typecheckMode: result.typecheckMode,
+      };
+    })(),
+    durationMs
+  );
   if (step.status === 'ok') {
     recordSuccessfulTypecheck({
       checkedProjectIds: step.checkedProjectIds,
@@ -212,9 +211,24 @@ export async function runFocusedTriggeredChecks({
   graphRunner = runDependencyGraphCheck,
 }) {
   return [
-    ...runFileScopedTriggeredChecks(targetFiles, jsLikeFiles),
-    ...runRepoScopedTriggeredChecks(targetFiles, qualityTargetFiles),
+    ...runFocusedTriggeredStaticChecks({
+      targetFiles,
+      qualityTargetFiles,
+      jsLikeFiles,
+    }),
     ...(await runDependencyGraphTriggeredChecks(targetFiles, graphRunner)),
-    runTypecheckStep(typecheckTargetFiles),
+    await runFocusedTypecheckStep(typecheckTargetFiles),
+  ];
+}
+
+export function runFocusedTriggeredStaticChecks({
+  deferOwnerGuards = false,
+  targetFiles,
+  qualityTargetFiles = targetFiles,
+  jsLikeFiles,
+}) {
+  return [
+    ...runFileScopedTriggeredChecks(targetFiles, jsLikeFiles),
+    ...runRepoScopedTriggeredChecks(targetFiles, qualityTargetFiles, deferOwnerGuards),
   ];
 }

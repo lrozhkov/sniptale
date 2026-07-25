@@ -37,6 +37,8 @@ import {
 import { PRODUCT_QA_SUITE } from './qa-scope.mjs';
 import { PRODUCT_SOURCE_ROOTS } from './src-production-targets.mjs';
 import { resolveProductUnitTestPool } from './verify-unit-tests.mjs';
+import { collectScheduledFullVerifySteps } from './verify-all.scheduler.mjs';
+import { collectOwnerGuardStep } from './owner-guard-step-helpers.mjs';
 
 function collectUnitTestScopeDetail({ codeFiles, releaseMode }) {
   return releaseMode
@@ -156,10 +158,11 @@ function createDefaultCollectors() {
       collectDependencyGraphStepResults({ targetFiles }),
     collectTypecheckStep: ({ targetFiles }) => collectTypecheckStepResult({ targetFiles }),
     collectDeadExportsStep,
-    collectUnitAndCoverageSteps: ({ codeFiles, releaseMode, targetFiles }) =>
+    collectUnitAndCoverageSteps: ({ codeFiles, releaseMode, targetFiles, vitestMaxWorkers }) =>
       collectUnitTestAndCoverageStepResults({
         codeFiles,
         coverageEnabled: false,
+        maxWorkers: vitestMaxWorkers ?? null,
         pool: resolveProductUnitTestPool(),
         releaseMode,
         suite: PRODUCT_QA_SUITE,
@@ -168,6 +171,47 @@ function createDefaultCollectors() {
     collectBuildStep,
     collectReleaseArchiveStep,
   };
+}
+
+export async function collectFullVerifyLane({ context, lane, vitestMaxWorkers }) {
+  const collectors = createDefaultCollectors();
+  const laneContext = { ...context, vitestMaxWorkers };
+  if (lane === 'appOwners' || lane === 'targetPaths') {
+    return { ownerStep: collectOwnerGuardStep(lane) };
+  }
+  if (lane === 'light') {
+    return {
+      lineLengthStep: collectors.collectLineLengthStep(context),
+      oxlintStep: collectors.collectOxlintStep(context),
+      aiHygieneStep: collectors.collectAiHygieneStep(context),
+      structuralRiskStep: collectors.collectStructuralRiskStep(context),
+      namingStep: collectors.collectNamingStep(context),
+      violationSteps: collectors.collectViolationSteps({ ...context, deferOwnerGuards: true }),
+      i18nStep: collectors.collectI18nStep(context),
+      designSystemStep: collectors.collectDesignSystemStep(context),
+      auditStep: collectors.collectAuditStep(context),
+    };
+  }
+  if (lane === 'lint') {
+    return {
+      eslintStep: await collectors.collectEslintStep(context),
+      sonarjsStep: context.releaseMode ? await collectors.collectSonarjsReleaseStep(context) : null,
+      securityStep: await collectors.collectSecurityStep(context),
+    };
+  }
+  if (lane === 'graph') {
+    return {
+      dependencySteps: await collectors.collectDependencyGraphSteps(context),
+      deadExportsStep: collectors.collectDeadExportsStep(context),
+    };
+  }
+  if (lane === 'typecheck') {
+    return { typecheckStep: collectors.collectTypecheckStep(context) };
+  }
+  if (lane === 'tests') {
+    return { testSteps: await collectors.collectUnitAndCoverageSteps(laneContext) };
+  }
+  throw new Error(`Unknown full verification lane: ${lane}`);
 }
 
 async function collectDependencyGraphSteps(context, collectors) {
@@ -222,7 +266,10 @@ export async function collectFullVerifyStepResults({
   ) {
     resolvedCollectors.collectDependencyGraphSteps = null;
   }
-  const steps = await collectCoreStepResults(context, resolvedCollectors);
+  const steps =
+    Object.keys(collectors).length === 0
+      ? await collectScheduledFullVerifySteps(context)
+      : await collectCoreStepResults(context, resolvedCollectors);
   await appendPostVerifySteps(steps, context, resolvedCollectors);
 
   return {

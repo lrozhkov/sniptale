@@ -82,6 +82,15 @@ it('accepts a complete final-owner fixture', () => {
   expect(appCoreOwnerErrors(context)).toEqual([]);
 });
 
+it('rejects a newly added app-core owner that is absent from the owner policy', () => {
+  const context = fixture();
+  context.codeFiles.push(write(context.root, 'apps/extension/src/composition/new-owner/index.ts'));
+
+  expect(appCoreOwnerErrors(context)).toContain(
+    'unclassified app-core owner: apps/extension/src/composition/new-owner/index.ts'
+  );
+});
+
 it('rejects stale owners, missing authorities, unclassified roots and forbidden edges', () => {
   const context = fixture();
   context.codeFiles.push(

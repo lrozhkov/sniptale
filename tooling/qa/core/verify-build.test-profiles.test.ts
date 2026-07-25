@@ -105,6 +105,8 @@ it('does not infer storage risk from the handbook name', () => {
   });
 
   expect(scope.matchedFamilies).not.toContain('storage-persistence');
+  expect(scope.fullSuite).toBe(false);
+  expect(scope.requireRelatedTests).toBe(false);
 });
 
 it('uses a changed replacement owner and its direct test for a consolidated deleted subtree', () => {

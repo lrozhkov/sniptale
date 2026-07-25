@@ -65,6 +65,11 @@ export async function collectSecurityStep({ files } = {}) {
 export function collectDeadExportsStep({ deadExportsRunner = runDeadExportsCheck } = {}) {
   const { durationMs, value: deadExportsReport } = measureSyncStep(() => deadExportsRunner());
   const deadExportsSummary = summarizeDeadExportsReport(deadExportsReport);
+  const sourceIndexDetail = deadExportsReport.sourceIndexStats
+    ? `source-index=${deadExportsReport.sourceIndexStats.cacheStatus}; ` +
+      `parsed=${deadExportsReport.sourceIndexStats.parsedFileCount}; ` +
+      `reused=${deadExportsReport.sourceIndexStats.reusedFileCount}`
+    : '';
   if (
     deadExportsSummary.unusedValueExportCount > 0 ||
     deadExportsSummary.unusedTypeExportCount > 0
@@ -72,10 +77,11 @@ export function collectDeadExportsStep({ deadExportsRunner = runDeadExportsCheck
     return createFailureStep('Dead exports', 'violations found', {
       stderr: formatDeadExportsReport(deadExportsReport),
       durationMs,
+      detail: sourceIndexDetail,
     });
   }
 
-  return withDuration(createOkStep('Dead exports'), durationMs);
+  return withDuration(createOkStep('Dead exports', sourceIndexDetail), durationMs);
 }
 
 const EXTENSION_BUILD_DIRECTORY_TRIGGER = /^apps\/extension\/(?:build|public)\//u;

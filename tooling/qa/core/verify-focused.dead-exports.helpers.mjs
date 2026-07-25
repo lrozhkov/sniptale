@@ -18,6 +18,7 @@ function filterDeadExportsReport(report, focusedFileSet) {
   return {
     unusedTypeExports: report.unusedTypeExports.filter((item) => focusedFileSet.has(item.file)),
     unusedValueExports: report.unusedValueExports.filter((item) => focusedFileSet.has(item.file)),
+    sourceIndexStats: report.sourceIndexStats,
   };
 }
 
@@ -36,5 +37,6 @@ export function runFocusedDeadExportsCheck(codeFiles) {
     skipped: false,
     report: filteredReport,
     summary: summarizeDeadExportsReport(filteredReport),
+    sourceIndexStats: filteredReport.sourceIndexStats,
   };
 }

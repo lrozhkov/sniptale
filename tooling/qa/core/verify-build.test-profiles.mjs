@@ -108,8 +108,15 @@ function resolveOwnerDirectProfile(input) {
 }
 
 function finalizeTestScope(scope) {
+  for (const field of ['fullSuite', 'requireRelatedTests']) {
+    if (scope[field] != null && typeof scope[field] !== 'boolean') {
+      throw new Error(`Build test scope ${field} must be a boolean when present.`);
+    }
+  }
   return {
     ...scope,
+    fullSuite: scope.fullSuite ?? false,
+    requireRelatedTests: scope.requireRelatedTests ?? false,
     detail: createScopeDetail(scope),
   };
 }

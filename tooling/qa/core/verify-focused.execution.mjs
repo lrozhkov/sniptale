@@ -14,7 +14,13 @@ import { runFocusedOxlintStep } from './verify-focused.oxlint-step.helpers.mjs';
 import { formatDeadExportsReport } from './verify-dead-exports.mjs';
 import { FOCUSED_CODE_VIOLATION_STEPS } from './verify-focused.code-steps.mjs';
 import { runFocusedUnitTests } from './verify-focused.test-steps.mjs';
-import { runFocusedTriggeredChecks } from './verify-focused-triggered.mjs';
+import {
+  runDependencyGraphTriggeredChecks,
+  runFocusedTriggeredStaticChecks,
+  runFocusedTypecheckStep,
+} from './verify-focused-triggered.execution.mjs';
+import { collectScheduledFocusedStepResults } from './verify-focused.scheduler.mjs';
+import { collectOwnerGuardStep } from './owner-guard-step-helpers.mjs';
 import { runLineLengthCheck } from '../guards/quality/verify-line-length.mjs';
 import { runManualMockExportParityCheck } from '../guards/quality/verify-manual-mock-export-parity.mjs';
 import { runManifestPermissionsCheck } from '../guards/architecture/verify-manifest-permissions.mjs';
@@ -152,25 +158,27 @@ function runDeadExportsStep(codeFiles) {
   }
 
   const { summary } = deadExportsResult;
+  const indexDetail = deadExportsResult.sourceIndexStats
+    ? `source-index=${deadExportsResult.sourceIndexStats.cacheStatus}; ` +
+      `parsed=${deadExportsResult.sourceIndexStats.parsedFileCount}; ` +
+      `reused=${deadExportsResult.sourceIndexStats.reusedFileCount}`
+    : '';
   if (summary.unusedValueExportCount === 0 && summary.unusedTypeExportCount === 0) {
-    return createOkStep('Dead exports');
+    return createOkStep('Dead exports', indexDetail);
   }
 
   return createFailureStep('Dead exports', 'violations found', {
     stderr: formatDeadExportsReport(deadExportsResult.report),
+    detail: indexDetail,
   });
 }
 
-function runFocusedPolicySteps({
-  existingTargetFiles,
-  shouldRunManifestPermissions,
-  shouldRunRuntimeTopology,
-}) {
+export function runFocusedPolicySteps({ shouldRunManifestPermissions, shouldRunRuntimeTopology }) {
   return [
     timeSyncStep(() =>
       runConditionalViolationStep(
         'Runtime topology',
-        shouldRunRuntimeTopology(existingTargetFiles),
+        shouldRunRuntimeTopology,
         'Runtime topology violations found:',
         () => runRuntimeTopologyCheck()
       )
@@ -178,7 +186,7 @@ function runFocusedPolicySteps({
     timeSyncStep(() =>
       runConditionalViolationStep(
         'Manifest permissions',
-        shouldRunManifestPermissions(existingTargetFiles),
+        shouldRunManifestPermissions,
         'Manifest permission violations found:',
         () => runManifestPermissionsCheck()
       )
@@ -186,8 +194,7 @@ function runFocusedPolicySteps({
   ];
 }
 
-export async function collectFocusedStepResults({
-  addedFiles = [],
+export function collectFocusedLightLane({
   baseline,
   codeFiles,
   existingTargetFiles,
@@ -195,38 +202,95 @@ export async function collectFocusedStepResults({
   qualityCodeFiles = codeFiles,
   qualityJsLikeFiles = jsLikeFiles,
   qualityTargetFiles = existingTargetFiles,
-  targetFiles,
   shouldRunManifestPermissions,
   shouldRunRuntimeTopology,
 }) {
-  return [
-    timeSyncStep(() => runFocusedOxlintStep(qualityJsLikeFiles)),
-    await timeAsyncStep(() => runEslintStep(qualityJsLikeFiles)),
-    await timeAsyncStep(() => runSonarjsStep(qualityCodeFiles)),
-    timeSyncStep(() => runChangedLineReadabilityStep(qualityCodeFiles)),
-    timeSyncStep(() => runAiHygieneStep(qualityCodeFiles, baseline)),
-    timeSyncStep(() => runStructuralRiskStep(qualityCodeFiles)),
-    timeSyncStep(() => runManualMockExportParityStep(qualityTargetFiles)),
-    ...runFocusedCodeSteps(qualityCodeFiles),
-    ...(await runFocusedTriggeredChecks({
+  return {
+    oxlintStep: timeSyncStep(() => runFocusedOxlintStep(qualityJsLikeFiles)),
+    qualitySteps: [
+      timeSyncStep(() => runChangedLineReadabilityStep(qualityCodeFiles)),
+      timeSyncStep(() => runAiHygieneStep(qualityCodeFiles, baseline)),
+      timeSyncStep(() => runStructuralRiskStep(qualityCodeFiles)),
+      timeSyncStep(() => runManualMockExportParityStep(qualityTargetFiles)),
+      ...runFocusedCodeSteps(qualityCodeFiles),
+    ],
+    triggeredStaticSteps: runFocusedTriggeredStaticChecks({
+      deferOwnerGuards: true,
       targetFiles: existingTargetFiles,
       qualityTargetFiles,
-      typecheckTargetFiles: targetFiles ?? existingTargetFiles,
       jsLikeFiles,
-    })),
-    ...runFocusedPolicySteps({
-      existingTargetFiles,
+    }),
+    policySteps: runFocusedPolicySteps({
       shouldRunManifestPermissions,
       shouldRunRuntimeTopology,
     }),
-    await timeAsyncStep(() => runSecurityStep(codeFiles)),
-    timeSyncStep(() => runDeadExportsStep(codeFiles)),
-    ...(await runFocusedUnitTests({
-      // Manifest replay proves behavior preservation for exact relocations. Raw files still run
-      // through security/dead-export lanes above; path-only files do not expand owner-test scope.
-      codeFiles: qualityCodeFiles,
-      newFiles: addedFiles.filter((file) => qualityCodeFiles.includes(file)),
-      targetFiles: qualityTargetFiles,
-    })),
-  ];
+  };
+}
+
+export function collectFocusedOwnerLane({ lane }) {
+  return { ownerStep: collectOwnerGuardStep(lane) };
+}
+
+export async function collectFocusedLintLane({
+  codeFiles,
+  jsLikeFiles,
+  qualityCodeFiles = codeFiles,
+  qualityJsLikeFiles = jsLikeFiles,
+}) {
+  return {
+    eslintStep: await timeAsyncStep(() => runEslintStep(qualityJsLikeFiles)),
+    sonarjsStep: await timeAsyncStep(() => runSonarjsStep(qualityCodeFiles)),
+    securityStep: await timeAsyncStep(() => runSecurityStep(codeFiles)),
+  };
+}
+
+export async function collectFocusedGraphLane({ codeFiles, existingTargetFiles }) {
+  return {
+    dependencySteps: await runDependencyGraphTriggeredChecks(existingTargetFiles),
+    deadExportsStep: timeSyncStep(() => runDeadExportsStep(codeFiles)),
+  };
+}
+
+export async function collectFocusedTypecheckLane(
+  { existingTargetFiles, targetFiles },
+  { maxConcurrency = 2 } = {}
+) {
+  return {
+    typecheckStep: await runFocusedTypecheckStep(targetFiles ?? existingTargetFiles, {
+      maxConcurrency,
+    }),
+  };
+}
+
+export async function collectFocusedTestLane(
+  {
+    addedFiles = [],
+    codeFiles,
+    existingTargetFiles,
+    qualityCodeFiles = codeFiles,
+    qualityTargetFiles = existingTargetFiles,
+  },
+  { maxWorkers, pool } = {}
+) {
+  return {
+    testSteps: await runFocusedUnitTests(
+      {
+        // Manifest replay proves behavior preservation for exact relocations. Raw files still run
+        // through security/dead-export lanes above; path-only files do not expand owner-test scope.
+        codeFiles: qualityCodeFiles,
+        newFiles: addedFiles.filter((file) => qualityCodeFiles.includes(file)),
+        targetFiles: qualityTargetFiles,
+      },
+      { maxWorkers, pool }
+    ),
+  };
+}
+
+export async function collectFocusedStepResults(context, dependencies) {
+  const workerContext = {
+    ...context,
+    shouldRunManifestPermissions: context.shouldRunManifestPermissions(context.existingTargetFiles),
+    shouldRunRuntimeTopology: context.shouldRunRuntimeTopology(context.existingTargetFiles),
+  };
+  return collectScheduledFocusedStepResults(workerContext, dependencies);
 }

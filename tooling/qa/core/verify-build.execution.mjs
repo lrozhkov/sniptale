@@ -18,6 +18,7 @@ import {
 } from './verify-closeout-step-helpers.mjs';
 import { PRODUCT_QA_SUITE } from './qa-scope.mjs';
 import { resolveProductUnitTestPool } from './verify-unit-tests.mjs';
+import { collectScheduledBuildStepResults } from './verify-build.scheduler.mjs';
 
 function createStaticCollectors() {
   return {
@@ -58,7 +59,7 @@ async function collectDependencyGraphSteps(context, buildScope, collectors) {
       ];
 }
 
-async function collectUnitAndCoverageSteps({ codeFiles, targetFiles, buildScope }) {
+async function collectUnitAndCoverageSteps({ codeFiles, maxWorkers, targetFiles, buildScope }) {
   return collectUnitTestAndCoverageStepResults({
     cacheSource: 'build',
     codeFiles,
@@ -66,6 +67,7 @@ async function collectUnitAndCoverageSteps({ codeFiles, targetFiles, buildScope 
     coverageEnabled: false,
     directFilesOverride: buildScope.testScope.directTestFiles,
     fullSuiteOverride: buildScope.testScope.fullSuite,
+    maxWorkers,
     pool: resolveProductUnitTestPool(),
     requireRelatedTestsOverride: buildScope.testScope.requireRelatedTests,
     relatedFilesOverride: buildScope.testScope.relatedFiles,
@@ -82,6 +84,40 @@ function createDefaultCollectors() {
     collectBuildStep,
     collectUnitAndCoverageSteps,
   };
+}
+
+export async function collectBuildLane({ context, buildScope, lane, vitestMaxWorkers }) {
+  const collectors = createDefaultCollectors();
+  if (lane === 'static') {
+    return {
+      namingStep: collectors.collectNamingStep(context, buildScope),
+      architectureStep: collectors.collectArchitectureGuardrailStep(context, buildScope),
+      canonicalFacadeStep: collectors.collectCanonicalFacadeStep(context, buildScope),
+      rootSideEffectsStep: collectors.collectRootSideEffectsStep(context, buildScope),
+    };
+  }
+  if (lane === 'security') {
+    return { securityStep: await collectors.collectSecurityStep(context, buildScope) };
+  }
+  if (lane === 'graph') {
+    return {
+      dependencySteps: await collectors.collectDependencyGraphSteps(context, buildScope),
+    };
+  }
+  if (lane === 'typecheck') {
+    return { typecheckStep: collectors.collectTypecheckStep(context, buildScope) };
+  }
+  if (lane === 'tests') {
+    return {
+      testSteps: await collectUnitAndCoverageSteps({
+        buildScope,
+        codeFiles: context.codeFiles,
+        maxWorkers: vitestMaxWorkers,
+        targetFiles: context.targetFiles,
+      }),
+    };
+  }
+  throw new Error(`Unknown build QA lane: ${lane}`);
 }
 
 async function collectCoreBuildSteps(context, buildScope, collectors) {
@@ -107,6 +143,11 @@ function appendBuildStep(steps, context, collectors) {
 
 export async function collectBuildCloseoutStepResults({ context, collectors = {} } = {}) {
   const buildScope = resolveBuildCloseoutScope(context);
+  if (Object.keys(collectors).length === 0) {
+    const steps = await collectScheduledBuildStepResults({ buildScope, context });
+    await appendBuildStep(steps, context, createDefaultCollectors());
+    return { scopeDetail: buildScope.testScope.detail, steps };
+  }
   const resolvedCollectors = {
     ...createDefaultCollectors(),
     ...collectors,

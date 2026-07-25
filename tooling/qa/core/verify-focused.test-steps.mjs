@@ -39,12 +39,20 @@ function createNoCodeFocusedSteps() {
   ];
 }
 
-async function runDirectTestsWithoutCoverage({ directTestFiles, runUnitTestsImpl, targetFiles }) {
+async function runDirectTestsWithoutCoverage({
+  directTestFiles,
+  maxWorkers,
+  pool,
+  runUnitTestsImpl,
+  targetFiles,
+}) {
   const unitTestStep = await collectRunnableFocusedUnitStep({
     coverageTargetFiles: [],
     profile: 'checkpoint-direct',
     testFiles: directTestFiles,
     shouldRunCoverage: false,
+    maxWorkers,
+    pool,
     runUnitTestsImpl,
   });
   recordFocusedUnitPlan({
@@ -79,6 +87,8 @@ function recordFocusedUnitPlan({
 
 async function collectRunnableFocusedUnitStep({
   coverageTargetFiles,
+  maxWorkers,
+  pool,
   profile = 'checkpoint-owner',
   testFiles,
   shouldRunCoverage,
@@ -99,6 +109,8 @@ async function collectRunnableFocusedUnitStep({
         coverageMode: 'diff',
         coverageTargets: coverageTargetFiles,
         suite: PRODUCT_QA_SUITE,
+        ...(maxWorkers == null ? {} : { maxWorkers }),
+        ...(pool == null ? {} : { pool }),
       })
     );
     return step.status === 'ok'
@@ -124,6 +136,8 @@ function resolveFocusedScope({ codeFiles, directTestFiles, focusedScopeOverride,
 async function createRunnableFocusedSteps({
   codeFiles,
   focusedScope,
+  maxWorkers,
+  pool,
   runUnitTestsImpl,
   targetFiles,
 }) {
@@ -132,6 +146,8 @@ async function createRunnableFocusedSteps({
     coverageTargetFiles: focusedScope.coverageTargetFiles,
     testFiles: focusedScope.testFiles,
     shouldRunCoverage,
+    maxWorkers,
+    pool,
     runUnitTestsImpl,
   });
   recordFocusedUnitPlan({
@@ -158,7 +174,7 @@ async function createRunnableFocusedSteps({
 
 export async function runFocusedUnitTests(
   { codeFiles, newFiles = [], targetFiles },
-  { focusedScopeOverride, runUnitTestsImpl } = {}
+  { focusedScopeOverride, maxWorkers, pool, runUnitTestsImpl } = {}
 ) {
   const directTestFiles = collectFocusedDiffTestFiles(targetFiles);
   if (codeFiles.length === 0) {
@@ -170,7 +186,13 @@ export async function runFocusedUnitTests(
     return createImportOnlyCodeFocusedSteps({
       directTestFiles,
       runDirectTestsWithoutCoverage: () =>
-        runDirectTestsWithoutCoverage({ directTestFiles, runUnitTestsImpl, targetFiles }),
+        runDirectTestsWithoutCoverage({
+          directTestFiles,
+          maxWorkers,
+          pool,
+          runUnitTestsImpl,
+          targetFiles,
+        }),
     });
   }
 
@@ -184,6 +206,8 @@ export async function runFocusedUnitTests(
     codeFiles: behavioralCodeFiles,
     directTestFiles,
     focusedScope,
+    maxWorkers,
+    pool,
   });
   if (earlyExitSteps) {
     return earlyExitSteps;
@@ -192,6 +216,8 @@ export async function runFocusedUnitTests(
   return createRunnableFocusedSteps({
     codeFiles: behavioralCodeFiles,
     focusedScope,
+    maxWorkers,
+    pool,
     runUnitTestsImpl,
     targetFiles,
   });

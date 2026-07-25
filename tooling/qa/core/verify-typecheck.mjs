@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 
 import { emitCommandResult, isExecutedAsScript, runRepoNodeEntry } from './shared.mjs';
 import {
@@ -168,6 +169,78 @@ function runGeneratedProjectTypecheck({ cwd, projectIds }) {
   };
 }
 
+function runGeneratedProjectCommand({ cwd, projectId }) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        path.join(cwd, 'node_modules/typescript/lib/tsc.js'),
+        '--project',
+        toGeneratedProjectPath(projectId),
+      ],
+      { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.once('error', reject);
+    child.once('close', (status) => resolve({ status: status ?? 1, stdout, stderr }));
+  });
+}
+
+function collectRunnableProjectIds(pending) {
+  return [...pending].filter((projectId) => {
+    const project = getTypecheckProject(projectId);
+    return !(project?.references ?? []).some((reference) => pending.has(reference));
+  });
+}
+
+export async function runTypecheckProjectGraph({ maxConcurrency = 2, projectIds, projectRunner }) {
+  if (!Number.isInteger(maxConcurrency) || maxConcurrency < 1) {
+    throw new Error('Typecheck maxConcurrency must be a positive integer.');
+  }
+
+  const pending = new Set(projectIds);
+  const results = new Map();
+  while (pending.size > 0) {
+    const runnable = collectRunnableProjectIds(pending).slice(0, maxConcurrency);
+    if (runnable.length === 0) {
+      throw new Error(`Typecheck project dependency cycle: ${[...pending].sort().join(', ')}`);
+    }
+
+    const waveResults = await Promise.all(
+      runnable.map(async (projectId) => [projectId, await projectRunner(projectId)])
+    );
+    for (const [projectId, result] of waveResults) {
+      results.set(projectId, result);
+      pending.delete(projectId);
+    }
+  }
+
+  const orderedResults = projectIds.map((projectId) => results.get(projectId));
+  return {
+    status: orderedResults.find((result) => result.status !== 0)?.status ?? 0,
+    stdout: orderedResults.map((result) => result.stdout).join(''),
+    stderr: orderedResults.map((result) => result.stderr).join(''),
+  };
+}
+
+async function runGeneratedProjectTypecheckAsync({
+  cwd,
+  maxConcurrency,
+  projectIds,
+  projectRunner = (projectId) => runGeneratedProjectCommand({ cwd, projectId }),
+}) {
+  return runTypecheckProjectGraph({ maxConcurrency, projectIds, projectRunner });
+}
+
 function appendTypecheckMetadata(result, metadata) {
   return {
     ...result,
@@ -223,6 +296,28 @@ export function runTypecheck({ cwd = process.cwd(), mode = 'full', targetFiles =
     ...metadata,
     projectIds,
   });
+}
+
+export async function runTypecheckAsync({
+  cwd = process.cwd(),
+  maxConcurrency = 2,
+  mode = 'full',
+  projectRunner,
+  targetFiles = [],
+} = {}) {
+  const metadata = resolveTypecheckRun({ mode, targetFiles });
+  if (metadata.mode === 'skip') return createSkippedTypecheckResult(metadata);
+  if (metadata.mode === 'full') return runTypecheck({ cwd, mode, targetFiles });
+
+  writeGeneratedTypecheckConfigs({ cwd });
+  const projectIds = metadata.projectIds.filter((projectId) => getTypecheckProject(projectId));
+  const result = await runGeneratedProjectTypecheckAsync({
+    cwd,
+    maxConcurrency,
+    projectIds,
+    projectRunner,
+  });
+  return appendTypecheckMetadata(result, { ...metadata, projectIds });
 }
 
 if (isExecutedAsScript(import.meta.url)) {
