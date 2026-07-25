@@ -5,12 +5,22 @@ import {
   createReusableUnitTestStep,
 } from './verify-all.unit-test-results.mjs';
 import { collectUnitTestAndCoverageStepResults } from './verify-all.unit-test-steps.mjs';
+import { resolveReusableUnitTestPlan } from './unit-test-cache.mjs';
 import { runUnitTests } from './verify-unit-tests.mjs';
+
+vi.mock('./unit-test-cache.mjs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./unit-test-cache.mjs')>();
+  return {
+    ...actual,
+    resolveReusableUnitTestPlan: vi.fn(actual.resolveReusableUnitTestPlan),
+  };
+});
 
 vi.mock('./verify-unit-tests.mjs', () => ({
   runUnitTests: vi.fn(() => ({ status: 0, stderr: '', stdout: '' })),
 }));
 
+const mockedResolveReusableUnitTestPlan = vi.mocked(resolveReusableUnitTestPlan);
 const mockedRunUnitTests = vi.mocked(runUnitTests);
 
 it('preserves the selected build profile in a successful direct unit-test step', () => {
@@ -133,4 +143,33 @@ it('requires at least one related test for graph-closed deletion successor proof
       suite: 'product',
     })
   );
+});
+
+it('always executes the release full suite instead of reusing an earlier plan', async () => {
+  mockedResolveReusableUnitTestPlan.mockClear();
+  mockedResolveReusableUnitTestPlan.mockReturnValueOnce({
+    matched: true,
+    plan: { mode: 'full-suite' },
+    source: 'prior-release',
+  });
+  mockedRunUnitTests.mockClear();
+
+  const steps = await collectUnitTestAndCoverageStepResults({
+    codeFiles: [],
+    coverageEnabled: false,
+    releaseMode: true,
+    targetFiles: [],
+  });
+
+  expect(mockedResolveReusableUnitTestPlan).not.toHaveBeenCalled();
+  expect(mockedRunUnitTests).toHaveBeenCalledWith(
+    expect.objectContaining({
+      relatedFiles: [],
+      suite: 'product',
+    })
+  );
+  expect(steps[0]).toMatchObject({
+    label: 'Unit tests',
+    status: 'ok',
+  });
 });

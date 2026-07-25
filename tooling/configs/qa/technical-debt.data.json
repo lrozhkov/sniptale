@@ -19089,6 +19089,7 @@
         "tooling/qa/core/unit-test-cache.mjs",
         "tooling/qa/core/unit-test-cache.test.ts",
         "tooling/qa/core/verify-all.unit-test-steps.mjs",
+        "tooling/qa/core/verify-all.unit-test-steps.test.ts",
         "tooling/qa/core/verify-focused.test-steps.mjs"
       ],
       "surfaces": [
@@ -19104,7 +19105,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/unit-test-coverage-plan.mjs",
-        "contentHash": "6657c5f82e967ea3d30c432b9ead6663cb000170249e1469eb51c8e9adb45680"
+        "contentHash": "0f37640ec04a3a8cb7e99b96d9eb0cc71d1b09706446de80db8360e96c444e1a"
       },
       "consumers": [
         "tooling/qa/core/unit-test-coverage-plan.mjs",
