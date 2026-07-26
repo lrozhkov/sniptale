@@ -20,6 +20,14 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
 }
 
+function areManualPlacementsEqual(
+  left: CalloutManualPlacement | null | undefined,
+  right: CalloutManualPlacement | null | undefined
+): boolean {
+  if (!left || !right) return left === right;
+  return left.centerOffsetX === right.centerOffsetX && left.centerOffsetY === right.centerOffsetY;
+}
+
 function getManualPlacement(args: {
   frameRect: Rect;
   height: number;
@@ -48,16 +56,24 @@ export function useCalloutDrag(args: {
   const pointerOffsetRef = React.useRef({ x: 0, y: 0 });
   const draftRef = React.useRef<CalloutManualPlacement | null>(null);
   const startPlacementRef = React.useRef<CalloutManualPlacement | null>(null);
+  const observedPlacementRef = React.useRef(args.manualPlacement);
   const handleVisibility = useTransientControlVisibility(
     isDragging || Boolean(args.isHandlePinned)
   );
 
   React.useEffect(() => {
-    if (!isDragging) setDraftPlacement(null);
-  }, [args.manualPlacement?.centerOffsetX, args.manualPlacement?.centerOffsetY, isDragging]);
+    const propChanged = !areManualPlacementsEqual(
+      observedPlacementRef.current,
+      args.manualPlacement
+    );
+    observedPlacementRef.current = args.manualPlacement;
+    if (isDragging || !draftRef.current || !propChanged) return;
+    draftRef.current = null;
+    setDraftPlacement(null);
+  }, [args.manualPlacement, isDragging]);
 
   const cancel = React.useCallback(() => {
-    if (!isDragging) return false;
+    if (!isDragging || pointerIdRef.current === null) return false;
     pointerIdRef.current = null;
     draftRef.current = startPlacementRef.current;
     setDraftPlacement(null);
@@ -94,7 +110,12 @@ export function useCalloutDrag(args: {
       const placement = draftRef.current;
       pointerIdRef.current = null;
       setIsDragging(false);
-      if (placement) args.onPositionChange(placement);
+      if (!placement) return;
+      if (areManualPlacementsEqual(placement, args.manualPlacement)) {
+        draftRef.current = null;
+        setDraftPlacement(null);
+      }
+      args.onPositionChange(placement);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !cancel()) return;

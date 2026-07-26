@@ -25,6 +25,13 @@ function getKeyboardPlacement(args: {
   };
 }
 
+function areStepBadgePlacementsEqual(
+  left: StepBadgeManualPlacement,
+  right: StepBadgeManualPlacement
+): boolean {
+  return left.position === right.position && left.side === right.side;
+}
+
 export function useStepBadgeBoundaryDrag(args: {
   frameRect: StepBadgeFrameRect;
   initialPlacement: StepBadgeManualPlacement;
@@ -35,6 +42,18 @@ export function useStepBadgeBoundaryDrag(args: {
   const pointerIdRef = React.useRef<number | null>(null);
   const draftRef = React.useRef<StepBadgeManualPlacement | null>(null);
   const previousSideRef = React.useRef<StepBadgeBoundarySide>(args.initialPlacement.side);
+  const observedPlacementRef = React.useRef(args.initialPlacement);
+
+  React.useEffect(() => {
+    const propChanged = !areStepBadgePlacementsEqual(
+      observedPlacementRef.current,
+      args.initialPlacement
+    );
+    observedPlacementRef.current = args.initialPlacement;
+    if (isDragging || !draftRef.current || !propChanged) return;
+    draftRef.current = null;
+    setDraftPlacement(null);
+  }, [args.initialPlacement, isDragging]);
 
   const cancel = React.useCallback(() => {
     if (pointerIdRef.current === null) return false;
@@ -66,10 +85,13 @@ export function useStepBadgeBoundaryDrag(args: {
       event.stopPropagation();
       const placement = draftRef.current;
       pointerIdRef.current = null;
-      draftRef.current = null;
-      setDraftPlacement(null);
       setIsDragging(false);
-      if (placement) args.onPositionChange(placement);
+      if (!placement) return;
+      if (areStepBadgePlacementsEqual(placement, args.initialPlacement)) {
+        draftRef.current = null;
+        setDraftPlacement(null);
+      }
+      args.onPositionChange(placement);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !cancel()) return;

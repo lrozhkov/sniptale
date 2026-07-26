@@ -34,6 +34,7 @@ export function useInteractiveFrameEditing({
   abortPointerSession: () => boolean;
   handleMouseDown: (event: React.PointerEvent) => void;
   handleResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
+  isResizingRef: React.MutableRefObject<boolean>;
 } {
   const session = useInteractiveFrameSessionState(tempFrame, effectMode, state);
   const { activity, current, origin } = session.pointer;
@@ -85,5 +86,6 @@ export function useInteractiveFrameEditing({
     abortPointerSession,
     handleMouseDown,
     handleResizeStart,
+    isResizingRef: activity.isResizingRef,
   };
 }

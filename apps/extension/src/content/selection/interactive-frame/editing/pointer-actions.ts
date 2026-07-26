@@ -179,12 +179,28 @@ function restoreResizeStart(params: InteractiveFrameListenerConfig) {
   );
 }
 
+function hasFrameGeometryChanged(startFrame: FrameData, endFrame: FrameData): boolean {
+  return (
+    startFrame.x !== endFrame.x ||
+    startFrame.y !== endFrame.y ||
+    startFrame.width !== endFrame.width ||
+    startFrame.height !== endFrame.height
+  );
+}
+
 function finishTransientResize(params: InteractiveFrameListenerConfig, commit: boolean) {
   const originState = params.resizeOriginStateRef.current;
   if (originState === 'editing') return;
-  if (commit) params.onUpdate({ ...params.tempFrameRef.current });
-  params.stateRef.current = 'hover';
-  params.setState('hover');
+  const startFrame = params.startFrameRef.current;
+  const committedFrame = params.tempFrameRef.current;
+  const geometryChanged = hasFrameGeometryChanged(startFrame, committedFrame);
+  if (commit) {
+    params.onUpdate({ ...committedFrame });
+  }
+  if (!commit || !geometryChanged) {
+    params.stateRef.current = 'hover';
+    params.setState('hover');
+  }
   resumeHighlighter();
 }
 

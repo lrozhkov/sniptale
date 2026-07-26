@@ -16,11 +16,22 @@ import {
   type InteractiveFramePointerStartEvent,
 } from './pointer-actions';
 import type { InteractiveFrameListenerConfig } from '../controller/types';
-import type { FrameState, ResizeDirection } from '../../../../features/highlighter/contracts';
+import type {
+  FrameData,
+  FrameState,
+  ResizeDirection,
+} from '../../../../features/highlighter/contracts';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
+import { MIN_FRAME_SIZE } from '../layout/portal';
 
-function createFixture() {
-  const frame = createFrameDataFixture('frame-1', { x: 20, y: 30, width: 100, height: 80 });
+function createFixture(overrides: Partial<FrameData> = {}) {
+  const frame = createFrameDataFixture('frame-1', {
+    x: 20,
+    y: 30,
+    width: 100,
+    height: 80,
+    ...overrides,
+  });
   const container = document.createElement('div');
   container.style.left = `${frame.x}px`;
   container.style.top = `${frame.y}px`;
@@ -206,7 +217,31 @@ describe('transient frame resize', () => {
     expect(fixture.onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ width: 140, height: 110 })
     );
+    expect(fixture.refs.isResizingRef.current).toBe(false);
+    expect(fixture.listenerConfig.stateRef.current).toBe('resizing');
     expect(highlighter.resumeHighlighter).toHaveBeenCalledOnce();
+  });
+
+  it('returns to hover immediately when pointerup commits unchanged geometry', () => {
+    const fixture = createFixture();
+    fixture.start(reactPointer(100, 100), 'se');
+
+    createInteractiveFramePointerUpHandler(fixture.listenerConfig)(domPointer(100, 100));
+
+    expect(fixture.onUpdate).toHaveBeenCalledOnce();
+    expect(fixture.listenerConfig.stateRef.current).toBe('hover');
+    expect(fixture.setState).toHaveBeenLastCalledWith('hover');
+  });
+
+  it('returns to hover when a resize is saturated at the minimum size', () => {
+    const fixture = createFixture({ width: MIN_FRAME_SIZE });
+    fixture.start(reactPointer(100, 100), 'e');
+
+    createInteractiveFramePointerUpHandler(fixture.listenerConfig)(domPointer(40, 100));
+
+    expect(fixture.refs.tempFrameRef.current.width).toBe(MIN_FRAME_SIZE);
+    expect(fixture.onUpdate).toHaveBeenCalledOnce();
+    expect(fixture.listenerConfig.stateRef.current).toBe('hover');
   });
 
   it('restores the starting geometry without a history update on cancel', () => {

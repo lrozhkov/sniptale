@@ -191,8 +191,10 @@ function flushHistoryApplyTimers() {
 }
 
 function renderPropSyncHarness(initialFrame: FrameData, initialState: FrameState = 'idle') {
+  const isResizingRef = { current: initialState === 'resizing' };
+
   function Harness(props: { frame: FrameData }) {
-    const [state] = React.useState<FrameState>(initialState);
+    const [state, setState] = React.useState<FrameState>(initialState);
     const [tempFrame, setTempFrame] = React.useState<FrameData>({
       ...props.frame,
       x: 200,
@@ -203,12 +205,16 @@ function renderPropSyncHarness(initialFrame: FrameData, initialState: FrameState
       defaultEffectMode: 'border',
       frame: props.frame,
       isCalloutEditing: false,
+      isResizingRef,
       setEffectMode,
+      setState,
       setTempFrame,
       state,
     });
 
-    return <div data-effect-mode={effectMode} data-temp-x={String(tempFrame.x)} />;
+    return (
+      <div data-effect-mode={effectMode} data-state={state} data-temp-x={String(tempFrame.x)} />
+    );
   }
 
   if (!container) {
@@ -222,6 +228,9 @@ function renderPropSyncHarness(initialFrame: FrameData, initialState: FrameState
   });
 
   return {
+    finishResize: () => {
+      isResizingRef.current = false;
+    },
     rerender: (nextFrame: FrameData) => {
       act(() => {
         root?.render(<Harness frame={nextFrame} />);
@@ -309,5 +318,19 @@ describe('useInteractiveFramePropSync', () => {
 
     expect(container?.firstElementChild?.getAttribute('data-effect-mode')).toBe('blur');
     expect(container?.firstElementChild?.getAttribute('data-temp-x')).toBe('200');
+    expect(container?.firstElementChild?.getAttribute('data-state')).toBe('resizing');
+  });
+
+  it('keeps committed resize geometry until updated frame props acknowledge it', () => {
+    const propSyncHarness = renderPropSyncHarness(frame, 'resizing');
+
+    propSyncHarness.finishResize();
+    expect(container?.firstElementChild?.getAttribute('data-temp-x')).toBe('200');
+    expect(container?.firstElementChild?.getAttribute('data-state')).toBe('resizing');
+
+    propSyncHarness.rerender({ ...frame, x: 240 });
+
+    expect(container?.firstElementChild?.getAttribute('data-temp-x')).toBe('240');
+    expect(container?.firstElementChild?.getAttribute('data-state')).toBe('hover');
   });
 });

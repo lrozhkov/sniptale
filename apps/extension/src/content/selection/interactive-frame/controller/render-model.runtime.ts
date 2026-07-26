@@ -56,9 +56,20 @@ export function useInteractiveFrameRuntime(params: {
     frame: params.frame,
     viewState,
   });
+  const editing = useInteractiveFrameEditing({
+    state: viewState.state,
+    tempFrame: viewState.tempFrame,
+    setTempFrame: viewState.setTempFrame,
+    containerRef: refs.containerRef,
+    frameId: params.frame.id,
+    effectMode: viewState.effectMode,
+    setState: viewState.setState,
+    onUpdate: params.onUpdate,
+  });
 
   useInteractiveFrameRuntimeSyncs({
     defaultEffectMode: params.defaultEffectMode,
+    editing,
     frame: params.frame,
     isTooltipVisible: runtimeState.isTooltipVisible,
     onStateChange: params.onStateChange,
@@ -69,16 +80,7 @@ export function useInteractiveFrameRuntime(params: {
     refs,
     viewState,
     ...runtimeState,
-    editing: useInteractiveFrameEditing({
-      state: viewState.state,
-      tempFrame: viewState.tempFrame,
-      setTempFrame: viewState.setTempFrame,
-      containerRef: refs.containerRef,
-      frameId: params.frame.id,
-      effectMode: viewState.effectMode,
-      setState: viewState.setState,
-      onUpdate: params.onUpdate,
-    }),
+    editing,
   };
 }
 
@@ -146,6 +148,7 @@ function useInteractiveFrameFloatingUiLayout(params: {
 
 function useInteractiveFrameRuntimeSyncs(params: {
   defaultEffectMode: EffectMode;
+  editing: ReturnType<typeof useInteractiveFrameEditing>;
   frame: FrameData;
   isTooltipVisible: boolean;
   onStateChange: ((newState: FrameState) => void) | undefined;
@@ -171,7 +174,9 @@ function useInteractiveFrameRuntimeSyncs(params: {
     defaultEffectMode: params.defaultEffectMode,
     frame: params.frame,
     isCalloutEditing: params.viewState.isCalloutEditing,
+    isResizingRef: params.editing.isResizingRef,
     setEffectMode: params.viewState.setEffectMode,
+    setState: params.viewState.setState,
     setTempFrame: params.viewState.setTempFrame,
     state: params.viewState.state,
   });
