@@ -103,6 +103,7 @@ describe('processFrameHover', () => {
       })
     );
     const handler = createThrottledMouseMoveHandler({
+      clearResizeFrame: vi.fn(),
       handleMouseMove,
       lastMouseX: { current: -1 },
       lastMouseY: { current: -1 },
@@ -119,9 +120,11 @@ describe('processFrameHover', () => {
 
   it.each([
     'sniptale-toolbar-portal-wrapper',
+    'sniptale-popover-menu',
     'sniptale-callout-settings-popover',
     'sniptale-step-badge-popover',
   ])('cancels pending frame hit-testing while the pointer is over %s', (className) => {
+    const clearResizeFrame = vi.fn();
     const handleMouseMove = vi.fn();
     const rafId = { current: 12 as number | null };
     const toolbar = document.createElement('div');
@@ -130,6 +133,7 @@ describe('processFrameHover', () => {
     Object.defineProperty(event, 'composedPath', { value: () => [toolbar, document.body] });
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
     const handler = createThrottledMouseMoveHandler({
+      clearResizeFrame,
       handleMouseMove,
       lastMouseX: { current: -1 },
       lastMouseY: { current: -1 },
@@ -141,6 +145,53 @@ describe('processFrameHover', () => {
 
     expect(cancelAnimationFrame).toHaveBeenCalledWith(12);
     expect(rafId.current).toBeNull();
+    expect(clearResizeFrame).toHaveBeenCalledOnce();
+    expect(handleMouseMove).not.toHaveBeenCalled();
+  });
+
+  it('clears frame proximity over the main content toolbar', () => {
+    const clearResizeFrame = vi.fn();
+    const handleMouseMove = vi.fn();
+    const toolbar = document.createElement('div');
+    toolbar.dataset['ui'] = 'content.toolbar.root';
+    const event = new MouseEvent('mousemove');
+    Object.defineProperty(event, 'composedPath', { value: () => [toolbar, document.body] });
+    const handler = createThrottledMouseMoveHandler({
+      clearResizeFrame,
+      handleMouseMove,
+      lastMouseX: { current: -1 },
+      lastMouseY: { current: -1 },
+      lastProcessTime: { current: 0 },
+      rafId: { current: null },
+    });
+
+    handler(event);
+
+    expect(clearResizeFrame).toHaveBeenCalledOnce();
+    expect(handleMouseMove).not.toHaveBeenCalled();
+  });
+
+  it('keeps resize proximity active while the pointer enters its own handle', () => {
+    const clearResizeFrame = vi.fn();
+    const handleMouseMove = vi.fn();
+    const handle = document.createElement('div');
+    handle.className = 'sniptale-resize-handle';
+    handle.dataset['frameId'] = 'frame-1';
+    handle.dataset['frameControl'] = 'resize-handle';
+    const event = new MouseEvent('mousemove');
+    Object.defineProperty(event, 'composedPath', { value: () => [handle, document.body] });
+    const handler = createThrottledMouseMoveHandler({
+      clearResizeFrame,
+      handleMouseMove,
+      lastMouseX: { current: -1 },
+      lastMouseY: { current: -1 },
+      lastProcessTime: { current: 0 },
+      rafId: { current: null },
+    });
+
+    handler(event);
+
+    expect(clearResizeFrame).not.toHaveBeenCalled();
     expect(handleMouseMove).not.toHaveBeenCalled();
   });
 });

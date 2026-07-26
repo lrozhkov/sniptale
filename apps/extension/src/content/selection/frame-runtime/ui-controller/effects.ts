@@ -158,6 +158,7 @@ export function useFrameUiMouseTracking(params: FrameUiMouseTrackingParams) {
 
   useEffect(() => {
     const throttledHandleMouseMove = createThrottledMouseMoveHandler({
+      clearResizeFrame: () => useFrameUIStore.getState().setResizeFrame(null),
       handleMouseMove,
       lastMouseX,
       lastMouseY,

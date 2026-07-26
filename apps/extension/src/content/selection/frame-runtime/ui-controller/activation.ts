@@ -11,7 +11,9 @@ import { queryAllContentUiElements, queryContentUiElement } from '../../../platf
 import { isHighlighterPausedState } from '../../highlighter';
 
 const OWNED_FLOATING_SELECTORS = [
+  '[data-ui="content.toolbar.root"]',
   '.sniptale-action-toolbar',
+  '.sniptale-popover-menu',
   '.sniptale-toolbar-portal-wrapper',
   '.sniptale-frame-toolbar-trigger',
   '.sniptale-frame-toolbar-bridge',

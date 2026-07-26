@@ -28,11 +28,13 @@ describe('frame UI store visibility hierarchy', () => {
     const store = useFrameUIStore.getState();
 
     store.selectFrame('frame-a');
+    store.setResizeFrame('frame-a');
     store.togglePopover('frame-a', 'frame-settings');
 
     expect(useFrameUIStore.getState()).toMatchObject({
       selectedFrameId: 'frame-a',
       activePopover: { frameId: 'frame-a', kind: 'frame-settings' },
+      resizeFrameId: null,
     });
 
     store.closePopover();
@@ -47,11 +49,13 @@ describe('frame UI store visibility hierarchy', () => {
   it('keeps quick popovers independent from selection authority', () => {
     const store = useFrameUIStore.getState();
 
+    store.setResizeFrame('frame-a');
     store.toggleQuickPopover('frame-a', 'step-badge');
 
     expect(useFrameUIStore.getState()).toMatchObject({
       selectedFrameId: null,
       activePopover: { frameId: 'frame-a', kind: 'step-badge' },
+      resizeFrameId: null,
     });
   });
 
