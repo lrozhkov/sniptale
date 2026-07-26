@@ -17,7 +17,6 @@ import {
   flushInteractiveFrameResize,
   queueInteractiveFrameResize,
 } from './resize-scheduler';
-import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 
 export interface InteractiveFramePointerStartEvent {
   button: number;
@@ -92,7 +91,6 @@ export function createInteractiveFrameResizeStartHandler(params: {
   tempFrameRef: React.MutableRefObject<FrameData>;
 }) {
   return (event: InteractiveFramePointerStartEvent, direction: ResizeDirection) => {
-    useFrameUIStore.getState().selectFrame(params.frameId);
     event.preventDefault();
     event.stopPropagation();
     event.nativeEvent.stopImmediatePropagation();

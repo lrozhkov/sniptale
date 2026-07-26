@@ -19,6 +19,7 @@ const domHost = vi.hoisted(() => ({
 }));
 const targetPolicy = vi.hoisted(() => ({
   hasBlockingHighlighterPopover: vi.fn(() => false),
+  isInsideExistingFrame: vi.fn(() => false),
   isHighlighterExtensionUiElement: vi.fn(() => false),
   isNearExistingFrameBorder: vi.fn(() => false),
 }));
@@ -39,6 +40,8 @@ import { createHoverSession } from './session';
 import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 import { setFrameSessionBorderPreset } from '../frame-runtime/session/border-preset';
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
+import { createFrameSelectionEventHandlers } from '../frame-runtime/ui-controller/activation';
+import type { FrameData } from '../../../features/highlighter/contracts';
 
 class TestPointerEvent extends MouseEvent implements FreeFramePointerEvent {
   readonly pointerId: number;
@@ -67,8 +70,18 @@ function createPointerEvent(
   return event;
 }
 
-function createClickEvent(target: HTMLElement, pointerId = 1): MouseEvent {
-  const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+function createClickEvent(
+  target: HTMLElement,
+  pointerId = 1,
+  clientX = 0,
+  clientY = 0
+): MouseEvent {
+  const event = new MouseEvent('click', {
+    bubbles: true,
+    cancelable: true,
+    clientX,
+    clientY,
+  });
   Object.defineProperty(event, 'target', { configurable: true, value: target });
   Object.defineProperty(event, 'pointerId', { configurable: true, value: pointerId });
   return event;
@@ -126,6 +139,7 @@ afterEach(() => {
   vi.clearAllMocks();
   targetPolicy.hasBlockingHighlighterPopover.mockReturnValue(false);
   targetPolicy.isHighlighterExtensionUiElement.mockReturnValue(false);
+  targetPolicy.isInsideExistingFrame.mockReturnValue(false);
   targetPolicy.isNearExistingFrameBorder.mockReturnValue(false);
   setFrameSessionBorderPreset(DEFAULT_BORDER_PRESET);
 });
@@ -258,6 +272,40 @@ describe('free frame drawing gesture', () => {
     expect(handlers.consumeSuppressedClick()).toBe(true);
     expect(handlers.consumeSuppressedClick()).toBe(false);
     expect(document.querySelector('.sniptale-free-frame-draft-portal')).toBeNull();
+  });
+
+  it('clears a post-draw click before an earlier frame activation listener can select', () => {
+    const { handlers } = createFixture();
+    const target = document.createElement('div');
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 100, 100, target));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 60, 60, target));
+    handlers.handlePointerUp(createPointerEvent('pointerup', 60, 60, target));
+    const existingFrame: FrameData = {
+      effectMode: 'border',
+      height: 120,
+      id: 'existing-frame',
+      width: 120,
+      x: 20,
+      y: 20,
+    };
+    const selectFrame = vi.fn();
+    const click = createClickEvent(target, 1, 60, 60);
+    const frameActivation = createFrameSelectionEventHandlers({
+      activePopoverRef: { current: null },
+      clearSelection: vi.fn(),
+      consumeSuppressedClick: handlers.consumeSuppressedClick,
+      framesRef: { current: [existingFrame] },
+      hoveredFrameIdRef: { current: null },
+      hoverFrame: vi.fn(),
+      selectedFrameIdRef: { current: null },
+      selectFrame,
+    });
+
+    frameActivation.click(click);
+
+    expect(click.defaultPrevented).toBe(true);
+    expect(selectFrame).not.toHaveBeenCalled();
+    expect(handlers.consumeSuppressedClick(click)).toBe(false);
   });
 
   it('keeps an exact-threshold gesture on the existing click path', () => {

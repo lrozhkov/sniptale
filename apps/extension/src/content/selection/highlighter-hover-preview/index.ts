@@ -30,6 +30,7 @@ export interface HoverController {
     pointerMove: (event: PointerEvent, iframe?: HTMLIFrameElement) => void;
     pointerUp: (event: PointerEvent, iframe?: HTMLIFrameElement) => void;
     cancelDrawing: (reason?: DrawingCancelReason) => boolean;
+    consumeSuppressedClick: (event?: MouseEvent) => boolean;
   };
   tracking: {
     cancelPendingFrame: () => void;
@@ -77,6 +78,7 @@ export function createHighlighterHoverController(
       pointerMove: drawing.handlePointerMove,
       pointerUp: drawing.handlePointerUp,
       cancelDrawing: drawing.cancelDrawing,
+      consumeSuppressedClick: drawing.consumeSuppressedClick,
     },
     tracking: {
       cancelPendingFrame: interactions.cancelPendingHoverFrame,

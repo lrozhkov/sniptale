@@ -1,6 +1,7 @@
 export {
   clearAllHighlights,
   clearFrameEditing,
+  consumeHighlighterSuppressedClick,
   disableHighlighterMode,
   enableHighlighterMode,
   invalidateFrameCache,

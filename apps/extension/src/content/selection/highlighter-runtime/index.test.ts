@@ -5,6 +5,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const facade = vi.hoisted(() => ({
   clearAllHighlights: vi.fn(),
   clearFrameEditing: vi.fn(),
+  consumeSuppressedClick: vi.fn(() => true),
   createLazyOwner: vi.fn(),
   disableMode: vi.fn(),
   enableMode: vi.fn(),
@@ -35,6 +36,7 @@ beforeEach(() => {
   const owner = {
     clearAllHighlights: facade.clearAllHighlights,
     clearFrameEditing: facade.clearFrameEditing,
+    consumeSuppressedClick: facade.consumeSuppressedClick,
     disableMode: facade.disableMode,
     enableMode: facade.enableMode,
     invalidateFrameCache: facade.invalidateFrameCache,
@@ -83,9 +85,11 @@ it('routes highlighter commands and queries through the created owner', async ()
   runtime.resumeHighlighter();
   runtime.setFrameEditing();
   runtime.clearFrameEditing();
+  const click = new MouseEvent('click');
 
   expect(runtime.isHighlighterEnabled()).toBe(true);
   expect(runtime.isHighlighterPausedState()).toBe(true);
+  expect(runtime.consumeHighlighterSuppressedClick(click)).toBe(true);
   expect(facade.invalidateFrameCache).toHaveBeenCalledOnce();
   expect(facade.enableMode).toHaveBeenCalledOnce();
   expect(facade.disableMode).toHaveBeenCalledOnce();
@@ -94,6 +98,7 @@ it('routes highlighter commands and queries through the created owner', async ()
   expect(facade.resume).toHaveBeenCalledOnce();
   expect(facade.setFrameEditing).toHaveBeenCalledOnce();
   expect(facade.clearFrameEditing).toHaveBeenCalledOnce();
+  expect(facade.consumeSuppressedClick).toHaveBeenCalledWith(click);
 });
 
 it('does not create an owner for disabled-state queries or cleanup', async () => {
@@ -104,6 +109,7 @@ it('does not create an owner for disabled-state queries or cleanup', async () =>
 
   expect(runtime.isHighlighterEnabled()).toBe(false);
   expect(runtime.isHighlighterPausedState()).toBe(false);
+  expect(runtime.consumeHighlighterSuppressedClick(new MouseEvent('click'))).toBe(false);
   expect(facade.disableMode).not.toHaveBeenCalled();
   expect(facade.getOwner).not.toHaveBeenCalled();
 });

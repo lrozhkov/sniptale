@@ -59,7 +59,7 @@ describe('highlighter hover session', () => {
   it('refreshes a dirty frame cache once and then reuses it', () => {
     const session = createHoverSession();
     const element = document.createElement('div');
-    const entry = { element, rect: new DOMRect(1, 2, 3, 4) };
+    const entry = { element };
     const refresh = vi.fn(() => [['frame', entry] as const]);
 
     expect(readHoverFrameCache(session, refresh).get('frame')).toBe(entry);

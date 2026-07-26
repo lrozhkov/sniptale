@@ -3,7 +3,6 @@ import { getFrameSessionBorderPreset } from '../frame-runtime/session/border-pre
 
 export type HoverFrameCacheEntry = {
   element: HTMLElement;
-  rect: DOMRect;
 };
 
 export interface HoverSession {

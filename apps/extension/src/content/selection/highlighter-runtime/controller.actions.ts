@@ -110,3 +110,10 @@ export function createHighlighterInvalidateActions(
     },
   };
 }
+
+export function createHighlighterInputActions(hoverController: Pick<HoverController, 'input'>) {
+  return {
+    consumeSuppressedClick: (event: MouseEvent) =>
+      hoverController.input.consumeSuppressedClick(event),
+  };
+}

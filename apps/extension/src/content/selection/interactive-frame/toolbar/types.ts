@@ -13,6 +13,7 @@ export interface InteractiveFrameToolbarProps {
   popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   stepBadgePopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   calloutPopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
+  clearSelection: FrameUIState['clearSelection'];
   closePopover: FrameUIState['closePopover'];
   togglePopover: FrameUIState['togglePopover'];
   setIsCalloutEditing: Dispatch<SetStateAction<boolean>>;

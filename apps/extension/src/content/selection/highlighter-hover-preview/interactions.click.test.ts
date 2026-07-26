@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const targetResolver = vi.hoisted(() => ({ resolvePagePreparationTarget: vi.fn() }));
 const targetPolicy = vi.hoisted(() => ({
   hasBlockingHighlighterPopover: vi.fn(() => false),
+  isInsideExistingFrame: vi.fn(() => false),
   isHighlighterExtensionUiElement: vi.fn(() => false),
   isNearExistingFrameBorder: vi.fn(() => false),
 }));
@@ -81,6 +82,19 @@ describe('highlighter hover click interaction', () => {
 
     handlers.handleClick(event);
 
+    expect(addFrame).not.toHaveBeenCalled();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('leaves an existing frame interior click for the frame selection owner', () => {
+    const { addFrame, handlers } = createFixture();
+    const event = createClickEvent(80, 90);
+    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(document.createElement('div'));
+    targetPolicy.isInsideExistingFrame.mockReturnValueOnce(true);
+
+    handlers.handleClick(event);
+
+    expect(targetPolicy.isInsideExistingFrame).toHaveBeenCalledWith(expect.anything(), 80, 90);
     expect(addFrame).not.toHaveBeenCalled();
     expect(event.preventDefault).not.toHaveBeenCalled();
   });

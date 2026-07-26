@@ -58,12 +58,10 @@ const HIGHLIGHTER_EXTENSION_UI_SELECTOR = [
 ].join(', ');
 
 function collectFrameCacheEntries(): Array<readonly [string, HoverFrameCacheEntry]> {
-  return queryAllContentUiElements('.sniptale-interactive-frame').map((frame) => {
+  return queryAllContentUiElements('.sniptale-interactive-frame').flatMap((frame) => {
     const element = frame as HTMLElement;
-    return [
-      element.id || element.className,
-      { element, rect: element.getBoundingClientRect() },
-    ] as const;
+    const frameId = element.dataset['frameId'];
+    return frameId ? ([[frameId, { element }]] as const) : [];
   });
 }
 
@@ -73,7 +71,8 @@ export function isNearExistingFrameBorder(
   y: number
 ): boolean {
   const frameCache = readHoverFrameCache(session, collectFrameCacheEntries);
-  for (const { rect } of frameCache.values()) {
+  for (const { element } of frameCache.values()) {
+    const rect = element.getBoundingClientRect();
     if (
       isPointWithinFrameBorderHit(
         { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
@@ -81,6 +80,21 @@ export function isNearExistingFrameBorder(
         y
       )
     ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function isInsideExistingFrame(
+  session: HoverFrameCacheSession,
+  x: number,
+  y: number
+): boolean {
+  const frameCache = readHoverFrameCache(session, collectFrameCacheEntries);
+  for (const { element } of frameCache.values()) {
+    const rect = element.getBoundingClientRect();
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
       return true;
     }
   }

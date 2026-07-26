@@ -6,6 +6,7 @@ import type { AddFreeFrameCallback } from '../../../features/highlighter/contrac
 import { getViewportClientPoint } from '../../platform/frame';
 import {
   hasBlockingHighlighterPopover,
+  isInsideExistingFrame,
   isHighlighterExtensionUiElement,
   isNearExistingFrameBorder,
 } from './targets';
@@ -103,7 +104,11 @@ function shouldSuppressHoverTarget(
   x: number,
   y: number
 ): boolean {
-  return isHighlighterExtensionUiElement(target) || isNearExistingFrameBorder(session, x, y);
+  return (
+    isHighlighterExtensionUiElement(target) ||
+    isInsideExistingFrame(session, x, y) ||
+    isNearExistingFrameBorder(session, x, y)
+  );
 }
 
 function canShowHoverTarget(props: {
@@ -200,6 +205,7 @@ function createHoverClickHandler(props: HoverInteractionProps) {
     const point = getViewportClientPoint(event.clientX, event.clientY, iframe);
     if (
       !target ||
+      isInsideExistingFrame(props.session, point.x, point.y) ||
       isNearExistingFrameBorder(props.session, point.x, point.y) ||
       shouldIgnoreHighlighterClick({ eventTarget: target, getState: props.getState })
     ) {

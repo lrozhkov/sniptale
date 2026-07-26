@@ -29,6 +29,7 @@ export interface HighlighterController {
   addHighlight: (element: HTMLElement) => void;
   clearAllHighlights: () => void;
   clearFrameEditing: () => void;
+  consumeSuppressedClick: (event: MouseEvent) => boolean;
   disableMode: () => void;
   dispose: () => void;
   enableMode: () => void;

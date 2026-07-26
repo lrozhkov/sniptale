@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
-import { getDistanceToFrameBorder, resolveFrameHitTarget, type FrameHitTarget } from './hit-test';
+import {
+  getDistanceToFrameBorder,
+  resolveFrameHitTarget,
+  resolveFrameInteriorHitTarget,
+  type FrameHitTarget,
+} from './hit-test';
 
 function frame(id: string, x: number, y: number, width: number, height: number): FrameData {
   return { effectMode: 'border', height, id, width, x, y };
@@ -100,5 +105,30 @@ describe('frame border hit testing', () => {
     expect(
       resolve({ frames: [first, second], hoveredFrameId: 'first', x: 103, y: 160 })?.frameId
     ).toBe('first');
+  });
+});
+
+describe('frame interior hit testing', () => {
+  it('resolves only the area beyond the concrete border hit zone', () => {
+    const outer = frame('outer', 100, 100, 400, 300);
+
+    expect(resolveFrameInteriorHitTarget({ frames: [outer], x: 300, y: 250 })).toBe('outer');
+    expect(resolveFrameInteriorHitTarget({ frames: [outer], x: 105, y: 250 })).toBeNull();
+    expect(resolveFrameInteriorHitTarget({ frames: [outer], x: 95, y: 250 })).toBeNull();
+  });
+
+  it('uses the visual top frame for nested and coincident interiors', () => {
+    const outer = frame('outer', 100, 100, 400, 300);
+    const inner = frame('inner', 160, 150, 120, 80);
+    const coincidentLast = frame('coincident-last', 160, 150, 120, 80);
+
+    expect(resolveFrameInteriorHitTarget({ frames: [outer, inner], x: 220, y: 190 })).toBe('inner');
+    expect(
+      resolveFrameInteriorHitTarget({
+        frames: [outer, inner, coincidentLast],
+        x: 220,
+        y: 190,
+      })
+    ).toBe('coincident-last');
   });
 });

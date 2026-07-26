@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { createFrameSelectionEventHandlers } from './activation';
+import { pauseHighlighter, resumeHighlighter } from '../../highlighter';
 
 function frame(): FrameData {
   return { effectMode: 'border', height: 100, id: 'frame-1', width: 180, x: 100, y: 100 };
@@ -13,7 +14,9 @@ function createHandlers(
   activePopover: {
     frameId: string;
     kind: 'frame-settings' | 'step-badge' | 'callout-settings';
-  } | null = null
+  } | null = null,
+  consumeSuppressedClick = vi.fn(() => false),
+  frames: FrameData[] = [frame()]
 ) {
   const actions = {
     clearSelection: vi.fn(),
@@ -23,22 +26,24 @@ function createHandlers(
   return {
     actions,
     handlers: createFrameSelectionEventHandlers({
-      framesRef: { current: [frame()] },
+      framesRef: { current: frames },
       hoveredFrameIdRef: { current: null },
       activePopoverRef: { current: activePopover },
       selectedFrameIdRef: { current: selectedFrameId },
+      consumeSuppressedClick,
       ...actions,
     }),
   };
 }
 
 afterEach(() => {
+  resumeHighlighter();
   document.body.replaceChildren();
   vi.unstubAllGlobals();
 });
 
 describe('frame selection events', () => {
-  it('selects and consumes a click on a concrete frame border', () => {
+  it('consumes a click on a concrete frame border without opening the toolbar', () => {
     const { actions, handlers } = createHandlers();
     const event = new MouseEvent('click', {
       cancelable: true,
@@ -48,16 +53,94 @@ describe('frame selection events', () => {
 
     handlers.click(event);
 
-    expect(actions.selectFrame).toHaveBeenCalledWith('frame-1', { x: 1, y: 50 });
+    expect(actions.selectFrame).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(true);
   });
 
-  it('clears a persistent selection on pointerdown in frame interior without consuming drawing', () => {
+  it('selects and consumes a simple primary click in the frame interior', () => {
+    const { actions, handlers } = createHandlers();
+    const event = new MouseEvent('click', {
+      button: 0,
+      cancelable: true,
+      clientX: 190,
+      clientY: 150,
+    });
+
+    handlers.click(event);
+
+    expect(actions.selectFrame).toHaveBeenCalledWith('frame-1', { x: 90, y: 50 });
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('leaves a secondary click in the frame interior untouched', () => {
+    const { actions, handlers } = createHandlers();
+    const event = new MouseEvent('click', {
+      button: 2,
+      cancelable: true,
+      clientX: 190,
+      clientY: 150,
+    });
+
+    handlers.click(event);
+
+    expect(actions.selectFrame).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('lets pending free-draw click suppression win before interior selection', () => {
+    const consumeSuppressedClick = vi.fn(() => true);
+    const { actions, handlers } = createHandlers(null, null, consumeSuppressedClick);
+    const event = new MouseEvent('click', {
+      button: 0,
+      cancelable: true,
+      clientX: 190,
+      clientY: 150,
+    });
+
+    handlers.click(event);
+
+    expect(consumeSuppressedClick).toHaveBeenCalledWith(event);
+    expect(actions.selectFrame).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('does not activate an underlying nested frame while direct editing owns the visual top', () => {
+    const outer = { ...frame(), height: 240, id: 'outer', width: 320 };
+    const inner = { ...frame(), height: 80, id: 'inner', width: 100, x: 160, y: 160 };
+    const { actions, handlers } = createHandlers(null, null, undefined, [outer, inner]);
+    const event = new MouseEvent('click', {
+      button: 0,
+      cancelable: true,
+      clientX: 210,
+      clientY: 200,
+    });
+    pauseHighlighter();
+
+    handlers.click(event);
+
+    expect(actions.selectFrame).not.toHaveBeenCalled();
+  });
+
+  it('keeps a persistent selection on pointerdown in frame interior without consuming drawing', () => {
     const { actions, handlers } = createHandlers('frame-1');
     const event = new MouseEvent('pointerdown', {
       cancelable: true,
       clientX: 190,
       clientY: 150,
+    });
+
+    handlers.pointerDown(event as PointerEvent);
+
+    expect(actions.clearSelection).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('clears a persistent selection on pointerdown outside every frame', () => {
+    const { actions, handlers } = createHandlers('frame-1');
+    const event = new MouseEvent('pointerdown', {
+      cancelable: true,
+      clientX: 20,
+      clientY: 20,
     });
 
     handlers.pointerDown(event as PointerEvent);

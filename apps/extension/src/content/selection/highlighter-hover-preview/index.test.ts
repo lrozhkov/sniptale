@@ -121,6 +121,7 @@ describe('highlighter hover preview controller', () => {
     controller.tracking.cancelPendingFrame();
     controller.tracking.clear();
     controller.input.cancelDrawing();
+    controller.input.consumeSuppressedClick(event);
 
     expect(overlayModule.actions.createOverlayContainer).toHaveBeenCalledOnce();
     expect(overlayModule.actions.removeOverlayContainer).toHaveBeenCalledOnce();
@@ -134,6 +135,7 @@ describe('highlighter hover preview controller', () => {
     expect(interactionModule.handlers.cancelPendingHoverFrame).toHaveBeenCalledOnce();
     expect(interactionModule.handlers.clearHoverTracking).toHaveBeenCalledOnce();
     expect(drawingModule.handlers.cancelDrawing).toHaveBeenCalledOnce();
+    expect(drawingModule.handlers.consumeSuppressedClick).toHaveBeenCalledWith(event);
   });
 
   it('logs the accessible iframe count', () => {

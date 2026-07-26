@@ -17,6 +17,7 @@ vi.mock('../../platform/page-context/dom', () => pageContext);
 import { createHoverSession } from './session';
 import {
   hasBlockingHighlighterPopover,
+  isInsideExistingFrame,
   isHighlighterExtensionUiElement,
   isNearExistingFrameBorder,
 } from './targets';
@@ -63,16 +64,42 @@ describe('highlighter hover target policy', () => {
     expect(hasBlockingHighlighterPopover()).toBe(true);
   });
 
-  it('refreshes frame geometry through session authority and excludes only the border zone', () => {
+  it('refreshes frame geometry through session authority for border and interior arbitration', () => {
     const session = createHoverSession();
     const frame = document.createElement('div');
-    frame.id = 'frame-1';
+    frame.dataset['frameId'] = 'frame-1';
     frame.getBoundingClientRect = vi.fn(() => new DOMRect(20, 40, 40, 40));
     contentUiRoot.queryAllContentUiElements.mockReturnValue([frame]);
 
     expect(isNearExistingFrameBorder(session, 15, 45)).toBe(true);
     expect(isNearExistingFrameBorder(session, 10, 60)).toBe(true);
     expect(isNearExistingFrameBorder(session, 40, 60)).toBe(false);
+    expect(isInsideExistingFrame(session, 40, 60)).toBe(true);
+    expect(isInsideExistingFrame(session, 15, 60)).toBe(false);
+    expect(contentUiRoot.queryAllContentUiElements).toHaveBeenCalledOnce();
+  });
+
+  it('keeps every frame in the inventory and reads live geometry after resize', () => {
+    const session = createHoverSession();
+    const first = document.createElement('div');
+    const second = document.createElement('div');
+    first.className = 'sniptale-interactive-frame';
+    second.className = 'sniptale-interactive-frame';
+    first.dataset['frameId'] = 'frame-1';
+    second.dataset['frameId'] = 'frame-2';
+    first.getBoundingClientRect = vi.fn(() => new DOMRect(20, 40, 40, 40));
+    let secondRect = new DOMRect(100, 120, 60, 40);
+    second.getBoundingClientRect = vi.fn(() => secondRect);
+    contentUiRoot.queryAllContentUiElements.mockReturnValue([first, second]);
+
+    expect(isInsideExistingFrame(session, 40, 60)).toBe(true);
+    expect(isInsideExistingFrame(session, 130, 140)).toBe(true);
+    expect([...session.frameCache.keys()]).toEqual(['frame-1', 'frame-2']);
+
+    secondRect = new DOMRect(180, 220, 80, 60);
+
+    expect(isInsideExistingFrame(session, 130, 140)).toBe(false);
+    expect(isInsideExistingFrame(session, 220, 250)).toBe(true);
     expect(contentUiRoot.queryAllContentUiElements).toHaveBeenCalledOnce();
   });
 });

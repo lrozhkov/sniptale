@@ -4,6 +4,7 @@ import { expect, it, vi } from 'vitest';
 import {
   createHighlighterFrameActions,
   createHighlighterInvalidateActions,
+  createHighlighterInputActions,
   createHighlighterRuntimeActions,
   createHighlighterStateActions,
 } from './controller.actions';
@@ -113,4 +114,14 @@ it('routes cache invalidation to the hover owner', () => {
   actions.invalidateFrameCache();
 
   expect(hoverController.invalidateFrameCache).toHaveBeenCalledTimes(1);
+});
+
+it('keeps click suppression under the hover input owner', () => {
+  const hoverController = createHoverControllerStub();
+  hoverController.consumeSuppressedClick.mockReturnValueOnce(true);
+  const click = { type: 'click' } as MouseEvent;
+  const actions = createHighlighterInputActions(hoverController);
+
+  expect(actions.consumeSuppressedClick(click)).toBe(true);
+  expect(hoverController.consumeSuppressedClick).toHaveBeenCalledWith(click);
 });

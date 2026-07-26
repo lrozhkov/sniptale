@@ -69,6 +69,7 @@ function getToolbarProps(props: InteractiveFrameFloatingUiProps) {
     popoverAnchorRef: props.popoverAnchorRef,
     stepBadgePopoverAnchorRef: props.stepBadgePopoverAnchorRef,
     calloutPopoverAnchorRef: props.calloutPopoverAnchorRef,
+    clearSelection: props.clearSelection,
     closePopover: props.closePopover,
     togglePopover: props.togglePopover,
     setIsCalloutEditing: props.setIsCalloutEditing,

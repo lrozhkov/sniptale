@@ -2,7 +2,11 @@ import type { MutableRefObject } from 'react';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import type { ActiveFramePopover } from '../state/frame-ui.store';
 import { getViewportClientPoint } from '../../../platform/frame';
-import { resolveFrameControlHit, resolveFrameHitTarget } from './hit-test';
+import {
+  resolveFrameControlHit,
+  resolveFrameHitTarget,
+  resolveFrameInteriorHitTarget,
+} from './hit-test';
 import { queryAllContentUiElements, queryContentUiElement } from '../../../platform/dom-host';
 import { isHighlighterPausedState } from '../../highlighter';
 
@@ -62,7 +66,16 @@ function resolveBorderHit(params: {
   });
 }
 
-function stopFrameBorderClick(event: MouseEvent) {
+function resolveInteriorHit(params: {
+  event: MouseEvent | PointerEvent;
+  iframe?: HTMLIFrameElement;
+  frames: FrameData[];
+}) {
+  const point = getViewportClientPoint(params.event.clientX, params.event.clientY, params.iframe);
+  return resolveFrameInteriorHitTarget({ frames: params.frames, x: point.x, y: point.y });
+}
+
+function stopFrameActivationClick(event: MouseEvent) {
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
@@ -79,6 +92,7 @@ export function createFrameSelectionEventHandlers(params: {
   hoveredFrameIdRef: MutableRefObject<string | null>;
   activePopoverRef: MutableRefObject<ActiveFramePopover | null>;
   selectedFrameIdRef: MutableRefObject<string | null>;
+  consumeSuppressedClick: (event: MouseEvent) => boolean;
   clearSelection: () => void;
   hoverFrame: (frameId: string) => void;
   selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
@@ -86,32 +100,51 @@ export function createFrameSelectionEventHandlers(params: {
   return {
     pointerDown: (event: PointerEvent, iframe?: HTMLIFrameElement) => {
       if (!params.selectedFrameIdRef.current || isFrameUiOwnedFloatingEvent(event)) return;
-      const hit = resolveBorderHit({
+      const borderHit = resolveBorderHit({
         event,
         frames: params.framesRef.current,
         hoveredFrameId: params.hoveredFrameIdRef.current,
         selectedFrameId: params.selectedFrameIdRef.current,
         ...(iframe ? { iframe } : {}),
       });
-      if (!hit) params.clearSelection();
+      const interiorHit = resolveInteriorHit({
+        event,
+        frames: params.framesRef.current,
+        ...(iframe ? { iframe } : {}),
+      });
+      if (!borderHit && !interiorHit) params.clearSelection();
     },
     click: (event: MouseEvent, iframe?: HTMLIFrameElement) => {
-      if (isFrameUiOwnedFloatingEvent(event)) return;
+      if (event.button !== 0 || isFrameUiOwnedFloatingEvent(event)) return;
+      if (params.consumeSuppressedClick(event)) {
+        stopFrameActivationClick(event);
+        return;
+      }
+      if (hasActiveFrameInteraction()) return;
       const directControl = resolveFrameControlHit(event);
-      if (directControl?.kind === 'trigger') return;
-      const hit = resolveBorderHit({
+      if (directControl) return;
+      const borderHit = resolveBorderHit({
         event,
         frames: params.framesRef.current,
         hoveredFrameId: params.hoveredFrameIdRef.current,
         selectedFrameId: params.selectedFrameIdRef.current,
         ...(iframe ? { iframe } : {}),
       });
-      if (!hit || hit.kind !== 'border') return;
-      stopFrameBorderClick(event);
+      if (borderHit?.kind === 'border') {
+        stopFrameActivationClick(event);
+        return;
+      }
+      const frameId = resolveInteriorHit({
+        event,
+        frames: params.framesRef.current,
+        ...(iframe ? { iframe } : {}),
+      });
+      if (!frameId) return;
+      stopFrameActivationClick(event);
       const point = getViewportClientPoint(event.clientX, event.clientY, iframe);
-      const frame = params.framesRef.current.find(({ id }) => id === hit.frameId);
+      const frame = params.framesRef.current.find(({ id }) => id === frameId);
       params.selectFrame(
-        hit.frameId,
+        frameId,
         frame ? { x: point.x - frame.x, y: point.y - frame.y } : undefined
       );
     },
