@@ -66,6 +66,7 @@ function renderCaptureDropdown() {
             value: 'download_default',
             label: 'Download',
             hint: 'Default',
+            icon: <span className="sniptale-popover-icon">Icon</span>,
           },
         ]}
         onSelect={() => undefined}
@@ -113,6 +114,7 @@ function renderVerticalCaptureDropdown() {
             value: 'download_default',
             label: 'Download',
             hint: 'Default',
+            icon: <span className="sniptale-popover-icon">Icon</span>,
           },
         ]}
         onSelect={() => undefined}
@@ -144,6 +146,7 @@ function renderVerticalCaptureDropdownWithSidebarInset() {
             value: 'download_default',
             label: 'Download',
             hint: 'Default',
+            icon: <span className="sniptale-popover-icon">Icon</span>,
           },
         ]}
         onSelect={() => undefined}
@@ -180,7 +183,7 @@ describe('ToolbarCaptureMenuDropdowns', () => {
     expect(menuRoot).not.toBeNull();
     expect(menuSurface?.style.top).toBe('calc(100% + 10px)');
     expect(menuSurface?.style.left).toBe('0px');
-    expect(menuSurface?.querySelector('.sniptale-popover-icon')).toBeNull();
+    expect(menuSurface?.querySelector('.sniptale-popover-icon')).not.toBeNull();
   });
 
   it('anchors the timer dropdown and keeps the semantic placement in sync', () => {
@@ -192,6 +195,7 @@ describe('ToolbarCaptureMenuDropdowns', () => {
     expect(menuRoot).not.toBeNull();
     expect(menu).not.toBeNull();
     expect(menu instanceof HTMLDivElement ? menu.style.bottom : '').toBe('calc(100% + 10px)');
+    expect(menuRoot?.querySelector('.sniptale-toolbar-menu-item-badge')).toBeNull();
   });
 
   it('opens vertical dropdown menus beside the toolbar without overlapping it', () => {
