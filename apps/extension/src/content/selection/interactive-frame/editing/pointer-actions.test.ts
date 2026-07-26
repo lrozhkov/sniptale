@@ -22,6 +22,15 @@ import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 function createFixture() {
   const frame = createFrameDataFixture('frame-1', { x: 20, y: 30, width: 100, height: 80 });
   const container = document.createElement('div');
+  container.style.left = `${frame.x}px`;
+  container.style.top = `${frame.y}px`;
+  container.style.width = `${frame.width}px`;
+  container.style.height = `${frame.height}px`;
+  const visibleFrame = document.createElement('div');
+  visibleFrame.className = 'sniptale-interactive-frame';
+  visibleFrame.style.width = `${frame.width}px`;
+  visibleFrame.style.height = `${frame.height}px`;
+  container.appendChild(visibleFrame);
   const stateRef: { current: FrameState } = { current: 'hover' };
   const refs = {
     isDraggingRef: { current: false },
@@ -65,7 +74,7 @@ function createFixture() {
     state: 'hover',
     stateRef,
   });
-  return { frame, listenerConfig, onUpdate, refs, setState, start };
+  return { container, frame, listenerConfig, onUpdate, refs, setState, start, visibleFrame };
 }
 
 function reactPointer(x: number, y: number): InteractiveFramePointerStartEvent {
@@ -150,6 +159,39 @@ describe('transient frame resize', () => {
 
     expect(fixture.refs.tempFrameRef.current).toMatchObject({ width: 140, height: 110 });
   });
+
+  it.each([
+    {
+      direction: 'w' as const,
+      move: { x: 80, y: 100 },
+      expectedFrameSize: '120px',
+      oppositeEdge: (container: HTMLDivElement, visibleFrame: HTMLDivElement) =>
+        Number.parseFloat(container.style.left) + Number.parseFloat(visibleFrame.style.width),
+      expectedOppositeEdge: 120,
+    },
+    {
+      direction: 'n' as const,
+      move: { x: 100, y: 80 },
+      expectedFrameSize: '100px',
+      oppositeEdge: (container: HTMLDivElement, visibleFrame: HTMLDivElement) =>
+        Number.parseFloat(container.style.top) + Number.parseFloat(visibleFrame.style.height),
+      expectedOppositeEdge: 110,
+    },
+  ])(
+    'keeps the visible opposite edge fixed during live $direction resize',
+    ({ direction, expectedFrameSize, expectedOppositeEdge, move, oppositeEdge }) => {
+      const fixture = createFixture();
+      fixture.start(reactPointer(100, 100), direction);
+      createInteractiveFramePointerMoveHandler(fixture.listenerConfig)(domPointer(move.x, move.y));
+
+      flushRaf();
+
+      const size =
+        direction === 'w' ? fixture.visibleFrame.style.width : fixture.visibleFrame.style.height;
+      expect(size).toBe(expectedFrameSize);
+      expect(oppositeEdge(fixture.container, fixture.visibleFrame)).toBe(expectedOppositeEdge);
+    }
+  );
 
   it('flushes the final pointer sample and commits exactly once on pointerup', () => {
     const fixture = createFixture();
