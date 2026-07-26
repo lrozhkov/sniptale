@@ -26,11 +26,15 @@ function createPointerEvent(
 
 const initialPlacement: StepBadgeManualPlacement = { position: 0.25, side: 'top' };
 
-function Harness(props: { initialPlacement: StepBadgeManualPlacement }) {
+function Harness(props: {
+  initialPlacement: StepBadgeManualPlacement;
+  visualOffset?: { x: number; y: number };
+}) {
   const drag = useStepBadgeBoundaryDrag({
     frameRect: { height: 120, width: 200, x: 100, y: 80 },
     initialPlacement: props.initialPlacement,
     onPositionChange,
+    visualOffset: props.visualOffset ?? { x: 0, y: 0 },
   });
   return (
     <button
@@ -112,5 +116,39 @@ describe('useStepBadgeBoundaryDrag', () => {
 
     expect(onPositionChange).not.toHaveBeenCalled();
     expect(handle.dataset['draft']).toBe('');
+  });
+
+  it('subtracts the configured visual offset while projecting pointer movement', () => {
+    act(() =>
+      root.render(<Harness initialPlacement={initialPlacement} visualOffset={{ x: 20, y: -10 }} />)
+    );
+    const handle = host.querySelector('button') as HTMLButtonElement;
+    handle.setPointerCapture = vi.fn();
+
+    act(() =>
+      handle.dispatchEvent(
+        createPointerEvent('pointerdown', { clientX: 170, clientY: 70, pointerId: 9 })
+      )
+    );
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointermove', { clientX: 170, clientY: 70, pointerId: 9 })
+      )
+    );
+    expect(handle.dataset['draft']).toContain('"position":0.25');
+
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointermove', { clientX: 240, clientY: 70, pointerId: 9 })
+      )
+    );
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointerup', { clientX: 240, clientY: 70, pointerId: 9 })
+      )
+    );
+
+    expect(onPositionChange).toHaveBeenCalledOnce();
+    expect(onPositionChange).toHaveBeenCalledWith({ position: 0.6, side: 'top' });
   });
 });

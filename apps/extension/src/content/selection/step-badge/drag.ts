@@ -36,6 +36,7 @@ export function useStepBadgeBoundaryDrag(args: {
   frameRect: StepBadgeFrameRect;
   initialPlacement: StepBadgeManualPlacement;
   onPositionChange: (placement: StepBadgeManualPlacement) => void;
+  visualOffset: { x: number; y: number };
 }) {
   const [draftPlacement, setDraftPlacement] = React.useState<StepBadgeManualPlacement | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -72,7 +73,10 @@ export function useStepBadgeBoundaryDrag(args: {
       event.stopPropagation();
       const placement = projectStepBadgeToFrameBoundary({
         frameRect: args.frameRect,
-        point: { x: event.clientX, y: event.clientY },
+        point: {
+          x: event.clientX - args.visualOffset.x,
+          y: event.clientY - args.visualOffset.y,
+        },
         previousSide: previousSideRef.current,
       });
       previousSideRef.current = placement.side;
