@@ -123,7 +123,7 @@ export function useInteractiveFramePropSync(params: {
   const { defaultEffectMode, frame, isCalloutEditing, setEffectMode, setTempFrame, state } = params;
 
   React.useEffect(() => {
-    if (state === 'editing' || isCalloutEditing) {
+    if (state === 'editing' || state === 'resizing' || isCalloutEditing) {
       return;
     }
 

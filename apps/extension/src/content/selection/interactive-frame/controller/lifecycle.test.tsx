@@ -190,9 +190,9 @@ function flushHistoryApplyTimers() {
   });
 }
 
-function renderPropSyncHarness(initialFrame: FrameData) {
+function renderPropSyncHarness(initialFrame: FrameData, initialState: FrameState = 'idle') {
   function Harness(props: { frame: FrameData }) {
-    const [state] = React.useState<'idle' | 'hover' | 'editing'>('idle');
+    const [state] = React.useState<FrameState>(initialState);
     const [tempFrame, setTempFrame] = React.useState<FrameData>({
       ...props.frame,
       x: 200,
@@ -290,5 +290,24 @@ describe('useInteractiveFramePropSync', () => {
 
     expect(container?.firstElementChild?.getAttribute('data-effect-mode')).toBe('border');
     expect(container?.firstElementChild?.getAttribute('data-temp-x')).toBe('10');
+  });
+
+  it('preserves live geometry and effect state while resizing', () => {
+    const propSyncHarness = renderPropSyncHarness(
+      {
+        ...frame,
+        effectMode: 'focus',
+      },
+      'resizing'
+    );
+
+    propSyncHarness.rerender({
+      ...frame,
+      x: 30,
+      effectMode: 'border',
+    });
+
+    expect(container?.firstElementChild?.getAttribute('data-effect-mode')).toBe('blur');
+    expect(container?.firstElementChild?.getAttribute('data-temp-x')).toBe('200');
   });
 });
