@@ -66,6 +66,9 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
       onTailFramePositionChange={(tailFramePosition) => {
         applyCalloutFrameUpdate({ ...callout, tailFramePosition });
       }}
+      onWidthChange={(maxWidth, manualPlacement) => {
+        applyCalloutFrameUpdate({ ...callout, maxWidth, manualPlacement });
+      }}
       settingsAnchorRef={props.calloutPopoverAnchorRef}
       showSettingsHandle={!isAnyFrameSelected}
     />

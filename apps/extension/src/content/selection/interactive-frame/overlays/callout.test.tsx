@@ -21,6 +21,10 @@ vi.mock('../../callout', () => ({
     onSettingsClick: () => void;
     onTailBaseRangeChange: (position: number, width: number) => void;
     onTailFramePositionChange: (position: number) => void;
+    onWidthChange: (
+      maxWidth: number,
+      placement: { centerOffsetX: number; centerOffsetY: number }
+    ) => void;
   }) => (
     <>
       <button data-ui="callout-settings" onClick={props.onSettingsClick} type="button">
@@ -56,6 +60,13 @@ vi.mock('../../callout', () => ({
         type="button"
       >
         move
+      </button>
+      <button
+        data-ui="callout-resize-width"
+        onClick={() => props.onWidthChange(260, { centerOffsetX: 84, centerOffsetY: -18 })}
+        type="button"
+      >
+        resize width
       </button>
     </>
   ),
@@ -175,6 +186,39 @@ describe('interactive frame callout overlay', () => {
       expect.objectContaining({
         callout: expect.objectContaining({
           manualPlacement: { centerOffsetX: 70, centerOffsetY: -20 },
+        }),
+      })
+    );
+  });
+
+  it('commits width and the opposite-edge placement as one merged frame update', () => {
+    const frame = createFrame();
+    const onUpdate = vi.fn();
+
+    renderNode(
+      <InteractiveFrameCalloutOverlay
+        {...createControlProps()}
+        frame={frame}
+        currentFrame={frame}
+        frameZIndex={100}
+        borderWidth={3}
+        isCalloutEditing={false}
+        setIsCalloutEditing={vi.fn()}
+        setTempFrame={vi.fn()}
+        onUpdate={onUpdate}
+      />
+    );
+
+    act(() => {
+      container?.querySelector<HTMLButtonElement>('[data-ui="callout-resize-width"]')?.click();
+    });
+
+    expect(onUpdate).toHaveBeenCalledOnce();
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callout: expect.objectContaining({
+          maxWidth: 260,
+          manualPlacement: { centerOffsetX: 84, centerOffsetY: -18 },
         }),
       })
     );

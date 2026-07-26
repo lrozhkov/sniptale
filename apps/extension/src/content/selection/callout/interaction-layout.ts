@@ -5,6 +5,7 @@ import type { ConnectorSide } from './dynamic-tail';
 import { getCalloutLayoutState } from './layout';
 import { getCalloutEdgePosition, useCalloutEdgeDrag } from './tail-drag';
 import { useCalloutTailBaseRange } from './tail-base-range';
+import { useCalloutWidthResize } from './width-resize';
 
 type FrameRect = { x: number; y: number; width: number; height: number };
 
@@ -16,23 +17,41 @@ export function useCalloutInteractionLayout(args: {
   onPositionChange: (placement: NonNullable<CalloutSettings['manualPlacement']>) => void;
   onTailBaseRangeChange: (position: number, width: number) => void;
   onTailFramePositionChange: (position: number) => void;
+  onWidthChange: (
+    maxWidth: number,
+    placement: NonNullable<CalloutSettings['manualPlacement']>
+  ) => void;
   settings: CalloutSettings;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
   zIndex: number;
 }) {
   const previousConnectorSideRef = React.useRef<ConnectorSide | undefined>(undefined);
+  const widthResize = useCalloutWidthResize({
+    dimensions: args.dimensions,
+    frameRect: args.frameRect,
+    isEditing: args.isEditing,
+    manualPlacement: args.settings.manualPlacement,
+    maxWidth: args.settings.maxWidth,
+    onWidthChange: args.onWidthChange,
+    wrapperRef: args.wrapperRef,
+  });
   const drag = useCalloutDrag({
     frameRect: args.frameRect,
     dimensions: args.dimensions,
     isEditing: args.isEditing,
-    ...(args.isSettingsOpen === undefined ? {} : { isHandlePinned: args.isSettingsOpen }),
+    isHandlePinned: Boolean(args.isSettingsOpen) || widthResize.isResizing,
     manualPlacement: args.settings.manualPlacement,
     onPositionChange: args.onPositionChange,
     wrapperRef: args.wrapperRef,
   });
+  const widthSettings = {
+    ...args.settings,
+    ...(widthResize.draftMaxWidth === null ? {} : { maxWidth: widthResize.draftMaxWidth }),
+    ...(widthResize.draftPlacement ? { manualPlacement: widthResize.draftPlacement } : {}),
+  };
   const placementSettings = drag.draftPlacement
-    ? { ...args.settings, manualPlacement: drag.draftPlacement }
-    : args.settings;
+    ? { ...widthSettings, manualPlacement: drag.draftPlacement }
+    : widthSettings;
   const baseLayoutArgs = {
     dimensions: args.dimensions,
     frameRect: args.frameRect,
@@ -86,5 +105,6 @@ export function useCalloutInteractionLayout(args: {
     tailBaseEndDrag: tailBaseRange.endDrag,
     tailBaseStartDrag: tailBaseRange.startDrag,
     tailFrameDrag,
+    widthResize,
   };
 }
