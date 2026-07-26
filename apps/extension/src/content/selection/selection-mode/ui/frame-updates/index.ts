@@ -6,6 +6,8 @@ import {
 import { showSelectionModeCancelButton } from '../cancel-button';
 import type { SelectionModeDom } from '../dom-types';
 import type { SelectionRect } from '../types';
+import { syncSelectionToolbarPaddingState } from '../final-elements/toolbar';
+import { closeSelectionCaptureActionMenu } from '../final-elements/capture-menu';
 
 function createDragFrameSizeLabel(): HTMLDivElement {
   const label = document.createElement('div');
@@ -58,10 +60,75 @@ function updateOverlayShades(finalOverlay: HTMLElement, rect: SelectionRect): vo
   }
 }
 
+export function scheduleDragFrameUpdate(dom: SelectionModeDom, rect: SelectionRect): void {
+  dom.pendingDragRect = { ...rect };
+  if (dom.dragFrameRafId !== null) {
+    return;
+  }
+
+  dom.dragFrameRafId = requestAnimationFrame(() => {
+    dom.dragFrameRafId = null;
+    const pendingRect = dom.pendingDragRect;
+    dom.pendingDragRect = null;
+    if (pendingRect) {
+      updateDragFrame(dom, pendingRect);
+    }
+  });
+}
+
+export function cancelScheduledDragFrameUpdate(dom: SelectionModeDom): void {
+  if (dom.dragFrameRafId !== null) {
+    cancelAnimationFrame(dom.dragFrameRafId);
+  }
+  dom.dragFrameRafId = null;
+  dom.pendingDragRect = null;
+}
+
+function commitPendingFinalFrameUpdate(dom: SelectionModeDom): void {
+  const pendingRect = dom.pendingFinalRect;
+  dom.pendingFinalRect = null;
+  if (pendingRect) {
+    updateFinalFrame(dom, pendingRect);
+  }
+}
+
+export function scheduleFinalFrameUpdate(dom: SelectionModeDom, rect: SelectionRect): void {
+  dom.pendingFinalRect = { ...rect };
+  if (dom.finalFrameRafId !== null) {
+    return;
+  }
+
+  dom.finalFrameRafId = requestAnimationFrame(() => {
+    dom.finalFrameRafId = null;
+    commitPendingFinalFrameUpdate(dom);
+  });
+}
+
+export function flushScheduledFinalFrameUpdate(dom: SelectionModeDom): void {
+  if (dom.finalFrameRafId !== null) {
+    cancelAnimationFrame(dom.finalFrameRafId);
+    dom.finalFrameRafId = null;
+  }
+  commitPendingFinalFrameUpdate(dom);
+}
+
+export function cancelScheduledFinalFrameUpdate(dom: SelectionModeDom): void {
+  if (dom.finalFrameRafId !== null) {
+    cancelAnimationFrame(dom.finalFrameRafId);
+  }
+  dom.finalFrameRafId = null;
+  dom.pendingFinalRect = null;
+}
+
 function updateSizePanelPosition(sizePanel: HTMLElement, rect: SelectionRect): void {
+  const measured = sizePanel.getBoundingClientRect();
   setContentSizeTooltipPosition(
     sizePanel,
-    calculateContentSizeTooltipPosition({ anchorRect: rect })
+    calculateContentSizeTooltipPosition({
+      anchorRect: rect,
+      tooltipWidth: measured.width || sizePanel.offsetWidth || 430,
+      tooltipHeight: measured.height || sizePanel.offsetHeight || 44,
+    })
   );
 }
 
@@ -81,6 +148,9 @@ export function updateDragFrame(dom: SelectionModeDom, rect: SelectionRect): voi
   }
 
   label.textContent = sizeText;
+  if (dom.dragOverlay) {
+    updateOverlayShades(dom.dragOverlay, rect);
+  }
 }
 
 export function updateFinalFrame(dom: SelectionModeDom, rect: SelectionRect): void {
@@ -111,10 +181,13 @@ export function updateFinalFrame(dom: SelectionModeDom, rect: SelectionRect): vo
   });
 
   updateOverlayShades(dom.finalOverlay, rect);
+  syncSelectionToolbarPaddingState(dom.sizePanel, rect);
   updateSizePanelPosition(dom.sizePanel, rect);
 }
 
 export function resetFinalElements(dom: SelectionModeDom): void {
+  cancelScheduledFinalFrameUpdate(dom);
+  closeSelectionCaptureActionMenu(dom.overlayContainer, false);
   dom.finalFrame?.remove();
   dom.finalOverlay?.remove();
   dom.sizePanel?.remove();
@@ -131,6 +204,9 @@ export function resetFinalElements(dom: SelectionModeDom): void {
 }
 
 export function cleanupSelectionModeDom(dom: SelectionModeDom): void {
+  cancelScheduledDragFrameUpdate(dom);
+  cancelScheduledFinalFrameUpdate(dom);
+  closeSelectionCaptureActionMenu(dom.overlayContainer, false);
   dom.overlayContainer?.remove();
 
   dom.overlayContainer = null;
@@ -138,6 +214,9 @@ export function cleanupSelectionModeDom(dom: SelectionModeDom): void {
   dom.scissorsIcon = null;
   dom.hoverSizeLabel = null;
   dom.dragFrame = null;
+  dom.dragOverlay = null;
+  dom.finalFrameRafId = null;
+  dom.pendingFinalRect = null;
   dom.finalFrame = null;
   dom.finalOverlay = null;
   dom.sizePanel = null;

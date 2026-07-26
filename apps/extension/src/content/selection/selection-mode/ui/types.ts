@@ -1,4 +1,6 @@
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
+import type { CaptureActionType } from '../../../../contracts/settings';
+import type { Selection } from '../types';
 
 export interface SelectionModeFinalElementsOptions {
   zIndexBase: number;
@@ -7,7 +9,11 @@ export interface SelectionModeFinalElementsOptions {
   minSelectionSize: number;
   getMaxSelectionWidth: () => number;
   getMaxSelectionHeight: () => number;
+  getCaptureAction: () => CaptureActionType;
+  getSelection: () => Selection;
   onConfirm: () => void;
+  onAdjustPadding: (direction: 'decrease' | 'increase') => void;
+  onCaptureActionChange: (action: CaptureActionType) => void;
   onResetToIdle: () => void;
   onSetupSizePanelListeners: () => void;
 }

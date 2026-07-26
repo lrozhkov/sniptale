@@ -18,7 +18,8 @@ it('finalizes a drag and clears pointer state on mouse up', async () => {
   } as SelectionModeInteractionState;
   const options = {
     finalizeDragSelection: vi.fn(),
-  } satisfies Pick<SelectionModeEventOptions, 'finalizeDragSelection'>;
+    flushFinalFrameUpdate: vi.fn(),
+  } satisfies Pick<SelectionModeEventOptions, 'finalizeDragSelection' | 'flushFinalFrameUpdate'>;
 
   handleSelectionModeMouseUp(state, options);
 

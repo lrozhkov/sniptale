@@ -14,55 +14,41 @@ import type { CaptureActionType } from '../../../../contracts/settings';
 import { createTrustedContentActionIntentSource } from '../../../application/privileged-action-intent';
 import { PopoverCheckIcon } from '../../icons/icons';
 import type { ToolbarCaptureActionsProps } from '../types';
+import { getCaptureActionDescriptors } from '../../../../features/quick-actions-presets/catalog';
 
 export function renderMenuCheck() {
   return <PopoverCheckIcon />;
 }
 
 export function getCaptureActionOptions() {
-  return [
-    {
-      value: 'download_default' as const,
-      label: translate('content.toolbar.captureDownloadLabel'),
-      hint: translate('content.toolbar.captureDownloadHint'),
-      icon: <Download className="sniptale-popover-icon" size={18} strokeWidth={2} />,
-    },
-    {
-      value: 'ask_preset' as const,
-      label: translate('content.toolbar.captureAskPresetLabel'),
-      hint: translate('content.toolbar.captureAskPresetHint'),
-      icon: <FolderInput className="sniptale-popover-icon" size={18} strokeWidth={2} />,
-    },
-    {
-      value: 'ask_system' as const,
-      label: translate('content.toolbar.captureAskSystemLabel'),
-      hint: translate('content.toolbar.captureAskSystemHint'),
-      icon: <Save className="sniptale-popover-icon" size={18} strokeWidth={2} />,
-    },
-    {
-      value: 'copy' as const,
-      label: translate('content.toolbar.captureCopyLabel'),
-      hint: translate('content.toolbar.captureCopyHint'),
-      icon: <Copy className="sniptale-popover-icon" size={18} strokeWidth={2} />,
-    },
-    {
-      value: 'scenario' as const,
-      label: translate('content.toolbar.captureScenarioLabel'),
-      hint: translate('content.toolbar.captureScenarioHint'),
-      icon: <FileStack className="sniptale-popover-icon" size={18} strokeWidth={2} />,
-    },
-    {
-      value: 'edit' as const,
-      label: translate('content.toolbar.captureEditLabel'),
-      hint: translate('content.toolbar.captureEditHint'),
-      icon: <Pencil className="sniptale-popover-icon" size={18} strokeWidth={2} />,
-    },
-  ] satisfies Array<{
+  return getCaptureActionDescriptors().map((option) => ({
+    ...option,
+    icon: getCaptureActionMenuIcon(option.value),
+  })) satisfies Array<{
     value: CaptureActionType;
     label: string;
     hint: string;
     icon: React.ReactNode;
   }>;
+}
+
+function getCaptureActionMenuIcon(captureAction: CaptureActionType) {
+  const iconProps = { className: 'sniptale-popover-icon', size: 18, strokeWidth: 2 };
+  switch (captureAction) {
+    case 'ask_preset':
+      return <FolderInput {...iconProps} />;
+    case 'ask_system':
+      return <Save {...iconProps} />;
+    case 'copy':
+      return <Copy {...iconProps} />;
+    case 'scenario':
+      return <FileStack {...iconProps} />;
+    case 'edit':
+      return <Pencil {...iconProps} />;
+    case 'download_default':
+    default:
+      return <Download {...iconProps} />;
+  }
 }
 
 export function getTimerOptions() {

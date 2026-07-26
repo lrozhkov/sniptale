@@ -35,8 +35,10 @@ function createState(
 function createOptions(): SelectionModeEventOptions {
   return {
     cancelSelection: vi.fn(),
+    closeCaptureActionMenu: vi.fn(() => false),
     confirmSelection: vi.fn(),
     finalizeDragSelection: vi.fn(),
+    flushFinalFrameUpdate: vi.fn(),
     handleDragMove: vi.fn(),
     handleResizeMove: vi.fn(),
     hideHoverFrame: vi.fn(),
@@ -167,6 +169,7 @@ function registerSkipNextClickTest() {
 
     handleSelectionModeMouseUp(state, options);
 
+    expect(options.flushFinalFrameUpdate).toHaveBeenCalledTimes(1);
     expect(state.skipNextClick).toBe(true);
     expect(state.isDragging).toBe(false);
     expect(state.isResizing).toBe(false);

@@ -89,8 +89,12 @@ async function captureRegularSelectionDataUrl(
   contentIntentSource: ContentPrivilegedActionIntentSource | undefined
 ): Promise<string> {
   logSelectionScreenshotDiag('runSelectionScreenshot.await-selection');
-  const area = await enableSelectionModeDeferredIfCurrent(() =>
-    isCurrentScreenshotRun(runtime, runToken)
+  const area = await enableSelectionModeDeferredIfCurrent(
+    () => isCurrentScreenshotRun(runtime, runToken),
+    {
+      captureAction: runtime.captureActionRef.current,
+      onCaptureActionChange: runtime.setCaptureAction,
+    }
   );
   assertCurrentScreenshotRun(runtime, runToken);
   logSelectionScreenshotDiag('runSelectionScreenshot.selection-resolved', { area });
@@ -136,8 +140,6 @@ export async function runSelectionScreenshot(
   runtime: ScreenshotControllerRuntime,
   options: ScreenshotSuccessFeedbackOptions = {}
 ): Promise<void> {
-  const actionType = runtime.captureActionRef.current;
-  const shouldSaveScenarioStep = shouldSaveScenarioCapture(actionType, runtime);
   const showSuccessToast = options.showSuccessToast !== false;
   try {
     assertCurrentScreenshotRun(runtime, options.runToken);
@@ -150,6 +152,8 @@ export async function runSelectionScreenshot(
     assertCurrentScreenshotRun(runtime, options.runToken);
 
     const dataUrl = await resolveSelectionDataUrl(runtime, options);
+    const actionType = runtime.captureActionRef.current;
+    const shouldSaveScenarioStep = shouldSaveScenarioCapture(actionType, runtime);
     await persistLocalCaptureDataUrl({
       actionType,
       contentIntentSource: options.contentIntentSource,

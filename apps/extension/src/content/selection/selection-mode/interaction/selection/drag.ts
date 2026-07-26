@@ -1,4 +1,5 @@
 import {
+  cancelScheduledDragFrameUpdate,
   createDragEventCatcher,
   hideHoverFrame as hideHoverFrameDom,
   removeDragEventCatcher,
@@ -44,6 +45,9 @@ export function startDragSelection(
   if (dom.dragFrame) {
     dom.dragFrame.style.display = 'block';
     updateDragFrameDom(dom, currentSelection);
+  }
+  if (dom.dragOverlay) {
+    dom.dragOverlay.style.display = 'block';
   }
 
   return {
@@ -98,9 +102,13 @@ export function finalizeDragSelection({
       skipNextClick: true,
     };
   } finally {
+    cancelScheduledDragFrameUpdate(dom);
     resetDocumentBodySelectionStyles();
     if (dom.dragFrame) {
       dom.dragFrame.style.display = 'none';
+    }
+    if (dom.dragOverlay) {
+      dom.dragOverlay.style.display = 'none';
     }
   }
 }

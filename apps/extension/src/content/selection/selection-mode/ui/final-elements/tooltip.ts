@@ -1,12 +1,13 @@
 import { createContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
 import { getSelectionModeSizePanelCopy } from '../constants';
 import type { SelectionModeFinalElementsOptions } from '../types';
+import { enhanceSelectionModeToolbar } from './toolbar';
 
 export function createSelectionModeFinalSizeTooltip(
   mountInto: HTMLElement,
   options: SelectionModeFinalElementsOptions
 ) {
-  return createContentSizeTooltipDom({
+  const tooltip = createContentSizeTooltipDom({
     copy: getSelectionModeSizePanelCopy(),
     mountInto,
     widthMin: options.minSelectionSize,
@@ -14,7 +15,16 @@ export function createSelectionModeFinalSizeTooltip(
     heightMin: options.minSelectionSize,
     heightMax: options.getMaxSelectionHeight(),
     maintainAspectRatio: false,
+    variant: 'frame-edit',
   });
+  enhanceSelectionModeToolbar(tooltip, {
+    getCaptureAction: options.getCaptureAction,
+    getSelection: options.getSelection,
+    onAdjustPadding: options.onAdjustPadding,
+    onCaptureActionChange: options.onCaptureActionChange,
+    overlayContainer: mountInto,
+  });
+  return tooltip;
 }
 
 export function wireSelectionModeFinalSizeTooltipActions(

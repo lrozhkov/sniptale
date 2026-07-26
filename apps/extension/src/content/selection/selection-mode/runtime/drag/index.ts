@@ -91,7 +91,7 @@ export function handleSelectionModeDragMove(
 ): void {
   args.state.currentSelection = getDragSelectionRuntime(args).handleDragMove(event);
   constrainSelectionModeSelection(args);
-  args.updateFinalFrame();
+  args.scheduleFinalFrameUpdate();
 }
 
 export function handleSelectionModeResizeMove(
@@ -104,7 +104,7 @@ export function handleSelectionModeResizeMove(
 
   args.state.currentSelection = getDragSelectionRuntime(args).handleResizeMove(event);
   constrainSelectionModeSelection(args);
-  args.updateFinalFrame();
+  args.scheduleFinalFrameUpdate();
 }
 
 export function showSelectionModeHoverFrame(

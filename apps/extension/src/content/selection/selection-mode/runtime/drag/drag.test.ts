@@ -86,8 +86,10 @@ function createArgs(
     getAbsolutePosition: vi.fn(() => ({ x: 0, y: 0, width: 10, height: 10 })),
     getMaxSelectionHeight: vi.fn(() => 500),
     getMaxSelectionWidth: vi.fn(() => 800),
+    flushFinalFrameUpdate: vi.fn(),
     hideHoverFrame: vi.fn(),
     minSelectionSize: 20,
+    scheduleFinalFrameUpdate: vi.fn(),
     setupListenerHandlers: createSetupListenerHandlers(),
     showFinalFrame: vi.fn(),
     showHoverFrameDom: vi.fn(),
@@ -214,7 +216,8 @@ function registerRuntimeFlowTest() {
 
     expect(args.state.currentSelection).toEqual({ x: 0, y: 0, width: 60, height: 50 });
     expect(args.state.currentState).toBe('idle');
-    expect(args.updateFinalFrame).toHaveBeenCalledTimes(2);
+    expect(args.updateFinalFrame).not.toHaveBeenCalled();
+    expect(args.scheduleFinalFrameUpdate).toHaveBeenCalledTimes(2);
     expect(dragRuntime.updateFinalFrame).toHaveBeenCalledTimes(1);
     expect(dragRuntime.handleDragMove).toHaveBeenCalledTimes(1);
     expect(dragRuntime.handleResizeMove).toHaveBeenCalledTimes(1);

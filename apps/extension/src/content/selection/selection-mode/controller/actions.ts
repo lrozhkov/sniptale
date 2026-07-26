@@ -4,6 +4,7 @@ import {
   setContentModeEnabled,
 } from '../../../application/mode-session';
 import type { SelectionModeRuntime } from '../runtime/composition';
+import type { SelectionModeActivationOptions } from '../types';
 
 const deactivateOtherContentModesTyped: (mode: 'selection-mode') => void =
   deactivateOtherContentModes;
@@ -23,10 +24,10 @@ export function createSelectionModeControllerActions(props: {
       logSelectionModeDiag('disableSelectionMode.requested');
       props.runtime.disableSelectionMode();
     },
-    enableSelectionMode: () => {
+    enableSelectionMode: (options?: SelectionModeActivationOptions) => {
       logSelectionModeDiag('enableSelectionMode.requested');
       deactivateOtherContentModesTyped('selection-mode');
-      const pendingSelection = props.runtime.enableSelectionMode();
+      const pendingSelection = props.runtime.enableSelectionMode(options);
       setContentModeEnabledTyped('selection-mode', true);
       return pendingSelection;
     },

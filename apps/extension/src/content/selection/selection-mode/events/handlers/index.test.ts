@@ -54,9 +54,11 @@ import { createSelectionModeEventHandlers } from '.';
 function createHandlersFixture() {
   const selectionModeEvents = {
     cancelSelection: vi.fn(),
+    closeCaptureActionMenu: vi.fn(() => false),
     confirmSelection: vi.fn(),
     constrainSelection: vi.fn(),
     finalizeDragSelection: vi.fn(),
+    flushFinalFrameUpdate: vi.fn(),
     handleDragMove: vi.fn(),
     handleResizeMove: vi.fn(),
     hideHoverFrame: vi.fn(),
@@ -187,6 +189,19 @@ function expectContentTargetFallback() {
   });
 }
 
+function expectDirectManipulationSkipsPointerDiagnostics() {
+  const { handlers, state } = createHandlersFixture();
+  state.currentState = 'drag';
+
+  handlers.handleMouseMove(new MouseEvent('mousemove'));
+
+  expect(getContentEventTargetElementMock).not.toHaveBeenCalled();
+  expect(logSelectionModeRuntimeMock).not.toHaveBeenCalledWith(
+    'MouseMove target changed',
+    expect.anything()
+  );
+}
+
 describe('selection-mode activation handlers', () => {
   it(
     'logs and delegates click and keyboard activation through the event seam',
@@ -204,5 +219,8 @@ describe('selection-mode pointer handlers', () => {
   });
   it('uses the content target exactly once when iframe resolution misses', () => {
     expectContentTargetFallback();
+  });
+  it('skips pointer target diagnostics during direct manipulation', () => {
+    expectDirectManipulationSkipsPointerDiagnostics();
   });
 });

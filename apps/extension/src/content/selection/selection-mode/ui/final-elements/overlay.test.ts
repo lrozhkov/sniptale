@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createSelectionModeFinalOverlay } from './overlay';
+import { createSelectionModeDragOverlay, createSelectionModeFinalOverlay } from './overlay';
 import type { ResolvedBorderPresetVisual } from '../../../../../features/highlighter/style';
 
 beforeEach(() => {
@@ -16,6 +16,10 @@ function createOptions() {
     minSelectionSize: 100,
     getMaxSelectionWidth: () => 1280,
     getMaxSelectionHeight: () => 720,
+    getCaptureAction: () => 'download_default' as const,
+    getSelection: () => ({ x: 0, y: 0, width: 100, height: 100 }),
+    onAdjustPadding: vi.fn(),
+    onCaptureActionChange: vi.fn(),
     onConfirm: vi.fn(),
     onResetToIdle: vi.fn(),
     onSetupSizePanelListeners: vi.fn(),
@@ -43,6 +47,15 @@ function createSelectionVisual(): ResolvedBorderPresetVisual {
 }
 
 describe('selection-mode final overlay', () => {
+  it('creates a lightweight four-shade drag overlay without an event catcher', () => {
+    const overlay = createSelectionModeDragOverlay('rgba(0, 0, 0, 0.55)');
+
+    expect(overlay.className).toBe('sniptale-selection-drag-overlay');
+    expect(overlay.querySelectorAll('.sniptale-shade')).toHaveLength(4);
+    expect(overlay.querySelector('.sniptale-selection-event-catcher')).toBeNull();
+    expect(overlay.style.display).toBe('none');
+  });
+
   it('creates shades and a reset catcher', () => {
     const options = createOptions();
     const overlay = createSelectionModeFinalOverlay(options);

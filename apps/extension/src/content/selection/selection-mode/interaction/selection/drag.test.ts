@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as selectionUi from '../../ui';
-import { finalizeDragSelection, handleDragMove, updateDragSelection } from './drag';
+import {
+  finalizeDragSelection,
+  handleDragMove,
+  startDragSelection,
+  updateDragSelection,
+} from './drag';
 import type { SelectionModeDom } from '../../ui/dom-types';
 
 const originalDocument = globalThis.document;
@@ -12,6 +17,11 @@ function createSelectionModeDom(overrides: Partial<SelectionModeDom> = {}): Sele
     scissorsIcon: null,
     hoverSizeLabel: null,
     dragFrame: null,
+    dragOverlay: null,
+    dragFrameRafId: null,
+    pendingDragRect: null,
+    finalFrameRafId: null,
+    pendingFinalRect: null,
     finalFrame: null,
     finalOverlay: null,
     sizePanel: null,
@@ -54,6 +64,39 @@ function expectSelectionMoveRelativeToDragStart() {
   expect(result).toEqual({ x: 160, y: 40, width: 140, height: 100 });
 }
 
+function expectDragStartShowsLightweightVisuals() {
+  stubDocumentBodyStyles();
+  const dragFrame = { style: { display: 'none' } } as HTMLElement;
+  const dragOverlay = { style: { display: 'none' } } as HTMLElement;
+  const dom = createSelectionModeDom({ dragFrame, dragOverlay });
+  const hideHoverFrameSpy = vi.spyOn(selectionUi, 'hideHoverFrame').mockImplementation(() => {});
+  const createCatcherSpy = vi
+    .spyOn(selectionUi, 'createDragEventCatcher')
+    .mockImplementation(() => {});
+  const updateFrameSpy = vi.spyOn(selectionUi, 'updateDragFrame').mockImplementation(() => {});
+
+  expect(startDragSelection({ dom, zIndexBase: 100 }, 15, 25)).toEqual({
+    currentSelection: { x: 15, y: 25, width: 0, height: 0 },
+    dragStartPoint: { x: 15, y: 25 },
+    currentState: 'drag',
+  });
+  expect(dragFrame.style.display).toBe('block');
+  expect(dragOverlay.style.display).toBe('block');
+  expect(updateFrameSpy).toHaveBeenCalledWith(dom, { x: 15, y: 25, width: 0, height: 0 });
+  expect(hideHoverFrameSpy).toHaveBeenCalledWith(dom);
+  expect(createCatcherSpy).toHaveBeenCalledWith(dom, 100);
+
+  expect(startDragSelection({ dom: createSelectionModeDom(), zIndexBase: 200 }, 5, 10)).toEqual({
+    currentSelection: { x: 5, y: 10, width: 0, height: 0 },
+    dragStartPoint: { x: 5, y: 10 },
+    currentState: 'drag',
+  });
+
+  hideHoverFrameSpy.mockRestore();
+  createCatcherSpy.mockRestore();
+  updateFrameSpy.mockRestore();
+}
+
 function expectIdleStateForSmallSelection() {
   stubDocumentBodyStyles();
 
@@ -63,13 +106,15 @@ function expectIdleStateForSmallSelection() {
     },
   } as HTMLElement;
 
+  const dragOverlay = { style: { display: 'block' } } as HTMLElement;
   const result = finalizeDragSelection({
-    dom: createSelectionModeDom({ dragFrame }),
+    dom: createSelectionModeDom({ dragFrame, dragOverlay }),
     currentSelection: { x: 10, y: 20, width: 4, height: 8 },
     minSelectionSize: 10,
   });
 
   expect(dragFrame.style.display).toBe('none');
+  expect(dragOverlay.style.display).toBe('none');
   expect(result).toEqual({
     shouldShowFinalFrame: false,
     currentState: 'idle',
@@ -114,6 +159,10 @@ describe('selection-mode drag interactions', () => {
   it(
     'moves the whole selection relative to the drag start point',
     expectSelectionMoveRelativeToDragStart
+  );
+  it(
+    'shows the lightweight frame and overlay when drawing starts',
+    expectDragStartShowsLightweightVisuals
   );
   it(
     'returns to idle when the dragged selection is below the minimum size',

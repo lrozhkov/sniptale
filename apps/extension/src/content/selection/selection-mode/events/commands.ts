@@ -1,4 +1,5 @@
 import { logSelectionModeKeyAction } from '../diag';
+import { getContentEventTargetElement } from '../../../platform/dom-host';
 import { isSelectionModeControl, stopSelectionModeEvent } from './helpers';
 import { resolveSelectionModePointerTarget } from './pointer-handlers/target';
 import type { SelectionModeEventOptions, SelectionModeInteractionState } from './types';
@@ -51,14 +52,23 @@ export function handleSelectionModeKeyDown(
     return;
   }
 
-  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+  const target = getContentEventTargetElement(event);
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
     return;
   }
 
   if (event.key === 'Escape') {
     event.preventDefault();
+    if (options.closeCaptureActionMenu(true)) {
+      event.stopImmediatePropagation();
+      return;
+    }
     logSelectionModeKeyAction('cancel', state);
     options.cancelSelection();
+    return;
+  }
+
+  if (event.key === 'Enter' && target && isSelectionModeControl(target)) {
     return;
   }
 

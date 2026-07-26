@@ -44,7 +44,12 @@ vi.mock('../selection/drag', () => ({
 }));
 
 vi.mock('../../ui', () => ({
-  updateDragFrame: updateDragFrameStateMock,
+  cancelScheduledDragFrameUpdate: vi.fn(),
+  cancelScheduledFinalFrameUpdate: vi.fn(),
+  flushScheduledFinalFrameUpdate: vi.fn(),
+  scheduleDragFrameUpdate: updateDragFrameStateMock,
+  scheduleFinalFrameUpdate: vi.fn(),
+  updateDragFrame: vi.fn(),
   updateFinalFrame: updateFinalFrameStateMock,
 }));
 
@@ -58,6 +63,11 @@ function createDom(): SelectionModeDom {
     scissorsIcon: null,
     hoverSizeLabel: null,
     dragFrame: null,
+    dragOverlay: null,
+    dragFrameRafId: null,
+    pendingDragRect: null,
+    finalFrameRafId: null,
+    pendingFinalRect: null,
     finalFrame: null,
     finalOverlay: null,
     sizePanel: null,

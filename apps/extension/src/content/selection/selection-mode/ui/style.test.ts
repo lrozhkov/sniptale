@@ -31,12 +31,12 @@ function createSelectionVisual(
 }
 
 describe('selection-mode ui style helpers', () => {
-  it('renders drag-frame css with overlay shade and portable preset visuals', () => {
-    const cssText = getSelectionDragFrameStyle(createSelectionVisual(), 'rgba(0, 0, 0, 0.4)');
+  it('renders drag-frame css without a viewport-sized spread shadow', () => {
+    const cssText = getSelectionDragFrameStyle(createSelectionVisual());
 
     expect(cssText).toContain('border: 3px dashed rgba(37, 99, 235, 0.75)');
     expect(cssText).toContain('background-color: rgba(34, 197, 94, 0.25)');
-    expect(cssText).toContain('box-shadow:');
+    expect(cssText).not.toContain('9999px');
     expect(cssText).toContain('outline-offset: 2px;');
   });
 
@@ -53,9 +53,7 @@ describe('selection-mode ui style helpers', () => {
   });
 
   it('uses border-box sizing so visual frames do not add pixels to the right or bottom edges', () => {
-    expect(getSelectionDragFrameStyle(createSelectionVisual(), 'rgba(0, 0, 0, 0.4)')).toContain(
-      'box-sizing: border-box'
-    );
+    expect(getSelectionDragFrameStyle(createSelectionVisual())).toContain('box-sizing: border-box');
     expect(getSelectionHoverFrameStyle(createSelectionVisual())).toContain(
       'box-sizing: border-box'
     );

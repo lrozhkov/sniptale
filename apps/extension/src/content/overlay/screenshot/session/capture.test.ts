@@ -87,6 +87,7 @@ function createArgs(overrides: Partial<FactoryArgs> = {}) {
       },
       captureActionRef: { current: 'download_default' },
       session,
+      setCaptureAction: vi.fn(),
       setIsCompletelyHidden: vi.fn(),
       setIsToolbarVisible: vi.fn(),
       setNavigationLockEnabled: vi.fn(),

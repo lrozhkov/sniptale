@@ -12,6 +12,7 @@ import {
 
 type SelectionModeEventHandlersDeps = {
   cancelSelection: () => void;
+  closeCaptureActionMenu: (restoreFocus: boolean) => boolean;
   confirmSelection: () => void;
   handleDragMove: (event: MouseEvent) => void;
   handleResizeMove: (event: MouseEvent) => void;
@@ -22,6 +23,7 @@ type SelectionModeEventHandlersDeps = {
   startDragSelection: (startX: number, startY: number) => void;
   updateDragSelection: (currentX: number, currentY: number) => void;
   finalizeDragSelection: () => void;
+  flushFinalFrameUpdate: () => void;
   resetToIdleState: () => void;
   updateFinalFrame: () => void;
 };
@@ -69,6 +71,10 @@ function createSelectionModePointerLogger(
   hoveredElement: HTMLElement | null,
   event: MouseEvent
 ): void {
+  if (state.currentState !== 'idle' && state.currentState !== 'hover') {
+    return;
+  }
+
   const target = getContentEventTargetElement(event);
   if (!target || target === hoveredElement) {
     return;

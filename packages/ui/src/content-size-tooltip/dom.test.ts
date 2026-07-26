@@ -99,11 +99,31 @@ function registerCreateMountedTooltipTest() {
 function registerPositionTest() {
   it('applies absolute tooltip positioning styles', () => {
     const tooltip = document.createElement('div');
+    tooltip.style.width = 'max-content';
+    tooltip.style.minWidth = '0';
 
     setContentSizeTooltipPosition(tooltip, { x: 24, y: 48 });
 
     expect(tooltip.style.getPropertyValue('left')).toBe('24px');
     expect(tooltip.style.getPropertyValue('top')).toBe('48px');
+    expect(tooltip.style.getPropertyValue('width')).toBe('max-content');
+    expect(tooltip.style.getPropertyValue('min-width')).toBe('0');
+  });
+}
+
+function registerFrameEditVariantTest() {
+  it('keeps the DOM frame-edit variant visually aligned with the React toolbar', () => {
+    const { tooltip } = createMountedTooltip({ variant: 'frame-edit' });
+
+    expect(tooltip.root.dataset['variant']).toBe('frame-edit');
+    expect(tooltip.root.style.getPropertyValue('min-width')).toBe('290px');
+    expect(tooltip.root.style.getPropertyValue('border-radius')).toBe('var(--sniptale-radius-md)');
+    expect(tooltip.cancelButton.textContent).toBe('');
+    expect(tooltip.confirmButton.textContent).toBe('');
+    expect(tooltip.cancelButton.querySelector('svg')).not.toBeNull();
+    expect(tooltip.confirmButton.querySelector('svg')).not.toBeNull();
+    expect(tooltip.cancelButton.style.getPropertyValue('width')).toBe('32px');
+    expect(tooltip.confirmButton.style.getPropertyValue('width')).toBe('32px');
   });
 }
 
@@ -188,6 +208,7 @@ function registerAspectRatioButtonStateTest() {
 function runContentSizeTooltipDomSuite() {
   registerCreateMountedTooltipTest();
   registerPositionTest();
+  registerFrameEditVariantTest();
   registerValueSyncTest();
   registerFocusedDraftSyncTest();
   registerAspectRatioButtonStateTest();

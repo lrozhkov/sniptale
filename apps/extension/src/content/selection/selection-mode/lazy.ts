@@ -3,10 +3,11 @@ import {
   createRetryableModuleLoader,
   preloadModule,
 } from '../../platform/module-loader/retryable-module-loader';
+import type { SelectionModeActivationOptions } from './types';
 
 type SelectionModeModule = {
   disableSelectionMode: () => void;
-  enableSelectionMode: () => Promise<CaptureArea>;
+  enableSelectionMode: (options?: SelectionModeActivationOptions) => Promise<CaptureArea>;
 };
 
 const selectionModeModuleLoader = createRetryableModuleLoader<SelectionModeModule>(
@@ -17,19 +18,22 @@ export function preloadSelectionMode(): Promise<void> {
   return preloadModule(selectionModeModuleLoader);
 }
 
-export async function enableSelectionModeDeferred(): Promise<CaptureArea> {
+export async function enableSelectionModeDeferred(
+  options?: SelectionModeActivationOptions
+): Promise<CaptureArea> {
   const { enableSelectionMode } = await selectionModeModuleLoader.load();
-  return enableSelectionMode();
+  return enableSelectionMode(options);
 }
 
 export async function enableSelectionModeDeferredIfCurrent(
-  isCurrent: () => boolean
+  isCurrent: () => boolean,
+  options?: SelectionModeActivationOptions
 ): Promise<CaptureArea> {
   const { enableSelectionMode } = await selectionModeModuleLoader.load();
   if (!isCurrent()) {
     throw new Error('Selection mode activation was superseded.');
   }
-  return enableSelectionMode();
+  return enableSelectionMode(options);
 }
 
 export function disableSelectionModeIfLoaded(): void {

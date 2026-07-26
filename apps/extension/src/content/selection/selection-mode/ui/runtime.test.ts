@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
+import type { CaptureActionType } from '../../../../contracts/settings';
 import type { SelectionModeDom } from './dom-types';
 
 const {
@@ -17,10 +18,15 @@ const {
 }));
 
 vi.mock('.', () => ({
+  cancelScheduledDragFrameUpdate: vi.fn(),
+  cancelScheduledFinalFrameUpdate: vi.fn(),
   createDragFrame: createDragFrameDomMock,
   createFinalElements: createFinalElementsDomMock,
   createHoverElements: createHoverElementsDomMock,
   createOverlayContainer: createOverlayContainerDomMock,
+  flushScheduledFinalFrameUpdate: vi.fn(),
+  scheduleDragFrameUpdate: vi.fn(),
+  scheduleFinalFrameUpdate: vi.fn(),
 }));
 
 import { createSelectionModeUiRuntime } from './runtime';
@@ -36,6 +42,11 @@ function createDomFixture(): SelectionModeDom {
     scissorsIcon: null,
     hoverSizeLabel: null,
     dragFrame: null,
+    dragOverlay: null,
+    dragFrameRafId: null,
+    pendingDragRect: null,
+    finalFrameRafId: null,
+    pendingFinalRect: null,
     finalFrame: null,
     finalOverlay: null,
     sizePanel: null,
@@ -50,11 +61,15 @@ function createDomFixture(): SelectionModeDom {
 
 interface UiRuntimeFixtureOverrides {
   getDom?: () => SelectionModeDom;
+  getCaptureAction?: () => 'download_default';
+  getSelection?: () => { x: number; y: number; width: number; height: number };
   getVisual?: () => ResolvedBorderPresetVisual;
   getMaxSelectionHeight?: () => number;
   getMaxSelectionWidth?: () => number;
   minSelectionSize?: number;
   onCancel?: () => void;
+  onAdjustPadding?: (direction: 'decrease' | 'increase') => void;
+  onCaptureActionChange?: (action: CaptureActionType) => void;
   onConfirm?: () => void;
   onResetToIdle?: () => void;
   onSetupSizePanelListeners?: () => void;
@@ -91,6 +106,8 @@ function createUiRuntimeFixture(overrides?: UiRuntimeFixtureOverrides) {
   let visual = createSelectionVisual();
   const onConfirm = overrides?.onConfirm ?? vi.fn();
   const onCancel = overrides?.onCancel ?? vi.fn();
+  const onAdjustPadding = overrides?.onAdjustPadding ?? vi.fn();
+  const onCaptureActionChange = overrides?.onCaptureActionChange ?? vi.fn();
   const onResetToIdle = overrides?.onResetToIdle ?? vi.fn();
   const onSetupSizePanelListeners = overrides?.onSetupSizePanelListeners ?? vi.fn();
   const getMaxSelectionWidth = overrides?.getMaxSelectionWidth ?? vi.fn(() => 1400);
@@ -100,12 +117,16 @@ function createUiRuntimeFixture(overrides?: UiRuntimeFixtureOverrides) {
   const prepareVisual = overrides?.prepareVisual ?? vi.fn(async () => undefined);
 
   const runtime = createSelectionModeUiRuntime({
+    getCaptureAction: overrides?.getCaptureAction ?? (() => 'download_default'),
     getDom,
+    getSelection: overrides?.getSelection ?? (() => ({ x: 1, y: 2, width: 300, height: 200 })),
     getVisual,
     getMaxSelectionHeight,
     getMaxSelectionWidth,
     minSelectionSize: overrides?.minSelectionSize ?? 100,
     onCancel: onCancel as () => void,
+    onAdjustPadding,
+    onCaptureActionChange,
     onConfirm: onConfirm as () => void,
     onResetToIdle: onResetToIdle as () => void,
     onSetupSizePanelListeners: onSetupSizePanelListeners as () => void,
@@ -122,6 +143,8 @@ function createUiRuntimeFixture(overrides?: UiRuntimeFixtureOverrides) {
     getMaxSelectionHeight,
     getMaxSelectionWidth,
     onCancel,
+    onAdjustPadding,
+    onCaptureActionChange,
     onConfirm,
     onResetToIdle,
     onSetupSizePanelListeners,
@@ -158,14 +181,21 @@ function registerFinalElementsConfigTest() {
   it('passes final-element callbacks and limits through the runtime config', () => {
     const getMaxSelectionWidth = vi.fn(() => 1600);
     const getMaxSelectionHeight = vi.fn(() => 1000);
-    const { dom, onConfirm, onResetToIdle, onSetupSizePanelListeners, runtime } =
-      createUiRuntimeFixture({
-        getMaxSelectionHeight,
-        getMaxSelectionWidth,
-        minSelectionSize: 120,
-        overlayBackground: 'rgba(255, 255, 255, 0.1)',
-        zIndexBase: 900,
-      });
+    const {
+      dom,
+      onAdjustPadding,
+      onCaptureActionChange,
+      onConfirm,
+      onResetToIdle,
+      onSetupSizePanelListeners,
+      runtime,
+    } = createUiRuntimeFixture({
+      getMaxSelectionHeight,
+      getMaxSelectionWidth,
+      minSelectionSize: 120,
+      overlayBackground: 'rgba(255, 255, 255, 0.1)',
+      zIndexBase: 900,
+    });
 
     runtime.createFinalElements();
 
@@ -176,6 +206,10 @@ function registerFinalElementsConfigTest() {
       minSelectionSize: 120,
       getMaxSelectionWidth,
       getMaxSelectionHeight,
+      getCaptureAction: expect.any(Function),
+      getSelection: expect.any(Function),
+      onAdjustPadding,
+      onCaptureActionChange,
       onConfirm,
       onResetToIdle,
       onSetupSizePanelListeners,

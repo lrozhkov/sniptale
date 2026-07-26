@@ -29,20 +29,27 @@ describe('selection-mode controller actions', () => {
     const cleanup = vi.fn();
     const runtime = {
       disableSelectionMode: vi.fn(),
-      enableSelectionMode: vi.fn(() => Promise.resolve('area')),
+      enableSelectionMode: vi.fn(() => Promise.resolve({ x: 1, y: 2, width: 3, height: 4 })),
       isSelectionModeActive: vi.fn(() => true),
-    } as never;
+    };
 
     const actions = createSelectionModeControllerActions({
       cleanup,
       runtime,
     });
 
-    await expect(actions.enableSelectionMode()).resolves.toBe('area');
+    const options = { captureAction: 'copy' as const };
+    await expect(actions.enableSelectionMode(options)).resolves.toEqual({
+      x: 1,
+      y: 2,
+      width: 3,
+      height: 4,
+    });
     actions.disableSelectionMode();
 
     expect(actions.isSelectionModeActive()).toBe(true);
     expect(actions.cleanup).toBe(cleanup);
+    expect(runtime.enableSelectionMode).toHaveBeenCalledWith(options);
     expect(diagMocks.logSelectionModeDiagMock).toHaveBeenNthCalledWith(
       1,
       'enableSelectionMode.requested'

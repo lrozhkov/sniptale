@@ -18,6 +18,7 @@ import {
 import { buildSelectionCaptureArea } from '../../runtime/capture-area';
 import { cleanupSelectionModeRuntime } from '../../runtime/cleanup';
 import { isSelectionModeExtensionUiElement } from '../../runtime/extension-ui';
+import { closeSelectionCaptureActionMenu } from '../../ui/final-elements/capture-menu';
 
 type SelectionModeEventsBridgeRuntimeArgs = SelectionModeRuntimeActionsArgs & {
   state: SelectionModeSession;
@@ -102,11 +103,17 @@ function createSelectionModeCleanup(args: SelectionModeEventsBridgeArgs) {
 
 function createSelectionModeRuntimeEventActions(runtimeArgs: SelectionModeEventsBridgeRuntimeArgs) {
   return {
+    closeCaptureActionMenu(restoreFocus: boolean) {
+      return closeSelectionCaptureActionMenu(runtimeArgs.state.dom.overlayContainer, restoreFocus);
+    },
     constrainSelection() {
       constrainSelectionModeSelection(runtimeArgs);
     },
     finalizeDragSelection() {
       finalizeSelectionModeDragSelection(runtimeArgs);
+    },
+    flushFinalFrameUpdate() {
+      runtimeArgs.flushFinalFrameUpdate();
     },
     handleDragMove(event: MouseEvent) {
       handleSelectionModeDragMove(runtimeArgs, event);

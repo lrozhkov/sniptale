@@ -21,6 +21,15 @@ import {
 import { cleanupSelectionModeRuntime } from '../../runtime/cleanup';
 import { isSelectionModeExtensionUiElement } from '../../runtime/extension-ui';
 
+const captureMenuMocks = vi.hoisted(() => ({
+  closeSelectionCaptureActionMenu: vi.fn(() => true),
+}));
+
+vi.mock('../../ui/final-elements/capture-menu', () => ({
+  closeSelectionCaptureActionMenu: captureMenuMocks.closeSelectionCaptureActionMenu,
+  createSelectionCaptureActionControls: vi.fn(),
+}));
+
 vi.mock('../../../locker', () => ({
   disableNavigationLock: vi.fn(),
 }));
@@ -57,7 +66,7 @@ function createBridge(
 ) {
   const state = createSelectionModeSession();
   state.currentSelection = { x: 10.2, y: 20.7, width: 30.4, height: 40.8 };
-  const runtimeArgs = { state } as never;
+  const runtimeArgs = { flushFinalFrameUpdate: vi.fn(), state } as never;
   return createSelectionModeEventsBridge({
     cleanupEvent: vi.fn(),
     disableCursor: vi.fn(),
@@ -119,7 +128,8 @@ function registerCleanupTest(): void {
     const handleKeyDown = vi.fn();
     const state = createSelectionModeSession();
     state.currentState = 'drag';
-    const runtimeArgs = { state } as never;
+    const flushFinalFrameUpdate = vi.fn();
+    const runtimeArgs = { flushFinalFrameUpdate, state } as never;
     const bridge = createBridge({
       disableCursor,
       handleKeyDown,
@@ -139,7 +149,8 @@ function registerRuntimeActionsTest(): void {
 
     const state = createSelectionModeSession();
     state.currentState = 'hover';
-    const runtimeArgs = { state } as never;
+    const flushFinalFrameUpdate = vi.fn();
+    const runtimeArgs = { flushFinalFrameUpdate, state } as never;
     const bridge = createBridge({ runtimeArgs });
     const dragEvent = new MouseEvent('mousemove');
     const resizeEvent = new MouseEvent('mousemove');
@@ -147,7 +158,9 @@ function registerRuntimeActionsTest(): void {
     const iframe = document.createElement('iframe');
 
     bridge.constrainSelection();
+    expect(bridge.closeCaptureActionMenu(true)).toBe(true);
     bridge.finalizeDragSelection();
+    bridge.flushFinalFrameUpdate();
     bridge.handleDragMove(dragEvent);
     bridge.handleResizeMove(resizeEvent);
     bridge.hideHoverFrame();
@@ -160,7 +173,12 @@ function registerRuntimeActionsTest(): void {
     bridge.updateFinalFrame();
 
     expect(constrainSelectionModeSelection).toHaveBeenCalledWith(runtimeArgs);
+    expect(captureMenuMocks.closeSelectionCaptureActionMenu).toHaveBeenCalledWith(
+      state.dom.overlayContainer,
+      true
+    );
     expect(finalizeSelectionModeDragSelection).toHaveBeenCalledWith(runtimeArgs);
+    expect(flushFinalFrameUpdate).toHaveBeenCalledTimes(1);
     expect(handleSelectionModeDragMove).toHaveBeenCalledWith(runtimeArgs, dragEvent);
     expect(handleSelectionModeResizeMove).toHaveBeenCalledWith(runtimeArgs, resizeEvent);
     expect(hideSelectionModeHoverFrame).toHaveBeenCalledWith(runtimeArgs);

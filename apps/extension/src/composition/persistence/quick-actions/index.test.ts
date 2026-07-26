@@ -38,6 +38,7 @@ vi.mock('../infrastructure/browser-storage', () => ({
 
 vi.mock('../../../features/quick-actions-presets/catalog', () => ({
   createBundledQuickAction: vi.fn(),
+  getCaptureActionDescriptors: vi.fn(),
   getBundledQuickActionConfig: vi.fn(),
   getBundledQuickActions: getBundledQuickActionsMock,
   getQuickActionDisplayName: vi.fn(),

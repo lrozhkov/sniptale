@@ -1,9 +1,10 @@
 import type { ContentSizeTooltipCopy } from './core';
+import type { ContentSizeTooltipVariant } from './types';
 import {
   CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE,
   CONTENT_SIZE_TOOLTIP_DIVIDER_STYLE,
   CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT,
-  CONTENT_SIZE_TOOLTIP_SURFACE_STYLE,
+  getContentSizeTooltipSurfaceStyle,
   getContentSizeTooltipActionButtonStyle,
   getContentSizeTooltipRatioButtonStyle,
 } from './styles';
@@ -20,10 +21,18 @@ function createLinkIcon(): SVGSVGElement {
   });
 }
 
-function createTooltipSvgIcon(args: { paths: string[]; transform?: string }) {
+function createActionIcon(kind: 'cancel' | 'confirm'): SVGSVGElement {
+  return createTooltipSvgIcon({
+    paths: kind === 'cancel' ? ['M18 6 6 18', 'm6 6 12 12'] : ['m20 6-11 11-5-5'],
+    size: 16,
+  });
+}
+
+function createTooltipSvgIcon(args: { paths: string[]; size?: number; transform?: string }) {
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  icon.setAttribute('width', '14');
-  icon.setAttribute('height', '14');
+  const size = String(args.size ?? 14);
+  icon.setAttribute('width', size);
+  icon.setAttribute('height', size);
   icon.setAttribute('viewBox', '0 0 24 24');
   icon.setAttribute('fill', 'none');
   icon.setAttribute('stroke', 'currentColor');
@@ -77,10 +86,11 @@ export function ensureTooltipInputStyles(root: HTMLElement) {
   root.prepend(style);
 }
 
-export function createTooltipSurface() {
+export function createTooltipSurface(variant: ContentSizeTooltipVariant = 'default') {
   const root = document.createElement('div');
   root.className = 'sniptale-content-size-tooltip';
-  applyTooltipDomStyle(root, CONTENT_SIZE_TOOLTIP_SURFACE_STYLE);
+  root.dataset['variant'] = variant;
+  applyTooltipDomStyle(root, getContentSizeTooltipSurfaceStyle(variant));
   root.addEventListener('mousedown', (event) => {
     event.stopPropagation();
   });
@@ -102,21 +112,26 @@ export function createTooltipRatioButton(copy: ContentSizeTooltipCopy, disabled:
   return button;
 }
 
-export function createTooltipActions(copy: ContentSizeTooltipCopy, confirmLabel?: string) {
+export function createTooltipActions(
+  copy: ContentSizeTooltipCopy,
+  confirmLabel?: string,
+  variant: ContentSizeTooltipVariant = 'default'
+) {
   const actions = document.createElement('div');
   applyTooltipDomStyle(actions, CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE);
+  const compact = variant === 'frame-edit';
 
   const cancelButton = createTooltipButton({
     ariaLabel: copy.cancel,
     className: 'sniptale-selection-size-cancel-button',
-    content: copy.cancel,
-    style: getContentSizeTooltipActionButtonStyle('neutral'),
+    content: compact ? createActionIcon('cancel') : copy.cancel,
+    style: getContentSizeTooltipActionButtonStyle('neutral', variant),
   }) as HTMLButtonElement;
   const confirmButton = createTooltipButton({
     ariaLabel: confirmLabel ?? copy.confirm,
     className: 'sniptale-selection-size-confirm-button',
-    content: confirmLabel ?? copy.confirm,
-    style: getContentSizeTooltipActionButtonStyle('accent'),
+    content: compact ? createActionIcon('confirm') : (confirmLabel ?? copy.confirm),
+    style: getContentSizeTooltipActionButtonStyle('accent', variant),
   }) as HTMLButtonElement;
 
   actions.append(cancelButton, confirmButton);

@@ -51,7 +51,7 @@ export const CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT = `
   }
 `;
 
-export const CONTENT_SIZE_TOOLTIP_SURFACE_STYLE: StyleRecord = {
+const CONTENT_SIZE_TOOLTIP_SURFACE_STYLE: StyleRecord = {
   position: 'fixed',
   display: 'inline-flex',
   alignItems: 'center',

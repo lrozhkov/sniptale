@@ -79,7 +79,7 @@ function createScenarioPayload() {
 function createRuntime(actionType: 'download_default' | 'scenario'): ScreenshotControllerRuntime & {
   scenario: NonNullable<ScreenshotControllerRuntime['scenario']>;
 } {
-  return {
+  const runtime = {
     capturePersistence: {
       sessionActivePresetId: null,
       setSaveDialogState: vi.fn(),
@@ -96,10 +96,17 @@ function createRuntime(actionType: 'download_default' | 'scenario'): ScreenshotC
       refreshSession: vi.fn(async () => undefined),
       saveSelectionCapture: vi.fn(async () => undefined),
     },
+    setCaptureAction: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
+  } satisfies ScreenshotControllerRuntime & {
+    scenario: NonNullable<ScreenshotControllerRuntime['scenario']>;
   };
+  runtime.setCaptureAction.mockImplementation((action) => {
+    runtime.captureActionRef.current = action;
+  });
+  return runtime;
 }
 
 async function settleCaptureTimers() {
@@ -183,6 +190,23 @@ async function expectNormalSelectionCaptureNoScenarioSave() {
   expect(runtime.scenario.ensureCaptureReady).not.toHaveBeenCalled();
   expect(runtime.scenario.saveSelectionCapture).not.toHaveBeenCalled();
   expect(runtime.scenario.refreshSession).not.toHaveBeenCalled();
+}
+
+async function expectSelectionToolbarActionControlsPersistence() {
+  const runtime = createRuntime('download_default');
+  enableSelectionModeDeferredIfCurrentMock.mockImplementationOnce(async (_isCurrent, options) => {
+    options?.onCaptureActionChange?.('copy');
+    return { x: 0, y: 0, width: 100, height: 80 };
+  });
+
+  const capturePromise = runSelectionScreenshot(runtime, { showSuccessToast: false });
+  await settleCaptureTimers();
+  await capturePromise;
+
+  expect(runtime.setCaptureAction).toHaveBeenCalledWith('copy');
+  expect(persistSelectionCaptureMock).toHaveBeenCalledWith(
+    expect.objectContaining({ actionType: 'copy' })
+  );
 }
 
 async function expectScenarioSelectionCaptureWaitsForScenarioReadiness() {
@@ -282,6 +306,10 @@ describe('screenshot-controller capture scenario gating', () => {
   it(
     'does not save selection captures into the scenario when the action is a normal download',
     expectNormalSelectionCaptureNoScenarioSave
+  );
+  it(
+    'uses the after-capture action selected inside the confirmed selection toolbar',
+    expectSelectionToolbarActionControlsPersistence
   );
   it(
     'waits for scenario capture readiness before saving selection captures into the scenario',
