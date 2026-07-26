@@ -38,11 +38,14 @@ export function TextSection({ actions, disabled, state }: SectionProps) {
       title={translate('content.pageStyleInspector.sectionText')}
       summary={changedSummary(countModified(state, TEXT_PROPERTIES))}
     >
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+      <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-3 gap-y-2">
         <TextModeButtons actions={actions} disabled={disabled} state={state} />
         <TextAlignButtons actions={actions} disabled={disabled} state={state} />
       </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+      <div
+        data-ui="content.page-style-inspector.typography-fields"
+        className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-3 gap-y-2"
+      >
         <div className="col-span-2">
           <ColorField
             disabled={disabled}
@@ -52,6 +55,7 @@ export function TextSection({ actions, disabled, state }: SectionProps) {
           />
         </div>
         <TextSelectField
+          className="col-span-2"
           disabled={disabled}
           label={translate('content.pageStyleInspector.fontFamily')}
           options={getFontFamilyOptions(fieldState(state, actions, 'font-family').value)}
@@ -83,6 +87,7 @@ function TextNumericFields({ actions, disabled, state }: SectionProps) {
         onChange={(value) => change('line-height', value)}
       />
       <TextSelectField
+        className="col-span-2"
         disabled={disabled}
         label={translate('content.pageStyleInspector.letterSpacing')}
         options={getLetterSpacingOptions(fieldState(state, actions, 'letter-spacing').value)}

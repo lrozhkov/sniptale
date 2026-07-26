@@ -2,6 +2,8 @@ import { RotateCcw } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
 
+export const PAGE_STYLE_SELECT_CLASS_NAME = '!h-10 !rounded-[10px]';
+
 function fieldLabelClassName(modified: boolean): string {
   return [
     'flex min-w-0 items-center justify-between gap-2 text-[11px] font-semibold',
@@ -13,6 +15,7 @@ function fieldLabelClassName(modified: boolean): string {
 
 export function Field(props: {
   children: ReactNode;
+  className?: string | undefined;
   defaultValue?: string | undefined;
   label: string;
   modified?: boolean | undefined;
@@ -20,9 +23,20 @@ export function Field(props: {
 }) {
   const modified = props.modified ?? false;
   return (
-    <label className="group/field relative grid min-w-0 gap-1">
+    <label
+      data-ui="content.page-style-inspector.field"
+      data-field-label={props.label}
+      className={[
+        'group/field relative grid w-full min-w-0 max-w-full gap-1',
+        props.className ?? '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <span className={fieldLabelClassName(modified)}>
-        <span className="truncate">{props.label}</span>
+        <span className="truncate" title={props.label}>
+          {props.label}
+        </span>
         <span className="flex min-h-5 shrink-0 items-center justify-end gap-1">
           {modified && props.onReset ? (
             <button

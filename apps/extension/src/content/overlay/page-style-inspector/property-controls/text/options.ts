@@ -27,7 +27,8 @@ function normalizeOptionKey(value: string): string {
 
 function addCurrentOption(
   options: readonly TextSelectOption[],
-  currentValue: string
+  currentValue: string,
+  resolveLabel: (value: string) => string = (value) => value
 ): TextSelectOption[] {
   const trimmedValue = currentValue.trim();
 
@@ -40,11 +41,22 @@ function addCurrentOption(
     return [...options];
   }
 
-  return [{ value: currentValue, label: currentValue }, ...options];
+  return [{ value: currentValue, label: resolveLabel(trimmedValue) }, ...options];
 }
 
 export function getFontFamilyOptions(currentValue: string): TextSelectOption[] {
-  return addCurrentOption(createValueOptions(FONT_FAMILY_VALUES), currentValue);
+  const fontOptions = FONT_FAMILY_VALUES.map((value) => ({
+    label: getPrimaryFontFamilyName(value),
+    value,
+  }));
+  return addCurrentOption(fontOptions, currentValue, getPrimaryFontFamilyName);
+}
+
+function getPrimaryFontFamilyName(value: string): string {
+  const primaryFamily = value.split(',')[0]?.trim() ?? value;
+  const quotedFamily = primaryFamily.match(/^(?:"([^"]+)"|'([^']+)')$/);
+  const unquotedFamily = quotedFamily?.[1] ?? quotedFamily?.[2] ?? primaryFamily;
+  return unquotedFamily.toLowerCase() === 'system-ui' ? 'System UI' : unquotedFamily;
 }
 
 export function getLineHeightOptions(currentValue: string): TextSelectOption[] {

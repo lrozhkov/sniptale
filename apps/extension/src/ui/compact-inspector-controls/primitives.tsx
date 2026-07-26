@@ -38,7 +38,7 @@ export const CompactInput = React.forwardRef<HTMLInputElement, ProductInputProps
         ref={ref}
         {...props}
         className={cx(
-          'h-10 px-3 text-sm leading-5',
+          'h-10 w-full min-w-0 max-w-full px-3 text-sm leading-5',
           COMPACT_INSPECTOR_SOLID_CONTROL_CLASS_NAME,
           className
         )}
@@ -55,7 +55,7 @@ export const CompactTextarea = React.forwardRef<HTMLTextAreaElement, ProductText
         {...props}
         data-ui="shared.ui.compact-textarea"
         className={cx(
-          'min-h-[6.875rem] w-full resize-y px-3 py-2 text-sm leading-5 outline-none',
+          'min-h-[6.875rem] w-full min-w-0 max-w-full resize-y px-3 py-2 text-sm leading-5 outline-none',
           COMPACT_INSPECTOR_SOLID_CONTROL_CLASS_NAME,
           className
         )}
@@ -70,7 +70,11 @@ export const CompactRange = React.forwardRef<HTMLInputElement, ProductRangeProps
       <ProductRange
         ref={ref}
         {...props}
-        className={cx('w-full', COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME, className)}
+        className={cx(
+          'w-full min-w-0 max-w-full',
+          COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
+          className
+        )}
         style={resolveCompactInspectorInteractiveControlStyle(style)}
       />
     );

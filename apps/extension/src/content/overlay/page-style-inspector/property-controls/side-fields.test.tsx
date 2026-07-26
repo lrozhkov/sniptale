@@ -120,7 +120,7 @@ it('starts unlinked and renders all four side inputs in one row', () => {
   expect(document.querySelectorAll('input[aria-label="Лево"]')).toHaveLength(1);
   expect(
     document.querySelector('[data-ui="content.page-style-inspector.side-values"]')?.className
-  ).toContain('grid-cols-4');
+  ).toContain('grid-cols-[repeat(4,minmax(0,1fr))]');
 });
 
 it('links side values through one grouped update after the user chooses linked mode', () => {

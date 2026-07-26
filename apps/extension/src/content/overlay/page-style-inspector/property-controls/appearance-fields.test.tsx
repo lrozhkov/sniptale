@@ -127,6 +127,14 @@ it('renders gradient and shadow as structured controls instead of raw CSS text f
   expect(
     document.querySelector('[data-ui="content.page-style-inspector.shadow-field"]')
   ).not.toBeNull();
+  expect(
+    document.querySelector('[data-ui="content.page-style-inspector.gradient-sub-controls"]')
+      ?.className
+  ).toContain('grid-cols-[repeat(2,minmax(0,1fr))]');
+  expect(
+    document.querySelector('[data-ui="content.page-style-inspector.shadow-sub-controls"]')
+      ?.className
+  ).toContain('grid-cols-[repeat(2,minmax(0,1fr))]');
 });
 
 it('commits gradient and shadow subcontrol edits as CSS declarations', () => {

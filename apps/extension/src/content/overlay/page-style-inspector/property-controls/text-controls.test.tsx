@@ -142,7 +142,7 @@ it('renders font, line-height, and letter-spacing as selectable controls', async
   expect(document.querySelector('input[aria-label="Высота строки"]')).toBeNull();
   expect(document.querySelector('input[aria-label="Межбуквенный"]')).toBeNull();
 
-  await pickOption('Шрифт', 'Arial, sans-serif');
+  await pickOption('Шрифт', 'Arial');
   await pickOption('Высота строки', '1.5');
   await pickOption('Межбуквенный', '0.5px');
 
@@ -169,6 +169,29 @@ it('keeps custom computed text values selectable instead of showing blank labels
   expect(
     document.querySelector<HTMLButtonElement>('button[aria-label="Межбуквенный"]')?.textContent
   ).toContain('0.25px');
+});
+
+it('contains long typography values inside their own responsive field', () => {
+  const longFontFamily = 'A Very Long Custom Display Font Family, sans-serif';
+  renderSection(createState({ 'font-family': longFontFamily }));
+
+  const typographyGrid = document.querySelector<HTMLElement>(
+    '[data-ui="content.page-style-inspector.typography-fields"]'
+  );
+  const fontTrigger = document.querySelector<HTMLButtonElement>('button[aria-label="Шрифт"]');
+  const fontField = fontTrigger?.closest<HTMLElement>(
+    '[data-ui="content.page-style-inspector.field"]'
+  );
+  const selectRoot = fontTrigger?.closest<HTMLElement>('[data-ui="shared.ui.compact-select"]');
+
+  expect(typographyGrid?.className).toContain('grid-cols-[repeat(2,minmax(0,1fr))]');
+  expect(fontField?.className).toContain('col-span-2');
+  expect(selectRoot?.className).toContain('min-w-0');
+  expect(fontTrigger?.className).toContain('min-w-0');
+  expect(fontTrigger?.className).toContain('overflow-hidden');
+  expect(fontTrigger?.className).toContain('h-10');
+  expect(fontTrigger?.className).toContain('rounded-[10px]');
+  expect(fontTrigger?.title).toBe(longFontFamily);
 });
 
 it('toggles underline and line-through independently on one text-decoration value', async () => {

@@ -69,7 +69,7 @@ export function ImageSection({ actions, disabled, state }: ImageSectionProps) {
 
 function ImageFitFields({ actions, disabled, state }: ImageSectionProps) {
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+    <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-3 gap-y-2">
       <SelectField
         disabled={disabled}
         label={translate('content.pageStyleInspector.objectFit')}

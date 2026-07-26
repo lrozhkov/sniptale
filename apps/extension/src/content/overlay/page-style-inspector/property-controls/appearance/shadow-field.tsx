@@ -1,7 +1,7 @@
 import { CompactColorSelector } from '../../../../../ui/color-selector';
 import { CompactInput, CompactSelect } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
-import { Field } from '../field-shell';
+import { Field, PAGE_STYLE_SELECT_CLASS_NAME } from '../field-shell';
 import {
   createDefaultBoxShadow,
   resolveCssBoxShadow,
@@ -104,6 +104,7 @@ function ShadowModeRow(props: {
       <ShadowPreview model={props.model} />
       <CompactSelect
         aria-label={props.label}
+        className={PAGE_STYLE_SELECT_CLASS_NAME}
         disabled={props.disabled}
         options={getShadowModeOptions()}
         value={props.model.mode}
@@ -135,7 +136,10 @@ function ShadowPreview(props: { model: ShadowFieldModel }) {
 
 function ShadowSubControls(props: { disabled: boolean; model: ShadowFieldModel }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div
+      data-ui="content.page-style-inspector.shadow-sub-controls"
+      className="grid min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] gap-2"
+    >
       <ShadowLengthInput
         disabled={props.disabled}
         label={translate('content.pageStyleInspector.shadowOffsetX')}

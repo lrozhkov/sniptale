@@ -1,7 +1,7 @@
 import { CompactColorSelector } from '../../../../../ui/color-selector';
 import { CompactInput, CompactSelect } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
-import { Field } from '../field-shell';
+import { Field, PAGE_STYLE_SELECT_CLASS_NAME } from '../field-shell';
 import {
   createDefaultLinearGradient,
   resolveCssGradient,
@@ -120,6 +120,7 @@ function GradientModeSelect(props: {
   return (
     <CompactSelect
       aria-label={props.label}
+      className={PAGE_STYLE_SELECT_CLASS_NAME}
       disabled={props.disabled}
       options={getGradientModeOptions()}
       value={props.model.mode}
@@ -134,7 +135,10 @@ function GradientModeSelect(props: {
 
 function GradientSubControls(props: { disabled: boolean; model: GradientFieldModel }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div
+      data-ui="content.page-style-inspector.gradient-sub-controls"
+      className="grid min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] gap-2"
+    >
       <GradientColorField
         label={translate('content.pageStyleInspector.gradientStartColor')}
         recentColors={[props.model.gradient.from, props.model.gradient.to]}

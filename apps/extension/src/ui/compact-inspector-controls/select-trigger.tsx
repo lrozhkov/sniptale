@@ -39,7 +39,8 @@ export function CompactSelectTrigger<T extends string>({
       aria-haspopup="listbox"
       disabled={disabled}
       className={cx(
-        'flex h-9 w-full items-center justify-between gap-2 rounded-[8px] border px-3',
+        'flex h-9 w-full min-w-0 max-w-full items-center justify-between gap-2',
+        'overflow-hidden rounded-[8px] border px-3',
         'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
         'text-left text-[12px] font-semibold text-[color:var(--sniptale-color-text-primary)]',
