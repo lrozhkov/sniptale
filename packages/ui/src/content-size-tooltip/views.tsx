@@ -15,6 +15,13 @@ import {
 import { startContentSizeTooltipStepperRepeat } from './repeat';
 import { TooltipSizeInput } from './input';
 
+const CONTENT_SIZE_TOOLTIP_ACTION_ICON_STYLE = {
+  display: 'block',
+  flex: '0 0 auto',
+  width: 16,
+  height: 16,
+} as const;
+
 function addStepperReleaseListeners(stopRepeating: () => void): void {
   const stopRepeatingOnce = () => {
     stopRepeating();
@@ -201,7 +208,11 @@ function TooltipActions(
         }}
         style={getContentSizeTooltipActionButtonStyle('neutral', variant) as CSSProperties}
       >
-        {compact ? <X size={15} strokeWidth={2.2} /> : props.copy.cancel}
+        {compact ? (
+          <X size={16} strokeWidth={2.25} style={CONTENT_SIZE_TOOLTIP_ACTION_ICON_STYLE} />
+        ) : (
+          props.copy.cancel
+        )}
       </button>
       <button
         type="button"
@@ -213,7 +224,11 @@ function TooltipActions(
         }}
         style={getContentSizeTooltipActionButtonStyle('accent', variant) as CSSProperties}
       >
-        {compact ? <Check size={15} strokeWidth={2.2} /> : props.copy.confirm}
+        {compact ? (
+          <Check size={16} strokeWidth={2.25} style={CONTENT_SIZE_TOOLTIP_ACTION_ICON_STYLE} />
+        ) : (
+          props.copy.confirm
+        )}
       </button>
     </div>
   );

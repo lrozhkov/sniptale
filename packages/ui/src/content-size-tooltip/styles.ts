@@ -194,9 +194,14 @@ export function getContentSizeTooltipActionButtonStyle(
   const baseStyle =
     variant === 'frame-edit'
       ? mergeStyleRecords(CONTENT_SIZE_TOOLTIP_ACTION_BUTTON_STYLE, {
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: '0 0 32px',
           width: '32px',
           minWidth: '32px',
           padding: '0',
+          boxSizing: 'border-box',
           lineHeight: 0,
         })
       : CONTENT_SIZE_TOOLTIP_ACTION_BUTTON_STYLE;
