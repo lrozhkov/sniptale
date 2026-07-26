@@ -77,7 +77,11 @@ describe('ProductToast rendering', () => {
     expect(toast?.hasAttribute('style')).toBe(false);
     expect(toast?.getAttribute('role')).toBe('status');
     expect(toast?.getAttribute('aria-live')).toBe('polite');
-    expect(toast?.querySelector('.sniptale-toast-icon-wrapper')).toBeNull();
+    expect(toast?.querySelector('.sniptale-toast-icon-wrapper')).not.toBeNull();
+    expect(toast?.querySelector('.sniptale-toast-icon-wrapper')?.getAttribute('aria-hidden')).toBe(
+      'true'
+    );
+    expect(toast?.querySelector('.lucide-info')).not.toBeNull();
   });
 
   it('renders success and error tones with the correct accessibility semantics', () => {
@@ -91,7 +95,7 @@ describe('ProductToast rendering', () => {
     expect(successToast?.className).toContain('sniptale-toast-success');
     expect(successToast?.getAttribute('role')).toBe('status');
     expect(successToast?.getAttribute('aria-live')).toBe('polite');
-    expect(successToast?.querySelector('.sniptale-toast-icon-wrapper')).toBeNull();
+    expect(successToast?.querySelector('.lucide-check')).not.toBeNull();
 
     renderToast({
       message: 'Error',
@@ -103,7 +107,17 @@ describe('ProductToast rendering', () => {
     expect(errorToast?.className).toContain('sniptale-toast-error');
     expect(errorToast?.getAttribute('role')).toBe('alert');
     expect(errorToast?.getAttribute('aria-live')).toBe('assertive');
-    expect(errorToast?.querySelector('.sniptale-toast-icon-wrapper')).toBeNull();
+    expect(errorToast?.querySelector('.lucide-circle-x')).not.toBeNull();
+  });
+
+  it('renders a distinct warning icon without changing polite status semantics', () => {
+    renderToast({ message: 'Warning', tone: 'warning' });
+
+    const warningToast = getToastElement();
+
+    expect(warningToast?.querySelector('.lucide-triangle-alert')).not.toBeNull();
+    expect(warningToast?.getAttribute('role')).toBe('status');
+    expect(warningToast?.getAttribute('aria-live')).toBe('polite');
   });
 
   it('syncs the exiting class when the prop changes', () => {

@@ -88,10 +88,25 @@ export const PRODUCT_DESIGN_SYSTEM_FEEDBACK_REGISTRY: DesignSystemRegistryEntry[
       '@sniptale/ui/styles/overlays/countdown',
     ],
     descriptionRu:
-      'Нейтральный toast feedback для runtime-статусов и отдельный countdown surface для time-based переходов.',
+      'Контрастный toast feedback на непрозрачной поверхности и отдельный countdown для time-based переходов.',
     descriptionEn:
-      'Neutral toast feedback for runtime statuses and a dedicated countdown surface for time-based transitions.',
+      'High-contrast toast feedback on an opaque surface and a dedicated countdown for time-based transitions.',
     variants: [
+      variant(
+        'info',
+        'Info',
+        'Info',
+        'Нейтральный runtime-статус с синей статусной меткой.',
+        'Neutral runtime status with a blue status marker.',
+        [
+          'Использует `.sniptale-toast-info`.',
+          'Текст остаётся нейтральным, статус передают иконка и accent rail.',
+        ],
+        [
+          'Uses `.sniptale-toast-info`.',
+          'Text remains neutral while the icon and accent rail communicate status.',
+        ]
+      ),
       variant(
         'success',
         'Success',
@@ -100,11 +115,26 @@ export const PRODUCT_DESIGN_SYSTEM_FEEDBACK_REGISTRY: DesignSystemRegistryEntry[
         'Restrained confirmation that an action completed successfully.',
         [
           'Использует `.sniptale-toast-success`.',
-          'Статус читается через мягкий accent и нейтральную panel surface.',
+          'Статус читается через иконку и accent поверх непрозрачной surface.',
         ],
         [
           'Uses `.sniptale-toast-success`.',
-          'Status relies on a soft accent over a neutral panel surface.',
+          'Status relies on an icon and accent over an opaque surface.',
+        ]
+      ),
+      variant(
+        'warning',
+        'Warning',
+        'Warning',
+        'Предупреждение, которое требует внимания без error-семантики.',
+        'A warning that needs attention without error semantics.',
+        [
+          'Использует `.sniptale-toast-warning`.',
+          'Сохраняет polite live-region и жёлтую статусную метку.',
+        ],
+        [
+          'Uses `.sniptale-toast-warning`.',
+          'Keeps a polite live region with an amber status marker.',
         ]
       ),
       variant(

@@ -26,7 +26,8 @@ vi.mock('../../runtime/async-actions', async (importOriginal) => ({
   fireAndReportEditorAction: mocks.fireActionMock,
 }));
 
-vi.mock('lucide-react', () => ({
+vi.mock('lucide-react', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('lucide-react')>()),
   Redo2: () => <span data-testid="redo-icon" />,
   RotateCcw: () => <span data-testid="reset-icon" />,
   Undo2: () => <span data-testid="undo-icon" />,

@@ -23,50 +23,89 @@
 
 @keyframes sniptale-slideIn {
   from {
-    transform: translateX(100%);
+    transform: translate3d(18px, 0, 0) scale(0.98);
     opacity: 0;
   }
 
   to {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0) scale(1);
     opacity: 1;
   }
 }
 
 @keyframes sniptale-slideOut {
   from {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0) scale(1);
     opacity: 1;
   }
 
   to {
-    transform: translateX(100%);
+    transform: translate3d(14px, 0, 0) scale(0.98);
     opacity: 0;
   }
 }
 
 .sniptale-toast {
   --sniptale-toast-accent: var(--sniptale-color-info);
-  --sniptale-toast-tint: var(--sniptale-color-info-soft);
-  --sniptale-toast-message-color: var(--sniptale-color-text-primary-strong);
+  position: relative;
   display: inline-flex;
-  min-width: min(320px, calc(100vw - 40px));
-  max-width: 400px;
+  min-width: min(300px, calc(100vw - 32px));
+  max-width: min(420px, calc(100vw - 32px));
   align-items: center;
-  border-radius: 14px;
+  gap: 10px;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 16px;
   border: 1px solid
-    color-mix(in srgb, var(--sniptale-toast-accent) 18%, var(--sniptale-color-border-soft) 82%);
+    color-mix(in srgb, var(--sniptale-toast-accent) 24%, var(--sniptale-color-border-soft) 76%);
   background: color-mix(
     in srgb,
-    var(--sniptale-color-surface-panel) 97%,
-    var(--sniptale-toast-tint) 3%
+    var(--sniptale-color-surface-canvas) 94%,
+    var(--sniptale-toast-accent) 6%
   );
-  padding: 12px 14px;
+  padding: 10px 13px 10px 15px;
   color: var(--sniptale-color-text-primary-strong);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--sniptale-color-shadow-strong) 16%, transparent);
+  box-shadow:
+    0 16px 40px color-mix(in srgb, var(--sniptale-color-shadow-strong) 26%, transparent),
+    0 3px 10px color-mix(in srgb, var(--sniptale-color-shadow-strong) 14%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 8%, transparent);
   backdrop-filter: none;
   animation: sniptale-slideIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sniptale-font-sans);
+}
+
+.sniptale-toast::before {
+  position: absolute;
+  inset: 9px auto 9px 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--sniptale-toast-accent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--sniptale-toast-accent) 46%, transparent);
+  content: '';
+}
+
+.sniptale-toast-icon-wrapper {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid
+    color-mix(in srgb, var(--sniptale-toast-accent) 26%, var(--sniptale-color-border-soft) 74%);
+  border-radius: 10px;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-canvas) 82%,
+    var(--sniptale-toast-accent) 18%
+  );
+  color: var(--sniptale-toast-accent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 9%, transparent);
+}
+
+.sniptale-toast-content {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .sniptale-toast-message {
@@ -74,40 +113,30 @@
   min-width: 0;
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.45;
-  color: var(--sniptale-toast-message-color);
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+  color: var(--sniptale-color-text-primary-strong);
 }
 
 .sniptale-toast-success {
   --sniptale-toast-accent: var(--sniptale-color-success);
-  --sniptale-toast-tint: var(--sniptale-color-success-soft);
-  --sniptale-toast-message-color: color-mix(
-    in srgb,
-    var(--sniptale-color-success) 56%,
-    var(--sniptale-color-text-primary-strong) 44%
-  );
 }
 
 .sniptale-toast-warning {
   --sniptale-toast-accent: var(--sniptale-color-warning);
-  --sniptale-toast-tint: var(--sniptale-color-warning-soft);
-  --sniptale-toast-message-color: color-mix(
-    in srgb,
-    var(--sniptale-color-warning) 60%,
-    var(--sniptale-color-text-primary-strong) 40%
-  );
 }
 
 .sniptale-toast-error {
   --sniptale-toast-accent: var(--sniptale-color-danger);
-  --sniptale-toast-tint: var(--sniptale-color-danger-soft);
-  --sniptale-toast-message-color: color-mix(
-    in srgb,
-    var(--sniptale-color-danger) 60%,
-    var(--sniptale-color-text-primary-strong) 40%
-  );
 }
 
 .sniptale-toast-exiting {
   animation: sniptale-slideOut 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sniptale-toast,
+  .sniptale-toast-exiting {
+    animation-duration: 1ms;
+  }
 }
