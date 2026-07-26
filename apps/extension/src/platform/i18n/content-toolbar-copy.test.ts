@@ -125,6 +125,18 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     ru: 'Размыть данные сейчас',
     en: 'Blur data now',
   },
+  'content.autoBlur.applyOnceSuccess': {
+    ru: 'Найденные данные скрыты: {count}',
+    en: 'Detected data blurred: {count}',
+  },
+  'content.autoBlur.applyOnceEmpty': {
+    ru: 'Данные для размытия не найдены',
+    en: 'No data to blur found',
+  },
+  'content.autoBlur.applyOnceError': {
+    ru: 'Не удалось найти и размыть данные',
+    en: 'Could not find and blur data',
+  },
   'content.autoBlur.applyOnceHint': {
     ru: 'Найти и размыть данные на текущей странице',
     en: 'Find and blur data on the current page',

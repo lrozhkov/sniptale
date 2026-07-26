@@ -2,8 +2,9 @@ import { useCallback } from 'react';
 import type { AutoBlurCategory } from '../../../../features/highlighter/contracts/auto-blur';
 import type { BlurSettings } from '../../../../features/highlighter/contracts';
 import { saveAutoBlurSettings } from '../persistence';
-import type { TranslationKey } from '../../../../platform/i18n';
+import { translate, type TranslationKey } from '../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { selectAutoBlurMatches, type AutoBlurMatch } from '../../../selection/auto-blur-runtime';
 import {
   applyAutoBlurWithSettings,
@@ -15,6 +16,21 @@ import {
 
 const logger = createLogger({ namespace: 'ContentAutoBlur' });
 const APPLY_ERROR_MESSAGE_KEY = 'content.autoBlur.applyError' satisfies TranslationKey;
+const APPLY_ONCE_SUCCESS_MESSAGE_KEY = 'content.autoBlur.applyOnceSuccess' satisfies TranslationKey;
+const APPLY_ONCE_EMPTY_MESSAGE_KEY = 'content.autoBlur.applyOnceEmpty' satisfies TranslationKey;
+const APPLY_ONCE_ERROR_MESSAGE_KEY = 'content.autoBlur.applyOnceError' satisfies TranslationKey;
+
+function reportApplyOnceResult(addedCount: number) {
+  if (addedCount === 0) {
+    showToast(translate(APPLY_ONCE_EMPTY_MESSAGE_KEY), 'info');
+    return;
+  }
+
+  showToast(
+    translate(APPLY_ONCE_SUCCESS_MESSAGE_KEY).replace('{count}', String(addedCount)),
+    'success'
+  );
+}
 
 interface ApplyActionArgs {
   blurSettings: BlurSettings;
@@ -131,15 +147,17 @@ export function useApplyOnceAction(args: {
 
     try {
       const settings = await loadSettingsOrDefault();
-      await applyAutoBlurWithSettings({
+      const result = await applyAutoBlurWithSettings({
         blurSettings: settings.blurSettings,
         frameManager,
         frames: frameManager.frames,
         selectedCategories: settings.selectedCategories,
       });
+      reportApplyOnceResult(result.addedCount);
     } catch (error) {
       logger.error('Failed to apply auto-blur once', error);
       failApplying(APPLY_ERROR_MESSAGE_KEY);
+      showToast(translate(APPLY_ONCE_ERROR_MESSAGE_KEY), 'error');
     } finally {
       finishApplying();
     }

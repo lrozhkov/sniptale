@@ -161,6 +161,18 @@ export const contentAutoBlurMessages = defineMessageSource({
     ru: 'Размыть данные сейчас',
     en: 'Blur data now',
   },
+  applyOnceSuccess: {
+    ru: 'Найденные данные скрыты: {count}',
+    en: 'Detected data blurred: {count}',
+  },
+  applyOnceEmpty: {
+    ru: 'Данные для размытия не найдены',
+    en: 'No data to blur found',
+  },
+  applyOnceError: {
+    ru: 'Не удалось найти и размыть данные',
+    en: 'Could not find and blur data',
+  },
   applyOnceHint: {
     ru: 'Найти и размыть данные на текущей странице',
     en: 'Find and blur data on the current page',
