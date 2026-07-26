@@ -24,4 +24,17 @@ describe('feedback contract', () => {
     expect(feedbackOwnerStylesheet).not.toContain('var(--sniptale-color-surface-panel) 97%');
     expect(feedbackOwnerStylesheet).toContain('@media (prefers-reduced-motion: reduce)');
   });
+
+  it('keeps the status icon semantic without a nested tinted surface', () => {
+    const iconRule = feedbackOwnerStylesheet.match(
+      /\.sniptale-toast-icon-wrapper \{(?<body>[^}]*)\}/
+    )?.groups?.['body'];
+
+    expect(iconRule).toBeDefined();
+    expect(iconRule).toContain('border: 0;');
+    expect(iconRule).toContain('background: transparent;');
+    expect(iconRule).toContain('box-shadow: none;');
+    expect(iconRule).toContain('color: var(--sniptale-toast-accent);');
+    expect(iconRule).not.toContain('color-mix(');
+  });
 });

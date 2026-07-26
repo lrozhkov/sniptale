@@ -91,16 +91,10 @@
   flex: 0 0 32px;
   align-items: center;
   justify-content: center;
-  border: 1px solid
-    color-mix(in srgb, var(--sniptale-toast-accent) 26%, var(--sniptale-color-border-soft) 74%);
-  border-radius: 10px;
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-surface-canvas) 82%,
-    var(--sniptale-toast-accent) 18%
-  );
+  border: 0;
+  background: transparent;
   color: var(--sniptale-toast-accent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, white 9%, transparent);
+  box-shadow: none;
 }
 
 .sniptale-toast-content {
