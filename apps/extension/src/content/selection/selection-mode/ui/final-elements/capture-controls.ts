@@ -59,7 +59,6 @@ function configureCaptureActionButton(
   button.setAttribute('aria-label', label);
   button.title = label;
   applySelectionToolbarButtonChrome(button, {
-    active: true,
     labelled: true,
     ...(split ? { split: 'start' as const } : {}),
   });

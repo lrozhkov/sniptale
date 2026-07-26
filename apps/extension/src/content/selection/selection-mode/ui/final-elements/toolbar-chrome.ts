@@ -1,7 +1,6 @@
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
 
 type SelectionToolbarButtonChromeOptions = {
-  active?: boolean;
   labelled?: boolean;
   preserveLayout?: boolean;
   split?: 'start' | 'end';
@@ -49,10 +48,8 @@ export function applySelectionToolbarButtonChrome(
     button.removeAttribute('style');
   }
   button.classList.add('sniptale-glass-toolbar-button');
-  button.classList.toggle('sniptale-glass-toolbar-button--active', options.active === true);
-
-  if (options.active) button.dataset['active'] = 'true';
-  else delete button.dataset['active'];
+  button.classList.remove('sniptale-glass-toolbar-button--active');
+  delete button.dataset['active'];
 
   if (options.labelled) {
     button.style.width = 'auto';
@@ -74,7 +71,6 @@ export function applySelectionToolbarButtonChrome(
 
 export function applySelectionToolbarCompactButtonChrome(button: HTMLButtonElement): void {
   applySelectionToolbarButtonChrome(button, {
-    active: button.getAttribute('aria-pressed') === 'true',
     preserveLayout: true,
   });
 }

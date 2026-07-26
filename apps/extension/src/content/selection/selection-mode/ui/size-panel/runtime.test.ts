@@ -120,7 +120,9 @@ describe('selection-mode size-panel setup boundary', () => {
     expect(scenario.session.aspectRatio).toBe(2);
     expect(scenario.aspectRatioButton.getAttribute('aria-pressed')).toBe('true');
     expect(scenario.aspectRatioButton.classList).toContain('sniptale-glass-toolbar-button');
-    expect(scenario.aspectRatioButton.classList).toContain('sniptale-glass-toolbar-button--active');
+    expect(scenario.aspectRatioButton.classList).not.toContain(
+      'sniptale-glass-toolbar-button--active'
+    );
     expect(scenario.aspectRatioButton.style.getPropertyValue('background')).toBe('');
     expect(scenario.aspectRatioButton.style.width).toBe('30px');
 

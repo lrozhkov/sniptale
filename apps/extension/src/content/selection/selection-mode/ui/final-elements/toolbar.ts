@@ -71,6 +71,7 @@ export function enhanceSelectionModeToolbar(
   applySelectionToolbarSurfaceChrome(tooltip.root);
   applySelectionToolbarButtonChrome(tooltip.cancelButton);
   applySelectionToolbarDividerChrome(tooltip.actions.previousElementSibling!);
+  applySelectionToolbarDividerChrome(tooltip.cancelButton.previousElementSibling!);
   const paddingControls = createPaddingControls(options);
   tooltip.root.insertBefore(paddingControls, tooltip.actions);
   tooltip.root.insertBefore(createSelectionToolbarDivider(), tooltip.actions);

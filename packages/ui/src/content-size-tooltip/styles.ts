@@ -21,6 +21,10 @@ export const CONTENT_SIZE_TOOLTIP_INPUT_CLASS_NAME = 'sniptale-content-size-tool
 export const CONTENT_SIZE_TOOLTIP_STEPPER_CLASS_NAME = 'sniptale-content-size-tooltip-stepper';
 export const CONTENT_SIZE_TOOLTIP_STEPPER_CONTROLS_CLASS_NAME =
   'sniptale-content-size-tooltip-stepper-controls';
+export const CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME =
+  'sniptale-content-size-tooltip-primary-action';
+export const CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_CLASS_NAME =
+  'sniptale-content-size-tooltip-ratio-button';
 
 export const CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT = `
   .${CONTENT_SIZE_TOOLTIP_INPUT_CLASS_NAME}::-webkit-inner-spin-button,
@@ -48,6 +52,38 @@ export const CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT = `
     .${CONTENT_SIZE_TOOLTIP_STEPPER_CONTROLS_CLASS_NAME} .sniptale-size-btn {
     opacity: 0;
     pointer-events: none;
+  }
+
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME} {
+    border-color: transparent;
+    background: transparent;
+    color: var(--sniptale-color-text-primary);
+    box-shadow: none;
+  }
+
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}:hover:not(:disabled) {
+    border-color: transparent;
+    background: transparent;
+    color: var(--sniptale-color-accent-emphasis);
+    box-shadow: none;
+  }
+
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_CLASS_NAME}[aria-pressed='true'] {
+    border-color: transparent;
+    background: transparent;
+    color: var(--sniptale-color-accent-emphasis);
+    box-shadow: none;
+  }
+
+  .sniptale-content-size-tooltip[data-variant='frame-edit'] .sniptale-size-btn,
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .sniptale-size-btn:hover:not(:disabled) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
   }
 `;
 
@@ -207,6 +243,14 @@ export function getContentSizeTooltipActionButtonStyle(
       : CONTENT_SIZE_TOOLTIP_ACTION_BUTTON_STYLE;
 
   if (tone === 'accent') {
+    if (variant === 'frame-edit') {
+      return {
+        ...baseStyle,
+        border: '0',
+        background: 'transparent',
+      };
+    }
+
     return {
       ...baseStyle,
       border: '1px solid color-mix(in srgb, var(--sniptale-color-accent) 28%, transparent)',
@@ -218,7 +262,11 @@ export function getContentSizeTooltipActionButtonStyle(
 
   return {
     ...baseStyle,
-    background: 'color-mix(in srgb, var(--sniptale-color-surface-hover) 58%, transparent)',
+    ...(variant === 'frame-edit'
+      ? { border: '0', background: 'transparent' }
+      : {
+          background: 'color-mix(in srgb, var(--sniptale-color-surface-hover) 58%, transparent)',
+        }),
     color: 'var(--sniptale-color-text-primary)',
   };
 }
@@ -226,6 +274,7 @@ export function getContentSizeTooltipActionButtonStyle(
 export function getContentSizeTooltipRatioButtonStyle(params: {
   active: boolean;
   disabled?: boolean;
+  variant?: ContentSizeTooltipVariant | undefined;
 }): StyleRecord {
   if (params.disabled) {
     return mergeStyleRecords(CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_STYLE, {
@@ -235,23 +284,40 @@ export function getContentSizeTooltipRatioButtonStyle(params: {
   }
 
   if (params.active) {
+    if (params.variant !== 'frame-edit') {
+      return mergeStyleRecords(CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_STYLE, {
+        border: '1px solid color-mix(in srgb, var(--sniptale-color-accent) 30%, transparent)',
+        background:
+          'color-mix(in srgb, var(--sniptale-color-accent) 9%, var(--sniptale-color-surface-hover) 91%)',
+        color: 'var(--sniptale-color-text-primary-strong)',
+      });
+    }
+
     return mergeStyleRecords(CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_STYLE, {
-      border: '1px solid color-mix(in srgb, var(--sniptale-color-accent) 30%, transparent)',
-      background:
-        'color-mix(in srgb, var(--sniptale-color-accent) 9%, var(--sniptale-color-surface-hover) 91%)',
-      color: 'var(--sniptale-color-text-primary-strong)',
+      borderColor: 'transparent',
+      background: 'transparent',
+      color: 'var(--sniptale-color-accent-emphasis)',
     });
   }
 
   return CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_STYLE;
 }
 
-export function getContentSizeTooltipStepButtonStyle(disabled: boolean): StyleRecord {
-  if (!disabled) {
-    return CONTENT_SIZE_TOOLTIP_STEPPER_BUTTON_STYLE;
-  }
+export function getContentSizeTooltipStepButtonStyle(
+  disabled: boolean,
+  variant: ContentSizeTooltipVariant = 'default'
+): StyleRecord {
+  const baseStyle =
+    variant === 'frame-edit'
+      ? mergeStyleRecords(CONTENT_SIZE_TOOLTIP_STEPPER_BUTTON_STYLE, {
+          border: '0',
+          background: 'transparent',
+        })
+      : CONTENT_SIZE_TOOLTIP_STEPPER_BUTTON_STYLE;
 
-  return mergeStyleRecords(CONTENT_SIZE_TOOLTIP_STEPPER_BUTTON_STYLE, {
+  if (!disabled) return baseStyle;
+
+  return mergeStyleRecords(baseStyle, {
     cursor: 'default',
   });
 }

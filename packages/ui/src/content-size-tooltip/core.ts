@@ -36,7 +36,7 @@ export const CONTENT_SIZE_TOOLTIP_DIMENSIONS = {
 } as const;
 
 export const CONTENT_SIZE_TOOLTIP_FRAME_EDIT_DIMENSIONS = {
-  width: 290,
+  width: 296,
   height: 44,
 } as const;
 

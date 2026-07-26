@@ -4,6 +4,8 @@ import type { ContentSizeTooltipProps } from './types';
 import {
   CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE,
   CONTENT_SIZE_TOOLTIP_DIVIDER_STYLE,
+  CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME,
+  CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_CLASS_NAME,
   CONTENT_SIZE_TOOLTIP_STEPPER_CLASS_NAME,
   CONTENT_SIZE_TOOLTIP_STEPPER_CONTROLS_CLASS_NAME,
   CONTENT_SIZE_TOOLTIP_STEPPER_CONTROLS_STYLE,
@@ -40,6 +42,7 @@ function TooltipStepperButton(props: {
   disabled: boolean;
   onClick: () => void;
   rotated?: boolean;
+  variant?: ContentSizeTooltipProps['variant'];
 }) {
   const suppressNextClickRef = useRef(false);
 
@@ -74,7 +77,7 @@ function TooltipStepperButton(props: {
           props.onClick();
         }
       }}
-      style={getContentSizeTooltipStepButtonStyle(props.disabled) as CSSProperties}
+      style={getContentSizeTooltipStepButtonStyle(props.disabled, props.variant) as CSSProperties}
     >
       {props.rotated ? (
         <ChevronDown size={12} strokeWidth={2.3} />
@@ -92,6 +95,7 @@ function TooltipStepperControls(props: {
   increaseLabel: string;
   onDecrease: () => void;
   onIncrease: () => void;
+  variant?: ContentSizeTooltipProps['variant'];
 }) {
   return (
     <div
@@ -103,6 +107,7 @@ function TooltipStepperControls(props: {
         className="sniptale-size-btn-plus"
         disabled={props.increaseDisabled}
         onClick={props.onIncrease}
+        variant={props.variant}
       />
       <TooltipStepperButton
         ariaLabel={props.decreaseLabel}
@@ -110,6 +115,7 @@ function TooltipStepperControls(props: {
         disabled={props.decreaseDisabled}
         onClick={props.onDecrease}
         rotated
+        variant={props.variant}
       />
     </div>
   );
@@ -126,6 +132,7 @@ function TooltipStepper(props: {
   onIncrease: () => void;
   onRawChange: (value: number) => void;
   value: number;
+  variant?: ContentSizeTooltipProps['variant'];
 }) {
   const roundedValue = Math.round(props.value);
 
@@ -149,6 +156,7 @@ function TooltipStepper(props: {
         increaseLabel={props.increaseLabel}
         onDecrease={props.onDecrease}
         onIncrease={props.onIncrease}
+        variant={props.variant}
       />
     </div>
   );
@@ -163,11 +171,13 @@ function TooltipAspectRatioButton(props: {
   canToggle: boolean;
   label: string;
   onToggle: () => void;
+  variant?: ContentSizeTooltipProps['variant'];
 }) {
   return (
     <button
       type="button"
       aria-label={props.label}
+      className={CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_CLASS_NAME}
       title={props.label}
       aria-pressed={props.canToggle ? props.active : undefined}
       disabled={!props.canToggle}
@@ -182,6 +192,7 @@ function TooltipAspectRatioButton(props: {
         getContentSizeTooltipRatioButtonStyle({
           active: props.active,
           disabled: !props.canToggle,
+          variant: props.variant,
         }) as CSSProperties
       }
     >
@@ -195,41 +206,58 @@ function TooltipActions(
 ) {
   const variant = props.variant ?? 'default';
   const compact = variant === 'frame-edit';
+  const cancelButton = (
+    <button
+      type="button"
+      {...(compact ? { 'aria-label': props.copy.cancel, title: props.copy.cancel } : {})}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        props.onCancel();
+      }}
+      style={getContentSizeTooltipActionButtonStyle('neutral', variant) as CSSProperties}
+    >
+      {compact ? (
+        <X size={16} strokeWidth={2.25} style={CONTENT_SIZE_TOOLTIP_ACTION_ICON_STYLE} />
+      ) : (
+        props.copy.cancel
+      )}
+    </button>
+  );
+  const confirmButton = (
+    <button
+      type="button"
+      className={CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}
+      {...(compact ? { 'aria-label': props.copy.confirm, title: props.copy.confirm } : {})}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        props.onConfirm();
+      }}
+      style={getContentSizeTooltipActionButtonStyle('accent', variant) as CSSProperties}
+    >
+      {compact ? (
+        <Check size={16} strokeWidth={2.25} style={CONTENT_SIZE_TOOLTIP_ACTION_ICON_STYLE} />
+      ) : (
+        props.copy.confirm
+      )}
+    </button>
+  );
 
   return (
     <div style={CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE as CSSProperties}>
-      <button
-        type="button"
-        {...(compact ? { 'aria-label': props.copy.cancel, title: props.copy.cancel } : {})}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          props.onCancel();
-        }}
-        style={getContentSizeTooltipActionButtonStyle('neutral', variant) as CSSProperties}
-      >
-        {compact ? (
-          <X size={16} strokeWidth={2.25} style={CONTENT_SIZE_TOOLTIP_ACTION_ICON_STYLE} />
-        ) : (
-          props.copy.cancel
-        )}
-      </button>
-      <button
-        type="button"
-        {...(compact ? { 'aria-label': props.copy.confirm, title: props.copy.confirm } : {})}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          props.onConfirm();
-        }}
-        style={getContentSizeTooltipActionButtonStyle('accent', variant) as CSSProperties}
-      >
-        {compact ? (
-          <Check size={16} strokeWidth={2.25} style={CONTENT_SIZE_TOOLTIP_ACTION_ICON_STYLE} />
-        ) : (
-          props.copy.confirm
-        )}
-      </button>
+      {compact ? (
+        <>
+          {confirmButton}
+          <TooltipDivider />
+          {cancelButton}
+        </>
+      ) : (
+        <>
+          {cancelButton}
+          {confirmButton}
+        </>
+      )}
     </div>
   );
 }
@@ -250,12 +278,14 @@ export function ContentSizeTooltipContent(
         onIncrease={props.onWidthIncrease}
         onRawChange={props.onWidthChangeRaw}
         value={props.widthValue}
+        variant={props.variant}
       />
       <TooltipAspectRatioButton
         active={props.maintainAspectRatio}
         canToggle={props.canToggleAspectRatio}
         label={props.copy.keepAspectRatio}
         onToggle={props.onToggleAspectRatio}
+        variant={props.variant}
       />
       <TooltipStepper
         decreaseLabel={props.copy.decreaseHeight}
@@ -268,6 +298,7 @@ export function ContentSizeTooltipContent(
         onIncrease={props.onHeightIncrease}
         onRawChange={props.onHeightChangeRaw}
         value={props.heightValue}
+        variant={props.variant}
       />
       <TooltipDivider />
       <TooltipActions

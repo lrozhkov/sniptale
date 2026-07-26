@@ -116,7 +116,7 @@ function registerFrameEditVariantTest() {
     const { tooltip } = createMountedTooltip({ variant: 'frame-edit' });
 
     expect(tooltip.root.dataset['variant']).toBe('frame-edit');
-    expect(tooltip.root.style.getPropertyValue('min-width')).toBe('290px');
+    expect(tooltip.root.style.getPropertyValue('min-width')).toBe('296px');
     expect(tooltip.root.style.getPropertyValue('border-radius')).toBe('var(--sniptale-radius-md)');
     expect(tooltip.cancelButton.textContent).toBe('');
     expect(tooltip.confirmButton.textContent).toBe('');
@@ -193,6 +193,9 @@ function registerAspectRatioButtonStateTest() {
     expect(button.getAttribute('aria-pressed')).toBe('true');
     expect(button.disabled).toBe(false);
     expect(button.style.getPropertyValue('background')).toBe(String(activeStyle['background']));
+    expect(button.style.getPropertyValue('background')).toContain(
+      'var(--sniptale-color-accent) 9%'
+    );
 
     syncContentSizeTooltipAspectRatioButtonState(button, {
       canToggleAspectRatio: false,
@@ -202,6 +205,17 @@ function registerAspectRatioButtonStateTest() {
     expect(button.getAttribute('aria-pressed')).toBe('false');
     expect(button.disabled).toBe(true);
     expect(button.style.getPropertyValue('opacity')).toBe(String(disabledStyle['opacity']));
+  });
+
+  it('keeps neutral active ratio visuals scoped to the frame-edit DOM variant', () => {
+    const { tooltip } = createMountedTooltip({ variant: 'frame-edit' });
+
+    syncContentSizeTooltipAspectRatioButtonState(tooltip.aspectRatioButton, {
+      maintainAspectRatio: true,
+    });
+
+    expect(tooltip.aspectRatioButton.style.getPropertyValue('background')).toBe('transparent');
+    expect(tooltip.aspectRatioButton.style.getPropertyValue('border-color')).toBe('transparent');
   });
 }
 

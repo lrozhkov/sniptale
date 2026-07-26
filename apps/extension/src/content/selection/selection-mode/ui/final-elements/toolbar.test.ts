@@ -107,7 +107,7 @@ describe('selection-mode confirmed toolbar', () => {
     expect(tooltip.root.classList).toContain('sniptale-glass-toolbar');
     expect(tooltip.root.classList).toContain('sniptale-toolbar-root');
     expect(tooltip.root.style.width).toBe('max-content');
-    expect(tooltip.root.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(2);
+    expect(tooltip.root.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(3);
 
     const decrease = tooltip.root.querySelector<HTMLButtonElement>(
       '.sniptale-selection-padding-decrease'
@@ -129,8 +129,21 @@ describe('selection-mode confirmed toolbar', () => {
     ).toBe(true);
     expect(tooltip.widthDecreaseButton.style.width).toBe('22px');
     expect(tooltip.aspectRatioButton.style.width).toBe('30px');
-    expect(tooltip.widthDecreaseButton.style.background).toBe('');
+    expect(tooltip.widthDecreaseButton.style.background).toBe('transparent');
     expect(tooltip.aspectRatioButton.style.background).toBe('');
+    expect(tooltip.widthDecreaseButton.getAttribute('style')).not.toContain('border:');
+    expect(tooltip.heightIncreaseButton.getAttribute('style')).not.toContain('border:');
+    expect(tooltip.aspectRatioButton.classList).not.toContain(
+      'sniptale-glass-toolbar-button--active'
+    );
+    expect(tooltip.aspectRatioButton.querySelector('svg path')?.getAttribute('d')).toBe(
+      'M9 17H7A5 5 0 0 1 7 7h2'
+    );
+    expect(tooltip.aspectRatioButton.querySelector('svg line')?.getAttribute('x1')).toBe('8');
+    expect(tooltip.actions.lastElementChild).toBe(tooltip.cancelButton);
+    expect(tooltip.cancelButton.previousElementSibling?.classList).toContain(
+      'sniptale-glass-toolbar-divider'
+    );
 
     decrease?.click();
     increase?.click();
@@ -138,12 +151,17 @@ describe('selection-mode confirmed toolbar', () => {
     expect(onAdjustPadding.mock.calls).toEqual([['decrease'], ['increase']]);
   });
 
-  it('shows the active action label with shared chrome and hides alternatives for scenario', () => {
+  it('shows a neutral primary action label and hides alternatives for scenario', () => {
     const regular = createToolbar();
     expect(regular.tooltip.confirmButton.textContent).toBe('Download');
-    expect(regular.tooltip.confirmButton.classList).toContain(
+    expect(regular.tooltip.confirmButton.classList).not.toContain(
       'sniptale-glass-toolbar-button--active'
     );
+    expect(regular.tooltip.confirmButton.classList).toContain(
+      'sniptale-content-size-tooltip-primary-action'
+    );
+    expect(regular.tooltip.confirmButton.style.background).toBe('');
+    expect(regular.tooltip.confirmButton.style.border).toBe('');
     expect(
       regular.tooltip.root.querySelector('.sniptale-selection-capture-menu-trigger')
     ).not.toBeNull();
