@@ -89,6 +89,10 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     ru: 'Добавляйте рамки, маски, размытие и комментарии',
     en: 'Add frames, masks, blur, and comments',
   },
+  'content.toolbar.autoBlur': {
+    ru: 'Размытие данных',
+    en: 'Sensitive data blur',
+  },
   'content.toolbar.modeMenuTitle': {
     ru: 'Режим работы',
     en: 'Working mode',

@@ -108,8 +108,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Clear all frames',
   },
   autoBlur: {
-    ru: 'Auto-Blur',
-    en: 'Auto-Blur',
+    ru: 'Размытие данных',
+    en: 'Sensitive data blur',
   },
   modeMenuTitle: {
     ru: 'Режим работы',

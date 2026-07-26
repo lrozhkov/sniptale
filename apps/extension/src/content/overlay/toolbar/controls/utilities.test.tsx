@@ -72,16 +72,14 @@ describe('ToolbarUtilityButtons', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows Auto-Blur only in highlighter mode and opens the configure menu action', async () => {
+  it('shows sensitive-data blur only in highlighter mode and opens the configure menu action', async () => {
     const props = createProps();
     await renderUtilities({ ...props, highlighterMode: false });
     expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')).toBeNull();
 
     await renderUtilities(props);
     const autoBlurButton = container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]');
-    expect(autoBlurButton?.querySelector('svg')?.getAttribute('class')).toContain(
-      'lucide-scan-eye'
-    );
+    expect(autoBlurButton?.querySelector('svg')?.getAttribute('class')).toContain('lucide-droplet');
     await act(async () => {
       autoBlurButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
