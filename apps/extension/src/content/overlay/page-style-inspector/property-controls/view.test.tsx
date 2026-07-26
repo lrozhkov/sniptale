@@ -132,6 +132,9 @@ it('keeps image editing focused on image, frame, and appearance controls', () =>
 it('keeps text editing focused on text, frame, and appearance controls', () => {
   renderControls(createState('text'));
 
+  expect(
+    document.querySelector('[data-ui="content.page-style-inspector.property-controls"]')?.className
+  ).toContain('min-w-0');
   expect(document.body.textContent).toContain('Текст');
   expect(document.body.textContent).toContain('Кадр');
   expect(document.body.textContent).toContain('Оформление');

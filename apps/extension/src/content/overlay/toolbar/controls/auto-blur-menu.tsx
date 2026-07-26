@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Check, Power, ScanText, Settings } from 'lucide-react';
+import { Check, Power, ScanText, Settings, ShieldEllipsis } from 'lucide-react';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -40,6 +40,7 @@ function AutoBlurMenuItem(props: {
   icon: React.ReactNode;
   label: string;
   hint?: string;
+  showHintInCompact?: boolean;
   selected?: boolean;
   dataUi: string;
   onSelect: () => Promise<void> | void;
@@ -58,7 +59,11 @@ function AutoBlurMenuItem(props: {
       onClick={handleMenuClick}
     >
       {props.icon}
-      <ProductToolbarMenuItemCopy label={props.label} hint={props.hint} />
+      <ProductToolbarMenuItemCopy
+        label={props.label}
+        hint={props.hint}
+        showHintInCompact={props.showHintInCompact === true}
+      />
       {props.selected ? <Check className="h-4 w-4 text-[var(--sniptale-color-accent)]" /> : null}
     </ProductToolbarMenuItem>
   );
@@ -100,6 +105,7 @@ function AutoBlurToggleItem(props: Pick<DropdownProps, 'autoBlur' | 'isLoading' 
           ? 'content.autoBlur.autoApplyEnableHint'
           : 'content.autoBlur.autoApplyBlockedHint'
       )}
+      showHintInCompact={toggleDisabled && !props.autoBlur.autoApplyAllowed}
       selected={props.autoBlur.autoApplyEnabled}
       onSelect={async () => {
         await props.autoBlur.onToggleAutoApply();
@@ -240,7 +246,7 @@ export function AutoBlurMenu(props: AutoBlurMenuProps) {
         aria-haspopup="menu"
         aria-expanded={bindings.open}
       >
-        <ScanText size={20} strokeWidth={2} />
+        <ShieldEllipsis size={20} strokeWidth={2} />
       </ContentToolbarButton>
 
       {renderAutoBlurDropdown(props, bindings)}

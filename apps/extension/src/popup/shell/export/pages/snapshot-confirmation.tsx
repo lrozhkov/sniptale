@@ -116,7 +116,6 @@ export function WebSnapshotConfirmationDialog({
 
   return (
     <ProductModal
-      accent="compact"
       closeOnBackdrop={!isSavingPreference}
       labelledBy="web-snapshot-confirmation-title"
       maxWidth="calc(100vw - 24px)"

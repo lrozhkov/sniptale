@@ -29,6 +29,11 @@ function createDomFixture(): SelectionModeDom {
     scissorsIcon: null,
     hoverSizeLabel: null,
     dragFrame: null,
+    dragOverlay: null,
+    dragFrameRafId: null,
+    pendingDragRect: null,
+    finalFrameRafId: null,
+    pendingFinalRect: null,
     finalFrame: null,
     finalOverlay: null,
     sizePanel: null,
@@ -115,7 +120,11 @@ function createFinalElementOptions(visual: ResolvedBorderPresetVisual) {
   return {
     getMaxSelectionHeight: () => 800,
     getMaxSelectionWidth: () => 1200,
+    getCaptureAction: () => 'download_default' as const,
+    getSelection: () => ({ x: 0, y: 0, width: 100, height: 100 }),
     minSelectionSize: 100,
+    onAdjustPadding: vi.fn(),
+    onCaptureActionChange: vi.fn(),
     onConfirm: vi.fn(),
     onResetToIdle: vi.fn(),
     onSetupSizePanelListeners: vi.fn(),
@@ -140,5 +149,8 @@ function expectDragFrameStyles(dom: SelectionModeDom) {
   expect(dom.dragFrame?.style.border).toContain('3px dotted');
   expect(dom.dragFrame?.style.backgroundColor).toBe('rgba(34, 197, 94, 0.24)');
   expect(dom.dragFrame?.style.borderRadius).toBe('10px');
-  expect(dom.dragFrame?.style.boxShadow).toContain('rgba(0, 0, 0, 0.4)');
+  expect(dom.dragFrame?.style.boxShadow).not.toContain('9999px');
+  expect(dom.dragOverlay?.querySelector<HTMLElement>('.sniptale-shade-top')?.style.background).toBe(
+    'rgba(0, 0, 0, 0.4)'
+  );
 }

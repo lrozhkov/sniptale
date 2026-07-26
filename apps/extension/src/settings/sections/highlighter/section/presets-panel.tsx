@@ -1,4 +1,4 @@
-import { Check, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n';
 import { getHighlighterPresetCountLabel } from './helpers';
@@ -61,16 +61,18 @@ function MakeDefaultPresetButton(props: { disabled: boolean; onClick: () => void
 }
 
 function HighlighterPresetActions({
+  enabledPresetCount,
   isDefault,
   preset,
   presets,
 }: {
+  enabledPresetCount: number;
   isDefault: boolean;
   preset: BorderPresetItem;
   presets: HighlighterPresetsProps['presets'];
 }) {
   const isVisible = presets.hoveredPresetId === preset.id;
-  const { deleteTitle, editTitle } = getHighlighterPresetActionTitles(preset.isSystemDefault);
+  const isLastEnabled = preset.enabled !== false && enabledPresetCount <= 1;
 
   return (
     <div className={getSettingsHoverActionsClassName(isVisible)}>
@@ -78,7 +80,12 @@ function HighlighterPresetActions({
         checked={preset.enabled !== false}
         size="sm"
         onClick={() => void presets.handleTogglePresetEnabled(preset.id)}
-        title={getHighlighterPresetSwitchTitle(preset.enabled)}
+        disabled={isLastEnabled}
+        title={
+          isLastEnabled
+            ? translate('highlighter.section.lastEnabledPresetDisabled')
+            : getHighlighterPresetSwitchTitle(preset.enabled)
+        }
       />
       {!isDefault ? (
         <MakeDefaultPresetButton
@@ -88,35 +95,31 @@ function HighlighterPresetActions({
       ) : null}
       <button
         onClick={() => presets.handleEditPreset(preset)}
-        disabled={preset.isSystemDefault}
         className={settingsInfoIconButtonClassName}
-        title={editTitle}
+        title={translate('common.actions.edit')}
       >
         <Pencil size={14} />
       </button>
-      <button
-        onClick={() => presets.handleDeletePreset(preset)}
-        disabled={preset.isSystemDefault}
-        className={settingsDangerIconButtonClassName}
-        title={deleteTitle}
-      >
-        <Trash2 size={14} />
-      </button>
+      {preset.origin === 'system' && preset.customized === true ? (
+        <button
+          onClick={() => void presets.handleResetPreset(preset.id)}
+          className={settingsInfoIconButtonClassName}
+          title={translate('highlighter.section.resetSystemPresetTitle')}
+        >
+          <RotateCcw size={14} />
+        </button>
+      ) : null}
+      {preset.origin !== 'system' ? (
+        <button
+          onClick={() => presets.handleDeletePreset(preset)}
+          className={settingsDangerIconButtonClassName}
+          title={translate('common.actions.delete')}
+        >
+          <Trash2 size={14} />
+        </button>
+      ) : null}
     </div>
   );
-}
-
-function getHighlighterPresetActionTitles(isSystemDefault: boolean | undefined) {
-  return {
-    deleteTitle:
-      isSystemDefault === true
-        ? translate('highlighter.section.systemPresetDeleteDisabled')
-        : translate('common.actions.delete'),
-    editTitle:
-      isSystemDefault === true
-        ? translate('highlighter.section.systemPresetEditDisabled')
-        : translate('common.actions.edit'),
-  };
 }
 
 function getHighlighterPresetRowState(
@@ -161,10 +164,11 @@ function AddHighlighterPresetButton(props: { onClick: () => void }) {
 }
 
 function HighlighterPresetRow({
+  enabledPresetCount,
   preset,
   settings,
   presets,
-}: HighlighterPresetsProps & { preset: BorderPresetItem }) {
+}: HighlighterPresetsProps & { enabledPresetCount: number; preset: BorderPresetItem }) {
   const rowState = getHighlighterPresetRowState(preset, { presets, settings });
   const rowClassName = getHighlighterPresetRowClassName(rowState);
 
@@ -187,11 +191,12 @@ function HighlighterPresetRow({
           {rowState.isDefault ? (
             <HighlighterPresetBadge tone="success" copyKey="highlighter.section.defaultBadge" />
           ) : null}
-          {preset.isSystemDefault ? (
+          {preset.origin === 'system' ? (
             <HighlighterPresetBadge tone="neutral" copyKey="highlighter.section.systemBadge" />
           ) : null}
         </div>
         <HighlighterPresetActions
+          enabledPresetCount={enabledPresetCount}
           isDefault={rowState.isDefault}
           preset={preset}
           presets={presets}
@@ -202,6 +207,9 @@ function HighlighterPresetRow({
 }
 
 export function HighlighterPresetsPanel({ presets, settings }: HighlighterPresetsProps) {
+  const enabledPresetCount = settings.borderPresets.filter(
+    (preset) => preset.enabled !== false
+  ).length;
   return (
     <div className="mb-8">
       <div className="mb-4 flex items-center justify-between">
@@ -218,6 +226,7 @@ export function HighlighterPresetsPanel({ presets, settings }: HighlighterPreset
         {settings.borderPresets.map((preset) => (
           <HighlighterPresetRow
             key={preset.id}
+            enabledPresetCount={enabledPresetCount}
             preset={preset}
             presets={presets}
             settings={settings}

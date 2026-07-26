@@ -10,6 +10,7 @@ import {
   splitCssLength,
   stepCssLength,
 } from './css-length';
+import { PAGE_STYLE_SELECT_CLASS_NAME } from './field-shell';
 
 type SideValueKind = 'color' | 'length' | 'select' | 'text';
 
@@ -80,6 +81,7 @@ function SideSelectInput(props: {
   return (
     <CompactSelect
       aria-label={props.ariaLabel}
+      className={PAGE_STYLE_SELECT_CLASS_NAME}
       disabled={props.disabled}
       options={getBorderStyleOptions(props.value)}
       value={normalizeBorderStyleValue(props.value)}

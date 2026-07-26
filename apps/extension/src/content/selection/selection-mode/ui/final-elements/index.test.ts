@@ -2,8 +2,13 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createContentSizeTooltipDomMock, getSelectionModeSizePanelCopyMock } = vi.hoisted(() => ({
+const {
+  createContentSizeTooltipDomMock,
+  enhanceSelectionModeToolbarMock,
+  getSelectionModeSizePanelCopyMock,
+} = vi.hoisted(() => ({
   createContentSizeTooltipDomMock: vi.fn(),
+  enhanceSelectionModeToolbarMock: vi.fn(),
   getSelectionModeSizePanelCopyMock: vi.fn(),
 }));
 
@@ -13,6 +18,12 @@ vi.mock('@sniptale/ui/content-size-tooltip/dom', () => ({
   setContentSizeTooltipPosition: vi.fn(),
   syncContentSizeTooltipAspectRatioButtonState: vi.fn(),
   syncContentSizeTooltipValues: vi.fn(),
+  createContentSizeTooltipDivider: vi.fn(() => document.createElement('span')),
+}));
+
+vi.mock('./toolbar', () => ({
+  enhanceSelectionModeToolbar: enhanceSelectionModeToolbarMock,
+  syncSelectionToolbarPaddingState: vi.fn(),
 }));
 
 vi.mock('../constants', () => ({
@@ -33,6 +44,11 @@ function createDomFixture(): SelectionModeDom {
     scissorsIcon: document.createElement('div'),
     hoverSizeLabel: null,
     dragFrame: null,
+    dragOverlay: null,
+    dragFrameRafId: null,
+    pendingDragRect: null,
+    finalFrameRafId: null,
+    pendingFinalRect: null,
     finalFrame: null,
     finalOverlay: null,
     sizePanel: null,
@@ -48,8 +64,13 @@ function createDomFixture(): SelectionModeDom {
 function createTooltipFixture() {
   return {
     root: document.createElement('div'),
+    actions: document.createElement('div'),
     widthInput: document.createElement('input'),
     heightInput: document.createElement('input'),
+    widthDecreaseButton: document.createElement('button'),
+    widthIncreaseButton: document.createElement('button'),
+    heightDecreaseButton: document.createElement('button'),
+    heightIncreaseButton: document.createElement('button'),
     aspectRatioButton: document.createElement('button'),
     cancelButton: document.createElement('button'),
     confirmButton: document.createElement('button'),
@@ -77,6 +98,10 @@ function createFinalElementsOptions(overrides?: {
     minSelectionSize: 100,
     getMaxSelectionWidth: () => 1280,
     getMaxSelectionHeight: () => 720,
+    getCaptureAction: () => 'download_default' as const,
+    getSelection: () => ({ x: 0, y: 0, width: 100, height: 100 }),
+    onAdjustPadding: vi.fn(),
+    onCaptureActionChange: vi.fn(),
     onConfirm: onConfirm as () => void,
     onResetToIdle: onResetToIdle as () => void,
     onSetupSizePanelListeners: onSetupSizePanelListeners as () => void,
@@ -149,6 +174,11 @@ describe('selection-mode final elements', () => {
       scissorsIcon: null,
       hoverSizeLabel: null,
       dragFrame: null,
+      dragOverlay: null,
+      dragFrameRafId: null,
+      pendingDragRect: null,
+      finalFrameRafId: null,
+      pendingFinalRect: null,
       finalFrame: null,
       finalOverlay: null,
       sizePanel: null,

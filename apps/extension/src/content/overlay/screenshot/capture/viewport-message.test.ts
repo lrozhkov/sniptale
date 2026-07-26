@@ -34,6 +34,7 @@ function createRuntime(): ScreenshotControllerRuntime {
     scenario: {
       buildCapturePayload: vi.fn(createScenarioPayload),
     },
+    setCaptureAction: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),

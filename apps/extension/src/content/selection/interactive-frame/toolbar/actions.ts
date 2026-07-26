@@ -41,6 +41,27 @@ export function createToolbarSurfaceHandlers(props: InteractiveFrameToolbarProps
   };
 }
 
+export function enableFrameStepBadge(
+  props: Pick<InteractiveFrameToolbarProps, 'closePopover'> & {
+    frameId: string;
+  }
+) {
+  props.closePopover();
+  dispatchStepBadgeEnable(props.frameId);
+}
+
+export function startFrameCalloutEditing(
+  props: Pick<InteractiveFrameToolbarProps, 'closePopover' | 'setIsCalloutEditing' | 'setState'> & {
+    frameId: string;
+  }
+) {
+  props.closePopover();
+  pagePreparationHistory.beginTransaction(`callout-editing:${props.frameId}`);
+  dispatchCalloutEnable(props.frameId);
+  props.setState('idle');
+  props.setIsCalloutEditing(true);
+}
+
 export function createInteractiveFrameToolbarActions(props: InteractiveFrameToolbarProps) {
   return {
     ...createSharedToolbarClickHandlers(props),
@@ -50,8 +71,7 @@ export function createInteractiveFrameToolbarActions(props: InteractiveFrameTool
       event.nativeEvent.stopImmediatePropagation();
       const enabled = props.frame.stepBadge?.enabled ?? false;
       if (!enabled) {
-        props.closePopover();
-        dispatchStepBadgeEnable(props.frame.id);
+        enableFrameStepBadge({ closePopover: props.closePopover, frameId: props.frame.id });
         return;
       }
       props.togglePopover(props.frame.id, 'step-badge');
@@ -62,11 +82,12 @@ export function createInteractiveFrameToolbarActions(props: InteractiveFrameTool
       event.nativeEvent.stopImmediatePropagation();
       const hasCallout = props.frame.callout?.enabled ?? false;
       if (!hasCallout) {
-        props.closePopover();
-        pagePreparationHistory.beginTransaction(`callout-editing:${props.frame.id}`);
-        dispatchCalloutEnable(props.frame.id);
-        props.setState('idle');
-        props.setIsCalloutEditing(true);
+        startFrameCalloutEditing({
+          closePopover: props.closePopover,
+          frameId: props.frame.id,
+          setIsCalloutEditing: props.setIsCalloutEditing,
+          setState: props.setState,
+        });
         return;
       }
       props.togglePopover(props.frame.id, 'callout-settings');

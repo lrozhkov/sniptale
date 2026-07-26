@@ -13,9 +13,23 @@ export function buildProductToastPreviews(locale: AppLocale): DesignSystemVarian
   return [
     designSystemPreview(
       'product.ui.toast',
+      'info',
+      <DesignSystemFloatingPreviewFrame minHeight={112}>
+        <ProductToast message={copy.infoToast} tone="info" duration={60_000} />
+      </DesignSystemFloatingPreviewFrame>
+    ),
+    designSystemPreview(
+      'product.ui.toast',
       'success',
       <DesignSystemFloatingPreviewFrame minHeight={112}>
         <ProductToast message={copy.successToast} tone="success" duration={60_000} />
+      </DesignSystemFloatingPreviewFrame>
+    ),
+    designSystemPreview(
+      'product.ui.toast',
+      'warning',
+      <DesignSystemFloatingPreviewFrame minHeight={112}>
+        <ProductToast message={copy.warningToast} tone="warning" duration={60_000} />
       </DesignSystemFloatingPreviewFrame>
     ),
     designSystemPreview(

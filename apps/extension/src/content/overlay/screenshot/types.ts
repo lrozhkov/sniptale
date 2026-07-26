@@ -43,6 +43,7 @@ export interface ScreenshotControllerRuntime {
   captureActionRef: MutableRefObject<CaptureActionType>;
   session: ScreenshotControllerRuntimeSession;
   scenario?: ScreenshotControllerScenarioBridge;
+  setCaptureAction: (action: CaptureActionType) => void;
   setIsCompletelyHidden: (hidden: boolean) => void;
   setIsToolbarVisible: (visible: boolean) => void;
   setNavigationLockEnabled: (enabled: boolean) => void;

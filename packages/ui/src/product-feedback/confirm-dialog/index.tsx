@@ -148,7 +148,6 @@ function renderProductConfirmDialogModal(props: {
       dialogClassName={props.dialogClassName}
       closeOnBackdrop={!props.isLoading}
       onClose={props.handleCancel}
-      accent="compact"
       role="alertdialog"
       width="min(440px, calc(100vw - 32px))"
       {...(props.backdropClassName === undefined

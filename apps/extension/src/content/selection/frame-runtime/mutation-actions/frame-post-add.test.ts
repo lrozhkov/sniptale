@@ -28,7 +28,6 @@ function createFrameData(withStepBadge = true) {
     borderSettings: {
       id: 'preset-1',
       name: 'Orange',
-      isSystemDefault: true,
       order: 0,
       width: 3,
       color: '#ff671d',

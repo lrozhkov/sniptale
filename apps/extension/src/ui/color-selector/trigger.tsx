@@ -16,7 +16,7 @@ import {
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
 
 const ROOT_CLASS_NAME = cx(
-  'relative flex w-full items-center gap-2 overflow-hidden px-2',
+  'relative flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden px-2',
   COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
   COMPACT_INSPECTOR_INTERACTIVE_CONTROL_SURFACE_CLASS_NAME
 );

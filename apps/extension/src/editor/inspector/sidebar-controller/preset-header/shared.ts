@@ -34,6 +34,7 @@ type PresetOverwriteCandidate = {
   id: string;
   isSystemDefault?: boolean;
   name: string;
+  origin?: 'system' | 'user';
 };
 
 export function getPresetSavePanelControls(
@@ -53,7 +54,10 @@ export function getPresetSavePanelControls(
 function getPresetOverwriteCandidates<TPreset extends PresetOverwriteCandidate>(
   presets: readonly TPreset[]
 ): TPreset[] {
-  return presets.filter((preset) => preset.enabled !== false && preset.isSystemDefault !== true);
+  return presets.filter(
+    (preset) =>
+      preset.enabled !== false && preset.isSystemDefault !== true && preset.origin !== 'system'
+  );
 }
 
 function buildPresetOverwriteOptions<TPreset extends PresetOverwriteCandidate>(

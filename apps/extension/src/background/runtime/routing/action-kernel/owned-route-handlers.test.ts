@@ -126,7 +126,6 @@ const contentRuntimeWakeupRouteContext = {
   },
   senderClassification: 'content-runtime-wakeup-content-script',
 } as BackgroundOwnedRouteContext;
-
 beforeEach(() => {
   vi.resetAllMocks();
 });

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import {
   createBorderSettingsFixture,
@@ -8,16 +8,20 @@ import {
   createFrameDataFixture,
 } from '../react/test-support';
 
+const appendToContentOverlayRoot = vi.hoisted(() =>
+  vi.fn((overlay: HTMLElement) => document.body.append(overlay))
+);
+
 vi.mock('../../../platform/dom-host', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/dom-host')>()),
-  appendToContentOverlayRoot: vi.fn(),
+  appendToContentOverlayRoot,
 }));
 
 vi.mock('../../../platform/dom-host/isolated', () => ({
   applyIsolatedContentRootStyle: vi.fn(),
 }));
 
-import { registerImmediateFocusOverlayUpdates } from './focus';
+import { registerImmediateFocusOverlayUpdates, updateFocusOverlayMask } from './focus';
 import type { OverlayRefs } from './types';
 
 function createOverlayRefs(rect: SVGRectElement): OverlayRefs {
@@ -47,6 +51,11 @@ function createFocusRect() {
   rect.dataset['frameId'] = 'frame-1';
   return rect;
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  document.body.replaceChildren();
+});
 
 describe('frame-effect-overlays focus immediate updates', () => {
   it('matches the raw frame geometry when the focus border is hidden', () => {
@@ -83,5 +92,24 @@ describe('frame-effect-overlays focus immediate updates', () => {
     expect(rect.getAttribute('height')).toBe('52');
 
     cleanup();
+  });
+
+  it('recreates a focus overlay removed by clear-all before a frame is restored', () => {
+    const refs = createOverlayRefs(createFocusRect());
+    refs.focusSvgRef.current = null;
+    const focusFrames = [createFrame(false)];
+
+    updateFocusOverlayMask(focusFrames, refs);
+    const removedOverlay = refs.focusOverlayRef.current;
+    expect(removedOverlay?.isConnected).toBe(true);
+
+    removedOverlay?.remove();
+    updateFocusOverlayMask([], refs);
+    updateFocusOverlayMask(focusFrames, refs);
+
+    expect(appendToContentOverlayRoot).toHaveBeenCalledTimes(2);
+    expect(refs.focusOverlayRef.current).not.toBe(removedOverlay);
+    expect(refs.focusOverlayRef.current?.isConnected).toBe(true);
+    expect(refs.focusOverlayRef.current?.contains(refs.focusSvgRef.current)).toBe(true);
   });
 });

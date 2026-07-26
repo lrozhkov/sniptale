@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createSettings } from './test-helpers';
+import { createDefaultHighlighterSettings } from '../../../features/highlighter/style/defaults';
 
 const { syncGetMock, translateMock } = vi.hoisted(() => ({
   syncGetMock: vi.fn(),
@@ -31,7 +31,7 @@ beforeEach(() => {
 
 it('returns detached cached snapshots to callers', async () => {
   syncGetMock.mockResolvedValue({
-    sniptale_highlighter_settings: createSettings(),
+    sniptale_highlighter_settings: createDefaultHighlighterSettings(),
   });
 
   const { getLoadedHighlighterSettingsSnapshot, loadHighlighterSettings } =
@@ -42,7 +42,7 @@ it('returns detached cached snapshots to callers', async () => {
   const firstSnapshot = getLoadedHighlighterSettingsSnapshot();
   const secondSnapshot = getLoadedHighlighterSettingsSnapshot();
 
-  expect(firstSnapshot).toEqual(createSettings());
-  expect(secondSnapshot).toEqual(createSettings());
+  expect(firstSnapshot).toEqual(createDefaultHighlighterSettings());
+  expect(secondSnapshot).toEqual(createDefaultHighlighterSettings());
   expect(firstSnapshot).not.toBe(secondSnapshot);
 });

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const targetResolver = vi.hoisted(() => ({ resolvePagePreparationTarget: vi.fn() }));
 const targetPolicy = vi.hoisted(() => ({
   hasBlockingHighlighterPopover: vi.fn(() => false),
+  isInsideExistingFrame: vi.fn(() => false),
   isHighlighterExtensionUiElement: vi.fn(() => false),
   isNearExistingFrameBorder: vi.fn(() => false),
 }));
@@ -72,6 +73,22 @@ describe('highlighter hover mouse lifecycle', () => {
 
     expect(showHoverOverlay).toHaveBeenCalledWith(target);
     expect(session.lastHoverTarget).toBe(target);
+  });
+
+  it('clears pending hover work without resolving the page below an open settings popover', () => {
+    const { handlers, hideHoverOverlay, session } = createFixture();
+    session.hoverRafId = 42;
+    session.lastHoverTarget = document.createElement('div');
+    targetPolicy.hasBlockingHighlighterPopover.mockReturnValue(true);
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+
+    handlers.handleMouseMove(new MouseEvent('mousemove', { clientX: 10, clientY: 12 }));
+
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(42);
+    expect(session.hoverRafId).toBeNull();
+    expect(session.lastHoverTarget).toBeNull();
+    expect(hideHoverOverlay).toHaveBeenCalledOnce();
+    expect(targetResolver.resolvePagePreparationTarget).not.toHaveBeenCalled();
   });
 
   it('cancels pending work and clears the target on mouse leave', () => {

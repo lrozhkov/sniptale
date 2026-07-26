@@ -6,12 +6,7 @@ import {
   type HighlighterStateGetters,
 } from './interactions';
 import { createHoverOverlayActions } from './overlay';
-import {
-  createHoverSession,
-  invalidateHighlighterSettings,
-  invalidateHoverFrameCache,
-} from './session';
-import type { HighlighterSettingsChangedDetail } from '../../platform/page-context/frame-events';
+import { createHoverSession, invalidateHoverFrameCache } from './session';
 import { createFreeFrameDrawingHandlers, type DrawingCancelReason } from './drawing';
 
 const logger = createLogger({ namespace: 'ContentHighlighter:HoverPreview' });
@@ -26,7 +21,6 @@ export interface HoverController {
   };
   invalidation: {
     frameCache: () => void;
-    settingsCache: (detail?: HighlighterSettingsChangedDetail) => void;
   };
   input: {
     mouseMove: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
@@ -36,6 +30,7 @@ export interface HoverController {
     pointerMove: (event: PointerEvent, iframe?: HTMLIFrameElement) => void;
     pointerUp: (event: PointerEvent, iframe?: HTMLIFrameElement) => void;
     cancelDrawing: (reason?: DrawingCancelReason) => boolean;
+    consumeSuppressedClick: (event?: MouseEvent) => boolean;
   };
   tracking: {
     cancelPendingFrame: () => void;
@@ -74,7 +69,6 @@ export function createHighlighterHoverController(
     },
     invalidation: {
       frameCache: () => invalidateHoverFrameCache(session),
-      settingsCache: (detail) => invalidateHighlighterSettings(session, detail),
     },
     input: {
       mouseMove: interactions.handleMouseMove,
@@ -84,6 +78,7 @@ export function createHighlighterHoverController(
       pointerMove: drawing.handlePointerMove,
       pointerUp: drawing.handlePointerUp,
       cancelDrawing: drawing.cancelDrawing,
+      consumeSuppressedClick: drawing.consumeSuppressedClick,
     },
     tracking: {
       cancelPendingFrame: interactions.cancelPendingHoverFrame,

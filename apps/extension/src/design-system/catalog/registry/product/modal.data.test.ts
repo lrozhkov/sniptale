@@ -12,6 +12,7 @@ describe('product modal design-system registry', () => {
     );
 
     expect(modalShellEntry?.descriptionEn).toContain('matte-neutral modal surface');
+    expect(modalShellEntry?.descriptionEn).not.toContain('accent line');
     expect(modalShellEntry?.variants[0]?.technicalNotesEn).toContain(
       'Idle chrome stays matte-neutral across both themes.'
     );

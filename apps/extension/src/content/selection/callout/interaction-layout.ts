@@ -12,6 +12,7 @@ export function useCalloutInteractionLayout(args: {
   dimensions: { width: number; height: number };
   frameRect: FrameRect;
   isEditing: boolean;
+  isSettingsOpen?: boolean;
   onPositionChange: (placement: NonNullable<CalloutSettings['manualPlacement']>) => void;
   onTailBaseRangeChange: (position: number, width: number) => void;
   onTailFramePositionChange: (position: number) => void;
@@ -24,6 +25,7 @@ export function useCalloutInteractionLayout(args: {
     frameRect: args.frameRect,
     dimensions: args.dimensions,
     isEditing: args.isEditing,
+    ...(args.isSettingsOpen === undefined ? {} : { isHandlePinned: args.isSettingsOpen }),
     manualPlacement: args.settings.manualPlacement,
     onPositionChange: args.onPositionChange,
     wrapperRef: args.wrapperRef,

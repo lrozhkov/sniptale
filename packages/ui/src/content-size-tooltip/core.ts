@@ -35,6 +35,11 @@ export const CONTENT_SIZE_TOOLTIP_DIMENSIONS = {
   height: 46,
 } as const;
 
+export const CONTENT_SIZE_TOOLTIP_FRAME_EDIT_DIMENSIONS = {
+  width: 290,
+  height: 44,
+} as const;
+
 const DEFAULT_GAP = 12;
 const DEFAULT_MARGIN = 12;
 const DEFAULT_INSIDE_INSET = 10;

@@ -13,6 +13,7 @@ import {
   Plus,
   Square,
   Trash2,
+  X,
 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { InteractiveFrameToolbarProps } from './types';
@@ -114,6 +115,7 @@ export function InteractiveFrameToolbarActionButtons(props: {
   handleButtonMouseDown: (event: React.MouseEvent) => void;
   handleEditClick: (event: React.MouseEvent) => void;
   handleDeleteClick: (event: React.MouseEvent) => void;
+  handleCloseClick: (event: React.MouseEvent) => void;
   handleDecreaseClick: (event: React.MouseEvent) => void;
   handleIncreaseClick: (event: React.MouseEvent) => void;
   canDecrease: boolean;
@@ -145,6 +147,7 @@ export function InteractiveFrameToolbarActionButtons(props: {
       >
         <Pencil size={18} />
       </ProductGlassToolbarButton>
+      <ProductGlassToolbarDivider />
       <ProductGlassToolbarButton
         onClick={props.handleDeleteClick}
         onMouseDown={props.handleButtonMouseDown}
@@ -152,6 +155,15 @@ export function InteractiveFrameToolbarActionButtons(props: {
         title={translate('content.interactiveFrame.deleteButton')}
       >
         <Trash2 size={18} />
+      </ProductGlassToolbarButton>
+      <ProductGlassToolbarDivider />
+      <ProductGlassToolbarButton
+        onClick={props.handleCloseClick}
+        onMouseDown={props.handleButtonMouseDown}
+        title={translate('common.actions.close')}
+        aria-label={translate('common.actions.close')}
+      >
+        <X size={18} />
       </ProductGlassToolbarButton>
     </>
   );

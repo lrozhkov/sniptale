@@ -17,6 +17,7 @@ import {
 } from './pointer-actions';
 import type { InteractiveFrameListenerConfig } from '../controller/types';
 import type { FrameState, ResizeDirection } from '../../../../features/highlighter/contracts';
+import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 
 function createFixture() {
   const frame = createFrameDataFixture('frame-1', { x: 20, y: 30, width: 100, height: 80 });
@@ -96,6 +97,7 @@ const rafCallbacks = new Map<number, FrameRequestCallback>();
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useFrameUIStore.getState().reset();
   nextRafId = 1;
   rafCallbacks.clear();
   vi.stubGlobal(
@@ -115,7 +117,10 @@ beforeEach(() => {
   );
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  useFrameUIStore.getState().reset();
+  vi.unstubAllGlobals();
+});
 
 function flushRaf(id = 1) {
   const callback = rafCallbacks.get(id);
@@ -124,6 +129,14 @@ function flushRaf(id = 1) {
 }
 
 describe('transient frame resize', () => {
+  it('does not open the frame toolbar from a resize-handle pointerdown', () => {
+    const fixture = createFixture();
+
+    fixture.start(reactPointer(100, 100), 'se');
+
+    expect(useFrameUIStore.getState().selectedFrameId).toBeNull();
+  });
+
   it('coalesces live resize samples into one update per animation frame', () => {
     const fixture = createFixture();
     fixture.start(reactPointer(100, 100), 'se');

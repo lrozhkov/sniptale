@@ -30,8 +30,10 @@ function createState(
 function createOptions(): SelectionModeEventOptions {
   return {
     cancelSelection: vi.fn(),
+    closeCaptureActionMenu: vi.fn(() => false),
     confirmSelection: vi.fn(),
     finalizeDragSelection: vi.fn(),
+    flushFinalFrameUpdate: vi.fn(),
     handleDragMove: vi.fn(),
     handleResizeMove: vi.fn(),
     hideHoverFrame: vi.fn(),
@@ -76,22 +78,30 @@ function registerExtensionClickTest() {
     control.className = 'sniptale-selection-size-confirm-button';
     const floatingCancel = document.createElement('button');
     floatingCancel.className = 'sniptale-selection-cancel-button';
+    const captureMenu = document.createElement('div');
+    captureMenu.className = 'sniptale-selection-capture-menu';
+    const captureMenuItem = document.createElement('button');
+    captureMenu.appendChild(captureMenuItem);
     host.appendChild(control);
     host.appendChild(floatingCancel);
+    host.appendChild(captureMenu);
     const state = createState();
     const options = createOptions();
     vi.mocked(options.isExtensionUIElement).mockReturnValue(true);
     const regularEvent = createClickEvent(host);
     const controlEvent = createClickEvent(control);
     const floatingCancelEvent = createClickEvent(floatingCancel);
+    const captureMenuEvent = createClickEvent(captureMenuItem);
 
     handleSelectionModeClick(regularEvent, state, options);
     handleSelectionModeClick(controlEvent, state, options);
     handleSelectionModeClick(floatingCancelEvent, state, options);
+    handleSelectionModeClick(captureMenuEvent, state, options);
 
     expect(regularEvent.preventDefault).toHaveBeenCalledOnce();
     expect(controlEvent.preventDefault).not.toHaveBeenCalled();
     expect(floatingCancelEvent.preventDefault).not.toHaveBeenCalled();
+    expect(captureMenuEvent.preventDefault).not.toHaveBeenCalled();
   });
 }
 
@@ -177,9 +187,35 @@ function registerKeyboardCommandTest() {
   });
 }
 
+function registerCaptureMenuKeyboardTest() {
+  it('closes the highest capture menu on Escape and leaves native control activation intact', () => {
+    const menu = document.createElement('div');
+    menu.className = 'sniptale-selection-capture-menu';
+    const item = document.createElement('button');
+    menu.appendChild(item);
+    const state = createState({ currentState: 'confirmed' });
+    const options = createOptions();
+    vi.mocked(options.closeCaptureActionMenu).mockReturnValue(true);
+    const escapeEvent = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    Object.defineProperty(escapeEvent, 'target', { value: item });
+    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+    Object.defineProperty(enterEvent, 'target', { value: item });
+
+    handleSelectionModeKeyDown(escapeEvent, state, options);
+    handleSelectionModeKeyDown(enterEvent, state, options);
+
+    expect(options.closeCaptureActionMenu).toHaveBeenCalledWith(true);
+    expect(options.cancelSelection).not.toHaveBeenCalled();
+    expect(options.confirmSelection).not.toHaveBeenCalled();
+    expect(escapeEvent.defaultPrevented).toBe(true);
+    expect(enterEvent.defaultPrevented).toBe(false);
+  });
+}
+
 describe('selection-mode command events', () => {
   registerDeferredClickTest();
   registerExtensionClickTest();
   registerSelectionAndResetTest();
   registerKeyboardCommandTest();
+  registerCaptureMenuKeyboardTest();
 });

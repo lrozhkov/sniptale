@@ -1,19 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createPreset, createSettings, createStoredSettings } from './test-helpers';
 
+import type { BorderPreset, HighlighterSettings } from '../../../features/highlighter/contracts';
+import { createDefaultHighlighterSettings } from '../../../features/highlighter/style/defaults';
+
+const storageState = vi.hoisted(() => ({ value: undefined as unknown }));
 const { syncGetMock, syncSetMock, translateMock } = vi.hoisted(() => ({
-  syncGetMock: vi.fn(),
-  syncSetMock: vi.fn(),
-  translateMock: vi.fn((key: string) => key),
+  syncGetMock: vi.fn(async () =>
+    storageState.value === undefined ? {} : { sniptale_highlighter_settings: storageState.value }
+  ),
+  syncSetMock: vi.fn(async (payload: Record<string, unknown>) => {
+    storageState.value = payload['sniptale_highlighter_settings'];
+  }),
+  translateMock: vi.fn((key: string) =>
+    key === 'highlighter.systemPresets.accent' ? 'Accent' : key
+  ),
 }));
 
 vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infrastructure/browser-storage')>()),
   browserStorage: {
-    sync: {
-      get: syncGetMock,
-      set: syncSetMock,
-    },
+    sync: { get: syncGetMock, set: syncSetMock },
   },
 }));
 
@@ -22,274 +28,229 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   translate: translateMock,
 }));
 
+function cloneSettings(settings: HighlighterSettings): HighlighterSettings {
+  return {
+    ...settings,
+    borderPresets: settings.borderPresets.map((preset) => ({
+      ...preset,
+      padding: { ...preset.padding },
+    })),
+    defaultBlurSettings: { ...settings.defaultBlurSettings },
+    defaultFocusSettings: { ...settings.defaultFocusSettings },
+  };
+}
+
+function createUserPreset(
+  id: string,
+  overrides: Pick<BorderPreset, 'order'> | undefined = undefined
+): BorderPreset {
+  const {
+    basedOnRevision: _basedOnRevision,
+    customized: _customized,
+    systemPresetKey: _systemPresetKey,
+    ...base
+  } = createDefaultHighlighterSettings().borderPresets[0]!;
+  return {
+    ...base,
+    id,
+    name: `Preset ${id}`,
+    origin: 'user',
+    ...(overrides ?? {}),
+  };
+}
+
+function seed(settings: HighlighterSettings = createDefaultHighlighterSettings()) {
+  storageState.value = cloneSettings(settings);
+}
+
 async function loadHighlighterStorage() {
   return import('./index');
 }
 
-function resetHighlighterStorageMocks() {
-  vi.clearAllMocks();
-  vi.resetModules();
-}
-
-async function verifiesDefaultLoad() {
-  syncGetMock.mockResolvedValue({});
-
-  const module = await loadHighlighterStorage();
-  const settings = await module.loadHighlighterSettings();
-
-  expect(translateMock).toHaveBeenCalledWith('shared.defaults.defaultBorderPresetName');
-  expect(settings).toEqual(module.DEFAULT_HIGHLIGHTER_SETTINGS);
-}
-
-async function verifiesLegacyBlurMigration() {
-  syncGetMock.mockResolvedValue({
-    sniptale_highlighter_settings: {
-      borderPresets: [createPreset('preset-1')],
-      defaultBorderPresetId: 'preset-1',
-      defaultEffectMode: 'blur',
-      defaultBlurSettings: {
-        amount: 24,
-        format: 'legacy',
-      },
-      defaultFocusSettings: {
-        opacity: 0.75,
-      },
-    },
+describe('highlighter persistence owner', () => {
+  beforeEach(() => {
+    storageState.value = undefined;
+    vi.clearAllMocks();
+    vi.resetModules();
   });
 
-  const { DEFAULT_BLUR_SETTINGS, loadHighlighterSettings } = await loadHighlighterStorage();
+  it('hydrates the complete catalog without write-on-read', async () => {
+    const module = await loadHighlighterStorage();
 
-  await expect(loadHighlighterSettings()).resolves.toEqual({
-    borderPresets: [createPreset('preset-1')],
-    defaultBorderPresetId: 'preset-1',
-    defaultEffectMode: 'blur',
-    defaultBlurSettings: {
-      ...DEFAULT_BLUR_SETTINGS,
-      amount: 24,
-      blurType: 'gaussian',
-      showBorder: false,
-    },
-    defaultFocusSettings: {
-      opacity: 0.75,
-      showBorder: false,
-    },
-  });
-}
-
-async function verifiesSaveSettings() {
-  const { getLoadedHighlighterSettingsSnapshot, saveHighlighterSettings } =
-    await loadHighlighterStorage();
-
-  await saveHighlighterSettings(createSettings());
-
-  expect(syncSetMock).toHaveBeenCalledWith({
-    sniptale_highlighter_settings: createSettings(),
-  });
-  expect(getLoadedHighlighterSettingsSnapshot()).toEqual(createSettings());
-}
-
-async function verifiesInvalidStoredSettingsAreDropped() {
-  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  syncGetMock.mockResolvedValue({
-    sniptale_highlighter_settings: {
-      borderPresets: [createPreset('preset-1'), { id: 'broken' }],
-      defaultBorderPresetId: 'missing',
-      defaultEffectMode: 'invalid',
-      defaultBlurSettings: {
-        amount: 'wide',
-        blurType: 'solid',
-      },
-      defaultFocusSettings: {
-        opacity: 0.75,
-        showBorder: 'yes',
-      },
-    },
+    await expect(module.loadHighlighterSettings()).resolves.toEqual(
+      module.DEFAULT_HIGHLIGHTER_SETTINGS
+    );
+    expect(syncSetMock).not.toHaveBeenCalled();
   });
 
-  const { DEFAULT_BLUR_SETTINGS, loadHighlighterSettings } = await loadHighlighterStorage();
+  it('adds and updates user presets through latest persisted state', async () => {
+    seed();
+    const module = await loadHighlighterStorage();
+    const user = createUserPreset('user-1');
 
-  await expect(loadHighlighterSettings()).resolves.toEqual({
-    borderPresets: [createPreset('preset-1')],
-    defaultBorderPresetId: 'preset-1',
-    defaultEffectMode: 'border',
-    defaultBlurSettings: {
-      ...DEFAULT_BLUR_SETTINGS,
-      amount: 10,
-      blurType: 'solid',
-      showBorder: false,
-    },
-    defaultFocusSettings: {
-      opacity: 0.75,
-      showBorder: false,
-    },
-  });
-  expect(warnSpy).toHaveBeenCalledWith(
-    '[SharedHighlighterStorage]',
-    'Dropped invalid highlighter settings fields from storage',
-    { invalidFieldCount: 4 }
-  );
-}
+    await expect(module.addBorderPreset(user)).resolves.toBe(true);
+    await expect(module.updateBorderPreset({ ...user, name: 'Updated' })).resolves.toBe(true);
 
-async function verifiesAddAndUpdatePresetFlow() {
-  syncGetMock.mockResolvedValue({
-    sniptale_highlighter_settings: createSettings(),
+    const stored = storageState.value as HighlighterSettings;
+    expect(stored.borderPresets.at(-1)).toMatchObject({
+      id: 'user-1',
+      name: 'Updated',
+      origin: 'user',
+    });
+    expect(stored.catalogCustomized).toBe(true);
   });
 
-  const { addBorderPreset, updateBorderPreset } = await loadHighlighterStorage();
+  it('distinguishes applied, unchanged, and rejected command outcomes', async () => {
+    const settings = createDefaultHighlighterSettings();
+    settings.borderPresets[1] = { ...settings.borderPresets[1]!, enabled: false };
+    seed(settings);
+    const module = await loadHighlighterStorage();
 
-  await addBorderPreset(createPreset('preset-2', { order: 1 }));
-  await updateBorderPreset(createPreset('preset-1', { name: 'Updated preset' }));
+    await expect(module.setDefaultBorderPresetWithOutcome('system-default')).resolves.toBe(
+      'unchanged'
+    );
+    await expect(module.setDefaultBorderPresetWithOutcome('system-soft-highlight')).resolves.toBe(
+      'rejected'
+    );
+    await expect(module.addBorderPresetWithOutcome(createUserPreset('user-1'))).resolves.toBe(
+      'applied'
+    );
+    await expect(module.addBorderPresetWithOutcome(createUserPreset('user-1'))).resolves.toBe(
+      'rejected'
+    );
+    await expect(module.updateBorderPresetWithOutcome(createUserPreset('missing'))).resolves.toBe(
+      'rejected'
+    );
 
-  expect(syncSetMock).toHaveBeenNthCalledWith(1, {
-    sniptale_highlighter_settings: createSettings({
-      borderPresets: [createPreset('preset-1'), createPreset('preset-2', { order: 1 })],
-    }),
-  });
-  expect(syncSetMock).toHaveBeenNthCalledWith(2, {
-    sniptale_highlighter_settings: createSettings({
-      borderPresets: [
-        createPreset('preset-1', { name: 'Updated preset' }),
-        createPreset('preset-2', { order: 1 }),
-      ],
-    }),
-  });
-}
-
-async function verifiesProtectedPresetUpdateBehavior() {
-  syncGetMock.mockResolvedValue({
-    sniptale_highlighter_settings: createSettings({
-      borderPresets: [createPreset('preset-1', { isSystemDefault: true })],
-    }),
+    expect(syncSetMock).toHaveBeenCalledOnce();
   });
 
-  const { updateBorderPreset } = await loadHighlighterStorage();
+  it('edits a system preset and freezes its current localized name', async () => {
+    const settings = createDefaultHighlighterSettings();
+    seed(settings);
+    const module = await loadHighlighterStorage();
+    const accent = settings.borderPresets[0]!;
 
-  await updateBorderPreset(createPreset('preset-1', { isSystemDefault: false, name: 'Edited' }));
-  await updateBorderPreset(createPreset('preset-missing'));
+    await expect(
+      module.updateBorderPreset({ ...accent, name: 'Accent', color: '#123456' })
+    ).resolves.toBe(true);
 
-  expect(syncSetMock).toHaveBeenCalledTimes(1);
-  expect(syncSetMock).toHaveBeenCalledWith({
-    sniptale_highlighter_settings: createSettings({
-      borderPresets: [
-        createPreset('preset-1', {
-          enabled: true,
-          isSystemDefault: true,
-          name: 'Edited',
-        }),
-      ],
-    }),
-  });
-}
-
-async function verifiesDeletePresetBehavior() {
-  syncGetMock.mockResolvedValue(createStoredSettings());
-
-  const module = await loadHighlighterStorage();
-
-  await expect(module.deleteBorderPreset('preset-2')).resolves.toBe(true);
-  await expect(module.deleteBorderPreset('preset-1')).resolves.toBe(false);
-
-  expect(syncSetMock).toHaveBeenCalledTimes(1);
-  expect(syncSetMock).toHaveBeenCalledWith({
-    sniptale_highlighter_settings: {
-      ...module.DEFAULT_HIGHLIGHTER_SETTINGS,
-      borderPresets: [createPreset('preset-1')],
-      defaultBorderPresetId: 'preset-1',
-    },
-  });
-}
-
-async function verifiesPresetOrdering() {
-  syncGetMock
-    .mockResolvedValueOnce(createStoredSettings())
-    .mockResolvedValueOnce(createStoredSettings())
-    .mockResolvedValueOnce(createStoredSettings());
-
-  const { setDefaultBorderPreset, updateBorderPresetsOrder } = await loadHighlighterStorage();
-
-  await setDefaultBorderPreset('preset-2');
-  await setDefaultBorderPreset('preset-missing');
-  await updateBorderPresetsOrder(['preset-2']);
-
-  expect(syncSetMock).toHaveBeenNthCalledWith(1, {
-    sniptale_highlighter_settings: createSettings({
-      borderPresets: [createPreset('preset-1'), createPreset('preset-2', { order: 1 })],
-      defaultBorderPresetId: 'preset-2',
-    }),
-  });
-  expect(syncSetMock).toHaveBeenNthCalledWith(2, {
-    sniptale_highlighter_settings: createSettings({
-      borderPresets: [
-        createPreset('preset-2', { order: 0 }),
-        createPreset('preset-1', { order: 1 }),
-      ],
-      defaultBorderPresetId: 'preset-2',
-    }),
-  });
-}
-
-async function verifiesDefaultEffectSettingUpdates() {
-  syncGetMock.mockResolvedValue(createStoredSettings());
-
-  const { saveDefaultBlurSettings, saveDefaultFocusSettings } = await loadHighlighterStorage();
-
-  await saveDefaultBlurSettings({
-    amount: 18,
-    blurType: 'solid',
-    showBorder: true,
-  });
-  await saveDefaultFocusSettings({
-    opacity: 0.8,
-    showBorder: true,
+    expect((storageState.value as HighlighterSettings).borderPresets[0]).toMatchObject({
+      color: '#123456',
+      customized: true,
+      name: 'Accent',
+      origin: 'system',
+      systemPresetKey: 'system-default',
+    });
   });
 
-  expect(syncSetMock).toHaveBeenNthCalledWith(1, {
-    sniptale_highlighter_settings: createSettings({
-      borderPresets: [createPreset('preset-1'), createPreset('preset-2', { order: 1 })],
-      defaultBorderPresetId: 'preset-2',
-      defaultBlurSettings: {
-        amount: 18,
-        blurType: 'solid',
-        showBorder: true,
-      },
-    }),
-  });
-  expect(syncSetMock).toHaveBeenNthCalledWith(2, {
-    sniptale_highlighter_settings: createSettings({
-      borderPresets: [createPreset('preset-1'), createPreset('preset-2', { order: 1 })],
-      defaultBorderPresetId: 'preset-2',
-      defaultBlurSettings: {
-        amount: 18,
-        blurType: 'solid',
-        showBorder: true,
-      },
-      defaultFocusSettings: {
-        opacity: 0.8,
-        showBorder: true,
-      },
-    }),
-  });
-}
+  it('allows disabling a system default and selects the next enabled preset deterministically', async () => {
+    seed();
+    const module = await loadHighlighterStorage();
 
-describe('highlighter', () => {
-  beforeEach(resetHighlighterStorageMocks);
+    await expect(module.setBorderPresetEnabled('system-default', false)).resolves.toBe(true);
 
-  it('loads default settings when storage is empty', verifiesDefaultLoad);
-  it('migrates legacy blur settings and merges focus defaults', verifiesLegacyBlurMigration);
-  it(
-    'drops invalid stored fields and repairs default preset selection',
-    verifiesInvalidStoredSettingsAreDropped
-  );
-  it('saves settings directly to sync storage', verifiesSaveSettings);
-  it('adds and updates border presets through persisted settings', verifiesAddAndUpdatePresetFlow);
-  it(
-    'preserves system defaults and skips missing preset updates',
-    verifiesProtectedPresetUpdateBehavior
-  );
-  it('deletes custom presets and resets default preset when needed', verifiesDeletePresetBehavior);
-  it('sets default presets and reorders them predictably', verifiesPresetOrdering);
-  it(
-    'updates default blur and focus settings through shared storage',
-    verifiesDefaultEffectSettingUpdates
-  );
+    const stored = storageState.value as HighlighterSettings;
+    expect(stored.borderPresets[0]?.enabled).toBe(false);
+    expect(stored.defaultBorderPresetId).toBe('system-soft-highlight');
+    expect(stored.catalogCustomized).toBe(true);
+    expect(stored.borderPresets[0]).toMatchObject({
+      customized: false,
+      name: 'system-default',
+    });
+  });
+
+  it('does not freeze localized names for reorder or default changes', async () => {
+    seed();
+    const module = await loadHighlighterStorage();
+
+    await module.setDefaultBorderPreset('system-soft-highlight');
+    await module.updateBorderPresetsOrder([
+      'system-soft-highlight',
+      'system-default',
+      'system-marker',
+      'system-success',
+      'system-attention',
+      'system-review',
+      'system-light-ui',
+      'system-dark-ui',
+    ]);
+
+    const stored = storageState.value as HighlighterSettings;
+    expect(stored.borderPresets.find((preset) => preset.id === 'system-default')).toMatchObject({
+      customized: false,
+      name: 'system-default',
+    });
+    expect(stored.catalogCustomized).toBe(true);
+  });
+
+  it('rejects an attempt to disable the last enabled preset', async () => {
+    const settings = createDefaultHighlighterSettings();
+    settings.borderPresets = settings.borderPresets.map((preset, index) => ({
+      ...preset,
+      enabled: index === 0,
+    }));
+    settings.catalogCustomized = true;
+    seed(settings);
+    const module = await loadHighlighterStorage();
+
+    await expect(module.setBorderPresetEnabled('system-default', false)).resolves.toBe(false);
+    expect(syncSetMock).not.toHaveBeenCalled();
+  });
+
+  it('resets a customized system preset without changing placement or default state', async () => {
+    const settings = createDefaultHighlighterSettings();
+    settings.borderPresets[0] = {
+      ...settings.borderPresets[0]!,
+      color: '#123456',
+      customized: true,
+      enabled: false,
+      name: 'Custom accent',
+      order: 7,
+    };
+    settings.defaultBorderPresetId = 'system-soft-highlight';
+    settings.catalogCustomized = true;
+    seed(settings);
+    const module = await loadHighlighterStorage();
+
+    await expect(module.resetSystemBorderPreset('system-default')).resolves.toBe(true);
+
+    expect((storageState.value as HighlighterSettings).borderPresets[0]).toMatchObject({
+      color: '#F97316',
+      customized: false,
+      enabled: false,
+      name: 'system-default',
+      order: 7,
+    });
+    expect((storageState.value as HighlighterSettings).defaultBorderPresetId).toBe(
+      'system-soft-highlight'
+    );
+  });
+
+  it('never physically deletes a system preset but deletes a user preset', async () => {
+    const settings = createDefaultHighlighterSettings();
+    settings.borderPresets.push(createUserPreset('user-1', { order: 8 }));
+    settings.catalogCustomized = true;
+    seed(settings);
+    const module = await loadHighlighterStorage();
+
+    await expect(module.deleteBorderPreset('system-default')).resolves.toBe(false);
+    await expect(module.deleteBorderPreset('user-1')).resolves.toBe(true);
+
+    expect((storageState.value as HighlighterSettings).borderPresets).toHaveLength(8);
+  });
+
+  it('updates blur and focus fields without marking the preset catalog customized', async () => {
+    seed();
+    const module = await loadHighlighterStorage();
+
+    await module.saveDefaultBlurSettings({ amount: 18, blurType: 'solid', showBorder: true });
+    await module.saveDefaultFocusSettings({ opacity: 0.8, showBorder: true });
+
+    expect(storageState.value).toMatchObject({
+      catalogCustomized: false,
+      defaultBlurSettings: { amount: 18, blurType: 'solid', showBorder: true },
+      defaultFocusSettings: { opacity: 0.8, showBorder: true },
+    });
+  });
 });

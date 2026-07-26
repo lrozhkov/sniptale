@@ -4,20 +4,32 @@ import type {
   FocusSettings,
   HighlighterSettings,
 } from '../../../features/highlighter/contracts';
+import { SYSTEM_BORDER_PRESET_CATALOG_REVISION } from '../../../features/highlighter/presets/catalog';
 import { browserStorage } from '../infrastructure/browser-storage';
+import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseStoredHighlighterSettings } from './guards';
 import { cloneHighlighterSettings, createHighlighterWriteController } from './mutation-write';
+import { resolveLoadedHighlighterSettings, warnAboutInvalidStoredSettings } from './resolved';
 import {
-  reorderBorderPresets,
-  resolveDefaultBorderPresetId,
-  resolveLoadedHighlighterSettings,
-  warnAboutInvalidStoredSettings,
-} from './resolved';
+  addUserBorderPreset,
+  deleteUserBorderPreset,
+  reorderPresets,
+  resetSystemBorderPresetToCanonical,
+  setPresetAsDefault,
+  setPresetEnabled,
+  updateExistingBorderPreset,
+} from './preset-mutations';
 
 export const HIGHLIGHTER_SETTINGS_KEY = 'sniptale_highlighter_settings';
 const logger = createLogger({ namespace: 'SharedHighlighterStorage' });
 let loadedHighlighterSettingsSnapshot: HighlighterSettings | null = null;
+
+export type HighlighterMutationOutcome = 'applied' | 'rejected' | 'unchanged';
+
+type HighlighterMutationDecision =
+  | { outcome: 'applied'; settings: HighlighterSettings }
+  | { outcome: 'rejected' | 'unchanged' };
 
 export {
   DEFAULT_BLUR_SETTINGS,
@@ -99,61 +111,130 @@ export function getLoadedHighlighterSettingsSnapshot(): HighlighterSettings | nu
     : null;
 }
 
-/**
- * Сохраняет настройки режима выделения
- */
-export async function saveHighlighterSettings(settings: HighlighterSettings): Promise<void> {
-  await enqueueHighlighterWrite(() => writeHighlighterSettings(settings));
+async function readResolvedHighlighterSettings() {
+  const result = await browserStorage.sync.get([HIGHLIGHTER_SETTINGS_KEY]);
+  const parsed = parseStoredHighlighterSettings(result[HIGHLIGHTER_SETTINGS_KEY]);
+  return {
+    parsed,
+    settings: resolveLoadedHighlighterSettings(
+      parsed.value.borderPresets,
+      parsed.value.defaultBorderPresetId,
+      parsed.value
+    ),
+  };
+}
+
+function isStoredHighlighterSettingsUnsafeForWrite(
+  parsed: ReturnType<typeof parseStoredHighlighterSettings>
+): boolean {
+  if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0) {
+    warnAboutInvalidStoredSettings({
+      hasInvalidRoot: parsed.hasInvalidRoot,
+      invalidFieldCount: parsed.invalidFieldCount,
+      logger,
+      migratedLegacyBlurFormat: parsed.migratedLegacyBlurFormat,
+    });
+    return true;
+  }
+
+  const storedRevision = parsed.value.systemPresetCatalogRevision;
+  if (storedRevision !== undefined && storedRevision > SYSTEM_BORDER_PRESET_CATALOG_REVISION) {
+    logger.warn('Skipping highlighter settings write from a newer catalog revision', {
+      storedRevision,
+    });
+    return true;
+  }
+
+  return false;
+}
+
+async function runHighlighterSettingsCommand(
+  command: (settings: HighlighterSettings) => HighlighterMutationDecision
+): Promise<HighlighterMutationOutcome> {
+  return enqueueHighlighterWrite(() =>
+    runWithPersistenceDomainMutationLock('highlighter-settings', async (permit) => {
+      const loaded = await readResolvedHighlighterSettings();
+      const settings = cloneHighlighterSettings(loaded.settings);
+      if (isStoredHighlighterSettingsUnsafeForWrite(loaded.parsed)) {
+        cacheLoadedHighlighterSettings(settings);
+        return 'rejected';
+      }
+      const decision = command(settings);
+
+      if (decision.outcome === 'applied') {
+        await writeHighlighterSettings(decision.settings, permit);
+      }
+      return decision.outcome;
+    })
+  );
 }
 
 async function updateHighlighterSettings(
   updater: (settings: HighlighterSettings) => HighlighterSettings | null
 ): Promise<boolean> {
-  return enqueueHighlighterWrite(async () => {
-    const settings = cloneHighlighterSettings(
-      loadedHighlighterSettingsSnapshot ?? (await loadHighlighterSettings())
-    );
+  const outcome = await runHighlighterSettingsCommand((settings) => {
     const nextSettings = updater(settings);
-
-    if (!nextSettings) {
-      return false;
-    }
-
-    await writeHighlighterSettings(nextSettings);
-    return true;
+    return nextSettings ? { outcome: 'applied', settings: nextSettings } : { outcome: 'rejected' };
   });
+  return outcome === 'applied';
+}
+
+export async function migrateHighlighterSystemPresetCatalog(): Promise<boolean> {
+  return enqueueHighlighterWrite(() =>
+    runWithPersistenceDomainMutationLock('highlighter-settings', async (permit) => {
+      const result = await browserStorage.sync.get([HIGHLIGHTER_SETTINGS_KEY]);
+      const stored = result[HIGHLIGHTER_SETTINGS_KEY];
+      const parsed = parseStoredHighlighterSettings(stored);
+      const migrated = resolveLoadedHighlighterSettings(
+        parsed.value.borderPresets,
+        parsed.value.defaultBorderPresetId,
+        parsed.value
+      );
+      if (stored !== undefined && isStoredHighlighterSettingsUnsafeForWrite(parsed)) {
+        cacheLoadedHighlighterSettings(migrated);
+        return false;
+      }
+      if (stored !== undefined && JSON.stringify(stored) === JSON.stringify(migrated)) {
+        cacheLoadedHighlighterSettings(migrated);
+        return false;
+      }
+      await writeHighlighterSettings(migrated, permit);
+      return true;
+    })
+  );
 }
 
 /**
  * Добавляет новый пресет рамки
  */
-export async function addBorderPreset(preset: BorderPreset): Promise<void> {
-  await updateHighlighterSettings((settings) => ({
-    ...settings,
-    borderPresets: [...settings.borderPresets, preset],
-  }));
+export async function addBorderPreset(preset: BorderPreset): Promise<boolean> {
+  return (await addBorderPresetWithOutcome(preset)) === 'applied';
+}
+
+export async function addBorderPresetWithOutcome(
+  preset: BorderPreset
+): Promise<HighlighterMutationOutcome> {
+  return runHighlighterSettingsCommand((settings) => {
+    const nextSettings = addUserBorderPreset(settings, preset);
+    return nextSettings ? { outcome: 'applied', settings: nextSettings } : { outcome: 'rejected' };
+  });
 }
 
 /**
  * Обновляет существующий пресет рамки
  */
-export async function updateBorderPreset(preset: BorderPreset): Promise<void> {
-  await updateHighlighterSettings((settings) => {
-    const index = settings.borderPresets.findIndex((current) => current.id === preset.id);
-    if (index < 0) {
-      return null;
-    }
+export async function updateBorderPreset(preset: BorderPreset): Promise<boolean> {
+  return (await updateBorderPresetWithOutcome(preset)) === 'applied';
+}
 
-    const nextPreset = settings.borderPresets[index]?.isSystemDefault
-      ? { ...preset, enabled: true, isSystemDefault: true }
-      : preset;
-
-    return {
-      ...settings,
-      borderPresets: settings.borderPresets.map((item, itemIndex) =>
-        itemIndex === index ? nextPreset : item
-      ),
-    };
+export async function updateBorderPresetWithOutcome(
+  preset: BorderPreset
+): Promise<HighlighterMutationOutcome> {
+  return runHighlighterSettingsCommand((settings) => {
+    const exists = settings.borderPresets.some((current) => current.id === preset.id);
+    const nextSettings = updateExistingBorderPreset(settings, preset);
+    if (nextSettings) return { outcome: 'applied', settings: nextSettings };
+    return { outcome: exists ? 'unchanged' : 'rejected' };
   });
 }
 
@@ -161,75 +242,43 @@ export async function updateBorderPreset(preset: BorderPreset): Promise<void> {
  * Удаляет пресет рамки (кроме системного)
  */
 export async function deleteBorderPreset(presetId: string): Promise<boolean> {
-  return updateHighlighterSettings((settings) => {
-    const preset = settings.borderPresets.find((current) => current.id === presetId);
-
-    if (preset?.isSystemDefault) {
-      return null;
-    }
-
-    const filtered = settings.borderPresets.filter((current) => current.id !== presetId);
-    if (filtered.length === 0 || filtered.length === settings.borderPresets.length) {
-      return null;
-    }
-
-    return {
-      ...settings,
-      borderPresets: filtered,
-      defaultBorderPresetId: resolveDefaultBorderPresetId(filtered, settings.defaultBorderPresetId),
-    };
-  });
+  return updateHighlighterSettings((settings) => deleteUserBorderPreset(settings, presetId));
 }
 
 /**
  * Устанавливает дефолтный пресет рамки
  */
-export async function setDefaultBorderPreset(presetId: string): Promise<void> {
-  await updateHighlighterSettings((settings) => {
-    const preset = settings.borderPresets.find((current) => current.id === presetId);
-    if (!preset || preset.enabled === false) {
-      return null;
-    }
+export async function setDefaultBorderPreset(presetId: string): Promise<boolean> {
+  return (await setDefaultBorderPresetWithOutcome(presetId)) === 'applied';
+}
 
-    return {
-      ...settings,
-      defaultBorderPresetId: presetId,
-    };
+export async function setDefaultBorderPresetWithOutcome(
+  presetId: string
+): Promise<HighlighterMutationOutcome> {
+  return runHighlighterSettingsCommand((settings) => {
+    const target = settings.borderPresets.find((preset) => preset.id === presetId);
+    if (!target || target.enabled === false) return { outcome: 'rejected' };
+    if (settings.defaultBorderPresetId === presetId) return { outcome: 'unchanged' };
+    const nextSettings = setPresetAsDefault(settings, presetId);
+    return nextSettings ? { outcome: 'applied', settings: nextSettings } : { outcome: 'rejected' };
   });
 }
 
-export async function setBorderPresetEnabled(presetId: string, enabled: boolean): Promise<void> {
-  await updateHighlighterSettings((settings) => {
-    const preset = settings.borderPresets.find((current) => current.id === presetId);
-    if (!preset || preset.isSystemDefault) {
-      return null;
-    }
-
-    const borderPresets = settings.borderPresets.map((current) =>
-      current.id === presetId ? { ...current, enabled } : current
-    );
-
-    return {
-      ...settings,
-      borderPresets,
-      defaultBorderPresetId: resolveDefaultBorderPresetId(
-        borderPresets,
-        settings.defaultBorderPresetId
-      ),
-    };
-  });
+export async function setBorderPresetEnabled(presetId: string, enabled: boolean): Promise<boolean> {
+  return updateHighlighterSettings((settings) => setPresetEnabled(settings, presetId, enabled));
 }
 
 /**
  * Обновляет порядок пресетов (после Drag-n-Drop)
  */
-export async function updateBorderPresetsOrder(orderedIds: string[]): Promise<void> {
-  await updateHighlighterSettings((settings) => {
-    return {
-      ...settings,
-      borderPresets: reorderBorderPresets(settings.borderPresets, orderedIds),
-    };
-  });
+export async function updateBorderPresetsOrder(orderedIds: string[]): Promise<boolean> {
+  return updateHighlighterSettings((settings) => reorderPresets(settings, orderedIds));
+}
+
+export async function resetSystemBorderPreset(presetId: string): Promise<boolean> {
+  return updateHighlighterSettings((settings) =>
+    resetSystemBorderPresetToCanonical(settings, presetId)
+  );
 }
 
 /**

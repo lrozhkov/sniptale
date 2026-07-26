@@ -32,6 +32,7 @@ function createScreenshotRuntime(args: {
     capturePersistence: args.params.capturePersistence,
     captureActionRef: args.params.captureActionRef,
     session: args.session,
+    setCaptureAction: args.params.setCaptureAction,
     setIsCompletelyHidden: args.params.setIsCompletelyHidden,
     setIsToolbarVisible: args.params.setIsToolbarVisible,
     setNavigationLockEnabled: args.params.setNavigationLockEnabled,

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const targetPolicy = vi.hoisted(() => ({
   hasBlockingHighlighterPopover: vi.fn(() => false),
+  isInsideExistingFrame: vi.fn(() => false),
   isHighlighterExtensionUiElement: vi.fn(() => false),
   isNearExistingFrameBorder: vi.fn(() => false),
 }));

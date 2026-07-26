@@ -11,16 +11,21 @@ import {
   createFrameDataFixture,
 } from '../../frame-runtime/react/test-support';
 import { InteractiveFrameCalloutOverlay } from './callout';
+import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 
 vi.mock('../../callout', () => ({
   Callout: (props: {
     frameRect: { width: number; height: number };
     onContentChange: (html: string) => void;
     onPositionChange: (placement: { centerOffsetX: number; centerOffsetY: number }) => void;
+    onSettingsClick: () => void;
     onTailBaseRangeChange: (position: number, width: number) => void;
     onTailFramePositionChange: (position: number) => void;
   }) => (
     <>
+      <button data-ui="callout-settings" onClick={props.onSettingsClick} type="button">
+        settings
+      </button>
       <button
         data-ui="callout-change"
         onClick={() => props.onContentChange('<p>updated</p>')}
@@ -97,6 +102,13 @@ function createFrame(): FrameData {
   });
 }
 
+function createControlProps() {
+  return {
+    calloutPopoverAnchorRef: { current: null },
+    isCalloutPopoverOpen: false,
+  };
+}
+
 describe('interactive frame callout overlay', () => {
   it('commits the merged frame snapshot immediately when callout content changes', () => {
     const frame = createFrame();
@@ -105,6 +117,7 @@ describe('interactive frame callout overlay', () => {
 
     renderNode(
       <InteractiveFrameCalloutOverlay
+        {...createControlProps()}
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
@@ -141,6 +154,7 @@ describe('interactive frame callout overlay', () => {
 
     renderNode(
       <InteractiveFrameCalloutOverlay
+        {...createControlProps()}
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
@@ -172,6 +186,7 @@ describe('interactive frame callout overlay', () => {
 
     renderNode(
       <InteractiveFrameCalloutOverlay
+        {...createControlProps()}
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
@@ -201,6 +216,7 @@ describe('interactive frame callout overlay', () => {
 
     renderNode(
       <InteractiveFrameCalloutOverlay
+        {...createControlProps()}
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
@@ -229,6 +245,7 @@ describe('interactive frame callout overlay', () => {
 
     renderNode(
       <InteractiveFrameCalloutOverlay
+        {...createControlProps()}
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
@@ -243,5 +260,33 @@ describe('interactive frame callout overlay', () => {
     expect(container?.querySelector('[data-ui="callout-frame-size"]')?.textContent).toBe(
       `${frame.width + 6}×${frame.height + 6}`
     );
+  });
+
+  it('opens comment settings through the quick-popover transition', () => {
+    const frame = createFrame();
+    useFrameUIStore.getState().reset();
+
+    renderNode(
+      <InteractiveFrameCalloutOverlay
+        {...createControlProps()}
+        frame={frame}
+        currentFrame={frame}
+        frameZIndex={100}
+        borderWidth={3}
+        isCalloutEditing={false}
+        setIsCalloutEditing={vi.fn()}
+        setTempFrame={vi.fn()}
+        onUpdate={vi.fn()}
+      />
+    );
+
+    act(() => {
+      container?.querySelector<HTMLButtonElement>('[data-ui="callout-settings"]')?.click();
+    });
+
+    expect(useFrameUIStore.getState().activePopover).toEqual({
+      frameId: frame.id,
+      kind: 'callout-settings',
+    });
   });
 });

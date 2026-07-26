@@ -13,7 +13,10 @@ export function PageStylePropertyControls(props: {
   const imageSelected = selectedKind === 'image';
 
   return (
-    <div className="grid gap-2.5">
+    <div
+      data-ui="content.page-style-inspector.property-controls"
+      className="grid w-full min-w-0 max-w-full gap-2.5"
+    >
       {imageSelected ? <ImageSection {...props} /> : <TextSection {...props} />}
       <BoxSection {...props} />
       <AppearanceSection {...props} />

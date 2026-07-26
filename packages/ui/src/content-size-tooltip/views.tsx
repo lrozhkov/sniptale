@@ -1,5 +1,5 @@
 import { useRef, type CSSProperties } from 'react';
-import { ChevronDown, ChevronUp, Link2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Link2, X } from 'lucide-react';
 import type { ContentSizeTooltipProps } from './types';
 import {
   CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE,
@@ -14,6 +14,13 @@ import {
 } from './styles';
 import { startContentSizeTooltipStepperRepeat } from './repeat';
 import { TooltipSizeInput } from './input';
+
+const CONTENT_SIZE_TOOLTIP_ACTION_ICON_STYLE = {
+  display: 'block',
+  flex: '0 0 auto',
+  width: 16,
+  height: 16,
+} as const;
 
 function addStepperReleaseListeners(stopRepeating: () => void): void {
   const stopRepeatingOnce = () => {
@@ -183,30 +190,45 @@ function TooltipAspectRatioButton(props: {
   );
 }
 
-function TooltipActions(props: Pick<ContentSizeTooltipProps, 'copy' | 'onCancel' | 'onConfirm'>) {
+function TooltipActions(
+  props: Pick<ContentSizeTooltipProps, 'copy' | 'onCancel' | 'onConfirm' | 'variant'>
+) {
+  const variant = props.variant ?? 'default';
+  const compact = variant === 'frame-edit';
+
   return (
     <div style={CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE as CSSProperties}>
       <button
         type="button"
+        {...(compact ? { 'aria-label': props.copy.cancel, title: props.copy.cancel } : {})}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
           props.onCancel();
         }}
-        style={getContentSizeTooltipActionButtonStyle('neutral') as CSSProperties}
+        style={getContentSizeTooltipActionButtonStyle('neutral', variant) as CSSProperties}
       >
-        {props.copy.cancel}
+        {compact ? (
+          <X size={16} strokeWidth={2.25} style={CONTENT_SIZE_TOOLTIP_ACTION_ICON_STYLE} />
+        ) : (
+          props.copy.cancel
+        )}
       </button>
       <button
         type="button"
+        {...(compact ? { 'aria-label': props.copy.confirm, title: props.copy.confirm } : {})}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
           props.onConfirm();
         }}
-        style={getContentSizeTooltipActionButtonStyle('accent') as CSSProperties}
+        style={getContentSizeTooltipActionButtonStyle('accent', variant) as CSSProperties}
       >
-        {props.copy.confirm}
+        {compact ? (
+          <Check size={16} strokeWidth={2.25} style={CONTENT_SIZE_TOOLTIP_ACTION_ICON_STYLE} />
+        ) : (
+          props.copy.confirm
+        )}
       </button>
     </div>
   );
@@ -248,7 +270,12 @@ export function ContentSizeTooltipContent(
         value={props.heightValue}
       />
       <TooltipDivider />
-      <TooltipActions copy={props.copy} onCancel={props.onCancel} onConfirm={props.onConfirm} />
+      <TooltipActions
+        copy={props.copy}
+        onCancel={props.onCancel}
+        onConfirm={props.onConfirm}
+        variant={props.variant ?? 'default'}
+      />
     </>
   );
 }

@@ -2,14 +2,19 @@ import { getAccessibleIframes, getIframeDocument, isIframeAccessible } from './c
 import { escapeCssIdentifier } from '@sniptale/platform/browser/iframe-selectors/css';
 
 type SniptaleLookup = { element: HTMLElement; iframe?: HTMLIFrameElement } | null;
+const retainedSniptaleIds = new Set<string>();
 
 function findElementBySniptaleIdInDocument(doc: Document, id: string): HTMLElement | null {
   return doc.querySelector(`[data-sniptale-id="${escapeCssIdentifier(id)}"]`) as HTMLElement | null;
 }
 
-function clearSniptaleIdsInDocument(doc: Document): void {
+function clearSniptaleIdsInDocument(doc: Document, shouldClear: (id: string) => boolean): void {
   doc.querySelectorAll('[data-sniptale-id]').forEach((element) => {
-    delete (element as HTMLElement).dataset['sniptaleId'];
+    const htmlElement = element as HTMLElement;
+    const id = htmlElement.dataset['sniptaleId'];
+    if (id && shouldClear(id)) {
+      delete htmlElement.dataset['sniptaleId'];
+    }
   });
 }
 
@@ -46,7 +51,10 @@ function findElementInNestedIframes(
   return null;
 }
 
-function clearSniptaleIdsInNestedIframes(iframes: Iterable<HTMLIFrameElement>): void {
+function clearSniptaleIdsInNestedIframes(
+  iframes: Iterable<HTMLIFrameElement>,
+  shouldClear: (id: string) => boolean
+): void {
   for (const iframe of iframes) {
     try {
       const iframeDoc = getIframeDocument(iframe);
@@ -54,16 +62,22 @@ function clearSniptaleIdsInNestedIframes(iframes: Iterable<HTMLIFrameElement>): 
         continue;
       }
 
-      clearSniptaleIdsInDocument(iframeDoc);
+      clearSniptaleIdsInDocument(iframeDoc, shouldClear);
       clearSniptaleIdsInNestedIframes(
         Array.from(iframeDoc.querySelectorAll('iframe')).filter((nestedIframe) =>
           isIframeAccessible(nestedIframe)
-        )
+        ),
+        shouldClear
       );
     } catch {
       // Ignore cross-origin errors.
     }
   }
+}
+
+function clearMatchingSniptaleIds(shouldClear: (id: string) => boolean): void {
+  clearSniptaleIdsInDocument(document, shouldClear);
+  clearSniptaleIdsInNestedIframes(getAccessibleIframes(), shouldClear);
 }
 
 /**
@@ -79,9 +93,27 @@ export function findElementBySniptaleId(id: string): SniptaleLookup {
 }
 
 /**
- * Clear all data-sniptale-id attributes from all documents (top-level + iframes).
+ * Clear unretained data-sniptale-id attributes from all documents (top-level + iframes).
  */
 export function clearAllSniptaleIds(): void {
-  clearSniptaleIdsInDocument(document);
-  clearSniptaleIdsInNestedIframes(getAccessibleIframes());
+  clearMatchingSniptaleIds((id) => !retainedSniptaleIds.has(id));
+}
+
+/**
+ * Keeps a transient parser id available while another content owner uses it as an in-memory
+ * locator. The id remains removable when that owner releases its bounded session.
+ */
+export function retainSniptaleId(id: string): void {
+  if (id) {
+    retainedSniptaleIds.add(id);
+  }
+}
+
+/**
+ * Releases and removes only the ids retained by a completed owner session.
+ */
+export function clearRetainedSniptaleIds(ids: Iterable<string>): void {
+  const idsToClear = new Set(ids);
+  idsToClear.forEach((id) => retainedSniptaleIds.delete(id));
+  clearMatchingSniptaleIds((id) => idsToClear.has(id));
 }

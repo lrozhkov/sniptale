@@ -26,6 +26,7 @@ export interface ProductToolbarMenuItemProps {
 export interface ProductToolbarMenuItemCopyProps {
   label: ReactNode;
   hint?: ReactNode;
+  showHintInCompact?: boolean;
 }
 
 export interface ProductToolbarMenuBadgeProps {
@@ -100,11 +101,26 @@ export function ProductToolbarMenuItem({
   );
 }
 
-export function ProductToolbarMenuItemCopy({ label, hint }: ProductToolbarMenuItemCopyProps) {
+export function ProductToolbarMenuItemCopy({
+  label,
+  hint,
+  showHintInCompact = false,
+}: ProductToolbarMenuItemCopyProps) {
   return (
     <span className="sniptale-toolbar-menu-item-copy">
       <span className="sniptale-toolbar-menu-item-label">{label}</span>
-      {hint ? <span className="sniptale-toolbar-menu-item-hint">{hint}</span> : null}
+      {hint ? (
+        <span
+          className={[
+            'sniptale-toolbar-menu-item-hint',
+            showHintInCompact ? 'sniptale-toolbar-menu-item-hint--show-compact' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {hint}
+        </span>
+      ) : null}
     </span>
   );
 }

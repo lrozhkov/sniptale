@@ -1,5 +1,5 @@
-import { GripVertical } from 'lucide-react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import { GripVertical, Settings2 } from 'lucide-react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { AppTheme } from '../../../ui/theme';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
@@ -13,6 +13,7 @@ export type CalloutInteractionHandleProps = {
   handleHandleFocus: () => void;
   handleMouseEnter: () => void;
   handleMouseLeave: () => void;
+  handleSettingsClick: () => void;
   handleTailPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   handleTailKeyDown: (event: CalloutHandleKeyboardEvent) => void;
   handleTailBaseEndPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -26,11 +27,65 @@ export type CalloutInteractionHandleProps = {
   isTailBaseEndDragging: boolean;
   isTailFrameDragging: boolean;
   portalTheme: AppTheme | null;
+  settingsAnchorRef: RefObject<HTMLButtonElement | null>;
+  settingsHandleStyle: CSSProperties;
+  showSettingsHandle: boolean;
   tailHandleCursor: CSSProperties['cursor'];
   tailHandleStyle: CSSProperties | null;
   tailBaseEndHandleStyle: CSSProperties | null;
   tailFrameHandleStyle: CSSProperties | null;
 };
+
+function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
+  if (props.isEditing || !props.showSettingsHandle) return null;
+  const label = translate('content.interactiveFrame.calloutSettings');
+  return (
+    <button
+      ref={props.settingsAnchorRef}
+      type="button"
+      className="sniptale-callout-settings-handle"
+      data-theme={props.portalTheme ?? undefined}
+      aria-label={label}
+      title={label}
+      style={mergeThemeScopedStyle(props.portalTheme, {
+        ...props.settingsHandleStyle,
+        width: 20,
+        height: 20,
+        padding: 0,
+        borderRadius: '50%',
+        border: '1px solid var(--sniptale-color-border-soft)',
+        background: 'var(--sniptale-color-surface-panel)',
+        color: 'var(--sniptale-color-text-secondary)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        opacity: props.isHandleVisible ? 1 : 0,
+        pointerEvents: props.isHandleVisible ? 'auto' : 'none',
+        boxShadow:
+          '0 2px 8px color-mix(in srgb, var(--sniptale-color-shadow-strong) 24%, transparent)',
+        transition: 'opacity 120ms ease, color 120ms ease, border-color 120ms ease',
+      })}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.nativeEvent.stopImmediatePropagation();
+      }}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.nativeEvent.stopImmediatePropagation();
+        props.handleSettingsClick();
+      }}
+      onFocus={props.handleHandleFocus}
+      onBlur={props.handleHandleBlur}
+      onMouseEnter={props.handleMouseEnter}
+      onMouseLeave={props.handleMouseLeave}
+    >
+      <Settings2 size={13} aria-hidden="true" />
+    </button>
+  );
+}
 
 function renderCalloutMoveHandle(props: CalloutInteractionHandleProps) {
   if (props.isEditing) return null;
@@ -124,6 +179,7 @@ export function renderCalloutInteractionHandles(props: CalloutInteractionHandleP
   return (
     <>
       {renderCalloutMoveHandle(props)}
+      {renderCalloutSettingsHandle(props)}
       {renderCalloutTailHandle(props, {
         className: 'sniptale-callout-tail-base-start-handle',
         isDragging: props.isTailDragging,

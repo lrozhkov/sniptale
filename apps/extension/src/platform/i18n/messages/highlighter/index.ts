@@ -9,6 +9,16 @@ import {
 } from '../shared/blur-controls';
 
 export const highlighterMessages = defineMessageSource({
+  systemPresets: {
+    accent: { ru: 'Акцент', en: 'Accent' },
+    softHighlight: { ru: 'Мягкое выделение', en: 'Soft highlight' },
+    marker: { ru: 'Маркер', en: 'Marker' },
+    done: { ru: 'Готово', en: 'Done' },
+    attention: { ru: 'Внимание', en: 'Attention' },
+    review: { ru: 'Ревью', en: 'Review' },
+    lightUi: { ru: 'Для светлого интерфейса', en: 'For light UI' },
+    darkUi: { ru: 'Для тёмного интерфейса', en: 'For dark UI' },
+  },
   section: {
     title: {
       ru: 'Режим выделения',
@@ -94,6 +104,18 @@ export const highlighterMessages = defineMessageSource({
       ru: 'Системный пресет нельзя удалить',
       en: 'System preset cannot be deleted',
     },
+    lastEnabledPresetDisabled: {
+      ru: 'Должен остаться хотя бы один включённый пресет',
+      en: 'At least one preset must remain enabled',
+    },
+    resetSystemPresetTitle: {
+      ru: 'Восстановить заводской вариант',
+      en: 'Restore factory preset',
+    },
+    presetReset: {
+      ru: 'Заводской вариант восстановлен',
+      en: 'Factory preset restored',
+    },
     addButton: {
       ru: 'Добавить пресет',
       en: 'Add preset',
@@ -154,6 +176,10 @@ export const highlighterMessages = defineMessageSource({
       ru: 'Превью',
       en: 'Preview',
     },
+    previewSampleText: {
+      ru: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer vitae lectus vel erat consequat posuere.',
+      en: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer vitae lectus vel erat consequat posuere.',
+    },
     borderColorLabel: {
       ru: 'Цвет рамки',
       en: 'Border color',
@@ -185,10 +211,6 @@ export const highlighterMessages = defineMessageSource({
     radiusLabel: {
       ru: 'Скругление',
       en: 'Radius',
-    },
-    opacityLabel: {
-      ru: 'Совместимость',
-      en: 'Compatibility',
     },
     strokeOpacityLabel: {
       ru: 'Прозрачность линии',
@@ -241,10 +263,6 @@ export const highlighterMessages = defineMessageSource({
     customCssHint: {
       ru: '(безопасные свойства: background, font, text-*)',
       en: '(safe properties: background, font, text-*)',
-    },
-    inheritCustomCssLabel: {
-      ru: 'Наследовать',
-      en: 'Inherit',
     },
     customCssPlaceholder: {
       ru: 'background: rgba(249,115,22,0.1); font-weight: bold;',

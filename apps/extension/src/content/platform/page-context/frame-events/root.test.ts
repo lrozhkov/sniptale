@@ -11,7 +11,6 @@ import {
   addFocusOpacityChangedListener,
   addFrameCalloutChangedListener,
   addFrameStepBadgeChangedListener,
-  addHighlighterSettingsChangedListener,
   addSessionBlurSettingsChangedListener,
   addSessionFocusSettingsChangedListener,
   addStepBadgeReorderListener,
@@ -21,7 +20,6 @@ import {
   dispatchFocusOpacityChanged,
   dispatchFrameCalloutChanged,
   dispatchFrameStepBadgeChanged,
-  dispatchHighlighterSettingsChanged,
   dispatchSessionBlurSettingsChanged,
   dispatchSessionFocusSettingsChanged,
   dispatchStepBadgeReorder,
@@ -122,16 +120,5 @@ describe('content frame events for shared settings', () => {
     cleanupBlur();
     cleanupFocus();
     cleanupOpacity();
-  });
-
-  it('dispatches and subscribes to highlighter-settings changes', () => {
-    const listener = vi.fn();
-    const cleanup = addHighlighterSettingsChangedListener(listener);
-
-    dispatchHighlighterSettingsChanged({ defaultBorderPresetId: 'preset-7' });
-
-    expect(listener).toHaveBeenCalledWith({ defaultBorderPresetId: 'preset-7' });
-
-    cleanup();
   });
 });

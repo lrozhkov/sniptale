@@ -8,6 +8,7 @@ describe('selection-mode session authority', () => {
   it('creates every field with the canonical idle defaults', () => {
     expect(createSelectionModeSession()).toEqual({
       aspectRatio: null,
+      captureAction: 'download_default',
       cleanupEventListeners: null,
       cleanupScrollListeners: null,
       currentSelection: { x: 0, y: 0, width: 0, height: 0 },
@@ -23,6 +24,7 @@ describe('selection-mode session authority', () => {
       isResizing: false,
       maintainAspectRatio: false,
       mouseDownPoint: null,
+      onCaptureActionChange: null,
       rejectCallback: null,
       resizeDirection: null,
       resolveCallback: null,
@@ -65,6 +67,7 @@ describe('selection-mode session authority', () => {
     expect(session).toBe(identity);
     expect(session).toEqual({
       aspectRatio: null,
+      captureAction: 'download_default',
       cleanupEventListeners: null,
       cleanupScrollListeners: null,
       currentSelection: { x: 0, y: 0, width: 0, height: 0 },
@@ -80,6 +83,7 @@ describe('selection-mode session authority', () => {
       isResizing: false,
       maintainAspectRatio: false,
       mouseDownPoint: null,
+      onCaptureActionChange: null,
       rejectCallback: null,
       resizeDirection: null,
       resolveCallback: null,

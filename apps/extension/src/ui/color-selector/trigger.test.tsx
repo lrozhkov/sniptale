@@ -69,6 +69,7 @@ it('renders swatch-plus-hex trigger chrome with muted chevron styling', () => {
   const paletteButton = getButton('Grid color');
 
   expect(trigger?.className).toContain('focus-within:border-[var(--sniptale-field-border-active)]');
+  expect(trigger?.className).toContain('min-w-0');
   expect(trigger?.className).toContain('overflow-hidden');
   expect(trigger?.style.getPropertyValue('--sniptale-field-height')).toBe('40px');
   expect(trigger?.style.getPropertyValue('--sniptale-field-bg-active')).toContain(

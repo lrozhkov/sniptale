@@ -2,6 +2,7 @@ import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-
 import { createLazyContentDefaultOwner } from '../../application/default-owner';
 import { registerContentMode } from '../../application/mode-session';
 import { createSelectionModeController } from './controller';
+import type { SelectionModeActivationOptions } from './types';
 
 const selectionModeControllerOwner = createLazyContentDefaultOwner(createSelectionModeController);
 
@@ -9,8 +10,10 @@ const selectionModeControllerOwner = createLazyContentDefaultOwner(createSelecti
  * Включает гибридный режим выделения области
  * @returns Promise с координатами выделенной области
  */
-export function enableSelectionMode(): Promise<CaptureArea> {
-  return selectionModeControllerOwner.getOwner().enableSelectionMode();
+export function enableSelectionMode(
+  options?: SelectionModeActivationOptions
+): Promise<CaptureArea> {
+  return selectionModeControllerOwner.getOwner().enableSelectionMode(options);
 }
 
 /**

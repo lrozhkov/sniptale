@@ -58,7 +58,6 @@ const testBorderSettings: BorderPreset = {
   inheritCustomCss: false,
   strokeOpacity: 100,
   id: 'preset-1',
-  isSystemDefault: true,
   name: 'Preset',
   opacity: 100,
   order: 0,

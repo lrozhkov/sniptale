@@ -1,21 +1,23 @@
 import type { EffectMode, FocusSettings } from '../../../features/highlighter/contracts';
 import { parseBorderPresetsFromStorage } from './border-preset';
-import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
+import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 import { parseDefaultBlurSettings } from './blur-settings';
 
-interface ParsedValue {
+interface ParsedHighlighterSettingsValue {
   borderPresets?: ReturnType<typeof parseBorderPresetsFromStorage>['borderPresets'];
   defaultBorderPresetId?: string;
   defaultBlurSettings?: ReturnType<typeof parseDefaultBlurSettings>['value'];
   defaultEffectMode?: EffectMode;
   defaultFocusSettings?: Partial<FocusSettings>;
+  systemPresetCatalogRevision?: number;
+  catalogCustomized?: boolean;
 }
 
 interface ParsedStorage {
   hasInvalidRoot: boolean;
   invalidFieldCount: number;
   migratedLegacyBlurFormat: boolean;
-  value: ParsedValue;
+  value: ParsedHighlighterSettingsValue;
 }
 
 type ParsedField = Pick<ParsedStorage, 'invalidFieldCount' | 'value'>;
@@ -50,12 +52,41 @@ function parseDefaultEffectMode(value: unknown): ParsedField {
     : { value: {}, invalidFieldCount: 1 };
 }
 
+function parseCatalogMetadata(value: Record<string, unknown>): ParsedField {
+  const parsed: Pick<
+    ParsedHighlighterSettingsValue,
+    'catalogCustomized' | 'systemPresetCatalogRevision'
+  > = {};
+  let invalidFieldCount = 0;
+
+  if (value['systemPresetCatalogRevision'] !== undefined) {
+    if (isNonNegativeInteger(value['systemPresetCatalogRevision'])) {
+      parsed.systemPresetCatalogRevision = value['systemPresetCatalogRevision'];
+    } else {
+      invalidFieldCount++;
+    }
+  }
+  if (value['catalogCustomized'] !== undefined) {
+    if (isBoolean(value['catalogCustomized'])) {
+      parsed.catalogCustomized = value['catalogCustomized'];
+    } else {
+      invalidFieldCount++;
+    }
+  }
+
+  return { value: parsed, invalidFieldCount };
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNumber(value) && Number.isInteger(value) && value >= 0;
+}
+
 function parseDefaultFocusSettings(value: unknown): ParsedField {
   if (value === undefined) {
     return { value: {}, invalidFieldCount: 0 };
   }
 
-  if (!isRecord(value)) {
+  if (!isPlainRecord(value)) {
     return { value: {}, invalidFieldCount: 1 };
   }
 
@@ -90,7 +121,7 @@ export function parseStoredHighlighterSettings(value: unknown): ParsedStorage {
     };
   }
 
-  if (!isRecord(value)) {
+  if (!isPlainRecord(value)) {
     return {
       value: {},
       hasInvalidRoot: true,
@@ -104,6 +135,7 @@ export function parseStoredHighlighterSettings(value: unknown): ParsedStorage {
   const defaultEffectMode = parseDefaultEffectMode(value['defaultEffectMode']);
   const parsedBlurSettings = parseDefaultBlurSettings(value['defaultBlurSettings']);
   const defaultFocusSettings = parseDefaultFocusSettings(value['defaultFocusSettings']);
+  const catalogMetadata = parseCatalogMetadata(value);
 
   return {
     value: {
@@ -114,6 +146,7 @@ export function parseStoredHighlighterSettings(value: unknown): ParsedStorage {
         ? {}
         : { defaultBlurSettings: parsedBlurSettings.value }),
       ...defaultFocusSettings.value,
+      ...catalogMetadata.value,
     },
     hasInvalidRoot: false,
     invalidFieldCount:
@@ -121,7 +154,8 @@ export function parseStoredHighlighterSettings(value: unknown): ParsedStorage {
       defaultBorderPresetId.invalidFieldCount +
       defaultEffectMode.invalidFieldCount +
       parsedBlurSettings.invalidFieldCount +
-      defaultFocusSettings.invalidFieldCount,
+      defaultFocusSettings.invalidFieldCount +
+      catalogMetadata.invalidFieldCount,
     migratedLegacyBlurFormat: parsedBlurSettings.migratedLegacyBlurFormat,
   };
 }

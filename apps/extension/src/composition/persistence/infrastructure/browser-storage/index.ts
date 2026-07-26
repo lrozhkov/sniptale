@@ -2,7 +2,7 @@ import { subscribeToChromeEvent } from '@sniptale/platform/browser/callback';
 import type { BrowserStorageAdapter } from '@sniptale/platform/browser/storage-types';
 import { createStorageAreaAdapter } from './area-adapter';
 
-export const browserStorage: BrowserStorageAdapter = {
+export const browserStorage = {
   local: createStorageAreaAdapter('local', true),
   sync: createStorageAreaAdapter('sync', true),
   session: createStorageAreaAdapter('session', true),
@@ -14,4 +14,4 @@ export const browserStorage: BrowserStorageAdapter = {
   subscribeToChanges(listener) {
     return subscribeToChromeEvent(chrome.storage?.onChanged, listener);
   },
-};
+} satisfies BrowserStorageAdapter;

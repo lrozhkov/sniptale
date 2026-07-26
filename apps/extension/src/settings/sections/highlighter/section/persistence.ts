@@ -1,6 +1,6 @@
 import {
   loadHighlighterSettings,
-  saveHighlighterSettings,
+  type HighlighterMutationOutcome,
 } from '../../../../composition/persistence/highlighter';
 import type { HighlighterSettings } from '../../../../features/highlighter/contracts';
 
@@ -16,7 +16,7 @@ const settingsSnapshots = new WeakMap<
   HighlighterSettingsPersistenceSession,
   HighlighterSettings | null
 >();
-const settingsSaveQueues = new WeakMap<HighlighterSettingsPersistenceSession, Promise<void>>();
+const settingsMutationQueues = new WeakMap<HighlighterSettingsPersistenceSession, Promise<void>>();
 
 export function createHighlighterSettingsPersistenceSession(): HighlighterSettingsPersistenceSession {
   return {};
@@ -57,42 +57,44 @@ function commitHighlighterSettings(
   state.setSettings(settings);
 }
 
-export async function saveQueuedHighlighterSettings(
+export async function runQueuedHighlighterMutation(
   state: HighlighterSettingsPersistenceState,
-  buildUpdated: (settings: HighlighterSettings) => HighlighterSettings | null,
-  persistSettings: (settings: HighlighterSettings) => Promise<void> = saveHighlighterSettings,
+  mutate: () => Promise<HighlighterMutationOutcome | boolean | void>,
   readSettings: () => Promise<HighlighterSettings> = loadHighlighterSettings
-): Promise<HighlighterSettings | null> {
+): Promise<{
+  applied: boolean;
+  outcome: HighlighterMutationOutcome;
+  settings: HighlighterSettings;
+} | null> {
   const key = getStateKey(state);
 
-  const runSave = async () => {
+  const runMutation = async () => {
     if (!reconcileCurrentHighlighterSettings(state)) {
       return null;
     }
 
+    const mutationResult = await mutate();
+    const outcome: HighlighterMutationOutcome =
+      mutationResult === undefined || mutationResult === true
+        ? 'applied'
+        : mutationResult === false
+          ? 'rejected'
+          : mutationResult;
     const settings = await readSettings();
     commitHighlighterSettings(state, settings);
-
-    const updated = buildUpdated(settings);
-    if (!updated) {
-      return null;
-    }
-
-    await persistSettings(updated);
-    commitHighlighterSettings(state, updated);
-    return updated;
+    return { applied: outcome === 'applied', outcome, settings };
   };
 
-  const previousSave = settingsSaveQueues.get(key) ?? Promise.resolve();
-  const nextSave = previousSave.catch(() => undefined).then(runSave);
+  const previousMutation = settingsMutationQueues.get(key) ?? Promise.resolve();
+  const nextMutation = previousMutation.catch(() => undefined).then(runMutation);
 
-  settingsSaveQueues.set(
+  settingsMutationQueues.set(
     key,
-    nextSave.then(
+    nextMutation.then(
       () => undefined,
       () => undefined
     )
   );
 
-  return nextSave;
+  return nextMutation;
 }

@@ -17,13 +17,15 @@ const domHost = vi.hoisted(() => ({
   ]),
   queryContentUiElement: vi.fn(() => null),
 }));
+const targetPolicy = vi.hoisted(() => ({
+  hasBlockingHighlighterPopover: vi.fn(() => false),
+  isInsideExistingFrame: vi.fn(() => false),
+  isHighlighterExtensionUiElement: vi.fn(() => false),
+  isNearExistingFrameBorder: vi.fn(() => false),
+}));
 
 vi.mock('../../parser/page-preparation/target', () => targetResolver);
-vi.mock('./targets', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./targets')>()),
-  hasBlockingHighlighterPopover: () => false,
-  isHighlighterExtensionUiElement: () => false,
-}));
+vi.mock('./targets', () => targetPolicy);
 vi.mock('../../platform/frame', () => framePlatform);
 vi.mock('../../platform/dom-host', () => domHost);
 vi.mock('../../platform/dom-host/isolated', () => ({
@@ -36,6 +38,10 @@ import { createFreeFrameDrawingHandlers, type FreeFramePointerEvent } from './dr
 import { createHoverInteractionHandlers } from './interactions';
 import { createHoverSession } from './session';
 import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
+import { setFrameSessionBorderPreset } from '../frame-runtime/session/border-preset';
+import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
+import { createFrameSelectionEventHandlers } from '../frame-runtime/ui-controller/activation';
+import type { FrameData } from '../../../features/highlighter/contracts';
 
 class TestPointerEvent extends MouseEvent implements FreeFramePointerEvent {
   readonly pointerId: number;
@@ -64,8 +70,18 @@ function createPointerEvent(
   return event;
 }
 
-function createClickEvent(target: HTMLElement, pointerId = 1): MouseEvent {
-  const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+function createClickEvent(
+  target: HTMLElement,
+  pointerId = 1,
+  clientX = 0,
+  clientY = 0
+): MouseEvent {
+  const event = new MouseEvent('click', {
+    bubbles: true,
+    cancelable: true,
+    clientX,
+    clientY,
+  });
   Object.defineProperty(event, 'target', { configurable: true, value: target });
   Object.defineProperty(event, 'pointerId', { configurable: true, value: pointerId });
   return event;
@@ -121,9 +137,57 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vi.clearAllMocks();
+  targetPolicy.hasBlockingHighlighterPopover.mockReturnValue(false);
+  targetPolicy.isHighlighterExtensionUiElement.mockReturnValue(false);
+  targetPolicy.isInsideExistingFrame.mockReturnValue(false);
+  targetPolicy.isNearExistingFrameBorder.mockReturnValue(false);
+  setFrameSessionBorderPreset(DEFAULT_BORDER_PRESET);
 });
 
 describe('free frame drawing gesture', () => {
+  it('renders the selected preset with drawing-layer opacity', () => {
+    const { handlers } = createFixture();
+    setFrameSessionBorderPreset({
+      id: 'drawing-preset',
+      name: 'Drawing',
+      enabled: true,
+      order: 0,
+      width: 4,
+      color: '#8B5CF6',
+      style: 'dashed',
+      radius: 8,
+      padding: { top: 5, right: 5, bottom: 5, left: 5 },
+      shadow: 30,
+      opacity: 100,
+      strokeOpacity: 70,
+      fillColor: '#EF4444',
+      fillOpacity: 7,
+      inheritCustomCss: false,
+      customCss: '',
+    });
+
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 60, 60));
+
+    const preview = document.querySelector<HTMLElement>('.sniptale-free-frame-draft');
+    expect(preview?.style.opacity).toBe('0.88');
+    expect(preview?.style.borderStyle).toBe('dashed');
+    expect(preview?.style.borderWidth).toBe('4px');
+    expect(preview?.style.borderRadius).toBe('8px');
+    expect(preview?.style.background).toBe('rgba(239, 68, 68, 0.07)');
+    expect(preview?.style.boxShadow).not.toBe('none');
+  });
+
+  it('does not start a page gesture through an open settings popover', () => {
+    const { handlers, session } = createFixture();
+    targetPolicy.hasBlockingHighlighterPopover.mockReturnValue(true);
+
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20));
+
+    expect(session.freeDraw.gesture).toBeNull();
+    expect(targetResolver.resolvePagePreparationTarget).not.toHaveBeenCalled();
+  });
+
   it('hides every other frame control as soon as drawing takes ownership', () => {
     const { handlers } = createFixture();
     useFrameUIStore.getState().hoverFrame('other-frame');
@@ -208,6 +272,40 @@ describe('free frame drawing gesture', () => {
     expect(handlers.consumeSuppressedClick()).toBe(true);
     expect(handlers.consumeSuppressedClick()).toBe(false);
     expect(document.querySelector('.sniptale-free-frame-draft-portal')).toBeNull();
+  });
+
+  it('clears a post-draw click before an earlier frame activation listener can select', () => {
+    const { handlers } = createFixture();
+    const target = document.createElement('div');
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 100, 100, target));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 60, 60, target));
+    handlers.handlePointerUp(createPointerEvent('pointerup', 60, 60, target));
+    const existingFrame: FrameData = {
+      effectMode: 'border',
+      height: 120,
+      id: 'existing-frame',
+      width: 120,
+      x: 20,
+      y: 20,
+    };
+    const selectFrame = vi.fn();
+    const click = createClickEvent(target, 1, 60, 60);
+    const frameActivation = createFrameSelectionEventHandlers({
+      activePopoverRef: { current: null },
+      clearSelection: vi.fn(),
+      consumeSuppressedClick: handlers.consumeSuppressedClick,
+      framesRef: { current: [existingFrame] },
+      hoveredFrameIdRef: { current: null },
+      hoverFrame: vi.fn(),
+      selectedFrameIdRef: { current: null },
+      selectFrame,
+    });
+
+    frameActivation.click(click);
+
+    expect(click.defaultPrevented).toBe(true);
+    expect(selectFrame).not.toHaveBeenCalled();
+    expect(handlers.consumeSuppressedClick(click)).toBe(false);
   });
 
   it('keeps an exact-threshold gesture on the existing click path', () => {
@@ -319,31 +417,34 @@ describe('free frame drawing cancellation and continuity', () => {
     expect(showHoverOverlay).toHaveBeenCalledWith(target);
   });
 
-  it.each(['sniptale-frame-toolbar-trigger', 'sniptale-toolbar-portal-wrapper'])(
-    'keeps an active draw alive across a mouseleave into %s UI',
-    (uiClassName) => {
-      const { addFreeFrame, handlers, session } = createFixture();
-      const pageTarget = document.createElement('section');
-      const uiTarget = document.createElement('div');
-      uiTarget.className = uiClassName;
+  it.each([
+    'sniptale-frame-toolbar-trigger',
+    'sniptale-frame-quick-action',
+    'sniptale-toolbar-portal-wrapper',
+    'sniptale-callout-settings-handle',
+    'sniptale-step-badge-controls',
+  ])('keeps an active draw alive across a mouseleave into %s UI', (uiClassName) => {
+    const { addFreeFrame, handlers, session } = createFixture();
+    const pageTarget = document.createElement('section');
+    const uiTarget = document.createElement('div');
+    uiTarget.className = uiClassName;
 
-      handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20, pageTarget));
-      handlers.handlePointerMove(createPointerEvent('pointermove', 40, 40, pageTarget));
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20, pageTarget));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 40, 40, pageTarget));
 
-      expect(handlers.cancelDrawing('mouseleave')).toBe(false);
-      expect(session.freeDraw.gesture?.isDrawing).toBe(true);
+    expect(handlers.cancelDrawing('mouseleave')).toBe(false);
+    expect(session.freeDraw.gesture?.isDrawing).toBe(true);
 
-      handlers.handlePointerMove(createPointerEvent('pointermove', 70, 70, uiTarget));
-      handlers.handlePointerUp(createPointerEvent('pointerup', 70, 70, uiTarget));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 70, 70, uiTarget));
+    handlers.handlePointerUp(createPointerEvent('pointerup', 70, 70, uiTarget));
 
-      expect(addFreeFrame).toHaveBeenCalledOnce();
-      expect(addFreeFrame).toHaveBeenCalledWith(
-        expect.objectContaining({ x: 20, y: 20, width: 50, height: 50 }),
-        pageTarget
-      );
-      expect(session.freeDraw.gesture).toBeNull();
-    }
-  );
+    expect(addFreeFrame).toHaveBeenCalledOnce();
+    expect(addFreeFrame).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 20, y: 20, width: 50, height: 50 }),
+      pageTarget
+    );
+    expect(session.freeDraw.gesture).toBeNull();
+  });
 
   it('keeps an active draw alive across scroll until pointerup', () => {
     const { addFreeFrame, handlers, session } = createFixture();

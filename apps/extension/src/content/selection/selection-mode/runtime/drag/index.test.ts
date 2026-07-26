@@ -38,8 +38,10 @@ function createRuntimeArgs(
     getAbsolutePosition: vi.fn(() => ({ x: 0, y: 0, width: 10, height: 10 })),
     getMaxSelectionHeight: () => 500,
     getMaxSelectionWidth: () => 500,
+    flushFinalFrameUpdate: vi.fn(),
     hideHoverFrame: vi.fn(),
     minSelectionSize: 10,
+    scheduleFinalFrameUpdate: vi.fn(),
     setupListenerHandlers: {
       handleClick: vi.fn(),
       handleKeyDown: vi.fn(),

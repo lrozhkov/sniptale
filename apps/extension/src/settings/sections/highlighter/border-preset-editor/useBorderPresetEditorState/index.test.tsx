@@ -8,6 +8,7 @@ import { useBorderPresetEditorState, type BorderPresetEditorProps } from '.';
 
 vi.mock('../../../../../platform/i18n', () => ({
   translate: (key: string) => key,
+  useAppLocale: () => 'en',
 }));
 
 type EditorState = ReturnType<typeof useBorderPresetEditorState>;
@@ -100,7 +101,6 @@ async function verifyExistingPresetEditBranch() {
   const preset = {
     id: 'preset-1',
     name: 'Existing border',
-    isSystemDefault: false,
     order: 3,
     width: 5,
     color: '#00aaff',

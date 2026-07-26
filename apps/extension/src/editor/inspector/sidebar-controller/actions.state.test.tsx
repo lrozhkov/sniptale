@@ -50,7 +50,10 @@ vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) =>
   },
 }));
 
-import { DEFAULT_BORDER_PRESET } from '../../../composition/persistence/highlighter';
+import {
+  DEFAULT_BORDER_PRESET,
+  DEFAULT_HIGHLIGHTER_SETTINGS,
+} from '../../../composition/persistence/highlighter';
 import { useBorderPresetsState, useRecentColorsState } from './actions.state';
 
 function createHookHarness<T>(useHook: () => T) {
@@ -127,7 +130,7 @@ it('loads, sorts, and falls back border presets through the owner state seam', a
   const empty = createHookHarness(() => useBorderPresetsState());
   await empty.flush();
 
-  expect(empty.value.borderPresets).toEqual([DEFAULT_BORDER_PRESET]);
+  expect(empty.value.borderPresets).toEqual(DEFAULT_HIGHLIGHTER_SETTINGS.borderPresets);
   expect(empty.value.defaultBorderPresetId).toBe(DEFAULT_BORDER_PRESET.id);
   empty.root.unmount();
 
@@ -135,7 +138,7 @@ it('loads, sorts, and falls back border presets through the owner state seam', a
   const failed = createHookHarness(() => useBorderPresetsState());
   await failed.flush();
 
-  expect(failed.value.borderPresets).toEqual([DEFAULT_BORDER_PRESET]);
+  expect(failed.value.borderPresets).toEqual(DEFAULT_HIGHLIGHTER_SETTINGS.borderPresets);
   failed.root.unmount();
 });
 

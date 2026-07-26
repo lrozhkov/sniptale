@@ -15,6 +15,12 @@ import { createTargetArgs } from './actions.helpers.catalog.test-support';
 function registerCatalogOptionsTest() {
   it('exposes the simplified arrow and text option catalogs', () => {
     const options = createStaticSidebarOptions();
+    const {
+      basedOnRevision: _basedOnRevision,
+      customized: _customized,
+      systemPresetKey: _systemPresetKey,
+      ...userPresetBase
+    } = DEFAULT_BORDER_PRESET;
 
     expectArrowOptionCatalog(options);
     expectLineOptionCatalog(options);
@@ -24,8 +30,20 @@ function registerCatalogOptionsTest() {
     expect(options.workspaceBackgroundPalette.length).toBeGreaterThan(0);
     expect(
       buildBorderPresetOptions([
-        { ...DEFAULT_BORDER_PRESET, id: 'hidden', name: 'Hidden', enabled: false },
-        { ...DEFAULT_BORDER_PRESET, id: 'visible', name: 'Visible', enabled: true },
+        {
+          ...userPresetBase,
+          id: 'hidden',
+          name: 'Hidden',
+          enabled: false,
+          origin: 'user',
+        },
+        {
+          ...userPresetBase,
+          id: 'visible',
+          name: 'Visible',
+          enabled: true,
+          origin: 'user',
+        },
       ])
     ).toEqual([{ label: 'Visible', value: 'visible' }]);
   });

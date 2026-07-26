@@ -64,6 +64,7 @@
     "./product-glass-toolbar": "./src/product-glass-toolbar/index.tsx",
     "./product-menus/dropdown": "./src/product-menus/dropdown/index.tsx",
     "./product-menus/toolbar": "./src/product-menus/toolbar/index.tsx",
+    "./product-menus/toolbar/dom": "./src/product-menus/toolbar/dom.ts",
     "./product-modal/actions": "./src/product-modal/actions.tsx",
     "./product-modal": "./src/product-modal/index.tsx",
     "./product-save-dialog": "./src/product-save-dialog/index.tsx",

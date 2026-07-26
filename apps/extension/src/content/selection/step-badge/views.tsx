@@ -116,6 +116,24 @@ function getOffsetFromDirections(
   return { x, y };
 }
 
+function getManualPosition(settings: StepBadgeSettings, borderWidth: number) {
+  const placement = settings.manualPlacement;
+  if (!placement) return null;
+  const normalizedPosition = Math.max(0, Math.min(1, placement.position));
+  const position = `calc(${normalizedPosition * 100}% + ${borderWidth * (normalizedPosition - 0.5)}px)`;
+  const strokeCenterOffset = -borderWidth / 2;
+  if (placement.side === 'top') {
+    return { top: strokeCenterOffset, left: position, translate: 'translate(-50%, -50%)' };
+  }
+  if (placement.side === 'right') {
+    return { top: position, right: strokeCenterOffset, translate: 'translate(50%, -50%)' };
+  }
+  if (placement.side === 'bottom') {
+    return { bottom: strokeCenterOffset, left: position, translate: 'translate(-50%, 50%)' };
+  }
+  return { top: position, left: strokeCenterOffset, translate: 'translate(-50%, -50%)' };
+}
+
 export function getStepBadgeStyle(props: {
   borderColor: string;
   borderWidth: number;
@@ -123,13 +141,17 @@ export function getStepBadgeStyle(props: {
   shadow?: number;
   zIndex: number;
   clickable: boolean;
+  isDragging?: boolean;
 }): React.CSSProperties {
   const anchor = getEffectiveAnchor(props.settings);
   const sizeLevel = getEffectiveSizeLevel(props.settings);
   const fontSize = Math.max(12, props.borderWidth * 2.5) * sizeLevelToMultiplier(sizeLevel);
   const badgeSize = fontSize * 1.8;
-  const offset = getOffsetFromDirections(props.settings.offsetDirections, badgeSize);
-  const position = ANCHOR_POSITIONS[anchor];
+  const manualPosition = getManualPosition(props.settings, props.borderWidth);
+  const offset = manualPosition
+    ? { x: 0, y: 0 }
+    : getOffsetFromDirections(props.settings.offsetDirections, badgeSize);
+  const position = manualPosition ?? ANCHOR_POSITIONS[anchor];
   const shadowVisual =
     props.shadow === undefined ? null : resolveBorderShadowVisual(props.shadow, props.borderColor);
 
@@ -156,7 +178,7 @@ export function getStepBadgeStyle(props: {
     border: '2px solid var(--sniptale-color-surface-base)',
     userSelect: 'none',
     WebkitUserSelect: 'none',
-    transition: 'transform 0.1s ease-out, box-shadow 0.15s ease-out',
+    transition: props.isDragging ? 'none' : 'transform 0.1s ease-out, box-shadow 0.15s ease-out',
     top: position.top,
     bottom: position.bottom,
     left: position.left,

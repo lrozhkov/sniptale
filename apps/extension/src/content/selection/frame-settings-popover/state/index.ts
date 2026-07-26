@@ -3,7 +3,6 @@ import type {
   BorderPreset,
   FocusSettings,
 } from '../../../../features/highlighter/contracts';
-import { setDefaultBorderPreset } from '../../../../composition/persistence/highlighter';
 import {
   createFrameBlurHandlers,
   createFrameFocusHandlers,
@@ -34,7 +33,6 @@ export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs
   });
   const handleSelectPreset = createFrameSettingsPresetHandler({
     onApplyToFrame: args.onApplyToFrame,
-    setDefaultBorderPreset,
     setSelectedPresetId: session.selectPreset,
   });
   const blurHandlers = createFrameBlurHandlers({

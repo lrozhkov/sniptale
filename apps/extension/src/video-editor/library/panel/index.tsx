@@ -64,7 +64,6 @@ export function VideoEditorLibraryPanel({
         'shadow-[0_20px_48px_color-mix(in_srgb,var(--sniptale-color-overlay)_24%,transparent)]',
       ].join(' ')}
     >
-      <div className="sniptale-modal-accent-sm" />
       <VideoEditorLibraryPanelBody {...props} inputRefs={inputRefs} onClose={onClose} />
     </aside>
   );

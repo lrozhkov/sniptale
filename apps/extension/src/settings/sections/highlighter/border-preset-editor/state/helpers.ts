@@ -2,13 +2,16 @@ import { validateCssString } from '../../../../../features/highlighter/css-sanit
 import { DEFAULT_BORDER_PRESET } from '../../../../../composition/persistence/highlighter';
 import { colorToRgba, resolveBorderShadowVisual } from '../../../../../features/highlighter/style';
 import type { BorderPreset } from '../../../../../features/highlighter/contracts';
+import { getBorderPresetDisplayName } from '../../../../../features/highlighter/presets/display-name';
+import type { AppLocale } from '../../../../../platform/i18n';
 import type { BorderPresetDraftSetters } from '../useBorderPresetEditorState/types';
 
 export function applyBorderPresetDraftState(
   nextPreset: BorderPreset,
-  setters: BorderPresetDraftSetters
+  setters: BorderPresetDraftSetters,
+  locale?: AppLocale
 ) {
-  setters.setName(nextPreset.name);
+  setters.setName(getBorderPresetDisplayName(nextPreset, locale));
   setters.setWidth(nextPreset.width);
   setters.setColor(nextPreset.color);
   setters.setStyle(nextPreset.style);
@@ -19,7 +22,7 @@ export function applyBorderPresetDraftState(
   setters.setStrokeOpacity(nextPreset.strokeOpacity);
   setters.setFillColor(nextPreset.fillColor);
   setters.setFillOpacity(nextPreset.fillOpacity);
-  setters.setInheritCustomCss(nextPreset.inheritCustomCss);
+  setters.setInheritCustomCss(Boolean(nextPreset.customCss.trim()));
   setters.setCustomCss(nextPreset.customCss);
 }
 

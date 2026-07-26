@@ -5,12 +5,19 @@ import type { SelectionModeDom } from '../dom-types';
 
 const {
   calculateContentSizeTooltipPositionMock,
+  closeSelectionCaptureActionMenuMock,
   setContentSizeTooltipPositionMock,
   syncContentSizeTooltipValuesMock,
 } = vi.hoisted(() => ({
   calculateContentSizeTooltipPositionMock: vi.fn(() => ({ left: 12, top: 34 })),
+  closeSelectionCaptureActionMenuMock: vi.fn(),
   setContentSizeTooltipPositionMock: vi.fn(),
   syncContentSizeTooltipValuesMock: vi.fn(),
+}));
+
+vi.mock('../final-elements/capture-menu', () => ({
+  closeSelectionCaptureActionMenu: closeSelectionCaptureActionMenuMock,
+  createSelectionCaptureActionControls: vi.fn(),
 }));
 
 vi.mock('@sniptale/ui/content-size-tooltip/core', () => ({
@@ -22,16 +29,26 @@ vi.mock('@sniptale/ui/content-size-tooltip/core', () => ({
 
 vi.mock('@sniptale/ui/content-size-tooltip/dom', () => ({
   ContentSizeTooltipDom: undefined,
+  createContentSizeTooltipDivider: vi.fn(),
   createContentSizeTooltipDom: vi.fn(),
   setContentSizeTooltipPosition: setContentSizeTooltipPositionMock,
   syncContentSizeTooltipAspectRatioButtonState: vi.fn(),
   syncContentSizeTooltipValues: syncContentSizeTooltipValuesMock,
 }));
 
-import { cleanupSelectionModeDom, resetFinalElements, updateDragFrame, updateFinalFrame } from '.';
+import {
+  cleanupSelectionModeDom,
+  flushScheduledFinalFrameUpdate,
+  resetFinalElements,
+  scheduleDragFrameUpdate,
+  scheduleFinalFrameUpdate,
+  updateDragFrame,
+  updateFinalFrame,
+} from '.';
 
 function createDom(): SelectionModeDom {
   const dragFrame = document.createElement('div');
+  const dragOverlay = document.createElement('div');
   const finalFrame = document.createElement('div');
   const finalOverlay = document.createElement('div');
   const sizePanel = document.createElement('div');
@@ -51,6 +68,11 @@ function createDom(): SelectionModeDom {
   leftShade.className = 'sniptale-shade-left';
   rightShade.className = 'sniptale-shade-right';
   finalOverlay.append(topShade, bottomShade, leftShade, rightShade);
+  for (const direction of ['top', 'bottom', 'left', 'right']) {
+    const shade = document.createElement('div');
+    shade.className = `sniptale-shade sniptale-shade-${direction}`;
+    dragOverlay.appendChild(shade);
+  }
 
   widthInput.min = '10';
   widthInput.max = '900';
@@ -59,7 +81,14 @@ function createDom(): SelectionModeDom {
   aspectRatioButton.setAttribute('aria-pressed', 'true');
   cancelButton.style.display = 'none';
 
-  overlayContainer.append(cancelButton, dragFrame, finalFrame, finalOverlay, sizePanel);
+  overlayContainer.append(
+    cancelButton,
+    dragOverlay,
+    dragFrame,
+    finalFrame,
+    finalOverlay,
+    sizePanel
+  );
   document.body.appendChild(overlayContainer);
 
   return {
@@ -68,6 +97,11 @@ function createDom(): SelectionModeDom {
     scissorsIcon: document.createElement('div'),
     hoverSizeLabel: null,
     dragFrame,
+    dragOverlay,
+    dragFrameRafId: null,
+    pendingDragRect: null,
+    finalFrameRafId: null,
+    pendingFinalRect: null,
     finalFrame,
     finalOverlay,
     sizePanel,
@@ -103,6 +137,35 @@ describe('selection-mode ui frame updates', () => {
     expect(labels[0]?.textContent).toBe('150 × 91');
   });
 
+  it('coalesces drag geometry into one animation-frame commit using the latest rectangle', () => {
+    const dom = createDom();
+    const scheduled: { commit?: FrameRequestCallback } = {};
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        scheduled.commit = callback;
+        return 17;
+      });
+
+    scheduleDragFrameUpdate(dom, { x: 10, y: 20, width: 30, height: 40 });
+    scheduleDragFrameUpdate(dom, { x: 15, y: 25, width: 90, height: 70 });
+
+    expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(1);
+    expect(dom.dragFrame?.style.left).toBe('');
+    if (!scheduled.commit) {
+      throw new Error('Expected a scheduled drag-frame commit');
+    }
+    scheduled.commit(16);
+
+    expect(dom.dragFrame?.style.left).toBe('15px');
+    expect(dom.dragFrame?.style.width).toBe('90px');
+    expect(dom.dragOverlay?.querySelector<HTMLElement>('.sniptale-shade-right')?.style.left).toBe(
+      '105px'
+    );
+    expect(dom.dragFrameRafId).toBeNull();
+    expect(dom.pendingDragRect).toBeNull();
+  });
+
   it('syncs tooltip values, frame geometry, overlay shades, and panel position', () => {
     const dom = createDom();
 
@@ -124,6 +187,8 @@ describe('selection-mode ui frame updates', () => {
     });
     expect(calculateContentSizeTooltipPositionMock).toHaveBeenCalledWith({
       anchorRect: { x: 100, y: 120, width: 240, height: 160 },
+      tooltipHeight: 44,
+      tooltipWidth: 430,
     });
     expect(setContentSizeTooltipPositionMock).toHaveBeenCalledWith(dom.sizePanel, {
       left: 12,
@@ -135,6 +200,31 @@ describe('selection-mode ui frame updates', () => {
     expect(
       dom.finalOverlay?.querySelector('.sniptale-shade-right')?.getAttribute('style')
     ).toContain('width: 940px');
+  });
+
+  it('coalesces confirmed geometry and flushes the latest rectangle on pointer completion', () => {
+    const dom = createDom();
+    const scheduled: { commit?: FrameRequestCallback } = {};
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        scheduled.commit = callback;
+        return 23;
+      });
+    const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame');
+
+    scheduleFinalFrameUpdate(dom, { x: 10, y: 20, width: 30, height: 40 });
+    scheduleFinalFrameUpdate(dom, { x: 15, y: 25, width: 90, height: 70 });
+
+    expect(requestAnimationFrameSpy).toHaveBeenCalledTimes(1);
+    expect(dom.finalFrame?.style.left).toBe('');
+    flushScheduledFinalFrameUpdate(dom);
+
+    expect(cancelAnimationFrameSpy).toHaveBeenCalledWith(23);
+    expect(dom.finalFrame?.style.left).toBe('15px');
+    expect(dom.finalFrame?.style.width).toBe('90px');
+    expect(dom.finalFrameRafId).toBeNull();
+    expect(dom.pendingFinalRect).toBeNull();
   });
 
   it('returns early when final-frame dependencies are missing', () => {
@@ -153,6 +243,8 @@ describe('selection-mode ui frame updates', () => {
 
     resetFinalElements(dom);
 
+    expect(closeSelectionCaptureActionMenuMock).toHaveBeenCalledWith(dom.overlayContainer, false);
+
     expect(dom.finalFrame).toBeNull();
     expect(dom.finalOverlay).toBeNull();
     expect(dom.sizePanel).toBeNull();
@@ -169,8 +261,11 @@ describe('selection-mode ui frame updates', () => {
 
     cleanupSelectionModeDom(dom);
 
+    expect(closeSelectionCaptureActionMenuMock).toHaveBeenCalledTimes(2);
+
     expect(dom.overlayContainer).toBeNull();
     expect(dom.dragFrame).toBeNull();
+    expect(dom.dragOverlay).toBeNull();
     expect(dom.scissorsIcon).toBeNull();
     expect(dom.cancelButton).toBeNull();
     expect(dom.dragEventCatcher).toBeNull();

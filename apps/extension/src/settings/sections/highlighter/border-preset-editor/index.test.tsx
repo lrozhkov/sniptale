@@ -79,7 +79,6 @@ describe('BorderPresetEditor opened state', () => {
     const preset = {
       id: 'preset-1',
       name: 'Preset',
-      isSystemDefault: false,
       order: 0,
       width: 3,
       color: '#ff6600',

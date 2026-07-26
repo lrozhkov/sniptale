@@ -59,12 +59,18 @@ function createDisableApiFixture(rejectCallback: ((reason?: unknown) => void) | 
 function registerEnableApiTest() {
   it('cleans up an existing session and enables selection mode with a fresh promise flow', async () => {
     const fixture = createEnableApiFixture();
-    const pendingSelection = enableSelectionModeApi(fixture.args);
+    const onCaptureActionChange = vi.fn();
+    const pendingSelection = enableSelectionModeApi({
+      ...fixture.args,
+      options: { captureAction: 'copy', onCaptureActionChange },
+    });
     await Promise.resolve();
 
     expect(fixture.cleanup).toHaveBeenCalledTimes(1);
     expect(fixture.session.isActive).toBe(true);
     expect(fixture.session.currentState).toBe('idle');
+    expect(fixture.session.captureAction).toBe('copy');
+    expect(fixture.session.onCaptureActionChange).toBe(onCaptureActionChange);
     expect(enableNavigationLock).toHaveBeenCalledWith(true);
     expect(fixture.prepareUi).toHaveBeenCalledTimes(1);
     expect(fixture.createOverlayContainer).toHaveBeenCalledTimes(1);

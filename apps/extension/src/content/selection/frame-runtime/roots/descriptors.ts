@@ -54,6 +54,8 @@ export type FrameRenderDescriptor = {
   stepBadgeAlphabet: string | undefined;
   stepBadgeAnchor: string | undefined;
   stepBadgeEnabled: boolean | undefined;
+  stepBadgeManualPosition: number | undefined;
+  stepBadgeManualSide: string | undefined;
   stepBadgeOffsetDirections: string;
   stepBadgeSizeLevel: number | undefined;
   stepBadgeType: string | undefined;
@@ -152,6 +154,8 @@ function buildFrameStepBadgeDescriptor(frame: FrameData) {
     stepBadgeAlphabet: stepBadge?.alphabet,
     stepBadgeAnchor: stepBadge?.anchor,
     stepBadgeEnabled: stepBadge?.enabled,
+    stepBadgeManualPosition: stepBadge?.manualPlacement?.position,
+    stepBadgeManualSide: stepBadge?.manualPlacement?.side,
     stepBadgeOffsetDirections: (stepBadge?.offsetDirections ?? []).join(','),
     stepBadgeSizeLevel: stepBadge?.sizeLevel,
     stepBadgeType: stepBadge?.type,

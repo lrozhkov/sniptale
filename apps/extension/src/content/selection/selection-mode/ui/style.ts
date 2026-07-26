@@ -39,21 +39,13 @@ function getSelectionFrameCss(visual: ResolvedBorderPresetVisual): string {
   `;
 }
 
-export function getSelectionDragFrameStyle(
-  visual: ResolvedBorderPresetVisual,
-  overlayBackground: string
-): string {
-  const frameShadow = resolveBorderShadowVisual(visual.shadow, visual.strokeColor).frameBoxShadow;
-
+export function getSelectionDragFrameStyle(visual: ResolvedBorderPresetVisual): string {
   return `
     position: absolute;
     ${getSelectionFrameCss(visual)}
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    box-shadow:
-      0 0 0 9999px ${overlayBackground}
-      ${frameShadow ? `,\n      ${frameShadow}` : ''};
     pointer-events: none;
     display: none;
     user-select: none;

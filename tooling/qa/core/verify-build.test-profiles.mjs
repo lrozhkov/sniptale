@@ -9,6 +9,11 @@ const TRANSITIVE_TEST_PROFILE_FAMILIES = new Set([
   'parser-snapshot-export',
   'storage-persistence',
 ]);
+const SATURATED_RELATED_PROFILE_FAMILIES = new Set([
+  'messaging-runtime',
+  'package-and-app-core',
+  'parser-snapshot-export',
+]);
 const BROAD_PUBLIC_TEST_PATTERN =
   /^(?:packages\/|apps\/extension\/src\/(?:composition|contracts|foundation|platform|workflows)\/)/u;
 const APP_CORE_PUBLIC_ROOT_PATTERN = /^apps\/extension\/src\/(?:features|ui)\//u;
@@ -19,38 +24,78 @@ export const BUILD_TEST_PROFILE_LIMITS = {
   ownerTests: 12,
   targetFiles: 8,
 };
+export const SATURATED_RELATED_INPUT_LIMIT = 32;
+
+export const BUILD_TEST_EXECUTION_CLASSES = Object.freeze({
+  bounded: 'bounded-concurrent',
+  saturated: 'saturated-exclusive',
+});
+
+function resolveExecutionPolicy({ fullSuite = false, matchedFamilies, profile, relatedFiles }) {
+  if (fullSuite) {
+    return {
+      executionClass: BUILD_TEST_EXECUTION_CLASSES.saturated,
+      executionReason: 'full-suite',
+    };
+  }
+  if (profile !== 'related-transitive') {
+    return {
+      executionClass: BUILD_TEST_EXECUTION_CLASSES.bounded,
+      executionReason: 'bounded-selection',
+    };
+  }
+  if (relatedFiles.length > SATURATED_RELATED_INPUT_LIMIT) {
+    return {
+      executionClass: BUILD_TEST_EXECUTION_CLASSES.saturated,
+      executionReason: 'related-input-threshold',
+    };
+  }
+  if (matchedFamilies.some((family) => SATURATED_RELATED_PROFILE_FAMILIES.has(family))) {
+    return {
+      executionClass: BUILD_TEST_EXECUTION_CLASSES.saturated,
+      executionReason: 'high-fan-out-family',
+    };
+  }
+  return {
+    executionClass: BUILD_TEST_EXECUTION_CLASSES.bounded,
+    executionReason: 'related-inputs-within-limit',
+  };
+}
 
 function createScopeDetail({
   directTestFiles,
+  executionClass,
+  executionReason,
   fullSuite = false,
   profile,
   profileReason,
   relatedFiles,
   matchedFamilies,
 }) {
-  const reasonDetail = profileReason ? `; reason=${profileReason}` : '';
+  const schedulingDetail = [
+    `selection=${profile}`,
+    `execution=${executionClass}`,
+    `related-inputs=${relatedFiles.length}`,
+    `reason=${executionReason}`,
+  ].join('; ');
+  const selectionReasonDetail = profileReason ? `; selection-reason=${profileReason}` : '';
   if (fullSuite) {
-    return `profile=${profile}; full product test suite${reasonDetail}`;
+    return `${schedulingDetail}; full product test suite${selectionReasonDetail}`;
   }
   if (relatedFiles.length > 0) {
     const familyDetail =
       matchedFamilies.length > 0 ? `; trigger families: ${matchedFamilies.join(', ')}` : '';
     const fileLabel = relatedFiles.length === 1 ? 'related file' : 'related files';
-    return [
-      `profile=${profile}`,
-      `broader related tests (${relatedFiles.length} ${fileLabel}${familyDetail})`,
-      reasonDetail.slice(2),
-    ]
-      .filter(Boolean)
-      .join('; ');
+    const relatedSummary = `broader related tests (${relatedFiles.length} ${fileLabel}${familyDetail})`;
+    return `${schedulingDetail}; ${relatedSummary}${selectionReasonDetail}`;
   }
   if (directTestFiles.length > 0) {
-    return `profile=${profile}; direct tests (${directTestFiles.length})${reasonDetail}`;
+    return `${schedulingDetail}; direct tests (${directTestFiles.length})${selectionReasonDetail}`;
   }
   if (profile === 'related-transitive') {
-    return `profile=${profile}; bounded consumer discovery required${reasonDetail}`;
+    return `${schedulingDetail}; bounded consumer discovery required${selectionReasonDetail}`;
   }
-  return `profile=${profile}; skipped: no matching unit-test targets${reasonDetail}`;
+  return `${schedulingDetail}; skipped: no matching unit-test targets${selectionReasonDetail}`;
 }
 
 function hasTransitiveProfileTrigger(files, matchedFamilies) {
@@ -113,11 +158,17 @@ function finalizeTestScope(scope) {
       throw new Error(`Build test scope ${field} must be a boolean when present.`);
     }
   }
-  return {
+  const normalizedScope = {
     ...scope,
     fullSuite: scope.fullSuite ?? false,
     requireRelatedTests: scope.requireRelatedTests ?? false,
-    detail: createScopeDetail(scope),
+  };
+  const executionPolicy = resolveExecutionPolicy(normalizedScope);
+  const finalizedScope = { ...normalizedScope, ...executionPolicy };
+  return {
+    ...normalizedScope,
+    executionClass: executionPolicy.executionClass,
+    detail: createScopeDetail(finalizedScope),
   };
 }
 

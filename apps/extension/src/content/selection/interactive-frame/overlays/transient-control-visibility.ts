@@ -1,8 +1,9 @@
 import React from 'react';
 
-const HANDLE_HIDE_GRACE_MS = 320;
+const CONTROL_HIDE_GRACE_MS = 320;
 
-export function useCalloutHandleVisibility(isDragging: boolean) {
+/** Keeps hover-only controls reachable while the pointer crosses their small portal gap. */
+export function useTransientControlVisibility(isPinned: boolean) {
   const [isHovered, setIsHovered] = React.useState(false);
   const hoverLeaveTimeoutRef = React.useRef<number | null>(null);
 
@@ -15,15 +16,15 @@ export function useCalloutHandleVisibility(isDragging: boolean) {
   }, []);
 
   const scheduleHide = React.useCallback(() => {
-    if (isDragging) return;
+    if (isPinned) return;
     if (hoverLeaveTimeoutRef.current !== null) {
       window.clearTimeout(hoverLeaveTimeoutRef.current);
     }
     hoverLeaveTimeoutRef.current = window.setTimeout(() => {
       hoverLeaveTimeoutRef.current = null;
       setIsHovered(false);
-    }, HANDLE_HIDE_GRACE_MS);
-  }, [isDragging]);
+    }, CONTROL_HIDE_GRACE_MS);
+  }, [isPinned]);
 
   React.useEffect(() => {
     return () => {
@@ -38,6 +39,6 @@ export function useCalloutHandleVisibility(isDragging: boolean) {
     handleFocus: show,
     handleMouseEnter: show,
     handleMouseLeave: scheduleHide,
-    isVisible: isHovered || isDragging,
+    isVisible: isHovered || isPinned,
   };
 }

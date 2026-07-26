@@ -44,21 +44,34 @@ describe('frame UI store visibility hierarchy', () => {
     });
   });
 
-  it('moves selection authority with a directly opened popover', () => {
+  it('keeps quick popovers independent from selection authority', () => {
     const store = useFrameUIStore.getState();
 
-    store.togglePopover('frame-a', 'step-badge');
+    store.toggleQuickPopover('frame-a', 'step-badge');
+
+    expect(useFrameUIStore.getState()).toMatchObject({
+      selectedFrameId: null,
+      activePopover: { frameId: 'frame-a', kind: 'step-badge' },
+    });
+  });
+
+  it('closes a quick popover when the main toolbar selects a frame', () => {
+    const store = useFrameUIStore.getState();
+
+    store.toggleQuickPopover('frame-a', 'callout-settings');
+    store.selectFrame('frame-a', { x: 30, y: 12 });
 
     expect(useFrameUIStore.getState()).toMatchObject({
       selectedFrameId: 'frame-a',
-      activePopover: { frameId: 'frame-a', kind: 'step-badge' },
+      toolbarAnchorOffset: { x: 30, y: 12 },
+      activePopover: null,
     });
   });
 
   it('switches popover families atomically for one selected frame', () => {
     const store = useFrameUIStore.getState();
     store.selectFrame('frame-a');
-    store.togglePopover('frame-a', 'frame-settings');
+    store.toggleQuickPopover('frame-a', 'step-badge');
     store.togglePopover('frame-a', 'callout-settings');
 
     expect(useFrameUIStore.getState()).toMatchObject({
@@ -132,7 +145,7 @@ describe('frame UI store cleanup', () => {
       activePopover: null,
     });
 
-    store.togglePopover('frame-b', 'callout-settings');
+    store.toggleQuickPopover('frame-b', 'callout-settings');
     store.reset();
     expect(useFrameUIStore.getState()).toMatchObject({
       hoveredFrameId: null,

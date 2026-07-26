@@ -55,7 +55,7 @@ function CompactSelectBody<T extends string>({
     <div
       ref={select.refs.containerRef}
       data-ui={props.dataUi ?? 'shared.ui.compact-select'}
-      className={cx('relative w-full', props.containerClassName)}
+      className={cx('relative w-full min-w-0 max-w-full', props.containerClassName)}
     >
       <CompactSelectTriggerView menuId={menuId} props={props} select={select} />
       <CompactSelectMenuView menuId={menuId} props={props} select={select} />

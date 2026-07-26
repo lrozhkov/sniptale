@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../platform/i18n', () => ({
   translate: (key: string) => key,
+  useAppLocale: () => 'en',
 }));
 
 import { HighlighterPresetRowContent } from './preset-row-content';
@@ -53,7 +54,6 @@ describe('HighlighterPresetRowContent', () => {
       await renderRow({
         id: `preset-${item.style}`,
         name: item.name,
-        isSystemDefault: false,
         order: 0,
         width: 5,
         color: '#ff6600',

@@ -26,14 +26,45 @@ function registerBorderPresetSchemaTests() {
         fillOpacity: 25,
         inheritCustomCss: true,
         customCss: 'outline: 1px solid red;',
+        enabled: false,
+        origin: 'system',
+        systemPresetKey: 'system-review',
+        basedOnRevision: 1,
+        customized: true,
       })
     ).toEqual(
       expect.objectContaining({
         fillColor: '#44556688',
         fillOpacity: 25,
         strokeOpacity: 50,
+        origin: 'system',
+        systemPresetKey: 'system-review',
       })
     );
+  });
+
+  it('rejects arbitrary storage-owned system translation keys', () => {
+    expect(() =>
+      BorderPresetSchema.parse({
+        id: 'system-unsafe',
+        name: 'Unsafe',
+        order: 0,
+        width: 4,
+        color: '#112233',
+        style: 'solid',
+        radius: 8,
+        padding: { top: 1, right: 2, bottom: 3, left: 4 },
+        shadow: 0,
+        opacity: 100,
+        strokeOpacity: 100,
+        fillColor: '#00000000',
+        fillOpacity: 0,
+        inheritCustomCss: false,
+        customCss: '',
+        origin: 'system',
+        systemPresetKey: 'highlighter.systemPresets.injected',
+      })
+    ).toThrow();
   });
 }
 

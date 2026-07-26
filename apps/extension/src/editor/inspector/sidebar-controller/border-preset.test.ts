@@ -79,6 +79,7 @@ describe('createBorderPresetFromShapeSettings', () => {
           ...DEFAULT_BORDER_PRESET,
           id: 'editor.tools.rectangle 1',
           name: 'editor.tools.rectangle 1',
+          origin: 'user',
         },
       ]
     );

@@ -36,12 +36,21 @@ export function useBorderPresetSaveHandler({
       fillOpacity: draft.fillOpacity,
       inheritCustomCss: draft.inheritCustomCss,
       customCss: draft.customCss,
+      ...(preset
+        ? {
+            ...(preset.origin === undefined ? {} : { origin: preset.origin }),
+            ...(preset.systemPresetKey === undefined
+              ? {}
+              : { systemPresetKey: preset.systemPresetKey }),
+            ...(preset.basedOnRevision === undefined
+              ? {}
+              : { basedOnRevision: preset.basedOnRevision }),
+            ...(preset.customized === undefined ? {} : { customized: preset.customized }),
+            ...(preset.enabled === undefined ? {} : { enabled: preset.enabled }),
+          }
+        : { origin: 'user' as const, enabled: true }),
     };
 
-    onSave(
-      preset?.isSystemDefault === undefined
-        ? nextPreset
-        : { ...nextPreset, isSystemDefault: preset.isSystemDefault }
-    );
+    onSave(nextPreset);
   }, [cssValidation, draft, onSave, preset]);
 }

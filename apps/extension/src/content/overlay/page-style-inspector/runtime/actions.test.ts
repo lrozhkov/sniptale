@@ -7,6 +7,7 @@ import {
 } from '@sniptale/runtime-contracts/page-style';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import type { FrameSessionSnapshot } from '../../../parser/page-preparation/history';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 import { applyPageStylePatchWithHistory, applyPageStyleRestoreRuleWithHistory } from './actions';
 
 vi.mock('../../../../composition/persistence/page-style/assets', async (importOriginal) => ({
@@ -51,6 +52,7 @@ function createSnapshot(label: string): FrameSessionSnapshot {
     ],
     globalEffectMode: 'border',
     globalStepBadgeSettings: { autoMode: true },
+    sessionBorderPreset: DEFAULT_BORDER_PRESET,
     sessionBlurSettings: { amount: 8, blurType: 'gaussian', showBorder: true },
     sessionCalloutStyle: null,
     sessionFocusSettings: { opacity: 0.5, showBorder: false },

@@ -13,6 +13,17 @@ it('keeps custom computed text values available as current select options', () =
   });
 });
 
+it('presents font families as names while preserving their CSS stack values', () => {
+  expect(getFontFamilyOptions('')[0]).toEqual({
+    label: 'Arial',
+    value: 'Arial, sans-serif',
+  });
+  expect(getFontFamilyOptions('"Custom Display", serif')[0]).toEqual({
+    label: 'Custom Display',
+    value: '"Custom Display", serif',
+  });
+});
+
 it('does not duplicate built-in options with different casing', () => {
   expect(getFontFamilyOptions('arial, sans-serif')).toHaveLength(getFontFamilyOptions('').length);
 });

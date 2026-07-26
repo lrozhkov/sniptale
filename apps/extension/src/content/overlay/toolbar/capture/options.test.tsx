@@ -58,6 +58,10 @@ function registerCaptureActionOptionTests() {
     expect(getCaptureActionOptions().map((option) => option.value)).toContain('scenario');
   });
 
+  it('keeps decorative icons out of the after-capture list model', () => {
+    expect(getCaptureActionOptions().every((option) => !('icon' in option))).toBe(true);
+  });
+
   it('returns the scenario tooltip label', () => {
     expect(getCaptureActionTooltip('scenario')).toBe('content.toolbar.afterCaptureScenario');
   });

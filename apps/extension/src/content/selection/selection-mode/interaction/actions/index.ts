@@ -13,7 +13,7 @@ import {
 } from '../selection/drag';
 import {
   type ResizeDirection,
-  updateDragFrame as updateDragFrameState,
+  scheduleDragFrameUpdate as scheduleDragFrameUpdateState,
   updateFinalFrame as updateFinalFrameState,
 } from '../../ui';
 
@@ -44,7 +44,7 @@ function startSelectionModeDragSelectionWithFrame(
 export function applySelectionModeDragSelection(args: {
   createDragFrame: () => void;
   currentSelection: Selection;
-  dom: Parameters<typeof updateDragFrameState>[0];
+  dom: Parameters<typeof scheduleDragFrameUpdateState>[0];
   dragStartPoint: { x: number; y: number };
   getMaxSelectionHeight: () => number;
   getMaxSelectionWidth: () => number;
@@ -79,7 +79,7 @@ export function applySelectionModeDragSelection(args: {
     startDragSelection: (startX: number, startY: number) =>
       startSelectionModeDragSelectionWithFrame(args, startX, startY),
 
-    updateDragFrame: () => updateDragFrameState(args.dom, args.currentSelection),
+    updateDragFrame: () => scheduleDragFrameUpdateState(args.dom, args.currentSelection),
     updateDragSelection: (currentX: number, currentY: number) =>
       updateDragSelectionState(args.dragStartPoint, currentX, currentY),
     updateFinalFrame: () => updateFinalFrameState(args.dom, args.currentSelection),

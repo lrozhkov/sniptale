@@ -2,7 +2,11 @@ import type { MutableRefObject } from 'react';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import type { ActiveFramePopover } from '../state/frame-ui.store';
 import { getViewportClientPoint } from '../../../platform/frame';
-import { resolveFrameControlHit, resolveFrameHitTarget } from './hit-test';
+import {
+  resolveFrameControlHit,
+  resolveFrameHitTarget,
+  resolveFrameInteriorHitTarget,
+} from './hit-test';
 import { queryAllContentUiElements, queryContentUiElement } from '../../../platform/dom-host';
 import { isHighlighterPausedState } from '../../highlighter';
 
@@ -11,12 +15,17 @@ const OWNED_FLOATING_SELECTORS = [
   '.sniptale-toolbar-portal-wrapper',
   '.sniptale-frame-toolbar-trigger',
   '.sniptale-frame-toolbar-bridge',
+  '.sniptale-frame-quick-action',
   '.sniptale-resize-handle',
   '.sniptale-frame-settings-popover',
   '.sniptale-step-badge-popover',
   '.sniptale-callout-settings-popover',
   '.sniptale-callout',
   '.sniptale-callout-format-toolbar',
+  '.sniptale-callout-drag-handle',
+  '.sniptale-callout-tail-handle',
+  '.sniptale-callout-settings-handle',
+  '.sniptale-step-badge-controls',
   '.sniptale-content-size-tooltip',
 ];
 
@@ -30,7 +39,7 @@ function hasActiveFrameInteraction() {
   );
 }
 
-function isOwnedFloatingEvent(event: Event): boolean {
+export function isFrameUiOwnedFloatingEvent(event: Event): boolean {
   const path = typeof event.composedPath === 'function' ? event.composedPath() : [event.target];
   return path.some(
     (target) =>
@@ -57,7 +66,16 @@ function resolveBorderHit(params: {
   });
 }
 
-function stopFrameBorderClick(event: MouseEvent) {
+function resolveInteriorHit(params: {
+  event: MouseEvent | PointerEvent;
+  iframe?: HTMLIFrameElement;
+  frames: FrameData[];
+}) {
+  const point = getViewportClientPoint(params.event.clientX, params.event.clientY, params.iframe);
+  return resolveFrameInteriorHitTarget({ frames: params.frames, x: point.x, y: point.y });
+}
+
+function stopFrameActivationClick(event: MouseEvent) {
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
@@ -74,39 +92,59 @@ export function createFrameSelectionEventHandlers(params: {
   hoveredFrameIdRef: MutableRefObject<string | null>;
   activePopoverRef: MutableRefObject<ActiveFramePopover | null>;
   selectedFrameIdRef: MutableRefObject<string | null>;
+  consumeSuppressedClick: (event: MouseEvent) => boolean;
   clearSelection: () => void;
   hoverFrame: (frameId: string) => void;
   selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
 }) {
   return {
     pointerDown: (event: PointerEvent, iframe?: HTMLIFrameElement) => {
-      if (!params.selectedFrameIdRef.current || isOwnedFloatingEvent(event)) return;
-      const hit = resolveBorderHit({
+      if (!params.selectedFrameIdRef.current || isFrameUiOwnedFloatingEvent(event)) return;
+      const borderHit = resolveBorderHit({
         event,
         frames: params.framesRef.current,
         hoveredFrameId: params.hoveredFrameIdRef.current,
         selectedFrameId: params.selectedFrameIdRef.current,
         ...(iframe ? { iframe } : {}),
       });
-      if (!hit) params.clearSelection();
+      const interiorHit = resolveInteriorHit({
+        event,
+        frames: params.framesRef.current,
+        ...(iframe ? { iframe } : {}),
+      });
+      if (!borderHit && !interiorHit) params.clearSelection();
     },
     click: (event: MouseEvent, iframe?: HTMLIFrameElement) => {
-      if (isOwnedFloatingEvent(event)) return;
+      if (event.button !== 0 || isFrameUiOwnedFloatingEvent(event)) return;
+      if (params.consumeSuppressedClick(event)) {
+        stopFrameActivationClick(event);
+        return;
+      }
+      if (hasActiveFrameInteraction()) return;
       const directControl = resolveFrameControlHit(event);
-      if (directControl?.kind === 'trigger') return;
-      const hit = resolveBorderHit({
+      if (directControl) return;
+      const borderHit = resolveBorderHit({
         event,
         frames: params.framesRef.current,
         hoveredFrameId: params.hoveredFrameIdRef.current,
         selectedFrameId: params.selectedFrameIdRef.current,
         ...(iframe ? { iframe } : {}),
       });
-      if (!hit || hit.kind !== 'border') return;
-      stopFrameBorderClick(event);
+      if (borderHit?.kind === 'border') {
+        stopFrameActivationClick(event);
+        return;
+      }
+      const frameId = resolveInteriorHit({
+        event,
+        frames: params.framesRef.current,
+        ...(iframe ? { iframe } : {}),
+      });
+      if (!frameId) return;
+      stopFrameActivationClick(event);
       const point = getViewportClientPoint(event.clientX, event.clientY, iframe);
-      const frame = params.framesRef.current.find(({ id }) => id === hit.frameId);
+      const frame = params.framesRef.current.find(({ id }) => id === frameId);
       params.selectFrame(
-        hit.frameId,
+        frameId,
         frame ? { x: point.x - frame.x, y: point.y - frame.y } : undefined
       );
     },

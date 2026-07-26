@@ -13,7 +13,8 @@ const selectionModeLazyMocks = vi.hoisted(() => ({
 
 vi.mock('.', () => ({
   disableSelectionMode: () => selectionModeLazyMocks.disableSelectionModeMock(),
-  enableSelectionMode: () => selectionModeLazyMocks.enableSelectionModeMock(),
+  enableSelectionMode: (options?: unknown) =>
+    selectionModeLazyMocks.enableSelectionModeMock(options),
 }));
 
 describe('selection-mode lazy loader', () => {
@@ -35,9 +36,12 @@ describe('selection-mode lazy loader', () => {
     const captureArea = { x: 2, y: 3, width: 4, height: 5 };
     selectionModeLazyMocks.enableSelectionModeMock.mockResolvedValue(captureArea);
 
-    await expect(enableSelectionModeDeferredIfCurrent(() => true)).resolves.toEqual(captureArea);
+    const options = { captureAction: 'copy' as const, onCaptureActionChange: vi.fn() };
+    await expect(enableSelectionModeDeferredIfCurrent(() => true, options)).resolves.toEqual(
+      captureArea
+    );
 
-    expect(selectionModeLazyMocks.enableSelectionModeMock).toHaveBeenCalledTimes(1);
+    expect(selectionModeLazyMocks.enableSelectionModeMock).toHaveBeenCalledWith(options);
   });
 
   it('checks freshness after lazy loading before enabling selection mode', async () => {

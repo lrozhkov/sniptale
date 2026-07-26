@@ -22,6 +22,7 @@ export type UseFrameMutationActionHelperOptions = {
   globalEffectModeRef: MutableRef<EffectMode>;
   globalStepBadgeAutoModeRef: MutableRef<boolean>;
   sessionBlurSettingsRef: MutableRef<BlurSettings>;
+  sessionDefaultsInitializedRef: MutableRef<boolean>;
   sessionFocusSettingsRef: MutableRef<FocusSettings>;
   sessionStepBadgeTemplateRef: MutableRef<StepBadgeSettings | null>;
   highlighterSettingsCacheRef: MutableRef<HighlighterSettings | null>;

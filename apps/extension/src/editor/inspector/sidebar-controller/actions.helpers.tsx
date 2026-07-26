@@ -43,6 +43,7 @@ import type {
   SidebarUtilityActionArgs,
 } from './types';
 import type { SelectionSettingsOwner } from './selection-owner';
+import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 
 function resolveToolSettingsOwner(tool: EditorTool): SelectionSettingsOwner | null {
   switch (tool) {
@@ -144,7 +145,7 @@ export function buildBorderPresetOptions(borderPresets: BorderPreset[]) {
   return borderPresets
     .filter((preset) => preset.enabled !== false)
     .map((preset) => ({
-      label: preset.name,
+      label: getBorderPresetDisplayName(preset),
       value: preset.id,
     }));
 }

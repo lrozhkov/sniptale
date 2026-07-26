@@ -2,14 +2,16 @@ import type {
   AutoBlurDetection,
   AutoBlurDetector,
 } from '../../../features/highlighter/contracts/auto-blur';
-import { hasBlurFrameForRect } from './geometry';
+import { getAutoBlurRectUnion, hasBlurFrameForRect } from './geometry';
 import type { AutoBlurDetectionCandidate, AutoBlurMatch, AutoBlurScanInput } from './types';
 import { collectVisibleAutoBlurTextSources, getAutoBlurTextSourceRangeRects } from './visible-text';
 import { ruleAutoBlurDetector } from './detectors/rule-detector';
 
 function createDetectionCandidate(detection: AutoBlurDetection): AutoBlurDetectionCandidate | null {
   const source = detection.source as ReturnType<typeof collectVisibleAutoBlurTextSources>[number];
-  const rect = getAutoBlurTextSourceRangeRects(source, detection.start, detection.end)[0];
+  const rect = getAutoBlurRectUnion(
+    getAutoBlurTextSourceRangeRects(source, detection.start, detection.end)
+  );
 
   return rect ? { ...detection, rect } : null;
 }

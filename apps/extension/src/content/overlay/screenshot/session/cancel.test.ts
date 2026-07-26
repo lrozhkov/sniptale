@@ -78,6 +78,7 @@ function createRuntime(session: ScreenshotControllerSession): ScreenshotControll
     },
     captureActionRef: { current: 'download_default' },
     session,
+    setCaptureAction: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),

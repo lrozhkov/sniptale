@@ -1,14 +1,20 @@
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
 import { createSelectionModeFinalElements } from './final-elements';
+import { createSelectionModeDragOverlay } from './final-elements/overlay';
 import { hideSelectionModeCancelButton } from './cancel-button';
 import type { SelectionModeDom } from './dom-types';
 import { getSelectionDragFrameStyle } from './style';
 import type { SelectionModeFinalElementsOptions } from './types';
 export {
+  cancelScheduledDragFrameUpdate,
+  cancelScheduledFinalFrameUpdate,
   cleanupSelectionModeDom,
+  flushScheduledFinalFrameUpdate,
   resetFinalElements,
+  scheduleFinalFrameUpdate,
   updateDragFrame,
   updateFinalFrame,
+  scheduleDragFrameUpdate,
 } from './frame-updates';
 export type { ResizeDirection } from './dom-types';
 export { createOverlayContainer, createSelectionModeDom } from './container';
@@ -22,11 +28,13 @@ export function createDragFrame(
   if (!dom.overlayContainer || dom.dragFrame) return;
 
   const dragFrame = document.createElement('div');
+  const dragOverlay = createSelectionModeDragOverlay(overlayBackground);
   dragFrame.className = 'sniptale-selection-drag-frame';
-  dragFrame.style.cssText = getSelectionDragFrameStyle(visual, overlayBackground);
+  dragFrame.style.cssText = getSelectionDragFrameStyle(visual);
 
-  dom.overlayContainer.appendChild(dragFrame);
+  dom.overlayContainer.append(dragOverlay, dragFrame);
   dom.dragFrame = dragFrame;
+  dom.dragOverlay = dragOverlay;
 }
 
 export function createDragEventCatcher(dom: SelectionModeDom, zIndexBase: number): void {

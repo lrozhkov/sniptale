@@ -9,6 +9,7 @@ import type { FrameData } from '../../../features/highlighter/contracts';
 import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 import { InteractiveFrame } from '.';
 import { queryAllContentUiElements, queryContentUiElement } from '../../platform/dom-host';
+import { translate } from '../../../platform/i18n';
 
 const highlighterMocks = vi.hoisted(() => ({
   clearFrameEditing: vi.fn(),
@@ -146,6 +147,44 @@ describe('InteractiveFrame size edit interactions', () => {
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ x: 115, y: 75, width: 330, height: 190 })
     );
+  });
+
+  it('orders toolbar commands in separated frame, annotation, edit, delete, and close groups', () => {
+    const { frame } = renderFrame();
+    act(() => useFrameUIStore.getState().selectFrame(frame.id));
+    const toolbar = queryContentUiElement<HTMLElement>('.sniptale-action-toolbar');
+    const titles = Array.from(toolbar?.querySelectorAll<HTMLButtonElement>('button') ?? []).map(
+      (button) => button.title
+    );
+
+    expect(titles).toEqual([
+      `${translate('content.interactiveFrame.effectBorder')}${translate(
+        'content.interactiveFrame.effectActiveSuffix'
+      )}`,
+      translate('content.interactiveFrame.effectBlur'),
+      translate('content.interactiveFrame.effectFocus'),
+      translate('content.interactiveFrame.stepBadgeEnable'),
+      translate('content.interactiveFrame.calloutAdd'),
+      translate('content.interactiveFrame.decreaseFrame'),
+      translate('content.interactiveFrame.increaseFrame'),
+      translate('content.interactiveFrame.editButton'),
+      translate('content.interactiveFrame.deleteButton'),
+      translate('common.actions.close'),
+    ]);
+    expect(toolbar?.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(4);
+  });
+
+  it('closes the selected toolbar without deleting the frame', () => {
+    const { frame, onDelete } = renderFrame();
+    act(() => useFrameUIStore.getState().selectFrame(frame.id));
+
+    act(() => {
+      findToolbarButton(/Close|Закрыть/).click();
+    });
+
+    expect(useFrameUIStore.getState().selectedFrameId).toBeNull();
+    expect(queryContentUiElement('.sniptale-action-toolbar')).toBeNull();
+    expect(onDelete).not.toHaveBeenCalled();
   });
 
   it('keeps the selected toolbar fixed when its settings popover opens', () => {

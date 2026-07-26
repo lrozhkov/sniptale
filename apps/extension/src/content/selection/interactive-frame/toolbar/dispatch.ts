@@ -67,6 +67,10 @@ export function createSharedToolbarClickHandlers(props: InteractiveFrameToolbarP
       props.closePopover();
       props.handleDelete();
     },
+    handleCloseClick: (event: ToolbarClickEvent) => {
+      stopToolbarEvent(event);
+      props.clearSelection();
+    },
     handleDecreaseClick: (event: ToolbarClickEvent) => {
       stopToolbarEvent(event);
       const nextFrame = resizeFrameByStep(props.frame, 'decrease');

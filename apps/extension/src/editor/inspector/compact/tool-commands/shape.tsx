@@ -19,6 +19,7 @@ import { TablerIcon } from '../tabler-icon';
 import { buildShadowCompactCommand } from './shadow';
 import { ShapeStrokeStyleSelector, ShapeStrokeStyleTrigger } from './shape-options';
 import { resolveShapeTool } from './shape-tool';
+import { getBorderPresetDisplayName } from '../../../../features/highlighter/presets/display-name';
 
 function buildShapePresetCommand(
   params: ToolCommandParams,
@@ -272,9 +273,11 @@ function buildShapeOpacityCommand(
 
 export function buildShapeCompactCommands(params: ToolCommandParams): CompactCommand[] {
   const settings = getEditorShapeSettings(params.inspectorToolSettings, resolveShapeTool(params));
+  const selectedPreset = params.borderPresets.find((item) => item.id === settings.borderPresetId);
   const presetLabel = settings.borderPresetId
-    ? (params.borderPresets.find((item) => item.id === settings.borderPresetId)?.name ??
-      translate('editor.compact.shapePresetFallback'))
+    ? selectedPreset
+      ? getBorderPresetDisplayName(selectedPreset)
+      : translate('editor.compact.shapePresetFallback')
     : translate('editor.compact.notSelected');
 
   return [

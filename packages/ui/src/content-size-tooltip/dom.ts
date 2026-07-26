@@ -1,7 +1,6 @@
 import type { ContentSizeTooltipCopy } from './core';
-import { mergeStyleRecords } from './core';
+import type { ContentSizeTooltipVariant } from './types';
 import {
-  CONTENT_SIZE_TOOLTIP_SURFACE_STYLE,
   getContentSizeTooltipRatioButtonStyle,
   getContentSizeTooltipStepButtonStyle,
 } from './styles';
@@ -15,8 +14,11 @@ import {
   ensureTooltipInputStyles,
 } from './dom-helpers';
 
+export { createTooltipDivider as createContentSizeTooltipDivider } from './dom-helpers';
+
 export interface ContentSizeTooltipDom {
   root: HTMLDivElement;
+  actions: HTMLDivElement;
   widthInput: HTMLInputElement;
   heightInput: HTMLInputElement;
   widthDecreaseButton: HTMLButtonElement;
@@ -36,6 +38,7 @@ function createTooltipDomParts(props: {
   widthMax: number;
   heightMin: number;
   heightMax: number;
+  variant?: ContentSizeTooltipVariant;
 }) {
   return {
     width: createTooltipStepperGroup({
@@ -55,7 +58,7 @@ function createTooltipDomParts(props: {
       max: props.heightMax,
     }),
     aspectRatioButton: createTooltipRatioButton(props.copy, props.canToggleAspectRatio === false),
-    ...createTooltipActions(props.copy, props.confirmLabel),
+    ...createTooltipActions(props.copy, props.confirmLabel, props.variant),
   };
 }
 
@@ -67,12 +70,14 @@ export function createContentSizeTooltipDom(props: {
   heightMin: number;
   maintainAspectRatio: boolean;
   mountInto: HTMLElement;
+  variant?: ContentSizeTooltipVariant;
   widthMax: number;
   widthMin: number;
 }) {
   ensureTooltipInputStyles(props.mountInto);
 
-  const root = createTooltipSurface();
+  const variant = props.variant ?? 'default';
+  const root = createTooltipSurface(variant);
   const parts = createTooltipDomParts(props);
   syncContentSizeTooltipAspectRatioButtonState(parts.aspectRatioButton, {
     canToggleAspectRatio: props.canToggleAspectRatio,
@@ -91,6 +96,7 @@ export function createContentSizeTooltipDom(props: {
 
   return {
     root,
+    actions: parts.actions,
     widthInput: parts.width.input,
     heightInput: parts.height.input,
     widthDecreaseButton: parts.width.decreaseButton,
@@ -107,13 +113,10 @@ export function setContentSizeTooltipPosition(
   tooltip: HTMLElement,
   position: { x: number; y: number }
 ) {
-  applyTooltipDomStyle(
-    tooltip,
-    mergeStyleRecords(CONTENT_SIZE_TOOLTIP_SURFACE_STYLE, {
-      top: `${position.y}px`,
-      left: `${position.x}px`,
-    })
-  );
+  applyTooltipDomStyle(tooltip, {
+    top: `${position.y}px`,
+    left: `${position.x}px`,
+  });
 }
 
 export function syncContentSizeTooltipValues(props: {

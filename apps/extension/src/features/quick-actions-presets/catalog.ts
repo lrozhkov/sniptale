@@ -1,6 +1,51 @@
 import { translate } from '../../platform/i18n';
-import type { BundledQuickActionId, QuickAction } from '../../contracts/settings';
+import type {
+  BundledQuickActionId,
+  CaptureActionType,
+  QuickAction,
+} from '../../contracts/settings';
 import type { BundledQuickActionConfig } from './types';
+
+interface CaptureActionDescriptor {
+  value: CaptureActionType;
+  label: string;
+  hint: string;
+}
+
+export function getCaptureActionDescriptors(): CaptureActionDescriptor[] {
+  return [
+    {
+      value: 'download_default',
+      label: translate('content.toolbar.captureDownloadLabel'),
+      hint: translate('content.toolbar.captureDownloadHint'),
+    },
+    {
+      value: 'ask_preset',
+      label: translate('content.toolbar.captureAskPresetLabel'),
+      hint: translate('content.toolbar.captureAskPresetHint'),
+    },
+    {
+      value: 'ask_system',
+      label: translate('content.toolbar.captureAskSystemLabel'),
+      hint: translate('content.toolbar.captureAskSystemHint'),
+    },
+    {
+      value: 'copy',
+      label: translate('content.toolbar.captureCopyLabel'),
+      hint: translate('content.toolbar.captureCopyHint'),
+    },
+    {
+      value: 'scenario',
+      label: translate('content.toolbar.captureScenarioLabel'),
+      hint: translate('content.toolbar.captureScenarioHint'),
+    },
+    {
+      value: 'edit',
+      label: translate('content.toolbar.captureEditLabel'),
+      hint: translate('content.toolbar.captureEditHint'),
+    },
+  ];
+}
 
 const bundledQuickActionConfigs: readonly BundledQuickActionConfig[] = [
   {

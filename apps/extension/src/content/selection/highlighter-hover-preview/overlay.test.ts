@@ -57,9 +57,9 @@ vi.mock('../../platform/dom-host/isolated', () => isolatedRoot);
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: vi.fn(() => logger),
 }));
-vi.mock('../../../composition/persistence/highlighter', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/highlighter')>()),
-  ...storage,
+vi.mock('../frame-runtime/session/border-preset', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../frame-runtime/session/border-preset')>()),
+  getFrameSessionBorderPreset: () => storage.DEFAULT_BORDER_PRESET,
 }));
 
 import {
@@ -82,12 +82,10 @@ afterEach(() => {
 
 function createState() {
   return {
-    cachedHighlighterSettings: null,
     frameCache: new Map(),
     frameCacheDirty: false,
     hoverOverlay: null as HTMLElement | null,
     overlayContainer: null as HTMLElement | null,
-    settingsLoadPromise: null,
   };
 }
 
@@ -118,6 +116,11 @@ function shouldCreateAndUpdateTheHoverOverlay(): void {
       shadow: 100,
     }
   );
+  expect(overlay.style.opacity).toBe('0.72');
+  expect(overlay.style.borderStyle).toBe('solid');
+  expect(overlay.style.borderWidth).toBe('2px');
+  expect(overlay.style.borderRadius).toBe('6px');
+  expect(overlay.style.boxShadow).not.toBe('none');
   hideHoverOverlay(state);
 
   expect(overlay.style.top).toBe('16px');
@@ -126,6 +129,52 @@ function shouldCreateAndUpdateTheHoverOverlay(): void {
   expect(overlay.style.height).toBe('30px');
   expect(overlay.style.borderColor).toBe('rgb(0, 255, 255)');
   expect(overlay.style.opacity).toBe('0');
+}
+
+function shouldPreservePresetFillAndStrokeRatiosUnderUniformOpacity(): void {
+  const state = createState();
+  const overlay = ensureHoverOverlay(state, storage.DEFAULT_BORDER_PRESET);
+
+  showHoverOverlay(
+    state,
+    { height: 10, width: 12, x: 1, y: 2 },
+    {
+      ...storage.DEFAULT_BORDER_PRESET,
+      fillColor: '#60A5FA',
+      fillOpacity: 8,
+      strokeOpacity: 65,
+    }
+  );
+
+  expect(overlay.style.opacity).toBe('0.72');
+  expect(overlay.style.borderColor).toBe('rgba(255, 255, 0, 0.65)');
+  expect(overlay.style.backgroundColor).toBe('rgba(96, 165, 250, 0.08)');
+}
+
+function shouldReplaceInheritedCustomCssOnTheReusedOverlay(): void {
+  const state = createState();
+  const position = { height: 10, width: 12, x: 1, y: 2 };
+
+  showHoverOverlay(state, position, {
+    ...storage.DEFAULT_BORDER_PRESET,
+    customCss: 'outline: 4px solid red; outline-offset: 7px; transition: none;',
+    inheritCustomCss: true,
+  });
+  const overlay = state.hoverOverlay;
+  expect(overlay?.style.outline).toBe('4px solid red');
+  expect(overlay?.style.outlineOffset).toBe('7px');
+  expect(overlay?.style.transition).toBe('none');
+
+  showHoverOverlay(state, position, {
+    ...storage.DEFAULT_BORDER_PRESET,
+    customCss: '',
+    inheritCustomCss: false,
+  });
+
+  expect(state.hoverOverlay).toBe(overlay);
+  expect(overlay?.style.outline).toBe('');
+  expect(overlay?.style.outlineOffset).toBe('');
+  expect(overlay?.style.transition).toContain('opacity 0.2s');
 }
 
 function shouldKeepHoverPreviewHiddenWhileCaptureUiIsHidden(): void {
@@ -137,6 +186,18 @@ function shouldKeepHoverPreviewHiddenWhileCaptureUiIsHidden(): void {
 
   expect(overlay.style.display).not.toBe('block');
   expect(overlay.style.opacity).toBe('0');
+}
+
+function shouldDisableMotionForReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({ matches: true }))
+  );
+  const state = createState();
+
+  const overlay = ensureHoverOverlay(state, storage.DEFAULT_BORDER_PRESET);
+
+  expect(overlay.style.transition).toBe('none');
 }
 
 function shouldRemoveOverlayArtifactsAndResetState(): void {
@@ -159,10 +220,6 @@ function shouldRemoveOverlayArtifactsAndResetState(): void {
 
 function shouldExposeOverlayActionsOverOneSession(): void {
   const session = createHoverSession();
-  session.cachedHighlighterSettings = {
-    borderPresets: [storage.DEFAULT_BORDER_PRESET],
-    defaultBorderPresetId: storage.DEFAULT_BORDER_PRESET.id,
-  } as typeof session.cachedHighlighterSettings;
   const actions = createHoverOverlayActions(session);
   const target = document.createElement('button');
 
@@ -182,6 +239,18 @@ function shouldExposeOverlayActionsOverOneSession(): void {
 describe('highlighter hover overlay', () => {
   it('creates and reuses the overlay container', shouldCreateAndReuseTheOverlayContainer);
   it('creates and updates the hover overlay', shouldCreateAndUpdateTheHoverOverlay);
+  it(
+    'preserves preset fill and stroke ratios under uniform opacity',
+    shouldPreservePresetFillAndStrokeRatiosUnderUniformOpacity
+  );
+  it(
+    'replaces inherited custom CSS on the reused overlay',
+    shouldReplaceInheritedCustomCssOnTheReusedOverlay
+  );
+  it(
+    'disables motion for reduced-motion preference',
+    shouldDisableMotionForReducedMotionPreference
+  );
   it(
     'keeps hover preview hidden while capture UI is hidden',
     shouldKeepHoverPreviewHiddenWhileCaptureUiIsHidden

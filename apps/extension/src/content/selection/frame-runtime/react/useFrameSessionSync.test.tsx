@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS: HighlighterSettings = {
   defaultBlurSettings: { amount: 8, blurType: 'gaussian', showBorder: true },
   defaultBorderPresetId: 'preset-1',
   defaultEffectMode: 'border',
+  systemPresetCatalogRevision: 1,
   defaultFocusSettings: { opacity: 0.5, showBorder: false },
 };
 
@@ -56,6 +57,7 @@ function Harness(props: {
   const highlighterSettingsCacheRef = useRef<HighlighterSettings | null>(DEFAULT_SETTINGS);
   const sessionBlurSettingsRef = useRef<BlurSettings>(DEFAULT_SETTINGS.defaultBlurSettings);
   const sessionCalloutStyleRef = useRef<Partial<CalloutSettings> | null>(null);
+  const sessionDefaultsInitializedRef = useRef(true);
   const sessionFocusSettingsRef = useRef<FocusSettings>(DEFAULT_SETTINGS.defaultFocusSettings);
 
   useFrameSessionSync({
@@ -64,6 +66,7 @@ function Harness(props: {
     reorderStepBadge: props.reorderStepBadge ?? vi.fn(),
     sessionBlurSettingsRef,
     sessionCalloutStyleRef,
+    sessionDefaultsInitializedRef,
     sessionFocusSettingsRef,
     setFrames: vi.fn(),
     syncFocusOpacity: props.syncFocusOpacity ?? vi.fn(),

@@ -84,7 +84,6 @@ describe('border preset editor state initialization', () => {
     const preset: BorderPreset = {
       id: 'preset-1',
       name: 'Orange border',
-      isSystemDefault: false,
       order: 4,
       width: 6,
       color: '#ff6600',
@@ -213,7 +212,9 @@ describe('border preset editor save edit flow', () => {
     const preset: BorderPreset = {
       id: 'preset-edit',
       name: 'Existing',
-      isSystemDefault: true,
+      origin: 'system',
+      systemPresetKey: 'system-default',
+      customized: false,
       order: 2,
       width: 4,
       color: '#111111',
@@ -244,7 +245,8 @@ describe('border preset editor save edit flow', () => {
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'preset-edit',
-        isSystemDefault: true,
+        origin: 'system',
+        systemPresetKey: 'system-default',
         order: 2,
         name: 'Edited',
       })

@@ -25,10 +25,12 @@ export interface SelectionModeEventOptions {
   startDragSelection: (startX: number, startY: number) => void;
   updateDragSelection: (currentX: number, currentY: number) => void;
   finalizeDragSelection: () => void;
+  flushFinalFrameUpdate: () => void;
   handleDragMove: (event: MouseEvent) => void;
   handleResizeMove: (event: MouseEvent) => void;
   selectElement: (target: HTMLElement, iframe?: HTMLIFrameElement) => void;
   resetToIdleState: () => void;
   cancelSelection: () => void;
+  closeCaptureActionMenu: (restoreFocus: boolean) => boolean;
   confirmSelection: () => void;
 }

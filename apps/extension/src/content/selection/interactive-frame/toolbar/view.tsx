@@ -39,6 +39,7 @@ export function InteractiveFrameToolbarContent({
         handleButtonMouseDown={toolbarActions.handleButtonMouseDown}
         handleEditClick={toolbarActions.handleEditClick}
         handleDeleteClick={toolbarActions.handleDeleteClick}
+        handleCloseClick={toolbarActions.handleCloseClick}
         handleDecreaseClick={toolbarActions.handleDecreaseClick}
         handleIncreaseClick={toolbarActions.handleIncreaseClick}
         canDecrease={canDecreaseFrameSize(toolbarProps.frame)}

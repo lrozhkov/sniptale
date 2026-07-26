@@ -36,7 +36,7 @@ type ModelFormModalContentProps = {
 
 function MissingProvidersState(props: Pick<ModelFormModalContentProps, 'onClose'>) {
   return (
-    <ProductModal width="400px" accent="compact" onClose={props.onClose}>
+    <ProductModal width="400px" onClose={props.onClose}>
       <div className="p-6 text-center">
         <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-[var(--sniptale-color-warning)]" />
         <h3 className="mb-2 text-lg font-semibold text-[var(--sniptale-color-text-primary-strong)]">

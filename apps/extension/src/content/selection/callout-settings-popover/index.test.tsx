@@ -61,7 +61,10 @@ describe('CalloutSettingsPopover', () => {
       );
     });
 
-    expect(document.querySelector('[data-ui="content.callout-settings.popover"]')).not.toBeNull();
+    const popover = document.querySelector('[data-ui="content.callout-settings.popover"]');
+    expect(popover).not.toBeNull();
+    expect(popover?.classList.contains('sniptale-content-popover--compact')).toBe(true);
+    expect(popover?.classList.contains('sniptale-glass-popover-scroll')).toBe(false);
 
     act(() => {
       vi.advanceTimersByTime(150);

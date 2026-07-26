@@ -58,7 +58,6 @@ function createPreset() {
   return {
     id: 'preset-1',
     name: 'Glow',
-    isSystemDefault: false,
     order: 0,
     width: 4,
     color: '#ff6600',

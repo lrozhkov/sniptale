@@ -114,9 +114,11 @@ export function collectBuildScopeForecast(
   const forecastScopeDetail =
     testScope.profile === 'related-transitive' && broadFamilies.length > 0
       ? [
-          `profile=${testScope.profile}`,
+          `selection=${testScope.profile}`,
+          `execution=${testScope.executionClass}`,
+          `related-inputs=${testScope.relatedFiles.length}`,
           'bounded owner and affected-consumer discovery required',
-          testScope.profileReason ? `reason=${testScope.profileReason}` : '',
+          testScope.profileReason ? `selection-reason=${testScope.profileReason}` : '',
         ]
           .filter(Boolean)
           .join('; ')

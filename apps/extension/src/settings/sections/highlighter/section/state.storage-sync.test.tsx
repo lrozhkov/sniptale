@@ -69,7 +69,8 @@ function createSettings(): HighlighterSettings {
       {
         id: 'preset-1',
         name: 'Default',
-        isSystemDefault: true,
+        origin: 'system',
+        systemPresetKey: 'system-default',
         order: 0,
         width: 2,
         color: '#ff0000',
@@ -87,6 +88,7 @@ function createSettings(): HighlighterSettings {
     ],
     defaultBorderPresetId: 'preset-1',
     defaultEffectMode: 'border',
+    systemPresetCatalogRevision: 1,
     defaultBlurSettings: {
       amount: 4,
       blurType: 'gaussian',

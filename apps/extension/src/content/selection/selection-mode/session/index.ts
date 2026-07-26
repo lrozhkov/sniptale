@@ -1,4 +1,5 @@
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
+import type { CaptureActionType } from '../../../../contracts/settings';
 import { createSelectionModeDom } from '../ui/container';
 import type { ResizeDirection, SelectionModeDom } from '../ui/dom-types';
 import type { Point, Selection, SelectionState } from '../types';
@@ -7,6 +8,8 @@ export interface SelectionModeSession {
   aspectRatio: number | null;
   cleanupEventListeners: (() => void) | null;
   cleanupScrollListeners: (() => void) | null;
+  captureAction: CaptureActionType;
+  onCaptureActionChange: ((action: CaptureActionType) => void) | null;
   currentSelection: Selection;
   currentState: SelectionState;
   cursorStyleCleanup: (() => void) | null;
@@ -35,6 +38,8 @@ export function createSelectionModeSession(): SelectionModeSession {
     aspectRatio: null,
     cleanupEventListeners: null,
     cleanupScrollListeners: null,
+    captureAction: 'download_default',
+    onCaptureActionChange: null,
     currentSelection: emptySelection(),
     currentState: 'idle',
     cursorStyleCleanup: null,
@@ -64,6 +69,8 @@ export function resetSelectionModeSession(session: SelectionModeSession): void {
     aspectRatio: null,
     cleanupEventListeners: null,
     cleanupScrollListeners: null,
+    captureAction: 'download_default',
+    onCaptureActionChange: null,
     currentSelection: emptySelection(),
     currentState: 'idle',
     dragStartPoint: { x: 0, y: 0 },

@@ -33,14 +33,21 @@ describe('buildProductToastPreviews', () => {
       root?.render(previews[0]!.preview);
     });
 
-    expect(previews).toHaveLength(3);
+    expect(previews).toHaveLength(5);
     expect(previews[0]).toEqual(
       expect.objectContaining({
         componentId: 'product.ui.toast',
-        variantId: 'success',
-        previewId: 'product.ui.toast.success',
+        variantId: 'info',
+        previewId: 'product.ui.toast.info',
       })
     );
-    expect(container?.textContent).toContain('Done');
+    expect(previews.map((preview) => preview.variantId)).toEqual([
+      'info',
+      'success',
+      'warning',
+      'error',
+      'countdown',
+    ]);
+    expect(container?.textContent).toContain('Informational message');
   });
 });

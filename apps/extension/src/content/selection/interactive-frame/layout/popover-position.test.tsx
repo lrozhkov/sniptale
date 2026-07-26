@@ -28,22 +28,39 @@ function PositionHarness(props: {
   anchorEl: HTMLElement;
   fallbackHeight?: number;
   frameRect?: { x: number; y: number; width: number; height: number };
+  isOpen?: boolean;
+  layoutHeight?: number;
+  transformedHeight?: number;
 }) {
   const popoverRef = React.useRef<HTMLDivElement | null>(null);
+  const setPopoverRef = React.useCallback(
+    (element: HTMLDivElement | null) => {
+      popoverRef.current = element;
+      if (!element || props.layoutHeight === undefined) return;
+      Object.defineProperties(element, {
+        offsetHeight: { configurable: true, value: props.layoutHeight },
+        offsetWidth: { configurable: true, value: 160 },
+      });
+      element.getBoundingClientRect = () =>
+        new DOMRect(0, 0, 160, props.transformedHeight ?? props.layoutHeight);
+    },
+    [props.layoutHeight, props.transformedHeight]
+  );
   const style = useFramePopoverPosition({
     anchorEl: props.anchorEl,
     fallbackSize: { width: 160, height: props.fallbackHeight ?? 80 },
     frameId: 'frame-1',
     frameRect: props.frameRect ?? { x: 200, y: 20, width: 200, height: 60 },
-    isOpen: true,
+    isOpen: props.isOpen ?? true,
     popoverRef,
   });
 
   return (
     <div
-      ref={popoverRef}
+      ref={setPopoverRef}
       data-left={style.left}
       data-max-height={style.maxHeight}
+      data-overflow={style.overflow}
       data-top={style.top}
     />
   );
@@ -110,6 +127,34 @@ describe('frame popover positioning', () => {
     expect(top + 80).toBeLessThanOrEqual(500);
   });
 
+  it('uses untransformed layout height so an animated popover stays clear above the toolbar', () => {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sniptale-toolbar-portal-wrapper';
+    toolbar.dataset['frameId'] = 'frame-1';
+    setRect(toolbar, new DOMRect(200, 500, 200, 48));
+    document.body.append(toolbar);
+
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(250, 505, 24, 24));
+    toolbar.append(anchor);
+
+    act(() =>
+      root.render(
+        <PositionHarness
+          anchorEl={anchor}
+          fallbackHeight={80}
+          layoutHeight={220}
+          transformedHeight={176}
+        />
+      )
+    );
+
+    const popover = container.firstElementChild as HTMLElement;
+    const top = Number(popover.dataset['top']);
+    expect(top).toBe(270);
+    expect(top + 220).toBe(490);
+  });
+
   it('keeps the canonical bottom side even when the selected frame is below the toolbar', () => {
     const toolbar = document.createElement('div');
     toolbar.className = 'sniptale-toolbar-portal-wrapper';
@@ -135,7 +180,7 @@ describe('frame popover positioning', () => {
     expect(Number(popover.dataset['top'])).toBe(158);
   });
 
-  it('caps every family-sized popover to the space above without crossing the toolbar', () => {
+  it('keeps every family-sized popover at its natural height without internal scrolling', () => {
     const toolbar = document.createElement('div');
     toolbar.className = 'sniptale-toolbar-portal-wrapper';
     toolbar.dataset['frameId'] = 'frame-1';
@@ -149,12 +194,13 @@ describe('frame popover positioning', () => {
       act(() => root.render(<PositionHarness anchorEl={anchor} fallbackHeight={fallbackHeight} />));
       const popover = container.firstElementChild as HTMLElement;
       const top = Number(popover.dataset['top']);
-      const maxHeight = Number.parseFloat(popover.dataset['maxHeight'] ?? '0');
-      expect(top + maxHeight).toBeLessThanOrEqual(190);
+      expect(top).toBe(190 - fallbackHeight);
+      expect(popover.dataset['maxHeight']).toBe('none');
+      expect(popover.dataset['overflow']).toBe('visible');
     });
   });
 
-  it('repositions after the toolbar layout changes', () => {
+  it('keeps its opening position when the annotation toolbar moves underneath it', () => {
     const observed: Element[] = [];
     let notifyResize: (() => void) | undefined;
     let scheduledLayout: FrameRequestCallback | undefined;
@@ -197,6 +243,42 @@ describe('frame popover positioning', () => {
     expect(Number(popover.dataset['top'])).toBe(158);
     act(() => scheduledLayout?.(0));
 
-    expect(Number(popover.dataset['top'])).toBe(238);
+    expect(Number(popover.dataset['top'])).toBe(158);
+  });
+
+  it('keeps a quick-control popover fixed when its annotation anchor moves', () => {
+    let anchorTop = 105;
+    const anchor = document.createElement('button');
+    anchor.getBoundingClientRect = vi.fn(() => new DOMRect(250, anchorTop, 24, 24));
+    document.body.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['top'])).toBe(139);
+
+    anchorTop = 285;
+    act(() =>
+      root.render(
+        <PositionHarness anchorEl={anchor} frameRect={{ x: 300, y: 280, width: 200, height: 60 }} />
+      )
+    );
+
+    expect(Number(popover.dataset['top'])).toBe(139);
+  });
+
+  it('starts a fresh placement session when the popover is reopened', () => {
+    let anchorTop = 105;
+    const anchor = document.createElement('button');
+    anchor.getBoundingClientRect = vi.fn(() => new DOMRect(250, anchorTop, 24, 24));
+    document.body.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+    expect(Number((container.firstElementChild as HTMLElement).dataset['top'])).toBe(139);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} isOpen={false} />));
+    anchorTop = 285;
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+
+    expect(Number((container.firstElementChild as HTMLElement).dataset['top'])).toBe(319);
   });
 });

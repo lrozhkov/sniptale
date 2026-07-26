@@ -92,6 +92,12 @@ function appendFrameOverlayFixture(overlayRoot: HTMLElement): void {
   const calloutHandle = document.createElement('button');
   calloutHandle.className = 'sniptale-callout-drag-handle';
   calloutHandle.textContent = 'Runtime callout handle';
+  const calloutSettingsHandle = document.createElement('button');
+  calloutSettingsHandle.className = 'sniptale-callout-settings-handle';
+  calloutSettingsHandle.textContent = 'Runtime callout settings';
+  const stepBadgeControls = document.createElement('div');
+  stepBadgeControls.className = 'sniptale-step-badge-controls';
+  stepBadgeControls.textContent = 'Runtime step badge controls';
   const freeDraft = document.createElement('div');
   freeDraft.className = 'sniptale-free-frame-draft-portal';
   freeDraft.textContent = 'Runtime free-frame draft';
@@ -105,6 +111,8 @@ function appendFrameOverlayFixture(overlayRoot: HTMLElement): void {
     trigger,
     triggerBridge,
     calloutHandle,
+    calloutSettingsHandle,
+    stepBadgeControls,
     freeDraft
   );
 }
@@ -180,6 +188,8 @@ function registerOverlaySnapshotTests(): void {
     expect(result.html).not.toContain('Runtime frame trigger');
     expect(result.html).not.toContain('Runtime trigger bridge');
     expect(result.html).not.toContain('Runtime callout handle');
+    expect(result.html).not.toContain('Runtime callout settings');
+    expect(result.html).not.toContain('Runtime step badge controls');
     expect(result.html).not.toContain('Runtime free-frame draft');
   });
 }

@@ -6,8 +6,8 @@ export const scenarioContentMessages = defineMessageSource({
     en: 'Scenario',
   },
   project: {
-    ru: 'Сценарий',
-    en: 'Scenario',
+    ru: 'Проект сценария',
+    en: 'Scenario project',
   },
   projectMenuTitle: {
     ru: 'Проект сценария',
@@ -26,28 +26,28 @@ export const scenarioContentMessages = defineMessageSource({
     en: 'No project selected',
   },
   modeManual: {
-    ru: 'Вручную',
-    en: 'Manual',
+    ru: 'Кнопкой снимка',
+    en: 'Screenshot button',
   },
   modeByClick: {
-    ru: 'По клику',
-    en: 'By click',
+    ru: 'Кликом по странице',
+    en: 'Clicking the page',
   },
   captureMode: {
-    ru: 'Режим захвата',
-    en: 'Capture mode',
+    ru: 'Добавление шагов',
+    en: 'Adding steps',
   },
   modeManualHint: {
-    ru: 'Добавляйте шаги вручную из тулбара',
-    en: 'Add steps manually from the toolbar',
+    ru: 'Добавлять шаг после нажатия кнопки снимка на панели',
+    en: 'Add a step when you use a screenshot button on the toolbar',
   },
   modeByClickHint: {
-    ru: 'Записывайте шаги кликом по странице',
-    en: 'Capture steps by clicking the page',
+    ru: 'Добавлять шаг при клике по элементу страницы',
+    en: 'Add a step when you click a page element',
   },
   modeByClickDisabledHint: {
-    ru: 'Недоступно, пока включено выделение, quick edit или AI-pick',
-    en: 'Unavailable while highlighter, quick edit, or AI pick is active',
+    ru: 'Сначала выключите аннотации, редактирование страницы и ИИ-редактор',
+    en: 'Turn off annotations, page editing, and the AI editor first',
   },
   sidebarShow: {
     ru: 'Показать sidebar',
@@ -106,8 +106,8 @@ export const scenarioContentMessages = defineMessageSource({
     en: 'Search projects',
   },
   projectSearchPlaceholder: {
-    ru: 'Введите название для нового или существующего проекта',
-    en: 'Enter a name for a new or existing project',
+    ru: 'Поиск или название нового проекта',
+    en: 'Search or enter a new project name',
   },
   recentProjects: {
     ru: 'Недавние',

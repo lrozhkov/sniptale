@@ -1,72 +1,70 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createPreset, createSettings } from './test-helpers';
 
-const { syncGetMock, syncSetMock, translateMock } = vi.hoisted(() => ({
-  syncGetMock: vi.fn(),
+import type { HighlighterSettings } from '../../../features/highlighter/contracts';
+import { createDefaultHighlighterSettings } from '../../../features/highlighter/style/defaults';
+
+const storageState = vi.hoisted(() => ({ value: undefined as unknown }));
+const { syncGetMock, syncSetMock } = vi.hoisted(() => ({
+  syncGetMock: vi.fn(async () => ({ sniptale_highlighter_settings: storageState.value })),
   syncSetMock: vi.fn(),
-  translateMock: vi.fn((key: string) => key),
 }));
 
 vi.mock('../infrastructure/browser-storage', () => ({
-  browserStorage: {
-    sync: {
-      get: syncGetMock,
-      set: syncSetMock,
-    },
-  },
-}));
-
-vi.mock('../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
-  translate: translateMock,
+  browserStorage: { sync: { get: syncGetMock, set: syncSetMock } },
 }));
 
 function createDeferred() {
-  let resolve: (() => void) | null = null;
+  let resolve!: () => void;
   const promise = new Promise<void>((nextResolve) => {
     resolve = nextResolve;
   });
-
-  return {
-    promise,
-    resolve: () => resolve?.(),
-  };
-}
-
-async function loadHighlighterStorage() {
-  return import('./index');
+  return { promise, resolve };
 }
 
 beforeEach(() => {
+  storageState.value = createDefaultHighlighterSettings();
   vi.clearAllMocks();
   vi.resetModules();
 });
 
-it('serializes concurrent preset mutations to avoid blind overwrites', async () => {
+it('serializes concurrent mutations and re-reads the latest persisted state', async () => {
   const firstWrite = createDeferred();
-  syncGetMock.mockResolvedValue({
-    sniptale_highlighter_settings: createSettings(),
-  });
-  syncSetMock.mockImplementationOnce(() => firstWrite.promise).mockResolvedValueOnce(undefined);
+  syncSetMock
+    .mockImplementationOnce(async (payload: Record<string, unknown>) => {
+      await firstWrite.promise;
+      storageState.value = payload['sniptale_highlighter_settings'];
+    })
+    .mockImplementationOnce(async (payload: Record<string, unknown>) => {
+      storageState.value = payload['sniptale_highlighter_settings'];
+    });
+  const module = await import('./index');
+  const source = createDefaultHighlighterSettings().borderPresets[0]!;
+  const {
+    basedOnRevision: _basedOnRevision,
+    customized: _customized,
+    systemPresetKey: _systemPresetKey,
+    ...userSource
+  } = source;
+  const userPreset = {
+    ...userSource,
+    id: 'user-1',
+    name: 'User preset',
+    origin: 'user' as const,
+  };
 
-  const { addBorderPreset, updateBorderPreset } = await loadHighlighterStorage();
-
-  const addPresetPromise = addBorderPreset(createPreset('preset-2', { order: 1 }));
-  const updatePresetPromise = updateBorderPreset(createPreset('preset-1', { name: 'Updated' }));
-
-  await vi.waitFor(() => {
-    expect(syncGetMock).toHaveBeenCalledTimes(1);
-    expect(syncSetMock).toHaveBeenCalledTimes(1);
-  });
+  const add = module.addBorderPreset(userPreset);
+  const disable = module.setBorderPresetEnabled('system-default', false);
+  await vi.waitFor(() => expect(syncSetMock).toHaveBeenCalledOnce());
+  expect(syncGetMock).toHaveBeenCalledOnce();
 
   firstWrite.resolve();
-  await Promise.all([addPresetPromise, updatePresetPromise]);
+  await Promise.all([add, disable]);
 
-  expect(syncSetMock.mock.calls.length).toBeGreaterThanOrEqual(2);
-  expect(syncSetMock.mock.lastCall?.[0]?.sniptale_highlighter_settings.borderPresets).toEqual(
-    expect.arrayContaining([
-      createPreset('preset-1', { name: 'Updated' }),
-      createPreset('preset-2', { order: 1 }),
-    ])
+  expect(syncGetMock).toHaveBeenCalledTimes(2);
+  expect(syncSetMock).toHaveBeenCalledTimes(2);
+  const stored = storageState.value as HighlighterSettings;
+  expect(stored.borderPresets.some((preset) => preset.id === 'user-1')).toBe(true);
+  expect(stored.borderPresets.find((preset) => preset.id === 'system-default')?.enabled).toBe(
+    false
   );
 });

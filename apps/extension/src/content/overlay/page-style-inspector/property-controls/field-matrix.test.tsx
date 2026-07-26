@@ -173,7 +173,7 @@ it('routes every text field to its page-style property update', async () => {
   const actions = renderControls('text');
 
   await pickColor('Цвет', '#2563eb');
-  await pickOption('Шрифт', 'Georgia, serif');
+  await pickOption('Шрифт', 'Georgia');
   inputValue('Размер', '22');
   await pickOption('Высота строки', '1.5');
   await pickOption('Межбуквенный', '1px');
@@ -286,4 +286,35 @@ it('keeps the UI field matrix aligned with every allowed page-style property', (
   ].sort();
 
   expect(coveredProperties).toEqual([...PAGE_STYLE_ALLOWED_PROPERTIES].sort());
+});
+
+it('keeps every block-property field and shared picker within the inspector column', () => {
+  renderControls('text');
+
+  const fields = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-ui="content.page-style-inspector.field"]')
+  );
+  const selects = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-ui="shared.ui.compact-select"]')
+  );
+  const colorSelectors = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-ui="shared.ui.color-selector"]')
+  );
+  const compactInputs = Array.from(document.querySelectorAll<HTMLElement>('.sniptale-input'));
+
+  expect(fields.length).toBeGreaterThan(8);
+  expect(selects.length).toBeGreaterThan(3);
+  expect(colorSelectors.length).toBeGreaterThan(3);
+  expect(compactInputs.length).toBeGreaterThan(5);
+
+  for (const control of [...fields, ...selects, ...colorSelectors, ...compactInputs]) {
+    expect(control.className).toContain('min-w-0');
+    expect(control.className).toContain('max-w-full');
+  }
+
+  for (const select of selects) {
+    const trigger = select.querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]');
+    expect(trigger?.className).toContain('h-10');
+    expect(trigger?.className).toContain('rounded-[10px]');
+  }
 });

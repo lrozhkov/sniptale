@@ -22,7 +22,6 @@ function createPreset(
   return {
     id: overrides.id ?? 'preset-1',
     name: overrides.name ?? 'Preset',
-    isSystemDefault: overrides.isSystemDefault ?? false,
     order: overrides.order ?? 0,
     width: overrides.width ?? 6,
     color: overrides.color ?? '#ff6600',
@@ -43,6 +42,10 @@ describe('highlighter-section helpers', () => {
   it('resolves localized count labels for singular, few, and many forms', verifyCountLabels);
 
   it('builds preview styles for each supported shadow level', verifyPreviewShadowStyles);
+
+  it('does not apply the retired compatibility opacity to the preset preview', () => {
+    expect(getHighlighterPresetPreviewStyle(createPreset({ opacity: 20 })).opacity).toBeUndefined();
+  });
 
   it('reorders presets and returns null when either id is missing', () => {
     const first = createPreset({ id: 'preset-1', order: 0 });

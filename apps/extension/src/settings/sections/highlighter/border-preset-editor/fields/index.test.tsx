@@ -8,30 +8,20 @@ vi.mock('../../../../../platform/i18n', () => ({
   translate: (key: string) => key,
 }));
 
-vi.mock('../../../../section-surface', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../section-surface')>()),
-  SettingsRangeField: ({
-    className,
-    max,
-    min,
+vi.mock('../../../../../ui/color-selector', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../ui/color-selector')>()),
+  CompactColorSelector: ({
+    label,
     onChange,
     value,
   }: {
-    className?: string;
-    max: string;
-    min: string;
-    onChange: (event: { target: { value: string } }) => void;
-    value: number;
+    label: string;
+    onChange: (value: string) => void;
+    value: string;
   }) => (
-    <input
-      data-testid="settings-range"
-      type="range"
-      min={min}
-      max={max}
-      value={value}
-      className={className}
-      onChange={(event) => onChange({ target: { value: event.currentTarget.value } })}
-    />
+    <button type="button" data-testid="compact-color-selector" onClick={() => onChange('#123456')}>
+      {label}:{value}
+    </button>
   ),
 }));
 
@@ -107,20 +97,17 @@ async function renderFields(state: ReturnType<typeof createState>) {
 
 function queryFieldElements() {
   const buttons = Array.from(container?.querySelectorAll('button') ?? []);
-  const textInputs = Array.from(
-    container?.querySelectorAll<HTMLInputElement>('input[type="text"]') ?? []
+  const colorSelectors = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('[data-testid="compact-color-selector"]') ?? []
   );
 
   return {
-    colorPicker: container?.querySelector('input[type="color"]') as HTMLInputElement,
-    colorTextInput: textInputs[1] as HTMLInputElement,
-    nameInput: textInputs[0] as HTMLInputElement,
+    colorSelectors,
+    nameInput: container?.querySelector('input[type="text"]') as HTMLInputElement,
     numberInputs: Array.from(
       container?.querySelectorAll<HTMLInputElement>('input[type="number"]') ?? []
     ),
-    ranges: Array.from(
-      container?.querySelectorAll<HTMLInputElement>('input[data-testid="settings-range"]') ?? []
-    ),
+    ranges: Array.from(container?.querySelectorAll<HTMLInputElement>('input[type="range"]') ?? []),
     resizeHandle: container?.querySelector('div[style*="ns-resize"]') as HTMLDivElement,
     styleButton: buttons.find((button) =>
       button.textContent?.includes('highlighter.editor.styleSolid')
@@ -130,36 +117,28 @@ function queryFieldElements() {
 }
 
 async function interactWithFields(state: ReturnType<typeof createBaseState>) {
-  const {
-    colorPicker,
-    colorTextInput,
-    nameInput,
-    numberInputs,
-    ranges,
-    resizeHandle,
-    styleButton,
-    textarea,
-  } = queryFieldElements();
+  const { colorSelectors, nameInput, numberInputs, ranges, resizeHandle, styleButton, textarea } =
+    queryFieldElements();
 
   await act(async () => {
     setInputValue(nameInput, 'Updated preset');
-    setInputValue(colorPicker, '#00ff00');
-    setInputValue(colorTextInput, '#123456');
+    colorSelectors[0]?.click();
+    colorSelectors[1]?.click();
     setInputValue(textarea, 'border-color: blue;');
     setInputValue(numberInputs[0] as HTMLInputElement, '11');
     setInputValue(numberInputs[3] as HTMLInputElement, '14');
     setInputValue(ranges[0] as HTMLInputElement, '7');
     setInputValue(ranges[1] as HTMLInputElement, '8');
     setInputValue(ranges[2] as HTMLInputElement, '65');
-    setInputValue(ranges[4] as HTMLInputElement, '55');
-    setInputValue(ranges[5] as HTMLInputElement, '100');
+    setInputValue(ranges[3] as HTMLInputElement, '55');
+    setInputValue(ranges[4] as HTMLInputElement, '100');
     styleButton?.click();
     resizeHandle?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   });
 
   expect(state.setName).toHaveBeenCalledWith('Updated preset');
-  expect(state.setColor).toHaveBeenCalledWith('#00ff00');
   expect(state.setColor).toHaveBeenCalledWith('#123456');
+  expect(state.setFillColor).toHaveBeenCalledWith('#123456');
   expect(state.setCustomCss).toHaveBeenCalledWith('border-color: blue;');
   expect(state.updatePadding).toHaveBeenCalledWith('top', 11);
   expect(state.updatePadding).toHaveBeenCalledWith('left', 14);
@@ -169,7 +148,7 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   expect(state.setWidth).toHaveBeenCalledWith(7);
   expect(state.setRadius).toHaveBeenCalledWith(8);
   expect(state.setStrokeOpacity).toHaveBeenCalledWith(65);
-  expect(state.setOpacity).toHaveBeenCalledWith(55);
+  expect(state.setFillOpacity).toHaveBeenCalledWith(55);
 }
 
 beforeEach(() => {
@@ -195,6 +174,9 @@ describe('BorderPresetEditorFields', () => {
     expect(container?.textContent).toContain('highlighter.editor.previewLabel');
     expect(container?.textContent).toContain('highlighter.editor.nameLabel');
     expect(container?.textContent).toContain('highlighter.editor.customCssLabel');
+    expect(container?.textContent).toContain('highlighter.editor.previewSampleText');
+    expect(container?.textContent).not.toContain('highlighter.editor.opacityLabel');
+    expect(container?.querySelector('input[type="checkbox"]')).toBeNull();
 
     await interactWithFields(state);
   });

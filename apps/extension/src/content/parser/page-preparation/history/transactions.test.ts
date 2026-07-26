@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createHistoryStoreState } from './store-state';
 import { createHistoryStoreCommitApi } from './transactions';
 import type { FrameSessionSnapshot } from './types';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
 function createSnapshot(label: string): FrameSessionSnapshot {
   return {
@@ -17,6 +18,7 @@ function createSnapshot(label: string): FrameSessionSnapshot {
     ],
     globalEffectMode: 'border',
     globalStepBadgeSettings: { autoMode: true },
+    sessionBorderPreset: DEFAULT_BORDER_PRESET,
     sessionBlurSettings: { amount: 8, blurType: 'gaussian', showBorder: true },
     sessionCalloutStyle: null,
     sessionFocusSettings: { opacity: 0.5, showBorder: false },

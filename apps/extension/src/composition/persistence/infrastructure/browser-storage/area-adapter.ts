@@ -4,7 +4,18 @@ import type {
   BrowserStorageAreaAdapter,
   BrowserStorageGetKeys,
 } from '@sniptale/platform/browser/storage-types';
-import { runWithPersistenceMutationPermit } from '../mutation-barrier';
+import {
+  isActivePersistenceMutationPermit,
+  runWithPersistenceMutationPermit,
+  type PersistenceMutationPermit,
+} from '../mutation-barrier';
+
+type PersistenceAwareBrowserStorageAreaAdapter = Omit<BrowserStorageAreaAdapter, 'set'> & {
+  set(
+    items: Parameters<BrowserStorageAreaAdapter['set']>[0],
+    permit?: PersistenceMutationPermit
+  ): Promise<void>;
+};
 
 function getStorageArea(areaName: chrome.storage.AreaName): chrome.storage.StorageArea | null {
   if (typeof chrome === 'undefined') {
@@ -60,7 +71,7 @@ async function materializeStorageValues(
 export function createStorageAreaAdapter(
   areaName: chrome.storage.AreaName,
   guardMutations: boolean
-): BrowserStorageAreaAdapter {
+): PersistenceAwareBrowserStorageAreaAdapter {
   return {
     isAvailable() {
       return getStorageArea(areaName) !== null;
@@ -74,13 +85,15 @@ export function createStorageAreaAdapter(
       return materializeStorageValues(areaName, keys ?? null);
     },
 
-    async set(items) {
+    async set(items, permit) {
       if (!getStorageArea(areaName)) {
         return Promise.reject(new Error(`chrome.storage.${areaName} is unavailable`));
       }
 
       const write = () => stateManager.writeMany(getStateManagerDomain(areaName), items);
-      await (guardMutations ? runWithPersistenceMutationPermit(write) : write());
+      await (guardMutations && !isActivePersistenceMutationPermit(permit)
+        ? runWithPersistenceMutationPermit(write)
+        : write());
     },
 
     async remove(keys) {

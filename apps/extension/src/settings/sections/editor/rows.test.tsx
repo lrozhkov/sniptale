@@ -91,7 +91,9 @@ function createRectanglePreset(): RectanglePreset {
     fillOpacity: 0,
     id: 'border-default',
     inheritCustomCss: false,
-    isSystemDefault: true,
+    origin: 'system',
+    systemPresetKey: 'system-default',
+    customized: true,
     name: 'Border',
     opacity: 100,
     order: 0,
@@ -211,7 +213,7 @@ describe('settings/editor-section rows', () => {
     expect(container?.querySelector('[data-testid="border-preview"]')).not.toBeNull();
     expect(container?.textContent).toContain('highlighter.section.defaultBadge');
     expect(container?.textContent).toContain('highlighter.section.systemBadge');
-    expect(container?.textContent).toContain('shared.defaults.defaultEditorPresetName');
+    expect(container?.textContent).toContain('Preset 1');
     expect(container?.querySelector('.line-clamp-2')).not.toBeNull();
 
     const switchButtons = Array.from(

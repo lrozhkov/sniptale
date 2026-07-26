@@ -115,7 +115,10 @@ function UnlinkedSideValues(props: {
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_32px] items-start gap-2">
-      <div data-ui="content.page-style-inspector.side-values" className="grid grid-cols-4 gap-2">
+      <div
+        data-ui="content.page-style-inspector.side-values"
+        className="grid min-w-0 grid-cols-[repeat(4,minmax(0,1fr))] gap-2"
+      >
         {props.properties.map((property, index) => (
           <SideValueLabel
             key={property}
@@ -151,7 +154,7 @@ function SideValueLabel(props: {
   const label = translate(SIDE_LABEL_KEYS[props.index] ?? SIDE_LABEL_KEYS[0]);
 
   return (
-    <label className="grid gap-1">
+    <label className="grid min-w-0 gap-1">
       <span className="text-center text-[10px] font-semibold text-[var(--sniptale-color-text-dim)]">
         {label}
       </span>

@@ -34,30 +34,6 @@
   font-family: inherit;
 }
 
-.sniptale-modal-accent {
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--sniptale-accent) 24%, transparent) 16%,
-    color-mix(in srgb, var(--sniptale-accent-light) 30%, transparent) 50%,
-    transparent 100%
-  );
-  flex-shrink: 0;
-}
-
-.sniptale-modal-accent-sm {
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--sniptale-accent) 20%, transparent) 18%,
-    color-mix(in srgb, var(--sniptale-accent-light) 26%, transparent) 52%,
-    transparent 100%
-  );
-  flex-shrink: 0;
-}
-
 .sniptale-modal-header {
   padding: 18px 24px 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--sniptale-modal-border) 52%, transparent);

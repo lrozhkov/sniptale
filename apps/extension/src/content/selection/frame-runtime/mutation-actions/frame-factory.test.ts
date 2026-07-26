@@ -13,6 +13,7 @@ import type { StepBadgeSettings } from '../../../../features/highlighter/contrac
 import { createFrameDataFixture } from '../react/test-support';
 import { createAddFrameHandler, createAddFreeFrameHandler } from './frame-factory';
 import { useFrameUIStore } from '../state/frame-ui.store';
+import { setFrameSessionBorderPreset } from '../session/border-preset';
 
 const invalidateFrameCache = vi.hoisted(() => vi.fn());
 
@@ -53,7 +54,6 @@ function createHighlighterSettings(): HighlighterSettings {
       {
         id: 'preset-1',
         name: 'Orange',
-        isSystemDefault: true,
         order: 0,
         width: 3,
         color: '#ff671d',
@@ -76,18 +76,21 @@ function createHighlighterSettings(): HighlighterSettings {
     ],
     defaultBorderPresetId: 'preset-1',
     defaultEffectMode: 'border',
+    systemPresetCatalogRevision: 1,
     defaultBlurSettings: createBlurSettings(),
     defaultFocusSettings: createFocusSettings(),
   };
 }
 
-function createOptions() {
-  let currentFrames: Array<ReturnType<typeof createFrameDataFixture>> = [];
+function createOptions(initialFrames: Array<ReturnType<typeof createFrameDataFixture>> = []) {
+  let currentFrames = [...initialFrames];
   const setFrames = vi.fn<Dispatch<SetStateAction<typeof currentFrames>>>((updater) => {
     currentFrames = typeof updater === 'function' ? updater(currentFrames) : updater;
   });
   const linkedElementsRef = { current: new Map<string, HTMLElement>() };
   const recalculateStepBadgesRef = { current: vi.fn<(excludeFrameId?: string) => void>() };
+  const highlighterSettings = createHighlighterSettings();
+  setFrameSessionBorderPreset(highlighterSettings.borderPresets[0]!);
 
   return {
     currentFrames: () => currentFrames,
@@ -105,7 +108,7 @@ function createOptions() {
       sessionStepBadgeTemplateRef: {
         current: createStepBadgeTemplate() as StepBadgeSettings | null,
       },
-      highlighterSettingsCacheRef: { current: createHighlighterSettings() },
+      highlighterSettingsCacheRef: { current: highlighterSettings },
       recalculateStepBadgesRef,
       calculateFrameCoords: (element: HTMLElement, borderSettings?: BorderPreset) =>
         createFrameDataFixture('frame-1', {
@@ -176,6 +179,21 @@ describe('frame mutation action frame factory', () => {
     'skips step badge scheduling when the session does not provide a badge template',
     verifyAddFrameSkipsBadgeRecalcWithoutTemplate
   );
+
+  it('uses explicit session settings instead of the last existing frame', () => {
+    const previousFrame = createFrameDataFixture('previous-frame', {
+      effectMode: 'focus',
+      blurSettings: { amount: 30, blurType: 'pixelate', showBorder: false },
+      focusSettings: { opacity: 0.9, showBorder: true },
+    });
+    const { options } = createOptions([previousFrame]);
+
+    const frame = createAddFrameHandler(options)(document.createElement('button'));
+
+    expect(frame.effectMode).toBe('border');
+    expect(frame.blurSettings).toEqual(createBlurSettings());
+    expect(frame.focusSettings).toEqual(createFocusSettings());
+  });
 
   it('selects a newly drawn free frame and closes the previous toolbar owner', () => {
     const { options } = createOptions();

@@ -116,4 +116,31 @@ describe('processFrameHover', () => {
 
     expect(handleMouseMove).toHaveBeenCalledWith(event, undefined);
   });
+
+  it.each([
+    'sniptale-toolbar-portal-wrapper',
+    'sniptale-callout-settings-popover',
+    'sniptale-step-badge-popover',
+  ])('cancels pending frame hit-testing while the pointer is over %s', (className) => {
+    const handleMouseMove = vi.fn();
+    const rafId = { current: 12 as number | null };
+    const toolbar = document.createElement('div');
+    toolbar.className = className;
+    const event = new MouseEvent('mousemove', { clientX: 300, clientY: 160 });
+    Object.defineProperty(event, 'composedPath', { value: () => [toolbar, document.body] });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const handler = createThrottledMouseMoveHandler({
+      handleMouseMove,
+      lastMouseX: { current: -1 },
+      lastMouseY: { current: -1 },
+      lastProcessTime: { current: 0 },
+      rafId,
+    });
+
+    handler(event);
+
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(12);
+    expect(rafId.current).toBeNull();
+    expect(handleMouseMove).not.toHaveBeenCalled();
+  });
 });

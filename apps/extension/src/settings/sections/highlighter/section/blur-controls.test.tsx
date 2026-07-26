@@ -69,7 +69,6 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
   return {
     id: overrides.id ?? 'preset-1',
     name: overrides.name ?? 'Preset',
-    isSystemDefault: overrides.isSystemDefault ?? false,
     order: overrides.order ?? 0,
     width: overrides.width ?? 4,
     color: overrides.color ?? '#ff6600',
@@ -91,6 +90,7 @@ function createSettings(overrides: Partial<HighlighterSettings> = {}): Highlight
     borderPresets: overrides.borderPresets ?? [createPreset()],
     defaultBorderPresetId: overrides.defaultBorderPresetId ?? 'preset-1',
     defaultEffectMode: overrides.defaultEffectMode ?? 'border',
+    systemPresetCatalogRevision: overrides.systemPresetCatalogRevision ?? 1,
     defaultBlurSettings: overrides.defaultBlurSettings ?? {
       amount: 4,
       blurType: 'gaussian',

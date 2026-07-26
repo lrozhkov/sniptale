@@ -42,10 +42,7 @@ function calculateCanonicalPopoverRect(params: {
     params.size.width,
     Math.max(0, params.viewport.width - VIEWPORT_MARGIN * 2)
   );
-  const height = Math.min(
-    params.size.height,
-    Math.max(0, params.viewport.height - VIEWPORT_MARGIN * 2)
-  );
+  const height = params.size.height;
   const x = clamp(
     params.anchorRect.x + params.anchorRect.width / 2 - width / 2,
     VIEWPORT_MARGIN,
@@ -53,13 +50,9 @@ function calculateCanonicalPopoverRect(params: {
   );
   const bottomY = params.surfaceRect.y + params.surfaceRect.height + POPOVER_GAP;
   const bottomAvailable = Math.max(0, params.viewport.height - VIEWPORT_MARGIN - bottomY);
-  const topAvailable = Math.max(0, params.surfaceRect.y - POPOVER_GAP - VIEWPORT_MARGIN);
   const placeBelow = height <= bottomAvailable;
-  const constrainedHeight = Math.min(height, placeBelow ? bottomAvailable : topAvailable);
-  const y = placeBelow
-    ? bottomY
-    : Math.max(VIEWPORT_MARGIN, params.surfaceRect.y - POPOVER_GAP - constrainedHeight);
-  return { x, y, width, height: constrainedHeight };
+  const y = placeBelow ? bottomY : params.surfaceRect.y - POPOVER_GAP - height;
+  return { x, y, width, height };
 }
 
 export function useFramePopoverPosition(params: {
@@ -71,13 +64,38 @@ export function useFramePopoverPosition(params: {
   popoverRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const [, refresh] = React.useReducer((value) => value + 1, 0);
+  const placementSessionRef = React.useRef<{
+    anchorEl: HTMLElement;
+    anchorRect: FloatingRect;
+    frameId: string;
+    surfaceRect: FloatingRect;
+  } | null>(null);
+  const placementSession = placementSessionRef.current;
+
+  if (!params.isOpen) {
+    placementSessionRef.current = null;
+  } else if (
+    params.anchorEl &&
+    (!placementSession ||
+      placementSession.anchorEl !== params.anchorEl ||
+      placementSession.frameId !== params.frameId)
+  ) {
+    const anchorRect = toRect(params.anchorEl.getBoundingClientRect());
+    placementSessionRef.current = {
+      anchorEl: params.anchorEl,
+      anchorRect,
+      frameId: params.frameId,
+      surfaceRect: getToolbarRect(params.frameId) ?? anchorRect,
+    };
+  }
 
   React.useLayoutEffect(() => {
     if (!params.isOpen) return;
     const update = () => refresh();
     const cleanupPosition = bindFloatingInteractionPositionListeners(params.anchorEl, update);
     const popover = params.popoverRef.current;
-    if (typeof ResizeObserver === 'undefined' || !popover) return cleanupPosition;
+    if (!popover) return cleanupPosition;
+    if (typeof ResizeObserver === 'undefined') return cleanupPosition;
     let layoutRafId: number | null = null;
     const updateAfterLayout = () => {
       if (layoutRafId !== null) return;
@@ -109,16 +127,16 @@ export function useFramePopoverPosition(params: {
   ]);
 
   if (!params.anchorEl) return getHiddenStyle();
-  const measured = params.popoverRef.current?.getBoundingClientRect();
+  const activePlacementSession = placementSessionRef.current;
+  if (!activePlacementSession) return getHiddenStyle();
+  const popover = params.popoverRef.current;
   const size =
-    measured && measured.width > 0 && measured.height > 0
-      ? { width: measured.width, height: measured.height }
+    popover && popover.offsetWidth > 0 && popover.offsetHeight > 0
+      ? { width: popover.offsetWidth, height: popover.offsetHeight }
       : params.fallbackSize;
-  const anchorRect = toRect(params.anchorEl.getBoundingClientRect());
-  const toolbarRect = getToolbarRect(params.frameId);
   const rect = calculateCanonicalPopoverRect({
-    anchorRect,
-    surfaceRect: toolbarRect ?? anchorRect,
+    anchorRect: activePlacementSession.anchorRect,
+    surfaceRect: activePlacementSession.surfaceRect,
     size,
     viewport: { width: window.innerWidth, height: window.innerHeight },
   });
@@ -127,8 +145,8 @@ export function useFramePopoverPosition(params: {
     top: rect.y,
     left: rect.x,
     maxWidth: 'calc(100vw - 16px)',
-    maxHeight: `${rect.height}px`,
-    overflow: 'auto',
+    maxHeight: 'none',
+    overflow: 'visible',
     zIndex: 2147483647,
     pointerEvents: 'auto',
   } satisfies CSSProperties;

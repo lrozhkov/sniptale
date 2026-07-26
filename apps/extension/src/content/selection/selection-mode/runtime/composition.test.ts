@@ -79,8 +79,10 @@ function createScenario() {
     getAbsolutePosition: vi.fn(() => ({ x: 0, y: 0, width: 10, height: 10 })),
     getMaxSelectionHeight: vi.fn(() => 720),
     getMaxSelectionWidth: vi.fn(() => 1280),
+    flushFinalFrameUpdate: vi.fn(),
     hideHoverFrame: vi.fn(),
     minSelectionSize: 10,
+    scheduleFinalFrameUpdate: vi.fn(),
     setupListenerHandlers: handlers,
     showFinalFrame: vi.fn(),
     showHoverFrameDom: vi.fn(),
@@ -91,6 +93,7 @@ function createScenario() {
   const events = {
     cancelSelection: vi.fn(),
     cleanup: vi.fn(),
+    closeCaptureActionMenu: vi.fn(() => false),
     confirmSelection: vi.fn(),
     constrainSelection: vi.fn(),
     resetToIdleState: vi.fn(),
@@ -163,9 +166,16 @@ describe('selection-mode runtime composition', () => {
     sizePanelArgs?.constrainSelection();
     sizePanelArgs?.updateFinalFrame();
     uiArgs?.onCancel();
+    scenario.session.currentSelection = { x: 20, y: 20, width: 100, height: 80 };
+    const onCaptureActionChange = vi.fn();
+    scenario.session.onCaptureActionChange = onCaptureActionChange;
+    uiArgs?.onAdjustPadding('increase');
+    uiArgs?.onCaptureActionChange('copy');
     uiArgs?.onConfirm();
     uiArgs?.onResetToIdle();
     expect(uiArgs?.getDom()).toBe(scenario.session.dom);
+    expect(uiArgs?.getCaptureAction()).toBe('copy');
+    expect(uiArgs?.getSelection()).toEqual({ x: 15, y: 15, width: 110, height: 90 });
     expect(uiArgs?.getVisual()).toBe(scenario.visual);
     setupArgs?.handleKeyDown(new KeyboardEvent('keydown'));
     bridgeArgs?.handleKeyDown(new KeyboardEvent('keydown'));
@@ -173,7 +183,8 @@ describe('selection-mode runtime composition', () => {
     scenario.runtime.cleanupEffects();
 
     expect(scenario.events.constrainSelection).toHaveBeenCalledOnce();
-    expect(scenario.events.updateFinalFrame).toHaveBeenCalledOnce();
+    expect(scenario.events.updateFinalFrame).toHaveBeenCalledTimes(2);
+    expect(onCaptureActionChange).toHaveBeenCalledWith('copy');
     expect(scenario.events.cancelSelection).toHaveBeenCalledOnce();
     expect(scenario.events.confirmSelection).toHaveBeenCalledOnce();
     expect(scenario.events.resetToIdleState).toHaveBeenCalledOnce();
@@ -195,16 +206,20 @@ describe('selection-mode runtime composition', () => {
     mocks.isSelectionModeActiveApi.mockReturnValue(true);
     const scenario = createScenario();
 
+    const options = { captureAction: 'copy' as const, onCaptureActionChange: vi.fn() };
+    await expect(scenario.runtime.enableSelectionMode(options)).resolves.toEqual(area);
     await expect(scenario.runtime.enableSelectionMode()).resolves.toEqual(area);
     scenario.runtime.disableSelectionMode();
     expect(scenario.runtime.isSelectionModeActive()).toBe(true);
 
     expect(mocks.enableSelectionModeApi).toHaveBeenCalledWith(
-      expect.objectContaining({ cleanup: scenario.cleanup, session: scenario.session })
+      expect.objectContaining({ cleanup: scenario.cleanup, options, session: scenario.session })
     );
-    expect(scenario.uiRuntime.prepare).toHaveBeenCalledOnce();
-    expect(scenario.uiRuntime.createOverlayContainer).toHaveBeenCalledOnce();
-    expect(scenario.uiRuntime.createHoverElements).toHaveBeenCalledOnce();
+    const enableWithoutOptionsArgs = mocks.enableSelectionModeApi.mock.calls[1]?.[0];
+    expect(enableWithoutOptionsArgs).not.toHaveProperty('options');
+    expect(scenario.uiRuntime.prepare).toHaveBeenCalledTimes(2);
+    expect(scenario.uiRuntime.createOverlayContainer).toHaveBeenCalledTimes(2);
+    expect(scenario.uiRuntime.createHoverElements).toHaveBeenCalledTimes(2);
     expect(mocks.enableCursor).toHaveBeenCalledWith(scenario.session);
     expect(mocks.setupRuntimeListeners).toHaveBeenCalledWith({
       hideHoverFrame: scenario.runtimeArgs.hideHoverFrame,

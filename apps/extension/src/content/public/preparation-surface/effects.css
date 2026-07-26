@@ -21,6 +21,8 @@
 :host(.sniptale-capture-ui-hidden) .sniptale-resize-handle,
 :host(.sniptale-capture-ui-hidden) .sniptale-callout-drag-handle,
 :host(.sniptale-capture-ui-hidden) .sniptale-callout-tail-handle,
+:host(.sniptale-capture-ui-hidden) .sniptale-callout-settings-handle,
+:host(.sniptale-capture-ui-hidden) .sniptale-step-badge-controls,
 :host(.sniptale-capture-ui-hidden) .sniptale-free-frame-draft-portal,
 :host(.sniptale-capture-ui-hidden) .sniptale-quick-edit-hover {
   display: none !important;
@@ -40,7 +42,9 @@
 }
 
 .sniptale-frame-toolbar-trigger:hover,
-.sniptale-frame-toolbar-trigger:focus-visible {
+.sniptale-frame-toolbar-trigger:focus-visible,
+.sniptale-frame-quick-action:hover,
+.sniptale-frame-quick-action:focus-visible {
   border-color: var(--sniptale-color-accent) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent) !important;
   outline: none;
@@ -50,11 +54,21 @@
   touch-action: none;
 }
 
+.sniptale-step-badge-move-handle {
+  touch-action: none;
+}
+
 .sniptale-callout-tail-handle {
   touch-action: none;
 }
 
 .sniptale-callout-drag-handle:focus-visible,
+.sniptale-callout-settings-handle:hover,
+.sniptale-callout-settings-handle:focus-visible,
+.sniptale-step-badge-move-handle:hover,
+.sniptale-step-badge-move-handle:focus-visible,
+.sniptale-step-badge-settings-handle:hover,
+.sniptale-step-badge-settings-handle:focus-visible,
 .sniptale-callout-tail-handle:hover,
 .sniptale-callout-tail-handle:focus-visible {
   border-color: var(--sniptale-color-accent) !important;

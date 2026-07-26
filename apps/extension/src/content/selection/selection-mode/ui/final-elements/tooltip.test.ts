@@ -2,8 +2,13 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createContentSizeTooltipDomMock, getSelectionModeSizePanelCopyMock } = vi.hoisted(() => ({
+const {
+  createContentSizeTooltipDomMock,
+  enhanceSelectionModeToolbarMock,
+  getSelectionModeSizePanelCopyMock,
+} = vi.hoisted(() => ({
   createContentSizeTooltipDomMock: vi.fn(),
+  enhanceSelectionModeToolbarMock: vi.fn(),
   getSelectionModeSizePanelCopyMock: vi.fn(),
 }));
 
@@ -13,6 +18,12 @@ vi.mock('@sniptale/ui/content-size-tooltip/dom', () => ({
   setContentSizeTooltipPosition: vi.fn(),
   syncContentSizeTooltipAspectRatioButtonState: vi.fn(),
   syncContentSizeTooltipValues: vi.fn(),
+  createContentSizeTooltipDivider: vi.fn(() => document.createElement('span')),
+}));
+
+vi.mock('./toolbar', () => ({
+  enhanceSelectionModeToolbar: enhanceSelectionModeToolbarMock,
+  syncSelectionToolbarPaddingState: vi.fn(),
 }));
 
 vi.mock('../constants', () => ({
@@ -48,7 +59,12 @@ describe('selection-mode final tooltip', () => {
         heightMin: 120,
         heightMax: 720,
         maintainAspectRatio: false,
+        variant: 'frame-edit',
       })
+    );
+    expect(enhanceSelectionModeToolbarMock).toHaveBeenCalledWith(
+      tooltip,
+      expect.objectContaining({ overlayContainer: mountInto })
     );
     expect(result).toBe(tooltip);
   });
@@ -74,6 +90,7 @@ describe('selection-mode final tooltip', () => {
 function createTooltipFixture() {
   return {
     root: document.createElement('div'),
+    actions: document.createElement('div'),
     widthInput: document.createElement('input'),
     heightInput: document.createElement('input'),
     widthDecreaseButton: document.createElement('button'),
@@ -93,6 +110,10 @@ function createOptions() {
     minSelectionSize: 120,
     getMaxSelectionWidth: () => 1280,
     getMaxSelectionHeight: () => 720,
+    getCaptureAction: () => 'download_default' as const,
+    getSelection: () => ({ x: 10, y: 10, width: 100, height: 100 }),
+    onAdjustPadding: vi.fn(),
+    onCaptureActionChange: vi.fn(),
     onConfirm: vi.fn(),
     onResetToIdle: vi.fn(),
     onSetupSizePanelListeners: vi.fn(),

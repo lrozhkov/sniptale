@@ -16,7 +16,9 @@ export interface SelectionModeRuntimeSetupArgs extends SelectionModeRuntimePoint
   createFinalElements: () => void;
   getMaxSelectionHeight: () => number;
   getMaxSelectionWidth: () => number;
+  flushFinalFrameUpdate: () => void;
   minSelectionSize: number;
+  scheduleFinalFrameUpdate: () => void;
   session: SelectionModeSession;
   updateFinalFrame: () => void;
   zIndexBase: number;
@@ -29,7 +31,9 @@ export function createSelectionModeRuntimeSetup(args: SelectionModeRuntimeSetupA
     getAbsolutePosition,
     getMaxSelectionHeight: args.getMaxSelectionHeight,
     getMaxSelectionWidth: args.getMaxSelectionWidth,
+    flushFinalFrameUpdate: args.flushFinalFrameUpdate,
     minSelectionSize: args.minSelectionSize,
+    scheduleFinalFrameUpdate: args.scheduleFinalFrameUpdate,
     setupListenerHandlers: createListenerHandlers(args),
     showFinalFrame: () => {
       args.createFinalElements();

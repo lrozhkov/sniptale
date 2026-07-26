@@ -5,6 +5,10 @@ import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/ca
 import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
 import type { FrameManagerRefs } from '../contracts';
 import { createFrameDataFixture } from '../test-support';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
+import { cloneBorderPreset } from '../../../../features/highlighter/presets/catalog';
+import { getFrameSessionBorderPreset, setFrameSessionBorderPreset } from '../session/border-preset';
+import { getCurrentBorderPreset as getHoverBorderPreset } from '../../highlighter-hover-preview/session';
 
 const mocks = vi.hoisted(() => ({
   captureFrameSessionSnapshot: vi.fn(),
@@ -43,11 +47,14 @@ function createRefs(): FrameManagerRefs {
     prevFramesRef: { current: [] as FrameData[] },
     prevFrameStatesRef: { current: new Map() },
     globalEffectModeRef: { current: 'border' as EffectMode },
-    sessionBlurSettingsRef: {
-      current: { amount: 8, blurType: 'gaussian' as const, showBorder: true },
-    },
-    sessionFocusSettingsRef: {
-      current: { opacity: 0.5, showBorder: false },
+    sessionSettingsRefs: {
+      blurSettings: {
+        current: { amount: 8, blurType: 'gaussian' as const, showBorder: true },
+      },
+      defaultsInitialized: { current: false },
+      focusSettings: {
+        current: { opacity: 0.5, showBorder: false },
+      },
     },
     sessionStepBadgeTemplateRef: { current: null },
     sessionCalloutStyleRef: { current: null as Partial<CalloutSettings> | null },
@@ -63,6 +70,7 @@ function createAppliedSnapshot() {
     frames: [],
     globalEffectMode: 'blur' as const,
     globalStepBadgeSettings: { autoMode: false },
+    sessionBorderPreset: cloneBorderPreset(DEFAULT_BORDER_PRESET),
     sessionBlurSettings: { amount: 10, blurType: 'gaussian' as const, showBorder: false },
     sessionCalloutStyle: { bgColor: '#111111' },
     sessionFocusSettings: { opacity: 0.7, showBorder: true },
@@ -70,6 +78,7 @@ function createAppliedSnapshot() {
       enabled: true,
       anchor: 'top-left' as const,
       offsetDirections: ['up' as const],
+      manualPlacement: { position: 0.4, side: 'top' as const },
       type: 'number' as const,
       alphabet: 'cyrillic' as const,
       value: '',
@@ -95,13 +104,24 @@ function expectAppliedSnapshotState(args: {
   expect(args.refs.globalEffectModeRef.current).toBe('blur');
   expect(args.refs.globalStepBadgeSettingsRef.current).toEqual({ autoMode: false });
   expect(args.refs.globalStepBadgeAutoModeRef.current).toBe(false);
-  expect(args.refs.sessionBlurSettingsRef.current).toEqual(args.snapshot.sessionBlurSettings);
-  expect(args.refs.sessionFocusSettingsRef.current).toEqual(args.snapshot.sessionFocusSettings);
+  expect(getFrameSessionBorderPreset()).toEqual(args.snapshot.sessionBorderPreset);
+  expect(getFrameSessionBorderPreset()).not.toBe(args.snapshot.sessionBorderPreset);
+  expect(getHoverBorderPreset()).toEqual(args.snapshot.sessionBorderPreset);
+  expect(args.refs.sessionSettingsRefs.blurSettings.current).toEqual(
+    args.snapshot.sessionBlurSettings
+  );
+  expect(args.refs.sessionSettingsRefs.focusSettings.current).toEqual(
+    args.snapshot.sessionFocusSettings
+  );
+  expect(args.refs.sessionSettingsRefs.defaultsInitialized.current).toBe(true);
   expect(args.refs.sessionStepBadgeTemplateRef.current).toEqual(
     args.snapshot.sessionStepBadgeTemplate
   );
   expect(args.refs.sessionStepBadgeTemplateRef.current).not.toBe(
     args.snapshot.sessionStepBadgeTemplate
+  );
+  expect(args.refs.sessionStepBadgeTemplateRef.current?.manualPlacement).not.toBe(
+    args.snapshot.sessionStepBadgeTemplate.manualPlacement
   );
   expect(args.refs.sessionCalloutStyleRef.current).toEqual(args.snapshot.sessionCalloutStyle);
   expect(args.refs.sessionCalloutStyleRef.current).not.toBe(args.snapshot.sessionCalloutStyle);
@@ -160,12 +180,13 @@ function expectBridgeSnapshotCapture() {
   refs.framesRef.current = frames;
   refs.globalEffectModeRef.current = 'focus';
   refs.globalStepBadgeSettingsRef.current = { autoMode: false };
-  refs.sessionBlurSettingsRef.current = {
+  setFrameSessionBorderPreset(DEFAULT_BORDER_PRESET);
+  refs.sessionSettingsRefs.blurSettings.current = {
     amount: 9,
     blurType: 'gaussian',
     showBorder: true,
   };
-  refs.sessionFocusSettingsRef.current = { opacity: 0.4, showBorder: true };
+  refs.sessionSettingsRefs.focusSettings.current = { opacity: 0.4, showBorder: true };
   refs.sessionCalloutStyleRef.current = { bgColor: '#fff' };
   refs.stepBadgeOrderRef.current = new Map([['frame-1', 1]]);
   mocks.captureFrameSessionSnapshot.mockReturnValue(expectedSnapshot);
@@ -181,9 +202,10 @@ function expectBridgeSnapshotCapture() {
     frames,
     globalEffectMode: 'focus',
     globalStepBadgeSettings: { autoMode: false },
-    sessionBlurSettings: refs.sessionBlurSettingsRef.current,
+    sessionBorderPreset: getFrameSessionBorderPreset(),
+    sessionBlurSettings: refs.sessionSettingsRefs.blurSettings.current,
     sessionCalloutStyle: refs.sessionCalloutStyleRef.current,
-    sessionFocusSettings: refs.sessionFocusSettingsRef.current,
+    sessionFocusSettings: refs.sessionSettingsRefs.focusSettings.current,
     sessionStepBadgeTemplate: null,
     stepBadgeOrder: refs.stepBadgeOrderRef.current,
   });

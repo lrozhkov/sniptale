@@ -3,7 +3,6 @@ import type {
   BlurSettings,
   FocusSettings,
   GlobalStepBadgeSettings,
-  HighlighterSettings,
 } from '../../../../features/highlighter/contracts';
 import {
   addCalloutDeleteListener,
@@ -11,53 +10,14 @@ import {
   addFocusOpacityChangedListener,
   addFrameCalloutChangedListener,
   addFrameStepBadgeChangedListener,
-  addHighlighterSettingsChangedListener,
   addSessionBlurSettingsChangedListener,
   addSessionFocusSettingsChangedListener,
   addStepBadgeReorderListener,
-  type HighlighterSettingsChangedDetail,
 } from '../../../platform/page-context/frame-events';
-
-function applyDefaultBorderPresetIdToCache(args: {
-  detail: HighlighterSettingsChangedDetail;
-  highlighterSettingsCacheRef: MutableRefObject<HighlighterSettings | null>;
-}): boolean {
-  const { defaultBorderPresetId } = args.detail;
-  const cachedSettings = args.highlighterSettingsCacheRef.current;
-
-  if (!defaultBorderPresetId || !cachedSettings) {
-    return false;
-  }
-
-  if (!cachedSettings.borderPresets.some((preset) => preset.id === defaultBorderPresetId)) {
-    return false;
-  }
-
-  args.highlighterSettingsCacheRef.current = {
-    ...cachedSettings,
-    defaultBorderPresetId,
-  };
-  return true;
-}
-
-function createHighlighterSettingsChangedCleanup(args: {
-  highlighterSettingsCacheRef: MutableRefObject<HighlighterSettings | null>;
-  loadSettings: () => void;
-}) {
-  return addHighlighterSettingsChangedListener((detail) => {
-    if (
-      !applyDefaultBorderPresetIdToCache({
-        detail,
-        highlighterSettingsCacheRef: args.highlighterSettingsCacheRef,
-      })
-    ) {
-      args.loadSettings();
-    }
-  });
-}
 
 function createSessionSettingsCleanups(args: {
   sessionBlurSettingsRef: MutableRefObject<BlurSettings>;
+  sessionDefaultsInitializedRef: MutableRefObject<boolean>;
   sessionFocusSettingsRef: MutableRefObject<FocusSettings>;
   syncFocusOpacity: (sourceFrameId: string, newOpacity: number) => void;
 }) {
@@ -67,9 +27,11 @@ function createSessionSettingsCleanups(args: {
     }),
     addSessionBlurSettingsChangedListener(({ settings }) => {
       args.sessionBlurSettingsRef.current = { ...settings };
+      args.sessionDefaultsInitializedRef.current = true;
     }),
     addSessionFocusSettingsChangedListener(({ settings }) => {
       args.sessionFocusSettingsRef.current = { ...settings };
+      args.sessionDefaultsInitializedRef.current = true;
     }),
   ] as Array<() => void>;
 }
@@ -94,19 +56,15 @@ export function createFrameSessionListenerCleanups(args: {
     handleGlobalStepBadgeSettingsChanged: (settings: Partial<GlobalStepBadgeSettings>) => void;
     handleStepBadgeReorder: (detail: { direction: 'up' | 'down'; frameId: string }) => void;
   };
-  highlighterSettingsCacheRef: MutableRefObject<HighlighterSettings | null>;
-  loadSettings: () => void;
   sessionBlurSettingsRef: MutableRefObject<BlurSettings>;
+  sessionDefaultsInitializedRef: MutableRefObject<boolean>;
   sessionFocusSettingsRef: MutableRefObject<FocusSettings>;
   syncFocusOpacity: (sourceFrameId: string, newOpacity: number) => void;
 }) {
   return [
-    createHighlighterSettingsChangedCleanup({
-      highlighterSettingsCacheRef: args.highlighterSettingsCacheRef,
-      loadSettings: args.loadSettings,
-    }),
     ...createSessionSettingsCleanups({
       sessionBlurSettingsRef: args.sessionBlurSettingsRef,
+      sessionDefaultsInitializedRef: args.sessionDefaultsInitializedRef,
       sessionFocusSettingsRef: args.sessionFocusSettingsRef,
       syncFocusOpacity: args.syncFocusOpacity,
     }),

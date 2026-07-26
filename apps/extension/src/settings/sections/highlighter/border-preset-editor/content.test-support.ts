@@ -64,7 +64,6 @@ export function createPreset(): BorderPreset {
   return {
     id: 'preset-2',
     name: 'Existing',
-    isSystemDefault: false,
     order: 1,
     width: 4,
     color: '#ffaa00',

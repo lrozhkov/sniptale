@@ -135,9 +135,36 @@ function verifyHistoryCancelOnUnmount() {
   expect(cancelTransactionSpy).toHaveBeenCalledWith('step-badge:frame-1');
 }
 
+function verifyCanonicalPositionClearsManualPlacement() {
+  const listener = vi.fn();
+  const cleanup = addFrameStepBadgeChangedListener(listener);
+
+  renderHarness({
+    anchor: 'top-left',
+    enabled: true,
+    manualPlacement: { position: 0.6, side: 'bottom' },
+    offsetDirections: [],
+    type: 'number',
+    value: '2',
+  });
+
+  act(() => latestState?.handleAnchorChange('top-right'));
+
+  expect(listener).toHaveBeenCalledWith({
+    frameId: 'frame-1',
+    settings: { anchor: 'top-right', manualPlacement: undefined },
+  });
+
+  cleanup();
+}
+
 describe('useStepBadgePopoverState', () => {
   it('dispatches frame step-badge changes and closes when disabled', verifyDisablesBadgeAndCloses);
   it('dispatches manual value changes through the shared event seam', verifyManualValueDispatch);
+  it(
+    'returns to canonical placement when the anchor changes',
+    verifyCanonicalPositionClearsManualPlacement
+  );
   it(
     'opens and commits a grouped history transaction around the popover session',
     verifyHistoryCommitOnClose

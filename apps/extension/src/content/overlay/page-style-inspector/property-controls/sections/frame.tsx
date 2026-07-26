@@ -55,7 +55,7 @@ export function BoxSection({ actions, disabled, state }: SectionProps) {
 
 function FrameSizeFields({ actions, disabled, state }: SectionProps) {
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+    <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-3 gap-y-2">
       <NumericField
         disabled={disabled}
         label={translate('content.pageStyleInspector.width')}

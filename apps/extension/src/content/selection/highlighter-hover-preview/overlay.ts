@@ -8,20 +8,44 @@ import { appendToContentOverlayRoot, queryAllContentUiElements } from '../../pla
 import { applyIsolatedContentRootStyle } from '../../platform/dom-host/isolated';
 import {
   colorToRgba,
-  percentToUnit,
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../features/highlighter/style';
 import type { BorderPreset } from '../../../features/highlighter/contracts';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import {
-  ensureHighlighterSettingsLoaded,
-  getCurrentBorderPreset,
-  type HoverDomSession,
-  type HoverSession,
-} from './session';
+import { getCurrentBorderPreset, type HoverDomSession, type HoverSession } from './session';
 
 const logger = createLogger({ namespace: 'ContentHighlighter:HoverPreview' });
+const appliedHoverCustomCssProperties = new WeakMap<HTMLElement, string[]>();
+
+function clearHoverCustomCssStyles(element: HTMLElement): void {
+  const properties = appliedHoverCustomCssProperties.get(element) ?? [];
+  for (const property of properties) {
+    const cssProperty = property.startsWith('--')
+      ? property
+      : property.replace(/[A-Z]/g, (character) => `-${character.toLowerCase()}`);
+    element.style.removeProperty(cssProperty);
+  }
+  appliedHoverCustomCssProperties.delete(element);
+}
+
+function applyHoverCustomCssStyles(
+  element: HTMLElement,
+  styles: ReturnType<typeof resolveBorderPresetVisual>['customCssStyles']
+): void {
+  Object.assign(element.style, styles);
+  appliedHoverCustomCssProperties.set(element, Object.keys(styles));
+}
+
+function getHoverPreviewTransition(): string {
+  if (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    return 'none';
+  }
+  return 'opacity 0.2s ease-out, top 0.15s ease-out, left 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out';
+}
 
 export type HoverOverlayActions = {
   createHoverOverlay: () => void;
@@ -82,18 +106,13 @@ export function ensureHoverOverlay(session: HoverDomSession, preset: BorderPrese
     margin: 0;
     padding: 0;
     pointer-events: none;
-    opacity: ${Math.min(0.6, percentToUnit(visual.strokeOpacity))};
-    transition:
-      opacity 0.2s ease-out,
-      top 0.15s ease-out,
-      left 0.15s ease-out,
-      width 0.15s ease-out,
-      height 0.15s ease-out;
+    opacity: 0.72;
+    transition: ${getHoverPreviewTransition()};
     z-index: 2147483645;
     box-shadow: ${resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none'};
     background-color: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
   `;
-  Object.assign(hoverOverlay.style, visual.customCssStyles);
+  applyHoverCustomCssStyles(hoverOverlay, visual.customCssStyles);
   ensureHighlighterOverlayContainer(session).appendChild(hoverOverlay);
   session.hoverOverlay = hoverOverlay;
   return hoverOverlay;
@@ -123,6 +142,7 @@ export function showHoverOverlay(
   }
 
   const visual = resolveBorderPresetVisual(preset);
+  clearHoverCustomCssStyles(hoverOverlay);
   const coords = calculateFrameContainerCoords(
     position,
     createFrameCalcSettings({ width: visual.strokeWidth, padding: visual.padding })
@@ -135,11 +155,12 @@ export function showHoverOverlay(
   hoverOverlay.style.borderStyle = visual.strokeStyle;
   hoverOverlay.style.borderColor = colorToRgba(visual.strokeColor, visual.strokeOpacity);
   hoverOverlay.style.borderRadius = `${visual.radius}px`;
-  hoverOverlay.style.opacity = String(Math.min(0.6, percentToUnit(visual.strokeOpacity)));
+  hoverOverlay.style.opacity = '0.72';
   hoverOverlay.style.boxShadow =
     resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none';
   hoverOverlay.style.backgroundColor = colorToRgba(visual.fillColor, visual.fillOpacity);
-  Object.assign(hoverOverlay.style, visual.customCssStyles);
+  hoverOverlay.style.transition = getHoverPreviewTransition();
+  applyHoverCustomCssStyles(hoverOverlay, visual.customCssStyles);
   hoverOverlay.style.display = 'block';
 }
 
@@ -170,8 +191,7 @@ export function createHoverOverlayActions(session: HoverSession): HoverOverlayAc
       removeHighlighterOverlayContainer(session);
     },
     createHoverOverlay: () => {
-      void ensureHighlighterSettingsLoaded(session);
-      ensureHoverOverlay(session, getCurrentBorderPreset(session));
+      ensureHoverOverlay(session, getCurrentBorderPreset());
     },
     removeHoverOverlay: () => {
       removeHoverOverlay(session);
@@ -181,14 +201,13 @@ export function createHoverOverlayActions(session: HoverSession): HoverOverlayAc
     },
     showHoverOverlay: (element) => {
       ensureHighlighterOverlayContainer(session);
-      void ensureHighlighterSettingsLoaded(session);
-      ensureHoverOverlay(session, getCurrentBorderPreset(session));
+      ensureHoverOverlay(session, getCurrentBorderPreset());
       if (!session.hoverOverlay || !session.overlayContainer) {
         logger.warn('Cannot show hover overlay without overlay container state');
         return;
       }
       const position = getAbsolutePosition(element);
-      const preset = getCurrentBorderPreset(session);
+      const preset = getCurrentBorderPreset();
       logHoverOverlayShown(position, preset);
       showHoverOverlay(session, position, preset);
     },

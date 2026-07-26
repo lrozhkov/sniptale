@@ -14,7 +14,10 @@ export function StepBadgePopoverAdapter(props: {
       anchorEl={props.anchorEl}
       portalTarget={resolveContentPortalTarget(props.anchorEl)}
       popoverRef={props.popoverRef}
-      className="sniptale-step-badge-popover sniptale-glass-popover"
+      className={[
+        'sniptale-step-badge-popover sniptale-glass-popover',
+        'sniptale-content-popover--compact',
+      ].join(' ')}
       style={props.getPopoverStyle()}
       dataUi="content.step-badge.popover"
     >

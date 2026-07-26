@@ -56,6 +56,7 @@ function createRuntime(): ScreenshotControllerRuntime {
       runActive: true,
       runGeneration: 1,
     },
+    setCaptureAction: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),

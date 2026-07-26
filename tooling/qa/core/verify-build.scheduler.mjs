@@ -1,7 +1,12 @@
-import { formatQaResourceProfile, resolveQaResourceProfile } from '../runtime/resource-profile.mjs';
+import {
+  formatQaResourceProfile,
+  resolveQaReleaseResourceProfile,
+  resolveQaResourceProfile,
+} from '../runtime/resource-profile.mjs';
 import { parseLaneResult } from '../runtime/lane-worker-contract.mjs';
 import { runQaLaneWorker } from '../runtime/lane-worker-runner.mjs';
 import { formatTaskScheduleDetail, runBoundedTasks } from '../runtime/task-scheduler.mjs';
+import { BUILD_TEST_EXECUTION_CLASSES } from './verify-build.test-profiles.mjs';
 
 const BUILD_WORKER_URL = new URL('./verify-build.worker.mjs', import.meta.url);
 const BUILD_LANE_RESOURCES = Object.freeze({
@@ -65,11 +70,20 @@ function createTasks({ buildScope, context, profile, workerRunner }) {
   const workerContext = createBuildWorkerContext(context);
   return ['typecheck', 'tests', 'security', 'graph', 'static'].map((lane) => {
     const resources = BUILD_LANE_RESOURCES[lane];
-    const cpuTokens = lane === 'tests' ? profile.vitestMaxWorkers : resources.cpuTokens;
-    const memoryMiB = resources.memoryMiB;
+    const dedicatedSaturatedTests =
+      buildScope.testScope.executionClass === BUILD_TEST_EXECUTION_CLASSES.saturated &&
+      lane === 'tests';
+    const cpuTokens =
+      lane === 'tests'
+        ? dedicatedSaturatedTests
+          ? profile.cpuTokens
+          : profile.vitestMaxWorkers
+        : resources.cpuTokens;
+    const memoryMiB = dedicatedSaturatedTests ? profile.memoryMiB : resources.memoryMiB;
     return {
       id: lane,
       cpuTokens,
+      exclusive: dedicatedSaturatedTests,
       memoryMiB,
       run: ({ signal }) =>
         workerRunner({
@@ -82,6 +96,16 @@ function createTasks({ buildScope, context, profile, workerRunner }) {
         }),
     };
   });
+}
+
+function requireExecutionClass(buildScope) {
+  const executionClass = buildScope?.testScope?.executionClass;
+  if (!Object.values(BUILD_TEST_EXECUTION_CLASSES).includes(executionClass)) {
+    throw new Error(
+      'Build test scope executionClass must be bounded-concurrent or saturated-exclusive.'
+    );
+  }
+  return executionClass;
 }
 
 function appendDetail(step, detail) {
@@ -133,13 +157,42 @@ function assemble(results) {
 export async function collectScheduledBuildStepResults(
   { buildScope, context },
   {
+    saturatedProfileResolver = resolveQaReleaseResourceProfile,
     profile = resolveQaResourceProfile(),
     scheduler = runBoundedTasks,
     workerRunner = runBuildLaneWorker,
   } = {}
 ) {
-  const results = await scheduler(createTasks({ buildScope, context, profile, workerRunner }), {
-    profile,
+  const executionClass = requireExecutionClass(buildScope);
+  const tasks = createTasks({ buildScope, context, profile, workerRunner });
+  if (executionClass === BUILD_TEST_EXECUTION_CLASSES.bounded) {
+    const results = await scheduler(tasks, { profile });
+    return assemble(results.map((result) => ({ ...result, value: annotate(result, profile) })));
+  }
+
+  const prerequisiteResults = await scheduler(
+    tasks.filter(({ id }) => id !== 'tests'),
+    { profile }
+  );
+  const selectedSaturatedProfile = saturatedProfileResolver();
+  const saturatedTasks = createTasks({
+    buildScope,
+    context,
+    profile: selectedSaturatedProfile,
+    workerRunner,
   });
-  return assemble(results.map((result) => ({ ...result, value: annotate(result, profile) })));
+  const saturatedResults = await scheduler(
+    saturatedTasks.filter(({ id }) => id === 'tests'),
+    { profile: selectedSaturatedProfile }
+  );
+  return assemble([
+    ...prerequisiteResults.map((result) => ({
+      ...result,
+      value: annotate(result, profile),
+    })),
+    ...saturatedResults.map((result) => ({
+      ...result,
+      value: annotate(result, selectedSaturatedProfile),
+    })),
+  ]);
 }

@@ -15,6 +15,13 @@ export type StepBadgeAnchor =
   | 'bottom-right';
 
 export type StepBadgeOffsetDirection = 'up' | 'down' | 'left' | 'right';
+export type StepBadgeBoundarySide = 'top' | 'right' | 'bottom' | 'left';
+
+export interface StepBadgeManualPlacement {
+  side: StepBadgeBoundarySide;
+  /** Normalized position along the selected frame side, from 0 to 1. */
+  position: number;
+}
 export type StepBadgeSizeLevel =
   | 0
   | 1
@@ -49,6 +56,7 @@ export interface StepBadgeSettings {
   size?: StepBadgeSize;
   sizeLevel?: StepBadgeSizeLevel;
   auto?: boolean;
+  manualPlacement?: StepBadgeManualPlacement | undefined;
 }
 
 export interface GlobalStepBadgeSettings {

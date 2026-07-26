@@ -1,4 +1,5 @@
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
+import type { CaptureActionType } from '../../../../contracts/settings';
 import type { SelectionModeSession } from '../session';
 import {
   createDragFrame as createDragFrameDom,
@@ -9,11 +10,15 @@ import {
 
 type SelectionModeUiRuntimeConfig = {
   getDom: () => SelectionModeSession['dom'];
+  getCaptureAction: () => CaptureActionType;
+  getSelection: () => SelectionModeSession['currentSelection'];
   getVisual: () => ResolvedBorderPresetVisual;
   getMaxSelectionHeight: () => number;
   getMaxSelectionWidth: () => number;
   minSelectionSize: number;
   onCancel: () => void;
+  onAdjustPadding: (direction: 'decrease' | 'increase') => void;
+  onCaptureActionChange: (action: CaptureActionType) => void;
   onConfirm: () => void;
   onResetToIdle: () => void;
   onSetupSizePanelListeners: () => void;
@@ -30,6 +35,10 @@ function createFinalElementsOptions(config: SelectionModeUiRuntimeConfig) {
     minSelectionSize: config.minSelectionSize,
     getMaxSelectionWidth: config.getMaxSelectionWidth,
     getMaxSelectionHeight: config.getMaxSelectionHeight,
+    getCaptureAction: config.getCaptureAction,
+    getSelection: config.getSelection,
+    onAdjustPadding: config.onAdjustPadding,
+    onCaptureActionChange: config.onCaptureActionChange,
     onConfirm: config.onConfirm,
     onResetToIdle: config.onResetToIdle,
     onSetupSizePanelListeners: config.onSetupSizePanelListeners,

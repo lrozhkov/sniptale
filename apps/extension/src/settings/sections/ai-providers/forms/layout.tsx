@@ -34,7 +34,6 @@ export function AiProvidersFormModalLayout(props: AiProvidersFormModalLayoutProp
       width="480px"
       maxHeight="85vh"
       scrollable
-      accent="compact"
       onClose={props.onClose}
       onKeyDown={handleAiProvidersModalKeyDown(props.onClose)}
     >

@@ -100,3 +100,46 @@
 .sniptale-content-popover .sniptale-glass-toggle-hint {
   color: var(--sniptale-color-text-dim);
 }
+
+.sniptale-content-popover--compact {
+  padding: 8px;
+}
+
+.sniptale-content-popover--compact .sniptale-content-popover-body,
+.sniptale-content-popover--compact .sniptale-glass-popover-body {
+  gap: 8px;
+}
+
+.sniptale-content-popover--compact .sniptale-content-popover-section,
+.sniptale-content-popover--compact .sniptale-glass-section {
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-row,
+.sniptale-content-popover--compact .sniptale-glass-toggle-row,
+.sniptale-content-popover--compact .sniptale-glass-color-row {
+  gap: 6px;
+}
+
+.sniptale-content-popover--compact .sniptale-glass-toggle-copy {
+  gap: 1px;
+}
+
+.sniptale-content-popover-range-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sniptale-content-popover-range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sniptale-content-popover .sniptale-glass-color-label--inline {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}

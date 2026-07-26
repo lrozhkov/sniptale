@@ -28,8 +28,10 @@ function createInteractionState(): SelectionModeInteractionState {
 function createSelectionModeOptions() {
   return {
     cancelSelection: vi.fn(),
+    closeCaptureActionMenu: vi.fn(() => false),
     confirmSelection: vi.fn(),
     finalizeDragSelection: vi.fn(),
+    flushFinalFrameUpdate: vi.fn(),
     handleDragMove: vi.fn(),
     handleResizeMove: vi.fn(),
     hideHoverFrame: vi.fn(),

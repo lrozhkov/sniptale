@@ -33,7 +33,8 @@ function createStepBadgeHandlers(props: {
   };
 
   return {
-    handleAnchorChange: (anchor: StepBadgeAnchor) => updateSettings({ anchor }),
+    handleAnchorChange: (anchor: StepBadgeAnchor) =>
+      updateSettings({ anchor, manualPlacement: undefined }),
     handleAlphabetChange: (alphabet: StepBadgeAlphabet) => updateSettings({ alphabet }),
     handleAutoModeChange: (auto: boolean) => updateSettings({ auto }),
     handleEnabledChange: (enabled: boolean) => {
@@ -44,7 +45,10 @@ function createStepBadgeHandlers(props: {
     },
     handleOffsetToggle: (direction: StepBadgeOffsetDirection) => {
       const current = props.localStepBadgeSettings.offsetDirections ?? [];
-      updateSettings({ offsetDirections: toggleStepBadgeOffset(current, direction) });
+      updateSettings({
+        manualPlacement: undefined,
+        offsetDirections: toggleStepBadgeOffset(current, direction),
+      });
     },
     handleSizeLevelChange: (sizeLevel: StepBadgeSizeLevel) => updateSettings({ sizeLevel }),
     handleTypeChange: (type: StepBadgeType) => updateSettings({ type }),

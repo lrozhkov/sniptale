@@ -8,14 +8,13 @@ import {
 import { resolvePagePreparationTarget } from '../../parser/page-preparation/target';
 import {
   colorToRgba,
-  percentToUnit,
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../features/highlighter/style';
 import type { FreeFrameInput } from '../../../features/highlighter/contracts';
 import type { HighlighterCallbacks, HighlighterStateGetters } from './interactions';
 import { getCurrentBorderPreset, type HoverSession } from './session';
-import { isHighlighterExtensionUiElement } from './targets';
+import { hasBlockingHighlighterPopover, isHighlighterExtensionUiElement } from './targets';
 import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 
 const DRAW_THRESHOLD = 5;
@@ -76,7 +75,7 @@ function ensurePreview(session: HoverSession): HTMLElement {
   if (session.freeDraw.preview) return session.freeDraw.preview;
   const preview = document.createElement('div');
   preview.className = 'sniptale-free-frame-draft';
-  const preset = getCurrentBorderPreset(session);
+  const preset = getCurrentBorderPreset();
   const visual = resolveBorderPresetVisual(preset);
   preview.style.cssText = `
     position: fixed;
@@ -88,7 +87,7 @@ function ensurePreview(session: HoverSession): HTMLElement {
     )};
     border-radius: ${visual.radius}px;
     background: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
-    opacity: ${Math.min(0.78, percentToUnit(visual.strokeOpacity))};
+    opacity: 0.88;
     box-shadow: ${resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none'};
   `;
   Object.assign(preview.style, visual.customCssStyles);
@@ -213,7 +212,8 @@ function canStartDrawing(props: {
     props.event.button !== 0 ||
     !props.getState.isModeEnabled() ||
     props.getState.isPaused() ||
-    props.getState.isFrameEditing()
+    props.getState.isFrameEditing() ||
+    hasBlockingHighlighterPopover()
   ) {
     return null;
   }

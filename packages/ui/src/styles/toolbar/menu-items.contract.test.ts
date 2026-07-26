@@ -15,6 +15,12 @@ describe('toolbar-menu-items contract', () => {
     expect(toolbarMenuItemsStylesheet).toContain('.sniptale-popover-divider {');
   });
 
+  it('allows a compact menu item to keep an important hint visible', () => {
+    expect(toolbarMenuItemsStylesheet).toContain(
+      '.sniptale-toolbar-menu--compact .sniptale-toolbar-menu-item-hint--show-compact {'
+    );
+  });
+
   it('does not keep menu-surface or countdown ownership inline', () => {
     expect(toolbarMenuItemsStylesheet).not.toContain('.sniptale-popover-menu {');
     expect(toolbarMenuItemsStylesheet).not.toContain('.sniptale-countdown-toast {');

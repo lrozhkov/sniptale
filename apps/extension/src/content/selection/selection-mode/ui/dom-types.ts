@@ -1,4 +1,5 @@
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
+import type { SelectionRect } from './types';
 
 export type ResizeDirection = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
@@ -8,6 +9,11 @@ export interface SelectionModeDom {
   scissorsIcon: HTMLElement | null;
   hoverSizeLabel: HTMLElement | null;
   dragFrame: HTMLElement | null;
+  dragOverlay: HTMLElement | null;
+  dragFrameRafId: number | null;
+  pendingDragRect: SelectionRect | null;
+  finalFrameRafId: number | null;
+  pendingFinalRect: SelectionRect | null;
   finalFrame: HTMLElement | null;
   finalOverlay: HTMLElement | null;
   sizePanel: HTMLElement | null;

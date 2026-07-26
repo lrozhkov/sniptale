@@ -60,7 +60,6 @@ function renderViewportPresetEditorBody(args: {
       width="420px"
       maxHeight="85vh"
       scrollable
-      accent="compact"
       onClose={args.onClose}
       onKeyDown={args.state.handleKeyDown}
     >

@@ -2,10 +2,7 @@ import type { CSSProperties } from 'react';
 import { mergeStyleRecords } from './core';
 import type { ContentSizeTooltipProps } from './types';
 import { ContentSizeTooltipContent } from './views';
-import {
-  CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT,
-  CONTENT_SIZE_TOOLTIP_SURFACE_STYLE,
-} from './styles';
+import { CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT, getContentSizeTooltipSurfaceStyle } from './styles';
 
 export function ContentSizeTooltip(props: ContentSizeTooltipProps) {
   const canToggleAspectRatio = props.canToggleAspectRatio ?? true;
@@ -16,8 +13,9 @@ export function ContentSizeTooltip(props: ContentSizeTooltipProps) {
       <div
         className="sniptale-content-size-tooltip"
         data-theme={props.portalTheme ?? undefined}
+        data-variant={props.variant ?? 'default'}
         style={
-          mergeStyleRecords(CONTENT_SIZE_TOOLTIP_SURFACE_STYLE, {
+          mergeStyleRecords(getContentSizeTooltipSurfaceStyle(props.variant), {
             top: `${props.position.y}px`,
             left: `${props.position.x}px`,
           }) as CSSProperties

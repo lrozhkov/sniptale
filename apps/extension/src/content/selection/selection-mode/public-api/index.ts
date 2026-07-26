@@ -2,12 +2,18 @@ import { disableNavigationLock, enableNavigationLock } from '../../locker';
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { SelectionModeSession } from '../session';
+import type { SelectionModeActivationOptions } from '../types';
 
 const logger = createLogger({ namespace: 'ContentSelectionMode' });
 
 type SelectionModeEnableSession = Pick<
   SelectionModeSession,
-  'currentState' | 'isActive' | 'rejectCallback' | 'resolveCallback'
+  | 'captureAction'
+  | 'currentState'
+  | 'isActive'
+  | 'onCaptureActionChange'
+  | 'rejectCallback'
+  | 'resolveCallback'
 >;
 
 function logSelectionModeDiag(event: string, details?: Record<string, unknown>): void {
@@ -20,6 +26,7 @@ export function enableSelectionModeApi(args: {
   createOverlayContainer: () => void;
   enableCursor: () => void;
   prepareUi: () => Promise<void>;
+  options?: SelectionModeActivationOptions;
   session: SelectionModeEnableSession;
   setupEventListeners: () => void;
 }) {
@@ -32,6 +39,8 @@ export function enableSelectionModeApi(args: {
 
       args.session.resolveCallback = resolve;
       args.session.rejectCallback = reject;
+      args.session.captureAction = args.options?.captureAction ?? 'download_default';
+      args.session.onCaptureActionChange = args.options?.onCaptureActionChange ?? null;
 
       try {
         args.session.currentState = 'idle';

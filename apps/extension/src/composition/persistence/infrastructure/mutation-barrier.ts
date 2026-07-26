@@ -18,19 +18,23 @@ export interface PersistenceLockManager {
 }
 
 let lockManagerForTests: PersistenceLockManager | null = null;
-let fallbackQueue: Promise<void> = Promise.resolve();
+const fallbackQueues = new Map<string, Promise<void>>();
 const activePersistenceMutationPermits = new WeakSet<object>();
 
 const fallbackLockManager: PersistenceLockManager = {
   request<T>(
-    _name: string,
+    name: string,
     _options: { mode: PersistenceLockMode },
     operation: () => T | Promise<T>
   ): Promise<T> {
-    const execution = fallbackQueue.then(operation);
-    fallbackQueue = execution.then(
-      () => undefined,
-      () => undefined
+    const queue = fallbackQueues.get(name) ?? Promise.resolve();
+    const execution = queue.then(operation);
+    fallbackQueues.set(
+      name,
+      execution.then(
+        () => undefined,
+        () => undefined
+      )
     );
     return execution;
   },
@@ -41,7 +45,7 @@ export function installPersistenceLockManagerForTests(
 ): void {
   lockManagerForTests = lockManager;
   if (lockManager === null) {
-    fallbackQueue = Promise.resolve();
+    fallbackQueues.clear();
   }
 }
 
@@ -92,4 +96,19 @@ export function runWithPersistentDataErasureBarrier<T>(
   operation: () => T | Promise<T>
 ): Promise<T> {
   return runWithPersistenceLock('exclusive', operation);
+}
+
+export type PersistenceMutationDomain = 'highlighter-settings';
+
+export function runWithPersistenceDomainMutationLock<T>(
+  domain: PersistenceMutationDomain,
+  operation: (permit: PersistenceMutationPermit) => T | Promise<T>
+): Promise<T> {
+  return runWithPersistenceMutationPermit((permit) =>
+    getPersistenceLockManager().request(
+      `${PERSISTENCE_LOCK_NAME}:${domain}`,
+      { mode: 'exclusive' },
+      () => operation(permit)
+    )
+  );
 }

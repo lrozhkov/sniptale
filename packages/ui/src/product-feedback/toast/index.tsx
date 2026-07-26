@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { Check, CircleX, Info, TriangleAlert, X, type LucideIcon } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
 export type ProductToastTone = 'info' | 'success' | 'warning' | 'error';
@@ -17,6 +17,23 @@ export interface ProductCountdownToastProps {
   labelSuffix: string;
   cancelLabel?: string;
   onCancel?: () => void;
+}
+
+const TOAST_TONE_ICONS: Record<ProductToastTone, LucideIcon> = {
+  error: CircleX,
+  info: Info,
+  success: Check,
+  warning: TriangleAlert,
+};
+
+function ProductToastIcon({ tone }: { tone: ProductToastTone }) {
+  const Icon = TOAST_TONE_ICONS[tone];
+
+  return (
+    <span className="sniptale-toast-icon-wrapper" aria-hidden="true">
+      <Icon size={17} strokeWidth={2.3} />
+    </span>
+  );
 }
 
 function ProductToastMessage({ message }: { message: string }) {
@@ -66,7 +83,10 @@ export function ProductToast({
       role={tone === 'error' ? 'alert' : 'status'}
       aria-live={tone === 'error' ? 'assertive' : 'polite'}
     >
-      <ProductToastMessage message={message} />
+      <ProductToastIcon tone={tone} />
+      <span className="sniptale-toast-content">
+        <ProductToastMessage message={message} />
+      </span>
     </div>
   );
 }

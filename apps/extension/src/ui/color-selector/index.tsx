@@ -151,7 +151,11 @@ function ColorSelectorBody(props: {
       ref={props.state.rootRef}
       data-ui="shared.ui.color-selector"
       data-open={props.state.expanded || props.state.pickerOpen ? 'true' : 'false'}
-      className={props.className ? `relative w-full ${props.className}` : 'relative w-full'}
+      className={
+        props.className
+          ? `relative w-full min-w-0 max-w-full ${props.className}`
+          : 'relative w-full min-w-0 max-w-full'
+      }
     >
       <ColorSelectorHeader
         active={props.state.expanded || props.state.pickerOpen}

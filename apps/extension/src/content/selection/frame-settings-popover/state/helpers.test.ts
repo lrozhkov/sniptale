@@ -9,10 +9,14 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import {
   addFocusOpacityChangedListener,
-  addHighlighterSettingsChangedListener,
   addSessionBlurSettingsChangedListener,
   addSessionFocusSettingsChangedListener,
 } from '../../../platform/page-context/frame-events';
+import {
+  getFrameSessionBorderPreset,
+  setFrameSessionBorderPreset,
+} from '../../frame-runtime/session/border-preset';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 import {
   createFrameBlurHandlers,
   createFrameFocusHandlers,
@@ -37,36 +41,17 @@ const PRESET: BorderPreset = {
   strokeOpacity: 100,
 };
 
-it('dispatches the saved default preset id after saving a preset', async () => {
-  const listener = vi.fn();
-  const cleanup = addHighlighterSettingsChangedListener(listener);
+it('keeps the selected preset in the current tab without saving the global default', () => {
+  setFrameSessionBorderPreset(DEFAULT_BORDER_PRESET);
   const handler = createFrameSettingsPresetHandler({
     onApplyToFrame: vi.fn(),
-    setDefaultBorderPreset: vi.fn().mockResolvedValue(undefined),
     setSelectedPresetId: vi.fn(),
   });
 
-  await handler(PRESET);
+  handler(PRESET);
 
-  expect(listener).toHaveBeenCalledWith({ defaultBorderPresetId: PRESET.id });
-
-  cleanup();
-});
-
-it('does not dispatch highlighter-settings changes when saving the default preset fails', async () => {
-  const listener = vi.fn();
-  const cleanup = addHighlighterSettingsChangedListener(listener);
-  const handler = createFrameSettingsPresetHandler({
-    onApplyToFrame: vi.fn(),
-    setDefaultBorderPreset: vi.fn().mockRejectedValue(new Error('write failed')),
-    setSelectedPresetId: vi.fn(),
-  });
-
-  await handler(PRESET);
-
-  expect(listener).not.toHaveBeenCalled();
-
-  cleanup();
+  expect(getFrameSessionBorderPreset()).toEqual(PRESET);
+  expect(getFrameSessionBorderPreset()).not.toBe(PRESET);
 });
 
 it('dispatches session blur settings changes through the shared event seam', () => {

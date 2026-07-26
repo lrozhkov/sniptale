@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createPreset, createSettings } from './test-helpers';
+import { createDefaultHighlighterSettings } from '../../../features/highlighter/style/defaults';
 
 const storageMocks = vi.hoisted(() => {
   const listeners: Array<
@@ -56,10 +56,7 @@ beforeEach(() => {
   storageMocks.resetListeners();
   storageMocks.canObserveChangesMock.mockReturnValue(true);
   storageMocks.getMock.mockResolvedValue({
-    sniptale_highlighter_settings: createSettings({
-      borderPresets: [createPreset('preset-1'), createPreset('preset-2', { order: 1 })],
-      defaultBorderPresetId: 'preset-2',
-    }),
+    sniptale_highlighter_settings: createDefaultHighlighterSettings(),
   });
   storageMocks.setMock.mockResolvedValue(undefined);
 });
@@ -74,10 +71,7 @@ it('subscribes to sync changes, ignores unrelated events, and returns detached s
   storageMocks.emitChange(
     {
       sniptale_highlighter_settings: {
-        newValue: createSettings({
-          borderPresets: [createPreset('preset-1'), createPreset('preset-2', { order: 1 })],
-          defaultBorderPresetId: 'preset-2',
-        }),
+        newValue: createDefaultHighlighterSettings(),
       },
     },
     'sync'
@@ -87,11 +81,11 @@ it('subscribes to sync changes, ignores unrelated events, and returns detached s
   snapshot?.borderPresets.splice(0, 1);
 
   expect(listener).toHaveBeenCalledOnce();
-  expect(module.getLoadedHighlighterSettingsSnapshot()?.borderPresets).toHaveLength(2);
+  expect(module.getLoadedHighlighterSettingsSnapshot()?.borderPresets).toHaveLength(8);
 
   unsubscribe();
   storageMocks.emitChange(
-    { sniptale_highlighter_settings: { newValue: createSettings() } },
+    { sniptale_highlighter_settings: { newValue: createDefaultHighlighterSettings() } },
     'sync'
   );
   expect(listener).toHaveBeenCalledTimes(1);
@@ -107,15 +101,13 @@ it('returns a noop unsubscribe handler when sync observation is unavailable', as
   expect(unsubscribe).toBeTypeOf('function');
 });
 
-it('updates enabled state while protecting system presets and preserving a valid default', async () => {
+it('updates system enabled state while preserving a valid default and the last-enabled invariant', async () => {
   const module = await loadHighlighterStorage();
-  let stored = createSettings({
-    borderPresets: [
-      createPreset('preset-1', { isSystemDefault: true }),
-      createPreset('preset-2', { enabled: true, order: 1 }),
-    ],
-    defaultBorderPresetId: 'preset-2',
-  });
+  let stored = createDefaultHighlighterSettings();
+  stored.borderPresets = stored.borderPresets.map((preset, index) => ({
+    ...preset,
+    enabled: index < 2,
+  }));
 
   storageMocks.getMock.mockImplementation(async () => ({
     sniptale_highlighter_settings: stored,
@@ -124,17 +116,16 @@ it('updates enabled state while protecting system presets and preserving a valid
     stored = payload.sniptale_highlighter_settings;
   });
 
-  await module.setBorderPresetEnabled('preset-1', false);
-  await module.setBorderPresetEnabled('preset-2', false);
-  await module.setBorderPresetEnabled('preset-2', true);
+  await module.setBorderPresetEnabled('system-default', false);
+  await module.setBorderPresetEnabled('system-soft-highlight', false);
 
-  expect(stored.defaultBorderPresetId).toBe('preset-1');
+  expect(stored.defaultBorderPresetId).toBe('system-soft-highlight');
   expect(stored.borderPresets[0]).toMatchObject({
-    id: 'preset-1',
-    isSystemDefault: true,
+    enabled: false,
+    id: 'system-default',
   });
   expect(stored.borderPresets[1]).toMatchObject({
     enabled: true,
-    id: 'preset-2',
+    id: 'system-soft-highlight',
   });
 });

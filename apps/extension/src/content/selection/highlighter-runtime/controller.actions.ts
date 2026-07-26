@@ -108,8 +108,12 @@ export function createHighlighterInvalidateActions(
     invalidateFrameCache: () => {
       hoverController.invalidation.frameCache();
     },
-    invalidateSettingsCache: () => {
-      hoverController.invalidation.settingsCache();
-    },
+  };
+}
+
+export function createHighlighterInputActions(hoverController: Pick<HoverController, 'input'>) {
+  return {
+    consumeSuppressedClick: (event: MouseEvent) =>
+      hoverController.input.consumeSuppressedClick(event),
   };
 }

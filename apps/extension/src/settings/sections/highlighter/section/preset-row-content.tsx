@@ -1,10 +1,13 @@
 import { translate } from '../../../../platform/i18n';
 import { getHighlighterPresetPreviewStyle } from './helpers';
 import type { HighlighterSectionContentProps } from './types';
+import { getBorderPresetDisplayName } from '../../../../features/highlighter/presets/display-name';
+import { useAppLocale } from '../../../../platform/i18n';
 
 type BorderPresetItem = HighlighterSectionContentProps['settings']['borderPresets'][number];
 
 export function HighlighterPresetRowContent({ preset }: { preset: BorderPresetItem }) {
+  const locale = useAppLocale();
   const styleLabel =
     preset.style === 'solid'
       ? translate('highlighter.editor.styleSolid')
@@ -25,7 +28,7 @@ export function HighlighterPresetRowContent({ preset }: { preset: BorderPresetIt
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-            {preset.name}
+            {getBorderPresetDisplayName(preset, locale)}
           </span>
         </div>
         <div className="mt-0.5 text-xs text-[var(--sniptale-color-text-dim)]">

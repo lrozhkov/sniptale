@@ -1,5 +1,9 @@
 import { mountStyleInAccessibleDocuments, walkAllDocuments } from '../../platform/frame';
-import { QUICK_EDIT_CURSOR_STYLE_ID, QUICK_EDIT_CURSOR_URL } from './style.constants';
+import {
+  QUICK_EDIT_CURSOR_STYLE_ID,
+  QUICK_EDIT_CURSOR_URL,
+  QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS,
+} from './style.constants';
 import type { QuickEditOverlayState } from './overlay.state';
 
 export function enableQuickEditCursor(state: QuickEditOverlayState): void {
@@ -9,8 +13,6 @@ export function enableQuickEditCursor(state: QuickEditOverlayState): void {
     }
 
     doc.body.classList.add('sniptale-quick-edit-mode');
-    doc.body.style.userSelect = 'none';
-    doc.body.style.webkitUserSelect = 'none';
   });
 
   state.cleanupCursorStyle?.();
@@ -39,6 +41,18 @@ export function enableQuickEditCursor(state: QuickEditOverlayState): void {
       cursor: text !important;
       user-select: text !important;
     }
+    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS},
+    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} * {
+      cursor: auto !important;
+    }
+    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} {
+      user-select: text !important;
+      -webkit-user-select: text !important;
+    }
+    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} .sniptale-toolbar,
+    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} .sniptale-toolbar *,
+    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} .sniptale-modal,
+    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} .sniptale-modal *,
     .sniptale-toolbar,
     .sniptale-toolbar *,
     .sniptale-modal,
@@ -59,8 +73,6 @@ export function disableQuickEditCursor(state: QuickEditOverlayState): void {
     }
 
     doc.body.classList.remove('sniptale-quick-edit-mode');
-    doc.body.style.userSelect = '';
-    doc.body.style.webkitUserSelect = '';
   });
 
   state.cleanupCursorStyle?.();

@@ -58,14 +58,13 @@ export function BorderPresetEditorContent({
     <ProductModal
       isOpen
       onClose={onClose}
-      width="720px"
-      maxWidth="95vw"
-      maxHeight="88vh"
+      width="660px"
+      maxWidth="94vw"
+      maxHeight="86vh"
       scrollable
-      accent="compact"
     >
       <ProductModalHeader compact title={title} onClose={onClose} />
-      <ProductModalBody compact className="space-y-6">
+      <ProductModalBody compact className="space-y-4">
         <BorderPresetEditorFields state={state} />
       </ProductModalBody>
       <EditorFooter

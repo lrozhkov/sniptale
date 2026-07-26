@@ -138,6 +138,38 @@ describe('ContentSizeTooltipContent rendering', () => {
     );
     expect(container?.textContent).toContain('Cancel');
     expect(container?.textContent).toContain('Apply size');
+    const actionButtons = Array.from(container?.querySelectorAll('button') ?? []).filter(
+      (button) => button.textContent === 'Cancel' || button.textContent === 'Apply size'
+    );
+    actionButtons.forEach((button) => {
+      expect(button.hasAttribute('aria-label')).toBe(false);
+      expect(button.hasAttribute('title')).toBe(false);
+    });
+  });
+
+  it('uses localized icon actions in the compact frame-edit toolbar', () => {
+    renderTooltip({ variant: 'frame-edit' });
+
+    const cancelButton = getButton('Cancel');
+    const confirmButton = getButton('Apply size');
+    expect(cancelButton).toBeTruthy();
+    expect(confirmButton).toBeTruthy();
+    expect(cancelButton?.textContent).toBe('');
+    expect(confirmButton?.textContent).toBe('');
+
+    for (const button of [cancelButton, confirmButton]) {
+      expect(button?.style.width).toBe('32px');
+      expect(button?.style.height).toBe('32px');
+      expect(button?.style.boxSizing).toBe('border-box');
+      expect(button?.style.display).toBe('inline-flex');
+      expect(button?.style.alignItems).toBe('center');
+      expect(button?.style.justifyContent).toBe('center');
+
+      const icon = button?.querySelector('svg');
+      expect(icon?.getAttribute('width')).toBe('16');
+      expect(icon?.getAttribute('height')).toBe('16');
+      expect(icon?.style.display).toBe('block');
+    }
   });
 });
 

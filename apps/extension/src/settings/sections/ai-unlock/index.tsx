@@ -134,12 +134,7 @@ function AISecretUnlockFooter(
 
 function AISecretUnlockModal(props: AISecretUnlockModalProps) {
   return (
-    <ProductModal
-      accent="compact"
-      closeOnBackdrop={false}
-      maxWidth="420px"
-      width="calc(100vw - 32px)"
-    >
+    <ProductModal closeOnBackdrop={false} maxWidth="420px" width="calc(100vw - 32px)">
       <ProductModalHeader
         compact
         disabled={props.isSubmitting}

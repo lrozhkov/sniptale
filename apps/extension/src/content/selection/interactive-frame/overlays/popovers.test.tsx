@@ -12,17 +12,21 @@ import {
 import { InteractiveFramePopovers } from './popovers';
 
 const frameSettingsPopoverMock = vi.hoisted(() => vi.fn((_props: Record<string, unknown>) => null));
+const stepBadgePopoverMock = vi.hoisted(() => vi.fn((_props: Record<string, unknown>) => null));
+const calloutSettingsPopoverMock = vi.hoisted(() =>
+  vi.fn((_props: Record<string, unknown>) => null)
+);
 
 vi.mock('../../frame-settings-popover', () => ({
   FrameSettingsPopover: frameSettingsPopoverMock,
 }));
 
 vi.mock('../../step-badge-popover', () => ({
-  StepBadgePopover: () => null,
+  StepBadgePopover: stepBadgePopoverMock,
 }));
 
 vi.mock('../../callout-settings-popover', () => ({
-  CalloutSettingsPopover: () => null,
+  CalloutSettingsPopover: calloutSettingsPopoverMock,
 }));
 
 vi.mock('./callout', () => ({
@@ -166,5 +170,46 @@ describe('InteractiveFramePopovers', () => {
 
     expect(setTempFrame).toHaveBeenCalledWith(expectedFrame);
     expect(onUpdate).toHaveBeenCalledWith(expectedFrame);
+  });
+
+  it('opens quick step and callout settings popovers without selecting the frame', () => {
+    const frame = createFrame('frame-1', '#2563eb');
+    const props = createPopoversProps({ currentFrame: frame, frame });
+
+    renderNode(
+      <InteractiveFramePopovers
+        {...props}
+        isSelected={false}
+        isStepBadgePopoverOpen
+        isCalloutPopoverOpen
+        frame={{
+          ...frame,
+          stepBadge: { enabled: true, type: 'number', value: '1' },
+          callout: {
+            anchor: 'top-center',
+            bgColor: '#fff',
+            enabled: true,
+            fontFamily: 'sans',
+            fontSize: 14,
+            fontWeight: 'normal',
+            htmlContent: 'Comment',
+            maxWidth: 200,
+            side: 'auto',
+            tailSize: 8,
+            textColor: '#111',
+            variant: 'bubble',
+          },
+        }}
+      />
+    );
+
+    expect(stepBadgePopoverMock).toHaveBeenCalledWith(
+      expect.objectContaining({ isOpen: true }),
+      undefined
+    );
+    expect(calloutSettingsPopoverMock).toHaveBeenCalledWith(
+      expect.objectContaining({ isOpen: true }),
+      undefined
+    );
   });
 });

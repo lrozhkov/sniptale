@@ -28,6 +28,7 @@ export function InteractiveFrameSizePanelContent({
       <ContentSizeTooltip
         portalTheme={portalTheme}
         position={sizePanelCoords}
+        variant="frame-edit"
         widthValue={panelProps.tempFrame.width}
         widthMin={MIN_FRAME_SIZE}
         widthMax={viewModel.controls.maxWidth}

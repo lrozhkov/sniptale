@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { QuickAction } from '../../contracts/settings';
-import { getBundledQuickActions, getQuickActionDisplayName, isBundledQuickAction } from './catalog';
+import {
+  getBundledQuickActions,
+  getCaptureActionDescriptors,
+  getQuickActionDisplayName,
+  isBundledQuickAction,
+} from './catalog';
 import { sanitizeQuickActionsDisplayMode } from './display-mode';
 import { mergeStoredQuickActions, normalizeQuickAction } from './normalization';
 
@@ -63,6 +68,26 @@ describe('quick-actions-presets bundled defaults', () => {
         screenshotMode: 'selection',
       })
     );
+  });
+});
+
+describe('quick-actions-presets after-capture catalog', () => {
+  it('provides the complete translated product action catalog', () => {
+    const descriptors = getCaptureActionDescriptors();
+
+    expect(descriptors.map((descriptor) => descriptor.value)).toEqual([
+      'download_default',
+      'ask_preset',
+      'ask_system',
+      'copy',
+      'scenario',
+      'edit',
+    ]);
+    expect(descriptors[0]).toEqual({
+      value: 'download_default',
+      label: 'translated:content.toolbar.captureDownloadLabel',
+      hint: 'translated:content.toolbar.captureDownloadHint',
+    });
   });
 });
 

@@ -6,6 +6,7 @@ import type { AddFreeFrameCallback } from '../../../features/highlighter/contrac
 import { getViewportClientPoint } from '../../platform/frame';
 import {
   hasBlockingHighlighterPopover,
+  isInsideExistingFrame,
   isHighlighterExtensionUiElement,
   isNearExistingFrameBorder,
 } from './targets';
@@ -103,7 +104,11 @@ function shouldSuppressHoverTarget(
   x: number,
   y: number
 ): boolean {
-  return isHighlighterExtensionUiElement(target) || isNearExistingFrameBorder(session, x, y);
+  return (
+    isHighlighterExtensionUiElement(target) ||
+    isInsideExistingFrame(session, x, y) ||
+    isNearExistingFrameBorder(session, x, y)
+  );
 }
 
 function canShowHoverTarget(props: {
@@ -127,6 +132,10 @@ function processScheduledHoverTarget(props: {
   y: number;
 }): void {
   if (!props.getState.isModeEnabled() || props.getState.isPaused()) return;
+  if (hasBlockingHighlighterPopover()) {
+    hideHoverPreview(props.session, props.hideHoverOverlay);
+    return;
+  }
   if (shouldSuppressHoverTarget(props.session, props.target, props.x, props.y)) {
     hideHoverPreview(props.session, props.hideHoverOverlay);
     return;
@@ -196,6 +205,7 @@ function createHoverClickHandler(props: HoverInteractionProps) {
     const point = getViewportClientPoint(event.clientX, event.clientY, iframe);
     if (
       !target ||
+      isInsideExistingFrame(props.session, point.x, point.y) ||
       isNearExistingFrameBorder(props.session, point.x, point.y) ||
       shouldIgnoreHighlighterClick({ eventTarget: target, getState: props.getState })
     ) {
@@ -238,6 +248,14 @@ function createHoverClickHandler(props: HoverInteractionProps) {
 function createHoverMouseMoveHandler(props: HoverInteractionProps) {
   return (event: MouseEvent, iframe?: HTMLIFrameElement) => {
     if (props.session.freeDraw.gesture) return;
+    if (hasBlockingHighlighterPopover()) {
+      if (props.session.hoverRafId !== null) {
+        cancelAnimationFrame(props.session.hoverRafId);
+        props.session.hoverRafId = null;
+      }
+      hideHoverPreview(props.session, props.overlayActions.hideHoverOverlay);
+      return;
+    }
     if (
       shouldSkipHoverProcessing({
         event,

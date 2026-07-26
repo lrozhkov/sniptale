@@ -77,6 +77,7 @@ function createRuntime(
       refreshSession: vi.fn(async () => undefined),
       saveSelectionCapture: vi.fn(async () => undefined),
     },
+    setCaptureAction: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),

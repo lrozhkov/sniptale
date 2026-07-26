@@ -8,7 +8,7 @@ export const editorInputClassName =
   'focus:outline-none focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]';
 
 export const editorPreviewFrameClassName = [
-  'flex h-32 w-32 items-center justify-center rounded-lg transition-colors',
+  'relative h-56 w-44 overflow-hidden rounded-lg p-4 transition-colors',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_82%,var(--sniptale-color-surface-panel)_18%)]',
 ].join(' ');
 

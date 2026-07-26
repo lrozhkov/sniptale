@@ -18,4 +18,11 @@ describe('overlays.countdown contract', () => {
     expect(overlaysCountdownStylesheet).toContain('.sniptale-pulse {');
     expect(overlaysCountdownStylesheet).toContain('@keyframes numberPulse');
   });
+
+  it('uses the same opaque canvas-backed surface as regular toast feedback', () => {
+    expect(overlaysCountdownStylesheet).toContain(
+      'var(--sniptale-color-surface-canvas) 94%,\n    var(--sniptale-color-accent) 6%'
+    );
+    expect(overlaysCountdownStylesheet).not.toContain('var(--sniptale-color-surface-panel) 97%');
+  });
 });

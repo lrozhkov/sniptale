@@ -23,6 +23,24 @@ export function createSelectionModeFinalOverlay(
   return finalOverlay;
 }
 
+export function createSelectionModeDragOverlay(overlayBackground: string): HTMLElement {
+  const dragOverlay = document.createElement('div');
+  dragOverlay.className = 'sniptale-selection-drag-overlay';
+  dragOverlay.style.cssText = `
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: transparent;
+    display: none;
+  `;
+
+  for (const direction of ['top', 'bottom', 'left', 'right']) {
+    dragOverlay.appendChild(createShade(direction, overlayBackground));
+  }
+
+  return dragOverlay;
+}
+
 function createShade(direction: string, overlayBackground: string): HTMLElement {
   const shade = document.createElement('div');
   shade.className = `sniptale-shade sniptale-shade-${direction}`;

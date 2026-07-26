@@ -2,7 +2,7 @@
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { CalloutAppearanceSection, CalloutDeleteButton } from './views';
+import { CalloutAppearanceSection, CalloutDeleteButton, CalloutTypographySection } from './views';
 
 describe('CalloutAppearanceSection', () => {
   it('renders inside the shared content popover section contract', () => {
@@ -33,5 +33,27 @@ describe('CalloutAppearanceSection', () => {
 
     expect(markup).toContain('Выключить');
     expect(markup).toContain('sniptale-glass-destructive');
+  });
+
+  it('stacks typography ranges compactly without redundant scale labels', () => {
+    const markup = renderToStaticMarkup(
+      <CalloutTypographySection
+        fontFamily="sans"
+        fontSize={16}
+        fontWeight="normal"
+        isTextOnly={false}
+        maxWidth={300}
+        onFontFamilyChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+        onFontWeightToggle={vi.fn()}
+        onMaxWidthChange={vi.fn()}
+        onTailSizeChange={vi.fn()}
+        tailSize={12}
+      />
+    );
+
+    expect(markup).toContain('sniptale-content-popover-range-grid');
+    expect(markup.match(/sniptale-content-popover-range-field/g)).toHaveLength(3);
+    expect(markup).not.toContain('sniptale-glass-range-meta');
   });
 });

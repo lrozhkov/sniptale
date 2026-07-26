@@ -15,7 +15,20 @@ export function EditorPreview({ state }: { state: EditorState }) {
       <div
         className={`${editorPreviewFrameClassName} ${getEditorPreviewFrameClassName(state.cssError)}`}
       >
-        <div style={state.previewStyle} className="transition-all duration-200" />
+        <p
+          aria-hidden="true"
+          className="select-none text-xs leading-5 text-[var(--sniptale-color-text-muted)]"
+        >
+          {translate('highlighter.editor.previewSampleText')}
+        </p>
+        <div
+          aria-hidden="true"
+          style={state.previewStyle}
+          className={[
+            'pointer-events-none absolute left-1/2 top-1/2',
+            '-translate-x-1/2 -translate-y-1/2 transition-all duration-200',
+          ].join(' ')}
+        />
       </div>
       {state.cssError ? (
         <div className="mt-2 flex max-w-[128px] items-start gap-1.5">

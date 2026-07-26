@@ -1,10 +1,11 @@
 import { translate } from '../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
+import { updateBorderPresetsOrder } from '../../../../composition/persistence/highlighter';
 import { reorderHighlighterPresets } from './helpers';
 import {
   reconcileCurrentHighlighterSettings,
-  saveQueuedHighlighterSettings,
+  runQueuedHighlighterMutation,
   type HighlighterSettingsPersistenceState,
 } from './persistence';
 
@@ -26,42 +27,8 @@ function resetDragState(state: HighlighterDragActionsState) {
 
 function computeReorderedPresetsForDrop(state: HighlighterDragActionsState, targetId: string) {
   const settings = reconcileCurrentHighlighterSettings(state);
-  if (!state.draggedId || !settings || state.draggedId === targetId) {
-    return null;
-  }
-
+  if (!state.draggedId || !settings || state.draggedId === targetId) return null;
   return reorderHighlighterPresets(settings.borderPresets, state.draggedId, targetId);
-}
-
-async function persistDraggedPresetDrop(
-  state: HighlighterDragActionsState,
-  draggedId: string,
-  targetId: string
-) {
-  const settings = reconcileCurrentHighlighterSettings(state);
-  if (!settings || draggedId === targetId) {
-    return false;
-  }
-
-  const reorderedPresets = reorderHighlighterPresets(settings.borderPresets, draggedId, targetId);
-  if (!reorderedPresets) {
-    return false;
-  }
-
-  await saveQueuedHighlighterSettings(state, (currentSettings) => {
-    const nextPresets = reorderHighlighterPresets(
-      currentSettings.borderPresets,
-      draggedId,
-      targetId
-    );
-    if (!nextPresets) {
-      return null;
-    }
-
-    return { ...currentSettings, borderPresets: nextPresets };
-  });
-
-  return true;
 }
 
 export function createHighlighterDragActions(state: HighlighterDragActionsState) {
@@ -72,28 +39,26 @@ export function createHighlighterDragActions(state: HighlighterDragActionsState)
     },
     handleDragOver: (event: HighlighterDragEvent, presetId: string) => {
       event.preventDefault();
-      if (state.draggedId && state.draggedId !== presetId) {
-        state.setDragOverId(presetId);
-      }
+      if (state.draggedId && state.draggedId !== presetId) state.setDragOverId(presetId);
     },
     handleDragLeave: () => state.setDragOverId(null),
     handleDrop: async (event: HighlighterDragEvent, targetId: string) => {
       event.preventDefault();
-      const draggedId = state.draggedId;
-      if (!computeReorderedPresetsForDrop(state, targetId)) {
+      const reordered = computeReorderedPresetsForDrop(state, targetId);
+      if (!reordered) {
         resetDragState(state);
         return;
       }
-
       try {
-        await persistDraggedPresetDrop(state, draggedId as string, targetId);
+        await runQueuedHighlighterMutation(state, () =>
+          updateBorderPresetsOrder(reordered.map((preset) => preset.id))
+        );
       } catch (error) {
         logger.error('Failed to reorder highlighter presets', error);
         toast.error(
           `${translate('common.states.error')}${translate('highlighter.section.reorderErrorSuffix')}`
         );
       }
-
       resetDragState(state);
     },
     handleDragEnd: () => resetDragState(state),

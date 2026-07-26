@@ -1,6 +1,6 @@
 import { CompactColorSelector } from '../../../../ui/color-selector';
 import { CompactInput, CompactSelect } from '../../../../ui/compact-inspector-controls';
-import { Field } from './field-shell';
+import { Field, PAGE_STYLE_SELECT_CLASS_NAME } from './field-shell';
 
 export function ColorField(props: {
   defaultValue?: string | undefined;
@@ -64,6 +64,7 @@ export function SelectField<T extends string>(props: {
     >
       <CompactSelect
         aria-label={props.label}
+        className={PAGE_STYLE_SELECT_CLASS_NAME}
         disabled={props.disabled}
         value={props.value}
         options={props.options}

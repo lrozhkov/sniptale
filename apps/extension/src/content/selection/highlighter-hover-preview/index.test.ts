@@ -6,7 +6,6 @@ const sessionModule = vi.hoisted(() => {
   const session = { owner: 'hover-session' };
   return {
     createHoverSession: vi.fn(() => session),
-    invalidateHighlighterSettings: vi.fn(),
     invalidateHoverFrameCache: vi.fn(),
     session,
   };
@@ -109,7 +108,6 @@ describe('highlighter hover preview controller', () => {
     );
     const event = new MouseEvent('mousemove');
     const iframe = document.createElement('iframe');
-    const detail = { defaultBorderPresetId: 'preset-2' };
 
     controller.overlay.createContainer();
     controller.overlay.removeContainer();
@@ -117,13 +115,13 @@ describe('highlighter hover preview controller', () => {
     controller.overlay.removePreview();
     controller.overlay.hidePreview();
     controller.invalidation.frameCache();
-    controller.invalidation.settingsCache(detail);
     controller.input.mouseMove(event, iframe);
     controller.input.mouseLeave();
     controller.input.click(event, iframe);
     controller.tracking.cancelPendingFrame();
     controller.tracking.clear();
     controller.input.cancelDrawing();
+    controller.input.consumeSuppressedClick(event);
 
     expect(overlayModule.actions.createOverlayContainer).toHaveBeenCalledOnce();
     expect(overlayModule.actions.removeOverlayContainer).toHaveBeenCalledOnce();
@@ -131,16 +129,13 @@ describe('highlighter hover preview controller', () => {
     expect(overlayModule.actions.removeHoverOverlay).toHaveBeenCalledOnce();
     expect(overlayModule.actions.hideHoverOverlay).toHaveBeenCalledOnce();
     expect(sessionModule.invalidateHoverFrameCache).toHaveBeenCalledWith(sessionModule.session);
-    expect(sessionModule.invalidateHighlighterSettings).toHaveBeenCalledWith(
-      sessionModule.session,
-      detail
-    );
     expect(interactionModule.handlers.handleMouseMove).toHaveBeenCalledWith(event, iframe);
     expect(interactionModule.handlers.handleMouseLeave).toHaveBeenCalledOnce();
     expect(interactionModule.handlers.handleClick).toHaveBeenCalledWith(event, iframe);
     expect(interactionModule.handlers.cancelPendingHoverFrame).toHaveBeenCalledOnce();
     expect(interactionModule.handlers.clearHoverTracking).toHaveBeenCalledOnce();
     expect(drawingModule.handlers.cancelDrawing).toHaveBeenCalledOnce();
+    expect(drawingModule.handlers.consumeSuppressedClick).toHaveBeenCalledWith(event);
   });
 
   it('logs the accessible iframe count', () => {

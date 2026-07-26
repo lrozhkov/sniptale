@@ -13,7 +13,7 @@ describe('ProductToolbarMenu', () => {
     const markup = renderToStaticMarkup(
       <ProductToolbarMenu title="Viewport" variant="viewport" compact placement="up">
         <ProductToolbarMenuItem selected>
-          <ProductToolbarMenuItemCopy label="Desktop" hint="1280×720" />
+          <ProductToolbarMenuItemCopy label="Desktop" hint="1280×720" showHintInCompact />
           <ProductToolbarMenuBadge>Active</ProductToolbarMenuBadge>
         </ProductToolbarMenuItem>
         <ProductToolbarMenuDivider />
@@ -33,6 +33,7 @@ describe('ProductToolbarMenu', () => {
       'sniptale-popover-item sniptale-toolbar-menu-item sniptale-popover-item-selected'
     );
     expect(markup).toContain('sniptale-toolbar-menu-item-badge');
+    expect(markup).toContain('sniptale-toolbar-menu-item-hint--show-compact');
     expect(markup).toContain('sniptale-popover-divider');
     expect(markup).toContain('opacity-50 cursor-not-allowed');
   });

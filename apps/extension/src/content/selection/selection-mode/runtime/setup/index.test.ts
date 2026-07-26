@@ -20,8 +20,10 @@ function createSetupFixture() {
     createFinalElements: vi.fn(() => order.push('create')),
     getMaxSelectionHeight: vi.fn(() => 800),
     getMaxSelectionWidth: vi.fn(() => 1200),
+    flushFinalFrameUpdate: vi.fn(),
     ...handlers,
     minSelectionSize: 32,
+    scheduleFinalFrameUpdate: vi.fn(),
     session,
     updateFinalFrame: vi.fn(() => {
       order.push(`update:${session.currentState}`);

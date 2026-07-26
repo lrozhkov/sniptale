@@ -21,6 +21,7 @@ it('uses a full product fallback for a deleted owner without executable tests', 
 
   expect(scope.profile).toBe('related-transitive');
   expect(scope.fullSuite).toBe(true);
+  expect(scope.executionClass).toBe('saturated-exclusive');
   expect(scope.directTestFiles).toEqual([]);
   expect(scope.relatedFiles).toEqual([]);
   expect(scope.detail).toContain('full product test suite');

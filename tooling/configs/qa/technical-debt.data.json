@@ -1781,18 +1781,22 @@
         "apps/extension/src/composition/persistence/highlighter/blur-settings.ts",
         "apps/extension/src/composition/persistence/highlighter/blur-stroke-style.ts",
         "apps/extension/src/composition/persistence/highlighter/border-preset.ts",
+        "apps/extension/src/composition/persistence/highlighter/catalog-migration.ts",
         "apps/extension/src/composition/persistence/highlighter/guards.ts",
         "apps/extension/src/composition/persistence/highlighter/index.ts",
         "apps/extension/src/composition/persistence/highlighter/mutation-write.ts",
+        "apps/extension/src/composition/persistence/highlighter/preset-mutations.ts",
         "apps/extension/src/composition/persistence/highlighter/resolved.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/composition/persistence/highlighter/blur-settings.ts",
         "apps/extension/src/composition/persistence/highlighter/blur-stroke-style.ts",
         "apps/extension/src/composition/persistence/highlighter/border-preset.ts",
+        "apps/extension/src/composition/persistence/highlighter/catalog-migration.ts",
         "apps/extension/src/composition/persistence/highlighter/guards.ts",
         "apps/extension/src/composition/persistence/highlighter/index.ts",
         "apps/extension/src/composition/persistence/highlighter/mutation-write.ts",
+        "apps/extension/src/composition/persistence/highlighter/preset-mutations.ts",
         "apps/extension/src/composition/persistence/highlighter/resolved.ts"
       ],
       "unownedFocusedFiles": []
@@ -3094,7 +3098,6 @@
         "apps/extension/src/content/selection/callout/editing.handlers.ts",
         "apps/extension/src/content/selection/callout/editing.ts",
         "apps/extension/src/content/selection/callout/geometry.ts",
-        "apps/extension/src/content/selection/callout/handle-visibility.ts",
         "apps/extension/src/content/selection/callout/handles.tsx",
         "apps/extension/src/content/selection/callout/index.tsx",
         "apps/extension/src/content/selection/callout/interaction-layout.ts",
@@ -3134,7 +3137,6 @@
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/frame-post-add.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/index.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/remove.ts",
-        "apps/extension/src/content/selection/frame-runtime/mutation-actions/session-defaults.helpers.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/types.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/update-resolver.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/update.ts",
@@ -3163,6 +3165,7 @@
         "apps/extension/src/content/selection/frame-runtime/roots/scroll/iframe-registration.ts",
         "apps/extension/src/content/selection/frame-runtime/roots/scroll/linked-elements.ts",
         "apps/extension/src/content/selection/frame-runtime/selection-frame-visual.ts",
+        "apps/extension/src/content/selection/frame-runtime/session/border-preset.ts",
         "apps/extension/src/content/selection/frame-runtime/session/callout-defaults.ts",
         "apps/extension/src/content/selection/frame-runtime/session/callout-handlers.ts",
         "apps/extension/src/content/selection/frame-runtime/session/core.ts",
@@ -3243,6 +3246,7 @@
         "apps/extension/src/content/selection/interactive-frame/overlays/hover-surface.tsx",
         "apps/extension/src/content/selection/interactive-frame/overlays/layers.tsx",
         "apps/extension/src/content/selection/interactive-frame/overlays/popovers.tsx",
+        "apps/extension/src/content/selection/interactive-frame/overlays/transient-control-visibility.ts",
         "apps/extension/src/content/selection/interactive-frame/render-model/comparison.ts",
         "apps/extension/src/content/selection/interactive-frame/render-model/current-frame.ts",
         "apps/extension/src/content/selection/interactive-frame/render-model/render-model.ts",
@@ -3263,6 +3267,8 @@
         "apps/extension/src/content/selection/interactive-frame/toolbar/index.tsx",
         "apps/extension/src/content/selection/interactive-frame/toolbar/portal.tsx",
         "apps/extension/src/content/selection/interactive-frame/toolbar/sections.tsx",
+        "apps/extension/src/content/selection/interactive-frame/toolbar/trigger-actions.tsx",
+        "apps/extension/src/content/selection/interactive-frame/toolbar/trigger-position.ts",
         "apps/extension/src/content/selection/interactive-frame/toolbar/trigger.tsx",
         "apps/extension/src/content/selection/interactive-frame/toolbar/types.ts",
         "apps/extension/src/content/selection/interactive-frame/toolbar/view.tsx",
@@ -3394,7 +3400,11 @@
         "apps/extension/src/content/selection/step-badge-popover/props.ts",
         "apps/extension/src/content/selection/step-badge-popover/state.ts",
         "apps/extension/src/content/selection/step-badge-popover/views.tsx",
+        "apps/extension/src/content/selection/step-badge/controls.tsx",
+        "apps/extension/src/content/selection/step-badge/drag.ts",
         "apps/extension/src/content/selection/step-badge/index.tsx",
+        "apps/extension/src/content/selection/step-badge/interaction.ts",
+        "apps/extension/src/content/selection/step-badge/placement.ts",
         "apps/extension/src/content/selection/step-badge/views.tsx"
       ],
       "rolloutFiles": [
@@ -7289,6 +7299,8 @@
         "apps/extension/src/features/highlighter/contracts/auto-blur.ts",
         "apps/extension/src/features/highlighter/contracts/index.ts",
         "apps/extension/src/features/highlighter/css-sanitizer/css.ts",
+        "apps/extension/src/features/highlighter/presets/catalog.ts",
+        "apps/extension/src/features/highlighter/presets/display-name.ts",
         "apps/extension/src/features/highlighter/style/defaults.ts",
         "apps/extension/src/features/highlighter/style/index.ts",
         "apps/extension/src/features/highlighter/style/public.ts",
@@ -7299,6 +7311,8 @@
         "apps/extension/src/features/highlighter/contracts/auto-blur.ts",
         "apps/extension/src/features/highlighter/contracts/index.ts",
         "apps/extension/src/features/highlighter/css-sanitizer/css.ts",
+        "apps/extension/src/features/highlighter/presets/catalog.ts",
+        "apps/extension/src/features/highlighter/presets/display-name.ts",
         "apps/extension/src/features/highlighter/style/defaults.ts",
         "apps/extension/src/features/highlighter/style/index.ts",
         "apps/extension/src/features/highlighter/style/public.ts",
@@ -11863,6 +11877,7 @@
         "packages/runtime-contracts/src/effect-v1/validation/scene.ts",
         "packages/runtime-contracts/src/effect-v1/validation/shared.ts",
         "packages/runtime-contracts/src/export/index.ts",
+        "packages/runtime-contracts/src/highlighter/border-preset.ts",
         "packages/runtime-contracts/src/highlighter/callout.ts",
         "packages/runtime-contracts/src/highlighter/step-badge.ts",
         "packages/runtime-contracts/src/messaging/capture-messages.ts",
@@ -11980,6 +11995,7 @@
         "packages/runtime-contracts/src/effect-v1/validation/scene.ts",
         "packages/runtime-contracts/src/effect-v1/validation/shared.ts",
         "packages/runtime-contracts/src/export/index.ts",
+        "packages/runtime-contracts/src/highlighter/border-preset.ts",
         "packages/runtime-contracts/src/highlighter/callout.ts",
         "packages/runtime-contracts/src/highlighter/step-badge.ts",
         "packages/runtime-contracts/src/messaging/capture-messages.ts",
@@ -16018,7 +16034,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/guardrail-preflight-scope.mjs",
-        "contentHash": "cc939409e82762ba6948f3a9f4fc81a8b4fe8e5c0f4cf9e0a83f1c702f4e76c4"
+        "contentHash": "f4719657384123da7a8ae96fe9e3d30f7cdd61dd67dc3401863f2d292ccc527d"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-report.mjs",
@@ -19723,7 +19739,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scheduler.mjs",
-        "contentHash": "f1f48414299a158314b79f6e41d8532129111242f29286bdf8f2a24c0e783381"
+        "contentHash": "db0577b78f39bc4521833b41bc84bb8ba1fe8ae453be9c0f3468de1a6941ca95"
       },
       "consumers": [
         "tooling/qa/core/verify-build.execution.mjs",
@@ -19758,12 +19774,13 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scope.mjs",
-        "contentHash": "00fdaa17027cb1f5defbb8353c0a0cca15e4475030d0aee76ef856974b8158c9"
+        "contentHash": "a0fc4280ba33d45ad321911bcefa45dec0a65fd392f3807e1d32e26b2f358757"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",
         "tooling/qa/core/verify-build.deleted-dead-export.test.ts",
         "tooling/qa/core/verify-build.execution.mjs",
+        "tooling/qa/core/verify-build.scheduler.test.ts",
         "tooling/qa/core/verify-build.scope.mjs",
         "tooling/qa/core/verify-build.scope.test.ts",
         "tooling/qa/core/verify-build.test-profiles.test.ts"

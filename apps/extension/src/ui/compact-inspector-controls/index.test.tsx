@@ -62,6 +62,9 @@ it('renders compact inspector inputs, ranges, selects, and color options', () =>
   expect(markup).toContain('--sniptale-range-shell-bg-active:transparent');
   expect(markup).toContain('--sniptale-range-shell-shadow-active:none');
   expect(markup).toContain('shared.ui.compact-select');
+  expect(markup).toContain('relative w-full min-w-0 max-w-full');
+  expect(markup).toContain('max-w-full items-center justify-between gap-2 overflow-hidden');
+  expect(markup).toContain('h-10 w-full min-w-0 max-w-full');
   expect(markup).toContain('--sniptale-field-bg-idle:transparent');
   expect(markup).toContain(COMPACT_INTERACTIVE_SURFACE_MIX_STYLE);
   expect(markup).not.toContain('sniptale-select');

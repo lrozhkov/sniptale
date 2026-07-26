@@ -66,7 +66,6 @@ function renderCaptureDropdown() {
             value: 'download_default',
             label: 'Download',
             hint: 'Default',
-            icon: <span>Icon</span>,
           },
         ]}
         onSelect={() => undefined}
@@ -114,7 +113,6 @@ function renderVerticalCaptureDropdown() {
             value: 'download_default',
             label: 'Download',
             hint: 'Default',
-            icon: <span>Icon</span>,
           },
         ]}
         onSelect={() => undefined}
@@ -146,7 +144,6 @@ function renderVerticalCaptureDropdownWithSidebarInset() {
             value: 'download_default',
             label: 'Download',
             hint: 'Default',
-            icon: <span>Icon</span>,
           },
         ]}
         onSelect={() => undefined}
@@ -183,6 +180,7 @@ describe('ToolbarCaptureMenuDropdowns', () => {
     expect(menuRoot).not.toBeNull();
     expect(menuSurface?.style.top).toBe('calc(100% + 10px)');
     expect(menuSurface?.style.left).toBe('0px');
+    expect(menuSurface?.querySelector('.sniptale-popover-icon')).toBeNull();
   });
 
   it('anchors the timer dropdown and keeps the semantic placement in sync', () => {

@@ -69,6 +69,7 @@ function getToolbarProps(props: InteractiveFrameFloatingUiProps) {
     popoverAnchorRef: props.popoverAnchorRef,
     stepBadgePopoverAnchorRef: props.stepBadgePopoverAnchorRef,
     calloutPopoverAnchorRef: props.calloutPopoverAnchorRef,
+    clearSelection: props.clearSelection,
     closePopover: props.closePopover,
     togglePopover: props.togglePopover,
     setIsCalloutEditing: props.setIsCalloutEditing,
@@ -83,10 +84,15 @@ function getToolbarProps(props: InteractiveFrameFloatingUiProps) {
 function getTriggerProps(props: InteractiveFrameFloatingUiProps) {
   return {
     frame: props.frame,
-    isVisible: props.isHovered && !props.isSelected && props.state !== 'resizing',
+    isVisible:
+      props.isHovered && !props.isSelected && (props.state === 'idle' || props.state === 'hover'),
+    closePopover: props.closePopover,
+    handleStartEditing: props.handleStartEditing,
     hoverFrame: props.hoverFrame,
     scheduleHoverFrameHide: props.scheduleHoverFrameHide,
     selectFrame: props.selectFrame,
+    setIsCalloutEditing: props.setIsCalloutEditing,
+    setState: props.setState,
   };
 }
 

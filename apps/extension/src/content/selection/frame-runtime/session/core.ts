@@ -24,6 +24,7 @@ export type FrameSessionSyncArgs = {
   highlighterSettingsCacheRef: MutableRefObject<HighlighterSettings | null>;
   globalEffectModeRef: MutableRefObject<EffectMode>;
   sessionBlurSettingsRef: MutableRefObject<BlurSettings>;
+  sessionDefaultsInitializedRef: MutableRefObject<boolean>;
   sessionFocusSettingsRef: MutableRefObject<FocusSettings>;
   sessionCalloutStyleRef: MutableRefObject<Partial<CalloutSettings> | null>;
   syncFocusOpacity: (sourceFrameId: string, newOpacity: number) => void;
@@ -38,6 +39,7 @@ export function setupFrameSessionSyncListeners({
   highlighterSettingsCacheRef,
   globalEffectModeRef,
   sessionBlurSettingsRef,
+  sessionDefaultsInitializedRef,
   sessionFocusSettingsRef,
   sessionCalloutStyleRef,
   syncFocusOpacity,
@@ -50,14 +52,14 @@ export function setupFrameSessionSyncListeners({
     globalEffectModeRef,
     highlighterSettingsCacheRef,
     sessionBlurSettingsRef,
+    sessionDefaultsInitializedRef,
     sessionFocusSettingsRef,
   });
   const handleStorageChanged = createFrameSessionStorageChangedHandler(loadSettings);
   const windowListeners = buildFrameSessionWindowListeners({
-    highlighterSettingsCacheRef,
-    loadSettings,
     syncFocusOpacity,
     sessionBlurSettingsRef,
+    sessionDefaultsInitializedRef,
     sessionFocusSettingsRef,
     updateGlobalStepBadgeSettings,
     updateFrameStepBadge,

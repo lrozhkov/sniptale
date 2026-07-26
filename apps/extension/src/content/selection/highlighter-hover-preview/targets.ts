@@ -21,6 +21,7 @@ const HIGHLIGHTER_EXTENSION_UI_CLASSES = [
   'sniptale-toolbar-portal-wrapper',
   'sniptale-frame-toolbar-trigger',
   'sniptale-frame-toolbar-bridge',
+  'sniptale-frame-quick-action',
   'sniptale-effect-toggle',
   'sniptale-resize-handle',
   'sniptale-focus-overlay',
@@ -30,6 +31,10 @@ const HIGHLIGHTER_EXTENSION_UI_CLASSES = [
   'sniptale-step-badge',
   'sniptale-callout',
   'sniptale-callout-format-toolbar',
+  'sniptale-callout-drag-handle',
+  'sniptale-callout-tail-handle',
+  'sniptale-callout-settings-handle',
+  'sniptale-step-badge-controls',
 ] as const;
 
 const HIGHLIGHTER_EXTENSION_UI_SELECTOR = [
@@ -37,6 +42,7 @@ const HIGHLIGHTER_EXTENSION_UI_SELECTOR = [
   '.sniptale-toolbar-portal-wrapper',
   '.sniptale-frame-toolbar-trigger',
   '.sniptale-frame-toolbar-bridge',
+  '.sniptale-frame-quick-action',
   '.sniptale-effect-toggle',
   '.sniptale-resize-handle',
   '.sniptale-frame-settings-popover',
@@ -45,15 +51,17 @@ const HIGHLIGHTER_EXTENSION_UI_SELECTOR = [
   '.sniptale-step-badge',
   '.sniptale-callout',
   '.sniptale-callout-format-toolbar',
+  '.sniptale-callout-drag-handle',
+  '.sniptale-callout-tail-handle',
+  '.sniptale-callout-settings-handle',
+  '.sniptale-step-badge-controls',
 ].join(', ');
 
 function collectFrameCacheEntries(): Array<readonly [string, HoverFrameCacheEntry]> {
-  return queryAllContentUiElements('.sniptale-interactive-frame').map((frame) => {
+  return queryAllContentUiElements('.sniptale-interactive-frame').flatMap((frame) => {
     const element = frame as HTMLElement;
-    return [
-      element.id || element.className,
-      { element, rect: element.getBoundingClientRect() },
-    ] as const;
+    const frameId = element.dataset['frameId'];
+    return frameId ? ([[frameId, { element }]] as const) : [];
   });
 }
 
@@ -63,7 +71,8 @@ export function isNearExistingFrameBorder(
   y: number
 ): boolean {
   const frameCache = readHoverFrameCache(session, collectFrameCacheEntries);
-  for (const { rect } of frameCache.values()) {
+  for (const { element } of frameCache.values()) {
+    const rect = element.getBoundingClientRect();
     if (
       isPointWithinFrameBorderHit(
         { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
@@ -71,6 +80,21 @@ export function isNearExistingFrameBorder(
         y
       )
     ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function isInsideExistingFrame(
+  session: HoverFrameCacheSession,
+  x: number,
+  y: number
+): boolean {
+  const frameCache = readHoverFrameCache(session, collectFrameCacheEntries);
+  for (const { element } of frameCache.values()) {
+    const rect = element.getBoundingClientRect();
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
       return true;
     }
   }

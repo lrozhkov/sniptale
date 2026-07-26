@@ -17,12 +17,28 @@ function isRangeWithinElement(range: Range, element: HTMLElement): boolean {
   return element.contains(range.startContainer) && element.contains(range.endContainer);
 }
 
+function getElementSelection(element: HTMLElement): Selection | null {
+  const root = element.getRootNode();
+  if (typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot) {
+    const getSelection = (root as ShadowRoot & { getSelection?: () => Selection | null })
+      .getSelection;
+    const shadowSelection = getSelection?.call(root);
+    if (shadowSelection) {
+      return shadowSelection;
+    }
+  }
+
+  return element.ownerDocument.defaultView?.getSelection() ?? null;
+}
+
 function insertPlainTextAtSelection(text: string, editableElement: HTMLDivElement): void {
-  const selection = window.getSelection();
+  const selection = getElementSelection(editableElement);
   const selectedRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
   const hasEditableSelection =
     selectedRange !== null && isRangeWithinElement(selectedRange, editableElement);
-  const range = hasEditableSelection ? selectedRange.cloneRange() : document.createRange();
+  const range = hasEditableSelection
+    ? selectedRange.cloneRange()
+    : editableElement.ownerDocument.createRange();
   editableElement.focus({ preventScroll: true });
   if (!hasEditableSelection) {
     range.selectNodeContents(editableElement);
@@ -30,7 +46,7 @@ function insertPlainTextAtSelection(text: string, editableElement: HTMLDivElemen
   }
 
   range.deleteContents();
-  const textNode = document.createTextNode(text);
+  const textNode = editableElement.ownerDocument.createTextNode(text);
   range.insertNode(textNode);
   range.setStartAfter(textNode);
   range.setEndAfter(textNode);

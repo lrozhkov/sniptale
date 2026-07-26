@@ -6,6 +6,7 @@ import {
 import {
   createHighlighterFrameActions,
   createHighlighterInvalidateActions,
+  createHighlighterInputActions,
   createHighlighterRuntimeActions,
   createHighlighterStateActions,
 } from './controller.actions';
@@ -33,6 +34,7 @@ function assembleHighlighterController(deps: HighlighterControllerDeps): Highlig
 
   return {
     ...createHighlighterInvalidateActions(hoverController),
+    ...createHighlighterInputActions(hoverController),
     ...createHighlighterRuntimeActions({
       disableRuntime: deps.disableRuntime ?? disableHighlighterRuntime,
       enableRuntime: deps.enableRuntime ?? enableHighlighterRuntime,

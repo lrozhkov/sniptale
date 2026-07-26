@@ -7,21 +7,17 @@ import type {
   FreeFrameInput,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
-import { resolveDefaultBorderPreset } from '../../../../features/editor/document/public';
 import { createCompositeSelector } from '../../../platform/frame/selectors';
-import { DEFAULT_BORDER_PRESET } from '../../../../composition/persistence/highlighter';
-import { resolveSessionFrameDefaults } from './session-defaults.helpers';
 import type { UseFrameMutationActionHelperOptions } from './types';
+import { getFrameSessionBorderPreset } from '../session/border-preset';
 
 type BuildFrameForAddArgs = Pick<
   UseFrameMutationActionHelperOptions,
-  | 'framesRef'
   | 'globalEffectModeRef'
   | 'globalStepBadgeAutoModeRef'
   | 'sessionBlurSettingsRef'
   | 'sessionFocusSettingsRef'
   | 'sessionStepBadgeTemplateRef'
-  | 'highlighterSettingsCacheRef'
 > & {
   calculateFrameCoords: (element: HTMLElement, borderSettings?: BorderPreset) => FrameData;
   element: HTMLElement;
@@ -65,30 +61,18 @@ export function buildFreeFrameForAdd(
 function resolveFrameBuildSettings(
   args: Pick<
     BuildFrameForAddArgs,
-    | 'framesRef'
     | 'globalEffectModeRef'
     | 'globalStepBadgeAutoModeRef'
-    | 'highlighterSettingsCacheRef'
     | 'sessionBlurSettingsRef'
     | 'sessionFocusSettingsRef'
     | 'sessionStepBadgeTemplateRef'
   >
 ) {
-  const sessionDefaults = resolveSessionFrameDefaults({
-    existingFrames: args.framesRef.current,
-    fallbackEffectMode: args.globalEffectModeRef.current,
-    fallbackBlurSettings: args.sessionBlurSettingsRef.current,
-    fallbackFocusSettings: args.sessionFocusSettingsRef.current,
-  });
-
   return {
-    borderSettings: resolveDefaultBorderPreset(
-      args.highlighterSettingsCacheRef.current,
-      DEFAULT_BORDER_PRESET
-    ),
-    blurSettings: sessionDefaults.blurSettings,
-    focusSettings: sessionDefaults.focusSettings,
-    effectMode: sessionDefaults.effectMode,
+    borderSettings: getFrameSessionBorderPreset(),
+    blurSettings: { ...args.sessionBlurSettingsRef.current },
+    focusSettings: { ...args.sessionFocusSettingsRef.current },
+    effectMode: args.globalEffectModeRef.current,
     template: args.sessionStepBadgeTemplateRef.current,
     isAutoMode: args.globalStepBadgeAutoModeRef.current,
   };

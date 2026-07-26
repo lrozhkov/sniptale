@@ -5,7 +5,6 @@ import type {
   FocusSettings,
   FrameData,
   GlobalStepBadgeSettings,
-  HighlighterSettings,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
 import type { WithHistoryCommit } from '../contracts';
@@ -22,10 +21,9 @@ import {
 } from './step-badge-handlers';
 
 export function buildFrameSessionWindowListeners(args: {
-  highlighterSettingsCacheRef: MutableRefObject<HighlighterSettings | null>;
-  loadSettings: () => void;
   syncFocusOpacity: (sourceFrameId: string, newOpacity: number) => void;
   sessionBlurSettingsRef: MutableRefObject<BlurSettings>;
+  sessionDefaultsInitializedRef: MutableRefObject<boolean>;
   sessionFocusSettingsRef: MutableRefObject<FocusSettings>;
   updateGlobalStepBadgeSettings: (settings: Partial<GlobalStepBadgeSettings>) => void;
   updateFrameStepBadge: (frameId: string, settings: Partial<StepBadgeSettings>) => void;
@@ -40,9 +38,8 @@ export function buildFrameSessionWindowListeners(args: {
   return createFrameSessionListenerCleanups({
     frameCalloutHandlers,
     frameStepBadgeHandlers,
-    highlighterSettingsCacheRef: args.highlighterSettingsCacheRef,
-    loadSettings: args.loadSettings,
     sessionBlurSettingsRef: args.sessionBlurSettingsRef,
+    sessionDefaultsInitializedRef: args.sessionDefaultsInitializedRef,
     sessionFocusSettingsRef: args.sessionFocusSettingsRef,
     syncFocusOpacity: args.withHistoryCommit(args.syncFocusOpacity),
   });

@@ -9,7 +9,6 @@ export interface ProductModalProps {
   maxWidth?: CSSProperties['maxWidth'];
   maxHeight?: CSSProperties['maxHeight'];
   scrollable?: boolean;
-  accent?: 'default' | 'compact';
   children: ReactNode;
   dialogClassName?: string;
   bodyClassName?: string;
@@ -80,7 +79,6 @@ export function ProductModal({
   maxWidth,
   maxHeight,
   scrollable = false,
-  accent = 'default',
   children,
   dialogClassName = '',
   role = 'dialog',
@@ -110,9 +108,6 @@ export function ProductModal({
         aria-labelledby={labelledBy}
         onKeyDown={onKeyDown}
       >
-        <div
-          className={accent === 'compact' ? 'sniptale-modal-accent-sm' : 'sniptale-modal-accent'}
-        />
         {children}
       </div>
     </>

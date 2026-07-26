@@ -3,6 +3,7 @@ import { getViewportClientPoint } from '../../../platform/frame';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { isHighlighterEnabled, isHighlighterPausedState } from '../../highlighter';
 import { resolveFrameHitTarget, type FrameHitTarget } from './hit-test';
+import { isFrameUiOwnedFloatingEvent } from './activation';
 
 const HOVER_THROTTLE_MS = 100;
 
@@ -69,6 +70,13 @@ export function createThrottledMouseMoveHandler(params: FrameUiMouseTrackingPara
 
   return (event: MouseEvent, iframe?: HTMLIFrameElement) => {
     if (isHighlighterPausedState()) {
+      return;
+    }
+    if (isFrameUiOwnedFloatingEvent(event)) {
+      if (rafId.current !== null) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = null;
+      }
       return;
     }
 

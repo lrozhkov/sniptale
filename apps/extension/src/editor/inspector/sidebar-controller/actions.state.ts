@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import type { BorderPreset } from '../../../features/highlighter/contracts';
 import {
   DEFAULT_BORDER_PRESET,
+  DEFAULT_HIGHLIGHTER_SETTINGS,
   loadHighlighterSettings,
   subscribeToHighlighterSettings,
 } from '../../../composition/persistence/highlighter';
-import { translate } from '../../../platform/i18n';
+import { translate, useAppLocale } from '../../../platform/i18n';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { loadRecentColors, pushRecentColor } from '../sidebar-shared';
 import { isRecordableRecentColor } from './colors';
@@ -17,12 +18,15 @@ function sortBorderPresets(borderPresets: BorderPreset[]): BorderPreset[] {
       return orderDelta;
     }
 
-    return left.name.localeCompare(right.name);
+    return left.id.localeCompare(right.id);
   });
 }
 
 export function useBorderPresetsState() {
-  const [borderPresets, setBorderPresets] = useState<BorderPreset[]>([DEFAULT_BORDER_PRESET]);
+  useAppLocale();
+  const [borderPresets, setBorderPresets] = useState<BorderPreset[]>(() =>
+    sortBorderPresets(DEFAULT_HIGHLIGHTER_SETTINGS.borderPresets)
+  );
   const [defaultBorderPresetId, setDefaultBorderPresetId] = useState(DEFAULT_BORDER_PRESET.id);
 
   useEffect(() => {
@@ -33,7 +37,9 @@ export function useBorderPresetsState() {
       }
 
       const loadedBorderPresets =
-        settings.borderPresets.length > 0 ? settings.borderPresets : [DEFAULT_BORDER_PRESET];
+        settings.borderPresets.length > 0
+          ? settings.borderPresets
+          : DEFAULT_HIGHLIGHTER_SETTINGS.borderPresets;
       setBorderPresets(sortBorderPresets(loadedBorderPresets));
       setDefaultBorderPresetId(settings.defaultBorderPresetId);
     };
@@ -42,7 +48,7 @@ export function useBorderPresetsState() {
       .then(applySettings)
       .catch(() => {
         if (!cancelled) {
-          setBorderPresets([DEFAULT_BORDER_PRESET]);
+          setBorderPresets(sortBorderPresets(DEFAULT_HIGHLIGHTER_SETTINGS.borderPresets));
           setDefaultBorderPresetId(DEFAULT_BORDER_PRESET.id);
         }
       });

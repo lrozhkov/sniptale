@@ -46,6 +46,16 @@ function getVisualLayer(frame: FrameData): number {
   return -(frame.width * frame.height);
 }
 
+function isPointInFrameInterior(frame: FrameData, x: number, y: number) {
+  return (
+    x >= frame.x &&
+    x <= frame.x + frame.width &&
+    y >= frame.y &&
+    y <= frame.y + frame.height &&
+    getDistanceToFrameBorder(frame, x, y) > FRAME_BORDER_HIT_THRESHOLD
+  );
+}
+
 function collectCandidates(frames: FrameData[], x: number, y: number): FrameHitCandidate[] {
   return frames.flatMap((frame, index) => {
     const distance = getDistanceToFrameBorder(frame, x, y);
@@ -99,6 +109,22 @@ export function resolveFrameHitTarget(params: {
   }
 
   return { frameId: nearest.frame.id, kind: 'border' };
+}
+
+export function resolveFrameInteriorHitTarget(params: {
+  frames: FrameData[];
+  x: number;
+  y: number;
+}): string | null {
+  const winner = params.frames
+    .flatMap((frame, index) =>
+      isPointInFrameInterior(frame, params.x, params.y)
+        ? [{ frame, index, visualLayer: getVisualLayer(frame) }]
+        : []
+    )
+    .sort((a, b) => b.visualLayer - a.visualLayer || b.index - a.index)[0];
+
+  return winner?.frame.id ?? null;
 }
 
 export function resolveFrameControlHit(event: Event): FrameHitTarget | null {

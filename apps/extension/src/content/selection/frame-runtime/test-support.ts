@@ -31,7 +31,6 @@ export function createBorderSettingsFixture(overrides: Partial<BorderPreset> = {
     color: '#000000',
     customCss: '',
     id: 'border',
-    isSystemDefault: true,
     name: 'Default Border',
     opacity: 1,
     strokeOpacity: 1,

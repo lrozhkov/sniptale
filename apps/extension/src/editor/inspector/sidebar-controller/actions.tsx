@@ -46,7 +46,11 @@ function createShapePresetSaveAction(args: {
     const preset = createBorderPresetFromShapeSettings(args.shapeSettings, args.borderPresets);
 
     try {
-      await addBorderPreset(preset);
+      const applied = await addBorderPreset(preset);
+      if (applied === false) {
+        toast.error(translate('editor.compact.saveShapePresetFailed'));
+        return;
+      }
     } catch {
       toast.error(translate('editor.compact.saveShapePresetFailed'));
       return;

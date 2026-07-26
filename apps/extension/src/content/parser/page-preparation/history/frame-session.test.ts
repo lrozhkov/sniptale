@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { createFrameDataFixture } from '../../../selection/frame-runtime/test-support';
 import { captureFrameSessionSnapshot } from './frame-session';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
 describe('captureFrameSessionSnapshot', () => {
   it('deep-clones manual callout placement and free page placement', () => {
@@ -23,11 +24,18 @@ describe('captureFrameSessionSnapshot', () => {
         variant: 'bubble',
       },
       pagePlacement: { iframePath: ['iframe#content'], pageX: 120, pageY: 240 },
+      stepBadge: {
+        enabled: true,
+        manualPlacement: { position: 0.72, side: 'bottom' },
+        type: 'number',
+        value: '3',
+      },
     });
     const snapshot = captureFrameSessionSnapshot({
       frames: [frame],
       globalEffectMode: 'border',
       globalStepBadgeSettings: { autoMode: true },
+      sessionBorderPreset: DEFAULT_BORDER_PRESET,
       sessionBlurSettings: { amount: 10, blurType: 'gaussian', showBorder: true },
       sessionCalloutStyle: null,
       sessionFocusSettings: { opacity: 0.4, showBorder: false },
@@ -36,12 +44,16 @@ describe('captureFrameSessionSnapshot', () => {
     });
     const saved = snapshot.frames[0]!;
 
+    expect(snapshot.sessionBorderPreset).not.toBe(DEFAULT_BORDER_PRESET);
+    expect(snapshot.sessionBorderPreset.padding).not.toBe(DEFAULT_BORDER_PRESET.padding);
     expect(saved.callout?.manualPlacement).not.toBe(frame.callout?.manualPlacement);
     expect(saved.pagePlacement).not.toBe(frame.pagePlacement);
     expect(saved.pagePlacement?.iframePath).not.toBe(frame.pagePlacement?.iframePath);
+    expect(saved.stepBadge?.manualPlacement).not.toBe(frame.stepBadge?.manualPlacement);
     expect(saved).toMatchObject({
       callout: { manualPlacement: { centerOffsetX: 80, centerOffsetY: -40 } },
       pagePlacement: { iframePath: ['iframe#content'], pageX: 120, pageY: 240 },
+      stepBadge: { manualPlacement: { position: 0.72, side: 'bottom' } },
     });
   });
 });

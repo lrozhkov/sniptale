@@ -4,11 +4,12 @@ import { logSelectionModeDiag, logSelectionModeError } from '../diag';
 import { createSelectionModeControllerActions } from './actions';
 import { createSelectionModeRuntime } from '../runtime/composition';
 import { createSelectionModeSession, resetSelectionModeSession } from '../session';
+import type { SelectionModeActivationOptions } from '../types';
 
 interface SelectionModeController {
   cleanup: () => void;
   disableSelectionMode: () => void;
-  enableSelectionMode: () => Promise<CaptureArea>;
+  enableSelectionMode: (options?: SelectionModeActivationOptions) => Promise<CaptureArea>;
   isSelectionModeActive: () => boolean;
 }
 
