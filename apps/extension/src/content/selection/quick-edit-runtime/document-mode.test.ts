@@ -54,6 +54,7 @@ afterEach(() => {
     writable: true,
   });
   vi.restoreAllMocks();
+  document.body.className = '';
   document.body.replaceChildren();
 });
 
@@ -65,10 +66,12 @@ function dispatchDocumentModeInput(target: HTMLElement, mutate: () => void): voi
 
 it('begins a document-mode history transaction on enable', () => {
   const documentMode = createDocumentMode();
+  document.body.classList.add('sniptale-quick-edit-text-cursor');
 
   documentMode.enable();
 
   expect(historyMocks.beginTransaction).toHaveBeenCalledWith('quick-edit-document-mode');
+  expect(document.body.classList.contains('sniptale-quick-edit-text-cursor')).toBe(false);
   documentMode.disable();
 });
 
@@ -101,6 +104,7 @@ it('commits document-mode DOM edits when document mode is disabled', () => {
   document.body.append(paragraph);
 
   documentMode.enable();
+  document.body.classList.add('sniptale-quick-edit-text-cursor');
   dispatchDocumentModeInput(paragraph, () => {
     paragraph.textContent = 'After';
   });
@@ -110,6 +114,7 @@ it('commits document-mode DOM edits when document mode is disabled', () => {
   expect(historyMocks.commitTransaction).toHaveBeenCalledWith('quick-edit-document-mode', {
     patches: [{ changed: true }],
   });
+  expect(document.body.classList.contains('sniptale-quick-edit-text-cursor')).toBe(false);
 });
 
 it('keeps document mode active when designMode restore fails', () => {

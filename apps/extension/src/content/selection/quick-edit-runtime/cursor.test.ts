@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  mountDocumentCursorTrackingMock: vi.fn(),
   mountStyleMock: vi.fn(),
   walkAllDocumentsMock: vi.fn(),
 }));
@@ -13,11 +14,17 @@ vi.mock('../../platform/frame', async (importOriginal) => ({
   walkAllDocuments: mocks.walkAllDocumentsMock,
 }));
 
+vi.mock('./document-cursor', () => ({
+  mountQuickEditDocumentCursorTracking: mocks.mountDocumentCursorTrackingMock,
+}));
+
 import { disableQuickEditCursor, enableQuickEditCursor } from './cursor';
 
 describe('quick edit cursor enablement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.mountDocumentCursorTrackingMock.mockReturnValue(vi.fn());
+    mocks.mountStyleMock.mockReturnValue(vi.fn());
     document.body.className = '';
     document.body.removeAttribute('style');
     document.body.replaceChildren();
@@ -48,6 +55,7 @@ describe('quick edit cursor enablement', () => {
     expect(mocks.mountStyleMock).toHaveBeenCalledWith(
       expect.objectContaining({ styleId: expect.stringContaining('quick-edit-cursor') })
     );
+    expect(mocks.mountDocumentCursorTrackingMock).toHaveBeenCalledOnce();
     expect(state.cursorStyleElement?.id).toContain('quick-edit-cursor');
   });
 
@@ -63,7 +71,10 @@ describe('quick edit cursor enablement', () => {
 
     expect(stylesheet).toContain('body.sniptale-quick-edit-document-mode');
     expect(stylesheet).toMatch(
-      /body\.sniptale-quick-edit-document-mode[\s\S]*?cursor:\s*auto\s*!important;/
+      /body\.sniptale-quick-edit-document-mode[\s\S]*?cursor:\s*default\s*!important;/
+    );
+    expect(stylesheet).toContain(
+      'body.sniptale-quick-edit-document-mode.sniptale-quick-edit-text-cursor'
     );
     expect(stylesheet).toMatch(
       /body\.sniptale-quick-edit-document-mode[\s\S]*?user-select:\s*text\s*!important;/
@@ -85,9 +96,12 @@ describe('quick edit cursor enablement', () => {
 
     document.body.classList.add('sniptale-quick-edit-document-mode');
 
-    expect(getComputedStyle(paragraph).cursor).toBe('auto');
+    expect(getComputedStyle(paragraph).cursor).toBe('default');
     expect(getComputedStyle(document.body).userSelect).toBe('text');
     expect(getComputedStyle(toolbarButton).cursor).toBe('pointer');
+
+    document.body.classList.add('sniptale-quick-edit-text-cursor');
+    expect(getComputedStyle(paragraph).cursor).toBe('text');
 
     style.remove();
   });
