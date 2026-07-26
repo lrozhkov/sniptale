@@ -11,7 +11,10 @@ const loggerMocks = vi.hoisted(() => ({
 }));
 
 const storageMocks = vi.hoisted(() => ({
+  addBorderPresetWithOutcome: vi.fn(),
   loadHighlighterSettings: vi.fn(),
+  setBorderPresetEnabled: vi.fn(),
+  updateBorderPresetWithOutcome: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -25,7 +28,10 @@ vi.mock('../../../composition/persistence/highlighter', async () => {
 
   return {
     ...actual,
+    addBorderPresetWithOutcome: storageMocks.addBorderPresetWithOutcome,
     loadHighlighterSettings: storageMocks.loadHighlighterSettings,
+    setBorderPresetEnabled: storageMocks.setBorderPresetEnabled,
+    updateBorderPresetWithOutcome: storageMocks.updateBorderPresetWithOutcome,
   };
 });
 
@@ -35,6 +41,7 @@ import {
   DEFAULT_BORDER_PRESET,
 } from '../../../features/highlighter/style/defaults';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
+import { translate } from '../../../platform/i18n';
 import { createBridgedMouseEvent } from '../../platform/trusted-events/synthetic-mouse';
 import { FrameSettingsPopover } from '.';
 
@@ -115,6 +122,34 @@ function getPresetButton(name: string) {
   return button;
 }
 
+function getPresetRow(name: string) {
+  const row = [...document.querySelectorAll<HTMLElement>('.sniptale-frame-style-preset-row')].find(
+    (candidate) => candidate.textContent?.includes(name)
+  );
+
+  if (!row) {
+    throw new Error(`Expected frame style preset row: ${name}`);
+  }
+
+  return row;
+}
+
+function clickTrusted(element: HTMLElement) {
+  act(() => {
+    element.dispatchEvent(
+      createBridgedMouseEvent('click', {
+        button: 0,
+        buttons: 1,
+        clientX: 20,
+        clientY: 30,
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+      })
+    );
+  });
+}
+
 function setRangeInputValue(input: HTMLInputElement, value: string) {
   const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
 
@@ -154,6 +189,9 @@ async function flushAsyncEffects() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   storageMocks.loadHighlighterSettings.mockReset();
+  storageMocks.addBorderPresetWithOutcome.mockReset();
+  storageMocks.setBorderPresetEnabled.mockReset();
+  storageMocks.updateBorderPresetWithOutcome.mockReset();
   loggerMocks.error.mockReset();
 
   anchorEl = document.createElement('button');
@@ -237,6 +275,12 @@ describe('FrameSettingsPopover loading state', () => {
     expect(popover?.classList).toContain('sniptale-content-popover');
     expect(popover?.dataset['frameId']).toBe('frame-1');
     expect(popover?.dataset['theme']).toBe('dark');
+    expect(popover?.dataset['sniptaleActivationBridge']).toBe('defer');
+    expect(
+      document.querySelector<HTMLElement>('.sniptale-frame-style-editor-layer')?.dataset[
+        'sniptaleActivationBridge'
+      ]
+    ).toBe('defer');
     expect(popover?.querySelector('.sniptale-content-popover-body')).not.toBeNull();
     popover?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(hostClick).not.toHaveBeenCalled();
@@ -308,7 +352,7 @@ describe('FrameSettingsPopover pending focus edits', () => {
 });
 
 describe('FrameSettingsPopover preset selection', () => {
-  it('applies a trusted selection to the frame and closes immediately', () => {
+  it('applies a trusted selection without closing the catalog', () => {
     const onApplyToFrame = vi.fn();
     const onClose = vi.fn();
     storageMocks.loadHighlighterSettings.mockReturnValue(
@@ -341,6 +385,111 @@ describe('FrameSettingsPopover preset selection', () => {
     expect(onApplyToFrame).toHaveBeenCalledWith({
       borderSettings: { ...DEFAULT_BORDER_PRESET },
     });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.querySelector('.sniptale-frame-settings-popover')).not.toBeNull();
+  });
+
+  it('does not treat pointer interaction inside the popover as an outside dismissal', () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    storageMocks.loadHighlighterSettings.mockReturnValue(
+      new Promise<HighlighterSettings>(() => undefined)
+    );
+    renderPopover({ onClose });
+    act(() => vi.advanceTimersByTime(200));
+
+    const label = document.querySelector<HTMLElement>('.sniptale-content-popover-section-label');
+    label?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+    label?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.querySelector('.sniptale-frame-settings-popover')).not.toBeNull();
+    vi.useRealTimers();
+  });
+});
+
+describe('FrameSettingsPopover preset catalog actions', () => {
+  it('keeps a disabled style visible for undo during the current session and hides it after reopen', async () => {
+    const firstPreset = createPersistedSettings().borderPresets[0]!;
+    const secondPreset = { ...firstPreset, id: 'second-preset', name: 'Second preset', order: 1 };
+    const enabledSettings = createPersistedSettings({
+      borderPresets: [firstPreset, secondPreset],
+    });
+    const disabledSettings = createPersistedSettings({
+      borderPresets: [{ ...firstPreset, enabled: false }, secondPreset],
+      defaultBorderPresetId: secondPreset.id,
+    });
+    storageMocks.loadHighlighterSettings
+      .mockResolvedValueOnce(enabledSettings)
+      .mockResolvedValueOnce(disabledSettings)
+      .mockResolvedValueOnce(enabledSettings)
+      .mockResolvedValue(disabledSettings);
+    storageMocks.setBorderPresetEnabled.mockResolvedValue(true);
+
+    renderPopover();
+    await flushAsyncEffects();
+
+    const row = getPresetRow(firstPreset.name);
+    const visibilityButton = row.querySelector<HTMLElement>(
+      '[data-frame-style-action="toggle-visibility"]'
+    );
+    expect(visibilityButton).not.toBeNull();
+    clickTrusted(visibilityButton!);
+    await flushAsyncEffects();
+
+    expect(storageMocks.setBorderPresetEnabled).toHaveBeenCalledWith(firstPreset.id, false);
+    expect(getPresetRow(firstPreset.name).dataset['enabled']).toBe('false');
+    expect(document.body.textContent).toContain(firstPreset.name);
+
+    clickTrusted(
+      getPresetRow(firstPreset.name).querySelector<HTMLElement>(
+        '[data-frame-style-action="toggle-visibility"]'
+      )!
+    );
+    await flushAsyncEffects();
+    expect(storageMocks.setBorderPresetEnabled).toHaveBeenLastCalledWith(firstPreset.id, true);
+    expect(getPresetRow(firstPreset.name).dataset['enabled']).toBe('true');
+
+    clickTrusted(
+      getPresetRow(firstPreset.name).querySelector<HTMLElement>(
+        '[data-frame-style-action="toggle-visibility"]'
+      )!
+    );
+    await flushAsyncEffects();
+    expect(getPresetRow(firstPreset.name).dataset['enabled']).toBe('false');
+
+    renderPopover({ isOpen: false });
+    renderPopover({ isOpen: true });
+    await flushAsyncEffects();
+
+    expect(document.body.textContent).not.toContain(firstPreset.name);
+    expect(document.body.textContent).toContain(secondPreset.name);
+  });
+
+  it('opens the shared style editor from both edit and add actions', async () => {
+    storageMocks.loadHighlighterSettings.mockResolvedValue(createPersistedSettings());
+    renderPopover();
+    await flushAsyncEffects();
+
+    const editButton = getPresetRow('Persisted preset').querySelector<HTMLElement>(
+      '[data-frame-style-action="edit"]'
+    );
+    editButton?.focus();
+    clickTrusted(editButton!);
+    const editModal = document.querySelector<HTMLElement>('.sniptale-modal');
+    expect(editModal).not.toBeNull();
+    expect(editModal?.contains(document.activeElement)).toBe(true);
+    expect(document.body.textContent).toContain(translate('highlighter.editor.editTitle'));
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(document.querySelector('.sniptale-modal')).toBeNull();
+    expect(document.activeElement).toBe(editButton);
+    const addButton = document.querySelector<HTMLElement>('[data-frame-style-action="add"]');
+    clickTrusted(addButton!);
+
+    expect(document.querySelector('.sniptale-modal')).not.toBeNull();
+    expect(document.body.textContent).toContain(translate('highlighter.editor.newTitle'));
   });
 });

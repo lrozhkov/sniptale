@@ -99,6 +99,30 @@ it('rolls the draft back to the committed value after cancel and reseeds from co
   expect(state?.pickerOpen).toBe(true);
 });
 
+it('lets Escape dismiss and roll back an active picker before parent layers', () => {
+  const onPreviewReset = vi.fn();
+  renderHarness({
+    onChange: vi.fn(),
+    onPreviewChange: vi.fn(),
+    onPreviewReset,
+    palette: ['#abcdef'],
+    recentColors: ['#123456'],
+    value: '#123456',
+  });
+
+  act(() => {
+    state?.handleOpenPicker();
+    state?.handleDraftColorChange('#abcdef');
+  });
+  act(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  });
+
+  expect(state?.pickerOpen).toBe(false);
+  expect(state?.draftColor).toBe('#123456');
+  expect(onPreviewReset).toHaveBeenCalledWith('#123456');
+});
+
 it('hides the picker and rolls back when choose-color is pressed again while editing', () => {
   const onChange = vi.fn();
   const onPreviewReset = vi.fn();

@@ -64,6 +64,7 @@ export const COVERAGE_ROLLOUT_GROUPS = [
     id: 'ui-product-surfaces',
     threshold: 'ui',
     prefixes: [
+      'apps/extension/src/ui/highlighter-preset-editor/',
       'apps/extension/src/popup',
       'apps/extension/src/settings',
       'apps/extension/src/gallery',

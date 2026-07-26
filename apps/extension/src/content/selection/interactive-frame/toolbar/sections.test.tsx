@@ -56,5 +56,10 @@ describe('InteractiveFrameToolbarEffectButtons', () => {
     });
 
     expect(hasKeySpreadWarning(consoleErrorSpy.mock.calls)).toBe(false);
+    expect(
+      [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].every(
+        (button) => button.dataset['sniptaleActivationBridge'] === 'defer'
+      )
+    ).toBe(true);
   });
 });

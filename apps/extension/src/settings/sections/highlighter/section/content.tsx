@@ -1,5 +1,5 @@
 import { translate } from '../../../../platform/i18n';
-import { BorderPresetEditor } from '../border-preset-editor';
+import { BorderPresetEditor } from '../../../../ui/highlighter-preset-editor';
 import { settingsSectionClassName, SettingsSectionHeader } from '../../../section-surface';
 import { HighlighterEffectsPanel } from './effects-panel';
 import { HighlighterPresetsPanel } from './presets-panel';

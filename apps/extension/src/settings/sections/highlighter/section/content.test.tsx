@@ -30,7 +30,7 @@ vi.mock('./presets-panel', () => ({
   },
 }));
 
-vi.mock('../border-preset-editor', () => ({
+vi.mock('../../../../ui/highlighter-preset-editor', () => ({
   BorderPresetEditor: (props: unknown) => {
     borderPresetEditorPropsSpy(props);
     return <div data-testid="border-preset-editor">editor</div>;

@@ -172,6 +172,11 @@ describe('InteractiveFrame size edit interactions', () => {
       translate('common.actions.close'),
     ]);
     expect(toolbar?.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(4);
+    expect(
+      [
+        ...(toolbar?.querySelectorAll<HTMLButtonElement>('[data-menu-indicator="true"]') ?? []),
+      ].every((button) => button.dataset['sniptaleActivationBridge'] === 'defer')
+    ).toBe(true);
   });
 
   it('closes the selected toolbar without deleting the frame', () => {

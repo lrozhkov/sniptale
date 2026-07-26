@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect } from 'react';
+import { type CSSProperties, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppLocale } from '../../platform/i18n';
 import {
@@ -14,6 +14,7 @@ import { ColorSelectorPickerPopover } from './picker-popover';
 import { useColorSelectorState } from '@sniptale/ui/color-selector/state';
 import { ColorSelectorTrigger } from './trigger';
 import type { CompactColorSelectorProps } from '@sniptale/ui/color-selector/types';
+import { FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
 
 export type { CompactColorSelectorProps } from '@sniptale/ui/color-selector/types';
 
@@ -45,6 +46,7 @@ type ColorSelectorPanelsProps = {
   cycleFormatMode: () => void;
   draftColor: string;
   expanded: boolean;
+  floatingOwnerId: string;
   formatMode: ReturnType<typeof useColorSelectorState>['formatMode'];
   normalizedPalette: readonly string[];
   normalizedRecentColors: readonly string[];
@@ -74,6 +76,7 @@ function ColorSelectorExpandedLayer(
   return (
     <ColorSelectorFloatingLayer
       layerRef={props.state.layerRef}
+      ownerId={props.floatingOwnerId}
       portalTheme={props.portalTheme}
       style={props.layerStyle}
       ui="shared.ui.color-selector.expanded-layer"
@@ -102,6 +105,7 @@ function ColorSelectorPickerLayer(
   return (
     <ColorSelectorFloatingLayer
       layerRef={props.state.layerRef}
+      ownerId={props.floatingOwnerId}
       portalTheme={props.portalTheme}
       style={props.layerStyle}
       ui="shared.ui.color-selector.picker-layer"
@@ -142,6 +146,7 @@ function ColorSelectorPanels(props: ColorSelectorPanelsProps) {
 
 function ColorSelectorBody(props: {
   className: string | undefined;
+  floatingOwnerId: string;
   label: string;
   state: ReturnType<typeof useColorSelectorState>;
   title: string;
@@ -149,6 +154,7 @@ function ColorSelectorBody(props: {
   return (
     <div
       ref={props.state.rootRef}
+      {...{ [FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE]: props.floatingOwnerId }}
       data-ui="shared.ui.color-selector"
       data-open={props.state.expanded || props.state.pickerOpen ? 'true' : 'false'}
       className={
@@ -171,6 +177,7 @@ function ColorSelectorBody(props: {
         cycleFormatMode={props.state.cycleFormatMode}
         draftColor={props.state.draftColor}
         expanded={props.state.expanded}
+        floatingOwnerId={props.floatingOwnerId}
         formatMode={props.state.formatMode}
         normalizedPalette={props.state.normalizedPalette}
         normalizedRecentColors={props.state.normalizedRecentColors}
@@ -203,6 +210,7 @@ export function CompactColorSelector({
   value,
 }: CompactColorSelectorProps) {
   useAppLocale();
+  const floatingOwnerId = useId();
   const state = useColorSelectorState({
     onChange,
     onPreviewChange,
@@ -216,5 +224,13 @@ export function CompactColorSelector({
     onOpenChange?.(open);
   }, [onOpenChange, open]);
 
-  return <ColorSelectorBody className={className} label={label} state={state} title={title} />;
+  return (
+    <ColorSelectorBody
+      className={className}
+      floatingOwnerId={floatingOwnerId}
+      label={label}
+      state={state}
+      title={title}
+    />
+  );
 }

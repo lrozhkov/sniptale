@@ -270,7 +270,7 @@ it('hides the picker and rolls back when the color trigger is clicked again', as
   expect(onPreviewReset).toHaveBeenCalledWith('#123456');
 });
 
-it('keeps the picker open on escape without committing the draft', async () => {
+it('closes the picker on escape and rolls back the draft without committing it', async () => {
   const onChange = vi.fn();
   const onPreviewChange = vi.fn();
   const onPreviewReset = vi.fn();
@@ -283,7 +283,7 @@ it('keeps the picker open on escape without committing the draft', async () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   });
 
-  expect(getButton('shared.ui.colorSelectorApply')).toBeDefined();
+  expect(getButton('shared.ui.colorSelectorApply')).toBeUndefined();
   expect(onChange).not.toHaveBeenCalled();
-  expect(onPreviewReset).not.toHaveBeenCalled();
+  expect(onPreviewReset).toHaveBeenCalledWith('#123456');
 });

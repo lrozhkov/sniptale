@@ -22,9 +22,11 @@ interface FrameSettingsDraft {
   localBlurSettings: BlurSettings;
   localFocusSettings: FocusSettings;
   selectedPresetId: string;
+  visiblePresetIds: string[];
 }
 
 interface FrameSettingsLifecycleState {
+  catalogRevision: number;
   dirty: { blur: boolean; focus: boolean };
   previousOpen: boolean;
   source: {
@@ -43,7 +45,14 @@ function createInitialDraft(): FrameSettingsDraft {
     localBlurSettings: { ...DEFAULT_BLUR_SETTINGS },
     localFocusSettings: getDefaultFocusSettings(),
     selectedPresetId: DEFAULT_BORDER_PRESET.id,
+    visiblePresetIds: [DEFAULT_BORDER_PRESET.id],
   };
+}
+
+function getEnabledPresetIds(settings: HighlighterSettings): string[] {
+  return settings.borderPresets
+    .filter((preset) => preset.enabled !== false)
+    .map((preset) => preset.id);
 }
 
 function createLifecycleState(args: {
@@ -52,6 +61,7 @@ function createLifecycleState(args: {
   focusSettings?: FocusSettings;
 }): FrameSettingsLifecycleState {
   return {
+    catalogRevision: 0,
     dirty: { blur: false, focus: false },
     previousOpen: false,
     source: {
@@ -71,6 +81,7 @@ function applyLoadedFrameSettingsDefaults(
   setDraft((current) => ({
     ...current,
     globalSettings: settings,
+    visiblePresetIds: getEnabledPresetIds(settings),
     ...(!source.blur && !dirty.blur && settings.defaultBlurSettings
       ? { localBlurSettings: { ...settings.defaultBlurSettings } }
       : {}),
@@ -89,9 +100,10 @@ function useFrameSettingsDefaultsLoad(
     if (!isOpen) return;
 
     let cancelled = false;
+    const loadRevision = lifecycleRef.current.catalogRevision;
     void loadHighlighterSettings()
       .then((settings) => {
-        if (!cancelled) {
+        if (!cancelled && lifecycleRef.current.catalogRevision === loadRevision) {
           applyLoadedFrameSettingsDefaults(settings, lifecycleRef, setDraft);
         }
       })
@@ -123,6 +135,7 @@ function syncFrameSettingsPopoverOpenState(
       selectedPresetId: lifecycle.source.border?.id ?? DEFAULT_BORDER_PRESET.id,
       localBlurSettings: { ...(lifecycle.source.blur ?? DEFAULT_BLUR_SETTINGS) },
       localFocusSettings: { ...(lifecycle.source.focus ?? getDefaultFocusSettings()) },
+      visiblePresetIds: getEnabledPresetIds(current.globalSettings),
     }));
   } else if (!isOpen && lifecycle.previousOpen) {
     pagePreparationHistory.commitTransaction(transactionKey);
@@ -168,20 +181,37 @@ export function useFrameSettingsPopoverLifecycle(args: {
   useFrameSettingsOpenTransaction(args.frameId, args.isOpen, lifecycleRef, setDraft);
 
   return {
-    applyBlurSettingsFromUser: (settings: BlurSettings) => {
-      lifecycleRef.current.dirty.blur = true;
-      setDraft((current) => ({ ...current, localBlurSettings: settings }));
+    catalog: {
+      globalSettings: draft.globalSettings,
+      reconcileCatalogSettings: (settings: HighlighterSettings, revealPresetId?: string) => {
+        lifecycleRef.current.catalogRevision += 1;
+        setDraft((current) => {
+          const visiblePresetIds =
+            revealPresetId && !current.visiblePresetIds.includes(revealPresetId)
+              ? [...current.visiblePresetIds, revealPresetId]
+              : current.visiblePresetIds;
+          return { ...current, globalSettings: settings, visiblePresetIds };
+        });
+      },
+      visibleBorderPresets: draft.globalSettings.borderPresets.filter((preset) =>
+        draft.visiblePresetIds.includes(preset.id)
+      ),
     },
-    applyFocusSettingsFromUser: (settings: FocusSettings) => {
-      lifecycleRef.current.dirty.focus = true;
-      setDraft((current) => ({ ...current, localFocusSettings: settings }));
+    frame: {
+      applyBlurSettingsFromUser: (settings: BlurSettings) => {
+        lifecycleRef.current.dirty.blur = true;
+        setDraft((current) => ({ ...current, localBlurSettings: settings }));
+      },
+      applyFocusSettingsFromUser: (settings: FocusSettings) => {
+        lifecycleRef.current.dirty.focus = true;
+        setDraft((current) => ({ ...current, localFocusSettings: settings }));
+      },
+      localBlurSettings: draft.localBlurSettings,
+      localFocusSettings: draft.localFocusSettings,
+      selectPreset: (presetId: string) => {
+        setDraft((current) => ({ ...current, selectedPresetId: presetId }));
+      },
+      selectedPresetId: draft.selectedPresetId,
     },
-    globalSettings: draft.globalSettings,
-    localBlurSettings: draft.localBlurSettings,
-    localFocusSettings: draft.localFocusSettings,
-    selectPreset: (presetId: string) => {
-      setDraft((current) => ({ ...current, selectedPresetId: presetId }));
-    },
-    selectedPresetId: draft.selectedPresetId,
   };
 }

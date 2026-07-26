@@ -38,24 +38,24 @@ export const SETTINGS_OWNER_MAPPINGS = [
   },
   {
     exclusive: true,
-    owner: 'settings-highlighter-field-sections',
+    owner: 'highlighter-preset-editor-field-sections',
     productionFile:
-      'apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/basic-settings.tsx',
+      'apps/extension/src/ui/highlighter-preset-editor/fields/sections/basic-settings.tsx',
     reason: 'Highlighter field sections are covered by their interaction suites.',
     testFiles: [
-      'apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/index.test.tsx',
-      'apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/padding-fields.test.tsx',
+      'apps/extension/src/ui/highlighter-preset-editor/fields/sections/index.test.tsx',
+      'apps/extension/src/ui/highlighter-preset-editor/fields/sections/padding-fields.test.tsx',
     ],
   },
   {
     exclusive: true,
-    owner: 'settings-highlighter-field-sections',
+    owner: 'highlighter-preset-editor-field-sections',
     productionFile:
-      'apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/custom-css-field.tsx',
+      'apps/extension/src/ui/highlighter-preset-editor/fields/sections/custom-css-field.tsx',
     reason: 'Highlighter field sections are covered by their interaction suites.',
     testFiles: [
-      'apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/index.test.tsx',
-      'apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/padding-fields.test.tsx',
+      'apps/extension/src/ui/highlighter-preset-editor/fields/sections/index.test.tsx',
+      'apps/extension/src/ui/highlighter-preset-editor/fields/sections/padding-fields.test.tsx',
     ],
   },
   {

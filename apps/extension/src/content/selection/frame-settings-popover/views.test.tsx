@@ -3,6 +3,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { EffectMode } from '../../../features/highlighter/contracts';
+import { translate } from '../../../platform/i18n';
 import { FrameSettingsPopoverContent } from './views';
 
 function createBorderPreset(id: string, name: string) {
@@ -30,7 +31,10 @@ function renderContent(effectMode: EffectMode) {
     <FrameSettingsPopoverContent
       effectMode={effectMode}
       globalSettings={{
-        borderPresets: [createBorderPreset('preset-1', 'Default')],
+        borderPresets: [
+          createBorderPreset('preset-1', 'Default'),
+          createBorderPreset('preset-2', 'Secondary'),
+        ],
         defaultBorderPresetId: 'preset-1',
         defaultEffectMode: 'border',
         systemPresetCatalogRevision: 1,
@@ -42,9 +46,13 @@ function renderContent(effectMode: EffectMode) {
       handleBlurTypeChange={vi.fn()}
       handleFocusChange={vi.fn()}
       handleFocusShowBorderChange={vi.fn()}
+      handleAddPreset={vi.fn()}
+      handleEditPreset={vi.fn()}
       handleSelectPreset={vi.fn()}
+      handleTogglePresetEnabled={vi.fn()}
       localBlurSettings={{ amount: 12, blurType: 'distortion', showBorder: true }}
       localFocusSettings={{ opacity: 0.65, showBorder: true }}
+      pendingPresetIds={new Set()}
       selectedPresetId="preset-1"
     />
   );
@@ -57,6 +65,17 @@ describe('FrameSettingsPopoverContent', () => {
     expect(markup).toContain('shared.ui.content-popover-section');
     expect(markup).toContain('sniptale-content-popover-section');
     expect(markup).toContain('Default');
+  });
+
+  it('exposes quiet edit and visibility actions plus a trailing add action', () => {
+    const markup = renderContent('border');
+
+    expect(markup).toContain('sniptale-frame-style-section');
+    expect(markup).toContain('sniptale-frame-style-preset-actions');
+    expect(markup).toContain(translate('content.overlayControls.configureFrameStyle'));
+    expect(markup).toContain(translate('content.overlayControls.hideFrameStyle'));
+    expect(markup).toContain(translate('content.overlayControls.addFrameStyle'));
+    expect(markup).toContain('sniptale-frame-style-add');
   });
 
   it('renders blur and focus controls inside the shared section contract', () => {

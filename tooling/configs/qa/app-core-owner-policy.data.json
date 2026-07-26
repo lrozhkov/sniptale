@@ -137,6 +137,11 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/ui/highlighter-preset-editor",
+      "ownerId": "app-core.highlighter-preset-editor-ui",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/ui/keyboard",
       "ownerId": "app-core.keyboard-ui",
       "ownerClass": "app-core"
@@ -592,6 +597,7 @@
     "apps/extension/src/ui/compact-inspector-controls",
     "apps/extension/src/ui/glass-select",
     "apps/extension/src/ui/gradient-preset-grid",
+    "apps/extension/src/ui/highlighter-preset-editor",
     "apps/extension/src/ui/keyboard",
     "apps/extension/src/ui/page-bootstrap",
     "apps/extension/src/ui/popup-shell",

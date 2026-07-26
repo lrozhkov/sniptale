@@ -11,6 +11,8 @@
 :host(.sniptale-capture-ui-hidden) .sniptale-frame-toolbar-trigger,
 :host(.sniptale-capture-ui-hidden) .sniptale-frame-toolbar-bridge,
 :host(.sniptale-capture-ui-hidden) .sniptale-frame-settings-popover,
+:host(.sniptale-capture-ui-hidden) .sniptale-frame-style-editor-layer,
+:host(.sniptale-capture-ui-hidden) [data-floating-ui-capture-transient='true'],
 :host(.sniptale-capture-ui-hidden) .sniptale-step-badge-popover,
 :host(.sniptale-capture-ui-hidden) .sniptale-callout-settings-popover,
 :host(.sniptale-capture-ui-hidden) .sniptale-callout-format-toolbar,

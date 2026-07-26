@@ -268,13 +268,6 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'content-frame-settings-popover-bindings',
-    productionFile: 'apps/extension/src/content/selection/frame-settings-popover/bindings.ts',
-    reason:
-      'Frame-settings popover binding and close ordering are exercised through the public surface suite.',
-    testFiles: ['apps/extension/src/content/selection/frame-settings-popover/index.test.tsx'],
-  },
-  {
     owner: 'content-frame-settings-popover-state',
     productionFile: 'apps/extension/src/content/selection/frame-settings-popover/state/index.ts',
     reason:

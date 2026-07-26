@@ -61,14 +61,16 @@ export function ProductGlassPresetMeta({
   );
 }
 
-export function ProductGlassPresetName({
-  children,
-  className = '',
-  ...props
-}: HTMLAttributes<HTMLSpanElement>) {
-  return (
-    <span className={joinClassNames('sniptale-glass-preset-name', className)} {...props}>
-      {children}
-    </span>
-  );
-}
+export const ProductGlassPresetName = forwardRef<HTMLSpanElement, HTMLAttributes<HTMLSpanElement>>(
+  function ProductGlassPresetName({ children, className = '', ...props }, ref) {
+    return (
+      <span
+        ref={ref}
+        className={joinClassNames('sniptale-glass-preset-name', className)}
+        {...props}
+      >
+        {children}
+      </span>
+    );
+  }
+);
