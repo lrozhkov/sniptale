@@ -24,5 +24,10 @@ export {
 export { waitForAccessibleIframeReady, type AccessibleIframeReadyResult } from './ready';
 export { addScrollListenersToAllWindows } from './scroll-listeners';
 export { findElementBySelector } from './selectors';
-export { clearAllSniptaleIds, findElementBySniptaleId } from './sniptale';
+export {
+  clearAllSniptaleIds,
+  clearRetainedSniptaleIds,
+  findElementBySniptaleId,
+  retainSniptaleId,
+} from './sniptale';
 export { resolveIframeEventTarget } from './target';

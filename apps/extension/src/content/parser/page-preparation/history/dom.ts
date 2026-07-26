@@ -1,4 +1,8 @@
-import { findElementBySelector } from '../../../platform/frame';
+import {
+  clearRetainedSniptaleIds,
+  findElementBySelector,
+  retainSniptaleId,
+} from '../../../platform/frame';
 import { createCompositeSelector } from '../../../platform/frame/selectors';
 import { sanitizeHtmlFragment } from '@sniptale/platform/security/sanitizers/html';
 import { hasUnsafeHistoryAttributes, normalizeHistoryAttributes } from './attributes';
@@ -60,6 +64,7 @@ const HISTORY_DOM_SANITIZER_OPTIONS = {
   ],
 };
 let pagePreparationHistoryElementId = 0;
+const retainedHistoryLocatorIds = new Set<string>();
 
 function replaceWithSanitizedFragment(target: HTMLElement, html: string): void {
   const sanitizedHtml = sanitizeHtmlFragment(html, HISTORY_DOM_SANITIZER_OPTIONS);
@@ -70,12 +75,20 @@ function replaceWithSanitizedFragment(target: HTMLElement, html: string): void {
 }
 
 function ensureStableHistoryLocator(element: HTMLElement): void {
-  if (element.dataset['sniptaleId']) {
-    return;
+  let id = element.dataset['sniptaleId'];
+  if (!id) {
+    pagePreparationHistoryElementId += 1;
+    id = `history-${pagePreparationHistoryElementId}`;
+    element.dataset['sniptaleId'] = id;
   }
 
-  pagePreparationHistoryElementId += 1;
-  element.dataset['sniptaleId'] = `history-${pagePreparationHistoryElementId}`;
+  retainedHistoryLocatorIds.add(id);
+  retainSniptaleId(id);
+}
+
+export function clearHistoryDomLocators(): void {
+  clearRetainedSniptaleIds(retainedHistoryLocatorIds);
+  retainedHistoryLocatorIds.clear();
 }
 
 function buildCompositeLocator(element: HTMLElement): string {

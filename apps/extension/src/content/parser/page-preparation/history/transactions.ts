@@ -10,6 +10,7 @@ import type {
   PageDomMutationBatch,
   PagePreparationHistoryEntry,
 } from './types';
+import { clearHistoryDomLocators } from './dom';
 
 type HistoryEntryArgs = {
   after?: FrameSessionSnapshot | null;
@@ -177,6 +178,7 @@ function createTransactionCommitApi(state: HistoryStoreRuntimeState) {
       state.future = [];
       state.deferredCommits.clear();
       state.transactions.clear();
+      clearHistoryDomLocators();
       publishHistoryState(state);
     },
     commitEntry(args: HistoryEntryArgs): void {

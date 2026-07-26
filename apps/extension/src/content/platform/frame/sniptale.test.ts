@@ -136,4 +136,24 @@ describe('iframe-utils-sniptale cleanup flow', () => {
       (nestedDoc.querySelector('[data-sniptale-id]') as HTMLElement | null)?.dataset['sniptaleId']
     ).toBeUndefined();
   });
+
+  it('preserves retained history locators until their owner clears them', async () => {
+    const retainedNode = document.createElement('div');
+    retainedNode.dataset['sniptaleId'] = 'retained';
+    const transientNode = document.createElement('div');
+    transientNode.dataset['sniptaleId'] = 'transient';
+    document.body.append(retainedNode, transientNode);
+    iframeCoreMocks.getAccessibleIframesMock.mockReturnValue([]);
+
+    const { clearAllSniptaleIds, clearRetainedSniptaleIds, retainSniptaleId } =
+      await import('./sniptale');
+    retainSniptaleId('retained');
+    clearAllSniptaleIds();
+
+    expect(retainedNode.dataset['sniptaleId']).toBe('retained');
+    expect(transientNode.dataset['sniptaleId']).toBeUndefined();
+
+    clearRetainedSniptaleIds(['retained']);
+    expect(retainedNode.dataset['sniptaleId']).toBeUndefined();
+  });
 });
