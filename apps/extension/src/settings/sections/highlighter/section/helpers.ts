@@ -20,7 +20,6 @@ export function getHighlighterPresetPreviewStyle(preset: BorderPreset): React.CS
     borderStyle: preset.style,
     borderColor: colorToRgba(preset.color, preset.strokeOpacity),
     borderRadius: `${Math.min(preset.radius, 8)}px`,
-    opacity: preset.opacity / 100,
     backgroundColor: colorToRgba(preset.fillColor, preset.fillOpacity),
     boxShadow: shadowVisual.settingsRowBoxShadow,
   };

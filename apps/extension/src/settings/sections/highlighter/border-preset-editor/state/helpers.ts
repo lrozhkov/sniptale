@@ -22,7 +22,7 @@ export function applyBorderPresetDraftState(
   setters.setStrokeOpacity(nextPreset.strokeOpacity);
   setters.setFillColor(nextPreset.fillColor);
   setters.setFillOpacity(nextPreset.fillOpacity);
-  setters.setInheritCustomCss(nextPreset.inheritCustomCss);
+  setters.setInheritCustomCss(Boolean(nextPreset.customCss.trim()));
   setters.setCustomCss(nextPreset.customCss);
 }
 

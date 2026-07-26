@@ -9,35 +9,20 @@ vi.mock('../../../../../../platform/i18n', () => ({
   translate: (key: string) => key,
 }));
 
-vi.mock('../../../../../section-surface', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../section-surface')>()),
-  SettingsRangeField: ({
-    displaySuffix,
+vi.mock('../../../../../../ui/color-selector', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../../ui/color-selector')>()),
+  CompactColorSelector: ({
     label,
-    max,
-    min,
     onChange,
     value,
   }: {
-    displaySuffix?: string;
     label: string;
-    max: string;
-    min: string;
-    onChange: (event: { target: { value: string } }) => void;
-    value: number;
+    onChange: (value: string) => void;
+    value: string;
   }) => (
-    <label>
-      <span>{label}</span>
-      <input
-        data-testid="settings-range"
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        data-suffix={displaySuffix}
-        onChange={(event) => onChange({ target: { value: event.currentTarget.value } })}
-      />
-    </label>
+    <button type="button" data-testid="compact-color-selector" onClick={() => onChange('#123456')}>
+      {label}:{value}
+    </button>
   ),
 }));
 
@@ -122,10 +107,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders preview state and error feedback', async () => {
+it('renders the text-backed preview state and error feedback', async () => {
   await renderUi(<EditorPreview state={createState() as never} />);
 
   expect(container?.textContent).toContain('highlighter.editor.previewLabel');
+  expect(container?.textContent).toContain('highlighter.editor.previewSampleText');
 
   await renderUi(<EditorPreview state={createState({ cssError: 'invalid-css' }) as never} />);
 
@@ -133,39 +119,37 @@ it('renders preview state and error feedback', async () => {
   expect(container?.querySelector('.border-2')).toBeTruthy();
 });
 
-it('wires basic settings through range, color, and style controls', async () => {
+it('wires compact color selectors, ranges, and style controls without compatibility', async () => {
   const state = createState({ fillColor: 'transparent' });
 
   await renderUi(<EditorBasicSettings state={state as never} />);
 
-  const colorInputs = Array.from(container?.querySelectorAll('input[type="text"]') ?? []);
-  const colorPickers = Array.from(
-    container?.querySelectorAll<HTMLInputElement>('input[type="color"]') ?? []
+  const colorSelectors = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('[data-testid="compact-color-selector"]') ?? []
   );
   const ranges = Array.from(
-    container?.querySelectorAll<HTMLInputElement>('input[data-testid="settings-range"]') ?? []
+    container?.querySelectorAll<HTMLInputElement>('input[type="range"]') ?? []
   );
 
-  expect(colorPickers[1]?.value).toBe('#000000');
+  expect(colorSelectors).toHaveLength(2);
+  expect(container?.textContent).not.toContain('highlighter.editor.opacityLabel');
 
   await act(async () => {
-    setInputValue(colorPickers[0] as HTMLInputElement, '#00ff00');
-    setInputValue(colorInputs[0] as HTMLInputElement, '#123456');
+    colorSelectors[0]?.click();
+    colorSelectors[1]?.click();
     setInputValue(ranges[0] as HTMLInputElement, '7');
     setInputValue(ranges[1] as HTMLInputElement, '8');
     setInputValue(ranges[2] as HTMLInputElement, '65');
-    setInputValue(ranges[4] as HTMLInputElement, '55');
     Array.from(container?.querySelectorAll('button') ?? [])
       .find((button) => button.textContent?.includes('highlighter.editor.styleSolid'))
       ?.click();
   });
 
-  expect(state.setColor).toHaveBeenCalledWith('#00ff00');
   expect(state.setColor).toHaveBeenCalledWith('#123456');
+  expect(state.setFillColor).toHaveBeenCalledWith('#123456');
   expect(state.setWidth).toHaveBeenCalledWith(7);
   expect(state.setRadius).toHaveBeenCalledWith(8);
   expect(state.setStrokeOpacity).toHaveBeenCalledWith(65);
-  expect(state.setOpacity).toHaveBeenCalledWith(55);
   expect(state.setStyle).toHaveBeenCalledWith('solid');
 });
 
@@ -189,12 +173,9 @@ it('wires shadow, padding, and custom-css controls', async () => {
 
   await act(async () => {
     setInputValue(
-      container?.querySelector<HTMLInputElement>(
-        'input[data-testid="settings-range"]'
-      ) as HTMLInputElement,
+      container?.querySelector<HTMLInputElement>('input[type="range"]') as HTMLInputElement,
       '100'
     );
-    container?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
     setInputValue(numberInputs[0] as HTMLInputElement, '11');
     setInputValue(numberInputs[3] as HTMLInputElement, '14');
     setInputValue(container?.querySelector('textarea') as HTMLTextAreaElement, 'border: 1px solid');
@@ -204,6 +185,7 @@ it('wires shadow, padding, and custom-css controls', async () => {
   });
 
   expect(state.setShadow).toHaveBeenCalledWith(100);
+  expect(container?.querySelector('input[type="checkbox"]')).toBeNull();
   expect(state.setInheritCustomCss).toHaveBeenCalledWith(true);
   expect(state.updatePadding).toHaveBeenCalledWith('top', 11);
   expect(state.updatePadding).toHaveBeenCalledWith('left', 14);

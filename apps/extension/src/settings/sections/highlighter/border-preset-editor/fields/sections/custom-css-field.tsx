@@ -5,27 +5,25 @@ import type { EditorState } from '../types';
 export function EditorCustomCssField({ state }: { state: EditorState }) {
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-between gap-3">
+      <div className="mb-1.5 flex items-baseline gap-2">
         <label className="block text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('highlighter.editor.customCssLabel')}
-          <span className="ml-2 text-[var(--sniptale-color-text-dim)]">
-            {translate('highlighter.editor.customCssHint')}
-          </span>
         </label>
-        <label className="flex items-center gap-2 text-xs text-[var(--sniptale-color-text-secondary)]">
-          <input
-            type="checkbox"
-            checked={state.inheritCustomCss}
-            onChange={(event) => state.setInheritCustomCss(event.target.checked)}
-            className="h-4 w-4 accent-[var(--sniptale-color-accent)]"
-          />
-          {translate('highlighter.editor.inheritCustomCssLabel')}
-        </label>
+        <span
+          title={translate('highlighter.editor.customCssHint')}
+          className="truncate text-[11px] text-[var(--sniptale-color-text-dim)]"
+        >
+          {translate('highlighter.editor.customCssHint')}
+        </span>
       </div>
       <div className="relative">
         <textarea
           value={state.customCss}
-          onChange={(event) => state.setCustomCss(event.target.value)}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            state.setCustomCss(nextValue);
+            state.setInheritCustomCss(Boolean(nextValue.trim()));
+          }}
           placeholder={translate('highlighter.editor.customCssPlaceholder')}
           style={{ height: `${state.textareaHeight}px` }}
           className={editorTextareaClassName}

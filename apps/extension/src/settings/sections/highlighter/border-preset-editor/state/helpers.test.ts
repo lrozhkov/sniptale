@@ -56,7 +56,7 @@ describe('border-preset-editor-state draft setters', () => {
       strokeOpacity: 66,
       fillColor: '#00ff00',
       fillOpacity: 35,
-      inheritCustomCss: true,
+      inheritCustomCss: false,
       customCss: 'color: red;',
     };
 
@@ -69,6 +69,8 @@ describe('border-preset-editor-state draft setters', () => {
     expect(setters.setWidth).toHaveBeenNthCalledWith(2, 3);
     expect(setters.setCustomCss).toHaveBeenNthCalledWith(1, 'color: red;');
     expect(setters.setCustomCss).toHaveBeenNthCalledWith(2, '');
+    expect(setters.setInheritCustomCss).toHaveBeenNthCalledWith(1, true);
+    expect(setters.setInheritCustomCss).toHaveBeenNthCalledWith(2, false);
   });
 });
 

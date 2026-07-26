@@ -160,11 +160,15 @@ function expectSharedModalState(state: EditorState) {
     expect.objectContaining({
       accent: 'compact',
       isOpen: true,
-      maxHeight: '88vh',
-      maxWidth: '95vw',
+      maxHeight: '86vh',
+      maxWidth: '94vw',
       scrollable: true,
-      width: '720px',
+      width: '660px',
     })
+  );
+
+  expect(container?.querySelector('[data-testid="product-modal-body"]')?.className).toContain(
+    'space-y-4'
   );
 }
 

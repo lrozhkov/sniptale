@@ -43,6 +43,10 @@ describe('highlighter-section helpers', () => {
 
   it('builds preview styles for each supported shadow level', verifyPreviewShadowStyles);
 
+  it('does not apply the retired compatibility opacity to the preset preview', () => {
+    expect(getHighlighterPresetPreviewStyle(createPreset({ opacity: 20 })).opacity).toBeUndefined();
+  });
+
   it('reorders presets and returns null when either id is missing', () => {
     const first = createPreset({ id: 'preset-1', order: 0 });
     const second = createPreset({ id: 'preset-2', order: 1 });

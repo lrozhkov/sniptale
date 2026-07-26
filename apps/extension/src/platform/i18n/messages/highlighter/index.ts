@@ -176,6 +176,10 @@ export const highlighterMessages = defineMessageSource({
       ru: 'Превью',
       en: 'Preview',
     },
+    previewSampleText: {
+      ru: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer vitae lectus vel erat consequat posuere.',
+      en: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer vitae lectus vel erat consequat posuere.',
+    },
     borderColorLabel: {
       ru: 'Цвет рамки',
       en: 'Border color',
@@ -207,10 +211,6 @@ export const highlighterMessages = defineMessageSource({
     radiusLabel: {
       ru: 'Скругление',
       en: 'Radius',
-    },
-    opacityLabel: {
-      ru: 'Совместимость',
-      en: 'Compatibility',
     },
     strokeOpacityLabel: {
       ru: 'Прозрачность линии',
@@ -263,10 +263,6 @@ export const highlighterMessages = defineMessageSource({
     customCssHint: {
       ru: '(безопасные свойства: background, font, text-*)',
       en: '(safe properties: background, font, text-*)',
-    },
-    inheritCustomCssLabel: {
-      ru: 'Наследовать',
-      en: 'Inherit',
     },
     customCssPlaceholder: {
       ru: 'background: rgba(249,115,22,0.1); font-weight: bold;',
