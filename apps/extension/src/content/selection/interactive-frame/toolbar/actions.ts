@@ -52,6 +52,7 @@ export function enableFrameStepBadge(
 
 export function startFrameCalloutEditing(
   props: Pick<InteractiveFrameToolbarProps, 'closePopover' | 'setIsCalloutEditing' | 'setState'> & {
+    clearSelection?: InteractiveFrameToolbarProps['clearSelection'];
     frameId: string;
   }
 ) {
@@ -60,6 +61,7 @@ export function startFrameCalloutEditing(
   dispatchCalloutEnable(props.frameId);
   props.setState('idle');
   props.setIsCalloutEditing(true);
+  props.clearSelection?.();
 }
 
 export function createInteractiveFrameToolbarActions(props: InteractiveFrameToolbarProps) {
@@ -83,6 +85,7 @@ export function createInteractiveFrameToolbarActions(props: InteractiveFrameTool
       const hasCallout = props.frame.callout?.enabled ?? false;
       if (!hasCallout) {
         startFrameCalloutEditing({
+          clearSelection: props.clearSelection,
           closePopover: props.closePopover,
           frameId: props.frame.id,
           setIsCalloutEditing: props.setIsCalloutEditing,
