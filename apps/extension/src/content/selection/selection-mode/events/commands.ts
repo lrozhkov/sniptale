@@ -75,6 +75,6 @@ export function handleSelectionModeKeyDown(
   if (event.key === 'Enter' && state.currentState === 'confirmed') {
     event.preventDefault();
     logSelectionModeKeyAction('confirm', state);
-    options.confirmSelection();
+    options.confirmSelection(event);
   }
 }

@@ -87,7 +87,7 @@ function createCaptureMenuItem(
     event.stopPropagation();
     closeSelectionCaptureActionMenu(options.overlayContainer, false);
     options.onCaptureActionChange(descriptor.value);
-    options.onConfirm();
+    options.onConfirm(event);
   });
   return button;
 }

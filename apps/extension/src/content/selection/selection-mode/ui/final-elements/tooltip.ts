@@ -40,6 +40,6 @@ export function wireSelectionModeFinalSizeTooltipActions(
   sizeTooltip.confirmButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    options.onConfirm();
+    options.onConfirm(event);
   });
 }

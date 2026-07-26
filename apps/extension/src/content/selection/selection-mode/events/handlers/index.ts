@@ -13,7 +13,7 @@ import {
 type SelectionModeEventHandlersDeps = {
   cancelSelection: () => void;
   closeCaptureActionMenu: (restoreFocus: boolean) => boolean;
-  confirmSelection: () => void;
+  confirmSelection: (event?: Event) => void;
   handleDragMove: (event: MouseEvent) => void;
   handleResizeMove: (event: MouseEvent) => void;
   hideHoverFrame: () => void;

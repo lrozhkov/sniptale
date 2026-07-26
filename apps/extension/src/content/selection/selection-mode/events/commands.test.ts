@@ -180,7 +180,7 @@ function registerKeyboardCommandTest() {
     handleSelectionModeKeyDown(enterEvent, state, options);
 
     expect(options.cancelSelection).toHaveBeenCalledTimes(1);
-    expect(options.confirmSelection).toHaveBeenCalledTimes(1);
+    expect(options.confirmSelection).toHaveBeenCalledWith(enterEvent);
     expect(inputEvent.preventDefault).not.toHaveBeenCalled();
     expect(escapeEvent.preventDefault).toHaveBeenCalledOnce();
     expect(enterEvent.preventDefault).toHaveBeenCalledOnce();

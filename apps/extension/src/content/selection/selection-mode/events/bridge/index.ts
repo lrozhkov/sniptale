@@ -44,7 +44,7 @@ export function createSelectionModeEventsBridge(args: SelectionModeEventsBridgeA
 }
 
 function createSelectionModeConfirmSelection(args: SelectionModeEventsBridgeArgs) {
-  return () => {
+  return (event?: Event) => {
     const area = buildSelectionCaptureArea(args.runtimeArgs.state.currentSelection);
     const resolveCallback = args.runtimeArgs.state.resolveCallback;
 
@@ -54,6 +54,9 @@ function createSelectionModeConfirmSelection(args: SelectionModeEventsBridgeArgs
     });
 
     try {
+      if (event) {
+        args.runtimeArgs.state.onConfirmEvent?.(event);
+      }
       args.cleanupEvent();
       logSelectionModeDiag('confirmSelection.after-cleanup');
       disableNavigationLock();

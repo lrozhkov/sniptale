@@ -10,7 +10,7 @@ export const SELECTION_CAPTURE_MENU_ID = 'sniptale-selection-capture-action-menu
 export interface SelectionCaptureActionOptions {
   getCaptureAction: () => CaptureActionType;
   onCaptureActionChange: (action: CaptureActionType) => void;
-  onConfirm: () => void;
+  onConfirm: (event?: Event) => void;
   overlayContainer: HTMLElement;
 }
 

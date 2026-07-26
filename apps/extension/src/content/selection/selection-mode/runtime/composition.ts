@@ -72,7 +72,7 @@ export function createSelectionModeRuntime(args: {
       args.session.captureAction = action;
       args.session.onCaptureActionChange?.(action);
     },
-    onConfirm: () => getEvents().confirmSelection(),
+    onConfirm: (event) => getEvents().confirmSelection(event),
     onResetToIdle: () => getEvents().resetToIdleState(),
     onSetupSizePanelListeners: setupSizePanelListeners,
     overlayBackground: OVERLAY_BACKGROUND,

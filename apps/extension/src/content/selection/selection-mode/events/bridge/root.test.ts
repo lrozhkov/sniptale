@@ -62,9 +62,10 @@ vi.mock('../../runtime/drag', () => ({
 }));
 
 function createBridge(
-  overrides: Partial<Parameters<typeof createSelectionModeEventsBridge>[0]> = {}
+  overrides: Partial<Parameters<typeof createSelectionModeEventsBridge>[0]> = {},
+  session = createSelectionModeSession()
 ) {
-  const state = createSelectionModeSession();
+  const state = session;
   state.currentSelection = { x: 10.2, y: 20.7, width: 30.4, height: 40.8 };
   const runtimeArgs = { flushFinalFrameUpdate: vi.fn(), state } as never;
   return createSelectionModeEventsBridge({
@@ -96,6 +97,23 @@ function registerResolveTest(): void {
 
     expect(disableNavigationLock).toHaveBeenCalledTimes(1);
     expect(resolveCallback).toHaveBeenCalledWith({ x: 10, y: 21, width: 30, height: 41 });
+  });
+}
+
+function registerConfirmEventTest(): void {
+  it('forwards the final confirmation event before selection cleanup', () => {
+    const order: string[] = [];
+    const state = createSelectionModeSession();
+    state.currentSelection = { x: 10, y: 20, width: 30, height: 40 };
+    state.onConfirmEvent = vi.fn(() => order.push('event'));
+    state.resolveCallback = vi.fn(() => order.push('resolve'));
+    const bridge = createBridge({ cleanupEvent: () => order.push('cleanup') }, state);
+    const event = new MouseEvent('click');
+
+    bridge.confirmSelection(event);
+
+    expect(state.onConfirmEvent).toHaveBeenCalledWith(event);
+    expect(order).toEqual(['event', 'cleanup', 'resolve']);
   });
 }
 
@@ -226,6 +244,7 @@ describe('selection-mode events bridge', () => {
   });
 
   registerResolveTest();
+  registerConfirmEventTest();
   registerRejectTest();
   registerCleanupTest();
   registerRuntimeActionsTest();

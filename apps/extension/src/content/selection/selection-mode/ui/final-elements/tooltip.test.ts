@@ -75,16 +75,14 @@ describe('selection-mode final tooltip', () => {
 
     wireSelectionModeFinalSizeTooltipActions(tooltip, options);
 
-    tooltip.cancelButton.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true })
-    );
-    tooltip.confirmButton.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true })
-    );
+    const cancelEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+    const confirmEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+    tooltip.cancelButton.dispatchEvent(cancelEvent);
+    tooltip.confirmButton.dispatchEvent(confirmEvent);
 
     expect(options.onCancel).toHaveBeenCalledTimes(1);
     expect(options.onResetToIdle).not.toHaveBeenCalled();
-    expect(options.onConfirm).toHaveBeenCalledTimes(1);
+    expect(options.onConfirm).toHaveBeenCalledWith(confirmEvent);
   });
 });
 

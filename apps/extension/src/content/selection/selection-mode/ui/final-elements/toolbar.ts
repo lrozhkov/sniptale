@@ -21,7 +21,7 @@ type ToolbarOptions = {
   getSelection: () => Selection;
   onAdjustPadding: (direction: 'decrease' | 'increase') => void;
   onCaptureActionChange: (action: CaptureActionType) => void;
-  onConfirm: () => void;
+  onConfirm: (event?: Event) => void;
   overlayContainer: HTMLElement;
 };
 

@@ -5,6 +5,7 @@ import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/messag
 import { cropImage } from '@sniptale/platform/browser/media/image-crop';
 import {
   attachContentActionIntent,
+  createTrustedContentActionIntentSource,
   type ContentPrivilegedActionIntentSource,
 } from '../../../application/privileged-action-intent';
 import { setUIHidden } from '../../../selection/locker';
@@ -26,6 +27,11 @@ import { CAPTURE_RESPONSE_TIMEOUT_MS, withCaptureStepTimeout } from './watchdog'
 
 const SELECTION_CAPTURE_RETRY_ATTEMPTS = 2;
 const logger = createLogger({ namespace: 'ContentScreenshotCapture' });
+
+type ResolvedSelectionCapture = {
+  contentIntentSource: ContentPrivilegedActionIntentSource | undefined;
+  dataUrl: string;
+};
 
 function logSelectionScreenshotDiag(event: string, details?: Record<string, unknown>): void {
   logger.debug(event, details ?? {});
@@ -87,13 +93,19 @@ async function captureRegularSelectionDataUrl(
   runtime: ScreenshotControllerRuntime,
   runToken: number | undefined,
   contentIntentSource: ContentPrivilegedActionIntentSource | undefined
-): Promise<string> {
+): Promise<ResolvedSelectionCapture> {
   logSelectionScreenshotDiag('runSelectionScreenshot.await-selection');
+  let confirmedIntentSource = contentIntentSource;
   const area = await enableSelectionModeDeferredIfCurrent(
     () => isCurrentScreenshotRun(runtime, runToken),
     {
       captureAction: runtime.captureActionRef.current,
       onCaptureActionChange: runtime.setCaptureAction,
+      onConfirmEvent: (event) => {
+        if (confirmedIntentSource?.kind !== 'background-auto-start') return;
+        confirmedIntentSource =
+          createTrustedContentActionIntentSource(event) ?? confirmedIntentSource;
+      },
     }
   );
   assertCurrentScreenshotRun(runtime, runToken);
@@ -105,22 +117,28 @@ async function captureRegularSelectionDataUrl(
   const capturedFrameDataUrl = await captureSelectionFrameWithRetry(
     runtime,
     runToken,
-    contentIntentSource
+    confirmedIntentSource
   );
   assertCurrentScreenshotRun(runtime, runToken);
-  return cropImage(capturedFrameDataUrl, area);
+  return {
+    contentIntentSource: confirmedIntentSource,
+    dataUrl: await cropImage(capturedFrameDataUrl, area),
+  };
 }
 
 async function resolveSelectionDataUrl(
   runtime: ScreenshotControllerRuntime,
   options: ScreenshotSuccessFeedbackOptions
-): Promise<string> {
-  const dataUrl = runtime.captureAdapter
-    ? await runtime.captureAdapter.captureSelection()
+): Promise<ResolvedSelectionCapture> {
+  const selectionCapture = runtime.captureAdapter
+    ? {
+        contentIntentSource: options.contentIntentSource,
+        dataUrl: await runtime.captureAdapter.captureSelection(),
+      }
     : await captureRegularSelectionDataUrl(runtime, options.runToken, options.contentIntentSource);
 
   assertCurrentScreenshotRun(runtime, options.runToken);
-  return dataUrl;
+  return selectionCapture;
 }
 
 async function refreshScenarioAfterSelection(
@@ -151,12 +169,12 @@ export async function runSelectionScreenshot(
     await waitForUiHideSettle();
     assertCurrentScreenshotRun(runtime, options.runToken);
 
-    const dataUrl = await resolveSelectionDataUrl(runtime, options);
+    const { contentIntentSource, dataUrl } = await resolveSelectionDataUrl(runtime, options);
     const actionType = runtime.captureActionRef.current;
     const shouldSaveScenarioStep = shouldSaveScenarioCapture(actionType, runtime);
     await persistLocalCaptureDataUrl({
       actionType,
-      contentIntentSource: options.contentIntentSource,
+      contentIntentSource,
       dataUrl,
       mode: 'selection',
       runtime,

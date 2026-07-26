@@ -254,13 +254,12 @@ describe('selection-mode capture action menu', () => {
       'content.toolbar.selectionCaptureActionTitle'
     );
     expect(menu?.querySelector('[data-ui$=".scenario"]')).toBeNull();
-    menu
-      ?.querySelector<HTMLButtonElement>('[data-ui$=".copy"]')
-      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    const copyEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+    menu?.querySelector<HTMLButtonElement>('[data-ui$=".copy"]')?.dispatchEvent(copyEvent);
     document.removeEventListener('click', captureGuard, true);
 
     expect(onCaptureActionChange).toHaveBeenCalledWith('copy');
-    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith(copyEvent);
     expect(menu?.isConnected).toBe(false);
     expect(trigger?.getAttribute('aria-expanded')).toBe('false');
   });

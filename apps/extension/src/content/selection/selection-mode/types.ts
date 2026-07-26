@@ -5,6 +5,7 @@ export type SelectionState = 'idle' | 'hover' | 'drag' | 'confirmed';
 export interface SelectionModeActivationOptions {
   captureAction?: CaptureActionType;
   onCaptureActionChange?: (action: CaptureActionType) => void;
+  onConfirmEvent?: (event: Event) => void;
 }
 
 export interface Selection {

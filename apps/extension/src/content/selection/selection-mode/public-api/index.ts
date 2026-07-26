@@ -12,6 +12,7 @@ type SelectionModeEnableSession = Pick<
   | 'currentState'
   | 'isActive'
   | 'onCaptureActionChange'
+  | 'onConfirmEvent'
   | 'rejectCallback'
   | 'resolveCallback'
 >;
@@ -41,6 +42,7 @@ export function enableSelectionModeApi(args: {
       args.session.rejectCallback = reject;
       args.session.captureAction = args.options?.captureAction ?? 'download_default';
       args.session.onCaptureActionChange = args.options?.onCaptureActionChange ?? null;
+      args.session.onConfirmEvent = args.options?.onConfirmEvent ?? null;
 
       try {
         args.session.currentState = 'idle';

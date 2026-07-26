@@ -19,7 +19,7 @@ type SelectionModeUiRuntimeConfig = {
   onCancel: () => void;
   onAdjustPadding: (direction: 'decrease' | 'increase') => void;
   onCaptureActionChange: (action: CaptureActionType) => void;
-  onConfirm: () => void;
+  onConfirm: (event?: Event) => void;
   onResetToIdle: () => void;
   onSetupSizePanelListeners: () => void;
   overlayBackground: string;

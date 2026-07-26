@@ -10,6 +10,7 @@ export interface SelectionModeSession {
   cleanupScrollListeners: (() => void) | null;
   captureAction: CaptureActionType;
   onCaptureActionChange: ((action: CaptureActionType) => void) | null;
+  onConfirmEvent: ((event: Event) => void) | null;
   currentSelection: Selection;
   currentState: SelectionState;
   cursorStyleCleanup: (() => void) | null;
@@ -40,6 +41,7 @@ export function createSelectionModeSession(): SelectionModeSession {
     cleanupScrollListeners: null,
     captureAction: 'download_default',
     onCaptureActionChange: null,
+    onConfirmEvent: null,
     currentSelection: emptySelection(),
     currentState: 'idle',
     cursorStyleCleanup: null,
@@ -71,6 +73,7 @@ export function resetSelectionModeSession(session: SelectionModeSession): void {
     cleanupScrollListeners: null,
     captureAction: 'download_default',
     onCaptureActionChange: null,
+    onConfirmEvent: null,
     currentSelection: emptySelection(),
     currentState: 'idle',
     dragStartPoint: { x: 0, y: 0 },
