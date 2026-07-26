@@ -52,6 +52,11 @@ it('writes parseable private byte-bounded artifacts after deep sanitization', ()
     decision: index % 2 === 0 ? 'Consolidate' : 'Keep',
     confidence: 'low',
     maximumStructuralScore: index,
+    productionFileCount: 2,
+    proofFileCount: 1,
+    navigationTransitions: 3,
+    proofTransitions: 2,
+    productionToProofEdges: 0,
     files: [`/home/alice/${secret}-cluster-${index}.ts`],
     fileMetrics: functions,
   }));
@@ -103,6 +108,13 @@ it('writes parseable private byte-bounded artifacts after deep sanitization', ()
   expect(artifact.forwardingEdges).toEqual([]);
   expect(artifact.clusters).toHaveLength(20);
   expect(artifact.clusters.every((cluster) => cluster.fileMetrics == null)).toBe(true);
+  expect(artifact.clusters[0]).toMatchObject({
+    productionFileCount: 2,
+    proofFileCount: 1,
+    navigationTransitions: 3,
+    proofTransitions: 2,
+    productionToProofEdges: 0,
+  });
   expect(fs.statSync(outputPath).mode & 0o777).toBe(0o600);
 });
 
@@ -279,6 +291,51 @@ it('composes one visible structural and topology block without running a reposit
   expect(output.match(/Topology fragmentation \(manual report-only\)/gu)).toHaveLength(1);
   expect(output).toContain('attention=0, watch=0');
   expect(output).toContain('candidates=0, split=0, consolidate=0, keep=0');
+});
+
+it('prints production navigation and proof closure once in the topology block', () => {
+  const root = createTempRoot('structural-audit-topology-console-');
+  const outputPath = path.join(root, 'report.json');
+  const result = runStructuralAuditWrapper({
+    files: [],
+    root,
+    structuralReportFactory: () => ({
+      scope: 'repo-wide-audit',
+      files: [],
+      functions: [],
+      violations: [],
+      advisories: [],
+    }),
+    fragmentationReportFactory: () => ({
+      clusters: [
+        {
+          id: 'apps/extension/src/content/selection/demo',
+          decision: 'Keep',
+          confidence: 'high',
+          fileCount: 3,
+          productionFileCount: 2,
+          proofFileCount: 1,
+          navigationTransitions: 4,
+          proofTransitions: 2,
+          productionToProofEdges: 0,
+          reasons: ['cohesive-orchestration-owner'],
+          maximumStructuralScore: 4,
+        },
+      ],
+      unresolvedEdges: 0,
+      summary: { totalClusters: 1, candidateClusters: 1, split: 0, consolidate: 0, keep: 1 },
+    }),
+    artifactOptions: {
+      outputPath,
+      sanitizerOptions: { repositoryRoot: root, sensitiveValues: [] },
+    },
+  });
+  const output = result.steps[0].consoleOutput;
+
+  expect(output.match(/production-files=2/gu)).toHaveLength(1);
+  expect(output.match(/proof-files=1/gu)).toHaveLength(1);
+  expect(output.match(/transitions=4/gu)).toHaveLength(1);
+  expect(output.match(/proof-transitions=2/gu)).toHaveLength(1);
 });
 
 it('keeps topology, artifact location, and a bounded structural preview visible', () => {

@@ -37,7 +37,6 @@ function activeFragmentationFamilies(signals) {
   if (signals.singleConsumerSmallFiles >= 3) {
     families.push({ family: 'single-consumer-small', weight: 1 });
   }
-  if (signals.delegationOnlyTests >= 2) families.push({ family: 'delegation-tests', weight: 1 });
   if (signals.facadeDepth >= 2) families.push({ family: 'facade-ladder', weight: 2 });
   return families;
 }
@@ -108,6 +107,13 @@ export function decideTopologyCluster(cluster, context) {
       reasons: splitReasons,
     };
   }
+  if (cluster.productionToProofEdges > 0) {
+    return {
+      decision: 'Keep',
+      confidence: 'low',
+      reasons: ['production-to-proof-dependency'],
+    };
+  }
   if (hasUnresolvedTopology(cluster)) {
     return { decision: 'Keep', confidence: 'low', reasons: ['unresolved-topology-or-authority'] };
   }
@@ -121,6 +127,13 @@ export function decideTopologyCluster(cluster, context) {
 }
 
 export function decideForwardingEdgeCandidate(candidate) {
+  if (candidate.productionToProofEdges > 0) {
+    return {
+      decision: 'Keep',
+      confidence: 'low',
+      reasons: ['production-to-proof-dependency'],
+    };
+  }
   if (candidate.forwarderIsPublicOrContract) {
     return {
       decision: 'Keep',
@@ -186,7 +199,7 @@ function createConsolidationDecision(cluster, context) {
     cluster,
     context.publicFiles,
     context.moduleByFile,
-    context.incoming
+    context.productionIncoming
   );
   if (families.length < 2 || weight < 4 || !mergeTarget)
     return { decision: 'Keep', confidence: 'low', reasons: ['insufficient-corroborated-evidence'] };
