@@ -40,6 +40,14 @@ export function useStepBadgeInteraction(args: {
     isEnabled: hasControls,
     placementKey: JSON.stringify({
       anchor: effectiveSettings.anchor,
+      frameRect: args.frameRect
+        ? {
+            height: args.frameRect.height,
+            width: args.frameRect.width,
+            x: args.frameRect.x,
+            y: args.frameRect.y,
+          }
+        : null,
       manualPlacement: effectiveSettings.manualPlacement,
       offsetDirections: effectiveSettings.offsetDirections,
       sizeLevel: effectiveSettings.sizeLevel,

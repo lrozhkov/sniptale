@@ -130,3 +130,52 @@ it('hides only the quick settings button while a main toolbar owns the frame UI'
   act(() => root.unmount());
   document.body.replaceChildren();
 });
+
+it('reanchors move and settings controls after scroll updates the frame geometry', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let badgeRect = new DOMRect(100, 80, 30, 30);
+  const rectSpy = vi
+    .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+      return this.classList.contains('sniptale-step-badge') ? badgeRect : new DOMRect();
+    });
+  const settings = createStepBadgeSettingsFixture({ value: '7' });
+  const renderBadge = (frameY: number) => {
+    root.render(
+      <StepBadge
+        settings={settings}
+        borderColor="#000"
+        borderWidth={2}
+        frameRect={{ height: 120, width: 200, x: 100, y: frameY }}
+        isSettingsOpen
+        onPositionChange={vi.fn()}
+        onSettingsClick={vi.fn()}
+        settingsAnchorRef={{ current: null }}
+        showSettingsHandle
+        zIndex={10}
+      />
+    );
+  };
+
+  act(() => renderBadge(80));
+  const controls = document.querySelector<HTMLElement>('.sniptale-step-badge-controls');
+  expect(controls?.style.top).toBe('70px');
+
+  act(() => window.dispatchEvent(new Event('scroll')));
+  badgeRect = new DOMRect(100, 30, 30, 30);
+  act(() => renderBadge(30));
+
+  expect(controls?.style.top).toBe('20px');
+  expect(controls?.querySelector('.sniptale-step-badge-move-handle')).toBeInstanceOf(
+    HTMLButtonElement
+  );
+  expect(controls?.querySelector('.sniptale-step-badge-settings-handle')).toBeInstanceOf(
+    HTMLButtonElement
+  );
+
+  rectSpy.mockRestore();
+  act(() => root.unmount());
+  document.body.replaceChildren();
+});
