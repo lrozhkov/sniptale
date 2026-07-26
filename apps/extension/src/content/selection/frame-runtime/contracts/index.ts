@@ -24,6 +24,12 @@ export type FrameSetter = Dispatch<SetStateAction<FrameData[]>>;
 export type FrameStateSetter = Dispatch<SetStateAction<Map<string, FrameState>>>;
 export type FrameMutableRef<T> = MutableRefObject<T>;
 
+export interface FrameSessionSettingsRefs {
+  blurSettings: FrameMutableRef<BlurSettings>;
+  defaultsInitialized: FrameMutableRef<boolean>;
+  focusSettings: FrameMutableRef<FocusSettings>;
+}
+
 export interface FrameManagerRefs {
   containerRef: FrameMutableRef<HTMLDivElement | null>;
   frameStatesRef: FrameMutableRef<Map<string, FrameState>>;
@@ -37,9 +43,8 @@ export interface FrameManagerRefs {
   prevFrameStatesRef: FrameMutableRef<Map<string, FrameState>>;
   prevFramesRef: FrameMutableRef<FrameData[]>;
   rootsRef: FrameMutableRef<Map<string, Root>>;
-  sessionBlurSettingsRef: FrameMutableRef<BlurSettings>;
   sessionCalloutStyleRef: FrameMutableRef<Partial<CalloutSettings> | null>;
-  sessionFocusSettingsRef: FrameMutableRef<FocusSettings>;
+  sessionSettingsRefs: FrameSessionSettingsRefs;
   sessionStepBadgeTemplateRef: FrameMutableRef<StepBadgeSettings | null>;
   stepBadgeOrderRef: FrameMutableRef<Map<string, number>>;
 }

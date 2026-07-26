@@ -6,12 +6,7 @@ import {
   type HighlighterStateGetters,
 } from './interactions';
 import { createHoverOverlayActions } from './overlay';
-import {
-  createHoverSession,
-  invalidateHighlighterSettings,
-  invalidateHoverFrameCache,
-} from './session';
-import type { HighlighterSettingsChangedDetail } from '../../platform/page-context/frame-events';
+import { createHoverSession, invalidateHoverFrameCache } from './session';
 import { createFreeFrameDrawingHandlers, type DrawingCancelReason } from './drawing';
 
 const logger = createLogger({ namespace: 'ContentHighlighter:HoverPreview' });
@@ -26,7 +21,6 @@ export interface HoverController {
   };
   invalidation: {
     frameCache: () => void;
-    settingsCache: (detail?: HighlighterSettingsChangedDetail) => void;
   };
   input: {
     mouseMove: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
@@ -74,7 +68,6 @@ export function createHighlighterHoverController(
     },
     invalidation: {
       frameCache: () => invalidateHoverFrameCache(session),
-      settingsCache: (detail) => invalidateHighlighterSettings(session, detail),
     },
     input: {
       mouseMove: interactions.handleMouseMove,

@@ -40,7 +40,6 @@ it('assembles state, hover, lifecycle, and invalidation owners directly', () => 
   controller.enableMode();
   controller.disableMode();
   controller.invalidateFrameCache();
-  controller.invalidateSettingsCache();
 
   expect(createState).toHaveBeenCalledTimes(1);
   expect(createHoverController).toHaveBeenCalledTimes(1);
@@ -48,7 +47,6 @@ it('assembles state, hover, lifecycle, and invalidation owners directly', () => 
   expect(disableRuntime).toHaveBeenCalledWith(state, hoverController);
   expect(logAccessibleIframeCount).toHaveBeenCalledTimes(1);
   expect(hoverController.invalidateFrameCache).toHaveBeenCalledTimes(1);
-  expect(hoverController.invalidateSettingsCache).toHaveBeenCalledTimes(1);
 });
 
 it('gives the hover owner live callback and state accessors', () => {

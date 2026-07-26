@@ -2,6 +2,7 @@ import { findElementBySelector } from '../../../platform/frame';
 import { createCompositeSelector } from '../../../platform/frame/selectors';
 import type {
   BlurSettings,
+  BorderPreset,
   CalloutSettings,
   EffectMode,
   FocusSettings,
@@ -10,6 +11,7 @@ import type {
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
 import type { FrameSessionSnapshot, SerializableFrameData } from './types';
+import { cloneBorderPreset } from '../../../../features/highlighter/presets/catalog';
 
 function cloneFrameSettings(frame: FrameData): SerializableFrameData {
   const { linkedElement, ...rest } = frame;
@@ -74,6 +76,7 @@ export function captureFrameSessionSnapshot(args: {
   frames: FrameData[];
   globalEffectMode: EffectMode;
   globalStepBadgeSettings: GlobalStepBadgeSettings;
+  sessionBorderPreset: BorderPreset;
   sessionBlurSettings: BlurSettings;
   sessionCalloutStyle: Partial<CalloutSettings> | null;
   sessionFocusSettings: FocusSettings;
@@ -84,6 +87,7 @@ export function captureFrameSessionSnapshot(args: {
     frames: args.frames.map(cloneFrameSettings),
     globalEffectMode: args.globalEffectMode,
     globalStepBadgeSettings: { ...args.globalStepBadgeSettings },
+    sessionBorderPreset: cloneBorderPreset(args.sessionBorderPreset),
     sessionBlurSettings: { ...args.sessionBlurSettings },
     sessionCalloutStyle: args.sessionCalloutStyle ? { ...args.sessionCalloutStyle } : null,
     sessionFocusSettings: { ...args.sessionFocusSettings },

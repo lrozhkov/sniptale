@@ -111,8 +111,6 @@ it('routes cache invalidation to the hover owner', () => {
   const actions = createHighlighterInvalidateActions(hoverController);
 
   actions.invalidateFrameCache();
-  actions.invalidateSettingsCache();
 
   expect(hoverController.invalidateFrameCache).toHaveBeenCalledTimes(1);
-  expect(hoverController.invalidateSettingsCache).toHaveBeenCalledTimes(1);
 });

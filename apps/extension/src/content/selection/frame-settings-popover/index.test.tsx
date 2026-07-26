@@ -12,7 +12,6 @@ const loggerMocks = vi.hoisted(() => ({
 
 const storageMocks = vi.hoisted(() => ({
   loadHighlighterSettings: vi.fn(),
-  setDefaultBorderPreset: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -29,10 +28,6 @@ vi.mock('../../../composition/persistence/highlighter', async () => {
     loadHighlighterSettings: storageMocks.loadHighlighterSettings,
   };
 });
-
-vi.mock('./state/highlighter-settings-mutation', () => ({
-  requestDefaultBorderPresetMutation: storageMocks.setDefaultBorderPreset,
-}));
 
 import {
   createDefaultHighlighterSettings,
@@ -159,7 +154,6 @@ async function flushAsyncEffects() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   storageMocks.loadHighlighterSettings.mockReset();
-  storageMocks.setDefaultBorderPreset.mockReset();
   loggerMocks.error.mockReset();
 
   anchorEl = document.createElement('button');
@@ -313,15 +307,13 @@ describe('FrameSettingsPopover pending focus edits', () => {
   });
 });
 
-describe('FrameSettingsPopover preset close ordering', () => {
-  it('closes after the selected preset persistence attempt completes', async () => {
-    const deferredPersistence = createDeferred<void>();
+describe('FrameSettingsPopover preset selection', () => {
+  it('applies a trusted selection to the frame and closes immediately', () => {
     const onApplyToFrame = vi.fn();
     const onClose = vi.fn();
     storageMocks.loadHighlighterSettings.mockReturnValue(
       new Promise<HighlighterSettings>(() => undefined)
     );
-    storageMocks.setDefaultBorderPreset.mockReturnValue(deferredPersistence.promise);
 
     renderPopover({ onApplyToFrame, onClose });
 
@@ -330,7 +322,7 @@ describe('FrameSettingsPopover preset close ordering', () => {
     });
 
     expect(onApplyToFrame).not.toHaveBeenCalled();
-    expect(storageMocks.setDefaultBorderPreset).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
 
     act(() => {
       getPresetButton(getBorderPresetDisplayName(DEFAULT_BORDER_PRESET)).dispatchEvent(
@@ -349,50 +341,6 @@ describe('FrameSettingsPopover preset close ordering', () => {
     expect(onApplyToFrame).toHaveBeenCalledWith({
       borderSettings: { ...DEFAULT_BORDER_PRESET },
     });
-    expect(onClose).not.toHaveBeenCalled();
-
-    await act(async () => {
-      deferredPersistence.resolve(undefined);
-      await deferredPersistence.promise;
-      await Promise.resolve();
-    });
-
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps the popover open when authoritative preset persistence is rejected', async () => {
-    const persistenceError = new Error('rejected preset target');
-    const onApplyToFrame = vi.fn();
-    const onClose = vi.fn();
-    storageMocks.loadHighlighterSettings.mockReturnValue(
-      new Promise<HighlighterSettings>(() => undefined)
-    );
-    storageMocks.setDefaultBorderPreset.mockRejectedValue(persistenceError);
-
-    renderPopover({ onApplyToFrame, onClose });
-
-    act(() => {
-      getPresetButton(getBorderPresetDisplayName(DEFAULT_BORDER_PRESET)).dispatchEvent(
-        createBridgedMouseEvent('click', {
-          button: 0,
-          buttons: 1,
-          clientX: 20,
-          clientY: 30,
-          ctrlKey: false,
-          metaKey: false,
-          shiftKey: false,
-        })
-      );
-    });
-    await flushAsyncEffects();
-
-    expect(onApplyToFrame).toHaveBeenCalledWith({
-      borderSettings: { ...DEFAULT_BORDER_PRESET },
-    });
-    expect(loggerMocks.error).toHaveBeenCalledWith(
-      'Failed to save default preset',
-      persistenceError
-    );
-    expect(onClose).not.toHaveBeenCalled();
   });
 });

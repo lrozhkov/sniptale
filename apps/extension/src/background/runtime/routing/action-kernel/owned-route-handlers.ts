@@ -9,7 +9,6 @@ import {
 import { routePageAccessMessage } from '../../page-access/route';
 import { routeNativeAppRuntimeMessage } from '../../native-app/route';
 import { routeContentRuntimeWakeupMessage } from '../../page-access/wakeup-route';
-import { routeHighlighterSettingsMutationMessage } from '../../../highlighter-settings/route';
 import { routePopupExportArchiveMessage } from '../../../capture/routes';
 import { routeLocalDataErasureMessage } from '../../../application/privacy-erasure/route';
 import { routePopupTabRouteCapabilityRequest } from '../capabilities/popup-tab/route-capabilities';
@@ -18,7 +17,6 @@ import type { ContentSenderBinding } from '../../../routing-contracts/capabiliti
 import {
   getContentActionCapabilityIssuanceSenderBinding,
   getContentRuntimeWakeupSenderBinding,
-  getHighlighterSettingsMutationSenderBinding,
   type BackgroundOwnedRouteContext,
 } from '../../../routing-contracts/owned-route-context';
 import { backgroundOwnedRouteInventory } from './owned-route-inventory';
@@ -71,8 +69,6 @@ function getBackgroundOwnedRouteHandler(
       return routeContentActionCapabilityIssuance;
     case 'content-runtime-wakeup':
       return routeContentRuntimeWakeupAction;
-    case 'highlighter-settings-mutation':
-      return routeHighlighterSettingsMutationAction;
     case 'llm-content-processing':
       return routeLlmAction;
     case 'llm-scenario-editor-processing':
@@ -155,19 +151,6 @@ function routeContentRuntimeWakeupAction(
       message: action.message,
       runtimeState: action.context.runtimeState,
       senderBinding: getContentRuntimeWakeupSenderBinding(routeContext, action.message),
-      sendResponse: action.context.sendResponse,
-    })
-  );
-}
-
-function routeHighlighterSettingsMutationAction(
-  action: BackgroundOwnedAction,
-  routeContext: BackgroundOwnedRouteContext | null
-): ActionResult | null {
-  return keepOpen(
-    routeHighlighterSettingsMutationMessage({
-      message: action.message,
-      senderBinding: getHighlighterSettingsMutationSenderBinding(routeContext, action.message),
       sendResponse: action.context.sendResponse,
     })
   );

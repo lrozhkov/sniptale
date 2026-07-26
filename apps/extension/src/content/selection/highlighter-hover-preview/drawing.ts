@@ -75,7 +75,7 @@ function ensurePreview(session: HoverSession): HTMLElement {
   if (session.freeDraw.preview) return session.freeDraw.preview;
   const preview = document.createElement('div');
   preview.className = 'sniptale-free-frame-draft';
-  const preset = getCurrentBorderPreset(session);
+  const preset = getCurrentBorderPreset();
   const visual = resolveBorderPresetVisual(preset);
   preview.style.cssText = `
     position: fixed;

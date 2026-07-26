@@ -11,6 +11,7 @@ import type {
 import type { StepBadgeSettings } from '../../../../features/highlighter/contracts';
 import { createFrameDataFixture } from '../react/test-support';
 import { buildFrameForAdd, buildFreeFrameForAdd } from './frame-build';
+import { setFrameSessionBorderPreset } from '../session/border-preset';
 
 function createBlurSettings(): BlurSettings {
   return {
@@ -74,6 +75,7 @@ function createStepBadgeTemplate(auto = true): StepBadgeSettings {
 }
 
 function createBuildArgs() {
+  setFrameSessionBorderPreset(createHighlighterSettings().borderPresets[0]!);
   const borderSettings: BorderPreset = {
     id: 'coords-border',
     name: 'Coords',
@@ -105,10 +107,8 @@ function createBuildArgs() {
         width: 100,
       }),
     element: document.createElement('button'),
-    framesRef: { current: [] },
     globalEffectModeRef: { current: 'border' as const },
     globalStepBadgeAutoModeRef: { current: true },
-    highlighterSettingsCacheRef: { current: createHighlighterSettings() },
     sessionBlurSettingsRef: { current: createBlurSettings() },
     sessionFocusSettingsRef: { current: createFocusSettings() },
     sessionStepBadgeTemplateRef: { current: createStepBadgeTemplate() as StepBadgeSettings | null },
@@ -161,10 +161,8 @@ describe('frame-mutation-actions-frame-build', () => {
   it('builds a free frame with session defaults and no DOM anchor', () => {
     const args = createBuildArgs();
     const frame = buildFreeFrameForAdd({
-      framesRef: args.framesRef,
       globalEffectModeRef: args.globalEffectModeRef,
       globalStepBadgeAutoModeRef: args.globalStepBadgeAutoModeRef,
-      highlighterSettingsCacheRef: args.highlighterSettingsCacheRef,
       sessionBlurSettingsRef: args.sessionBlurSettingsRef,
       sessionFocusSettingsRef: args.sessionFocusSettingsRef,
       sessionStepBadgeTemplateRef: args.sessionStepBadgeTemplateRef,

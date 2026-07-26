@@ -20,12 +20,9 @@ export {
 } from './step-badge';
 export {
   addFocusOpacityChangedListener,
-  addHighlighterSettingsChangedListener,
   addSessionBlurSettingsChangedListener,
   addSessionFocusSettingsChangedListener,
   dispatchFocusOpacityChanged,
-  dispatchHighlighterSettingsChanged,
   dispatchSessionBlurSettingsChanged,
   dispatchSessionFocusSettingsChanged,
-  type HighlighterSettingsChangedDetail,
 } from './session';

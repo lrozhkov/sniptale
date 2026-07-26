@@ -22,6 +22,7 @@ export interface FrameSessionSnapshot {
   frames: SerializableFrameData[];
   globalEffectMode: EffectMode;
   globalStepBadgeSettings: GlobalStepBadgeSettings;
+  sessionBorderPreset: BorderPreset;
   sessionBlurSettings: BlurSettings;
   sessionCalloutStyle: Partial<CalloutSettings> | null;
   sessionFocusSettings: FocusSettings;

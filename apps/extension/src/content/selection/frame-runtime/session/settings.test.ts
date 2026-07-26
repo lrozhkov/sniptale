@@ -3,9 +3,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   BlurSettings,
+  EffectMode,
   FocusSettings,
   HighlighterSettings,
 } from '../../../../features/highlighter/contracts';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
+import { cloneBorderPreset } from '../../../../features/highlighter/presets/catalog';
+import {
+  getFrameSessionBorderPreset,
+  resetFrameSessionBorderPreset,
+  setFrameSessionBorderPreset,
+} from './border-preset';
 
 const loggerMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -45,9 +53,10 @@ function createSettingsRefs() {
   const focus: FocusSettings = { opacity: 0.2, showBorder: true };
 
   return {
-    globalEffectModeRef: { current: 'blur' as const },
+    globalEffectModeRef: { current: 'blur' as EffectMode },
     highlighterSettingsCacheRef: { current: null as HighlighterSettings | null },
     sessionBlurSettingsRef: { current: blur },
+    sessionDefaultsInitializedRef: { current: false },
     sessionFocusSettingsRef: { current: focus },
   };
 }
@@ -55,6 +64,7 @@ function createSettingsRefs() {
 beforeEach(() => {
   settingsMocks.loadHighlighterSettings.mockReset();
   loggerMocks.error.mockReset();
+  resetFrameSessionBorderPreset();
 });
 
 describe('frame-session-sync-settings', () => {
@@ -98,6 +108,185 @@ describe('frame-session-sync-settings', () => {
 
     expect(settingsMocks.loadHighlighterSettings).toHaveBeenCalledTimes(2);
   });
+
+  it('keeps current-tab choices while a new tab initializes from the latest persisted defaults', async () => {
+    const firstPreset = {
+      ...cloneBorderPreset(DEFAULT_BORDER_PRESET),
+      id: 'first-default',
+      name: 'First default',
+    };
+    const latestPreset = {
+      ...cloneBorderPreset(DEFAULT_BORDER_PRESET),
+      id: 'latest-default',
+      name: 'Latest default',
+    };
+    const currentTabPreset = {
+      ...cloneBorderPreset(DEFAULT_BORDER_PRESET),
+      id: 'current-tab-choice',
+      name: 'Current tab choice',
+    };
+    const firstDefaults: HighlighterSettings = {
+      ...DEFAULT_SETTINGS,
+      borderPresets: [firstPreset],
+      defaultBorderPresetId: firstPreset.id,
+      defaultEffectMode: 'border',
+      defaultBlurSettings: { amount: 6, blurType: 'gaussian', showBorder: false },
+      defaultFocusSettings: { opacity: 0.4, showBorder: false },
+    };
+    const latestDefaults: HighlighterSettings = {
+      ...DEFAULT_SETTINGS,
+      borderPresets: [latestPreset],
+      defaultBorderPresetId: latestPreset.id,
+      defaultEffectMode: 'focus',
+      defaultBlurSettings: { amount: 24, blurType: 'pixelate', showBorder: true },
+      defaultFocusSettings: { opacity: 0.8, showBorder: true },
+    };
+    settingsMocks.loadHighlighterSettings
+      .mockResolvedValueOnce(firstDefaults)
+      .mockResolvedValueOnce(latestDefaults)
+      .mockResolvedValueOnce(latestDefaults);
+    const currentTab = createSettingsRefs();
+    const loadCurrentTab = createFrameSessionSettingsLoader(currentTab);
+
+    loadCurrentTab();
+    await Promise.resolve();
+    currentTab.globalEffectModeRef.current = 'blur';
+    setFrameSessionBorderPreset(currentTabPreset);
+    currentTab.sessionBlurSettingsRef.current = {
+      amount: 13,
+      blurType: 'solid',
+      showBorder: false,
+    };
+    currentTab.sessionFocusSettingsRef.current = { opacity: 0.25, showBorder: false };
+    currentTab.sessionDefaultsInitializedRef.current = true;
+    loadCurrentTab();
+    await Promise.resolve();
+
+    expect(currentTab.globalEffectModeRef.current).toBe('blur');
+    expect(getFrameSessionBorderPreset()).toEqual(currentTabPreset);
+    expect(currentTab.sessionBlurSettingsRef.current).toEqual({
+      amount: 13,
+      blurType: 'solid',
+      showBorder: false,
+    });
+    expect(currentTab.sessionFocusSettingsRef.current).toEqual({
+      opacity: 0.25,
+      showBorder: false,
+    });
+    expect(currentTab.highlighterSettingsCacheRef.current).toEqual(latestDefaults);
+
+    resetFrameSessionBorderPreset();
+    const newTab = createSettingsRefs();
+    createFrameSessionSettingsLoader(newTab)();
+    await Promise.resolve();
+
+    expect(newTab.globalEffectModeRef.current).toBe('focus');
+    expect(getFrameSessionBorderPreset()).toEqual(latestPreset);
+    expect(getFrameSessionBorderPreset()).not.toBe(latestPreset);
+    expect(newTab.sessionBlurSettingsRef.current).toEqual(latestDefaults.defaultBlurSettings);
+    expect(newTab.sessionFocusSettingsRef.current).toEqual(latestDefaults.defaultFocusSettings);
+  });
+
+  it('discards an older settings load that resolves after the latest request', async () => {
+    const older = createDeferred<HighlighterSettings>();
+    const latest = createDeferred<HighlighterSettings>();
+    const latestPreset = {
+      ...cloneBorderPreset(DEFAULT_BORDER_PRESET),
+      id: 'latest-race-winner',
+      name: 'Latest race winner',
+    };
+    const latestSettings = {
+      ...DEFAULT_SETTINGS,
+      borderPresets: [latestPreset],
+      defaultBorderPresetId: latestPreset.id,
+      defaultEffectMode: 'focus' as const,
+    };
+    settingsMocks.loadHighlighterSettings
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(latest.promise);
+    const refs = createSettingsRefs();
+    const loadSettings = createFrameSessionSettingsLoader(refs);
+
+    loadSettings();
+    loadSettings();
+    latest.resolve(latestSettings);
+    await latest.promise;
+    await Promise.resolve();
+    older.resolve({ ...DEFAULT_SETTINGS, defaultEffectMode: 'blur' });
+    await older.promise;
+    await Promise.resolve();
+
+    expect(refs.highlighterSettingsCacheRef.current).toEqual(latestSettings);
+    expect(refs.globalEffectModeRef.current).toBe('focus');
+    expect(getFrameSessionBorderPreset()).toEqual(latestPreset);
+  });
+
+  it('initializes the border default after a non-border choice wins during the initial load', async () => {
+    const pending = createDeferred<HighlighterSettings>();
+    const persistedPreset = {
+      ...cloneBorderPreset(DEFAULT_BORDER_PRESET),
+      id: 'persisted-border-after-effect-choice',
+      name: 'Persisted border after effect choice',
+    };
+    settingsMocks.loadHighlighterSettings.mockReturnValue(pending.promise);
+    const refs = createSettingsRefs();
+    const loadSettings = createFrameSessionSettingsLoader(refs);
+
+    loadSettings();
+    refs.globalEffectModeRef.current = 'focus';
+    refs.sessionBlurSettingsRef.current = {
+      amount: 19,
+      blurType: 'solid',
+      showBorder: false,
+    };
+    refs.sessionFocusSettingsRef.current = { opacity: 0.35, showBorder: true };
+    refs.sessionDefaultsInitializedRef.current = true;
+    pending.resolve({
+      ...DEFAULT_SETTINGS,
+      borderPresets: [persistedPreset],
+      defaultBorderPresetId: persistedPreset.id,
+    });
+    await pending.promise;
+    await Promise.resolve();
+
+    expect(getFrameSessionBorderPreset()).toEqual(persistedPreset);
+    expect(refs.globalEffectModeRef.current).toBe('focus');
+    expect(refs.sessionBlurSettingsRef.current).toEqual({
+      amount: 19,
+      blurType: 'solid',
+      showBorder: false,
+    });
+    expect(refs.sessionFocusSettingsRef.current).toEqual({ opacity: 0.35, showBorder: true });
+  });
+
+  it('keeps an explicit border choice made before the initial settings load resolves', async () => {
+    const pending = createDeferred<HighlighterSettings>();
+    const persistedPreset = {
+      ...cloneBorderPreset(DEFAULT_BORDER_PRESET),
+      id: 'persisted-border-loser',
+      name: 'Persisted border loser',
+    };
+    const explicitPreset = {
+      ...cloneBorderPreset(DEFAULT_BORDER_PRESET),
+      id: 'explicit-border-winner',
+      name: 'Explicit border winner',
+    };
+    settingsMocks.loadHighlighterSettings.mockReturnValue(pending.promise);
+    const refs = createSettingsRefs();
+    const loadSettings = createFrameSessionSettingsLoader(refs);
+
+    loadSettings();
+    setFrameSessionBorderPreset(explicitPreset);
+    pending.resolve({
+      ...DEFAULT_SETTINGS,
+      borderPresets: [persistedPreset],
+      defaultBorderPresetId: persistedPreset.id,
+    });
+    await pending.promise;
+    await Promise.resolve();
+
+    expect(getFrameSessionBorderPreset()).toEqual(explicitPreset);
+  });
 });
 
 describe('frame-session-sync-settings cleanup', () => {
@@ -135,6 +324,24 @@ function expectLoaderRefUpdates(refs: ReturnType<typeof createSettingsRefs>) {
     defaultEffectMode: undefined,
   });
   expect(refs.globalEffectModeRef.current).toBe('border');
+  expect(getFrameSessionBorderPreset()).toEqual(DEFAULT_BORDER_PRESET);
   expect(refs.sessionBlurSettingsRef.current).toEqual(DEFAULT_SETTINGS.defaultBlurSettings);
   expect(refs.sessionFocusSettingsRef.current).toEqual(DEFAULT_SETTINGS.defaultFocusSettings);
+}
+
+function createDeferred<T>() {
+  let resolvePromise: ((value: T) => void) | null = null;
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve;
+  });
+
+  return {
+    promise,
+    resolve: (value: T) => {
+      if (!resolvePromise) {
+        throw new Error('Deferred promise resolve callback is unavailable');
+      }
+      resolvePromise(value);
+    },
+  };
 }

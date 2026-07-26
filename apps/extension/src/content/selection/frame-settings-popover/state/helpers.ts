@@ -1,4 +1,3 @@
-import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
   BlurSettings,
   BlurType,
@@ -7,19 +6,15 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import {
   dispatchFocusOpacityChanged,
-  dispatchHighlighterSettingsChanged,
   dispatchSessionBlurSettingsChanged,
   dispatchSessionFocusSettingsChanged,
 } from '../../../platform/page-context/frame-events';
+import { setFrameSessionBorderPreset } from '../../frame-runtime/session/border-preset';
 
 const DEFAULT_FOCUS_SETTINGS: FocusSettings = {
   opacity: 0.5,
   showBorder: false,
 };
-const logger = createLogger({ namespace: 'ContentFrameSettingsPopover' });
-
-export type FrameSettingsPresetCommitOutcome = 'accepted' | 'rejected';
-
 export function getDefaultFocusSettings(): FocusSettings {
   return { ...DEFAULT_FOCUS_SETTINGS };
 }
@@ -27,20 +22,12 @@ export function getDefaultFocusSettings(): FocusSettings {
 export function createFrameSettingsPresetHandler(args: {
   onApplyToFrame: (settings: { borderSettings?: BorderPreset }) => void;
   setSelectedPresetId: (presetId: string) => void;
-  setDefaultBorderPreset: (presetId: string) => Promise<void>;
 }) {
-  return async (preset: BorderPreset): Promise<FrameSettingsPresetCommitOutcome> => {
+  return (preset: BorderPreset): void => {
     args.setSelectedPresetId(preset.id);
-    args.onApplyToFrame({ borderSettings: { ...preset } });
-
-    try {
-      await args.setDefaultBorderPreset(preset.id);
-      dispatchHighlighterSettingsChanged({ defaultBorderPresetId: preset.id });
-      return 'accepted';
-    } catch (error) {
-      logger.error('Failed to save default preset', error);
-      return 'rejected';
-    }
+    const sessionPreset = { ...preset, padding: { ...preset.padding } };
+    args.onApplyToFrame({ borderSettings: sessionPreset });
+    setFrameSessionBorderPreset(sessionPreset);
   };
 }
 

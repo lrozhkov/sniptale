@@ -18,61 +18,9 @@ type SessionFocusSettingsChangedDetail = {
   settings: FocusSettings;
 };
 
-export type HighlighterSettingsChangedDetail = {
-  defaultBorderPresetId?: string;
-};
-
-const HIGHLIGHTER_SETTINGS_CHANGED_EVENT = 'sniptale-highlighter-settings-changed';
 const SESSION_BLUR_SETTINGS_CHANGED_EVENT = 'sniptale-session-blur-settings-changed';
 const SESSION_FOCUS_SETTINGS_CHANGED_EVENT = 'sniptale-session-focus-settings-changed';
 const FOCUS_OPACITY_CHANGED_EVENT = 'sniptale-focus-opacity-changed';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function parseHighlighterSettingsChangedDetail(
-  detail: unknown
-): HighlighterSettingsChangedDetail | null {
-  if (!isRecord(detail)) {
-    return null;
-  }
-
-  if (Object.keys(detail).some((key) => key !== 'defaultBorderPresetId')) {
-    return null;
-  }
-
-  if ('defaultBorderPresetId' in detail && typeof detail['defaultBorderPresetId'] !== 'string') {
-    return null;
-  }
-
-  return {
-    ...(typeof detail['defaultBorderPresetId'] === 'string'
-      ? { defaultBorderPresetId: detail['defaultBorderPresetId'] }
-      : {}),
-  };
-}
-
-export function dispatchHighlighterSettingsChanged(
-  detail: HighlighterSettingsChangedDetail = {},
-  target?: ContentRuntimeEventTarget
-): void {
-  dispatchContentRuntimeDetailEvent(HIGHLIGHTER_SETTINGS_CHANGED_EVENT, detail, target);
-}
-
-export function addHighlighterSettingsChangedListener(
-  listener: (detail: HighlighterSettingsChangedDetail) => void,
-  target?: ContentRuntimeEventTarget
-): () => void {
-  return addContentRuntimeDetailEventListener(
-    HIGHLIGHTER_SETTINGS_CHANGED_EVENT,
-    listener,
-    target,
-    {
-      parseDetail: parseHighlighterSettingsChangedDetail,
-    }
-  );
-}
 
 export function dispatchSessionBlurSettingsChanged(
   detail: SessionBlurSettingsChangedDetail,

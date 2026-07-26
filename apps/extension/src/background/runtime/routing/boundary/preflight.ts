@@ -12,7 +12,6 @@ export const backgroundOwnedMessageTypes = [
   MessageType.AI_SETTINGS_QUERY,
   MessageType.AI_SETTINGS_MUTATION,
   MessageType.AI_SECRET_UNLOCK,
-  MessageType.HIGHLIGHTER_SETTINGS_MUTATION,
   MessageType.NATIVE_APP_QUERY,
   MessageType.NATIVE_APP_MUTATION,
   MessageType.PAGE_ACCESS,

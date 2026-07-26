@@ -14,7 +14,6 @@ export function createHoverControllerStub() {
   const handlePointerUp = vi.fn();
   const hideHoverOverlay = vi.fn();
   const invalidateFrameCache = vi.fn();
-  const invalidateSettingsCache = vi.fn();
   const removeHoverOverlay = vi.fn();
   const removeOverlayContainer = vi.fn();
 
@@ -28,7 +27,6 @@ export function createHoverControllerStub() {
     },
     invalidation: {
       frameCache: invalidateFrameCache,
-      settingsCache: invalidateSettingsCache,
     },
     input: {
       mouseMove: handleMouseMove,
@@ -56,7 +54,6 @@ export function createHoverControllerStub() {
     handlePointerUp,
     hideHoverOverlay,
     invalidateFrameCache,
-    invalidateSettingsCache,
     removeHoverOverlay,
     removeOverlayContainer,
   };

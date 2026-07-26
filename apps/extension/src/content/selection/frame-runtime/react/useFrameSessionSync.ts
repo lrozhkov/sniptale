@@ -43,6 +43,7 @@ function useFrameSessionSyncEffect(args: UseFrameSessionSyncArgs) {
     highlighterSettingsCacheRef,
     globalEffectModeRef,
     sessionBlurSettingsRef,
+    sessionDefaultsInitializedRef,
     sessionFocusSettingsRef,
     sessionCalloutStyleRef,
   } = args;
@@ -55,6 +56,7 @@ function useFrameSessionSyncEffect(args: UseFrameSessionSyncArgs) {
         highlighterSettingsCacheRef,
         globalEffectModeRef,
         sessionBlurSettingsRef,
+        sessionDefaultsInitializedRef,
         sessionFocusSettingsRef,
         sessionCalloutStyleRef,
         syncFocusOpacity: (sourceFrameId, newOpacity) =>
@@ -72,6 +74,7 @@ function useFrameSessionSyncEffect(args: UseFrameSessionSyncArgs) {
       globalEffectModeRef,
       highlighterSettingsCacheRef,
       sessionBlurSettingsRef,
+      sessionDefaultsInitializedRef,
       sessionCalloutStyleRef,
       sessionFocusSettingsRef,
     ]

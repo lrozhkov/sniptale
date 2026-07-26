@@ -37,6 +37,8 @@ import { createFreeFrameDrawingHandlers, type FreeFramePointerEvent } from './dr
 import { createHoverInteractionHandlers } from './interactions';
 import { createHoverSession } from './session';
 import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
+import { setFrameSessionBorderPreset } from '../frame-runtime/session/border-preset';
+import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
 
 class TestPointerEvent extends MouseEvent implements FreeFramePointerEvent {
   readonly pointerId: number;
@@ -125,34 +127,30 @@ afterEach(() => {
   targetPolicy.hasBlockingHighlighterPopover.mockReturnValue(false);
   targetPolicy.isHighlighterExtensionUiElement.mockReturnValue(false);
   targetPolicy.isNearExistingFrameBorder.mockReturnValue(false);
+  setFrameSessionBorderPreset(DEFAULT_BORDER_PRESET);
 });
 
 describe('free frame drawing gesture', () => {
   it('renders the selected preset with drawing-layer opacity', () => {
-    const { handlers, session } = createFixture();
-    session.cachedHighlighterSettings = {
-      borderPresets: [
-        {
-          id: 'drawing-preset',
-          name: 'Drawing',
-          enabled: true,
-          order: 0,
-          width: 4,
-          color: '#8B5CF6',
-          style: 'dashed',
-          radius: 8,
-          padding: { top: 5, right: 5, bottom: 5, left: 5 },
-          shadow: 30,
-          opacity: 100,
-          strokeOpacity: 70,
-          fillColor: '#EF4444',
-          fillOpacity: 7,
-          inheritCustomCss: false,
-          customCss: '',
-        },
-      ],
-      defaultBorderPresetId: 'drawing-preset',
-    } as typeof session.cachedHighlighterSettings;
+    const { handlers } = createFixture();
+    setFrameSessionBorderPreset({
+      id: 'drawing-preset',
+      name: 'Drawing',
+      enabled: true,
+      order: 0,
+      width: 4,
+      color: '#8B5CF6',
+      style: 'dashed',
+      radius: 8,
+      padding: { top: 5, right: 5, bottom: 5, left: 5 },
+      shadow: 30,
+      opacity: 100,
+      strokeOpacity: 70,
+      fillColor: '#EF4444',
+      fillOpacity: 7,
+      inheritCustomCss: false,
+      customCss: '',
+    });
 
     handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20));
     handlers.handlePointerMove(createPointerEvent('pointermove', 60, 60));

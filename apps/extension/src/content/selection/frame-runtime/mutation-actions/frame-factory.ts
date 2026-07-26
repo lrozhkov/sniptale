@@ -12,14 +12,12 @@ import { useFrameUIStore } from '../state/frame-ui.store';
 type CreateAddFrameHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
   | 'setFrames'
-  | 'framesRef'
   | 'linkedElementsRef'
   | 'globalEffectModeRef'
   | 'globalStepBadgeAutoModeRef'
   | 'sessionBlurSettingsRef'
   | 'sessionFocusSettingsRef'
   | 'sessionStepBadgeTemplateRef'
-  | 'highlighterSettingsCacheRef'
   | 'recalculateStepBadgesRef'
 > & {
   calculateFrameCoords: (element: HTMLElement, borderSettings?: BorderPreset) => FrameData;
@@ -36,14 +34,12 @@ export function createCalculateFrameCoords(generateFrameId: () => string) {
 
 export function createAddFrameHandler({
   setFrames,
-  framesRef,
   linkedElementsRef,
   globalEffectModeRef,
   globalStepBadgeAutoModeRef,
   sessionBlurSettingsRef,
   sessionFocusSettingsRef,
   sessionStepBadgeTemplateRef,
-  highlighterSettingsCacheRef,
   recalculateStepBadgesRef,
   calculateFrameCoords,
 }: CreateAddFrameHandlerArgs) {
@@ -51,10 +47,8 @@ export function createAddFrameHandler({
     const frameData = buildFrameForAdd({
       calculateFrameCoords,
       element,
-      framesRef,
       globalEffectModeRef,
       globalStepBadgeAutoModeRef,
-      highlighterSettingsCacheRef,
       sessionBlurSettingsRef,
       sessionFocusSettingsRef,
       sessionStepBadgeTemplateRef,
@@ -79,13 +73,11 @@ export function createAddFreeFrameHandler(
 ) {
   return (input: FreeFrameInput) => {
     const frameData = buildFreeFrameForAdd({
-      framesRef: args.framesRef,
       globalEffectModeRef: args.globalEffectModeRef,
       globalStepBadgeAutoModeRef: args.globalStepBadgeAutoModeRef,
       sessionBlurSettingsRef: args.sessionBlurSettingsRef,
       sessionFocusSettingsRef: args.sessionFocusSettingsRef,
       sessionStepBadgeTemplateRef: args.sessionStepBadgeTemplateRef,
-      highlighterSettingsCacheRef: args.highlighterSettingsCacheRef,
       generateFrameId: args.generateFrameId,
       input,
     });

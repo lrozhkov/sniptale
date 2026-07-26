@@ -43,15 +43,21 @@ function createSyncFocusOpacityHandler(setFrames: FrameSetter) {
 
 export function createUpdateFrameEffectHandler({
   globalEffectModeRef,
+  sessionDefaultsInitializedRef,
   sessionBlurSettingsRef,
   sessionFocusSettingsRef,
   setFrames,
 }: Pick<
   UseFrameMutationActionHelperOptions,
-  'globalEffectModeRef' | 'sessionBlurSettingsRef' | 'sessionFocusSettingsRef' | 'setFrames'
+  | 'globalEffectModeRef'
+  | 'sessionBlurSettingsRef'
+  | 'sessionFocusSettingsRef'
+  | 'setFrames'
+  | 'sessionDefaultsInitializedRef'
 >) {
   return (frameId: string, mode: EffectMode) => {
     globalEffectModeRef.current = mode;
+    sessionDefaultsInitializedRef.current = true;
     setFrames((prev) => {
       const targetFrame = prev.find((frame) => frame.id === frameId);
       if (targetFrame?.blurSettings) {

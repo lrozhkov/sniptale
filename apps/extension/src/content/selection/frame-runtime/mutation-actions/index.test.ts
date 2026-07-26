@@ -32,11 +32,13 @@ describe('frame mutation action assembly', () => {
       current: { amount: 8, blurType: 'gaussian' as const, showBorder: true },
     };
     const sessionFocusSettingsRef = { current: { opacity: 0.5, showBorder: false } };
+    const sessionDefaultsInitializedRef = { current: false };
     const globalEffectModeRef = { current: 'border' as const };
 
     const updateFrameEffect = createUpdateFrameEffectHandler({
       globalEffectModeRef,
       sessionBlurSettingsRef,
+      sessionDefaultsInitializedRef,
       sessionFocusSettingsRef,
       setFrames,
     });
@@ -45,6 +47,7 @@ describe('frame mutation action assembly', () => {
     const updatedFrame = currentFrames[1];
     expect(updatedFrame?.effectMode).toBe('focus');
     expect(globalEffectModeRef.current).toBe('focus');
+    expect(sessionDefaultsInitializedRef.current).toBe(true);
     expect(sessionBlurSettingsRef.current).toEqual(updatedFrame?.blurSettings);
     expect(sessionFocusSettingsRef.current).toEqual(updatedFrame?.focusSettings);
   });

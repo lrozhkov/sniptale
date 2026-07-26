@@ -108,8 +108,5 @@ export function createHighlighterInvalidateActions(
     invalidateFrameCache: () => {
       hoverController.invalidation.frameCache();
     },
-    invalidateSettingsCache: () => {
-      hoverController.invalidation.settingsCache();
-    },
   };
 }

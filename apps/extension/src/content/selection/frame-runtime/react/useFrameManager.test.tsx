@@ -18,9 +18,12 @@ function createRefs() {
     prevFrameStatesRef: { current: new Map() },
     prevFramesRef: { current: [] },
     rootsRef: { current: new Map() },
-    sessionBlurSettingsRef: { current: { amount: 8, blurType: 'gaussian', showBorder: true } },
     sessionCalloutStyleRef: { current: null },
-    sessionFocusSettingsRef: { current: { opacity: 0.5, showBorder: false } },
+    sessionSettingsRefs: {
+      blurSettings: { current: { amount: 8, blurType: 'gaussian', showBorder: true } },
+      defaultsInitialized: { current: true },
+      focusSettings: { current: { opacity: 0.5, showBorder: false } },
+    },
     sessionStepBadgeTemplateRef: { current: null },
     stepBadgeOrderRef: { current: new Map() },
   };

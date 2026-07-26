@@ -33,7 +33,6 @@ export interface HighlighterController {
   dispose: () => void;
   enableMode: () => void;
   invalidateFrameCache: () => void;
-  invalidateSettingsCache: () => void;
   isEnabled: () => boolean;
   isPausedState: () => boolean;
   pause: () => void;

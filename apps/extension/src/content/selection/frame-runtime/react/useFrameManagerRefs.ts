@@ -37,6 +37,7 @@ export function useFrameManagerRefs(): FrameManagerRefs {
   const globalEffectModeRef = useRef<EffectMode>('border');
   const sessionBlurSettingsRef = useRef<BlurSettings>({ ...DEFAULT_BLUR_SETTINGS });
   const sessionFocusSettingsRef = useRef<FocusSettings>({ ...DEFAULT_FOCUS_SETTINGS });
+  const sessionDefaultsInitializedRef = useRef(false);
   const sessionStepBadgeTemplateRef = useRef<StepBadgeSettings | null>(null);
   const sessionCalloutStyleRef = useRef<Partial<CalloutSettings> | null>(null);
   const stepBadgeOrderRef = useRef<Map<string, number>>(new Map());
@@ -54,8 +55,11 @@ export function useFrameManagerRefs(): FrameManagerRefs {
     prevFramesRef,
     prevFrameStatesRef,
     globalEffectModeRef,
-    sessionBlurSettingsRef,
-    sessionFocusSettingsRef,
+    sessionSettingsRefs: {
+      blurSettings: sessionBlurSettingsRef,
+      defaultsInitialized: sessionDefaultsInitializedRef,
+      focusSettings: sessionFocusSettingsRef,
+    },
     sessionStepBadgeTemplateRef,
     sessionCalloutStyleRef,
     stepBadgeOrderRef,

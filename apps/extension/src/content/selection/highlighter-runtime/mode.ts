@@ -1,5 +1,4 @@
 import { deactivateOtherContentModes, setContentModeEnabled } from '../../application/mode-session';
-import { addHighlighterSettingsChangedListener } from '../../platform/page-context/frame-events';
 import { dispatchHighlighterModeChanged as emitHighlighterModeChanged } from '../../platform/page-context/mode-events';
 import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 import type { HoverController } from '../highlighter-hover-preview';
@@ -36,14 +35,6 @@ export function enableHighlighterRuntime(
     isAnyFrameEditing: () => state.isFrameEditing,
   });
   state.cleanupEventListeners = cleanupRuntimeListeners;
-  const cleanupSettingsChanged = addHighlighterSettingsChangedListener((detail) => {
-    hoverController.invalidation.settingsCache(detail);
-  });
-
-  state.cleanupEventListeners = () => {
-    cleanupRuntimeListeners();
-    cleanupSettingsChanged();
-  };
 }
 
 export function disableHighlighterRuntime(

@@ -88,11 +88,6 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       type: typeof MessageType.HIGHLIGHTER_MODE_STATUS;
       tabId?: number;
     };
-    [MessageType.HIGHLIGHTER_SETTINGS_MUTATION]: {
-      type: typeof MessageType.HIGHLIGHTER_SETTINGS_MUTATION;
-      operation: 'set-default-border-preset';
-      presetId: string;
-    };
     [MessageType.ENABLE_QUICK_EDIT_MODE]: {
       type: typeof MessageType.ENABLE_QUICK_EDIT_MODE;
       tabId?: number;
@@ -155,7 +150,6 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
     [MessageType.ENABLE_HIGHLIGHTER_MODE]: RuntimeEmptyResponse;
     [MessageType.DISABLE_HIGHLIGHTER_MODE]: RuntimeEmptyResponse;
     [MessageType.HIGHLIGHTER_MODE_STATUS]: ModeStatusResponse;
-    [MessageType.HIGHLIGHTER_SETTINGS_MUTATION]: RuntimeMessageResponse<{ result?: string }>;
     [MessageType.ENABLE_QUICK_EDIT_MODE]: RuntimeEmptyResponse;
     [MessageType.DISABLE_QUICK_EDIT_MODE]: RuntimeEmptyResponse;
     [MessageType.QUICK_EDIT_MODE_STATUS]: ModeStatusResponse;

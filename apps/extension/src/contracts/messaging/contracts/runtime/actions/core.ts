@@ -56,12 +56,6 @@ function isContentRuntimeWakeupReason(value: unknown): value is 'pin-to-tab' | '
   return value === 'pin-to-tab' || value === 'scenario';
 }
 
-function isHighlighterSettingsMutationOperation(
-  value: unknown
-): value is 'set-default-border-preset' {
-  return value === 'set-default-border-preset';
-}
-
 function isPageStorageErasureOperation(value: unknown): value is 'erase' | 'verify' {
   return value === 'erase' || value === 'verify';
 }
@@ -140,22 +134,6 @@ export const runtimeActionCoreMessageContracts = {
       createRuntimeResponseGuard({
         optional: { reason: isContentRuntimeWakeupReason, restored: isBoolean },
       })
-    ),
-  },
-  [MessageType.HIGHLIGHTER_SETTINGS_MUTATION]: {
-    parseRequest: createGuardParser(
-      'runtime HIGHLIGHTER_SETTINGS_MUTATION message',
-      createMessageGuard({
-        type: MessageType.HIGHLIGHTER_SETTINGS_MUTATION,
-        required: {
-          operation: isHighlighterSettingsMutationOperation,
-          presetId: isString,
-        },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime HIGHLIGHTER_SETTINGS_MUTATION response',
-      createRuntimeResponseGuard({ optional: { result: isString } })
     ),
   },
   [MessageType.ERASE_LOCAL_EXTENSION_DATA]: {

@@ -29,7 +29,6 @@ import {
   dispatchFocusOpacityChanged,
   dispatchFrameCalloutChanged,
   dispatchFrameStepBadgeChanged,
-  dispatchHighlighterSettingsChanged,
   dispatchSessionBlurSettingsChanged,
   dispatchSessionFocusSettingsChanged,
   dispatchStepBadgeReorder,
@@ -120,7 +119,6 @@ function dispatchFrameSessionEvents() {
   dispatchSessionFocusSettingsChanged({
     settings: { opacity: 0.25, showBorder: true },
   });
-  dispatchHighlighterSettingsChanged();
 }
 
 beforeEach(() => {
@@ -144,6 +142,7 @@ it('syncs frame and callout events through the shared frame-event seam', async (
     reorderStepBadge,
     sessionBlurSettingsRef: { current: DEFAULT_SETTINGS.defaultBlurSettings },
     sessionCalloutStyleRef: { current: null },
+    sessionDefaultsInitializedRef: { current: false },
     sessionFocusSettingsRef: { current: DEFAULT_SETTINGS.defaultFocusSettings },
     setFrames: framesStore.setFrames,
     syncFocusOpacity,
@@ -191,6 +190,7 @@ it('wraps only discrete non-step-badge session handlers with history commits', a
     reorderStepBadge: vi.fn(),
     sessionBlurSettingsRef: { current: DEFAULT_SETTINGS.defaultBlurSettings },
     sessionCalloutStyleRef: { current: null },
+    sessionDefaultsInitializedRef: { current: false },
     sessionFocusSettingsRef: { current: DEFAULT_SETTINGS.defaultFocusSettings },
     setFrames: framesStore.setFrames,
     syncFocusOpacity: vi.fn(),
