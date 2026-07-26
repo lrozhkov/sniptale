@@ -246,7 +246,7 @@ describe('frame popover positioning', () => {
     expect(Number(popover.dataset['top'])).toBe(158);
   });
 
-  it('keeps a quick-control popover fixed when its annotation anchor moves', () => {
+  it('opens a quick-control popover to the right and keeps that position fixed', () => {
     let anchorTop = 105;
     const anchor = document.createElement('button');
     anchor.getBoundingClientRect = vi.fn(() => new DOMRect(250, anchorTop, 24, 24));
@@ -254,7 +254,8 @@ describe('frame popover positioning', () => {
 
     act(() => root.render(<PositionHarness anchorEl={anchor} />));
     const popover = container.firstElementChild as HTMLElement;
-    expect(Number(popover.dataset['top'])).toBe(139);
+    expect(Number(popover.dataset['left'])).toBe(284);
+    expect(Number(popover.dataset['top'])).toBe(77);
 
     anchorTop = 285;
     act(() =>
@@ -263,6 +264,32 @@ describe('frame popover positioning', () => {
       )
     );
 
+    expect(Number(popover.dataset['left'])).toBe(284);
+    expect(Number(popover.dataset['top'])).toBe(77);
+  });
+
+  it('opens a quick-control popover to the left when the right side has no room', () => {
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(760, 105, 24, 24));
+    document.body.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['left'])).toBe(590);
+    expect(Number(popover.dataset['top'])).toBe(77);
+  });
+
+  it('uses the canonical vertical fallback when neither quick-control side fits', () => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(200);
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(88, 105, 24, 24));
+    document.body.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['left'])).toBe(20);
     expect(Number(popover.dataset['top'])).toBe(139);
   });
 
@@ -273,12 +300,14 @@ describe('frame popover positioning', () => {
     document.body.append(anchor);
 
     act(() => root.render(<PositionHarness anchorEl={anchor} />));
-    expect(Number((container.firstElementChild as HTMLElement).dataset['top'])).toBe(139);
+    expect(Number((container.firstElementChild as HTMLElement).dataset['left'])).toBe(284);
+    expect(Number((container.firstElementChild as HTMLElement).dataset['top'])).toBe(77);
 
     act(() => root.render(<PositionHarness anchorEl={anchor} isOpen={false} />));
     anchorTop = 285;
     act(() => root.render(<PositionHarness anchorEl={anchor} />));
 
-    expect(Number((container.firstElementChild as HTMLElement).dataset['top'])).toBe(319);
+    expect(Number((container.firstElementChild as HTMLElement).dataset['left'])).toBe(284);
+    expect(Number((container.firstElementChild as HTMLElement).dataset['top'])).toBe(257);
   });
 });
