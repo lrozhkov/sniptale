@@ -58,7 +58,10 @@ function createDetector(detections: AutoBlurDetection[]): AutoBlurDetector {
 describe('scanAutoBlurTargets', () => {
   beforeEach(() => {
     visibleTextMocks.collectVisibleAutoBlurTextSources.mockReset();
-    visibleTextMocks.getAutoBlurTextSourceRangeRects.mockClear();
+    visibleTextMocks.getAutoBlurTextSourceRangeRects.mockReset();
+    visibleTextMocks.getAutoBlurTextSourceRangeRects.mockImplementation(
+      (source: AutoBlurTextSource) => source.rects
+    );
   });
 
   it('dedupes overlapping detections, keeps raw values, and marks existing blur frames', async () => {
@@ -91,5 +94,21 @@ describe('scanAutoBlurTargets', () => {
       value: 'https://a.io/path',
     });
     expect(visibleTextMocks.getAutoBlurTextSourceRangeRects).toHaveBeenCalledWith(source, 0, 8);
+  });
+
+  it('uses the complete multiline range instead of only its first rectangle', async () => {
+    const source = createSource('john@example.com');
+    visibleTextMocks.collectVisibleAutoBlurTextSources.mockReturnValue([source]);
+    visibleTextMocks.getAutoBlurTextSourceRangeRects.mockReturnValue([
+      { height: 16, width: 80, x: 10, y: 2400 },
+      { height: 16, width: 40, x: 10, y: 2420 },
+    ]);
+
+    const result = await scanAutoBlurTargets(
+      { frames: [] },
+      createDetector([createDetection(source, {})])
+    );
+
+    expect(result.matches[0]?.rect).toEqual({ height: 36, width: 80, x: 10, y: 2400 });
   });
 });

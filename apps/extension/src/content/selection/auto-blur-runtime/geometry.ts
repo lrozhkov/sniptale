@@ -24,12 +24,39 @@ export function normalizeAutoBlurRect(
     return null;
   }
 
+  const x = Math.floor(rect.x);
+  const y = Math.floor(rect.y);
+
   return {
-    x: Math.round(rect.x),
-    y: Math.round(rect.y),
-    width: Math.round(rect.width),
-    height: Math.round(rect.height),
+    x,
+    y,
+    width: Math.ceil(rect.x + rect.width) - x,
+    height: Math.ceil(rect.y + rect.height) - y,
   };
+}
+
+export function getAutoBlurRectUnion(rects: AutoBlurTextRect[]): AutoBlurTextRect | null {
+  if (rects.length === 0) {
+    return null;
+  }
+
+  let left = Number.POSITIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  rects.forEach((rect) => {
+    left = Math.min(left, rect.x);
+    top = Math.min(top, rect.y);
+    right = Math.max(right, rect.x + rect.width);
+    bottom = Math.max(bottom, rect.y + rect.height);
+  });
+
+  return normalizeAutoBlurRect({
+    height: bottom - top,
+    width: right - left,
+    x: left,
+    y: top,
+  });
 }
 
 export function isFrameOverlappingAutoBlurRect(frame: FrameData, rect: AutoBlurTextRect): boolean {

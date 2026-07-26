@@ -4,7 +4,6 @@ import type {
   FrameData,
 } from '../../../../features/highlighter/contracts';
 import { createCompositeSelector } from '../../../platform/frame/selectors';
-import { getAbsolutePosition } from '../../../platform/frame';
 import {
   DEFAULT_BORDER_PRESET,
   DEFAULT_FOCUS_SETTINGS,
@@ -21,6 +20,8 @@ import { shouldDropLinkedElement } from '../roots/scroll/linked-elements';
 import type { UseFrameMutationActionHelperOptions } from './types';
 import { createGenerateFrameId } from './frame-factory';
 import { useFrameUIStore } from '../state/frame-ui.store';
+import { calculateFrameContainerCoords, createFrameCalcSettings } from '../coords';
+import { calculateFrameOffsetFromElement } from '../manager/coords';
 
 type CreateAddAutoBlurFramesHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -49,16 +50,6 @@ function cloneFocusSettings(settings: FocusSettings | undefined): FocusSettings 
   return { ...(settings ?? DEFAULT_FOCUS_SETTINGS) };
 }
 
-function createFrameOffset(target: AutoBlurApplyInput['targets'][number]) {
-  const elementPosition = getAbsolutePosition(target.element);
-  return {
-    x: target.rect.x - elementPosition.x,
-    y: target.rect.y - elementPosition.y,
-    width: target.rect.width - elementPosition.width,
-    height: target.rect.height - elementPosition.height,
-  };
-}
-
 function createLinkedElementSelector(element: HTMLElement): string {
   const selector = createCompositeSelector(element);
   return selector.iframeSelector
@@ -73,16 +64,18 @@ function createAutoBlurFrame(args: {
   target: AutoBlurApplyInput['targets'][number];
   blurSettings: AutoBlurApplyInput['blurSettings'];
 }): FrameData {
+  const frameCoords = calculateFrameContainerCoords(
+    args.target.rect,
+    createFrameCalcSettings(args.borderSettings)
+  );
+
   return {
     id: args.generateFrameId(),
     createdBy: 'auto-blur',
-    x: args.target.rect.x,
-    y: args.target.rect.y,
-    width: args.target.rect.width,
-    height: args.target.rect.height,
+    ...frameCoords,
     linkedElement: args.target.element,
     linkedElementSelector: createLinkedElementSelector(args.target.element),
-    offset: createFrameOffset(args.target),
+    offset: calculateFrameOffsetFromElement(frameCoords, args.target.element),
     effectMode: 'blur',
     borderSettings: args.borderSettings,
     blurSettings: { ...args.blurSettings },
@@ -146,16 +139,16 @@ export function createAddAutoBlurFramesHandler(args: CreateAddAutoBlurFramesHand
   const generateFrameId = createGenerateFrameId();
 
   return (input: AutoBlurApplyInput) => {
-    let addedFrames: FrameData[] = [];
+    const addedFrames: FrameData[] = [];
+    const borderSettings = resolveDefaultBorderPreset(args.highlighterSettingsCacheRef.current);
+    const focusSettings = cloneFocusSettings(args.sessionFocusSettingsRef.current);
 
-    args.setFrames((prev) => {
-      const availableTargets = input.targets.filter(
-        (target) => !hasBlurFrameForRect([...prev, ...addedFrames], target.rect)
-      );
-      const borderSettings = resolveDefaultBorderPreset(args.highlighterSettingsCacheRef.current);
-      const focusSettings = cloneFocusSettings(args.sessionFocusSettingsRef.current);
+    input.targets.forEach((target) => {
+      if (hasBlurFrameForRect([...args.framesRef.current, ...addedFrames], target.rect)) {
+        return;
+      }
 
-      addedFrames = availableTargets.map((target) =>
+      addedFrames.push(
         createAutoBlurFrame({
           borderSettings,
           blurSettings: input.blurSettings,
@@ -164,9 +157,12 @@ export function createAddAutoBlurFramesHandler(args: CreateAddAutoBlurFramesHand
           target,
         })
       );
-
-      return addedFrames.length > 0 ? [...prev, ...addedFrames] : prev;
     });
+
+    if (addedFrames.length > 0) {
+      args.framesRef.current = [...args.framesRef.current, ...addedFrames];
+      args.setFrames((prev) => [...prev, ...addedFrames]);
+    }
 
     addedFrames.forEach((frame) => {
       if (frame.linkedElement) {

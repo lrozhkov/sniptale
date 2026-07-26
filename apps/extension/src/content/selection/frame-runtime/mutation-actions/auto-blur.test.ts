@@ -13,11 +13,15 @@ import {
 const iframeUtilsMocks = vi.hoisted(() => ({
   createCompositeSelector: vi.fn(),
   getAbsolutePosition: vi.fn(),
+  getContainingIframe: vi.fn(),
   invalidateFrameCache: vi.fn(),
+  resolveDocumentPagePlacement: vi.fn(),
 }));
 
 vi.mock('../../../platform/frame', () => ({
   getAbsolutePosition: iframeUtilsMocks.getAbsolutePosition,
+  getContainingIframe: iframeUtilsMocks.getContainingIframe,
+  resolveDocumentPagePlacement: iframeUtilsMocks.resolveDocumentPagePlacement,
 }));
 
 vi.mock('../../../platform/frame/selectors', () => ({
@@ -34,6 +38,8 @@ import {
   createSyncAutoBlurFramesHandler,
 } from './auto-blur';
 import { useFrameUIStore } from '../state/frame-ui.store';
+import { getBlurOverlayBox } from '../effects/geometry';
+import { syncFramePositionOnScroll } from '../roots/scroll/frame-updates';
 
 type HandlerArgs = Parameters<typeof createAddAutoBlurFramesHandler>[0];
 
@@ -102,11 +108,12 @@ function expectAddedFrame(frame: FrameData | undefined, element: HTMLElement) {
     height: 18,
     linkedElement: element,
     linkedElementSelector: '#target',
-    offset: { height: -12, width: -20, x: 95, y: 110 },
+    offset: { height: -12, width: -20, x: 93, y: 108 },
     width: 70,
-    x: 100,
-    y: 120,
+    x: 98,
+    y: 118,
   });
+  expect(getBlurOverlayBox(frame!)).toEqual({ height: 18, width: 70, x: 100, y: 120 });
 }
 
 function expectAutoBlurFramesAdded() {
@@ -198,6 +205,7 @@ function expectAutoBlurFramesSyncedToCurrentTargets() {
 
 describe('createAddAutoBlurFramesHandler', () => {
   beforeEach(() => {
+    document.body.innerHTML = '';
     vi.clearAllMocks();
     useFrameUIStore.getState().reset();
     iframeUtilsMocks.createCompositeSelector.mockReturnValue({
@@ -210,10 +218,26 @@ describe('createAddAutoBlurFramesHandler', () => {
       x: 5,
       y: 10,
     });
+    iframeUtilsMocks.getContainingIframe.mockReturnValue(null);
   });
 
   it('adds blur frames for selected targets and skips duplicate blur rectangles', () => {
     expectAutoBlurFramesAdded();
+  });
+
+  it('expands the blur overlay by the configured frame padding', () => {
+    const scenario = createHandlerScenario();
+    const preset = scenario.args.highlighterSettingsCacheRef.current!.borderPresets[0]!;
+    preset.padding = { bottom: 3, left: 2, right: 4, top: 1 };
+
+    createAddAutoBlurFramesHandler(scenario.args)(createAutoBlurInput(scenario.element));
+
+    expect(getBlurOverlayBox(scenario.getFrames()[1]!)).toEqual({
+      height: 22,
+      width: 76,
+      x: 98,
+      y: 119,
+    });
   });
 
   it('clears only auto-blur frames for matching scan targets', () => {
@@ -222,6 +246,69 @@ describe('createAddAutoBlurFramesHandler', () => {
 
   it('syncs auto-blur frames to the current scan and drops stale page frames', () => {
     expectAutoBlurFramesSyncedToCurrentTargets();
+  });
+
+  it('registers an offscreen DOM anchor before a deferred React update and follows scroll', () => {
+    const scenario = createHandlerScenario();
+    const committedBeforeAdd = scenario.getFrames();
+    const pendingUpdates: SetStateAction<FrameData[]>[] = [];
+    scenario.args.setFrames = vi.fn((update) => pendingUpdates.push(update));
+    document.body.appendChild(scenario.element);
+    iframeUtilsMocks.getAbsolutePosition.mockReturnValue({
+      height: 30,
+      width: 90,
+      x: 5,
+      y: 2400,
+    });
+
+    const result = createAddAutoBlurFramesHandler(scenario.args)({
+      blurSettings: createBlurSettingsFixture({ amount: 22, blurType: 'solid' }),
+      targets: [
+        {
+          element: scenario.element,
+          id: 'offscreen',
+          rect: { height: 18, width: 70, x: 100, y: 2420 },
+        },
+      ],
+    });
+
+    expect(result).toEqual({ addedCount: 1, skippedCount: 0 });
+    const pendingUpdate = pendingUpdates[0];
+    const committedFrames =
+      typeof pendingUpdate === 'function' ? pendingUpdate(committedBeforeAdd) : pendingUpdate!;
+    const frame = committedFrames.at(-1)!;
+    expect(scenario.args.linkedElementsRef.current.get(frame.id)).toBe(scenario.element);
+    expect(getBlurOverlayBox(frame)).toEqual({
+      height: 18,
+      width: 70,
+      x: 100,
+      y: 2420,
+    });
+
+    iframeUtilsMocks.getAbsolutePosition.mockReturnValue({
+      height: 30,
+      width: 90,
+      x: 5,
+      y: 100,
+    });
+    const setFramesAfterScroll = vi.fn();
+    syncFramePositionOnScroll({
+      frame,
+      frameState: undefined,
+      linkedElement: scenario.args.linkedElementsRef.current.get(frame.id),
+      linkedElementsRef: scenario.args.linkedElementsRef,
+      setFrames: setFramesAfterScroll,
+    });
+
+    const scrollUpdate = setFramesAfterScroll.mock.calls[0]?.[0] as SetStateAction<FrameData[]>;
+    const scrolledFrames =
+      typeof scrollUpdate === 'function' ? scrollUpdate(committedFrames) : scrollUpdate;
+    expect(getBlurOverlayBox(scrolledFrames.at(-1)!)).toEqual({
+      height: 18,
+      width: 70,
+      x: 100,
+      y: 120,
+    });
   });
 
   it('cleans transient UI before a deferred React frame updater is flushed', () => {
