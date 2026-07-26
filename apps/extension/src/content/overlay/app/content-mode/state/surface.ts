@@ -12,14 +12,45 @@ import {
 
 function useContentPinToTabState() {
   const [pinToTab, setPinToTabState] = useState(readContentPinToTabSessionState);
+  const confirmedPinToTabRef = useRef(pinToTab);
   const writeGenerationRef = useRef(0);
 
-  const setPinToTab = useCallback((value: boolean) => {
-    const writeGeneration = writeGenerationRef.current + 1;
-    writeGenerationRef.current = writeGeneration;
-    writeContentPinToTabSessionState(value, () => writeGenerationRef.current === writeGeneration);
+  const commitPinToTabState = useCallback((value: boolean) => {
     setPinToTabState(value);
   }, []);
+
+  const commitConfirmedPinToTabState = useCallback(
+    (value: boolean) => {
+      confirmedPinToTabRef.current = value;
+      commitPinToTabState(value);
+    },
+    [commitPinToTabState]
+  );
+
+  const setPinToTab = useCallback(
+    (value: boolean) => {
+      const writeGeneration = writeGenerationRef.current + 1;
+      writeGenerationRef.current = writeGeneration;
+      const isCurrent = () => writeGenerationRef.current === writeGeneration;
+
+      commitPinToTabState(value);
+      void writeContentPinToTabSessionState(value, isCurrent)
+        .then((result) => {
+          if (result.status === 'acknowledged') {
+            confirmedPinToTabRef.current = result.value;
+            if (isCurrent()) {
+              commitPinToTabState(result.value);
+            }
+          }
+        })
+        .catch(() => {
+          if (isCurrent()) {
+            commitPinToTabState(confirmedPinToTabRef.current);
+          }
+        });
+    },
+    [commitPinToTabState]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -32,14 +63,14 @@ function useContentPinToTabState() {
           return;
         }
 
-        setPinToTabState(value);
+        commitConfirmedPinToTabState(value);
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [commitConfirmedPinToTabState]);
 
   return { pinToTab, setPinToTab };
 }

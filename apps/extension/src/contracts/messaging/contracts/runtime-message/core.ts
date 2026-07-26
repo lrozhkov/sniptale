@@ -118,6 +118,7 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       requestId: string;
     };
     [MessageType.CONTENT_RUNTIME_WAKEUP]: {
+      pinToTab?: boolean;
       type: typeof MessageType.CONTENT_RUNTIME_WAKEUP;
     };
     [MessageType.EXPORT_POPUP_PROGRESS]: RuntimePopupExportProgressMessage;
@@ -158,6 +159,7 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
     [MessageType.PAGE_ACCESS]: PageAccessResponse;
     [MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY]: PopupTabRouteCapabilityResponse;
     [MessageType.CONTENT_RUNTIME_WAKEUP]: RuntimeMessageResponse<{
+      pinToTab: boolean;
       restored?: boolean;
       reason?: 'pin-to-tab' | 'scenario';
     }>;

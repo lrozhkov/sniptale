@@ -102,26 +102,45 @@ it('parses content privileged activation-key requests and responses', () => {
 it('parses content runtime wake-up responses with bounded restore reasons', () => {
   expect(
     contentRuntimeWakeupContract.parseResponse({
+      pinToTab: true,
       reason: 'pin-to-tab',
       restored: true,
       success: true,
     })
   ).toEqual({
+    pinToTab: true,
     reason: 'pin-to-tab',
     restored: true,
     success: true,
   });
   expect(
     contentRuntimeWakeupContract.parseResponse({
+      pinToTab: false,
       reason: 'scenario',
       restored: true,
       success: true,
     })
   ).toEqual({
+    pinToTab: false,
     reason: 'scenario',
     restored: true,
     success: true,
   });
+  expect(
+    contentRuntimeWakeupContract.parseResponse({
+      error: 'wake-up failed',
+      success: false,
+    })
+  ).toEqual({
+    error: 'wake-up failed',
+    success: false,
+  });
+  expect(() =>
+    contentRuntimeWakeupContract.parseResponse({
+      restored: false,
+      success: true,
+    })
+  ).toThrow();
   expect(() =>
     contentRuntimeWakeupContract.parseResponse({
       reason: 'other',
@@ -134,11 +153,19 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
 it('parses content runtime wake-up requests', () => {
   expect(
     contentRuntimeWakeupContract.parseRequest({
+      pinToTab: true,
       type: MessageType.CONTENT_RUNTIME_WAKEUP,
     })
   ).toEqual({
+    pinToTab: true,
     type: MessageType.CONTENT_RUNTIME_WAKEUP,
   });
+  expect(() =>
+    contentRuntimeWakeupContract.parseRequest({
+      pinToTab: 'yes',
+      type: MessageType.CONTENT_RUNTIME_WAKEUP,
+    })
+  ).toThrow();
 });
 
 it('strictly parses the offscreen page-storage privacy command and result', () => {

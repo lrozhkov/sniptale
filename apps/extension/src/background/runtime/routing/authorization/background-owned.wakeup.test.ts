@@ -21,11 +21,12 @@ function contentRuntimeWakeupRequest(
     frameId: 0,
     tab: { id: 7 } as chrome.tabs.Tab,
     url: 'https://example.test/page',
-  }
+  },
+  pinToTab?: boolean
 ): BackgroundOwnedAuthorizationRequest {
   return {
     kind: 'background-owned',
-    message: { type: MessageType.CONTENT_RUNTIME_WAKEUP },
+    message: { pinToTab, type: MessageType.CONTENT_RUNTIME_WAKEUP },
     sender,
   };
 }
@@ -61,7 +62,7 @@ it('authorizes content runtime wake-up with typed sender binding', () => {
 });
 
 it('rejects content runtime wake-up from unauthorized senders', () => {
-  expect(authorizeBackgroundOwnedRoute(contentRuntimeWakeupRequest({}))).toEqual({
+  expect(authorizeBackgroundOwnedRoute(contentRuntimeWakeupRequest({}, true))).toEqual({
     authorized: false,
     reason: 'Unauthorized content runtime wake-up sender',
   });

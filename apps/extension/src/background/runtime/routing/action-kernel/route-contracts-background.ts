@@ -30,9 +30,11 @@ export const BACKGROUND_ACTION_ROUTE_CONTRACTS = {
     freshnessReplayPolicy:
       'content sender binding and page-access state are checked before full runtime injection',
     requiredAuthority: 'content runtime wake-up owner policy',
-    responseShape: 'wake-up restored flag and optional restore reason',
-    sideEffects: 'lazy full content runtime injection and optional page-preparation restore',
-    transitiveStateOwner: 'background page-access owner plus scenario session state',
+    responseShape: 'authoritative pin state, wake-up restored flag, and optional restore reason',
+    sideEffects:
+      'pin-to-tab session mutation, lazy full content runtime injection, and optional page-preparation restore',
+    transitiveStateOwner:
+      'background pin-session persistence, page-access owner, and scenario session state',
   },
   'internal-signal': {
     acceptedSenderClass: 'background runtime internals',

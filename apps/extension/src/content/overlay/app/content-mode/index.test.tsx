@@ -8,17 +8,7 @@ import { installContentRuntimeMessagingMock } from '../../../application/runtime
 
 const storageMocks = vi.hoisted(() => ({
   loadSettings: vi.fn(async () => ({})),
-  sendRuntimeMessage: vi.fn(async () => ({
-    success: true,
-    documentId: 'content-document-7',
-    enabled: true,
-    tabId: 7,
-    viewport: null as { width: number; height: number } | null,
-  })),
-  browserStorageSessionGet: vi.fn(async () => ({})),
-  browserStorageSessionIsAvailable: vi.fn(() => false),
-  browserStorageSessionRemove: vi.fn(async () => undefined),
-  browserStorageSessionSet: vi.fn(async () => undefined),
+  sendRuntimeMessage: vi.fn<(message: unknown) => Promise<unknown>>(),
 }));
 
 vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
@@ -31,23 +21,6 @@ vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/runtime-messaging')>()),
   sendRuntimeMessage: storageMocks.sendRuntimeMessage,
 }));
-
-vi.mock(
-  '../../../../composition/persistence/infrastructure/browser-storage',
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import('../../../../composition/persistence/infrastructure/browser-storage')
-    >()),
-    browserStorage: {
-      session: {
-        get: storageMocks.browserStorageSessionGet,
-        isAvailable: storageMocks.browserStorageSessionIsAvailable,
-        remove: storageMocks.browserStorageSessionRemove,
-        set: storageMocks.browserStorageSessionSet,
-      },
-    },
-  })
-);
 
 import { useContentAppModeState } from '.';
 
@@ -81,12 +54,12 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   installContentRuntimeMessagingMock(storageMocks.sendRuntimeMessage);
   storageMocks.loadSettings.mockClear();
-  storageMocks.sendRuntimeMessage.mockClear();
-  storageMocks.browserStorageSessionGet.mockClear();
-  storageMocks.browserStorageSessionIsAvailable.mockClear();
-  storageMocks.browserStorageSessionRemove.mockClear();
-  storageMocks.browserStorageSessionSet.mockClear();
-  storageMocks.browserStorageSessionIsAvailable.mockReturnValue(false);
+  storageMocks.sendRuntimeMessage.mockReset();
+  storageMocks.sendRuntimeMessage.mockResolvedValue({
+    pinToTab: false,
+    restored: false,
+    success: true,
+  });
   window.sessionStorage.clear();
 });
 
@@ -156,19 +129,14 @@ function registerPinnedToolbarWindowStorageRestoreTest() {
   });
 }
 
-function registerPinnedToolbarBrowserSessionRestoreTest() {
-  it('hydrates pin-to-tab from browser session storage before restoring the toolbar state', async () => {
-    storageMocks.browserStorageSessionIsAvailable.mockReturnValue(true);
-    storageMocks.browserStorageSessionGet.mockResolvedValueOnce({
-      'sniptale.content.pin-to-tab:tab:7': true,
-    });
+function registerPinnedToolbarBackgroundRestoreTest() {
+  it('hydrates pin-to-tab through background and makes the restored toolbar visible', async () => {
     storageMocks.sendRuntimeMessage
       .mockResolvedValueOnce({
+        pinToTab: true,
+        reason: 'pin-to-tab',
+        restored: true,
         success: true,
-        documentId: 'content-document-7',
-        enabled: true,
-        tabId: 7,
-        viewport: null,
       })
       .mockResolvedValueOnce({
         success: true,
@@ -184,30 +152,33 @@ function registerPinnedToolbarBrowserSessionRestoreTest() {
       await Promise.resolve();
     });
 
-    expect(storageMocks.browserStorageSessionGet).toHaveBeenCalledWith({
-      'sniptale.content.pin-to-tab:tab:7': false,
+    expect(storageMocks.sendRuntimeMessage).toHaveBeenNthCalledWith(1, {
+      type: 'CONTENT_RUNTIME_WAKEUP',
+    });
+    expect(storageMocks.sendRuntimeMessage).toHaveBeenNthCalledWith(2, {
+      type: 'SCREENSHOT_MODE_STATUS',
     });
     expect(getLatestState().pinToTab).toBe(true);
     expect(getLatestState().screenshotMode).toBe(true);
+    expect(getLatestState().isToolbarVisible).toBe(true);
     expect(getLatestState().currentViewport).toEqual({ width: 1440, height: 900 });
   });
 }
 
 async function verifyStalePinHydrationIsIgnored() {
-  let resolveSessionState: (value: Record<string, unknown>) => void = () => undefined;
-  storageMocks.browserStorageSessionIsAvailable.mockReturnValue(true);
-  storageMocks.sendRuntimeMessage.mockResolvedValue({
-    success: true,
-    documentId: 'content-document-7',
-    enabled: true,
-    tabId: 7,
-    viewport: null,
-  });
-  storageMocks.browserStorageSessionGet.mockReturnValueOnce(
-    new Promise((resolve) => {
-      resolveSessionState = resolve;
-    })
-  );
+  let resolveHydration: (value: unknown) => void = () => undefined;
+  storageMocks.sendRuntimeMessage
+    .mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveHydration = resolve;
+      })
+    )
+    .mockResolvedValue({
+      pinToTab: true,
+      reason: 'pin-to-tab',
+      restored: true,
+      success: true,
+    });
 
   await renderHarness();
 
@@ -215,7 +186,8 @@ async function verifyStalePinHydrationIsIgnored() {
     getLatestState().setPinToTab(true);
   });
   await act(async () => {
-    resolveSessionState({ 'sniptale.content.pin-to-tab': false });
+    resolveHydration({ pinToTab: false, restored: false, success: true });
+    await Promise.resolve();
     await Promise.resolve();
   });
 
@@ -250,7 +222,7 @@ async function verifyDelayedPreferenceDoesNotOverwriteScenarioRestore() {
 describe('useContentAppModeState', () => {
   registerStableOverlayStateTests();
   registerPinnedToolbarWindowStorageRestoreTest();
-  registerPinnedToolbarBrowserSessionRestoreTest();
+  registerPinnedToolbarBackgroundRestoreTest();
   it(
     'does not let stale pin-to-tab hydration overwrite a newer toggle',
     verifyStalePinHydrationIsIgnored
