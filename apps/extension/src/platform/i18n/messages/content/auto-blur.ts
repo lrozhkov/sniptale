@@ -166,8 +166,8 @@ export const contentAutoBlurMessages = defineMessageSource({
     en: 'Find and blur data on the current page',
   },
   configure: {
-    ru: 'Настроить Auto-Blur',
-    en: 'Configure Auto-Blur',
+    ru: 'Настроить',
+    en: 'Configure',
   },
   configureHint: {
     ru: 'Выбрать типы данных, проверить найденное и настроить размытие',

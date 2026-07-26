@@ -130,8 +130,8 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Find and blur data on the current page',
   },
   'content.autoBlur.configure': {
-    ru: 'Настроить Auto-Blur',
-    en: 'Configure Auto-Blur',
+    ru: 'Настроить',
+    en: 'Configure',
   },
   'content.autoBlur.configureHint': {
     ru: 'Выбрать типы данных, проверить найденное и настроить размытие',
