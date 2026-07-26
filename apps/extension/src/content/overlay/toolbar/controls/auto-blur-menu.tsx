@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Check, Power, ScanText, Settings, ShieldEllipsis } from 'lucide-react';
+import { Check, ScanEye, ScanSearch, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -94,7 +94,7 @@ function AutoBlurToggleItem(props: Pick<DropdownProps, 'autoBlur' | 'isLoading' 
     <AutoBlurMenuItem
       dataUi="content.toolbar.auto-blur-toggle"
       disabled={toggleDisabled}
-      icon={<Power className="h-4 w-4" />}
+      icon={<ShieldCheck className="h-4 w-4" />}
       label={translate(
         props.autoBlur.autoApplyEnabled
           ? 'content.autoBlur.autoApplyDisabled'
@@ -120,7 +120,7 @@ function AutoBlurApplyOnceItem(props: Pick<DropdownProps, 'autoBlur' | 'isLoadin
     <AutoBlurMenuItem
       dataUi="content.toolbar.auto-blur-apply-once"
       disabled={props.isLoading || props.autoBlur.isApplying}
-      icon={<ScanText className="h-4 w-4" />}
+      icon={<ScanSearch className="h-4 w-4" />}
       label={translate('content.autoBlur.applyOnce')}
       hint={translate('content.autoBlur.applyOnceHint')}
       onSelect={async () => {
@@ -136,7 +136,7 @@ function AutoBlurConfigureItem(props: Pick<DropdownProps, 'autoBlur' | 'isLoadin
     <AutoBlurMenuItem
       dataUi="content.toolbar.auto-blur-configure"
       disabled={props.isLoading}
-      icon={<Settings className="h-4 w-4" />}
+      icon={<SlidersHorizontal className="h-4 w-4" />}
       label={translate('content.autoBlur.configure')}
       hint={translate('content.autoBlur.configureHint')}
       onSelect={() => {
@@ -246,7 +246,7 @@ export function AutoBlurMenu(props: AutoBlurMenuProps) {
         aria-haspopup="menu"
         aria-expanded={bindings.open}
       >
-        <ShieldEllipsis size={20} strokeWidth={2} />
+        <ScanEye size={20} strokeWidth={2} />
       </ContentToolbarButton>
 
       {renderAutoBlurDropdown(props, bindings)}
