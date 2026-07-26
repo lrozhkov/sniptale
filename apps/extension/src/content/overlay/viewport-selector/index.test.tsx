@@ -74,6 +74,7 @@ it('renders the selector without a synthetic loading contract and opens the menu
   }
 
   expect(button.disabled).toBe(false);
+  expect(button.querySelector('svg')).not.toBeNull();
   expect(container?.textContent).not.toContain('loading');
 
   await act(async () => {
@@ -83,4 +84,7 @@ it('renders the selector without a synthetic loading contract and opens the menu
   expect(viewportSelectorMocks.menuStateChangeMock).toHaveBeenCalledWith(true);
   expect(container?.textContent).toContain('content.toolbar.viewportNativeLabel');
   expect(container?.textContent).toContain('HD');
+  expect(
+    container?.querySelector('.sniptale-popover-menu')?.querySelector('.sniptale-popover-icon')
+  ).toBeNull();
 });

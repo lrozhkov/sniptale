@@ -211,7 +211,7 @@ describe('ToolbarPrimaryControls', () => {
     const modeButton = queryModeSelectorButton();
 
     expect(modeButton?.getAttribute('data-active')).toBe('true');
-    expect(modeButton?.getAttribute('title')).toBe('Стандартный');
+    expect(modeButton?.getAttribute('title')).toBe('Курсор');
 
     const active = createToolbarPrimaryControlsProps({ aiPickMode: true, isCursorMode: false });
     renderToolbarPrimaryControls(active.props);

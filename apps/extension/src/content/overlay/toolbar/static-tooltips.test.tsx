@@ -132,14 +132,14 @@ describe('toolbar static tooltips', () => {
   it('keeps capture-action tooltip static for active and inactive states', async () => {
     await renderCaptureActionToggle('download_default');
     const inactiveButton = document.querySelector('button');
-    expect(inactiveButton?.getAttribute('title')).toBe('После захвата');
+    expect(inactiveButton?.getAttribute('title')).toBe('После снимка');
     expect(inactiveButton?.getAttribute('data-tooltip')).toBeNull();
     expect(inactiveButton?.className.includes('sniptale-capture-active')).toBe(false);
     expect(inactiveButton?.getAttribute('data-active')).toBe('true');
 
     await renderCaptureActionToggle('copy');
     const activeButton = document.querySelector('button');
-    expect(activeButton?.getAttribute('title')).toBe('После захвата');
+    expect(activeButton?.getAttribute('title')).toBe('После снимка');
     expect(activeButton?.getAttribute('data-tooltip')).toBeNull();
     expect(activeButton?.className.includes('sniptale-capture-active')).toBe(false);
     expect(activeButton?.getAttribute('data-active')).toBe('true');
@@ -147,11 +147,15 @@ describe('toolbar static tooltips', () => {
 
   it('keeps viewport tooltip static even when emulation is active', async () => {
     await renderViewportButton(null);
-    expect(document.querySelector('button')?.getAttribute('title')).toBe('Эмуляция экрана');
+    expect(document.querySelector('button')?.getAttribute('title')).toBe(
+      'Размер страницы для снимка'
+    );
     expect(document.querySelector('button')?.getAttribute('data-tooltip')).toBeNull();
 
     await renderViewportButton({ width: 1440, height: 900 });
-    expect(document.querySelector('button')?.getAttribute('title')).toBe('Эмуляция экрана');
+    expect(document.querySelector('button')?.getAttribute('title')).toBe(
+      'Размер страницы для снимка'
+    );
     expect(document.querySelector('button')?.getAttribute('data-tooltip')).toBeNull();
     expect(document.querySelector('button')?.getAttribute('data-active')).toBe('true');
   }, 15000);
@@ -166,9 +170,9 @@ describe('toolbar static tooltips', () => {
     const buttons = Array.from(document.querySelectorAll('button'));
 
     expect(buttons.map((button) => button.getAttribute('title'))).toEqual([
-      'Видимая область',
-      'Полная страница',
-      'Выделенная область',
+      'Снимок видимой области',
+      'Снимок всей страницы',
+      'Выбрать область для снимка',
     ]);
     expect(buttons.every((button) => button.getAttribute('data-tooltip') === null)).toBe(true);
   });

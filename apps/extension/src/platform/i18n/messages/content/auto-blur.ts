@@ -150,27 +150,27 @@ export const contentAutoBlurMessages = defineMessageSource({
     en: 'Disable auto-blur',
   },
   autoApplyEnableHint: {
-    ru: 'Работает при закрепленной панели или активном сценарии',
-    en: 'Works when the toolbar is pinned or scenario mode is active',
+    ru: 'Автоматически размывать найденные данные перед каждым снимком',
+    en: 'Automatically blur detected data before every screenshot',
   },
   autoApplyBlockedHint: {
-    ru: 'Закрепите панель за вкладкой или включите сценарий',
-    en: 'Pin the toolbar to the tab or enable scenario mode',
+    ru: 'Сначала закрепите панель во вкладке или включите сценарий',
+    en: 'Pin the toolbar to this tab or turn on scenario mode first',
   },
   applyOnce: {
-    ru: 'Применить разово',
-    en: 'Apply once',
+    ru: 'Размыть данные сейчас',
+    en: 'Blur data now',
   },
   applyOnceHint: {
-    ru: 'Использует текущие настройки',
-    en: 'Uses current settings',
+    ru: 'Найти и размыть данные на текущей странице',
+    en: 'Find and blur data on the current page',
   },
   configure: {
-    ru: 'Настроить',
-    en: 'Configure',
+    ru: 'Настроить Auto-Blur',
+    en: 'Configure Auto-Blur',
   },
   configureHint: {
-    ru: 'Категории, найденные элементы и параметры blur',
-    en: 'Categories, detected items, and blur settings',
+    ru: 'Выбрать типы данных, проверить найденное и настроить размытие',
+    en: 'Choose data types, review matches, and adjust blur',
   },
 });

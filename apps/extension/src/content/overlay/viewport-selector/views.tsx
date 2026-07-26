@@ -12,8 +12,8 @@ import type { ViewportPreset } from '../../../contracts/settings';
 import type { ProductToolbarMenuPlacement } from '@sniptale/ui/product-menus/toolbar';
 import { PopoverCheckIcon } from '../icons/icons';
 
-function ViewportIcon({ className }: { className?: string }) {
-  return <Scaling className={className} size={18} strokeWidth={2} />;
+function ViewportIcon() {
+  return <Scaling size={18} strokeWidth={2} />;
 }
 
 export function ViewportSelectorButton(props: {
@@ -65,7 +65,6 @@ function ViewportMenuItem(props: {
       onClick={stopMenuEvent}
       selected={props.selected}
     >
-      <ViewportIcon className="sniptale-popover-icon" />
       <ProductToolbarMenuItemCopy label={props.label} hint={props.hint} />
       {props.selected ? <PopoverCheckIcon /> : null}
     </ProductToolbarMenuItem>

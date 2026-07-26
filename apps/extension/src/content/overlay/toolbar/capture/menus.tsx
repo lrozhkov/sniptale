@@ -18,7 +18,6 @@ type ToolbarCaptureActionMenuProps = {
     value: string;
     label: string;
     hint: string;
-    icon: React.ReactNode;
   }>;
   closeMenus: (except?: ToolbarCapturePopoverMenu | null) => void;
   displayMode: 'horizontal' | 'vertical';

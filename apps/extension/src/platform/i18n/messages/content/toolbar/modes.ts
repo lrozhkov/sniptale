@@ -44,16 +44,16 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Navigation lock',
   },
   cursorDefault: {
-    ru: 'Стандартный (по умолчанию)',
-    en: 'Standard (default)',
+    ru: 'Обычная работа со страницей без инструментов редактирования',
+    en: 'Use the page normally without editing tools',
   },
   cursorLabel: {
-    ru: 'Стандартный',
-    en: 'Standard',
+    ru: 'Курсор',
+    en: 'Cursor',
   },
   cursorEnable: {
-    ru: 'Перейти в стандартный режим',
-    en: 'Switch to standard mode',
+    ru: 'Вернуться к обычной работе со страницей',
+    en: 'Return to normal page interaction',
   },
   aiLabel: {
     ru: 'ИИ-редактор',
@@ -64,8 +64,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Close AI editor',
   },
   aiEnable: {
-    ru: 'Открыть ИИ-редактор',
-    en: 'Open AI editor',
+    ru: 'Выберите элемент на странице и опишите изменение',
+    en: 'Select a page element and describe the change',
   },
   quickEditLabel: {
     ru: 'Редактирование страницы',
@@ -76,8 +76,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Disable editing',
   },
   quickEditEnable: {
-    ru: 'Включить редактирование страницы',
-    en: 'Enable page editing',
+    ru: 'Редактируйте текст и стили прямо на странице',
+    en: 'Edit text and styles directly on the page',
   },
   quickEditDocumentModeLabel: {
     ru: 'Свободное редактирование',
@@ -100,8 +100,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Disable annotations',
   },
   highlighterEnable: {
-    ru: 'Включить аннотации',
-    en: 'Enable annotations',
+    ru: 'Добавляйте рамки, маски, размытие и комментарии',
+    en: 'Add frames, masks, blur, and comments',
   },
   clearFrames: {
     ru: 'Очистить все рамки',
@@ -112,8 +112,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Auto-Blur',
   },
   modeMenuTitle: {
-    ru: 'Режимы подготовки',
-    en: 'Preparation modes',
+    ru: 'Режим работы',
+    en: 'Working mode',
   },
   settingsLabel: {
     ru: 'Настройки панели',
@@ -128,47 +128,47 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Horizontal toolbar',
   },
   panelHorizontalHint: {
-    ru: 'Классическая раскладка в одну строку',
-    en: 'Classic single-row layout',
+    ru: 'Разместить кнопки панели в одну строку',
+    en: 'Arrange toolbar buttons in one row',
   },
   panelVertical: {
     ru: 'Вертикальная панель',
     en: 'Vertical toolbar',
   },
   panelVerticalHint: {
-    ru: 'Компактная раскладка с секциями друг под другом',
-    en: 'Compact stacked layout',
+    ru: 'Разместить секции панели друг под другом',
+    en: 'Stack toolbar sections vertically',
   },
   compactMenus: {
-    ru: 'Компактные меню',
-    en: 'Compact menus',
+    ru: 'Компактный вид меню',
+    en: 'Compact menu view',
   },
   compactMenusHint: {
-    ru: 'Скрывать подсказки и уплотнять выпадающие меню',
-    en: 'Hide hints and tighten dropdown menus',
+    ru: 'Скрыть описания и уменьшить высоту пунктов меню',
+    en: 'Hide descriptions and reduce the height of menu items',
   },
   pinToTab: {
-    ru: 'Закрепить за вкладкой',
-    en: 'Pin to tab',
+    ru: 'Закрепить панель во вкладке',
+    en: 'Pin toolbar to this tab',
   },
   pinToTabHint: {
-    ru: 'Восстанавливает панель после обновления страницы в этой вкладке',
-    en: 'Restores the toolbar after a page refresh in this tab',
+    ru: 'Снова показывать панель после обновления этой вкладки',
+    en: 'Show the toolbar again after this tab is refreshed',
   },
   pinToTabLockedHint: {
-    ru: 'В режиме сценария опция всегда включена для текущей сессии вкладки',
-    en: 'Scenario mode always keeps this enabled for the current tab session',
+    ru: 'Панель закреплена, пока включён сценарий',
+    en: 'The toolbar stays pinned while scenario mode is on',
   },
   hideToolbar: {
-    ru: 'Свернуть панель',
-    en: 'Collapse toolbar',
+    ru: 'Скрыть панель',
+    en: 'Hide toolbar',
   },
   screenshotDisable: {
-    ru: 'Отключить режим скриншота',
-    en: 'Disable screenshot mode',
+    ru: 'Выйти из режима снимка',
+    en: 'Exit screenshot mode',
   },
   screenshotEnable: {
-    ru: 'Включить режим скриншота',
-    en: 'Enable screenshot mode',
+    ru: 'Перейти в режим снимка',
+    en: 'Enter screenshot mode',
   },
 });

@@ -21,34 +21,11 @@ export function renderMenuCheck() {
 }
 
 export function getCaptureActionOptions() {
-  return getCaptureActionDescriptors().map((option) => ({
-    ...option,
-    icon: getCaptureActionMenuIcon(option.value),
-  })) satisfies Array<{
+  return getCaptureActionDescriptors() satisfies Array<{
     value: CaptureActionType;
     label: string;
     hint: string;
-    icon: React.ReactNode;
   }>;
-}
-
-function getCaptureActionMenuIcon(captureAction: CaptureActionType) {
-  const iconProps = { className: 'sniptale-popover-icon', size: 18, strokeWidth: 2 };
-  switch (captureAction) {
-    case 'ask_preset':
-      return <FolderInput {...iconProps} />;
-    case 'ask_system':
-      return <Save {...iconProps} />;
-    case 'copy':
-      return <Copy {...iconProps} />;
-    case 'scenario':
-      return <FileStack {...iconProps} />;
-    case 'edit':
-      return <Pencil {...iconProps} />;
-    case 'download_default':
-    default:
-      return <Download {...iconProps} />;
-  }
 }
 
 export function getTimerOptions() {
