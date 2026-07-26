@@ -81,6 +81,10 @@
   display: none;
 }
 
+.sniptale-toolbar-menu--compact .sniptale-toolbar-menu-item-hint--show-compact {
+  display: block;
+}
+
 .sniptale-popover-item:hover .sniptale-toolbar-menu-item-hint,
 .sniptale-popover-item-selected .sniptale-toolbar-menu-item-hint {
   color: var(--sniptale-color-text-secondary);

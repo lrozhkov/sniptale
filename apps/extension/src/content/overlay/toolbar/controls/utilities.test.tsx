@@ -79,6 +79,9 @@ describe('ToolbarUtilityButtons', () => {
 
     await renderUtilities(props);
     const autoBlurButton = container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]');
+    expect(autoBlurButton?.querySelector('svg')?.getAttribute('class')).toContain(
+      'lucide-shield-ellipsis'
+    );
     await act(async () => {
       autoBlurButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
@@ -94,7 +97,7 @@ describe('ToolbarUtilityButtons', () => {
   it('disables auto-enable when the toolbar is not pinned or scenario-owned', async () => {
     const props = createProps();
     props.autoBlur.autoApplyAllowed = false;
-    await renderUtilities(props);
+    await renderUtilities({ ...props, compactMenus: true });
 
     await act(async () => {
       container
@@ -105,5 +108,8 @@ describe('ToolbarUtilityButtons', () => {
     const toggle = container?.querySelector('[data-ui="content.toolbar.auto-blur-toggle"]');
     expect(toggle).toHaveProperty('disabled', true);
     expect(container?.textContent).toContain('content.autoBlur.autoApplyBlockedHint');
+    expect(
+      toggle?.querySelector('.sniptale-toolbar-menu-item-hint')?.getAttribute('class')
+    ).toContain('sniptale-toolbar-menu-item-hint--show-compact');
   });
 });
