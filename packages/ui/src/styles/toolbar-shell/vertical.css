@@ -14,6 +14,10 @@
   margin-bottom: 2px;
 }
 
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-drag-handle svg {
+  transform: rotate(90deg);
+}
+
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-group {
   width: 100%;
   flex-direction: column;

@@ -14,5 +14,9 @@ describe('toolbar-shell vertical contract', () => {
     );
     expect(toolbarShellVerticalStylesheet).toContain('.sniptale-glass-toolbar-divider {');
     expect(toolbarShellVerticalStylesheet).toContain('.sniptale-toolbar-menu-item > svg,');
+    expect(toolbarShellVerticalStylesheet).toContain(
+      ".sniptale-toolbar[data-display-mode='vertical'] .sniptale-drag-handle svg {"
+    );
+    expect(toolbarShellVerticalStylesheet).toContain('transform: rotate(90deg);');
   });
 });
