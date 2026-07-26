@@ -51,10 +51,10 @@ describe('selection-mode runtime cleanup', () => {
     expect(state.dom.overlayContainer).toBeNull();
   });
 
-  it('resets selection runtime state even when one cleanup callback fails', () => {
+  it('resets owned runtime state without mutating host body styles when cleanup fails', () => {
     const { overlayContainer, state } = createActiveRuntimeState();
-    document.body.style.userSelect = 'none';
-    document.body.style.webkitUserSelect = 'none';
+    document.body.style.userSelect = 'text';
+    document.body.style.webkitUserSelect = 'text';
     state.currentState = 'drag';
     state.cleanupEventListeners.mockImplementation(() => {
       throw new Error('cleanup failed');
@@ -65,8 +65,8 @@ describe('selection-mode runtime cleanup', () => {
     expect(state.cleanupScrollListeners).toBeNull();
     expect(state.isActive).toBe(false);
     expect(state.currentState).toBe('idle');
-    expect(document.body.style.userSelect).toBe('');
-    expect(document.body.style.webkitUserSelect).toBe('');
+    expect(document.body.style.userSelect).toBe('text');
+    expect(document.body.style.webkitUserSelect).toBe('text');
     expect(document.body.contains(overlayContainer)).toBe(false);
   });
 });

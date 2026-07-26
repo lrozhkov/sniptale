@@ -23,6 +23,7 @@ function createDom(): SelectionModeDom {
     hoverSizeLabel: null,
     dragFrame: document.createElement('div'),
     dragOverlay: null,
+    dragMaskBackground: null,
     dragFrameRafId: null,
     pendingDragRect: null,
     finalFrameRafId: null,

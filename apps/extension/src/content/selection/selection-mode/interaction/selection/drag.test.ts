@@ -18,6 +18,7 @@ function createSelectionModeDom(overrides: Partial<SelectionModeDom> = {}): Sele
     hoverSizeLabel: null,
     dragFrame: null,
     dragOverlay: null,
+    dragMaskBackground: null,
     dragFrameRafId: null,
     pendingDragRect: null,
     finalFrameRafId: null,
@@ -35,14 +36,14 @@ function createSelectionModeDom(overrides: Partial<SelectionModeDom> = {}): Sele
   };
 }
 
-function stubDocumentBodyStyles(): void {
+function stubDocumentBodyStyles(userSelect = ''): void {
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
     value: {
       body: {
         style: {
-          userSelect: '',
-          webkitUserSelect: '',
+          userSelect,
+          webkitUserSelect: userSelect,
         },
       },
     },
@@ -65,9 +66,9 @@ function expectSelectionMoveRelativeToDragStart() {
 }
 
 function expectDragStartShowsLightweightVisuals() {
-  stubDocumentBodyStyles();
+  stubDocumentBodyStyles('text');
   const dragFrame = { style: { display: 'none' } } as HTMLElement;
-  const dragOverlay = { style: { display: 'none' } } as HTMLElement;
+  const dragOverlay = { style: { display: 'none' } } as HTMLCanvasElement;
   const dom = createSelectionModeDom({ dragFrame, dragOverlay });
   const hideHoverFrameSpy = vi.spyOn(selectionUi, 'hideHoverFrame').mockImplementation(() => {});
   const createCatcherSpy = vi
@@ -85,6 +86,8 @@ function expectDragStartShowsLightweightVisuals() {
   expect(updateFrameSpy).toHaveBeenCalledWith(dom, { x: 15, y: 25, width: 0, height: 0 });
   expect(hideHoverFrameSpy).toHaveBeenCalledWith(dom);
   expect(createCatcherSpy).toHaveBeenCalledWith(dom, 100);
+  expect(document.body.style.userSelect).toBe('text');
+  expect(document.body.style.webkitUserSelect).toBe('text');
 
   expect(startDragSelection({ dom: createSelectionModeDom(), zIndexBase: 200 }, 5, 10)).toEqual({
     currentSelection: { x: 5, y: 10, width: 0, height: 0 },
@@ -106,7 +109,7 @@ function expectIdleStateForSmallSelection() {
     },
   } as HTMLElement;
 
-  const dragOverlay = { style: { display: 'block' } } as HTMLElement;
+  const dragOverlay = { style: { display: 'block' } } as HTMLCanvasElement;
   const result = finalizeDragSelection({
     dom: createSelectionModeDom({ dragFrame, dragOverlay }),
     currentSelection: { x: 10, y: 20, width: 4, height: 8 },
@@ -123,8 +126,8 @@ function expectIdleStateForSmallSelection() {
   });
 }
 
-function expectBodySelectionResetAfterCleanupFailure() {
-  stubDocumentBodyStyles();
+function expectBodySelectionRemainsUntouchedAfterCleanupFailure() {
+  stubDocumentBodyStyles('text');
   const removeDragEventCatcherSpy = vi
     .spyOn(selectionUi, 'removeDragEventCatcher')
     .mockImplementation(() => {
@@ -138,8 +141,8 @@ function expectBodySelectionResetAfterCleanupFailure() {
       minSelectionSize: 10,
     })
   ).toThrow('cleanup failed');
-  expect(document.body.style.userSelect).toBe('');
-  expect(document.body.style.webkitUserSelect).toBe('');
+  expect(document.body.style.userSelect).toBe('text');
+  expect(document.body.style.webkitUserSelect).toBe('text');
 
   removeDragEventCatcherSpy.mockRestore();
 }
@@ -169,7 +172,7 @@ describe('selection-mode drag interactions', () => {
     expectIdleStateForSmallSelection
   );
   it(
-    'restores body selection styles even when drag-event cleanup throws',
-    expectBodySelectionResetAfterCleanupFailure
+    'never invalidates page-wide body selection styles, including failed cleanup',
+    expectBodySelectionRemainsUntouchedAfterCleanupFailure
   );
 });

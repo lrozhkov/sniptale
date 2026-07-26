@@ -24,6 +24,7 @@ export function handleSelectionModeIdleMouseDown(
     return;
   }
 
+  stopSelectionModeEvent(event);
   state.mouseDownPoint = { x: event.clientX, y: event.clientY };
   state.hasMovedEnough = false;
 }

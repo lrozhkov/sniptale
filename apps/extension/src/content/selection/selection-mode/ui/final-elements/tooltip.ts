@@ -22,6 +22,7 @@ export function createSelectionModeFinalSizeTooltip(
     getSelection: options.getSelection,
     onAdjustPadding: options.onAdjustPadding,
     onCaptureActionChange: options.onCaptureActionChange,
+    onConfirm: options.onConfirm,
     overlayContainer: mountInto,
   });
   return tooltip;
@@ -34,7 +35,7 @@ export function wireSelectionModeFinalSizeTooltipActions(
   sizeTooltip.cancelButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    options.onResetToIdle();
+    options.onCancel();
   });
   sizeTooltip.confirmButton.addEventListener('click', (event) => {
     event.preventDefault();

@@ -6,6 +6,7 @@ import {
 import {
   handleSelectionModeConfirmedMouseDown,
   handleSelectionModeIdleMouseDown,
+  stopSelectionModeEvent,
 } from '../helpers';
 import type { SelectionModeEventOptions, SelectionModeInteractionState } from '../types';
 import { resolveSelectionModePointerTarget } from './target';
@@ -63,7 +64,6 @@ export function handleSelectionModeMouseLeave(
 }
 
 function handleHoverStateMove(
-  event: MouseEvent,
   state: SelectionModeInteractionState,
   options: SelectionModeMouseMoveOptions,
   target: HTMLElement,
@@ -76,17 +76,22 @@ function handleHoverStateMove(
 
   state.hoveredElement = target;
   options.showHoverFrame(target, iframe);
+}
 
-  if (!state.mouseDownPoint || state.hasMovedEnough) {
-    return;
-  }
-
+function handlePendingDragCandidateMove(
+  event: MouseEvent,
+  state: SelectionModeInteractionState,
+  options: SelectionModeMouseMoveOptions
+): boolean {
+  if (!state.mouseDownPoint || state.hasMovedEnough) return false;
+  stopSelectionModeEvent(event);
   const dx = event.clientX - state.mouseDownPoint.x;
   const dy = event.clientY - state.mouseDownPoint.y;
   if (Math.abs(dx) > state.dragThreshold || Math.abs(dy) > state.dragThreshold) {
     state.hasMovedEnough = true;
     options.startDragSelection(state.mouseDownPoint.x, state.mouseDownPoint.y);
   }
+  return true;
 }
 
 function handleConfirmedStateMove(
@@ -95,11 +100,13 @@ function handleConfirmedStateMove(
   options: SelectionModeMouseMoveOptions
 ): void {
   if (state.isDragging) {
+    stopSelectionModeEvent(event);
     options.handleDragMove(event);
     return;
   }
 
   if (state.isResizing && state.resizeDirection) {
+    stopSelectionModeEvent(event);
     options.handleResizeMove(event);
   }
 }
@@ -115,12 +122,20 @@ export function handleSelectionModeMouseMove(
   }
 
   if (state.currentState === 'drag') {
+    stopSelectionModeEvent(event);
     options.updateDragSelection(event.clientX, event.clientY);
     return;
   }
 
   if (state.currentState === 'confirmed') {
     handleConfirmedStateMove(event, state, options);
+    return;
+  }
+
+  if (
+    (state.currentState === 'idle' || state.currentState === 'hover') &&
+    handlePendingDragCandidateMove(event, state, options)
+  ) {
     return;
   }
 
@@ -131,12 +146,13 @@ export function handleSelectionModeMouseMove(
   }
 
   if (state.currentState === 'idle' || state.currentState === 'hover') {
-    handleHoverStateMove(event, state, options, target, iframe);
+    handleHoverStateMove(state, options, target, iframe);
     return;
   }
 }
 
 export function handleSelectionModeMouseUp(
+  event: MouseEvent,
   state: SelectionModeInteractionState,
   options: Pick<SelectionModeEventOptions, 'finalizeDragSelection' | 'flushFinalFrameUpdate'>
 ): void {
@@ -145,6 +161,7 @@ export function handleSelectionModeMouseUp(
   }
 
   if (state.currentState === 'drag') {
+    stopSelectionModeEvent(event);
     logSelectionModeDragFinalize(state);
     options.finalizeDragSelection();
     state.mouseDownPoint = null;
@@ -154,6 +171,7 @@ export function handleSelectionModeMouseUp(
 
   if (state.currentState === 'confirmed') {
     if (state.isDragging || state.isResizing) {
+      stopSelectionModeEvent(event);
       options.flushFinalFrameUpdate();
       logSelectionModePointerFinish(state);
       state.skipNextClick = true;

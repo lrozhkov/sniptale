@@ -55,12 +55,16 @@ function createPointerEvent(
   target: HTMLElement | null,
   coords: { clientX: number; clientY: number }
 ): MouseEvent {
-  return {
+  const event = new MouseEvent('mousemove', {
+    cancelable: true,
     clientX: coords.clientX,
     clientY: coords.clientY,
-    composedPath: () => (target ? [target] : []),
-    target,
-  } as unknown as MouseEvent;
+  });
+  Object.defineProperties(event, {
+    composedPath: { configurable: true, value: () => (target ? [target] : []) },
+    target: { configurable: true, value: target },
+  });
+  return event;
 }
 
 function registerHideHoverTest() {
@@ -97,9 +101,9 @@ function registerThresholdDragTest() {
       options
     );
 
-    expect(state.hoveredElement).toBe(target);
+    expect(state.hoveredElement).toBeNull();
     expect(state.hasMovedEnough).toBe(true);
-    expect(options.showHoverFrame).toHaveBeenCalledWith(target, undefined);
+    expect(options.showHoverFrame).not.toHaveBeenCalled();
     expect(options.startDragSelection).toHaveBeenCalledWith(10, 20);
   });
 }
@@ -130,12 +134,10 @@ function registerDragFinalizeTest() {
     target.className = 'sniptale-selection-final-frame';
     const state = createState({ currentState: 'confirmed' });
     const options = createOptions();
-    const downEvent = {
-      ...createPointerEvent(target, { clientX: 150, clientY: 110 }),
-      preventDefault: vi.fn(),
-      stopImmediatePropagation: vi.fn(),
-      stopPropagation: vi.fn(),
-    } as unknown as MouseEvent;
+    const downEvent = createPointerEvent(target, { clientX: 150, clientY: 110 });
+    vi.spyOn(downEvent, 'preventDefault');
+    vi.spyOn(downEvent, 'stopImmediatePropagation');
+    vi.spyOn(downEvent, 'stopPropagation');
 
     handleSelectionModeMouseDown(downEvent, state, options);
 
@@ -147,7 +149,7 @@ function registerDragFinalizeTest() {
     state.mouseDownPoint = { x: 150, y: 110 };
     state.hasMovedEnough = true;
 
-    handleSelectionModeMouseUp(state, options);
+    handleSelectionModeMouseUp(new MouseEvent('mouseup', { cancelable: true }), state, options);
 
     expect(options.finalizeDragSelection).toHaveBeenCalledTimes(1);
     expect(state.mouseDownPoint).toBeNull();
@@ -167,7 +169,7 @@ function registerSkipNextClickTest() {
     });
     const options = createOptions();
 
-    handleSelectionModeMouseUp(state, options);
+    handleSelectionModeMouseUp(new MouseEvent('mouseup', { cancelable: true }), state, options);
 
     expect(options.flushFinalFrameUpdate).toHaveBeenCalledTimes(1);
     expect(state.skipNextClick).toBe(true);

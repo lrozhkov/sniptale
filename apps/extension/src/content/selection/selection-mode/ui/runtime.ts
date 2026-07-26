@@ -39,6 +39,7 @@ function createFinalElementsOptions(config: SelectionModeUiRuntimeConfig) {
     getSelection: config.getSelection,
     onAdjustPadding: config.onAdjustPadding,
     onCaptureActionChange: config.onCaptureActionChange,
+    onCancel: config.onCancel,
     onConfirm: config.onConfirm,
     onResetToIdle: config.onResetToIdle,
     onSetupSizePanelListeners: config.onSetupSizePanelListeners,
@@ -49,7 +50,7 @@ export function createSelectionModeUiRuntime(config: SelectionModeUiRuntimeConfi
   return {
     prepare: () => config.prepareVisual(),
     createDragFrame: () => {
-      createDragFrameDom(config.getDom(), config.getVisual(), config.overlayBackground);
+      createDragFrameDom(config.getDom(), config.getVisual());
     },
 
     createFinalElements: () => {
@@ -63,6 +64,7 @@ export function createSelectionModeUiRuntime(config: SelectionModeUiRuntimeConfi
     createOverlayContainer: () => {
       createOverlayContainerDom(config.getDom(), {
         cancelSelection: config.onCancel,
+        overlayBackground: config.overlayBackground,
         zIndexBase: config.zIndexBase,
       });
     },

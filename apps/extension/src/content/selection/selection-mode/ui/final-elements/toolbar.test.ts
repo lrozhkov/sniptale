@@ -67,14 +67,16 @@ function createToolbar(
   });
   const onAdjustPadding = vi.fn();
   const onCaptureActionChange = vi.fn();
+  const onConfirm = vi.fn();
   enhanceSelectionModeToolbar(tooltip, {
     getCaptureAction: () => 'download_default',
     getSelection: () => selection,
     onAdjustPadding,
     onCaptureActionChange,
+    onConfirm,
     overlayContainer,
   });
-  return { onAdjustPadding, onCaptureActionChange, overlayContainer, tooltip };
+  return { onAdjustPadding, onCaptureActionChange, onConfirm, overlayContainer, tooltip };
 }
 
 function createCaptureGuardOptions(): SelectionModeEventOptions {
@@ -146,7 +148,7 @@ describe('selection-mode confirmed toolbar', () => {
   });
 
   it('lets menu items pass the real document-capture guard and update the split action', () => {
-    const { onCaptureActionChange, overlayContainer, tooltip } = createToolbar();
+    const { onCaptureActionChange, onConfirm, overlayContainer, tooltip } = createToolbar();
     const state = createSelectionModeSession();
     state.isActive = true;
     state.currentState = 'confirmed';
@@ -163,6 +165,9 @@ describe('selection-mode confirmed toolbar', () => {
 
     const menu = overlayContainer.querySelector('.sniptale-selection-capture-menu');
     expect(menu).not.toBeNull();
+    expect(menu?.querySelector('.sniptale-toolbar-menu-title')?.textContent).toBe(
+      'content.toolbar.selectionCaptureActionTitle'
+    );
     expect(menu?.querySelector('[data-ui$=".scenario"]')).toBeNull();
     menu
       ?.querySelector<HTMLButtonElement>('[data-ui$=".copy"]')
@@ -170,9 +175,8 @@ describe('selection-mode confirmed toolbar', () => {
     document.removeEventListener('click', captureGuard, true);
 
     expect(onCaptureActionChange).toHaveBeenCalledWith('copy');
+    expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(menu?.isConnected).toBe(false);
-    expect(tooltip.confirmButton.dataset['captureAction']).toBe('copy');
-    expect(tooltip.confirmButton.getAttribute('aria-label')).toBe('Copy');
     expect(trigger?.getAttribute('aria-expanded')).toBe('false');
   });
 
@@ -183,7 +187,7 @@ describe('selection-mode confirmed toolbar', () => {
     );
     trigger?.click();
 
-    const firstItem = overlayContainer.querySelector<HTMLButtonElement>('[role="menuitemradio"]');
+    const firstItem = overlayContainer.querySelector<HTMLButtonElement>('[role="menuitem"]');
     expect(document.activeElement).toBe(firstItem);
 
     document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -241,9 +245,7 @@ describe('selection-mode confirmed toolbar', () => {
     );
     trigger?.click();
     const menu = overlayContainer.querySelector<HTMLElement>('.sniptale-selection-capture-menu');
-    const items = Array.from(
-      menu?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []
-    );
+    const items = Array.from(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
 
     expect(items.map((item) => item.tabIndex)).toEqual([0, -1, -1]);
     items[0]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));

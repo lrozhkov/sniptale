@@ -7,4 +7,5 @@ export const SELECTION_MODE_CONTROL_SELECTOR = [
   '.sniptale-selection-size-cancel-button',
   '.sniptale-selection-size-confirm-button',
   '.sniptale-selection-capture-menu',
+  '.sniptale-selection-event-catcher',
 ].join(', ');

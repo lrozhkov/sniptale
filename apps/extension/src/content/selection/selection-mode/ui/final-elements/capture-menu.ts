@@ -25,6 +25,7 @@ interface CaptureMenuLifecycleState {
 interface CaptureActionControlsOptions {
   getCaptureAction: () => CaptureActionType;
   onCaptureActionChange: (action: CaptureActionType) => void;
+  onConfirm: () => void;
   overlayContainer: HTMLElement;
 }
 
@@ -82,7 +83,7 @@ function createSvg(paths: string[], size = 16): SVGSVGElement {
 }
 
 function createCaptureMenuTrigger(): HTMLButtonElement {
-  const label = translate('content.toolbar.afterCaptureTitle');
+  const label = translate('content.toolbar.selectionCaptureActionTitle');
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'sniptale-selection-capture-menu-trigger';
@@ -118,24 +119,12 @@ function positionCaptureMenu(menu: HTMLElement, anchor: HTMLElement): void {
   menu.style.top = `${top}px`;
 }
 
-function syncSelectionCaptureAction(root: ParentNode, action: CaptureActionType): void {
-  const button = root.querySelector<HTMLButtonElement>('.sniptale-selection-size-confirm-button');
-  if (!button) return;
-  const descriptor = getCaptureActionDescriptors().find((item) => item.value === action);
-  button.replaceChildren(createSvg(ACTION_ICON_PATHS[action]));
-  button.dataset['captureAction'] = action;
-  if (descriptor) {
-    button.setAttribute('aria-label', descriptor.label);
-    button.title = descriptor.label;
-  }
-}
-
 function createCaptureMenuSurface(): {
   list: HTMLElement;
   menu: HTMLElement;
 } {
   const { root: menu, list } = createProductToolbarMenuDom({
-    title: translate('content.toolbar.afterCaptureTitle'),
+    title: translate('content.toolbar.selectionCaptureActionTitle'),
     variant: 'capture',
   });
   menu.id = CAPTURE_MENU_ID;
@@ -154,16 +143,13 @@ function createCaptureMenuSurface(): {
 
 function createCaptureMenuItem(
   descriptor: CaptureActionDescriptor,
-  selected: boolean,
   tabIndex: number,
   options: CaptureActionControlsOptions
 ): HTMLButtonElement {
   const button = createProductToolbarMenuItemDom({
     dataUi: `content.selection.capture-action-option.${descriptor.value}`,
-    selected,
   });
-  button.setAttribute('role', 'menuitemradio');
-  button.setAttribute('aria-checked', String(selected));
+  button.setAttribute('role', 'menuitem');
   button.tabIndex = tabIndex;
   button.append(
     createSvg(ACTION_ICON_PATHS[descriptor.value], 18),
@@ -172,9 +158,9 @@ function createCaptureMenuItem(
   button.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
+    closeSelectionCaptureActionMenu(options.overlayContainer, false);
     options.onCaptureActionChange(descriptor.value);
-    syncSelectionCaptureAction(options.overlayContainer, descriptor.value);
-    closeSelectionCaptureActionMenu(options.overlayContainer, true);
+    options.onConfirm();
   });
   return button;
 }
@@ -183,18 +169,8 @@ function appendCaptureMenuActions(list: HTMLElement, options: CaptureActionContr
   const descriptors = getCaptureActionDescriptors().filter(
     (descriptor) => descriptor.value !== 'scenario'
   );
-  const currentAction = options.getCaptureAction();
-  const hasCurrentAction = descriptors.some((descriptor) => descriptor.value === currentAction);
   descriptors.forEach((descriptor, index) => {
-    const selected = descriptor.value === currentAction;
-    list.appendChild(
-      createCaptureMenuItem(
-        descriptor,
-        selected,
-        selected || (!hasCurrentAction && index === 0) ? 0 : -1,
-        options
-      )
-    );
+    list.appendChild(createCaptureMenuItem(descriptor, index === 0 ? 0 : -1, options));
   });
 }
 
@@ -203,7 +179,7 @@ function installCaptureMenuKeyboardNavigation(
   overlayContainer: HTMLElement
 ): void {
   menu.addEventListener('keydown', (event) => {
-    const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
+    const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
     const currentIndex = items.findIndex((item) => item === event.target);
     if (currentIndex < 0) return;
 
@@ -275,7 +251,7 @@ function openSelectionCaptureActionMenu(
     trigger,
     removeLifecycleListeners: installCaptureMenuLifecycle(options.overlayContainer, menu, trigger),
   });
-  menu.querySelector<HTMLButtonElement>('[role="menuitemradio"][tabindex="0"]')?.focus();
+  menu.querySelector<HTMLButtonElement>('[role="menuitem"][tabindex="0"]')?.focus();
 }
 
 export function closeSelectionCaptureActionMenu(

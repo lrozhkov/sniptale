@@ -121,6 +121,10 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     ru: 'После снимка',
     en: 'After screenshot',
   },
+  selectionCaptureActionTitle: {
+    ru: 'Сделать снимок и…',
+    en: 'Capture and…',
+  },
   screenshotDelayTooltip: {
     ru: 'Задержка перед снимком',
     en: 'Delay before screenshot',

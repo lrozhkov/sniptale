@@ -13,7 +13,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-it('starts drag selection after the threshold is crossed in hover mode', async () => {
+it('starts drag selection without resolving or measuring page DOM after pointer down', async () => {
   const target = document.createElement('section');
   vi.mocked(resolveSelectionModePointerTarget).mockReturnValue(target);
   const state = {
@@ -45,9 +45,14 @@ it('starts drag selection after the threshold is crossed in hover mode', async (
     | 'updateDragSelection'
   >;
 
-  handleSelectionModeMouseMove({ clientX: 18, clientY: 29 } as MouseEvent, state, options);
+  handleSelectionModeMouseMove(
+    new MouseEvent('mousemove', { cancelable: true, clientX: 18, clientY: 29 }),
+    state,
+    options
+  );
 
-  expect(options.showHoverFrame).toHaveBeenCalledWith(target, undefined);
+  expect(resolveSelectionModePointerTarget).not.toHaveBeenCalled();
+  expect(options.showHoverFrame).not.toHaveBeenCalled();
   expect(options.startDragSelection).toHaveBeenCalledWith(10, 20);
 });
 
@@ -75,10 +80,22 @@ it('skips DOM target resolution while drawing the selection rectangle', () => {
     | 'updateDragSelection'
   >;
 
-  handleSelectionModeMouseMove({ clientX: 44, clientY: 55 } as MouseEvent, state, options);
+  const event = new MouseEvent('mousemove', {
+    cancelable: true,
+    clientX: 44,
+    clientY: 55,
+  });
+  const preventDefault = vi.spyOn(event, 'preventDefault');
+  const stopPropagation = vi.spyOn(event, 'stopPropagation');
+  const stopImmediatePropagation = vi.spyOn(event, 'stopImmediatePropagation');
+
+  handleSelectionModeMouseMove(event, state, options);
 
   expect(options.updateDragSelection).toHaveBeenCalledWith(44, 55);
   expect(resolveSelectionModePointerTarget).not.toHaveBeenCalled();
+  expect(preventDefault).toHaveBeenCalledOnce();
+  expect(stopPropagation).toHaveBeenCalledOnce();
+  expect(stopImmediatePropagation).toHaveBeenCalledOnce();
 });
 
 it('skips DOM target resolution while moving a confirmed selection', () => {
@@ -106,7 +123,11 @@ it('skips DOM target resolution while moving a confirmed selection', () => {
     | 'startDragSelection'
     | 'updateDragSelection'
   >;
-  const event = { clientX: 88, clientY: 99 } as MouseEvent;
+  const event = new MouseEvent('mousemove', {
+    cancelable: true,
+    clientX: 88,
+    clientY: 99,
+  });
 
   handleSelectionModeMouseMove(event, state, options);
 

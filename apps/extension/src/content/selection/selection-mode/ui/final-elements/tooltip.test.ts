@@ -82,7 +82,8 @@ describe('selection-mode final tooltip', () => {
       new MouseEvent('click', { bubbles: true, cancelable: true })
     );
 
-    expect(options.onResetToIdle).toHaveBeenCalledTimes(1);
+    expect(options.onCancel).toHaveBeenCalledTimes(1);
+    expect(options.onResetToIdle).not.toHaveBeenCalled();
     expect(options.onConfirm).toHaveBeenCalledTimes(1);
   });
 });
@@ -114,6 +115,7 @@ function createOptions() {
     getSelection: () => ({ x: 10, y: 10, width: 100, height: 100 }),
     onAdjustPadding: vi.fn(),
     onCaptureActionChange: vi.fn(),
+    onCancel: vi.fn(),
     onConfirm: vi.fn(),
     onResetToIdle: vi.fn(),
     onSetupSizePanelListeners: vi.fn(),

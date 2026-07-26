@@ -90,7 +90,7 @@ export function createSelectionModeRuntime(args: {
     handleMouseDown: (event, iframe) => getHandlers().handleMouseDown(event, iframe),
     handleMouseLeave: () => getHandlers().handleMouseLeave(),
     handleMouseMove: (event, iframe) => getHandlers().handleMouseMove(event, iframe),
-    handleMouseUp: () => getHandlers().handleMouseUp(),
+    handleMouseUp: (event) => getHandlers().handleMouseUp(event),
     minSelectionSize: MIN_SELECTION_SIZE,
     scheduleFinalFrameUpdate: () =>
       scheduleFinalFrameUpdate(args.session.dom, args.session.currentSelection),

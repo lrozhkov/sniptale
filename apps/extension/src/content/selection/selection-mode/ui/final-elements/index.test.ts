@@ -45,6 +45,7 @@ function createDomFixture(): SelectionModeDom {
     hoverSizeLabel: null,
     dragFrame: null,
     dragOverlay: null,
+    dragMaskBackground: null,
     dragFrameRafId: null,
     pendingDragRect: null,
     finalFrameRafId: null,
@@ -84,11 +85,13 @@ beforeEach(() => {
 });
 
 function createFinalElementsOptions(overrides?: {
+  onCancel?: () => void;
   onConfirm?: () => void;
   onResetToIdle?: () => void;
   onSetupSizePanelListeners?: () => void;
 }) {
   const onConfirm = overrides?.onConfirm ?? vi.fn();
+  const onCancel = overrides?.onCancel ?? vi.fn();
   const onResetToIdle = overrides?.onResetToIdle ?? vi.fn();
   const onSetupSizePanelListeners = overrides?.onSetupSizePanelListeners ?? vi.fn();
 
@@ -102,6 +105,7 @@ function createFinalElementsOptions(overrides?: {
     getSelection: () => ({ x: 0, y: 0, width: 100, height: 100 }),
     onAdjustPadding: vi.fn(),
     onCaptureActionChange: vi.fn(),
+    onCancel: onCancel as () => void,
     onConfirm: onConfirm as () => void,
     onResetToIdle: onResetToIdle as () => void,
     onSetupSizePanelListeners: onSetupSizePanelListeners as () => void,
@@ -175,6 +179,7 @@ describe('selection-mode final elements', () => {
       hoverSizeLabel: null,
       dragFrame: null,
       dragOverlay: null,
+      dragMaskBackground: null,
       dragFrameRafId: null,
       pendingDragRect: null,
       finalFrameRafId: null,
@@ -200,10 +205,12 @@ describe('selection-mode final elements', () => {
     const tooltip = createTooltipFixture();
     createContentSizeTooltipDomMock.mockReturnValue(tooltip);
     const onConfirm = vi.fn();
+    const onCancel = vi.fn();
     const onResetToIdle = vi.fn();
     const onSetupSizePanelListeners = vi.fn();
     const options = createFinalElementsOptions({
       onConfirm,
+      onCancel,
       onResetToIdle,
       onSetupSizePanelListeners,
     });
@@ -214,7 +221,8 @@ describe('selection-mode final elements', () => {
     expect(onSetupSizePanelListeners).toHaveBeenCalledTimes(1);
     triggerFinalElementsActions(dom, tooltip);
 
-    expect(onResetToIdle).toHaveBeenCalledTimes(2);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onResetToIdle).toHaveBeenCalledTimes(1);
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 });

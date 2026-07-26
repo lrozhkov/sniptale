@@ -30,6 +30,7 @@ function createDomFixture(): SelectionModeDom {
     hoverSizeLabel: null,
     dragFrame: null,
     dragOverlay: null,
+    dragMaskBackground: 'rgba(0, 0, 0, 0.4)',
     dragFrameRafId: null,
     pendingDragRect: null,
     finalFrameRafId: null,
@@ -125,6 +126,7 @@ function createFinalElementOptions(visual: ResolvedBorderPresetVisual) {
     minSelectionSize: 100,
     onAdjustPadding: vi.fn(),
     onCaptureActionChange: vi.fn(),
+    onCancel: vi.fn(),
     onConfirm: vi.fn(),
     onResetToIdle: vi.fn(),
     onSetupSizePanelListeners: vi.fn(),
@@ -135,12 +137,9 @@ function createFinalElementOptions(visual: ResolvedBorderPresetVisual) {
 }
 
 function createDragFrames(dom: SelectionModeDom, visual: ResolvedBorderPresetVisual) {
-  createDragFrame(dom, visual, 'rgba(0, 0, 0, 0.4)');
-  createDragFrame(
-    dom,
-    createSelectionVisual({ strokeColor: '#000', strokeWidth: 5 }),
-    'rgba(255, 255, 255, 0.2)'
-  );
+  createDragFrame(dom, visual);
+  dom.dragMaskBackground = 'rgba(255, 255, 255, 0.2)';
+  createDragFrame(dom, createSelectionVisual({ strokeColor: '#000', strokeWidth: 5 }));
 }
 
 function expectDragFrameStyles(dom: SelectionModeDom) {
@@ -150,7 +149,7 @@ function expectDragFrameStyles(dom: SelectionModeDom) {
   expect(dom.dragFrame?.style.backgroundColor).toBe('rgba(34, 197, 94, 0.24)');
   expect(dom.dragFrame?.style.borderRadius).toBe('10px');
   expect(dom.dragFrame?.style.boxShadow).not.toContain('9999px');
-  expect(dom.dragOverlay?.querySelector<HTMLElement>('.sniptale-shade-top')?.style.background).toBe(
-    'rgba(0, 0, 0, 0.4)'
-  );
+  expect(dom.dragOverlay).toBeInstanceOf(HTMLCanvasElement);
+  expect(dom.dragOverlay?.dataset['overlayBackground']).toBe('rgba(0, 0, 0, 0.4)');
+  expect(dom.dragOverlay?.querySelector('.sniptale-shade')).toBeNull();
 }

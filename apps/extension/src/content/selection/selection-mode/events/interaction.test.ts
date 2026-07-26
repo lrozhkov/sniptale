@@ -159,6 +159,28 @@ it('does not start drag or resize when pressing the shared confirm button', () =
   expect(event.stopImmediatePropagation).not.toHaveBeenCalled();
 });
 
+it('owns idle pointer down before the host page can start native selection work', () => {
+  const state = { ...createInteractionState(), currentState: 'idle' as const };
+  const options = {
+    ...createSelectionModeOptions(),
+    isExtensionUIElement: () => false,
+  };
+  const target = document.createElement('p');
+  const event = createSelectionModeMouseEvent({
+    clientX: 80,
+    clientY: 60,
+    target,
+    type: 'mousedown',
+  });
+
+  handleSelectionModeMouseDown(event, state, options);
+
+  expect(state.mouseDownPoint).toEqual({ x: 80, y: 60 });
+  expect(event.preventDefault).toHaveBeenCalledOnce();
+  expect(event.stopPropagation).toHaveBeenCalledOnce();
+  expect(event.stopImmediatePropagation).toHaveBeenCalledOnce();
+});
+
 it('captures the current selection as resize start state when dragging a handle', () => {
   const state = createInteractionState();
   const options = createSelectionModeOptions();

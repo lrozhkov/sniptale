@@ -2,11 +2,13 @@ import { appendToContentOverlayRoot } from '../../../platform/dom-host';
 import { applyIsolatedContentRootStyle } from '../../../platform/dom-host/isolated';
 import { applyContentRuntimeTheme } from '../../../platform/page-context/dom';
 import { ensureSelectionModeCancelButton } from './cancel-button';
+import { resolveSelectionModeDragMaskBackground } from './final-elements/overlay';
 import { SELECTION_MODE_OVERLAY_STYLE } from './styles.constants';
 import type { SelectionModeDom } from './dom-types';
 
 interface OverlayContainerOptions {
   cancelSelection: () => void;
+  overlayBackground: string;
   zIndexBase: number;
 }
 
@@ -18,6 +20,7 @@ export function createSelectionModeDom(): SelectionModeDom {
     hoverSizeLabel: null,
     dragFrame: null,
     dragOverlay: null,
+    dragMaskBackground: null,
     dragFrameRafId: null,
     pendingDragRect: null,
     finalFrameRafId: null,
@@ -44,7 +47,7 @@ export function createOverlayContainer(
   }
 
   const overlayContainer = document.createElement('div');
-  overlayContainer.className = 'sniptale-selection-container';
+  overlayContainer.className = 'sniptale-selection-container sniptale-extension-surface';
   applyIsolatedContentRootStyle(
     overlayContainer,
     `
@@ -65,5 +68,9 @@ export function createOverlayContainer(
   overlayContainer.appendChild(style);
   appendToContentOverlayRoot(overlayContainer);
   dom.overlayContainer = overlayContainer;
+  dom.dragMaskBackground = resolveSelectionModeDragMaskBackground(
+    overlayContainer,
+    options.overlayBackground
+  );
   ensureSelectionModeCancelButton(dom, options);
 }

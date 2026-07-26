@@ -43,6 +43,7 @@ function createDomFixture(): SelectionModeDom {
     hoverSizeLabel: null,
     dragFrame: null,
     dragOverlay: null,
+    dragMaskBackground: null,
     dragFrameRafId: null,
     pendingDragRect: null,
     finalFrameRafId: null,
@@ -168,10 +169,11 @@ function registerDomDelegationTest() {
     runtime.createHoverElements();
     runtime.createOverlayContainer();
 
-    expect(createDragFrameDomMock).toHaveBeenCalledWith(dom, visual, 'rgba(0, 0, 0, 0.35)');
+    expect(createDragFrameDomMock).toHaveBeenCalledWith(dom, visual);
     expect(createHoverElementsDomMock).toHaveBeenCalledWith(dom, visual, 800);
     expect(createOverlayContainerDomMock).toHaveBeenCalledWith(dom, {
       cancelSelection: expect.any(Function),
+      overlayBackground: 'rgba(0, 0, 0, 0.35)',
       zIndexBase: 800,
     });
   });
@@ -185,6 +187,7 @@ function registerFinalElementsConfigTest() {
       dom,
       onAdjustPadding,
       onCaptureActionChange,
+      onCancel,
       onConfirm,
       onResetToIdle,
       onSetupSizePanelListeners,
@@ -210,6 +213,7 @@ function registerFinalElementsConfigTest() {
       getSelection: expect.any(Function),
       onAdjustPadding,
       onCaptureActionChange,
+      onCancel,
       onConfirm,
       onResetToIdle,
       onSetupSizePanelListeners,
@@ -233,6 +237,7 @@ function registerLatestDomTest() {
 
     expect(createOverlayContainerDomMock).toHaveBeenCalledWith(initialDom, {
       cancelSelection: expect.any(Function),
+      overlayBackground: 'rgba(0, 0, 0, 0.35)',
       zIndexBase: 800,
     });
     expect(createHoverElementsDomMock).toHaveBeenCalledWith(nextDom, nextVisual, 800);
@@ -250,6 +255,7 @@ function registerCancelCallbackTest() {
 
     expect(createOverlayContainerDomMock).toHaveBeenCalledWith(dom, {
       cancelSelection: expect.any(Function),
+      overlayBackground: 'rgba(0, 0, 0, 0.35)',
       zIndexBase: 800,
     });
     expect(onCancel).toHaveBeenCalledTimes(1);

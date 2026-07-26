@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { expect, it, vi } from 'vitest';
 import { handleSelectionModeMouseUp } from '.';
 import type { SelectionModeEventOptions, SelectionModeInteractionState } from '../types';
@@ -21,9 +23,13 @@ it('finalizes a drag and clears pointer state on mouse up', async () => {
     flushFinalFrameUpdate: vi.fn(),
   } satisfies Pick<SelectionModeEventOptions, 'finalizeDragSelection' | 'flushFinalFrameUpdate'>;
 
-  handleSelectionModeMouseUp(state, options);
+  const event = new MouseEvent('mouseup', { cancelable: true });
+  const preventDefault = vi.spyOn(event, 'preventDefault');
+
+  handleSelectionModeMouseUp(event, state, options);
 
   expect(options.finalizeDragSelection).toHaveBeenCalledOnce();
   expect(logSelectionModeDragFinalize).toHaveBeenCalledWith(state);
   expect(state.mouseDownPoint).toBeNull();
+  expect(preventDefault).toHaveBeenCalledOnce();
 });

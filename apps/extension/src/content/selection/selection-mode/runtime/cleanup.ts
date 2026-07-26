@@ -54,8 +54,6 @@ export function cleanupSelectionModeRuntime(
 
   try {
     document.removeEventListener('keydown', handleKeyDown);
-    document.body.style.userSelect = '';
-    document.body.style.webkitUserSelect = '';
 
     removeDragEventCatcher(state.dom);
     cleanupSelectionModeDom(state.dom);
