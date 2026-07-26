@@ -36,7 +36,7 @@ function buildDefaultModalPreview(copy: ReturnType<typeof getProductPreviewCopy>
 function buildCompactModalPreview(copy: ReturnType<typeof getProductPreviewCopy>) {
   return (
     <DesignSystemFloatingPreviewFrame minHeight={220}>
-      <ProductModal width="100%" maxWidth="420px" accent="compact">
+      <ProductModal width="100%" maxWidth="420px">
         <ProductModalHeader title={copy.modalShellCompactTitle} compact />
         <ProductModalBody compact>
           <ProductInput value={copy.modalShellCompactValue} readOnly />

@@ -200,7 +200,6 @@ export function AutoTransformWizard(props: {
       width="min(460px, calc(100vw - 28px))"
       maxHeight="calc(100vh - 28px)"
       scrollable
-      accent="compact"
     >
       <ProductModalHeader
         compact

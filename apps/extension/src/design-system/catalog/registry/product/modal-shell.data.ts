@@ -27,9 +27,9 @@ export const PRODUCT_DESIGN_SYSTEM_MODAL_SHELL_REGISTRY: DesignSystemRegistryEnt
       '@sniptale/ui/styles/overlays/save-dialog',
     ],
     descriptionRu:
-      'Базовая matte-neutral modal-поверхность продукта с backdrop, subtle accent line, секциями хедера/тела/футера и close action.',
+      'Базовая matte-neutral modal-поверхность продукта с backdrop, секциями хедера/тела/футера и close action.',
     descriptionEn:
-      'Base matte-neutral modal surface with a backdrop, subtle accent line, header/body/footer sections, and a close action.',
+      'Base matte-neutral modal surface with a backdrop, header/body/footer sections, and a close action.',
     variants: [
       variant(
         'default',

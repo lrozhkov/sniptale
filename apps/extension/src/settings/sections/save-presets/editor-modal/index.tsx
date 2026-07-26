@@ -18,14 +18,7 @@ export function SavePresetEditorModal(props: SavePresetEditorModalProps) {
   };
 
   return (
-    <ProductModal
-      isOpen
-      onClose={props.onClose}
-      width="420px"
-      maxHeight="85vh"
-      scrollable
-      accent="compact"
-    >
+    <ProductModal isOpen onClose={props.onClose} width="420px" maxHeight="85vh" scrollable>
       <ProductModalHeader
         compact
         title={resolveSavePresetEditorTitle(props.preset)}

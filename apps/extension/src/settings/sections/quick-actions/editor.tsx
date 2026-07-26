@@ -72,14 +72,7 @@ export function QuickActionsEditor(props: {
   const isExisting = state.actions.some((action) => action.id === state.editingId);
 
   return (
-    <ProductModal
-      isOpen
-      onClose={state.handleCancelEdit}
-      width="560px"
-      maxHeight="85vh"
-      scrollable
-      accent="compact"
-    >
+    <ProductModal isOpen onClose={state.handleCancelEdit} width="560px" maxHeight="85vh" scrollable>
       <ProductModalHeader
         compact
         title={resolveQuickActionsEditorTitle(isExisting)}

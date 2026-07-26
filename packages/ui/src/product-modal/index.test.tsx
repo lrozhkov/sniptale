@@ -47,4 +47,11 @@ describe('ProductModal', () => {
     expect(backdrop?.style.pointerEvents).toBe('auto');
     expect(dialog?.style.pointerEvents).toBe('auto');
   });
+
+  it('keeps the modal header free of decorative accent strips', () => {
+    renderModal();
+
+    expect(container?.querySelector('.sniptale-modal-accent')).toBeNull();
+    expect(container?.querySelector('.sniptale-modal-accent-sm')).toBeNull();
+  });
 });

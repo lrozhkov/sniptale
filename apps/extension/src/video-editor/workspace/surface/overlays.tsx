@@ -66,7 +66,6 @@ function ExportFailureOverlay(props: {
 }): React.JSX.Element {
   return (
     <ProductModal
-      accent="compact"
       labelledBy="video-editor-export-failure-title"
       onClose={props.onClose}
       role="alertdialog"

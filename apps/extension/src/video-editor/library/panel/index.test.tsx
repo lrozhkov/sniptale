@@ -36,6 +36,7 @@ it('opens the media library as a full-height left drawer without a modal backdro
   expect(drawer?.className).toContain('w-[min(760px,calc(100vw-24px))]');
   expect(drawer?.className).toContain('rounded-r-[14px]');
   expect(container?.querySelector('.sniptale-modal-backdrop')).toBeNull();
+  expect(container?.querySelector('.sniptale-modal-accent-sm')).toBeNull();
 });
 
 it('renders nothing while the drawer is closed', () => {

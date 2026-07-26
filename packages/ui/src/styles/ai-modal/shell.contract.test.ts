@@ -19,4 +19,8 @@ describe('ai-modal shell contract', () => {
     expect(aiModalShellStylesheet).toContain('.sniptale-modal-close {');
     expect(aiModalShellStylesheet).toContain('.sniptale-modal-close-sm {');
   });
+
+  it('does not add a decorative accent strip above modal headers', () => {
+    expect(aiModalShellStylesheet).not.toContain('.sniptale-modal-accent');
+  });
 });

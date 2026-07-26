@@ -224,7 +224,6 @@ export function SecretProtectionDialog(props: { state: SecretProtectionState }) 
 
   return (
     <ProductModal
-      accent="compact"
       closeOnBackdrop={!dialog.isSubmitting}
       maxWidth="420px"
       onClose={props.state.handleCloseDialog}

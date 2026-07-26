@@ -62,7 +62,6 @@ export function BorderPresetEditorContent({
       maxWidth="94vw"
       maxHeight="86vh"
       scrollable
-      accent="compact"
     >
       <ProductModalHeader compact title={title} onClose={onClose} />
       <ProductModalBody compact className="space-y-4">

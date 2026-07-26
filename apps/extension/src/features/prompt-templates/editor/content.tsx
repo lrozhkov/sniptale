@@ -49,7 +49,6 @@ export function PromptTemplateEditorContent({
       width="480px"
       maxHeight="85vh"
       scrollable
-      accent="compact"
       backdropClassName="sniptale-ai-template-editor-backdrop"
       onClose={onClose}
       onKeyDown={state.actions.handleKeyDown}
