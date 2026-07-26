@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 
 const pinSessionMocks = vi.hoisted(() => ({
+  clearPinnedToolbarOperationState: vi.fn(),
   clearPinToTabSessionStorageState: vi.fn(),
 }));
 
@@ -13,6 +14,11 @@ vi.mock(
     clearPinToTabSessionStorageState: pinSessionMocks.clearPinToTabSessionStorageState,
   })
 );
+
+vi.mock('../../page-access/pinned-toolbar-operation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/pinned-toolbar-operation')>()),
+  clearPinnedToolbarOperationState: pinSessionMocks.clearPinnedToolbarOperationState,
+}));
 
 import {
   createModeState,
@@ -39,6 +45,7 @@ it('clears mode state and delegates tab close handling on tab removal', () => {
   expect(state.quickEditModeState.has(7)).toBe(false);
   expect(state.viewportState.has(7)).toBe(false);
   expect(handleTabClose).toHaveBeenCalledWith(7);
+  expect(pinSessionMocks.clearPinnedToolbarOperationState).toHaveBeenCalledWith(7);
   expect(pinSessionMocks.clearPinToTabSessionStorageState).toHaveBeenCalledWith(7);
   expect(logger.log).toHaveBeenCalledWith('Tab closed, state cleared', 7);
 });

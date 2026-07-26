@@ -11,8 +11,25 @@ const loggerMocks = vi.hoisted(() => ({
   warn: vi.fn(),
 }));
 
+const intentMocks = vi.hoisted(() => ({
+  attachContentActionIntent: vi.fn(
+    async (message: Record<string, unknown>, source?: { kind: string }) =>
+      source
+        ? {
+            ...message,
+            contentIntent: { requestId: 'pin-request-1', token: 'pin-token-1' },
+          }
+        : message
+  ),
+}));
+
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => loggerMocks,
+}));
+
+vi.mock('../../../../application/privileged-action-intent', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../application/privileged-action-intent')>()),
+  attachContentActionIntent: intentMocks.attachContentActionIntent,
 }));
 
 vi.mock('../../../../../platform/runtime-messaging', async (importOriginal) => ({
@@ -96,6 +113,31 @@ it('persists pin state through the background owner', async () => {
     type: 'CONTENT_RUNTIME_WAKEUP',
   });
   expect(window.sessionStorage.getItem('sniptale.content.pin-to-tab')).toBeNull();
+});
+
+it('binds pin activation to its trusted toolbar event before requesting host access', async () => {
+  runtimeMocks.sendRuntimeMessage.mockResolvedValueOnce({
+    pinToTab: true,
+    reason: 'pin-to-tab',
+    restored: true,
+    success: true,
+  });
+  const source = { kind: 'trusted-content-event' as const };
+
+  await expect(writeContentPinToTabSessionState(true, () => true, source)).resolves.toEqual({
+    status: 'acknowledged',
+    value: true,
+  });
+
+  expect(intentMocks.attachContentActionIntent).toHaveBeenCalledWith(
+    { pinToTab: true, type: 'CONTENT_RUNTIME_WAKEUP' },
+    source
+  );
+  expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+    contentIntent: { requestId: 'pin-request-1', token: 'pin-token-1' },
+    pinToTab: true,
+    type: 'CONTENT_RUNTIME_WAKEUP',
+  });
 });
 
 it('rejects an unconfirmed background write for UI rollback', async () => {

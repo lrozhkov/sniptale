@@ -20,6 +20,19 @@ export async function refreshActivePageAccessRuntime(tabId: number): Promise<boo
   return defaultPageAccessService.refreshActivePageAccessRuntime(tabId);
 }
 
+export async function registerPinnedToolbarAllSitesAccess(args: {
+  commit: () => Promise<boolean>;
+  expectedUrl: string;
+  isCurrent: () => boolean;
+  tabId: number;
+}): Promise<'registered' | 'superseded'> {
+  return defaultPageAccessService.registerPinnedToolbarAllSitesAccess(args);
+}
+
+export async function requestPinnedToolbarAllSitesPermission(): Promise<boolean> {
+  return defaultPageAccessService.requestPinnedToolbarAllSitesPermission();
+}
+
 export async function ensureActivePageAccessRuntime(
   tabId: number,
   failureMessage?: string
@@ -46,4 +59,8 @@ export async function clearPageAccessTabActivation(tabId: number): Promise<void>
 
 export async function unregisterRemovedPageAccessOrigins(origins: string[]): Promise<void> {
   await defaultPageAccessService.unregisterRemovedPageAccessOrigins(origins);
+}
+
+export async function reconcilePageAccessTabNavigation(tabId: number, url: string): Promise<void> {
+  await defaultPageAccessService.reconcilePageAccessTabNavigation(tabId, url);
 }

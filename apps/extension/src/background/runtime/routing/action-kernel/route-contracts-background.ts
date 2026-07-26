@@ -25,14 +25,17 @@ export const BACKGROUND_ACTION_ROUTE_CONTRACTS = {
     transitiveStateOwner: 'content privileged action capability store',
   },
   'content-runtime-wakeup': {
-    acceptedSenderClass: 'owned top-frame content shim for a page-access tab',
+    acceptedSenderClass:
+      'owned top-frame content runtime; the passive shim may request wake-up without pin mutation',
     errorShape: 'content runtime wake-up route error response',
     freshnessReplayPolicy:
-      'content sender binding and page-access state are checked before full runtime injection',
-    requiredAuthority: 'content runtime wake-up owner policy',
+      'content sender binding and page-access state are checked before full runtime injection; ' +
+      'pin activation consumes a one-shot trusted-event capability',
+    requiredAuthority:
+      'content runtime wake-up owner policy and trusted-event capability for pin activation',
     responseShape: 'authoritative pin state, wake-up restored flag, and optional restore reason',
     sideEffects:
-      'pin-to-tab session mutation, lazy full content runtime injection, and optional page-preparation restore',
+      'optional all-sites grant and pin-session mutation, lazy runtime injection, and page-preparation restore',
     transitiveStateOwner:
       'background pin-session persistence, page-access owner, and scenario session state',
   },

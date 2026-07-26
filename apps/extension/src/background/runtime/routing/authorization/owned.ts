@@ -1,4 +1,5 @@
 import type { AISecretUnlockMessage } from '../../../../contracts/messaging/ai-secret-unlock';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { isOwnedSettingsPage } from '../../../../platform/navigation/extension-pages';
 import {
   authorizeContentLlmRoute,
@@ -9,6 +10,7 @@ import {
 import { isPopupTabRouteSenderUrl } from '../capabilities/popup-tab/route-capabilities';
 import { markPreauthorizedPopupTabRouteCapabilityRequestMessage } from '../capabilities/popup-tab/preauthorization';
 import { authorizeContentSender } from '../../../routing-contracts/capabilities/content-action/sender-binding';
+import { consumeContentPrivilegedActionCapabilityBinding } from '../../../routing-contracts/capabilities/content-action/route';
 import {
   AUTHORIZED,
   authorize,
@@ -159,6 +161,17 @@ function authorizeContentRuntimeWakeupRoute(
   const senderDecision = authorizeContentSender(request.sender);
   if (!senderDecision.allowed) {
     return reject('Unauthorized content runtime wake-up sender');
+  }
+  if (
+    request.message['pinToTab'] === true &&
+    !consumeContentPrivilegedActionCapabilityBinding({
+      actionType: MessageType.CONTENT_RUNTIME_WAKEUP,
+      contentIntent: request.message['contentIntent'],
+      resolvedTabId: senderDecision.principal.tabId,
+      sender: request.sender,
+    })
+  ) {
+    return reject('Unauthorized pin-to-tab permission request');
   }
   return authorize(
     createBackgroundOwnedRoutePreauthorization({

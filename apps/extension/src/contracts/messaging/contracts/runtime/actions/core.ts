@@ -152,7 +152,10 @@ export const runtimeActionCoreMessageContracts = {
       'runtime CONTENT_RUNTIME_WAKEUP message',
       createMessageGuard({
         type: MessageType.CONTENT_RUNTIME_WAKEUP,
-        optional: { pinToTab: isBoolean },
+        optional: {
+          contentIntent: isContentPrivilegedActionCapability,
+          pinToTab: isBoolean,
+        },
       })
     ),
     parseResponse: createGuardParser(

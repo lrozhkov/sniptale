@@ -118,6 +118,7 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       requestId: string;
     };
     [MessageType.CONTENT_RUNTIME_WAKEUP]: {
+      contentIntent?: ContentPrivilegedActionCapability;
       pinToTab?: boolean;
       type: typeof MessageType.CONTENT_RUNTIME_WAKEUP;
     };

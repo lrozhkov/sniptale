@@ -8,6 +8,8 @@ import { createScenarioSessionServiceStub } from '../../../../../../tooling/test
 const pageAccessMocks = vi.hoisted(() => ({
   ensureActivePageAccessRuntime: vi.fn(),
   hasActivePageAccess: vi.fn(),
+  registerPinnedToolbarAllSitesAccess: vi.fn(),
+  requestPinnedToolbarAllSitesPermission: vi.fn(),
 }));
 
 const pinStorageMocks = vi.hoisted(() => ({
@@ -23,6 +25,8 @@ vi.mock('./service', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./service')>()),
   ensureActivePageAccessRuntime: pageAccessMocks.ensureActivePageAccessRuntime,
   hasActivePageAccess: pageAccessMocks.hasActivePageAccess,
+  registerPinnedToolbarAllSitesAccess: pageAccessMocks.registerPinnedToolbarAllSitesAccess,
+  requestPinnedToolbarAllSitesPermission: pageAccessMocks.requestPinnedToolbarAllSitesPermission,
 }));
 
 vi.mock('../../../composition/persistence/content-pin-session/index', async (importOriginal) => ({
@@ -39,6 +43,7 @@ vi.mock('../tab-mode-router-screenshot', async (importOriginal) => ({
 }));
 
 import { routeContentRuntimeWakeupMessage } from './wakeup-route';
+import { invalidatePinnedToolbarOperations } from './pinned-toolbar-operation';
 
 const senderBinding: ContentSenderBinding = {
   documentId: 'document-7',
@@ -113,16 +118,29 @@ function firstInvocationOrder(invocationCallOrder: number[]): number {
   return order ?? 0;
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   pageAccessMocks.ensureActivePageAccessRuntime.mockResolvedValue(undefined);
+  pageAccessMocks.registerPinnedToolbarAllSitesAccess.mockImplementation(
+    async (args: { commit: () => Promise<boolean> }) =>
+      (await args.commit()) ? 'registered' : 'superseded'
+  );
+  pageAccessMocks.requestPinnedToolbarAllSitesPermission.mockResolvedValue(true);
   pageAccessMocks.hasActivePageAccess.mockResolvedValue(true);
   pinStorageMocks.readPinToTabSessionStorageState.mockResolvedValue(false);
   pinStorageMocks.writePinToTabSessionStorageState.mockResolvedValue(undefined);
   screenshotModeMocks.enableScreenshotMode.mockResolvedValue(undefined);
 });
 
-describe('routeContentRuntimeWakeupMessage basics', () => {
+describe('routeContentRuntimeWakeupMessage boundary', () => {
   it('ignores non-wakeup messages', () => {
     const sendResponse = vi.fn();
 
@@ -173,7 +191,9 @@ describe('routeContentRuntimeWakeupMessage basics', () => {
     });
     expect(pinStorageMocks.writePinToTabSessionStorageState).not.toHaveBeenCalled();
   });
+});
 
+describe('routeContentRuntimeWakeupMessage pinned restore', () => {
   it('restores user-pinned page preparation when page access is still active', async () => {
     pinStorageMocks.readPinToTabSessionStorageState.mockResolvedValue(true);
 
@@ -188,6 +208,45 @@ describe('routeContentRuntimeWakeupMessage basics', () => {
     expect(screenshotModeMocks.enableScreenshotMode).toHaveBeenCalledOnce();
   });
 
+  it('stops a delayed passive restore when a newer unpin invalidates it', async () => {
+    let authoritativePin = true;
+    pinStorageMocks.readPinToTabSessionStorageState.mockImplementation(
+      async () => authoritativePin
+    );
+    pinStorageMocks.writePinToTabSessionStorageState.mockImplementation(
+      async (_scope: unknown, value: boolean) => {
+        authoritativePin = value;
+      }
+    );
+    const pageAccess = createDeferred<boolean>();
+    pageAccessMocks.hasActivePageAccess.mockReturnValueOnce(pageAccess.promise);
+    const passiveRestore = routeWakeup();
+    await vi.waitFor(() => {
+      expect(pageAccessMocks.hasActivePageAccess).toHaveBeenCalledWith(7);
+    });
+
+    const unpin = routeWakeup(createRuntimeState(), {
+      pinToTab: false,
+      type: MessageType.CONTENT_RUNTIME_WAKEUP,
+    });
+    await expect(unpin).resolves.toEqual({
+      pinToTab: false,
+      restored: false,
+      success: true,
+    });
+    pageAccess.resolve(true);
+
+    await expect(passiveRestore).resolves.toEqual({
+      pinToTab: false,
+      restored: false,
+      success: true,
+    });
+    expect(pageAccessMocks.ensureActivePageAccessRuntime).not.toHaveBeenCalled();
+    expect(screenshotModeMocks.enableScreenshotMode).not.toHaveBeenCalled();
+  });
+});
+
+describe('routeContentRuntimeWakeupMessage pin mutation', () => {
   it('persists pin changes through the background session-storage owner', async () => {
     const runtimeState = createRuntimeState();
     runtimeState.screenshotModeState.set(7, true);
@@ -211,6 +270,158 @@ describe('routeContentRuntimeWakeupMessage basics', () => {
         storageKey: 'sniptale.content.pin-to-tab:tab:7',
       },
       true,
+      expect.any(Function)
+    );
+    expect(pageAccessMocks.requestPinnedToolbarAllSitesPermission).toHaveBeenCalledOnce();
+    expect(pageAccessMocks.registerPinnedToolbarAllSitesAccess).toHaveBeenCalledWith({
+      commit: expect.any(Function),
+      expectedUrl: 'https://example.test/path',
+      isCurrent: expect.any(Function),
+      tabId: 7,
+    });
+    expect(
+      firstInvocationOrder(
+        pageAccessMocks.requestPinnedToolbarAllSitesPermission.mock.invocationCallOrder
+      )
+    ).toBeLessThan(
+      firstInvocationOrder(
+        pageAccessMocks.registerPinnedToolbarAllSitesAccess.mock.invocationCallOrder
+      )
+    );
+    expect(
+      firstInvocationOrder(
+        pageAccessMocks.registerPinnedToolbarAllSitesAccess.mock.invocationCallOrder
+      )
+    ).toBeLessThan(
+      firstInvocationOrder(
+        pinStorageMocks.writePinToTabSessionStorageState.mock.invocationCallOrder
+      )
+    );
+  });
+
+  it('keeps pin disabled when persistent page access is denied', async () => {
+    const runtimeState = createRuntimeState();
+    runtimeState.screenshotModeState.set(7, true);
+    pageAccessMocks.requestPinnedToolbarAllSitesPermission.mockResolvedValueOnce(false);
+
+    await expect(
+      routeWakeup(runtimeState, {
+        pinToTab: true,
+        type: MessageType.CONTENT_RUNTIME_WAKEUP,
+      })
+    ).resolves.toEqual({
+      pinToTab: false,
+      restored: false,
+      success: true,
+    });
+
+    expect(pinStorageMocks.writePinToTabSessionStorageState).toHaveBeenCalledTimes(1);
+    expect(pinStorageMocks.writePinToTabSessionStorageState).toHaveBeenCalledWith(
+      {
+        screenshotModeEnabled: true,
+        storageKey: 'sniptale.content.pin-to-tab:tab:7',
+      },
+      false,
+      expect.any(Function)
+    );
+    expect(pageAccessMocks.registerPinnedToolbarAllSitesAccess).not.toHaveBeenCalled();
+  });
+
+  it('keeps pin disabled when persistent page-access setup fails', async () => {
+    const runtimeState = createRuntimeState();
+    runtimeState.screenshotModeState.set(7, true);
+    pageAccessMocks.registerPinnedToolbarAllSitesAccess.mockRejectedValueOnce(
+      new Error('persistent access setup failed')
+    );
+    const sendResponse = vi.fn();
+
+    routeContentRuntimeWakeupMessage({
+      message: { pinToTab: true, type: MessageType.CONTENT_RUNTIME_WAKEUP },
+      runtimeState,
+      senderBinding,
+      sendResponse,
+    });
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({
+        error: 'persistent access setup failed',
+        success: false,
+      });
+    });
+
+    expect(pinStorageMocks.writePinToTabSessionStorageState).toHaveBeenCalledTimes(1);
+    expect(pinStorageMocks.writePinToTabSessionStorageState).toHaveBeenCalledWith(
+      {
+        screenshotModeEnabled: true,
+        storageKey: 'sniptale.content.pin-to-tab:tab:7',
+      },
+      false,
+      expect.any(Function)
+    );
+    expect(pageAccessMocks.requestPinnedToolbarAllSitesPermission).toHaveBeenCalledOnce();
+  });
+
+  it('does not register or commit a delayed grant after navigation invalidates its document', async () => {
+    const runtimeState = createRuntimeState();
+    runtimeState.screenshotModeState.set(7, true);
+    const permission = createDeferred<boolean>();
+    pageAccessMocks.requestPinnedToolbarAllSitesPermission.mockReturnValueOnce(permission.promise);
+    const response = routeWakeup(runtimeState, {
+      pinToTab: true,
+      type: MessageType.CONTENT_RUNTIME_WAKEUP,
+    });
+    await vi.waitFor(() => {
+      expect(pageAccessMocks.requestPinnedToolbarAllSitesPermission).toHaveBeenCalledOnce();
+    });
+
+    invalidatePinnedToolbarOperations(7);
+    permission.resolve(true);
+
+    await expect(response).resolves.toEqual({
+      pinToTab: false,
+      restored: false,
+      success: true,
+    });
+    expect(pageAccessMocks.registerPinnedToolbarAllSitesAccess).not.toHaveBeenCalled();
+    expect(pinStorageMocks.writePinToTabSessionStorageState).not.toHaveBeenCalled();
+  });
+
+  it('lets a newer unpin supersede a delayed grant before registration or commit', async () => {
+    const runtimeState = createRuntimeState();
+    runtimeState.screenshotModeState.set(7, true);
+    const permission = createDeferred<boolean>();
+    pageAccessMocks.requestPinnedToolbarAllSitesPermission.mockReturnValueOnce(permission.promise);
+    const pinResponse = routeWakeup(runtimeState, {
+      pinToTab: true,
+      type: MessageType.CONTENT_RUNTIME_WAKEUP,
+    });
+    await vi.waitFor(() => {
+      expect(pageAccessMocks.requestPinnedToolbarAllSitesPermission).toHaveBeenCalledOnce();
+    });
+
+    const unpinResponse = routeWakeup(runtimeState, {
+      pinToTab: false,
+      type: MessageType.CONTENT_RUNTIME_WAKEUP,
+    });
+    await expect(unpinResponse).resolves.toEqual({
+      pinToTab: false,
+      restored: false,
+      success: true,
+    });
+    permission.resolve(true);
+
+    await expect(pinResponse).resolves.toEqual({
+      pinToTab: false,
+      restored: false,
+      success: true,
+    });
+    expect(pageAccessMocks.registerPinnedToolbarAllSitesAccess).not.toHaveBeenCalled();
+    expect(pinStorageMocks.writePinToTabSessionStorageState).toHaveBeenCalledTimes(1);
+    expect(pinStorageMocks.writePinToTabSessionStorageState).toHaveBeenCalledWith(
+      {
+        screenshotModeEnabled: true,
+        storageKey: 'sniptale.content.pin-to-tab:tab:7',
+      },
+      false,
       expect.any(Function)
     );
   });
@@ -240,7 +451,9 @@ describe('routeContentRuntimeWakeupMessage basics', () => {
     );
     expect(pageAccessMocks.ensureActivePageAccessRuntime).not.toHaveBeenCalled();
   });
+});
 
+describe('routeContentRuntimeWakeupMessage unavailable access', () => {
   it('fails closed for user pin when page access is unavailable after navigation', async () => {
     pinStorageMocks.readPinToTabSessionStorageState.mockResolvedValue(true);
     pageAccessMocks.hasActivePageAccess.mockResolvedValue(false);

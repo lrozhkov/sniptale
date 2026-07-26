@@ -49,7 +49,7 @@ export type ContentAppVisibilityState = {
   setIsCompletelyHidden: (hidden: boolean) => void;
   setIsToolbarVisible: (visible: boolean) => void;
   setNavigationLockEnabled: (enabled: boolean) => void;
-  setPinToTab: (value: boolean) => void;
+  setPinToTab: (value: boolean, contentIntentSource?: ContentPrivilegedActionIntentSource) => void;
   setSaveDialogState: (state: { dataUrl: string; filename: string } | null) => void;
   setSessionActivePresetId: (presetId: string | null) => void;
 };

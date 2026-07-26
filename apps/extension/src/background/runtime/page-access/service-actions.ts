@@ -6,6 +6,7 @@ import {
   PAGE_ACCESS_ALL_SITES_SCRIPT_ID,
 } from './constants';
 import {
+  commitContentScriptRegistration,
   ensureContentScriptRegistration,
   getMissingOriginPermissions,
   hasAllSitesPermission,
@@ -119,6 +120,37 @@ export async function grantAllSitesAccess(
     throw error;
   }
   return { success: true, result: 'granted', status: await statusReader.readFromContext(context) };
+}
+
+export async function requestPinnedToolbarAllSitesPermission(): Promise<boolean> {
+  return browserPermissions.request({ origins: [...ALL_SITES_ORIGIN_PATTERNS] });
+}
+
+export async function registerPinnedToolbarAllSitesAccess(args: {
+  commit: () => Promise<boolean>;
+  expectedUrl: string;
+  isCurrent: () => boolean;
+  resolveContext: () => Promise<PageAccessStatusContext>;
+}): Promise<'registered' | 'superseded'> {
+  if (!args.isCurrent()) {
+    return 'superseded';
+  }
+
+  const context = await args.resolveContext();
+  if (
+    !args.isCurrent() ||
+    context.kind !== 'supported' ||
+    context.target.url.href !== new URL(args.expectedUrl).href
+  ) {
+    return 'superseded';
+  }
+
+  const committed = await commitContentScriptRegistration({
+    commit: async () => args.isCurrent() && (await args.commit()),
+    id: PAGE_ACCESS_ALL_SITES_SCRIPT_ID,
+    matches: [...ALL_SITES_CONTENT_SCRIPT_MATCHES],
+  });
+  return committed && args.isCurrent() ? 'registered' : 'superseded';
 }
 
 export async function registerGrantedSiteAccess(

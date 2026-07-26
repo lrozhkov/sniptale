@@ -6,6 +6,7 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
 import type { ToolbarMenuState } from '../state/menu';
 import { ToolbarSettingsDropdown } from './settings-content';
+import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 
 type ToolbarSettingsMenuProps = {
   compactMenus: boolean;
@@ -19,7 +20,10 @@ type ToolbarSettingsMenuProps = {
   onCompactMenusChange: (compactMenus: boolean) => void;
   onDisableScreenshotMode: () => void;
   onDisplayModeChange: (displayMode: ContentToolbarDisplayMode) => void;
-  onPinToTabChange: (value: boolean) => void;
+  onPinToTabChange: (
+    value: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => void;
 };
 
 function useToolbarSettingsMenuBindings(props: ToolbarSettingsMenuProps) {

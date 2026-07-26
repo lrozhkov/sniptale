@@ -11,7 +11,16 @@ import type { ScenarioRecorderSurfaceState } from '@sniptale/runtime-contracts/s
 import type { ContentSenderBinding } from '../../routing-contracts/capabilities/content-action/capability-store';
 import type { BackgroundRuntimeMessageDeps } from '../routing/boundary/shared';
 import { respondAsyncRoute } from '../../routing-contracts/response';
-import { ensureActivePageAccessRuntime, hasActivePageAccess } from './service';
+import {
+  ensureActivePageAccessRuntime,
+  hasActivePageAccess,
+  registerPinnedToolbarAllSitesAccess,
+  requestPinnedToolbarAllSitesPermission,
+} from './service';
+import {
+  beginPinnedToolbarOperation,
+  observePinnedToolbarOperations,
+} from './pinned-toolbar-operation';
 import { enableScreenshotMode } from '../tab-mode-router-screenshot';
 import { runtimeActionCoreMessageContracts } from '../../../contracts/messaging/contracts/runtime/actions/core';
 
@@ -35,6 +44,11 @@ type ScenarioRestoreState = {
   surface: ScenarioRecorderSurfaceState;
 };
 
+type UserPinnedState = {
+  isCurrent: () => boolean;
+  userPinned: boolean;
+};
+
 function parseContentRuntimeWakeupMessage(message: unknown): ContentRuntimeWakeupMessage | null {
   try {
     return runtimeActionCoreMessageContracts[MessageType.CONTENT_RUNTIME_WAKEUP].parseRequest(
@@ -48,20 +62,92 @@ function parseContentRuntimeWakeupMessage(message: unknown): ContentRuntimeWakeu
 async function synchronizeUserPinnedState(args: {
   message: ContentRuntimeWakeupMessage;
   runtimeState: BackgroundRuntimeMessageDeps;
-  tabId: number;
-}): Promise<boolean> {
-  if (args.message.pinToTab !== undefined) {
-    await writePinToTabSessionStorageState(
-      {
-        screenshotModeEnabled: args.runtimeState.screenshotModeState.get(args.tabId) === true,
-        storageKey: createPinToTabSessionStorageKey(args.tabId),
-      },
-      args.message.pinToTab,
-      () => true
-    );
+  senderBinding: ContentSenderBinding;
+}): Promise<UserPinnedState> {
+  const tabId = args.senderBinding.tabId;
+  const requestedPinState = args.message.pinToTab;
+  if (requestedPinState === undefined) {
+    const operation = observePinnedToolbarOperations(tabId);
+    return {
+      isCurrent: operation.isCurrent,
+      userPinned: await operation.runExclusive(() => readPinToTabSessionStorageState(tabId)),
+    };
   }
 
-  return readPinToTabSessionStorageState(args.tabId);
+  const operation = beginPinnedToolbarOperation(tabId);
+  const screenshotModeEnabled = args.runtimeState.screenshotModeState.get(tabId) === true;
+  const storageScope = {
+    screenshotModeEnabled,
+    storageKey: createPinToTabSessionStorageKey(tabId),
+  };
+  let permissionResult: { error?: unknown; granted: boolean } | null = null;
+
+  if (requestedPinState && screenshotModeEnabled) {
+    try {
+      permissionResult = {
+        granted: await requestPinnedToolbarAllSitesPermission(),
+      };
+    } catch (error) {
+      permissionResult = { error, granted: false };
+    }
+  }
+
+  const userPinned = await operation.runExclusive(async () => {
+    if (!operation.isCurrent()) {
+      return readPinToTabSessionStorageState(tabId);
+    }
+
+    if (!requestedPinState || !screenshotModeEnabled) {
+      await writePinToTabSessionStorageState(storageScope, requestedPinState, operation.isCurrent);
+      return readPinToTabSessionStorageState(tabId);
+    }
+
+    if (permissionResult?.error !== undefined) {
+      await writePinToTabSessionStorageState(storageScope, false, operation.isCurrent);
+      throw permissionResult.error;
+    }
+
+    if (permissionResult?.granted !== true) {
+      await writePinToTabSessionStorageState(storageScope, false, operation.isCurrent);
+      return readPinToTabSessionStorageState(tabId);
+    }
+
+    let registration: 'registered' | 'superseded';
+    try {
+      registration = await registerPinnedToolbarAllSitesAccess({
+        commit: async () => {
+          if (!operation.isCurrent()) {
+            return false;
+          }
+
+          const previousPinState = await readPinToTabSessionStorageState(tabId);
+          if (!operation.isCurrent()) {
+            return false;
+          }
+
+          await writePinToTabSessionStorageState(storageScope, true, operation.isCurrent);
+          if (operation.isCurrent()) {
+            return true;
+          }
+
+          await writePinToTabSessionStorageState(storageScope, previousPinState, () => true);
+          return false;
+        },
+        expectedUrl: args.senderBinding.senderUrl,
+        isCurrent: operation.isCurrent,
+        tabId,
+      });
+    } catch (error) {
+      await writePinToTabSessionStorageState(storageScope, false, operation.isCurrent);
+      throw error;
+    }
+    if (registration !== 'registered' || !operation.isCurrent()) {
+      return readPinToTabSessionStorageState(tabId);
+    }
+    return readPinToTabSessionStorageState(tabId);
+  });
+
+  return { isCurrent: operation.isCurrent, userPinned };
 }
 
 function shouldScenarioSurfaceRestore(surface: ScenarioRecorderSurfaceState): boolean {
@@ -117,39 +203,84 @@ async function enablePreparationForWakeup(
   );
 }
 
+async function createSupersededWakeupResponse(
+  tabId: number
+): Promise<ContentRuntimeWakeupResponse> {
+  return {
+    pinToTab: await readPinToTabSessionStorageState(tabId),
+    restored: false,
+    success: true,
+  };
+}
+
+async function restoreRuntimeForWakeup(args: {
+  isCurrent: () => boolean;
+  runtimeState: BackgroundRuntimeMessageDeps;
+  scenarioState: ScenarioRestoreState;
+  tabId: number;
+  userPinned: boolean;
+}): Promise<boolean> {
+  if (!(await hasActivePageAccess(args.tabId)) || !args.isCurrent()) {
+    return false;
+  }
+
+  await restoreForcedScenarioSurface({
+    runtimeState: args.runtimeState,
+    scenarioState: args.scenarioState,
+    tabId: args.tabId,
+  });
+  if (!args.isCurrent()) {
+    return false;
+  }
+
+  await ensureActivePageAccessRuntime(args.tabId);
+  if (!args.isCurrent()) {
+    return false;
+  }
+
+  if (args.userPinned || args.scenarioState.shouldEnablePreparation) {
+    await enablePreparationForWakeup(args.tabId, args.runtimeState);
+  }
+  return args.isCurrent();
+}
+
 async function handleContentRuntimeWakeup(args: {
   message: ContentRuntimeWakeupMessage;
   runtimeState: BackgroundRuntimeMessageDeps;
   senderBinding: ContentSenderBinding;
 }): Promise<ContentRuntimeWakeupResponse> {
   const tabId = args.senderBinding.tabId;
-  const [userPinned, scenarioState] = await Promise.all([
+  const [userPinState, scenarioState] = await Promise.all([
     synchronizeUserPinnedState({
       message: args.message,
       runtimeState: args.runtimeState,
-      tabId,
+      senderBinding: args.senderBinding,
     }),
     readScenarioRestoreState(tabId, args.runtimeState),
   ]);
+  const userPinned = userPinState.userPinned;
+
+  if (!userPinState.isCurrent()) {
+    return createSupersededWakeupResponse(tabId);
+  }
 
   if (!userPinned && !scenarioState.shouldRestore) {
     return { pinToTab: false, restored: false, success: true };
   }
 
-  if (!(await hasActivePageAccess(tabId))) {
-    return { pinToTab: userPinned, restored: false, success: true };
-  }
-
-  await restoreForcedScenarioSurface({
+  const restored = await restoreRuntimeForWakeup({
+    isCurrent: userPinState.isCurrent,
     runtimeState: args.runtimeState,
     scenarioState,
     tabId,
+    userPinned,
   });
+  if (!userPinState.isCurrent()) {
+    return createSupersededWakeupResponse(tabId);
+  }
 
-  await ensureActivePageAccessRuntime(tabId);
-
-  if (userPinned || scenarioState.shouldEnablePreparation) {
-    await enablePreparationForWakeup(tabId, args.runtimeState);
+  if (!restored) {
+    return { pinToTab: userPinned, restored: false, success: true };
   }
 
   return {

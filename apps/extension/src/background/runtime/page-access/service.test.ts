@@ -128,6 +128,7 @@ it('runs with an injected temporary activation store', async () => {
     grant: vi.fn(),
     has: vi.fn().mockResolvedValue(true),
     hydrate: vi.fn(),
+    reconcileNavigation: vi.fn(),
   };
   const service = createPageAccessService({ temporaryTabActivationStore });
 
@@ -177,10 +178,10 @@ it('restores temporary tab activation from session storage after service worker 
   expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
 });
 
-it('clears stale temporary tab activation when the tab URL changes', async () => {
+it('clears stale temporary tab activation when the tab origin changes', async () => {
   const { handlePageAccessMessage } = await import('./service');
   setSessionStorageState({
-    [TEMPORARY_ACTIVE_TABS_STORAGE_KEY]: [{ tabId: 7, url: 'https://example.test/old' }],
+    [TEMPORARY_ACTIVE_TABS_STORAGE_KEY]: [{ tabId: 7, url: 'https://other.test/old' }],
   });
 
   await expect(

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { QuickActionOverlay } from '../../../../../contracts/settings';
+import type { ContentPrivilegedActionIntentSource } from '../../../../application/privileged-action-intent';
 
 import { useCaptureActionState } from './capture-action';
 import { usePendingAutoStartCaptureState } from './pending-auto-start';
@@ -28,13 +29,13 @@ function useContentPinToTabState() {
   );
 
   const setPinToTab = useCallback(
-    (value: boolean) => {
+    (value: boolean, contentIntentSource?: ContentPrivilegedActionIntentSource) => {
       const writeGeneration = writeGenerationRef.current + 1;
       writeGenerationRef.current = writeGeneration;
       const isCurrent = () => writeGenerationRef.current === writeGeneration;
 
       commitPinToTabState(value);
-      void writeContentPinToTabSessionState(value, isCurrent)
+      void writeContentPinToTabSessionState(value, isCurrent, contentIntentSource)
         .then((result) => {
           if (result.status === 'acknowledged') {
             confirmedPinToTabRef.current = result.value;

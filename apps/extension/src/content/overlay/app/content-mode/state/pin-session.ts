@@ -1,6 +1,10 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getContentRuntimeServices } from '../../../../application/runtime-services/services';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import {
+  attachContentActionIntent,
+  type ContentPrivilegedActionIntentSource,
+} from '../../../../application/privileged-action-intent';
 
 type ContentPinToTabSessionWriteGuard = () => boolean;
 type ContentPinToTabSessionWriteResult =
@@ -14,11 +18,18 @@ export function readContentPinToTabSessionState(): boolean {
   return false;
 }
 
-async function requestPinToTabSessionState(pinToTab?: boolean): Promise<boolean> {
-  const message =
+async function requestPinToTabSessionState(
+  pinToTab?: boolean,
+  contentIntentSource?: ContentPrivilegedActionIntentSource
+): Promise<boolean> {
+  const baseMessage =
     pinToTab === undefined
       ? { type: MessageType.CONTENT_RUNTIME_WAKEUP }
       : { pinToTab, type: MessageType.CONTENT_RUNTIME_WAKEUP };
+  const message =
+    pinToTab === true
+      ? await attachContentActionIntent(baseMessage, contentIntentSource)
+      : baseMessage;
   const response = await getContentRuntimeServices().messaging.sendRuntimeMessage(message);
   if (!response?.success || typeof response.pinToTab !== 'boolean') {
     throw new Error('Background pin-to-tab session owner returned an invalid response');
@@ -42,7 +53,8 @@ function isCurrentWrite(): boolean {
 
 export function writeContentPinToTabSessionState(
   value: boolean,
-  isCurrent: ContentPinToTabSessionWriteGuard = isCurrentWrite
+  isCurrent: ContentPinToTabSessionWriteGuard = isCurrentWrite,
+  contentIntentSource?: ContentPrivilegedActionIntentSource
 ): Promise<ContentPinToTabSessionWriteResult> {
   const writeOperation = pinToTabWriteChain
     .catch(() => undefined)
@@ -53,7 +65,7 @@ export function writeContentPinToTabSessionState(
 
       return {
         status: 'acknowledged',
-        value: await requestPinToTabSessionState(value),
+        value: await requestPinToTabSessionState(value, contentIntentSource),
       } as const;
     });
 

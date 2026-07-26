@@ -5,6 +5,15 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToolbarSettingsDropdown } from './settings-content';
 
+const createTrustedContentActionIntentSource = vi.hoisted(() =>
+  vi.fn(() => ({ kind: 'trusted-content-event' as const }))
+);
+
+vi.mock('../../../application/privileged-action-intent', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../application/privileged-action-intent')>()),
+  createTrustedContentActionIntentSource,
+}));
+
 vi.mock('../../../../platform/i18n', () => ({
   translate: (key: string) => key,
 }));
@@ -158,7 +167,8 @@ describe('ToolbarSettingsDropdown', () => {
       pinButton?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     });
 
-    expect(onPinToTabChange).toHaveBeenCalledWith(true);
+    expect(onPinToTabChange).toHaveBeenCalledWith(true, { kind: 'trusted-content-event' });
+    expect(createTrustedContentActionIntentSource).toHaveBeenCalledOnce();
   });
 
   it('disables the pin-to-tab toggle when scenario mode locks it', () => {

@@ -95,7 +95,7 @@ export type ContentAppLayoutToolbarProps = {
   pinToTab: boolean;
   setCaptureAction: (action: CaptureActionType) => void;
   setCurrentViewport: (viewport: { width: number; height: number } | null) => void;
-  setPinToTab: (value: boolean) => void;
+  setPinToTab: (value: boolean, contentIntentSource?: ContentPrivilegedActionIntentSource) => void;
   setTimerDelay: (delay: number) => void;
   timerDelay: number;
 };

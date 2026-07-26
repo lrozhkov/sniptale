@@ -150,6 +150,20 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
   ).toThrow();
 });
 
+it('parses a capability-bound pin-to-tab activation request', () => {
+  expect(
+    contentRuntimeWakeupContract.parseRequest({
+      contentIntent: { requestId: 'pin-request-1', token: 'pin-token-1' },
+      pinToTab: true,
+      type: MessageType.CONTENT_RUNTIME_WAKEUP,
+    })
+  ).toEqual({
+    contentIntent: { requestId: 'pin-request-1', token: 'pin-token-1' },
+    pinToTab: true,
+    type: MessageType.CONTENT_RUNTIME_WAKEUP,
+  });
+});
+
 it('parses content runtime wake-up requests', () => {
   expect(
     contentRuntimeWakeupContract.parseRequest({
