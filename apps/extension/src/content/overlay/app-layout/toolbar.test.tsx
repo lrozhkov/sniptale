@@ -253,6 +253,7 @@ async function verifiesScenarioSidebarPreloadOnIntent() {
 
   await lastToolbarProps.scenario.onCaptureActionSelected('scenario');
   expect(preloadContentScenarioRecorderSidebarMock).toHaveBeenCalledTimes(1);
+  expect(props.toolbar.modeController.handleEnableCursorMode).not.toHaveBeenCalled();
 
   props.scenario.state.sidebarVisible = false;
   await renderShell(props);

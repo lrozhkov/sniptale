@@ -55,7 +55,6 @@ function useScenarioByClickBlockSync(args: {
 function buildScenarioToolbarProps(args: {
   blocked: boolean;
   actions: ContentAppScenarioActions;
-  handleEnableCursorMode: () => void;
   state: ContentAppScenarioState;
   onFinishScenario: () => Promise<void>;
 }) {
@@ -72,7 +71,6 @@ function buildScenarioToolbarProps(args: {
     onCaptureActionSelected: (action: CaptureActionType) => {
       if (action === 'scenario') {
         warmScenarioRecorderSidebar();
-        args.handleEnableCursorMode();
       }
       return args.actions.applyCaptureAction(action);
     },
@@ -204,7 +202,6 @@ export function ContentToolbarShell({ scenario, toolbar }: ContentToolbarShellPr
   const scenarioToolbarProps = buildScenarioToolbarProps({
     blocked: byClickBlocked,
     actions: scenario.actions,
-    handleEnableCursorMode: toolbar.modeController.handleEnableCursorMode,
     state: scenario.state,
     onFinishScenario: handleFinishScenario,
   });

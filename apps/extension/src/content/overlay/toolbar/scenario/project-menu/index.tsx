@@ -128,8 +128,8 @@ function renderScenarioProjectMenu(args: {
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   const buttonTitle = args.scenario.projectName
-    ? `${translate('scenario.content.project')}: ${args.scenario.projectName}`
-    : translate('scenario.content.project');
+    ? `${translate('scenario.content.projectButton')}: ${args.scenario.projectName}`
+    : translate('scenario.content.projectButton');
 
   return (
     <>
@@ -147,7 +147,7 @@ function renderScenarioProjectMenu(args: {
         title={buttonTitle}
         dataUi="content.toolbar.scenario-project-button"
         menuIndicator
-        aria-label={translate('scenario.content.project')}
+        aria-label={buttonTitle}
         aria-haspopup="menu"
         aria-expanded={args.projectMenuOpen}
       >

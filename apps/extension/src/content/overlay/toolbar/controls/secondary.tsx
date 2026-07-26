@@ -1,5 +1,4 @@
 import { ToolbarCaptureActions } from '../capture';
-import { ToolbarScenarioControls } from '../scenario/controls';
 import type { useToolbarViewModel } from '../state/view-model';
 import type { ToolbarProps } from '../types';
 import { ToolbarUtilityButtons } from './utilities';
@@ -33,19 +32,6 @@ function resolveEffectiveInteractionMode(
   return 'cursor';
 }
 
-function shouldShowCompactScenarioControls(
-  toolbarProps: ToolbarProps,
-  viewModel: ToolbarViewModel,
-  interactionMode: ReturnType<typeof resolveEffectiveInteractionMode>
-): boolean {
-  return (
-    viewModel.screenshotMode &&
-    viewModel.captureAction === 'scenario' &&
-    Boolean(toolbarProps.scenario) &&
-    interactionMode === 'cursor'
-  );
-}
-
 function resolveScenarioCaptureProps(
   toolbarProps: ToolbarProps,
   viewModel: ToolbarViewModel
@@ -53,22 +39,6 @@ function resolveScenarioCaptureProps(
   return viewModel.screenshotMode && viewModel.captureAction === 'scenario'
     ? toolbarProps.scenario
     : undefined;
-}
-
-function renderCompactScenarioControls(args: {
-  showScenarioControls: boolean;
-  toolbarProps: ToolbarProps;
-  viewModel: ToolbarViewModel;
-}) {
-  return args.showScenarioControls ? (
-    <ToolbarScenarioControls
-      compactMenus={args.viewModel.derivedState.compactMenus}
-      displayMode={args.viewModel.derivedState.displayMode}
-      scenario={args.toolbarProps.scenario!}
-      showWorkflowActions={false}
-      toolbarMenuState={args.viewModel.toolbarMenuState}
-    />
-  ) : null;
 }
 
 function createUtilityButtonsProps(args: {
@@ -135,16 +105,10 @@ function createSecondaryControlsRenderState(props: {
   onViewportChange: (viewport: { width: number; height: number } | null) => void;
 }) {
   const interactionMode = resolveEffectiveInteractionMode(props.toolbarProps, props.viewModel);
-  const showScenarioControls = shouldShowCompactScenarioControls(
-    props.toolbarProps,
-    props.viewModel,
-    interactionMode
-  );
   const scenarioCaptureProps = resolveScenarioCaptureProps(props.toolbarProps, props.viewModel);
 
   return {
     interactionMode,
-    showScenarioControls,
     captureActionProps: createCaptureActionProps({
       onViewportChange: props.onViewportChange,
       scenarioCaptureProps,
@@ -160,13 +124,10 @@ export function ToolbarSecondaryControls(props: {
   onViewportChange: (viewport: { width: number; height: number } | null) => void;
 }) {
   const { toolbarProps, viewModel } = props;
-  const { captureActionProps, interactionMode, showScenarioControls } =
-    createSecondaryControlsRenderState(props);
+  const { captureActionProps, interactionMode } = createSecondaryControlsRenderState(props);
 
   return (
     <>
-      {renderCompactScenarioControls({ showScenarioControls, toolbarProps, viewModel })}
-
       <ToolbarUtilityButtons
         {...createUtilityButtonsProps({
           interactionMode,

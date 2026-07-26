@@ -153,6 +153,14 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     ru: 'Проект сценария',
     en: 'Scenario project',
   },
+  'scenario.content.projectButton': {
+    ru: 'Выбрать проект',
+    en: 'Choose project',
+  },
+  'scenario.content.projectMenuTitle': {
+    ru: 'Выберите проект сценария',
+    en: 'Choose a scenario project',
+  },
   'scenario.content.modeManual': {
     ru: 'Кнопкой снимка',
     en: 'Screenshot button',
@@ -174,8 +182,16 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Turn off annotations, page editing, and the AI editor first',
   },
   'scenario.content.captureMode': {
-    ru: 'Добавление шагов',
-    en: 'Adding steps',
+    ru: 'Как добавлять шаги',
+    en: 'How to add steps',
+  },
+  'scenario.content.sidebarShow': {
+    ru: 'Показать шаги сценария',
+    en: 'Show scenario steps',
+  },
+  'scenario.content.sidebarHide': {
+    ru: 'Скрыть шаги сценария',
+    en: 'Hide scenario steps',
   },
   'scenario.content.projectSearchPlaceholder': {
     ru: 'Поиск или название нового проекта',

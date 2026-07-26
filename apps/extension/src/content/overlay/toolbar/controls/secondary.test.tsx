@@ -39,15 +39,6 @@ vi.mock('../capture', () => ({
   ),
 }));
 
-vi.mock('../scenario/controls', () => ({
-  ToolbarScenarioControls: (props: { showWorkflowActions?: boolean }) => (
-    <div
-      data-ui="test.scenario-controls"
-      data-workflow-actions={props.showWorkflowActions ? 'true' : 'false'}
-    />
-  ),
-}));
-
 vi.mock('./utilities', () => ({
   ToolbarUtilityButtons: (props: { highlighterMode: boolean; isCursorMode: boolean }) => (
     <div
@@ -189,29 +180,6 @@ async function renderSecondaryControls(params: {
   });
 }
 
-function readOrderedDataUi(): Array<string | null> {
-  return Array.from(document.querySelectorAll('[data-ui]')).map((node) =>
-    node.getAttribute('data-ui')
-  );
-}
-
-function expectScenarioControlsBeforeUtilityAndCapture(): void {
-  const orderedDataUi = readOrderedDataUi();
-
-  expect(document.querySelector('[data-ui="test.scenario-controls"]')).not.toBeNull();
-  expect(
-    document
-      .querySelector('[data-ui="test.scenario-controls"]')
-      ?.getAttribute('data-workflow-actions')
-  ).toBe('false');
-  expect(orderedDataUi.indexOf('test.scenario-controls')).toBeLessThan(
-    orderedDataUi.indexOf('test.utility-buttons')
-  );
-  expect(orderedDataUi.indexOf('test.utility-buttons')).toBeLessThan(
-    orderedDataUi.indexOf('test.capture-actions')
-  );
-}
-
 async function verifiesScenarioCaptureForwarding() {
   await renderSecondaryControls({ captureAction: 'download_default' });
   expect(
@@ -224,13 +192,20 @@ async function verifiesScenarioCaptureForwarding() {
   ).toBe('true');
 }
 
-async function verifiesCompactScenarioControlOrder() {
+async function verifiesScenarioCaptureAcrossInteractionModes() {
   await renderSecondaryControls({ captureAction: 'scenario', isCursorMode: true });
-  expectScenarioControlsBeforeUtilityAndCapture();
+  expect(
+    document.querySelector('[data-ui="test.capture-actions"]')?.getAttribute('data-scenario')
+  ).toBe('true');
 
-  await renderSecondaryControls({ captureAction: 'scenario', isCursorMode: false });
-
-  expect(document.querySelector('[data-ui="test.scenario-controls"]')).toBeNull();
+  await renderSecondaryControls({
+    captureAction: 'scenario',
+    highlighterMode: true,
+    isCursorMode: false,
+  });
+  expect(
+    document.querySelector('[data-ui="test.capture-actions"]')?.getAttribute('data-scenario')
+  ).toBe('true');
 }
 
 async function verifiesModeDependentUtilityVisibility() {
@@ -284,8 +259,8 @@ describe('ToolbarSecondaryControls', () => {
     verifiesScenarioCaptureForwarding
   );
   it(
-    'renders compact scenario controls before utility buttons in cursor scenario mode',
-    verifiesCompactScenarioControlOrder
+    'keeps scenario capture composition while the interaction mode changes',
+    verifiesScenarioCaptureAcrossInteractionModes
   );
   it(
     'forwards mode-dependent utility visibility and persisted display mode state',
