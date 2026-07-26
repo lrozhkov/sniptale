@@ -2,7 +2,6 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getContentSizeTooltipRatioButtonStyle } from '@sniptale/ui/content-size-tooltip/styles';
 import { createSelectionModeSession } from '../../session';
 import { createSelectionModeSizePanelSetup } from './runtime';
 
@@ -109,8 +108,6 @@ describe('selection-mode size-panel setup boundary', () => {
 
   it('toggles ratio state and snapshots the current ratio only when enabling', () => {
     const scenario = createScenario();
-    const activeStyle = getContentSizeTooltipRatioButtonStyle({ active: true });
-    const inactiveStyle = getContentSizeTooltipRatioButtonStyle({ active: false });
     scenario.session.maintainAspectRatio = false;
     scenario.session.aspectRatio = null;
     scenario.setup();
@@ -122,9 +119,10 @@ describe('selection-mode size-panel setup boundary', () => {
     expect(scenario.session.maintainAspectRatio).toBe(true);
     expect(scenario.session.aspectRatio).toBe(2);
     expect(scenario.aspectRatioButton.getAttribute('aria-pressed')).toBe('true');
-    expect(scenario.aspectRatioButton.style.getPropertyValue('background')).toBe(
-      String(activeStyle['background'])
-    );
+    expect(scenario.aspectRatioButton.classList).toContain('sniptale-glass-toolbar-button');
+    expect(scenario.aspectRatioButton.classList).toContain('sniptale-glass-toolbar-button--active');
+    expect(scenario.aspectRatioButton.style.getPropertyValue('background')).toBe('');
+    expect(scenario.aspectRatioButton.style.width).toBe('30px');
 
     scenario.aspectRatioButton.dispatchEvent(
       new MouseEvent('click', { bubbles: true, cancelable: true })
@@ -133,8 +131,9 @@ describe('selection-mode size-panel setup boundary', () => {
     expect(scenario.session.maintainAspectRatio).toBe(false);
     expect(scenario.session.aspectRatio).toBe(2);
     expect(scenario.aspectRatioButton.getAttribute('aria-pressed')).toBe('false');
-    expect(scenario.aspectRatioButton.style.getPropertyValue('background')).toBe(
-      String(inactiveStyle['background'])
+    expect(scenario.aspectRatioButton.classList).not.toContain(
+      'sniptale-glass-toolbar-button--active'
     );
+    expect(scenario.aspectRatioButton.style.getPropertyValue('background')).toBe('');
   });
 });

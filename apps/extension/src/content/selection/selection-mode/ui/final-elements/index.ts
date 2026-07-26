@@ -21,7 +21,11 @@ function assembleSelectionModeFinalElements(
   const finalFrame = createSelectionModeFinalFrame(options);
   const sizeTooltip = createSelectionModeFinalSizeTooltip(overlayContainer, options);
 
-  createSelectionModeFinalResizeHandles(finalFrame, options.visual.strokeColor);
+  createSelectionModeFinalResizeHandles(
+    finalFrame,
+    options.visual.strokeColor,
+    options.visual.strokeWidth
+  );
   overlayContainer.append(finalOverlay, finalFrame);
 
   return { finalFrame, finalOverlay, sizeTooltip };

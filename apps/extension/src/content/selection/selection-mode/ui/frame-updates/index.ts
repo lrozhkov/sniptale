@@ -9,6 +9,7 @@ import type { SelectionRect } from '../types';
 import { syncSelectionToolbarPaddingState } from '../final-elements/toolbar';
 import { closeSelectionCaptureActionMenu } from '../final-elements/capture-menu';
 import { paintSelectionModeDragMask } from '../final-elements/overlay';
+import { syncSelectionToolbarCompactControlsChrome } from '../final-elements/toolbar-chrome';
 
 function createDragFrameSizeLabel(): HTMLDivElement {
   const label = document.createElement('div');
@@ -180,6 +181,7 @@ export function updateFinalFrame(dom: SelectionModeDom, rect: SelectionRect): vo
     heightMin: Number(dom.heightInput.min),
     heightMax: Number(dom.heightInput.max),
   });
+  syncSelectionToolbarCompactControlsChrome(dom.sizeTooltip);
 
   updateOverlayShades(dom.finalOverlay, rect);
   syncSelectionToolbarPaddingState(dom.sizePanel, rect);

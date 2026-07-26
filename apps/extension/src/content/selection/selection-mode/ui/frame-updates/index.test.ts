@@ -30,11 +30,13 @@ const {
   calculateContentSizeTooltipPositionMock,
   closeSelectionCaptureActionMenuMock,
   setContentSizeTooltipPositionMock,
+  syncSelectionToolbarCompactControlsChromeMock,
   syncContentSizeTooltipValuesMock,
 } = vi.hoisted(() => ({
   calculateContentSizeTooltipPositionMock: vi.fn(() => ({ left: 12, top: 34 })),
   closeSelectionCaptureActionMenuMock: vi.fn(),
   setContentSizeTooltipPositionMock: vi.fn(),
+  syncSelectionToolbarCompactControlsChromeMock: vi.fn(),
   syncContentSizeTooltipValuesMock: vi.fn(),
 }));
 
@@ -57,6 +59,11 @@ vi.mock('@sniptale/ui/content-size-tooltip/dom', () => ({
   setContentSizeTooltipPosition: setContentSizeTooltipPositionMock,
   syncContentSizeTooltipAspectRatioButtonState: vi.fn(),
   syncContentSizeTooltipValues: syncContentSizeTooltipValuesMock,
+}));
+
+vi.mock('../final-elements/toolbar-chrome', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../final-elements/toolbar-chrome')>()),
+  syncSelectionToolbarCompactControlsChrome: syncSelectionToolbarCompactControlsChromeMock,
 }));
 
 import {
@@ -209,6 +216,7 @@ describe('selection-mode ui frame updates', () => {
       heightMin: 10,
       heightMax: 700,
     });
+    expect(syncSelectionToolbarCompactControlsChromeMock).toHaveBeenCalledWith(dom.sizeTooltip);
     expect(calculateContentSizeTooltipPositionMock).toHaveBeenCalledWith({
       anchorRect: { x: 100, y: 120, width: 240, height: 160 },
       tooltipHeight: 44,

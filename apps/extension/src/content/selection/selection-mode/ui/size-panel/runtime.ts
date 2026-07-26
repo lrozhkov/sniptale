@@ -2,6 +2,7 @@ import { syncContentSizeTooltipAspectRatioButtonState } from '@sniptale/ui/conte
 import type { Selection } from '../../types';
 import { MIN_SELECTION_SIZE } from '../../constants';
 import type { SelectionModeSession } from '../../session';
+import { applySelectionToolbarCompactButtonChrome } from '../final-elements/toolbar-chrome';
 import {
   bindSelectionHeightInput,
   bindSelectionWidthInput,
@@ -84,6 +85,7 @@ function bindAspectRatioToggle(button: HTMLButtonElement, session: SizePanelSess
     syncContentSizeTooltipAspectRatioButtonState(button, {
       maintainAspectRatio: session.maintainAspectRatio,
     });
+    applySelectionToolbarCompactButtonChrome(button);
 
     const selection = session.currentSelection;
     if (session.maintainAspectRatio && selection.width > 0 && selection.height > 0) {
