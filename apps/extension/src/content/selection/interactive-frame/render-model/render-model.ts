@@ -5,25 +5,17 @@ import {
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../../features/highlighter/style';
-import { getInteractiveFrameStyle } from '../layout/style';
+import { resolveFrameSurface } from '../../../../features/highlighter/frame-surface';
+import {
+  getInteractiveFrameFillStyle,
+  getInteractiveFrameStrokeStyle,
+  getInteractiveFrameStyle,
+} from '../layout/style';
 
-const HIGHLIGHT_BORDER_WIDTH = 3;
 const Z_INDEX_FRAMES = 2147483644;
 
 function resolveInteractiveFrameBorderVisual(frame: FrameData) {
   return frame.borderSettings ? resolveBorderPresetVisual(frame.borderSettings) : null;
-}
-
-function shouldShowInteractiveFrameBorder(params: { effectMode: EffectMode; frame: FrameData }) {
-  if (params.effectMode === 'blur') {
-    return params.frame.blurSettings?.showBorder ?? false;
-  }
-
-  if (params.effectMode === 'focus') {
-    return params.frame.focusSettings?.showBorder ?? false;
-  }
-
-  return true;
 }
 
 export function useInteractiveFrameRenderRefs() {
@@ -61,7 +53,8 @@ export function getInteractiveFrameDisplay(params: {
 }) {
   const { frame, currentFrame, effectMode, state, zIndex } = params;
   const borderVisual = resolveInteractiveFrameBorderVisual(frame);
-  const borderWidth = borderVisual?.strokeWidth ?? HIGHLIGHT_BORDER_WIDTH;
+  const surface = resolveFrameSurface({ ...currentFrame, effectMode });
+  const borderWidth = surface.geometry.strokeWidth;
   const borderColor = borderVisual?.strokeColor ?? 'var(--sniptale-color-accent)';
   const borderCssColor = borderVisual
     ? colorToRgba(borderVisual.strokeColor, borderVisual.strokeOpacity)
@@ -79,14 +72,21 @@ export function getInteractiveFrameDisplay(params: {
     borderShadow: frame.borderSettings?.shadow,
     frameStyle: getInteractiveFrameStyle({
       currentFrame,
-      shouldShowBorder: shouldShowInteractiveFrameBorder({ effectMode, frame }),
+      state,
+    }),
+    fillStyle: getInteractiveFrameFillStyle({
+      decorationVisible: surface.decorationVisible,
+      fillVisible: surface.fillVisible,
+      fillColor: fillCssColor,
+      borderRadius: surface.geometry.radius,
+      ...(borderVisual ? { customCssStyles: borderVisual.customCssStyles } : {}),
+    }),
+    strokeStyle: getInteractiveFrameStrokeStyle({
+      visible: surface.strokeVisible,
       borderWidth,
       borderStyle: borderVisual?.strokeStyle ?? 'solid',
       borderColor: borderCssColor,
-      borderRadius: borderVisual?.radius ?? 0,
-      fillColor: fillCssColor,
-      state,
-      ...(borderVisual ? { customCssStyles: borderVisual.customCssStyles } : {}),
+      borderRadius: surface.geometry.radius,
       ...(shadowVisual?.frameBoxShadow === undefined
         ? {}
         : { boxShadow: shadowVisual.frameBoxShadow }),

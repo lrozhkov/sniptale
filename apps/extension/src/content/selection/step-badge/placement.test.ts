@@ -16,7 +16,7 @@ describe('step badge boundary placement', () => {
     });
   });
 
-  it('maps the normalized position to the visual stroke center, including border width', () => {
+  it('maps the normalized position to the canonical frame boundary independent of stroke width', () => {
     const style = getStepBadgeStyle({
       borderColor: '#111',
       borderWidth: 4,
@@ -30,9 +30,26 @@ describe('step badge boundary placement', () => {
       zIndex: 10,
     });
 
-    expect(style.bottom).toBe(-2);
-    expect(style.left).toBe('calc(75% + 1px)');
+    expect(style.bottom).toBe(0);
+    expect(style.left).toBe('75%');
     expect(style.transform).toBe('translate(-50%, 50%) translate(0px, 0px)');
+
+    const thickStyle = getStepBadgeStyle({
+      borderColor: '#111',
+      borderWidth: 20,
+      clickable: false,
+      settings: {
+        enabled: true,
+        manualPlacement: { position: 0.75, side: 'bottom' },
+        type: 'number',
+        value: '4',
+      },
+      zIndex: 10,
+    });
+    expect({ bottom: thickStyle.bottom, left: thickStyle.left }).toEqual({
+      bottom: 0,
+      left: '75%',
+    });
   });
 
   it('keeps the configured visual offset after the badge is moved manually', () => {

@@ -9,14 +9,7 @@ export function createSizePanelUpdater(params: {
   return (updater: (current: FrameData) => FrameData) => {
     params.setTempFrame((prev) => {
       const next = updater(prev);
-      updateEffectOverlay(
-        params.effectMode,
-        params.frameId,
-        next.x,
-        next.y,
-        next.width,
-        next.height
-      );
+      updateEffectOverlay(params.effectMode, params.frameId, next);
       return next;
     });
   };

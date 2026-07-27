@@ -51,6 +51,7 @@ export interface HighlighterSettings {
 
 export interface FrameData {
   id: string;
+  /** Canonical outer visual box shared by effects, fill, inward stroke, hit testing, and controls. */
   x: number;
   y: number;
   width: number;

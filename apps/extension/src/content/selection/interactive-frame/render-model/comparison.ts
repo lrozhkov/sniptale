@@ -6,20 +6,11 @@ function hasMeaningfulRectChange(
 ) {
   const prevFrame = prevProps.frame;
   const nextFrame = nextProps.frame;
-  if (
-    prevFrame.x === nextFrame.x &&
-    prevFrame.y === nextFrame.y &&
-    prevFrame.width === nextFrame.width &&
-    prevFrame.height === nextFrame.height
-  ) {
-    return false;
-  }
-
   return (
-    Math.abs(prevFrame.x - nextFrame.x) >= 1 ||
-    Math.abs(prevFrame.y - nextFrame.y) >= 1 ||
-    Math.abs(prevFrame.width - nextFrame.width) >= 1 ||
-    Math.abs(prevFrame.height - nextFrame.height) >= 1
+    prevFrame.x !== nextFrame.x ||
+    prevFrame.y !== nextFrame.y ||
+    prevFrame.width !== nextFrame.width ||
+    prevFrame.height !== nextFrame.height
   );
 }
 

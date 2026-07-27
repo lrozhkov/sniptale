@@ -9,7 +9,23 @@ vi.mock('../css-sanitizer/css', () => ({
     blockedProps: css.includes('position') ? ['position'] : [],
     hasBlockedProps: css.includes('position'),
     rawError: null,
-    styles: { outline: '1px solid red' },
+    styles: css.includes('geometry-escape')
+      ? {
+          all: 'unset',
+          backgroundImage: 'linear-gradient(red, blue)',
+          border: '20px dashed blue',
+          borderRadius: '50px',
+          boxShadow: '0 0 4px red',
+          clip: 'rect(0, 0, 0, 0)',
+          inset: '0',
+          offsetPath: 'path("M 0 0 L 100 100")',
+          WebkitClipPath: 'inset(10px)',
+          WebkitMask: 'linear-gradient(black, transparent)',
+          WebkitTransform: 'scale(2)',
+          zIndex: '999',
+          zoom: '2',
+        }
+      : { outline: '1px solid red' },
   })),
 }));
 
@@ -73,5 +89,14 @@ describe('highlighter visual preset resolver', () => {
     expect(
       resolveBorderPresetVisual(createPreset({ inheritCustomCss: false })).customCssStyles
     ).toEqual({});
+  });
+
+  it('projects accepted custom css to decoration-only properties', () => {
+    expect(
+      resolveBorderPresetVisual(createPreset({ customCss: 'geometry-escape' })).customCssStyles
+    ).toEqual({
+      backgroundImage: 'linear-gradient(red, blue)',
+      boxShadow: '0 0 4px red',
+    });
   });
 });

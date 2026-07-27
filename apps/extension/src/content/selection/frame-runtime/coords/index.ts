@@ -1,4 +1,5 @@
 import type { BorderPadding } from '../../../../features/highlighter/contracts';
+import { projectElementFrameSurface } from '../../../../features/highlighter/frame-surface';
 
 const DEFAULT_BORDER_WIDTH = 3;
 const DEFAULT_PADDING: BorderPadding = {
@@ -31,14 +32,10 @@ export function calculateFrameContainerCoords(
   elementPos: ElementAbsolutePosition,
   settings: FrameCalcSettings
 ): FrameContainerCoords {
-  const { borderWidth, padding } = settings;
-
-  return {
-    x: elementPos.x - padding.left - borderWidth,
-    y: elementPos.y - padding.top - borderWidth,
-    width: elementPos.width + padding.left + padding.right,
-    height: elementPos.height + padding.top + padding.bottom,
-  };
+  return projectElementFrameSurface(elementPos, {
+    strokeWidth: settings.borderWidth,
+    padding: settings.padding,
+  });
 }
 
 export function createFrameCalcSettings(

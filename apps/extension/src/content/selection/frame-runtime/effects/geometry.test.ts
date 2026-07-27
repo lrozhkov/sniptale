@@ -35,9 +35,9 @@ function expectFocusMaskRectAttributes(
   expect(rect?.getAttribute('height')).toBe(expected.height);
 }
 
-function expectBlurGeometryWithoutBorder() {
+function expectCanonicalBlurGeometry(showBorder: boolean) {
   const frame = createFrame({
-    blurSettings: createBlurSettingsFixture({ showBorder: false }),
+    blurSettings: createBlurSettingsFixture({ showBorder }),
     borderSettings: createBorderSettings(),
     x: 15,
     y: 25,
@@ -46,28 +46,34 @@ function expectBlurGeometryWithoutBorder() {
   });
 
   expect(getBlurOverlayBox(frame)).toEqual({
-    x: 19,
-    y: 29,
+    x: 15,
+    y: 25,
     width: 130,
     height: 90,
   });
 }
 
-function expectBlurGeometryWithBorder() {
+function expectCanonicalFocusGeometry(showBorder: boolean) {
   const frame = createFrame({
-    blurSettings: createBlurSettingsFixture({ showBorder: true }),
+    focusSettings: createFocusSettingsFixture({ showBorder }),
     borderSettings: createBorderSettings(),
-    x: 15,
-    y: 25,
-    width: 130,
-    height: 90,
+    x: 30,
+    y: 40,
+    width: 150,
+    height: 70,
   });
 
-  expect(getBlurOverlayBox(frame)).toEqual({
-    x: 19,
-    y: 29,
-    width: 130,
-    height: 90,
+  expect(getFocusMaskBox(frame)).toEqual({
+    x: 30,
+    y: 40,
+    width: 150,
+    height: 70,
+  });
+  expectFocusMaskRectAttributes(frame, {
+    x: '30',
+    y: '40',
+    width: '150',
+    height: '70',
   });
 }
 
@@ -83,72 +89,18 @@ function expectPixelateBlurFallbackStyle() {
   });
 }
 
-function expectFocusGeometryWithoutBorder() {
-  const frame = createFrame({
-    focusSettings: createFocusSettingsFixture({ showBorder: false }),
-    borderSettings: createBorderSettings(),
-    x: 30,
-    y: 40,
-    width: 150,
-    height: 70,
-  });
-
-  expect(getFocusMaskBox(frame)).toEqual({
-    x: 34,
-    y: 44,
-    width: 150,
-    height: 70,
-  });
-  expectFocusMaskRectAttributes(frame, {
-    x: '34',
-    y: '44',
-    width: '150',
-    height: '70',
-  });
-}
-
-function expectFocusGeometryWithBorder() {
-  const frame = createFrame({
-    focusSettings: createFocusSettingsFixture({ showBorder: true }),
-    borderSettings: createBorderSettings(),
-    x: 30,
-    y: 40,
-    width: 150,
-    height: 70,
-  });
-
-  expect(getFocusMaskBox(frame)).toEqual({
-    x: 30,
-    y: 40,
-    width: 158,
-    height: 78,
-  });
-  expectFocusMaskRectAttributes(frame, {
-    x: '30',
-    y: '40',
-    width: '158',
-    height: '78',
-  });
-}
-
 describe('frame-manager-effect-geometry', () => {
-  it('matches the raw frame rect for blur overlays when the border is hidden', () => {
-    expectBlurGeometryWithoutBorder();
-  });
-
-  it('keeps the inset blur geometry when the border stays visible', () => {
-    expectBlurGeometryWithBorder();
-  });
+  it.each([false, true])(
+    'keeps blur on the canonical outer frame rect when decoration visibility is %s',
+    expectCanonicalBlurGeometry
+  );
 
   it('falls back to a pixelated blur style when pixelate frames reach the content overlay', () => {
     expectPixelateBlurFallbackStyle();
   });
 
-  it('matches the raw frame rect for focus masks when the border is hidden', () => {
-    expectFocusGeometryWithoutBorder();
-  });
-
-  it('keeps the expanded focus mask geometry when the border stays visible', () => {
-    expectFocusGeometryWithBorder();
-  });
+  it.each([false, true])(
+    'keeps focus on the canonical outer frame rect when decoration visibility is %s',
+    expectCanonicalFocusGeometry
+  );
 });

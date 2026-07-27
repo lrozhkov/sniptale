@@ -87,8 +87,8 @@ describe('frame manager coords', () => {
     expect(calculateFrameViewportCoords(target, testBorderSettings)).toEqual({
       x: 233,
       y: 144,
-      width: 108,
-      height: 59,
+      width: 116,
+      height: 67,
     });
   });
 

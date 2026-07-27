@@ -74,12 +74,7 @@ export function syncFramePositionOnScroll({
   const nextCoords = frame.offset
     ? applyFrameOffsetToElement(linkedElement, frame.offset)
     : calculateFrameViewportCoords(linkedElement, frame.borderSettings);
-  const nextFrameCoords = {
-    x: nextCoords.x,
-    y: nextCoords.y,
-    width: frame.width,
-    height: frame.height,
-  };
+  const nextFrameCoords = nextCoords;
   if (!haveFrameCoordsChanged(frame, nextFrameCoords)) {
     return;
   }

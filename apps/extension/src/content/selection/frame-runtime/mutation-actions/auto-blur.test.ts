@@ -105,15 +105,15 @@ function expectAddedFrame(frame: FrameData | undefined, element: HTMLElement) {
     blurSettings: { amount: 22, blurType: 'solid', showBorder: true },
     createdBy: 'auto-blur',
     effectMode: 'blur',
-    height: 18,
+    height: 22,
     linkedElement: element,
     linkedElementSelector: '#target',
-    offset: { height: -12, width: -20, x: 93, y: 108 },
-    width: 70,
+    offset: { height: -8, width: -16, x: 93, y: 108 },
+    width: 74,
     x: 98,
     y: 118,
   });
-  expect(getBlurOverlayBox(frame!)).toEqual({ height: 18, width: 70, x: 100, y: 120 });
+  expect(getBlurOverlayBox(frame!)).toEqual({ height: 22, width: 74, x: 98, y: 118 });
 }
 
 function expectAutoBlurFramesAdded() {
@@ -233,10 +233,10 @@ describe('createAddAutoBlurFramesHandler', () => {
     createAddAutoBlurFramesHandler(scenario.args)(createAutoBlurInput(scenario.element));
 
     expect(getBlurOverlayBox(scenario.getFrames()[1]!)).toEqual({
-      height: 22,
-      width: 76,
-      x: 98,
-      y: 119,
+      height: 26,
+      width: 80,
+      x: 96,
+      y: 117,
     });
   });
 
@@ -279,10 +279,10 @@ describe('createAddAutoBlurFramesHandler', () => {
     const frame = committedFrames.at(-1)!;
     expect(scenario.args.linkedElementsRef.current.get(frame.id)).toBe(scenario.element);
     expect(getBlurOverlayBox(frame)).toEqual({
-      height: 18,
-      width: 70,
-      x: 100,
-      y: 2420,
+      height: 22,
+      width: 74,
+      x: 98,
+      y: 2418,
     });
 
     iframeUtilsMocks.getAbsolutePosition.mockReturnValue({
@@ -304,10 +304,10 @@ describe('createAddAutoBlurFramesHandler', () => {
     const scrolledFrames =
       typeof scrollUpdate === 'function' ? scrollUpdate(committedFrames) : scrollUpdate;
     expect(getBlurOverlayBox(scrolledFrames.at(-1)!)).toEqual({
-      height: 18,
-      width: 70,
-      x: 100,
-      y: 120,
+      height: 22,
+      width: 74,
+      x: 98,
+      y: 118,
     });
   });
 

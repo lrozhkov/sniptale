@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import {
   createBlurSettingsFixture,
+  createBorderSettingsFixture,
   createFocusSettingsFixture,
   createFrameDataFixture,
 } from './test-support';
@@ -106,6 +107,23 @@ async function expectRelevantOverlayChangesRetriggerOnlyTheirOwner() {
   expect(domMocks.updateBlurOverlayNodes).toHaveBeenCalledTimes(1);
 }
 
+async function expectFocusRadiusChangeRetriggersFocusOwner() {
+  const initialFrames = [createFrame('focus-1', 'focus'), createFrame('blur-1', 'blur')];
+  const nextFrames = [
+    {
+      ...createFrame('focus-1', 'focus'),
+      borderSettings: createBorderSettingsFixture({ radius: 18 }),
+    },
+    createFrame('blur-1', 'blur'),
+  ];
+
+  await renderHarness(initialFrames);
+  await renderHarness(nextFrames);
+
+  expect(domMocks.updateFocusOverlayMask).toHaveBeenCalledTimes(2);
+  expect(domMocks.updateBlurOverlayNodes).toHaveBeenCalledTimes(1);
+}
+
 async function expectUnmountCleanupRemovesOverlayArtifacts() {
   const focusOverlay = document.createElement('div');
   focusOverlay.className = 'sniptale-focus-overlay';
@@ -136,6 +154,10 @@ describe('useFrameEffectOverlays', () => {
   it(
     'retriggers only the changed overlay owner when relevant descriptor fields change',
     expectRelevantOverlayChangesRetriggerOnlyTheirOwner
+  );
+  it(
+    'rebuilds the focus mask when its canonical corner radius changes',
+    expectFocusRadiusChangeRetriggersFocusOwner
   );
   it('removes overlay artifacts on unmount cleanup', expectUnmountCleanupRemovesOverlayArtifacts);
 });

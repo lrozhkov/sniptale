@@ -21,6 +21,20 @@ function createProps(): InteractiveFrameProps {
 }
 
 describe('areInteractiveFramePropsEqual', () => {
+  it('preserves fractional canonical rect updates', () => {
+    const prevProps = createProps();
+    const nextProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        x: prevProps.frame.x + 0.125,
+        width: prevProps.frame.width + 0.25,
+      },
+    };
+
+    expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
+  });
+
   it('treats focus border visibility as a render-critical change', () => {
     const prevProps = createProps();
     const nextProps: InteractiveFrameProps = {

@@ -7,7 +7,6 @@ interface InteractiveFrameCalloutOverlayProps {
   frame: FrameData;
   currentFrame: FrameData;
   frameZIndex: number;
-  borderWidth: number;
   isCalloutEditing: boolean;
   isCalloutPopoverOpen: boolean;
   calloutPopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
@@ -39,11 +38,7 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
     <Callout
       frameId={props.frame.id}
       settings={callout}
-      frameRect={{
-        ...props.currentFrame,
-        width: props.currentFrame.width + props.borderWidth * 2,
-        height: props.currentFrame.height + props.borderWidth * 2,
-      }}
+      frameRect={props.currentFrame}
       zIndex={props.frameZIndex + 1}
       isEditing={props.isCalloutEditing}
       isSettingsOpen={props.isCalloutPopoverOpen}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../../features/highlighter/contracts';
 import { createFrameDataFixture, createStepBadgeSettingsFixture } from '../../test-support';
 
@@ -64,6 +64,10 @@ afterEach(() => {
   useFrameUIStore.getState().reset();
 });
 
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 function createFrame(id: string, stepBadge = false): FrameData {
   return createFrameDataFixture(id, {
     ...(stepBadge ? { stepBadge: createStepBadgeSettingsFixture({ value: '1' }) } : {}),
@@ -125,10 +129,13 @@ function expectOffsetAwarePositionUpdate(): void {
   });
 
   expect(mocks.applyFrameOffsetToElement).toHaveBeenCalledWith(linkedElement, frame.offset);
-  expect(runSetter(setFrames, [frame])).toEqual([{ ...frame, x: 44, y: 55 }]);
+  expect(mocks.calculateFrameViewportCoords).not.toHaveBeenCalled();
+  expect(runSetter(setFrames, [frame])).toEqual([
+    { ...frame, x: 44, y: 55, width: 130, height: 90 },
+  ]);
 }
 
-function expectScrollMeasurementsDoNotResizeFrame(): void {
+function expectLinkedProjectionUpdatesCanonicalGeometry(): void {
   const linkedElement = document.createElement('div');
   const linkedElementsRef = { current: new Map([['frame-1', linkedElement]]) };
   const setFrames = vi.fn();
@@ -153,7 +160,7 @@ function expectScrollMeasurementsDoNotResizeFrame(): void {
     x: frame.x,
     y: frame.y - 24,
     width: frame.width,
-    height: frame.height,
+    height: frame.height + 18,
   });
 }
 
@@ -187,8 +194,8 @@ describe('syncFramePositionOnScroll updates', () => {
     expectOffsetAwarePositionUpdate
   );
   it(
-    'keeps stored dimensions when scroll-time GWT layout measurements drift',
-    expectScrollMeasurementsDoNotResizeFrame
+    'treats the linked-element projection as canonical geometry when no manual offset exists',
+    expectLinkedProjectionUpdatesCanonicalGeometry
   );
 });
 
@@ -250,8 +257,8 @@ describe('createFrameScrollHandler', () => {
 
     expect(mocks.logger.debug).toHaveBeenCalledWith('Handling scroll sync', { frameCount: 1 });
     expect(runSetter(setFrames, [frame])[0]).toMatchObject({
-      height: frame.height,
-      width: frame.width,
+      height: 81,
+      width: 121,
       x: 11,
       y: 21,
     });

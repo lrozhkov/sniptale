@@ -4,12 +4,12 @@
     {
       "category": "archive-integration",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "2efc59ec269c53d88993de1230bc4a974a20b0373c398bb8282c0ff4c85aacf2"
+      "sha256": "3c1624ab0fbe0701085ecddd1004a07f20a141ad3d5c097342968bbf3a83ce22"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "2efc59ec269c53d88993de1230bc4a974a20b0373c398bb8282c0ff4c85aacf2"
+      "sha256": "3c1624ab0fbe0701085ecddd1004a07f20a141ad3d5c097342968bbf3a83ce22"
     },
     {
       "category": "bundled-font",

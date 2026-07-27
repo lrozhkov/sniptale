@@ -17,8 +17,10 @@ vi.mock('../../../platform/dom-host/isolated', () => ({
   applyIsolatedContentRootStyle: vi.fn(),
 }));
 
-import { registerImmediateBlurOverlayUpdates } from './blur';
+import { registerImmediateBlurOverlayUpdates, updateBlurOverlayNodes } from './blur';
 import type { OverlayRefs } from './types';
+
+type FrameGeometry = Pick<FrameData, 'x' | 'y' | 'width' | 'height'>;
 
 function createOverlayRefs(overlay: HTMLDivElement): OverlayRefs {
   return {
@@ -31,47 +33,49 @@ function createOverlayRefs(overlay: HTMLDivElement): OverlayRefs {
   };
 }
 
-function createFrame(showBorder: boolean): FrameData {
+function createFrame(showBorder: boolean, geometry: FrameGeometry): FrameData {
   return createFrameDataFixture('frame-1', {
+    ...geometry,
     effectMode: 'blur',
     blurSettings: createBlurSettingsFixture({ showBorder }),
     borderSettings: createBorderSettingsFixture({ width: 4 }),
   });
 }
 
-describe('frame-effect-overlays blur immediate updates', () => {
-  it('matches the raw frame geometry when the blur border is hidden', () => {
-    const overlay = document.createElement('div');
-    const cleanup = registerImmediateBlurOverlayUpdates(
-      { current: [createFrame(false)] },
-      createOverlayRefs(overlay)
-    );
+function expectOverlayGeometry(overlay: HTMLDivElement, geometry: FrameGeometry) {
+  expect(overlay.style.left).toBe(`${geometry.x}px`);
+  expect(overlay.style.top).toBe(`${geometry.y}px`);
+  expect(overlay.style.width).toBe(`${geometry.width}px`);
+  expect(overlay.style.height).toBe(`${geometry.height}px`);
+}
 
-    window.sniptaleUpdateBlurOverlayImmediate?.('frame-1', 11, 22, 33, 44);
+describe('frame-effect-overlays blur geometry', () => {
+  it.each([false, true])(
+    'keeps static and immediate rendering on one canonical geometry when showBorder=%s',
+    (showBorder) => {
+      const geometry = { x: 11, y: 22, width: 33, height: 44 };
+      const frame = createFrame(showBorder, geometry);
+      const overlay = document.createElement('div');
+      const refs = createOverlayRefs(overlay);
 
-    expect(overlay.style.left).toBe('15px');
-    expect(overlay.style.top).toBe('26px');
-    expect(overlay.style.width).toBe('33px');
-    expect(overlay.style.height).toBe('44px');
+      updateBlurOverlayNodes([frame], refs, vi.fn(), vi.fn());
 
-    cleanup();
-    expect(window.sniptaleUpdateBlurOverlayImmediate).toBeUndefined();
-  });
+      expectOverlayGeometry(overlay, geometry);
+      expect(overlay.style.borderRadius).toBe('6px');
 
-  it('keeps the inset blur geometry when the blur border stays visible', () => {
-    const overlay = document.createElement('div');
-    const cleanup = registerImmediateBlurOverlayUpdates(
-      { current: [createFrame(true)] },
-      createOverlayRefs(overlay)
-    );
+      overlay.style.left = '0px';
+      overlay.style.top = '0px';
+      overlay.style.width = '1px';
+      overlay.style.height = '1px';
+      const cleanup = registerImmediateBlurOverlayUpdates({ current: [frame] }, refs);
 
-    window.sniptaleUpdateBlurOverlayImmediate?.('frame-1', 11, 22, 33, 44);
+      window.sniptaleUpdateBlurOverlayImmediate?.('frame-1', geometry);
 
-    expect(overlay.style.left).toBe('15px');
-    expect(overlay.style.top).toBe('26px');
-    expect(overlay.style.width).toBe('33px');
-    expect(overlay.style.height).toBe('44px');
+      expectOverlayGeometry(overlay, geometry);
+      expect(overlay.style.borderRadius).toBe('6px');
 
-    cleanup();
-  });
+      cleanup();
+      expect(window.sniptaleUpdateBlurOverlayImmediate).toBeUndefined();
+    }
+  );
 });

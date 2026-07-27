@@ -9,12 +9,10 @@ export function InteractiveFrameResizeHandleLayer(props: {
   frameId: string;
   tempFrame: FrameData;
   handleSize: number;
-  borderWidth: number;
   borderColor?: string;
   onResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 }) {
-  const { directions, frameId, tempFrame, handleSize, borderWidth, borderColor, onResizeStart } =
-    props;
+  const { directions, frameId, tempFrame, handleSize, borderColor, onResizeStart } = props;
   const resolvedBorderColor = borderColor ?? 'var(--sniptale-color-accent)';
 
   const baseStyle: CSSProperties = {
@@ -41,7 +39,7 @@ export function InteractiveFrameResizeHandleLayer(props: {
           data-direction={dir}
           style={{
             ...baseStyle,
-            ...getResizeHandleStyle(dir, tempFrame, handleSize, borderWidth),
+            ...getResizeHandleStyle(dir, tempFrame, handleSize),
             cursor: getCursorForDirection(dir),
           }}
           aria-hidden="true"

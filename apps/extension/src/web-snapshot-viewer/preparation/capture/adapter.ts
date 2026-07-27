@@ -1,7 +1,7 @@
 import type { FrameData } from '../../../features/highlighter/contracts';
 import { cropImage } from '@sniptale/platform/browser/media/image-crop';
 import type { ScreenshotCaptureAdapter } from '../../../content/public/preparation-surface';
-import { composeViewerCaptureOverlays } from './overlays';
+import { composeViewerCaptureOverlays } from './overlays/composer';
 import { renderViewerFrameToDataUrl } from './render';
 import { requestViewerSelectionArea } from './selection';
 import type { ViewerCaptureMode } from './types';

@@ -79,7 +79,7 @@ function ensurePreview(session: HoverSession): HTMLElement {
   const visual = resolveBorderPresetVisual(preset);
   preview.style.cssText = `
     position: fixed;
-    box-sizing: content-box;
+    box-sizing: border-box;
     pointer-events: none;
     border: ${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
       visual.strokeColor,
@@ -91,6 +91,15 @@ function ensurePreview(session: HoverSession): HTMLElement {
     box-shadow: ${resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none'};
   `;
   Object.assign(preview.style, visual.customCssStyles);
+  preview.style.boxSizing = 'border-box';
+  preview.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
+    visual.strokeColor,
+    visual.strokeOpacity
+  )}`;
+  preview.style.borderRadius = `${visual.radius}px`;
+  preview.style.margin = '0';
+  preview.style.padding = '0';
+  preview.style.clipPath = 'none';
   ensurePreviewRoot(session).appendChild(preview);
   session.freeDraw.preview = preview;
   return preview;

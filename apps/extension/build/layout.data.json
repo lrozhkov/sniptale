@@ -149,6 +149,12 @@
       "mode": "test-e2e"
     },
     {
+      "outputPath": "tooling/test/harness/highlighter-geometry.html",
+      "sourcePath": "tooling/test/harness/highlighter-geometry.html",
+      "rollupName": "testHarnessHighlighterGeometry",
+      "mode": "test-e2e"
+    },
+    {
       "outputPath": "tooling/test/harness/preview-audio-diagnostic.html",
       "sourcePath": "tooling/test/harness/preview-audio-diagnostic.html",
       "rollupName": "testHarnessPreviewAudioDiagnostic",

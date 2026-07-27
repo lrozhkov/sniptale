@@ -39,6 +39,11 @@ describe('quick-edit page-style frame', () => {
     expect(document.querySelectorAll('.sniptale-quick-edit-page-style-frame')).toHaveLength(1);
     expect(firstFrame?.style.display).toBe('block');
     expect(firstFrame?.style.border).toContain('var(--sniptale-color-info)');
+    expect(firstFrame?.style.boxSizing).toBe('border-box');
+    expect(firstFrame?.style.left).toBe('6px');
+    expect(firstFrame?.style.top).toBe('2px');
+    expect(firstFrame?.style.width).toBe('76px');
+    expect(firstFrame?.style.height).toBe('76px');
 
     hideQuickEditPageStyleFrame();
     expect(firstFrame?.style.display).toBe('none');

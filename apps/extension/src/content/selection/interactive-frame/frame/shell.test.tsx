@@ -65,6 +65,8 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
           frame={frame}
           frameRef={{ current: null }}
           frameStyle={{}}
+          fillStyle={{ backgroundColor: 'rgba(22, 163, 74, 0.25)', borderRadius: '8px' }}
+          strokeStyle={{ border: '3px solid rgb(17, 17, 17)', borderRadius: '8px' }}
           frameZIndex={100}
           handleMouseDown={vi.fn()}
           handleResizeStart={vi.fn()}
@@ -76,6 +78,22 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
         />
       );
     });
+
+    const container = host.querySelector<HTMLElement>('.sniptale-frame-container');
+    const surface = host.querySelector<HTMLElement>('.sniptale-interactive-frame');
+    const fill = host.querySelector<HTMLElement>('.sniptale-interactive-frame-fill');
+    const stroke = host.querySelector<HTMLElement>('.sniptale-interactive-frame-stroke');
+    expect(container?.style.left).toBe(`${frame.x}px`);
+    expect(container?.style.top).toBe(`${frame.y}px`);
+    expect(container?.style.width).toBe(`${frame.width}px`);
+    expect(container?.style.height).toBe(`${frame.height}px`);
+    expect(fill?.parentElement).toBe(surface);
+    expect(stroke?.parentElement).toBe(surface);
+    expect(Array.from(surface?.children ?? []).slice(0, 2)).toEqual([fill, stroke]);
+    expect(fill?.style.backgroundColor).toBe('rgba(22, 163, 74, 0.25)');
+    expect(fill?.style.borderRadius).toBe('8px');
+    expect(stroke?.style.border).toBe('3px solid rgb(17, 17, 17)');
+    expect(stroke?.style.borderRadius).toBe('8px');
 
     act(() => host.querySelector<HTMLButtonElement>('[data-ui="move-step"]')?.click());
     expect(stepBadgeListener).toHaveBeenCalledOnce();

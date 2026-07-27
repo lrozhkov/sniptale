@@ -178,6 +178,32 @@ describe('free frame drawing gesture', () => {
     expect(preview?.style.boxShadow).not.toBe('none');
   });
 
+  it('preserves safe custom decoration without yielding canonical stroke geometry', () => {
+    const { handlers } = createFixture();
+    setFrameSessionBorderPreset({
+      ...DEFAULT_BORDER_PRESET,
+      width: 4,
+      radius: 8,
+      inheritCustomCss: true,
+      customCss: [
+        'background-image: linear-gradient(red, blue)',
+        'box-shadow: 0 0 4px red',
+        'border: 20px dashed blue',
+        'border-radius: 50px',
+      ].join('; '),
+    });
+
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 60, 60));
+
+    const preview = document.querySelector<HTMLElement>('.sniptale-free-frame-draft');
+    expect(preview?.style.backgroundImage).toBe('linear-gradient(red, blue)');
+    expect(preview?.style.boxShadow).toBe('0 0 4px red');
+    expect(preview?.style.borderWidth).toBe('4px');
+    expect(preview?.style.borderStyle).toBe(DEFAULT_BORDER_PRESET.style);
+    expect(preview?.style.borderRadius).toBe('8px');
+  });
+
   it('does not start a page gesture through an open settings popover', () => {
     const { handlers, session } = createFixture();
     targetPolicy.hasBlockingHighlighterPopover.mockReturnValue(true);

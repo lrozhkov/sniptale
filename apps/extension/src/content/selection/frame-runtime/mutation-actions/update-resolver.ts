@@ -15,7 +15,11 @@ export function resolveUpdatedFrame(args: {
     return resolveCoordsUpdatedFrame(args);
   }
 
-  if (args.linkedElement?.isConnected && haveFrameBorderMetricsChanged(args.frame, args.newFrame)) {
+  if (
+    args.linkedElement?.isConnected &&
+    args.frame.offset === undefined &&
+    haveFrameBorderMetricsChanged(args.frame, args.newFrame)
+  ) {
     return resolveBorderMetricsUpdatedFrame({
       ...args,
       linkedElement: args.linkedElement,

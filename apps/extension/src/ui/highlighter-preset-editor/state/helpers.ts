@@ -1,6 +1,10 @@
 import { validateCssString } from '../../../features/highlighter/css-sanitizer/css';
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
-import { colorToRgba, resolveBorderShadowVisual } from '../../../features/highlighter/style';
+import {
+  colorToRgba,
+  projectFrameDecorationCssStyles,
+  resolveBorderShadowVisual,
+} from '../../../features/highlighter/style';
 import type { BorderPreset } from '../../../features/highlighter/contracts';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import type { AppLocale } from '../../../platform/i18n';
@@ -65,19 +69,21 @@ export function buildBorderPresetPreviewStyle({
   style: 'solid' | 'dashed' | 'dotted';
   width: number;
 }) {
-  const customCssStyles = inheritCustomCss ? validateCssString(customCss).styles : {};
+  const customCssStyles = inheritCustomCss
+    ? projectFrameDecorationCssStyles(validateCssString(customCss).styles)
+    : {};
   const shadowVisual = resolveBorderShadowVisual(shadow, color);
 
   return {
+    backgroundColor: colorToRgba(fillColor, fillOpacity),
+    boxShadow: shadowVisual.settingsPreviewBoxShadow,
+    opacity: 1,
+    ...customCssStyles,
     width: '80px',
     height: '80px',
     borderWidth: `${width}px`,
     borderStyle: style,
     borderColor: colorToRgba(color, strokeOpacity),
     borderRadius: `${radius}px`,
-    backgroundColor: colorToRgba(fillColor, fillOpacity),
-    opacity: 1,
-    boxShadow: shadowVisual.settingsPreviewBoxShadow,
-    ...customCssStyles,
   } satisfies React.CSSProperties;
 }

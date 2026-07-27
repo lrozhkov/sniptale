@@ -26,7 +26,7 @@ function createBorderPreset(id: string, name: string) {
   };
 }
 
-function renderContent(effectMode: EffectMode) {
+function renderContent(effectMode: EffectMode, decorationVisible = true) {
   return renderToStaticMarkup(
     <FrameSettingsPopoverContent
       effectMode={effectMode}
@@ -38,8 +38,12 @@ function renderContent(effectMode: EffectMode) {
         defaultBorderPresetId: 'preset-1',
         defaultEffectMode: 'border',
         systemPresetCatalogRevision: 1,
-        defaultBlurSettings: { amount: 12, blurType: 'distortion', showBorder: true },
-        defaultFocusSettings: { opacity: 0.65, showBorder: true },
+        defaultBlurSettings: {
+          amount: 12,
+          blurType: 'distortion',
+          showBorder: decorationVisible,
+        },
+        defaultFocusSettings: { opacity: 0.65, showBorder: decorationVisible },
       }}
       handleBlurChange={vi.fn()}
       handleBlurShowBorderChange={vi.fn()}
@@ -50,8 +54,8 @@ function renderContent(effectMode: EffectMode) {
       handleEditPreset={vi.fn()}
       handleSelectPreset={vi.fn()}
       handleTogglePresetEnabled={vi.fn()}
-      localBlurSettings={{ amount: 12, blurType: 'distortion', showBorder: true }}
-      localFocusSettings={{ opacity: 0.65, showBorder: true }}
+      localBlurSettings={{ amount: 12, blurType: 'distortion', showBorder: decorationVisible }}
+      localFocusSettings={{ opacity: 0.65, showBorder: decorationVisible }}
       pendingPresetIds={new Set()}
       selectedPresetId="preset-1"
     />
@@ -77,6 +81,37 @@ describe('FrameSettingsPopoverContent', () => {
     expect(markup).toContain(translate('content.overlayControls.addFrameStyle'));
     expect(markup).toContain('sniptale-frame-style-add');
   });
+
+  it.each(['blur', 'focus'] as const)(
+    'shares the frame-and-fill preset section with %s when decoration is enabled',
+    (effectMode) => {
+      const markup = renderContent(effectMode, true);
+
+      expect(markup).toContain(translate('content.overlayControls.frameStyleLabel'));
+      expect(markup).toContain(translate('content.overlayControls.showBorderTitle'));
+      expect(markup).toContain('sniptale-frame-style-section');
+      expect(markup).toContain('sniptale-glass-switch--on');
+      expect(markup).toContain('Default');
+      expect(markup).toContain('Secondary');
+      expect(markup).toContain('sniptale-frame-style-add');
+    }
+  );
+
+  it.each(['blur', 'focus'] as const)(
+    'keeps the %s effect controls visible while hidden decoration collapses its presets',
+    (effectMode) => {
+      const markup = renderContent(effectMode, false);
+
+      expect(markup).toContain(translate('content.overlayControls.frameStyleLabel'));
+      expect(markup).toContain(translate('content.overlayControls.showBorderTitle'));
+      expect(markup).toContain('sniptale-glass-switch');
+      expect(markup).not.toContain('sniptale-glass-switch--on');
+      expect(markup).not.toContain('Default');
+      expect(markup).not.toContain('Secondary');
+      expect(markup).not.toContain('sniptale-frame-style-add');
+      expect(markup).toContain('class="sniptale-glass-range"');
+    }
+  );
 
   it('renders blur and focus controls inside the shared section contract', () => {
     const blurMarkup = renderContent('blur');

@@ -5,6 +5,7 @@ import {
   percentToUnit,
 } from '@sniptale/ui/highlighter-style/normalize';
 import type { BorderPadding, BorderPreset } from '@sniptale/ui/highlighter-style/types';
+import { projectFrameDecorationCssStyles } from './decoration';
 
 export interface ResolvedBorderPresetVisual {
   id: string;
@@ -72,7 +73,7 @@ function resolveCustomCssStyles(preset: BorderPreset): CSSProperties {
     return {};
   }
 
-  return validation.styles;
+  return projectFrameDecorationCssStyles(validation.styles);
 }
 
 export function resolveBorderPresetVisual(preset: BorderPreset): ResolvedBorderPresetVisual {

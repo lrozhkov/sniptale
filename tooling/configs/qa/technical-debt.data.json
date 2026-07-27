@@ -7321,8 +7321,10 @@
         "apps/extension/src/features/highlighter/contracts/auto-blur.ts",
         "apps/extension/src/features/highlighter/contracts/index.ts",
         "apps/extension/src/features/highlighter/css-sanitizer/css.ts",
+        "apps/extension/src/features/highlighter/frame-surface/index.ts",
         "apps/extension/src/features/highlighter/presets/catalog.ts",
         "apps/extension/src/features/highlighter/presets/display-name.ts",
+        "apps/extension/src/features/highlighter/style/decoration.ts",
         "apps/extension/src/features/highlighter/style/defaults.ts",
         "apps/extension/src/features/highlighter/style/index.ts",
         "apps/extension/src/features/highlighter/style/public.ts",
@@ -7333,8 +7335,10 @@
         "apps/extension/src/features/highlighter/contracts/auto-blur.ts",
         "apps/extension/src/features/highlighter/contracts/index.ts",
         "apps/extension/src/features/highlighter/css-sanitizer/css.ts",
+        "apps/extension/src/features/highlighter/frame-surface/index.ts",
         "apps/extension/src/features/highlighter/presets/catalog.ts",
         "apps/extension/src/features/highlighter/presets/display-name.ts",
+        "apps/extension/src/features/highlighter/style/decoration.ts",
         "apps/extension/src/features/highlighter/style/defaults.ts",
         "apps/extension/src/features/highlighter/style/index.ts",
         "apps/extension/src/features/highlighter/style/public.ts",
@@ -11462,7 +11466,10 @@
       "productionFiles": [
         "apps/extension/src/web-snapshot-viewer/index.tsx",
         "apps/extension/src/web-snapshot-viewer/preparation/capture/adapter.ts",
-        "apps/extension/src/web-snapshot-viewer/preparation/capture/overlays.ts",
+        "apps/extension/src/web-snapshot-viewer/preparation/capture/overlays/canvas.ts",
+        "apps/extension/src/web-snapshot-viewer/preparation/capture/overlays/composer.ts",
+        "apps/extension/src/web-snapshot-viewer/preparation/capture/overlays/decoration.ts",
+        "apps/extension/src/web-snapshot-viewer/preparation/capture/overlays/effects.ts",
         "apps/extension/src/web-snapshot-viewer/preparation/capture/render.ts",
         "apps/extension/src/web-snapshot-viewer/preparation/capture/selection.ts",
         "apps/extension/src/web-snapshot-viewer/preparation/capture/types.ts",
@@ -15626,6 +15633,7 @@
         "contentHash": "66bd887ef133a708e5a96f1d17012f54da6f59220c063bc1cc173abf35d634fe"
       },
       "consumers": [
+        "tooling/test/e2e/extension-critical-highlighter-geometry.spec.ts",
         "tooling/test/e2e/extension-critical-media.spec.ts",
         "tooling/test/e2e/extension-critical-offscreen.spec.ts",
         "tooling/test/e2e/extension-critical-popup.spec.ts",
@@ -16139,6 +16147,32 @@
         "property:setupGlobals/runtime",
         "property:setupGlobals/storage",
         "property:setupGlobals/value"
+      ]
+    },
+    {
+      "id": "policy.source.highlighter-geometry-tsx.13f22b389d",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/harness/highlighter-geometry.tsx",
+        "contentHash": "927a4114c2b71c6ff0bf589aa87e9da9feb8f0d0bda16481b4c9e4e7a6468b4b"
+      },
+      "consumers": [
+        "tooling/test/harness/highlighter-geometry.tsx"
+      ],
+      "surfaces": [
+        "binding:CELL",
+        "binding:GEOMETRY_CASES",
+        "binding:SURFACE",
+        "binding:THICK_PRESET",
+        "property:createFrame/blurSettings",
+        "property:createFrame/borderSettings",
+        "property:createFrame/focusSettings",
+        "property:padding",
+        "property:ViewerParity/anonymous-295/frames"
       ]
     },
     {
@@ -17959,7 +17993,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/run-e2e.mjs",
-        "contentHash": "4b1ce286cb3869aaf0751ee45fb42c1d18ce8e6d4711a78b526a8890859e81e4"
+        "contentHash": "c9413aaa11a954e999e855d440e8f7dfa23b4ccab757fb79186a338139b3a13f"
       },
       "consumers": [
         "tooling/test/e2e/run-e2e.mjs",

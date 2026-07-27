@@ -23,7 +23,7 @@ export function createSelectionModeFinalResizeHandles(
     handle.className = `sniptale-resize-handle sniptale-resize-${direction}`;
     handle.dataset['direction'] = direction;
     handle.setAttribute('aria-hidden', 'true');
-    handle.style.cssText = getResizeHandleStyle(direction, borderColor, handleSize, borderWidth);
+    handle.style.cssText = getResizeHandleStyle(direction, borderColor, handleSize);
     finalFrame.appendChild(handle);
   });
 }
@@ -31,11 +31,10 @@ export function createSelectionModeFinalResizeHandles(
 function getResizeHandleStyle(
   direction: ResizeDirection,
   borderColor: string,
-  handleSize: number,
-  borderWidth: number
+  handleSize: number
 ): string {
   const halfHandle = handleSize / 2;
-  const edgeOffset = halfHandle + borderWidth / 2;
+  const edgeOffset = halfHandle;
   const baseStyle = `
     position: absolute;
     width: ${handleSize}px;

@@ -13,6 +13,7 @@ it('maps e2e suites to canonical Playwright spec sets', () => {
   expect(parseE2eOptions(['--suite', 'critical', '--headed'])).toMatchObject({
     headed: true,
     specs: [
+      'tooling/test/e2e/extension-critical-highlighter-geometry.spec.ts',
       'tooling/test/e2e/extension-critical-media.spec.ts',
       'tooling/test/e2e/extension-critical-offscreen.spec.ts',
       'tooling/test/e2e/extension-critical-popup.spec.ts',
@@ -66,6 +67,7 @@ it('records Playwright result after a green E2E build', () => {
     scope: 'runtime-smoke',
     suite: 'critical',
     targetFiles: [
+      'tooling/test/e2e/extension-critical-highlighter-geometry.spec.ts',
       'tooling/test/e2e/extension-critical-media.spec.ts',
       'tooling/test/e2e/extension-critical-offscreen.spec.ts',
       'tooling/test/e2e/extension-critical-popup.spec.ts',

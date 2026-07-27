@@ -144,6 +144,40 @@ function expectResolverRecalculatesViewportCoordsForBorderMetricChanges() {
   linkedElement.remove();
 }
 
+function expectResolverPreservesManualOffsetForBorderMetricChanges() {
+  const frame = {
+    ...createFrame(),
+    offset: { x: 7, y: 9, width: 100, height: 80 },
+  };
+  const linkedElement = document.createElement('div');
+  document.body.appendChild(linkedElement);
+
+  const updated = resolveUpdatedFrame({
+    frame,
+    frameId: frame.id,
+    linkedElement,
+    newFrame: {
+      ...frame,
+      borderSettings: {
+        ...frame.borderSettings!,
+        width: 5,
+      },
+    },
+  });
+
+  expect(coordsMocks.calculateFrameViewportCoords).not.toHaveBeenCalled();
+  expect(updated).toMatchObject({
+    x: frame.x,
+    y: frame.y,
+    width: frame.width,
+    height: frame.height,
+    borderSettings: { width: 5 },
+    linkedElement,
+    offset: frame.offset,
+  });
+  linkedElement.remove();
+}
+
 describe('frame-mutation-actions-update-resolver', () => {
   it(
     'preserves existing overlay state when a disconnected update omits linked-element data',
@@ -203,7 +237,11 @@ describe('frame-mutation-actions-update-resolver', () => {
     expectResolverRecalculatesOffsetForConnectedCoordChanges
   );
   it(
-    'recalculates viewport coordinates when border metrics change on a connected element',
+    'treats the linked-element projection as authoritative when border metrics change without an offset',
     expectResolverRecalculatesViewportCoordsForBorderMetricChanges
+  );
+  it(
+    'keeps a manual offset authoritative when border metrics change on a connected element',
+    expectResolverPreservesManualOffsetForBorderMetricChanges
   );
 });

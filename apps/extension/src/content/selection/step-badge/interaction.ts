@@ -23,16 +23,8 @@ export function useStepBadgeInteraction(args: {
   const hasControls = Boolean(args.frameRect && args.onPositionChange);
   const initialPlacement = getStepBadgeInitialPlacement(args.settings);
   const visualOffset = getStepBadgeVisualMetrics(args.settings, args.borderWidth).offset;
-  const boundaryFrameRect = args.frameRect
-    ? {
-        x: args.frameRect.x + args.borderWidth / 2,
-        y: args.frameRect.y + args.borderWidth / 2,
-        width: args.frameRect.width + args.borderWidth,
-        height: args.frameRect.height + args.borderWidth,
-      }
-    : { x: 0, y: 0, width: 1, height: 1 };
   const drag = useStepBadgeBoundaryDrag({
-    frameRect: boundaryFrameRect,
+    frameRect: args.frameRect ?? { x: 0, y: 0, width: 1, height: 1 },
     initialPlacement,
     onPositionChange: args.onPositionChange ?? (() => undefined),
     visualOffset,

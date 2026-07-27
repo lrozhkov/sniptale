@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createBlurSettingsFixture,
+  createBorderSettingsFixture,
   createFocusSettingsFixture,
   createFrameDataFixture,
 } from '../test-support';
@@ -35,6 +36,15 @@ describe('frame-effect-overlays-descriptors', () => {
     const changedFocusDescriptors = buildFocusFrameDescriptors([
       { ...createFrame('focus-1', 'focus'), focusSettings: { opacity: 0.8, showBorder: false } },
     ]);
+    const changedFocusRadiusDescriptors = buildFocusFrameDescriptors([
+      {
+        ...createFrame('focus-1', 'focus'),
+        borderSettings: createBorderSettingsFixture({ radius: 18 }),
+      },
+    ]);
+    const paintOnlyFocusDescriptors = buildFocusFrameDescriptors([
+      { ...createFrame('focus-1', 'focus'), focusSettings: { opacity: 0.4, showBorder: true } },
+    ]);
     const blurDescriptors = buildBlurFrameDescriptors([createFrame('blur-1', 'blur')]);
     const changedBlurDescriptors = buildBlurFrameDescriptors([
       {
@@ -45,6 +55,10 @@ describe('frame-effect-overlays-descriptors', () => {
 
     expect(areFocusFrameDescriptorsEqual(focusDescriptors, equalFocusDescriptors)).toBe(true);
     expect(areFocusFrameDescriptorsEqual(focusDescriptors, changedFocusDescriptors)).toBe(false);
+    expect(areFocusFrameDescriptorsEqual(focusDescriptors, changedFocusRadiusDescriptors)).toBe(
+      false
+    );
+    expect(areFocusFrameDescriptorsEqual(focusDescriptors, paintOnlyFocusDescriptors)).toBe(true);
     expect(areBlurFrameDescriptorsEqual(blurDescriptors, changedBlurDescriptors)).toBe(false);
     expect(areBlurFrameDescriptorsEqual(blurDescriptors, [])).toBe(false);
   });
@@ -59,6 +73,7 @@ function expectDescriptorProjection() {
 
   expect(buildFocusFrameDescriptors(frames)).toEqual([
     {
+      borderRadius: 6,
       height: 120,
       id: 'focus-1',
       opacity: 0.4,
@@ -72,10 +87,8 @@ function expectDescriptorProjection() {
       amount: 12,
       blurType: 'gaussian',
       borderRadius: 6,
-      borderWidth: 2,
       height: 120,
       id: 'blur-1',
-      showBlurBorder: true,
       width: 240,
       x: 10,
       y: 20,

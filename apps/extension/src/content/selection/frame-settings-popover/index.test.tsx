@@ -39,6 +39,7 @@ import {
   createDefaultHighlighterSettings,
   DEFAULT_BLUR_SETTINGS,
   DEFAULT_BORDER_PRESET,
+  DEFAULT_FOCUS_SETTINGS,
 } from '../../../features/highlighter/style/defaults';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { translate } from '../../../platform/i18n';
@@ -132,6 +133,16 @@ function getPresetRow(name: string) {
   }
 
   return row;
+}
+
+function getDecorationSwitch() {
+  const toggle = document.querySelector<HTMLButtonElement>('.sniptale-glass-switch');
+
+  if (!toggle) {
+    throw new Error('Expected frame-and-fill decoration switch to be rendered');
+  }
+
+  return toggle;
 }
 
 function clickTrusted(element: HTMLElement) {
@@ -388,6 +399,44 @@ describe('FrameSettingsPopover preset selection', () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(document.querySelector('.sniptale-frame-settings-popover')).not.toBeNull();
   });
+
+  it.each(['blur', 'focus'] as const)(
+    'preserves the selected preset while %s frame-and-fill decoration is hidden and restored',
+    (effectMode) => {
+      const onApplyToFrame = vi.fn();
+      const presetName = getBorderPresetDisplayName(DEFAULT_BORDER_PRESET);
+      storageMocks.loadHighlighterSettings.mockReturnValue(
+        new Promise<HighlighterSettings>(() => undefined)
+      );
+
+      renderPopover({
+        effectMode,
+        borderSettings: { ...DEFAULT_BORDER_PRESET },
+        onApplyToFrame,
+        ...(effectMode === 'blur'
+          ? { blurSettings: { ...DEFAULT_BLUR_SETTINGS, showBorder: false } }
+          : { focusSettings: { ...DEFAULT_FOCUS_SETTINGS, showBorder: false } }),
+      });
+
+      expect(document.querySelector('.sniptale-frame-style-preset-row')).toBeNull();
+      expect(document.body.textContent).not.toContain(presetName);
+
+      act(() => getDecorationSwitch().click());
+
+      expect(onApplyToFrame).toHaveBeenLastCalledWith(
+        effectMode === 'blur'
+          ? { blurSettings: { ...DEFAULT_BLUR_SETTINGS, showBorder: true } }
+          : { focusSettings: { ...DEFAULT_FOCUS_SETTINGS, showBorder: true } }
+      );
+      expect(getPresetButton(presetName).classList).toContain('sniptale-glass-preset-item--active');
+
+      act(() => getDecorationSwitch().click());
+      expect(document.querySelector('.sniptale-frame-style-preset-row')).toBeNull();
+
+      act(() => getDecorationSwitch().click());
+      expect(getPresetButton(presetName).classList).toContain('sniptale-glass-preset-item--active');
+    }
+  );
 
   it('does not treat pointer interaction inside the popover as an outside dismissal', () => {
     vi.useFakeTimers();

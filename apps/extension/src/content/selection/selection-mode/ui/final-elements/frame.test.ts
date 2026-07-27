@@ -60,8 +60,8 @@ describe('selection-mode final frame', () => {
     expect(handle?.style.borderRadius).toBe('50%');
     expect(handle?.style.background).toBe('rgb(255, 255, 255)');
     expect(handle?.style.width).toBe('11px');
-    expect(handle?.style.top).toBe('-7px');
-    expect(handle?.style.left).toBe('-7px');
+    expect(handle?.style.top).toBe('-5.5px');
+    expect(handle?.style.left).toBe('-5.5px');
   });
 
   it('applies the expected cursor and outline styles to the shell and handles', () => {
@@ -94,9 +94,9 @@ describe('selection-mode final frame', () => {
     ).toContain('cursor: ew-resize');
     expect(
       frame.querySelector<HTMLElement>('.sniptale-resize-handle[data-direction="ne"]')?.style.top
-    ).toBe('-6px');
+    ).toBe('-5px');
     expect(
       frame.querySelector<HTMLElement>('.sniptale-resize-handle[data-direction="ne"]')?.style.right
-    ).toBe('-6px');
+    ).toBe('-5px');
   });
 });

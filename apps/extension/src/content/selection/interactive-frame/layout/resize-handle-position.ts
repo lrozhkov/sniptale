@@ -4,14 +4,13 @@ import type { FrameData, ResizeDirection } from '../../../../features/highlighte
 export function getResizeHandleStyle(
   direction: ResizeDirection,
   frame: FrameData,
-  handleSize: number,
-  borderWidth: number
+  handleSize: number
 ): CSSProperties {
   const halfHandle = handleSize / 2;
-  const leftStrokeCenter = frame.x + borderWidth / 2;
-  const topStrokeCenter = frame.y + borderWidth / 2;
-  const rightStrokeCenter = frame.x + frame.width + borderWidth * 1.5;
-  const bottomStrokeCenter = frame.y + frame.height + borderWidth * 1.5;
+  const leftStrokeCenter = frame.x;
+  const topStrokeCenter = frame.y;
+  const rightStrokeCenter = frame.x + frame.width;
+  const bottomStrokeCenter = frame.y + frame.height;
   const centerX = (leftStrokeCenter + rightStrokeCenter) / 2 - halfHandle;
   const centerY = (topStrokeCenter + bottomStrokeCenter) / 2 - halfHandle;
 

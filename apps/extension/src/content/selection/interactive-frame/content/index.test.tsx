@@ -50,6 +50,8 @@ function createProps(): React.ComponentProps<typeof InteractiveFrameContent> {
     frame,
     frameRef: { current: null },
     frameStyle: {},
+    fillStyle: { backgroundColor: 'rgba(22, 163, 74, 0.25)' },
+    strokeStyle: { border: '2px solid #ff671d' },
     frameZIndex: 100,
     handleCancel: vi.fn(),
     handleDelete: vi.fn(),
@@ -96,7 +98,12 @@ it('routes resize chrome and current geometry to their dedicated render owners',
   act(() => root?.render(<InteractiveFrameContent {...props} />));
 
   expect(owners.shell).toHaveBeenCalledWith(
-    expect.objectContaining({ currentFrame: props.currentFrame, isResizeHovered: true }),
+    expect.objectContaining({
+      currentFrame: props.currentFrame,
+      fillStyle: props.fillStyle,
+      strokeStyle: props.strokeStyle,
+      isResizeHovered: true,
+    }),
     undefined
   );
   expect(owners.floating).toHaveBeenCalledWith(

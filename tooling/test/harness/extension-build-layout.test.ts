@@ -38,6 +38,9 @@ it('maps physical app and harness sources to stable legacy output ids', () => {
 
   const e2eInputs = extensionRollupInputs(layout, 'test-e2e');
   expect(e2eInputs.testHarnessPopup).toBe(path.join(appRoot, 'tooling/test/harness/popup.html'));
+  expect(e2eInputs.testHarnessHighlighterGeometry).toBe(
+    path.join(appRoot, 'tooling/test/harness/highlighter-geometry.html')
+  );
   expect(extensionHtmlInputSource(layout, e2eInputs.testHarnessPopup)).toBe(
     path.resolve('tooling/test/harness/popup.html')
   );

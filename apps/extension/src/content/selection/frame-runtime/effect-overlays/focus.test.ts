@@ -24,6 +24,8 @@ vi.mock('../../../platform/dom-host/isolated', () => ({
 import { registerImmediateFocusOverlayUpdates, updateFocusOverlayMask } from './focus';
 import type { OverlayRefs } from './types';
 
+type FrameGeometry = Pick<FrameData, 'x' | 'y' | 'width' | 'height'>;
+
 function createOverlayRefs(rect: SVGRectElement): OverlayRefs {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.appendChild(rect);
@@ -38,11 +40,12 @@ function createOverlayRefs(rect: SVGRectElement): OverlayRefs {
   };
 }
 
-function createFrame(showBorder: boolean): FrameData {
+function createFrame(showBorder: boolean, geometry?: FrameGeometry): FrameData {
   return createFrameDataFixture('frame-1', {
+    ...geometry,
     effectMode: 'focus',
     focusSettings: createFocusSettingsFixture({ showBorder }),
-    borderSettings: createBorderSettingsFixture({ width: 4 }),
+    borderSettings: createBorderSettingsFixture({ radius: 18, width: 4 }),
   });
 }
 
@@ -57,42 +60,45 @@ beforeEach(() => {
   document.body.replaceChildren();
 });
 
-describe('frame-effect-overlays focus immediate updates', () => {
-  it('matches the raw frame geometry when the focus border is hidden', () => {
-    const rect = createFocusRect();
-    const cleanup = registerImmediateFocusOverlayUpdates(
-      { current: [createFrame(false)] },
-      createOverlayRefs(rect)
-    );
+function expectRectGeometry(rect: SVGRectElement, geometry: FrameGeometry) {
+  expect(rect.getAttribute('x')).toBe(String(geometry.x));
+  expect(rect.getAttribute('y')).toBe(String(geometry.y));
+  expect(rect.getAttribute('width')).toBe(String(geometry.width));
+  expect(rect.getAttribute('height')).toBe(String(geometry.height));
+}
 
-    window.sniptaleUpdateFocusMaskImmediate?.('frame-1', 11, 22, 33, 44);
+describe('frame-effect-overlays focus geometry', () => {
+  it.each([false, true])(
+    'keeps static and immediate rendering on one canonical geometry when showBorder=%s',
+    (showBorder) => {
+      const geometry = { x: 11, y: 22, width: 33, height: 44 };
+      const frame = createFrame(showBorder, geometry);
+      const refs = createOverlayRefs(createFocusRect());
 
-    expect(rect.getAttribute('x')).toBe('15');
-    expect(rect.getAttribute('y')).toBe('26');
-    expect(rect.getAttribute('width')).toBe('33');
-    expect(rect.getAttribute('height')).toBe('44');
+      updateFocusOverlayMask([frame], refs);
+      const rect = refs.focusSvgRef.current?.querySelector<SVGRectElement>(
+        'rect[data-frame-id="frame-1"]'
+      );
+      expect(rect).not.toBeNull();
+      expectRectGeometry(rect!, geometry);
+      expect(rect?.getAttribute('rx')).toBe('16.5');
 
-    cleanup();
-    expect(window.sniptaleUpdateFocusMaskImmediate).toBeUndefined();
-    expect(window.sniptaleGetFocusSvgRef).toBeUndefined();
-  });
+      rect?.setAttribute('x', '0');
+      rect?.setAttribute('y', '0');
+      rect?.setAttribute('width', '1');
+      rect?.setAttribute('height', '1');
+      const cleanup = registerImmediateFocusOverlayUpdates({ current: [frame] }, refs);
 
-  it('keeps the expanded focus geometry when the focus border stays visible', () => {
-    const rect = createFocusRect();
-    const cleanup = registerImmediateFocusOverlayUpdates(
-      { current: [createFrame(true)] },
-      createOverlayRefs(rect)
-    );
+      window.sniptaleUpdateFocusMaskImmediate?.('frame-1', geometry);
 
-    window.sniptaleUpdateFocusMaskImmediate?.('frame-1', 11, 22, 33, 44);
+      expectRectGeometry(rect!, geometry);
+      expect(rect?.getAttribute('rx')).toBe('16.5');
 
-    expect(rect.getAttribute('x')).toBe('11');
-    expect(rect.getAttribute('y')).toBe('22');
-    expect(rect.getAttribute('width')).toBe('41');
-    expect(rect.getAttribute('height')).toBe('52');
-
-    cleanup();
-  });
+      cleanup();
+      expect(window.sniptaleUpdateFocusMaskImmediate).toBeUndefined();
+      expect(window.sniptaleGetFocusSvgRef).toBeUndefined();
+    }
+  );
 
   it('recreates a focus overlay removed by clear-all before a frame is restored', () => {
     const refs = createOverlayRefs(createFocusRect());

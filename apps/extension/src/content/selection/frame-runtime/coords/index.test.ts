@@ -69,8 +69,8 @@ describe('frame-coords calculateFrameContainerCoords', () => {
     ).toEqual({
       x: 33,
       y: 24,
-      width: 171,
-      height: 101,
+      width: 175,
+      height: 105,
     });
   });
 });

@@ -12,6 +12,8 @@ interface InteractiveFrameFrameShellProps {
   frameRef: React.RefObject<HTMLDivElement | null>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   frameStyle: React.CSSProperties;
+  fillStyle: React.CSSProperties;
+  strokeStyle: React.CSSProperties;
   frameZIndex: number;
   state: import('../../../../features/highlighter/contracts').FrameState;
   isResizeHovered: boolean;
@@ -49,6 +51,18 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
           zIndex: props.frameZIndex,
         }}
       >
+        <div
+          aria-hidden="true"
+          className="sniptale-interactive-frame-fill"
+          data-frame-id={props.frame.id}
+          style={props.fillStyle}
+        />
+        <div
+          aria-hidden="true"
+          className="sniptale-interactive-frame-stroke"
+          data-frame-id={props.frame.id}
+          style={props.strokeStyle}
+        />
         <InteractiveFrameResizeHandles
           state={props.state}
           isResizeHovered={props.isResizeHovered}

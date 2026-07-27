@@ -169,14 +169,7 @@ function restoreResizeStart(params: InteractiveFrameListenerConfig) {
   params.tempFrameRef.current = startFrame;
   params.setTempFrame(startFrame);
   syncInteractiveFrameContainer(params.containerRef.current, startFrame);
-  updateEffectOverlay(
-    params.effectModeRef.current,
-    params.frameId,
-    startFrame.x,
-    startFrame.y,
-    startFrame.width,
-    startFrame.height
-  );
+  updateEffectOverlay(params.effectModeRef.current, params.frameId, startFrame);
 }
 
 function hasFrameGeometryChanged(startFrame: FrameData, endFrame: FrameData): boolean {
