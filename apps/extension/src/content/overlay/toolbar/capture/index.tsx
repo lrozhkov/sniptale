@@ -23,6 +23,7 @@ export const ToolbarCaptureActions: React.FC<ToolbarCaptureActionsProps> = (prop
       compactMenus={props.compactMenus}
       displayMode={props.displayMode}
       pinToTab={props.pinToTab}
+      pinToTabAvailable={props.pinToTabAvailable}
       pinToTabLocked={props.pinToTabLocked}
       onCompactMenusChange={props.onCompactMenusChange}
       onDisplayModeChange={props.onDisplayModeChange}

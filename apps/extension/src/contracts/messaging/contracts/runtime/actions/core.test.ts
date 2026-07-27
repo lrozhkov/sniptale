@@ -103,12 +103,14 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
   expect(
     contentRuntimeWakeupContract.parseResponse({
       pinToTab: true,
+      pinToTabAvailable: true,
       reason: 'pin-to-tab',
       restored: true,
       success: true,
     })
   ).toEqual({
     pinToTab: true,
+    pinToTabAvailable: true,
     reason: 'pin-to-tab',
     restored: true,
     success: true,
@@ -116,12 +118,14 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
   expect(
     contentRuntimeWakeupContract.parseResponse({
       pinToTab: false,
+      pinToTabAvailable: true,
       reason: 'scenario',
       restored: true,
       success: true,
     })
   ).toEqual({
     pinToTab: false,
+    pinToTabAvailable: true,
     reason: 'scenario',
     restored: true,
     success: true,
@@ -137,6 +141,7 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
   });
   expect(() =>
     contentRuntimeWakeupContract.parseResponse({
+      pinToTab: true,
       restored: false,
       success: true,
     })

@@ -2,7 +2,6 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
   clearPageAccessTabActivationMock,
-  clearAllPinToTabSessionStorageStateMock,
   reconcilePageAccessTabNavigationMock,
   reconcilePersistentContentScriptRegistrationsMock,
   subscribeToPermissionsRemovedMock,
@@ -11,7 +10,6 @@ const {
   unregisterRemovedPageAccessOriginsMock,
 } = vi.hoisted(() => ({
   clearPageAccessTabActivationMock: vi.fn(),
-  clearAllPinToTabSessionStorageStateMock: vi.fn(),
   reconcilePageAccessTabNavigationMock: vi.fn(),
   reconcilePersistentContentScriptRegistrationsMock: vi.fn(),
   subscribeToPermissionsRemovedMock: vi.fn(),
@@ -32,13 +30,6 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
     subscribeToRemoved: subscribeToTabRemovedMock,
     subscribeToUpdated: subscribeToTabUpdatedMock,
   },
-}));
-
-vi.mock('../../../composition/persistence/content-pin-session/index', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../../composition/persistence/content-pin-session/index')
-  >()),
-  clearAllPinToTabSessionStorageState: clearAllPinToTabSessionStorageStateMock,
 }));
 
 vi.mock('./registration', async (importOriginal) => ({
@@ -95,7 +86,6 @@ it('keeps temporary page access through reload and delegates URL reconciliation 
 
 it('unregisters dynamic page-access scripts only when removed origins are present', async () => {
   const { initializePageAccessLifecycle } = await import('./lifecycle');
-  clearAllPinToTabSessionStorageStateMock.mockResolvedValue(undefined);
   initializePageAccessLifecycle();
 
   subscribeToPermissionsRemovedMock.mock.calls[0]?.[0]({});
@@ -105,56 +95,37 @@ it('unregisters dynamic page-access scripts only when removed origins are presen
 
   await vi.waitFor(() => {
     expect(unregisterRemovedPageAccessOriginsMock).toHaveBeenCalledTimes(1);
-    expect(clearAllPinToTabSessionStorageStateMock).toHaveBeenCalledTimes(1);
   });
   expect(unregisterRemovedPageAccessOriginsMock).toHaveBeenCalledWith(['https://example.test/*']);
 });
 
-it.each([
-  { delayedCleanup: 'pin storage', fastFailure: 'registration removal', tabId: 71 },
-  { delayedCleanup: 'registration removal', fastFailure: 'pin storage', tabId: 72 },
-] as const)(
-  'keeps newer pin work blocked when $fastFailure fails before delayed $delayedCleanup settles',
-  async ({ delayedCleanup, fastFailure, tabId }) => {
-    const cleanupError = new Error(`${fastFailure} failed`);
-    const delayed = createDeferred();
-    const events: string[] = [];
-    const logger = { warn: vi.fn() };
+it('keeps newer pin work blocked until permission cleanup settles', async () => {
+  const tabId = 71;
+  const delayed = createDeferred();
+  const events: string[] = [];
+  const logger = { warn: vi.fn() };
 
-    if (delayedCleanup === 'pin storage') {
-      unregisterRemovedPageAccessOriginsMock.mockRejectedValueOnce(cleanupError);
-      clearAllPinToTabSessionStorageStateMock.mockReturnValueOnce(delayed.promise);
-    } else {
-      unregisterRemovedPageAccessOriginsMock.mockReturnValueOnce(delayed.promise);
-      clearAllPinToTabSessionStorageStateMock.mockRejectedValueOnce(cleanupError);
-    }
+  unregisterRemovedPageAccessOriginsMock.mockReturnValueOnce(delayed.promise);
 
-    const { initializePageAccessLifecycle } = await import('./lifecycle');
-    const { beginPinnedToolbarOperation, clearPinnedToolbarOperationState } =
-      await import('./pinned-toolbar-operation');
-    initializePageAccessLifecycle(logger);
+  const { initializePageAccessLifecycle } = await import('./lifecycle');
+  const { beginPinnedToolbarOperation, clearPinnedToolbarOperationState } =
+    await import('./pinned-toolbar-operation');
+  initializePageAccessLifecycle(logger);
 
-    subscribeToPermissionsRemovedMock.mock.calls[0]?.[0]({ origins: ['<all_urls>'] });
-    const newerPin = beginPinnedToolbarOperation(tabId).runExclusive(async () => {
-      events.push('pin');
-    });
+  subscribeToPermissionsRemovedMock.mock.calls[0]?.[0]({ origins: ['<all_urls>'] });
+  const newerPin = beginPinnedToolbarOperation(tabId).runExclusive(async () => {
+    events.push('pin');
+  });
 
-    await vi.waitFor(() => {
-      expect(unregisterRemovedPageAccessOriginsMock).toHaveBeenCalledOnce();
-      expect(clearAllPinToTabSessionStorageStateMock).toHaveBeenCalledOnce();
-    });
-    expect(events).toEqual([]);
-    expect(logger.warn).not.toHaveBeenCalled();
+  await vi.waitFor(() => {
+    expect(unregisterRemovedPageAccessOriginsMock).toHaveBeenCalledOnce();
+  });
+  expect(events).toEqual([]);
+  expect(logger.warn).not.toHaveBeenCalled();
 
-    delayed.resolve();
-    await newerPin;
-    await vi.waitFor(() => {
-      expect(logger.warn).toHaveBeenCalledWith(
-        'Failed to clean pinned toolbar state after permission removal',
-        cleanupError
-      );
-    });
-    expect(events).toEqual(['pin']);
-    clearPinnedToolbarOperationState(tabId);
-  }
-);
+  delayed.resolve();
+  await newerPin;
+  expect(logger.warn).not.toHaveBeenCalled();
+  expect(events).toEqual(['pin']);
+  clearPinnedToolbarOperationState(tabId);
+});

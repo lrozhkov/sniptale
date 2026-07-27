@@ -234,6 +234,12 @@ export function parseViewerPreparationCommand(message: unknown): ViewerPreparati
     }
     command.quickActionOverlay = message['quickActionOverlay'];
   }
+  if (hasOwn(message, 'toolbarVisible')) {
+    if (!isBoolean(message['toolbarVisible'])) {
+      return null;
+    }
+    command.toolbarVisible = message['toolbarVisible'];
+  }
 
   return command;
 }

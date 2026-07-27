@@ -12,13 +12,21 @@ import {
 it('parses correlated preparation request envelopes', () => {
   expect(
     parseViewerPreparationPortRequest({
-      command: { type: MessageType.ENABLE_SCREENSHOT_MODE, viewport: null },
+      command: {
+        toolbarVisible: false,
+        type: MessageType.ENABLE_SCREENSHOT_MODE,
+        viewport: null,
+      },
       requestId: 'prep-1',
       type: WEB_SNAPSHOT_VIEWER_PREPARATION_REQUEST,
       viewerPortGeneration: 'viewer-generation-1',
     })
   ).toEqual({
-    command: { type: MessageType.ENABLE_SCREENSHOT_MODE, viewport: null },
+    command: {
+      toolbarVisible: false,
+      type: MessageType.ENABLE_SCREENSHOT_MODE,
+      viewport: null,
+    },
     requestId: 'prep-1',
     type: WEB_SNAPSHOT_VIEWER_PREPARATION_REQUEST,
     viewerPortGeneration: 'viewer-generation-1',

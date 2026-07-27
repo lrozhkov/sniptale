@@ -4,6 +4,7 @@ import type {
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import { createPageAccessService, type PageAccessService } from './service-factory';
 import { temporaryTabActivationStore } from './tab-activation';
+import { hasAllSitesPermission } from './registration';
 
 export { createPageAccessService };
 export type { PageAccessService };
@@ -14,6 +15,10 @@ const defaultPageAccessService = createPageAccessService({
 
 export async function hasActivePageAccess(tabId: number): Promise<boolean> {
   return defaultPageAccessService.hasActivePageAccess(tabId);
+}
+
+export async function hasPinnedToolbarAllSitesAccess(): Promise<boolean> {
+  return hasAllSitesPermission();
 }
 
 export async function refreshActivePageAccessRuntime(tabId: number): Promise<boolean> {
@@ -27,10 +32,6 @@ export async function registerPinnedToolbarAllSitesAccess(args: {
   tabId: number;
 }): Promise<'registered' | 'superseded'> {
   return defaultPageAccessService.registerPinnedToolbarAllSitesAccess(args);
-}
-
-export async function requestPinnedToolbarAllSitesPermission(): Promise<boolean> {
-  return defaultPageAccessService.requestPinnedToolbarAllSitesPermission();
 }
 
 export async function ensureActivePageAccessRuntime(

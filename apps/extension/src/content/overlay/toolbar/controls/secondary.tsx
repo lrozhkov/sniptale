@@ -77,6 +77,7 @@ function createCaptureActionProps(args: {
     compactMenus: args.viewModel.derivedState.compactMenus,
     displayMode: args.viewModel.derivedState.displayMode,
     pinToTab: args.toolbarProps.pinToTab ?? false,
+    pinToTabAvailable: args.toolbarProps.pinToTabAvailable ?? false,
     pinToTabLocked: args.toolbarProps.pinToTabLocked ?? false,
     onCompactMenusChange: args.viewModel.derivedState.setCompactMenus,
     onDisplayModeChange: args.viewModel.derivedState.setDisplayMode,

@@ -41,6 +41,7 @@ export function ToolbarCaptureActionGroup(
         <ToolbarSettingsMenu
           compactMenus={captureProps.compactMenus}
           pinToTab={captureProps.pinToTab}
+          pinToTabAvailable={captureProps.pinToTabAvailable}
           pinToTabLocked={captureProps.pinToTabLocked}
           sidebarVisible={captureProps.scenario?.sidebarVisible ?? false}
           screenshotMode={captureProps.screenshotMode}

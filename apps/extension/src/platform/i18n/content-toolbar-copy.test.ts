@@ -109,6 +109,10 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     ru: 'Панель закреплена, пока включён сценарий',
     en: 'The toolbar stays pinned while scenario mode is on',
   },
+  'content.toolbar.pinToTabUnavailableHint': {
+    ru: 'Разрешите расширению доступ ко всем сайтам, чтобы панель восстанавливалась после переходов',
+    en: 'Allow the extension on all sites so the toolbar can return after navigation',
+  },
   'content.toolbar.hideToolbar': {
     ru: 'Скрыть панель',
     en: 'Hide toolbar',

@@ -9,6 +9,7 @@ export interface ToolbarCaptureActionsProps {
   compactMenus: boolean;
   displayMode: ContentToolbarDisplayMode;
   pinToTab: boolean;
+  pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
   onCompactMenusChange: (compactMenus: boolean) => void;
   onDisplayModeChange: (displayMode: ContentToolbarDisplayMode) => void;
@@ -60,6 +61,7 @@ export interface ToolbarProps {
   screenshotMode?: boolean;
   isCursorMode?: boolean;
   pinToTab?: boolean;
+  pinToTabAvailable?: boolean;
   pinToTabLocked?: boolean;
   onDisableAiPickMode?: () => void;
   onEnableCursorMode?: () => void;

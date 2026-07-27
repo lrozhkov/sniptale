@@ -16,7 +16,10 @@ vi.mock('../../../../../platform/runtime-messaging', async (importOriginal) => (
   sendRuntimeMessage: runtimeMocks.sendRuntimeMessage,
 }));
 
-import { writeContentPinToTabSessionState } from './pin-session';
+import {
+  writeContentPinToTabSessionState,
+  writeContentPinToTabToolbarVisibilityState,
+} from './pin-session';
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
@@ -44,12 +47,16 @@ beforeEach(async () => {
 it('serializes a newer unpin after an older delayed pin write', async () => {
   const pinResponse = createDeferred<{
     pinToTab: boolean;
+    pinToTabAvailable: boolean;
     restored: boolean;
     success: boolean;
   }>();
-  runtimeMocks.sendRuntimeMessage
-    .mockReturnValueOnce(pinResponse.promise)
-    .mockResolvedValueOnce({ pinToTab: false, restored: false, success: true });
+  runtimeMocks.sendRuntimeMessage.mockReturnValueOnce(pinResponse.promise).mockResolvedValueOnce({
+    pinToTab: false,
+    pinToTabAvailable: true,
+    restored: false,
+    success: true,
+  });
 
   const pin = writeContentPinToTabSessionState(true);
   await flushMicrotasks();
@@ -57,9 +64,22 @@ it('serializes a newer unpin after an older delayed pin write', async () => {
   await flushMicrotasks();
 
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(1);
-  pinResponse.resolve({ pinToTab: true, restored: true, success: true });
-  await expect(pin).resolves.toEqual({ status: 'acknowledged', value: true });
-  await expect(unpin).resolves.toEqual({ status: 'acknowledged', value: false });
+  pinResponse.resolve({
+    pinToTab: true,
+    pinToTabAvailable: true,
+    restored: true,
+    success: true,
+  });
+  await expect(pin).resolves.toEqual({
+    pinToTabAvailable: true,
+    status: 'acknowledged',
+    value: true,
+  });
+  await expect(unpin).resolves.toEqual({
+    pinToTabAvailable: true,
+    status: 'acknowledged',
+    value: false,
+  });
 
   expect(runtimeMocks.sendRuntimeMessage.mock.calls).toEqual([
     [{ pinToTab: true, type: 'CONTENT_RUNTIME_WAKEUP' }],
@@ -76,6 +96,7 @@ it('does not send an older queued write after a newer generation supersedes it',
   };
   runtimeMocks.sendRuntimeMessage.mockResolvedValue({
     pinToTab: false,
+    pinToTabAvailable: true,
     restored: false,
     success: true,
   });
@@ -84,7 +105,11 @@ it('does not send an older queued write after a newer generation supersedes it',
   const unpin = write(false);
 
   await expect(pin).resolves.toEqual({ status: 'superseded' });
-  await expect(unpin).resolves.toEqual({ status: 'acknowledged', value: false });
+  await expect(unpin).resolves.toEqual({
+    pinToTabAvailable: true,
+    status: 'acknowledged',
+    value: false,
+  });
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(1);
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledWith({
     pinToTab: false,
@@ -95,12 +120,63 @@ it('does not send an older queued write after a newer generation supersedes it',
 it('continues the write queue after an earlier runtime failure', async () => {
   runtimeMocks.sendRuntimeMessage
     .mockRejectedValueOnce(new Error('runtime unavailable'))
-    .mockResolvedValueOnce({ pinToTab: false, restored: false, success: true });
+    .mockResolvedValueOnce({
+      pinToTab: false,
+      pinToTabAvailable: true,
+      restored: false,
+      success: true,
+    });
 
   const pin = writeContentPinToTabSessionState(true);
   const unpin = writeContentPinToTabSessionState(false);
 
   await expect(pin).rejects.toThrow('runtime unavailable');
-  await expect(unpin).resolves.toEqual({ status: 'acknowledged', value: false });
+  await expect(unpin).resolves.toEqual({
+    pinToTabAvailable: true,
+    status: 'acknowledged',
+    value: false,
+  });
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(2);
+});
+
+it('serializes a collapsed-toolbar write after pin activation', async () => {
+  const pinResponse = createDeferred<{
+    pinToTab: boolean;
+    pinToTabAvailable: boolean;
+    restored: boolean;
+    success: boolean;
+  }>();
+  runtimeMocks.sendRuntimeMessage.mockReturnValueOnce(pinResponse.promise).mockResolvedValueOnce({
+    pinToTab: true,
+    pinToTabAvailable: true,
+    restored: false,
+    success: true,
+  });
+
+  const pin = writeContentPinToTabSessionState(true);
+  await flushMicrotasks();
+  const collapse = writeContentPinToTabToolbarVisibilityState(false);
+  await flushMicrotasks();
+
+  expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(1);
+  pinResponse.resolve({
+    pinToTab: true,
+    pinToTabAvailable: true,
+    restored: true,
+    success: true,
+  });
+  await expect(pin).resolves.toMatchObject({ status: 'acknowledged', value: true });
+  await expect(collapse).resolves.toBeUndefined();
+  expect(runtimeMocks.sendRuntimeMessage.mock.calls).toEqual([
+    [{ pinToTab: true, type: 'CONTENT_RUNTIME_WAKEUP' }],
+    [{ toolbarVisible: false, type: 'CONTENT_RUNTIME_WAKEUP' }],
+  ]);
+});
+
+it('rejects a visibility write when background persistence fails', async () => {
+  runtimeMocks.sendRuntimeMessage.mockRejectedValueOnce(new Error('runtime unavailable'));
+
+  await expect(writeContentPinToTabToolbarVisibilityState(false)).rejects.toThrow(
+    'runtime unavailable'
+  );
 });

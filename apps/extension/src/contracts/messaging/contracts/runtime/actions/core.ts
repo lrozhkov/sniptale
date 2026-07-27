@@ -60,6 +60,7 @@ function isContentRuntimeWakeupReason(value: unknown): value is 'pin-to-tab' | '
 
 type ContentRuntimeWakeupResponse = RuntimeMessageResponse<{
   pinToTab: boolean;
+  pinToTabAvailable: boolean;
   reason?: 'pin-to-tab' | 'scenario';
   restored?: boolean;
 }>;
@@ -68,6 +69,7 @@ const isContentRuntimeWakeupResponseEnvelope =
   createRuntimeResponseGuard<ContentRuntimeWakeupResponse>({
     optional: {
       pinToTab: isBoolean,
+      pinToTabAvailable: isBoolean,
       reason: isContentRuntimeWakeupReason,
       restored: isBoolean,
     },
@@ -78,7 +80,10 @@ function isContentRuntimeWakeupResponse(input: unknown): input is ContentRuntime
     return false;
   }
 
-  return input['success'] !== true || isBoolean(input['pinToTab']);
+  return (
+    input['success'] !== true ||
+    (isBoolean(input['pinToTab']) && isBoolean(input['pinToTabAvailable']))
+  );
 }
 
 function isPageStorageErasureOperation(value: unknown): value is 'erase' | 'verify' {
@@ -155,6 +160,7 @@ export const runtimeActionCoreMessageContracts = {
         optional: {
           contentIntent: isContentPrivilegedActionCapability,
           pinToTab: isBoolean,
+          toolbarVisible: isBoolean,
         },
       })
     ),

@@ -102,9 +102,11 @@ function projectPreparationToolbar(
       screenshotMode: modeState.screenshotMode,
     },
     pinToTab: modeState.pinToTab,
+    pinToTabAvailable: modeState.pinToTabAvailable,
     setCaptureAction: modeState.setCaptureAction,
     setCurrentViewport: modeState.setCurrentViewport,
     setPinToTab: modeState.setPinToTab,
+    setPinnedToolbarVisible: modeState.setPinnedToolbarVisible,
     setTimerDelay: modeState.setTimerDelay,
     timerDelay: modeState.timerDelay,
   };

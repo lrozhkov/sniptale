@@ -7,7 +7,9 @@ type PinnedToolbarOperation = {
 
 type PinnedToolbarOperationState = {
   chain: Promise<void>;
-  generation: number;
+  documentGeneration: number;
+  mutationGeneration: number;
+  restoreGeneration: number;
 };
 
 const operationStates = new Map<number, PinnedToolbarOperationState>();
@@ -16,17 +18,19 @@ let permissionCleanupBarrier: Promise<void> = Promise.resolve();
 function createOperationState(): PinnedToolbarOperationState {
   return {
     chain: Promise.resolve(),
-    generation: 0,
+    documentGeneration: 0,
+    mutationGeneration: 0,
+    restoreGeneration: 0,
   };
 }
 
 function createPinnedToolbarOperation(
   tabId: number,
   state: PinnedToolbarOperationState,
-  generation: number
+  isCurrentOperation: () => boolean
 ): PinnedToolbarOperation {
   let started = false;
-  const isCurrent = () => operationStates.get(tabId) === state && state.generation === generation;
+  const isCurrent = () => operationStates.get(tabId) === state && isCurrentOperation();
 
   return {
     isCurrent,
@@ -57,30 +61,77 @@ function acquirePinnedToolbarOperationState(tabId: number): PinnedToolbarOperati
 
 export function beginPinnedToolbarOperation(tabId: number): PinnedToolbarOperation {
   const state = acquirePinnedToolbarOperationState(tabId);
-  state.generation += 1;
-  return createPinnedToolbarOperation(tabId, state, state.generation);
+  state.mutationGeneration += 1;
+  const documentGeneration = state.documentGeneration;
+  const mutationGeneration = state.mutationGeneration;
+  return createPinnedToolbarOperation(
+    tabId,
+    state,
+    () =>
+      state.documentGeneration === documentGeneration &&
+      state.mutationGeneration === mutationGeneration
+  );
+}
+
+export function beginPinnedToolbarDurableOperation(tabId: number): PinnedToolbarOperation {
+  const state = acquirePinnedToolbarOperationState(tabId);
+  state.mutationGeneration += 1;
+  const mutationGeneration = state.mutationGeneration;
+  return createPinnedToolbarOperation(
+    tabId,
+    state,
+    () => state.mutationGeneration === mutationGeneration
+  );
+}
+
+export function beginPinnedToolbarRestoreOperation(tabId: number): PinnedToolbarOperation {
+  const state = acquirePinnedToolbarOperationState(tabId);
+  state.restoreGeneration += 1;
+  const documentGeneration = state.documentGeneration;
+  const mutationGeneration = state.mutationGeneration;
+  const restoreGeneration = state.restoreGeneration;
+  return createPinnedToolbarOperation(
+    tabId,
+    state,
+    () =>
+      state.documentGeneration === documentGeneration &&
+      state.mutationGeneration === mutationGeneration &&
+      state.restoreGeneration === restoreGeneration
+  );
 }
 
 export function observePinnedToolbarOperations(tabId: number): PinnedToolbarOperation {
   const state = acquirePinnedToolbarOperationState(tabId);
-  return createPinnedToolbarOperation(tabId, state, state.generation);
+  const documentGeneration = state.documentGeneration;
+  const mutationGeneration = state.mutationGeneration;
+  const restoreGeneration = state.restoreGeneration;
+  return createPinnedToolbarOperation(
+    tabId,
+    state,
+    () =>
+      state.documentGeneration === documentGeneration &&
+      state.mutationGeneration === mutationGeneration &&
+      state.restoreGeneration === restoreGeneration
+  );
 }
 
 export function invalidatePinnedToolbarOperations(tabId: number): void {
   const state = operationStates.get(tabId);
   if (state) {
-    state.generation += 1;
+    state.documentGeneration += 1;
+    state.restoreGeneration += 1;
   }
 }
 
-function invalidateAllPinnedToolbarOperations(): void {
+function invalidateAllDocumentBoundPinnedToolbarOperations(): void {
   for (const state of operationStates.values()) {
-    state.generation += 1;
+    state.documentGeneration += 1;
+    state.restoreGeneration += 1;
   }
 }
 
 export function runPinnedToolbarPermissionCleanup(work: () => Promise<void>): Promise<void> {
-  invalidateAllPinnedToolbarOperations();
+  invalidateAllDocumentBoundPinnedToolbarOperations();
   const pendingOperations = Array.from(operationStates.values(), (state) => state.chain);
   const cleanup = permissionCleanupBarrier
     .catch(() => undefined)
@@ -96,7 +147,6 @@ export function runPinnedToolbarPermissionCleanup(work: () => Promise<void>): Pr
 export function clearPinnedToolbarOperationState(tabId: number): void {
   const state = operationStates.get(tabId);
   if (state) {
-    state.generation += 1;
     operationStates.delete(tabId);
   }
 }

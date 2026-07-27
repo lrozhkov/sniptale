@@ -122,10 +122,6 @@ export async function grantAllSitesAccess(
   return { success: true, result: 'granted', status: await statusReader.readFromContext(context) };
 }
 
-export async function requestPinnedToolbarAllSitesPermission(): Promise<boolean> {
-  return browserPermissions.request({ origins: [...ALL_SITES_ORIGIN_PATTERNS] });
-}
-
 export async function registerPinnedToolbarAllSitesAccess(args: {
   commit: () => Promise<boolean>;
   expectedUrl: string;

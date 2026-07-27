@@ -24,7 +24,10 @@ interface ContentAppBindingsParams {
   > &
     Pick<ContentAppVisibilityState, 'setIsToolbarVisible'>;
   modeFlags: ContentAppModeFlags;
-  visibilityState: Pick<ContentAppVisibilityState, 'isCompletelyHidden' | 'isToolbarVisible'>;
+  visibilityState: Pick<
+    ContentAppVisibilityState,
+    'isCompletelyHidden' | 'isToolbarVisible' | 'setPinnedToolbarVisible'
+  >;
 }
 
 function useNavigationLockCleanup(modeFlags: ContentAppModeFlags) {
@@ -92,19 +95,15 @@ function useFrameCallbackRegistration(args: {
 
 export function useContentAppBindings(params: ContentAppBindingsParams) {
   const { modeControls } = params;
-  const {
-    setAiPickMode,
-    setHighlighterMode,
-    setIsToolbarVisible,
-    setQuickEditDocumentMode,
-    setQuickEditMode,
-  } = modeControls;
+  const { setPinnedToolbarVisible } = params.visibilityState;
+  const { setAiPickMode, setHighlighterMode, setQuickEditDocumentMode, setQuickEditMode } =
+    modeControls;
   const frameManager = useFrameManager({
     InteractiveFrameComponent: params.InteractiveFrameComponent,
   });
   const handleShowToolbar = useCallback(() => {
-    setIsToolbarVisible(true);
-  }, [setIsToolbarVisible]);
+    setPinnedToolbarVisible(true);
+  }, [setPinnedToolbarVisible]);
 
   useFrameUIController({ frames: frameManager.frames });
   useQuickActionHotkeys();

@@ -188,9 +188,11 @@ function createProps() {
         screenshotMode: false,
       },
       pinToTab: false,
+      pinToTabAvailable: true,
       setCaptureAction: vi.fn(),
       setCurrentViewport: vi.fn(),
       setPinToTab: vi.fn(),
+      setPinnedToolbarVisible: vi.fn(),
       setTimerDelay: vi.fn(),
       timerDelay: 0,
     },
@@ -247,6 +249,7 @@ async function verifiesLayoutComposition() {
     isCompletelyHidden: props.toolbar.isCompletelyHidden,
     modeController: props.toolbar.modeController,
     scenario: props.scenario,
+    setPinToTab: props.toolbar.setPinToTab,
   });
   expect(dialogsCall?.[0]).toEqual({ dialogs: props.dialogs });
 }

@@ -1,7 +1,9 @@
 import { expect, it, vi } from 'vitest';
 
 import {
+  beginPinnedToolbarDurableOperation,
   beginPinnedToolbarOperation,
+  beginPinnedToolbarRestoreOperation,
   clearPinnedToolbarOperationState,
   invalidatePinnedToolbarOperations,
   observePinnedToolbarOperations,
@@ -63,6 +65,42 @@ it('invalidates pending work on navigation and tab cleanup', () => {
   const closingTabOperation = beginPinnedToolbarOperation(10);
   clearPinnedToolbarOperationState(10);
   expect(closingTabOperation.isCurrent()).toBe(false);
+});
+
+it('keeps an accepted durable mutation current across navigation invalidation', async () => {
+  const durableMutation = beginPinnedToolbarDurableOperation(13);
+
+  invalidatePinnedToolbarOperations(13);
+
+  await expect(durableMutation.runExclusive(async () => durableMutation.isCurrent())).resolves.toBe(
+    true
+  );
+  clearPinnedToolbarOperationState(13);
+});
+
+it('queues navigation restore behind an accepted durable mutation', async () => {
+  const events: string[] = [];
+  const mutationRelease = createDeferred<void>();
+  const mutation = beginPinnedToolbarDurableOperation(14);
+  const mutationWork = mutation.runExclusive(async () => {
+    events.push('mutation-start');
+    await mutationRelease.promise;
+    events.push('mutation-end');
+  });
+  invalidatePinnedToolbarOperations(14);
+  const restore = beginPinnedToolbarRestoreOperation(14);
+  const restoreWork = restore.runExclusive(async () => {
+    events.push('restore');
+  });
+
+  await vi.waitFor(() => {
+    expect(events).toEqual(['mutation-start']);
+  });
+  mutationRelease.resolve(undefined);
+  await Promise.all([mutationWork, restoreWork]);
+
+  expect(events).toEqual(['mutation-start', 'mutation-end', 'restore']);
+  clearPinnedToolbarOperationState(14);
 });
 
 it('lets passive restoration observe without superseding a current mutation', () => {

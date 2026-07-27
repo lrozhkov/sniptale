@@ -139,6 +139,7 @@ function renderToolbarSettingsUtilityItems(props: {
     contentIntentSource?: ContentPrivilegedActionIntentSource
   ) => void;
   pinToTab: boolean;
+  pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
   screenshotMode: boolean;
 }) {
@@ -174,6 +175,7 @@ function renderPinToTabItem(props: {
     contentIntentSource?: ContentPrivilegedActionIntentSource
   ) => void;
   pinToTab: boolean;
+  pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
 }) {
   return (
@@ -189,13 +191,15 @@ function renderPinToTabItem(props: {
       hint={
         props.pinToTabLocked
           ? translate('content.toolbar.pinToTabLockedHint')
-          : translate('content.toolbar.pinToTabHint')
+          : !props.pinToTabAvailable
+            ? translate('content.toolbar.pinToTabUnavailableHint')
+            : translate('content.toolbar.pinToTabHint')
       }
-      disabled={props.pinToTabLocked}
+      disabled={props.pinToTabLocked || !props.pinToTabAvailable}
       selected={props.pinToTab || props.pinToTabLocked}
       onSelect={(event) => {
         stopMenuEvent(event);
-        if (props.pinToTabLocked) {
+        if (props.pinToTabLocked || !props.pinToTabAvailable) {
           return;
         }
 
@@ -263,6 +267,7 @@ type ToolbarSettingsDropdownProps = {
     contentIntentSource?: ContentPrivilegedActionIntentSource
   ) => void;
   pinToTab: boolean;
+  pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
   screenshotMode: boolean;
   triggerRef: React.RefObject<HTMLButtonElement | null>;

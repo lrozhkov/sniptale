@@ -8,8 +8,16 @@ import {
 
 type ContentPinToTabSessionWriteGuard = () => boolean;
 type ContentPinToTabSessionWriteResult =
-  | { status: 'acknowledged'; value: boolean }
+  | { pinToTabAvailable: boolean; status: 'acknowledged'; value: boolean }
   | { status: 'superseded' };
+type ContentPinToTabSessionState = {
+  pinToTab: boolean;
+  pinToTabAvailable: boolean;
+};
+type ContentPinToTabSessionMutation = {
+  pinToTab?: boolean;
+  toolbarVisible?: boolean;
+};
 
 const logger = createLogger({ namespace: 'ContentPinToTabSessionState' });
 let pinToTabWriteChain: Promise<void> = Promise.resolve();
@@ -19,31 +27,35 @@ export function readContentPinToTabSessionState(): boolean {
 }
 
 async function requestPinToTabSessionState(
-  pinToTab?: boolean,
+  mutation: ContentPinToTabSessionMutation = {},
   contentIntentSource?: ContentPrivilegedActionIntentSource
-): Promise<boolean> {
-  const baseMessage =
-    pinToTab === undefined
-      ? { type: MessageType.CONTENT_RUNTIME_WAKEUP }
-      : { pinToTab, type: MessageType.CONTENT_RUNTIME_WAKEUP };
+): Promise<ContentPinToTabSessionState> {
+  const baseMessage = { ...mutation, type: MessageType.CONTENT_RUNTIME_WAKEUP };
   const message =
-    pinToTab === true
+    mutation.pinToTab === true
       ? await attachContentActionIntent(baseMessage, contentIntentSource)
       : baseMessage;
   const response = await getContentRuntimeServices().messaging.sendRuntimeMessage(message);
-  if (!response?.success || typeof response.pinToTab !== 'boolean') {
+  if (
+    !response?.success ||
+    typeof response.pinToTab !== 'boolean' ||
+    typeof response.pinToTabAvailable !== 'boolean'
+  ) {
     throw new Error('Background pin-to-tab session owner returned an invalid response');
   }
 
-  return response.pinToTab;
+  return {
+    pinToTab: response.pinToTab,
+    pinToTabAvailable: response.pinToTabAvailable,
+  };
 }
 
-export async function loadContentPinToTabSessionState(): Promise<boolean> {
+export async function loadContentPinToTabSessionState(): Promise<ContentPinToTabSessionState> {
   try {
     return await requestPinToTabSessionState();
   } catch (error) {
     logger.warn('Failed to load authoritative pin-to-tab session state', error);
-    return false;
+    return { pinToTab: false, pinToTabAvailable: false };
   }
 }
 
@@ -63,9 +75,11 @@ export function writeContentPinToTabSessionState(
         return { status: 'superseded' } as const;
       }
 
+      const state = await requestPinToTabSessionState({ pinToTab: value }, contentIntentSource);
       return {
+        pinToTabAvailable: state.pinToTabAvailable,
         status: 'acknowledged',
-        value: await requestPinToTabSessionState(value, contentIntentSource),
+        value: state.pinToTab,
       } as const;
     });
 
@@ -78,6 +92,24 @@ export function writeContentPinToTabSessionState(
     if (isCurrent()) {
       logger.warn('Failed to persist authoritative pin-to-tab session state', error);
     }
+    throw error;
+  });
+}
+
+export function writeContentPinToTabToolbarVisibilityState(value: boolean): Promise<void> {
+  const writeOperation = pinToTabWriteChain
+    .catch(() => undefined)
+    .then(async () => {
+      await requestPinToTabSessionState({ toolbarVisible: value });
+    });
+
+  pinToTabWriteChain = writeOperation.then(
+    () => undefined,
+    () => undefined
+  );
+
+  return writeOperation.catch((error) => {
+    logger.warn('Failed to persist pinned-toolbar visibility state', error);
     throw error;
   });
 }

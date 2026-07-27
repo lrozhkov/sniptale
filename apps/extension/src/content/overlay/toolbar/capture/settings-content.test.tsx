@@ -56,7 +56,11 @@ function createMenuRef() {
   } as React.RefObject<HTMLDivElement | null>;
 }
 
-function renderSettingsDropdown(params?: { pinToTab?: boolean; pinToTabLocked?: boolean }) {
+function renderSettingsDropdown(params?: {
+  pinToTab?: boolean;
+  pinToTabAvailable?: boolean;
+  pinToTabLocked?: boolean;
+}) {
   ensureContainer();
   const onPinToTabChange = vi.fn();
 
@@ -73,6 +77,7 @@ function renderSettingsDropdown(params?: { pinToTab?: boolean; pinToTabLocked?: 
         onHide={() => undefined}
         onPinToTabChange={onPinToTabChange}
         pinToTab={params?.pinToTab ?? false}
+        pinToTabAvailable={params?.pinToTabAvailable ?? true}
         pinToTabLocked={params?.pinToTabLocked ?? false}
         screenshotMode={true}
         triggerRef={createButtonRef()}
@@ -100,6 +105,7 @@ function renderSettingsDropdownNearSidebar() {
         onHide={() => undefined}
         onPinToTabChange={() => undefined}
         pinToTab={false}
+        pinToTabAvailable={true}
         pinToTabLocked={false}
         screenshotMode={true}
         triggerRef={createButtonRef({
@@ -177,6 +183,21 @@ describe('ToolbarSettingsDropdown', () => {
 
     expect(pinButton).toBeDefined();
     expect(pinButton?.hasAttribute('disabled')).toBe(true);
+
+    act(() => {
+      pinButton?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+
+    expect(onPinToTabChange).not.toHaveBeenCalled();
+  });
+
+  it('disables pin-to-tab when persistent all-sites access is unavailable', () => {
+    const { onPinToTabChange } = renderSettingsDropdown({ pinToTabAvailable: false });
+    const pinButton = findButton('content.toolbar.pinToTab');
+
+    expect(pinButton).toBeDefined();
+    expect(pinButton?.hasAttribute('disabled')).toBe(true);
+    expect(pinButton?.textContent).toContain('content.toolbar.pinToTabUnavailableHint');
 
     act(() => {
       pinButton?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));

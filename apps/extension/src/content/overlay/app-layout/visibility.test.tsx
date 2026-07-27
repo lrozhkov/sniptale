@@ -157,9 +157,11 @@ function createToolbarProps(
       screenshotMode: true,
     },
     pinToTab: false,
+    pinToTabAvailable: true,
     setCaptureAction: vi.fn(),
     setCurrentViewport: vi.fn(),
     setPinToTab: vi.fn(),
+    setPinnedToolbarVisible: vi.fn(),
     setTimerDelay: vi.fn(),
     timerDelay: 0,
   };

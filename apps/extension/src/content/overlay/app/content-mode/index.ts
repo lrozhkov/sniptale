@@ -1,6 +1,5 @@
 import {
   useCaptureActionPreference,
-  usePinnedToolbarModeCleanup,
   usePinnedToolbarRestore,
   useQuickActionToastCountdown,
   useSessionPresetReset,
@@ -41,12 +40,6 @@ export function useContentAppModeState() {
   const scenarioPinned = state.captureAction === 'scenario';
 
   useCaptureActionPreference(state.captureAction, state.setCaptureAction);
-  usePinnedToolbarModeCleanup({
-    pinToTab: state.pinToTab,
-    scenarioPinned,
-    screenshotMode: state.screenshotMode,
-    setPinToTab: state.setPinToTab,
-  });
   usePinnedToolbarRestore({
     pinToTab: state.pinToTab,
     scenarioPinned,

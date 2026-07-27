@@ -26,6 +26,7 @@ vi.mock('../capture', () => ({
     displayMode: string;
     onPinToTabChange: () => void;
     pinToTab: boolean;
+    pinToTabAvailable: boolean;
     pinToTabLocked: boolean;
     scenario?: unknown;
   }) => (
@@ -33,6 +34,7 @@ vi.mock('../capture', () => ({
       data-ui="test.capture-actions"
       data-display-mode={props.displayMode}
       data-pin-to-tab={props.pinToTab ? 'true' : 'false'}
+      data-pin-to-tab-available={props.pinToTabAvailable ? 'true' : 'false'}
       data-pin-to-tab-locked={props.pinToTabLocked ? 'true' : 'false'}
       data-scenario={props.scenario ? 'true' : 'false'}
     />
@@ -87,6 +89,7 @@ function createToolbarProps(params?: { isCursorMode?: boolean }) {
     onToggleQuickEditMode: vi.fn(),
     onToggleScreenshotMode: vi.fn(),
     pinToTab: true,
+    pinToTabAvailable: true,
     pinToTabLocked: false,
     quickEditMode: false,
     screenshotMode: true,

@@ -76,9 +76,11 @@ function createToolbarLayoutSection(
       screenshotMode: viewModel.modeState.screenshotMode,
     },
     pinToTab: viewModel.modeState.pinToTab,
+    pinToTabAvailable: viewModel.modeState.pinToTabAvailable,
     setCaptureAction: viewModel.modeState.setCaptureAction,
     setCurrentViewport: viewModel.modeState.setCurrentViewport,
     setPinToTab: viewModel.modeState.setPinToTab,
+    setPinnedToolbarVisible: viewModel.modeState.setPinnedToolbarVisible,
     setTimerDelay: viewModel.modeState.setTimerDelay,
     timerDelay: viewModel.modeState.timerDelay,
   };

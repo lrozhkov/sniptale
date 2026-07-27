@@ -118,7 +118,9 @@ async function verifyEnableScreenshotModeWithDefaultPreset() {
   });
   sendTabMessageMock.mockResolvedValue(undefined);
 
-  await enableScreenshotMode(5, screenshotModeState, viewportState, viewportOwnerState);
+  await enableScreenshotMode(5, screenshotModeState, viewportState, viewportOwnerState, new Map(), {
+    toolbarVisible: false,
+  });
 
   expect(isDebuggerAttachedMock).toHaveBeenCalledWith(5);
   expect(attachDebuggerMock).toHaveBeenCalledWith(
@@ -132,6 +134,7 @@ async function verifyEnableScreenshotModeWithDefaultPreset() {
   expect(viewportOwnerState.get(5)).toBe('debugger');
   expect(screenshotModeState.get(5)).toBe(true);
   expect(sendTabMessageMock).toHaveBeenCalledWith(5, {
+    toolbarVisible: false,
     type: 'ENABLE_SCREENSHOT_MODE',
     viewport: { width: 1440, height: 900 },
   });
@@ -162,6 +165,107 @@ async function verifyEnableScreenshotModeWithNativeViewport() {
     viewport: null,
   });
   expect(screenshotModeState.get(5)).toBe(true);
+}
+
+async function verifyGuardedEnableRollsBackAfterAuthorityIsRevoked() {
+  const { enableScreenshotModeGuarded } = await import('./mode');
+  const screenshotModeState = new Map<number, boolean>();
+  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>();
+  const viewportState = new Map<number, { width: number; height: number } | null>();
+  const commitGuard = vi
+    .fn<() => Promise<boolean>>()
+    .mockResolvedValueOnce(true)
+    .mockResolvedValueOnce(false);
+
+  browserTabsGetMock.mockResolvedValue({ id: 5, url: 'https://example.com' });
+  loadSettingsMock.mockResolvedValue({
+    defaultViewportId: 'wide',
+    viewportPresets: [{ id: 'wide', label: 'Wide', width: 1440, height: 900 }],
+  });
+  sendTabMessageMock.mockResolvedValue(undefined);
+
+  await expect(
+    enableScreenshotModeGuarded(
+      5,
+      screenshotModeState,
+      viewportState,
+      viewportOwnerState,
+      new Map(),
+      { commitGuard, toolbarVisible: false }
+    )
+  ).resolves.toBe(false);
+
+  expect(commitGuard).toHaveBeenCalledTimes(2);
+  expect(sendTabMessageMock).toHaveBeenNthCalledWith(1, 5, {
+    toolbarVisible: false,
+    type: 'ENABLE_SCREENSHOT_MODE',
+    viewport: { width: 1440, height: 900 },
+  });
+  expect(sendTabMessageMock).toHaveBeenNthCalledWith(2, 5, {
+    type: 'DISABLE_SCREENSHOT_MODE',
+  });
+  expect(clearViewportMock).toHaveBeenCalledWith(5);
+  expect(detachDebuggerMock).toHaveBeenCalledWith(5, 'screenshot');
+  expect(screenshotModeState.has(5)).toBe(false);
+  expect(viewportState.has(5)).toBe(false);
+  expect(viewportOwnerState.has(5)).toBe(false);
+}
+
+async function verifyGuardedEnableRestoresAnActiveMode() {
+  const { enableScreenshotModeGuarded } = await import('./mode');
+  const screenshotModeState = new Map<number, boolean>([[5, true]]);
+  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'debugger']]);
+  const viewportState = new Map<number, { width: number; height: number } | null>([
+    [5, { width: 1024, height: 768 }],
+  ]);
+  const commitGuard = vi
+    .fn<() => Promise<boolean>>()
+    .mockResolvedValueOnce(true)
+    .mockResolvedValueOnce(false);
+
+  browserTabsGetMock.mockResolvedValue({ id: 5, url: 'https://example.com' });
+  loadSettingsMock.mockResolvedValue({
+    defaultViewportId: 'wide',
+    viewportPresets: [{ id: 'wide', label: 'Wide', width: 1440, height: 900 }],
+  });
+  isDebuggerAttachedMock.mockResolvedValue(true);
+  sendTabMessageMock.mockResolvedValue(undefined);
+
+  await expect(
+    enableScreenshotModeGuarded(
+      5,
+      screenshotModeState,
+      viewportState,
+      viewportOwnerState,
+      new Map(),
+      {
+        commitGuard,
+        readPreparationState: async () => ({ screenshotMode: true, visible: false }),
+        toolbarVisible: true,
+      }
+    )
+  ).resolves.toBe(false);
+
+  expect(sendTabMessageMock).toHaveBeenNthCalledWith(1, 5, {
+    toolbarVisible: true,
+    type: 'ENABLE_SCREENSHOT_MODE',
+    viewport: { width: 1440, height: 900 },
+  });
+  expect(sendTabMessageMock).toHaveBeenNthCalledWith(2, 5, {
+    toolbarVisible: false,
+    type: 'ENABLE_SCREENSHOT_MODE',
+    viewport: { width: 1024, height: 768 },
+  });
+  expect(sendTabMessageMock).not.toHaveBeenCalledWith(5, {
+    type: 'DISABLE_SCREENSHOT_MODE',
+  });
+  expect(setViewportMock).toHaveBeenNthCalledWith(1, 5, 1440, 900);
+  expect(setViewportMock).toHaveBeenNthCalledWith(2, 5, 1024, 768);
+  expect(clearViewportMock).not.toHaveBeenCalled();
+  expect(detachDebuggerMock).not.toHaveBeenCalled();
+  expect(screenshotModeState.get(5)).toBe(true);
+  expect(viewportState.get(5)).toEqual({ width: 1024, height: 768 });
+  expect(viewportOwnerState.get(5)).toBe('debugger');
 }
 
 async function verifyEnableScreenshotModeRollsBackViewportWhenContentNotificationFails() {
@@ -274,6 +378,14 @@ describe('tab-mode-router-screenshot', () => {
   it(
     'enables screenshot mode without debugger setup for native defaults',
     verifyEnableScreenshotModeWithNativeViewport
+  );
+  it(
+    'rolls back a restore-owned enable when authority disappears before commit',
+    verifyGuardedEnableRollsBackAfterAuthorityIsRevoked
+  );
+  it(
+    'restores an already-active screenshot mode when guarded reconciliation is rejected',
+    verifyGuardedEnableRestoresAnActiveMode
   );
   it(
     'rejects screenshot mode on restricted browser pages',

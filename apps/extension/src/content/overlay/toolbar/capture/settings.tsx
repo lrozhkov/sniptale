@@ -11,6 +11,7 @@ import type { ContentPrivilegedActionIntentSource } from '../../../application/p
 type ToolbarSettingsMenuProps = {
   compactMenus: boolean;
   pinToTab: boolean;
+  pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
   sidebarVisible?: boolean;
   screenshotMode: boolean;
@@ -96,6 +97,7 @@ function renderToolbarSettingsDropdown(args: {
       onHide={args.props.onClose}
       onPinToTabChange={args.props.onPinToTabChange}
       pinToTab={args.props.pinToTab}
+      pinToTabAvailable={args.props.pinToTabAvailable}
       pinToTabLocked={args.props.pinToTabLocked}
       screenshotMode={args.props.screenshotMode}
       triggerRef={args.triggerRef}

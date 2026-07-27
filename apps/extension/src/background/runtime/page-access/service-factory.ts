@@ -12,7 +12,6 @@ import {
   registerPinnedToolbarAllSitesAccess as registerPinnedToolbarAllSitesAccessAction,
   registerGrantedAllSitesAccess,
   registerGrantedSiteAccess,
-  requestPinnedToolbarAllSitesPermission as requestPinnedToolbarAllSitesPermissionAction,
   revokeSiteAccess,
   type PageAccessServiceContext,
 } from './service-actions';
@@ -32,7 +31,6 @@ export type PageAccessService = {
     isCurrent: () => boolean;
     tabId: number;
   }): Promise<'registered' | 'superseded'>;
-  requestPinnedToolbarAllSitesPermission(): Promise<boolean>;
   refreshActivePageAccessRuntime(tabId: number): Promise<boolean>;
   reconcilePageAccessTabNavigation(tabId: number, url: string): Promise<void>;
   unregisterRemovedPageAccessOrigins(origins: string[]): Promise<void>;
@@ -160,9 +158,6 @@ export function createPageAccessService({
         isCurrent: args.isCurrent,
         resolveContext: () => resolveStatusContext(args.tabId),
       });
-    },
-    async requestPinnedToolbarAllSitesPermission() {
-      return requestPinnedToolbarAllSitesPermissionAction();
     },
     async refreshActivePageAccessRuntime(tabId) {
       return refreshActivePageAccessRuntimeWithContext(tabId, serviceContext);

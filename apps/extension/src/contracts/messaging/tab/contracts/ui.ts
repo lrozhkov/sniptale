@@ -95,7 +95,9 @@ export const tabUiMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'tab TOOLBAR_STATUS response',
-      createRuntimeResponseGuard({ optional: { visible: isBoolean } })
+      createRuntimeResponseGuard({
+        optional: { screenshotMode: isBoolean, visible: isBoolean },
+      })
     ),
   },
   [MessageType.VIEWPORT_CHANGED]: {

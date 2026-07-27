@@ -34,35 +34,20 @@ it('handles denied all-sites grants without registering global content scripts',
   expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
 });
 
-it('requests pinned-toolbar permission without resolving the tab or registering runtime access', async () => {
-  const { requestPinnedToolbarAllSitesPermission } = await import('./service');
+it('reports whether pin-to-tab already has persistent all-sites access', async () => {
+  const { hasPinnedToolbarAllSitesAccess } = await import('./service');
+  browserPermissionsContainsMock.mockResolvedValueOnce(true);
 
-  await expect(requestPinnedToolbarAllSitesPermission()).resolves.toBe(true);
+  await expect(hasPinnedToolbarAllSitesAccess()).resolves.toBe(true);
 
-  expect(browserPermissionsRequestMock).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
-  expect(browserTabsGetMock).not.toHaveBeenCalled();
-  expect(browserScriptingRegisterContentScriptsMock).not.toHaveBeenCalled();
+  expect(browserPermissionsContainsMock).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
+  expect(browserPermissionsRequestMock).not.toHaveBeenCalled();
 });
 
-it('performs no tab, status, registration, or injection work after pinned permission denial', async () => {
-  const { requestPinnedToolbarAllSitesPermission } = await import('./service');
-  browserPermissionsRequestMock.mockResolvedValue(false);
-
-  await expect(requestPinnedToolbarAllSitesPermission()).resolves.toBe(false);
-
-  expect(browserPermissionsRequestMock).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
-  expect(browserPermissionsContainsMock).not.toHaveBeenCalled();
-  expect(browserTabsGetMock).not.toHaveBeenCalled();
-  expect(browserScriptingRegisterContentScriptsMock).not.toHaveBeenCalled();
-  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
-});
-
-it('keeps an explicit pinned-toolbar permission when runtime registration fails', async () => {
-  const { registerPinnedToolbarAllSitesAccess, requestPinnedToolbarAllSitesPermission } =
-    await import('./service');
+it('does not mutate an existing all-sites grant when pinned runtime registration fails', async () => {
+  const { registerPinnedToolbarAllSitesAccess } = await import('./service');
   browserScriptingRegisterContentScriptsMock.mockRejectedValueOnce(new Error('register failed'));
 
-  await expect(requestPinnedToolbarAllSitesPermission()).resolves.toBe(true);
   await expect(
     registerPinnedToolbarAllSitesAccess({
       commit: async () => true,
@@ -72,7 +57,7 @@ it('keeps an explicit pinned-toolbar permission when runtime registration fails'
     })
   ).rejects.toThrow('register failed');
 
-  expect(browserPermissionsRequestMock).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
+  expect(browserPermissionsRequestMock).not.toHaveBeenCalled();
   expect(browserPermissionsRemoveMock).not.toHaveBeenCalled();
 });
 

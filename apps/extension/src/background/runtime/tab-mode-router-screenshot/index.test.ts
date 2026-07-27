@@ -4,6 +4,7 @@ import * as screenshotStatus from './status';
 import {
   disableScreenshotMode as disableScreenshotModeFromOwner,
   enableScreenshotMode as enableScreenshotModeFromOwner,
+  enableScreenshotModeGuarded as enableScreenshotModeGuardedFromOwner,
 } from './mode';
 import * as navigationCleanup from './navigation-cleanup';
 import { handleSetViewport as handleSetViewportFromOwner } from './viewport';
@@ -12,11 +13,13 @@ import {
   cleanupScreenshotModeAfterNavigation,
   disableScreenshotMode,
   enableScreenshotMode,
+  enableScreenshotModeGuarded,
   handleSetViewport,
 } from './index';
 
 it('re-exports tab-mode screenshot entrypoints from the owner folder without wrapping them', () => {
   expect(enableScreenshotMode).toBe(enableScreenshotModeFromOwner);
+  expect(enableScreenshotModeGuarded).toBe(enableScreenshotModeGuardedFromOwner);
   expect(disableScreenshotMode).toBe(disableScreenshotModeFromOwner);
   expect(handleSetViewport).toBe(handleSetViewportFromOwner);
   expect(cleanupScreenshotModeAfterNavigation).toBe(

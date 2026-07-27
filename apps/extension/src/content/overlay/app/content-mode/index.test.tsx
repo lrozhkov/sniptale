@@ -57,6 +57,7 @@ beforeEach(() => {
   storageMocks.sendRuntimeMessage.mockReset();
   storageMocks.sendRuntimeMessage.mockResolvedValue({
     pinToTab: false,
+    pinToTabAvailable: true,
     restored: false,
     success: true,
   });
@@ -134,6 +135,7 @@ function registerPinnedToolbarBackgroundRestoreTest() {
     storageMocks.sendRuntimeMessage
       .mockResolvedValueOnce({
         pinToTab: true,
+        pinToTabAvailable: true,
         reason: 'pin-to-tab',
         restored: true,
         success: true,
@@ -165,6 +167,35 @@ function registerPinnedToolbarBackgroundRestoreTest() {
   });
 }
 
+function registerPinnedToolbarLifecycleTest() {
+  it('keeps the user pin when background lifecycle cleanup disables screenshot mode', async () => {
+    storageMocks.sendRuntimeMessage.mockResolvedValueOnce({
+      pinToTab: true,
+      pinToTabAvailable: true,
+      restored: true,
+      success: true,
+    });
+
+    await renderHarness();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      getLatestState().setScreenshotMode(true);
+    });
+    act(() => {
+      getLatestState().setScreenshotMode(false);
+    });
+
+    expect(getLatestState().pinToTab).toBe(true);
+    expect(storageMocks.sendRuntimeMessage).not.toHaveBeenCalledWith({
+      pinToTab: false,
+      type: 'CONTENT_RUNTIME_WAKEUP',
+    });
+  });
+}
+
 async function verifyStalePinHydrationIsIgnored() {
   let resolveHydration: (value: unknown) => void = () => undefined;
   storageMocks.sendRuntimeMessage
@@ -175,6 +206,7 @@ async function verifyStalePinHydrationIsIgnored() {
     )
     .mockResolvedValue({
       pinToTab: true,
+      pinToTabAvailable: true,
       reason: 'pin-to-tab',
       restored: true,
       success: true,
@@ -186,7 +218,12 @@ async function verifyStalePinHydrationIsIgnored() {
     getLatestState().setPinToTab(true);
   });
   await act(async () => {
-    resolveHydration({ pinToTab: false, restored: false, success: true });
+    resolveHydration({
+      pinToTab: false,
+      pinToTabAvailable: true,
+      restored: false,
+      success: true,
+    });
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -223,6 +260,7 @@ describe('useContentAppModeState', () => {
   registerStableOverlayStateTests();
   registerPinnedToolbarWindowStorageRestoreTest();
   registerPinnedToolbarBackgroundRestoreTest();
+  registerPinnedToolbarLifecycleTest();
   it(
     'does not let stale pin-to-tab hydration overwrite a newer toggle',
     verifyStalePinHydrationIsIgnored

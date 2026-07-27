@@ -48,6 +48,7 @@ beforeEach(() => {
   runtimeMocks.sendRuntimeMessage.mockReset();
   runtimeMocks.sendRuntimeMessage.mockResolvedValue({
     pinToTab: false,
+    pinToTabAvailable: true,
     restored: false,
     success: true,
   });
@@ -64,12 +65,16 @@ it('does not treat page window session storage as authoritative initial state', 
 it('hydrates pin state through the authorized background owner', async () => {
   runtimeMocks.sendRuntimeMessage.mockResolvedValueOnce({
     pinToTab: true,
+    pinToTabAvailable: true,
     reason: 'pin-to-tab',
     restored: true,
     success: true,
   });
 
-  await expect(loadContentPinToTabSessionState()).resolves.toBe(true);
+  await expect(loadContentPinToTabSessionState()).resolves.toEqual({
+    pinToTab: true,
+    pinToTabAvailable: true,
+  });
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledWith({
     type: 'CONTENT_RUNTIME_WAKEUP',
   });
@@ -78,18 +83,25 @@ it('hydrates pin state through the authorized background owner', async () => {
 it('does not confuse scenario restoration with a user pin', async () => {
   runtimeMocks.sendRuntimeMessage.mockResolvedValueOnce({
     pinToTab: false,
+    pinToTabAvailable: true,
     reason: 'scenario',
     restored: true,
     success: true,
   });
 
-  await expect(loadContentPinToTabSessionState()).resolves.toBe(false);
+  await expect(loadContentPinToTabSessionState()).resolves.toEqual({
+    pinToTab: false,
+    pinToTabAvailable: true,
+  });
 });
 
 it('fails closed and reports an invalid background response', async () => {
   runtimeMocks.sendRuntimeMessage.mockResolvedValueOnce({ success: true });
 
-  await expect(loadContentPinToTabSessionState()).resolves.toBe(false);
+  await expect(loadContentPinToTabSessionState()).resolves.toEqual({
+    pinToTab: false,
+    pinToTabAvailable: false,
+  });
   expect(loggerMocks.warn).toHaveBeenCalledWith(
     'Failed to load authoritative pin-to-tab session state',
     expect.any(Error)
@@ -99,12 +111,14 @@ it('fails closed and reports an invalid background response', async () => {
 it('persists pin state through the background owner', async () => {
   runtimeMocks.sendRuntimeMessage.mockResolvedValueOnce({
     pinToTab: true,
+    pinToTabAvailable: true,
     reason: 'pin-to-tab',
     restored: true,
     success: true,
   });
 
   await expect(writeContentPinToTabSessionState(true)).resolves.toEqual({
+    pinToTabAvailable: true,
     status: 'acknowledged',
     value: true,
   });
@@ -115,9 +129,10 @@ it('persists pin state through the background owner', async () => {
   expect(window.sessionStorage.getItem('sniptale.content.pin-to-tab')).toBeNull();
 });
 
-it('binds pin activation to its trusted toolbar event before requesting host access', async () => {
+it('binds pin activation to its trusted toolbar event before mutating the session owner', async () => {
   runtimeMocks.sendRuntimeMessage.mockResolvedValueOnce({
     pinToTab: true,
+    pinToTabAvailable: true,
     reason: 'pin-to-tab',
     restored: true,
     success: true,
@@ -125,6 +140,7 @@ it('binds pin activation to its trusted toolbar event before requesting host acc
   const source = { kind: 'trusted-content-event' as const };
 
   await expect(writeContentPinToTabSessionState(true, () => true, source)).resolves.toEqual({
+    pinToTabAvailable: true,
     status: 'acknowledged',
     value: true,
   });

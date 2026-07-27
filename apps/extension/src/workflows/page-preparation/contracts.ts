@@ -61,5 +61,6 @@ export type ViewerPreparationCommand =
       autoStartCaptureType?: 'visible' | 'full';
       autoStartSelection?: boolean;
       quickActionOverlay?: QuickActionOverlay & { delaySeconds?: number };
+      toolbarVisible?: boolean;
       viewport?: { width: number; height: number } | null;
     };

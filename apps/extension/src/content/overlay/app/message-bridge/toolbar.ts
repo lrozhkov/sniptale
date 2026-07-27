@@ -23,7 +23,11 @@ export function handleToolbarVisibilityMessage(
   }
 
   if (request.type === MessageType.TOOLBAR_STATUS) {
-    sendResponse({ success: true, visible: params.modeState.isToolbarVisible });
+    sendResponse({
+      screenshotMode: params.modeState.screenshotMode,
+      success: true,
+      visible: params.modeState.isToolbarVisible,
+    });
     return true;
   }
 

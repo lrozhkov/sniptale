@@ -129,9 +129,11 @@ function createToolbarProps(): ContentAppLayoutToolbarProps {
       screenshotMode: true,
     },
     pinToTab: false,
+    pinToTabAvailable: true,
     setCaptureAction: vi.fn(),
     setCurrentViewport: vi.fn(),
     setPinToTab: vi.fn(),
+    setPinnedToolbarVisible: vi.fn(),
     setTimerDelay: vi.fn(),
     timerDelay: 0,
   };
@@ -191,6 +193,7 @@ async function verifiesByClickModeSync() {
 
 async function verifiesScreenshotDisableAndVisibility() {
   const props = createProps();
+  props.toolbar.pinToTab = true;
   await renderShell(props);
 
   const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
@@ -200,6 +203,7 @@ async function verifiesScreenshotDisableAndVisibility() {
   await Promise.resolve();
 
   expect(props.toolbar.modeController.handleToggleScreenshotMode).toHaveBeenCalledWith(false);
+  expect(props.toolbar.setPinToTab).toHaveBeenCalledWith(false);
   expect(props.scenario.actions.handleScreenshotModeDisabled).toHaveBeenCalledTimes(1);
 
   props.toolbar.isToolbarVisible = false;
@@ -220,6 +224,19 @@ async function verifiesToolbarUsesModeStateCaptureAction() {
   };
 
   expect(lastToolbarProps.captureAction).toBe('download_default');
+}
+
+async function verifiesHidePersistsCollapsedPinnedToolbarState() {
+  const props = createProps();
+  await renderShell(props);
+
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    onHide: () => void;
+  };
+  lastToolbarProps.onHide();
+
+  expect(props.toolbar.modeController.handleHideToolbar).not.toHaveBeenCalled();
+  expect(props.toolbar.setPinnedToolbarVisible).toHaveBeenCalledWith(false);
 }
 
 async function verifiesToolbarForwardsQuickEditDocumentMode() {
@@ -267,6 +284,22 @@ async function verifiesScenarioSidebarPreloadOnIntent() {
   expect(preloadContentScenarioRecorderSidebarMock).toHaveBeenCalledTimes(2);
 }
 
+async function verifiesScenarioFinishUsesExplicitScreenshotExit() {
+  const props = createProps();
+  props.toolbar.pinToTab = true;
+  await renderShell(props);
+
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    scenario: { onFinishScenario: () => Promise<void> };
+  };
+  await lastToolbarProps.scenario.onFinishScenario();
+
+  expect(props.toolbar.modeController.handleToggleScreenshotMode).toHaveBeenCalledWith(false);
+  expect(props.toolbar.setPinToTab).toHaveBeenCalledWith(false);
+  expect(props.scenario.actions.handleScreenshotModeDisabled).toHaveBeenCalledOnce();
+  expect(props.scenario.actions.openEditor).toHaveBeenCalledOnce();
+}
+
 describe('ContentToolbarShell', () => {
   useContentToolbarShellTestScope();
 
@@ -283,8 +316,16 @@ describe('ContentToolbarShell', () => {
     verifiesScenarioSidebarPreloadOnIntent
   );
   it(
+    'routes scenario finish through the explicit screenshot-mode exit owner',
+    verifiesScenarioFinishUsesExplicitScreenshotExit
+  );
+  it(
     'renders the toolbar capture action from mode state instead of stale scenario state',
     verifiesToolbarUsesModeStateCaptureAction
+  );
+  it(
+    'persists collapsed pinned-toolbar state when hiding the toolbar',
+    verifiesHidePersistsCollapsedPinnedToolbarState
   );
   it(
     'forwards quick-edit document submode state and handler into the toolbar',

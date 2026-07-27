@@ -147,6 +147,35 @@ async function expectScreenshotMessagesStillRouteThroughUiBridge() {
 }
 
 describe('useRuntimeMessageBridge', () => {
+  it('reports React-owned toolbar readiness and screenshot mode together', async () => {
+    const params = createBridgeParams();
+    params.modeState.isToolbarVisible = true;
+    params.modeState.screenshotMode = true;
+    await renderBridge(params);
+
+    const listener = subscribeToMessages.mock.calls[0]?.[0] as
+      | ((
+          message: unknown,
+          sender: chrome.runtime.MessageSender,
+          sendResponse: (response?: unknown) => void
+        ) => boolean)
+      | undefined;
+    const sendResponse = vi.fn();
+
+    expect(
+      listener?.(
+        { type: MessageType.TOOLBAR_STATUS },
+        {} as chrome.runtime.MessageSender,
+        sendResponse
+      )
+    ).toBe(false);
+    expect(sendResponse).toHaveBeenCalledWith({
+      screenshotMode: true,
+      success: true,
+      visible: true,
+    });
+  });
+
   it('subscribes once and routes messages through the latest bridge params after rerender', async () => {
     const initialSetToolbarVisible = vi.fn();
     const nextSetToolbarVisible = vi.fn();

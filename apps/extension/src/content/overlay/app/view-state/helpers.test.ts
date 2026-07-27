@@ -20,6 +20,7 @@ function createModeState(): ContentAppModeState {
     navigationLockEnabled: false,
     pendingAutoStartCapture: { type: 'selection' },
     pinToTab: false,
+    pinToTabAvailable: true,
     quickActionOverlayRef: { current: null },
     quickActionToastCountdown: 5,
     quickEditDocumentMode: false,
@@ -36,6 +37,7 @@ function createModeState(): ContentAppModeState {
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
     setPinToTab: vi.fn(),
+    setPinnedToolbarVisible: vi.fn(),
     setQuickActionOverlay: vi.fn(),
     setQuickActionToastCountdown: vi.fn(),
     setQuickEditDocumentMode: vi.fn(),
@@ -89,6 +91,7 @@ function createVisibilityState(modeState: ContentAppModeState) {
     queueAutoStartCapture: modeState.queueAutoStartCapture,
     saveDialogState: modeState.saveDialogState,
     setIsCompletelyHidden: modeState.setIsCompletelyHidden,
+    setPinnedToolbarVisible: modeState.setPinnedToolbarVisible,
     setSaveDialogState: modeState.setSaveDialogState,
   };
 }

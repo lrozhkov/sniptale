@@ -75,7 +75,7 @@ function enableScreenshotModeState(
   params.modeControls.setScreenshotMode(true);
   params.modeControls.setNavigationLockEnabled(true);
   params.modeControls.setIsToolbarVisible(
-    !request.autoStartSelection && !request.autoStartCaptureType
+    request.toolbarVisible ?? (!request.autoStartSelection && !request.autoStartCaptureType)
   );
   params.viewport.setCurrentViewport(request.viewport ?? null);
   applyQuickActionOverlay(request, params);

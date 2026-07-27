@@ -9,11 +9,14 @@ import {
   loadContentPinToTabSessionState,
   readContentPinToTabSessionState,
   writeContentPinToTabSessionState,
+  writeContentPinToTabToolbarVisibilityState,
 } from './pin-session';
 
 function useContentPinToTabState() {
   const [pinToTab, setPinToTabState] = useState(readContentPinToTabSessionState);
+  const [pinToTabAvailable, setPinToTabAvailable] = useState(false);
   const confirmedPinToTabRef = useRef(pinToTab);
+  const refreshGenerationRef = useRef(0);
   const writeGenerationRef = useRef(0);
 
   const commitPinToTabState = useCallback((value: boolean) => {
@@ -40,12 +43,15 @@ function useContentPinToTabState() {
           if (result.status === 'acknowledged') {
             confirmedPinToTabRef.current = result.value;
             if (isCurrent()) {
+              refreshGenerationRef.current += 1;
+              setPinToTabAvailable(result.pinToTabAvailable);
               commitPinToTabState(result.value);
             }
           }
         })
         .catch(() => {
           if (isCurrent()) {
+            refreshGenerationRef.current += 1;
             commitPinToTabState(confirmedPinToTabRef.current);
           }
         });
@@ -53,27 +59,44 @@ function useContentPinToTabState() {
     [commitPinToTabState]
   );
 
-  useEffect(() => {
-    let cancelled = false;
-
+  const refreshPinToTabState = useCallback(() => {
+    const refreshGeneration = refreshGenerationRef.current + 1;
+    refreshGenerationRef.current = refreshGeneration;
     const startedAtGeneration = writeGenerationRef.current;
 
-    void loadContentPinToTabSessionState().then((value) => {
-      if (!cancelled) {
-        if (writeGenerationRef.current !== startedAtGeneration) {
-          return;
-        }
-
-        commitConfirmedPinToTabState(value);
+    void loadContentPinToTabSessionState().then((state) => {
+      if (
+        refreshGenerationRef.current !== refreshGeneration ||
+        writeGenerationRef.current !== startedAtGeneration
+      ) {
+        return;
       }
-    });
 
-    return () => {
-      cancelled = true;
-    };
+      setPinToTabAvailable(state.pinToTabAvailable);
+      commitConfirmedPinToTabState(state.pinToTab);
+    });
   }, [commitConfirmedPinToTabState]);
 
-  return { pinToTab, setPinToTab };
+  useEffect(() => {
+    const handleFocus = () => refreshPinToTabState();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshPinToTabState();
+      }
+    };
+
+    refreshPinToTabState();
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      refreshGenerationRef.current += 1;
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshPinToTabState]);
+
+  return { pinToTab, pinToTabAvailable, setPinToTab };
 }
 
 function useQuickActionOverlayState() {
@@ -89,7 +112,19 @@ function useQuickActionOverlayState() {
 }
 
 function useContentVisibilityState() {
-  const [isToolbarVisible, setIsToolbarVisible] = useState(false);
+  const [isToolbarVisible, setToolbarVisibleState] = useState(false);
+  const confirmedToolbarVisibilityRef = useRef(false);
+  const visibilityWriteGenerationRef = useRef(0);
+  const projectToolbarVisibility = useCallback((value: boolean) => {
+    setToolbarVisibleState(value);
+  }, []);
+  const setIsToolbarVisible = useCallback(
+    (value: boolean) => {
+      confirmedToolbarVisibilityRef.current = value;
+      projectToolbarVisibility(value);
+    },
+    [projectToolbarVisibility]
+  );
   const [isCompletelyHidden, setIsCompletelyHidden] = useState(false);
   const [currentViewport, setCurrentViewport] = useState<{ width: number; height: number } | null>(
     null
@@ -102,7 +137,24 @@ function useContentVisibilityState() {
     dataUrl: string;
     filename: string;
   } | null>(null);
-  const { pinToTab, setPinToTab } = useContentPinToTabState();
+  const { pinToTab, pinToTabAvailable, setPinToTab } = useContentPinToTabState();
+  const setPinnedToolbarVisible = useCallback(
+    (value: boolean) => {
+      const writeGeneration = visibilityWriteGenerationRef.current + 1;
+      visibilityWriteGenerationRef.current = writeGeneration;
+      projectToolbarVisibility(value);
+      void writeContentPinToTabToolbarVisibilityState(value)
+        .then(() => {
+          confirmedToolbarVisibilityRef.current = value;
+        })
+        .catch(() => {
+          if (visibilityWriteGenerationRef.current === writeGeneration) {
+            projectToolbarVisibility(confirmedToolbarVisibilityRef.current);
+          }
+        });
+    },
+    [projectToolbarVisibility]
+  );
   const { quickActionOverlayRef, setQuickActionOverlay } = useQuickActionOverlayState();
 
   return {
@@ -111,6 +163,7 @@ function useContentVisibilityState() {
     isToolbarVisible,
     navigationLockEnabled,
     pinToTab,
+    pinToTabAvailable,
     quickActionOverlayRef,
     quickActionToastCountdown,
     saveDialogState,
@@ -119,6 +172,7 @@ function useContentVisibilityState() {
     setIsCompletelyHidden,
     setIsToolbarVisible,
     setNavigationLockEnabled,
+    setPinnedToolbarVisible,
     setPinToTab,
     setQuickActionOverlay,
     setQuickActionToastCountdown,

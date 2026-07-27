@@ -70,6 +70,7 @@ function MenuGroupHarness(props: { scenario?: ToolbarProps['scenario'] }) {
       onTimerDelayChange={vi.fn()}
       onViewportChange={vi.fn()}
       pinToTab={false}
+      pinToTabAvailable={true}
       pinToTabLocked={false}
       screenshotMode
       timerDelay={0}

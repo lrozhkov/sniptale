@@ -1,8 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { installBackgroundRuntimeMessagingMock } from '../../routing-contracts/runtime-messaging/mock';
 import { browserScriptingExecuteScriptMock, sendTabMessageMock } from './service.test-support';
-import { injectContentRuntimeAndAwaitReady, waitForContentRuntimeReady } from './readiness';
+import {
+  injectContentRuntimeAndAwaitReady,
+  waitForContentRuntimeReady,
+  waitForContentToolbarReady,
+} from './readiness';
 
 const VIEWPORT_COORDS_RESPONSE = {
   coords: { x: 0, y: 0, width: 100, height: 100, outerWidth: 100, outerHeight: 100 },
@@ -74,4 +79,23 @@ it('fails closed when the content runtime never becomes ready', async () => {
 
   expect(sendTabMessage).toHaveBeenCalledTimes(40);
   expect(wait).toHaveBeenCalledTimes(39);
+});
+
+it('waits for the React toolbar bridge instead of accepting the earlier core listener', async () => {
+  const wait = vi.fn(async () => undefined);
+  const sendTabMessage = vi
+    .fn()
+    .mockResolvedValueOnce({ success: true })
+    .mockResolvedValueOnce({ screenshotMode: false, success: true, visible: false });
+
+  await expect(waitForContentToolbarReady(12, { sendTabMessage, wait })).resolves.toEqual({
+    screenshotMode: false,
+    visible: false,
+  });
+
+  expect(sendTabMessage).toHaveBeenNthCalledWith(1, 12, {
+    type: MessageType.TOOLBAR_STATUS,
+  });
+  expect(sendTabMessage).toHaveBeenCalledTimes(2);
+  expect(wait).toHaveBeenCalledWith(50);
 });
