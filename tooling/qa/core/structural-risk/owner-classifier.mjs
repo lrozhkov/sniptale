@@ -11,16 +11,137 @@ const RUNTIME_TOPOLOGY = [...getRuntimeTopology()].sort(
   (left, right) => right.root.length - left.root.length
 );
 
+const DIRECT_PERSISTENCE_CALLEE_ROOTS = [
+  'indexedDB',
+  'localStorage',
+  'sessionStorage',
+  'caches',
+  'storage',
+  'chrome.storage',
+  'browser.storage',
+  'window.indexedDB',
+  'window.localStorage',
+  'window.sessionStorage',
+  'window.caches',
+  'globalThis.indexedDB',
+  'globalThis.localStorage',
+  'globalThis.sessionStorage',
+  'globalThis.caches',
+];
+const PERSISTENCE_RECEIVER_TOKEN_PATTERN = /[A-Za-z_$][\w$]*/gu;
+const PERSISTENCE_RECEIVER_NAMES = new Set([
+  'db',
+  'database',
+  'objectStore',
+  'persistence',
+  'repo',
+  'repository',
+  'store',
+]);
+const PERSISTENCE_RECEIVER_SUFFIX_PATTERN =
+  /(?:DB|Db|Database|ObjectStore|Persistence|Repo|Repository|Storage|Store)$/u;
+const PERSISTENCE_MUTATION_METHODS = new Set(['delete', 'persist', 'put', 'save', 'transaction']);
+
+function compactCallText(text) {
+  return text.replaceAll(/\s+/gu, '');
+}
+
+function persistenceMutationReceiver(text) {
+  const compact = compactCallText(text);
+  let receiverEnd = -1;
+  for (const method of PERSISTENCE_MUTATION_METHODS) {
+    receiverEnd = Math.max(
+      receiverEnd,
+      compact.lastIndexOf(`.${method}(`),
+      compact.lastIndexOf(`?.${method}(`)
+    );
+  }
+  return receiverEnd < 0 ? null : compact.slice(0, receiverEnd);
+}
+
+function consumeQuotedCharacter(state, character) {
+  if (state.quote === null) {
+    if (`'"\``.includes(character)) state.quote = character;
+    return state.quote !== null;
+  }
+  if (state.escaped) state.escaped = false;
+  else if (character === '\\') state.escaped = true;
+  else if (character === state.quote) state.quote = null;
+  return true;
+}
+
+function sourceWithoutQuotedContents(text) {
+  const quoteState = { escaped: false, quote: null };
+  let unquoted = '';
+  for (const character of text) {
+    if (!consumeQuotedCharacter(quoteState, character)) unquoted += character;
+  }
+  return unquoted;
+}
+
+function collectSimpleCallCallees(text) {
+  const source = sourceWithoutQuotedContents(text);
+  const callees = [];
+  for (let index = 0; index < source.length; index += 1) {
+    if (source[index] !== '(') continue;
+    let cursor = index - 1;
+    while (/\s/u.test(source[cursor] ?? '')) cursor -= 1;
+    const end = cursor + 1;
+    while (/[A-Za-z0-9_$?.]/u.test(source[cursor] ?? '')) cursor -= 1;
+    const callee = source.slice(cursor + 1, end);
+    if (/^[A-Za-z_$]/u.test(callee)) callees.push(callee.replaceAll('?.', '.'));
+  }
+  return callees;
+}
+
+function hasDirectPersistenceCall(text) {
+  return collectSimpleCallCallees(text).some((callee) =>
+    DIRECT_PERSISTENCE_CALLEE_ROOTS.some((root) => callee === root || callee.startsWith(`${root}.`))
+  );
+}
+
+function receiverChainText(receiver) {
+  let depth = 0;
+  const quoteState = { escaped: false, quote: null };
+  let outsideArguments = '';
+  for (const character of receiver) {
+    if (consumeQuotedCharacter(quoteState, character)) continue;
+    if (character === '(' || character === '[') {
+      depth += 1;
+      continue;
+    }
+    if (character === ')' || character === ']') {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (depth === 0) outsideArguments += character;
+  }
+  return outsideArguments;
+}
+
+function hasPersistenceReceiver(receiver) {
+  PERSISTENCE_RECEIVER_TOKEN_PATTERN.lastIndex = 0;
+  return Array.from(
+    receiverChainText(receiver).matchAll(PERSISTENCE_RECEIVER_TOKEN_PATTERN),
+    ([token]) => token
+  ).some(
+    (token) =>
+      PERSISTENCE_RECEIVER_NAMES.has(token) || PERSISTENCE_RECEIVER_SUFFIX_PATTERN.test(token)
+  );
+}
+
+function hasPersistenceEffect(text) {
+  const receiver = persistenceMutationReceiver(text);
+  return hasDirectPersistenceCall(text) || (receiver != null && hasPersistenceReceiver(receiver));
+}
+
 const EFFECT_FAMILIES = [
   [
     'browser-privilege',
     /\b(?:chrome|browser)\.(?:tabs|downloads|scripting|debugger|permissions|identity|management|contextMenus)\b/u,
   ],
   ['messaging', /\b(?:sendMessage|postMessage|onMessage|runtime\.connect|BroadcastChannel)\b/u],
-  [
-    'persistence',
-    /\b(?:indexedDB|localStorage|sessionStorage|storage\.|\.put\(|\.delete\(|\.save\(|\.persist\(|transaction\()\b/u,
-  ],
+  ['persistence', hasPersistenceEffect],
   ['network', /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b/u],
   [
     'dom-ui',
@@ -106,11 +227,19 @@ export function isEntrypointOwner(relativePath) {
 }
 
 export function classifyEffectFamily(text) {
-  return EFFECT_FAMILIES.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
+  return (
+    EFFECT_FAMILIES.find(([, matcher]) =>
+      matcher instanceof RegExp ? matcher.test(text) : matcher(text)
+    )?.[0] ?? null
+  );
 }
 
 export function collectEffectFamilies(text) {
   return [
-    ...new Set(EFFECT_FAMILIES.filter(([, pattern]) => pattern.test(text)).map(([name]) => name)),
+    ...new Set(
+      EFFECT_FAMILIES.filter(([, matcher]) =>
+        matcher instanceof RegExp ? matcher.test(text) : matcher(text)
+      ).map(([name]) => name)
+    ),
   ];
 }

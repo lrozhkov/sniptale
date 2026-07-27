@@ -77,6 +77,7 @@ function createModeState() {
     isCompletelyHidden: false,
     isToolbarVisible: true,
     pinToTab: false,
+    pinToTabAvailable: true,
     quickActionToastCountdown: 3,
     quickEditDocumentMode: false,
     quickEditMode: false,

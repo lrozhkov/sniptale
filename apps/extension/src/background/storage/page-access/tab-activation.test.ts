@@ -41,12 +41,34 @@ it('hydrates legacy stored rows without updated timestamps', async () => {
   await expect(store.hydrate()).resolves.toEqual(new Map([[7, 'https://example.test/7']]));
 });
 
-it('expires stale activation when the tab URL changes', async () => {
+it('retains temporary activation across same-origin document navigation', async () => {
   const store = createStore();
   await store.grant(createTarget(7));
 
-  await expect(store.has(createTarget(7, 'https://example.test/changed'))).resolves.toBe(false);
+  await expect(store.has(createTarget(7, 'https://example.test/changed'))).resolves.toBe(true);
 
+  expect(sessionStorageState[TEMPORARY_ACTIVE_TABS_STORAGE_KEY]).toEqual([
+    { tabId: 7, updatedAtMs: 1000, url: 'https://example.test/7' },
+  ]);
+});
+
+it('expires stale activation when the tab changes origin', async () => {
+  const store = createStore();
+  await store.grant(createTarget(7));
+
+  await expect(store.has(createTarget(7, 'https://other.test/changed'))).resolves.toBe(false);
+
+  expect(sessionStorageState[TEMPORARY_ACTIVE_TABS_STORAGE_KEY]).toEqual([]);
+});
+
+it('does not resurrect activation after a cross-origin round trip without an intermediate read', async () => {
+  const store = createStore();
+  await store.grant(createTarget(7));
+
+  await store.reconcileNavigation(createTarget(7, 'https://other.test/path'));
+  await store.reconcileNavigation(createTarget(7, 'https://example.test/return'));
+
+  await expect(store.has(createTarget(7))).resolves.toBe(false);
   expect(sessionStorageState[TEMPORARY_ACTIVE_TABS_STORAGE_KEY]).toEqual([]);
 });
 

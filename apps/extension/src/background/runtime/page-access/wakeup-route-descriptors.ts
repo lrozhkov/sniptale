@@ -5,6 +5,6 @@ export const contentRuntimeWakeupRouteDescriptor = {
   messageTypes: [MessageType.CONTENT_RUNTIME_WAKEUP],
   ownerModule: 'apps/extension/src/background/runtime/page-access/wakeup-route.ts',
   policyAuthorityFamily: 'content-runtime-wakeup',
-  policyStateIds: ['page-access-tab-activation'],
+  policyStateIds: ['content-action-capabilities', 'page-access-tab-activation'],
   routeAuthorityFamily: 'content-runtime-wakeup',
 } as const;

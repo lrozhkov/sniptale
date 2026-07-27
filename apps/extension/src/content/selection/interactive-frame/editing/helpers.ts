@@ -18,6 +18,15 @@ export function syncInteractiveFrameContainer(
   container.style.top = `${frame.y}px`;
   container.style.width = `${frame.width}px`;
   container.style.height = `${frame.height}px`;
+
+  const visibleFrame = container.firstElementChild;
+  if (
+    visibleFrame instanceof HTMLElement &&
+    visibleFrame.classList.contains('sniptale-interactive-frame')
+  ) {
+    visibleFrame.style.width = `${frame.width}px`;
+    visibleFrame.style.height = `${frame.height}px`;
+  }
 }
 
 export function applyDragUpdate(params: {

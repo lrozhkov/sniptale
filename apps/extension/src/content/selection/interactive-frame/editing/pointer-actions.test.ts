@@ -16,12 +16,32 @@ import {
   type InteractiveFramePointerStartEvent,
 } from './pointer-actions';
 import type { InteractiveFrameListenerConfig } from '../controller/types';
-import type { FrameState, ResizeDirection } from '../../../../features/highlighter/contracts';
+import type {
+  FrameData,
+  FrameState,
+  ResizeDirection,
+} from '../../../../features/highlighter/contracts';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
+import { MIN_FRAME_SIZE } from '../layout/portal';
 
-function createFixture() {
-  const frame = createFrameDataFixture('frame-1', { x: 20, y: 30, width: 100, height: 80 });
+function createFixture(overrides: Partial<FrameData> = {}) {
+  const frame = createFrameDataFixture('frame-1', {
+    x: 20,
+    y: 30,
+    width: 100,
+    height: 80,
+    ...overrides,
+  });
   const container = document.createElement('div');
+  container.style.left = `${frame.x}px`;
+  container.style.top = `${frame.y}px`;
+  container.style.width = `${frame.width}px`;
+  container.style.height = `${frame.height}px`;
+  const visibleFrame = document.createElement('div');
+  visibleFrame.className = 'sniptale-interactive-frame';
+  visibleFrame.style.width = `${frame.width}px`;
+  visibleFrame.style.height = `${frame.height}px`;
+  container.appendChild(visibleFrame);
   const stateRef: { current: FrameState } = { current: 'hover' };
   const refs = {
     isDraggingRef: { current: false },
@@ -65,7 +85,7 @@ function createFixture() {
     state: 'hover',
     stateRef,
   });
-  return { frame, listenerConfig, onUpdate, refs, setState, start };
+  return { container, frame, listenerConfig, onUpdate, refs, setState, start, visibleFrame };
 }
 
 function reactPointer(x: number, y: number): InteractiveFramePointerStartEvent {
@@ -151,6 +171,39 @@ describe('transient frame resize', () => {
     expect(fixture.refs.tempFrameRef.current).toMatchObject({ width: 140, height: 110 });
   });
 
+  it.each([
+    {
+      direction: 'w' as const,
+      move: { x: 80, y: 100 },
+      expectedFrameSize: '120px',
+      oppositeEdge: (container: HTMLDivElement, visibleFrame: HTMLDivElement) =>
+        Number.parseFloat(container.style.left) + Number.parseFloat(visibleFrame.style.width),
+      expectedOppositeEdge: 120,
+    },
+    {
+      direction: 'n' as const,
+      move: { x: 100, y: 80 },
+      expectedFrameSize: '100px',
+      oppositeEdge: (container: HTMLDivElement, visibleFrame: HTMLDivElement) =>
+        Number.parseFloat(container.style.top) + Number.parseFloat(visibleFrame.style.height),
+      expectedOppositeEdge: 110,
+    },
+  ])(
+    'keeps the visible opposite edge fixed during live $direction resize',
+    ({ direction, expectedFrameSize, expectedOppositeEdge, move, oppositeEdge }) => {
+      const fixture = createFixture();
+      fixture.start(reactPointer(100, 100), direction);
+      createInteractiveFramePointerMoveHandler(fixture.listenerConfig)(domPointer(move.x, move.y));
+
+      flushRaf();
+
+      const size =
+        direction === 'w' ? fixture.visibleFrame.style.width : fixture.visibleFrame.style.height;
+      expect(size).toBe(expectedFrameSize);
+      expect(oppositeEdge(fixture.container, fixture.visibleFrame)).toBe(expectedOppositeEdge);
+    }
+  );
+
   it('flushes the final pointer sample and commits exactly once on pointerup', () => {
     const fixture = createFixture();
     fixture.start(reactPointer(100, 100), 'se');
@@ -164,7 +217,31 @@ describe('transient frame resize', () => {
     expect(fixture.onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ width: 140, height: 110 })
     );
+    expect(fixture.refs.isResizingRef.current).toBe(false);
+    expect(fixture.listenerConfig.stateRef.current).toBe('resizing');
     expect(highlighter.resumeHighlighter).toHaveBeenCalledOnce();
+  });
+
+  it('returns to hover immediately when pointerup commits unchanged geometry', () => {
+    const fixture = createFixture();
+    fixture.start(reactPointer(100, 100), 'se');
+
+    createInteractiveFramePointerUpHandler(fixture.listenerConfig)(domPointer(100, 100));
+
+    expect(fixture.onUpdate).toHaveBeenCalledOnce();
+    expect(fixture.listenerConfig.stateRef.current).toBe('hover');
+    expect(fixture.setState).toHaveBeenLastCalledWith('hover');
+  });
+
+  it('returns to hover when a resize is saturated at the minimum size', () => {
+    const fixture = createFixture({ width: MIN_FRAME_SIZE });
+    fixture.start(reactPointer(100, 100), 'e');
+
+    createInteractiveFramePointerUpHandler(fixture.listenerConfig)(domPointer(40, 100));
+
+    expect(fixture.refs.tempFrameRef.current.width).toBe(MIN_FRAME_SIZE);
+    expect(fixture.onUpdate).toHaveBeenCalledOnce();
+    expect(fixture.listenerConfig.stateRef.current).toBe('hover');
   });
 
   it('restores the starting geometry without a history update on cancel', () => {

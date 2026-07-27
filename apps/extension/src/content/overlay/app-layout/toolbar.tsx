@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { Toolbar } from '../toolbar/view';
 import {
+  exitScreenshotModeFromUserAction,
   finishScenarioRecorder,
   isScenarioByClickBlocked,
   resolveScenarioByClickTransition,
@@ -55,7 +56,6 @@ function useScenarioByClickBlockSync(args: {
 function buildScenarioToolbarProps(args: {
   blocked: boolean;
   actions: ContentAppScenarioActions;
-  handleEnableCursorMode: () => void;
   state: ContentAppScenarioState;
   onFinishScenario: () => Promise<void>;
 }) {
@@ -72,7 +72,6 @@ function buildScenarioToolbarProps(args: {
     onCaptureActionSelected: (action: CaptureActionType) => {
       if (action === 'scenario') {
         warmScenarioRecorderSidebar();
-        args.handleEnableCursorMode();
       }
       return args.actions.applyCaptureAction(action);
     },
@@ -97,25 +96,29 @@ function buildScenarioToolbarProps(args: {
 }
 
 function createFinishScenarioHandler(args: {
-  modeController: ContentAppLayoutToolbarProps['modeController'];
+  onDisableScreenshotMode: () => void;
   scenarioActions: Pick<ContentAppScenarioActions, 'handleScreenshotModeDisabled' | 'openEditor'>;
 }) {
   return () =>
     finishScenarioRecorder({
-      modeController: args.modeController,
+      onDisableScreenshotMode: args.onDisableScreenshotMode,
       scenarioController: args.scenarioActions,
     });
 }
 
 function createScreenshotModeToggleHandler(args: {
   modeController: ContentAppLayoutToolbarProps['modeController'];
+  onDisableScreenshotMode: () => void;
   scenarioActions: Pick<ContentAppScenarioActions, 'handleScreenshotModeDisabled'>;
 }) {
   return (enabled: boolean) => {
-    args.modeController.handleToggleScreenshotMode(enabled);
-    if (!enabled) {
-      void args.scenarioActions.handleScreenshotModeDisabled();
+    if (enabled) {
+      args.modeController.handleToggleScreenshotMode(true);
+      return;
     }
+
+    args.onDisableScreenshotMode();
+    void args.scenarioActions.handleScreenshotModeDisabled();
   };
 }
 
@@ -139,6 +142,9 @@ function renderToolbarShell(args: {
 }) {
   const { modeController, modes } = args.toolbar;
   const autoBlur = createToolbarAutoBlurProps(args.toolbar.autoBlurController);
+  const handleHideToolbar = () => {
+    args.toolbar.setPinnedToolbarVisible(false);
+  };
 
   return (
     <div className="sniptale-app" data-hidden={args.toolbar.isCompletelyHidden ? 'true' : 'false'}>
@@ -158,12 +164,13 @@ function renderToolbarShell(args: {
           : { pageStyleInspector: args.toolbar.pageStyleInspector })}
         screenshotMode={modes.screenshotMode}
         pinToTab={args.toolbar.pinToTab}
+        pinToTabAvailable={args.toolbar.pinToTabAvailable}
         pinToTabLocked={args.toolbar.captureAction === 'scenario' && modes.screenshotMode}
         onCaptureActionChange={args.toolbar.setCaptureAction}
         onDisableAiPickMode={args.toolbar.aiController.handleDisableAiPickMode}
         onPinToTabChange={args.toolbar.setPinToTab}
         onTakeScreenshot={args.toolbar.handleTakeScreenshot}
-        onHide={modeController.handleHideToolbar}
+        onHide={handleHideToolbar}
         onClearHighlights={modeController.handleClearHighlights}
         autoBlur={autoBlur}
         onToggleNavigationLock={modeController.handleToggleNavigationLock}
@@ -182,12 +189,18 @@ function renderToolbarShell(args: {
 
 export function ContentToolbarShell({ scenario, toolbar }: ContentToolbarShellProps) {
   const byClickBlocked = isScenarioByClickBlocked(toolbar.modes);
+  const handleDisableScreenshotMode = () =>
+    exitScreenshotModeFromUserAction({
+      modeController: toolbar.modeController,
+      setPinToTab: toolbar.setPinToTab,
+    });
   const handleFinishScenario = createFinishScenarioHandler({
-    modeController: toolbar.modeController,
+    onDisableScreenshotMode: handleDisableScreenshotMode,
     scenarioActions: scenario.actions,
   });
   const handleToggleScreenshotMode = createScreenshotModeToggleHandler({
     modeController: toolbar.modeController,
+    onDisableScreenshotMode: handleDisableScreenshotMode,
     scenarioActions: scenario.actions,
   });
 
@@ -204,7 +217,6 @@ export function ContentToolbarShell({ scenario, toolbar }: ContentToolbarShellPr
   const scenarioToolbarProps = buildScenarioToolbarProps({
     blocked: byClickBlocked,
     actions: scenario.actions,
-    handleEnableCursorMode: toolbar.modeController.handleEnableCursorMode,
     state: scenario.state,
     onFinishScenario: handleFinishScenario,
   });

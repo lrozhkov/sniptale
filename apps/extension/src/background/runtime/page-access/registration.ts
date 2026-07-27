@@ -18,6 +18,12 @@ import {
 // chrome.scripting registration. Manifest content_scripts are intentionally forbidden.
 const CONTENT_RUNTIME_FILE = 'assets/contentRuntime.js';
 const CONTENT_RUNTIME_SHIM_FILE = 'assets/contentRuntimeShim.js';
+const registrationOperationChains = new Map<string, Promise<void>>();
+
+type ContentScriptRegistrationChange =
+  | { kind: 'created' }
+  | { kind: 'replaced'; previous: chrome.scripting.RegisteredContentScript }
+  | { kind: 'unchanged' };
 
 export async function hasAllSitesPermission(): Promise<boolean> {
   return browserPermissions.contains({ origins: [...ALL_SITES_ORIGIN_PATTERNS] });
@@ -31,30 +37,105 @@ export async function hasSitePermission(url: URL, allSitesGranted: boolean): Pro
   return browserPermissions.contains({ origins: [createOriginPattern(url)] });
 }
 
-export async function ensureContentScriptRegistration(args: {
+function runContentScriptRegistrationOperation<T>(id: string, work: () => Promise<T>): Promise<T> {
+  const previous = registrationOperationChains.get(id) ?? Promise.resolve();
+  const operation = previous.catch(() => undefined).then(work);
+  const chain = operation
+    .then(
+      () => undefined,
+      () => undefined
+    )
+    .finally(() => {
+      if (registrationOperationChains.get(id) === chain) {
+        registrationOperationChains.delete(id);
+      }
+    });
+  registrationOperationChains.set(id, chain);
+  return operation;
+}
+
+function createExpectedContentScriptRegistration(args: {
   id: string;
   matches: string[];
-}): Promise<void> {
+}): chrome.scripting.RegisteredContentScript {
+  return {
+    allFrames: false,
+    id: args.id,
+    js: [CONTENT_RUNTIME_SHIM_FILE],
+    matches: args.matches,
+    persistAcrossSessions: true,
+    runAt: 'document_idle',
+  };
+}
+
+async function applyContentScriptRegistration(args: {
+  id: string;
+  matches: string[];
+}): Promise<ContentScriptRegistrationChange> {
   const registered = await browserScripting.getRegisteredContentScripts({ ids: [args.id] });
   const [existing] = registered;
   if (existing && isExpectedContentScriptRegistration(existing, args)) {
-    return;
+    return { kind: 'unchanged' };
   }
 
   if (existing) {
     await browserScripting.unregisterContentScripts({ ids: [args.id] });
   }
 
-  await browserScripting.registerContentScripts([
-    {
-      allFrames: false,
-      id: args.id,
-      js: [CONTENT_RUNTIME_SHIM_FILE],
-      matches: args.matches,
-      persistAcrossSessions: true,
-      runAt: 'document_idle',
-    },
-  ]);
+  try {
+    await browserScripting.registerContentScripts([createExpectedContentScriptRegistration(args)]);
+  } catch (error) {
+    if (existing) {
+      await browserScripting.registerContentScripts([existing]);
+    }
+    throw error;
+  }
+
+  return existing ? { kind: 'replaced', previous: existing } : { kind: 'created' };
+}
+
+async function rollbackContentScriptRegistration(
+  id: string,
+  change: ContentScriptRegistrationChange
+): Promise<void> {
+  if (change.kind === 'unchanged') {
+    return;
+  }
+
+  await browserScripting.unregisterContentScripts({ ids: [id] });
+  if (change.kind === 'replaced') {
+    await browserScripting.registerContentScripts([change.previous]);
+  }
+}
+
+export async function ensureContentScriptRegistration(args: {
+  id: string;
+  matches: string[];
+}): Promise<void> {
+  await runContentScriptRegistrationOperation(args.id, async () => {
+    await applyContentScriptRegistration(args);
+  });
+}
+
+export async function commitContentScriptRegistration(args: {
+  commit: () => Promise<boolean>;
+  id: string;
+  matches: string[];
+}): Promise<boolean> {
+  return runContentScriptRegistrationOperation(args.id, async () => {
+    const change = await applyContentScriptRegistration(args);
+    try {
+      if (await args.commit()) {
+        return true;
+      }
+    } catch (error) {
+      await rollbackContentScriptRegistration(args.id, change);
+      throw error;
+    }
+
+    await rollbackContentScriptRegistration(args.id, change);
+    return false;
+  });
 }
 
 function isExpectedContentScriptRegistration(
@@ -108,11 +189,13 @@ export async function reconcilePersistentContentScriptRegistrations(): Promise<v
 }
 
 async function unregisterAllSitesContentScript(): Promise<void> {
-  await browserScripting.unregisterContentScripts({ ids: [PAGE_ACCESS_ALL_SITES_SCRIPT_ID] });
+  await unregisterSiteContentScript(PAGE_ACCESS_ALL_SITES_SCRIPT_ID);
 }
 
 export async function unregisterSiteContentScript(id: string): Promise<void> {
-  await browserScripting.unregisterContentScripts({ ids: [id] });
+  await runContentScriptRegistrationOperation(id, () =>
+    browserScripting.unregisterContentScripts({ ids: [id] })
+  );
 }
 
 export async function unregisterRemovedContentScripts(origins: string[]): Promise<void> {

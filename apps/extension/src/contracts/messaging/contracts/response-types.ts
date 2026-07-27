@@ -87,6 +87,7 @@ export type ProjectExportCapabilitiesResponse =
   RuntimeMessageResponse<ProjectExportCapabilitiesPayload>;
 
 export type ToolbarStatusResponse = RuntimeMessageResponse<{
+  screenshotMode?: boolean;
   visible?: boolean;
 }>;
 

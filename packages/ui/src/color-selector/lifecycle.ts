@@ -47,29 +47,33 @@ function useOutsideDismiss(args: {
   }, [args, expanded, layerRef, pickerOpen, rootRef, setExpanded]);
 }
 
-function useExpandedEscapeDismiss(args: {
+function useEscapeDismiss(args: {
   expanded: boolean;
+  onPickerOutsideDismiss: () => void;
   pickerOpen: boolean;
   setExpanded: Dispatch<SetStateAction<boolean>>;
 }) {
-  const { expanded, pickerOpen, setExpanded } = args;
+  const { expanded, onPickerOutsideDismiss, pickerOpen, setExpanded } = args;
 
   useEffect(() => {
-    if (!expanded || pickerOpen) {
+    if (!expanded && !pickerOpen) {
       return;
     }
 
     const handleDocumentKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setExpanded(false);
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (pickerOpen) onPickerOutsideDismiss();
+        else setExpanded(false);
       }
     };
 
-    document.addEventListener('keydown', handleDocumentKeyDown);
+    document.addEventListener('keydown', handleDocumentKeyDown, true);
     return () => {
-      document.removeEventListener('keydown', handleDocumentKeyDown);
+      document.removeEventListener('keydown', handleDocumentKeyDown, true);
     };
-  }, [expanded, pickerOpen, setExpanded]);
+  }, [expanded, onPickerOutsideDismiss, pickerOpen, setExpanded]);
 }
 
 export function useColorSelectorLifecycle(args: {
@@ -103,7 +107,12 @@ export function useColorSelectorLifecycle(args: {
     rootRef,
     setExpanded,
   });
-  useExpandedEscapeDismiss({ expanded, pickerOpen, setExpanded });
+  useEscapeDismiss({
+    expanded,
+    onPickerOutsideDismiss: args.onPickerOutsideDismiss,
+    pickerOpen,
+    setExpanded,
+  });
 
   const previousCommittedColorRef = useRef(committedColor);
 

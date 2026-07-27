@@ -8,6 +8,7 @@ import { useCalloutEditing } from './editing';
 import { createCalloutSettingsKey } from './settings-key';
 import { getCalloutTailDragCursor } from './tail-drag';
 import { useCalloutInteractionLayout } from './interaction-layout';
+import type { CalloutHandleKeyboardEvent } from './keyboard';
 
 interface CalloutProps {
   frameId: string;
@@ -24,6 +25,10 @@ interface CalloutProps {
   onPositionChange: (placement: NonNullable<CalloutSettings['manualPlacement']>) => void;
   onTailBaseRangeChange: (position: number, width: number) => void;
   onTailFramePositionChange: (position: number) => void;
+  onWidthChange: (
+    maxWidth: number,
+    placement: NonNullable<CalloutSettings['manualPlacement']>
+  ) => void;
   settingsAnchorRef: React.RefObject<HTMLButtonElement | null>;
   showSettingsHandle: boolean;
 }
@@ -47,6 +52,7 @@ export const Callout: React.FC<CalloutProps> = ({
   onPositionChange,
   onTailBaseRangeChange,
   onTailFramePositionChange,
+  onWidthChange,
   settingsAnchorRef,
   showSettingsHandle,
 }) => {
@@ -71,6 +77,7 @@ export const Callout: React.FC<CalloutProps> = ({
     onPositionChange,
     onTailBaseRangeChange,
     onTailFramePositionChange,
+    onWidthChange,
     settings,
     wrapperRef,
     zIndex,
@@ -91,6 +98,7 @@ export const Callout: React.FC<CalloutProps> = ({
         tailBaseEndDrag: interaction.tailBaseEndDrag,
         tailBaseStartDrag: interaction.tailBaseStartDrag,
         tailFrameDrag: interaction.tailFrameDrag,
+        widthResize: interaction.widthResize,
       })}
       wrapperRef={wrapperRef}
     />
@@ -107,6 +115,7 @@ function createCalloutBodyProps(args: {
   tailBaseStartDrag: ReturnType<typeof useCalloutInteractionLayout>['tailBaseStartDrag'];
   tailBaseEndDrag: ReturnType<typeof useCalloutInteractionLayout>['tailBaseEndDrag'];
   tailFrameDrag: ReturnType<typeof useCalloutInteractionLayout>['tailFrameDrag'];
+  widthResize: ReturnType<typeof useCalloutInteractionLayout>['widthResize'];
   onSettingsClick: () => void;
   settingsAnchorRef: React.RefObject<HTMLButtonElement | null>;
   showSettingsHandle: boolean;
@@ -158,12 +167,23 @@ function createCalloutBodyProps(args: {
     handleTailFrameKeyDown: args.tailFrameDrag.handleKeyDown,
     handleMouseEnter: args.drag.handleMouseEnter,
     handleMouseLeave: args.drag.handleMouseLeave,
+    handleResizeLeftPointerDown: (event: React.PointerEvent<HTMLButtonElement>) =>
+      args.widthResize.handlePointerDown('left', event),
+    handleResizeLeftKeyDown: (event: CalloutHandleKeyboardEvent) =>
+      args.widthResize.handleKeyDown('left', event),
+    handleResizeRightPointerDown: (event: React.PointerEvent<HTMLButtonElement>) =>
+      args.widthResize.handlePointerDown('right', event),
+    handleResizeRightKeyDown: (event: CalloutHandleKeyboardEvent) =>
+      args.widthResize.handleKeyDown('right', event),
     isDragging: args.drag.isDragging,
     isHandleVisible:
       args.drag.isHandleVisible ||
       args.tailBaseStartDrag.isDragging ||
       args.tailBaseEndDrag.isDragging ||
-      args.tailFrameDrag.isDragging,
+      args.tailFrameDrag.isDragging ||
+      args.widthResize.isResizing,
+    isResizingLeft: args.widthResize.activeSide === 'left',
+    isResizingRight: args.widthResize.activeSide === 'right',
     isTailDragging: args.tailBaseStartDrag.isDragging,
     isTailBaseEndDragging: args.tailBaseEndDrag.isDragging,
     isTailFrameDragging: args.tailFrameDrag.isDragging,
@@ -192,6 +212,18 @@ function createCalloutBodyProps(args: {
           zIndex: args.layout.effectiveZIndex + 1,
         }
       : null,
+    resizeLeftHandleStyle: {
+      position: 'fixed' as const,
+      left: args.layout.calloutPos.x - 6,
+      top: args.layout.calloutPos.y + args.layout.calloutDimensions.height / 2 - 6,
+      zIndex: args.layout.effectiveZIndex + 1,
+    },
+    resizeRightHandleStyle: {
+      position: 'fixed' as const,
+      left: args.layout.calloutPos.x + args.layout.calloutDimensions.width - 6,
+      top: args.layout.calloutPos.y + args.layout.calloutDimensions.height / 2 - 6,
+      zIndex: args.layout.effectiveZIndex + 1,
+    },
     wrapperStyle: args.layout.wrapperStyle,
   };
 }

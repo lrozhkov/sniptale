@@ -21,13 +21,14 @@ vi.mock('../infrastructure/browser-storage', () => ({
 }));
 
 import {
-  clearAllPinToTabSessionStorageState,
   clearPinToTabSessionStorageState,
+  createPinToTabToolbarVisibilitySessionStorageKey,
   createPinToTabSessionStorageKey,
   isPinToTabSessionStorageAccessDeniedError,
   isPinToTabSessionStorageAvailable,
   loadPinToTabSessionStorageState,
   readPinToTabSessionStorageState,
+  readPinToTabToolbarVisibilitySessionStorageState,
   writePinToTabSessionStorageState,
 } from './index';
 
@@ -46,6 +47,9 @@ afterEach(() => {
 describe('content pin-to-tab session identity', () => {
   it('creates a tab-scoped storage key', () => {
     expect(createPinToTabSessionStorageKey(7)).toBe('sniptale.content.pin-to-tab:tab:7');
+    expect(createPinToTabToolbarVisibilitySessionStorageKey(7)).toBe(
+      'sniptale.content.pin-to-tab-toolbar-visible:tab:7'
+    );
   });
 
   it('reports availability and storage access denied errors', () => {
@@ -67,7 +71,6 @@ describe('content pin-to-tab session reads', () => {
 
     await expect(
       loadPinToTabSessionStorageState({
-        screenshotModeEnabled: true,
         storageKey: 'pin-key',
       })
     ).resolves.toBe(true);
@@ -85,53 +88,76 @@ describe('content pin-to-tab session reads', () => {
     expect(sessionGetMock).toHaveBeenCalledWith({ 'sniptale.content.pin-to-tab:tab:7': false });
   });
 
-  it('clears one tab or all tab-scoped pin states', async () => {
-    sessionGetMock.mockResolvedValueOnce({
-      'other-key': true,
-      'sniptale.content.pin-to-tab:tab:7': true,
-      'sniptale.content.pin-to-tab:tab:8': true,
-    });
+  it('defaults pinned-toolbar visibility to expanded and reads a stored collapsed state', async () => {
+    sessionGetMock
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ 'sniptale.content.pin-to-tab-toolbar-visible:tab:7': false });
 
+    await expect(readPinToTabToolbarVisibilitySessionStorageState(7)).resolves.toBe(true);
+    await expect(readPinToTabToolbarVisibilitySessionStorageState(7)).resolves.toBe(false);
+  });
+
+  it('defaults pinned-toolbar visibility to expanded when session storage is unavailable', async () => {
+    sessionIsAvailableMock.mockReturnValue(false);
+
+    await expect(readPinToTabToolbarVisibilitySessionStorageState(7)).resolves.toBe(true);
+    expect(sessionGetMock).not.toHaveBeenCalled();
+  });
+
+  it('clears both tab-scoped pin session fields', async () => {
     await clearPinToTabSessionStorageState(7);
-    await clearAllPinToTabSessionStorageState();
 
-    expect(sessionRemoveMock).toHaveBeenNthCalledWith(1, 'sniptale.content.pin-to-tab:tab:7');
-    expect(sessionRemoveMock).toHaveBeenNthCalledWith(2, [
+    expect(sessionRemoveMock).toHaveBeenCalledWith([
       'sniptale.content.pin-to-tab:tab:7',
-      'sniptale.content.pin-to-tab:tab:8',
+      'sniptale.content.pin-to-tab-toolbar-visible:tab:7',
     ]);
   });
 });
 
 describe('content pin-to-tab session writes', () => {
-  it('writes pinned state only while current and screenshot mode is enabled', async () => {
+  it('writes pinned state only while the guarded operation is current', async () => {
     await writePinToTabSessionStorageState(
-      { screenshotModeEnabled: false, storageKey: 'pin-key' },
-      true,
-      () => true
-    );
-    await writePinToTabSessionStorageState(
-      { screenshotModeEnabled: true, storageKey: 'pin-key' },
-      true,
+      7,
+      { pinToTab: true, toolbarVisible: false },
       () => false
     );
     await writePinToTabSessionStorageState(
-      { screenshotModeEnabled: true, storageKey: 'pin-key' },
-      true,
+      7,
+      { pinToTab: true, toolbarVisible: false },
       () => true
     );
 
     expect(sessionSetMock).toHaveBeenCalledTimes(1);
-    expect(sessionSetMock).toHaveBeenCalledWith({ 'pin-key': true });
+    expect(sessionSetMock).toHaveBeenCalledWith({
+      'sniptale.content.pin-to-tab-toolbar-visible:tab:7': false,
+      'sniptale.content.pin-to-tab:tab:7': true,
+    });
   });
 
-  it('removes unpinned state through browser session storage', async () => {
-    await writePinToTabSessionStorageState(
-      { screenshotModeEnabled: false, storageKey: 'pin-key' },
-      false,
-      () => true
-    );
+  it('atomically removes pin and visibility when unpinning', async () => {
+    await writePinToTabSessionStorageState(7, { pinToTab: false }, () => true);
 
-    expect(sessionRemoveMock).toHaveBeenCalledWith('pin-key');
+    expect(sessionRemoveMock).toHaveBeenCalledTimes(1);
+    expect(sessionRemoveMock).toHaveBeenCalledWith([
+      'sniptale.content.pin-to-tab:tab:7',
+      'sniptale.content.pin-to-tab-toolbar-visible:tab:7',
+    ]);
+  });
+
+  it('writes tab-scoped collapsed visibility only while the operation is current', async () => {
+    await writePinToTabSessionStorageState(7, { toolbarVisible: false }, () => false);
+    await writePinToTabSessionStorageState(7, { toolbarVisible: false }, () => true);
+
+    expect(sessionSetMock).toHaveBeenCalledTimes(1);
+    expect(sessionSetMock).toHaveBeenCalledWith({
+      'sniptale.content.pin-to-tab-toolbar-visible:tab:7': false,
+    });
+  });
+
+  it('does not mutate toolbar visibility when storage is unavailable', async () => {
+    sessionIsAvailableMock.mockReturnValue(false);
+    await writePinToTabSessionStorageState(7, { toolbarVisible: false }, () => true);
+
+    expect(sessionSetMock).not.toHaveBeenCalled();
   });
 });

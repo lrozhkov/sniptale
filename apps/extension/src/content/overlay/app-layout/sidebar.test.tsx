@@ -98,6 +98,7 @@ function createProps() {
       handleToggleScreenshotMode: vi.fn(),
     },
     scenario: createScenarioProps(),
+    setPinToTab: vi.fn(),
   };
 }
 
@@ -191,6 +192,7 @@ describe('ContentScenarioRecorderSidebar finish flow', () => {
     await clickRenderedSidebarButton();
 
     expect(props.modeController.handleToggleScreenshotMode).toHaveBeenCalledWith(false);
+    expect(props.setPinToTab).toHaveBeenCalledWith(false);
     expect(props.scenario.actions.handleScreenshotModeDisabled).toHaveBeenCalledTimes(1);
     expect(props.scenario.actions.openEditor).toHaveBeenCalledWith();
 

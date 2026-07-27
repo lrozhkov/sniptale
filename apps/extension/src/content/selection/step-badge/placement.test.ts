@@ -35,6 +35,25 @@ describe('step badge boundary placement', () => {
     expect(style.transform).toBe('translate(-50%, 50%) translate(0px, 0px)');
   });
 
+  it('keeps the configured visual offset after the badge is moved manually', () => {
+    const style = getStepBadgeStyle({
+      borderColor: '#111',
+      borderWidth: 4,
+      clickable: false,
+      settings: {
+        enabled: true,
+        manualPlacement: { position: 0.75, side: 'bottom' },
+        offsetDirections: ['right'],
+        size: 'standard',
+        type: 'number',
+        value: '4',
+      },
+      zIndex: 10,
+    });
+
+    expect(style.transform).toBe('translate(-50%, 50%) translate(7.2px, 0px)');
+  });
+
   it('projects free pointer movement onto one exact frame border', () => {
     const placement = projectStepBadgeToFrameBoundary({
       frameRect,

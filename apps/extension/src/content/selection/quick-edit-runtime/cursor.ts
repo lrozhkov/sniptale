@@ -3,20 +3,13 @@ import {
   QUICK_EDIT_CURSOR_STYLE_ID,
   QUICK_EDIT_CURSOR_URL,
   QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS,
+  QUICK_EDIT_TEXT_CURSOR_BODY_CLASS,
 } from './style.constants';
 import type { QuickEditOverlayState } from './overlay.state';
+import { mountQuickEditDocumentCursorTracking } from './document-cursor';
 
-export function enableQuickEditCursor(state: QuickEditOverlayState): void {
-  walkAllDocuments((doc) => {
-    if (!doc.body) {
-      return;
-    }
-
-    doc.body.classList.add('sniptale-quick-edit-mode');
-  });
-
-  state.cleanupCursorStyle?.();
-  state.cleanupCursorStyle = mountStyleInAccessibleDocuments({
+function mountQuickEditCursorStyle(): () => void {
+  return mountStyleInAccessibleDocuments({
     styleId: QUICK_EDIT_CURSOR_STYLE_ID,
     textContent: `
     body,
@@ -43,7 +36,11 @@ export function enableQuickEditCursor(state: QuickEditOverlayState): void {
     }
     body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS},
     body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} * {
-      cursor: auto !important;
+      cursor: default !important;
+    }
+    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS}.${QUICK_EDIT_TEXT_CURSOR_BODY_CLASS},
+    body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS}.${QUICK_EDIT_TEXT_CURSOR_BODY_CLASS} * {
+      cursor: text !important;
     }
     body.${QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS} {
       user-select: text !important;
@@ -61,6 +58,24 @@ export function enableQuickEditCursor(state: QuickEditOverlayState): void {
     }
   `,
   });
+}
+
+export function enableQuickEditCursor(state: QuickEditOverlayState): void {
+  walkAllDocuments((doc) => {
+    if (!doc.body) {
+      return;
+    }
+
+    doc.body.classList.add('sniptale-quick-edit-mode');
+  });
+
+  state.cleanupCursorStyle?.();
+  const cleanupStyle = mountQuickEditCursorStyle();
+  const cleanupCursorTracking = mountQuickEditDocumentCursorTracking();
+  state.cleanupCursorStyle = () => {
+    cleanupCursorTracking();
+    cleanupStyle();
+  };
   state.cursorStyleElement = document.getElementById(
     QUICK_EDIT_CURSOR_STYLE_ID
   ) as HTMLStyleElement | null;

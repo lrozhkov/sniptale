@@ -70,6 +70,7 @@ function getPurposeActionTypes(
     MessageType.OPEN_EDITOR_WITH_IMAGE,
     MessageType.SAVE_SCREENSHOT_TO_GALLERY,
     MessageType.TRIGGER_QUICK_ACTION,
+    MessageType.CONTENT_RUNTIME_WAKEUP,
   ];
 }
 

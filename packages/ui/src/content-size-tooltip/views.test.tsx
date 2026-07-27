@@ -122,7 +122,7 @@ afterEach(() => {
 
 describe('ContentSizeTooltipContent rendering', () => {
   it('renders the steppers and action controls with the expected labels', () => {
-    renderTooltip();
+    renderTooltip({ maintainAspectRatio: true });
 
     expect(getButton('Decrease width')).toBeTruthy();
     expect(getButton('Decrease width')?.className).toContain('sniptale-size-btn');
@@ -136,6 +136,13 @@ describe('ContentSizeTooltipContent rendering', () => {
     expect(getButton('Keep aspect ratio')?.nextElementSibling).toBe(
       getInput('Height')?.parentElement
     );
+    expect(getButton('Keep aspect ratio')?.querySelector('svg path')?.getAttribute('d')).toBe(
+      'M9 17H7A5 5 0 0 1 7 7h2'
+    );
+    expect(getButton('Keep aspect ratio')?.querySelector('svg line')?.getAttribute('x1')).toBe('8');
+    expect(getButton('Keep aspect ratio')?.style.background).toContain(
+      'var(--sniptale-color-accent) 9%'
+    );
     expect(container?.textContent).toContain('Cancel');
     expect(container?.textContent).toContain('Apply size');
     const actionButtons = Array.from(container?.querySelectorAll('button') ?? []).filter(
@@ -148,14 +155,30 @@ describe('ContentSizeTooltipContent rendering', () => {
   });
 
   it('uses localized icon actions in the compact frame-edit toolbar', () => {
-    renderTooltip({ variant: 'frame-edit' });
+    renderTooltip({ maintainAspectRatio: true, variant: 'frame-edit' });
 
     const cancelButton = getButton('Cancel');
     const confirmButton = getButton('Apply size');
+    const ratioButton = getButton('Keep aspect ratio');
+    const increaseHeightButton = getButton('Increase height');
     expect(cancelButton).toBeTruthy();
     expect(confirmButton).toBeTruthy();
+    expect(ratioButton).toBeTruthy();
     expect(cancelButton?.textContent).toBe('');
     expect(confirmButton?.textContent).toBe('');
+    expect(confirmButton?.nextElementSibling?.getAttribute('aria-hidden')).toBe('true');
+    expect(confirmButton?.nextElementSibling?.nextElementSibling).toBe(cancelButton);
+    expect(cancelButton?.parentElement?.lastElementChild).toBe(cancelButton);
+    expect(confirmButton?.style.background).toBe('transparent');
+    expect(confirmButton?.style.border).toBe('0px');
+    expect(confirmButton?.classList).toContain('sniptale-content-size-tooltip-primary-action');
+    expect(ratioButton?.style.background).toBe('transparent');
+    expect(ratioButton?.style.borderColor).toBe('transparent');
+    expect(increaseHeightButton?.style.border).toBe('0px');
+
+    const ratioIcon = ratioButton?.querySelector('svg');
+    expect(ratioIcon?.querySelector('path')?.getAttribute('d')).toBe('M9 17H7A5 5 0 0 1 7 7h2');
+    expect(ratioIcon?.querySelector('line')?.getAttribute('x1')).toBe('8');
 
     for (const button of [cancelButton, confirmButton]) {
       expect(button?.style.width).toBe('32px');

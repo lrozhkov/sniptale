@@ -149,6 +149,26 @@ function expectRepeatedPopupPreparationEnableBecomesNoOp() {
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
 }
 
+function expectPinnedRestorePreservesCollapsedToolbar() {
+  const params = createBridgeParams();
+  const sendResponse = vi.fn();
+
+  expect(
+    handleScreenshotModeMessage(
+      {
+        toolbarVisible: false,
+        type: MessageType.ENABLE_SCREENSHOT_MODE,
+      },
+      params,
+      sendResponse
+    )
+  ).toBe(true);
+
+  expect(params.modeControls.setScreenshotMode).toHaveBeenCalledWith(true);
+  expect(params.modeControls.setIsToolbarVisible).toHaveBeenCalledWith(false);
+  expect(sendResponse).toHaveBeenCalledWith({ success: true });
+}
+
 function expectDestroyToolbarInvalidatesInFlightCapture() {
   const params = createBridgeParams();
   const sendResponse = vi.fn();
@@ -179,6 +199,10 @@ function runHandleScreenshotModeMessageSuite() {
   it(
     'keeps repeated popup preparation enables idempotent when screenshot mode is already visible',
     expectRepeatedPopupPreparationEnableBecomesNoOp
+  );
+  it(
+    'preserves collapsed toolbar visibility when pinned preparation is restored',
+    expectPinnedRestorePreservesCollapsedToolbar
   );
   it(
     'invalidates in-flight captures when destroying the toolbar',

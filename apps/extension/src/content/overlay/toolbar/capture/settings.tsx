@@ -6,10 +6,12 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
 import type { ToolbarMenuState } from '../state/menu';
 import { ToolbarSettingsDropdown } from './settings-content';
+import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 
 type ToolbarSettingsMenuProps = {
   compactMenus: boolean;
   pinToTab: boolean;
+  pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
   sidebarVisible?: boolean;
   screenshotMode: boolean;
@@ -19,7 +21,10 @@ type ToolbarSettingsMenuProps = {
   onCompactMenusChange: (compactMenus: boolean) => void;
   onDisableScreenshotMode: () => void;
   onDisplayModeChange: (displayMode: ContentToolbarDisplayMode) => void;
-  onPinToTabChange: (value: boolean) => void;
+  onPinToTabChange: (
+    value: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => void;
 };
 
 function useToolbarSettingsMenuBindings(props: ToolbarSettingsMenuProps) {
@@ -92,6 +97,7 @@ function renderToolbarSettingsDropdown(args: {
       onHide={args.props.onClose}
       onPinToTabChange={args.props.onPinToTabChange}
       pinToTab={args.props.pinToTab}
+      pinToTabAvailable={args.props.pinToTabAvailable}
       pinToTabLocked={args.props.pinToTabLocked}
       screenshotMode={args.props.screenshotMode}
       triggerRef={args.triggerRef}

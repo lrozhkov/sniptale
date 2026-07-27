@@ -114,16 +114,33 @@ describe('content size tooltip dom helpers controls', () => {
 
 describe('content size tooltip dom helpers action controls', () => {
   it('creates ratio and action buttons with disabled and custom label states', () => {
-    const ratioButton = createTooltipRatioButton(copy, true);
-    const { actions, cancelButton, confirmButton } = createTooltipActions(copy, 'Apply size');
+    const ratioButton = createTooltipRatioButton(copy, true, 'frame-edit');
+    const defaultRatioButton = createTooltipRatioButton(copy, false);
+    const { actions, cancelButton, confirmButton } = createTooltipActions(
+      copy,
+      'Apply size',
+      'frame-edit'
+    );
 
     expect(ratioButton.disabled).toBe(true);
     expect(ratioButton.getAttribute('aria-pressed')).toBe('false');
     expect(ratioButton.title).toBe(copy.keepAspectRatio);
     expect(ratioButton.querySelectorAll('svg path')).toHaveLength(2);
-    expect(cancelButton.textContent).toBe(copy.cancel);
-    expect(confirmButton.textContent).toBe('Apply size');
-    expect(actions.children).toHaveLength(2);
+    expect(ratioButton.querySelector('svg path')?.getAttribute('d')).toBe(
+      'M9 17H7A5 5 0 0 1 7 7h2'
+    );
+    expect(ratioButton.querySelector('svg line')?.getAttribute('x1')).toBe('8');
+    expect(defaultRatioButton.querySelector('svg path')?.getAttribute('d')).toBe(
+      'M10 13a5 5 0 0 0 7.54.54l2.92-2.92a5 5 0 0 0-7.07-7.08L11.7 5.23'
+    );
+    expect(defaultRatioButton.querySelector('svg line')).toBeNull();
+    expect(cancelButton.textContent).toBe('');
+    expect(confirmButton.textContent).toBe('');
+    expect(confirmButton.classList).toContain('sniptale-content-size-tooltip-primary-action');
+    expect(actions.children).toHaveLength(3);
+    expect(actions.children[0]).toBe(confirmButton);
+    expect(actions.children[1]?.getAttribute('aria-hidden')).toBe('true');
+    expect(actions.children[2]).toBe(cancelButton);
   });
 
   it('uses the default confirm label and active ratio button state when enabled', () => {

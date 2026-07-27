@@ -4,6 +4,8 @@ import {
   CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE,
   CONTENT_SIZE_TOOLTIP_DIVIDER_STYLE,
   CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT,
+  CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME,
+  CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_CLASS_NAME,
   getContentSizeTooltipSurfaceStyle,
   getContentSizeTooltipActionButtonStyle,
   getContentSizeTooltipRatioButtonStyle,
@@ -11,6 +13,19 @@ import {
 import { applyTooltipDomStyle, type ContentSizeTooltipStyleRecord } from './dom-style';
 export { applyTooltipDomStyle } from './dom-style';
 export { createTooltipStepperGroup } from './dom-stepper';
+
+function createLink2Icon(): SVGSVGElement {
+  const icon = createTooltipSvgIcon({
+    paths: ['M9 17H7A5 5 0 0 1 7 7h2', 'M15 7h2a5 5 0 1 1 0 10h-2'],
+  });
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', '8');
+  line.setAttribute('x2', '16');
+  line.setAttribute('y1', '12');
+  line.setAttribute('y2', '12');
+  icon.appendChild(line);
+  return icon;
+}
 
 function createLinkIcon(): SVGSVGElement {
   return createTooltipSvgIcon({
@@ -100,14 +115,19 @@ export function createTooltipSurface(variant: ContentSizeTooltipVariant = 'defau
   return root;
 }
 
-export function createTooltipRatioButton(copy: ContentSizeTooltipCopy, disabled: boolean) {
+export function createTooltipRatioButton(
+  copy: ContentSizeTooltipCopy,
+  disabled: boolean,
+  variant: ContentSizeTooltipVariant = 'default'
+) {
   const button = createTooltipButton({
     ariaLabel: copy.keepAspectRatio,
-    className: 'sniptale-selection-size-ratio-button',
-    content: createLinkIcon(),
-    style: getContentSizeTooltipRatioButtonStyle({ active: false, disabled }),
+    className: `sniptale-selection-size-ratio-button ${CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_CLASS_NAME}`,
+    content: variant === 'frame-edit' ? createLink2Icon() : createLinkIcon(),
+    style: getContentSizeTooltipRatioButtonStyle({ active: false, disabled, variant }),
   }) as HTMLButtonElement;
   button.setAttribute('aria-pressed', 'false');
+  button.dataset['variant'] = variant;
   button.disabled = disabled;
   return button;
 }
@@ -129,12 +149,13 @@ export function createTooltipActions(
   }) as HTMLButtonElement;
   const confirmButton = createTooltipButton({
     ariaLabel: confirmLabel ?? copy.confirm,
-    className: 'sniptale-selection-size-confirm-button',
+    className: `sniptale-selection-size-confirm-button ${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}`,
     content: compact ? createActionIcon('confirm') : (confirmLabel ?? copy.confirm),
     style: getContentSizeTooltipActionButtonStyle('accent', variant),
   }) as HTMLButtonElement;
 
-  actions.append(cancelButton, confirmButton);
+  if (compact) actions.append(confirmButton, createTooltipDivider(), cancelButton);
+  else actions.append(cancelButton, confirmButton);
   return { actions, cancelButton, confirmButton };
 }
 

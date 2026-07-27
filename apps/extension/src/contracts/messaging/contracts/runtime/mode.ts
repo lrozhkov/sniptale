@@ -34,6 +34,7 @@ export const runtimeModeMessageContracts = {
           quickActionOverlay: isQuickActionOverlay,
           autoStartSelection: isBoolean,
           autoStartCaptureType: isString,
+          toolbarVisible: isBoolean,
           contentIntentGrant: ContentActionContract.isContentPrivilegedActionAutoStartGrant,
         },
       })

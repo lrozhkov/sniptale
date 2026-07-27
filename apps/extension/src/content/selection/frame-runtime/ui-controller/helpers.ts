@@ -2,7 +2,7 @@ import type { MutableRefObject } from 'react';
 import { getViewportClientPoint } from '../../../platform/frame';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { isHighlighterEnabled, isHighlighterPausedState } from '../../highlighter';
-import { resolveFrameHitTarget, type FrameHitTarget } from './hit-test';
+import { resolveFrameControlHit, resolveFrameHitTarget, type FrameHitTarget } from './hit-test';
 import { isFrameUiOwnedFloatingEvent } from './activation';
 
 const HOVER_THROTTLE_MS = 100;
@@ -65,8 +65,11 @@ export function processFrameHover(params: {
 /**
  * Builds a throttled mousemove listener backed by RAF.
  */
-export function createThrottledMouseMoveHandler(params: FrameUiMouseTrackingParams) {
-  const { handleMouseMove, lastMouseX, lastMouseY, lastProcessTime, rafId } = params;
+export function createThrottledMouseMoveHandler(
+  params: FrameUiMouseTrackingParams & { clearResizeFrame: () => void }
+) {
+  const { clearResizeFrame, handleMouseMove, lastMouseX, lastMouseY, lastProcessTime, rafId } =
+    params;
 
   return (event: MouseEvent, iframe?: HTMLIFrameElement) => {
     if (isHighlighterPausedState()) {
@@ -76,6 +79,9 @@ export function createThrottledMouseMoveHandler(params: FrameUiMouseTrackingPara
       if (rafId.current !== null) {
         cancelAnimationFrame(rafId.current);
         rafId.current = null;
+      }
+      if (resolveFrameControlHit(event)?.kind !== 'resize-handle') {
+        clearResizeFrame();
       }
       return;
     }

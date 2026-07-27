@@ -211,13 +211,17 @@ async function verifyNavigationCleanupClearsInactiveViewerPort() {
 
 async function verifyNewPresetEnableWaitsForNavigationCleanup() {
   const { cleanupScreenshotModeAfterNavigation } = await import('./navigation-cleanup');
-  const { enableScreenshotMode } = await import('./mode');
+  const { enableScreenshotModeGuarded } = await import('./mode');
   const screenshotModeState = new Map<number, boolean>([[5, true]]);
   const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'debugger']]);
   const viewportState = new Map<number, { width: number; height: number } | null>([
     [5, { width: 1280, height: 720 }],
   ]);
   const viewportClear = createDeferred<void>();
+  const readPreparationState = vi.fn(async () => ({
+    screenshotMode: false,
+    visible: false,
+  }));
 
   clearViewportMock.mockReturnValueOnce(viewportClear.promise);
 
@@ -230,15 +234,18 @@ async function verifyNewPresetEnableWaitsForNavigationCleanup() {
   await waitForQueuedOperation();
   expect(clearViewportMock).toHaveBeenCalledWith(5);
 
-  const enablePromise = enableScreenshotMode(
+  const enablePromise = enableScreenshotModeGuarded(
     5,
     screenshotModeState,
     viewportState,
-    viewportOwnerState
+    viewportOwnerState,
+    new Map(),
+    { commitGuard: async () => true, readPreparationState, toolbarVisible: false }
   );
   await waitForQueuedOperation();
 
   expect(browserTabsGetMock).not.toHaveBeenCalled();
+  expect(readPreparationState).not.toHaveBeenCalled();
 
   viewportClear.resolve(undefined);
   await cleanupPromise;
@@ -247,6 +254,9 @@ async function verifyNewPresetEnableWaitsForNavigationCleanup() {
   expect(detachDebuggerMock).toHaveBeenCalledWith(5, 'screenshot');
   expect(detachDebuggerMock.mock.invocationCallOrder[0]!).toBeLessThan(
     browserTabsGetMock.mock.invocationCallOrder[0]!
+  );
+  expect(detachDebuggerMock.mock.invocationCallOrder[0]!).toBeLessThan(
+    readPreparationState.mock.invocationCallOrder[0]!
   );
   expect(setViewportMock).toHaveBeenCalledWith(5, 1440, 900);
   expect(clearViewportMock.mock.invocationCallOrder[0]!).toBeLessThan(

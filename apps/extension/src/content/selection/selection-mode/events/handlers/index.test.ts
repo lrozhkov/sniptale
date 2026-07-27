@@ -73,6 +73,7 @@ function createHandlersFixture() {
   const state = {
     currentState: 'hover',
     hoveredElement: document.createElement('div'),
+    mouseDownPoint: null as { x: number; y: number } | null,
   };
 
   return {
@@ -123,10 +124,11 @@ function expectPointerHandlerLifecycle() {
   resolveIframeEventTargetMock.mockReturnValue(document.createElement('article'));
   const moveEvent = new MouseEvent('mousemove');
   const downEvent = new MouseEvent('mousedown');
+  const upEvent = new MouseEvent('mouseup');
 
   handlers.handleMouseMove(moveEvent);
   handlers.handleMouseDown(downEvent);
-  handlers.handleMouseUp();
+  handlers.handleMouseUp(upEvent);
   handlers.handleMouseLeave();
 
   expect(logSelectionModeRuntimeMock).toHaveBeenCalledWith('MouseMove target changed', {
@@ -152,7 +154,7 @@ function expectPointerHandlerLifecycle() {
     selectionModeEvents,
     undefined
   );
-  expect(handleSelectionModeMouseUpMock).toHaveBeenCalledWith(state, selectionModeEvents);
+  expect(handleSelectionModeMouseUpMock).toHaveBeenCalledWith(upEvent, state, selectionModeEvents);
   expect(handleSelectionModeMouseLeaveMock).toHaveBeenCalledWith(state, selectionModeEvents);
 }
 
@@ -202,6 +204,20 @@ function expectDirectManipulationSkipsPointerDiagnostics() {
   );
 }
 
+function expectHeldPointerSkipsPointerDiagnostics() {
+  const { handlers, state } = createHandlersFixture();
+  state.mouseDownPoint = { x: 80, y: 60 };
+
+  handlers.handleMouseMove(new MouseEvent('mousemove'));
+
+  expect(getContentEventTargetElementMock).not.toHaveBeenCalled();
+  expect(logSelectionModeRuntimeMock).not.toHaveBeenCalledWith(
+    'MouseMove target changed',
+    expect.anything()
+  );
+  expect(handleSelectionModeMouseMoveMock).toHaveBeenCalledTimes(1);
+}
+
 describe('selection-mode activation handlers', () => {
   it(
     'logs and delegates click and keyboard activation through the event seam',
@@ -222,5 +238,8 @@ describe('selection-mode pointer handlers', () => {
   });
   it('skips pointer target diagnostics during direct manipulation', () => {
     expectDirectManipulationSkipsPointerDiagnostics();
+  });
+  it('skips pointer target diagnostics across the full handler path while the button is held', () => {
+    expectHeldPointerSkipsPointerDiagnostics();
   });
 });

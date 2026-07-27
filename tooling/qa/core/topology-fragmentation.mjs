@@ -85,6 +85,7 @@ function collectPublicContractFiles(graph, runtimes, readFile) {
     });
   }
   for (const edge of graph.codeEdges) {
+    if (isBuildTestFile(edge.importer)) continue;
     const importerRuntime = runtimeFor(edge.importer, runtimes);
     const targetRuntime = runtimeFor(edge.target, runtimes);
     if (importerRuntime && APP_PUBLIC_ROOT_PATTERN.test(edge.target)) publicFiles.add(edge.target);
@@ -93,12 +94,6 @@ function collectPublicContractFiles(graph, runtimes, readFile) {
     }
   }
   return publicFiles;
-}
-
-function collectIncomingConsumers(graph) {
-  const incoming = new Map(graph.files.map((file) => [file, new Set()]));
-  graph.codeEdges.forEach((edge) => incoming.get(edge.target)?.add(edge.importer));
-  return incoming;
 }
 
 function collectProductionIncomingConsumers(graph) {
@@ -113,6 +108,7 @@ function collectReExportCycleFiles(graph) {
   const adjacency = new Map();
   for (const edge of graph.codeEdges) {
     if (edge.edgeKind !== 're-export') continue;
+    if (isBuildTestFile(edge.importer) || isBuildTestFile(edge.target)) continue;
     const targets = adjacency.get(edge.importer) ?? [];
     targets.push(edge.target);
     adjacency.set(edge.importer, targets);
@@ -156,15 +152,25 @@ function facadeDepth(files, graph, moduleByFile) {
 }
 
 function collectClusterTopology(files, context) {
-  const fileSet = new Set(files);
-  const internalEdges = context.graph.codeEdges.filter(
-    (edge) => fileSet.has(edge.importer) && fileSet.has(edge.target)
+  const productionFiles = files.filter((file) => !isBuildTestFile(file));
+  const proofFiles = files.filter(isBuildTestFile);
+  const productionFileSet = new Set(productionFiles);
+  const proofFileSet = new Set(proofFiles);
+  const productionEdges = context.graph.codeEdges.filter(
+    (edge) => !isBuildTestFile(edge.importer) && !isBuildTestFile(edge.target)
   );
-  const touchingEdges = context.graph.codeEdges.filter(
-    (edge) => fileSet.has(edge.importer) || fileSet.has(edge.target)
+  const internalEdges = productionEdges.filter(
+    (edge) => productionFileSet.has(edge.importer) && productionFileSet.has(edge.target)
   );
-  const externalConsumers = context.graph.codeEdges.filter(
-    (edge) => fileSet.has(edge.target) && !fileSet.has(edge.importer)
+  const touchingEdges = productionEdges.filter(
+    (edge) => productionFileSet.has(edge.importer) || productionFileSet.has(edge.target)
+  );
+  const externalConsumers = productionEdges.filter(
+    (edge) => productionFileSet.has(edge.target) && !productionFileSet.has(edge.importer)
+  );
+  const proofEdges = context.graph.codeEdges.filter((edge) => proofFileSet.has(edge.importer));
+  const productionToProofEdges = context.graph.codeEdges.filter(
+    (edge) => productionFileSet.has(edge.importer) && isBuildTestFile(edge.target)
   );
   const crossClusterConsumers = new Set(externalConsumers.map((edge) => edge.importer));
   const crossRuntimeConsumers = new Set(
@@ -177,15 +183,22 @@ function collectClusterTopology(files, context) {
       .map((edge) => edge.importer)
   );
   return {
+    productionFileCount: productionFiles.length,
+    proofFileCount: proofFiles.length,
     crossRuntimeConsumers: crossRuntimeConsumers.size,
     internalEdges: internalEdges.length,
     crossClusterConsumers: crossClusterConsumers.size,
     navigationTransitions: new Set(touchingEdges.map((edge) => `${edge.importer}->${edge.target}`))
       .size,
-    unresolvedEdges: context.graph.unresolvedEdges.filter((edge) => fileSet.has(edge.importer))
-      .length,
-    resourceEdges: context.graph.resourceEdges.filter((edge) => fileSet.has(edge.importer)).length,
-    reExportCycle: files.some((file) => context.cycleFiles.has(file)),
+    proofTransitions: new Set(proofEdges.map((edge) => `${edge.importer}->${edge.target}`)).size,
+    productionToProofEdges: productionToProofEdges.length,
+    unresolvedEdges: context.graph.unresolvedEdges.filter((edge) =>
+      productionFileSet.has(edge.importer)
+    ).length,
+    resourceEdges: context.graph.resourceEdges.filter((edge) =>
+      productionFileSet.has(edge.importer)
+    ).length,
+    reExportCycle: productionFiles.some((file) => context.cycleFiles.has(file)),
   };
 }
 
@@ -228,25 +241,30 @@ function collectClusterStructuralMetrics(metrics) {
 }
 
 function collectFragmentationSignals(files, metrics, context) {
+  const productionFiles = files.filter((file) => !isBuildTestFile(file));
+  const productionMetrics = metrics.filter((metric) => !isBuildTestFile(metric.file));
   return {
-    forwardingOnlyFiles: files.filter((file) => context.moduleByFile.get(file).forwardingOnly)
+    forwardingOnlyFiles: productionFiles.filter(
+      (file) => context.moduleByFile.get(file).forwardingOnly
+    ).length,
+    passThroughFiles: productionFiles.filter((file) => context.moduleByFile.get(file).passThrough)
       .length,
-    passThroughFiles: files.filter((file) => context.moduleByFile.get(file).passThrough).length,
-    proxyFamilyFiles: files.filter(isTopologyProxyPath).length,
-    singleConsumerSmallFiles: metrics.filter(
+    proxyFamilyFiles: productionFiles.filter(isTopologyProxyPath).length,
+    singleConsumerSmallFiles: productionMetrics.filter(
       (metric) =>
         metric.lines <= 60 &&
-        context.incoming.get(metric.file)?.size === 1 &&
+        context.productionIncoming.get(metric.file)?.size === 1 &&
         !context.publicFiles.has(metric.file)
     ).length,
     delegationOnlyTests: files.filter((file) => context.moduleByFile.get(file).delegationOnlyTest)
       .length,
-    facadeDepth: facadeDepth(files, context.graph, context.moduleByFile),
+    facadeDepth: facadeDepth(productionFiles, context.graph, context.moduleByFile),
   };
 }
 
 function buildCluster(key, metrics, context) {
   const files = metrics.map((metric) => metric.file).sort();
+  const productionMetrics = metrics.filter((metric) => !isBuildTestFile(metric.file));
   const details = metrics.map((metric) => ({
     file: metric.file,
     reason: classifyTopologyChangeReason(metric.file, metric, context.publicFiles),
@@ -258,9 +276,11 @@ function buildCluster(key, metrics, context) {
     fileDetails: details,
     fileMetrics: metrics,
     changeReasons: [...new Set(details.map(({ reason }) => reason))].sort(),
-    provenPublicContractFiles: files.filter((file) => context.publicFiles.has(file)),
+    provenPublicContractFiles: productionMetrics
+      .map((metric) => metric.file)
+      .filter((file) => context.publicFiles.has(file)),
     ...collectClusterTopology(files, context),
-    ...collectClusterStructuralMetrics(metrics),
+    ...collectClusterStructuralMetrics(productionMetrics),
     signals: collectFragmentationSignals(files, metrics, context),
   };
   return { ...cluster, ...decideTopologyCluster(cluster, context) };
@@ -361,7 +381,6 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
   );
   const moduleByFile = new Map(graph.modules.map((module) => [module.file, module]));
   const publicFiles = collectPublicContractFiles(graph, runtimes, readFile);
-  const incoming = collectIncomingConsumers(graph);
   const productionIncoming = collectProductionIncomingConsumers(graph);
   const cycleFiles = collectReExportCycleFiles(graph);
   const grouped = new Map();
@@ -379,7 +398,6 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
     runtimes,
     moduleByFile,
     publicFiles,
-    incoming,
     productionIncoming,
     cycleFiles,
   };
@@ -409,7 +427,7 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
   );
   return {
     schemaVersion: 2,
-    clusterStrategy: 'path-depth-v2+forwarding-edge-v1',
+    clusterStrategy: 'path-depth-v3+forwarding-edge-v1',
     scannedFiles: graph.files.length,
     partitionedFiles: eligibleMetrics.length,
     unresolvedEdges: graph.unresolvedEdges.length,
@@ -456,8 +474,10 @@ export function formatTopologyFragmentationConsole(report, { limit = 12 } = {}) 
     lines.push(
       [
         `${cluster.decision}/${cluster.confidence} ${cluster.id}:`,
-        `files=${cluster.fileCount},`,
+        `production-files=${cluster.productionFileCount ?? cluster.fileCount},`,
+        `proof-files=${cluster.proofFileCount ?? 0},`,
         `transitions=${cluster.navigationTransitions},`,
+        `proof-transitions=${cluster.proofTransitions ?? 0},`,
         `reasons=${cluster.reasons.join('|')}`,
       ].join(' ')
     );

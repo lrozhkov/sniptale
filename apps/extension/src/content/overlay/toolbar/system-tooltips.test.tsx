@@ -71,6 +71,7 @@ describe('toolbar system tooltips', () => {
       <ToolbarSettingsMenu
         compactMenus={false}
         pinToTab={false}
+        pinToTabAvailable={true}
         pinToTabLocked={false}
         screenshotMode
         displayMode="horizontal"

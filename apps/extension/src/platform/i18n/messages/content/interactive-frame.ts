@@ -53,6 +53,14 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Переместить комментарий',
     en: 'Move comment',
   },
+  resizeCommentLeft: {
+    ru: 'Изменить ширину комментария слева',
+    en: 'Resize comment from the left',
+  },
+  resizeCommentRight: {
+    ru: 'Изменить ширину комментария справа',
+    en: 'Resize comment from the right',
+  },
   calloutSettings: {
     ru: 'Настройки комментария',
     en: 'Comment settings',

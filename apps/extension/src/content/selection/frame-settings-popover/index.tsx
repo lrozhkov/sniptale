@@ -9,6 +9,7 @@ import type { FrameSettingsPopoverProps } from './types';
 import { FrameSettingsPopoverContent } from './views';
 import { POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
+import { BorderPresetEditor } from '../../../ui/highlighter-preset-editor';
 
 function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
   event.stopPropagation();
@@ -31,31 +32,58 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   }
 
   return createPortal(
-    <div
-      ref={state.surface.popoverRef}
-      className="sniptale-frame-settings-popover sniptale-glass-popover sniptale-content-popover"
-      data-theme={state.surface.portalTheme ?? undefined}
-      data-frame-id={props.frameId}
-      onMouseDown={stopPopoverPropagation}
-      onClick={stopPopoverPropagation}
-      style={getThemedPortalStyle(state.surface.portalTheme, popoverStyle)}
-    >
-      <div className="sniptale-content-popover-body">
-        <FrameSettingsPopoverContent
-          effectMode={props.effectMode}
-          globalSettings={state.settings.global}
-          handleBlurChange={state.handlers.handleBlurChange}
-          handleBlurShowBorderChange={state.handlers.handleBlurShowBorderChange}
-          handleBlurTypeChange={state.handlers.handleBlurTypeChange}
-          handleFocusChange={state.handlers.handleFocusChange}
-          handleFocusShowBorderChange={state.handlers.handleFocusShowBorderChange}
-          handleSelectPreset={state.handlers.handleSelectPreset}
-          localBlurSettings={state.settings.localBlur}
-          localFocusSettings={state.settings.localFocus}
-          selectedPresetId={state.settings.selectedPresetId}
+    <>
+      <div
+        ref={state.surface.popoverRef}
+        className="sniptale-frame-settings-popover sniptale-glass-popover sniptale-content-popover"
+        data-sniptale-activation-bridge="defer"
+        data-theme={state.surface.portalTheme ?? undefined}
+        data-frame-id={props.frameId}
+        onMouseDown={stopPopoverPropagation}
+        onClick={stopPopoverPropagation}
+        style={getThemedPortalStyle(state.surface.portalTheme, popoverStyle)}
+      >
+        <div className="sniptale-content-popover-body">
+          <FrameSettingsPopoverContent
+            effectMode={props.effectMode}
+            globalSettings={{
+              ...state.settings.global,
+              borderPresets: state.catalog.visibleBorderPresets,
+            }}
+            handleBlurChange={state.handlers.handleBlurChange}
+            handleBlurShowBorderChange={state.handlers.handleBlurShowBorderChange}
+            handleBlurTypeChange={state.handlers.handleBlurTypeChange}
+            handleFocusChange={state.handlers.handleFocusChange}
+            handleFocusShowBorderChange={state.handlers.handleFocusShowBorderChange}
+            handleAddPreset={state.handlers.handleAddPreset}
+            handleEditPreset={state.handlers.handleEditPreset}
+            handleSelectPreset={state.handlers.handleSelectPreset}
+            handleTogglePresetEnabled={state.handlers.handleTogglePresetEnabled}
+            localBlurSettings={state.settings.localBlur}
+            localFocusSettings={state.settings.localFocus}
+            pendingPresetIds={state.catalog.pendingPresetIds}
+            selectedPresetId={state.settings.selectedPresetId}
+          />
+        </div>
+      </div>
+      <div
+        className="sniptale-frame-style-editor-layer"
+        data-sniptale-activation-bridge="defer"
+        data-theme={state.surface.portalTheme ?? undefined}
+        onMouseDown={stopPopoverPropagation}
+        onClick={stopPopoverPropagation}
+      >
+        <BorderPresetEditor
+          isOpen={state.catalog.editor.isOpen}
+          isSaving={state.catalog.editor.isSaving}
+          onClose={state.catalog.editor.onClose}
+          onSave={state.catalog.editor.onSave}
+          {...(state.catalog.editor.preset === undefined
+            ? {}
+            : { preset: state.catalog.editor.preset })}
         />
       </div>
-    </div>,
+    </>,
     resolveContentPortalTarget(props.anchorEl)
   );
 }

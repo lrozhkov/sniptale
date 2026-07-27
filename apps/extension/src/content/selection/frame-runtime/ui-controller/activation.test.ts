@@ -182,6 +182,36 @@ describe('frame selection events', () => {
     expect(escape.defaultPrevented).toBe(false);
   });
 
+  it('keeps preset-editor and owned portal pointer events out of frame hit-testing', () => {
+    const targets = [
+      (() => {
+        const editorLayer = document.createElement('div');
+        editorLayer.className = 'sniptale-frame-style-editor-layer';
+        const editorControl = document.createElement('button');
+        editorLayer.append(editorControl);
+        document.body.append(editorLayer);
+        return { path: [editorControl, editorLayer], target: editorControl };
+      })(),
+      (() => {
+        const floatingLayer = document.createElement('div');
+        floatingLayer.setAttribute('data-floating-ui-owned-by', 'frame-style-color');
+        document.body.append(floatingLayer);
+        return { path: [floatingLayer], target: floatingLayer };
+      })(),
+    ];
+
+    targets.forEach(({ path, target }) => {
+      const { actions, handlers } = createHandlers('frame-1');
+      const pointerDown = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+      Object.defineProperty(pointerDown, 'target', { value: target });
+      Object.defineProperty(pointerDown, 'composedPath', { value: () => path });
+
+      handlers.pointerDown(pointerDown as PointerEvent);
+
+      expect(actions.clearSelection).not.toHaveBeenCalled();
+    });
+  });
+
   it('leaves the first Escape to each open popover family without clearing selection', () => {
     const kinds = ['frame-settings', 'step-badge', 'callout-settings'] as const;
 

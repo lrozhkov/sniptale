@@ -41,6 +41,22 @@ it('routes regular page preparation through the content-script message', async (
   });
 });
 
+it('forwards pinned-toolbar visibility through regular page preparation', async () => {
+  await enablePreparationByCapability({
+    capability: TabRuntimeCapability.Regular,
+    ports: new Map(),
+    tabId: 7,
+    toolbarVisible: false,
+    viewport: null,
+  });
+
+  expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
+    toolbarVisible: false,
+    type: MessageType.ENABLE_SCREENSHOT_MODE,
+    viewport: null,
+  });
+});
+
 it('routes owned snapshot viewer preparation through the registered port', async () => {
   const registration = createAckingViewerPortRegistration();
   const ports = new Map([[9, registration]]);

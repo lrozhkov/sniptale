@@ -15,6 +15,7 @@ export type TemporaryTabActivationStore = {
   grant(target: TemporaryTabActivationTarget): Promise<void>;
   has(target: TemporaryTabActivationTarget): Promise<boolean>;
   hydrate(): Promise<Map<number, string>>;
+  reconcileNavigation(target: TemporaryTabActivationTarget): Promise<void>;
 };
 
 type TemporaryTabActivationStoreDeps = {
@@ -70,6 +71,14 @@ function serializeTemporaryActiveTabs(
   updatedAtMs: number
 ): StoredTemporaryActiveTab[] {
   return Array.from(entries, ([tabId, url]) => ({ tabId, updatedAtMs, url }));
+}
+
+function hasSameOrigin(left: string, right: URL): boolean {
+  try {
+    return new URL(left).origin === right.origin;
+  } catch {
+    return false;
+  }
 }
 
 async function readTemporaryActiveTabs({
@@ -173,7 +182,7 @@ export function createTemporaryTabActivationStore({
           return false;
         }
 
-        if (activatedUrl === target.url.href) {
+        if (hasSameOrigin(activatedUrl, target.url)) {
           return true;
         }
 
@@ -184,6 +193,17 @@ export function createTemporaryTabActivationStore({
     },
     hydrate() {
       return runMutation((entries) => new Map(entries));
+    },
+    reconcileNavigation(target) {
+      return runMutation(async (entries) => {
+        const activatedUrl = entries.get(target.tabId);
+        if (!activatedUrl || hasSameOrigin(activatedUrl, target.url)) {
+          return;
+        }
+
+        entries.delete(target.tabId);
+        await writeEntries(entries);
+      });
     },
   };
 }

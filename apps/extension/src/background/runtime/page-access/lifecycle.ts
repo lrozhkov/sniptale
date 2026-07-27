@@ -1,8 +1,13 @@
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
-import { clearAllPinToTabSessionStorageState } from '../../../composition/persistence/content-pin-session/index';
-import { clearPageAccessTabActivation, unregisterRemovedPageAccessOrigins } from './service';
+import {
+  clearPageAccessTabActivation,
+  reconcilePageAccessTabNavigation,
+  unregisterRemovedPageAccessOrigins,
+} from './service';
 import { reconcilePersistentContentScriptRegistrations } from './registration';
+import { isSupportedUrl } from './target';
+import { runPinnedToolbarPermissionCleanup } from './pinned-toolbar-operation';
 
 type PageAccessLifecycleLogger = {
   warn(message: string, error: unknown): void;
@@ -18,7 +23,13 @@ export function initializePageAccessLifecycle(logger?: PageAccessLifecycleLogger
   });
 
   browserTabs.subscribeToUpdated((tabId, changeInfo) => {
-    if (changeInfo.status === 'loading' || typeof changeInfo.url === 'string') {
+    if (typeof changeInfo.url !== 'string') {
+      return;
+    }
+
+    if (isSupportedUrl(changeInfo.url)) {
+      void reconcilePageAccessTabNavigation(tabId, changeInfo.url);
+    } else {
       void clearPageAccessTabActivation(tabId);
     }
   });
@@ -29,7 +40,10 @@ export function initializePageAccessLifecycle(logger?: PageAccessLifecycleLogger
       return;
     }
 
-    void unregisterRemovedPageAccessOrigins(origins);
-    void clearAllPinToTabSessionStorageState();
+    void runPinnedToolbarPermissionCleanup(() => unregisterRemovedPageAccessOrigins(origins)).catch(
+      (error) => {
+        logger?.warn('Failed to clean pinned toolbar state after permission removal', error);
+      }
+    );
   });
 }

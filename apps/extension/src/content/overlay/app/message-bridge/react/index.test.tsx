@@ -86,6 +86,7 @@ function createRuntimeBridgeParams(): ContentRuntimeBridgeParams {
       queueAutoStartCapture: vi.fn(),
       saveDialogState: null,
       setIsCompletelyHidden: vi.fn(),
+      setPinnedToolbarVisible: vi.fn(),
       setSaveDialogState: vi.fn(),
     },
   };

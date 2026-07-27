@@ -43,18 +43,25 @@ describe('selection-mode final frame', () => {
       getSelection: () => ({ x: 0, y: 0, width: 100, height: 100 }),
       onAdjustPadding: () => {},
       onCaptureActionChange: () => {},
+      onCancel: () => {},
       onConfirm: () => {},
       onResetToIdle: () => {},
       onSetupSizePanelListeners: () => {},
       visual: createSelectionVisual(),
     });
 
-    createSelectionModeFinalResizeHandles(frame, '#38bdf8');
+    createSelectionModeFinalResizeHandles(frame, '#38bdf8', 3);
 
     expect(frame.className).toBe('sniptale-selection-final-frame');
     expect(frame.querySelectorAll('.sniptale-resize-handle')).toHaveLength(8);
     expect(frame.querySelector('.sniptale-resize-handle[data-direction="nw"]')).not.toBeNull();
     expect(frame.querySelector('.sniptale-resize-handle[data-direction="se"]')).not.toBeNull();
+    const handle = frame.querySelector<HTMLElement>('.sniptale-resize-handle');
+    expect(handle?.style.borderRadius).toBe('50%');
+    expect(handle?.style.background).toBe('rgb(255, 255, 255)');
+    expect(handle?.style.width).toBe('11px');
+    expect(handle?.style.top).toBe('-7px');
+    expect(handle?.style.left).toBe('-7px');
   });
 
   it('applies the expected cursor and outline styles to the shell and handles', () => {
@@ -68,6 +75,7 @@ describe('selection-mode final frame', () => {
       getSelection: () => ({ x: 0, y: 0, width: 100, height: 100 }),
       onAdjustPadding: () => {},
       onCaptureActionChange: () => {},
+      onCancel: () => {},
       onConfirm: () => {},
       onResetToIdle: () => {},
       onSetupSizePanelListeners: () => {},
@@ -77,12 +85,18 @@ describe('selection-mode final frame', () => {
       }),
     });
 
-    createSelectionModeFinalResizeHandles(frame, '#ef4444');
+    createSelectionModeFinalResizeHandles(frame, '#ef4444', 2);
 
     expect(frame.style.cssText).toContain('cursor: move');
     expect(frame.style.cssText).toContain('border: 2px solid rgb(239, 68, 68)');
     expect(
       frame.querySelector<HTMLElement>('.sniptale-resize-handle[data-direction="e"]')?.style.cssText
     ).toContain('cursor: ew-resize');
+    expect(
+      frame.querySelector<HTMLElement>('.sniptale-resize-handle[data-direction="ne"]')?.style.top
+    ).toBe('-6px');
+    expect(
+      frame.querySelector<HTMLElement>('.sniptale-resize-handle[data-direction="ne"]')?.style.right
+    ).toBe('-6px');
   });
 });

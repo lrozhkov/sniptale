@@ -1,9 +1,10 @@
 import { browserStorage } from '../infrastructure/browser-storage';
 
 const CONTENT_PIN_TO_TAB_SESSION_KEY_PREFIX = 'sniptale.content.pin-to-tab:tab:';
+const CONTENT_PIN_TO_TAB_TOOLBAR_VISIBILITY_SESSION_KEY_PREFIX =
+  'sniptale.content.pin-to-tab-toolbar-visible:tab:';
 
 export type PinToTabSessionScope = {
-  screenshotModeEnabled: boolean;
   storageKey: string;
 };
 
@@ -15,6 +16,10 @@ export function isPinToTabSessionStorageAvailable(): boolean {
 
 export function createPinToTabSessionStorageKey(tabId: number): string {
   return `${CONTENT_PIN_TO_TAB_SESSION_KEY_PREFIX}${tabId}`;
+}
+
+export function createPinToTabToolbarVisibilitySessionStorageKey(tabId: number): string {
+  return `${CONTENT_PIN_TO_TAB_TOOLBAR_VISIBILITY_SESSION_KEY_PREFIX}${tabId}`;
 }
 
 function getPinToTabSessionStorageErrorMessage(error: unknown): string | null {
@@ -64,31 +69,48 @@ export async function readPinToTabSessionStorageState(tabId: number): Promise<bo
   return stored[storageKey] === true;
 }
 
+export async function readPinToTabToolbarVisibilitySessionStorageState(
+  tabId: number
+): Promise<boolean> {
+  if (!browserStorage.session.isAvailable()) {
+    return true;
+  }
+
+  const storageKey = createPinToTabToolbarVisibilitySessionStorageKey(tabId);
+  const stored = await browserStorage.session.get(createPinToTabSessionDefaults(storageKey, true));
+  return stored[storageKey] !== false;
+}
+
+export type PinToTabSessionStorageMutation =
+  | { pinToTab: false }
+  | { pinToTab: true; toolbarVisible: boolean }
+  | { toolbarVisible: boolean };
+
 export async function writePinToTabSessionStorageState(
-  scope: PinToTabSessionScope,
-  value: boolean,
+  tabId: number,
+  mutation: PinToTabSessionStorageMutation,
   isCurrent: ContentPinToTabSessionWriteGuard
 ): Promise<void> {
-  if (!browserStorage.session.isAvailable()) {
-    return;
-  }
-  if (!isCurrent()) {
-    return;
-  }
-  if (value && !scope.screenshotModeEnabled) {
+  if (!browserStorage.session.isAvailable() || !isCurrent()) {
     return;
   }
 
-  if (!isCurrent()) {
+  const pinStorageKey = createPinToTabSessionStorageKey(tabId);
+  const visibilityStorageKey = createPinToTabToolbarVisibilitySessionStorageKey(tabId);
+  if ('pinToTab' in mutation) {
+    if (!mutation.pinToTab) {
+      await browserStorage.session.remove([pinStorageKey, visibilityStorageKey]);
+      return;
+    }
+
+    await browserStorage.session.set({
+      [pinStorageKey]: true,
+      [visibilityStorageKey]: mutation.toolbarVisible,
+    });
     return;
   }
 
-  if (value) {
-    await browserStorage.session.set(createPinToTabSessionDefaults(scope.storageKey, true));
-    return;
-  }
-
-  await browserStorage.session.remove(scope.storageKey);
+  await browserStorage.session.set({ [visibilityStorageKey]: mutation.toolbarVisible });
 }
 
 export async function clearPinToTabSessionStorageState(tabId: number): Promise<void> {
@@ -96,21 +118,8 @@ export async function clearPinToTabSessionStorageState(tabId: number): Promise<v
     return;
   }
 
-  await browserStorage.session.remove(createPinToTabSessionStorageKey(tabId));
-}
-
-export async function clearAllPinToTabSessionStorageState(): Promise<void> {
-  if (!browserStorage.session.isAvailable()) {
-    return;
-  }
-
-  const stored = await browserStorage.session.get(null);
-  const keys = Object.keys(stored).filter((key) =>
-    key.startsWith(CONTENT_PIN_TO_TAB_SESSION_KEY_PREFIX)
-  );
-  if (keys.length === 0) {
-    return;
-  }
-
-  await browserStorage.session.remove(keys);
+  await browserStorage.session.remove([
+    createPinToTabSessionStorageKey(tabId),
+    createPinToTabToolbarVisibilitySessionStorageKey(tabId),
+  ]);
 }

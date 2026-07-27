@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { PageAccessOperation } from '@sniptale/runtime-contracts/messaging/page-access';
@@ -14,6 +14,14 @@ import {
   createMessage,
 } from './service.test-support';
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 it('handles denied all-sites grants without registering global content scripts', async () => {
   const { handlePageAccessMessage } = await import('./service');
   browserPermissionsRequestMock.mockResolvedValue(false);
@@ -24,6 +32,110 @@ it('handles denied all-sites grants without registering global content scripts',
 
   expect(browserScriptingRegisterContentScriptsMock).not.toHaveBeenCalled();
   expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
+});
+
+it('reports whether pin-to-tab already has persistent all-sites access', async () => {
+  const { hasPinnedToolbarAllSitesAccess } = await import('./service');
+  browserPermissionsContainsMock.mockResolvedValueOnce(true);
+
+  await expect(hasPinnedToolbarAllSitesAccess()).resolves.toBe(true);
+
+  expect(browserPermissionsContainsMock).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
+  expect(browserPermissionsRequestMock).not.toHaveBeenCalled();
+});
+
+it('does not mutate an existing all-sites grant when pinned runtime registration fails', async () => {
+  const { registerPinnedToolbarAllSitesAccess } = await import('./service');
+  browserScriptingRegisterContentScriptsMock.mockRejectedValueOnce(new Error('register failed'));
+
+  await expect(
+    registerPinnedToolbarAllSitesAccess({
+      commit: async () => true,
+      expectedUrl: 'https://example.test/path',
+      isCurrent: () => true,
+      tabId: 7,
+    })
+  ).rejects.toThrow('register failed');
+
+  expect(browserPermissionsRequestMock).not.toHaveBeenCalled();
+  expect(browserPermissionsRemoveMock).not.toHaveBeenCalled();
+});
+
+it('rejects pinned runtime registration after the trusted document navigates', async () => {
+  const { registerPinnedToolbarAllSitesAccess } = await import('./service');
+  browserTabsGetMock.mockResolvedValue({ id: 7, url: 'https://other.test/path' });
+
+  await expect(
+    registerPinnedToolbarAllSitesAccess({
+      commit: async () => true,
+      expectedUrl: 'https://example.test/path',
+      isCurrent: () => true,
+      tabId: 7,
+    })
+  ).resolves.toBe('superseded');
+
+  expect(browserScriptingRegisterContentScriptsMock).not.toHaveBeenCalled();
+  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
+});
+
+it('does not resolve or register pinned runtime access after its operation is superseded', async () => {
+  const { registerPinnedToolbarAllSitesAccess } = await import('./service');
+
+  await expect(
+    registerPinnedToolbarAllSitesAccess({
+      commit: async () => true,
+      expectedUrl: 'https://example.test/path',
+      isCurrent: () => false,
+      tabId: 7,
+    })
+  ).resolves.toBe('superseded');
+
+  expect(browserTabsGetMock).not.toHaveBeenCalled();
+  expect(browserScriptingRegisterContentScriptsMock).not.toHaveBeenCalled();
+});
+
+it('registers future pinned runtime access only for the still-current trusted document', async () => {
+  const { registerPinnedToolbarAllSitesAccess } = await import('./service');
+
+  await expect(
+    registerPinnedToolbarAllSitesAccess({
+      commit: async () => true,
+      expectedUrl: 'https://example.test/path',
+      isCurrent: () => true,
+      tabId: 7,
+    })
+  ).resolves.toBe('registered');
+
+  expect(browserTabsGetMock).toHaveBeenCalledWith(7);
+  expect(browserScriptingRegisterContentScriptsMock).toHaveBeenCalledOnce();
+  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
+});
+
+it('rolls back a newly created pinned registration when invalidated during browser registration', async () => {
+  const { registerPinnedToolbarAllSitesAccess } = await import('./service');
+  const registration = createDeferred<void>();
+  let current = true;
+  const commit = vi.fn(async () => true);
+  browserScriptingRegisterContentScriptsMock.mockReturnValueOnce(registration.promise);
+
+  const result = registerPinnedToolbarAllSitesAccess({
+    commit,
+    expectedUrl: 'https://example.test/path',
+    isCurrent: () => current,
+    tabId: 7,
+  });
+  await vi.waitFor(() => {
+    expect(browserScriptingRegisterContentScriptsMock).toHaveBeenCalledOnce();
+  });
+
+  current = false;
+  registration.resolve(undefined);
+
+  await expect(result).resolves.toBe('superseded');
+  expect(commit).not.toHaveBeenCalled();
+  expect(browserScriptingUnregisterContentScriptsMock).toHaveBeenCalledWith({
+    ids: ['sniptale-page-access-all-sites'],
+  });
 });
 
 it('rolls back just-granted all-sites permission when content script registration fails', async () => {

@@ -9,6 +9,7 @@ import {
   activateCurrentTab,
   grantAllSitesAccess,
   grantSiteAccess,
+  registerPinnedToolbarAllSitesAccess as registerPinnedToolbarAllSitesAccessAction,
   registerGrantedAllSitesAccess,
   registerGrantedSiteAccess,
   revokeSiteAccess,
@@ -24,7 +25,14 @@ export type PageAccessService = {
   ensureNativeVisibleCaptureAuthority(tabId: number, failureMessage?: string): Promise<void>;
   handlePageAccessMessage(message: PageAccessMessage): Promise<PageAccessResponse>;
   hasActivePageAccess(tabId: number): Promise<boolean>;
+  registerPinnedToolbarAllSitesAccess(args: {
+    commit: () => Promise<boolean>;
+    expectedUrl: string;
+    isCurrent: () => boolean;
+    tabId: number;
+  }): Promise<'registered' | 'superseded'>;
   refreshActivePageAccessRuntime(tabId: number): Promise<boolean>;
+  reconcilePageAccessTabNavigation(tabId: number, url: string): Promise<void>;
   unregisterRemovedPageAccessOrigins(origins: string[]): Promise<void>;
 };
 
@@ -143,8 +151,19 @@ export function createPageAccessService({
     async hasActivePageAccess(tabId) {
       return hasActivePageAccessWithContext(tabId, serviceContext);
     },
+    async registerPinnedToolbarAllSitesAccess(args) {
+      return registerPinnedToolbarAllSitesAccessAction({
+        commit: args.commit,
+        expectedUrl: args.expectedUrl,
+        isCurrent: args.isCurrent,
+        resolveContext: () => resolveStatusContext(args.tabId),
+      });
+    },
     async refreshActivePageAccessRuntime(tabId) {
       return refreshActivePageAccessRuntimeWithContext(tabId, serviceContext);
+    },
+    async reconcilePageAccessTabNavigation(tabId, url) {
+      await temporaryTabActivationStore.reconcileNavigation({ tabId, url: new URL(url) });
     },
     async unregisterRemovedPageAccessOrigins(origins) {
       await unregisterRemovedContentScripts(origins);

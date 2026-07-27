@@ -13,6 +13,10 @@ export type CalloutInteractionHandleProps = {
   handleHandleFocus: () => void;
   handleMouseEnter: () => void;
   handleMouseLeave: () => void;
+  handleResizeLeftPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  handleResizeLeftKeyDown: (event: CalloutHandleKeyboardEvent) => void;
+  handleResizeRightPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  handleResizeRightKeyDown: (event: CalloutHandleKeyboardEvent) => void;
   handleSettingsClick: () => void;
   handleTailPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   handleTailKeyDown: (event: CalloutHandleKeyboardEvent) => void;
@@ -23,18 +27,74 @@ export type CalloutInteractionHandleProps = {
   isDragging: boolean;
   isEditing: boolean;
   isHandleVisible: boolean;
+  isResizingLeft: boolean;
+  isResizingRight: boolean;
   isTailDragging: boolean;
   isTailBaseEndDragging: boolean;
   isTailFrameDragging: boolean;
   portalTheme: AppTheme | null;
   settingsAnchorRef: RefObject<HTMLButtonElement | null>;
   settingsHandleStyle: CSSProperties;
+  resizeLeftHandleStyle: CSSProperties;
+  resizeRightHandleStyle: CSSProperties;
   showSettingsHandle: boolean;
   tailHandleCursor: CSSProperties['cursor'];
   tailHandleStyle: CSSProperties | null;
   tailBaseEndHandleStyle: CSSProperties | null;
   tailFrameHandleStyle: CSSProperties | null;
 };
+
+function renderCalloutWidthHandle(
+  props: CalloutInteractionHandleProps,
+  control: {
+    isResizing: boolean;
+    labelKey: 'resizeCommentLeft' | 'resizeCommentRight';
+    onKeyDown: (event: CalloutHandleKeyboardEvent) => void;
+    onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+    side: 'left' | 'right';
+    style: CSSProperties;
+  }
+) {
+  if (props.isEditing) return null;
+  const label = translate(`content.interactiveFrame.${control.labelKey}`);
+  return (
+    <button
+      type="button"
+      className={[
+        'sniptale-callout-tail-handle',
+        'sniptale-callout-resize-handle',
+        `sniptale-callout-resize-handle--${control.side}`,
+      ].join(' ')}
+      data-theme={props.portalTheme ?? undefined}
+      aria-label={label}
+      aria-keyshortcuts="ArrowLeft ArrowRight"
+      title={label}
+      style={mergeThemeScopedStyle(props.portalTheme, {
+        ...control.style,
+        width: 12,
+        height: 12,
+        padding: 0,
+        boxSizing: 'border-box',
+        borderRadius: '50%',
+        border: '2px solid var(--sniptale-color-border-soft)',
+        background: '#ffffff',
+        cursor: 'ew-resize',
+        opacity: props.isHandleVisible ? 1 : 0,
+        pointerEvents: props.isHandleVisible ? 'auto' : 'none',
+        boxShadow: control.isResizing
+          ? '0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 20%, transparent)'
+          : '0 1px 5px color-mix(in srgb, var(--sniptale-color-shadow-strong) 24%, transparent)',
+        transition: 'opacity 120ms ease, border-color 120ms ease, box-shadow 120ms ease',
+      })}
+      onPointerDown={control.onPointerDown}
+      onKeyDown={control.onKeyDown}
+      onFocus={props.handleHandleFocus}
+      onBlur={props.handleHandleBlur}
+      onMouseEnter={props.handleMouseEnter}
+      onMouseLeave={props.handleMouseLeave}
+    />
+  );
+}
 
 function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
   if (props.isEditing || !props.showSettingsHandle) return null;
@@ -180,6 +240,22 @@ export function renderCalloutInteractionHandles(props: CalloutInteractionHandleP
     <>
       {renderCalloutMoveHandle(props)}
       {renderCalloutSettingsHandle(props)}
+      {renderCalloutWidthHandle(props, {
+        isResizing: props.isResizingLeft,
+        labelKey: 'resizeCommentLeft',
+        onKeyDown: props.handleResizeLeftKeyDown,
+        onPointerDown: props.handleResizeLeftPointerDown,
+        side: 'left',
+        style: props.resizeLeftHandleStyle,
+      })}
+      {renderCalloutWidthHandle(props, {
+        isResizing: props.isResizingRight,
+        labelKey: 'resizeCommentRight',
+        onKeyDown: props.handleResizeRightKeyDown,
+        onPointerDown: props.handleResizeRightPointerDown,
+        side: 'right',
+        style: props.resizeRightHandleStyle,
+      })}
       {renderCalloutTailHandle(props, {
         className: 'sniptale-callout-tail-base-start-handle',
         isDragging: props.isTailDragging,

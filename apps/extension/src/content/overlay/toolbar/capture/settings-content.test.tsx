@@ -5,6 +5,15 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToolbarSettingsDropdown } from './settings-content';
 
+const createTrustedContentActionIntentSource = vi.hoisted(() =>
+  vi.fn(() => ({ kind: 'trusted-content-event' as const }))
+);
+
+vi.mock('../../../application/privileged-action-intent', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../application/privileged-action-intent')>()),
+  createTrustedContentActionIntentSource,
+}));
+
 vi.mock('../../../../platform/i18n', () => ({
   translate: (key: string) => key,
 }));
@@ -47,7 +56,11 @@ function createMenuRef() {
   } as React.RefObject<HTMLDivElement | null>;
 }
 
-function renderSettingsDropdown(params?: { pinToTab?: boolean; pinToTabLocked?: boolean }) {
+function renderSettingsDropdown(params?: {
+  pinToTab?: boolean;
+  pinToTabAvailable?: boolean;
+  pinToTabLocked?: boolean;
+}) {
   ensureContainer();
   const onPinToTabChange = vi.fn();
 
@@ -64,6 +77,7 @@ function renderSettingsDropdown(params?: { pinToTab?: boolean; pinToTabLocked?: 
         onHide={() => undefined}
         onPinToTabChange={onPinToTabChange}
         pinToTab={params?.pinToTab ?? false}
+        pinToTabAvailable={params?.pinToTabAvailable ?? true}
         pinToTabLocked={params?.pinToTabLocked ?? false}
         screenshotMode={true}
         triggerRef={createButtonRef()}
@@ -91,6 +105,7 @@ function renderSettingsDropdownNearSidebar() {
         onHide={() => undefined}
         onPinToTabChange={() => undefined}
         pinToTab={false}
+        pinToTabAvailable={true}
         pinToTabLocked={false}
         screenshotMode={true}
         triggerRef={createButtonRef({
@@ -158,7 +173,8 @@ describe('ToolbarSettingsDropdown', () => {
       pinButton?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     });
 
-    expect(onPinToTabChange).toHaveBeenCalledWith(true);
+    expect(onPinToTabChange).toHaveBeenCalledWith(true, { kind: 'trusted-content-event' });
+    expect(createTrustedContentActionIntentSource).toHaveBeenCalledOnce();
   });
 
   it('disables the pin-to-tab toggle when scenario mode locks it', () => {
@@ -167,6 +183,21 @@ describe('ToolbarSettingsDropdown', () => {
 
     expect(pinButton).toBeDefined();
     expect(pinButton?.hasAttribute('disabled')).toBe(true);
+
+    act(() => {
+      pinButton?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+
+    expect(onPinToTabChange).not.toHaveBeenCalled();
+  });
+
+  it('disables pin-to-tab when persistent all-sites access is unavailable', () => {
+    const { onPinToTabChange } = renderSettingsDropdown({ pinToTabAvailable: false });
+    const pinButton = findButton('content.toolbar.pinToTab');
+
+    expect(pinButton).toBeDefined();
+    expect(pinButton?.hasAttribute('disabled')).toBe(true);
+    expect(pinButton?.textContent).toContain('content.toolbar.pinToTabUnavailableHint');
 
     act(() => {
       pinButton?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));

@@ -112,6 +112,7 @@ function createBindingsProps() {
     visibilityState: {
       isCompletelyHidden: false,
       isToolbarVisible: false,
+      setPinnedToolbarVisible: vi.fn(),
     },
   };
 }
@@ -148,7 +149,8 @@ async function expectStableShowToolbarCallback() {
 
   secondCall?.onShowToolbar();
 
-  expect(props.modeControls.setIsToolbarVisible).toHaveBeenCalledWith(true);
+  expect(props.modeControls.setIsToolbarVisible).not.toHaveBeenCalled();
+  expect(props.visibilityState.setPinnedToolbarVisible).toHaveBeenCalledWith(true);
 }
 
 async function expectPagePreparationHistoryReset() {

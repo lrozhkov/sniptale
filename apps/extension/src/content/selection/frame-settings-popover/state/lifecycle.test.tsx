@@ -10,6 +10,7 @@ import type {
   HighlighterSettings,
 } from '../../../../features/highlighter/contracts';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
 const loggerMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -17,6 +18,7 @@ const loggerMocks = vi.hoisted(() => ({
 
 const storageMocks = vi.hoisted(() => ({
   loadHighlighterSettings: vi.fn(),
+  updateBorderPresetWithOutcome: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -31,10 +33,12 @@ vi.mock('../../../../composition/persistence/highlighter', async () => {
   return {
     ...actual,
     loadHighlighterSettings: storageMocks.loadHighlighterSettings,
+    updateBorderPresetWithOutcome: storageMocks.updateBorderPresetWithOutcome,
   };
 });
 
 import { useFrameSettingsPopoverState } from '.';
+import { useFrameSettingsPopoverLifecycle } from './lifecycle';
 
 const DEFAULT_SETTINGS: HighlighterSettings = {
   borderPresets: [],
@@ -48,6 +52,8 @@ const DEFAULT_SETTINGS: HighlighterSettings = {
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let latestState: ReturnType<typeof useFrameSettingsPopoverState> | null = null;
+let latestLifecycle: ReturnType<typeof useFrameSettingsPopoverLifecycle> | null = null;
+let onApplyToFrame = vi.fn();
 
 function Harness(props: {
   blurSettings?: BlurSettings;
@@ -59,13 +65,21 @@ function Harness(props: {
   latestState = useFrameSettingsPopoverState({
     frameId: 'frame-1',
     isOpen: props.isOpen,
-    onApplyToFrame: () => undefined,
+    onApplyToFrame,
     ...(props.blurSettings === undefined ? {} : { blurSettings: props.blurSettings }),
     ...(props.borderSettings === undefined ? {} : { borderSettings: props.borderSettings }),
     ...(props.focusSettings === undefined ? {} : { focusSettings: props.focusSettings }),
   });
 
   return <div data-tick={String(props.tick)} />;
+}
+
+function LifecycleHarness(props: { isOpen: boolean }) {
+  latestLifecycle = useFrameSettingsPopoverLifecycle({
+    frameId: 'frame-1',
+    isOpen: props.isOpen,
+  });
+  return null;
 }
 
 function renderHarness(
@@ -88,11 +102,24 @@ function renderHarness(
   });
 }
 
+function renderLifecycleHarness(isOpen: boolean) {
+  if (!container) {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  }
+  act(() => root?.render(<LifecycleHarness isOpen={isOpen} />));
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   storageMocks.loadHighlighterSettings.mockReset();
+  storageMocks.updateBorderPresetWithOutcome.mockReset();
+  storageMocks.updateBorderPresetWithOutcome.mockResolvedValue('applied');
   loggerMocks.error.mockReset();
+  onApplyToFrame = vi.fn();
   latestState = null;
+  latestLifecycle = null;
 });
 
 afterEach(() => {
@@ -103,6 +130,7 @@ afterEach(() => {
   container?.remove();
   container = null;
   latestState = null;
+  latestLifecycle = null;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -192,5 +220,98 @@ describe('frame settings popover state lifecycle', () => {
     expect(latestState?.settings.global).toEqual(DEFAULT_SETTINGS);
     expect(latestState?.settings.localBlur.amount).toBe(37);
     expect(latestState?.settings.localBlur).not.toEqual(DEFAULT_SETTINGS.defaultBlurSettings);
+  });
+
+  it('does not publish an older open-time load after a catalog mutation revision', async () => {
+    let resolveSettings: ((settings: HighlighterSettings) => void) | undefined;
+    const oldSettings = {
+      ...DEFAULT_SETTINGS,
+      borderPresets: [DEFAULT_BORDER_PRESET],
+      defaultBorderPresetId: DEFAULT_BORDER_PRESET.id,
+    };
+    const canonicalPreset = {
+      ...DEFAULT_BORDER_PRESET,
+      enabled: false,
+      name: 'Canonical mutation',
+    };
+    const canonicalSettings = {
+      ...oldSettings,
+      borderPresets: [canonicalPreset],
+    };
+    storageMocks.loadHighlighterSettings.mockReturnValue(
+      new Promise<HighlighterSettings>((resolve) => {
+        resolveSettings = resolve;
+      })
+    );
+    renderLifecycleHarness(true);
+
+    act(() => {
+      latestLifecycle?.catalog.reconcileCatalogSettings(canonicalSettings, canonicalPreset.id);
+    });
+    await act(async () => {
+      resolveSettings?.(oldSettings);
+      await Promise.resolve();
+    });
+
+    expect(latestLifecycle?.catalog.globalSettings).toEqual(canonicalSettings);
+    expect(latestLifecycle?.catalog.visibleBorderPresets).toEqual([canonicalPreset]);
+  });
+
+  it('applies a canonical edit immediately when it updates the frame selected preset', async () => {
+    const activePreset = {
+      ...DEFAULT_BORDER_PRESET,
+      id: 'active-preset',
+      name: 'Active preset',
+    };
+    const submittedPreset = { ...activePreset, width: 7 };
+    const canonicalPreset = { ...submittedPreset, customized: true };
+    const canonicalSettings = {
+      ...DEFAULT_SETTINGS,
+      borderPresets: [canonicalPreset],
+      defaultBorderPresetId: canonicalPreset.id,
+    };
+    storageMocks.loadHighlighterSettings.mockResolvedValue(canonicalSettings);
+    renderHarness(true, 0, { borderSettings: activePreset });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(latestState?.settings.selectedPresetId).toBe(activePreset.id);
+    act(() => latestState?.handlers.handleEditPreset(activePreset));
+
+    await act(async () => latestState?.catalog.editor.onSave(submittedPreset));
+
+    expect(onApplyToFrame).toHaveBeenCalledWith({
+      borderSettings: { ...canonicalPreset, padding: { ...canonicalPreset.padding } },
+    });
+  });
+
+  it('does not restyle the frame when a different catalog preset is edited', async () => {
+    const activePreset = {
+      ...DEFAULT_BORDER_PRESET,
+      id: 'active-preset',
+      name: 'Active preset',
+    };
+    const otherPreset = {
+      ...DEFAULT_BORDER_PRESET,
+      id: 'other-preset',
+      name: 'Other preset',
+    };
+    const canonicalOtherPreset = { ...otherPreset, width: 7 };
+    storageMocks.loadHighlighterSettings.mockResolvedValue({
+      ...DEFAULT_SETTINGS,
+      borderPresets: [activePreset, canonicalOtherPreset],
+      defaultBorderPresetId: activePreset.id,
+    });
+    renderHarness(true, 0, { borderSettings: activePreset });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => latestState?.handlers.handleEditPreset(otherPreset));
+
+    await act(async () => latestState?.catalog.editor.onSave(canonicalOtherPreset));
+
+    expect(onApplyToFrame).not.toHaveBeenCalled();
   });
 });

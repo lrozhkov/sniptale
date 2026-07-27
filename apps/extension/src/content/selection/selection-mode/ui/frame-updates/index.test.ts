@@ -3,15 +3,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SelectionModeDom } from '../dom-types';
 
+type DragCanvasContextFixture = {
+  clearRect: ReturnType<typeof vi.fn>;
+  fillRect: ReturnType<typeof vi.fn>;
+  fillStyle: string;
+};
+
+const dragCanvasContexts = new WeakMap<HTMLCanvasElement, DragCanvasContextFixture>();
+
+function createDragCanvas(): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  const context: DragCanvasContextFixture = {
+    clearRect: vi.fn(),
+    fillRect: vi.fn(),
+    fillStyle: '',
+  };
+  Object.defineProperty(canvas, 'getContext', {
+    configurable: true,
+    value: vi.fn(() => context),
+  });
+  dragCanvasContexts.set(canvas, context);
+  return canvas;
+}
+
 const {
   calculateContentSizeTooltipPositionMock,
   closeSelectionCaptureActionMenuMock,
   setContentSizeTooltipPositionMock,
+  syncSelectionToolbarCompactControlsChromeMock,
   syncContentSizeTooltipValuesMock,
 } = vi.hoisted(() => ({
   calculateContentSizeTooltipPositionMock: vi.fn(() => ({ left: 12, top: 34 })),
   closeSelectionCaptureActionMenuMock: vi.fn(),
   setContentSizeTooltipPositionMock: vi.fn(),
+  syncSelectionToolbarCompactControlsChromeMock: vi.fn(),
   syncContentSizeTooltipValuesMock: vi.fn(),
 }));
 
@@ -36,6 +61,11 @@ vi.mock('@sniptale/ui/content-size-tooltip/dom', () => ({
   syncContentSizeTooltipValues: syncContentSizeTooltipValuesMock,
 }));
 
+vi.mock('../final-elements/toolbar-chrome', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../final-elements/toolbar-chrome')>()),
+  syncSelectionToolbarCompactControlsChrome: syncSelectionToolbarCompactControlsChromeMock,
+}));
+
 import {
   cleanupSelectionModeDom,
   flushScheduledFinalFrameUpdate,
@@ -48,7 +78,8 @@ import {
 
 function createDom(): SelectionModeDom {
   const dragFrame = document.createElement('div');
-  const dragOverlay = document.createElement('div');
+  const dragOverlay = createDragCanvas();
+  dragOverlay.dataset['overlayBackground'] = 'rgba(0, 0, 0, 0.5)';
   const finalFrame = document.createElement('div');
   const finalOverlay = document.createElement('div');
   const sizePanel = document.createElement('div');
@@ -68,12 +99,6 @@ function createDom(): SelectionModeDom {
   leftShade.className = 'sniptale-shade-left';
   rightShade.className = 'sniptale-shade-right';
   finalOverlay.append(topShade, bottomShade, leftShade, rightShade);
-  for (const direction of ['top', 'bottom', 'left', 'right']) {
-    const shade = document.createElement('div');
-    shade.className = `sniptale-shade sniptale-shade-${direction}`;
-    dragOverlay.appendChild(shade);
-  }
-
   widthInput.min = '10';
   widthInput.max = '900';
   heightInput.min = '10';
@@ -98,6 +123,7 @@ function createDom(): SelectionModeDom {
     hoverSizeLabel: null,
     dragFrame,
     dragOverlay,
+    dragMaskBackground: 'rgba(0, 0, 0, 0.5)',
     dragFrameRafId: null,
     pendingDragRect: null,
     finalFrameRafId: null,
@@ -135,10 +161,12 @@ describe('selection-mode ui frame updates', () => {
     expect(dom.dragFrame?.style.height).toBe('90.8px');
     expect(labels).toHaveLength(1);
     expect(labels[0]?.textContent).toBe('150 × 91');
+    expect(dom.dragOverlay?.getContext).toHaveBeenCalledTimes(1);
   });
 
   it('coalesces drag geometry into one animation-frame commit using the latest rectangle', () => {
     const dom = createDom();
+    const getComputedStyleSpy = vi.spyOn(window, 'getComputedStyle');
     const scheduled: { commit?: FrameRequestCallback } = {};
     const requestAnimationFrameSpy = vi
       .spyOn(window, 'requestAnimationFrame')
@@ -159,11 +187,14 @@ describe('selection-mode ui frame updates', () => {
 
     expect(dom.dragFrame?.style.left).toBe('15px');
     expect(dom.dragFrame?.style.width).toBe('90px');
-    expect(dom.dragOverlay?.querySelector<HTMLElement>('.sniptale-shade-right')?.style.left).toBe(
-      '105px'
-    );
+    const canvasContext = dom.dragOverlay ? dragCanvasContexts.get(dom.dragOverlay) : undefined;
+    expect(canvasContext?.clearRect).toHaveBeenCalledWith(0, 0, 1280, 720);
+    expect(canvasContext?.fillRect).toHaveBeenCalledWith(0, 0, 1280, 25);
+    expect(canvasContext?.fillRect).toHaveBeenCalledWith(105, 25, 1175, 70);
+    expect(dom.dragOverlay?.querySelector('.sniptale-shade')).toBeNull();
     expect(dom.dragFrameRafId).toBeNull();
     expect(dom.pendingDragRect).toBeNull();
+    expect(getComputedStyleSpy).not.toHaveBeenCalled();
   });
 
   it('syncs tooltip values, frame geometry, overlay shades, and panel position', () => {
@@ -185,6 +216,7 @@ describe('selection-mode ui frame updates', () => {
       heightMin: 10,
       heightMax: 700,
     });
+    expect(syncSelectionToolbarCompactControlsChromeMock).toHaveBeenCalledWith(dom.sizeTooltip);
     expect(calculateContentSizeTooltipPositionMock).toHaveBeenCalledWith({
       anchorRect: { x: 100, y: 120, width: 240, height: 160 },
       tooltipHeight: 44,

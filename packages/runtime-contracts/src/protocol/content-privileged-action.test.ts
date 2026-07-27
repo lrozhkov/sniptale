@@ -27,6 +27,7 @@ it('matches the exact protected message type set', () => {
     MessageType.SAVE_RECORDING_FOR_DOWNLOAD,
     MessageType.RELEASE_RECORDING_DOWNLOAD,
     MessageType.TRIGGER_QUICK_ACTION,
+    MessageType.CONTENT_RUNTIME_WAKEUP,
   ]);
 });
 

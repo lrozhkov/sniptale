@@ -1,4 +1,5 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
 import type { ProcessWithLLMMessage, ProcessWithLLMResponse } from '../../../llm';
 import type { RequestLlmSessionMessage, RequestLlmSessionResponse } from '../../../llm';
 import type {
@@ -45,6 +46,7 @@ import {
   isBoolean,
   isImageDataUrl,
   isNumber,
+  isRecord,
   isString,
 } from '../../../validators/index';
 import { isContentPrivilegedActionCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
@@ -54,6 +56,34 @@ import { pageAccessRuntimeContracts } from './page-access';
 
 function isContentRuntimeWakeupReason(value: unknown): value is 'pin-to-tab' | 'scenario' {
   return value === 'pin-to-tab' || value === 'scenario';
+}
+
+type ContentRuntimeWakeupResponse = RuntimeMessageResponse<{
+  pinToTab: boolean;
+  pinToTabAvailable: boolean;
+  reason?: 'pin-to-tab' | 'scenario';
+  restored?: boolean;
+}>;
+
+const isContentRuntimeWakeupResponseEnvelope =
+  createRuntimeResponseGuard<ContentRuntimeWakeupResponse>({
+    optional: {
+      pinToTab: isBoolean,
+      pinToTabAvailable: isBoolean,
+      reason: isContentRuntimeWakeupReason,
+      restored: isBoolean,
+    },
+  });
+
+function isContentRuntimeWakeupResponse(input: unknown): input is ContentRuntimeWakeupResponse {
+  if (!isContentRuntimeWakeupResponseEnvelope(input) || !isRecord(input)) {
+    return false;
+  }
+
+  return (
+    input['success'] !== true ||
+    (isBoolean(input['pinToTab']) && isBoolean(input['pinToTabAvailable']))
+  );
 }
 
 function isPageStorageErasureOperation(value: unknown): value is 'erase' | 'verify' {
@@ -127,13 +157,16 @@ export const runtimeActionCoreMessageContracts = {
       'runtime CONTENT_RUNTIME_WAKEUP message',
       createMessageGuard({
         type: MessageType.CONTENT_RUNTIME_WAKEUP,
+        optional: {
+          contentIntent: isContentPrivilegedActionCapability,
+          pinToTab: isBoolean,
+          toolbarVisible: isBoolean,
+        },
       })
     ),
     parseResponse: createGuardParser(
       'runtime CONTENT_RUNTIME_WAKEUP response',
-      createRuntimeResponseGuard({
-        optional: { reason: isContentRuntimeWakeupReason, restored: isBoolean },
-      })
+      isContentRuntimeWakeupResponse
     ),
   },
   [MessageType.ERASE_LOCAL_EXTENSION_DATA]: {

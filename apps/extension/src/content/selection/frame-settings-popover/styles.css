@@ -1,0 +1,118 @@
+.sniptale-frame-settings-popover .sniptale-content-popover-section-label {
+  justify-content: flex-start;
+  padding-inline: 0;
+  text-align: left;
+}
+
+.sniptale-frame-style-section > .sniptale-content-popover-section-label {
+  padding-inline: 11px;
+}
+
+.sniptale-frame-style-preset-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sniptale-frame-style-preset-row .sniptale-glass-preset-item {
+  padding-right: 66px;
+}
+
+.sniptale-frame-style-preset-row .sniptale-glass-preset-meta {
+  text-align: left;
+}
+
+.sniptale-frame-style-preset-row[data-enabled='false'] .sniptale-glass-preset-item {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.sniptale-frame-style-preset-actions {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 120ms ease;
+}
+
+.sniptale-frame-style-preset-row:hover .sniptale-frame-style-preset-actions,
+.sniptale-frame-style-preset-row:focus-within .sniptale-frame-style-preset-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sniptale-frame-style-preset-action {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.sniptale-frame-style-preset-action:hover:not(:disabled),
+.sniptale-frame-style-preset-action:focus-visible {
+  background: transparent;
+  color: var(--sniptale-color-accent);
+  outline: none;
+}
+
+.sniptale-frame-style-preset-action:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sniptale-color-accent) 22%, transparent);
+}
+
+.sniptale-frame-style-preset-action:disabled {
+  cursor: wait;
+  opacity: 0.45;
+}
+
+.sniptale-frame-style-add {
+  width: 100%;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.sniptale-frame-style-add:hover,
+.sniptale-frame-style-add:focus-visible {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 38%,
+    var(--sniptale-color-border-soft) 62%
+  );
+  background: color-mix(in srgb, var(--sniptale-color-accent) 7%, transparent);
+  color: var(--sniptale-color-accent);
+  outline: none;
+}
+
+.sniptale-frame-style-editor-layer {
+  display: contents;
+}

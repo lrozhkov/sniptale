@@ -64,6 +64,7 @@ function renderGroup(screenshotMode = true) {
         compactMenus={false}
         displayMode="vertical"
         pinToTab={false}
+        pinToTabAvailable={true}
         pinToTabLocked={false}
         onCompactMenusChange={() => undefined}
         onDisplayModeChange={() => undefined}

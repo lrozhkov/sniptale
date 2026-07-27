@@ -128,8 +128,14 @@ describe('ContentSizeTooltip', () => {
     const surface = getTooltipSurface();
 
     expect(surface?.dataset['variant']).toBe('frame-edit');
-    expect(surface?.style.width).toBe('290px');
-    expect(surface?.style.minWidth).toBe('290px');
+    expect(surface?.style.width).toBe('296px');
+    expect(surface?.style.minWidth).toBe('296px');
+    expect(container?.querySelector('style')?.textContent).toContain(
+      '.sniptale-content-size-tooltip-primary-action:hover:not(:disabled)'
+    );
+    expect(container?.querySelector('style')?.textContent).toContain(
+      '.sniptale-size-btn:hover:not(:disabled)'
+    );
   });
 });
 

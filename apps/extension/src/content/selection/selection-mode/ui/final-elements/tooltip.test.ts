@@ -75,15 +75,14 @@ describe('selection-mode final tooltip', () => {
 
     wireSelectionModeFinalSizeTooltipActions(tooltip, options);
 
-    tooltip.cancelButton.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true })
-    );
-    tooltip.confirmButton.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true })
-    );
+    const cancelEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+    const confirmEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+    tooltip.cancelButton.dispatchEvent(cancelEvent);
+    tooltip.confirmButton.dispatchEvent(confirmEvent);
 
-    expect(options.onResetToIdle).toHaveBeenCalledTimes(1);
-    expect(options.onConfirm).toHaveBeenCalledTimes(1);
+    expect(options.onCancel).toHaveBeenCalledTimes(1);
+    expect(options.onResetToIdle).not.toHaveBeenCalled();
+    expect(options.onConfirm).toHaveBeenCalledWith(confirmEvent);
   });
 });
 
@@ -114,6 +113,7 @@ function createOptions() {
     getSelection: () => ({ x: 10, y: 10, width: 100, height: 100 }),
     onAdjustPadding: vi.fn(),
     onCaptureActionChange: vi.fn(),
+    onCancel: vi.fn(),
     onConfirm: vi.fn(),
     onResetToIdle: vi.fn(),
     onSetupSizePanelListeners: vi.fn(),

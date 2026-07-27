@@ -4,6 +4,7 @@ import React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { CalloutManualPlacement } from '@sniptale/runtime-contracts/highlighter/callout';
 import { useCalloutDrag, type CalloutDragStartEvent } from './drag';
 
 class TestPointerEvent extends MouseEvent {
@@ -35,14 +36,14 @@ afterEach(() => {
   onPositionChange.mockReset();
 });
 
-function renderHarness() {
-  function Harness() {
+function renderHarness(manualPlacement?: CalloutManualPlacement) {
+  function Harness(props: { manualPlacement: CalloutManualPlacement | undefined }) {
     const wrapperRef = React.useRef<HTMLDivElement | null>(null);
     drag = useCalloutDrag({
       dimensions: { width: 100, height: 40 },
       frameRect: { x: 100, y: 100, width: 120, height: 80 },
       isEditing: false,
-      manualPlacement: undefined,
+      manualPlacement: props.manualPlacement,
       onPositionChange,
       wrapperRef,
     });
@@ -52,9 +53,14 @@ function renderHarness() {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
-  act(() => root?.render(<Harness />));
+  act(() => root?.render(<Harness manualPlacement={manualPlacement} />));
   const wrapper = container.querySelector<HTMLElement>('[data-ui="callout-wrapper"]');
   vi.spyOn(wrapper!, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 200, 100, 40));
+  return {
+    rerender: (nextPlacement: CalloutManualPlacement) => {
+      act(() => root?.render(<Harness manualPlacement={nextPlacement} />));
+    },
+  };
 }
 
 function startDrag() {
@@ -92,7 +98,7 @@ function keyboardEvent(key: string, shiftKey = false) {
 
 describe('useCalloutDrag', () => {
   it('previews movement locally and commits one placement on pointerup', () => {
-    renderHarness();
+    const harness = renderHarness();
     startDrag();
     dispatchPointer('pointermove', 260, 250);
 
@@ -103,6 +109,10 @@ describe('useCalloutDrag', () => {
 
     expect(onPositionChange).toHaveBeenCalledOnce();
     expect(onPositionChange).toHaveBeenCalledWith({ centerOffsetX: 140, centerOffsetY: 120 });
+    expect(drag?.draftPlacement).toEqual({ centerOffsetX: 140, centerOffsetY: 120 });
+
+    harness.rerender({ centerOffsetX: 140, centerOffsetY: 120 });
+    expect(drag?.draftPlacement).toBeNull();
   });
 
   it('rolls back without a commit when pointer capture is lost', () => {
@@ -114,6 +124,27 @@ describe('useCalloutDrag', () => {
     expect(drag?.draftPlacement).toBeNull();
     expect(drag?.isDragging).toBe(false);
     expect(onPositionChange).not.toHaveBeenCalled();
+  });
+
+  it('keeps the committed draft when lost capture follows pointerup in the same event turn', () => {
+    renderHarness();
+    startDrag();
+    dispatchPointer('pointermove', 260, 250);
+
+    act(() => {
+      document.dispatchEvent(
+        new TestPointerEvent('pointerup', {
+          button: 0,
+          clientX: 260,
+          clientY: 250,
+          pointerId: 7,
+        })
+      );
+      document.dispatchEvent(new Event('lostpointercapture'));
+    });
+
+    expect(onPositionChange).toHaveBeenCalledOnce();
+    expect(drag?.draftPlacement).toEqual({ centerOffsetX: 140, centerOffsetY: 120 });
   });
 
   it('moves and clamps the comment through arrow-key operations', () => {

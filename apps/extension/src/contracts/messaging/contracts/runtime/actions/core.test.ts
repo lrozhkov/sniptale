@@ -102,26 +102,50 @@ it('parses content privileged activation-key requests and responses', () => {
 it('parses content runtime wake-up responses with bounded restore reasons', () => {
   expect(
     contentRuntimeWakeupContract.parseResponse({
+      pinToTab: true,
+      pinToTabAvailable: true,
       reason: 'pin-to-tab',
       restored: true,
       success: true,
     })
   ).toEqual({
+    pinToTab: true,
+    pinToTabAvailable: true,
     reason: 'pin-to-tab',
     restored: true,
     success: true,
   });
   expect(
     contentRuntimeWakeupContract.parseResponse({
+      pinToTab: false,
+      pinToTabAvailable: true,
       reason: 'scenario',
       restored: true,
       success: true,
     })
   ).toEqual({
+    pinToTab: false,
+    pinToTabAvailable: true,
     reason: 'scenario',
     restored: true,
     success: true,
   });
+  expect(
+    contentRuntimeWakeupContract.parseResponse({
+      error: 'wake-up failed',
+      success: false,
+    })
+  ).toEqual({
+    error: 'wake-up failed',
+    success: false,
+  });
+  expect(() =>
+    contentRuntimeWakeupContract.parseResponse({
+      pinToTab: true,
+      restored: false,
+      success: true,
+    })
+  ).toThrow();
   expect(() =>
     contentRuntimeWakeupContract.parseResponse({
       reason: 'other',
@@ -131,14 +155,36 @@ it('parses content runtime wake-up responses with bounded restore reasons', () =
   ).toThrow();
 });
 
-it('parses content runtime wake-up requests', () => {
+it('parses a capability-bound pin-to-tab activation request', () => {
   expect(
     contentRuntimeWakeupContract.parseRequest({
+      contentIntent: { requestId: 'pin-request-1', token: 'pin-token-1' },
+      pinToTab: true,
       type: MessageType.CONTENT_RUNTIME_WAKEUP,
     })
   ).toEqual({
+    contentIntent: { requestId: 'pin-request-1', token: 'pin-token-1' },
+    pinToTab: true,
     type: MessageType.CONTENT_RUNTIME_WAKEUP,
   });
+});
+
+it('parses content runtime wake-up requests', () => {
+  expect(
+    contentRuntimeWakeupContract.parseRequest({
+      pinToTab: true,
+      type: MessageType.CONTENT_RUNTIME_WAKEUP,
+    })
+  ).toEqual({
+    pinToTab: true,
+    type: MessageType.CONTENT_RUNTIME_WAKEUP,
+  });
+  expect(() =>
+    contentRuntimeWakeupContract.parseRequest({
+      pinToTab: 'yes',
+      type: MessageType.CONTENT_RUNTIME_WAKEUP,
+    })
+  ).toThrow();
 });
 
 it('strictly parses the offscreen page-storage privacy command and result', () => {

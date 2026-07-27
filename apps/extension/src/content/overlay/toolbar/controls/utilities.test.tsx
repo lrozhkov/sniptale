@@ -72,20 +72,31 @@ describe('ToolbarUtilityButtons', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows Auto-Blur only in highlighter mode and opens the configure menu action', async () => {
+  it('shows sensitive-data blur only in highlighter mode and opens the configure menu action', async () => {
     const props = createProps();
     await renderUtilities({ ...props, highlighterMode: false });
     expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')).toBeNull();
 
     await renderUtilities(props);
     const autoBlurButton = container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]');
-    expect(autoBlurButton?.querySelector('svg')?.getAttribute('class')).toContain(
-      'lucide-shield-ellipsis'
-    );
+    expect(autoBlurButton?.querySelector('svg')?.getAttribute('class')).toContain('lucide-droplet');
     await act(async () => {
       autoBlurButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
+    expect(
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-toggle"] svg')
+        ?.getAttribute('class')
+    ).toContain('lucide-shield-check');
+    expect(
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-apply-once"] svg')
+        ?.getAttribute('class')
+    ).toContain('lucide-scan-search');
     const configure = container?.querySelector('[data-ui="content.toolbar.auto-blur-configure"]');
+    expect(configure?.querySelector('svg')?.getAttribute('class')).toContain(
+      'lucide-sliders-horizontal'
+    );
     await act(async () => {
       configure?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     });

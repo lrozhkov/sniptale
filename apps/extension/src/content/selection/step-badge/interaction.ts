@@ -6,7 +6,11 @@ import type {
 import { useTransientControlVisibility } from '../interactive-frame/overlays/transient-control-visibility';
 import { useStepBadgeControlPosition } from './controls';
 import { useStepBadgeBoundaryDrag } from './drag';
-import { getStepBadgeInitialPlacement, type StepBadgeFrameRect } from './placement';
+import {
+  getStepBadgeInitialPlacement,
+  getStepBadgeVisualMetrics,
+  type StepBadgeFrameRect,
+} from './placement';
 
 export function useStepBadgeInteraction(args: {
   borderWidth: number;
@@ -18,6 +22,7 @@ export function useStepBadgeInteraction(args: {
   const badgeRef = React.useRef<HTMLDivElement | null>(null);
   const hasControls = Boolean(args.frameRect && args.onPositionChange);
   const initialPlacement = getStepBadgeInitialPlacement(args.settings);
+  const visualOffset = getStepBadgeVisualMetrics(args.settings, args.borderWidth).offset;
   const boundaryFrameRect = args.frameRect
     ? {
         x: args.frameRect.x + args.borderWidth / 2,
@@ -30,6 +35,7 @@ export function useStepBadgeInteraction(args: {
     frameRect: boundaryFrameRect,
     initialPlacement,
     onPositionChange: args.onPositionChange ?? (() => undefined),
+    visualOffset,
   });
   const visibility = useTransientControlVisibility(drag.isDragging || Boolean(args.isSettingsOpen));
   const effectiveSettings = drag.draftPlacement
@@ -40,6 +46,14 @@ export function useStepBadgeInteraction(args: {
     isEnabled: hasControls,
     placementKey: JSON.stringify({
       anchor: effectiveSettings.anchor,
+      frameRect: args.frameRect
+        ? {
+            height: args.frameRect.height,
+            width: args.frameRect.width,
+            x: args.frameRect.x,
+            y: args.frameRect.y,
+          }
+        : null,
       manualPlacement: effectiveSettings.manualPlacement,
       offsetDirections: effectiveSettings.offsetDirections,
       sizeLevel: effectiveSettings.sizeLevel,

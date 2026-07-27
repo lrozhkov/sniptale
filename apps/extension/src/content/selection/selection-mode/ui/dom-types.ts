@@ -9,7 +9,8 @@ export interface SelectionModeDom {
   scissorsIcon: HTMLElement | null;
   hoverSizeLabel: HTMLElement | null;
   dragFrame: HTMLElement | null;
-  dragOverlay: HTMLElement | null;
+  dragOverlay: HTMLCanvasElement | null;
+  dragMaskBackground: string | null;
   dragFrameRafId: number | null;
   pendingDragRect: SelectionRect | null;
   finalFrameRafId: number | null;

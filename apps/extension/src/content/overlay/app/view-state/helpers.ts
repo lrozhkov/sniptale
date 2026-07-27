@@ -65,6 +65,7 @@ export function buildContentVisibilityState(
   | 'queueAutoStartCapture'
   | 'saveDialogState'
   | 'setIsCompletelyHidden'
+  | 'setPinnedToolbarVisible'
   | 'setSaveDialogState'
 > {
   return {
@@ -76,6 +77,7 @@ export function buildContentVisibilityState(
     queueAutoStartCapture: modeState.queueAutoStartCapture,
     saveDialogState: modeState.saveDialogState,
     setIsCompletelyHidden: modeState.setIsCompletelyHidden,
+    setPinnedToolbarVisible: modeState.setPinnedToolbarVisible,
     setSaveDialogState: modeState.setSaveDialogState,
   };
 }

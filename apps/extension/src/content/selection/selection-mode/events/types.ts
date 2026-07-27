@@ -32,5 +32,5 @@ export interface SelectionModeEventOptions {
   resetToIdleState: () => void;
   cancelSelection: () => void;
   closeCaptureActionMenu: (restoreFocus: boolean) => boolean;
-  confirmSelection: () => void;
+  confirmSelection: (event?: Event) => void;
 }

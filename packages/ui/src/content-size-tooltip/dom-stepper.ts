@@ -1,4 +1,5 @@
 import type { ContentSizeTooltipCopy } from './core';
+import type { ContentSizeTooltipVariant } from './types';
 import {
   CONTENT_SIZE_TOOLTIP_INPUT_CLASS_NAME,
   CONTENT_SIZE_TOOLTIP_INPUT_STYLE,
@@ -40,6 +41,7 @@ function createStepperButton(props: {
   className: string;
   target: 'width' | 'height';
   rotated?: boolean;
+  variant?: ContentSizeTooltipVariant | undefined;
 }) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -47,8 +49,9 @@ function createStepperButton(props: {
   button.setAttribute('aria-label', props.ariaLabel);
   button.title = props.ariaLabel;
   button.dataset['target'] = props.target;
+  button.dataset['variant'] = props.variant ?? 'default';
   button.appendChild(createChevronIcon(Boolean(props.rotated)));
-  applyTooltipDomStyle(button, getContentSizeTooltipStepButtonStyle(false));
+  applyTooltipDomStyle(button, getContentSizeTooltipStepButtonStyle(false, props.variant));
   bindRepeatingStepperButton(button);
   return button;
 }
@@ -151,6 +154,7 @@ export function createTooltipStepperGroup(props: {
   inputId: string;
   min: number;
   max: number;
+  variant?: ContentSizeTooltipVariant | undefined;
 }): ContentSizeTooltipDomStepperGroup {
   const group = document.createElement('div');
   group.className = CONTENT_SIZE_TOOLTIP_STEPPER_CLASS_NAME;
@@ -162,11 +166,13 @@ export function createTooltipStepperGroup(props: {
     className: 'sniptale-size-btn-minus',
     target: props.dimension,
     rotated: true,
+    variant: props.variant,
   });
   const increaseButton = createStepperButton({
     ariaLabel: props.dimension === 'width' ? props.copy.increaseWidth : props.copy.increaseHeight,
     className: 'sniptale-size-btn-plus',
     target: props.dimension,
+    variant: props.variant,
   });
 
   group.append(input, createStepperControls(increaseButton, decreaseButton));

@@ -11,7 +11,8 @@ export interface SelectionModeFinalElementsOptions {
   getMaxSelectionHeight: () => number;
   getCaptureAction: () => CaptureActionType;
   getSelection: () => Selection;
-  onConfirm: () => void;
+  onConfirm: (event?: Event) => void;
+  onCancel: () => void;
   onAdjustPadding: (direction: 'decrease' | 'increase') => void;
   onCaptureActionChange: (action: CaptureActionType) => void;
   onResetToIdle: () => void;

@@ -39,6 +39,9 @@ export function ToolbarScenarioControls(props: {
   toolbarMenuState: ToolbarMenuState;
 }) {
   const showWorkflowActions = props.showWorkflowActions ?? true;
+  const sidebarActionLabel = props.scenario.sidebarVisible
+    ? translate('scenario.content.sidebarHide')
+    : translate('scenario.content.sidebarShow');
 
   return (
     <>
@@ -54,13 +57,9 @@ export function ToolbarScenarioControls(props: {
       <ContentToolbarButton
         active={props.scenario.sidebarVisible}
         onClick={props.scenario.onToggleSidebar}
-        title={
-          props.scenario.sidebarVisible
-            ? translate('scenario.content.sidebarHide')
-            : translate('scenario.content.sidebarShow')
-        }
+        title={sidebarActionLabel}
         dataUi="content.toolbar.scenario-sidebar-button"
-        aria-label={translate('scenario.content.sidebar')}
+        aria-label={sidebarActionLabel}
       >
         {props.scenario.sidebarVisible ? (
           <PanelRightOpen className="h-[18px] w-[18px]" />

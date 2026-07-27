@@ -116,20 +116,42 @@ export function useInteractiveFramePropSync(params: {
   defaultEffectMode: EffectMode;
   frame: FrameData;
   isCalloutEditing: boolean;
+  isResizingRef: React.MutableRefObject<boolean>;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
+  setState: React.Dispatch<React.SetStateAction<FrameState>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   state: FrameState;
 }) {
-  const { defaultEffectMode, frame, isCalloutEditing, setEffectMode, setTempFrame, state } = params;
+  const {
+    defaultEffectMode,
+    frame,
+    isCalloutEditing,
+    isResizingRef,
+    setEffectMode,
+    setState,
+    setTempFrame,
+    state,
+  } = params;
 
   React.useEffect(() => {
     if (state === 'editing' || isCalloutEditing) {
       return;
     }
+    if (state === 'resizing' && isResizingRef.current) return;
 
     setEffectMode(frame.effectMode ?? defaultEffectMode);
     setTempFrame(frame);
-  }, [defaultEffectMode, frame, isCalloutEditing, setEffectMode, setTempFrame, state]);
+    if (state === 'resizing') setState('hover');
+  }, [
+    defaultEffectMode,
+    frame,
+    isCalloutEditing,
+    isResizingRef,
+    setEffectMode,
+    setState,
+    setTempFrame,
+    state,
+  ]);
 }
 
 export function useInteractiveFrameEditingEffects(params: {

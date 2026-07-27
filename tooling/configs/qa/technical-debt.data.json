@@ -730,6 +730,8 @@
         "apps/extension/src/background/runtime/native-app/tray-actions.ts",
         "apps/extension/src/background/runtime/native-app/tray-shortcut-priority.ts",
         "apps/extension/src/background/runtime/page-access/lifecycle.ts",
+        "apps/extension/src/background/runtime/page-access/pinned-toolbar-operation.ts",
+        "apps/extension/src/background/runtime/page-access/pinned-toolbar-restore.ts",
         "apps/extension/src/background/runtime/page-access/readiness.ts",
         "apps/extension/src/background/runtime/page-access/registration.ts",
         "apps/extension/src/background/runtime/page-access/route-descriptors.ts",
@@ -1346,6 +1348,8 @@
         "apps/extension/src/background/runtime/native-app/tray-actions.ts",
         "apps/extension/src/background/runtime/native-app/tray-shortcut-priority.ts",
         "apps/extension/src/background/runtime/page-access/lifecycle.ts",
+        "apps/extension/src/background/runtime/page-access/pinned-toolbar-operation.ts",
+        "apps/extension/src/background/runtime/page-access/pinned-toolbar-restore.ts",
         "apps/extension/src/background/runtime/page-access/readiness.ts",
         "apps/extension/src/background/runtime/page-access/registration.ts",
         "apps/extension/src/background/runtime/page-access/route-descriptors.ts",
@@ -3108,6 +3112,8 @@
         "apps/extension/src/content/selection/callout/tail-drag.ts",
         "apps/extension/src/content/selection/callout/tail.ts",
         "apps/extension/src/content/selection/callout/views.tsx",
+        "apps/extension/src/content/selection/callout/width-constraints.ts",
+        "apps/extension/src/content/selection/callout/width-resize.ts",
         "apps/extension/src/content/selection/controls/tooltip-copy.ts",
         "apps/extension/src/content/selection/frame-dom-driver/timing.ts",
         "apps/extension/src/content/selection/frame-runtime/contracts/index.ts",
@@ -3180,10 +3186,12 @@
         "apps/extension/src/content/selection/frame-runtime/ui-controller/helpers.ts",
         "apps/extension/src/content/selection/frame-runtime/ui-controller/hit-test.ts",
         "apps/extension/src/content/selection/frame-runtime/ui-controller/index.ts",
-        "apps/extension/src/content/selection/frame-settings-popover/bindings.ts",
         "apps/extension/src/content/selection/frame-settings-popover/controller.ts",
         "apps/extension/src/content/selection/frame-settings-popover/helpers.tsx",
         "apps/extension/src/content/selection/frame-settings-popover/index.tsx",
+        "apps/extension/src/content/selection/frame-settings-popover/overflow-hint.tsx",
+        "apps/extension/src/content/selection/frame-settings-popover/state/catalog.ts",
+        "apps/extension/src/content/selection/frame-settings-popover/state/editor-session.ts",
         "apps/extension/src/content/selection/frame-settings-popover/state/helpers.ts",
         "apps/extension/src/content/selection/frame-settings-popover/state/index.ts",
         "apps/extension/src/content/selection/frame-settings-popover/state/lifecycle.ts",
@@ -3288,6 +3296,7 @@
         "apps/extension/src/content/selection/quick-edit-runtime/controller.contracts.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/controller.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/cursor.ts",
+        "apps/extension/src/content/selection/quick-edit-runtime/document-cursor.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/document-mode.history.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/document-mode.targets.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/document-mode.ts",
@@ -3361,6 +3370,7 @@
         "apps/extension/src/content/selection/selection-mode/interaction/selection/bounds.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/selection/drag.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/selection/helpers.ts",
+        "apps/extension/src/content/selection/selection-mode/interaction/selection/padding.ts",
         "apps/extension/src/content/selection/selection-mode/lazy.ts",
         "apps/extension/src/content/selection/selection-mode/public-api/index.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/capture-area.ts",
@@ -3374,9 +3384,14 @@
         "apps/extension/src/content/selection/selection-mode/ui/cancel-button.ts",
         "apps/extension/src/content/selection/selection-mode/ui/container.ts",
         "apps/extension/src/content/selection/selection-mode/ui/dom-types.ts",
+        "apps/extension/src/content/selection/selection-mode/ui/final-elements/capture-controls.ts",
+        "apps/extension/src/content/selection/selection-mode/ui/final-elements/capture-menu.ts",
         "apps/extension/src/content/selection/selection-mode/ui/final-elements/frame.ts",
+        "apps/extension/src/content/selection/selection-mode/ui/final-elements/icons.ts",
         "apps/extension/src/content/selection/selection-mode/ui/final-elements/index.ts",
         "apps/extension/src/content/selection/selection-mode/ui/final-elements/overlay.ts",
+        "apps/extension/src/content/selection/selection-mode/ui/final-elements/toolbar-chrome.ts",
+        "apps/extension/src/content/selection/selection-mode/ui/final-elements/toolbar.ts",
         "apps/extension/src/content/selection/selection-mode/ui/final-elements/tooltip.ts",
         "apps/extension/src/content/selection/selection-mode/ui/frame-updates/index.ts",
         "apps/extension/src/content/selection/selection-mode/ui/hover.ts",
@@ -3676,6 +3691,7 @@
         "apps/extension/src/content/selection/quick-edit-runtime/controller.contracts.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/controller.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/cursor.ts",
+        "apps/extension/src/content/selection/quick-edit-runtime/document-cursor.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/document-mode.history.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/document-mode.targets.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/document-mode.ts",
@@ -3741,6 +3757,7 @@
         "apps/extension/src/content/selection/selection-mode/interaction/selection/bounds.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/selection/drag.ts",
         "apps/extension/src/content/selection/selection-mode/interaction/selection/helpers.ts",
+        "apps/extension/src/content/selection/selection-mode/interaction/selection/padding.ts",
         "apps/extension/src/content/selection/selection-mode/lazy.ts",
         "apps/extension/src/content/selection/selection-mode/public-api/index.ts",
         "apps/extension/src/content/selection/selection-mode/runtime/capture-area.ts",
@@ -3754,9 +3771,14 @@
         "apps/extension/src/content/selection/selection-mode/ui/cancel-button.ts",
         "apps/extension/src/content/selection/selection-mode/ui/container.ts",
         "apps/extension/src/content/selection/selection-mode/ui/dom-types.ts",
+        "apps/extension/src/content/selection/selection-mode/ui/final-elements/capture-controls.ts",
+        "apps/extension/src/content/selection/selection-mode/ui/final-elements/capture-menu.ts",
         "apps/extension/src/content/selection/selection-mode/ui/final-elements/frame.ts",
+        "apps/extension/src/content/selection/selection-mode/ui/final-elements/icons.ts",
         "apps/extension/src/content/selection/selection-mode/ui/final-elements/index.ts",
         "apps/extension/src/content/selection/selection-mode/ui/final-elements/overlay.ts",
+        "apps/extension/src/content/selection/selection-mode/ui/final-elements/toolbar-chrome.ts",
+        "apps/extension/src/content/selection/selection-mode/ui/final-elements/toolbar.ts",
         "apps/extension/src/content/selection/selection-mode/ui/final-elements/tooltip.ts",
         "apps/extension/src/content/selection/selection-mode/ui/frame-updates/index.ts",
         "apps/extension/src/content/selection/selection-mode/ui/hover.ts",
@@ -10152,27 +10174,6 @@
         "apps/extension/src/settings/sections/editor/logic.ts",
         "apps/extension/src/settings/sections/editor/rows.tsx",
         "apps/extension/src/settings/sections/editor/types.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/content.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/helpers.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/index.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/basic-settings.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/custom-css-field.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/padding-fields.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/preview.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/shadow-buttons.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/style-buttons.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/types.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/index.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/state/helpers.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/draft-state.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/index.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/initialization.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/resize-listeners.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/resize.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/save-handler.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/types.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/update-padding.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/validation.ts",
         "apps/extension/src/settings/sections/highlighter/section/blur-controls.tsx",
         "apps/extension/src/settings/sections/highlighter/section/content.tsx",
         "apps/extension/src/settings/sections/highlighter/section/crud-actions.ts",
@@ -10444,27 +10445,6 @@
         "apps/extension/src/settings/sections/editor/logic.ts",
         "apps/extension/src/settings/sections/editor/rows.tsx",
         "apps/extension/src/settings/sections/editor/types.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/content.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/helpers.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/index.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/basic-settings.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/custom-css-field.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/padding-fields.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/preview.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/shadow-buttons.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/sections/style-buttons.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/fields/types.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/index.tsx",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/state/helpers.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/draft-state.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/index.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/initialization.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/resize-listeners.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/resize.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/save-handler.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/types.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/update-padding.ts",
-        "apps/extension/src/settings/sections/highlighter/border-preset-editor/useBorderPresetEditorState/validation.ts",
         "apps/extension/src/settings/sections/highlighter/section/blur-controls.tsx",
         "apps/extension/src/settings/sections/highlighter/section/content.tsx",
         "apps/extension/src/settings/sections/highlighter/section/crud-actions.ts",
@@ -10727,6 +10707,62 @@
         "apps/extension/src/ui/gradient-preset-grid/index.tsx"
       ],
       "rolloutFiles": [],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/ui/highlighter-preset-editor",
+      "disposition": "rollout",
+      "reason": "Shared highlighter preset editor preserves UI coverage rollout across settings and content consumers.",
+      "productionFiles": [
+        "apps/extension/src/ui/highlighter-preset-editor/content.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/helpers.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/index.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/basic-settings.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/compact-range-field.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/custom-css-field.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/padding-fields.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/sample.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/shadow-buttons.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/style-buttons.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/types.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/index.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/modal-lifecycle.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/state/helpers.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/draft-state.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/index.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/initialization.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/resize-listeners.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/resize.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/save-handler.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/types.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/update-padding.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/validation.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/ui/highlighter-preset-editor/content.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/helpers.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/index.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/basic-settings.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/compact-range-field.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/custom-css-field.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/padding-fields.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/sample.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/shadow-buttons.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/style-buttons.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/types.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/index.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/modal-lifecycle.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/state/helpers.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/draft-state.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/index.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/initialization.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/resize-listeners.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/resize.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/save-handler.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/types.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/update-padding.ts",
+        "apps/extension/src/ui/highlighter-preset-editor/useBorderPresetEditorState/validation.ts"
+      ],
       "unownedFocusedFiles": []
     },
     {
@@ -12115,6 +12151,7 @@
         "packages/ui/src/dom-events/index.ts",
         "packages/ui/src/editor-chrome/index.tsx",
         "packages/ui/src/floating-chrome/index.tsx",
+        "packages/ui/src/floating-interactions/ownership.ts",
         "packages/ui/src/floating-interactions/placement.ts",
         "packages/ui/src/floating-interactions/target.ts",
         "packages/ui/src/glass-select/dismiss.ts",
@@ -12151,6 +12188,7 @@
         "packages/ui/src/product-glass-controls/primitives.tsx",
         "packages/ui/src/product-glass-toolbar/index.tsx",
         "packages/ui/src/product-menus/dropdown/index.tsx",
+        "packages/ui/src/product-menus/toolbar/dom.ts",
         "packages/ui/src/product-menus/toolbar/index.tsx",
         "packages/ui/src/product-modal/actions.tsx",
         "packages/ui/src/product-modal/index.tsx",
@@ -12216,6 +12254,7 @@
         "packages/ui/src/dom-events/index.ts",
         "packages/ui/src/editor-chrome/index.tsx",
         "packages/ui/src/floating-chrome/index.tsx",
+        "packages/ui/src/floating-interactions/ownership.ts",
         "packages/ui/src/floating-interactions/placement.ts",
         "packages/ui/src/floating-interactions/target.ts",
         "packages/ui/src/glass-select/dismiss.ts",
@@ -12252,6 +12291,7 @@
         "packages/ui/src/product-glass-controls/primitives.tsx",
         "packages/ui/src/product-glass-toolbar/index.tsx",
         "packages/ui/src/product-menus/dropdown/index.tsx",
+        "packages/ui/src/product-menus/toolbar/dom.ts",
         "packages/ui/src/product-menus/toolbar/index.tsx",
         "packages/ui/src/product-modal/actions.tsx",
         "packages/ui/src/product-modal/index.tsx",
@@ -12283,7 +12323,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "e2451539c2157a5cdf1ab5d53f5211864595a10dca6ca6b5ea09f59c8d29e06e"
+        "contentHash": "acd112715829348b896bd0fde25c792f2adb384fbdf48645972d57880d6f8bf7"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -12365,7 +12405,7 @@
       "remediation": "Remove or narrow the exclusion and assign the target to its real coverage owner.",
       "exactSource": {
         "path": "tooling/qa/core/verify-test-coverage.registry.mjs",
-        "contentHash": "6f3dc847f35750df6051d2ed56c7172cce6dfd3799d1350e60611695deb23f11"
+        "contentHash": "2bbf81b92e95b1db17d55b901c6edb84ff8c4debb2e6a5a0b504a2231fe9c43d"
       },
       "consumers": [
         "tooling/qa/core/coverage-audit-report.mjs",
@@ -16550,7 +16590,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "f290b780759350ea3a78a136ff469443e173b066b8014a1acc2870c7d0c7de2e"
+        "contentHash": "de0954b9373f7ed600cdf25e8485657a6f91f371f07b5f00860e3575efd16a0d"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16605,7 +16645,6 @@
         "property:testFiles[49]",
         "property:testFiles[5]",
         "property:testFiles[50]",
-        "property:testFiles[51]",
         "property:testFiles[6]",
         "property:testFiles[7]",
         "property:testFiles[8]",
@@ -17049,7 +17088,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/owner-classifier.mjs",
-        "contentHash": "51bd67e826e0e8a1707006056c42251cbde86976bcf4551d925cb63626e1bb07"
+        "contentHash": "15416428d42c0ce04d561c8d82b67e15c1ddcc2c8239bae2a7a5a547c7399865"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -17058,10 +17097,14 @@
         "tooling/qa/core/structural-risk/owner-classifier.mjs",
         "tooling/qa/core/verify-build.deleted-closure.mjs",
         "tooling/qa/core/verify-build.test-profiles.mjs",
+        "tooling/qa/core/verify-structural-risk.test.ts",
         "tooling/qa/wrappers/preflight.mjs"
       ],
       "surfaces": [
-        "binding:EFFECT_FAMILIES"
+        "binding:DIRECT_PERSISTENCE_CALLEE_ROOTS",
+        "binding:EFFECT_FAMILIES",
+        "binding:PERSISTENCE_MUTATION_METHODS",
+        "binding:PERSISTENCE_RECEIVER_NAMES"
       ]
     },
     {
@@ -18317,7 +18360,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/settings.mjs",
-        "contentHash": "735ed530b5fcadb2130e4ea1b75f121450bcdb3e3f7751eea54ce5a75fc34e5b"
+        "contentHash": "8f8cd20c44347b60dee50a846d499672aff7082dd1afd2456f0b771fe8d011b7"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18938,7 +18981,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/topology-fragmentation.mjs",
-        "contentHash": "4bb2b7d5581a8f38eb651eb90f5b4b9fd649a3be05d334a6e85f93544db43c43"
+        "contentHash": "abff39968dc6bf1bfe64abc5eb0ed0ff5438e44c5eecaca82a3f17f989dbc1c8"
       },
       "consumers": [
         "tooling/qa/core/topology-fragmentation.mjs",
@@ -18946,8 +18989,8 @@
         "tooling/qa/wrappers/structural-audit.mjs"
       ],
       "surfaces": [
-        "property:buildForwardingEdgeClusters/anonymous-303/forwardingFiles",
-        "property:buildForwardingEdgeClusters/anonymous-303/signals",
+        "property:buildForwardingEdgeClusters/anonymous-323/forwardingFiles",
+        "property:buildForwardingEdgeClusters/anonymous-323/signals",
         "property:collectTopologyFragmentationReport/summary"
       ]
     },
@@ -18960,7 +19003,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/topology-fragmentation.policy.mjs",
-        "contentHash": "2fc73ca213b530bfc150bbb6dfec65740196e0139ecfe486e0932656b4181ffa"
+        "contentHash": "758cb051e3ffebfb59e065000208834525b74fabce8ec79a67928b7c36acf8d9"
       },
       "consumers": [
         "tooling/qa/core/topology-fragmentation.mjs",
@@ -18975,10 +19018,12 @@
         "property:decideForwardingEdgeCandidate/reasons[2]",
         "property:decideForwardingEdgeCandidate/reasons[3]",
         "property:decideForwardingEdgeCandidate/reasons[4]",
+        "property:decideForwardingEdgeCandidate/reasons[5]",
         "property:decideTopologyCluster/reasons",
         "property:decideTopologyCluster/reasons[1]",
         "property:decideTopologyCluster/reasons[2]",
-        "property:decideTopologyCluster/reasons[3]"
+        "property:decideTopologyCluster/reasons[3]",
+        "property:decideTopologyCluster/reasons[4]"
       ]
     },
     {

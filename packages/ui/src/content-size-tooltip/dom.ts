@@ -48,6 +48,7 @@ function createTooltipDomParts(props: {
       inputId: 'sniptale-width-input',
       min: props.widthMin,
       max: props.widthMax,
+      variant: props.variant,
     }),
     height: createTooltipStepperGroup({
       copy: props.copy,
@@ -56,8 +57,13 @@ function createTooltipDomParts(props: {
       inputId: 'sniptale-height-input',
       min: props.heightMin,
       max: props.heightMax,
+      variant: props.variant,
     }),
-    aspectRatioButton: createTooltipRatioButton(props.copy, props.canToggleAspectRatio === false),
+    aspectRatioButton: createTooltipRatioButton(
+      props.copy,
+      props.canToggleAspectRatio === false,
+      props.variant
+    ),
     ...createTooltipActions(props.copy, props.confirmLabel, props.variant),
   };
 }
@@ -173,11 +179,13 @@ export function syncContentSizeTooltipAspectRatioButtonState(
     getContentSizeTooltipRatioButtonStyle({
       active: props.maintainAspectRatio,
       disabled,
+      variant: button.dataset['variant'] === 'frame-edit' ? 'frame-edit' : 'default',
     })
   );
 }
 
 function syncStepperButtonState(button: HTMLButtonElement, disabled: boolean) {
   button.disabled = disabled;
-  applyTooltipDomStyle(button, getContentSizeTooltipStepButtonStyle(disabled));
+  const variant = button.dataset['variant'] === 'frame-edit' ? 'frame-edit' : 'default';
+  applyTooltipDomStyle(button, getContentSizeTooltipStepButtonStyle(disabled, variant));
 }

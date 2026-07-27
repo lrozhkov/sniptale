@@ -108,8 +108,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Clear all frames',
   },
   autoBlur: {
-    ru: 'Auto-Blur',
-    en: 'Auto-Blur',
+    ru: 'Размытие данных',
+    en: 'Sensitive data blur',
   },
   modeMenuTitle: {
     ru: 'Режим работы',
@@ -158,6 +158,10 @@ export const contentToolbarModesMessages = defineMessageSource({
   pinToTabLockedHint: {
     ru: 'Панель закреплена, пока включён сценарий',
     en: 'The toolbar stays pinned while scenario mode is on',
+  },
+  pinToTabUnavailableHint: {
+    ru: 'Разрешите расширению доступ ко всем сайтам, чтобы панель восстанавливалась после переходов',
+    en: 'Allow the extension on all sites so the toolbar can return after navigation',
   },
   hideToolbar: {
     ru: 'Скрыть панель',

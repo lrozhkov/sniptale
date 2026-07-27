@@ -59,7 +59,7 @@ describe('calculateInteractiveFrameSizePanelPosition', () => {
 
     expect(
       calculateInteractiveFrameSizePanelPosition({ x: 120, y: 180, width: 240, height: 120 })
-    ).toEqual({ x: 95, y: 126 });
+    ).toEqual({ x: 92, y: 126 });
   });
 
   it('flips the compact editing toolbar below the frame instead of covering it', () => {
@@ -68,6 +68,6 @@ describe('calculateInteractiveFrameSizePanelPosition', () => {
 
     expect(
       calculateInteractiveFrameSizePanelPosition({ x: 120, y: 18, width: 240, height: 120 })
-    ).toEqual({ x: 95, y: 148 });
+    ).toEqual({ x: 92, y: 148 });
   });
 });

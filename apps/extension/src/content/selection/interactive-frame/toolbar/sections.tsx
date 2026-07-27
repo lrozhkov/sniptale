@@ -44,6 +44,7 @@ export function InteractiveFrameToolbarEffectButtons(props: {
         return (
           <ProductGlassToolbarButton
             key={mode}
+            data-sniptale-activation-bridge="defer"
             ref={
               isActive ? (props.popoverAnchorRef as React.RefObject<HTMLButtonElement>) : undefined
             }
@@ -71,6 +72,7 @@ function InteractiveFrameToolbarStepButton(props: {
 }) {
   return (
     <ProductGlassToolbarButton
+      data-sniptale-activation-bridge="defer"
       ref={props.stepBadgePopoverAnchorRef as React.RefObject<HTMLButtonElement>}
       onClick={props.handleStepBadgeClick}
       onMouseDown={props.handleButtonMouseDown}
@@ -95,6 +97,7 @@ function InteractiveFrameToolbarCalloutButton(props: {
 }) {
   return (
     <ProductGlassToolbarButton
+      data-sniptale-activation-bridge="defer"
       ref={props.calloutPopoverAnchorRef as React.RefObject<HTMLButtonElement>}
       onClick={props.handleCalloutClick}
       onMouseDown={props.handleButtonMouseDown}

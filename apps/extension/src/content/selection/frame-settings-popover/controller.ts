@@ -3,8 +3,8 @@ import type {
   BlurSettings,
   FocusSettings,
 } from '../../../features/highlighter/contracts';
+import { useRef } from 'react';
 import { useContentPortalTheme } from '../interactive-frame/layout/portal';
-import { useFrameSettingsPopoverBindings } from './bindings';
 import {
   useFrameSettingsPopoverDistanceClose,
   useFrameSettingsPopoverModeClose,
@@ -36,36 +36,31 @@ export function useFrameSettingsPopoverController(args: {
     ...(args.borderSettings === undefined ? {} : { borderSettings: args.borderSettings }),
     ...(args.focusSettings === undefined ? {} : { focusSettings: args.focusSettings }),
   });
-  const bindings = useFrameSettingsPopoverBindings({
-    handleSelectPreset: state.handlers.handleSelectPreset,
-    onClose: args.onClose,
-  });
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   useFrameSettingsPopoverOutsideClose({
-    isOpen: args.isOpen,
+    isOpen: args.isOpen && !state.catalog.editor.isOpen,
     onClose: args.onClose,
-    popoverRef: bindings.popoverRef,
+    popoverRef,
   });
   useFrameSettingsPopoverModeClose({ isOpen: args.isOpen, onClose: args.onClose });
   useFrameSettingsPopoverDistanceClose({
-    isOpen: args.isOpen,
+    isOpen: args.isOpen && !state.catalog.editor.isOpen,
     onClose: args.onClose,
-    popoverRef: bindings.popoverRef,
+    popoverRef,
   });
   usePopoverEscapeClose({
     anchorEl: args.anchorEl,
-    isOpen: args.isOpen,
+    isOpen: args.isOpen && !state.catalog.editor.isOpen,
     onClose: args.onClose,
   });
 
   return {
-    handlers: {
-      ...state.handlers,
-      handleSelectPreset: bindings.handleSelectPresetAndClose,
-    },
+    catalog: state.catalog,
+    handlers: state.handlers,
     settings: state.settings,
     surface: {
-      popoverRef: bindings.popoverRef,
+      popoverRef,
       portalTheme,
     },
   };

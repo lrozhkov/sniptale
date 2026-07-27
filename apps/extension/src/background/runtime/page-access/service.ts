@@ -4,6 +4,7 @@ import type {
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import { createPageAccessService, type PageAccessService } from './service-factory';
 import { temporaryTabActivationStore } from './tab-activation';
+import { hasAllSitesPermission } from './registration';
 
 export { createPageAccessService };
 export type { PageAccessService };
@@ -16,8 +17,21 @@ export async function hasActivePageAccess(tabId: number): Promise<boolean> {
   return defaultPageAccessService.hasActivePageAccess(tabId);
 }
 
+export async function hasPinnedToolbarAllSitesAccess(): Promise<boolean> {
+  return hasAllSitesPermission();
+}
+
 export async function refreshActivePageAccessRuntime(tabId: number): Promise<boolean> {
   return defaultPageAccessService.refreshActivePageAccessRuntime(tabId);
+}
+
+export async function registerPinnedToolbarAllSitesAccess(args: {
+  commit: () => Promise<boolean>;
+  expectedUrl: string;
+  isCurrent: () => boolean;
+  tabId: number;
+}): Promise<'registered' | 'superseded'> {
+  return defaultPageAccessService.registerPinnedToolbarAllSitesAccess(args);
 }
 
 export async function ensureActivePageAccessRuntime(
@@ -46,4 +60,8 @@ export async function clearPageAccessTabActivation(tabId: number): Promise<void>
 
 export async function unregisterRemovedPageAccessOrigins(origins: string[]): Promise<void> {
   await defaultPageAccessService.unregisterRemovedPageAccessOrigins(origins);
+}
+
+export async function reconcilePageAccessTabNavigation(tabId: number, url: string): Promise<void> {
+  await defaultPageAccessService.reconcilePageAccessTabNavigation(tabId, url);
 }

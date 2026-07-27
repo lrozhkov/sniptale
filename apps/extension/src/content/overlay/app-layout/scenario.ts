@@ -9,13 +9,18 @@ type ScenarioByClickRestoreState = {
 };
 
 type FinishScenarioRecorderArgs = {
-  modeController: {
-    handleToggleScreenshotMode: (enabled: boolean) => void;
-  };
+  onDisableScreenshotMode: () => void;
   scenarioController: {
     handleScreenshotModeDisabled: () => Promise<void>;
     openEditor: (stepId?: string | null) => Promise<void>;
   };
+};
+
+type UserScreenshotModeExitArgs = {
+  modeController: {
+    handleToggleScreenshotMode: (enabled: boolean) => void;
+  };
+  setPinToTab: (value: boolean) => void;
 };
 
 export function isScenarioByClickBlocked(modes: ScenarioBlockedModes) {
@@ -38,8 +43,13 @@ export function resolveScenarioByClickTransition(args: {
     : null;
 }
 
-export async function finishScenarioRecorder(args: FinishScenarioRecorderArgs) {
+export function exitScreenshotModeFromUserAction(args: UserScreenshotModeExitArgs): void {
   args.modeController.handleToggleScreenshotMode(false);
+  args.setPinToTab(false);
+}
+
+export async function finishScenarioRecorder(args: FinishScenarioRecorderArgs) {
+  args.onDisableScreenshotMode();
   await args.scenarioController.handleScreenshotModeDisabled();
   await args.scenarioController.openEditor();
 }

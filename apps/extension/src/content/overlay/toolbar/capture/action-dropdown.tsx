@@ -27,6 +27,7 @@ type CaptureActionDropdownProps = {
     value: string;
     label: string;
     hint: string;
+    icon: React.ReactNode;
   }>;
   onSelect: (value: string) => void;
   viewportRightInset?: number;
@@ -48,6 +49,7 @@ function CaptureActionDropdownItems(props: {
         onClick={preventToolbarMenuClick}
         selected={isSelected}
       >
+        {option.icon}
         <ProductToolbarMenuItemCopy label={option.label} hint={option.hint} />
         {isSelected && renderMenuCheck()}
       </ProductToolbarMenuItem>

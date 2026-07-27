@@ -46,6 +46,7 @@ function registerDomShellTest() {
       hoverSizeLabel: null,
       dragFrame: null,
       dragOverlay: null,
+      dragMaskBackground: null,
       dragFrameRafId: null,
       pendingDragRect: null,
       finalFrameRafId: null,
@@ -71,16 +72,26 @@ function registerOverlayContainerTest() {
       container.style.colorScheme = 'dark';
     });
 
-    createOverlayContainer(dom, { cancelSelection: vi.fn(), zIndexBase: 700 });
-    createOverlayContainer(dom, { cancelSelection: vi.fn(), zIndexBase: 900 });
+    createOverlayContainer(dom, {
+      cancelSelection: vi.fn(),
+      overlayBackground: 'rgba(9, 9, 11, 0.656)',
+      zIndexBase: 700,
+    });
+    createOverlayContainer(dom, {
+      cancelSelection: vi.fn(),
+      overlayBackground: 'rgba(9, 9, 11, 0.656)',
+      zIndexBase: 900,
+    });
 
     expect(appendToContentOverlayRootMock).toHaveBeenCalledTimes(1);
     expect(applyIsolatedContentRootStyleMock).toHaveBeenCalledTimes(1);
     expect(applyContentRuntimeThemeMock).toHaveBeenCalledTimes(1);
     expect(applyIsolatedContentRootStyleMock.mock.calls[0]?.[0]).toBe(dom.overlayContainer);
     expect(applyIsolatedContentRootStyleMock.mock.calls[0]?.[1]).toContain('z-index: 700;');
+    expect(dom.overlayContainer?.classList.contains('sniptale-extension-surface')).toBe(true);
     expect(dom.overlayContainer?.dataset['theme']).toBe('dark');
     expect(dom.overlayContainer?.style.colorScheme).toBe('dark');
+    expect(dom.dragMaskBackground).toBe('rgba(9, 9, 11, 0.656)');
     expect(dom.overlayContainer?.querySelector('style')?.textContent).toContain(
       '.sniptale-selection-size-panel'
     );
@@ -93,10 +104,18 @@ function registerCancelButtonTest() {
     const cancelSelection = vi.fn();
     const overlayPointerListener = vi.fn();
 
-    createOverlayContainer(dom, { cancelSelection, zIndexBase: 700 });
+    createOverlayContainer(dom, {
+      cancelSelection,
+      overlayBackground: 'rgba(0, 0, 0, 0.45)',
+      zIndexBase: 700,
+    });
     dom.overlayContainer?.addEventListener('click', overlayPointerListener);
     dom.overlayContainer?.addEventListener('mousedown', overlayPointerListener);
-    createOverlayContainer(dom, { cancelSelection, zIndexBase: 900 });
+    createOverlayContainer(dom, {
+      cancelSelection,
+      overlayBackground: 'rgba(0, 0, 0, 0.45)',
+      zIndexBase: 900,
+    });
 
     const button = dom.overlayContainer?.querySelector<HTMLButtonElement>(
       '.sniptale-selection-cancel-button'
@@ -130,7 +149,11 @@ function registerThemeFallbackTest() {
   it('preserves runtime helper decisions when no theme is applied', () => {
     const dom = createSelectionModeDom();
 
-    createOverlayContainer(dom, { cancelSelection: vi.fn(), zIndexBase: 500 });
+    createOverlayContainer(dom, {
+      cancelSelection: vi.fn(),
+      overlayBackground: 'rgba(0, 0, 0, 0.45)',
+      zIndexBase: 500,
+    });
 
     expect(dom.overlayContainer?.hasAttribute('data-theme')).toBe(false);
     expect(dom.overlayContainer?.style.colorScheme).toBe('');

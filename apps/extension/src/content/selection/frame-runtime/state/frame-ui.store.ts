@@ -71,12 +71,13 @@ function createOpenPopoverAction(set: FrameStoreSet, get: FrameStoreGet) {
         selectedFrameId: frameId,
         toolbarAnchorOffset: null,
         activePopover: { frameId, kind },
+        resizeFrameId: null,
       });
       return;
     }
 
     logger.debug('openPopover succeeded', frameId);
-    set({ activePopover: { frameId, kind } });
+    set({ activePopover: { frameId, kind }, resizeFrameId: null });
   };
 }
 
@@ -169,7 +170,7 @@ function createFrameUIVisibilityActions(set: FrameStoreSet, get: FrameStoreGet) 
         set({ activePopover: null });
         return;
       }
-      set({ activePopover: { frameId, kind } });
+      set({ activePopover: { frameId, kind }, resizeFrameId: null });
     },
 
     closePopover: () => {

@@ -9,10 +9,14 @@ export interface ToolbarCaptureActionsProps {
   compactMenus: boolean;
   displayMode: ContentToolbarDisplayMode;
   pinToTab: boolean;
+  pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
   onCompactMenusChange: (compactMenus: boolean) => void;
   onDisplayModeChange: (displayMode: ContentToolbarDisplayMode) => void;
-  onPinToTabChange: (value: boolean) => void;
+  onPinToTabChange: (
+    value: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => void;
   onCaptureActionChange: (action: CaptureActionType) => void;
   onCaptureActionCommitted?: (action: CaptureActionType) => Promise<void> | void;
   onClose: () => void;
@@ -57,10 +61,14 @@ export interface ToolbarProps {
   screenshotMode?: boolean;
   isCursorMode?: boolean;
   pinToTab?: boolean;
+  pinToTabAvailable?: boolean;
   pinToTabLocked?: boolean;
   onDisableAiPickMode?: () => void;
   onEnableCursorMode?: () => void;
-  onPinToTabChange?: (value: boolean) => void;
+  onPinToTabChange?: (
+    value: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => void;
   onTakeScreenshot: (
     type: 'visible' | 'full' | 'selection',
     contentIntentSource?: ContentPrivilegedActionIntentSource

@@ -19,11 +19,6 @@ type FinalizeDragSelectionArgs = {
   minSelectionSize: number;
 };
 
-function resetDocumentBodySelectionStyles(): void {
-  document.body.style.userSelect = '';
-  document.body.style.webkitUserSelect = '';
-}
-
 export function startDragSelection(
   { dom, zIndexBase }: StartDragSelectionArgs,
   startX: number,
@@ -31,9 +26,6 @@ export function startDragSelection(
 ): { currentSelection: Selection; dragStartPoint: Point; currentState: SelectionState } {
   hideHoverFrameDom(dom);
   createDragEventCatcher(dom, zIndexBase);
-
-  document.body.style.userSelect = 'none';
-  document.body.style.webkitUserSelect = 'none';
 
   const currentSelection = {
     x: startX,
@@ -103,7 +95,6 @@ export function finalizeDragSelection({
     };
   } finally {
     cancelScheduledDragFrameUpdate(dom);
-    resetDocumentBodySelectionStyles();
     if (dom.dragFrame) {
       dom.dragFrame.style.display = 'none';
     }

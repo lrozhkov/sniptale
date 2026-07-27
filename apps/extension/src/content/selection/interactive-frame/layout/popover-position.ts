@@ -32,8 +32,34 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
 }
 
+function calculateQuickControlPopoverRect(params: {
+  anchorRect: FloatingRect;
+  height: number;
+  viewport: { width: number; height: number };
+  width: number;
+}): FloatingRect | null {
+  const rightX = params.anchorRect.x + params.anchorRect.width + POPOVER_GAP;
+  const leftX = params.anchorRect.x - POPOVER_GAP - params.width;
+  const x =
+    rightX + params.width <= params.viewport.width - VIEWPORT_MARGIN
+      ? rightX
+      : leftX >= VIEWPORT_MARGIN
+        ? leftX
+        : null;
+  if (x === null) return null;
+
+  const maxY = Math.max(VIEWPORT_MARGIN, params.viewport.height - params.height - VIEWPORT_MARGIN);
+  const y = clamp(
+    params.anchorRect.y + params.anchorRect.height / 2 - params.height / 2,
+    VIEWPORT_MARGIN,
+    maxY
+  );
+  return { x, y, width: params.width, height: params.height };
+}
+
 function calculateCanonicalPopoverRect(params: {
   anchorRect: FloatingRect;
+  preferSidePlacement: boolean;
   surfaceRect: FloatingRect;
   size: { width: number; height: number };
   viewport: { width: number; height: number };
@@ -43,6 +69,16 @@ function calculateCanonicalPopoverRect(params: {
     Math.max(0, params.viewport.width - VIEWPORT_MARGIN * 2)
   );
   const height = params.size.height;
+  if (params.preferSidePlacement) {
+    const sideRect = calculateQuickControlPopoverRect({
+      anchorRect: params.anchorRect,
+      height,
+      viewport: params.viewport,
+      width,
+    });
+    if (sideRect) return sideRect;
+  }
+
   const x = clamp(
     params.anchorRect.x + params.anchorRect.width / 2 - width / 2,
     VIEWPORT_MARGIN,
@@ -68,6 +104,7 @@ export function useFramePopoverPosition(params: {
     anchorEl: HTMLElement;
     anchorRect: FloatingRect;
     frameId: string;
+    preferSidePlacement: boolean;
     surfaceRect: FloatingRect;
   } | null>(null);
   const placementSession = placementSessionRef.current;
@@ -85,6 +122,7 @@ export function useFramePopoverPosition(params: {
       anchorEl: params.anchorEl,
       anchorRect,
       frameId: params.frameId,
+      preferSidePlacement: !params.anchorEl.closest('.sniptale-toolbar-portal-wrapper'),
       surfaceRect: getToolbarRect(params.frameId) ?? anchorRect,
     };
   }
@@ -136,6 +174,7 @@ export function useFramePopoverPosition(params: {
       : params.fallbackSize;
   const rect = calculateCanonicalPopoverRect({
     anchorRect: activePlacementSession.anchorRect,
+    preferSidePlacement: activePlacementSession.preferSidePlacement,
     surfaceRect: activePlacementSession.surfaceRect,
     size,
     viewport: { width: window.innerWidth, height: window.innerHeight },

@@ -1,5 +1,3 @@
-import { createContentSizeTooltipDivider } from '@sniptale/ui/content-size-tooltip/dom';
-import { getContentSizeTooltipActionButtonStyle } from '@sniptale/ui/content-size-tooltip/styles';
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
 import type { CaptureActionType } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
@@ -9,27 +7,32 @@ import {
 } from '../../interaction/selection/padding';
 import type { Selection } from '../../types';
 import { createSelectionCaptureActionControls } from './capture-menu';
-
-const TOOLBAR_BUTTON_STYLE = getContentSizeTooltipActionButtonStyle('neutral', 'frame-edit');
+import { createSelectionPaddingIcon } from './icons';
+import {
+  applySelectionToolbarButtonChrome,
+  applySelectionToolbarDividerChrome,
+  applySelectionToolbarSurfaceChrome,
+  createSelectionToolbarDivider,
+  syncSelectionToolbarCompactControlsChrome,
+} from './toolbar-chrome';
 
 type ToolbarOptions = {
   getCaptureAction: () => CaptureActionType;
   getSelection: () => Selection;
   onAdjustPadding: (direction: 'decrease' | 'increase') => void;
   onCaptureActionChange: (action: CaptureActionType) => void;
+  onConfirm: (event?: Event) => void;
   overlayContainer: HTMLElement;
 };
 
-function createToolbarButton(className: string, label: string, content: string) {
+function createToolbarButton(className: string, label: string, content: Node) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = className;
   button.setAttribute('aria-label', label);
   button.title = label;
-  Object.assign(button.style, TOOLBAR_BUTTON_STYLE);
-  button.textContent = content;
-  button.style.fontSize = '18px';
-  button.style.lineHeight = '1';
+  applySelectionToolbarButtonChrome(button);
+  button.appendChild(content);
   return button;
 }
 
@@ -40,12 +43,12 @@ function createPaddingControls(options: ToolbarOptions): HTMLElement {
   const decrease = createToolbarButton(
     'sniptale-selection-padding-decrease',
     translate('content.interactiveFrame.decreaseFrame'),
-    '−'
+    createSelectionPaddingIcon('decrease')
   );
   const increase = createToolbarButton(
     'sniptale-selection-padding-increase',
     translate('content.interactiveFrame.increaseFrame'),
-    '+'
+    createSelectionPaddingIcon('increase')
   );
   decrease.addEventListener('click', (event) => {
     event.preventDefault();
@@ -65,11 +68,15 @@ export function enhanceSelectionModeToolbar(
   tooltip: ContentSizeTooltipDom,
   options: ToolbarOptions
 ): void {
-  Object.assign(tooltip.root.style, { width: 'max-content', minWidth: '0' });
+  applySelectionToolbarSurfaceChrome(tooltip.root);
+  applySelectionToolbarButtonChrome(tooltip.cancelButton);
+  applySelectionToolbarDividerChrome(tooltip.actions.previousElementSibling!);
+  applySelectionToolbarDividerChrome(tooltip.cancelButton.previousElementSibling!);
   const paddingControls = createPaddingControls(options);
   tooltip.root.insertBefore(paddingControls, tooltip.actions);
-  tooltip.root.insertBefore(createContentSizeTooltipDivider(), tooltip.actions);
+  tooltip.root.insertBefore(createSelectionToolbarDivider(), tooltip.actions);
   createSelectionCaptureActionControls(tooltip, options);
+  syncSelectionToolbarCompactControlsChrome(tooltip);
   syncSelectionToolbarPaddingState(tooltip.root, options.getSelection());
 }
 

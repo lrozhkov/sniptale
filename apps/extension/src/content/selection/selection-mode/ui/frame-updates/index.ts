@@ -8,6 +8,8 @@ import type { SelectionModeDom } from '../dom-types';
 import type { SelectionRect } from '../types';
 import { syncSelectionToolbarPaddingState } from '../final-elements/toolbar';
 import { closeSelectionCaptureActionMenu } from '../final-elements/capture-menu';
+import { paintSelectionModeDragMask } from '../final-elements/overlay';
+import { syncSelectionToolbarCompactControlsChrome } from '../final-elements/toolbar-chrome';
 
 function createDragFrameSizeLabel(): HTMLDivElement {
   const label = document.createElement('div');
@@ -141,7 +143,7 @@ export function updateDragFrame(dom: SelectionModeDom, rect: SelectionRect): voi
   dom.dragFrame.style.height = `${rect.height}px`;
 
   const sizeText = `${Math.round(rect.width)} × ${Math.round(rect.height)}`;
-  let label = dom.dragFrame.querySelector('.sniptale-drag-size-label') as HTMLElement | null;
+  let label = dom.dragFrame.firstElementChild as HTMLElement | null;
   if (!label) {
     label = createDragFrameSizeLabel();
     dom.dragFrame.appendChild(label);
@@ -149,7 +151,7 @@ export function updateDragFrame(dom: SelectionModeDom, rect: SelectionRect): voi
 
   label.textContent = sizeText;
   if (dom.dragOverlay) {
-    updateOverlayShades(dom.dragOverlay, rect);
+    paintSelectionModeDragMask(dom.dragOverlay, rect);
   }
 }
 
@@ -179,6 +181,7 @@ export function updateFinalFrame(dom: SelectionModeDom, rect: SelectionRect): vo
     heightMin: Number(dom.heightInput.min),
     heightMax: Number(dom.heightInput.max),
   });
+  syncSelectionToolbarCompactControlsChrome(dom.sizeTooltip);
 
   updateOverlayShades(dom.finalOverlay, rect);
   syncSelectionToolbarPaddingState(dom.sizePanel, rect);
@@ -215,6 +218,7 @@ export function cleanupSelectionModeDom(dom: SelectionModeDom): void {
   dom.hoverSizeLabel = null;
   dom.dragFrame = null;
   dom.dragOverlay = null;
+  dom.dragMaskBackground = null;
   dom.finalFrameRafId = null;
   dom.pendingFinalRect = null;
   dom.finalFrame = null;

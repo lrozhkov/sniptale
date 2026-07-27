@@ -12,6 +12,10 @@ import {
   bindFloatingInteractionPositionListeners,
   mergeFloatingInteractionLayerStyle,
 } from '../floating-interactions/placement';
+import {
+  FLOATING_INTERACTION_CAPTURE_TRANSIENT_ATTRIBUTE,
+  FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE,
+} from '../floating-interactions/ownership';
 
 const COLOR_SELECTOR_LAYER_WIDTH = 224;
 const COLOR_SELECTOR_LAYER_GAP = 8;
@@ -69,6 +73,7 @@ export function useColorSelectorLayerStyle(anchor: HTMLElement | null, open: boo
 export function ColorSelectorFloatingLayer(props: {
   children: ReactNode;
   layerRef: RefObject<HTMLDivElement | null>;
+  ownerId: string;
   portalTheme: string | null;
   style: CSSProperties;
   ui: string;
@@ -88,6 +93,8 @@ export function ColorSelectorFloatingLayer(props: {
       className={floatingPanelClassName}
       data-theme={props.portalTheme ?? undefined}
       data-floating-ui-root="true"
+      {...{ [FLOATING_INTERACTION_CAPTURE_TRANSIENT_ATTRIBUTE]: 'true' }}
+      {...{ [FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE]: props.ownerId }}
       data-ui={props.ui}
       onPointerDown={stopLayerEventPropagation}
       onMouseDown={stopLayerEventPropagation}

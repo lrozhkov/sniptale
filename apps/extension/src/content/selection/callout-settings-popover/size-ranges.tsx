@@ -1,4 +1,9 @@
 import { translate } from '../../../platform/i18n';
+import {
+  clampCalloutMaxWidth,
+  MAX_CALLOUT_MAX_WIDTH,
+  MIN_CALLOUT_MAX_WIDTH,
+} from '../callout/width-constraints';
 import { CalloutRangeControl } from './range-control';
 
 export function CalloutFontSizeRange(props: {
@@ -24,11 +29,11 @@ export function CalloutMaxWidthRange(props: {
   return (
     <CalloutRangeControl
       label={translate('content.callout.maxWidthLabelPrefix')}
-      min={100}
-      max={500}
+      min={MIN_CALLOUT_MAX_WIDTH}
+      max={MAX_CALLOUT_MAX_WIDTH}
       step={50}
       value={props.maxWidth}
-      onChange={(value) => props.onMaxWidthChange(Math.max(100, Math.min(500, value)))}
+      onChange={(value) => props.onMaxWidthChange(clampCalloutMaxWidth(value))}
     />
   );
 }

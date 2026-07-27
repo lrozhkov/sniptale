@@ -67,6 +67,7 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       quickActionOverlay?: QuickActionOverlay & { delaySeconds?: number };
       autoStartSelection?: boolean;
       autoStartCaptureType?: 'visible' | 'full';
+      toolbarVisible?: boolean;
     } & ContentPrivilegedActionGrantPayload;
     [MessageType.DISABLE_SCREENSHOT_MODE]: {
       type: typeof MessageType.DISABLE_SCREENSHOT_MODE;
@@ -118,6 +119,9 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       requestId: string;
     };
     [MessageType.CONTENT_RUNTIME_WAKEUP]: {
+      contentIntent?: ContentPrivilegedActionCapability;
+      pinToTab?: boolean;
+      toolbarVisible?: boolean;
       type: typeof MessageType.CONTENT_RUNTIME_WAKEUP;
     };
     [MessageType.EXPORT_POPUP_PROGRESS]: RuntimePopupExportProgressMessage;
@@ -158,6 +162,8 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
     [MessageType.PAGE_ACCESS]: PageAccessResponse;
     [MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY]: PopupTabRouteCapabilityResponse;
     [MessageType.CONTENT_RUNTIME_WAKEUP]: RuntimeMessageResponse<{
+      pinToTab: boolean;
+      pinToTabAvailable: boolean;
       restored?: boolean;
       reason?: 'pin-to-tab' | 'scenario';
     }>;

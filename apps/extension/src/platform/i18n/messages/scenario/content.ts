@@ -10,8 +10,12 @@ export const scenarioContentMessages = defineMessageSource({
     en: 'Scenario project',
   },
   projectMenuTitle: {
-    ru: 'Проект сценария',
-    en: 'Scenario project',
+    ru: 'Выберите проект сценария',
+    en: 'Choose a scenario project',
+  },
+  projectButton: {
+    ru: 'Выбрать проект',
+    en: 'Choose project',
   },
   currentProject: {
     ru: 'Текущий проект',
@@ -34,8 +38,8 @@ export const scenarioContentMessages = defineMessageSource({
     en: 'Clicking the page',
   },
   captureMode: {
-    ru: 'Добавление шагов',
-    en: 'Adding steps',
+    ru: 'Как добавлять шаги',
+    en: 'How to add steps',
   },
   modeManualHint: {
     ru: 'Добавлять шаг после нажатия кнопки снимка на панели',
@@ -50,16 +54,16 @@ export const scenarioContentMessages = defineMessageSource({
     en: 'Turn off annotations, page editing, and the AI editor first',
   },
   sidebarShow: {
-    ru: 'Показать sidebar',
-    en: 'Show sidebar',
+    ru: 'Показать шаги сценария',
+    en: 'Show scenario steps',
   },
   sidebarHide: {
-    ru: 'Скрыть sidebar',
-    en: 'Hide sidebar',
+    ru: 'Скрыть шаги сценария',
+    en: 'Hide scenario steps',
   },
   sidebar: {
-    ru: 'Сценарий',
-    en: 'Scenario',
+    ru: 'Шаги сценария',
+    en: 'Scenario steps',
   },
   openEditor: {
     ru: 'Редактор сценариев',

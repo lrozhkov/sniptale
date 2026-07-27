@@ -2,19 +2,43 @@ import {
   MessageType,
   type ResponseSender,
 } from '@sniptale/runtime-contracts/messaging/message-types';
-import { readPinToTabSessionStorageState } from '../../../composition/persistence/content-pin-session/index';
+import {
+  readPinToTabSessionStorageState,
+  readPinToTabToolbarVisibilitySessionStorageState,
+  writePinToTabSessionStorageState,
+} from '../../../composition/persistence/content-pin-session/index';
 import type { ScenarioRecorderSurfaceState } from '@sniptale/runtime-contracts/scenario/types/session';
 import type { ContentSenderBinding } from '../../routing-contracts/capabilities/content-action/capability-store';
 import type { BackgroundRuntimeMessageDeps } from '../routing/boundary/shared';
 import { respondAsyncRoute } from '../../routing-contracts/response';
-import { ensureActivePageAccessRuntime, hasActivePageAccess } from './service';
-import { enableScreenshotMode } from '../tab-mode-router-screenshot';
+import {
+  ensureActivePageAccessRuntime,
+  hasActivePageAccess,
+  hasPinnedToolbarAllSitesAccess,
+  registerPinnedToolbarAllSitesAccess,
+} from './service';
+import {
+  beginPinnedToolbarDurableOperation,
+  beginPinnedToolbarOperation,
+  observePinnedToolbarOperations,
+} from './pinned-toolbar-operation';
+import { enableScreenshotMode, enableScreenshotModeGuarded } from '../tab-mode-router-screenshot';
+import { runtimeActionCoreMessageContracts } from '../../../contracts/messaging/contracts/runtime/actions/core';
+import { waitForContentToolbarReady } from './readiness';
 
 type ContentRuntimeWakeupResponse = {
   error?: string;
+  pinToTab?: boolean;
+  pinToTabAvailable?: boolean;
   reason?: 'pin-to-tab' | 'scenario';
   restored?: boolean;
   success: boolean;
+};
+
+type ContentRuntimeWakeupMessage = {
+  pinToTab?: boolean;
+  toolbarVisible?: boolean;
+  type: typeof MessageType.CONTENT_RUNTIME_WAKEUP;
 };
 
 type ScenarioRestoreState = {
@@ -24,14 +48,236 @@ type ScenarioRestoreState = {
   surface: ScenarioRecorderSurfaceState;
 };
 
-function isContentRuntimeWakeupMessage(message: unknown): message is {
-  type: typeof MessageType.CONTENT_RUNTIME_WAKEUP;
-} {
-  return (
-    typeof message === 'object' &&
-    message !== null &&
-    (message as { type?: unknown }).type === MessageType.CONTENT_RUNTIME_WAKEUP
+type UserPinnedState = {
+  isCurrent: () => boolean;
+  pinToTabAvailable: boolean;
+  toolbarVisible: boolean;
+  userPinned: boolean;
+  visibilityMutation: boolean;
+};
+
+type PinnedToolbarSessionOperation = ReturnType<typeof beginPinnedToolbarOperation>;
+
+function parseContentRuntimeWakeupMessage(message: unknown): ContentRuntimeWakeupMessage | null {
+  try {
+    const parsed =
+      runtimeActionCoreMessageContracts[MessageType.CONTENT_RUNTIME_WAKEUP].parseRequest(message);
+    if (parsed.pinToTab !== undefined && parsed.toolbarVisible !== undefined) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function readUserPinnedSessionState(tabId: number) {
+  const [userPinned, toolbarVisible] = await Promise.all([
+    readPinToTabSessionStorageState(tabId),
+    readPinToTabToolbarVisibilitySessionStorageState(tabId),
+  ]);
+  return { toolbarVisible, userPinned };
+}
+
+async function projectUserPinnedState(args: {
+  operation: PinnedToolbarSessionOperation;
+  pinToTabAvailable: boolean;
+  tabId: number;
+  visibilityMutation: boolean;
+}): Promise<UserPinnedState> {
+  return {
+    isCurrent: args.operation.isCurrent,
+    pinToTabAvailable: args.pinToTabAvailable,
+    ...(await readUserPinnedSessionState(args.tabId)),
+    visibilityMutation: args.visibilityMutation,
+  };
+}
+
+function observeUserPinnedSession(
+  tabId: number,
+  operation: PinnedToolbarSessionOperation
+): Promise<UserPinnedState> {
+  return operation.runExclusive(async () =>
+    projectUserPinnedState({
+      operation,
+      pinToTabAvailable: await hasPinnedToolbarAllSitesAccess(),
+      tabId,
+      visibilityMutation: false,
+    })
   );
+}
+
+function synchronizeToolbarVisibility(args: {
+  operation: PinnedToolbarSessionOperation;
+  tabId: number;
+  toolbarVisible: boolean;
+}): Promise<UserPinnedState> {
+  return args.operation.runExclusive(async () => {
+    const availability = hasPinnedToolbarAllSitesAccess();
+    const currentState = await readUserPinnedSessionState(args.tabId);
+    if (args.operation.isCurrent() && currentState.userPinned) {
+      await writePinToTabSessionStorageState(
+        args.tabId,
+        { toolbarVisible: args.toolbarVisible },
+        args.operation.isCurrent
+      );
+    }
+    return projectUserPinnedState({
+      operation: args.operation,
+      pinToTabAvailable: await availability,
+      tabId: args.tabId,
+      visibilityMutation: true,
+    });
+  });
+}
+
+function synchronizeUserUnpin(
+  tabId: number,
+  operation: PinnedToolbarSessionOperation
+): Promise<UserPinnedState> {
+  return operation.runExclusive(async () => {
+    const availability = hasPinnedToolbarAllSitesAccess();
+    await writePinToTabSessionStorageState(tabId, { pinToTab: false }, operation.isCurrent);
+    return projectUserPinnedState({
+      operation,
+      pinToTabAvailable: await availability,
+      tabId,
+      visibilityMutation: false,
+    });
+  });
+}
+
+async function commitUserPinSession(args: {
+  operation: PinnedToolbarSessionOperation;
+  tabId: number;
+  toolbarVisible: boolean;
+}): Promise<boolean> {
+  if (!args.operation.isCurrent()) {
+    return false;
+  }
+
+  const previousState = await readUserPinnedSessionState(args.tabId);
+  if (!args.operation.isCurrent()) {
+    return false;
+  }
+
+  await writePinToTabSessionStorageState(
+    args.tabId,
+    { pinToTab: true, toolbarVisible: args.toolbarVisible },
+    args.operation.isCurrent
+  );
+  if (args.operation.isCurrent()) {
+    return true;
+  }
+
+  await writePinToTabSessionStorageState(
+    args.tabId,
+    previousState.userPinned
+      ? { pinToTab: true, toolbarVisible: previousState.toolbarVisible }
+      : { pinToTab: false },
+    () => true
+  );
+  return false;
+}
+
+async function synchronizeUserPinActivation(args: {
+  operation: PinnedToolbarSessionOperation;
+  senderBinding: ContentSenderBinding;
+}): Promise<UserPinnedState> {
+  const tabId = args.senderBinding.tabId;
+  const pinToTabAvailable = await hasPinnedToolbarAllSitesAccess();
+  if (!args.operation.isCurrent()) {
+    return projectUserPinnedState({
+      operation: args.operation,
+      pinToTabAvailable,
+      tabId,
+      visibilityMutation: false,
+    });
+  }
+
+  const toolbarStatus = pinToTabAvailable ? await waitForContentToolbarReady(tabId) : null;
+  if (!args.operation.isCurrent()) {
+    return projectUserPinnedState({
+      operation: args.operation,
+      pinToTabAvailable,
+      tabId,
+      visibilityMutation: false,
+    });
+  }
+
+  return args.operation.runExclusive(async () => {
+    if (!args.operation.isCurrent()) {
+      return projectUserPinnedState({
+        operation: args.operation,
+        pinToTabAvailable,
+        tabId,
+        visibilityMutation: false,
+      });
+    }
+
+    if (!pinToTabAvailable || toolbarStatus?.screenshotMode !== true) {
+      await writePinToTabSessionStorageState(tabId, { pinToTab: false }, args.operation.isCurrent);
+      return projectUserPinnedState({
+        operation: args.operation,
+        pinToTabAvailable,
+        tabId,
+        visibilityMutation: false,
+      });
+    }
+
+    try {
+      await registerPinnedToolbarAllSitesAccess({
+        commit: () =>
+          commitUserPinSession({
+            operation: args.operation,
+            tabId,
+            toolbarVisible: toolbarStatus.visible,
+          }),
+        expectedUrl: args.senderBinding.senderUrl,
+        isCurrent: args.operation.isCurrent,
+        tabId,
+      });
+    } catch (error) {
+      await writePinToTabSessionStorageState(tabId, { pinToTab: false }, args.operation.isCurrent);
+      throw error;
+    }
+
+    return projectUserPinnedState({
+      operation: args.operation,
+      pinToTabAvailable,
+      tabId,
+      visibilityMutation: false,
+    });
+  });
+}
+
+async function synchronizeUserPinnedState(args: {
+  message: ContentRuntimeWakeupMessage;
+  senderBinding: ContentSenderBinding;
+}): Promise<UserPinnedState> {
+  const tabId = args.senderBinding.tabId;
+  const requestedPinState = args.message.pinToTab;
+  const requestedToolbarVisibility = args.message.toolbarVisible;
+  if (requestedPinState === undefined && requestedToolbarVisibility === undefined) {
+    return observeUserPinnedSession(tabId, observePinnedToolbarOperations(tabId));
+  }
+
+  if (requestedToolbarVisibility !== undefined) {
+    return synchronizeToolbarVisibility({
+      operation: beginPinnedToolbarDurableOperation(tabId),
+      tabId,
+      toolbarVisible: requestedToolbarVisibility,
+    });
+  }
+
+  if (!requestedPinState) {
+    return synchronizeUserUnpin(tabId, beginPinnedToolbarDurableOperation(tabId));
+  }
+
+  return synchronizeUserPinActivation({
+    operation: beginPinnedToolbarOperation(tabId),
+    senderBinding: args.senderBinding,
+  });
 }
 
 function shouldScenarioSurfaceRestore(surface: ScenarioRecorderSurfaceState): boolean {
@@ -76,49 +322,152 @@ async function restoreForcedScenarioSurface(args: {
 
 async function enablePreparationForWakeup(
   tabId: number,
-  runtimeState: BackgroundRuntimeMessageDeps
-): Promise<void> {
+  runtimeState: BackgroundRuntimeMessageDeps,
+  options: {
+    commitGuard?: () => boolean | Promise<boolean>;
+    readPreparationState?: () => Promise<{ screenshotMode: boolean; visible: boolean }>;
+    toolbarVisible?: boolean;
+  } = {}
+): Promise<boolean> {
+  if (options.commitGuard) {
+    return enableScreenshotModeGuarded(
+      tabId,
+      runtimeState.screenshotModeState,
+      runtimeState.viewportState,
+      runtimeState.viewportOwnerState,
+      runtimeState.webSnapshotViewerPorts,
+      {
+        commitGuard: options.commitGuard,
+        ...(options.readPreparationState
+          ? { readPreparationState: options.readPreparationState }
+          : {}),
+        ...(options.toolbarVisible === undefined ? {} : { toolbarVisible: options.toolbarVisible }),
+      }
+    );
+  }
+
   await enableScreenshotMode(
     tabId,
     runtimeState.screenshotModeState,
     runtimeState.viewportState,
     runtimeState.viewportOwnerState,
-    runtimeState.webSnapshotViewerPorts
+    runtimeState.webSnapshotViewerPorts,
+    options.toolbarVisible === undefined ? {} : { toolbarVisible: options.toolbarVisible }
   );
+  return true;
 }
 
-async function handleContentRuntimeWakeup(args: {
+async function createSupersededWakeupResponse(
+  tabId: number
+): Promise<ContentRuntimeWakeupResponse> {
+  return {
+    pinToTab: await readPinToTabSessionStorageState(tabId),
+    pinToTabAvailable: await hasPinnedToolbarAllSitesAccess(),
+    restored: false,
+    success: true,
+  };
+}
+
+async function restoreRuntimeForWakeup(args: {
+  isCurrent: () => boolean;
   runtimeState: BackgroundRuntimeMessageDeps;
-  senderBinding: ContentSenderBinding;
-}): Promise<ContentRuntimeWakeupResponse> {
-  const tabId = args.senderBinding.tabId;
-  const [userPinned, scenarioState] = await Promise.all([
-    readPinToTabSessionStorageState(tabId),
-    readScenarioRestoreState(tabId, args.runtimeState),
-  ]);
-
-  if (!userPinned && !scenarioState.shouldRestore) {
-    return { restored: false, success: true };
-  }
-
-  if (!(await hasActivePageAccess(tabId))) {
-    return { restored: false, success: true };
+  scenarioState: ScenarioRestoreState;
+  tabId: number;
+  userPinned: boolean;
+  toolbarVisible: boolean;
+}): Promise<boolean> {
+  if (!(await hasActivePageAccess(args.tabId)) || !args.isCurrent()) {
+    return false;
   }
 
   await restoreForcedScenarioSurface({
     runtimeState: args.runtimeState,
+    scenarioState: args.scenarioState,
+    tabId: args.tabId,
+  });
+  if (!args.isCurrent()) {
+    return false;
+  }
+
+  await ensureActivePageAccessRuntime(args.tabId);
+  if (!args.isCurrent()) {
+    return false;
+  }
+
+  await waitForContentToolbarReady(args.tabId);
+  if (!args.isCurrent()) {
+    return false;
+  }
+
+  if (args.userPinned || args.scenarioState.shouldEnablePreparation) {
+    const scenarioOwnsPreparation = args.scenarioState.shouldEnablePreparation;
+    const toolbarVisible = scenarioOwnsPreparation
+      ? true
+      : args.userPinned
+        ? args.toolbarVisible
+        : undefined;
+    return enablePreparationForWakeup(args.tabId, args.runtimeState, {
+      ...(toolbarVisible === undefined ? {} : { toolbarVisible }),
+      ...(!scenarioOwnsPreparation && args.userPinned
+        ? {
+            commitGuard: async () => args.isCurrent() && (await hasPinnedToolbarAllSitesAccess()),
+            readPreparationState: () => waitForContentToolbarReady(args.tabId),
+          }
+        : {}),
+    });
+  }
+  return args.isCurrent();
+}
+
+async function handleContentRuntimeWakeup(args: {
+  message: ContentRuntimeWakeupMessage;
+  runtimeState: BackgroundRuntimeMessageDeps;
+  senderBinding: ContentSenderBinding;
+}): Promise<ContentRuntimeWakeupResponse> {
+  const tabId = args.senderBinding.tabId;
+  const [userPinState, scenarioState] = await Promise.all([
+    synchronizeUserPinnedState({
+      message: args.message,
+      senderBinding: args.senderBinding,
+    }),
+    readScenarioRestoreState(tabId, args.runtimeState),
+  ]);
+  const userPinned = userPinState.userPinned;
+  const pinToTabAvailable = userPinState.pinToTabAvailable;
+  const restorableUserPin = userPinned && pinToTabAvailable;
+
+  if (!userPinState.isCurrent()) {
+    return createSupersededWakeupResponse(tabId);
+  }
+
+  if (userPinState.visibilityMutation) {
+    return { pinToTab: userPinned, pinToTabAvailable, restored: false, success: true };
+  }
+
+  if (!restorableUserPin && !scenarioState.shouldRestore) {
+    return { pinToTab: userPinned, pinToTabAvailable, restored: false, success: true };
+  }
+
+  const restored = await restoreRuntimeForWakeup({
+    isCurrent: userPinState.isCurrent,
+    runtimeState: args.runtimeState,
     scenarioState,
     tabId,
+    toolbarVisible: userPinState.toolbarVisible,
+    userPinned: restorableUserPin,
   });
+  if (!userPinState.isCurrent()) {
+    return createSupersededWakeupResponse(tabId);
+  }
 
-  await ensureActivePageAccessRuntime(tabId);
-
-  if (userPinned || scenarioState.shouldEnablePreparation) {
-    await enablePreparationForWakeup(tabId, args.runtimeState);
+  if (!restored) {
+    return { pinToTab: userPinned, pinToTabAvailable, restored: false, success: true };
   }
 
   return {
-    reason: userPinned ? 'pin-to-tab' : 'scenario',
+    pinToTab: userPinned,
+    pinToTabAvailable,
+    reason: restorableUserPin ? 'pin-to-tab' : 'scenario',
     restored: true,
     success: true,
   };
@@ -130,12 +479,15 @@ export function routeContentRuntimeWakeupMessage(args: {
   senderBinding: ContentSenderBinding | null;
   sendResponse: ResponseSender<ContentRuntimeWakeupResponse>;
 }): boolean {
-  if (!isContentRuntimeWakeupMessage(args.message)) {
+  const message = parseContentRuntimeWakeupMessage(args.message);
+  if (!message) {
     return false;
   }
 
   if (!args.senderBinding) {
     args.sendResponse({
+      pinToTab: false,
+      pinToTabAvailable: false,
       restored: false,
       success: false,
     });
@@ -144,6 +496,7 @@ export function routeContentRuntimeWakeupMessage(args: {
 
   respondAsyncRoute(
     handleContentRuntimeWakeup({
+      message,
       runtimeState: args.runtimeState,
       senderBinding: args.senderBinding,
     }),

@@ -20,15 +20,13 @@ export type { ResizeDirection } from './dom-types';
 export { createOverlayContainer, createSelectionModeDom } from './container';
 export { createHoverElements, hideHoverFrame, showHoverFrame } from './hover';
 
-export function createDragFrame(
-  dom: SelectionModeDom,
-  visual: ResolvedBorderPresetVisual,
-  overlayBackground: string
-): void {
+export function createDragFrame(dom: SelectionModeDom, visual: ResolvedBorderPresetVisual): void {
   if (!dom.overlayContainer || dom.dragFrame) return;
 
   const dragFrame = document.createElement('div');
-  const dragOverlay = createSelectionModeDragOverlay(overlayBackground);
+  const dragOverlay = createSelectionModeDragOverlay(
+    dom.dragMaskBackground ?? 'rgba(0, 0, 0, 0.45)'
+  );
   dragFrame.className = 'sniptale-selection-drag-frame';
   dragFrame.style.cssText = getSelectionDragFrameStyle(visual);
 
@@ -50,6 +48,9 @@ export function createDragEventCatcher(dom: SelectionModeDom, zIndexBase: number
     bottom: 0;
     pointer-events: auto;
     cursor: crosshair;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
     z-index: ${zIndexBase - 1};
   `;
 

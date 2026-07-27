@@ -9,15 +9,19 @@ import {
 } from './hit-test';
 import { queryAllContentUiElements, queryContentUiElement } from '../../../platform/dom-host';
 import { isHighlighterPausedState } from '../../highlighter';
+import { FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
 
 const OWNED_FLOATING_SELECTORS = [
+  '[data-ui="content.toolbar.root"]',
   '.sniptale-action-toolbar',
+  '.sniptale-popover-menu',
   '.sniptale-toolbar-portal-wrapper',
   '.sniptale-frame-toolbar-trigger',
   '.sniptale-frame-toolbar-bridge',
   '.sniptale-frame-quick-action',
   '.sniptale-resize-handle',
   '.sniptale-frame-settings-popover',
+  '.sniptale-frame-style-editor-layer',
   '.sniptale-step-badge-popover',
   '.sniptale-callout-settings-popover',
   '.sniptale-callout',
@@ -27,6 +31,7 @@ const OWNED_FLOATING_SELECTORS = [
   '.sniptale-callout-settings-handle',
   '.sniptale-step-badge-controls',
   '.sniptale-content-size-tooltip',
+  `[${FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE}]`,
 ];
 
 function hasActiveFrameInteraction() {

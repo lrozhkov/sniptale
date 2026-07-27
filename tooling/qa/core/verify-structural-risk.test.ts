@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { FUNCTION_PROFILES } from './structural-risk/config.mjs';
+import { collectEffectFamilies } from './structural-risk/owner-classifier.mjs';
 import {
   createStructuralRiskReport,
   analyzeStructuralSource,
@@ -115,6 +116,47 @@ describe('structural file scoring', () => {
     expect(scoreFile(base)).toBe(0);
     expect(scoreFile({ ...base, lines: 601, ownerGroupCount: 7 })).toBe(6);
     expect(scoreFile({ ...base, effectCount: 4, stateAuthorities: 3 })).toBe(6);
+  });
+});
+
+describe('structural persistence effects', () => {
+  it.each([
+    'weakMap.delete(key)',
+    'map.delete(key)',
+    'set.delete(key)',
+    'captureMenuStates.delete(container)',
+    'context.save()',
+    'queue.put(item)',
+    'service.save(item)',
+    'controller.persist(item)',
+    'map.delete(db)',
+    'queue.put(repository)',
+    'context.save(projectRepository)',
+    'map.get(repository).delete(key)',
+    'map.delete(storage.key)',
+    'context.save(localStorage)',
+    'queue.put(browser.storage.local)',
+  ])('does not classify unrelated mutation as persistence: %s', (source) => {
+    expect(collectEffectFamilies(source)).not.toContain('persistence');
+  });
+
+  it.each([
+    "localStorage.setItem('key', 'value')",
+    "sessionStorage.removeItem('key')",
+    "indexedDB.open('projects')",
+    "window.localStorage.setItem('key', 'value')",
+    "globalThis.indexedDB.open('projects')",
+    "chrome.storage.local.set({ key: 'value' })",
+    "browser.storage.sync.get('key')",
+    'storage.save(item)',
+    'db.transaction()',
+    'objectStore.delete(key)',
+    'projectRepository.save(project)',
+    "tx.objectStore('projects').delete(key)",
+    "database.table('projects').put(project)",
+    'getStore().delete(key)',
+  ])('classifies proven persistence receiver mutation: %s', (source) => {
+    expect(collectEffectFamilies(source)).toContain('persistence');
   });
 });
 

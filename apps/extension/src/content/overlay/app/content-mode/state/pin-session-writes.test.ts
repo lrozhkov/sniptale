@@ -3,40 +3,23 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { installContentRuntimeMessagingMock } from '../../../../application/runtime-services/services.test-support';
 
-const browserStorageMocks = vi.hoisted(() => ({
-  get: vi.fn(),
-  isAvailable: vi.fn(() => true),
-  remove: vi.fn(),
+const runtimeMocks = vi.hoisted(() => ({
   sendRuntimeMessage: vi.fn(),
-  set: vi.fn(),
 }));
-
-const loggerMocks = vi.hoisted(() => ({
-  warn: vi.fn(),
-}));
-
-vi.mock(
-  '../../../../../composition/persistence/infrastructure/browser-storage',
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import('../../../../../composition/persistence/infrastructure/browser-storage')
-    >()),
-    browserStorage: {
-      session: browserStorageMocks,
-    },
-  })
-);
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => loggerMocks,
+  createLogger: () => ({ warn: vi.fn() }),
 }));
 
 vi.mock('../../../../../platform/runtime-messaging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/runtime-messaging')>()),
-  sendRuntimeMessage: browserStorageMocks.sendRuntimeMessage,
+  sendRuntimeMessage: runtimeMocks.sendRuntimeMessage,
 }));
 
-import { loadContentPinToTabSessionState, writeContentPinToTabSessionState } from './pin-session';
+import {
+  writeContentPinToTabSessionState,
+  writeContentPinToTabToolbarVisibilityState,
+} from './pin-session';
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
@@ -53,103 +36,147 @@ async function flushMicrotasks() {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 beforeEach(async () => {
   await flushMicrotasks();
-  installContentRuntimeMessagingMock(browserStorageMocks.sendRuntimeMessage);
-  browserStorageMocks.get.mockReset();
-  browserStorageMocks.isAvailable.mockReset();
-  browserStorageMocks.remove.mockReset();
-  browserStorageMocks.sendRuntimeMessage.mockReset();
-  browserStorageMocks.set.mockReset();
-  loggerMocks.warn.mockReset();
-  browserStorageMocks.get.mockResolvedValue({});
-  browserStorageMocks.isAvailable.mockReturnValue(true);
-  browserStorageMocks.remove.mockResolvedValue(undefined);
-  browserStorageMocks.sendRuntimeMessage.mockResolvedValue({
+  installContentRuntimeMessagingMock(runtimeMocks.sendRuntimeMessage);
+  runtimeMocks.sendRuntimeMessage.mockReset();
+});
+
+it('serializes a newer unpin after an older delayed pin write', async () => {
+  const pinResponse = createDeferred<{
+    pinToTab: boolean;
+    pinToTabAvailable: boolean;
+    restored: boolean;
+    success: boolean;
+  }>();
+  runtimeMocks.sendRuntimeMessage.mockReturnValueOnce(pinResponse.promise).mockResolvedValueOnce({
+    pinToTab: false,
+    pinToTabAvailable: true,
+    restored: false,
     success: true,
-    documentId: 'content-document-7',
-    enabled: true,
-    tabId: 7,
-    viewport: null,
-  });
-  browserStorageMocks.set.mockResolvedValue(undefined);
-});
-
-it('keeps disabled-mode hydration read-only before a newer pin write', async () => {
-  browserStorageMocks.sendRuntimeMessage
-    .mockResolvedValueOnce({
-      success: true,
-      documentId: 'content-document-7',
-      enabled: false,
-      tabId: 7,
-      viewport: null,
-    })
-    .mockResolvedValueOnce({
-      success: true,
-      documentId: 'content-document-7',
-      enabled: true,
-      tabId: 7,
-      viewport: null,
-    });
-
-  await expect(loadContentPinToTabSessionState()).resolves.toBe(false);
-  writeContentPinToTabSessionState(true);
-  await flushMicrotasks();
-
-  expect(browserStorageMocks.remove).not.toHaveBeenCalled();
-  expect(browserStorageMocks.set).toHaveBeenCalledWith({
-    'sniptale.content.pin-to-tab:tab:7': true,
-  });
-});
-
-it('serializes a newer unpin after an older delayed pin storage write', async () => {
-  const setStorage = createDeferred<void>();
-  browserStorageMocks.set.mockReturnValueOnce(setStorage.promise);
-
-  writeContentPinToTabSessionState(true);
-  await flushMicrotasks();
-  expect(browserStorageMocks.set).toHaveBeenCalledWith({
-    'sniptale.content.pin-to-tab:tab:7': true,
   });
 
-  writeContentPinToTabSessionState(false);
+  const pin = writeContentPinToTabSessionState(true);
   await flushMicrotasks();
-  expect(browserStorageMocks.remove).not.toHaveBeenCalled();
-
-  setStorage.resolve(undefined);
+  const unpin = writeContentPinToTabSessionState(false);
   await flushMicrotasks();
 
-  expect(browserStorageMocks.remove).toHaveBeenCalledWith('sniptale.content.pin-to-tab:tab:7');
-  expect(browserStorageMocks.set.mock.invocationCallOrder[0]!).toBeLessThan(
-    browserStorageMocks.remove.mock.invocationCallOrder[0]!
-  );
+  expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(1);
+  pinResponse.resolve({
+    pinToTab: true,
+    pinToTabAvailable: true,
+    restored: true,
+    success: true,
+  });
+  await expect(pin).resolves.toEqual({
+    pinToTabAvailable: true,
+    status: 'acknowledged',
+    value: true,
+  });
+  await expect(unpin).resolves.toEqual({
+    pinToTabAvailable: true,
+    status: 'acknowledged',
+    value: false,
+  });
+
+  expect(runtimeMocks.sendRuntimeMessage.mock.calls).toEqual([
+    [{ pinToTab: true, type: 'CONTENT_RUNTIME_WAKEUP' }],
+    [{ pinToTab: false, type: 'CONTENT_RUNTIME_WAKEUP' }],
+  ]);
 });
 
-it('does not let an older delayed status write restore a newer unpinned state', async () => {
-  const firstStatus = createDeferred<unknown>();
+it('does not send an older queued write after a newer generation supersedes it', async () => {
   let generation = 0;
   const write = (value: boolean) => {
     const writeGeneration = generation + 1;
     generation = writeGeneration;
-    writeContentPinToTabSessionState(value, () => generation === writeGeneration);
+    return writeContentPinToTabSessionState(value, () => generation === writeGeneration);
   };
-
-  browserStorageMocks.sendRuntimeMessage.mockReturnValueOnce(firstStatus.promise);
-
-  write(true);
-  write(false);
-  firstStatus.resolve({
+  runtimeMocks.sendRuntimeMessage.mockResolvedValue({
+    pinToTab: false,
+    pinToTabAvailable: true,
+    restored: false,
     success: true,
-    documentId: 'content-document-7',
-    enabled: true,
-    tabId: 7,
-    viewport: null,
   });
+
+  const pin = write(true);
+  const unpin = write(false);
+
+  await expect(pin).resolves.toEqual({ status: 'superseded' });
+  await expect(unpin).resolves.toEqual({
+    pinToTabAvailable: true,
+    status: 'acknowledged',
+    value: false,
+  });
+  expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(1);
+  expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+    pinToTab: false,
+    type: 'CONTENT_RUNTIME_WAKEUP',
+  });
+});
+
+it('continues the write queue after an earlier runtime failure', async () => {
+  runtimeMocks.sendRuntimeMessage
+    .mockRejectedValueOnce(new Error('runtime unavailable'))
+    .mockResolvedValueOnce({
+      pinToTab: false,
+      pinToTabAvailable: true,
+      restored: false,
+      success: true,
+    });
+
+  const pin = writeContentPinToTabSessionState(true);
+  const unpin = writeContentPinToTabSessionState(false);
+
+  await expect(pin).rejects.toThrow('runtime unavailable');
+  await expect(unpin).resolves.toEqual({
+    pinToTabAvailable: true,
+    status: 'acknowledged',
+    value: false,
+  });
+  expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(2);
+});
+
+it('serializes a collapsed-toolbar write after pin activation', async () => {
+  const pinResponse = createDeferred<{
+    pinToTab: boolean;
+    pinToTabAvailable: boolean;
+    restored: boolean;
+    success: boolean;
+  }>();
+  runtimeMocks.sendRuntimeMessage.mockReturnValueOnce(pinResponse.promise).mockResolvedValueOnce({
+    pinToTab: true,
+    pinToTabAvailable: true,
+    restored: false,
+    success: true,
+  });
+
+  const pin = writeContentPinToTabSessionState(true);
+  await flushMicrotasks();
+  const collapse = writeContentPinToTabToolbarVisibilityState(false);
   await flushMicrotasks();
 
-  expect(browserStorageMocks.set).not.toHaveBeenCalled();
-  expect(browserStorageMocks.remove).toHaveBeenCalledWith('sniptale.content.pin-to-tab:tab:7');
+  expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(1);
+  pinResponse.resolve({
+    pinToTab: true,
+    pinToTabAvailable: true,
+    restored: true,
+    success: true,
+  });
+  await expect(pin).resolves.toMatchObject({ status: 'acknowledged', value: true });
+  await expect(collapse).resolves.toBeUndefined();
+  expect(runtimeMocks.sendRuntimeMessage.mock.calls).toEqual([
+    [{ pinToTab: true, type: 'CONTENT_RUNTIME_WAKEUP' }],
+    [{ toolbarVisible: false, type: 'CONTENT_RUNTIME_WAKEUP' }],
+  ]);
+});
+
+it('rejects a visibility write when background persistence fails', async () => {
+  runtimeMocks.sendRuntimeMessage.mockRejectedValueOnce(new Error('runtime unavailable'));
+
+  await expect(writeContentPinToTabToolbarVisibilityState(false)).rejects.toThrow(
+    'runtime unavailable'
+  );
 });

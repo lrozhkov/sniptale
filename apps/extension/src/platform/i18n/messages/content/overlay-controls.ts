@@ -13,6 +13,30 @@ export const contentOverlayControlsMessages = defineMessageSource({
     ru: 'Стиль рамки',
     en: 'Frame style',
   },
+  configureFrameStyle: {
+    ru: 'Настроить стиль',
+    en: 'Customize style',
+  },
+  hideFrameStyle: {
+    ru: 'Скрыть из списка',
+    en: 'Hide from list',
+  },
+  restoreFrameStyle: {
+    ru: 'Вернуть в список',
+    en: 'Restore to list',
+  },
+  addFrameStyle: {
+    ru: 'Добавить',
+    en: 'Add',
+  },
+  saveFrameStyleError: {
+    ru: 'Не удалось сохранить стиль рамки',
+    en: 'Could not save the frame style',
+  },
+  toggleFrameStyleError: {
+    ru: 'Не удалось изменить видимость стиля',
+    en: 'Could not change style visibility',
+  },
   blurStrengthLabelPrefix: blurStrengthMessage,
   blurTypeLabel: blurTypeLabelMessage,
   blurTypeGaussian: blurTypeGaussianMessage,

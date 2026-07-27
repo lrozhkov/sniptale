@@ -69,6 +69,10 @@ const toolbarSecondaryControlsSource = readFileSync(
   new URL('./controls/secondary.tsx', import.meta.url),
   'utf8'
 );
+const toolbarCaptureMenuGroupSource = readFileSync(
+  new URL('./capture/menu-group.tsx', import.meta.url),
+  'utf8'
+);
 const interactiveFrameToolbarSectionsSource = readFileSync(
   new URL('../../selection/interactive-frame/toolbar/sections.tsx', import.meta.url),
   'utf8'
@@ -186,13 +190,18 @@ function expectToolbarModeIconContract(): void {
 }
 
 function expectToolbarSecondaryControlsContract(): void {
-  expect(toolbarSecondaryControlsSource).toContain(
-    'displayMode={args.viewModel.derivedState.displayMode}'
-  );
-  expect(toolbarSecondaryControlsSource).toContain('<ToolbarScenarioControls');
+  expect(toolbarSecondaryControlsSource).not.toContain('<ToolbarScenarioControls');
   expect(toolbarSecondaryControlsSource).not.toContain('<ContentToolbarDivider />');
   expect(toolbarSecondaryControlsSource).toContain(
     'onDisplayModeChange: args.viewModel.derivedState.setDisplayMode'
+  );
+  expect(toolbarCaptureMenuGroupSource).toContain('<ToolbarScenarioControls');
+  expect(toolbarCaptureMenuGroupSource).toContain('displayMode={captureProps.displayMode}');
+  expect(toolbarCaptureMenuGroupSource.indexOf('<CaptureActionMenuNode')).toBeLessThan(
+    toolbarCaptureMenuGroupSource.indexOf('<ToolbarScenarioControls')
+  );
+  expect(toolbarCaptureMenuGroupSource.indexOf('<ToolbarScenarioControls')).toBeLessThan(
+    toolbarCaptureMenuGroupSource.indexOf('<TimerMenuNode')
   );
 }
 

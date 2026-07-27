@@ -94,6 +94,23 @@ function mockHistoryTransactions() {
 }
 
 describe('useCalloutEditing external finish lifecycle', () => {
+  it('commits the callout editing transaction when Enter finishes input', () => {
+    const history = mockHistoryTransactions();
+    const onContentChange = vi.fn();
+    const onStopEditing = vi.fn();
+    const { editable } = renderHarness({ onContentChange, onStopEditing });
+
+    act(() => {
+      editable.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' })
+      );
+    });
+
+    expect(onContentChange).toHaveBeenCalledWith('<p>updated</p>');
+    expect(onStopEditing).toHaveBeenCalledTimes(1);
+    expect(history.commitTransactionSpy).toHaveBeenCalledWith('callout-editing:frame-1');
+  });
+
   it('commits the callout editing transaction when Escape finishes input', () => {
     const history = mockHistoryTransactions();
     const onContentChange = vi.fn();

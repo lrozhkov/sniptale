@@ -14,14 +14,14 @@ vi.mock('@sniptale/ui/content-toolbar', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/ui/content-toolbar')>()),
   ContentToolbarButton: (props: {
     children?: ReactNode;
-    ariaLabel?: string;
+    'aria-label'?: string;
     dataUi: string;
     onClick?: () => void;
     title?: string;
   }) => (
     <button
       type="button"
-      aria-label={props.ariaLabel}
+      aria-label={props['aria-label']}
       data-ui={props.dataUi}
       title={props.title}
       onClick={props.onClick}
@@ -117,11 +117,14 @@ it('renders scenario menus and wires sidebar, finish, and open-editor actions', 
 
   expect(container?.querySelector('[data-ui="test.scenario-project-menu"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="test.scenario-mode-menu"]')).not.toBeNull();
+  const sidebarButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.scenario-sidebar-button"]'
+  );
+  expect(sidebarButton?.title).toBe('scenario.content.sidebarHide');
+  expect(sidebarButton?.getAttribute('aria-label')).toBe('scenario.content.sidebarHide');
 
   act(() => {
-    container
-      ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.scenario-sidebar-button"]')
-      ?.click();
+    sidebarButton?.click();
     container
       ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.scenario-finish-button"]')
       ?.click();

@@ -1,10 +1,24 @@
 import { expect, it, vi } from 'vitest';
 
 import {
+  exitScreenshotModeFromUserAction,
   finishScenarioRecorder,
   isScenarioByClickBlocked,
   resolveScenarioByClickTransition,
 } from './scenario';
+
+it('always clears authoritative pin state on explicit exit despite a stale false projection', () => {
+  const handleToggleScreenshotMode = vi.fn();
+  const setPinToTab = vi.fn();
+
+  exitScreenshotModeFromUserAction({
+    modeController: { handleToggleScreenshotMode },
+    setPinToTab,
+  });
+
+  expect(handleToggleScreenshotMode).toHaveBeenCalledWith(false);
+  expect(setPinToTab).toHaveBeenCalledWith(false);
+});
 
 it('treats highlighter, quick edit, and ai-pick as by-click blockers', () => {
   expect(
@@ -53,9 +67,7 @@ it('finishes the recorder by disabling screenshot mode before opening the scenar
   });
 
   await finishScenarioRecorder({
-    modeController: {
-      handleToggleScreenshotMode,
-    },
+    onDisableScreenshotMode: () => handleToggleScreenshotMode(false),
     scenarioController: {
       handleScreenshotModeDisabled,
       openEditor,

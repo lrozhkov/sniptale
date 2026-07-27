@@ -3,9 +3,19 @@ import { expect, it } from 'vitest';
 import {
   browserPermissionsContainsMock,
   browserPermissionsGetAllMock,
+  browserScriptingGetRegisteredContentScriptsMock,
   browserScriptingRegisterContentScriptsMock,
   browserScriptingUnregisterContentScriptsMock,
 } from './service.test-support';
+
+const staleRegistration: chrome.scripting.RegisteredContentScript = {
+  allFrames: true,
+  id: 'sniptale-page-access-all-sites',
+  js: ['assets/contentRuntimeShim.js'],
+  matches: ['http://*/*', 'https://*/*'],
+  persistAcrossSessions: true,
+  runAt: 'document_idle',
+};
 
 it('does not re-check site permission when all-sites access already covers the tab', async () => {
   const { hasSitePermission } = await import('./registration');
@@ -118,4 +128,40 @@ it('reconciles persistent shim registration from legacy split all-sites host per
     }),
   ]);
   expect(browserScriptingRegisterContentScriptsMock).toHaveBeenCalledTimes(1);
+});
+
+it('restores a replaced registration when the owning transaction is superseded', async () => {
+  const { commitContentScriptRegistration } = await import('./registration');
+  browserScriptingGetRegisteredContentScriptsMock.mockResolvedValueOnce([staleRegistration]);
+
+  await expect(
+    commitContentScriptRegistration({
+      commit: async () => false,
+      id: 'sniptale-page-access-all-sites',
+      matches: ['http://*/*', 'https://*/*'],
+    })
+  ).resolves.toBe(false);
+
+  expect(browserScriptingUnregisterContentScriptsMock).toHaveBeenCalledTimes(2);
+  expect(browserScriptingRegisterContentScriptsMock).toHaveBeenNthCalledWith(2, [
+    staleRegistration,
+  ]);
+});
+
+it('preserves an already-valid registration when the owning transaction is superseded', async () => {
+  const { commitContentScriptRegistration } = await import('./registration');
+  browserScriptingGetRegisteredContentScriptsMock.mockResolvedValueOnce([
+    { ...staleRegistration, allFrames: false },
+  ]);
+
+  await expect(
+    commitContentScriptRegistration({
+      commit: async () => false,
+      id: 'sniptale-page-access-all-sites',
+      matches: ['http://*/*', 'https://*/*'],
+    })
+  ).resolves.toBe(false);
+
+  expect(browserScriptingUnregisterContentScriptsMock).not.toHaveBeenCalled();
+  expect(browserScriptingRegisterContentScriptsMock).not.toHaveBeenCalled();
 });

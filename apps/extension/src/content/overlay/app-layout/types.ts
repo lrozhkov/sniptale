@@ -93,9 +93,11 @@ export type ContentAppLayoutToolbarProps = {
     onToggle: () => void;
   };
   pinToTab: boolean;
+  pinToTabAvailable: boolean;
   setCaptureAction: (action: CaptureActionType) => void;
   setCurrentViewport: (viewport: { width: number; height: number } | null) => void;
-  setPinToTab: (value: boolean) => void;
+  setPinToTab: (value: boolean, contentIntentSource?: ContentPrivilegedActionIntentSource) => void;
+  setPinnedToolbarVisible: (visible: boolean) => void;
   setTimerDelay: (delay: number) => void;
   timerDelay: number;
 };

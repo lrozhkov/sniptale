@@ -64,24 +64,6 @@ export function useQuickActionToastCountdown(
   }, [quickActionToastCountdown, setQuickActionToastCountdown]);
 }
 
-export function usePinnedToolbarModeCleanup(params: {
-  pinToTab: boolean;
-  scenarioPinned: boolean;
-  screenshotMode: boolean;
-  setPinToTab: (value: boolean) => void;
-}) {
-  const { pinToTab, scenarioPinned, screenshotMode, setPinToTab } = params;
-  const previousScreenshotModeRef = useRef(screenshotMode);
-
-  useEffect(() => {
-    if (previousScreenshotModeRef.current && !screenshotMode && pinToTab && !scenarioPinned) {
-      setPinToTab(false);
-    }
-
-    previousScreenshotModeRef.current = screenshotMode;
-  }, [pinToTab, scenarioPinned, screenshotMode, setPinToTab]);
-}
-
 function restorePinnedToolbarState(
   params: {
     setCurrentViewport: (viewport: { width: number; height: number } | null) => void;

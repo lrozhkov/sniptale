@@ -16,6 +16,10 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
 import { createContentEntrypointStyles, resolveContentEntrypointStyleUrls } from './styles';
 
 const STYLES_SOURCE_PATH = fileURLToPath(new URL('./styles.ts', import.meta.url));
+const HOST_STYLES_PATH = fileURLToPath(new URL('./host.css', import.meta.url));
+const FRAME_SETTINGS_STYLES_PATH = fileURLToPath(
+  new URL('../../selection/frame-settings-popover/styles.css', import.meta.url)
+);
 
 afterEach(() => {
   runtimeInfoGetUrlMock.mockClear();
@@ -25,8 +29,14 @@ describe('content entrypoint styles', () => {
   it('loads the shared style bundle once for the shadow runtime', () => {
     const styles = createContentEntrypointStyles();
     const source = readFileSync(STYLES_SOURCE_PATH, 'utf8');
+    const hostStyles = readFileSync(HOST_STYLES_PATH, 'utf8');
+    const frameSettingsStyles = readFileSync(FRAME_SETTINGS_STYLES_PATH, 'utf8');
 
-    expect(styles).toContain(':host {');
+    expect(styles).toBeTypeOf('string');
+    expect(hostStyles).toContain(':host {');
+    expect(frameSettingsStyles).toContain('.sniptale-frame-style-preset-row');
+    expect(source).toContain('./host.css?inline');
+    expect(source).toContain('frame-settings-popover/styles.css?inline');
     expect(source).toContain('@sniptale/ui/styles?inline');
     expect(source).not.toContain('@sniptale/ui/styles/tailwind?inline');
     expect(source).not.toContain('../../../shared/design-tokens.css?inline');

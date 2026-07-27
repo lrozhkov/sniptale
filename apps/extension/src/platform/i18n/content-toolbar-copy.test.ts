@@ -89,6 +89,10 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     ru: 'Добавляйте рамки, маски, размытие и комментарии',
     en: 'Add frames, masks, blur, and comments',
   },
+  'content.toolbar.autoBlur': {
+    ru: 'Размытие данных',
+    en: 'Sensitive data blur',
+  },
   'content.toolbar.modeMenuTitle': {
     ru: 'Режим работы',
     en: 'Working mode',
@@ -104,6 +108,10 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
   'content.toolbar.pinToTabLockedHint': {
     ru: 'Панель закреплена, пока включён сценарий',
     en: 'The toolbar stays pinned while scenario mode is on',
+  },
+  'content.toolbar.pinToTabUnavailableHint': {
+    ru: 'Разрешите расширению доступ ко всем сайтам, чтобы панель восстанавливалась после переходов',
+    en: 'Allow the extension on all sites so the toolbar can return after navigation',
   },
   'content.toolbar.hideToolbar': {
     ru: 'Скрыть панель',
@@ -121,13 +129,25 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     ru: 'Размыть данные сейчас',
     en: 'Blur data now',
   },
+  'content.autoBlur.applyOnceSuccess': {
+    ru: 'Найденные данные скрыты: {count}',
+    en: 'Detected data blurred: {count}',
+  },
+  'content.autoBlur.applyOnceEmpty': {
+    ru: 'Данные для размытия не найдены',
+    en: 'No data to blur found',
+  },
+  'content.autoBlur.applyOnceError': {
+    ru: 'Не удалось найти и размыть данные',
+    en: 'Could not find and blur data',
+  },
   'content.autoBlur.applyOnceHint': {
     ru: 'Найти и размыть данные на текущей странице',
     en: 'Find and blur data on the current page',
   },
   'content.autoBlur.configure': {
-    ru: 'Настроить Auto-Blur',
-    en: 'Configure Auto-Blur',
+    ru: 'Настроить',
+    en: 'Configure',
   },
   'content.autoBlur.configureHint': {
     ru: 'Выбрать типы данных, проверить найденное и настроить размытие',
@@ -136,6 +156,14 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
   'scenario.content.project': {
     ru: 'Проект сценария',
     en: 'Scenario project',
+  },
+  'scenario.content.projectButton': {
+    ru: 'Выбрать проект',
+    en: 'Choose project',
+  },
+  'scenario.content.projectMenuTitle': {
+    ru: 'Выберите проект сценария',
+    en: 'Choose a scenario project',
   },
   'scenario.content.modeManual': {
     ru: 'Кнопкой снимка',
@@ -158,8 +186,16 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Turn off annotations, page editing, and the AI editor first',
   },
   'scenario.content.captureMode': {
-    ru: 'Добавление шагов',
-    en: 'Adding steps',
+    ru: 'Как добавлять шаги',
+    en: 'How to add steps',
+  },
+  'scenario.content.sidebarShow': {
+    ru: 'Показать шаги сценария',
+    en: 'Show scenario steps',
+  },
+  'scenario.content.sidebarHide': {
+    ru: 'Скрыть шаги сценария',
+    en: 'Hide scenario steps',
   },
   'scenario.content.projectSearchPlaceholder': {
     ru: 'Поиск или название нового проекта',

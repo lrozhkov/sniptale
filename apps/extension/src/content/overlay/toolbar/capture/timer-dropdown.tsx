@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   ProductToolbarMenu,
-  ProductToolbarMenuBadge,
   ProductToolbarMenuItem,
   ProductToolbarMenuItemCopy,
 } from '@sniptale/ui/product-menus/toolbar';
@@ -51,9 +50,6 @@ function TimerDropdownItems(props: {
             onClick={preventToolbarMenuClick}
             selected={isSelected}
           >
-            <ProductToolbarMenuBadge>
-              {option.value === 0 ? '0s' : `${option.value}s`}
-            </ProductToolbarMenuBadge>
             <ProductToolbarMenuItemCopy label={option.label} hint={option.hint} />
             {isSelected && renderMenuCheck()}
           </ProductToolbarMenuItem>

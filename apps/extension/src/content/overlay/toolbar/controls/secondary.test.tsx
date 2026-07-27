@@ -26,6 +26,7 @@ vi.mock('../capture', () => ({
     displayMode: string;
     onPinToTabChange: () => void;
     pinToTab: boolean;
+    pinToTabAvailable: boolean;
     pinToTabLocked: boolean;
     scenario?: unknown;
   }) => (
@@ -33,17 +34,9 @@ vi.mock('../capture', () => ({
       data-ui="test.capture-actions"
       data-display-mode={props.displayMode}
       data-pin-to-tab={props.pinToTab ? 'true' : 'false'}
+      data-pin-to-tab-available={props.pinToTabAvailable ? 'true' : 'false'}
       data-pin-to-tab-locked={props.pinToTabLocked ? 'true' : 'false'}
       data-scenario={props.scenario ? 'true' : 'false'}
-    />
-  ),
-}));
-
-vi.mock('../scenario/controls', () => ({
-  ToolbarScenarioControls: (props: { showWorkflowActions?: boolean }) => (
-    <div
-      data-ui="test.scenario-controls"
-      data-workflow-actions={props.showWorkflowActions ? 'true' : 'false'}
     />
   ),
 }));
@@ -96,6 +89,7 @@ function createToolbarProps(params?: { isCursorMode?: boolean }) {
     onToggleQuickEditMode: vi.fn(),
     onToggleScreenshotMode: vi.fn(),
     pinToTab: true,
+    pinToTabAvailable: true,
     pinToTabLocked: false,
     quickEditMode: false,
     screenshotMode: true,
@@ -189,29 +183,6 @@ async function renderSecondaryControls(params: {
   });
 }
 
-function readOrderedDataUi(): Array<string | null> {
-  return Array.from(document.querySelectorAll('[data-ui]')).map((node) =>
-    node.getAttribute('data-ui')
-  );
-}
-
-function expectScenarioControlsBeforeUtilityAndCapture(): void {
-  const orderedDataUi = readOrderedDataUi();
-
-  expect(document.querySelector('[data-ui="test.scenario-controls"]')).not.toBeNull();
-  expect(
-    document
-      .querySelector('[data-ui="test.scenario-controls"]')
-      ?.getAttribute('data-workflow-actions')
-  ).toBe('false');
-  expect(orderedDataUi.indexOf('test.scenario-controls')).toBeLessThan(
-    orderedDataUi.indexOf('test.utility-buttons')
-  );
-  expect(orderedDataUi.indexOf('test.utility-buttons')).toBeLessThan(
-    orderedDataUi.indexOf('test.capture-actions')
-  );
-}
-
 async function verifiesScenarioCaptureForwarding() {
   await renderSecondaryControls({ captureAction: 'download_default' });
   expect(
@@ -224,13 +195,20 @@ async function verifiesScenarioCaptureForwarding() {
   ).toBe('true');
 }
 
-async function verifiesCompactScenarioControlOrder() {
+async function verifiesScenarioCaptureAcrossInteractionModes() {
   await renderSecondaryControls({ captureAction: 'scenario', isCursorMode: true });
-  expectScenarioControlsBeforeUtilityAndCapture();
+  expect(
+    document.querySelector('[data-ui="test.capture-actions"]')?.getAttribute('data-scenario')
+  ).toBe('true');
 
-  await renderSecondaryControls({ captureAction: 'scenario', isCursorMode: false });
-
-  expect(document.querySelector('[data-ui="test.scenario-controls"]')).toBeNull();
+  await renderSecondaryControls({
+    captureAction: 'scenario',
+    highlighterMode: true,
+    isCursorMode: false,
+  });
+  expect(
+    document.querySelector('[data-ui="test.capture-actions"]')?.getAttribute('data-scenario')
+  ).toBe('true');
 }
 
 async function verifiesModeDependentUtilityVisibility() {
@@ -284,8 +262,8 @@ describe('ToolbarSecondaryControls', () => {
     verifiesScenarioCaptureForwarding
   );
   it(
-    'renders compact scenario controls before utility buttons in cursor scenario mode',
-    verifiesCompactScenarioControlOrder
+    'keeps scenario capture composition while the interaction mode changes',
+    verifiesScenarioCaptureAcrossInteractionModes
   );
   it(
     'forwards mode-dependent utility visibility and persisted display mode state',

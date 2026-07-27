@@ -1,5 +1,6 @@
 import { ToolbarCaptureActionMenu, ToolbarTimerMenu, ToolbarViewportMenu } from './menus';
 import type { ToolbarCaptureActionsProps } from '../types';
+import { ToolbarScenarioControls } from '../scenario/controls';
 import { getCaptureActionIcon, getCaptureActionOptions, getTimerOptions } from './options';
 import type { useToolbarCaptureMenus } from './use-menus';
 
@@ -98,6 +99,17 @@ export function ToolbarCaptureMenuGroup(
         onSelectCaptureAction={onSelectCaptureAction}
         viewportRightInset={viewportRightInset}
       />
+      {captureProps.screenshotMode &&
+      captureProps.captureAction === 'scenario' &&
+      captureProps.scenario ? (
+        <ToolbarScenarioControls
+          compactMenus={captureProps.compactMenus}
+          displayMode={captureProps.displayMode}
+          scenario={captureProps.scenario}
+          showWorkflowActions={false}
+          toolbarMenuState={captureProps.toolbarMenuState}
+        />
+      ) : null}
       <TimerMenuNode
         menus={menus}
         compactMenus={captureProps.compactMenus}

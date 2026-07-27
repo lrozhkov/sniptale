@@ -1,6 +1,6 @@
 import { ScenarioRecorderSidebar } from '../scenario-recorder/sidebar';
 import { useScenarioRecorderSidebarPosition } from '../scenario-recorder/sidebar/position';
-import { finishScenarioRecorder } from './scenario';
+import { exitScreenshotModeFromUserAction, finishScenarioRecorder } from './scenario';
 import { useDeferredSidebarHighlight } from './sidebar-highlight';
 import { shouldRenderContentScenarioRecorderSidebar } from './sidebar-visibility';
 import type { ContentAppLayoutScenarioProps, ContentAppModeController } from './types';
@@ -9,6 +9,7 @@ type ContentScenarioRecorderSidebarArgs = {
   isCompletelyHidden: boolean;
   modeController: Pick<ContentAppModeController, 'handleToggleScreenshotMode'>;
   scenario: ContentAppLayoutScenarioProps;
+  setPinToTab: (value: boolean) => void;
 };
 
 export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSidebarArgs) {
@@ -28,7 +29,11 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
       onDeleteStep={(stepId) => void args.scenario.actions.deleteRecentStep(stepId)}
       onFinish={() =>
         void finishScenarioRecorder({
-          modeController: args.modeController,
+          onDisableScreenshotMode: () =>
+            exitScreenshotModeFromUserAction({
+              modeController: args.modeController,
+              setPinToTab: args.setPinToTab,
+            }),
           scenarioController: args.scenario.actions,
         })
       }

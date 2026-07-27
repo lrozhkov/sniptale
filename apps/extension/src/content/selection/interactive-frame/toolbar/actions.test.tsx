@@ -66,6 +66,15 @@ describe('interactive frame toolbar callout actions', () => {
     cleanup();
   });
 
+  it('clears frame selection so finishing a new callout cannot restore its toolbar', () => {
+    const props = createToolbarProps();
+
+    createInteractiveFrameToolbarActions(props).handleCalloutClick(createToolbarEvent());
+
+    expect(props.clearSelection).toHaveBeenCalledOnce();
+    expect(props.setIsCalloutEditing).toHaveBeenCalledWith(true);
+  });
+
   it('routes enabled popover families through the single store transition', () => {
     const props = createToolbarProps(
       createFrameDataFixture('frame-1', {

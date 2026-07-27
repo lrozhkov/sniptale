@@ -46,14 +46,18 @@ function orchestrationFunction(overrides: MetricOverrides = {}) {
   };
 }
 
-function collect(sources: Record<string, string>, metrics: ReturnType<typeof metric>[]) {
+function collect(
+  sources: Record<string, string>,
+  metrics: ReturnType<typeof metric>[],
+  advisories: Array<{ file: string }> = []
+) {
   const readFile = (file: string) => {
     if (!(file in sources)) throw new Error(`Missing fixture ${file}`);
     return sources[file];
   };
   return collectTopologyFragmentationReport({
     files: metrics.map((item) => item.file),
-    structuralReport: { files: metrics, functions: [], violations: [], advisories: [] },
+    structuralReport: { files: metrics, functions: [], violations: [], advisories },
     root: '/unused',
     readFile,
   });
@@ -89,7 +93,11 @@ it('uses the canonical change-reason precedence', () => {
 });
 
 it('keeps the approved decision precedence for mixed and unresolved protected clusters', () => {
-  const context = { publicFiles: new Set(), moduleByFile: new Map(), incoming: new Map() };
+  const context = {
+    publicFiles: new Set(),
+    moduleByFile: new Map(),
+    productionIncoming: new Map(),
+  };
   const base = {
     fileMetrics: [],
     effectFamilies: [],
@@ -133,6 +141,56 @@ it('keeps the approved decision precedence for mixed and unresolved protected cl
     decision: 'Keep',
     confidence: 'low',
     reasons: ['unresolved-topology-or-authority'],
+  });
+});
+
+it('keeps proof-only delegation evidence out of consolidation decisions', () => {
+  const core = 'owner/core.ts';
+  const helper = 'owner/helper.ts';
+  const context = {
+    publicFiles: new Set<string>(),
+    moduleByFile: new Map([
+      [core, { forwardingOnly: false }],
+      [helper, { forwardingOnly: false }],
+    ]),
+    productionIncoming: new Map([
+      [core, new Set(['owner/a.ts', 'owner/b.ts'])],
+      [helper, new Set(['owner/a.ts'])],
+    ]),
+  };
+  const decision = decideTopologyCluster(
+    {
+      fileMetrics: [],
+      effectFamilies: [],
+      stateMutationFiles: 0,
+      changeReasons: ['default'],
+      cohesion: 1,
+      lexicalStateReceiverKeys: [],
+      unresolvedEdges: 0,
+      unresolvedStateAuthorities: 0,
+      reExportCycle: false,
+      productionToProofEdges: 0,
+      provenPublicContractFiles: [],
+      signals: {
+        forwardingOnlyFiles: 2,
+        passThroughFiles: 0,
+        proxyFamilyFiles: 0,
+        singleConsumerSmallFiles: 3,
+        delegationOnlyTests: 2,
+        facadeDepth: 0,
+      },
+      fileDetails: [
+        { file: core, reason: 'default' },
+        { file: helper, reason: 'default' },
+      ],
+    },
+    context
+  );
+
+  expect(decision).toMatchObject({
+    decision: 'Keep',
+    confidence: 'low',
+    reasons: ['insufficient-corroborated-evidence'],
   });
 });
 
@@ -215,6 +273,32 @@ it('classifies single-consumer forwarding edges with explicit safety vetoes', ()
     decision: 'Keep',
     confidence: 'high',
     reasons: ['proven-public-or-contract-forwarder'],
+  });
+});
+
+it('keeps a forwarding edge that reaches proof code from production', () => {
+  const root = 'apps/extension/src/content/selection/proof-forwarding';
+  const sources = {
+    [`${root}/consumer.ts`]: "import { run } from './facade'; export const result = run();",
+    [`${root}/facade.ts`]: "export { run } from './run'; export { fixture } from './fixture.test';",
+    [`${root}/fixture.test.ts`]: 'export const fixture = true;',
+    [`${root}/run.ts`]: 'export function run() { return true; }',
+  };
+  const report = collect(
+    sources,
+    Object.keys(sources).map((file) => metric(file))
+  );
+  const edge = report.clusters.find(
+    (cluster) =>
+      cluster.clusterKind === 'forwarding-edge' &&
+      cluster.forwardingFiles.includes(`${root}/facade.ts`)
+  );
+
+  expect(edge).toMatchObject({
+    decision: 'Keep',
+    confidence: 'low',
+    reasons: ['production-to-proof-dependency'],
+    productionToProofEdges: 1,
   });
 });
 
@@ -391,6 +475,100 @@ it('splits evidenced mixed UI/effect/state ownership but not structural score al
     decision: 'Keep',
     confidence: 'low',
   });
+});
+
+it('keeps proof-only state and persistence out of production topology decisions', () => {
+  const root = 'apps/extension/src/content/selection/proof-only';
+  const sources = {
+    [`${root}/types.ts`]: 'export type Session = { active: boolean };',
+    [`${root}/view.tsx`]: 'export const View = () => null;',
+    [`${root}/view.test.ts`]:
+      "import { View } from './view'; localStorage.setItem('fixture', String(View));",
+    [`${root}/types.test.ts`]:
+      "import type { Session } from './types'; export const fixture: Session = { active: true };",
+  };
+  const metrics = [
+    metric(`${root}/types.ts`),
+    metric(`${root}/view.tsx`, {
+      architecturalLayer: 'ui',
+      stateAuthorities: 1,
+      stateReceiverNames: ['session'],
+      stateReceiverKeys: ['session@10'],
+      effectFamilies: ['dom-ui'],
+      effectCount: 1,
+      score: 5,
+    }),
+    metric(`${root}/view.test.ts`, {
+      architecturalLayer: 'ui',
+      stateAuthorities: 4,
+      stateReceiverNames: ['fixture'],
+      stateReceiverKeys: ['fixture@10'],
+      effectFamilies: ['persistence'],
+      effectCount: 1,
+      score: 8,
+    }),
+    metric(`${root}/types.test.ts`, {
+      stateAuthorities: 3,
+      stateReceiverNames: ['fixture'],
+      stateReceiverKeys: ['fixture@20'],
+      effectFamilies: ['persistence'],
+      effectCount: 1,
+    }),
+  ];
+  const report = collect(sources, metrics, [{ file: `${root}/view.tsx` }]);
+  const cluster = report.clusters.find((candidate) => candidate.id === root);
+
+  expect(cluster).toMatchObject({
+    decision: 'Keep',
+    productionFileCount: 2,
+    proofFileCount: 2,
+    effectFamilies: ['dom-ui'],
+    stateAuthorityPoints: 1,
+    maximumStructuralScore: 5,
+  });
+  expect(cluster?.reasons).not.toContain('mixed-ui-effects-state');
+  expect(cluster?.proofTransitions).toBeGreaterThan(0);
+});
+
+it('separates proof-importer edges and vetoes production imports of proof code', () => {
+  const root = 'apps/extension/src/content/selection/proof-direction';
+  const sources = {
+    [`${root}/runtime.ts`]:
+      "import { fixture } from './fixture.test'; export const result = fixture;",
+    [`${root}/fixture.test.ts`]: "import { read } from './read'; export const fixture = read();",
+    [`${root}/read.ts`]: 'export const read = () => true;',
+  };
+  const metrics = Object.keys(sources).map((file) => metric(file));
+  const report = collect(sources, metrics, [{ file: `${root}/runtime.ts` }]);
+  const cluster = report.clusters.find((candidate) => candidate.id === root);
+
+  expect(cluster).toMatchObject({
+    decision: 'Keep',
+    confidence: 'low',
+    reasons: ['production-to-proof-dependency'],
+    productionFileCount: 2,
+    proofFileCount: 1,
+    productionToProofEdges: 1,
+    navigationTransitions: 0,
+    proofTransitions: 1,
+  });
+});
+
+it('does not infer a public runtime contract from a proof-only cross-runtime import', () => {
+  const testFile = 'apps/extension/src/content/selection/proof-contract/view.test.ts';
+  const target = 'apps/extension/src/popup/proof-contract/internal.ts';
+  const sources = {
+    [testFile]: "import { internal } from '../../../popup/proof-contract/internal'; void internal;",
+    [target]: 'export const internal = true;',
+  };
+  const metrics = Object.keys(sources).map((file) => metric(file));
+  const report = collect(sources, metrics, [{ file: target }]);
+  const cluster = report.clusters.find(
+    (candidate) => candidate.id === 'apps/extension/src/popup/proof-contract'
+  );
+
+  expect(cluster?.provenPublicContractFiles).toEqual([]);
+  expect(cluster?.decision).toBe('Keep');
 });
 
 it('preserves cohesive orchestration and proven contract boundaries', () => {

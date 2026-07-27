@@ -41,6 +41,16 @@ vi.mock('../ui-activation-bridge', () => ({
   installContentUiActivationBridge: installContentUiActivationBridgeMock,
 }));
 
+vi.mock('../../public/preparation-surface/styles', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../public/preparation-surface/styles')>()),
+  createContentEntrypointStyles: () => `
+:host {
+  all: initial;
+  position: fixed;
+}
+`,
+}));
+
 vi.mock('./diagnostics', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./diagnostics')>()),
   logRegionCaptureApiSupport: vi.fn(),

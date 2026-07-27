@@ -14,6 +14,7 @@ export type RuntimeMessageRequest = {
   quickActionOverlay?: QuickActionOverlay & { delaySeconds?: number };
   autoStartSelection?: boolean;
   autoStartCaptureType?: 'visible' | 'full';
+  toolbarVisible?: boolean;
   contentIntentGrant?: ContentActionContract.ContentPrivilegedActionAutoStartGrant;
   payload?: {
     type?: 'info' | 'success' | 'warning' | 'error';

@@ -1,7 +1,10 @@
 import type { EditableElement } from '../../../features/highlighter/contracts';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createQuickEditDocumentModeHistoryTracker } from './document-mode.history';
-import { QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS } from './style.constants';
+import {
+  QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS,
+  QUICK_EDIT_TEXT_CURSOR_BODY_CLASS,
+} from './style.constants';
 
 const ENABLED_DESIGN_MODE = 'on';
 
@@ -56,6 +59,7 @@ function isDocumentModeOwnerEnabled(state: QuickEditDocumentModeState): boolean 
 
 function cleanupDocumentModeState(state: QuickEditDocumentModeState): void {
   document.body?.classList.remove(QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS);
+  document.body?.classList.remove(QUICK_EDIT_TEXT_CURSOR_BODY_CLASS);
   state.previousDesignMode = null;
 }
 
@@ -93,6 +97,7 @@ function applyDocumentModeEnable(state: QuickEditDocumentModeState, originalDesi
     if (!isDesignModeEnabled()) {
       throw new Error('document.designMode did not switch to "on"');
     }
+    document.body?.classList.remove(QUICK_EDIT_TEXT_CURSOR_BODY_CLASS);
     document.body?.classList.add(QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS);
     logger.log('Quick edit document mode enabled');
   } catch (error) {

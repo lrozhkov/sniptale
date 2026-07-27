@@ -2,6 +2,8 @@ import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { browserWebNavigation } from '@sniptale/platform/browser/web-navigation';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { cleanupScreenshotModeAfterNavigation } from '../../tab-mode-router-screenshot';
+import { restorePinnedToolbarAfterNavigation } from '../../page-access/pinned-toolbar-restore';
+import { invalidatePinnedToolbarOperations } from '../../page-access/pinned-toolbar-operation';
 import {
   handleExportHarNavigationStart,
   handleTabNavigation,
@@ -25,6 +27,12 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
     }
 
     handleTabUpdated(tabId, changeInfo);
+
+    if (changeInfo.status === 'complete') {
+      void restorePinnedToolbarAfterNavigation(tabId, state).catch((error) => {
+        logger.warn('Failed to restore pinned toolbar after navigation', error);
+      });
+    }
   });
 
   browserWebNavigation.subscribeToBeforeNavigate((details: unknown) => {
@@ -33,6 +41,7 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
       return;
     }
 
+    invalidatePinnedToolbarOperations(navigation.tabId);
     clearBackgroundRuntimeTabEditingState(state, navigation.tabId);
     void cleanupScreenshotModeAfterNavigation(
       navigation.tabId,
