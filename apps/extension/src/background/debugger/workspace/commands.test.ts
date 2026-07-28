@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 
 it('pins the visible compositor area to the exact CSS viewport', async () => {
-  await overrideDeviceMetrics(9, 1280, 720);
+  await overrideDeviceMetrics(9, 1280, 720, 2);
 
   expect(browserDebuggerMock.sendCommand).toHaveBeenCalledWith(
     { tabId: 9 },
@@ -37,7 +37,7 @@ it('pins the visible compositor area to the exact CSS viewport', async () => {
       positionX: 0,
       positionY: 0,
       scrollbarType: 'overlay',
-      viewport: { x: 0, y: 0, width: 1280, height: 720, scale: 1 },
+      viewport: { x: 0, y: 0, width: 1280, height: 720, scale: 2 },
     }
   );
 });

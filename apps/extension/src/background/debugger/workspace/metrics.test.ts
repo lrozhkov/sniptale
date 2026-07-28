@@ -1,16 +1,30 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { readIsolatedViewportMetrics, waitForIsolatedViewportPaint } from './metrics';
+import {
+  readIsolatedViewportMetrics,
+  readViewportCompositorScale,
+  waitForIsolatedViewportPaint,
+} from './metrics';
 
-const { executeScriptMock } = vi.hoisted(() => ({ executeScriptMock: vi.fn() }));
+const { browserDebuggerMock, executeScriptMock, withTimeoutMock } = vi.hoisted(() => ({
+  browserDebuggerMock: { sendCommand: vi.fn() },
+  executeScriptMock: vi.fn(),
+  withTimeoutMock: vi.fn(),
+}));
 
+vi.mock('@sniptale/platform/browser/debugger', () => ({ browserDebugger: browserDebuggerMock }));
 vi.mock('@sniptale/platform/browser/scripting', () => ({
   browserScripting: { executeScript: executeScriptMock },
 }));
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ debug: vi.fn() }),
 }));
+vi.mock('../infra', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infra')>()),
+  withTimeout: withTimeoutMock,
+}));
 beforeEach(() => {
   vi.clearAllMocks();
+  withTimeoutMock.mockImplementation((promise: Promise<unknown>) => promise);
 });
 
 afterEach(() => {
@@ -47,6 +61,25 @@ it('reads the live isolated-world viewport inside the injected function', async 
     cssWidth: 1365,
     cssHeight: 767,
   });
+});
+
+it('reads and parses the live compositor scale through the debugger boundary', async () => {
+  browserDebuggerMock.sendCommand.mockResolvedValue({
+    layoutViewport: { clientWidth: 800, clientHeight: 600 },
+    cssLayoutViewport: { clientWidth: 400, clientHeight: 300 },
+    cssVisualViewport: { zoom: 1 },
+  });
+
+  await expect(readViewportCompositorScale(9)).resolves.toBe(2);
+  expect(browserDebuggerMock.sendCommand).toHaveBeenCalledWith(
+    { tabId: 9 },
+    'Page.getLayoutMetrics'
+  );
+});
+
+it('fails closed when debugger compositor metrics are malformed', async () => {
+  browserDebuggerMock.sendCommand.mockResolvedValue({});
+  await expect(readViewportCompositorScale(9)).rejects.toThrow('compositor metrics');
 });
 
 it('waits for two isolated animation frames before capture continues', async () => {

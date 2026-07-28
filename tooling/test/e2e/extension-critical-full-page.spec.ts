@@ -1,5 +1,9 @@
-import { expect, type Page } from '@playwright/test';
+import { chromium, expect, type Page } from '@playwright/test';
 
+import {
+  buildDeviceMetricsOverrideParams,
+  buildViewportCompositorScale,
+} from '../../../apps/extension/src/background/debugger/workspace/helpers';
 import { test } from './support/extension-fixture';
 
 const HARNESS_PATH = '/tooling/test/harness/full-page-capture.html';
@@ -230,4 +234,93 @@ test('native full-page capture composes one dominant internal scroller with its 
     [0, 0, 255, 255],
     [0, 255, 255, 255],
   ]);
+});
+
+test('viewport compositor preserves a non-zero CSS crop at 2x display scale', async () => {
+  test.setTimeout(30_000);
+  const browser = await chromium.launch({
+    headless: false,
+    args: ['--force-device-scale-factor=2'],
+  });
+
+  try {
+    const context = await browser.newContext({ viewport: null });
+    const page = await context.newPage();
+    await page.setContent(`
+      <style>
+        html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+        .tile { position: absolute; width: 50%; height: 50%; }
+        .top-left { left: 0; top: 0; background: rgb(255, 0, 0); }
+        .top-right { right: 0; top: 0; background: rgb(0, 255, 0); }
+        .bottom-left { bottom: 0; left: 0; background: rgb(0, 0, 255); }
+        .bottom-right { bottom: 0; right: 0; background: rgb(255, 255, 0); }
+      </style>
+      <div class="tile top-left"></div>
+      <div class="tile top-right"></div>
+      <div class="tile bottom-left"></div>
+      <div class="tile bottom-right"></div>
+    `);
+    const cdp = await context.newCDPSession(page);
+    const viewport = { height: 300, width: 400 };
+    const compositorScale = buildViewportCompositorScale(await cdp.send('Page.getLayoutMetrics'));
+    await cdp.send(
+      'Emulation.setDeviceMetricsOverride',
+      buildDeviceMetricsOverrideParams(viewport.width, viewport.height, compositorScale)
+    );
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
+    );
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          devicePixelRatio: window.devicePixelRatio,
+          height: window.innerHeight,
+          width: window.innerWidth,
+        }))
+      )
+      .toEqual({ devicePixelRatio: 1, height: viewport.height, width: viewport.width });
+
+    const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png' });
+    const crop = { height: 220, width: 300, x: 50, y: 40 };
+    const sampled = await page.evaluate(
+      async ({ data, points }) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${data}`;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Viewport compositor sample context is unavailable');
+        context.drawImage(image, 0, 0);
+        return {
+          pixels: points.map(({ x, y }) => Array.from(context.getImageData(x, y, 1, 1).data)),
+          size: { height: image.height, width: image.width },
+        };
+      },
+      {
+        data: screenshot.data,
+        points: [
+          { x: crop.x + 50, y: crop.y + 40 },
+          { x: crop.x + 210, y: crop.y + 40 },
+          { x: crop.x + 50, y: crop.y + 160 },
+          { x: crop.x + 210, y: crop.y + 160 },
+        ],
+      }
+    );
+
+    expect(sampled.size).toEqual(viewport);
+    expect(sampled.pixels).toEqual([
+      [255, 0, 0, 255],
+      [0, 255, 0, 255],
+      [0, 0, 255, 255],
+      [255, 255, 0, 255],
+    ]);
+  } finally {
+    await browser.close();
+  }
 });
