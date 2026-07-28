@@ -122,8 +122,47 @@ it('dispatches exact surface metadata and waits for source validation', async ()
   );
 });
 
-it('uses the natural source and disables unsupported system audio', async () => {
+it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
+  'validates %s source readiness against its initiating tab viewport',
+  async (captureMode) => {
+    const viewport = {
+      devicePixelRatio: 2,
+      height: 720,
+      scrollX: 0,
+      scrollY: 0,
+      width: 1280,
+    };
+
+    await finalizeRecordingStart({
+      captureMode,
+      captureSource: { mode: captureMode, streamId: 'tab-1' },
+      generation: 1,
+      recordingId: 'recording-42',
+      streamInstanceId: 'stream-instance-1',
+      settings,
+      surface: null,
+      tabId: 12,
+      viewport,
+    });
+
+    expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
+      expectedStreamInstanceId: 'stream-instance-1',
+      expectedViewport: viewport,
+      recordingId: 'recording-42',
+      tabId: 12,
+    });
+  }
+);
+
+it('does not validate a SCREEN source against the initiating tab viewport', async () => {
   supportsSystemAudioMock.mockReturnValue(false);
+  const viewport = {
+    devicePixelRatio: 2,
+    height: 720,
+    scrollX: 0,
+    scrollY: 0,
+    width: 1280,
+  };
   await finalizeRecordingStart({
     captureMode: CaptureMode.SCREEN,
     captureSource: { mode: CaptureMode.SCREEN, streamId: 'screen-1' },
@@ -133,9 +172,19 @@ it('uses the natural source and disables unsupported system audio', async () => 
     settings,
     surface: null,
     tabId: 12,
+    viewport,
+  });
+  expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
+    expectedStreamInstanceId: 'stream-instance-1',
+    expectedViewport: null,
+    recordingId: 'recording-42',
+    tabId: 12,
   });
   expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
-    expect.objectContaining({ settings: expect.objectContaining({ systemAudioEnabled: false }) })
+    expect.objectContaining({
+      settings: expect.objectContaining({ systemAudioEnabled: false }),
+      viewport,
+    })
   );
 });
 

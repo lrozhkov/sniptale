@@ -56,7 +56,10 @@ export async function finalizeRecordingStart(context: {
     : waitForVideoSourceReady({
         recordingId: context.recordingId,
         expectedStreamInstanceId: context.streamInstanceId,
-        expectedViewport: context.viewport ?? null,
+        expectedViewport:
+          context.captureMode === CaptureMode.TAB || context.captureMode === CaptureMode.TAB_CROP
+            ? (context.viewport ?? null)
+            : null,
         tabId: context.tabId,
       });
   const observedReady = ready?.catch(() => null);
