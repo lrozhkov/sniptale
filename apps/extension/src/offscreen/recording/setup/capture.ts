@@ -16,6 +16,7 @@ export async function acquireRecordingSourceStream(params: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
+  viewport?: { width: number; height: number };
 }) {
   if (params.captureMode === CaptureMode.SCREEN) {
     return acquireDesktopStream(params.settings);
@@ -66,10 +67,19 @@ async function acquireCameraStream(settings: VideoRecordingSettings) {
 function createTabVideoConstraints(params: {
   streamId: string;
   controlledCursorCaptureEnabled?: boolean;
+  viewport?: { width: number; height: number };
 }): MediaTrackConstraints {
   const mandatory: Record<string, unknown> = {
     chromeMediaSource: 'tab',
     chromeMediaSourceId: params.streamId,
+    ...(params.viewport
+      ? {
+          minWidth: params.viewport.width,
+          maxWidth: params.viewport.width,
+          minHeight: params.viewport.height,
+          maxHeight: params.viewport.height,
+        }
+      : {}),
   };
   return {
     mandatory,
@@ -81,10 +91,12 @@ async function acquireTabStream({
   streamId,
   settings,
   captureMode,
+  viewport,
 }: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
+  viewport?: { width: number; height: number };
 }) {
   const audioConstraints: MediaTrackConstraints | false = settings.systemAudioEnabled
     ? ({
@@ -97,6 +109,7 @@ async function acquireTabStream({
 
   const videoConstraints = createTabVideoConstraints({
     streamId,
+    ...(viewport === undefined ? {} : { viewport }),
     ...(settings.controlledCursorCaptureEnabled === undefined
       ? {}
       : { controlledCursorCaptureEnabled: settings.controlledCursorCaptureEnabled }),

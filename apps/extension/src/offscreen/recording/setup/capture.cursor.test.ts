@@ -97,7 +97,7 @@ it('requests tab capture without the native cursor when controlled cursor captur
   expect(loggerWarnMock).not.toHaveBeenCalled();
 });
 
-it('requests the natural tab source without preset-derived size constraints', async () => {
+it('requests a viewport-shaped source for current-size tab recording', async () => {
   const getUserMedia = vi.fn().mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
     getVideoTracks: () => [{ getSettings: () => ({ width: 1024, height: 768 }) }],
@@ -108,6 +108,7 @@ it('requests the natural tab source without preset-derived size constraints', as
     captureMode: CaptureMode.TAB,
     settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
     streamId: 'tab-stream-viewport',
+    viewport: { width: 1919, height: 947 },
   });
 
   expect(getUserMedia).toHaveBeenCalledWith({
@@ -116,6 +117,10 @@ it('requests the natural tab source without preset-derived size constraints', as
       mandatory: {
         chromeMediaSource: 'tab',
         chromeMediaSourceId: 'tab-stream-viewport',
+        maxHeight: 947,
+        maxWidth: 1919,
+        minHeight: 947,
+        minWidth: 1919,
       },
     },
   });

@@ -90,6 +90,7 @@ it('accepts a natural physical TAB source and produces the canonical CSS output'
     captureMode: CaptureMode.TAB,
     settings,
     streamId: 'stream-1',
+    viewport: { width: 1280, height: 720 },
   });
   expect(mocks.resolveTabGeometry).toHaveBeenCalledWith(
     { x: 0, y: 0, width: 1280, height: 720 },
