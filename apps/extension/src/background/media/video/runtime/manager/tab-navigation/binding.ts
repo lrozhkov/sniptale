@@ -1,5 +1,3 @@
-import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
-import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { getVideoSurfaceSession } from '../../../capture-surface';
 import {
@@ -7,7 +5,6 @@ import {
   getVideoRecordingId,
   getVideoRecordingTabId,
 } from '../../../session-state';
-import { getBackgroundRuntimeMessaging } from '../../../../../routing-contracts/runtime-messaging/services';
 
 export type NavigationBinding = {
   generation: number;
@@ -49,16 +46,4 @@ export function isCurrentNavigationBinding(binding: NavigationBinding): boolean 
     session.streamInstanceId === binding.streamInstanceId &&
     session.tabId === binding.tabId
   );
-}
-
-export async function sendNavigationRecorderCommand(
-  type:
-    | typeof VideoMessageType.OFFSCREEN_PAUSE_RECORDING
-    | typeof VideoMessageType.OFFSCREEN_RESUME_RECORDING,
-  binding: NavigationBinding
-): Promise<void> {
-  const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
-    attachOffscreenCommandCapability({ type, ...binding })
-  );
-  if (response?.success !== true) throw new Error(response?.error ?? 'Offscreen command failed');
 }

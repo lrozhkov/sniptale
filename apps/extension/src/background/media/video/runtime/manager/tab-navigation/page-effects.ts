@@ -6,6 +6,8 @@ import { getVideoRecordingRuntimeState } from '../../session-state';
 import { isControlledCursorCaptureEnabled } from '../../../session-state';
 import { restoreRecordingOverlayAfterNavigation } from '../../../ui/overlay-restore';
 import {
+  abandonControlledCursorNavigationEffects,
+  beginControlledCursorNavigationEffects,
   restoreControlledCursorEffects,
   suspendControlledCursorEffects,
 } from '../controlled-cursor/navigation-effects';
@@ -25,6 +27,7 @@ export type TabNavigationPageAccessVerifier = (
 
 type TabNavigationEffectBinding = {
   isCurrent: () => boolean;
+  navigationEpoch: number | null;
   recordingId: string;
   shouldResume: boolean;
   tabId: number;
@@ -40,6 +43,17 @@ export function resolveTabNavigationPageEffects(): TabNavigationPageEffects {
     controlledCursor: isControlledCursorCaptureEnabled(),
     cropOverlay: getVideoRecordingRuntimeState().captureMode === CaptureMode.TAB_CROP,
   };
+}
+
+export function beginTabNavigationPageEffects(effects: TabNavigationPageEffects): number | null {
+  return effects.controlledCursor ? beginControlledCursorNavigationEffects() : null;
+}
+
+export function abandonTabNavigationPageEffects(
+  effects: TabNavigationPageEffects,
+  binding: TabNavigationEffectBinding
+): void {
+  if (effects.controlledCursor) abandonControlledCursorNavigationEffects(binding);
 }
 
 export async function suspendTabNavigationPageEffects(

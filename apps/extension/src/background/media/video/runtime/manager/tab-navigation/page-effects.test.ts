@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
 const mocks = vi.hoisted(() => ({
+  abandonCursor: vi.fn(),
+  beginCursor: vi.fn(),
   cursorEnabled: false,
   ensurePageAccess: vi.fn(),
   getRuntimeState: vi.fn(),
@@ -34,11 +36,15 @@ vi.mock('../../../capture-viewport', async (importOriginal) => ({
 }));
 vi.mock('../controlled-cursor/navigation-effects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../controlled-cursor/navigation-effects')>()),
+  abandonControlledCursorNavigationEffects: mocks.abandonCursor,
+  beginControlledCursorNavigationEffects: mocks.beginCursor,
   restoreControlledCursorEffects: mocks.restoreCursor,
   suspendControlledCursorEffects: mocks.suspendCursor,
 }));
 
 import {
+  abandonTabNavigationPageEffects,
+  beginTabNavigationPageEffects,
   resolveTabNavigationPageEffects,
   restoreTabNavigationPageEffects,
   suspendTabNavigationPageEffects,
@@ -46,6 +52,7 @@ import {
 
 const binding = {
   isCurrent: () => true,
+  navigationEpoch: 11,
   recordingId: 'recording-1',
   shouldResume: true,
   tabId: 7,
@@ -53,6 +60,7 @@ const binding = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.beginCursor.mockReturnValue(11);
   mocks.cursorEnabled = false;
   mocks.ensurePageAccess.mockResolvedValue(undefined);
   mocks.getRuntimeState.mockReturnValue({ captureMode: CaptureMode.TAB, cropRegion: null });
@@ -74,6 +82,7 @@ beforeEach(() => {
 it('resolves only page-owned effects and does nothing for plain TAB', async () => {
   const effects = resolveTabNavigationPageEffects();
   expect(effects).toEqual({ controlledCursor: false, cropOverlay: false });
+  expect(beginTabNavigationPageEffects(effects)).toBeNull();
 
   await suspendTabNavigationPageEffects(effects, binding);
   await restoreTabNavigationPageEffects(effects, binding, mocks.ensurePageAccess);
@@ -88,11 +97,13 @@ it('uses canonical page access before restoring cursor and crop overlay', async 
     cropRegion: { x: 10, y: 20, width: 300, height: 300 },
   });
   const effects = resolveTabNavigationPageEffects();
+  expect(beginTabNavigationPageEffects(effects)).toBe(11);
 
   await suspendTabNavigationPageEffects(effects, binding);
   await restoreTabNavigationPageEffects(effects, binding, mocks.ensurePageAccess);
 
   expect(mocks.suspendCursor).toHaveBeenCalledWith(binding);
+  expect(mocks.beginCursor).toHaveBeenCalledOnce();
   expect(mocks.ensurePageAccess).toHaveBeenCalledWith(7, expect.any(String));
   expect(mocks.restoreCursor).toHaveBeenCalledWith(binding);
   expect(mocks.restoreOverlay).toHaveBeenCalledWith(
@@ -101,6 +112,14 @@ it('uses canonical page access before restoring cursor and crop overlay', async 
     binding.isCurrent,
     [0, 100, 250, 500, 1000, 2000]
   );
+});
+
+it('delegates token-scoped controlled-cursor cleanup on abandonment', () => {
+  const effects = { controlledCursor: true, cropOverlay: false };
+
+  abandonTabNavigationPageEffects(effects, binding);
+
+  expect(mocks.abandonCursor).toHaveBeenCalledWith(binding);
 });
 
 it('fails closed when required crop page access or cursor restoration is unavailable', async () => {

@@ -1,11 +1,12 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   appendControlledCursorTelemetry,
+  beginControlledCursorNavigation,
+  clearControlledCursorNavigationPending,
   getControlledCursorOffsetSeconds,
   getVideoRecordingTabId,
   isControlledCursorCaptureEnabled,
   setControlledCursorAutoPaused,
-  setControlledCursorNavigationPending,
   setControlledCursorOffsetSeconds,
 } from '../../../session-state';
 import { getVideoRecordingRuntimeState } from '../../session-state';
@@ -20,6 +21,7 @@ const REBOOTSTRAP_RETRY_DELAYS_MS = [0, 250, 1000] as const;
 
 type NavigationEffectBinding = {
   isCurrent: () => boolean;
+  navigationEpoch: number | null;
   recordingId: string;
   shouldResume: boolean;
   tabId: number;
@@ -37,11 +39,30 @@ function isControlledCursorEffectActive(binding: NavigationEffectBinding): boole
   );
 }
 
+function clearControlledCursorEffects(binding: NavigationEffectBinding): boolean {
+  if (
+    !binding.isCurrent() ||
+    binding.navigationEpoch === null ||
+    !clearControlledCursorNavigationPending(binding.navigationEpoch)
+  ) {
+    return false;
+  }
+  setControlledCursorAutoPaused(false);
+  return true;
+}
+
+export function beginControlledCursorNavigationEffects(): number {
+  return beginControlledCursorNavigation();
+}
+
+export function abandonControlledCursorNavigationEffects(binding: NavigationEffectBinding): void {
+  clearControlledCursorEffects(binding);
+}
+
 export async function suspendControlledCursorEffects(
   binding: NavigationEffectBinding
 ): Promise<void> {
   if (!isControlledCursorCaptureEnabled() || getVideoRecordingTabId() !== binding.tabId) return;
-  setControlledCursorNavigationPending(true);
   setControlledCursorAutoPaused(binding.shouldResume);
   setControlledCursorOffsetSeconds(getVideoRecordingRuntimeState().duration);
   try {
@@ -55,7 +76,10 @@ export async function suspendControlledCursorEffects(
 export async function restoreControlledCursorEffects(
   binding: NavigationEffectBinding
 ): Promise<void> {
-  if (!isControlledCursorCaptureEnabled() || getVideoRecordingTabId() !== binding.tabId) return;
+  if (!isControlledCursorCaptureEnabled() || getVideoRecordingTabId() !== binding.tabId) {
+    clearControlledCursorEffects(binding);
+    return;
+  }
 
   for (const delayMs of REBOOTSTRAP_RETRY_DELAYS_MS) {
     if (delayMs > 0) await wait(delayMs);
@@ -69,8 +93,7 @@ export async function restoreControlledCursorEffects(
       if (!isControlledCursorEffectActive(binding)) return;
       await syncControlledCursorCapture(binding.tabId, binding.shouldResume ? 'resume' : 'pause');
       if (!isControlledCursorEffectActive(binding)) return;
-      setControlledCursorAutoPaused(false);
-      setControlledCursorNavigationPending(false);
+      clearControlledCursorEffects(binding);
       return;
     } catch (error) {
       logger.warn('Controlled cursor re-bootstrap attempt failed', {
@@ -82,5 +105,6 @@ export async function restoreControlledCursorEffects(
     }
   }
 
+  clearControlledCursorEffects(binding);
   throw new Error('Controlled cursor capture could not be restored after navigation');
 }

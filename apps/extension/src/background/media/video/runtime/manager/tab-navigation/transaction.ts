@@ -1,17 +1,17 @@
-// policyStateId: video-capture-surface-sessions - this transaction suspends and restores the active recording surface.
+// policyStateId: video-capture-surface-sessions
+// Navigation recovery restores page-owned effects without interrupting the media recorder.
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { getVideoSurfaceSession } from '../../../capture-surface';
 import { getVideoRecordingRuntimeState } from '../../session-state';
-import { stopRecording } from '../controls.stop';
 import {
   isCurrentNavigationBinding,
   resolveNavigationBinding,
-  sendNavigationRecorderCommand,
   type NavigationBinding,
 } from './binding';
 import {
+  abandonTabNavigationPageEffects,
+  beginTabNavigationPageEffects,
   resolveTabNavigationPageEffects,
   restoreTabNavigationPageEffects,
   suspendTabNavigationPageEffects,
@@ -27,8 +27,8 @@ type TabNavigationTransaction = {
   completion: Promise<void> | null;
   documentId: string | null;
   effects: TabNavigationPageEffects;
-  pauseRecorder: boolean;
-  pauseResult: Promise<boolean>;
+  navigationEpoch: number | null;
+  preparation: Promise<boolean>;
   pageAccessVerifier: TabNavigationPageAccessVerifier | null;
   reassertViewport: boolean;
   revalidateSource: boolean;
@@ -44,51 +44,27 @@ function isCurrentTransaction(transaction: TabNavigationTransaction): boolean {
 function createEffectBinding(transaction: TabNavigationTransaction) {
   return {
     isCurrent: () => isCurrentTransaction(transaction),
+    navigationEpoch: transaction.navigationEpoch,
     recordingId: transaction.binding.recordingId,
     shouldResume: transaction.shouldResume,
     tabId: transaction.binding.tabId,
   };
 }
 
-async function stopCurrentTransaction(
-  transaction: TabNavigationTransaction,
-  error: unknown
-): Promise<void> {
+function abandonCurrentTransaction(transaction: TabNavigationTransaction, error: unknown): void {
   if (!isCurrentTransaction(transaction)) return;
-  logger.error('Tab recording could not be restored after navigation', error);
+  logger.warn('Tab recording page recovery was skipped; media recording continues', error);
+  abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
   activeTransaction = null;
-  const result = await stopRecording(false);
-  if (result.result !== 'accepted') {
-    throw new Error(
-      result.result === 'failed'
-        ? result.error
-        : `Recording stop was not accepted: ${result.result}`
-    );
-  }
 }
 
-async function pauseTransaction(transaction: TabNavigationTransaction): Promise<boolean> {
+async function prepareTransaction(transaction: TabNavigationTransaction): Promise<boolean> {
   try {
-    const work: Promise<unknown>[] = [
-      suspendTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction)),
-    ];
-    if (transaction.shouldResume) {
-      work.push(
-        sendNavigationRecorderCommand(
-          VideoMessageType.OFFSCREEN_PAUSE_RECORDING,
-          transaction.binding
-        )
-      );
-    }
-    await Promise.all(work);
-    return isCurrentNavigationBinding(transaction.binding);
+    await suspendTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
   } catch (error) {
-    const current = activeTransaction;
-    if (current && current.binding.recordingId === transaction.binding.recordingId) {
-      await stopCurrentTransaction(current, error);
-    }
-    return false;
+    logger.warn('Recording page effects could not be suspended before navigation', error);
   }
+  return isCurrentNavigationBinding(transaction.binding);
 }
 
 function createTransaction(
@@ -103,8 +79,8 @@ function createTransaction(
     completion: null,
     documentId: null,
     effects,
-    pauseRecorder: true,
-    pauseResult: Promise.resolve(false),
+    navigationEpoch: previous?.navigationEpoch ?? beginTabNavigationPageEffects(effects),
+    preparation: Promise.resolve(false),
     pageAccessVerifier: null,
     reassertViewport,
     revalidateSource: true,
@@ -113,7 +89,7 @@ function createTransaction(
       getVideoRecordingRuntimeState().status === VideoRecordingStatus.RECORDING,
   };
   activeTransaction = transaction;
-  transaction.pauseResult = previous?.pauseResult ?? pauseTransaction(transaction);
+  transaction.preparation = previous?.preparation ?? prepareTransaction(transaction);
   return transaction;
 }
 
@@ -130,7 +106,7 @@ export function beginTabNavigationTransaction(
 
 async function restoreTransaction(transaction: TabNavigationTransaction): Promise<void> {
   try {
-    if (!(await transaction.pauseResult) || !isCurrentTransaction(transaction)) return;
+    if (!(await transaction.preparation) || !isCurrentTransaction(transaction)) return;
     const pageAccessVerifier = transaction.pageAccessVerifier;
     if (!pageAccessVerifier) throw new Error('Recording page access verifier is unavailable');
     if (transaction.reassertViewport) await reassertViewportSurface(transaction.binding);
@@ -149,22 +125,16 @@ async function restoreTransaction(transaction: TabNavigationTransaction): Promis
       await revalidateTabSource(transaction.binding, pageEffects.liveViewport, pageAccessVerifier);
     }
     if (!isCurrentTransaction(transaction)) return;
-    if (transaction.pauseRecorder && transaction.shouldResume) {
-      await sendNavigationRecorderCommand(
-        VideoMessageType.OFFSCREEN_RESUME_RECORDING,
-        transaction.binding
-      );
-    }
     if (activeTransaction === transaction) activeTransaction = null;
   } catch (error) {
-    await stopCurrentTransaction(transaction, error);
+    abandonCurrentTransaction(transaction, error);
   }
 }
 
 function startCompletion(transaction: TabNavigationTransaction): void {
   if (transaction.completion) return;
   transaction.completion = restoreTransaction(transaction).catch((error) => {
-    logger.error('Failed to stop tab recording after navigation failure', error);
+    logger.error('Unexpected tab recording navigation recovery failure', error);
   });
 }
 
@@ -215,7 +185,7 @@ export function recoverDetachedViewport(
 
 export function failActiveTabNavigation(error: unknown): void {
   const transaction = activeTransaction;
-  if (transaction) void stopCurrentTransaction(transaction, error);
+  if (transaction) abandonCurrentTransaction(transaction, error);
 }
 
 export function isTabNavigationTransactionPending(): boolean {
