@@ -67,6 +67,7 @@ vi.mock('../recording/controller', () => ({
   setViewportDrawState: setViewportDrawStateMock,
   startRecording: startRecordingMock,
   stopRecording: stopRecordingMock,
+  updateRecordingSettings: vi.fn(),
   updateViewportCrop: updateViewportCropMock,
 }));
 

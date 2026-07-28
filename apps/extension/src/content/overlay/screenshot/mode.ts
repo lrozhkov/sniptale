@@ -11,8 +11,12 @@ import type {
   ScreenshotStartContext,
 } from './types';
 import type { ScreenshotControllerSession } from './session/state';
+import { getContentRuntimeServices } from '../../application/runtime-services/services';
+import { createLogger } from '@sniptale/platform/observability/logger';
+import { createDisableScreenshotModeRequest } from '../viewport-selector/capability';
 
 const STALE_SCREENSHOT_RUN_ERROR_NAME = 'StaleScreenshotRunError';
+const logger = createLogger({ namespace: 'ContentScreenshotMode' });
 
 export class StaleScreenshotRunError extends Error {
   constructor() {
@@ -122,6 +126,13 @@ export function closeQuickActionCapture(
     runtime.setNavigationLockEnabled
   );
   params.setIsToolbarVisible(false);
+  try {
+    void getContentRuntimeServices().messaging.sendRuntimeMessage(
+      createDisableScreenshotModeRequest()
+    );
+  } catch (error) {
+    logger.error('Screenshot surface binding is unavailable during quick-action cleanup', error);
+  }
 }
 
 export function cancelQuickActionCountdown(

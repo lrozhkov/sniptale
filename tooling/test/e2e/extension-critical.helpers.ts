@@ -106,7 +106,7 @@ export function createQuickAction(name: string) {
     bundledId: null,
     hotkey: null,
     screenshotMode: 'visible' as const,
-    emulation: 'native',
+    viewportPresetId: null,
     delay: null,
     afterCapture: 'edit' as const,
     imageFormat: 'png' as const,
@@ -237,7 +237,7 @@ export function createRecordingRuntimeState(status: VideoRecordingStatus) {
       tabTitle: 'Harness tab',
       tabUrl: 'https://example.com/',
     },
-    viewportPreset: null,
+    viewportPresetId: null,
     error: null,
   };
 }

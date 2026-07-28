@@ -1,6 +1,7 @@
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
 import type { RuntimeMessagingTransport } from '../../../platform/runtime-messaging';
 import type { ShowRegionSelectorMessage } from '../../../contracts/video/types/messages';
+import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 
 type RegionSelectorRequestBinding = Pick<
   ShowRegionSelectorMessage,
@@ -33,6 +34,7 @@ export type RegionSelectorControllerDeps = {
   appendToContentOverlayRoot?: <T extends Node>(node: T) => T;
   applyIsolatedContentRootStyle?: (element: HTMLElement, styleText: string) => void;
   sendRuntimeMessage?: RuntimeMessagingTransport['sendRuntimeMessage'];
+  getViewportInfo?: () => ViewportInfo;
 };
 
 export type RegionSelectorController = {

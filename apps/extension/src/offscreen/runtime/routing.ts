@@ -9,12 +9,19 @@ import {
 import {
   pauseRecording,
   resumeRecording,
-  setViewportDrawState,
   startRecording,
   stopRecording,
-  updateViewportCrop,
+  updateRecordingSettings,
 } from '../recording/controller';
-import { updateRecordingSettings } from '../recording/update-settings';
+import { allowRecordingBegin } from '../recording/start/gate';
+import { recordingContext } from '../recording/context';
+import {
+  createSourceVideo,
+  releaseSourceVideo,
+  waitForSourceMetadata,
+} from '../recording/stream/video-source';
+import { revalidateTabOutputGeometry } from '../recording/stream/tab-output';
+import type { RecordingStopOutcome } from '../recording/context';
 import { buildDesktopMediaRequestOptions } from './desktop-media-options';
 import {
   handledOffscreenRuntimeMessageTypes,
@@ -74,8 +81,8 @@ export function resolveOffscreenErrorPhase(
     case VideoMessageType.GET_DESKTOP_MEDIA:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_START_RECORDING:
-    case VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP:
-    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
+    case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
+    case VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
@@ -100,8 +107,7 @@ export function resolveOffscreenRuntimeResponseMode(
       return 'immediate-ack';
     case VideoMessageType.GET_DESKTOP_MEDIA:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
-    case VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP:
-    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
+    case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
     case VideoMessageType.OFFSCREEN_STOP_RECORDING:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
@@ -109,6 +115,8 @@ export function resolveOffscreenRuntimeResponseMode(
     case VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT:
       return 'deferred-ack';
+    case VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE:
+      return 'manual';
   }
 }
 
@@ -120,35 +128,19 @@ function buildStartRecordingArgs(
     settings: message.settings,
     ...(message.tabId === undefined ? {} : { tabId: message.tabId }),
     ...(message.viewport === undefined ? {} : { viewport: message.viewport }),
-    ...(message.recordingId === undefined ? {} : { recordingId: message.recordingId }),
+    recordingId: message.recordingId,
     ...(message.captureMode === undefined ? {} : { captureMode: message.captureMode }),
     ...(message.cropRegion === undefined ? {} : { cropRegion: message.cropRegion }),
-    ...(message.targetResolution === undefined
-      ? {}
-      : { targetResolution: message.targetResolution }),
-    ...(message.emulatedViewportCssSize === undefined
-      ? {}
-      : { emulatedViewportCssSize: message.emulatedViewportCssSize }),
+    generation: message.generation,
+    streamInstanceId: message.streamInstanceId,
+    ...(message.surface === undefined ? {} : { surface: message.surface }),
   };
-}
-
-function handleViewportCropMessage(
-  message: Extract<HandledMessage, { type: typeof VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP }>
-) {
-  updateViewportCrop({
-    ...(message.targetResolution === undefined
-      ? {}
-      : { targetResolution: message.targetResolution }),
-    ...(message.emulatedViewportCssSize === undefined
-      ? {}
-      : { viewportSizeInPixels: message.emulatedViewportCssSize }),
-  });
 }
 
 export async function handleOffscreenRuntimeMessage(
   message: HandledMessage,
   sendResponse?: ResponseSender
-): Promise<void> {
+): Promise<void | RecordingStopOutcome> {
   switch (message.type) {
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
       handlePageStoragePrivacyErasure(message, sendResponse);
@@ -166,31 +158,108 @@ export async function handleOffscreenRuntimeMessage(
     case VideoMessageType.OFFSCREEN_START_RECORDING:
       await startRecording(buildStartRecordingArgs(message));
       return;
-    case VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP:
-      handleViewportCropMessage(message);
+    case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
+      allowRecordingBegin(message);
       return;
-    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
-      setViewportDrawState({
-        frozen: message.frozen,
-        navigationEpoch: message.navigationEpoch,
-      });
+    case VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE:
+      await revalidateSource(message, sendResponse);
       return;
     case VideoMessageType.OFFSCREEN_STOP_RECORDING:
-      await stopRecording(message.discard ?? false);
-      return;
+      return await stopRecording(
+        {
+          recordingId: message.recordingId,
+          generation: message.generation,
+          streamInstanceId: message.streamInstanceId,
+        },
+        message.discard ?? false
+      );
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
-      pauseRecording();
+      pauseRecording(resolveRecordingSourceBinding(message));
       return;
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
-      resumeRecording();
+      resumeRecording(resolveRecordingSourceBinding(message));
       return;
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
-      updateRecordingSettings(message.settings);
+      updateRecordingSettings(resolveRecordingSourceBinding(message), message.settings);
       return;
     case VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES:
       await handleProjectExportRuntimeMessage(message, sendResponse);
       return;
+  }
+}
+
+function resolveRecordingSourceBinding(message: {
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+}) {
+  return {
+    recordingId: message.recordingId,
+    generation: message.generation,
+    streamInstanceId: message.streamInstanceId,
+  };
+}
+
+async function revalidateSource(
+  message: Extract<HandledMessage, { type: typeof VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE }>,
+  sendResponse?: ResponseSender
+): Promise<void> {
+  const binding = {
+    recordingId: message.recordingId,
+    generation: message.generation,
+    streamInstanceId: message.streamInstanceId,
+  };
+  const stream = recordingContext.sourceStream;
+  if (!stream || !recordingContext.matchesSourceBinding(binding)) {
+    sendResponse?.({ success: false, result: 'DENY', error: 'Recording source is unavailable' });
+    return;
+  }
+  const video = createSourceVideo(stream);
+  try {
+    await waitForSourceMetadata(video);
+    if (
+      recordingContext.sourceStream !== stream ||
+      !recordingContext.matchesSourceBinding(binding) ||
+      video.videoWidth !== recordingContext.sourceVideoWidth ||
+      video.videoHeight !== recordingContext.sourceVideoHeight
+    ) {
+      throw new Error('Recording source geometry changed during revalidation');
+    }
+    const tabOutputGeometry = recordingContext.tabOutputGeometry;
+    if (
+      tabOutputGeometry &&
+      !revalidateTabOutputGeometry(
+        tabOutputGeometry,
+        {
+          width: video.videoWidth,
+          height: video.videoHeight,
+        },
+        message.viewport
+          ? {
+              width: message.viewport.width,
+              height: message.viewport.height,
+              devicePixelRatio: message.viewport.devicePixelRatio,
+            }
+          : tabOutputGeometry.coordinateSpace
+      )
+    ) {
+      throw new Error('Recording tab output mapping changed during revalidation');
+    }
+    sendResponse?.({
+      success: true,
+      result: 'ALLOW',
+      videoWidth: video.videoWidth,
+      videoHeight: video.videoHeight,
+    });
+  } catch (error) {
+    sendResponse?.({
+      success: false,
+      result: 'DENY',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    releaseSourceVideo(video);
   }
 }

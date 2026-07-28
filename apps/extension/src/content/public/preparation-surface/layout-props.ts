@@ -10,6 +10,7 @@ import type { useScenarioController } from '../../../content/overlay/scenario/co
 import type { useScreenshotController } from '../../../content/overlay/screenshot/controller';
 import type { useToolbarModeController } from '../../../content/overlay/toolbar/mode-controller';
 import type { useFrameManager } from '../../../content/selection/frame-runtime/react/useFrameManager';
+import type { PreparationHostPorts } from './types';
 
 type FrameManager = ReturnType<typeof useFrameManager>;
 
@@ -25,6 +26,7 @@ type PreparationLayoutProjectionArgs = {
   controllers: PreparationSurfaceControllers;
   frameManager: FrameManager;
   modeState: ContentAppModeState;
+  ports: PreparationHostPorts;
 };
 
 type PreparationLayoutProjection = {
@@ -105,6 +107,9 @@ function projectPreparationToolbar(
     pinToTabAvailable: modeState.pinToTabAvailable,
     setCaptureAction: modeState.setCaptureAction,
     setCurrentViewport: modeState.setCurrentViewport,
+    ...(args.ports.mutateViewport === undefined
+      ? {}
+      : { mutateViewport: args.ports.mutateViewport }),
     setPinToTab: modeState.setPinToTab,
     setPinnedToolbarVisible: modeState.setPinnedToolbarVisible,
     setTimerDelay: modeState.setTimerDelay,

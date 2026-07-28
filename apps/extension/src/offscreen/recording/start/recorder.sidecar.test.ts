@@ -134,8 +134,6 @@ it('does not send a saved notification when sidecar-aware main finalization is d
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
     settings: { quality: VideoQuality.HIGH } as never,
-    captureWidth: 1280,
-    captureHeight: 720,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker: {
       reset: vi.fn(),
@@ -163,8 +161,6 @@ it('starts audio-bearing main streams while sidecar recording is active', () => 
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
     settings: { quality: VideoQuality.HIGH } as never,
-    captureWidth: 1280,
-    captureHeight: 720,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker: {
       reset: vi.fn(),

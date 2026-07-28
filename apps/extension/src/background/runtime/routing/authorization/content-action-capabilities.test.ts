@@ -16,6 +16,7 @@ import {
   getBackgroundOwnedRouteContext,
   getContentActionCapabilityIssuanceSenderBinding,
 } from '../../../routing-contracts/owned-route-context';
+import type { ContentPrivilegedActionType } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
@@ -26,6 +27,7 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
 
 const CONTENT_URL = 'https://example.test/page';
 const EDITOR_URL = 'chrome-extension://test/apps/extension/src/editor/index.html';
+const POPUP_URL = 'chrome-extension://test/apps/extension/src/popup/index.html';
 const CONTENT_SENDER_BINDING = {
   documentId: 'content-document-7',
   frameId: 0,
@@ -56,7 +58,7 @@ function contentSender(tabId = 7): chrome.runtime.MessageSender {
   });
 }
 
-function issueContentIntent(actionType: typeof CaptureMessageType.CAPTURE_VISIBLE) {
+function issueContentIntent(actionType: ContentPrivilegedActionType) {
   const proofRequest = {
     actionType,
     requestId: 'content-request-1',
@@ -258,6 +260,123 @@ it('authorizes content capture routes with a matching one-shot capability', () =
   const contentIntent = issueContentIntent(CaptureMessageType.CAPTURE_VISIBLE);
   const message = { contentIntent, type: CaptureMessageType.CAPTURE_VISIBLE };
 
+  expect(
+    authorizeIPCMessage({
+      family: 'capture',
+      kind: 'privileged-tab-route',
+      message,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual({ authorized: true });
+  expect(
+    authorizeIPCMessage({
+      family: 'capture',
+      kind: 'privileged-tab-route',
+      message,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual({
+    authorized: false,
+    reason: 'Unauthorized content action capability',
+  });
+});
+
+it('requires a document-bound one-shot intent for content-originated screenshot enable', () => {
+  const bareMessage = { type: MessageType.ENABLE_SCREENSHOT_MODE } as const;
+  expect(
+    authorizeIPCMessage({
+      family: 'tab-mode',
+      kind: 'privileged-tab-route',
+      message: bareMessage,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual({
+    authorized: false,
+    reason: 'Unauthorized content action capability',
+  });
+
+  const contentIntent = issueContentIntent(MessageType.ENABLE_SCREENSHOT_MODE);
+  const message = { contentIntent, type: MessageType.ENABLE_SCREENSHOT_MODE } as const;
+  const mismatchedDocumentSender = sender({
+    documentId: 'content-document-replaced',
+    frameId: 0,
+    tabId: 7,
+    url: CONTENT_URL,
+  });
+  expect(
+    authorizeIPCMessage({
+      family: 'tab-mode',
+      kind: 'privileged-tab-route',
+      message,
+      resolvedTabId: 7,
+      sender: mismatchedDocumentSender,
+    })
+  ).toEqual({
+    authorized: false,
+    reason: 'Unauthorized content action capability',
+  });
+  const matchingContentIntent = issueContentIntent(MessageType.ENABLE_SCREENSHOT_MODE);
+  const matchingMessage = {
+    contentIntent: matchingContentIntent,
+    type: MessageType.ENABLE_SCREENSHOT_MODE,
+  } as const;
+  expect(
+    authorizeIPCMessage({
+      family: 'tab-mode',
+      kind: 'privileged-tab-route',
+      message: matchingMessage,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual({ authorized: true });
+  expect(
+    authorizeIPCMessage({
+      family: 'tab-mode',
+      kind: 'privileged-tab-route',
+      message: matchingMessage,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual({
+    authorized: false,
+    reason: 'Unauthorized content action capability',
+  });
+});
+
+it('keeps popup screenshot enable on the extension-owned route without a content intent', () => {
+  expect(
+    authorizeIPCMessage({
+      family: 'tab-mode',
+      kind: 'privileged-tab-route',
+      message: { type: MessageType.ENABLE_SCREENSHOT_MODE },
+      resolvedTabId: 7,
+      sender: sender({ url: POPUP_URL }),
+    })
+  ).toEqual({ authorized: true });
+});
+
+it('requires a matching trusted user intent to renew a screenshot surface session', () => {
+  expect(
+    authorizeIPCMessage({
+      family: 'capture',
+      kind: 'privileged-tab-route',
+      message: { type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION },
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual({
+    authorized: false,
+    reason: 'Unauthorized content action capability',
+  });
+
+  const contentIntent = issueContentIntent(CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION);
+  const message = {
+    contentIntent,
+    type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+  } as const;
   expect(
     authorizeIPCMessage({
       family: 'capture',

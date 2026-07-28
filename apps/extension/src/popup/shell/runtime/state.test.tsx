@@ -43,7 +43,7 @@ vi.mock('../../recording/video/copy', (_importOriginal) => ({
     duration: 0,
     error: null,
     status: VideoRecordingStatus.IDLE,
-    viewportPreset: null,
+    viewportPresetId: null,
   },
 }));
 
@@ -122,8 +122,6 @@ function expectInitialPopupRuntimeState() {
         isLoadingWebcams: false,
       }),
       presets: expect.objectContaining({
-        appliedViewportPresetId: null,
-        appliedViewportTabId: null,
         quickActionsReady: false,
         selectedPreset: null,
         videoCaptureMode: CaptureMode.TAB,
@@ -141,11 +139,18 @@ function expectInitialPopupRuntimeState() {
 async function updatePopupRuntimeState() {
   await act(async () => {
     latestState?.presets.setViewportPresets([
-      { height: 720, id: 'preset-1', label: 'Wide', width: 1280 },
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Wide',
+        target: 'viewport',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 0,
+      },
     ]);
     latestState?.presets.setSelectedPresetId('preset-1');
-    latestState?.presets.setAppliedViewportPresetId('preset-1');
-    latestState?.presets.setAppliedViewportTabId(1);
     latestState?.presets.setVideoCaptureMode(CaptureMode.TAB_CROP);
     latestState?.presets.setQuickActionsReady(true);
     latestState?.recording.setRecordingState({
@@ -155,7 +160,7 @@ async function updatePopupRuntimeState() {
       duration: 0,
       error: null,
       status: VideoRecordingStatus.RECORDING,
-      viewportPreset: null,
+      viewportPresetId: null,
     });
     latestState?.session.setPage('export');
     latestState?.recording.setStartError('boom');
@@ -164,10 +169,8 @@ async function updatePopupRuntimeState() {
 
 function expectUpdatedPopupRuntimeState() {
   expect(latestState?.presets.selectedPreset).toEqual(
-    expect.objectContaining({ id: 'preset-1', label: 'Wide' })
+    expect.objectContaining({ id: 'preset-1', name: 'Wide' })
   );
-  expect(latestState?.presets.appliedViewportPresetId).toBe('preset-1');
-  expect(latestState?.presets.appliedViewportTabId).toBe(1);
   expect(latestState?.presets.quickActionsReady).toBe(true);
   expect(latestState?.presets.videoCaptureMode).toBe(CaptureMode.TAB_CROP);
   expect(latestState?.recording.recordingActive).toBe(true);

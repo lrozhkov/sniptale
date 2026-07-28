@@ -74,7 +74,9 @@ describe('video diagnostics toggle', () => {
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     expect(onSettingsChange).not.toHaveBeenCalled();
-    expect(button?.getAttribute('title')).toContain('расширенную диагностику');
+    expect(button?.getAttribute('title')?.toLocaleLowerCase('ru')).toContain(
+      'расширенную диагностику'
+    );
 
     const confirmation = container?.querySelector(
       '[data-ui="popup.video.diagnostics-confirmation"]'
@@ -98,7 +100,9 @@ describe('video diagnostics toggle', () => {
 
     const button = container?.querySelector('button');
     expect(container?.textContent).not.toContain('screen preset');
-    expect(button?.getAttribute('title')).toContain('расширенную диагностику');
+    expect(button?.getAttribute('title')?.toLocaleLowerCase('ru')).toContain(
+      'расширенная диагностика'
+    );
     expect(button).toHaveProperty('disabled', true);
   });
 });

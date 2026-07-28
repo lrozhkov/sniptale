@@ -58,32 +58,29 @@ beforeEach(() => {
   recordingContext.sourceStream = null;
   recordingContext.audioMixer = null;
   recordingContext.recordedChunks = [];
-  recordingContext.updateViewportPresetCrop = vi.fn();
-  recordingContext.updateViewportPresetDrawState = vi.fn();
-  recordingContext.viewportDrawFrozen = true;
-  recordingContext.viewportNavigationEpoch = 9;
   recordingContext.currentRecordingId = null;
   recordingContext.stopRecordingResolve = null;
   recordingContext.stopRecordingReject = null;
 });
 
-it('uses provided recording ids and generates fallback ids when missing', () => {
+it('binds the background-minted recording and stream identities before source setup', () => {
   expect(
     initializeRecordingSession({
       settings: createSettings(),
       streamId: 'stream-1',
       recordingId: 'recording-1',
+      generation: 1,
+      streamInstanceId: 'stream-instance-1',
     })
   ).toBe('recording-1');
-  recordingContext.resetRecordingSession();
-
-  const generatedId = initializeRecordingSession({
-    settings: createSettings(),
-    streamId: 'stream-2',
-  });
-
-  expect(generatedId).toMatch(/^rec-/);
-  expect(recordingContext.currentRecordingId).toBe(generatedId);
+  expect(recordingContext.currentRecordingId).toBe('recording-1');
+  expect(
+    recordingContext.matchesSourceBinding({
+      generation: 1,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+    })
+  ).toBe(true);
 });
 
 it('cleans up mixers, streams, sidecars, and recorder stop failures without throwing', async () => {
@@ -125,8 +122,6 @@ it('cleans up mixers, streams, sidecars, and recorder stop failures without thro
   expect(recordingContext.sourceStream).toBeNull();
   expect(recordingContext.videoStream).toBeNull();
   expect(recordingContext.mediaRecorder).toBeNull();
-  expect(recordingContext.viewportDrawFrozen).toBe(false);
-  expect(recordingContext.viewportNavigationEpoch).toBe(0);
 });
 
 it('reports start errors against the active session before cleanup', () => {

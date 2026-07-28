@@ -33,7 +33,7 @@ export function createRuntimeRecordingState(
     duration: 0,
     error: null,
     status,
-    viewportPreset: null,
+    viewportPresetId: null,
   };
 }
 
@@ -101,7 +101,6 @@ function createActiveTabCapabilities(): ActiveTabCapabilities {
       [CaptureMode.TAB]: supported,
       [CaptureMode.TAB_CROP]: supported,
       [CaptureMode.CAMERA]: supported,
-      [CaptureMode.VIEWPORT_EMULATION]: supported,
     },
   };
 }
@@ -117,16 +116,12 @@ function createRuntimePresets(
   overrides: PopupRuntimeStateSliceOverrides
 ): PopupRuntimeStateSlice['presets'] {
   return {
-    appliedViewportPresetId: overrides.appliedViewportPresetId ?? null,
-    appliedViewportTabId: overrides.appliedViewportTabId ?? null,
     displayMode: overrides.displayMode ?? DEFAULT_QUICK_ACTIONS_DISPLAY_MODE,
     quickActions: overrides.quickActions ?? [],
     quickActionsReady: overrides.quickActionsReady ?? true,
     selectedPreset: overrides.selectedPreset ?? null,
     selectedPresetId: overrides.selectedPresetId ?? null,
     setDisplayMode: overrides.setDisplayMode ?? vi.fn(),
-    setAppliedViewportPresetId: overrides.setAppliedViewportPresetId ?? vi.fn(),
-    setAppliedViewportTabId: overrides.setAppliedViewportTabId ?? vi.fn(),
     setQuickActions: overrides.setQuickActions ?? vi.fn(),
     setQuickActionsReady: overrides.setQuickActionsReady ?? vi.fn(),
     setSelectedPresetId: overrides.setSelectedPresetId ?? vi.fn(),

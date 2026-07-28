@@ -66,8 +66,8 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => {
 
 import { recordingContext } from '../context';
 import { finalizeRecordingBootstrap } from './recorder';
+import { createSettings } from './helpers.test-support';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 
 type MediaRecorderMockInstance = {
   onerror: ((event: Event) => void) | null;
@@ -129,32 +129,32 @@ beforeEach(() => {
 });
 
 function registerFinalizeFailureTest() {
-  it('rejects the pending stop request without rethrowing when finalization fails', async () => {
+  it('returns one terminal stop outcome when finalization fails after recorder shutdown', async () => {
     const finalizeError = new Error('save failed');
     const rejectStopRecording = vi.fn();
+    const resolveStopRecording = vi.fn();
 
     finalizeRecordingMock.mockRejectedValueOnce(finalizeError);
     recordingContext.beginRecordingSession('recording-failure');
 
     finalizeRecordingBootstrap({
       resolvedRecordingId: 'recording-failure',
-      settings: { quality: VideoQuality.HIGH } as never,
-      captureWidth: 1920,
-      captureHeight: 1080,
+      settings: createSettings(),
       trackSettings: { width: 1920, height: 1080, frameRate: 30 },
-      durationTracker: {
-        reset: vi.fn(),
-        startSegment: vi.fn(),
-      } as never,
+      durationTracker: recordingContext.durationTracker,
     });
     recordingContext.beginStopRequest({
       reject: rejectStopRecording,
-      resolve: vi.fn(),
+      resolve: resolveStopRecording,
     });
 
     await expect(lastMediaRecorderInstance?.onstop?.()).resolves.toBeUndefined();
 
-    expect(rejectStopRecording).toHaveBeenCalledWith(finalizeError);
+    expect(resolveStopRecording).toHaveBeenCalledWith({
+      error: 'save failed',
+      result: 'terminal-failure',
+    });
+    expect(rejectStopRecording).not.toHaveBeenCalled();
     expect(recordingContext.videoStream).toBeNull();
     expect(recordingContext.mediaRecorder).toBeNull();
     expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
@@ -176,14 +176,9 @@ function registerRecorderErrorFallbackTest() {
 
     finalizeRecordingBootstrap({
       resolvedRecordingId: 'recording-error',
-      settings: { quality: VideoQuality.HIGH } as never,
-      captureWidth: 1920,
-      captureHeight: 1080,
+      settings: createSettings(),
       trackSettings: { width: 1920, height: 1080, frameRate: 30 },
-      durationTracker: {
-        reset: vi.fn(),
-        startSegment: vi.fn(),
-      } as never,
+      durationTracker: recordingContext.durationTracker,
     });
     recordingContext.stopRecordingReject = rejectStopRecording;
 
@@ -202,14 +197,9 @@ function registerRecorderErrorTerminalNotificationTest() {
 
     finalizeRecordingBootstrap({
       resolvedRecordingId: 'recording-runtime-error',
-      settings: { quality: VideoQuality.HIGH } as never,
-      captureWidth: 1920,
-      captureHeight: 1080,
+      settings: createSettings(),
       trackSettings: { width: 1920, height: 1080, frameRate: 30 },
-      durationTracker: {
-        reset: vi.fn(),
-        startSegment: vi.fn(),
-      } as never,
+      durationTracker: recordingContext.durationTracker,
     });
 
     lastMediaRecorderInstance?.onerror?.({ error: new Error('encoder failed') } as ErrorEvent);
@@ -230,15 +220,42 @@ function registerRecorderErrorTerminalNotificationTest() {
   });
 }
 
+function registerRecorderErrorStopOrderingTest() {
+  it('returns a terminal bound-stop outcome without emitting an independent stop error', () => {
+    const resolveStop = vi.fn();
+    const rejectStop = vi.fn();
+    recordingContext.beginRecordingSession('recording-stop-error');
+
+    finalizeRecordingBootstrap({
+      resolvedRecordingId: 'recording-stop-error',
+      settings: createSettings(),
+      trackSettings: { width: 1920, height: 1080, frameRate: 30 },
+      durationTracker: recordingContext.durationTracker,
+    });
+    recordingContext.beginStopRequest({ reject: rejectStop, resolve: resolveStop });
+
+    lastMediaRecorderInstance?.onerror?.({ error: new Error('encoder failed') } as ErrorEvent);
+
+    expect(resolveStop).toHaveBeenCalledWith({
+      error: 'encoder failed',
+      result: 'terminal-failure',
+    });
+    expect(rejectStop).not.toHaveBeenCalled();
+    expect(sendRuntimeMessageMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ type: VideoMessageType.OFFSCREEN_ERROR }),
+      })
+    );
+  });
+}
+
 function registerDisplaySurfaceMetadataTest() {
   it('omits null cursor mode while preserving verified display surface metadata', () => {
     recordingContext.beginRecordingSession('recording-surface');
 
     finalizeRecordingBootstrap({
       resolvedRecordingId: 'recording-surface',
-      settings: { quality: VideoQuality.HIGH } as never,
-      captureWidth: 1920,
-      captureHeight: 1080,
+      settings: createSettings(),
       cursorCaptureMode: null,
       trackSettings: {
         displaySurface: 'window',
@@ -246,10 +263,7 @@ function registerDisplaySurfaceMetadataTest() {
         height: 1080,
         width: 1920,
       },
-      durationTracker: {
-        reset: vi.fn(),
-        startSegment: vi.fn(),
-      } as never,
+      durationTracker: recordingContext.durationTracker,
     });
 
     expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
@@ -268,5 +282,6 @@ describe('offscreen-recording-start-recorder error paths', () => {
   registerFinalizeFailureTest();
   registerRecorderErrorFallbackTest();
   registerRecorderErrorTerminalNotificationTest();
+  registerRecorderErrorStopOrderingTest();
   registerDisplaySurfaceMetadataTest();
 });

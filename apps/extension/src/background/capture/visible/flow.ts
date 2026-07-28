@@ -142,11 +142,13 @@ async function captureViewportWithClipNative(
     const parsedResult = parseCaptureScreenshotResult(rawResult);
     const capturedDataUrl = createDebuggerCaptureDataUrl(parsedResult.data, settings.imageFormat);
 
-    return finalizeCapturedDataUrl({
+    const finalized = await finalizeCapturedDataUrl({
       dataUrl: capturedDataUrl,
       settings,
       convertPngToWebp,
     });
+    await assertExactCaptureDimensions(finalized, viewport);
+    return finalized;
   });
 
   logger.debug('Viewport capture masked fixed elements', {
@@ -156,6 +158,25 @@ async function captureViewportWithClipNative(
   });
   logger.log('Completed viewport capture', { format: settings.imageFormat, tabId, viewport });
   return result;
+}
+
+async function assertExactCaptureDimensions(
+  dataUrl: string,
+  expected: { width: number; height: number }
+): Promise<void> {
+  const bitmap = await createImageBitmap(await (await fetch(dataUrl)).blob());
+  try {
+    if (bitmap.width !== expected.width || bitmap.height !== expected.height) {
+      throw new Error(
+        [
+          `Viewport capture verification failed: expected ${expected.width}x${expected.height},`,
+          `received ${bitmap.width}x${bitmap.height}`,
+        ].join(' ')
+      );
+    }
+  } finally {
+    bitmap.close();
+  }
 }
 
 export async function captureViewportWithClip(

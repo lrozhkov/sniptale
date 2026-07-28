@@ -10,7 +10,16 @@ import type {
 
 export type RuntimeMessageRequest = {
   type?: string;
-  viewport?: { width: number; height: number } | null;
+  viewport?: {
+    presetId: string;
+    target: 'viewport' | 'window';
+    width: number;
+    height: number;
+  } | null;
+  surfaceCapabilityToken?: string;
+  surfaceLeaseGeneration?: number;
+  surfaceOperationGeneration?: number;
+  surfaceWarning?: string;
   quickActionOverlay?: QuickActionOverlay & { delaySeconds?: number };
   autoStartSelection?: boolean;
   autoStartCaptureType?: 'visible' | 'full';

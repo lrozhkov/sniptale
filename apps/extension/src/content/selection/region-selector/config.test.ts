@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 
 beforeEach(() => {
@@ -8,12 +8,7 @@ beforeEach(() => {
 });
 
 describe('region-selector-ui config metrics', () => {
-  it('converts a device-pixel region into css overlay metrics', async () => {
-    vi.stubGlobal('window', {
-      ...window,
-      devicePixelRatio: 2,
-    });
-
+  it('keeps the CSS selection coordinates unchanged in the recording overlay', async () => {
     const { getRecordingOverlayMetrics } = await import('./config');
 
     expect(
@@ -24,11 +19,19 @@ describe('region-selector-ui config metrics', () => {
         height: 480,
       })
     ).toEqual({
-      cssHeight: 240,
-      cssWidth: 320,
-      cssX: 100,
-      cssY: 60,
-      indicatorTop: 30,
+      cssHeight: 480,
+      cssWidth: 640,
+      cssX: 200,
+      cssY: 120,
+      indicatorTop: 90,
+    });
+  });
+
+  it('places the recording indicator below a top-edge selection instead of inside it', async () => {
+    const { getRecordingOverlayMetrics } = await import('./config');
+
+    expect(getRecordingOverlayMetrics({ x: 10, y: 0, width: 300, height: 300 })).toMatchObject({
+      indicatorTop: 308,
     });
   });
 

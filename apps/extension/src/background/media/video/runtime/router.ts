@@ -25,6 +25,7 @@ import {
 import { routeExportRuntimeMessage } from './handlers/export/route';
 import { routeStateLifecycleRuntimeMessage } from './handlers/state/route';
 import type { ProjectExportPreauthorization } from '../../../routing-contracts/project-export-preauthorization';
+import { acceptVideoSourceReady } from '../capture-surface';
 
 function mapRuntimeDiagnosticEvent(message: {
   event?: string;
@@ -72,6 +73,18 @@ function routeRecordingRuntimeMessage(
   }
   if (message.type === VideoMessageType.OFFSCREEN_RECORDING_STARTED) {
     return handleOffscreenRecordingStarted(message, sendResponse);
+  }
+  if (message.type === VideoMessageType.OFFSCREEN_SOURCE_READY) {
+    void acceptVideoSourceReady(message).then(
+      (result) => sendResponse({ success: true, result }),
+      (error) =>
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+          result: 'DENY',
+        })
+    );
+    return { handled: true, keepChannelOpen: true };
   }
   if (message.type === VideoMessageType.OFFSCREEN_RECORDING_STOPPED) {
     return handleOffscreenRecordingStopped(message, sendResponse);

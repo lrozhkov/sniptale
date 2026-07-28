@@ -1,6 +1,6 @@
 export {
   announceCaptureSource,
-  buildViewportEmulationResult,
+  beginPreparedRecording,
   enableAnnotationsOrAbort,
   ensureOffscreenDocumentReadyOrAbort,
   finalizeRecordingStart,

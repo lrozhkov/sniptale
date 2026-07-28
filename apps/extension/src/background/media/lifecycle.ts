@@ -1,11 +1,16 @@
-export { reconcileVideoRecordingLeaseOnStartup } from './video/recording-control-lease';
+export {
+  ensureActiveVideoRecordingLeaseHydrated,
+  reconcileVideoRecordingLeaseOnStartup,
+} from './video/recording-control-lease';
+export { recoverVideoCaptureSurfaceOnStartup } from './video/capture-surface';
 export { startRecording } from './video/manager';
 export { handleRegionSelectionNavigationStart } from './video/ui/region-selection';
 export {
-  handleControlledCursorNavigationStart,
+  handleTabRecordingDebuggerDetach,
+  handleTabRecordingNavigationCommitted,
+  handleTabRecordingNavigationCompleted,
+  handleTabRecordingNavigationError,
+  handleTabRecordingNavigationStart,
   handleTabClose,
-  handleTabUpdated,
-  handleViewportRecordingDebuggerDetach,
-  handleViewportRecordingNavigationStart,
 } from './video/runtime/manager';
 export { resetVideoRecordingRuntimeState } from './video/runtime/session-state';

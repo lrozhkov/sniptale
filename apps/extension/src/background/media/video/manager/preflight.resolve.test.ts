@@ -25,10 +25,15 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-async function verifyViewportPresetRequired() {
+async function verifyCurrentSizeTabCapture() {
   const notifyStartFailed = vi.fn();
   const localize = vi.fn(() => 'preset required');
   const deps = createResolveCaptureSourceDeps({
+    getCaptureSource: vi.fn(async () => ({
+      mode: CaptureMode.TAB,
+      streamId: 'stream-1',
+      tabId: 7,
+    })),
     localize,
     notifyStartFailed,
   });
@@ -36,16 +41,16 @@ async function verifyViewportPresetRequired() {
   await expect(
     resolveCaptureSource(
       {
-        captureMode: CaptureMode.VIEWPORT_EMULATION,
+        captureMode: CaptureMode.TAB,
         tab: { id: 7 } as chrome.tabs.Tab,
         tabId: 7,
       },
       deps
     )
-  ).resolves.toBeNull();
+  ).resolves.toEqual({ mode: CaptureMode.TAB, streamId: 'stream-1', tabId: 7 });
 
-  expect(localize).toHaveBeenCalledWith('background.runtime.viewportPresetRequired');
-  expect(notifyStartFailed).toHaveBeenCalledWith('preset required');
+  expect(localize).not.toHaveBeenCalled();
+  expect(notifyStartFailed).not.toHaveBeenCalled();
 }
 
 async function verifyScreenCaptureSuccess() {
@@ -149,10 +154,14 @@ async function verifyTabCropSuccessIncludesTabMetadata() {
       tabId: 7,
     })),
     requestRegionSelection: vi.fn(async () => ({
-      x: 10,
-      y: 20,
-      width: 300,
-      height: 200,
+      region: { x: 10, y: 20, width: 300, height: 200 },
+      captureViewport: {
+        width: 1280,
+        height: 720,
+        scrollX: 0,
+        scrollY: 0,
+        devicePixelRatio: 2,
+      },
     })),
   });
 
@@ -174,6 +183,13 @@ async function verifyTabCropSuccessIncludesTabMetadata() {
     mode: CaptureMode.TAB_CROP,
     streamId: 'stream-1',
     tabId: 7,
+    captureViewport: {
+      devicePixelRatio: 2,
+      height: 720,
+      scrollX: 0,
+      scrollY: 0,
+      width: 1280,
+    },
     tabTitle: 'Example',
     tabUrl: 'https://example.test/page',
     tabFavicon: 'https://example.test/icon.png',
@@ -186,8 +202,8 @@ async function verifyTabCropSuccessIncludesTabMetadata() {
   });
 }
 
-describe('resolveCaptureSource viewport preset', () => {
-  it('notifies when viewport emulation starts without a preset', verifyViewportPresetRequired);
+describe('resolveCaptureSource', () => {
+  it('resolves tab capture with current size and no preset', verifyCurrentSizeTabCapture);
 
   it(
     'resolves screen capture after offscreen readiness and desktop source selection',

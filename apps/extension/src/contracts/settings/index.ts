@@ -1,5 +1,15 @@
 import type { CaptureActionType } from '@sniptale/runtime-contracts/capture/action';
+import type { ViewportPreset } from '../../features/viewport-presets/contracts';
 export type { CaptureActionType } from '@sniptale/runtime-contracts/capture/action';
+export type {
+  SystemViewportPreset,
+  SystemViewportPresetKey,
+  UserViewportPreset,
+  ViewportPreset,
+  ViewportPresetAvailability,
+  ViewportPresetAvailabilityReason,
+  ViewportPresetTarget,
+} from '../../features/viewport-presets/contracts';
 
 /**
  * Preset for a relative path inside Downloads.
@@ -10,16 +20,6 @@ export interface SavePreset {
   path: string;
   enabled: boolean;
   order: number;
-}
-
-/**
- * Post-capture action / save target.
- */
-export interface ViewportPreset {
-  id: string;
-  width: number;
-  height: number;
-  label: string;
 }
 
 export interface ContextMenuSettings {
@@ -52,8 +52,8 @@ export interface Settings {
   contentToolbar?: ContentToolbarPreferences;
   contextMenu: ContextMenuSettings;
   saveCapturesToGallery: boolean;
-  viewportPresets?: ViewportPreset[];
-  defaultViewportId?: string | null;
+  viewportPresets: ViewportPreset[];
+  defaultViewportPresetId: string | null;
   presets?: SavePreset[];
   defaultImagePresetId?: string | null;
   defaultVideoPresetId?: string | null;
@@ -159,7 +159,7 @@ export interface QuickAction {
   bundledId?: BundledQuickActionId | null;
   hotkey?: HotkeyConfig | null;
   screenshotMode: QuickActionScreenshotMode;
-  emulation?: string | null;
+  viewportPresetId?: string | null;
   delay?: QuickActionDelay | null;
   afterCapture?: CaptureActionType | null;
   imageFormat?: 'png' | 'jpeg' | 'webp' | null;

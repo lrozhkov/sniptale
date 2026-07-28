@@ -55,7 +55,7 @@ it('requests webcam permission and carries webcam settings into START_RECORDING'
     setRecordingControlCapability,
     setStartError,
     videoSettings: defaultSettings,
-    viewportPreset: null,
+    viewportPresetId: null,
   });
 
   expect(requestWebcamPermission).toHaveBeenCalledWith('cam-1');
@@ -79,7 +79,7 @@ it('does not send START_RECORDING when webcam permission fails', async () => {
     setRecordingControlCapability,
     setStartError,
     videoSettings: defaultSettings,
-    viewportPreset: null,
+    viewportPresetId: null,
   });
 
   expect(requestWebcamPermission).toHaveBeenCalledWith('cam-1');

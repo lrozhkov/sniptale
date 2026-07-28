@@ -2,6 +2,7 @@ import {
   BROADCAST_CHANNEL_OWNER_FILES,
   HISTORY_OWNER_FILES,
   LOCAL_STORAGE_OWNER_FILES,
+  SYSTEM_DISPLAY_OWNER_FILES,
 } from './browser-adapters-owners.mjs';
 import { normalizeBrowserAdapterPath } from './browser-adapters-paths.mjs';
 
@@ -70,6 +71,12 @@ const BROWSER_RUNTIME_RULES = [
 ];
 
 const BROWSER_EVENT_RULES = [
+  createNestedMethodRule({
+    rule: 'browser-windows-listener',
+    message: 'Use @sniptale/platform/browser/windows for window bounds subscriptions.',
+    target: 'chrome.windows',
+    segments: [['onBoundsChanged'], ['addListener', 'removeListener']],
+  }),
   createNestedMethodRule({
     rule: 'browser-tabs-listener',
     message: 'Use @sniptale/platform/browser/tabs for tab listener subscriptions.',
@@ -186,8 +193,15 @@ export const BROWSER_ADAPTER_RULES = [
     rule: 'browser-windows-direct',
     message: 'Use @sniptale/platform/browser/windows for chrome.windows access.',
     target: 'chrome.windows',
-    methods: ['get'],
+    methods: ['get', 'update'],
   }),
+  {
+    rule: 'browser-system-display-direct',
+    message: 'Use @sniptale/platform/browser/displays for chrome.system.display access.',
+    astGrepPattern: 'chrome.system.display.getInfo($$$ARGS)',
+    allow: (relativePath) =>
+      SYSTEM_DISPLAY_OWNER_FILES.has(normalizeBrowserAdapterPath(relativePath)),
+  },
   createMethodRule({
     rule: 'browser-downloads-listener',
     message: 'Use @sniptale/platform/browser/downloads for download listener subscriptions.',

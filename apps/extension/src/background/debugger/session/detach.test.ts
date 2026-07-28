@@ -122,12 +122,12 @@ it('swallows not-attached detach failures for the last client', async () => {
   await expect(detachDebugger(7, 'screenshot')).resolves.toBeUndefined();
 });
 
-it('logs and swallows unexpected detach failures for the last client', async () => {
+it('logs and surfaces unexpected detach failures for the last client', async () => {
   const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   seedDebuggerSessionStateForTests(7, ['screenshot'], 'target-7');
   withTimeout.mockRejectedValue(new Error('detach failed'));
 
-  await expect(detachDebugger(7, 'screenshot')).resolves.toBeUndefined();
+  await expect(detachDebugger(7, 'screenshot')).rejects.toThrow('detach failed');
 
   expect(consoleErrorSpy).toHaveBeenCalledWith(
     '[BackgroundDebuggerDetach]',

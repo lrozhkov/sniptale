@@ -24,7 +24,6 @@ import { registerPopupLifecycleBrowserListeners } from './browser-listeners';
 
 function createParams() {
   return {
-    clearAppliedViewportAuthority: vi.fn(),
     refreshActiveTabCapabilities: vi.fn(async () => undefined),
     refreshGalleryStatus: vi.fn(async () => undefined),
   };
@@ -70,7 +69,6 @@ describe('registerPopupLifecycleBrowserListeners', () => {
 
     expect(params.refreshActiveTabCapabilities).toHaveBeenCalledTimes(3);
     expect(params.refreshGalleryStatus).toHaveBeenCalledTimes(1);
-    expect(params.clearAppliedViewportAuthority).toHaveBeenCalledTimes(2);
 
     cleanup();
 

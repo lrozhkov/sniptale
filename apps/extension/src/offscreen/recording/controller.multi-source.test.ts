@@ -74,7 +74,7 @@ function createSettings() {
 beforeEach(() => {
   vi.clearAllMocks();
   getActiveMultiSourceRecordingIdMock.mockReturnValue('multi-1');
-  hasActiveMultiSourceRecordingMock.mockReturnValue(false);
+  hasActiveMultiSourceRecordingMock.mockReturnValueOnce(false).mockReturnValue(true);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   startMultiSourceRecordingMock.mockResolvedValue(undefined);
   stopMultiSourceRecordingMock.mockResolvedValue(undefined);
@@ -82,7 +82,9 @@ beforeEach(() => {
 
 it('routes multi-source starts to the multi-source session owner', async () => {
   await startRecording({
+    generation: 1,
     recordingId: 'multi-1',
+    streamInstanceId: 'stream-instance-multi-1',
     settings: createSettings(),
     streamId: 'desktop-multi',
   } as never);
@@ -94,12 +96,23 @@ it('routes multi-source starts to the multi-source session owner', async () => {
   expect(startRecordingImplMock).not.toHaveBeenCalled();
 });
 
-it('routes multi-source stop pause and resume through the multi-source session owner', async () => {
-  hasActiveMultiSourceRecordingMock.mockReturnValue(true);
+it('routes only a matching multi-source stop through the session owner', async () => {
+  await startRecording({
+    generation: 1,
+    recordingId: 'multi-1',
+    streamInstanceId: 'stream-instance-multi-1',
+    settings: createSettings(),
+    streamId: 'desktop-multi',
+  });
 
-  await stopRecording(true);
-  pauseRecording();
-  resumeRecording();
+  const binding = {
+    generation: 1,
+    recordingId: 'multi-1',
+    streamInstanceId: 'stream-instance-multi-1',
+  };
+  pauseRecording(binding);
+  resumeRecording(binding);
+  await stopRecording(binding, true);
 
   expect(stopMultiSourceRecordingMock).toHaveBeenCalledWith(true);
   expect(pauseMultiSourceRecordingMock).toHaveBeenCalledOnce();

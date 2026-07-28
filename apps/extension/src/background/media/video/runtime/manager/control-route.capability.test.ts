@@ -184,7 +184,7 @@ it('allows screen recording without a page-access check', async () => {
     17,
     createStartMessage().settings,
     CaptureMode.SCREEN,
-    undefined,
+    null,
     popupSenderUrl
   );
   expect(sendResponse).toHaveBeenCalledWith({
@@ -216,7 +216,7 @@ it('refreshes tab recording content runtime before storage and manager side effe
     17,
     createStartMessage().settings,
     CaptureMode.TAB,
-    undefined,
+    null,
     popupSenderUrl
   );
 });

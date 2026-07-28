@@ -8,6 +8,7 @@ const {
   resetRecordingTabIdMock,
   resetVideoRecordingRuntimeStateMock,
   restoreCurrentRecordingFromLeaseMock,
+  releaseVideoCaptureSurfaceMock,
 } = vi.hoisted(() => ({
   clearActiveVideoRecordingLeaseMock: vi.fn(),
   finishVideoRecordingStopMock: vi.fn(),
@@ -16,6 +17,7 @@ const {
   resetRecordingTabIdMock: vi.fn(),
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   restoreCurrentRecordingFromLeaseMock: vi.fn(),
+  releaseVideoCaptureSurfaceMock: vi.fn(),
 }));
 
 vi.mock('../../session-state', async (importOriginal) => ({
@@ -37,6 +39,10 @@ vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
   restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
 }));
+vi.mock('../../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture-surface')>()),
+  releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
+}));
 
 import { handleOffscreenError } from './offscreen-lifecycle';
 
@@ -53,6 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   getVideoRecordingIdMock.mockReturnValue('rec-1');
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
+  releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
 });
 
 it('clears completed session state for current stop-phase offscreen errors', async () => {

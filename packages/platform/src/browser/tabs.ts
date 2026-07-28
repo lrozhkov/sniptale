@@ -17,7 +17,7 @@ interface BrowserTabsAdapter {
     windowId?: number,
     options?: chrome.extensionTypes.ImageDetails
   ): Promise<string>;
-  setZoom(tabId: number, zoomFactor: number): Promise<void>;
+  getZoom(tabId: number): Promise<number>;
   subscribeToUpdated(
     listener: typeof chrome.tabs.onUpdated.addListener extends (listener: infer T) => void
       ? T
@@ -86,8 +86,8 @@ export const browserTabs: BrowserTabsAdapter = {
     return chrome.tabs.captureVisibleTab();
   },
 
-  setZoom(tabId, zoomFactor) {
-    return chrome.tabs.setZoom(tabId, zoomFactor);
+  getZoom(tabId) {
+    return chrome.tabs.getZoom(tabId);
   },
 
   subscribeToUpdated(listener) {

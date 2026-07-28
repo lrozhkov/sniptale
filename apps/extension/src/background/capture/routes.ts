@@ -1,5 +1,8 @@
 export { routeCaptureMessage, type RouteCaptureMessage } from './routing';
-export { markPreauthorizedContentActionRouteMessage } from './routing/authorization/content-action';
+export {
+  getPreauthorizedContentActionRouteMessage,
+  markPreauthorizedContentActionRouteMessage,
+} from './routing/authorization/content-action';
 export { markPreauthorizedGalleryUpdateRouteMessage } from './routing/authorization/gallery-update';
 export { consumeGalleryImageUpdateCapability } from './routing/gallery-update-capabilities';
 export { routePopupExportArchiveMessage } from './popup-export/archive-route';

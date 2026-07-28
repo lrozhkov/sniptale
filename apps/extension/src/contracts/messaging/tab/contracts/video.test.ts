@@ -189,6 +189,14 @@ function verifyRegionSelectionContracts() {
     regionSelectionRequestGeneration: 'generation-1',
     regionSelectionRequestId: 'request-1',
   };
+  const captureViewport = {
+    devicePixelRatio: 2,
+    height: 720,
+    scrollX: 0,
+    scrollY: 0,
+    visualViewportScale: 1,
+    width: 1280,
+  };
 
   expect(
     tabVideoMessageContracts[VideoMessageType.SHOW_REGION_SELECTOR]?.parseRequest({
@@ -206,11 +214,13 @@ function verifyRegionSelectionContracts() {
       type: VideoMessageType.REGION_SELECTED,
       ...binding,
       region: { height: 20, width: 10, x: 1, y: 2 },
+      captureViewport,
     })
   ).toEqual({
     type: VideoMessageType.REGION_SELECTED,
     ...binding,
     region: { height: 20, width: 10, x: 1, y: 2 },
+    captureViewport,
   });
   expect(
     tabVideoMessageContracts[VideoMessageType.REGION_SELECTION_CANCELLED]?.parseRequest({

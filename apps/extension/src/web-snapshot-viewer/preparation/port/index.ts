@@ -42,11 +42,11 @@ function handleViewerExportPortRequest(
   );
 }
 
-function handleViewerPreparationPortRequest(
+async function handleViewerPreparationPortRequest(
   port: chrome.runtime.Port,
   request: ViewerPreparationPortRequest,
-  onCommand: (command: ViewerPreparationCommand) => void
-): void {
+  onCommand: (command: ViewerPreparationCommand) => void | Promise<void>
+): Promise<void> {
   const response: ViewerPreparationPortResponse = {
     type: WEB_SNAPSHOT_VIEWER_PREPARATION_RESPONSE,
     requestId: request.requestId,
@@ -54,7 +54,7 @@ function handleViewerPreparationPortRequest(
     viewerPortGeneration: request.viewerPortGeneration,
   };
   try {
-    onCommand(request.command);
+    await onCommand(request.command);
   } catch (error) {
     response.success = false;
     response.error =
@@ -64,7 +64,7 @@ function handleViewerPreparationPortRequest(
 }
 
 export function connectViewerPreparationPort(
-  onCommand: (command: ViewerPreparationCommand) => void,
+  onCommand: (command: ViewerPreparationCommand) => void | Promise<void>,
   onPopupExportRequest?: (
     request: ViewerPopupExportMessage,
     sendResponse: PreparationPopupSendResponse
@@ -80,13 +80,13 @@ export function connectViewerPreparationPort(
 
     const preparationRequest = parseViewerPreparationPortRequest(message);
     if (preparationRequest) {
-      handleViewerPreparationPortRequest(port, preparationRequest, onCommand);
+      void handleViewerPreparationPortRequest(port, preparationRequest, onCommand);
       return;
     }
 
     const command = parseViewerPreparationCommand(message);
     if (command) {
-      onCommand(command);
+      void onCommand(command);
     }
   };
 

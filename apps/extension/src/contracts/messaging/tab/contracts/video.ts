@@ -113,7 +113,11 @@ export const tabVideoMessageContracts = {
       'tab REGION_SELECTED message',
       createMessageGuard({
         type: VideoMessageType.REGION_SELECTED,
-        required: { ...regionSelectionBindingGuard, region: isViewportRegion },
+        required: {
+          ...regionSelectionBindingGuard,
+          region: isViewportRegion,
+          captureViewport: isViewportInfo,
+        },
       })
     ),
     parseResponse: createGuardParser('tab REGION_SELECTED response', createRuntimeResponseGuard()),

@@ -4,7 +4,6 @@ import {
   CaptureMode,
   normalizeVideoSourceCount,
   type CaptureSource,
-  type VideoViewportPresetSelection,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { getCaptureSource } from '../capture-source';
 import { requestDesktopMedia, requestDisplayMediaSource } from '../ui/desktop-media';
@@ -35,19 +34,13 @@ interface ResolveCaptureSourceParams {
   captureMode: CaptureMode;
   controlledCursorCaptureEnabled?: boolean;
   sourceCount?: number;
-  viewportPreset?: VideoViewportPresetSelection;
 }
 
 export async function resolveCaptureSource(
   params: ResolveCaptureSourceParams,
   deps: ResolveCaptureSourceDeps = defaultResolveCaptureSourceDeps
 ): Promise<CaptureSource | null> {
-  const { tabId, tab, captureMode, viewportPreset } = params;
-
-  if (captureMode === CaptureMode.VIEWPORT_EMULATION && !viewportPreset) {
-    deps.notifyStartFailed(deps.localize('background.runtime.viewportPresetRequired'));
-    return null;
-  }
+  const { tabId, tab, captureMode } = params;
 
   if (captureMode === CaptureMode.SCREEN) {
     return resolveScreenCaptureSource(
@@ -81,7 +74,7 @@ async function resolveScreenCaptureSource(
 
   const desktopSource = await deps.requestDesktopMedia(captureMode, controlledCursorCaptureEnabled);
   if (!desktopSource) {
-    deps.notifyStartFailed(deps.localize('background.runtime.sourceSelectionCancelled'));
+    await deps.notifyStartFailed(deps.localize('background.runtime.sourceSelectionCancelled'));
     return null;
   }
 
@@ -144,7 +137,7 @@ async function requestMultiScreenDesktopSource(params: {
     }
 
     await rollbackPreparedMultiScreenCaptureSources(deps);
-    deps.notifyStartFailed(deps.localize('background.runtime.sourceSelectionCancelled'));
+    await deps.notifyStartFailed(deps.localize('background.runtime.sourceSelectionCancelled'));
     return null;
   } catch (error) {
     await handleMultiScreenDesktopPreparationFailure(error, params);
@@ -169,7 +162,7 @@ async function handleMultiScreenDesktopPreparationFailure(
     sourceIndex,
   });
   await rollbackPreparedMultiScreenCaptureSources(deps);
-  deps.notifyStartFailed(
+  await deps.notifyStartFailed(
     deps.localize(
       phase === 'desktop-picker'
         ? 'background.runtime.sourcePickerFailed'

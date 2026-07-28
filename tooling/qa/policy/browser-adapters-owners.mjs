@@ -17,3 +17,5 @@ export const HISTORY_OWNER_FILES = new Set([
 export const BROADCAST_CHANNEL_OWNER_FILES = new Set([
   'apps/extension/src/features/media-hub/events/index.ts',
 ]);
+
+export const SYSTEM_DISPLAY_OWNER_FILES = new Set(['packages/platform/src/browser/displays.ts']);

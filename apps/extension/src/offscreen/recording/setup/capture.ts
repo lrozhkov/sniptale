@@ -5,7 +5,6 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { consumeDesktopStream, detachCachedPreview } from './desktop-media';
-import { resolveRecordingSafeDimension } from '../dimensions';
 import {
   buildWebcamQualityConstraints,
   resolveWebcamQualitySettings,
@@ -13,33 +12,10 @@ import {
 
 const logger = createLogger({ namespace: 'OffscreenRecordingSetup' });
 
-export function resolveCaptureDimensions(params: {
-  viewport?: { width: number; height: number; devicePixelRatio?: number };
-  captureMode?: CaptureMode;
-  targetResolution?: { width: number; height: number };
-}) {
-  const dpr = params.viewport?.devicePixelRatio || 1;
-  let captureWidth = params.viewport
-    ? resolveRecordingSafeDimension(params.viewport.width * dpr)
-    : undefined;
-  let captureHeight = params.viewport
-    ? resolveRecordingSafeDimension(params.viewport.height * dpr)
-    : undefined;
-
-  if (params.captureMode === CaptureMode.VIEWPORT_EMULATION && params.targetResolution) {
-    captureWidth = resolveRecordingSafeDimension(params.targetResolution.width);
-    captureHeight = resolveRecordingSafeDimension(params.targetResolution.height);
-  }
-
-  return { captureWidth, captureHeight };
-}
-
 export async function acquireRecordingSourceStream(params: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
-  captureWidth?: number;
-  captureHeight?: number;
 }) {
   if (params.captureMode === CaptureMode.SCREEN) {
     return acquireDesktopStream(params.settings);
@@ -89,19 +65,12 @@ async function acquireCameraStream(settings: VideoRecordingSettings) {
 
 function createTabVideoConstraints(params: {
   streamId: string;
-  captureWidth?: number;
-  captureHeight?: number;
   controlledCursorCaptureEnabled?: boolean;
 }): MediaTrackConstraints {
   const mandatory: Record<string, unknown> = {
     chromeMediaSource: 'tab',
     chromeMediaSourceId: params.streamId,
   };
-  if (params.captureWidth && params.captureHeight) {
-    mandatory['maxWidth'] = params.captureWidth;
-    mandatory['maxHeight'] = params.captureHeight;
-  }
-
   return {
     mandatory,
     ...(params.controlledCursorCaptureEnabled === true ? { cursor: 'never' as const } : {}),
@@ -112,14 +81,10 @@ async function acquireTabStream({
   streamId,
   settings,
   captureMode,
-  captureWidth,
-  captureHeight,
 }: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
-  captureWidth?: number;
-  captureHeight?: number;
 }) {
   const audioConstraints: MediaTrackConstraints | false = settings.systemAudioEnabled
     ? ({
@@ -132,8 +97,6 @@ async function acquireTabStream({
 
   const videoConstraints = createTabVideoConstraints({
     streamId,
-    ...(captureHeight === undefined ? {} : { captureHeight }),
-    ...(captureWidth === undefined ? {} : { captureWidth }),
     ...(settings.controlledCursorCaptureEnabled === undefined
       ? {}
       : { controlledCursorCaptureEnabled: settings.controlledCursorCaptureEnabled }),
@@ -146,8 +109,6 @@ async function acquireTabStream({
   const cursorCaptureMode = resolveCursorCaptureMode(stream, settings, captureMode);
   logger.debug('Acquired tab capture stream', {
     hasAudio: Boolean(audioConstraints),
-    captureWidth,
-    captureHeight,
   });
   return {
     stream,
@@ -203,7 +164,6 @@ function resolveCursorCaptureMode(
       return VideoCursorCaptureMode.EMBEDDED_FALLBACK;
     case CaptureMode.TAB:
     case CaptureMode.TAB_CROP:
-    case CaptureMode.VIEWPORT_EMULATION:
       logger.debug('Controlled cursor capture will use embedded cursor telemetry', {
         ...sharedLogContext,
         captureMode,

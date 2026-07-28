@@ -46,10 +46,7 @@ beforeEach(() => {
 
 describe('video manager diagnostics startup', () => {
   it('skips diagnostics when the mode is not eligible', verifyIneligibleModeSkip);
-  it(
-    'starts diagnostics when viewport emulation is active and supported',
-    verifyViewportEmulationDiagnostics
-  );
+  it('starts diagnostics for supported full-tab capture', verifyViewportEmulationDiagnostics);
   it(
     'skips diagnostics when annotations are unsupported or viewport is missing',
     verifyUnsupportedDiagnosticsSkip
@@ -59,7 +56,7 @@ describe('video manager diagnostics startup', () => {
 
 async function verifyIneligibleModeSkip(): Promise<void> {
   await attemptDiagnosticsStart({
-    captureMode: CaptureMode.TAB,
+    captureMode: CaptureMode.SCREEN,
     settings,
     viewport: { width: 1280, height: 720 },
     tabId: 5,
@@ -70,7 +67,7 @@ async function verifyIneligibleModeSkip(): Promise<void> {
 
 async function verifyViewportEmulationDiagnostics(): Promise<void> {
   await attemptDiagnosticsStart({
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     settings,
     viewport: { width: 1440, height: 900 },
     tabId: 8,
@@ -86,18 +83,18 @@ async function verifyUnsupportedDiagnosticsSkip(): Promise<void> {
   supportsAnnotations.mockReturnValue(false);
 
   await attemptDiagnosticsStart({
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     settings,
     viewport: { width: 1440, height: 900 },
     tabId: 8,
   });
   await attemptDiagnosticsStart({
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     settings,
     tabId: 8,
   });
   await attemptDiagnosticsStart({
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     settings,
     viewport: { width: 1440, height: 900 },
   });
@@ -110,7 +107,7 @@ async function verifyDiagnosticsStartupFailure(): Promise<void> {
 
   await expect(
     attemptDiagnosticsStart({
-      captureMode: CaptureMode.VIEWPORT_EMULATION,
+      captureMode: CaptureMode.TAB,
       settings,
       viewport: { width: 1280, height: 720 },
       tabId: 12,

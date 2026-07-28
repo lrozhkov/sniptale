@@ -1,5 +1,10 @@
 import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createRouteErrorResponse } from '../../../routing-contracts/response';
+import {
+  getScreenshotSurfaceBinding,
+  renewScreenshotSurfaceCapability,
+} from '../../../capture-surface/screenshot-session';
+import { getPreauthorizedContentActionRouteMessage } from '../authorization/content-action';
 import { handleFullCapture } from '../handlers.full';
 import { handleVisibleCapture, handleVisibleCaptureForCrop } from '../handlers.visible';
 import type { CaptureRouteAdapterContext } from './types';
@@ -7,6 +12,12 @@ import type { CaptureRouteAdapterContext } from './types';
 type ScreenshotCaptureHandler = (context: CaptureRouteAdapterContext['context']) => boolean;
 
 export function routeScreenshotCaptureMessage(args: CaptureRouteAdapterContext): boolean {
+  if (args.routeArgs.message.type === CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION) {
+    void renewScreenshotSurfaceSession(args).catch((error: unknown) => {
+      args.context.sendResponse(createRouteErrorResponse(error));
+    });
+    return true;
+  }
   const handler = resolveScreenshotCaptureHandler(args.routeArgs.message);
   if (!handler) {
     return false;
@@ -20,6 +31,23 @@ export function routeScreenshotCaptureMessage(args: CaptureRouteAdapterContext):
       args.context.sendResponse(createRouteErrorResponse(error));
     });
   return true;
+}
+
+async function renewScreenshotSurfaceSession(args: CaptureRouteAdapterContext): Promise<void> {
+  await authorizeScreenshotCapture(args);
+  const senderBinding = getPreauthorizedContentActionRouteMessage(args.routeArgs.message);
+  if (!senderBinding || senderBinding.tabId !== args.context.resolvedTabId) {
+    throw new Error('Unauthorized screenshot surface renewal');
+  }
+
+  renewScreenshotSurfaceCapability({
+    documentId: senderBinding.documentId,
+    tabId: args.context.resolvedTabId,
+  });
+  args.context.screenshotModeState.set(args.context.resolvedTabId, true);
+  const binding = getScreenshotSurfaceBinding(args.context.resolvedTabId);
+  if (!binding) throw new Error('Screenshot surface session is unavailable');
+  args.context.sendResponse({ success: true, ...binding });
 }
 
 function resolveScreenshotCaptureHandler(
@@ -59,5 +87,5 @@ function isNativeVisibleCapture(args: CaptureRouteAdapterContext): boolean {
   }
 
   const viewport = args.context.viewportState.get(args.context.resolvedTabId);
-  return viewport === null || viewport === undefined;
+  return viewport === null || viewport === undefined || viewport.target === 'window';
 }

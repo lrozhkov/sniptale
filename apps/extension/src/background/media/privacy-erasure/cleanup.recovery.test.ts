@@ -16,6 +16,9 @@ const {
   resetVideoRecordingStartSessionMock,
   stopRecordingForPrivacyErasureMock,
   waitForStopSideEffectsMock,
+  readCaptureSurfaceJournalMock,
+  hasOwnerLeaseMock,
+  releaseOwnersMock,
 } = vi.hoisted(() => ({
   clearActiveVideoRecordingLeaseMock: vi.fn(),
   clearProjectExportJobLedgerForPrivacyErasureMock: vi.fn(),
@@ -31,6 +34,9 @@ const {
   resetVideoRecordingStartSessionMock: vi.fn(),
   stopRecordingForPrivacyErasureMock: vi.fn(),
   waitForStopSideEffectsMock: vi.fn(),
+  readCaptureSurfaceJournalMock: vi.fn(),
+  hasOwnerLeaseMock: vi.fn(),
+  releaseOwnersMock: vi.fn(),
 }));
 
 vi.mock('../video/recording-control-lease', async (importOriginal) => ({
@@ -73,6 +79,17 @@ vi.mock('../../storage/video/recording-control-lease', async (importOriginal) =>
   ...(await importOriginal<typeof import('../../storage/video/recording-control-lease')>()),
   inspectPersistedLease: inspectPersistedLeaseMock,
 }));
+vi.mock('../../storage/capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../storage/capture-surface')>()),
+  readCaptureSurfaceJournal: readCaptureSurfaceJournalMock,
+}));
+vi.mock('../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture-surface')>()),
+  getCaptureSurfaceService: () => ({
+    hasOwnerLease: hasOwnerLeaseMock,
+    releaseOwners: releaseOwnersMock,
+  }),
+}));
 
 import { mediaPrivacyErasureCleanupAdapter } from './cleanup';
 
@@ -87,6 +104,9 @@ beforeEach(() => {
   inspectPersistedLeaseMock.mockResolvedValue({ status: 'absent' });
   stopRecordingForPrivacyErasureMock.mockResolvedValue({ result: 'no-active-recording' });
   waitForStopSideEffectsMock.mockResolvedValue(undefined);
+  readCaptureSurfaceJournalMock.mockResolvedValue([]);
+  hasOwnerLeaseMock.mockReturnValue(false);
+  releaseOwnersMock.mockResolvedValue(undefined);
 });
 
 it('drains delayed stop persistence before clearing the recording authority', async () => {
@@ -135,6 +155,45 @@ it('preserves the durable lease when strict offscreen termination is not acknowl
   expect(result).toContainEqual(
     expect.objectContaining({
       error: 'recording-stop-failed',
+      id: 'recording-runtime-state',
+      status: 'failed',
+    })
+  );
+  expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
+});
+
+it('does not report verified erasure while a video surface journal entry remains', async () => {
+  ensureActiveVideoRecordingLeaseHydratedMock.mockResolvedValueOnce(recordingLease);
+  getCurrentRecordingIdMock.mockReturnValue(recordingLease.recordingId);
+  stopRecordingForPrivacyErasureMock.mockResolvedValueOnce({ result: 'accepted' });
+  readCaptureSurfaceJournalMock.mockResolvedValueOnce([
+    { owner: 'video', sessionId: 'another-stale-recording' },
+  ]);
+
+  const result = await mediaPrivacyErasureCleanupAdapter.cleanup();
+
+  expect(result).toContainEqual({
+    error: 'recording-surface-cleanup-failed',
+    id: 'recording-runtime-state',
+    severity: 'required',
+    status: 'failed',
+  });
+  expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
+  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+});
+
+it('does not recover corrupt durable media state while a video surface remains', async () => {
+  inspectPersistedLeaseMock.mockResolvedValueOnce({ status: 'invalid' });
+  inspectActiveProjectExportJobLedgerEntryMock.mockResolvedValueOnce({ status: 'invalid' });
+  readCaptureSurfaceJournalMock.mockResolvedValueOnce([
+    { owner: 'video', sessionId: 'stale-recording' },
+  ]);
+
+  const result = await mediaPrivacyErasureCleanupAdapter.cleanup();
+
+  expect(result).toContainEqual(
+    expect.objectContaining({
+      error: 'invalid-media-state-recovery-failed',
       id: 'recording-runtime-state',
       status: 'failed',
     })

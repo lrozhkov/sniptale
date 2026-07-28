@@ -181,6 +181,17 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/overlay/toolbar/capture/menus.test.tsx'],
   },
   {
+    owner: 'content-overlay-toolbar-viewport-mutation',
+    productionFile: 'apps/extension/src/content/overlay/toolbar/view.tsx',
+    exclusive: true,
+    reason:
+      'Toolbar viewport changes use the shared owner and its injected viewer-local mutation port.',
+    testFiles: [
+      'apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts',
+      'apps/extension/src/content/overlay/toolbar/shell/view.test.tsx',
+    ],
+  },
+  {
     owner: 'content-page-preparation-local-save-hook',
     productionFile: 'apps/extension/src/content/parser/page-preparation/local-save/hook/index.ts',
     exclusive: true,

@@ -1,17 +1,21 @@
 import type { AudioMixer } from '../stream/audio-mixer';
 import { sendRuntimeMessageBestEffort } from '../../runtime-messaging/best-effort';
 import { createDurationTracker } from '../duration';
-import type { ViewportCropUpdater, ViewportDrawStateUpdater } from '../stream/viewport';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import type { TabOutputGeometry } from '../stream/tab-output';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingContext' });
 
 type RecordingLifecycleState = 'idle' | 'starting' | 'recording' | 'stopping';
 
+export type RecordingStopOutcome =
+  | { result: 'stopped' }
+  | { error: string; result: 'terminal-failure' };
+
 interface StopRequestHandlers {
   discard?: boolean;
-  resolve: () => void;
+  resolve: (outcome?: RecordingStopOutcome) => void;
   reject: (reason?: unknown) => void;
 }
 
@@ -21,12 +25,13 @@ class OffscreenRecordingContext {
   sourceStream: MediaStream | null = null;
   audioMixer: AudioMixer | null = null;
   recordedChunks: Blob[] = [];
-  updateViewportPresetCrop: ViewportCropUpdater | null = null;
-  updateViewportPresetDrawState: ViewportDrawStateUpdater | null = null;
-  viewportDrawFrozen = false;
-  viewportNavigationEpoch = 0;
   currentRecordingId: string | null = null;
-  stopRecordingResolve: (() => void) | null = null;
+  generation: number | null = null;
+  streamInstanceId: string | null = null;
+  sourceVideoHeight: number | null = null;
+  sourceVideoWidth: number | null = null;
+  tabOutputGeometry: TabOutputGeometry | null = null;
+  stopRecordingResolve: ((outcome?: RecordingStopOutcome) => void) | null = null;
   stopRecordingReject: ((reason?: unknown) => void) | null = null;
   discardOnStop = false;
 
@@ -54,9 +59,41 @@ class OffscreenRecordingContext {
     return this.#lifecycleState;
   }
 
-  beginRecordingSession(recordingId: string): void {
+  beginRecordingSession(recordingId: string, generation = 0): void {
     this.#setLifecycleState('starting', 'beginRecordingSession');
     this.currentRecordingId = recordingId;
+    this.generation = generation;
+    this.streamInstanceId = null;
+    this.sourceVideoHeight = null;
+    this.sourceVideoWidth = null;
+    this.tabOutputGeometry = null;
+  }
+
+  bindStreamInstance(binding: {
+    recordingId: string;
+    generation: number;
+    streamInstanceId: string;
+  }): void {
+    if (
+      this.currentRecordingId !== binding.recordingId ||
+      this.generation !== binding.generation ||
+      this.lifecycleState !== 'starting'
+    ) {
+      throw new Error('Stale recording source binding');
+    }
+    this.streamInstanceId = binding.streamInstanceId;
+  }
+
+  matchesSourceBinding(binding: {
+    recordingId: string;
+    generation: number;
+    streamInstanceId: string;
+  }): boolean {
+    return (
+      this.currentRecordingId === binding.recordingId &&
+      this.generation === binding.generation &&
+      this.streamInstanceId === binding.streamInstanceId
+    );
   }
 
   activateRecorder(mediaRecorder: MediaRecorder): void {
@@ -73,7 +110,7 @@ class OffscreenRecordingContext {
 
   clearStopRequest(): {
     reject: ((reason?: unknown) => void) | null;
-    resolve: (() => void) | null;
+    resolve: ((outcome?: RecordingStopOutcome) => void) | null;
   } {
     const resolve = this.stopRecordingResolve;
     const reject = this.stopRecordingReject;
@@ -93,11 +130,12 @@ class OffscreenRecordingContext {
   }
 
   resetRecordingSession(): void {
-    this.updateViewportPresetCrop = null;
-    this.updateViewportPresetDrawState = null;
-    this.viewportDrawFrozen = false;
-    this.viewportNavigationEpoch = 0;
     this.currentRecordingId = null;
+    this.generation = null;
+    this.streamInstanceId = null;
+    this.sourceVideoHeight = null;
+    this.sourceVideoWidth = null;
+    this.tabOutputGeometry = null;
     this.recordedChunks.length = 0;
     this.discardOnStop = false;
     this.stopRecordingResolve = null;
@@ -111,7 +149,7 @@ class OffscreenRecordingContext {
         idle: ['idle', 'starting'],
         starting: ['idle', 'recording'],
         recording: ['idle', 'stopping'],
-        stopping: ['idle'],
+        stopping: ['idle', 'stopping'],
       };
 
     if (!allowedTransitions[this.#lifecycleState].includes(nextState)) {

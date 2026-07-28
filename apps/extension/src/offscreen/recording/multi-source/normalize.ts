@@ -4,11 +4,7 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { resolveRecordingSafeSize } from '../dimensions';
-import {
-  createRecordingVideoElement,
-  waitForVideoReady,
-  wrapCanvasTrackStop,
-} from '../stream/viewport/video';
+import { createSourceVideo, waitForSourceMetadata } from '../stream/video-source';
 
 type NormalizedMultiSourceVideoStream = {
   dimensions: { height: number; width: number };
@@ -87,13 +83,9 @@ export async function normalizeMultiSourceVideoStream(
   sourceStream: MediaStream,
   quality: VideoRecordingSettings['quality']
 ): Promise<NormalizedMultiSourceVideoStream> {
-  const video = createRecordingVideoElement(sourceStream);
+  const video = createSourceVideo(sourceStream);
   try {
-    await waitForVideoReady(
-      video,
-      'Multi-source video ready timeout',
-      'Multi-source video load error'
-    );
+    await waitForSourceMetadata(video);
 
     const dimensions = resolveRecordingSafeSize({
       height: video.videoHeight,
@@ -115,11 +107,13 @@ export async function normalizeMultiSourceVideoStream(
     drawFrame();
     const stopFrameLoop = startFixedFramePump(frameRate, drawFrame);
 
-    wrapCanvasTrackStop(canvasVideoTrack, () => {
+    const stopCanvasTrack = canvasVideoTrack.stop.bind(canvasVideoTrack);
+    canvasVideoTrack.stop = () => {
       stopFrameLoop();
       releaseVideo(video);
       stopStreamTracks(sourceStream);
-    });
+      stopCanvasTrack();
+    };
 
     return { dimensions, stream: normalizedStream };
   } catch (error) {

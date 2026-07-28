@@ -74,6 +74,9 @@ function SnapshotViewerHeader(props: {
         <div className="truncate text-xs text-[var(--sniptale-color-text-muted)]">
           {props.loaded.manifest.source.url}
         </div>
+        <div className="truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
+          {translate('webSnapshotViewer.app.pngDprHint', props.locale)}
+        </div>
       </div>
       <button
         type="button"

@@ -15,8 +15,26 @@ export function createPopupBootstrapSettings(overrides: Record<string, unknown> 
     presets: [],
     saveCapturesToGallery: false,
     viewportPresets: [
-      { height: 720, id: 'preset-1', label: 'Compact', width: 1280 },
-      { height: 1080, id: 'preset-2', label: 'Full HD', width: 1920 },
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Compact',
+        target: 'viewport',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 0,
+      },
+      {
+        kind: 'user',
+        id: 'preset-2',
+        name: 'Full HD',
+        target: 'viewport',
+        width: 1920,
+        height: 1080,
+        enabled: true,
+        order: 0,
+      },
     ],
     ...overrides,
   };
@@ -38,7 +56,7 @@ export function createPopupBootstrapVideoSettings(overrides: Record<string, unkn
 
 export function createPopupBootstrapVideoUiState(overrides: Record<string, unknown> = {}) {
   return {
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     viewportPresetId: 'missing-preset',
     ...overrides,
   };
@@ -52,6 +70,6 @@ export function createPopupBootstrapRecordingState(status = VideoRecordingStatus
     duration: 12,
     error: null,
     status,
-    viewportPreset: null,
+    viewportPresetId: null,
   };
 }

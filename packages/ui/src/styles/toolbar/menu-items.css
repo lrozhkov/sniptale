@@ -66,6 +66,32 @@
 .sniptale-toolbar-menu-item-label {
   font-size: 12px;
   color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sniptale-viewport-menu .sniptale-popover-item {
+  min-height: 34px;
+  padding: 6px 8px;
+  gap: 8px;
+}
+
+.sniptale-viewport-menu .sniptale-toolbar-menu-item-copy {
+  flex-direction: row;
+  align-items: center;
+}
+
+.sniptale-viewport-menu .sniptale-toolbar-menu-item-label {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sniptale-toolbar-menu-item-meta {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sniptale-color-text-dim);
 }
 
 .sniptale-toolbar-menu-item-hint {

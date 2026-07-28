@@ -8,6 +8,8 @@ import { HotkeyInput } from './hotkey-input';
 import { allowedQuickActionIcons, delayOptions, quickActionIconMap } from './section/constants';
 import { settingsMetaLabelClassName } from '../../section-surface';
 import { type QuickActionsSectionState } from './controller';
+import { getViewportPresetDisplayName } from '../../../features/viewport-presets/display-name';
+import { formatViewportPresetDimensions } from '../../../features/viewport-presets/format';
 
 const iconPickerClassName = [
   'flex flex-wrap gap-1 rounded-md border p-2',
@@ -26,16 +28,22 @@ function DynamicIcon(props: { className?: string; name: string }) {
   return <Icon className={props.className} />;
 }
 
-function buildEmulationOptions(viewportPresets: ViewportPreset[] | undefined) {
+function buildViewportPresetOptions(viewportPresets: ViewportPreset[] | undefined) {
   return [
     {
-      value: 'native',
-      label: `${translate('settings.quickActions.emulationNone')} (native)`,
+      value: '',
+      label: translate('viewportPresets.section.nativeOption'),
     },
-    ...(viewportPresets ?? []).map((preset) => ({
-      value: preset.id,
-      label: `${preset.label} (${preset.width}×${preset.height})`,
-    })),
+    ...(viewportPresets ?? [])
+      .filter((preset) => preset.enabled)
+      .map((preset) => ({
+        value: preset.id,
+        label: `${getViewportPresetDisplayName(preset)} (${formatViewportPresetDimensions(
+          preset.width,
+          preset.height
+        )})`,
+        description: translate(`viewportPresets.hints.${preset.target}`),
+      })),
   ];
 }
 
@@ -129,7 +137,7 @@ export function QuickActionsEditorSecondaryCaptureFields(props: {
   state: QuickActionsSectionState;
   viewportPresets: ViewportPreset[] | undefined;
 }) {
-  const emulationOptions = buildEmulationOptions(props.viewportPresets);
+  const viewportPresetOptions = buildViewportPresetOptions(props.viewportPresets);
 
   return (
     <div className="mb-4 grid grid-cols-2 gap-4">
@@ -138,11 +146,9 @@ export function QuickActionsEditorSecondaryCaptureFields(props: {
           {translate('settings.quickActions.screenEmulationLabel')}
         </label>
         <ProductSelect
-          value={props.state.editForm?.emulation || 'native'}
-          onChange={(value) =>
-            props.state.updateFormField('emulation', value === 'native' ? null : value)
-          }
-          options={emulationOptions}
+          value={props.state.editForm?.viewportPresetId ?? ''}
+          onChange={(value) => props.state.updateFormField('viewportPresetId', value || null)}
+          options={viewportPresetOptions}
         />
       </div>
 

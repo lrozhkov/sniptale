@@ -20,7 +20,6 @@ function createChromeTabsStub() {
     query: vi.fn(),
     reload: vi.fn(),
     remove: vi.fn(),
-    setZoom: vi.fn(),
     update: vi.fn(),
   };
 }
@@ -42,7 +41,6 @@ function mockCoreTabCommands(tabsStub: ReturnType<typeof createChromeTabsStub>) 
   tabsStub.update.mockResolvedValue({ id: 4 });
   tabsStub.remove.mockResolvedValue(undefined);
   tabsStub.reload.mockResolvedValue(undefined);
-  tabsStub.setZoom.mockResolvedValue(undefined);
 }
 
 async function expectCoreTabCommandResults() {
@@ -52,7 +50,6 @@ async function expectCoreTabCommandResults() {
   await expect(browserTabs.update(4, { active: true })).resolves.toEqual({ id: 4 });
   await expect(browserTabs.remove([4, 5])).resolves.toBeUndefined();
   await expect(browserTabs.reload(4, { bypassCache: true })).resolves.toBeUndefined();
-  await expect(browserTabs.setZoom(4, 1.25)).resolves.toBeUndefined();
 }
 
 function expectCoreTabCommandCalls(tabsStub: ReturnType<typeof createChromeTabsStub>) {
@@ -62,7 +59,6 @@ function expectCoreTabCommandCalls(tabsStub: ReturnType<typeof createChromeTabsS
   expect(tabsStub.update).toHaveBeenCalledWith(4, { active: true });
   expect(tabsStub.remove).toHaveBeenCalledWith([4, 5]);
   expect(tabsStub.reload).toHaveBeenCalledWith(4, { bypassCache: true });
-  expect(tabsStub.setZoom).toHaveBeenCalledWith(4, 1.25);
 }
 
 function mockCaptureAndReloadCommands(tabsStub: ReturnType<typeof createChromeTabsStub>) {

@@ -148,13 +148,13 @@ describe('toolbar static tooltips', () => {
   it('keeps viewport tooltip static even when emulation is active', async () => {
     await renderViewportButton(null);
     expect(document.querySelector('button')?.getAttribute('title')).toBe(
-      'Размер страницы для снимка'
+      'Размер страницы или окна для снимка'
     );
     expect(document.querySelector('button')?.getAttribute('data-tooltip')).toBeNull();
 
     await renderViewportButton({ width: 1440, height: 900 });
     expect(document.querySelector('button')?.getAttribute('title')).toBe(
-      'Размер страницы для снимка'
+      'Размер страницы или окна для снимка'
     );
     expect(document.querySelector('button')?.getAttribute('data-tooltip')).toBeNull();
     expect(document.querySelector('button')?.getAttribute('data-active')).toBe('true');

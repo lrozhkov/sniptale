@@ -18,23 +18,36 @@ export function useViewportPresetsSection() {
   };
 
   return {
-    defaultViewportId: sync.defaultViewportId,
-    deleteMessage: getDeleteMessage(dialogs.viewportToDelete?.label),
-    editingViewport: dialogs.editingViewport,
-    handleAddViewportPreset: actions.handleAddViewportPreset,
-    handleDefaultViewportChange: actions.handleDefaultViewportChange,
-    handleDeleteViewportPreset: actions.handleDeleteViewportPreset,
-    handleEditViewportPreset: actions.handleEditViewportPreset,
-    handleSaveViewportPreset: actions.handleSaveViewportPreset,
-    hoveredViewportId: dialogs.hoveredViewportId,
-    isLoading: sync.isLoading,
-    isViewportEditorOpen: dialogs.isViewportEditorOpen,
-    presetsCountLabel: getViewportPresetCountLabel(sync.viewportPresets.length),
-    setHoveredViewportId: dialogs.setHoveredViewportId,
-    viewportConfirmOpen: dialogs.viewportConfirmOpen,
-    viewportPresets: sync.viewportPresets,
-    closeViewportDeleteDialog,
-    closeViewportEditor,
-    confirmDeleteViewport: actions.confirmDeleteViewport,
+    defaultField: {
+      onChange: actions.handleDefaultViewportChange,
+      selectedPresetId: sync.defaultViewportPresetId,
+    },
+    deletion: {
+      close: closeViewportDeleteDialog,
+      confirm: actions.confirmDeleteViewport,
+      isOpen: dialogs.viewportConfirmOpen,
+      message: getDeleteMessage(dialogs.viewportToDelete ?? undefined),
+    },
+    editor: {
+      close: closeViewportEditor,
+      isOpen: dialogs.isViewportEditorOpen,
+      onAdd: actions.handleAddViewportPreset,
+      onSave: actions.handleSaveViewportPreset,
+      ...(dialogs.editingViewport === undefined ? {} : { editingPreset: dialogs.editingViewport }),
+    },
+    list: {
+      countLabel: getViewportPresetCountLabel(sync.viewportPresets.length),
+      hoveredPresetId: dialogs.hoveredViewportId,
+      onDelete: actions.handleDeleteViewportPreset,
+      onEdit: actions.handleEditViewportPreset,
+      onHoverChange: dialogs.setHoveredViewportId,
+      onMove: actions.handleMoveViewportPreset,
+      onReset: actions.handleResetViewportPreset,
+      onToggle: actions.handleToggleViewportPreset,
+    },
+    model: {
+      isLoading: sync.isLoading,
+      presets: sync.viewportPresets,
+    },
   };
 }

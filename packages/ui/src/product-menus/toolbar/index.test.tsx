@@ -4,6 +4,7 @@ import {
   ProductToolbarMenu,
   ProductToolbarMenuBadge,
   ProductToolbarMenuDivider,
+  ProductToolbarMenuGroupLabel,
   ProductToolbarMenuItem,
   ProductToolbarMenuItemCopy,
 } from './index';
@@ -12,12 +13,15 @@ describe('ProductToolbarMenu', () => {
   it('renders placement, compact, selected, and disabled menu states', () => {
     const markup = renderToStaticMarkup(
       <ProductToolbarMenu title="Viewport" variant="viewport" compact placement="up">
+        <ProductToolbarMenuGroupLabel>Page viewport</ProductToolbarMenuGroupLabel>
         <ProductToolbarMenuItem selected>
           <ProductToolbarMenuItemCopy label="Desktop" hint="1280×720" showHintInCompact />
           <ProductToolbarMenuBadge>Active</ProductToolbarMenuBadge>
         </ProductToolbarMenuItem>
         <ProductToolbarMenuDivider />
-        <ProductToolbarMenuItem disabled>Disabled row</ProductToolbarMenuItem>
+        <ProductToolbarMenuItem ariaDisabled ariaDescribedBy="reason">
+          Disabled row
+        </ProductToolbarMenuItem>
       </ProductToolbarMenu>
     );
 
@@ -28,6 +32,7 @@ describe('ProductToolbarMenu', () => {
       ].join(' ')
     );
     expect(markup).toContain('sniptale-toolbar-menu-title');
+    expect(markup).toContain('Page viewport');
     expect(markup).toContain('sniptale-toolbar-menu-list');
     expect(markup).toContain(
       'sniptale-popover-item sniptale-toolbar-menu-item sniptale-popover-item-selected'
@@ -36,6 +41,9 @@ describe('ProductToolbarMenu', () => {
     expect(markup).toContain('sniptale-toolbar-menu-item-hint--show-compact');
     expect(markup).toContain('sniptale-popover-divider');
     expect(markup).toContain('opacity-50 cursor-not-allowed');
+    expect(markup).toContain('aria-disabled="true"');
+    expect(markup).toContain('aria-describedby="reason"');
+    expect(markup).not.toContain('disabled=""');
   });
 
   it('renders the side-placement class for vertical toolbar menus', () => {

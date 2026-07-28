@@ -16,15 +16,32 @@ export const defaultSettings: VideoRecordingSettings = {
   systemAudioEnabled: true,
 };
 
-export const viewportPreset = { id: 'wide', label: 'Wide', width: 1920, height: 1080 };
+export const viewportPreset = {
+  kind: 'user',
+  id: 'wide',
+  name: 'Wide',
+  target: 'viewport',
+  width: 1920,
+  height: 1080,
+  enabled: true,
+  order: 0,
+};
 export const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 
 export const recordingContext = {
   tabId: 17,
-  captureMode: CaptureMode.VIEWPORT_EMULATION,
+  captureMode: CaptureMode.TAB,
   captureSource: { mode: CaptureMode.TAB, streamId: 'stream-1' },
-  viewport: { width: 1920, height: 1080 },
-  viewportEmulationResult: { cssWidth: 1280, cssHeight: 720, scale: 0.66 },
-  viewportPreset,
+  generation: 1,
+  viewportPresetId: viewportPreset.id,
+  surface: {
+    sessionId: 'recording-1',
+    leaseId: 'lease-1',
+    generation: 1,
+    presetId: viewportPreset.id,
+    target: 'viewport',
+    width: viewportPreset.width,
+    height: viewportPreset.height,
+  },
   settings: defaultSettings,
 };

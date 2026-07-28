@@ -5,6 +5,7 @@ import {
   createRuntimeResponseGuard,
   isBoolean,
   isLiveVideoRecordingSettingsPatch,
+  isNumber,
   isString,
 } from '../../../../validators/index';
 import type { PartialRuntimeRegistry } from '../../../runtime-message.registry.ts';
@@ -28,7 +29,12 @@ export const runtimeVideoOffscreenControlMessageContracts = {
       'runtime OFFSCREEN_STOP_RECORDING message',
       createMessageGuard({
         type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
-        required: { capabilityToken: isString },
+        required: {
+          capabilityToken: isString,
+          recordingId: isString,
+          generation: isNumber,
+          streamInstanceId: isString,
+        },
         optional: { discard: isBoolean },
       })
     ),
@@ -42,7 +48,12 @@ export const runtimeVideoOffscreenControlMessageContracts = {
       'runtime OFFSCREEN_PAUSE_RECORDING message',
       createMessageGuard({
         type: VideoMessageType.OFFSCREEN_PAUSE_RECORDING,
-        required: { capabilityToken: isString },
+        required: {
+          capabilityToken: isString,
+          recordingId: isString,
+          generation: isNumber,
+          streamInstanceId: isString,
+        },
       })
     ),
     parseResponse: createGuardParser(
@@ -55,7 +66,12 @@ export const runtimeVideoOffscreenControlMessageContracts = {
       'runtime OFFSCREEN_RESUME_RECORDING message',
       createMessageGuard({
         type: VideoMessageType.OFFSCREEN_RESUME_RECORDING,
-        required: { capabilityToken: isString },
+        required: {
+          capabilityToken: isString,
+          recordingId: isString,
+          generation: isNumber,
+          streamInstanceId: isString,
+        },
       })
     ),
     parseResponse: createGuardParser(
@@ -70,6 +86,9 @@ export const runtimeVideoOffscreenControlMessageContracts = {
         type: VideoMessageType.OFFSCREEN_UPDATE_SETTINGS,
         required: {
           capabilityToken: isString,
+          recordingId: isString,
+          generation: isNumber,
+          streamInstanceId: isString,
           settings: isLiveVideoRecordingSettingsPatch,
         },
       })

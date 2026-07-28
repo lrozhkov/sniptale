@@ -6,7 +6,7 @@ import type { ScenarioSessionService } from '../../scenario/session-service/inde
 import type { PageAccessPort } from '../../routing-contracts/page-access-port';
 import type { WebSnapshotViewerPorts } from '../page-preparation/viewer-ports';
 
-export type ViewportState = Map<number, { width: number; height: number } | null>;
+export type ViewportState = import('../../routing-contracts/tab-mode-state').ViewportState;
 
 export type CaptureGuardState = { isCapturing: boolean };
 
@@ -44,6 +44,10 @@ export type RouteCaptureMessage =
   | {
       type: 'CAPTURE_VISIBLE_FOR_CROP';
       actionType?: CaptureActionType;
+      contentIntent?: ContentPrivilegedActionCapability;
+    }
+  | {
+      type: 'RENEW_SCREENSHOT_SURFACE_SESSION';
       contentIntent?: ContentPrivilegedActionCapability;
     }
   | {

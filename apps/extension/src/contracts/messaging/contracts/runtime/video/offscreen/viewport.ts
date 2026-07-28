@@ -3,10 +3,8 @@ import { createGuardParser } from '@sniptale/runtime-contracts/messaging/parsers
 import {
   createMessageGuard,
   createRuntimeResponseGuard,
-  isBoolean,
   isCaptureMode,
   isNumber,
-  isSize2d,
   isString,
   isVideoRecordingSettings,
   isViewportInfo,
@@ -24,15 +22,23 @@ export const runtimeVideoOffscreenViewportMessageContracts = {
           capabilityToken: isString,
           streamId: isString,
           settings: isVideoRecordingSettings,
+          generation: isNumber,
+          recordingId: isString,
+          streamInstanceId: isString,
         },
         optional: {
           tabId: isNumber,
           viewport: isViewportInfo,
-          recordingId: isString,
           captureMode: isCaptureMode,
           cropRegion: isViewportRegion,
-          targetResolution: isSize2d,
-          emulatedViewportCssSize: isSize2d,
+          surface: (value) =>
+            typeof value === 'object' &&
+            value !== null &&
+            isString((value as Record<string, unknown>)['presetId']) &&
+            ((value as Record<string, unknown>)['target'] === 'viewport' ||
+              (value as Record<string, unknown>)['target'] === 'window') &&
+            isNumber((value as Record<string, unknown>)['width']) &&
+            isNumber((value as Record<string, unknown>)['height']),
         },
       })
     ),
@@ -41,34 +47,43 @@ export const runtimeVideoOffscreenViewportMessageContracts = {
       createRuntimeResponseGuard({ allowUndefined: true, optional: { result: isString } })
     ),
   },
-  [VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP]: {
+  [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: {
     parseRequest: createGuardParser(
-      'runtime OFFSCREEN_UPDATE_VIEWPORT_CROP message',
+      'runtime OFFSCREEN_BEGIN_RECORDING message',
       createMessageGuard({
-        type: VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP,
-        required: { capabilityToken: isString },
-        optional: {
-          targetResolution: isSize2d,
-          emulatedViewportCssSize: isSize2d,
+        type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
+        required: {
+          capabilityToken: isString,
+          recordingId: isString,
+          generation: isNumber,
+          streamInstanceId: isString,
         },
       })
     ),
     parseResponse: createGuardParser(
-      'runtime OFFSCREEN_UPDATE_VIEWPORT_CROP response',
+      'runtime OFFSCREEN_BEGIN_RECORDING response',
       createRuntimeResponseGuard({ allowUndefined: true, optional: { result: isString } })
     ),
   },
-  [VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE]: {
+  [VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE]: {
     parseRequest: createGuardParser(
-      'runtime OFFSCREEN_SET_VIEWPORT_DRAW_STATE message',
+      'runtime OFFSCREEN_REVALIDATE_SOURCE message',
       createMessageGuard({
-        type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
-        required: { capabilityToken: isString, frozen: isBoolean, navigationEpoch: isNumber },
+        type: VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE,
+        required: {
+          capabilityToken: isString,
+          recordingId: isString,
+          generation: isNumber,
+          streamInstanceId: isString,
+        },
+        optional: { viewport: isViewportInfo },
       })
     ),
     parseResponse: createGuardParser(
-      'runtime OFFSCREEN_SET_VIEWPORT_DRAW_STATE response',
-      createRuntimeResponseGuard({ allowUndefined: true, optional: { result: isString } })
+      'runtime OFFSCREEN_REVALIDATE_SOURCE response',
+      createRuntimeResponseGuard({
+        optional: { result: isString, videoWidth: isNumber, videoHeight: isNumber },
+      })
     ),
   },
 } satisfies PartialRuntimeRegistry;

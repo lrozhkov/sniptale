@@ -7,8 +7,19 @@ import { getPopupVideoSetupProps } from './props';
 
 function createRuntime(): PopupVideoSetupRuntime {
   return createPopupAppShellRuntime({
-    videoCaptureMode: CaptureMode.VIEWPORT_EMULATION,
-    viewportPresets: [{ id: 'preset-1', label: 'Preset', width: 1280, height: 720 }],
+    videoCaptureMode: CaptureMode.TAB,
+    viewportPresets: [
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Preset',
+        target: 'viewport',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 0,
+      },
+    ],
   });
 }
 
@@ -19,8 +30,6 @@ it('maps runtime state into lazy page props', () => {
   expect(props.settings).toBe(runtime.recording.videoSettings);
   expect(props.captureMode).toBe(runtime.recording.videoCaptureMode);
   expect(props.selectedPresetId).toBe(runtime.recording.selectedPresetId);
-  expect(props.appliedViewportPresetId).toBe(runtime.recording.appliedViewportPresetId);
-  expect(props.appliedViewportTabId).toBe(runtime.recording.appliedViewportTabId);
   expect(props.viewportPresets).toBe(runtime.home.viewportPresets);
   expect(props.activeTabCapabilities).toBe(runtime.environment.activeTabCapabilities);
   expect(props.webcamDevices).toBe(runtime.recording.webcamDevices);
@@ -43,7 +52,7 @@ it('uses start cancellation while the recorder has not activated yet', () => {
       duration: 0,
       error: null,
       status: VideoRecordingStatus.COUNTDOWN,
-      viewportPreset: null,
+      viewportPresetId: null,
     },
   });
   const props = getPopupVideoSetupProps(runtime);
@@ -73,7 +82,7 @@ it('updates active live media state without changing persisted setup settings', 
         webcamSelected: false,
       },
       status: VideoRecordingStatus.RECORDING,
-      viewportPreset: null,
+      viewportPresetId: null,
     },
     setRecordingState,
     setVideoSettings,

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseInstalledDetails, parseTopLevelNavigation } from './parsers';
+import {
+  parseInstalledDetails,
+  parseTopLevelDocumentNavigation,
+  parseTopLevelNavigation,
+} from './parsers';
 
 describe('parseInstalledDetails', () => {
   it('accepts known Chrome install reasons', () => {
@@ -12,6 +16,19 @@ describe('parseInstalledDetails', () => {
     expect(parseInstalledDetails(null)).toBeNull();
     expect(parseInstalledDetails({})).toBeNull();
     expect(parseInstalledDetails({ reason: 'unexpected' })).toBeNull();
+  });
+});
+
+describe('parseTopLevelDocumentNavigation', () => {
+  it('requires a top-level document id', () => {
+    expect(
+      parseTopLevelDocumentNavigation({ documentId: 'document-1', frameId: 0, tabId: 12 })
+    ).toEqual({ documentId: 'document-1', frameId: 0, tabId: 12 });
+    expect(
+      parseTopLevelDocumentNavigation({ documentId: 'document-1', frameId: 3, tabId: 12 })
+    ).toBeNull();
+    expect(parseTopLevelDocumentNavigation({ frameId: 0, tabId: 12 })).toBeNull();
+    expect(parseTopLevelDocumentNavigation({ documentId: '', frameId: 0, tabId: 12 })).toBeNull();
   });
 });
 

@@ -32,7 +32,7 @@ function createState(countdownEndsAt: number | null): VideoRecordingRuntimeState
     countdownEndsAt,
     captureMode: null,
     captureSource: null,
-    viewportPreset: null,
+    viewportPresetId: null,
     error: null,
   };
 }

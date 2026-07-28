@@ -15,6 +15,7 @@ const settingsFixture = {
   },
   saveCapturesToGallery: false,
   viewportPresets: [],
+  defaultViewportPresetId: null,
   presets: [],
   defaultImagePresetId: null,
   defaultVideoPresetId: null,

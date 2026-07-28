@@ -1,8 +1,10 @@
-export type ScreenshotViewport = { width: number; height: number } | null;
+import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
+
+export type ScreenshotViewport = AppliedViewportPresetPayload | null;
 
 export type ViewportState = Map<number, ScreenshotViewport>;
 
-type ScreenshotViewportOwner = 'debugger' | 'viewer';
+type ScreenshotViewportOwner = 'capture-surface' | 'viewer';
 
 export type ViewportOwnerState = Map<number, ScreenshotViewportOwner>;
 

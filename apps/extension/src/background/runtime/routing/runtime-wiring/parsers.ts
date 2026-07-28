@@ -30,3 +30,26 @@ export function parseTopLevelNavigation(
 
   return details.frameId === 0 ? { frameId: details.frameId, tabId: details.tabId } : null;
 }
+
+type TopLevelDocumentNavigation = {
+  documentId: string;
+  frameId: 0;
+  tabId: number;
+};
+
+export function parseTopLevelDocumentNavigation(
+  details: unknown
+): TopLevelDocumentNavigation | null {
+  const navigation = parseTopLevelNavigation(details);
+  if (
+    !navigation ||
+    typeof details !== 'object' ||
+    details === null ||
+    !('documentId' in details)
+  ) {
+    return null;
+  }
+  return typeof details.documentId === 'string' && details.documentId.length > 0
+    ? { documentId: details.documentId, frameId: 0, tabId: navigation.tabId }
+    : null;
+}

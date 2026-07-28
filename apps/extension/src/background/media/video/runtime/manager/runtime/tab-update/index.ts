@@ -1,1 +1,0 @@
-export { handleTabUpdated } from './route';

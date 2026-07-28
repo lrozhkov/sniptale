@@ -38,7 +38,6 @@ function createCapabilities(reason: string | null = null): ActiveTabCapabilities
       [CaptureMode.TAB]: supported,
       [CaptureMode.TAB_CROP]: supported,
       [CaptureMode.CAMERA]: supported,
-      [CaptureMode.VIEWPORT_EMULATION]: supported,
       [CaptureMode.SCREEN]: supported,
     },
   };

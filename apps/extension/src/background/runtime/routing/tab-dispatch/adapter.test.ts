@@ -92,7 +92,7 @@ it('omits the viewer port registry when tab-mode deps omit it', async () => {
   handleTabMessage({
     deps: depsWithoutViewerPorts,
     logger: { error: loggerErrorMock, warn: loggerWarnMock },
-    message: { type: MessageType.ENABLE_SCREENSHOT_MODE },
+    message: { type: MessageType.ENABLE_HIGHLIGHTER_MODE },
     resolvedTabId: 17,
     sendResponse,
     sender: createTopLevelContentSender(17, 'https://example.test/page'),
@@ -116,7 +116,7 @@ it('rejects tab-mode routes without page access before owner side effects', asyn
   handleTabMessage({
     deps,
     logger: { error: loggerErrorMock, warn: loggerWarnMock },
-    message: { type: MessageType.ENABLE_SCREENSHOT_MODE },
+    message: { type: MessageType.ENABLE_HIGHLIGHTER_MODE },
     resolvedTabId: 17,
     sendResponse,
     sender: createTopLevelContentSender(17, 'https://example.test/page'),
@@ -127,6 +127,28 @@ it('rejects tab-mode routes without page access before owner side effects', asyn
   expect(routeTabModeMessageMock).not.toHaveBeenCalled();
   expect(sendResponse).toHaveBeenCalledWith({
     error: 'Page access is required.',
+    success: false,
+  });
+});
+
+it('rejects content screenshot enable without a trusted one-shot intent before owner effects', () => {
+  const { deps } = registerListener();
+  const sendResponse = createSendResponse();
+  const message = { type: MessageType.ENABLE_SCREENSHOT_MODE } as const;
+  isTabModeMessageMock.mockReturnValue(true);
+
+  handleTabMessage({
+    deps,
+    logger: { error: loggerErrorMock, warn: loggerWarnMock },
+    message,
+    resolvedTabId: 17,
+    sendResponse,
+    sender: createTopLevelContentSender(17, 'https://example.test/page'),
+  });
+
+  expect(routeTabModeMessageMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: 'Unauthorized content action capability',
     success: false,
   });
 });

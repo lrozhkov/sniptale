@@ -1,5 +1,5 @@
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
-import { isRouteCaptureMessage } from '../../message-guards/guards/tab';
+import { isRouteCaptureMessage, isTabModeMessage } from '../../message-guards/guards/tab';
 import { authorizeIPCMessage } from '../../authorization/index';
 import type { TabRouteArgs } from '../../boundary/shared';
 import type { PrivilegedTabRouteFamily } from '../../boundary/sender-policy';
@@ -11,7 +11,10 @@ export function rejectUnauthorizedRouteSender(
   const authorization = authorizeIPCMessage({
     family,
     kind: 'privileged-tab-route',
-    message: isRouteCaptureMessage(args.message) ? args.message : undefined,
+    message:
+      isRouteCaptureMessage(args.message) || isTabModeMessage(args.message)
+        ? args.message
+        : undefined,
     resolvedTabId: args.resolvedTabId,
     sender: args.sender,
   });

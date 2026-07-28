@@ -93,6 +93,7 @@ function handleKnownViewportMessage(
   switch (message.type) {
     case VideoMessageType.GET_VIEWPORT_COORDS:
       sendResponse({
+        success: true,
         coords: {
           x: 0,
           y: 0,
@@ -101,6 +102,7 @@ function handleKnownViewportMessage(
           outerWidth: window.outerWidth,
           outerHeight: window.outerHeight,
         },
+        viewport: getViewportInfo(),
       });
       return true;
     case VideoMessageType.SHOW_COUNTDOWN:

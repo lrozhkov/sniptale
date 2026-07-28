@@ -1,13 +1,13 @@
 import { defineMessageSource } from '../../source';
 
 const VIEWPORT_CONFLICT_ERROR_RU = [
-  'Эмуляция viewport недоступна: другое расширение инжектирует iframe на страницу.',
-  'Отключите Jam, Loom или подобные расширения.',
+  'Размер страницы сейчас нельзя изменить: вкладка или окно заняты другой операцией.',
+  'Завершите текущий снимок или запись и повторите попытку.',
 ].join(' ');
 
 const VIEWPORT_CONFLICT_ERROR_EN = [
-  'Viewport emulation is unavailable: another extension injects an iframe into the page.',
-  'Disable Jam, Loom, or similar extensions.',
+  'The page size cannot be changed while another operation controls this tab or window.',
+  'Finish the current capture or recording and try again.',
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({
@@ -20,12 +20,12 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: VIEWPORT_CONFLICT_ERROR_EN,
   },
   viewportErrorPrefix: {
-    ru: 'Ошибка эмуляции viewport:',
-    en: 'Viewport emulation error:',
+    ru: 'Не удалось применить размер:',
+    en: 'Could not apply the size:',
   },
   viewportChangeError: {
-    ru: 'Ошибка при изменении viewport',
-    en: 'Failed to change the viewport',
+    ru: 'Не удалось изменить размер области страницы',
+    en: 'Could not change the page viewport size',
   },
   navigationLockManaged: {
     ru: 'Блокировка автоматически управляется в режимах выделения/редактирования',

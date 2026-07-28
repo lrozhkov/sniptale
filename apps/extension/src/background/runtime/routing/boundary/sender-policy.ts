@@ -1,12 +1,11 @@
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { isOwnedSnapshotViewerPage } from '../../../../features/tab-capabilities/url';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import type { RouteCaptureMessage } from '../../../capture/routes';
 import { authorizeContentSender } from '../../../routing-contracts/capabilities/content-action/sender-binding';
 import { isPopupTabRouteSenderUrl } from '../capabilities/popup-tab/route-capabilities';
 
 type CaptureRouteSenderPolicyArgs = {
-  message: RouteCaptureMessage;
+  message: { type: string };
   resolvedTabId: number;
   sender: chrome.runtime.MessageSender | undefined;
 };
@@ -20,7 +19,7 @@ export type PrivilegedTabRouteFamily =
 
 type PrivilegedTabRouteSenderPolicyArgs = {
   family: PrivilegedTabRouteFamily;
-  message?: RouteCaptureMessage;
+  message?: { type: string };
   resolvedTabId: number;
   sender: chrome.runtime.MessageSender | undefined;
 };
@@ -78,7 +77,7 @@ function isOwnedExtensionDocument(senderUrl: string | undefined, path: string): 
 }
 
 function isAuthorizedEditorCaptureRoute(
-  message: RouteCaptureMessage,
+  message: { type: string },
   sender: chrome.runtime.MessageSender | undefined
 ): boolean {
   return (
@@ -88,14 +87,14 @@ function isAuthorizedEditorCaptureRoute(
 }
 
 function isAuthorizedPopupCaptureRoute(
-  message: RouteCaptureMessage,
+  message: { type: string },
   sender: chrome.runtime.MessageSender | undefined
 ): boolean {
   return isPopupTabRouteSenderUrl(sender?.url) && popupCaptureRoutes.has(message.type);
 }
 
 function isAuthorizedViewerCaptureRoute(
-  message: RouteCaptureMessage,
+  message: { type: string },
   sender: chrome.runtime.MessageSender | undefined
 ): boolean {
   return isOwnedSnapshotViewerPage(sender?.url) && viewerCaptureRoutes.has(message.type);

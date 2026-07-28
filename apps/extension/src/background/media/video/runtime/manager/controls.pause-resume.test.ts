@@ -9,20 +9,26 @@ const {
   hasActiveVideoRecordingSessionMock,
   isControlledCursorCaptureEnabledMock,
   isControlledCursorNavigationPendingMock,
+  isTabRecordingNavigationPendingMock,
   loggerErrorMock,
   loggerWarnMock,
+  requireActiveVideoRecordingSourceBindingMock,
   sendRuntimeMessageMock,
   syncControlledCursorCaptureMock,
+  markTabRecordingManuallyPausedMock,
 } = vi.hoisted(() => ({
   getVideoRecordingCaptureModeMock: vi.fn(),
   getVideoRecordingTabIdMock: vi.fn(),
   hasActiveVideoRecordingSessionMock: vi.fn(),
   isControlledCursorCaptureEnabledMock: vi.fn(),
   isControlledCursorNavigationPendingMock: vi.fn(),
+  isTabRecordingNavigationPendingMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerWarnMock: vi.fn(),
+  requireActiveVideoRecordingSourceBindingMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   syncControlledCursorCaptureMock: vi.fn(),
+  markTabRecordingManuallyPausedMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -47,6 +53,17 @@ vi.mock('../../session-state', async (importOriginal) => ({
   isControlledCursorNavigationPending: isControlledCursorNavigationPendingMock,
 }));
 
+vi.mock('../../recording-control-lease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording-control-lease')>()),
+  requireActiveVideoRecordingSourceBinding: requireActiveVideoRecordingSourceBindingMock,
+}));
+
+vi.mock('./tab-navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./tab-navigation')>()),
+  isTabRecordingNavigationPending: isTabRecordingNavigationPendingMock,
+  markTabRecordingManuallyPaused: markTabRecordingManuallyPausedMock,
+}));
+
 vi.mock('./controlled-cursor/messages', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./controlled-cursor/messages')>()),
   syncControlledCursorCapture: syncControlledCursorCaptureMock,
@@ -61,6 +78,12 @@ beforeEach(() => {
   hasActiveVideoRecordingSessionMock.mockReturnValue(true);
   isControlledCursorCaptureEnabledMock.mockReturnValue(true);
   isControlledCursorNavigationPendingMock.mockReturnValue(false);
+  isTabRecordingNavigationPendingMock.mockReturnValue(false);
+  requireActiveVideoRecordingSourceBindingMock.mockResolvedValue({
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  });
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   installBackgroundRuntimeMessagingMock({ sendRuntimeMessage: sendRuntimeMessageMock });
   syncControlledCursorCaptureMock.mockResolvedValue(undefined);
@@ -99,6 +122,7 @@ function registerSyncTests() {
     );
     expect(syncControlledCursorCaptureMock).toHaveBeenCalledWith(17, 'pause');
     expect(syncControlledCursorCaptureMock).toHaveBeenCalledWith(17, 'resume');
+    expect(markTabRecordingManuallyPausedMock).toHaveBeenCalledOnce();
   });
 
   it('also syncs telemetry pause and resume for plain tab recordings without controlled cursor capture', async () => {
@@ -147,6 +171,13 @@ function registerNavigationBlockTest() {
     expect(loggerWarnMock).toHaveBeenCalledWith(
       'Cannot resume controlled cursor capture while navigation re-bootstrap is pending'
     );
+  });
+
+  it('blocks manual resume while tab navigation work is pending', async () => {
+    isTabRecordingNavigationPendingMock.mockReturnValue(true);
+
+    await expect(resumeRecording()).resolves.toEqual({ result: 'blocked' });
+    expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
   });
 }
 

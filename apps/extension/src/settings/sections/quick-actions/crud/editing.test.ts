@@ -26,7 +26,7 @@ function createQuickAction(overrides: Partial<QuickAction> = {}): QuickAction {
     afterCapture: overrides.afterCapture ?? 'download_default',
     bundledId: overrides.bundledId ?? null,
     delay: overrides.delay ?? null,
-    emulation: overrides.emulation ?? 'native',
+    viewportPresetId: overrides.viewportPresetId ?? 'native',
     exitAfterCapture: overrides.exitAfterCapture ?? false,
     hotkey: overrides.hotkey ?? null,
     icon: overrides.icon ?? 'Camera',

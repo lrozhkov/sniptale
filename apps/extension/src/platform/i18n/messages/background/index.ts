@@ -103,8 +103,8 @@ export const backgroundMessages = defineMessageSource({
       en: 'Recording remains paused because separate cursor capture could not reconnect after navigation.',
     },
     viewportPresetRequired: {
-      ru: 'Для режима эмуляции viewport необходимо выбрать пресет',
-      en: 'Select a preset for viewport emulation mode',
+      ru: 'Выберите пресет размера для записи вкладки',
+      en: 'Select a size preset for tab recording',
     },
     sourceSelectionCancelled: {
       ru: 'Выбор источника отменён',

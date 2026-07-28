@@ -31,6 +31,7 @@ const captureMessageTypes = [
   CaptureMessageType.CAPTURE_VISIBLE,
   CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
   CaptureMessageType.CAPTURE_FULL,
+  CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
   MessageType.EXECUTE_SAVE,
   MessageType.REQUEST_EXPORT_HAR_START_CAPABILITY,
   MessageType.EXPORT_START_HAR,
@@ -63,7 +64,9 @@ const tabModeMessageTypes = [
   MessageType.ENABLE_QUICK_EDIT_MODE,
   MessageType.DISABLE_QUICK_EDIT_MODE,
   MessageType.QUICK_EDIT_MODE_STATUS,
-  MessageType.SET_VIEWPORT,
+  MessageType.APPLY_VIEWPORT_PRESET,
+  MessageType.RELEASE_VIEWPORT_PRESET,
+  MessageType.GET_VIEWPORT_PRESET_AVAILABILITY,
   MessageType.GET_VIEWPORT_STATUS,
 ] as const satisfies ReadonlyArray<TabModeMessage['type']>;
 

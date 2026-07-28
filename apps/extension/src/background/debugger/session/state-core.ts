@@ -1,6 +1,11 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 
-export type DebuggerClient = 'screenshot' | 'diagnostics' | 'video-emulation' | 'export-har';
+export type DebuggerClient =
+  | 'screenshot'
+  | 'diagnostics'
+  | 'capture-surface-screenshot'
+  | 'capture-surface-video'
+  | 'export-har';
 
 export interface DebuggerSessionSnapshot {
   clients: DebuggerClient[];

@@ -9,7 +9,7 @@ import {
 import { formatHotkey } from '../../../../features/keyboard-shortcuts/hotkey-format';
 import type { HotkeyConfig, ViewportPreset } from '../../../../contracts/settings';
 import { afterCaptureLabels, quickActionIconMap, screenshotModeLabels } from '../section/constants';
-import { getDelayLabel, getEmulationLabel } from '../section/helpers';
+import { getDelayLabel, getViewportPresetLabel } from '../section/helpers';
 import type { QuickActionsSectionState } from '../controller';
 import {
   getSettingsHoverActionsClassName,
@@ -151,10 +151,10 @@ function QuickActionRowMeta(props: {
   return (
     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-[var(--sniptale-color-text-dim)]">
       <span>{screenshotModeLabels[action.screenshotMode]}</span>
-      {action.emulation && action.emulation !== 'native' ? (
+      {action.viewportPresetId ? (
         <>
           <span className="text-[var(--sniptale-color-text-dim)]">•</span>
-          <span>{getEmulationLabel(props.viewportPresets, action.emulation)}</span>
+          <span>{getViewportPresetLabel(props.viewportPresets, action.viewportPresetId)}</span>
         </>
       ) : null}
       {action.delay !== null && action.delay !== undefined ? (

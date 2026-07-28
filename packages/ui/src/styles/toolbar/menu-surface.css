@@ -26,6 +26,17 @@
   min-width: 280px;
 }
 
+.sniptale-viewport-menu {
+  width: min(304px, calc(100vw - 24px));
+  max-height: min(360px, calc(100vh - 24px));
+  overflow: hidden;
+}
+
+.sniptale-viewport-menu .sniptale-toolbar-menu-list {
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .sniptale-toolbar-menu-title {
   padding: 0 2px;
   font-size: 12px;
@@ -33,6 +44,32 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--sniptale-color-text-muted-strong);
+}
+
+.sniptale-toolbar-menu-group-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+}
+
+.sniptale-toolbar-menu-group-hint {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--sniptale-color-text-dim);
+}
+
+.sniptale-toolbar-menu-detail {
+  margin: 2px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 62%, transparent);
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--sniptale-color-text-secondary);
 }
 
 .sniptale-toolbar-menu-list {

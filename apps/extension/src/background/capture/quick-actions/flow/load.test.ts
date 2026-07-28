@@ -33,7 +33,7 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
       showSettings: true,
     },
     saveCapturesToGallery: false,
-    defaultViewportId: 'native',
+    defaultViewportPresetId: null,
     imageFormat: 'png',
     imageQuality: 90,
     authenticatedSnapshotAssetsEnabled: true,
@@ -66,26 +66,26 @@ beforeEach(() => {
 describe('loadQuickActionRuntimeContext', () => {
   it('loads the quick action and resolves defaults', async () => {
     getQuickActionsMock.mockResolvedValue([
-      createQuickAction({ screenshotMode: 'selection', emulation: 'preset-1' }),
+      createQuickAction({ screenshotMode: 'selection', viewportPresetId: 'preset-1' }),
     ]);
     loadSettingsMock.mockResolvedValue(
       createSettings({
-        defaultViewportId: 'preset-default',
+        defaultViewportPresetId: 'preset-default',
         imageFormat: 'jpeg',
         imageQuality: 80,
       })
     );
 
     await expect(loadQuickActionRuntimeContext('action-1')).resolves.toEqual({
-      action: createQuickAction({ screenshotMode: 'selection', emulation: 'preset-1' }),
+      action: createQuickAction({ screenshotMode: 'selection', viewportPresetId: 'preset-1' }),
       afterCapture: 'download_default',
       captureMode: 'selection',
       delaySeconds: 0,
-      emulation: 'preset-1',
+      viewportPresetId: 'preset-1',
       imageFormat: 'jpeg',
       imageQuality: 80,
       settings: createSettings({
-        defaultViewportId: 'preset-default',
+        defaultViewportPresetId: 'preset-default',
         imageFormat: 'jpeg',
         imageQuality: 80,
       }),
@@ -114,7 +114,7 @@ describe('resolveQuickActionRuntimeContext', () => {
       afterCapture: 'copy',
       captureMode: 'visible',
       delaySeconds: 0,
-      emulation: 'native',
+      viewportPresetId: null,
       imageFormat: 'png',
       imageQuality: 90,
     });

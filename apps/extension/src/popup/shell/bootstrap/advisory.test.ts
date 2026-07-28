@@ -44,7 +44,7 @@ vi.mock('../../recording/video/copy', (_importOriginal) => ({
     duration: 0,
     error: null,
     status: 'IDLE',
-    viewportPreset: null,
+    viewportPresetId: null,
   },
 }));
 
@@ -72,7 +72,18 @@ function createSettings() {
     imageQuality: 92,
     presets: [],
     saveCapturesToGallery: false,
-    viewportPresets: [{ height: 1080, id: 'preset-2', label: 'Full HD', width: 1920 }],
+    viewportPresets: [
+      {
+        kind: 'user',
+        id: 'preset-2',
+        name: 'Full HD',
+        target: 'viewport',
+        width: 1920,
+        height: 1080,
+        enabled: true,
+        order: 0,
+      },
+    ],
   };
 }
 
@@ -119,7 +130,7 @@ beforeEach(() => {
       duration: 12,
       error: null,
       status: 'RECORDING',
-      viewportPreset: null,
+      viewportPresetId: null,
     },
     success: true,
   });

@@ -20,10 +20,11 @@ declare module './index' {
     type COUNTDOWN_COMPLETE = typeof import('./index').VideoMessageType.COUNTDOWN_COMPLETE;
     type OFFSCREEN_START_RECORDING =
       typeof import('./index').VideoMessageType.OFFSCREEN_START_RECORDING;
-    type OFFSCREEN_UPDATE_VIEWPORT_CROP =
-      typeof import('./index').VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP;
-    type OFFSCREEN_SET_VIEWPORT_DRAW_STATE =
-      typeof import('./index').VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE;
+    type OFFSCREEN_SOURCE_READY = typeof import('./index').VideoMessageType.OFFSCREEN_SOURCE_READY;
+    type OFFSCREEN_BEGIN_RECORDING =
+      typeof import('./index').VideoMessageType.OFFSCREEN_BEGIN_RECORDING;
+    type OFFSCREEN_REVALIDATE_SOURCE =
+      typeof import('./index').VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE;
     type OFFSCREEN_STOP_RECORDING =
       typeof import('./index').VideoMessageType.OFFSCREEN_STOP_RECORDING;
     type OFFSCREEN_PAUSE_RECORDING =

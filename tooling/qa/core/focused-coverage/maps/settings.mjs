@@ -1,6 +1,21 @@
 export const SETTINGS_OWNER_MAPPINGS = [
   {
     exclusive: true,
+    owner: 'settings-viewport-presets',
+    productionPrefix: 'apps/extension/src/settings/sections/viewport-presets/',
+    reason: 'Viewport preset CRUD, grouping, defaults, and sync are covered by focused suites.',
+    testFiles: [
+      'apps/extension/src/settings/sections/viewport-presets/content.test.tsx',
+      'apps/extension/src/settings/sections/viewport-presets/controller.test.tsx',
+      'apps/extension/src/settings/sections/viewport-presets/helpers.test.ts',
+      'apps/extension/src/settings/sections/viewport-presets/index.test.tsx',
+      'apps/extension/src/settings/sections/viewport-presets/section-content/default-viewport.test.tsx',
+      'apps/extension/src/settings/sections/viewport-presets/section-content/list/empty-state.test.tsx',
+      'apps/extension/src/settings/sections/viewport-presets/section-content/list/shell.test.tsx',
+    ],
+  },
+  {
+    exclusive: true,
     owner: 'settings-ai-secret-protection-dialog',
     productionFile:
       'apps/extension/src/settings/sections/ai-providers/surface/secret-protection-dialog.tsx',
@@ -136,10 +151,9 @@ export const SETTINGS_OWNER_MAPPINGS = [
     productionFile:
       'apps/extension/src/settings/sections/viewport-presets/section-content/default-viewport.tsx',
     reason:
-      'Default viewport options and loading state are covered by viewport content and list suites.',
+      'Default viewport options, target grouping, and loading state are covered by its focused suite.',
     testFiles: [
-      'apps/extension/src/settings/sections/viewport-presets/section-content/content.test.tsx',
-      'apps/extension/src/settings/sections/viewport-presets/section-content/list.test.tsx',
+      'apps/extension/src/settings/sections/viewport-presets/section-content/default-viewport.test.tsx',
     ],
   },
 ];

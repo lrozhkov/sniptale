@@ -81,6 +81,9 @@ test('offscreen runtime pause and resume controls emit lifecycle messages', asyn
 
   await emitTrustedOffscreenHarnessRuntimeMessage(page, {
     type: VideoMessageType.OFFSCREEN_PAUSE_RECORDING,
+    generation: 1,
+    recordingId: 'recording-e2e-harness',
+    streamInstanceId: 'stream-instance-e2e-harness',
   });
 
   await expect
@@ -92,6 +95,9 @@ test('offscreen runtime pause and resume controls emit lifecycle messages', asyn
 
   await emitTrustedOffscreenHarnessRuntimeMessage(page, {
     type: VideoMessageType.OFFSCREEN_RESUME_RECORDING,
+    generation: 1,
+    recordingId: 'recording-e2e-harness',
+    streamInstanceId: 'stream-instance-e2e-harness',
   });
 
   await expect

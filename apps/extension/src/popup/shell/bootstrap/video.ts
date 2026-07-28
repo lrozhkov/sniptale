@@ -5,7 +5,7 @@ import {
   loadVideoUiState,
 } from '../../../composition/persistence/capture-settings';
 import {
-  CaptureMode,
+  type CaptureMode,
   type VideoRecordingSettings,
   type VideoRecordingUiState,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -152,10 +152,7 @@ function buildPopupBootstrapVideoData(
   const selectedPresetId = viewportPresets.some((preset) => preset.id === rawPresetId)
     ? rawPresetId
     : null;
-  const captureMode =
-    storedVideoUiState.captureMode === CaptureMode.VIEWPORT_EMULATION
-      ? CaptureMode.TAB
-      : storedVideoUiState.captureMode;
+  const captureMode = storedVideoUiState.captureMode;
 
   return {
     captureMode,

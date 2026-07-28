@@ -56,7 +56,7 @@ afterEach(() => {
 
 it('forwards viewport section state into the presets content shell', async () => {
   const sectionState = {
-    defaultViewportId: 'native',
+    defaultViewportPresetId: 'native',
     handleAddViewportPreset: vi.fn(),
     viewportPresets: [],
   };
@@ -72,7 +72,7 @@ it('forwards viewport section state into the presets content shell', async () =>
 it('forwards the editing viewport only when the controller exposes one', async () => {
   const editingViewport = { id: 'viewport-1', label: 'Tablet' };
   useViewportPresetsSectionSpy.mockReturnValue({
-    defaultViewportId: 'native',
+    defaultViewportPresetId: 'native',
     editingViewport,
     handleAddViewportPreset: vi.fn(),
     viewportPresets: [],

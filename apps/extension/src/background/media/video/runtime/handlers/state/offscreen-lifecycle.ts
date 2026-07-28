@@ -1,4 +1,4 @@
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRuntimeMessage } from '../../../../../../contracts/video/types/messages';
 import { runBestEffort } from '@sniptale/foundation/best-effort';
 import { openVideoEditorPage } from '../../../../../../platform/navigation/extension-pages';
@@ -26,6 +26,7 @@ import {
 import { waitForStopSideEffects } from '../../manager/controls.stop/effects';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
 import { markOffscreenDocumentReady } from '../../offscreen-manager';
+import { releaseVideoCaptureSurface } from '../../../capture-surface';
 import {
   createAsyncLifecycleRoute,
   HANDLED_SYNC_RESULT,
@@ -74,30 +75,20 @@ async function handleOffscreenErrorAsync(message: {
 
     if (shouldNotifyRecordingStartFailure(message.phase)) {
       clearRecordingStartActivationWatchdog(message.recordingId);
-      notifyRecordingStartFailed(message.error || translate('background.runtime.recordingError'));
+      await notifyRecordingStartFailed(
+        message.error || translate('background.runtime.recordingError')
+      );
       await clearActiveVideoRecordingLease(message.recordingId);
       return;
     }
 
+    await releaseVideoCaptureSurface(message.recordingId);
     finishVideoRecordingStop();
     resetCompletedVideoRecordingSession(message.recordingId);
     resetRecordingTabId();
     resetVideoRecordingRuntimeState();
     await clearActiveVideoRecordingLease(message.recordingId);
   }
-
-  if (!shouldNotifyRecordingStartFailure(message.phase)) {
-    return;
-  }
-
-  runBestEffort(
-    sendRuntimeMessage({
-      type: VideoMessageType.RECORDING_START_FAILED,
-      error: message.error || translate('background.runtime.recordingError'),
-    }),
-    logger,
-    'Failed to forward offscreen error to runtime transport'
-  );
 }
 
 export function handleVideoSavedToIdb(
@@ -140,6 +131,7 @@ async function handleVideoSavedToIdbAsync(message: {
     }
 
     const shouldOpenEditor = shouldOpenVideoEditorAfterRecording();
+    await releaseVideoCaptureSurface(message.recordingId);
     finishVideoRecordingStop();
     resetCompletedVideoRecordingSession(message.recordingId);
     resetRecordingTabId();

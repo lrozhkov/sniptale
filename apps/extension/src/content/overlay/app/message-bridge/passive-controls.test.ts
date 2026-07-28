@@ -71,13 +71,23 @@ function expectViewportUpdatesRouteThroughControls() {
 
   expect(
     handleViewportChangedMessage(
-      { type: MessageType.VIEWPORT_CHANGED, viewport: { height: 900, width: 1440 } },
+      {
+        type: MessageType.VIEWPORT_CHANGED,
+        viewport: {
+          presetId: 'test:viewport',
+          target: 'viewport',
+          height: 900,
+          width: 1440,
+        },
+      },
       params,
       sendResponse
     )
   ).toBe(true);
 
   expect(params.viewport.setCurrentViewport).toHaveBeenCalledWith({
+    presetId: 'test:viewport',
+    target: 'viewport',
     height: 900,
     width: 1440,
   });

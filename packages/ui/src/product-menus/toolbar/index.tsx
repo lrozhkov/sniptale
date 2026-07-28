@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEventHandler, ReactNode } from 'react';
+import type { CSSProperties, FocusEventHandler, MouseEventHandler, ReactNode } from 'react';
 
 export type ProductToolbarMenuPlacement = 'down' | 'up' | 'side';
 
@@ -16,9 +16,13 @@ export interface ProductToolbarMenuItemProps {
   children: ReactNode;
   className?: string;
   dataUi?: string;
+  ariaDescribedBy?: string;
+  ariaDisabled?: boolean;
   disabled?: boolean;
   selected?: boolean;
+  onFocus?: FocusEventHandler<HTMLButtonElement>;
   onMouseDown?: MouseEventHandler<HTMLButtonElement>;
+  onMouseEnter?: MouseEventHandler<HTMLButtonElement>;
   onClick?: MouseEventHandler<HTMLButtonElement>;
   type?: 'button' | 'submit' | 'reset';
 }
@@ -32,6 +36,15 @@ export interface ProductToolbarMenuItemCopyProps {
 export interface ProductToolbarMenuBadgeProps {
   children: ReactNode;
   className?: string;
+}
+
+export interface ProductToolbarMenuGroupLabelProps {
+  children: ReactNode;
+}
+
+export interface ProductToolbarMenuGroupCopyProps {
+  hint: ReactNode;
+  label: ReactNode;
 }
 
 /**
@@ -71,9 +84,13 @@ export function ProductToolbarMenuItem({
   children,
   className = '',
   dataUi,
+  ariaDescribedBy,
+  ariaDisabled = false,
   disabled = false,
   selected = false,
+  onFocus,
   onMouseDown,
+  onMouseEnter,
   onClick,
   type = 'button',
 }: ProductToolbarMenuItemProps) {
@@ -81,7 +98,7 @@ export function ProductToolbarMenuItem({
     'sniptale-popover-item',
     'sniptale-toolbar-menu-item',
     selected ? 'sniptale-popover-item-selected' : '',
-    disabled ? 'opacity-50 cursor-not-allowed' : '',
+    disabled || ariaDisabled ? 'opacity-50 cursor-not-allowed' : '',
     className,
   ]
     .filter(Boolean)
@@ -91,13 +108,42 @@ export function ProductToolbarMenuItem({
     <button
       type={type}
       data-ui={dataUi}
+      aria-describedby={ariaDescribedBy}
+      aria-disabled={ariaDisabled || undefined}
       disabled={disabled}
       className={resolvedClassName}
+      onFocus={onFocus}
       onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
       onClick={onClick}
     >
       {children}
     </button>
+  );
+}
+
+export function ProductToolbarMenuGroupLabel({ children }: ProductToolbarMenuGroupLabelProps) {
+  return <div className="sniptale-toolbar-menu-title">{children}</div>;
+}
+
+export function ProductToolbarMenuGroupCopy({ hint, label }: ProductToolbarMenuGroupCopyProps) {
+  return (
+    <span className="sniptale-toolbar-menu-group-copy">
+      <span>{label}</span>
+      <span className="sniptale-toolbar-menu-group-hint">{hint}</span>
+    </span>
+  );
+}
+
+export function ProductToolbarMenuItemMeta({ children }: { children: ReactNode }) {
+  return <span className="sniptale-toolbar-menu-item-meta">{children}</span>;
+}
+
+export function ProductToolbarMenuDetail({ children, id }: { children: ReactNode; id: string }) {
+  return (
+    <div id={id} className="sniptale-toolbar-menu-detail" role="status">
+      {children}
+    </div>
   );
 }
 

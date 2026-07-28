@@ -5,18 +5,16 @@ import type { Settings } from '../../../../contracts/settings';
 import { installBackgroundRuntimeMessagingMock } from '../../../routing-contracts/runtime-messaging/mock';
 
 const {
-  clearViewport,
   createRenderedCaptureJob,
-  detachDebugger,
   executeDownload,
   openEditorWithImage,
+  releaseQuickActionSurface,
   transitionCaptureJob,
 } = vi.hoisted(() => ({
-  clearViewport: vi.fn(),
   createRenderedCaptureJob: vi.fn(),
-  detachDebugger: vi.fn(),
   executeDownload: vi.fn(),
   openEditorWithImage: vi.fn(),
+  releaseQuickActionSurface: vi.fn(),
   transitionCaptureJob: vi.fn(),
 }));
 
@@ -43,13 +41,9 @@ vi.mock('../../jobs/rendered-job', () => ({
   createRenderedCaptureJob,
 }));
 
-vi.mock('../../../debugger/session/detach', () => ({
-  detachDebugger,
-}));
-
-vi.mock('../../../debugger/workspace', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../debugger/workspace')>()),
-  clearViewport,
+vi.mock('./surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./surface')>()),
+  releaseQuickActionSurface,
 }));
 
 vi.mock('../../jobs/state-machine', async (importOriginal) => ({
@@ -68,6 +62,7 @@ beforeEach(() => {
   sendMessage.mockResolvedValue({ success: true });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendMessage });
   transitionCaptureJob.mockResolvedValue(undefined);
+  releaseQuickActionSurface.mockResolvedValue(undefined);
 });
 
 describe('capture quick action finalize copy flow', () => {
@@ -221,26 +216,22 @@ describe('capture quick action finalize warning paths', () => {
     );
   });
 
-  it('warns when debugger cleanup fails after capture', async () => {
-    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    clearViewport.mockRejectedValueOnce(new Error('cleanup failed'));
+  it('surfaces capture-surface release failures after capture', async () => {
+    releaseQuickActionSurface.mockRejectedValueOnce(new Error('cleanup failed'));
 
-    await finalizeQuickActionCapture({
-      action: createAction('download-debugger-action', 'Download', 'download_default'),
-      captureResult: {
-        dataUrl: 'data:image/png;base64,download',
-        filename: 'capture.png',
-        needsDebugger: true,
-      },
-      settings: createSettings(),
-      tabId: 15,
-    });
-
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      '[BackgroundQuickAction]',
-      'Failed to cleanup debugger',
-      expect.any(Error)
-    );
+    await expect(
+      finalizeQuickActionCapture({
+        action: createAction('download-surface-action', 'Download', 'download_default'),
+        captureResult: {
+          dataUrl: 'data:image/png;base64,download',
+          filename: 'capture.png',
+          needsDebugger: true,
+        },
+        settings: createSettings(),
+        tabId: 15,
+      })
+    ).rejects.toThrow('cleanup failed');
+    expect(releaseQuickActionSurface).toHaveBeenCalledWith(15);
   });
 });
 
@@ -281,6 +272,8 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
     skipWebSnapshotSaveDisclosure: false,
     rawDiagnosticsEnabled: false,
     saveCapturesToGallery: false,
+    defaultViewportPresetId: null,
+    viewportPresets: [],
     ...overrides,
   };
 }

@@ -6,6 +6,17 @@ import type { RegionSelectionRequestBinding } from './region-selection.request-b
 import { createRuntimeSubscriptionHarness } from './desktop-media.test-support';
 
 const region = { x: 10, y: 20, width: 300, height: 200 };
+const captureViewport = {
+  devicePixelRatio: 2,
+  height: 720,
+  scrollX: 0,
+  scrollY: 0,
+  viewportOffsetX: 0,
+  viewportOffsetY: 0,
+  visualViewportScale: 1,
+  width: 1280,
+};
+const selection = { captureViewport, region };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -73,6 +84,7 @@ function selectedMessage(binding: RegionSelectionRequestBinding) {
   return {
     type: VideoMessageType.REGION_SELECTED,
     ...messageBinding(binding),
+    captureViewport,
     region,
   };
 }
@@ -114,7 +126,7 @@ it('rejects stale request bindings before accepting the current selection', asyn
   expect(request.showRecordingOverlay).not.toHaveBeenCalled();
   request.runtime.emit(selectedMessage(request.binding), sender());
 
-  await expect(request.resultPromise).resolves.toEqual(region);
+  await expect(request.resultPromise).resolves.toEqual(selection);
   expect(request.showRecordingOverlay).toHaveBeenCalledOnce();
 });
 
@@ -132,7 +144,7 @@ it('requires exact tab, frame, document, and sender URL binding', async () => {
   expect(request.showRecordingOverlay).not.toHaveBeenCalled();
   request.runtime.emit(selectedMessage(binding), sender({ documentId: 'doc-1' }));
 
-  await expect(request.resultPromise).resolves.toEqual(region);
+  await expect(request.resultPromise).resolves.toEqual(selection);
   expect(request.showRecordingOverlay).toHaveBeenCalledOnce();
 });
 
@@ -152,7 +164,7 @@ it('consumes a valid selection response once', async () => {
 
   expect(request.showRecordingOverlay).toHaveBeenCalledOnce();
   resolveOverlay();
-  await expect(request.resultPromise).resolves.toEqual(region);
+  await expect(request.resultPromise).resolves.toEqual(selection);
 });
 
 it('invalidates pending selection on timeout and navigation', async () => {
@@ -213,7 +225,7 @@ it('keeps the latest overlapping request active when older binding resolves late
 
   runtime.emit(selectedMessage(latest), sender());
 
-  await expect(latestResult).resolves.toEqual(region);
+  await expect(latestResult).resolves.toEqual(selection);
   await expect(oldResult).resolves.toBeNull();
   expect(showRecordingOverlay).toHaveBeenCalledOnce();
   expect(deps.sendTabMessage).toHaveBeenCalledTimes(1);
@@ -249,6 +261,6 @@ it('ignores older request errors after a newer request becomes active', async ()
   runtime.emit(selectedMessage(latest), sender());
 
   await expect(oldResult).resolves.toBeNull();
-  await expect(latestResult).resolves.toEqual(region);
+  await expect(latestResult).resolves.toEqual(selection);
   expect(showRecordingOverlay).toHaveBeenCalledOnce();
 });

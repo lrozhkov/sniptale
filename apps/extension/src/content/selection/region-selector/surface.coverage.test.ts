@@ -120,6 +120,7 @@ it('creates recording overlays and replaces any existing overlay', () => {
     resolvedDeps: {
       appendToContentOverlayRoot,
       applyIsolatedContentRootStyle: vi.fn(),
+      getViewportInfo: vi.fn(),
       sendRuntimeMessage: vi.fn(),
     },
     state,
@@ -146,6 +147,7 @@ it('shows region selectors once and renders the surface with tooltip wiring', ()
     resolvedDeps: {
       appendToContentOverlayRoot,
       applyIsolatedContentRootStyle,
+      getViewportInfo: vi.fn(),
       sendRuntimeMessage: vi.fn(),
     },
     state,

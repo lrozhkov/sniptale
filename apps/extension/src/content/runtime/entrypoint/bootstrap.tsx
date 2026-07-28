@@ -36,12 +36,16 @@ function getContentRuntimeMarkerVersion(): string {
 }
 
 function readWindowViewportInfo(): ViewportInfo {
+  const visualViewport = window.visualViewport;
   return {
     width: window.innerWidth,
     height: window.innerHeight,
     scrollX: window.scrollX,
     scrollY: window.scrollY,
     devicePixelRatio: window.devicePixelRatio || 1,
+    viewportOffsetX: visualViewport?.offsetLeft ?? 0,
+    viewportOffsetY: visualViewport?.offsetTop ?? 0,
+    visualViewportScale: visualViewport?.scale ?? 1,
   };
 }
 

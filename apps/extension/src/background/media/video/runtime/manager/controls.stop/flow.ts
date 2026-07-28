@@ -1,8 +1,5 @@
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
-import { getBackgroundRuntimeMessaging } from '../../../../../routing-contracts/runtime-messaging/services';
 import {
   getVideoRecordingRuntimeState,
   resetVideoRecordingRuntimeState,
@@ -20,6 +17,17 @@ import {
 } from '../../../session-state';
 import { runStopSideEffects } from './effects';
 import type { StopFailureLogging } from './failure-logging';
+import { getVideoRecordingId } from '../../../session-state';
+import { releaseVideoCaptureSurface } from '../../../capture-surface';
+import { getVideoSurfaceSession } from '../../../capture-surface';
+import {
+  clearActiveVideoRecordingLease,
+  ensureActiveVideoRecordingLeaseHydrated,
+} from '../../../recording-control-lease';
+import {
+  requestBoundOffscreenRecordingStop,
+  type RecordingSourceBinding,
+} from '../../../offscreen-recording-stop';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeControls' });
 
@@ -51,11 +59,22 @@ function resolveStopSkipResult(): Extract<
   return null;
 }
 
-function completeEarlyStop(): void {
+async function completeEarlyStop(): Promise<RecordingStopResult> {
+  const recordingId = getVideoRecordingId();
+  try {
+    await releaseVideoCaptureSurface(recordingId);
+    await clearActiveVideoRecordingLease(recordingId ?? undefined);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setVideoRecordingRuntimeState({ error: message });
+    logger.error('Failed to restore capture surface after early stop', error);
+    return { error: message, result: 'failed' };
+  }
   resetCompletedVideoRecordingSession();
   resetVideoRecordingRuntimeState();
   finishVideoRecordingStop();
   logger.log('Recording start cancelled before recorder activation');
+  return { result: 'cancelled-before-active' };
 }
 
 function isRecordingStartCancellable(): boolean {
@@ -64,29 +83,26 @@ function isRecordingStartCancellable(): boolean {
 
 async function sendStopSignals(
   discard: boolean,
-  requireAcknowledgement = false,
   failureLogging: StopFailureLogging = 'detailed'
 ): Promise<RecordingStopResult> {
+  const recordingId = getVideoRecordingId();
+  const sourceBinding = await resolveRecordingSourceBinding(recordingId);
+  if (!sourceBinding) {
+    const error = 'Recording source binding is unavailable';
+    setVideoRecordingRuntimeState({ error });
+    return { error, result: 'failed' };
+  }
   const previousState = getVideoRecordingRuntimeState();
   setVideoRecordingRuntimeState({
     status: VideoRecordingStatus.STOPPING,
     countdownEndsAt: null,
     error: null,
   });
+  let terminalError: string | null = null;
 
   try {
-    const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
-      attachOffscreenCommandCapability({
-        type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
-        discard,
-      })
-    );
-    if (response?.success === false) {
-      throw new Error(response.error ?? 'Offscreen recording stop rejected');
-    }
-    if (requireAcknowledgement && (response?.success !== true || response.result !== 'accepted')) {
-      throw new Error('Offscreen recording stop acknowledgement missing');
-    }
+    const acknowledgement = await requestBoundOffscreenRecordingStop(sourceBinding, discard);
+    terminalError = acknowledgement.terminalError;
   } catch (error) {
     const failedStopState = getVideoRecordingRuntimeState();
     finishVideoRecordingStop();
@@ -110,7 +126,40 @@ async function sendStopSignals(
   }
 
   logger.log('Stop commands sent; runtime state reset is deferred until offscreen confirms stop');
+  try {
+    await releaseVideoCaptureSurface(recordingId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setVideoRecordingRuntimeState({ error: message });
+    logger.error('Failed to restore capture surface after stop', error);
+    return { error: message, result: 'failed' };
+  }
+  if (terminalError !== null) {
+    finishVideoRecordingStop();
+    resetCompletedVideoRecordingSession(recordingId ?? undefined);
+    resetVideoRecordingRuntimeState();
+    await clearActiveVideoRecordingLease(recordingId ?? undefined);
+    return { error: terminalError, result: 'failed' };
+  }
   return { result: 'accepted' };
+}
+
+async function resolveRecordingSourceBinding(
+  recordingId: string | null
+): Promise<RecordingSourceBinding | null> {
+  if (!recordingId) return null;
+  const session = getVideoSurfaceSession(recordingId);
+  if (session?.streamInstanceId) {
+    return {
+      generation: session.generation,
+      recordingId,
+      streamInstanceId: session.streamInstanceId,
+    };
+  }
+  const lease = await ensureActiveVideoRecordingLeaseHydrated();
+  return lease?.recordingId === recordingId && lease.surfaceBinding
+    ? { recordingId, ...lease.surfaceBinding }
+    : null;
 }
 
 export async function stopRecording(discard = false): Promise<RecordingStopResult> {
@@ -125,8 +174,7 @@ export async function stopRecording(discard = false): Promise<RecordingStopResul
   runStopSideEffects(context);
 
   if (context.shouldResetImmediately) {
-    completeEarlyStop();
-    return { result: 'cancelled-before-active' };
+    return completeEarlyStop();
   }
 
   return await sendStopSignals(discard);
@@ -138,7 +186,7 @@ export async function stopRecordingForPrivacyErasure(): Promise<RecordingStopRes
     return skipResult;
   }
   if (skipResult?.result === 'already-stopping') {
-    return sendStopSignals(true, true, 'fixed');
+    return sendStopSignals(true, 'fixed');
   }
 
   const context = beginVideoRecordingStop();
@@ -149,11 +197,10 @@ export async function stopRecordingForPrivacyErasure(): Promise<RecordingStopRes
   runStopSideEffects(context, 'fixed');
 
   if (context.shouldResetImmediately) {
-    completeEarlyStop();
-    return { result: 'cancelled-before-active' };
+    return completeEarlyStop();
   }
 
-  return sendStopSignals(true, true, 'fixed');
+  return sendStopSignals(true, 'fixed');
 }
 
 export async function cancelRecordingStart(): Promise<RecordingStopResult> {

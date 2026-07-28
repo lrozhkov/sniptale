@@ -48,7 +48,7 @@ describe('video active page helpers: labels', () => {
           captureMode: null,
           captureSource: null,
           countdownEndsAt: null,
-          viewportPreset: null,
+          viewportPresetId: null,
         },
       })
     ).not.toBe(
@@ -61,7 +61,7 @@ describe('video active page helpers: labels', () => {
           captureMode: null,
           captureSource: null,
           countdownEndsAt: null,
-          viewportPreset: null,
+          viewportPresetId: null,
         },
       })
     );

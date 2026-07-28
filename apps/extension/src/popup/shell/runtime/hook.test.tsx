@@ -187,24 +187,6 @@ it('sends pause and resume runtime messages based on the recording status', asyn
   });
 });
 
-it('exposes lifecycle clearing for applied viewport authority', async () => {
-  const setAppliedViewportPresetId = vi.fn();
-  const setAppliedViewportTabId = vi.fn();
-  usePopupRuntimeStateMock.mockReturnValueOnce(
-    createRuntimeState({
-      setAppliedViewportPresetId,
-      setAppliedViewportTabId,
-    })
-  );
-
-  await renderHarness();
-  const lifecycleParams = usePopupLifecycleEffectMock.mock.calls[0]?.[0]?.();
-  lifecycleParams.browser.clearAppliedViewportAuthority();
-
-  expect(setAppliedViewportPresetId).toHaveBeenCalledWith(null);
-  expect(setAppliedViewportTabId).toHaveBeenCalledWith(null);
-});
-
 it('groups lifecycle roles while preserving one setter authority', async () => {
   const setStartError = vi.fn();
   usePopupRuntimeStateMock.mockReturnValueOnce(createRuntimeState({ setStartError }));

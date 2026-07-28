@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   MIN_REGION_SELECTOR_SIZE,
   resizeRegionDimension,
-  toDevicePixelRegion,
   updateDraggingRegion,
   updateResizingRegion,
   type RegionBounds,
@@ -17,15 +16,6 @@ beforeEach(() => {
 });
 
 describe('region-selector geometry helpers', () => {
-  it('converts regions into device pixels', () => {
-    expect(toDevicePixelRegion({ x: 10, y: 20, width: 30, height: 40 })).toEqual({
-      x: 20,
-      y: 40,
-      width: 60,
-      height: 80,
-    });
-  });
-
   it('resizes around the region center while clamping to viewport bounds', () => {
     const region = { x: 900, y: 760, width: 120, height: 120 };
 

@@ -7,7 +7,10 @@ import {
 import { initializePageAccessLifecycle } from '../../page-access/lifecycle';
 import { nativeIngestionPrivacyErasureCleanupAdapter } from '../../native-app/privacy-erasure';
 import { getNativeAppRuntimeService } from '../../native-app/service-singleton';
-import { configureNativeIngestionPrivacyErasureCleanupPort } from '../../../application/privacy-erasure/composition';
+import {
+  configureNativeIngestionPrivacyErasureCleanupPort,
+  configureScreenshotPrivacyErasureCleanupPort,
+} from '../../../application/privacy-erasure/composition';
 import { configureDownloadPort } from '../../../routing-contracts/download-port';
 import { executeDownloadBlob } from '../../../capture/download/download-router';
 import { registerDebuggerListeners } from './debugger';
@@ -16,6 +19,7 @@ import { registerNavigationListeners } from './navigation';
 import { runStartupMaintenance } from './startup';
 import type { BackgroundModeState } from './shared';
 import { registerTabLifecycleListeners } from './tab-lifecycle';
+import { disableScreenshotMode } from '../../tab-mode-router-screenshot';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeWiring' });
 
@@ -26,9 +30,19 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   runStartupMaintenance(state, logger);
   registerInstallListener(logger);
   registerTabLifecycleListeners(state, logger);
-  registerDebuggerListeners(logger);
+  registerDebuggerListeners(logger, state);
   registerNavigationListeners(state);
   initializePageAccessLifecycle(logger);
+  configureScreenshotPrivacyErasureCleanupPort({
+    disableScreenshotMode: (tabId, runtimeState) =>
+      disableScreenshotMode(
+        tabId,
+        runtimeState.screenshotModeState,
+        runtimeState.viewportState,
+        runtimeState.viewportOwnerState,
+        runtimeState.webSnapshotViewerPorts
+      ),
+  });
   configureNativeIngestionPrivacyErasureCleanupPort(nativeIngestionPrivacyErasureCleanupAdapter);
   getNativeAppRuntimeService().connect();
   registerWebSnapshotViewerPorts(state.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts());

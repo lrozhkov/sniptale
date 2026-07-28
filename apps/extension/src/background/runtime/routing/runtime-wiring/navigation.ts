@@ -10,23 +10,32 @@ import {
 } from '../../../diagnostics/lifecycle';
 import { clearBackgroundRuntimeTabEditingState } from '../../../application/runtime-state';
 import {
-  handleControlledCursorNavigationStart,
+  ensureActiveVideoRecordingLeaseHydrated,
   handleRegionSelectionNavigationStart,
-  handleTabUpdated,
-  handleViewportRecordingNavigationStart,
+  handleTabRecordingNavigationCommitted,
+  handleTabRecordingNavigationCompleted,
+  handleTabRecordingNavigationError,
+  handleTabRecordingNavigationStart,
 } from '../../../media/lifecycle';
-import { parseTopLevelNavigation } from './parsers';
+import { parseTopLevelDocumentNavigation, parseTopLevelNavigation } from './parsers';
 import type { BackgroundModeState } from './shared';
+import { ensureActivePageAccessRuntime } from '../../page-access/service';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeNavigationWiring' });
+
+function runAfterVideoLeaseHydration(description: string, work: () => void): void {
+  void ensureActiveVideoRecordingLeaseHydrated()
+    .then(work)
+    .catch((error) => {
+      logger.warn(`Failed to ${description} after recording lease hydration`, error);
+    });
+}
 
 export function registerNavigationListeners(state: BackgroundModeState): void {
   browserTabs.subscribeToUpdated((tabId, changeInfo, tab) => {
     if (changeInfo.status === 'loading' && tab.url) {
       handleTabNavigation(tabId, tab.url);
     }
-
-    handleTabUpdated(tabId, changeInfo);
 
     if (changeInfo.status === 'complete') {
       void restorePinnedToolbarAfterNavigation(tabId, state).catch((error) => {
@@ -52,11 +61,44 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
     ).catch((error) => {
       logger.warn('Failed to clean screenshot mode after navigation', error);
     });
-    handleRegionSelectionNavigationStart(navigation.tabId);
+    runAfterVideoLeaseHydration('process recording navigation', () => {
+      handleRegionSelectionNavigationStart(navigation.tabId);
+      handleTabRecordingNavigationStart(navigation.tabId);
+    });
     void handleExportHarNavigationStart(navigation.tabId).catch((error) => {
       logger.warn('Failed to clean HAR export after navigation', error);
     });
-    handleViewportRecordingNavigationStart(navigation.tabId);
-    handleControlledCursorNavigationStart(navigation.tabId);
+  });
+
+  browserWebNavigation.subscribeToCommitted((details: unknown) => {
+    const navigation = parseTopLevelDocumentNavigation(details);
+    if (!navigation) return;
+    runAfterVideoLeaseHydration('bind recording navigation document', () => {
+      handleTabRecordingNavigationCommitted(navigation.tabId, navigation.documentId);
+    });
+  });
+
+  browserWebNavigation.subscribeToCompleted((details: unknown) => {
+    const navigation = parseTopLevelDocumentNavigation(details);
+    if (!navigation) return;
+    runAfterVideoLeaseHydration('complete recording navigation', () => {
+      handleTabRecordingNavigationCompleted(
+        navigation.tabId,
+        navigation.documentId,
+        ensureActivePageAccessRuntime
+      );
+    });
+  });
+
+  browserWebNavigation.subscribeToErrorOccurred((details: unknown) => {
+    const navigation = parseTopLevelDocumentNavigation(details);
+    if (!navigation) return;
+    runAfterVideoLeaseHydration('reconcile failed recording navigation', () => {
+      handleTabRecordingNavigationError(
+        navigation.tabId,
+        navigation.documentId,
+        ensureActivePageAccessRuntime
+      );
+    });
   });
 }

@@ -13,6 +13,7 @@
     "tabs",
     "webNavigation",
     "debugger",
+    "system.display",
     "activeTab",
     "scripting",
     "downloads",

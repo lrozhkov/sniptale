@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
+  PREPARATION_SURFACE_RESIZE,
   WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
   WEB_SNAPSHOT_VIEWER_EXPORT_RESPONSE,
 } from './contracts';
@@ -28,10 +29,10 @@ describe('viewer preparation simple command parser', () => {
     });
     expect(
       parseViewerPreparationCommand({
-        type: MessageType.SET_VIEWPORT,
+        type: PREPARATION_SURFACE_RESIZE,
         viewport: null,
       })
-    ).toEqual({ type: MessageType.SET_VIEWPORT, viewport: null });
+    ).toEqual({ type: PREPARATION_SURFACE_RESIZE, viewport: null });
   });
 });
 
@@ -49,7 +50,12 @@ describe('viewer preparation enable command parser', () => {
           imageQuality: 90,
         },
         type: MessageType.ENABLE_SCREENSHOT_MODE,
-        viewport: { height: 720, width: 1280 },
+        viewport: {
+          presetId: 'test:viewport',
+          target: 'viewport',
+          height: 720,
+          width: 1280,
+        },
       })
     ).toEqual({
       autoStartCaptureType: 'visible',
@@ -62,7 +68,12 @@ describe('viewer preparation enable command parser', () => {
         imageQuality: 90,
       },
       type: MessageType.ENABLE_SCREENSHOT_MODE,
-      viewport: { height: 720, width: 1280 },
+      viewport: {
+        presetId: 'test:viewport',
+        target: 'viewport',
+        height: 720,
+        width: 1280,
+      },
     });
   });
 });
@@ -71,7 +82,7 @@ describe('viewer preparation command rejection parser', () => {
   it('rejects malformed screenshot mode command payloads', () => {
     expect(
       parseViewerPreparationCommand({
-        type: MessageType.SET_VIEWPORT,
+        type: PREPARATION_SURFACE_RESIZE,
         viewport: { height: 720, width: '1280' },
       })
     ).toBeNull();

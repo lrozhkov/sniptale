@@ -11,6 +11,8 @@ import {
 } from '../../session-state';
 import { syncControlledCursorCapture } from './controlled-cursor/messages';
 import { getBackgroundRuntimeMessaging } from '../../../../routing-contracts/runtime-messaging/services';
+import { isTabRecordingNavigationPending, markTabRecordingManuallyPaused } from './tab-navigation';
+import { requireActiveVideoRecordingSourceBinding } from '../../recording-control-lease';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeControls' });
 
@@ -24,8 +26,9 @@ async function sendRecordingCommand(
   actionLabel: 'pause' | 'resume'
 ): Promise<void> {
   try {
+    const binding = await requireActiveVideoRecordingSourceBinding();
     await getBackgroundRuntimeMessaging().sendRuntimeMessage(
-      attachOffscreenCommandCapability({ type })
+      attachOffscreenCommandCapability({ type, ...binding })
     );
   } catch (error) {
     logger.error(`Failed to ${actionLabel} recording`, error);
@@ -57,11 +60,7 @@ function shouldSyncTelemetryCaptureState(): boolean {
   }
 
   const captureMode = getVideoRecordingCaptureMode();
-  return (
-    captureMode === CaptureMode.TAB ||
-    captureMode === CaptureMode.TAB_CROP ||
-    captureMode === CaptureMode.VIEWPORT_EMULATION
-  );
+  return captureMode === CaptureMode.TAB || captureMode === CaptureMode.TAB_CROP;
 }
 
 function resolveTelemetrySyncLabel(): 'controlled cursor capture' | 'recording telemetry capture' {
@@ -97,6 +96,7 @@ export async function pauseRecording(): Promise<RecordingControlResult> {
     return { result: 'no-active-recording' };
   }
 
+  markTabRecordingManuallyPaused();
   try {
     await Promise.all([
       sendRecordingCommand(VideoMessageType.OFFSCREEN_PAUSE_RECORDING, 'pause'),
@@ -113,7 +113,7 @@ export async function resumeRecording(): Promise<RecordingControlResult> {
     return { result: 'no-active-recording' };
   }
 
-  if (shouldBlockControlledCursorResume()) {
+  if (shouldBlockControlledCursorResume() || isTabRecordingNavigationPending()) {
     return { result: 'blocked' };
   }
 

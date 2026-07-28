@@ -43,7 +43,13 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   translate: vi.fn((key: string) => key),
 }));
 
-import { startRecording, stopRecording } from './controller';
+import {
+  pauseRecording,
+  resumeRecording,
+  startRecording,
+  stopRecording,
+  updateRecordingSettings,
+} from './controller';
 import { recordingContext } from './context';
 
 class ActiveMediaRecorderFixture extends EventTarget implements MediaRecorder {
@@ -68,6 +74,9 @@ class ActiveMediaRecorderFixture extends EventTarget implements MediaRecorder {
 
 function createStartParams(): Parameters<typeof startRecording>[0] {
   return {
+    generation: 1,
+    recordingId: 'recording-delayed',
+    streamInstanceId: 'stream-instance-delayed',
     streamId: 'stream-delayed',
     settings: {
       autoFadeDelay: 0,
@@ -81,6 +90,12 @@ function createStartParams(): Parameters<typeof startRecording>[0] {
     },
   };
 }
+
+const sourceBinding = {
+  generation: 1,
+  recordingId: 'recording-delayed',
+  streamInstanceId: 'stream-instance-delayed',
+};
 
 function createActiveRecorderFixture() {
   const recorder = new ActiveMediaRecorderFixture();
@@ -109,7 +124,8 @@ it('waits for a delayed start and terminates activation before acknowledging sto
     () =>
       new Promise<void>((resolve) => {
         completeStart = () => {
-          recordingContext.beginRecordingSession('recording-delayed');
+          recordingContext.beginRecordingSession('recording-delayed', 1);
+          recordingContext.bindStreamInstance(sourceBinding);
           recordingContext.activateRecorder(recorder);
           resolve();
         };
@@ -117,7 +133,7 @@ it('waits for a delayed start and terminates activation before acknowledging sto
   );
 
   const start = startRecording(createStartParams());
-  const stop = stopRecording(true);
+  const stop = stopRecording(sourceBinding, true);
   let stopSettled = false;
   void stop.then(() => {
     stopSettled = true;
@@ -129,7 +145,7 @@ it('waits for a delayed start and terminates activation before acknowledging sto
   await start;
   await vi.waitFor(() => expect(stopRecorder).toHaveBeenCalledOnce());
   recordingContext.stopRecordingResolve?.();
-  await expect(stop).resolves.toBeUndefined();
+  await expect(stop).resolves.toEqual({ result: 'stopped' });
 });
 
 it('fails a stuck start cancellation within a deadline and allows a safe retry', async () => {
@@ -143,14 +159,66 @@ it('fails a stuck start cancellation within a deadline and allows a safe retry',
   );
 
   const start = startRecording(createStartParams());
-  const stopExpectation = expect(stopRecording(true)).rejects.toThrow(
-    'background.runtime.recordingStopTimeout'
-  );
+  const stopExpectation = expect(stopRecording(sourceBinding, true)).resolves.toEqual({
+    error: 'background.runtime.recordingStopTimeout',
+    result: 'terminal-failure',
+  });
   await vi.advanceTimersByTimeAsync(10_000);
   await stopExpectation;
   expect(cancelPendingMultiSourceRecordingStartMock).toHaveBeenCalledOnce();
 
   completeStart();
   await start;
-  await expect(stopRecording(true)).resolves.toBeUndefined();
+  await expect(stopRecording(sourceBinding, true)).resolves.toEqual({ result: 'stopped' });
+});
+
+it('rejects a delayed stop whose source identity belongs to another start', async () => {
+  let completeStart!: () => void;
+  startRecordingImplMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        completeStart = resolve;
+      })
+  );
+  const start = startRecording(createStartParams());
+
+  await expect(
+    stopRecording(
+      {
+        generation: 1,
+        recordingId: 'recording-stale',
+        streamInstanceId: 'stream-instance-stale',
+      },
+      true
+    )
+  ).rejects.toThrow('Stale recording source binding');
+  expect(cancelPendingMultiSourceRecordingStartMock).not.toHaveBeenCalled();
+
+  completeStart();
+  await start;
+});
+
+it('rejects delayed pause, resume, and settings commands from another recording start', async () => {
+  let completeStart!: () => void;
+  startRecordingImplMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        completeStart = resolve;
+      })
+  );
+  const start = startRecording(createStartParams());
+  const stale = {
+    generation: 0,
+    recordingId: 'recording-stale',
+    streamInstanceId: 'stream-instance-stale',
+  };
+
+  expect(() => pauseRecording(stale)).toThrow('Stale recording source binding');
+  expect(() => resumeRecording(stale)).toThrow('Stale recording source binding');
+  expect(() => updateRecordingSettings(stale, { microphoneEnabled: false })).toThrow(
+    'Stale recording source binding'
+  );
+
+  completeStart();
+  await start;
 });

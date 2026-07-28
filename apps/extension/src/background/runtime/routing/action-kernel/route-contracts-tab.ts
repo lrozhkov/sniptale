@@ -67,8 +67,10 @@ export const TAB_ACTION_ROUTE_CONTRACTS = {
   'tab-mode-privileged-tab-route': {
     acceptedSenderClass: 'owned content tab or extension page routed to an authorized tab',
     errorShape: 'tab-mode route error response',
-    freshnessReplayPolicy: 'resolved tab/frame/document state scopes mode toggles and reads',
-    requiredAuthority: 'privileged tab mode authorization policy',
+    freshnessReplayPolicy:
+      'resolved tab/frame/document state plus one-shot trusted intent scopes content surface enable',
+    requiredAuthority:
+      'privileged tab mode authorization policy and trusted content intent for content surface enable',
     responseShape: 'tab-mode route response',
     sideEffects: 'content overlay mode, viewport, or highlighter runtime changes',
     transitiveStateOwner: 'background tab-mode route owner',

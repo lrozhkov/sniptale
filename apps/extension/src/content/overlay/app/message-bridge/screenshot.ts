@@ -6,6 +6,11 @@ import type {
   RuntimeMessageRequest,
   RuntimeMessageResponse,
 } from './types';
+import {
+  setScreenshotSurfaceBinding,
+  setScreenshotSurfaceCapabilityToken,
+} from '../../viewport-selector/capability';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 
 function disableEditingModes(params: RuntimeMessageBridgeParams): void {
   if (params.modeState.aiPickMode) {
@@ -128,6 +133,16 @@ function handleEnableScreenshotMode(
     return false;
   }
 
+  setScreenshotSurfaceBinding({
+    token: request.surfaceCapabilityToken ?? null,
+    ...(request.surfaceLeaseGeneration === undefined
+      ? {}
+      : { leaseGeneration: request.surfaceLeaseGeneration }),
+    ...(request.surfaceOperationGeneration === undefined
+      ? {}
+      : { operationGeneration: request.surfaceOperationGeneration }),
+  });
+
   if (
     params.modeState.screenshotMode &&
     params.modeState.isToolbarVisible &&
@@ -139,12 +154,14 @@ function handleEnableScreenshotMode(
 
   queueAutoStartCaptureIfNeeded(request, params);
   enableScreenshotModeState(request, params);
+  if (request.surfaceWarning) showToast(request.surfaceWarning, 'warning', 5000);
 
   sendResponse({ success: true });
   return true;
 }
 
 function hideScreenshotToolbar(params: RuntimeMessageBridgeParams): void {
+  setScreenshotSurfaceCapabilityToken(null);
   params.viewport.clearPendingAutoStartCapture();
   params.viewport.invalidateScreenshotRuns();
   params.modeControls.setScreenshotMode(false);

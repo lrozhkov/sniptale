@@ -138,16 +138,16 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     en: 'Delay before screenshot',
   },
   viewportButton: {
-    ru: 'Размер страницы для снимка',
-    en: 'Page size for screenshot',
+    ru: 'Размер страницы или окна для снимка',
+    en: 'Page or window size for screenshot',
   },
   viewportMenuTitle: {
-    ru: 'Размер страницы',
-    en: 'Page size',
+    ru: 'Размер страницы или окна',
+    en: 'Page or window size',
   },
   viewportNativeLabel: {
-    ru: 'Текущий размер вкладки',
-    en: 'Current tab size',
+    ru: 'Текущий размер',
+    en: 'Current size',
   },
   viewportNativeHint: {
     ru: 'Использовать текущий размер вкладки для снимков',

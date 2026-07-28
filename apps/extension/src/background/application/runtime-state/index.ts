@@ -1,6 +1,6 @@
 import { ScenarioSessionService } from '../../scenario/session-service';
 import type { WebSnapshotViewerPorts } from '../../capture/page-preparation/viewer-ports';
-import type { ViewportOwnerState } from '../../routing-contracts/tab-mode-state';
+import type { ViewportOwnerState, ViewportState } from '../../routing-contracts/tab-mode-state';
 
 type ReconstructibleBackgroundRuntimeState = {
   /**
@@ -10,7 +10,7 @@ type ReconstructibleBackgroundRuntimeState = {
   quickEditModeState: Map<number, boolean>;
   screenshotModeState: Map<number, boolean>;
   viewportOwnerState: ViewportOwnerState;
-  viewportState: Map<number, { width: number; height: number } | null>;
+  viewportState: ViewportState;
 };
 
 type DisposableBackgroundRuntimeState = {

@@ -14,7 +14,7 @@ export const contextMenuSettingsFixture = {
   defaultExportPresetId: null,
   defaultImagePresetId: null,
   defaultVideoPresetId: 'preset-default',
-  defaultViewportId: 'native',
+  defaultViewportPresetId: 'preset-default',
   imageFormat: 'png' as const,
   imageQuality: 100,
   authenticatedSnapshotAssetsEnabled: true,
@@ -24,8 +24,26 @@ export const contextMenuSettingsFixture = {
   presets: [],
   saveCapturesToGallery: false,
   viewportPresets: [
-    { id: 'preset-default', width: 1440, height: 900, label: 'Default' },
-    { id: 'preset-alt', width: 1920, height: 1080, label: 'Full HD' },
+    {
+      kind: 'user' as const,
+      id: 'preset-default',
+      name: 'Default',
+      target: 'viewport' as const,
+      width: 1440,
+      height: 900,
+      enabled: true,
+      order: 0,
+    },
+    {
+      kind: 'user' as const,
+      id: 'preset-alt',
+      name: 'Full HD',
+      target: 'viewport' as const,
+      width: 1920,
+      height: 1080,
+      enabled: true,
+      order: 0,
+    },
   ],
 };
 

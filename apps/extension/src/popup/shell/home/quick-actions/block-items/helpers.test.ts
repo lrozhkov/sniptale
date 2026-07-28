@@ -45,7 +45,7 @@ describe('popup quick action block helper styling', () => {
           metaKey: false,
         },
         screenshotMode: 'visible',
-        emulation: null,
+        viewportPresetId: null,
         delay: null,
         afterCapture: null,
         imageFormat: null,

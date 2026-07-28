@@ -6,4 +6,4 @@ export {
   resetRecordingId,
   resetRecordingTabId,
 } from './recording-state';
-export { handleTabClose, handleTabUpdated } from './tab-lifecycle';
+export { handleTabClose } from './tab-close';

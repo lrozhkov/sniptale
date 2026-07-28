@@ -3,9 +3,19 @@ import {
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import type { ViewportPreset } from '../../../../contracts/settings';
 
-export function createSelectedPreset() {
-  return { id: 'preset-1', label: 'Preset', width: 1280, height: 720 };
+export function createSelectedPreset(): ViewportPreset {
+  return {
+    kind: 'user',
+    id: 'preset-1',
+    name: 'Preset',
+    target: 'viewport',
+    width: 1280,
+    height: 720,
+    enabled: true,
+    order: 0,
+  };
 }
 
 export function createActiveTabCapabilities() {
@@ -23,7 +33,6 @@ export function createActiveTabCapabilities() {
       [CaptureMode.TAB_CROP]: { supported: true, reason: null },
       [CaptureMode.CAMERA]: { supported: true, reason: null },
       [CaptureMode.SCREEN]: { supported: true, reason: null },
-      [CaptureMode.VIEWPORT_EMULATION]: { supported: true, reason: null },
     },
   };
 }

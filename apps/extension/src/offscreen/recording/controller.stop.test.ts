@@ -38,12 +38,23 @@ beforeEach(() => {
 });
 
 it('publishes stopped with the session id when cleanup clears an inactive recorder session', async () => {
-  recordingContext.beginRecordingSession('recording-race');
+  recordingContext.beginRecordingSession('recording-race', 1);
+  recordingContext.bindStreamInstance({
+    generation: 1,
+    recordingId: 'recording-race',
+    streamInstanceId: 'stream-instance-race',
+  });
   cleanupResourcesMock.mockImplementationOnce(() => {
     recordingContext.resetRecordingSession();
   });
 
-  await expect(stopRecording()).resolves.toBeUndefined();
+  await expect(
+    stopRecording({
+      generation: 1,
+      recordingId: 'recording-race',
+      streamInstanceId: 'stream-instance-race',
+    })
+  ).resolves.toEqual({ result: 'stopped' });
 
   expect(cleanupResourcesMock).toHaveBeenCalledOnce();
   expect(loggerDebugMock).toHaveBeenCalledWith('Stop requested without an active recording');

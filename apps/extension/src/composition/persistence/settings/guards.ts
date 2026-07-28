@@ -210,8 +210,8 @@ function parseScalarSettingsFields(
   );
   invalidFieldCount += assignParsedSettingsField(
     nextValue,
-    'defaultViewportId',
-    parseOptionalNullableString(value['defaultViewportId'])
+    'defaultViewportPresetId',
+    parseOptionalNullableString(value['defaultViewportPresetId'])
   );
   invalidFieldCount += parseDefaultPresetSettingsFields(value, nextValue);
   invalidFieldCount += assignParsedSettingsField(

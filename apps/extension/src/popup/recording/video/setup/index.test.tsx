@@ -62,7 +62,6 @@ function createActiveTabCapabilities(
       [CaptureMode.TAB]: { supported: true, reason: null },
       [CaptureMode.TAB_CROP]: { supported: true, reason: null },
       [CaptureMode.CAMERA]: { supported: true, reason: null },
-      [CaptureMode.VIEWPORT_EMULATION]: { supported: true, reason: null },
       [CaptureMode.SCREEN]: { supported: true, reason: null },
     },
     ...overrides,
@@ -76,9 +75,18 @@ function createProps(
     settings: createVideoSettings(),
     captureMode: CaptureMode.TAB,
     selectedPresetId: 'preset-1',
-    appliedViewportPresetId: 'preset-1',
-    appliedViewportTabId: 1,
-    viewportPresets: [{ id: 'preset-1', label: 'Preset', width: 1280, height: 720 }],
+    viewportPresets: [
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Preset',
+        target: 'viewport',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 0,
+      },
+    ],
     activeTabCapabilities: createActiveTabCapabilities(),
     microphoneDevices: [],
     isLoadingMicrophones: false,
@@ -126,7 +134,7 @@ function createRecordingState(): VideoRecordingRuntimeState {
     duration: 0,
     error: null,
     status: VideoRecordingStatus.IDLE,
-    viewportPreset: null,
+    viewportPresetId: null,
   };
 }
 

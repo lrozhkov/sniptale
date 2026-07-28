@@ -7,7 +7,7 @@ import {
 } from '../../../diagnostics/runtime-errors';
 import { getPauseResumeMessageType } from './message';
 import type { RecordingControlCapability } from '../recording-control-capability';
-import { getPopupRuntimeServices } from '../services';
+import { getPopupRuntimeServices } from '../../../runtime-services';
 
 const logger = createLogger({ namespace: 'PopupRuntime' });
 

@@ -7,8 +7,10 @@ const {
   cleanupOldRecordings,
   cleanupExpiredProjectExportInputs,
   cleanupScreenshotModeAfterNavigation,
+  cleanupScreenshotModeAfterTabClose,
   clearDebuggerSessionState,
   ensurePersistentStorage,
+  ensureActiveVideoRecordingLeaseHydrated,
   handleDebuggerEvent,
   handleDiagnosticsForcedDetach,
   handleExportHarDebuggerEvent,
@@ -16,18 +18,21 @@ const {
   handleExportHarNavigationStart,
   handleTabClose,
   handleTabNavigation,
-  handleTabUpdated,
-  handleControlledCursorNavigationStart,
   handleRegionSelectionNavigationStart,
-  handleViewportRecordingDebuggerDetach,
-  handleViewportRecordingNavigationStart,
+  handleTabRecordingDebuggerDetach,
+  handleTabRecordingNavigationCommitted,
+  handleTabRecordingNavigationCompleted,
+  handleTabRecordingNavigationError,
+  handleTabRecordingNavigationStart,
   initializeAiStorageAccess,
   initializeBackgroundContextMenus,
   nativeAppConnect,
   parseInstalledDetails,
+  parseTopLevelDocumentNavigation,
   parseTopLevelNavigation,
   rebuildBackgroundContextMenus,
   recoverInterruptedSessions,
+  recoverVideoCaptureSurfaceOnStartup,
   reconcileCaptureJobDownloadOnStartup,
   reconcileCaptureJobsOnStartup,
   registerWebSnapshotViewerPorts,
@@ -46,8 +51,10 @@ const {
   cleanupOldRecordings: vi.fn(),
   cleanupExpiredProjectExportInputs: vi.fn(),
   cleanupScreenshotModeAfterNavigation: vi.fn(),
+  cleanupScreenshotModeAfterTabClose: vi.fn(),
   clearDebuggerSessionState: vi.fn(),
   ensurePersistentStorage: vi.fn(),
+  ensureActiveVideoRecordingLeaseHydrated: vi.fn(),
   handleDebuggerEvent: vi.fn(),
   handleDiagnosticsForcedDetach: vi.fn(),
   handleExportHarDebuggerEvent: vi.fn(),
@@ -55,18 +62,21 @@ const {
   handleExportHarNavigationStart: vi.fn(),
   handleTabClose: vi.fn(),
   handleTabNavigation: vi.fn(),
-  handleTabUpdated: vi.fn(),
-  handleControlledCursorNavigationStart: vi.fn(),
   handleRegionSelectionNavigationStart: vi.fn(),
-  handleViewportRecordingDebuggerDetach: vi.fn(),
-  handleViewportRecordingNavigationStart: vi.fn(),
+  handleTabRecordingDebuggerDetach: vi.fn(),
+  handleTabRecordingNavigationCommitted: vi.fn(),
+  handleTabRecordingNavigationCompleted: vi.fn(),
+  handleTabRecordingNavigationError: vi.fn(),
+  handleTabRecordingNavigationStart: vi.fn(),
   initializeAiStorageAccess: vi.fn(),
   initializeBackgroundContextMenus: vi.fn(),
   nativeAppConnect: vi.fn(),
   parseInstalledDetails: vi.fn(),
+  parseTopLevelDocumentNavigation: vi.fn(),
   rebuildBackgroundContextMenus: vi.fn(),
   parseTopLevelNavigation: vi.fn(),
   recoverInterruptedSessions: vi.fn(),
+  recoverVideoCaptureSurfaceOnStartup: vi.fn(),
   reconcileCaptureJobDownloadOnStartup: vi.fn(),
   reconcileCaptureJobsOnStartup: vi.fn(),
   registerWebSnapshotViewerPorts: vi.fn(),
@@ -120,16 +130,20 @@ vi.mock('../../../apps/extension/src/background/capture/lifecycle', () => ({
 }));
 vi.mock('../../../apps/extension/src/background/runtime/routing/runtime-wiring/parsers', () => ({
   parseInstalledDetails,
+  parseTopLevelDocumentNavigation,
   parseTopLevelNavigation,
 }));
 vi.mock('../../../apps/extension/src/background/media/lifecycle', () => ({
-  handleControlledCursorNavigationStart,
+  ensureActiveVideoRecordingLeaseHydrated,
   handleRegionSelectionNavigationStart,
   handleTabClose,
-  handleTabUpdated,
-  handleViewportRecordingDebuggerDetach,
-  handleViewportRecordingNavigationStart,
+  handleTabRecordingDebuggerDetach,
+  handleTabRecordingNavigationCommitted,
+  handleTabRecordingNavigationCompleted,
+  handleTabRecordingNavigationError,
+  handleTabRecordingNavigationStart,
   reconcileVideoRecordingLeaseOnStartup,
+  recoverVideoCaptureSurfaceOnStartup,
   resetVideoRecordingRuntimeState,
 }));
 vi.mock('../../../apps/extension/src/background/runtime/context-menu/service', () => ({
@@ -141,6 +155,7 @@ vi.mock('../../../apps/extension/src/background/runtime/native-app/service-singl
 }));
 vi.mock('../../../apps/extension/src/background/runtime/tab-mode-router-screenshot', () => ({
   cleanupScreenshotModeAfterNavigation,
+  cleanupScreenshotModeAfterTabClose,
 }));
 
 import { createScenarioSessionServiceStub } from './scenario-session-service.stub';
@@ -151,23 +166,28 @@ export {
   cleanupOldRecordings,
   cleanupExpiredProjectExportInputs,
   cleanupScreenshotModeAfterNavigation,
+  cleanupScreenshotModeAfterTabClose,
   clearDebuggerSessionState,
   handleDebuggerEvent,
   handleDiagnosticsForcedDetach,
   handleExportHarDebuggerEvent,
   handleExportHarForcedDetach,
   handleExportHarNavigationStart,
+  ensureActiveVideoRecordingLeaseHydrated,
   handleTabClose,
   handleTabNavigation,
-  handleTabUpdated,
-  handleControlledCursorNavigationStart,
   handleRegionSelectionNavigationStart,
-  handleViewportRecordingDebuggerDetach,
-  handleViewportRecordingNavigationStart,
+  handleTabRecordingDebuggerDetach,
+  handleTabRecordingNavigationCommitted,
+  handleTabRecordingNavigationCompleted,
+  handleTabRecordingNavigationError,
+  handleTabRecordingNavigationStart,
+  recoverVideoCaptureSurfaceOnStartup,
   initializeAiStorageAccess,
   initializeBackgroundContextMenus,
   nativeAppConnect,
   parseInstalledDetails,
+  parseTopLevelDocumentNavigation,
   parseTopLevelNavigation,
   reconcileCaptureJobDownloadOnStartup,
   reconcileCaptureJobsOnStartup,
@@ -194,6 +214,15 @@ export const debuggerDetachListenerRef: { current: DebuggerDetachListener | null
 export const navigationListenerRef: { current: ((details: unknown) => void) | null } = {
   current: null,
 };
+export const navigationCommittedListenerRef: { current: ((details: unknown) => void) | null } = {
+  current: null,
+};
+export const navigationCompletedListenerRef: { current: ((details: unknown) => void) | null } = {
+  current: null,
+};
+export const navigationErrorListenerRef: { current: ((details: unknown) => void) | null } = {
+  current: null,
+};
 export const installedListenerRef: { current: ((details: unknown) => void) | null } = {
   current: null,
 };
@@ -206,10 +235,16 @@ export function createModeState() {
     screenshotModeState: new Map<number, boolean>([[7, true]]),
     highlighterModeState: new Map<number, boolean>([[7, true]]),
     quickEditModeState: new Map<number, boolean>([[7, true]]),
-    viewportOwnerState: new Map([[7, 'debugger' as const]]),
-    viewportState: new Map<number, { width: number; height: number } | null>([
-      [7, { width: 1280, height: 720 }],
-    ]),
+    viewportOwnerState: new Map([[7, 'capture-surface' as const]]),
+    viewportState: new Map<
+      number,
+      {
+        presetId: string;
+        target: 'viewport' | 'window';
+        width: number;
+        height: number;
+      } | null
+    >([[7, { presetId: 'test:viewport', target: 'viewport', width: 1280, height: 720 }]]),
     webSnapshotViewerPorts,
     scenarioSessionService: createScenarioSessionServiceStub(),
   };
@@ -225,19 +260,25 @@ function resetListenerRefs() {
   debuggerEventListenerRef.current = null;
   debuggerDetachListenerRef.current = null;
   navigationListenerRef.current = null;
+  navigationCommittedListenerRef.current = null;
+  navigationCompletedListenerRef.current = null;
+  navigationErrorListenerRef.current = null;
   installedListenerRef.current = null;
 }
 
 function resetMockDefaults() {
   ensurePersistentStorage.mockResolvedValue(undefined);
+  ensureActiveVideoRecordingLeaseHydrated.mockResolvedValue(null);
   cleanupOldRecordings.mockResolvedValue(undefined);
   cleanupExpiredProjectExportInputs.mockResolvedValue(undefined);
   cleanupScreenshotModeAfterNavigation.mockResolvedValue(undefined);
+  cleanupScreenshotModeAfterTabClose.mockResolvedValue(undefined);
   handleExportHarNavigationStart.mockResolvedValue(undefined);
   initializeBackgroundContextMenus.mockReturnValue(undefined);
   nativeAppConnect.mockReturnValue(undefined);
   rebuildBackgroundContextMenus.mockResolvedValue(undefined);
   recoverInterruptedSessions.mockResolvedValue(undefined);
+  recoverVideoCaptureSurfaceOnStartup.mockResolvedValue(undefined);
   reconcileCaptureJobsOnStartup.mockResolvedValue({
     activeFailed: 0,
     downloadsReconciled: 0,
@@ -245,6 +286,7 @@ function resetMockDefaults() {
   });
   initializeAiStorageAccess.mockResolvedValue(undefined);
   parseInstalledDetails.mockReturnValue(null);
+  parseTopLevelDocumentNavigation.mockReturnValue(null);
   parseTopLevelNavigation.mockReturnValue(null);
 }
 
@@ -275,6 +317,21 @@ function installBrowserListenerMocks() {
         onBeforeNavigate: {
           addListener: vi.fn((listener: (details: unknown) => void) => {
             navigationListenerRef.current = listener;
+          }),
+        },
+        onCommitted: {
+          addListener: vi.fn((listener: (details: unknown) => void) => {
+            navigationCommittedListenerRef.current = listener;
+          }),
+        },
+        onCompleted: {
+          addListener: vi.fn((listener: (details: unknown) => void) => {
+            navigationCompletedListenerRef.current = listener;
+          }),
+        },
+        onErrorOccurred: {
+          addListener: vi.fn((listener: (details: unknown) => void) => {
+            navigationErrorListenerRef.current = listener;
           }),
         },
       },

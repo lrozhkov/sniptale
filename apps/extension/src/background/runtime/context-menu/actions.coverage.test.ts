@@ -7,9 +7,10 @@ const {
   enableScreenshotModeMock,
   ensureActivePageAccessRuntimeMock,
   ensureNativeVisibleCaptureAuthorityMock,
+  getContextMenuVideoPresetAvailabilityMock,
+  getViewportPresetErrorMessageMock,
   loadSettingsMock,
   loggerWarnMock,
-  resolveContextMenuVideoPresetMock,
   showContextMenuToastMock,
   startContextMenuExportMock,
   startContextMenuVideoRecordingMock,
@@ -19,12 +20,17 @@ const {
   enableScreenshotModeMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
   ensureNativeVisibleCaptureAuthorityMock: vi.fn(),
+  getContextMenuVideoPresetAvailabilityMock: vi.fn(),
+  getViewportPresetErrorMessageMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   loggerWarnMock: vi.fn(),
-  resolveContextMenuVideoPresetMock: vi.fn(),
   showContextMenuToastMock: vi.fn(),
   startContextMenuExportMock: vi.fn(),
   startContextMenuVideoRecordingMock: vi.fn(),
+}));
+
+vi.mock('../../../features/viewport-presets/error-message', () => ({
+  getViewportPresetErrorMessage: getViewportPresetErrorMessageMock,
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -61,7 +67,7 @@ vi.mock('./action-helpers', async () => {
   return {
     ...actual,
     copyContextMenuExportPreview: copyContextMenuExportPreviewMock,
-    resolveContextMenuVideoPreset: resolveContextMenuVideoPresetMock,
+    getContextMenuVideoPresetAvailability: getContextMenuVideoPresetAvailabilityMock,
     showContextMenuToast: showContextMenuToastMock,
     startContextMenuExport: startContextMenuExportMock,
     startContextMenuVideoRecording: startContextMenuVideoRecordingMock,
@@ -91,8 +97,11 @@ function createDeps() {
   return {
     captureGuardState: { isCapturing: false },
     screenshotModeState: new Map<number, boolean>(),
-    viewportOwnerState: new Map<number, 'debugger' | 'viewer'>(),
-    viewportState: new Map<number, { width: number; height: number } | null>(),
+    viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
   };
 }
 
@@ -123,14 +132,20 @@ function resetContextMenuActionCoverageMocks(): void {
     defaultExportPresetId: null,
     defaultImagePresetId: null,
     defaultVideoPresetId: null,
-    defaultViewportId: 'native',
+    defaultViewportPresetId: 'native',
     imageFormat: 'png',
     imageQuality: 100,
     presets: [],
     saveCapturesToGallery: false,
     viewportPresets: [],
   });
-  resolveContextMenuVideoPresetMock.mockResolvedValue({ id: 'preset-1' });
+  getContextMenuVideoPresetAvailabilityMock.mockResolvedValue({
+    status: 'requires-start-validation',
+    presetId: 'preset-1',
+    target: 'viewport',
+    required: { width: 1280, height: 720 },
+  });
+  getViewportPresetErrorMessageMock.mockReturnValue(null);
   showContextMenuToastMock.mockResolvedValue(undefined);
   startContextMenuExportMock.mockResolvedValue(undefined);
   startContextMenuVideoRecordingMock.mockResolvedValue(undefined);
@@ -245,6 +260,20 @@ it('shows error feedback on tabs and logs when no active tab is available', asyn
   );
 });
 
+it('uses localized viewport availability feedback instead of raw reason codes', async () => {
+  getViewportPresetErrorMessageMock.mockReturnValueOnce('Friendly unavailable message');
+
+  await showBackgroundContextMenuError({
+    error: new Error('window-too-large'),
+    tab: createTab(),
+  });
+
+  expect(showContextMenuToastMock).toHaveBeenCalledWith(
+    9,
+    expect.objectContaining({ message: 'Friendly unavailable message', type: 'error' })
+  );
+});
+
 it('logs a warning when showing the error toast itself fails', async () => {
   showContextMenuToastMock.mockRejectedValueOnce(new Error('toast-failed'));
 
@@ -260,9 +289,29 @@ it('logs a warning when showing the error toast itself fails', async () => {
 });
 
 it('reports whether a context-menu preset is currently resolvable', async () => {
-  await expect(hasContextMenuVideoPreset()).resolves.toBe(true);
+  await expect(hasContextMenuVideoPreset(createTab())).resolves.toBe(true);
 
-  resolveContextMenuVideoPresetMock.mockResolvedValueOnce(null);
+  getContextMenuVideoPresetAvailabilityMock.mockResolvedValueOnce({
+    status: 'unavailable',
+    presetId: 'preset-1',
+    target: 'viewport',
+    reason: 'viewport-too-large',
+  });
 
+  await expect(hasContextMenuVideoPreset(createTab())).resolves.toBe(false);
+
+  getContextMenuVideoPresetAvailabilityMock.mockRejectedValueOnce(new Error('query-failed'));
+
+  await expect(hasContextMenuVideoPreset(createTab())).resolves.toBe(false);
+  expect(loggerWarnMock).toHaveBeenCalledWith(
+    'Failed to query context-menu video preset availability',
+    expect.any(Error)
+  );
+});
+
+it('does not query preset availability without a supported active tab', async () => {
   await expect(hasContextMenuVideoPreset()).resolves.toBe(false);
+  await expect(hasContextMenuVideoPreset(createTab('chrome://settings'))).resolves.toBe(false);
+
+  expect(getContextMenuVideoPresetAvailabilityMock).not.toHaveBeenCalled();
 });

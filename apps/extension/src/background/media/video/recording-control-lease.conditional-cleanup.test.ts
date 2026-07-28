@@ -57,8 +57,9 @@ vi.mock('./runtime/session-state', async (importOriginal) => ({
 }));
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
+  activateVideoRecordingLease,
   clearActiveVideoRecordingLease,
-  issueActiveVideoRecordingLease,
+  issuePreparedVideoRecordingLease,
   resetActiveVideoRecordingLeaseForTests,
   validateRecordingControlCapability,
 } from './recording-control-lease';
@@ -99,10 +100,15 @@ it('restores the lease when conditional cleanup loses a late-activation race', a
   const remove = createDeferred<void>();
   const shouldClear = vi.fn(() => true);
 
-  await issueActiveVideoRecordingLease({
+  await issuePreparedVideoRecordingLease({
     captureMode: CaptureMode.TAB,
     ownerSenderUrl,
     openEditorAfterRecording: true,
+  });
+  await activateVideoRecordingLease({
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: null,
   });
   browserStorageSessionSetMock.mockClear();
   browserStorageSessionRemoveMock.mockReturnValueOnce(remove.promise);
@@ -135,10 +141,15 @@ it('preserves a newer lease when stale conditional cleanup resumes after retry',
   const remove = createDeferred<void>();
   const shouldClear = vi.fn(() => true);
 
-  await issueActiveVideoRecordingLease({
+  await issuePreparedVideoRecordingLease({
     captureMode: CaptureMode.TAB,
     ownerSenderUrl,
     openEditorAfterRecording: true,
+  });
+  await activateVideoRecordingLease({
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: null,
   });
   browserStorageSessionRemoveMock.mockReturnValueOnce(remove.promise);
 
@@ -147,10 +158,15 @@ it('preserves a newer lease when stale conditional cleanup resumes after retry',
 
   getVideoRecordingIdMock.mockReturnValue('recording-2');
   vi.mocked(crypto.randomUUID).mockReturnValueOnce(secondControlToken);
-  await issueActiveVideoRecordingLease({
+  await issuePreparedVideoRecordingLease({
     captureMode: CaptureMode.SCREEN,
     ownerSenderUrl,
     openEditorAfterRecording: false,
+  });
+  await activateVideoRecordingLease({
+    generation: 1,
+    recordingId: 'recording-2',
+    streamInstanceId: null,
   });
   browserStorageSessionSetMock.mockClear();
 

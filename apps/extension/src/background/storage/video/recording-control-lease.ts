@@ -8,11 +8,15 @@ const RECORDING_LEASE_TTL_MS = 12 * 60 * 60 * 1000;
 export type VideoRecordingControlLease = {
   captureMode: CaptureMode;
   controlToken: string;
+  cropRegion: { x: number; y: number; width: number; height: number } | null;
   expiresAt: number;
   openEditorAfterRecording: boolean;
   ownerSenderUrl: string;
+  phase: 'prepared' | 'active';
   recordingId: string;
   recordingTabId: number | null;
+  surfaceBinding: { generation: number; streamInstanceId: string } | null;
+  viewportPresetId: string | null;
 };
 
 type PersistedLeaseRecord = VideoRecordingControlLease & {
@@ -37,17 +41,22 @@ function parsePersistedLease(value: unknown, now = Date.now()): VideoRecordingCo
   if (!isRecord(value)) {
     return null;
   }
+  const cropRegion = value['cropRegion'] ?? null;
 
   if (
     value['version'] !== 1 ||
     !isCaptureMode(value['captureMode']) ||
     typeof value['controlToken'] !== 'string' ||
+    !isCropRegion(cropRegion) ||
     typeof value['expiresAt'] !== 'number' ||
     !Number.isFinite(value['expiresAt']) ||
     typeof value['openEditorAfterRecording'] !== 'boolean' ||
     typeof value['ownerSenderUrl'] !== 'string' ||
+    (value['phase'] !== 'prepared' && value['phase'] !== 'active') ||
     typeof value['recordingId'] !== 'string' ||
     !isValidRecordingTabId(value['recordingTabId']) ||
+    !isSurfaceBinding(value['surfaceBinding']) ||
+    !(value['viewportPresetId'] === undefined || isNullableString(value['viewportPresetId'])) ||
     value['expiresAt'] <= now
   ) {
     return null;
@@ -56,16 +65,63 @@ function parsePersistedLease(value: unknown, now = Date.now()): VideoRecordingCo
   return {
     captureMode: value['captureMode'],
     controlToken: value['controlToken'],
+    cropRegion,
     expiresAt: value['expiresAt'],
     openEditorAfterRecording: value['openEditorAfterRecording'],
     ownerSenderUrl: value['ownerSenderUrl'],
+    phase: value['phase'],
     recordingId: value['recordingId'],
     recordingTabId: value['recordingTabId'],
+    surfaceBinding: value['surfaceBinding'],
+    viewportPresetId: value['viewportPresetId'] ?? null,
   };
 }
 
 function isValidRecordingTabId(value: unknown): value is number | null {
   return value === null || (typeof value === 'number' && Number.isInteger(value));
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
+}
+
+function isCropRegion(
+  value: unknown
+): value is { x: number; y: number; width: number; height: number } | null {
+  if (value === null) return true;
+  if (!isRecord(value)) return false;
+  const x = value['x'];
+  const y = value['y'];
+  const width = value['width'];
+  const height = value['height'];
+  return (
+    typeof x === 'number' &&
+    Number.isFinite(x) &&
+    x >= 0 &&
+    typeof y === 'number' &&
+    Number.isFinite(y) &&
+    y >= 0 &&
+    typeof width === 'number' &&
+    Number.isFinite(width) &&
+    width > 0 &&
+    typeof height === 'number' &&
+    Number.isFinite(height) &&
+    height > 0
+  );
+}
+
+function isSurfaceBinding(
+  value: unknown
+): value is { generation: number; streamInstanceId: string } | null {
+  return (
+    value === null ||
+    (isRecord(value) &&
+      typeof value['generation'] === 'number' &&
+      Number.isInteger(value['generation']) &&
+      value['generation'] > 0 &&
+      typeof value['streamInstanceId'] === 'string' &&
+      value['streamInstanceId'].length > 0)
+  );
 }
 
 function createPersistedLease(lease: VideoRecordingControlLease): PersistedLeaseRecord {
@@ -79,18 +135,25 @@ export function canPersistVideoRecordingLease(): boolean {
 export function createLeaseSnapshot(args: {
   captureMode: CaptureMode;
   ownerSenderUrl: string;
+  cropRegion?: { x: number; y: number; width: number; height: number } | null;
   openEditorAfterRecording: boolean;
   recordingId: string;
   recordingTabId: number | null;
+  surfaceBinding?: { generation: number; streamInstanceId: string } | null;
+  viewportPresetId?: string | null;
 }): VideoRecordingControlLease {
   return {
     captureMode: args.captureMode,
     controlToken: crypto.randomUUID(),
+    cropRegion: args.cropRegion ?? null,
     expiresAt: Date.now() + RECORDING_LEASE_TTL_MS,
     openEditorAfterRecording: args.openEditorAfterRecording,
     ownerSenderUrl: args.ownerSenderUrl,
+    phase: 'prepared',
     recordingId: args.recordingId,
     recordingTabId: args.recordingTabId,
+    surfaceBinding: args.surfaceBinding ?? null,
+    viewportPresetId: args.viewportPresetId ?? null,
   };
 }
 

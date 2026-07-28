@@ -9,10 +9,12 @@ import type {
   RuntimeOffscreenRecordingResumedMessage,
   RuntimeOffscreenRecordingStartedMessage,
   RuntimeOffscreenRecordingStoppedMessage,
-  RuntimeOffscreenSetViewportDrawStateMessage,
+  RuntimeOffscreenSourceReadyMessage,
+  RuntimeOffscreenBeginRecordingMessage,
   RuntimeOffscreenStartRecordingMessage,
+  RuntimeOffscreenStopRecordingMessage,
   RuntimeOffscreenUpdateSettingsMessage,
-  RuntimeOffscreenUpdateViewportCropMessage,
+  RuntimeOffscreenRevalidateSourceMessage,
   RuntimeRecordingDurationUpdatedMessage,
   RuntimeRecordingStartFailedMessage,
   RuntimeRecordingStateSyncMessage,
@@ -20,7 +22,6 @@ import type {
 import type {
   CaptureSource,
   VideoRecordingSettings,
-  VideoViewportPresetSelection,
 } from '@sniptale/runtime-contracts/video/types/types';
 
 export type { RuntimeVideoSessionResponseByType } from './session-responses';
@@ -31,7 +32,7 @@ export type RuntimeVideoSessionRequestByType = {
     settings: VideoRecordingSettings;
     tabId?: number;
     captureMode?: string;
-    viewportPreset?: VideoViewportPresetSelection;
+    viewportPresetId?: string | null;
   };
   [VideoMessageType.CANCEL_RECORDING_START]: {
     type: typeof VideoMessageType.CANCEL_RECORDING_START;
@@ -81,20 +82,23 @@ export type RuntimeVideoSessionRequestByType = {
     offscreenStartupId: string;
   };
   [VideoMessageType.OFFSCREEN_START_RECORDING]: RuntimeOffscreenStartRecordingMessage;
-  [VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP]: RuntimeOffscreenUpdateViewportCropMessage;
-  [VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE]: RuntimeOffscreenSetViewportDrawStateMessage;
-  [VideoMessageType.OFFSCREEN_STOP_RECORDING]: {
-    type: typeof VideoMessageType.OFFSCREEN_STOP_RECORDING;
-    capabilityToken: string;
-    discard?: boolean;
-  };
+  [VideoMessageType.OFFSCREEN_SOURCE_READY]: RuntimeOffscreenSourceReadyMessage;
+  [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: RuntimeOffscreenBeginRecordingMessage;
+  [VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE]: RuntimeOffscreenRevalidateSourceMessage;
+  [VideoMessageType.OFFSCREEN_STOP_RECORDING]: RuntimeOffscreenStopRecordingMessage;
   [VideoMessageType.OFFSCREEN_PAUSE_RECORDING]: {
     type: typeof VideoMessageType.OFFSCREEN_PAUSE_RECORDING;
     capabilityToken: string;
+    recordingId: string;
+    generation: number;
+    streamInstanceId: string;
   };
   [VideoMessageType.OFFSCREEN_RESUME_RECORDING]: {
     type: typeof VideoMessageType.OFFSCREEN_RESUME_RECORDING;
     capabilityToken: string;
+    recordingId: string;
+    generation: number;
+    streamInstanceId: string;
   };
   [VideoMessageType.OFFSCREEN_UPDATE_SETTINGS]: RuntimeOffscreenUpdateSettingsMessage;
   [VideoMessageType.OFFSCREEN_RECORDING_STARTED]: RuntimeOffscreenRecordingStartedMessage;
@@ -110,6 +114,7 @@ export type RuntimeVideoSessionRequestByType = {
     regionSelectionRequestGeneration: string;
     regionSelectionRequestId: string;
     region: RuntimeAreaSelectedMessage['area'];
+    captureViewport: import('@sniptale/runtime-contracts/video/types/types').ViewportInfo;
   };
   [VideoMessageType.REGION_SELECTION_CANCELLED]: {
     type: typeof VideoMessageType.REGION_SELECTION_CANCELLED;

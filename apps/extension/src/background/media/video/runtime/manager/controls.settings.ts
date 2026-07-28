@@ -7,6 +7,7 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { getBackgroundRuntimeMessaging } from '../../../../routing-contracts/runtime-messaging/services';
 import { hasActiveVideoRecordingSession } from '../../session-state';
+import { requireActiveVideoRecordingSourceBinding } from '../../recording-control-lease';
 import { getVideoRecordingRuntimeState, setVideoRecordingRuntimeState } from '../session-state';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeControls' });
@@ -25,9 +26,11 @@ export async function updateRecordingSettings(
   }
 
   try {
+    const binding = await requireActiveVideoRecordingSourceBinding();
     await getBackgroundRuntimeMessaging().sendRuntimeMessage(
       attachOffscreenCommandCapability({
         type: VideoMessageType.OFFSCREEN_UPDATE_SETTINGS,
+        ...binding,
         settings,
       })
     );

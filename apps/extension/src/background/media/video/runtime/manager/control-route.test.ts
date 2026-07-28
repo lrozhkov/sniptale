@@ -51,11 +51,10 @@ vi.mock('./controls', () => ({
   finalizeRecordingDiagnostics: vi.fn(),
   getCurrentRecordingId: vi.fn(),
   getRecordingTabId: vi.fn(),
-  handleControlledCursorNavigationStart: vi.fn(),
   handleTabClose: vi.fn(),
   handleTabUpdated: vi.fn(),
-  handleViewportRecordingDebuggerDetach: vi.fn(),
-  handleViewportRecordingNavigationStart: vi.fn(),
+  handleTabRecordingDebuggerDetach: vi.fn(),
+  handleTabRecordingNavigationStart: vi.fn(),
   isRecording: vi.fn(),
   notifyRecordingStartFailed: vi.fn(),
   OVERLAY_RESTORE_RETRY_DELAYS_MS: [],
@@ -168,7 +167,7 @@ async function verifiesStartRecordingSuccessWithDefaultMode() {
     17,
     createStartMessage().settings,
     CaptureMode.TAB,
-    undefined,
+    null,
     popupSenderUrl
   );
   expect(sendResponse).toHaveBeenCalledWith({
@@ -187,7 +186,7 @@ async function verifiesStartRecordingFailureResponse() {
     message: {
       ...createStartMessage(),
       captureMode: CaptureMode.SCREEN,
-      viewportPreset: { width: 1280, height: 720 },
+      viewportPresetId: 'preset-1',
     },
     resolvedTabId: 11,
     sendResponse,

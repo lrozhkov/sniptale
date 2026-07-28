@@ -57,9 +57,10 @@ function createRouteArgs() {
     scenarioSessionService: createScenarioSessionServiceStub(),
     screenshotModeState: new Map([[42, true]]),
     sendResponse: vi.fn(),
-    viewportState: new Map<number, { width: number; height: number } | null>([
-      [42, { width: 1280, height: 720 }],
-    ]),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >([[42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }]]),
     pageAccessPort: {
       ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
       ensureNativeVisibleCaptureAuthority: ensureNativeVisibleCaptureAuthorityMock,

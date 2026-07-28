@@ -1,8 +1,5 @@
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import type {
-  VideoRecordingSettings,
-  VideoViewportPresetSelection,
-} from '@sniptale/runtime-contracts/video/types/types';
+import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import {
   defaultAnnotationSetupDeps,
   defaultCaptureSourceResolverDeps,
@@ -17,14 +14,12 @@ export async function resolveCaptureSourceForMode(
   tab: chrome.tabs.Tab | null,
   captureMode: CaptureMode,
   settings?: VideoRecordingSettings,
-  viewportPreset?: VideoViewportPresetSelection,
   deps: CaptureSourceResolverDeps = defaultCaptureSourceResolverDeps
 ) {
   deps.logger.debug('Resolving capture source', {
     captureMode,
     controlledCursorCaptureEnabled: settings?.controlledCursorCaptureEnabled === true,
     tabId,
-    viewportPreset,
   });
   return deps.resolveCaptureSource({
     tabId,
@@ -34,7 +29,6 @@ export async function resolveCaptureSourceForMode(
       ? { controlledCursorCaptureEnabled: true }
       : {}),
     ...(settings?.sourceCount === undefined ? {} : { sourceCount: settings.sourceCount }),
-    ...(viewportPreset === undefined ? {} : { viewportPreset }),
   });
 }
 

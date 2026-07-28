@@ -10,7 +10,7 @@ describe('video-session-state idle state', () => {
       countdownEndsAt: null,
       captureMode: null,
       captureSource: null,
-      viewportPreset: null,
+      viewportPresetId: null,
       liveMedia: null,
       error: null,
     });

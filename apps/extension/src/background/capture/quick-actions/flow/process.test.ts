@@ -36,7 +36,7 @@ function createSettings(): Settings {
       showSettings: true,
     },
     saveCapturesToGallery: false,
-    defaultViewportId: 'native',
+    defaultViewportPresetId: null,
     imageFormat: 'png',
     imageQuality: 90,
     authenticatedSnapshotAssetsEnabled: true,
@@ -77,7 +77,7 @@ function createRuntimeContext(captureMode: 'visible' | 'selection' = 'visible') 
     afterCapture: captureMode === 'selection' ? 'copy' : 'download_default',
     captureMode,
     delaySeconds: captureMode === 'selection' ? 1 : 0,
-    emulation: 'native',
+    viewportPresetId: null,
     imageFormat: captureMode === 'selection' ? 'jpeg' : 'png',
     imageQuality: captureMode === 'selection' ? 75 : 90,
     settings: createSettings(),
@@ -88,7 +88,10 @@ function createProcessArgs() {
   return {
     actionId: 'action-1',
     tabId: 19,
-    viewportState: new Map<number, { width: number; height: number } | null>(),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
     screenshotModeState: new Map<number, boolean>(),
   };
 }

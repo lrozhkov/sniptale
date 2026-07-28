@@ -1,74 +1,29 @@
 export interface ViewportEmulationResult {
   cssWidth: number;
   cssHeight: number;
-  scale: number;
 }
 
-export type LayoutMetrics = {
-  visualViewport?: {
-    clientWidth?: number;
-    clientHeight?: number;
-  };
-  layoutViewport?: {
-    clientWidth?: number;
-    clientHeight?: number;
-  };
-  contentSize?: {
-    width?: number;
-    height?: number;
-  };
-};
-
-type WorkspaceSize = {
-  width: number;
-  height: number;
-};
-
-export const DEFAULT_WORKSPACE_SIZE: WorkspaceSize = {
-  width: 1920,
-  height: 1080,
-};
-
-export function resolveAvailableWorkspaceFromLayoutMetrics(
-  layoutMetrics: LayoutMetrics,
-  debuggerBannerHeight: number
-): WorkspaceSize | null {
-  const visualViewport = layoutMetrics.visualViewport;
-  if (visualViewport?.clientWidth && visualViewport.clientHeight) {
+export function buildViewportEmulationResult(value: unknown): ViewportEmulationResult {
+  if (!isRecord(value)) return unavailableViewportMetrics();
+  if (isPositiveInteger(value['width']) && isPositiveInteger(value['height'])) {
     return {
-      width: visualViewport.clientWidth,
-      height: visualViewport.clientHeight - debuggerBannerHeight,
+      cssWidth: value['width'],
+      cssHeight: value['height'],
     };
   }
-
-  const layoutViewport = layoutMetrics.layoutViewport;
-  if (layoutViewport?.clientWidth && layoutViewport.clientHeight) {
-    return {
-      width: layoutViewport.clientWidth,
-      height: layoutViewport.clientHeight - debuggerBannerHeight,
-    };
-  }
-
-  return null;
+  return unavailableViewportMetrics();
 }
 
-export function calculateViewportScale(workspace: WorkspaceSize, width: number, height: number) {
-  const scaleX = workspace.width / width;
-  const scaleY = workspace.height / height;
-  const scale = Math.min(scaleX, scaleY, 1);
-  return { scale, scaleX, scaleY };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function buildViewportEmulationResult(
-  layoutMetrics: LayoutMetrics,
-  width: number,
-  height: number,
-  scale: number
-): ViewportEmulationResult {
-  const visualViewport = layoutMetrics.visualViewport;
-  return {
-    cssWidth: visualViewport?.clientWidth ?? Math.round(width * scale),
-    cssHeight: visualViewport?.clientHeight ?? Math.round(height * scale),
-    scale,
-  };
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
+
+function unavailableViewportMetrics(): never {
+  throw new Error(
+    'Viewport verification failed: window.innerWidth/window.innerHeight are unavailable'
+  );
 }

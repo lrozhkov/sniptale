@@ -1,6 +1,9 @@
 import { FakeRuntimeMessagingTransport } from '../../../platform/runtime-messaging/fake';
 import type { RuntimeMessagingTransport } from '../../../platform/runtime-messaging/transport';
-import { resetPopupRuntimeServicesForTests, setPopupRuntimeServicesForTests } from './services';
+import {
+  resetPopupRuntimeServicesForTests,
+  setPopupRuntimeServicesForTests,
+} from '../../runtime-services';
 
 type LooseRuntimeMessageSender = (message: unknown) => Promise<unknown>;
 type RuntimeMessageSender = RuntimeMessagingTransport['sendRuntimeMessage'];

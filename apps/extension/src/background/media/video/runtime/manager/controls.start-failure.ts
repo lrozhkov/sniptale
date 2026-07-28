@@ -3,6 +3,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   getVideoRecordingTabId,
+  getVideoRecordingId,
   isControlledCursorCaptureEnabled,
   resetVideoRecordingStartSession,
   setOpenEditorAfterRecording,
@@ -10,6 +11,7 @@ import {
 } from '../../session-state';
 import { resetVideoRecordingRuntimeState } from '../session-state';
 import { getBackgroundRuntimeMessaging } from '../../../../routing-contracts/runtime-messaging/services';
+import { cancelVideoSourceReadyWait, releaseVideoCaptureSurface } from '../../capture-surface';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeControls' });
 
@@ -35,9 +37,17 @@ function disableControlledCursorCapture(tabId: number): void {
   );
 }
 
-export function notifyRecordingStartFailed(error: string): void {
+export async function notifyRecordingStartFailed(
+  error: string,
+  options: { retainAuthority?: boolean } = {}
+): Promise<void> {
   logger.error('Recording start failed', error);
   const recordingTabId = getVideoRecordingTabId();
+  const recordingId = getVideoRecordingId();
+  if (options.retainAuthority !== true) {
+    if (recordingId) cancelVideoSourceReadyWait(recordingId, new Error(error));
+    await releaseVideoCaptureSurface(recordingId);
+  }
 
   if (recordingTabId !== null) {
     if (isControlledCursorCaptureEnabled()) {
@@ -46,10 +56,12 @@ export function notifyRecordingStartFailed(error: string): void {
     hideRecordingOverlay(recordingTabId);
   }
 
-  setVideoRecordingId(null);
-  setOpenEditorAfterRecording(false);
-  resetVideoRecordingStartSession();
-  resetVideoRecordingRuntimeState();
+  if (options.retainAuthority !== true) {
+    setVideoRecordingId(null);
+    setOpenEditorAfterRecording(false);
+    resetVideoRecordingStartSession();
+    resetVideoRecordingRuntimeState();
+  }
 
   runBestEffort(
     getBackgroundRuntimeMessaging().sendRuntimeMessage({

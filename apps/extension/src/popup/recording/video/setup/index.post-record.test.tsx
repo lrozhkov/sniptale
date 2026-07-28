@@ -86,8 +86,6 @@ function createProps(overrides: Partial<React.ComponentProps<typeof VideoSetupPa
   return {
     activeRecordingId: null,
     activeTabCapabilities: createActiveTabCapabilities(),
-    appliedViewportPresetId: null,
-    appliedViewportTabId: null,
     captureMode: CaptureMode.TAB,
     galleryStatus: null,
     isLoadingMicrophones: false,
@@ -140,7 +138,6 @@ function createActiveTabCapabilities(): ActiveTabCapabilities {
       [CaptureMode.TAB]: { supported: true, reason: null },
       [CaptureMode.TAB_CROP]: { supported: true, reason: null },
       [CaptureMode.CAMERA]: { supported: true, reason: null },
-      [CaptureMode.VIEWPORT_EMULATION]: { supported: true, reason: null },
     },
   };
 }
@@ -153,7 +150,7 @@ function createRecordingState(status: VideoRecordingStatus) {
     duration: status === VideoRecordingStatus.IDLE ? 0 : 8,
     error: null,
     status,
-    viewportPreset: null,
+    viewportPresetId: null,
   };
 }
 

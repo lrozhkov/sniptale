@@ -105,7 +105,7 @@ it('omits optional viewer ports when tab route deps do not own a registry', asyn
   const { deps } = registerListener();
   delete (deps as Partial<typeof deps>).webSnapshotViewerPorts;
   const sendResponse = vi.fn();
-  const message = { type: MessageType.ENABLE_SCREENSHOT_MODE };
+  const message = { type: MessageType.ENABLE_HIGHLIGHTER_MODE };
 
   browserTabsGetMock.mockResolvedValue({
     id: 17,

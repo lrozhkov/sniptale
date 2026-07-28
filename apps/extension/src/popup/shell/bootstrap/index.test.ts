@@ -59,7 +59,7 @@ vi.mock('../../recording/video/copy', (_importOriginal) => ({
     duration: 0,
     error: null,
     status: VideoRecordingStatus.IDLE,
-    viewportPreset: null,
+    viewportPresetId: null,
   },
 }));
 
@@ -121,7 +121,7 @@ function configureFailedRecordingBootstrapResponse() {
   );
   mocks.loadVideoUiStateMock.mockResolvedValue(
     createPopupBootstrapVideoUiState({
-      captureMode: CaptureMode.VIEWPORT_EMULATION,
+      captureMode: CaptureMode.TAB,
       viewportPresetId: 'missing-preset',
     })
   );

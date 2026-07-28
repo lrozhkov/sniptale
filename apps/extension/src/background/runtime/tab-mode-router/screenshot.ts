@@ -3,13 +3,16 @@ import type { TabModeMessage } from '@sniptale/runtime-contracts/messaging/messa
 import { createWebSnapshotViewerPorts } from '../../capture/lifecycle';
 import {
   buildScreenshotModeStatusResponse,
-  disableScreenshotMode,
+  disableScreenshotModeForContent,
   enableScreenshotMode,
-  handleSetViewport,
+  getScreenshotPresetAvailabilities,
+  handleApplyViewportPreset,
+  handleReleaseViewportPreset,
 } from '../tab-mode-router-screenshot';
-import { respondAsyncSuccess } from '../../routing-contracts/response';
+import { respondAsyncRoute, respondAsyncSuccess } from '../../routing-contracts/response';
 import type { TabModeContext } from './shared';
 import { isScreenshotModeMessage } from './shared';
+import { getPreauthorizedContentActionRouteMessage } from '../../capture/routes';
 
 function handleScreenshotModeStatus(context: TabModeContext): boolean {
   return buildScreenshotModeStatusResponse(
@@ -30,28 +33,35 @@ export function routeScreenshotModeMessage(
   }
 
   switch (message.type) {
-    case MessageType.ENABLE_SCREENSHOT_MODE:
+    case MessageType.ENABLE_SCREENSHOT_MODE: {
+      const senderBinding = getPreauthorizedContentActionRouteMessage(message);
       respondAsyncSuccess(
         enableScreenshotMode(
           context.resolvedTabId,
           context.screenshotModeState,
           context.viewportState,
           context.viewportOwnerState,
-          context.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts()
+          context.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts(),
+          senderBinding ? { surfaceDocumentId: senderBinding.documentId } : {}
         ),
         context.sendResponse
       );
       return true;
+    }
 
     case MessageType.DISABLE_SCREENSHOT_MODE:
       respondAsyncSuccess(
-        disableScreenshotMode(
-          context.resolvedTabId,
-          context.screenshotModeState,
-          context.viewportState,
-          context.viewportOwnerState,
-          context.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts()
-        ),
+        disableScreenshotModeForContent({
+          leaseGeneration: message.leaseGeneration,
+          operationGeneration: message.operationGeneration,
+          screenshotModeState: context.screenshotModeState,
+          senderDocumentId: context.senderDocumentId,
+          surfaceCapabilityToken: message.surfaceCapabilityToken,
+          tabId: context.resolvedTabId,
+          viewportOwnerState: context.viewportOwnerState,
+          viewportState: context.viewportState,
+          webSnapshotViewerPorts: context.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts(),
+        }),
         context.sendResponse
       );
       return true;
@@ -64,16 +74,47 @@ export function routeScreenshotModeMessage(
 }
 
 export function routeViewportMessage(message: TabModeMessage, context: TabModeContext): boolean {
-  if (message.type === MessageType.SET_VIEWPORT) {
+  if (message.type === MessageType.APPLY_VIEWPORT_PRESET) {
     respondAsyncSuccess(
-      handleSetViewport(
+      handleApplyViewportPreset(
         context.resolvedTabId,
-        message.width,
-        message.height,
+        message.presetId,
+        message.operationGeneration,
+        message.surfaceCapabilityToken,
+        context.senderDocumentId,
         context.viewportState,
         context.viewportOwnerState,
         context.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts()
       ),
+      context.sendResponse
+    );
+    return true;
+  }
+
+  if (message.type === MessageType.RELEASE_VIEWPORT_PRESET) {
+    respondAsyncSuccess(
+      handleReleaseViewportPreset(
+        context.resolvedTabId,
+        message.operationGeneration,
+        message.leaseGeneration,
+        message.surfaceCapabilityToken,
+        context.senderDocumentId,
+        context.viewportState,
+        context.viewportOwnerState,
+        context.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts()
+      ),
+      context.sendResponse
+    );
+    return true;
+  }
+
+  if (message.type === MessageType.GET_VIEWPORT_PRESET_AVAILABILITY) {
+    respondAsyncRoute(
+      getScreenshotPresetAvailabilities(
+        context.resolvedTabId,
+        message.presetIds,
+        message.context ?? 'screenshot'
+      ).then((availabilities) => ({ success: true as const, availabilities })),
       context.sendResponse
     );
     return true;

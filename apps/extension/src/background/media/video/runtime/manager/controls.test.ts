@@ -7,8 +7,6 @@ const {
   stopRecordingFromOwner,
   overlayRetryDelaysFromOwner,
 } = vi.hoisted(() => ({
-  handleViewportRecordingDebuggerDetachFromOwner: vi.fn(),
-  handleViewportRecordingNavigationStartFromOwner: vi.fn(),
   notifyRecordingStartFailedFromOwner: vi.fn(),
   pauseRecordingFromOwner: vi.fn(),
   resumeRecordingFromOwner: vi.fn(),

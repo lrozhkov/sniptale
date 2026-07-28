@@ -14,6 +14,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'ai-secret-unlock-requests',
   'ai-settings-mutation-queue',
   'capture-download-jobs',
+  'capture-surface-leases',
   'content-action-activation-keys',
   'content-action-auto-start-grants',
   'content-action-capabilities',
@@ -31,6 +32,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'project-export-job-ledger',
   'recording-download-staged-chunks',
   'tab-mode-runtime-state',
+  'video-capture-surface-sessions',
   'video-recording-control-lease',
   'web-snapshot-staged-blobs',
 ] as const satisfies readonly PolicyStateId[];

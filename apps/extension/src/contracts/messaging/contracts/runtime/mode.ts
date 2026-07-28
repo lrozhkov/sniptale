@@ -10,8 +10,8 @@ import {
   isBoolean,
   isNullable,
   isNumber,
+  isRecord,
   isQuickActionOverlay,
-  isSize2d,
   isString,
 } from '../../validators/index';
 import * as ContentActionContract from '@sniptale/runtime-contracts/protocol/content-privileged-action';
@@ -21,6 +21,76 @@ type PartialRuntimeRegistry = Partial<
 >;
 
 const asyncRouteAckFields = { result: isString };
+const isAppliedViewportPreset = (
+  value: unknown
+): value is {
+  presetId: string;
+  target: 'viewport' | 'window';
+  width: number;
+  height: number;
+} =>
+  isRecord(value) &&
+  isString(value['presetId']) &&
+  (value['target'] === 'viewport' || value['target'] === 'window') &&
+  isNumber(value['width']) &&
+  isNumber(value['height']);
+
+const availabilityReasons = new Set([
+  'disabled',
+  'missing',
+  'unsupported-context',
+  'viewport-too-large',
+  'window-too-large',
+  'window-not-normal',
+  'zoom-not-100',
+  'surface-busy',
+  'permission-denied',
+  'platform-rejected',
+  'verification-failed',
+]);
+
+function hasOnlyFields(value: Record<string, unknown>, fields: readonly string[]): boolean {
+  const allowed = new Set(fields);
+  return Object.keys(value).every((field) => allowed.has(field));
+}
+
+function isSize(value: unknown): value is { width: number; height: number } {
+  return (
+    isRecord(value) &&
+    hasOnlyFields(value, ['width', 'height']) &&
+    isNumber(value['width']) &&
+    isNumber(value['height'])
+  );
+}
+
+function isViewportPresetAvailability(value: unknown): boolean {
+  if (!isRecord(value) || !isString(value['presetId'])) return false;
+  const target = value['target'];
+  if (value['status'] === 'available' || value['status'] === 'requires-start-validation') {
+    return (
+      hasOnlyFields(value, ['status', 'presetId', 'target', 'required']) &&
+      (target === 'viewport' || (value['status'] === 'available' && target === 'window')) &&
+      isSize(value['required'])
+    );
+  }
+  return (
+    value['status'] === 'unavailable' &&
+    hasOnlyFields(value, ['status', 'presetId', 'target', 'reason', 'required', 'available']) &&
+    (target === null || target === 'viewport' || target === 'window') &&
+    isString(value['reason']) &&
+    availabilityReasons.has(value['reason']) &&
+    (value['required'] === undefined || isSize(value['required'])) &&
+    (value['available'] === undefined || isSize(value['available']))
+  );
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length > 0 && value.every(isString);
+}
+
+function isViewportPresetAvailabilityArray(value: unknown): boolean {
+  return Array.isArray(value) && value.every(isViewportPresetAvailability);
+}
 
 export const runtimeModeMessageContracts = {
   [MessageType.ENABLE_SCREENSHOT_MODE]: {
@@ -30,11 +100,16 @@ export const runtimeModeMessageContracts = {
         type: MessageType.ENABLE_SCREENSHOT_MODE,
         optional: {
           tabId: isNumber,
-          viewport: isNullable(isSize2d),
+          viewport: isNullable(isAppliedViewportPreset),
           quickActionOverlay: isQuickActionOverlay,
           autoStartSelection: isBoolean,
           autoStartCaptureType: isString,
           toolbarVisible: isBoolean,
+          contentIntent: ContentActionContract.isContentPrivilegedActionCapability,
+          surfaceCapabilityToken: isString,
+          surfaceLeaseGeneration: isNumber,
+          surfaceOperationGeneration: isNumber,
+          surfaceWarning: isString,
           contentIntentGrant: ContentActionContract.isContentPrivilegedActionAutoStartGrant,
         },
       })
@@ -49,7 +124,12 @@ export const runtimeModeMessageContracts = {
       'runtime DISABLE_SCREENSHOT_MODE message',
       createMessageGuard({
         type: MessageType.DISABLE_SCREENSHOT_MODE,
-        optional: { tabId: isNumber },
+        optional: {
+          leaseGeneration: isNumber,
+          operationGeneration: isNumber,
+          surfaceCapabilityToken: isString,
+          tabId: isNumber,
+        },
       })
     ),
     parseResponse: createGuardParser(
@@ -72,9 +152,12 @@ export const runtimeModeMessageContracts = {
           documentId: isString,
           enabled: isBoolean,
           supported: isBoolean,
+          surfaceCapabilityToken: isString,
+          surfaceLeaseGeneration: isNumber,
+          surfaceOperationGeneration: isNumber,
           tabId: isNumber,
           unsupportedReason: isNullable(isString),
-          viewport: isNullable(isSize2d),
+          viewport: isNullable(isAppliedViewportPreset),
         },
       })
     ),
@@ -157,17 +240,59 @@ export const runtimeModeMessageContracts = {
       createRuntimeResponseGuard({ optional: { enabled: isBoolean } })
     ),
   },
-  [MessageType.SET_VIEWPORT]: {
+  [MessageType.APPLY_VIEWPORT_PRESET]: {
     parseRequest: createGuardParser(
-      'runtime SET_VIEWPORT message',
+      'runtime APPLY_VIEWPORT_PRESET message',
       createMessageGuard({
-        type: MessageType.SET_VIEWPORT,
-        optional: { width: isNumber, height: isNumber, tabId: isNumber },
+        type: MessageType.APPLY_VIEWPORT_PRESET,
+        required: {
+          operationGeneration: isNumber,
+          presetId: isString,
+          surfaceCapabilityToken: isString,
+        },
+        optional: { tabId: isNumber },
       })
     ),
     parseResponse: createGuardParser(
-      'runtime SET_VIEWPORT response',
+      'runtime APPLY_VIEWPORT_PRESET response',
       createRuntimeResponseGuard({ optional: { result: isString } })
+    ),
+  },
+  [MessageType.RELEASE_VIEWPORT_PRESET]: {
+    parseRequest: createGuardParser(
+      'runtime RELEASE_VIEWPORT_PRESET message',
+      createMessageGuard({
+        type: MessageType.RELEASE_VIEWPORT_PRESET,
+        required: {
+          leaseGeneration: isNumber,
+          operationGeneration: isNumber,
+          surfaceCapabilityToken: isString,
+        },
+        optional: { tabId: isNumber },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime RELEASE_VIEWPORT_PRESET response',
+      createRuntimeResponseGuard({ optional: { result: isString } })
+    ),
+  },
+  [MessageType.GET_VIEWPORT_PRESET_AVAILABILITY]: {
+    parseRequest: createGuardParser(
+      'runtime GET_VIEWPORT_PRESET_AVAILABILITY message',
+      createMessageGuard({
+        type: MessageType.GET_VIEWPORT_PRESET_AVAILABILITY,
+        required: { presetIds: isStringArray },
+        optional: {
+          context: (value) => value === 'screenshot' || value === 'video',
+          tabId: isNumber,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime GET_VIEWPORT_PRESET_AVAILABILITY response',
+      createRuntimeResponseGuard({
+        optional: { availabilities: isViewportPresetAvailabilityArray },
+      })
     ),
   },
   [MessageType.GET_VIEWPORT_STATUS]: {
@@ -180,7 +305,7 @@ export const runtimeModeMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime GET_VIEWPORT_STATUS response',
-      createRuntimeResponseGuard({ optional: { viewport: isNullable(isSize2d) } })
+      createRuntimeResponseGuard({ optional: { viewport: isNullable(isAppliedViewportPreset) } })
     ),
   },
 } satisfies PartialRuntimeRegistry;

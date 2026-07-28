@@ -50,6 +50,7 @@ vi.mock('../recording/controller', () => ({
   setViewportDrawState: vi.fn(),
   startRecording: vi.fn(),
   stopRecording: stopRecordingMock,
+  updateRecordingSettings: vi.fn(),
   updateViewportCrop: vi.fn(),
 }));
 
@@ -79,6 +80,9 @@ function createStopCommand() {
   return {
     type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
     discard: true,
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
   };
 }
 

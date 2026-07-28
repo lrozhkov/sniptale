@@ -1,10 +1,19 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { FakeRuntimeMessagingTransport } from '../../../../platform/runtime-messaging/fake';
-import { sendOffscreenStartRecording } from './start-helpers';
+const getBackgroundRuntimeMessagingMock = vi.hoisted(() => vi.fn());
 
-const defaultSettings = {
+vi.mock('../../../routing-contracts/runtime-messaging/services', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../routing-contracts/runtime-messaging/services')
+  >()),
+  getBackgroundRuntimeMessaging: getBackgroundRuntimeMessagingMock,
+}));
+
+import { sendOffscreenBeginRecording, sendOffscreenStartRecording } from './start-helpers';
+
+const settings = {
   microphoneEnabled: false,
   microphoneDeviceId: null,
   webcamEnabled: false,
@@ -17,176 +26,153 @@ const defaultSettings = {
   diagnosticsEnabled: false,
 };
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
 function createTransport() {
   const transport = new FakeRuntimeMessagingTransport();
   transport.onRuntimeMessage(VideoMessageType.OFFSCREEN_START_RECORDING, () => undefined);
   return transport;
 }
 
-function createViewportEmulationArgs() {
-  return {
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
-    captureSource: {
-      mode: CaptureMode.TAB,
-      streamId: 'stream-id',
-    },
-    currentRecordingId: 'recording-1',
-    recordingTabId: 321,
-    settings: defaultSettings,
-    viewportPreset: {
-      id: 'wide',
-      label: 'Wide',
-      width: 1920,
-      height: 1080,
-    },
-    viewportEmulationResult: {
-      cssWidth: 1295.6,
-      cssHeight: 734.2,
-      scale: 0.7,
-    },
-  };
-}
-
-function createStandardCaptureArgs() {
-  return {
-    captureMode: CaptureMode.TAB_CROP,
-    captureSource: {
-      mode: CaptureMode.TAB_CROP,
-      streamId: 'stream-area',
-      cropRegion: {
-        x: 10,
-        y: 20,
-        width: 300,
-        height: 200,
-      },
-    },
-    currentRecordingId: null,
-    recordingTabId: null,
-    settings: defaultSettings,
-    viewport: {
-      width: 1440,
-      height: 900,
-      scrollX: 0,
-      scrollY: 0,
-      devicePixelRatio: 1,
-    },
-  };
-}
-
-function expectViewportEmulationRequest(transport: FakeRuntimeMessagingTransport) {
-  expect(transport.runtimeRequests).toContainEqual(
-    expect.objectContaining({
-      type: VideoMessageType.OFFSCREEN_START_RECORDING,
-      capabilityToken: expect.any(String),
-      streamId: 'stream-id',
-      settings: defaultSettings,
-      tabId: 321,
-      recordingId: 'recording-1',
-      captureMode: CaptureMode.VIEWPORT_EMULATION,
-      targetResolution: {
-        width: 1920,
-        height: 1080,
-      },
-      emulatedViewportCssSize: {
-        width: 1296,
-        height: 734,
-      },
-    })
-  );
-}
-
-function expectStandardCaptureRequest(transport: FakeRuntimeMessagingTransport) {
-  expect(transport.runtimeRequests).toContainEqual(
-    expect.objectContaining({
-      type: VideoMessageType.OFFSCREEN_START_RECORDING,
-      capabilityToken: expect.any(String),
-      streamId: 'stream-area',
-      settings: defaultSettings,
-      viewport: {
-        width: 1440,
-        height: 900,
-        scrollX: 0,
-        scrollY: 0,
-        devicePixelRatio: 1,
-      },
-      captureMode: CaptureMode.TAB_CROP,
-      cropRegion: {
-        x: 10,
-        y: 20,
-        width: 300,
-        height: 200,
-      },
-    })
-  );
-}
-
-describe('video-manager-start-helpers viewport emulation flow', () => {
-  it('forwards the reported viewport bounds for VIEWPORT_EMULATION', () => {
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const transport = createTransport();
-
-    sendOffscreenStartRecording(createViewportEmulationArgs(), vi.fn(), transport);
-
-    expectViewportEmulationRequest(transport);
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      '[VideoManager]',
-      'Viewport emulation offscreen bounds resolved',
-      expect.objectContaining({
-        viewportBounds: {
-          width: 1296,
-          height: 734,
-        },
-      })
-    );
-  });
-
-  it('drops crop regions from viewport-emulation payloads even when the source still has one', () => {
-    const transport = createTransport();
-
-    sendOffscreenStartRecording(
-      {
-        ...createViewportEmulationArgs(),
-        captureSource: {
-          mode: CaptureMode.TAB,
-          streamId: 'stream-id',
-          cropRegion: {
-            x: 10,
-            y: 20,
-            width: 300,
-            height: 200,
-          },
-        },
-      },
-      vi.fn(),
-      transport
-    );
-
-    expect(transport.runtimeRequests[0]).not.toHaveProperty('cropRegion');
-  });
+beforeEach(() => {
+  getBackgroundRuntimeMessagingMock.mockReset();
 });
 
-describe('video-manager-start-helpers standard capture flow', () => {
-  it('preserves crop regions and skips viewport emulation payload details outside emulation mode', () => {
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const transport = createTransport();
+it('forwards the exact surface contract without preset-derived constraints', async () => {
+  const transport = createTransport();
+  const surface = {
+    presetId: 'wide',
+    target: 'viewport' as const,
+    width: 1920,
+    height: 1080,
+    sessionId: 'recording-1',
+    leaseId: 'lease-1',
+    generation: 4,
+  };
 
-    sendOffscreenStartRecording(createStandardCaptureArgs(), vi.fn(), transport);
+  await sendOffscreenStartRecording(
+    {
+      captureMode: CaptureMode.TAB,
+      captureSource: { mode: CaptureMode.TAB, streamId: 'stream-id' },
+      generation: 4,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+      recordingTabId: 321,
+      settings,
+      surface,
+    },
+    transport
+  );
 
-    expectStandardCaptureRequest(transport);
-    expect(consoleLogSpy).not.toHaveBeenCalled();
-  });
+  expect(transport.runtimeRequests).toContainEqual(
+    expect.objectContaining({
+      type: VideoMessageType.OFFSCREEN_START_RECORDING,
+      streamId: 'stream-id',
+      generation: 4,
+      recordingId: 'recording-1',
+      tabId: 321,
+      surface: { presetId: 'wide', target: 'viewport', width: 1920, height: 1080 },
+    })
+  );
+  expect(transport.runtimeRequests[0]).not.toHaveProperty('targetResolution');
+  expect(transport.runtimeRequests[0]).not.toHaveProperty('emulatedViewportCssSize');
+});
 
-  it('supports transport-only invocation without an error callback', async () => {
-    const transport = createTransport();
+it('preserves intentional 1:1 TAB_CROP coordinates', async () => {
+  const transport = createTransport();
+  await sendOffscreenStartRecording(
+    {
+      captureMode: CaptureMode.TAB_CROP,
+      captureSource: {
+        mode: CaptureMode.TAB_CROP,
+        streamId: 'stream-area',
+        cropRegion: { x: 10, y: 20, width: 300, height: 200 },
+      },
+      generation: 1,
+      recordingId: 'recording-2',
+      streamInstanceId: 'stream-instance-2',
+      recordingTabId: 9,
+      settings,
+      surface: null,
+    },
+    transport
+  );
+  expect(transport.runtimeRequests[0]).toEqual(
+    expect.objectContaining({ cropRegion: { x: 10, y: 20, width: 300, height: 200 } })
+  );
+});
 
+it('omits optional tab, viewport, crop, and surface fields for a natural window source', async () => {
+  const transport = createTransport();
+  await sendOffscreenStartRecording(
+    {
+      captureMode: CaptureMode.SCREEN,
+      captureSource: { mode: CaptureMode.SCREEN, streamId: 'screen' },
+      generation: 2,
+      recordingId: 'recording-screen',
+      streamInstanceId: 'stream-instance-screen',
+      recordingTabId: null,
+      settings,
+      surface: null,
+    },
+    transport
+  );
+
+  expect(transport.runtimeRequests[0]).not.toHaveProperty('tabId');
+  expect(transport.runtimeRequests[0]).not.toHaveProperty('viewport');
+  expect(transport.runtimeRequests[0]).not.toHaveProperty('cropRegion');
+  expect(transport.runtimeRequests[0]).not.toHaveProperty('surface');
+});
+
+it('surfaces explicit and fallback source-preparation rejection messages', async () => {
+  for (const response of [{ error: 'source rejected', success: false }, { success: false }]) {
+    const transport = new FakeRuntimeMessagingTransport();
+    transport.onRuntimeMessage(VideoMessageType.OFFSCREEN_START_RECORDING, () => response);
     await expect(
-      sendOffscreenStartRecording(createStandardCaptureArgs(), transport)
-    ).resolves.toBeUndefined();
+      sendOffscreenStartRecording(
+        {
+          captureMode: CaptureMode.TAB,
+          captureSource: { mode: CaptureMode.TAB, streamId: 'stream' },
+          generation: 1,
+          recordingId: 'recording',
+          streamInstanceId: 'stream-instance',
+          recordingTabId: 1,
+          settings,
+          surface: null,
+        },
+        transport
+      )
+    ).rejects.toThrow(response.error ?? 'Offscreen rejected recording source preparation');
+  }
+});
 
-    expectStandardCaptureRequest(transport);
-  });
+it('begins only the matching prepared stream and surfaces offscreen rejection', async () => {
+  const transport = new FakeRuntimeMessagingTransport();
+  transport.onRuntimeMessage(VideoMessageType.OFFSCREEN_BEGIN_RECORDING, () => undefined);
+  getBackgroundRuntimeMessagingMock.mockReturnValue(transport);
+
+  await expect(
+    sendOffscreenBeginRecording({
+      generation: 3,
+      recordingId: 'recording',
+      streamInstanceId: 'stream-instance',
+    })
+  ).resolves.toBeUndefined();
+  expect(transport.runtimeRequests[0]).toEqual(
+    expect.objectContaining({
+      generation: 3,
+      recordingId: 'recording',
+      streamInstanceId: 'stream-instance',
+      type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
+    })
+  );
+
+  const rejected = new FakeRuntimeMessagingTransport();
+  rejected.onRuntimeMessage(VideoMessageType.OFFSCREEN_BEGIN_RECORDING, () => ({ success: false }));
+  getBackgroundRuntimeMessagingMock.mockReturnValue(rejected);
+  await expect(
+    sendOffscreenBeginRecording({
+      generation: 3,
+      recordingId: 'recording',
+      streamInstanceId: 'stream-instance',
+    })
+  ).rejects.toThrow('Offscreen rejected recording start');
 });

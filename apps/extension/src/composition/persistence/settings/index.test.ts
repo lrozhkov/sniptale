@@ -34,6 +34,8 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 }));
 
 import { clearSettings, loadSettings, saveSettings } from './index';
+import { createSystemViewportPresetCatalog } from '../../../features/viewport-presets/catalog';
+import { normalizeViewportPresetOrder } from '../../../features/viewport-presets/operations';
 
 const DEFAULT_CONTENT_TOOLBAR = {
   displayMode: 'horizontal' as const,
@@ -51,10 +53,7 @@ const DEFAULT_CONTEXT_MENU = {
   showPageLinkCopy: true,
   showSettings: true,
 };
-const DEFAULT_VIEWPORT_PRESETS = [
-  { id: 'fhd', width: 1920, height: 1080, label: 'Full HD' },
-  { id: 'hd', width: 1280, height: 720, label: 'HD' },
-];
+const DEFAULT_VIEWPORT_PRESETS = createSystemViewportPresetCatalog();
 const PRIVACY_DEFAULTS = {
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   authenticatedSnapshotAssetsEnabled: false,
@@ -90,7 +89,7 @@ async function verifySaveAndClearContracts() {
     },
     saveCapturesToGallery: true,
     viewportPresets: [],
-    defaultViewportId: 'custom',
+    defaultViewportPresetId: 'custom',
     presets: [],
     defaultImagePresetId: 'image-1',
     defaultVideoPresetId: 'video-1',
@@ -126,7 +125,7 @@ async function verifyLoadMigration() {
     contextMenu: DEFAULT_CONTEXT_MENU,
     saveCapturesToGallery: true,
     viewportPresets: DEFAULT_VIEWPORT_PRESETS,
-    defaultViewportId: 'native',
+    defaultViewportPresetId: null,
     presets: [],
     defaultImagePresetId: null,
     defaultVideoPresetId: null,
@@ -135,9 +134,23 @@ async function verifyLoadMigration() {
     imageQuality: 75,
     ...PRIVACY_DEFAULTS,
   });
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
 }
 
 async function verifyStoredSettings() {
+  const storedViewportPresets = normalizeViewportPresetOrder([
+    ...DEFAULT_VIEWPORT_PRESETS,
+    {
+      kind: 'user' as const,
+      id: 'mobile',
+      name: 'Mobile',
+      target: 'viewport' as const,
+      width: 390,
+      height: 844,
+      enabled: true,
+      order: 9,
+    },
+  ]);
   const storedSettings = {
     captureAction: 'copy' as const,
     contentToolbar: {
@@ -157,8 +170,8 @@ async function verifyStoredSettings() {
       showSettings: true,
     },
     saveCapturesToGallery: false,
-    viewportPresets: [{ id: 'mobile', width: 390, height: 844, label: 'Mobile' }],
-    defaultViewportId: 'mobile',
+    viewportPresets: storedViewportPresets,
+    defaultViewportPresetId: 'mobile',
     presets: [],
     defaultImagePresetId: 'image-7',
     defaultVideoPresetId: 'video-7',
@@ -195,10 +208,19 @@ const invalidStoredSettingsFixture = {
   },
   saveCapturesToGallery: true,
   viewportPresets: [
-    { id: 'mobile', width: 390, height: 844, label: 'Mobile' },
+    {
+      kind: 'user',
+      id: 'mobile',
+      name: 'Mobile',
+      target: 'viewport',
+      width: 390,
+      height: 844,
+      enabled: true,
+      order: 0,
+    },
     { id: 'broken-preset' },
   ],
-  defaultViewportId: 42,
+  defaultViewportPresetId: 42,
   presets: [
     { id: 'preset-1', name: 'Screens', path: 'screens', enabled: true, order: 0 },
     { id: 'broken-save-preset' },
@@ -229,8 +251,8 @@ const expectedInvalidStoredSettingsResult = {
     showSettings: false,
   },
   saveCapturesToGallery: true,
-  viewportPresets: [{ id: 'mobile', width: 390, height: 844, label: 'Mobile' }],
-  defaultViewportId: 'native',
+  viewportPresets: DEFAULT_VIEWPORT_PRESETS,
+  defaultViewportPresetId: null,
   presets: [{ id: 'preset-1', name: 'Screens', path: 'screens', enabled: true, order: 0 }],
   defaultImagePresetId: null,
   defaultVideoPresetId: 'video-9',
@@ -262,7 +284,7 @@ async function verifyInvalidRootFallback() {
     contextMenu: DEFAULT_CONTEXT_MENU,
     saveCapturesToGallery: false,
     viewportPresets: DEFAULT_VIEWPORT_PRESETS,
-    defaultViewportId: 'native',
+    defaultViewportPresetId: null,
     presets: [],
     defaultImagePresetId: null,
     defaultVideoPresetId: null,
@@ -288,7 +310,7 @@ describe('settings', () => {
   it('keeps default settings stable when storage returns no payload', async () => {
     browserStorageSyncGetMock.mockResolvedValueOnce({});
     await expect(loadSettings()).resolves.toMatchObject({
-      defaultViewportId: 'native',
+      defaultViewportPresetId: null,
       imageFormat: 'png',
     });
   });

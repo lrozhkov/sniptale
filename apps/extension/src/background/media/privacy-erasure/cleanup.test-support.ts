@@ -6,6 +6,8 @@ export const recordingLease = {
   ownerSenderUrl: 'chrome-extension://test/settings',
   recordingId: 'recording-1',
   recordingTabId: 7,
+  surfaceBinding: null,
+  viewportPresetId: null,
 };
 
 export function createRunningExportLedger() {

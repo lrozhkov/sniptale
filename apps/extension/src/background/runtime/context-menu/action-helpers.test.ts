@@ -4,6 +4,7 @@ import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { installBackgroundRuntimeMessagingMock } from '../../routing-contracts/runtime-messaging/mock';
 
 const {
+  captureSurfaceGetAvailabilityMock,
   loadPopupExportPreferencesMock,
   loadSettingsMock,
   loadVideoSettingsMock,
@@ -17,6 +18,7 @@ const {
   runtimeGetUrlMock,
   translateMock,
 } = vi.hoisted(() => ({
+  captureSurfaceGetAvailabilityMock: vi.fn(),
   loadPopupExportPreferencesMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   loadVideoSettingsMock: vi.fn(),
@@ -29,6 +31,13 @@ const {
   startRecordingMock: vi.fn(),
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
   translateMock: vi.fn((key: string) => key),
+}));
+
+vi.mock('../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture-surface')>()),
+  getCaptureSurfaceService: vi.fn(() => ({
+    getAvailability: captureSurfaceGetAvailabilityMock,
+  })),
 }));
 
 vi.mock('../../../platform/navigation/extension-pages', async (importOriginal) => ({
@@ -114,6 +123,14 @@ function resetContextMenuActionHelperMocks(): void {
     captureMode: CaptureMode.TAB,
     viewportPresetId: 'preset-alt',
   });
+  captureSurfaceGetAvailabilityMock.mockImplementation(({ presetId }: { presetId: string }) =>
+    Promise.resolve({
+      status: 'requires-start-validation',
+      presetId,
+      target: 'viewport',
+      required: { width: 1920, height: 1080 },
+    })
+  );
   sendTabMessageMock.mockResolvedValue({ success: true });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   startRecordingMock.mockResolvedValue(undefined);
@@ -143,12 +160,9 @@ it('falls back to the default video preset when ui state points to a missing pre
     captureMode: CaptureMode.TAB,
     viewportPresetId: 'missing-preset',
   });
-  await expect(resolveContextMenuVideoPreset(contextMenuSettingsFixture)).resolves.toEqual({
-    height: 900,
-    id: 'preset-default',
-    label: 'Default',
-    width: 1440,
-  });
+  await expect(resolveContextMenuVideoPreset(contextMenuSettingsFixture)).resolves.toBe(
+    'preset-default'
+  );
 });
 
 it('returns null when neither the ui state nor the default preset can be resolved', async () => {
@@ -159,7 +173,26 @@ it('returns null when neither the ui state nor the default preset can be resolve
   await expect(
     resolveContextMenuVideoPreset({
       ...contextMenuSettingsFixture,
-      defaultVideoPresetId: 'missing-default',
+      defaultViewportPresetId: 'missing-default',
+    })
+  ).resolves.toBeNull();
+});
+
+it('falls back from a disabled preferred preset and rejects a disabled default', async () => {
+  const settings = {
+    ...contextMenuSettingsFixture,
+    viewportPresets: contextMenuSettingsFixture.viewportPresets.map((preset) => ({
+      ...preset,
+      enabled: preset.id !== 'preset-alt',
+    })),
+  };
+
+  await expect(resolveContextMenuVideoPreset(settings)).resolves.toBe('preset-default');
+
+  await expect(
+    resolveContextMenuVideoPreset({
+      ...settings,
+      viewportPresets: settings.viewportPresets.map((preset) => ({ ...preset, enabled: false })),
     })
   ).resolves.toBeNull();
 });
@@ -170,7 +203,7 @@ it('starts non-preset video recording without a viewport preset payload', async 
     21,
     contextMenuVideoSettingsFixture,
     CaptureMode.TAB,
-    undefined,
+    null,
     'chrome-extension://test/apps/extension/src/popup/index.html'
   );
 });
@@ -178,15 +211,48 @@ it('starts non-preset video recording without a viewport preset payload', async 
 it('throws a translated error when preset recording has no resolvable preset', async () => {
   loadSettingsMock.mockResolvedValue({
     ...contextMenuSettingsFixture,
-    defaultVideoPresetId: 'missing-default',
+    defaultViewportPresetId: 'missing-default',
   });
   loadVideoUiStateMock.mockResolvedValue({
     captureMode: CaptureMode.TAB,
     viewportPresetId: 'missing-preset',
   });
-  await expect(startContextMenuVideoRecording(21, CaptureMode.VIEWPORT_EMULATION)).rejects.toThrow(
+  await expect(startContextMenuVideoRecording(21, CaptureMode.TAB, true)).rejects.toThrow(
     'popup.video.choosePresetError'
   );
+});
+
+it('rechecks physical preset availability immediately before recording', async () => {
+  await startContextMenuVideoRecording(21, CaptureMode.TAB, true);
+
+  expect(captureSurfaceGetAvailabilityMock).toHaveBeenCalledWith({
+    tabId: 21,
+    presetId: 'preset-alt',
+    context: 'video-tab',
+  });
+  expect(startRecordingMock).toHaveBeenCalledWith(
+    21,
+    contextMenuVideoSettingsFixture,
+    CaptureMode.TAB,
+    'preset-alt',
+    'chrome-extension://test/apps/extension/src/popup/index.html'
+  );
+});
+
+it('blocks an unavailable context-menu preset before recording starts', async () => {
+  captureSurfaceGetAvailabilityMock.mockResolvedValueOnce({
+    status: 'unavailable',
+    presetId: 'preset-alt',
+    target: 'viewport',
+    reason: 'viewport-too-large',
+    required: { width: 1920, height: 1080 },
+    available: { width: 1280, height: 720 },
+  });
+
+  await expect(startContextMenuVideoRecording(21, CaptureMode.TAB, true)).rejects.toMatchObject({
+    code: 'viewport-too-large',
+  });
+  expect(startRecordingMock).not.toHaveBeenCalled();
 });
 
 it('fails export start when the content flow returns an error', async () => {

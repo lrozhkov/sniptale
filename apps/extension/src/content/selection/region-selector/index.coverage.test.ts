@@ -99,6 +99,11 @@ it('selects a region, clears it, and hides the selector', async () => {
   controller.hideRegionSelector();
 
   expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledWith({
+    captureViewport: expect.objectContaining({
+      devicePixelRatio: expect.any(Number),
+      height: expect.any(Number),
+      width: expect.any(Number),
+    }),
     region: { height: 4, width: 3, x: 1, y: 2 },
     ...requestBinding,
     type: VideoMessageType.REGION_SELECTED,

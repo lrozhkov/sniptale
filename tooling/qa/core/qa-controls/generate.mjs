@@ -24,8 +24,43 @@ function writeJson(relativePath, value) {
 const PROOF_OVERRIDES = new Map([
   ['npm-audit.mjs', ['tooling/qa/core/verify-runners.test.ts']],
   ['run-controller.mjs', ['tooling/qa/runtime/observability/lifecycle.test.ts']],
+  ['verify-all.scheduler.mjs', ['tooling/qa/core/verify-all.scheduler.test.ts']],
+  ['verify-all.worker.mjs', ['tooling/qa/core/lane-worker-input-contracts.test.ts']],
+  ['verify-build.scheduler.mjs', ['tooling/qa/core/verify-build.scheduler.test.ts']],
+  ['verify-build.worker.mjs', ['tooling/qa/core/lane-worker-input-contracts.test.ts']],
+  ['verify-focused.scheduler.mjs', ['tooling/qa/core/verify-focused.scheduler.test.ts']],
+  ['verify-focused.worker.mjs', ['tooling/qa/core/lane-worker-input-contracts.test.ts']],
+  ['verify-harness.scheduler.mjs', ['tooling/qa/core/verify-harness.scheduler.test.ts']],
+  ['verify-harness.worker.mjs', ['tooling/qa/core/lane-worker-input-contracts.test.ts']],
   ['verify-technical-debt.mjs', ['tooling/qa/core/technical-debt-registry.test.ts']],
 ]);
+
+const DETERMINISTIC_VALIDATION_ROOTS = [
+  'tooling/qa/core',
+  'tooling/qa/guards/architecture',
+  'tooling/qa/guards/security',
+  'tooling/qa/guards/quality',
+];
+
+function isDeterministicValidationTool(executablePath) {
+  const tool = path.basename(executablePath);
+  return (
+    /^verify-.*\.(?:mjs|sh)$/u.test(tool) &&
+    !/\.helpers\.|\.data\.|\.constants\.|\.rules\.|\.thresholds\.|\.usage\./u.test(tool) &&
+    tool !== 'verify-all.violation-steps.mjs' &&
+    tool !== 'verify-focused.config.mjs'
+  );
+}
+
+function collectDeterministicValidationTools() {
+  return [
+    ...new Set(
+      DETERMINISTIC_VALIDATION_ROOTS.flatMap((root) =>
+        fs.readdirSync(fromRelativePath(root)).filter((tool) => isDeterministicValidationTool(tool))
+      )
+    ),
+  ].sort();
+}
 
 function synchronizeValidationManifest(discovery) {
   const manifest = JSON.parse(fs.readFileSync(fromRelativePath(VALIDATION_MANIFEST_PATH), 'utf8'));
@@ -47,6 +82,17 @@ function synchronizeValidationManifest(discovery) {
   for (const control of discovery.controls.filter(({ sourceExists }) => sourceExists === true)) {
     const current = candidates.get(control.tool) ?? [];
     candidates.set(control.tool, [...new Set([...current, ...control.proofFiles])].sort());
+  }
+  for (const executable of discovery.executables.filter(({ path: executablePath }) =>
+    isDeterministicValidationTool(executablePath)
+  )) {
+    const tool = path.basename(executable.path);
+    const current = candidates.get(tool) ?? [];
+    candidates.set(tool, [...new Set([...current, ...executable.proofFiles])].sort());
+  }
+  for (const tool of collectDeterministicValidationTools()) {
+    const current = candidates.get(tool) ?? [];
+    candidates.set(tool, [...new Set([...current, ...(PROOF_OVERRIDES.get(tool) ?? [])])].sort());
   }
   const missing = [...candidates]
     .filter(([tool]) => !uniqueExisting.has(tool))

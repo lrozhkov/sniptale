@@ -4,13 +4,19 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { PREPARATION_SURFACE_RESIZE } from '../../../workflows/page-preparation';
 import type { ContentAppModeState } from '../../../content/overlay/app/mode';
 import { createModeState } from './mode-state.test-support';
 import { PreparationSurface, type PreparationHostPorts } from '.';
 
 type PortListener = (command: {
   type: string;
-  viewport?: { width: number; height: number };
+  viewport?: {
+    presetId: string;
+    target: 'viewport' | 'window';
+    width: number;
+    height: number;
+  };
 }) => void;
 type RuntimeLayoutProps = {
   dialogs: {
@@ -167,7 +173,12 @@ it('routes preparation enable commands through screenshot-mode state without ena
   act(() => {
     portListener?.({
       type: MessageType.ENABLE_SCREENSHOT_MODE,
-      viewport: { width: 1280, height: 720 },
+      viewport: {
+        presetId: 'test:viewport',
+        target: 'viewport',
+        width: 1280,
+        height: 720,
+      },
     });
   });
 
@@ -175,6 +186,8 @@ it('routes preparation enable commands through screenshot-mode state without ena
   expect(runtimeMocks.modeState?.setNavigationLockEnabled).toHaveBeenCalledWith(true);
   expect(runtimeMocks.modeState?.setIsToolbarVisible).toHaveBeenCalledWith(true);
   expect(runtimeMocks.modeState?.setCurrentViewport).toHaveBeenCalledWith({
+    presetId: 'test:viewport',
+    target: 'viewport',
     width: 1280,
     height: 720,
   });
@@ -244,12 +257,19 @@ it('applies preparation viewport commands to mode state without taking screensho
 
   act(() => {
     portListener?.({
-      type: MessageType.SET_VIEWPORT,
-      viewport: { width: 390, height: 844 },
+      type: PREPARATION_SURFACE_RESIZE,
+      viewport: {
+        presetId: 'test:viewport',
+        target: 'viewport',
+        width: 390,
+        height: 844,
+      },
     });
   });
 
   expect(runtimeMocks.modeState?.setCurrentViewport).toHaveBeenCalledWith({
+    presetId: 'test:viewport',
+    target: 'viewport',
     width: 390,
     height: 844,
   });

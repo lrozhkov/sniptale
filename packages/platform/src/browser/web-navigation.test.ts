@@ -15,18 +15,23 @@ function installChromeGlobal(chromeStub: unknown) {
 }
 
 describe('browser webNavigation adapter', () => {
-  it('returns deterministic unsubscribe for before-navigate listeners', () => {
-    const onBeforeNavigate = {
+  it.each([
+    ['subscribeToBeforeNavigate', 'onBeforeNavigate'],
+    ['subscribeToCommitted', 'onCommitted'],
+    ['subscribeToCompleted', 'onCompleted'],
+    ['subscribeToErrorOccurred', 'onErrorOccurred'],
+  ] as const)('returns deterministic unsubscribe for %s listeners', (method, eventName) => {
+    const event = {
       addListener: vi.fn(),
       removeListener: vi.fn(),
     };
-    installChromeGlobal({ webNavigation: { onBeforeNavigate } });
+    installChromeGlobal({ webNavigation: { [eventName]: event } });
 
     const listener = vi.fn();
-    const unsubscribe = browserWebNavigation.subscribeToBeforeNavigate(listener);
+    const unsubscribe = browserWebNavigation[method](listener);
     unsubscribe();
 
-    expect(onBeforeNavigate.addListener).toHaveBeenCalledWith(listener);
-    expect(onBeforeNavigate.removeListener).toHaveBeenCalledWith(listener);
+    expect(event.addListener).toHaveBeenCalledWith(listener);
+    expect(event.removeListener).toHaveBeenCalledWith(listener);
   });
 });

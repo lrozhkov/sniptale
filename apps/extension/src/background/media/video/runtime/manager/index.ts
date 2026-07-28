@@ -3,7 +3,6 @@ export {
   getCurrentRecordingId,
   getRecordingTabId,
   handleTabClose,
-  handleTabUpdated,
   isRecording,
   resetRecordingId,
   resetRecordingTabId,
@@ -16,7 +15,9 @@ export {
   stopRecordingForPrivacyErasure,
 } from './controls';
 export {
-  handleViewportRecordingDebuggerDetach,
-  handleViewportRecordingNavigationStart,
-} from './viewport-navigation';
-export { handleControlledCursorNavigationStart } from './controlled-cursor/navigation';
+  handleTabRecordingDebuggerDetach,
+  handleTabRecordingNavigationCommitted,
+  handleTabRecordingNavigationCompleted,
+  handleTabRecordingNavigationError,
+  handleTabRecordingNavigationStart,
+} from './tab-navigation';

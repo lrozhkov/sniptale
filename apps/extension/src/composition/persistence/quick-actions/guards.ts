@@ -119,9 +119,10 @@ function isStoredQuickAction(value: unknown): value is StoredQuickAction {
       'hotkey',
       (fieldValue) => fieldValue === null || isQuickActionHotkey(fieldValue)
     ) &&
+    value['emulation'] === undefined &&
     hasOptionalField(
       value,
-      'emulation',
+      'viewportPresetId',
       (fieldValue) => fieldValue === null || isString(fieldValue)
     ) &&
     hasOptionalField(

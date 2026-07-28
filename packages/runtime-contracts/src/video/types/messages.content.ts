@@ -1,5 +1,5 @@
 import type { VideoMessageType } from '../messages/index';
-import type { CaptureMode, VideoRecordingSettings } from './types';
+import type { CaptureMode, VideoRecordingSettings, ViewportInfo } from './types';
 
 export interface EnableAnnotationsMessage {
   type: typeof VideoMessageType.ENABLE_ANNOTATIONS;
@@ -79,6 +79,7 @@ export interface RegionSelectedMessage {
     width: number;
     height: number;
   };
+  captureViewport: ViewportInfo;
 }
 
 export interface RegionSelectionCancelledMessage {

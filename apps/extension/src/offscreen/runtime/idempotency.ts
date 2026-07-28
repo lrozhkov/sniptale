@@ -3,20 +3,22 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import type { HandledOffscreenRuntimeMessageType } from './routing';
 
 type CommandEntry = {
-  completion: Promise<void>;
+  completion: Promise<unknown>;
   reject(error: unknown): void;
-  resolve(): void;
+  resolve(value: unknown): void;
 };
 
 type IdempotencyResult =
-  | { duplicate: true; completion: Promise<void> }
-  | { duplicate: false; completeWith(work: Promise<void>): Promise<void> }
+  | { duplicate: true; completion: Promise<unknown> }
+  | { duplicate: false; completeWith(work: Promise<unknown>): Promise<unknown> }
   | { duplicate: false; tracked: false };
 
 type OffscreenIdempotencyMessage = {
   desktopMediaRequestId?: unknown;
+  generation?: unknown;
   jobId?: unknown;
   recordingId?: unknown;
+  streamInstanceId?: unknown;
   type: HandledOffscreenRuntimeMessageType;
 };
 
@@ -45,13 +47,13 @@ const idempotencyPolicyByType = {
     idempotent: true,
     reason: 'recording startup is correlated by recordingId when present',
   },
-  [VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP]: {
-    idempotent: false,
-    reason: 'viewport crop is a latest-value command',
+  [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: {
+    idempotent: true,
+    reason: 'recording begin is bound to a recording and stream generation',
   },
-  [VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE]: {
+  [VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE]: {
     idempotent: false,
-    reason: 'draw state is a latest-value command keyed by navigationEpoch in the owner',
+    reason: 'source revalidation is a read-like command',
   },
   [VideoMessageType.OFFSCREEN_STOP_RECORDING]: {
     idempotent: true,
@@ -131,7 +133,11 @@ function createIdempotencyKey(args: {
   const jobId = readCorrelationId(args.message);
   return JSON.stringify({
     commandType: args.message.type,
-    generation: args.capabilityGeneration,
+    capabilityGeneration: args.capabilityGeneration,
+    recordingGeneration:
+      typeof args.message.generation === 'number' ? args.message.generation : null,
+    streamInstanceId:
+      typeof args.message.streamInstanceId === 'string' ? args.message.streamInstanceId : null,
     jobId,
   });
 }
@@ -150,9 +156,9 @@ export function markOffscreenSideEffectCommand(args: {
     return { duplicate: true, completion: existing.completion };
   }
 
-  let resolveEntry: (() => void) | undefined;
+  let resolveEntry: ((value?: unknown) => void) | undefined;
   let rejectEntry: ((error: unknown) => void) | undefined;
-  const completion = new Promise<void>((resolve, reject) => {
+  const completion = new Promise<unknown>((resolve, reject) => {
     resolveEntry = resolve;
     rejectEntry = reject;
   });
@@ -161,7 +167,7 @@ export function markOffscreenSideEffectCommand(args: {
   const entry: CommandEntry = {
     completion,
     reject: (error) => rejectEntry?.(error),
-    resolve: () => resolveEntry?.(),
+    resolve: (value) => resolveEntry?.(value),
   };
   executedCommandKeys.set(key, entry);
   pruneExecutedCommandKeys();
@@ -170,7 +176,7 @@ export function markOffscreenSideEffectCommand(args: {
     duplicate: false,
     completeWith: (work) => {
       void work.then(
-        () => entry.resolve(),
+        (value) => entry.resolve(value),
         (error) => {
           executedCommandKeys.delete(key);
           entry.reject(error);

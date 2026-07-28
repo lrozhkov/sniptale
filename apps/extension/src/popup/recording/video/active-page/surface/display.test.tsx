@@ -24,7 +24,7 @@ function renderDisplay(viewportPresetLabel: string | null = 'HD 1280x720') {
           duration: 8,
           error: null,
           status: VideoRecordingStatus.RECORDING,
-          viewportPreset: null,
+          viewportPresetId: null,
         }}
         sourceLabel="Example Domain"
         value="00:08"

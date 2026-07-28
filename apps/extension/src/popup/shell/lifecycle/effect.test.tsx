@@ -35,7 +35,6 @@ function createLifecycleParams() {
       setRecordingControlCapability: vi.fn(),
     },
     browser: {
-      clearAppliedViewportAuthority: vi.fn(),
       refreshActiveTabCapabilities: vi.fn(async () => undefined),
       refreshGalleryStatus: vi.fn(async () => undefined),
     },

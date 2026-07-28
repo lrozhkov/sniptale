@@ -114,6 +114,7 @@ function registerViewportCoordsTest() {
     ).toBe(true);
 
     expect(sendResponse).toHaveBeenCalledWith({
+      success: true,
       coords: {
         x: 0,
         y: 0,
@@ -122,6 +123,7 @@ function registerViewportCoordsTest() {
         outerWidth: 1440,
         outerHeight: 900,
       },
+      viewport: createViewportInfo(),
     });
   });
 }

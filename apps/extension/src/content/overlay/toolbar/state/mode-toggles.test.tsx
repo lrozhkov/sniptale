@@ -5,7 +5,15 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const modeToggleMocks = vi.hoisted(() => ({
+  attachContentActionIntent: vi.fn(),
+  createTrustedContentActionIntentSource: vi.fn(),
   sendRuntimeMessage: vi.fn(),
+}));
+
+vi.mock('../../../application/privileged-action-intent', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../application/privileged-action-intent')>()),
+  attachContentActionIntent: modeToggleMocks.attachContentActionIntent,
+  createTrustedContentActionIntentSource: modeToggleMocks.createTrustedContentActionIntentSource,
 }));
 
 vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
@@ -39,10 +47,14 @@ function createDeferredResponse() {
   };
 }
 
-function ModeToggleHarness(props: { aiPickMode: boolean; onDisableAiPickMode?: () => void }) {
+function ModeToggleHarness(props: {
+  aiPickMode: boolean;
+  onDisableAiPickMode?: () => void;
+  screenshotMode?: boolean;
+}) {
   const { pendingInteractionMode, toggleMode } = useToolbarModeToggles({
     aiPickMode: props.aiPickMode,
-    screenshotMode: true,
+    screenshotMode: props.screenshotMode ?? true,
     highlighterMode: false,
     quickEditMode: false,
     onToggleScreenshotMode: vi.fn(),
@@ -57,6 +69,13 @@ function ModeToggleHarness(props: { aiPickMode: boolean; onDisableAiPickMode?: (
 
   return (
     <>
+      <button
+        type="button"
+        data-ui="test.screenshot-toggle"
+        onClick={(event) => {
+          void toggleMode('screenshot', event.nativeEvent);
+        }}
+      />
       <button
         type="button"
         data-ui="test.quickedit-toggle"
@@ -75,6 +94,13 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+  modeToggleMocks.createTrustedContentActionIntentSource.mockReturnValue({
+    kind: 'trusted-content-event',
+  });
+  modeToggleMocks.attachContentActionIntent.mockImplementation(async (message) => ({
+    ...message,
+    contentIntent: { requestId: 'request-1', token: 'token-1' },
+  }));
 });
 
 afterEach(() => {
@@ -89,6 +115,29 @@ afterEach(() => {
 });
 
 describe('useToolbarModeToggles', () => {
+  it('attaches trusted one-shot intent before content-originated screenshot enable', async () => {
+    modeToggleMocks.sendRuntimeMessage.mockResolvedValue({ success: true });
+    await act(async () => {
+      root?.render(<ModeToggleHarness aiPickMode={false} screenshotMode={false} />);
+    });
+
+    const toggleButton = document.querySelector('[data-ui="test.screenshot-toggle"]');
+    await act(async () => {
+      toggleButton?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(modeToggleMocks.createTrustedContentActionIntentSource).toHaveBeenCalledOnce();
+    expect(modeToggleMocks.attachContentActionIntent).toHaveBeenCalledWith(
+      { type: 'ENABLE_SCREENSHOT_MODE' },
+      { kind: 'trusted-content-event' }
+    );
+    expect(modeToggleMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+      contentIntent: { requestId: 'request-1', token: 'token-1' },
+      type: 'ENABLE_SCREENSHOT_MODE',
+    });
+  });
+
   it('keeps the target editing mode pending before AI mode is cleared', async () => {
     const deferred = createDeferredResponse();
     const disableAiPickMode = vi.fn();

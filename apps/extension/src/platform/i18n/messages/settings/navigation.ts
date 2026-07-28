@@ -14,8 +14,8 @@ export const settingsNavigationMessages = defineMessageSource({
     en: 'AI settings',
   },
   presets: {
-    ru: 'Пресеты экрана',
-    en: 'Screen presets',
+    ru: 'Пресеты размеров',
+    en: 'Size presets',
   },
   saves: {
     ru: 'Сохранение файлов',

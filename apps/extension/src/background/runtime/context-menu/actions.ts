@@ -1,6 +1,7 @@
 import { translate } from '../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getErrorMessage } from '../../../platform/runtime-messaging';
+import { getViewportPresetErrorMessage } from '../../../features/viewport-presets/error-message';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { classifyTabRuntimeCapability } from '../../../features/tab-capabilities/runtime';
@@ -24,9 +25,9 @@ import { copyContextMenuPageLink } from './page-link/actions';
 import { parsePageLinkCopyFormat } from './page-link/constants';
 import {
   copyContextMenuExportPreview,
+  getContextMenuVideoPresetAvailability,
   handlePageContextMenuAction,
   isTabBoundContextMenuAction,
-  resolveContextMenuVideoPreset,
   showContextMenuToast,
   startContextMenuExport,
   startContextMenuVideoRecording,
@@ -36,7 +37,7 @@ import type { ViewportOwnerState } from '../../routing-contracts/tab-mode-state'
 
 const logger = createLogger({ namespace: 'BackgroundContextMenuActions' });
 
-type ViewportState = Map<number, { width: number; height: number } | null>;
+type ViewportState = import('../../routing-contracts/tab-mode-state').ViewportState;
 type CaptureGuardState = { isCapturing: boolean };
 type ContextMenuTab = chrome.tabs.Tab & { id: number };
 
@@ -135,7 +136,7 @@ async function handleTabBoundContextMenuAction(
       return true;
 
     case CONTEXT_MENU_VIDEO_PRESET_ID:
-      await startContextMenuVideoRecording(args.tabId, CaptureMode.VIEWPORT_EMULATION);
+      await startContextMenuVideoRecording(args.tabId, CaptureMode.TAB, true);
       return true;
 
     case CONTEXT_MENU_VIDEO_WINDOW_ID:
@@ -224,7 +225,9 @@ export async function showBackgroundContextMenuError(args: {
     return;
   }
 
-  const message = getErrorMessage(args.error, translate('content.runtime.unknownError'));
+  const message =
+    getViewportPresetErrorMessage(args.error) ??
+    getErrorMessage(args.error, translate('content.runtime.unknownError'));
   await showContextMenuToast(args.tab.id, {
     message,
     title: translate('common.states.error'),
@@ -234,8 +237,16 @@ export async function showBackgroundContextMenuError(args: {
   });
 }
 
-export async function hasContextMenuVideoPreset(): Promise<boolean> {
+export async function hasContextMenuVideoPreset(tab?: chrome.tabs.Tab): Promise<boolean> {
+  if (!tab?.id || classifyTabRuntimeCapability(tab) !== TabRuntimeCapability.Regular) {
+    return false;
+  }
   const settings = await loadSettings();
-  const preset = await resolveContextMenuVideoPreset(settings);
-  return preset !== null;
+  try {
+    const availability = await getContextMenuVideoPresetAvailability(tab.id, settings);
+    return availability !== null && availability.status !== 'unavailable';
+  } catch (error) {
+    logger.warn('Failed to query context-menu video preset availability', error);
+    return false;
+  }
 }

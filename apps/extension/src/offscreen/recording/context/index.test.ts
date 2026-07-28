@@ -42,9 +42,6 @@ function expectEmptyRecordingState() {
   expect(recordingContext.recordedChunks).toEqual([]);
   expect(recordingContext.currentRecordingId).toBeNull();
   expect(recordingContext.lifecycleState).toBe('idle');
-  expect(recordingContext.viewportDrawFrozen).toBe(false);
-  expect(recordingContext.viewportNavigationEpoch).toBe(0);
-  expect(recordingContext.updateViewportPresetCrop).toBeNull();
 }
 
 function verifyLifecycleOwnerApi() {
@@ -90,6 +87,54 @@ describe('offscreen-recording-context', () => {
   });
 
   it('tracks legal recording lifecycle transitions through the owner API', verifyLifecycleOwnerApi);
+
+  it('binds a stream instance only to the matching starting session', () => {
+    recordingContext.beginRecordingSession('recording-1', 3);
+
+    expect(() =>
+      recordingContext.bindStreamInstance({
+        generation: 3,
+        recordingId: 'stale-recording',
+        streamInstanceId: 'stream-1',
+      })
+    ).toThrow('Stale recording source binding');
+    expect(() =>
+      recordingContext.bindStreamInstance({
+        generation: 2,
+        recordingId: 'recording-1',
+        streamInstanceId: 'stream-1',
+      })
+    ).toThrow('Stale recording source binding');
+
+    recordingContext.bindStreamInstance({
+      generation: 3,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-1',
+    });
+    expect(
+      recordingContext.matchesSourceBinding({
+        generation: 3,
+        recordingId: 'recording-1',
+        streamInstanceId: 'stream-1',
+      })
+    ).toBe(true);
+    expect(
+      recordingContext.matchesSourceBinding({
+        generation: 3,
+        recordingId: 'recording-1',
+        streamInstanceId: 'stream-2',
+      })
+    ).toBe(false);
+
+    recordingContext.activateRecorder({ state: 'recording' } as MediaRecorder);
+    expect(() =>
+      recordingContext.bindStreamInstance({
+        generation: 3,
+        recordingId: 'recording-1',
+        streamInstanceId: 'stream-2',
+      })
+    ).toThrow('Stale recording source binding');
+  });
 
   it(
     'rejects illegal lifecycle transitions before a recording session is initialized',

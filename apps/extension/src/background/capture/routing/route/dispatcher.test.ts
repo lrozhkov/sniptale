@@ -101,14 +101,20 @@ import { createScenarioSessionServiceStub } from '../../../../../../../tooling/t
 import { routeCaptureMessage } from './dispatcher';
 import { createWebSnapshotManifest, flushRouteAsync } from './dispatcher.test-support';
 import type { RouteCaptureMessage } from '../types';
+import { markPreauthorizedContentActionRouteMessage } from '../authorization/content-action';
+import {
+  getScreenshotSurfaceSession,
+  resetScreenshotSurfaceSessionsForTests,
+} from '../../../capture-surface/screenshot-session';
 
 function createRouteArgs() {
   return {
     resolvedTabId: 42,
     sendResponse: vi.fn(),
-    viewportState: new Map<number, { width: number; height: number } | null>([
-      [42, { width: 1280, height: 720 }],
-    ]),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >([[42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }]]),
     screenshotModeState: new Map([[42, true]]),
     captureGuardState: { isCapturing: false },
     pageAccessPort: {
@@ -122,6 +128,7 @@ function createRouteArgs() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetScreenshotSurfaceSessionsForTests();
   handleVisibleCaptureMock.mockReturnValue(true);
   handleVisibleCaptureForCropMock.mockReturnValue(true);
   handleFullCaptureMock.mockReturnValue(true);
@@ -140,6 +147,51 @@ beforeEach(() => {
   handleTriggerQuickActionMock.mockReturnValue(true);
   browserTabsGetMock.mockResolvedValue({ id: 42, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
+});
+
+it('renews a screenshot surface only for its preauthorized content document', async () => {
+  const args = createRouteArgs();
+  const message = {
+    contentIntent: { requestId: 'renew-request-1', token: 'renew-token-1' },
+    type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+  } as const;
+  markPreauthorizedContentActionRouteMessage(message, {
+    documentId: 'content-document-42',
+    frameId: 0,
+    senderUrl: 'https://example.test/page',
+    tabId: 42,
+  });
+
+  expect(routeCaptureMessage({ ...args, message })).toBe(true);
+  await flushRouteAsync();
+
+  expect(ensureActivePageAccessRuntimeMock).toHaveBeenCalledWith(42);
+  expect(getScreenshotSurfaceSession(42)).toMatchObject({
+    documentId: 'content-document-42',
+    lastOperationGeneration: 0,
+  });
+  expect(args.sendResponse).toHaveBeenCalledWith({
+    success: true,
+    surfaceCapabilityToken: expect.any(String),
+    surfaceOperationGeneration: 0,
+  });
+});
+
+it('rejects screenshot surface renewal without preauthorized sender ownership', async () => {
+  const args = createRouteArgs();
+  const message = {
+    contentIntent: { requestId: 'renew-request-1', token: 'renew-token-1' },
+    type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+  } as const;
+
+  expect(routeCaptureMessage({ ...args, message })).toBe(true);
+  await flushRouteAsync();
+
+  expect(args.sendResponse).toHaveBeenCalledWith({
+    success: false,
+    error: 'Unauthorized screenshot surface renewal',
+  });
+  expect(getScreenshotSurfaceSession(42)).toBeNull();
 });
 
 it('routes capture requests through handler contexts', async () => {

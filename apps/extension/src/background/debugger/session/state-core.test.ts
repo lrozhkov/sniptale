@@ -60,6 +60,17 @@ it('clears the tab session when the last attached client is released', () => {
   expect(getDebuggerSessionSnapshot(state, 9)).toEqual({ clients: [], targetId: null });
 });
 
+it('keeps a viewport lease attached when full-page screenshot ownership releases', () => {
+  const state = createDebuggerSessionState();
+  seedDebuggerSessionState(state, 9, ['capture-surface-screenshot', 'screenshot'], 'target-9');
+
+  expect(releaseAttachedClientFromState(state, 9, 'screenshot')).toBe('remaining');
+  expect(getDebuggerSessionSnapshot(state, 9)).toEqual({
+    clients: ['capture-surface-screenshot'],
+    targetId: 'target-9',
+  });
+});
+
 it('clears clients and target mappings on a forceful detach', () => {
   const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   const state = createDebuggerSessionState();

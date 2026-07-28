@@ -103,7 +103,7 @@ function verifyPopupRuntimeSyncMessageParsing() {
       countdownEndsAt: null,
       captureMode: CaptureMode.TAB,
       captureSource: null,
-      viewportPreset: null,
+      viewportPresetId: null,
       error: null,
     },
   });

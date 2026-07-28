@@ -170,18 +170,12 @@ function usePopupCapturePresetState() {
   const [viewportPresets, setViewportPresets] = useState<ViewportPreset[]>([]);
   const [videoCaptureMode, setVideoCaptureMode] = useState<CaptureMode>(CaptureMode.TAB);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
-  const [appliedViewportPresetId, setAppliedViewportPresetId] = useState<string | null>(null);
-  const [appliedViewportTabId, setAppliedViewportTabId] = useState<number | null>(null);
 
   return {
-    appliedViewportPresetId,
-    appliedViewportTabId,
     displayMode,
     quickActions,
     quickActionsReady,
     selectedPresetId,
-    setAppliedViewportPresetId,
-    setAppliedViewportTabId,
     setDisplayMode,
     setQuickActions,
     setQuickActionsReady,

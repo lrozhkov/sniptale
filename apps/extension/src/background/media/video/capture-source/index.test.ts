@@ -27,14 +27,11 @@ vi.mock('../../../../platform/i18n/index', async (importOriginal) => ({
 }));
 
 import {
-  createCaptureModeService,
   enrichCaptureSourceWithTabInfo,
   getCaptureSource,
-  getPendingCaptureSource,
   getScreenStreamId,
   getTabCropStreamId,
   getTabStreamId,
-  setPendingCaptureSource,
   supportsAnnotations,
   supportsSystemAudio,
   updateCaptureSourceCropRegion,
@@ -57,36 +54,7 @@ describe('capture-source ownership', () => {
     translateMock.mockImplementation((key: string) => key);
   });
 
-  it('keeps pending capture source isolated per service instance', () => {
-    const firstService = createCaptureModeService();
-    const secondService = createCaptureModeService();
-    const source = {
-      mode: CaptureMode.TAB,
-      streamId: 'stream-1',
-      tabId: 7,
-    };
-
-    firstService.setPendingCaptureSource(source);
-
-    expect(firstService.getPendingCaptureSource()).toEqual(source);
-    expect(secondService.getPendingCaptureSource()).toBeNull();
-  });
-
-  it('preserves the compatibility facade for pending capture source access', () => {
-    const source = {
-      mode: CaptureMode.TAB_CROP,
-      streamId: 'stream-2',
-      tabId: 9,
-    };
-
-    setPendingCaptureSource(source);
-    expect(getPendingCaptureSource()).toEqual(source);
-
-    setPendingCaptureSource(null);
-    expect(getPendingCaptureSource()).toBeNull();
-  });
-
-  it('resolves tab capture sources for tab, crop, and viewport-emulation modes', async () => {
+  it('resolves tab capture sources for tab and crop modes', async () => {
     const tab = createTab(11);
 
     await expect(getTabStreamId(11)).resolves.toEqual({
@@ -109,7 +77,7 @@ describe('capture-source ownership', () => {
       streamId: 'stream-1',
       tabId: 11,
     });
-    await expect(getCaptureSource(CaptureMode.VIEWPORT_EMULATION, tab)).resolves.toEqual({
+    await expect(getCaptureSource(CaptureMode.TAB, tab)).resolves.toEqual({
       mode: CaptureMode.TAB,
       streamId: 'stream-1',
       tabId: 11,
@@ -185,7 +153,7 @@ describe('capture-source ownership', () => {
     });
 
     expect(supportsAnnotations(CaptureMode.TAB)).toBe(true);
-    expect(supportsAnnotations(CaptureMode.VIEWPORT_EMULATION)).toBe(true);
+    expect(supportsAnnotations(CaptureMode.TAB)).toBe(true);
     expect(supportsAnnotations(CaptureMode.SCREEN)).toBe(false);
     expect(supportsSystemAudio(CaptureMode.TAB_CROP)).toBe(true);
     expect(supportsSystemAudio(CaptureMode.SCREEN)).toBe(false);

@@ -10,7 +10,7 @@ export async function restoreRecordingOverlayAfterNavigation(
   region: RecordingRegion,
   shouldRestore: () => boolean,
   retryDelaysMs: number[]
-): Promise<void> {
+): Promise<boolean> {
   const logger = createLogger({ namespace: 'BackgroundVideoUi:OverlayRestore' });
 
   for (const delayMs of retryDelaysMs) {
@@ -19,17 +19,18 @@ export async function restoreRecordingOverlayAfterNavigation(
     }
 
     if (!shouldRestore()) {
-      return;
+      return false;
     }
 
     try {
       await showRecordingOverlay(tabId, region);
       logger.debug('Recording overlay restored after navigation');
-      return;
+      return true;
     } catch (error) {
       logger.warn('Recording overlay restore retry failed', error);
     }
   }
 
   logger.warn('Failed to restore recording overlay after navigation');
+  return false;
 }

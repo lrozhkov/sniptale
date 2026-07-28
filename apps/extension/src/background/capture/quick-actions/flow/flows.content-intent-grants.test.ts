@@ -3,13 +3,15 @@ import type { Settings, ViewportPreset } from '../../../../contracts/settings';
 import { installBackgroundRuntimeMessagingMock } from '../../../routing-contracts/runtime-messaging/mock';
 
 const {
+  getScreenshotSurfaceBindingMock,
   issueContentPrivilegedActionAutoStartGrantMock,
+  prepareQuickActionSurfaceMock,
   sendTabMessageMock,
-  setupQuickActionDebuggerMock,
 } = vi.hoisted(() => ({
+  getScreenshotSurfaceBindingMock: vi.fn(),
   issueContentPrivilegedActionAutoStartGrantMock: vi.fn(),
+  prepareQuickActionSurfaceMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
-  setupQuickActionDebuggerMock: vi.fn(),
 }));
 
 vi.mock('../../../../platform/runtime-messaging/index', async (importOriginal) => ({
@@ -22,9 +24,14 @@ vi.mock('../../../routing-contracts/capabilities/content-action/route', async (i
   >()),
   issueContentPrivilegedActionAutoStartGrant: issueContentPrivilegedActionAutoStartGrantMock,
 }));
-vi.mock('./debugger', () => ({
-  isDebuggerRequired: vi.fn((emulation: string) => emulation !== 'native'),
-  setupQuickActionDebugger: setupQuickActionDebuggerMock,
+vi.mock('../../../capture-surface/screenshot-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture-surface/screenshot-session')>()),
+  getScreenshotSurfaceBinding: getScreenshotSurfaceBindingMock,
+}));
+vi.mock('./surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./surface')>()),
+  applyQuickActionSurface: prepareQuickActionSurfaceMock,
+  releaseQuickActionSurface: vi.fn(),
 }));
 
 import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -46,7 +53,7 @@ function createSettings(viewportPresets: ViewportPreset[]): Settings {
       showSettings: true,
     },
     saveCapturesToGallery: false,
-    defaultViewportId: 'native',
+    defaultViewportPresetId: null,
     imageFormat: 'png',
     imageQuality: 90,
     authenticatedSnapshotAssetsEnabled: true,
@@ -70,27 +77,51 @@ function createCaptureArgs(captureMode: 'visible' | 'full') {
     afterCapture: 'ask_preset' as const,
     captureMode,
     delaySeconds: 0,
-    emulation: 'preset-1',
+    viewportPresetId: 'preset-1',
     imageFormat: 'png' as const,
     imageQuality: 88,
     screenshotModeState: new Map<number, boolean>(),
-    settings: createSettings([{ id: 'preset-1', width: 1440, height: 900, label: 'Preset 1' }]),
-    tabId: 21,
-    viewportState: new Map<number, { width: number; height: number } | null>([
-      [21, { width: 1440, height: 900 }],
+    settings: createSettings([
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Preset 1',
+        target: 'viewport' as const,
+        width: 1440,
+        height: 900,
+        enabled: true,
+        order: 0,
+      },
     ]),
+    tabId: 21,
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >([[21, { presetId: 'test:viewport', target: 'viewport' as const, width: 1440, height: 900 }]]),
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   issueContentPrivilegedActionAutoStartGrantMock.mockReturnValue({ grantToken: 'grant-token-1' });
+  getScreenshotSurfaceBindingMock.mockReturnValue({
+    surfaceCapabilityToken: 'surface-token-1',
+    surfaceLeaseGeneration: 1,
+    surfaceOperationGeneration: 1,
+  });
   sendTabMessageMock.mockResolvedValue(undefined);
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
-  setupQuickActionDebuggerMock.mockResolvedValue({
-    cleanup: vi.fn().mockResolvedValue(undefined),
-    ready: true,
-  });
+  prepareQuickActionSurfaceMock.mockImplementation(
+    async (args: ReturnType<typeof createCaptureArgs>) => {
+      args.viewportState.set(args.tabId, {
+        presetId: 'preset-1',
+        target: 'viewport' as const,
+        width: 1440,
+        height: 900,
+      });
+      return { surfaceCapabilityToken: 'surface-token-1' };
+    }
+  );
 });
 
 it('grants visible auto-start access to content-owned preset-session saves', async () => {

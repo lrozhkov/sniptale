@@ -27,7 +27,7 @@ it('announces the capture source through the typed runtime transport seam', asyn
     streamId: 'stream-id',
   };
 
-  await announceCaptureSource(captureSource, CaptureMode.TAB, undefined, transport);
+  await announceCaptureSource(captureSource, CaptureMode.TAB, null, transport);
 
   expect(transport.runtimeRequests).toContainEqual({
     type: VideoMessageType.CAPTURE_SOURCE_OBTAINED,
@@ -36,7 +36,8 @@ it('announces the capture source through the typed runtime transport seam', asyn
   expect(setVideoRecordingRuntimeState).toHaveBeenCalledWith({
     captureSource,
     captureMode: CaptureMode.TAB,
-    viewportPreset: null,
+    cropRegion: null,
+    viewportPresetId: null,
   });
 });
 
@@ -48,7 +49,7 @@ it('uses the background runtime messaging service by default', async () => {
     streamId: 'stream-id',
   };
 
-  await announceCaptureSource(captureSource, CaptureMode.TAB);
+  await announceCaptureSource(captureSource, CaptureMode.TAB, null);
 
   expect(sendRuntimeMessage).toHaveBeenCalledWith({
     type: VideoMessageType.CAPTURE_SOURCE_OBTAINED,

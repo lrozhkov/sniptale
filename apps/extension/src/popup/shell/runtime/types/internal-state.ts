@@ -36,16 +36,12 @@ interface PopupRuntimePresetState {
   videoCaptureMode: CaptureMode;
   selectedPresetId: string | null;
   selectedPreset: ViewportPreset | null;
-  appliedViewportPresetId: string | null;
-  appliedViewportTabId: number | null;
   setQuickActions: Dispatch<SetStateAction<QuickAction[]>>;
   setQuickActionsReady: Dispatch<SetStateAction<boolean>>;
   setDisplayMode: Dispatch<SetStateAction<QuickActionsDisplayMode>>;
   setViewportPresets: Dispatch<SetStateAction<ViewportPreset[]>>;
   setVideoCaptureMode: Dispatch<SetStateAction<CaptureMode>>;
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;
-  setAppliedViewportPresetId: Dispatch<SetStateAction<string | null>>;
-  setAppliedViewportTabId: Dispatch<SetStateAction<number | null>>;
 }
 
 interface PopupRuntimeRecordingState {

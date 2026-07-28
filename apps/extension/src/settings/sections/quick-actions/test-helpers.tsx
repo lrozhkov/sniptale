@@ -58,7 +58,8 @@ type HotkeyInputControllerState = {
   isRecording: boolean;
 };
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 
@@ -88,7 +89,16 @@ vi.mock('../../section-surface/panel-controls', () => createSettingsPanelControl
 import { QuickActionsSection } from '.';
 
 const VIEWPORT_PRESETS: ViewportPreset[] = [
-  { id: 'desktop-1440', label: 'Desktop', width: 1440, height: 900 },
+  {
+    id: 'desktop-1440',
+    kind: 'user',
+    name: 'Desktop',
+    target: 'viewport' as const,
+    width: 1440,
+    height: 900,
+    enabled: true,
+    order: 0,
+  },
 ];
 
 let container: HTMLDivElement | null = null;

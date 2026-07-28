@@ -12,7 +12,7 @@ export const IDLE_RECORDING_STATE: VideoRecordingRuntimeState = {
   countdownEndsAt: null,
   captureMode: null,
   captureSource: null,
-  viewportPreset: null,
+  viewportPresetId: null,
   liveMedia: null,
   error: null,
 };
@@ -21,7 +21,6 @@ export function getCaptureModeLabels(): Record<CaptureMode, string> {
   return {
     [CaptureMode.TAB]: translate('popup.labels.captureModeTab'),
     [CaptureMode.TAB_CROP]: translate('popup.labels.captureModeArea'),
-    [CaptureMode.VIEWPORT_EMULATION]: translate('popup.labels.captureModePreset'),
     [CaptureMode.CAMERA]: translate('popup.video.modeCameraLabel'),
     [CaptureMode.SCREEN]: translate('popup.labels.captureModeScreen'),
   };
@@ -32,7 +31,6 @@ export function supportsControlledCursorCapture(captureMode: CaptureMode): boole
     case CaptureMode.SCREEN:
     case CaptureMode.TAB:
     case CaptureMode.TAB_CROP:
-    case CaptureMode.VIEWPORT_EMULATION:
     case CaptureMode.CAMERA:
       return false;
   }
@@ -42,7 +40,6 @@ export function supportsCursorTrackTelemetry(captureMode: CaptureMode): boolean 
   switch (captureMode) {
     case CaptureMode.TAB:
     case CaptureMode.TAB_CROP:
-    case CaptureMode.VIEWPORT_EMULATION:
       return true;
     case CaptureMode.CAMERA:
     case CaptureMode.SCREEN:
@@ -89,8 +86,7 @@ export function formatDuration(seconds: number): string {
 
 export function describeCaptureSource(
   captureSource: CaptureSource | null,
-  captureMode: CaptureMode | null,
-  viewportPresetLabel: string | null
+  captureMode: CaptureMode | null
 ): string {
   const captureModeLabels = getCaptureModeLabels();
   if (captureSource) {
@@ -109,15 +105,7 @@ export function describeCaptureSource(
         return captureSource.screenName || translate('popup.labels.sourceScreen');
       case CaptureMode.CAMERA:
         return translate('popup.video.modeCameraLabel');
-      case CaptureMode.VIEWPORT_EMULATION:
-        return viewportPresetLabel
-          ? `${captureSource.tabTitle || translate('popup.labels.captureModeTab')} • ${viewportPresetLabel}`
-          : captureSource.tabTitle || translate('popup.labels.sourceViewportPreset');
     }
-  }
-
-  if (captureMode === CaptureMode.VIEWPORT_EMULATION && viewportPresetLabel) {
-    return `${translate('popup.labels.sourceViewportPrefix')} ${viewportPresetLabel}`;
   }
 
   if (captureMode) {
@@ -128,10 +116,5 @@ export function describeCaptureSource(
 }
 
 export function getViewportPresetLabel(state: VideoRecordingRuntimeState): string | null {
-  if (!state.viewportPreset) {
-    return null;
-  }
-
-  const { label, width, height } = state.viewportPreset;
-  return label ? `${label} ${width}×${height}` : `${width}×${height}`;
+  return state.viewportPresetId;
 }

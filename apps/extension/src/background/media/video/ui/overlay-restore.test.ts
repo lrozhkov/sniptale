@@ -26,7 +26,7 @@ it('retries overlay restoration until a send succeeds', async () => {
   const restorePromise = restoreRecordingOverlayAfterNavigation(42, region, () => true, [0, 250]);
 
   await vi.runAllTimersAsync();
-  await expect(restorePromise).resolves.toBeUndefined();
+  await expect(restorePromise).resolves.toBe(true);
 
   expect(sendTabMessage).toHaveBeenNthCalledWith(1, 42, {
     type: 'SHOW_RECORDING_OVERLAY',
@@ -41,7 +41,7 @@ it('stops retrying when the restore predicate returns false', async () => {
   const restorePromise = restoreRecordingOverlayAfterNavigation(42, region, () => false, [0, 250]);
 
   await vi.runAllTimersAsync();
-  await expect(restorePromise).resolves.toBeUndefined();
+  await expect(restorePromise).resolves.toBe(false);
 
   expect(sendTabMessage).not.toHaveBeenCalled();
 });

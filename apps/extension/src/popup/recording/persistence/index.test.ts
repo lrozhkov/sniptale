@@ -43,8 +43,8 @@ describe('popup persistence', () => {
     expect(mocks.saveVideoSettingsMock).toHaveBeenCalledWith(settings);
   });
 
-  it('stores viewport emulation without preset as tab mode', async () => {
-    await persistVideoUiState(CaptureMode.VIEWPORT_EMULATION, null);
+  it('stores current size independently from tab capture mode', async () => {
+    await persistVideoUiState(CaptureMode.TAB, null);
 
     expect(mocks.saveVideoUiStateMock).toHaveBeenCalledWith({
       captureMode: CaptureMode.TAB,
@@ -52,7 +52,7 @@ describe('popup persistence', () => {
     });
   });
 
-  it('preserves non-legacy capture modes while storing viewport preset preference', async () => {
+  it('preserves screen mode while storing the inert preset preference', async () => {
     await persistVideoUiState(CaptureMode.SCREEN, 'preset-1');
 
     expect(mocks.saveVideoUiStateMock).toHaveBeenLastCalledWith({
@@ -61,8 +61,8 @@ describe('popup persistence', () => {
     });
   });
 
-  it('stores viewport preset selection independently from legacy viewport mode', async () => {
-    await persistVideoUiState(CaptureMode.VIEWPORT_EMULATION, 'preset-1');
+  it('stores viewport preset selection independently from capture mode', async () => {
+    await persistVideoUiState(CaptureMode.TAB, 'preset-1');
 
     expect(mocks.saveVideoUiStateMock).toHaveBeenLastCalledWith({
       captureMode: CaptureMode.TAB,

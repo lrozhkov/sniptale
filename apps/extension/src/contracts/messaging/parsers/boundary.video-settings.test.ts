@@ -17,7 +17,10 @@ it('accepts offscreen recording settings updates', () => {
   const message = parseOffscreenRuntimeMessage({
     type: VideoMessageType.OFFSCREEN_UPDATE_SETTINGS,
     capabilityToken: 'capability-token-1',
+    generation: 2,
+    recordingId: 'recording-1',
     settings: { webcamEnabled: false },
+    streamInstanceId: 'stream-instance-1',
   });
 
   expect(message.type).toBe(VideoMessageType.OFFSCREEN_UPDATE_SETTINGS);

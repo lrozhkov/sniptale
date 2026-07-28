@@ -87,7 +87,8 @@ async function restoreTabCropOverlayOnBootstrap(
       return;
     }
 
-    const cropRegion = stateResult.value.state?.captureSource?.cropRegion;
+    const cropRegion =
+      stateResult.value.state?.cropRegion ?? stateResult.value.state?.captureSource?.cropRegion;
     if (
       !tabResult.value.isCurrentTab ||
       stateResult.value.state?.captureMode !== CaptureMode.TAB_CROP ||
@@ -124,17 +125,16 @@ export function initializeTopLevelContentRuntime(
   getViewportInfo: ViewportInfoReader,
   services: ContentRuntimeServices = createContentRuntimeServices()
 ): ContentRuntimeCleanup {
-  const regionSelectorController = createRegionSelectorController();
+  const regionSelectorController = createRegionSelectorController({ getViewportInfo });
   const lifecycle: ContentRuntimeLifecycle = { disposed: false };
 
   initializePageStyleRuntime();
-  void restoreTabCropOverlayOnBootstrap(regionSelectorController, lifecycle, services);
-
   const unsubscribe = browserRuntime.subscribeToMessages(
     createContentRuntimeMessageListener(getViewportInfo, {
       regionSelectorController,
     })
   );
+  void restoreTabCropOverlayOnBootstrap(regionSelectorController, lifecycle, services);
 
   return () => {
     lifecycle.disposed = true;

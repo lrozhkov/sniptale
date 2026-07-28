@@ -10,13 +10,12 @@ import {
   resetRecordingTabId,
   stopRecordingForPrivacyErasure,
 } from '../video/runtime/manager';
-import {
-  quiesceViewportEmulationForPrivacyErasure,
-  waitForStopSideEffects,
-} from '../video/runtime/manager/controls.stop/effects';
+import { waitForStopSideEffects } from '../video/runtime/manager/controls.stop/effects';
 import { resetVideoRecordingRuntimeState } from '../video/runtime/session-state';
 import { finishVideoRecordingStop, resetVideoRecordingStartSession } from '../video/session-state';
 import { inspectPersistedLease } from '../../storage/video/recording-control-lease';
+import { readCaptureSurfaceJournal } from '../../storage/capture-surface';
+import { getCaptureSurfaceService } from '../../capture-surface';
 import { failed, RECORDING_PARTICIPANT_ID, verified } from './result';
 
 export function resetRecordingRuntimeStateForPrivacyErasure(): void {
@@ -27,13 +26,25 @@ export function resetRecordingRuntimeStateForPrivacyErasure(): void {
   resetVideoRecordingRuntimeState();
 }
 
-async function cleanupRecordingDebugger(): Promise<boolean> {
+async function verifyVideoCaptureSurfacesAbsent(): Promise<boolean> {
   try {
-    await quiesceViewportEmulationForPrivacyErasure();
-    return true;
+    const journal = await readCaptureSurfaceJournal();
+    return (
+      !journal.some((entry) => entry.owner === 'video') &&
+      !getCaptureSurfaceService().hasOwnerLease('video')
+    );
   } catch {
     return false;
   }
+}
+
+export async function cleanupVideoCaptureSurfacesForPrivacyErasure(): Promise<boolean> {
+  try {
+    await getCaptureSurfaceService().releaseOwners(['video']);
+  } catch {
+    return false;
+  }
+  return verifyVideoCaptureSurfacesAbsent();
 }
 
 async function cleanupRecordingLease(
@@ -84,8 +95,8 @@ export async function cleanupRecording(): Promise<ErasureParticipantResult> {
     await waitForStopSideEffects();
   }
 
-  if (!(await cleanupRecordingDebugger())) {
-    return failed(RECORDING_PARTICIPANT_ID, 'recording-debugger-cleanup-failed');
+  if (!(await cleanupVideoCaptureSurfacesForPrivacyErasure())) {
+    return failed(RECORDING_PARTICIPANT_ID, 'recording-surface-cleanup-failed');
   }
 
   const leaseFailure = await cleanupRecordingLease(recordingId);

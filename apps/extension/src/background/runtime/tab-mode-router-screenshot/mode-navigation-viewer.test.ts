@@ -53,10 +53,11 @@ function resetViewerNavigationCleanupMocks() {
 async function verifyViewerViewportCleanupSkipsDebugger() {
   const { cleanupScreenshotModeAfterNavigation } = await import('./navigation-cleanup');
   const screenshotModeState = new Map<number, boolean>([[5, true]]);
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'viewer']]);
-  const viewportState = new Map<number, { width: number; height: number } | null>([
-    [5, { width: 390, height: 844 }],
-  ]);
+  const viewportOwnerState = new Map<number, 'capture-surface' | 'viewer'>([[5, 'viewer']]);
+  const viewportState = new Map<
+    number,
+    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+  >([[5, { presetId: 'test:viewport', target: 'viewport' as const, width: 390, height: 844 }]]);
   const webSnapshotViewerPorts = new Map([[5, createAckingViewerPortRegistration()]]);
 
   await cleanupScreenshotModeAfterNavigation(
@@ -76,10 +77,11 @@ async function verifyViewerViewportCleanupSkipsDebugger() {
 async function verifyViewerViewportCleanupSkipsDebuggerAfterPortDisappears() {
   const { cleanupScreenshotModeAfterNavigation } = await import('./navigation-cleanup');
   const screenshotModeState = new Map<number, boolean>([[5, true]]);
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'viewer']]);
-  const viewportState = new Map<number, { width: number; height: number } | null>([
-    [5, { width: 390, height: 844 }],
-  ]);
+  const viewportOwnerState = new Map<number, 'capture-surface' | 'viewer'>([[5, 'viewer']]);
+  const viewportState = new Map<
+    number,
+    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+  >([[5, { presetId: 'test:viewport', target: 'viewport' as const, width: 390, height: 844 }]]);
   const webSnapshotViewerPorts = new Map([[5, createAckingViewerPortRegistration()]]);
   const cleanupPromise = cleanupScreenshotModeAfterNavigation(
     5,
@@ -93,7 +95,7 @@ async function verifyViewerViewportCleanupSkipsDebuggerAfterPortDisappears() {
   await cleanupPromise;
 
   expect(loggerWarnMock).toHaveBeenCalledWith(
-    'Failed to notify screenshot mode cleanup after navigation',
+    'Failed to disable preparation after navigation',
     expect.any(Error)
   );
   expect(clearViewportMock).not.toHaveBeenCalled();

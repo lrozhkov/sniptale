@@ -27,6 +27,7 @@ import type {
   OffscreenRecordingResumedMessage,
   OffscreenRecordingStartedMessage,
   OffscreenRecordingStoppedMessage,
+  OffscreenSourceReadyMessage,
 } from './messages.offscreen.ts';
 
 export type * from '@sniptale/runtime-contracts/video/types/messages.content';
@@ -40,6 +41,7 @@ export type VideoRuntimeMessage =
   | GetRecordingTabIdMessage
   | RecordingDurationUpdatedMessage
   | OffscreenRecordingStartedMessage
+  | OffscreenSourceReadyMessage
   | OffscreenRecordingStoppedMessage
   | OffscreenRecordingPausedMessage
   | OffscreenRecordingResumedMessage

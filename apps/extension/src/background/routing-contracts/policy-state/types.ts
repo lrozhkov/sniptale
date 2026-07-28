@@ -2,6 +2,7 @@ export type PolicyStateId =
   | 'ai-settings-mutation-queue'
   | 'ai-secret-unlock-requests'
   | 'capture-download-jobs'
+  | 'capture-surface-leases'
   | 'content-action-activation-keys'
   | 'content-action-auto-start-grants'
   | 'content-action-capabilities'
@@ -19,6 +20,7 @@ export type PolicyStateId =
   | 'project-export-job-ledger'
   | 'recording-download-staged-chunks'
   | 'tab-mode-runtime-state'
+  | 'video-capture-surface-sessions'
   | 'video-recording-control-lease'
   | 'web-snapshot-staged-blobs';
 

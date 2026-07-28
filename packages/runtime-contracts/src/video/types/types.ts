@@ -9,7 +9,6 @@ export const CaptureMode = {
   TAB_CROP: 'TAB_CROP',
   CAMERA: 'CAMERA',
   SCREEN: 'SCREEN',
-  VIEWPORT_EMULATION: 'VIEWPORT_EMULATION',
 } as const;
 
 export type CaptureMode = (typeof CaptureMode)[keyof typeof CaptureMode];
@@ -35,6 +34,7 @@ export interface CaptureSource {
     width: number;
     height: number;
   };
+  captureViewport?: ViewportInfo;
   cameraDeviceId?: string | null;
   screenName?: string;
 }
@@ -234,20 +234,14 @@ export interface VideoRecordingState {
   startTime?: number;
 }
 
-export interface VideoViewportPresetSelection {
-  id?: string;
-  width: number;
-  height: number;
-  label?: string;
-}
-
 export interface VideoRecordingRuntimeState {
   status: VideoRecordingStatus;
   duration: number;
   countdownEndsAt: number | null;
   captureMode: CaptureMode | null;
   captureSource: CaptureSource | null;
-  viewportPreset: VideoViewportPresetSelection | null;
+  cropRegion?: SelectedArea | null;
+  viewportPresetId: string | null;
   liveMedia?: VideoRecordingLiveMediaState | null;
   error: string | null;
 }
@@ -267,4 +261,5 @@ export interface ViewportInfo {
   outerHeight?: number;
   viewportOffsetX?: number;
   viewportOffsetY?: number;
+  visualViewportScale?: number;
 }

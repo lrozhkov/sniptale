@@ -13,7 +13,6 @@ export function registerPopupLifecycleBrowserListeners(
 
   const handleTabActivated = () => {
     const params = getParams();
-    params.clearAppliedViewportAuthority();
     void params.refreshActiveTabCapabilities();
   };
 
@@ -24,7 +23,6 @@ export function registerPopupLifecycleBrowserListeners(
   ) => {
     if (tab.active && (typeof changeInfo.url === 'string' || changeInfo.status === 'complete')) {
       const params = getParams();
-      params.clearAppliedViewportAuthority();
       void params.refreshActiveTabCapabilities();
     }
   };

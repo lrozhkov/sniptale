@@ -6,11 +6,9 @@ import {
   getVideoRecordingCountdownSessionId,
   getVideoRecordingId,
   getVideoRecordingTabId,
-  getViewportNavigationEpoch,
   hasActiveVideoRecordingTab,
   isVideoRecordingPreparationInProgress,
   isVideoRecordingStopInProgress,
-  isViewportNavigationPending,
   shouldOpenVideoEditorAfterRecording,
 } from './reads';
 
@@ -22,8 +20,6 @@ beforeEach(() => {
   videoManagerSession.isStopping = false;
   videoManagerSession.currentCaptureMode = CaptureMode.TAB;
   videoManagerSession.currentCountdownSessionId = 'countdown-42';
-  videoManagerSession.viewportNavigationEpoch = 8;
-  videoManagerSession.viewportNavigationPending = true;
 });
 
 it('reads recording session fields through the read facade', () => {
@@ -32,8 +28,6 @@ it('reads recording session fields through the read facade', () => {
   expect(shouldOpenVideoEditorAfterRecording()).toBe(true);
   expect(getVideoRecordingCaptureMode()).toBe(CaptureMode.TAB);
   expect(getVideoRecordingCountdownSessionId()).toBe('countdown-42');
-  expect(getViewportNavigationEpoch()).toBe(8);
-  expect(isViewportNavigationPending()).toBe(true);
   expect(isVideoRecordingPreparationInProgress()).toBe(true);
   expect(isVideoRecordingStopInProgress()).toBe(false);
   expect(hasActiveVideoRecordingTab()).toBe(true);

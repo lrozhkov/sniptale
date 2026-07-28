@@ -40,7 +40,7 @@ function createRecordingStateResponse() {
       countdownEndsAt: null,
       captureMode: null,
       captureSource: null,
-      viewportPreset: null,
+      viewportPresetId: null,
       error: null,
     },
   };

@@ -8,6 +8,7 @@ import {
   WEB_SNAPSHOT_VIEWER_PORT,
 } from '../../../workflows/page-preparation';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { PREPARATION_SURFACE_RESIZE } from '../../../workflows/page-preparation';
 import { connectViewerPreparationPort } from '.';
 
 let portMessageListener: ((message: unknown) => void) | null = null;
@@ -68,7 +69,7 @@ it('routes viewer export port requests and posts correlated responses', () => {
   expect(onCommand).not.toHaveBeenCalled();
 });
 
-it('routes viewer preparation requests and posts command success', () => {
+it('routes viewer preparation requests and posts command success', async () => {
   const onCommand = vi.fn();
 
   connectViewerPreparationPort(onCommand);
@@ -79,16 +80,20 @@ it('routes viewer preparation requests and posts command success', () => {
     viewerPortGeneration: 'viewer-generation-1',
   });
 
-  expect(onCommand).toHaveBeenCalledWith({
-    type: MessageType.ENABLE_SCREENSHOT_MODE,
-    viewport: null,
-  });
-  expect(postMessage).toHaveBeenCalledWith({
-    type: WEB_SNAPSHOT_VIEWER_PREPARATION_RESPONSE,
-    requestId: 'prep-req-1',
-    success: true,
-    viewerPortGeneration: 'viewer-generation-1',
-  });
+  await vi.waitFor(() =>
+    expect(onCommand).toHaveBeenCalledWith({
+      type: MessageType.ENABLE_SCREENSHOT_MODE,
+      viewport: null,
+    })
+  );
+  await vi.waitFor(() =>
+    expect(postMessage).toHaveBeenCalledWith({
+      type: WEB_SNAPSHOT_VIEWER_PREPARATION_RESPONSE,
+      requestId: 'prep-req-1',
+      success: true,
+      viewerPortGeneration: 'viewer-generation-1',
+    })
+  );
 });
 
 it('reports viewer preparation request handler failures', () => {
@@ -119,7 +124,7 @@ it('ignores malformed viewer preparation port payloads', () => {
 
   connectViewerPreparationPort(onCommand, onPopupExportRequest);
   portMessageListener?.({
-    type: MessageType.SET_VIEWPORT,
+    type: PREPARATION_SURFACE_RESIZE,
     viewport: { height: 720, width: '1280' },
   });
   portMessageListener?.({

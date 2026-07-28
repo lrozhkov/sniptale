@@ -24,7 +24,6 @@ import { bootstrapPopupLifecycle } from './bootstrap-workflow';
 
 function createParams() {
   return {
-    clearAppliedViewportAuthority: vi.fn(),
     refreshActiveTabCapabilities: vi.fn(async () => undefined),
     refreshGalleryStatus: vi.fn(async () => undefined),
     setDisplayMode: vi.fn(),
@@ -68,7 +67,18 @@ function createBootstrapState() {
     recordingState: { status: 'idle' } as const,
     selectedPresetId: 'preset-1',
     videoSettings: { microphoneId: 'mic-1' },
-    viewportPresets: [{ id: 'preset-1', label: 'Desktop', height: 768, width: 1366 }],
+    viewportPresets: [
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Desktop',
+        target: 'viewport',
+        width: 1366,
+        height: 768,
+        enabled: true,
+        order: 0,
+      },
+    ],
   };
 }
 

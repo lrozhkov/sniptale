@@ -71,7 +71,7 @@ function createState() {
       icon: 'Camera',
       hotkey: null,
       screenshotMode: 'visible',
-      emulation: null,
+      viewportPresetId: null,
       delay: null,
       afterCapture: 'download_default',
       exitAfterCapture: false,
@@ -100,7 +100,18 @@ function renderFields() {
         <QuickActionsEditorPrimaryCaptureFields state={state} />
         <QuickActionsEditorSecondaryCaptureFields
           state={state}
-          viewportPresets={[{ id: 'preset-1', label: 'Desktop', width: 1440, height: 900 }]}
+          viewportPresets={[
+            {
+              kind: 'user',
+              id: 'preset-1',
+              name: 'Desktop',
+              target: 'viewport',
+              width: 1440,
+              height: 900,
+              enabled: true,
+              order: 0,
+            },
+          ]}
         />
       </div>
     );
@@ -157,15 +168,15 @@ function verifyQuickActionEditorFieldInteractions() {
   expect(state.updateFormField).toHaveBeenCalledWith('hotkey', { key: 'K' });
   expect(state.handleHotkeyError).toHaveBeenCalledWith('bad-hotkey');
   expect(state.updateFormField).toHaveBeenCalledWith('screenshotMode', 'full');
-  expect(state.updateFormField).toHaveBeenCalledWith('emulation', 'preset-1');
-  expect(state.updateFormField).toHaveBeenCalledWith('emulation', null);
+  expect(state.updateFormField).toHaveBeenCalledWith('viewportPresetId', 'preset-1');
+  expect(state.updateFormField).toHaveBeenCalledWith('viewportPresetId', null);
   expect(state.updateFormField).toHaveBeenCalledWith('delay', 5);
   expect(state.updateFormField).toHaveBeenCalledWith('delay', null);
 }
 
 describe('quick-actions-editor-fields', () => {
   it(
-    'wires identity, hotkey, emulation, and delay field handlers',
+    'wires identity, hotkey, viewport preset, and delay field handlers',
     verifyQuickActionEditorFieldInteractions
   );
 });

@@ -48,8 +48,26 @@ function createSettings(overrides: Record<string, unknown> = {}) {
     presets: [],
     saveCapturesToGallery: false,
     viewportPresets: [
-      { height: 720, id: 'preset-1', label: 'Compact', width: 1280 },
-      { height: 1080, id: 'preset-2', label: 'Full HD', width: 1920 },
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Compact',
+        target: 'viewport',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 0,
+      },
+      {
+        kind: 'user',
+        id: 'preset-2',
+        name: 'Full HD',
+        target: 'viewport',
+        width: 1920,
+        height: 1080,
+        enabled: true,
+        order: 0,
+      },
     ],
     ...overrides,
   };
@@ -73,7 +91,7 @@ function createVideoSettings(overrides: Record<string, unknown> = {}) {
 
 function createVideoUiState(overrides: Record<string, unknown> = {}) {
   return {
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     viewportPresetId: 'missing-preset',
     ...overrides,
   };
@@ -134,7 +152,7 @@ async function verifiesViewportFallbackCaptureMode() {
   );
   mocks.loadVideoUiStateMock.mockResolvedValue(
     createVideoUiState({
-      captureMode: CaptureMode.VIEWPORT_EMULATION,
+      captureMode: CaptureMode.TAB,
       viewportPresetId: 'missing-preset',
     })
   );
@@ -230,7 +248,7 @@ describe('popup-bootstrap video owner', () => {
     verifiesHydratedPopupVideoBootstrapState
   );
   it(
-    'falls back to tab capture when viewport emulation has no resolved preset',
+    'uses current size when the stored preset no longer exists',
     verifiesViewportFallbackCaptureMode
   );
   it(

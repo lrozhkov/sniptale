@@ -21,7 +21,6 @@ vi.mock('../copy', (_importOriginal) => ({
   getCaptureModeLabels: vi.fn(() => ({
     TAB: 'Tab',
     TAB_CROP: 'Area',
-    VIEWPORT_EMULATION: 'Preset',
     SCREEN: 'Screen',
   })),
   getViewportPresetLabel: vi.fn(() => 'Preset 1280x720'),
@@ -95,7 +94,7 @@ function createRecordingState(
     countdownEndsAt: null,
     captureMode: CaptureMode.TAB,
     captureSource: null,
-    viewportPreset: null,
+    viewportPresetId: null,
     error: null,
     ...overrides,
   };

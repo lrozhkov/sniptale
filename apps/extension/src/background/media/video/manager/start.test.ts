@@ -9,9 +9,8 @@ const {
   loggerLogMock,
   loggerWarnMock,
   notifyRecordingStartFailedMock,
-  normalizeViewportPresetMock,
   initializeRecordingContextMock,
-  issueActiveVideoRecordingLeaseMock,
+  issuePreparedVideoRecordingLeaseMock,
   runCountdownMock,
   scheduleRecordingStartActivationWatchdogMock,
   sendRuntimeMessageMock,
@@ -28,11 +27,8 @@ const {
   loggerLogMock: vi.fn(),
   loggerWarnMock: vi.fn(),
   notifyRecordingStartFailedMock: vi.fn(),
-  normalizeViewportPresetMock: vi.fn((captureMode, viewportPreset) =>
-    captureMode === 'VIEWPORT_EMULATION' ? viewportPreset : undefined
-  ),
   initializeRecordingContextMock: vi.fn(),
-  issueActiveVideoRecordingLeaseMock: vi.fn(),
+  issuePreparedVideoRecordingLeaseMock: vi.fn(),
   runCountdownMock: vi.fn(),
   scheduleRecordingStartActivationWatchdogMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
@@ -72,8 +68,7 @@ vi.mock('./flow', async (importOriginal) => ({
   isStartCancelled: isStartCancelledMock,
   runCountdown: runCountdownMock,
 }));
-vi.mock('./recording-context', () => ({
-  normalizeViewportPreset: normalizeViewportPresetMock,
+vi.mock('./recording-context.prepare', () => ({
   initializeRecordingContext: initializeRecordingContextMock,
 }));
 vi.mock('./start-activation-watchdog', async (importOriginal) => ({
@@ -82,7 +77,8 @@ vi.mock('./start-activation-watchdog', async (importOriginal) => ({
 }));
 vi.mock('../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../recording-control-lease')>()),
-  issueActiveVideoRecordingLease: issueActiveVideoRecordingLeaseMock,
+  activateVideoRecordingLease: vi.fn().mockResolvedValue({ controlToken: 'control-token-1' }),
+  issuePreparedVideoRecordingLease: issuePreparedVideoRecordingLeaseMock,
 }));
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -101,11 +97,17 @@ function resetStartRecordingTestState() {
   isVideoRecordingPreparationInProgressMock.mockReturnValue(false);
   initializeRecordingContextMock.mockResolvedValue(recordingContext);
   runCountdownMock.mockResolvedValue(true);
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
+  sendRuntimeMessageMock.mockImplementation((message: { type?: string }) =>
+    Promise.resolve(
+      message.type === VideoMessageType.OFFSCREEN_STOP_RECORDING
+        ? { success: true, result: 'accepted' }
+        : undefined
+    )
+  );
   installBackgroundRuntimeMessagingMock({ sendRuntimeMessage: sendRuntimeMessageMock });
   isStartCancelledMock.mockReturnValue(false);
-  finalizeRecordingStartMock.mockResolvedValue(undefined);
-  issueActiveVideoRecordingLeaseMock.mockResolvedValue({
+  finalizeRecordingStartMock.mockResolvedValue('stream-instance-1');
+  issuePreparedVideoRecordingLeaseMock.mockResolvedValue({
     controlToken: 'control-token-1',
     recordingId: 'recording-1',
   });
@@ -114,9 +116,9 @@ function resetStartRecordingTestState() {
 function startRecordingFromPopup(
   settings = defaultSettings,
   captureMode: CaptureMode = CaptureMode.TAB,
-  nextViewportPreset?: typeof viewportPreset
+  nextViewportPresetId?: string
 ) {
-  return startRecording(17, settings, captureMode, nextViewportPreset, ownerSenderUrl);
+  return startRecording(17, settings, captureMode, nextViewportPresetId, ownerSenderUrl);
 }
 
 function expectFullStartRollback() {
@@ -146,17 +148,18 @@ function verifiesDuplicateStartWhileActiveRecordingExists() {
   });
 }
 
-function verifiesPreparationFailureAndPresetNormalization() {
+function verifiesPreparationFailureKeepsPresetIdentity() {
   initializeRecordingContextMock.mockRejectedValue(new Error('mode blocked'));
-  return startRecordingFromPopup(defaultSettings, CaptureMode.TAB, viewportPreset).then(() => {
-    expect(normalizeViewportPresetMock).toHaveBeenCalledWith(CaptureMode.TAB, viewportPreset);
+  return startRecordingFromPopup(defaultSettings, CaptureMode.TAB, viewportPreset.id).then(() => {
     expect(beginVideoRecordingPreparationMock).toHaveBeenCalledWith(
       CaptureMode.TAB,
       expect.objectContaining({ sourceCount: 1 }),
-      undefined
+      viewportPreset.id
     );
     expect(setVideoRecordingIdMock).toHaveBeenCalledWith('recording-1');
-    expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('mode blocked');
+    expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('mode blocked', {
+      retainAuthority: false,
+    });
     expect(runCountdownMock).not.toHaveBeenCalled();
   });
 }
@@ -174,8 +177,8 @@ function verifiesAbortWhenCaptureSourceCannotBeResolved() {
 function verifiesAbortWhenCountdownDoesNotComplete() {
   runCountdownMock.mockResolvedValue(false);
   return startRecordingFromPopup().then(() => {
-    expect(finalizeRecordingStartMock).not.toHaveBeenCalled();
-    expect(isStartCancelledMock).not.toHaveBeenCalled();
+    expect(finalizeRecordingStartMock).toHaveBeenCalledOnce();
+    expect(isStartCancelledMock).toHaveBeenCalledWith(17, CaptureMode.TAB);
     expectFullStartRollback();
   });
 }
@@ -210,42 +213,61 @@ async function verifiesMultiSourceScreenSettingsAndCancellationRollback() {
   );
 }
 
-function verifiesViewportEmulationHappyPath() {
-  return startRecordingFromPopup(
-    defaultSettings,
-    CaptureMode.VIEWPORT_EMULATION,
-    viewportPreset
-  ).then(() => {
+function verifiesViewportPresetHappyPath() {
+  return startRecordingFromPopup(defaultSettings, CaptureMode.TAB, viewportPreset.id).then(() => {
     const sanitizedSettings = {
       ...defaultSettings,
       sourceCount: 1,
     };
     expect(beginVideoRecordingPreparationMock).toHaveBeenCalledWith(
-      CaptureMode.VIEWPORT_EMULATION,
+      CaptureMode.TAB,
       sanitizedSettings,
-      viewportPreset
+      viewportPreset.id
     );
     expect(initializeRecordingContextMock).toHaveBeenCalledWith({
-      captureMode: CaptureMode.VIEWPORT_EMULATION,
+      captureMode: CaptureMode.TAB,
       settings: sanitizedSettings,
       tabId: 17,
-      viewportPreset,
+      viewportPresetId: viewportPreset.id,
     });
-    expect(runCountdownMock).toHaveBeenCalledWith(
-      17,
-      CaptureMode.VIEWPORT_EMULATION,
-      sanitizedSettings
-    );
+    expect(runCountdownMock).toHaveBeenCalledWith(17, CaptureMode.TAB, sanitizedSettings);
     expect(initializeRecordingContextMock.mock.calls[0]?.[0].settings).not.toBe(defaultSettings);
     expect(setOpenEditorAfterRecordingMock).toHaveBeenCalledWith(false);
-    expect(isStartCancelledMock).toHaveBeenCalledWith(17, CaptureMode.VIEWPORT_EMULATION);
+    expect(isStartCancelledMock).toHaveBeenCalledWith(17, CaptureMode.TAB);
     expect(scheduleRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('recording-1');
     expect(finalizeRecordingStartMock).toHaveBeenCalledWith({
       ...recordingContext,
-      onBeforeOffscreenStartDispatch: expect.any(Function),
-      shouldAbortBeforeOffscreenStart: expect.any(Function),
+      recordingId: 'recording-1',
+      streamInstanceId: 'recording-1',
+    });
+    expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
+      captureMode: CaptureMode.TAB,
+      cropRegion: null,
+      openEditorAfterRecording: false,
+      ownerSenderUrl,
+      surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
+      viewportPresetId: viewportPreset.id,
     });
   });
+}
+
+async function verifiesCropGeometryPersistence(): Promise<void> {
+  const cropRegion = { x: 120, y: 80, width: 300, height: 300 };
+  initializeRecordingContextMock.mockResolvedValue({
+    ...recordingContext,
+    captureMode: CaptureMode.TAB_CROP,
+    captureSource: {
+      ...recordingContext.captureSource,
+      mode: CaptureMode.TAB_CROP,
+      cropRegion,
+    },
+  });
+
+  await startRecordingFromPopup(defaultSettings, CaptureMode.TAB_CROP, viewportPreset.id);
+
+  expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith(
+    expect.objectContaining({ captureMode: CaptureMode.TAB_CROP, cropRegion })
+  );
 }
 
 describe('video-manager start', () => {
@@ -260,8 +282,8 @@ describe('video-manager start', () => {
     verifiesDuplicateStartWhileActiveRecordingExists
   );
   it(
-    'reports preparation failures and drops viewport presets outside viewport emulation',
-    verifiesPreparationFailureAndPresetNormalization
+    'reports preparation failures without replacing the selected preset ID',
+    verifiesPreparationFailureKeepsPresetIdentity
   );
   it(
     'aborts early when recording context preparation returns null',
@@ -273,7 +295,11 @@ describe('video-manager start', () => {
     verifiesMultiSourceScreenSettingsAndCancellationRollback
   );
   it(
-    'finalizes a viewport emulation recording with the assembled context',
-    verifiesViewportEmulationHappyPath
+    'finalizes a viewport preset recording with the assembled context',
+    verifiesViewportPresetHappyPath
+  );
+  it(
+    'persists TAB_CROP geometry for worker and navigation recovery',
+    verifiesCropGeometryPersistence
   );
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useSettingsStore } from '../../runtime/store/useSettingsStore';
 import type { ViewportPreset } from '../../../contracts/settings';
@@ -6,17 +6,29 @@ import type { ViewportPreset } from '../../../contracts/settings';
 export function useViewportPresetsSync() {
   const { settings, updateSettings, isLoading } = useSettingsStore();
   const [viewportPresets, setViewportPresets] = useState<ViewportPreset[]>([]);
-  const [defaultViewportId, setDefaultViewportId] = useState('native');
+  const [defaultViewportPresetId, setDefaultViewportPresetId] = useState<string | null>(null);
+  const mutationActiveRef = useRef(false);
+  const [isMutating, setIsMutating] = useState(false);
 
   useEffect(() => {
-    setViewportPresets(settings.viewportPresets ?? []);
-    setDefaultViewportId(settings.defaultViewportId ?? 'native');
-  }, [settings.defaultViewportId, settings.viewportPresets]);
+    setViewportPresets(settings.viewportPresets);
+    setDefaultViewportPresetId(settings.defaultViewportPresetId);
+  }, [settings.defaultViewportPresetId, settings.viewportPresets]);
 
   return {
-    defaultViewportId,
-    isLoading,
-    setDefaultViewportId,
+    beginMutation: () => {
+      if (mutationActiveRef.current) return false;
+      mutationActiveRef.current = true;
+      setIsMutating(true);
+      return true;
+    },
+    defaultViewportPresetId,
+    endMutation: () => {
+      mutationActiveRef.current = false;
+      setIsMutating(false);
+    },
+    isLoading: isLoading || isMutating,
+    setDefaultViewportPresetId,
     setViewportPresets,
     settings,
     updateSettings,

@@ -59,7 +59,7 @@ function createQuickAction(overrides: Partial<QuickAction> = {}): QuickAction {
     bundledId: overrides.bundledId ?? null,
     hotkey: overrides.hotkey ?? null,
     screenshotMode: overrides.screenshotMode ?? 'visible',
-    emulation: overrides.emulation ?? 'native',
+    viewportPresetId: overrides.viewportPresetId ?? 'native',
     delay: overrides.delay ?? null,
     afterCapture: overrides.afterCapture ?? 'download_default',
     imageFormat: overrides.imageFormat ?? null,

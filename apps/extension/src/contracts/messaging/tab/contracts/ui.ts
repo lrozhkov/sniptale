@@ -15,10 +15,24 @@ import {
   isImageDataUrl,
   isNullable,
   isNumber,
+  isRecord,
   isShowToastPayload,
-  isSize2d,
   isString,
 } from '../../validators/index';
+
+const isAppliedViewportPreset = (
+  value: unknown
+): value is {
+  presetId: string;
+  target: 'viewport' | 'window';
+  width: number;
+  height: number;
+} =>
+  isRecord(value) &&
+  isString(value['presetId']) &&
+  (value['target'] === 'viewport' || value['target'] === 'window') &&
+  isNumber(value['width']) &&
+  isNumber(value['height']);
 
 type PartialTabRegistry = Partial<MessageContractRegistry<TabRequestByType, TabResponseByType>>;
 
@@ -105,7 +119,7 @@ export const tabUiMessageContracts = {
       'tab VIEWPORT_CHANGED message',
       createMessageGuard({
         type: MessageType.VIEWPORT_CHANGED,
-        required: { viewport: isNullable(isSize2d) },
+        required: { viewport: isNullable(isAppliedViewportPreset) },
       })
     ),
     parseResponse: createGuardParser('tab VIEWPORT_CHANGED response', createRuntimeResponseGuard()),

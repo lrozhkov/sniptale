@@ -49,7 +49,7 @@ export function createQuickAction(overrides: Partial<QuickAction> = {}): QuickAc
       shiftKey: true,
     },
     screenshotMode: overrides.screenshotMode ?? 'visible',
-    emulation: overrides.emulation ?? null,
+    viewportPresetId: overrides.viewportPresetId ?? null,
     delay: overrides.delay ?? null,
     afterCapture: overrides.afterCapture ?? 'download_default',
     imageFormat: overrides.imageFormat ?? null,

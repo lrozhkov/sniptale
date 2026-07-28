@@ -14,22 +14,27 @@ export function initializeRecordingSession(params: {
   viewport?: { width: number; height: number; devicePixelRatio?: number };
   captureMode?: string;
   cropRegion?: { x: number; y: number; width: number; height: number };
-  targetResolution?: { width: number; height: number };
-  emulatedViewportCssSize?: { width: number; height: number };
-  recordingId?: string;
+  generation: number;
+  streamInstanceId: string;
+  surface?: { presetId: string; target: 'viewport' | 'window'; width: number; height: number };
+  recordingId: string;
 }) {
   logger.debug('Initializing recording session', {
     captureMode: params.captureMode ?? 'TAB',
     hasViewport: Boolean(params.viewport),
     hasCropRegion: Boolean(params.cropRegion),
-    hasTargetResolution: Boolean(params.targetResolution),
-    hasEmulatedViewportCssSize: Boolean(params.emulatedViewportCssSize),
+    generation: params.generation,
+    hasSurface: Boolean(params.surface),
     recordingIdProvided: Boolean(params.recordingId),
   });
 
-  const resolvedRecordingId =
-    params.recordingId || `rec-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-  recordingContext.beginRecordingSession(resolvedRecordingId);
+  const resolvedRecordingId = params.recordingId;
+  recordingContext.beginRecordingSession(resolvedRecordingId, params.generation);
+  recordingContext.bindStreamInstance({
+    generation: params.generation,
+    recordingId: resolvedRecordingId,
+    streamInstanceId: params.streamInstanceId,
+  });
   logger.debug('Resolved recording session ID', { recordingId: resolvedRecordingId });
   return resolvedRecordingId;
 }

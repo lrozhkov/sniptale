@@ -15,6 +15,8 @@ const desktopMediaContract =
 const desktopMediaFailedContract =
   runtimeVideoOffscreenEventMessageContracts[VideoMessageType.DESKTOP_MEDIA_FAILED];
 const errorContract = runtimeVideoOffscreenEventMessageContracts[VideoMessageType.OFFSCREEN_ERROR];
+const sourceReadyContract =
+  runtimeVideoOffscreenEventMessageContracts[VideoMessageType.OFFSCREEN_SOURCE_READY];
 const startRecordingContract =
   runtimeVideoOffscreenViewportMessageContracts[VideoMessageType.OFFSCREEN_START_RECORDING];
 
@@ -49,6 +51,35 @@ it('accepts valid cursor capture modes on offscreen recording started messages',
   });
 });
 
+it('validates exact source-ready metadata and optional numeric track settings', () => {
+  const message = {
+    type: VideoMessageType.OFFSCREEN_SOURCE_READY,
+    generation: 2,
+    recordingId: 'rec-1',
+    streamInstanceId: 'stream-1',
+    videoHeight: 720,
+    videoWidth: 1280,
+    trackSettings: { frameRate: 30, height: 720, width: 1280 },
+  };
+  expect(sourceReadyContract.parseRequest(message)).toEqual(message);
+  expect(sourceReadyContract.parseRequest({ ...message, trackSettings: {} })).toEqual({
+    ...message,
+    trackSettings: {},
+  });
+
+  for (const trackSettings of [
+    null,
+    'invalid',
+    { width: '1280' },
+    { height: '720' },
+    { frameRate: '30' },
+  ]) {
+    expect(() => sourceReadyContract.parseRequest({ ...message, trackSettings })).toThrow(
+      /OFFSCREEN_SOURCE_READY/
+    );
+  }
+});
+
 it('rejects invalid webcam track settings on recording started messages', () => {
   expect(() =>
     startedContract.parseRequest({
@@ -74,14 +105,20 @@ it('rejects unknown capture modes on offscreen recording start requests', () => 
     startRecordingContract.parseRequest({
       type: VideoMessageType.OFFSCREEN_START_RECORDING,
       capabilityToken: 'test-capability',
+      generation: 1,
+      recordingId: 'rec-1',
       streamId: 'stream-1',
+      streamInstanceId: 'stream-instance-1',
       settings: recordingSettings,
       captureMode: CaptureMode.TAB,
     })
   ).toEqual({
     type: VideoMessageType.OFFSCREEN_START_RECORDING,
     capabilityToken: 'test-capability',
+    generation: 1,
+    recordingId: 'rec-1',
     streamId: 'stream-1',
+    streamInstanceId: 'stream-instance-1',
     settings: recordingSettings,
     captureMode: CaptureMode.TAB,
   });
@@ -90,11 +127,35 @@ it('rejects unknown capture modes on offscreen recording start requests', () => 
     startRecordingContract.parseRequest({
       type: VideoMessageType.OFFSCREEN_START_RECORDING,
       capabilityToken: 'test-capability',
+      generation: 1,
+      recordingId: 'rec-1',
       streamId: 'stream-1',
+      streamInstanceId: 'stream-instance-1',
       settings: recordingSettings,
       captureMode: 'region',
     })
   ).toThrow(/OFFSCREEN_START_RECORDING/);
+});
+
+it('requires complete source identity on offscreen recording start requests', () => {
+  const request = {
+    type: VideoMessageType.OFFSCREEN_START_RECORDING,
+    capabilityToken: 'test-capability',
+    generation: 1,
+    recordingId: 'rec-1',
+    streamId: 'stream-1',
+    streamInstanceId: 'stream-instance-1',
+    settings: recordingSettings,
+    captureMode: CaptureMode.TAB,
+  };
+
+  for (const field of ['generation', 'recordingId', 'streamInstanceId'] as const) {
+    const invalidRequest = { ...request };
+    delete invalidRequest[field];
+    expect(() => startRecordingContract.parseRequest(invalidRequest)).toThrow(
+      /OFFSCREEN_START_RECORDING/
+    );
+  }
 });
 
 it('requires recording ids on offscreen recording lifecycle messages', () => {

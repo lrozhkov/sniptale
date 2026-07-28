@@ -48,4 +48,10 @@ describe('settings default graph', () => {
     expect(firstSettings.contextMenu).not.toBe(secondSettings.contextMenu);
     expect(firstSettings.contentToolbar).not.toBe(secondSettings.contentToolbar);
   });
+
+  it('uses the v1 system catalog and current size as the default', () => {
+    const settings = createDefaultSettings();
+    expect(settings.viewportPresets).toHaveLength(9);
+    expect(settings.defaultViewportPresetId).toBeNull();
+  });
 });

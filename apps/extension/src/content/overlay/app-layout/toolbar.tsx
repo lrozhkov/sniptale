@@ -178,6 +178,9 @@ function renderToolbarShell(args: {
         onTimerDelayChange={args.toolbar.setTimerDelay}
         currentViewport={args.toolbar.currentViewport}
         onViewportChange={args.toolbar.setCurrentViewport}
+        {...(args.toolbar.mutateViewport === undefined
+          ? {}
+          : { mutateViewport: args.toolbar.mutateViewport })}
         scenario={args.scenarioToolbarProps}
         isCursorMode={args.toolbar.isCursorMode}
         onEnableCursorMode={modeController.handleEnableCursorMode}

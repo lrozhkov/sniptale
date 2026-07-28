@@ -82,6 +82,11 @@
       "ownerClass": "feature"
     },
     {
+      "sourcePrefix": "apps/extension/src/features/viewport-presets",
+      "ownerId": "feature.viewport-presets",
+      "ownerClass": "feature"
+    },
+    {
       "sourcePrefix": "apps/extension/src/features/web-snapshot",
       "ownerId": "feature.web-snapshot",
       "ownerClass": "feature"

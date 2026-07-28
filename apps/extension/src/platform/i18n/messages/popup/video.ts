@@ -32,12 +32,12 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Allow camera access first',
   },
   modePresetLabel: {
-    ru: 'Пресет',
-    en: 'Preset',
+    ru: 'Вкладка с пресетом размера',
+    en: 'Tab with size preset',
   },
   modePresetHint: {
-    ru: 'Эмуляция viewport по сохранённому пресету',
-    en: 'Emulate a viewport using a saved preset',
+    ru: 'Запись вкладки с выбранным размером области страницы или окна браузера',
+    en: 'Record the tab with a selected page viewport or browser window size',
   },
   modeScreenLabel: {
     ru: 'Окно',
@@ -48,12 +48,12 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Choose a window, tab, or screen via the system picker',
   },
   presetRowLabel: {
-    ru: 'Экран',
-    en: 'Screen',
+    ru: 'Размер',
+    en: 'Size',
   },
   presetRowAria: {
-    ru: 'Строка выбора viewport-пресета',
-    en: 'Viewport preset row',
+    ru: 'Выбор размера для записи',
+    en: 'Recording size selector',
   },
   presetPlaceholder: {
     ru: 'Выберите пресет',
@@ -68,12 +68,12 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Native size',
   },
   presetNativeDescription: {
-    ru: 'Без эмуляции viewport',
-    en: 'No viewport emulation',
+    ru: 'Не изменять область страницы или окно браузера',
+    en: 'Do not resize the page viewport or browser window',
   },
   presetAria: {
-    ru: 'Viewport preset',
-    en: 'Viewport preset',
+    ru: 'Пресет размера записи',
+    en: 'Recording size preset',
   },
   choosePresetError: {
     ru: 'Сначала выберите пресет',
@@ -134,12 +134,12 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Extended diagnostics are unavailable for area recording.',
   },
   diagnosticsUnavailableLabel: {
-    ru: 'Диагностика доступна для пресета экрана',
-    en: 'Diagnostics are available for screen presets',
+    ru: 'Диагностика доступна для записи вкладки',
+    en: 'Diagnostics are available for full-tab recording',
   },
   diagnosticsUnavailableDescription: {
-    ru: 'Сначала примените размер экрана к вкладке, чтобы включить расширенную диагностику.',
-    en: 'Apply a screen size to the tab before turning on extended diagnostics.',
+    ru: 'Расширенная диагностика доступна только при записи вкладки целиком.',
+    en: 'Extended diagnostics are available only when recording the full tab.',
   },
   qualityLabel: {
     ru: 'Качество',

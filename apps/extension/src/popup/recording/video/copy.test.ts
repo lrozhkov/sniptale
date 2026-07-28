@@ -37,9 +37,7 @@ function verifiesStatusLabels() {
     't:popup.labels.statusSaving'
   );
   expect(getRecordingStatusLabel(VideoRecordingStatus.IDLE)).toBe('t:popup.labels.statusReady');
-  expect(getCaptureModeLabels()[CaptureMode.VIEWPORT_EMULATION]).toBe(
-    't:popup.labels.captureModePreset'
-  );
+  expect(getCaptureModeLabels()[CaptureMode.TAB]).toBe('t:popup.labels.captureModeTab');
   expect(getCaptureModeLabels()[CaptureMode.CAMERA]).toBe('t:popup.video.modeCameraLabel');
 }
 
@@ -50,24 +48,18 @@ function verifiesDurationFormatting() {
 
 function verifiesCaptureSourceDescriptions() {
   expect(
-    describeCaptureSource(
-      { mode: CaptureMode.TAB, streamId: 's1', tabTitle: '' },
-      CaptureMode.TAB,
-      null
-    )
+    describeCaptureSource({ mode: CaptureMode.TAB, streamId: 's1', tabTitle: '' }, CaptureMode.TAB)
   ).toBe('t:popup.labels.sourceActiveTab');
   expect(
     describeCaptureSource(
       { mode: CaptureMode.SCREEN, streamId: 's2', screenName: '' },
-      CaptureMode.SCREEN,
-      null
+      CaptureMode.SCREEN
     )
   ).toBe('t:popup.labels.sourceScreen');
   expect(
     describeCaptureSource(
-      { mode: CaptureMode.VIEWPORT_EMULATION, streamId: 's3', tabTitle: 'Tab title' },
-      CaptureMode.VIEWPORT_EMULATION,
-      null
+      { mode: CaptureMode.TAB, streamId: 's3', tabTitle: 'Tab title' },
+      CaptureMode.TAB
     )
   ).toBe('Tab title');
   expect(
@@ -78,30 +70,22 @@ function verifiesCaptureSourceDescriptions() {
         tabTitle: 'Cropped tab',
         cropRegion: { x: 0, y: 0, width: 640, height: 360 },
       },
-      CaptureMode.TAB_CROP,
-      null
+      CaptureMode.TAB_CROP
     )
   ).toBe('Cropped tab • 640×360');
   expect(
     describeCaptureSource(
-      { mode: CaptureMode.VIEWPORT_EMULATION, streamId: 's5', tabTitle: 'Preset tab' },
-      CaptureMode.VIEWPORT_EMULATION,
-      'Preset 1440×900'
+      { mode: CaptureMode.TAB, streamId: 's5', tabTitle: 'Preset tab' },
+      CaptureMode.TAB
     )
-  ).toBe('Preset tab • Preset 1440×900');
-  expect(describeCaptureSource(null, CaptureMode.VIEWPORT_EMULATION, 'Preset 1440×900')).toBe(
-    't:popup.labels.sourceViewportPrefix Preset 1440×900'
-  );
-  expect(describeCaptureSource(null, null, null)).toBe('t:popup.labels.sourcePending');
+  ).toBe('Preset tab');
+  expect(describeCaptureSource(null, CaptureMode.TAB)).toBe('t:popup.labels.captureModeTab');
+  expect(describeCaptureSource(null, null)).toBe('t:popup.labels.sourcePending');
 }
 
 function verifiesCameraCaptureSourceDescription() {
   expect(
-    describeCaptureSource(
-      { mode: CaptureMode.CAMERA, streamId: 'camera' },
-      CaptureMode.CAMERA,
-      null
-    )
+    describeCaptureSource({ mode: CaptureMode.CAMERA, streamId: 'camera' }, CaptureMode.CAMERA)
   ).toBe('t:popup.video.modeCameraLabel');
 }
 
@@ -113,10 +97,10 @@ function verifiesViewportPresetLabels() {
       countdownEndsAt: null,
       captureMode: null,
       captureSource: null,
-      viewportPreset: { id: 'preset-1', label: 'Desktop', width: 1280, height: 720 },
+      viewportPresetId: 'preset-1',
       error: null,
     })
-  ).toBe('Desktop 1280×720');
+  ).toBe('preset-1');
 
   expect(
     getViewportPresetLabel({
@@ -125,10 +109,10 @@ function verifiesViewportPresetLabels() {
       countdownEndsAt: null,
       captureMode: null,
       captureSource: null,
-      viewportPreset: { id: 'preset-2', label: '', width: 1024, height: 768 },
+      viewportPresetId: null,
       error: null,
     })
-  ).toBe('1024×768');
+  ).toBeNull();
 }
 
 function verifiesDefaultLiveMediaState() {
@@ -159,18 +143,18 @@ function verifiesDefaultLiveMediaState() {
 function verifiesControlledCursorSupport() {
   expect(supportsCursorTrackTelemetry(CaptureMode.TAB)).toBe(true);
   expect(supportsCursorTrackTelemetry(CaptureMode.TAB_CROP)).toBe(true);
-  expect(supportsCursorTrackTelemetry(CaptureMode.VIEWPORT_EMULATION)).toBe(true);
+  expect(supportsCursorTrackTelemetry(CaptureMode.TAB)).toBe(true);
   expect(supportsCursorTrackTelemetry(CaptureMode.SCREEN)).toBe(false);
   expect(supportsCursorTrackTelemetry(CaptureMode.CAMERA)).toBe(false);
   expect(supportsControlledCursorCapture(CaptureMode.TAB)).toBe(false);
   expect(supportsControlledCursorCapture(CaptureMode.TAB_CROP)).toBe(false);
-  expect(supportsControlledCursorCapture(CaptureMode.VIEWPORT_EMULATION)).toBe(false);
+  expect(supportsControlledCursorCapture(CaptureMode.TAB)).toBe(false);
   expect(supportsControlledCursorCapture(CaptureMode.SCREEN)).toBe(false);
   expect(supportsControlledCursorCapture(CaptureMode.CAMERA)).toBe(false);
   expect(getControlledCursorDescription(CaptureMode.TAB_CROP)).toBe(
     't:popup.video.controlledCursorDescriptionEmbedded'
   );
-  expect(getControlledCursorDescription(CaptureMode.VIEWPORT_EMULATION)).toBe(
+  expect(getControlledCursorDescription(CaptureMode.TAB)).toBe(
     't:popup.video.controlledCursorDescriptionEmbedded'
   );
   expect(getControlledCursorDescription(CaptureMode.SCREEN)).toBe(

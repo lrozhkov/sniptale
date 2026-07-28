@@ -3,7 +3,8 @@ import { useAppLocale } from '../../../platform/i18n';
 import { ToolbarShellContent } from './shell/view';
 import { handleToolbarViewportChange } from './shell/viewport-change';
 import { useToolbarViewModel } from './state/view-model';
-import type { ToolbarProps } from './types';
+import type { ToolbarProps, ToolbarViewportSelection } from './types';
+import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
 
 export const Toolbar: React.FC<ToolbarProps> = (props) => {
   useAppLocale();
@@ -22,8 +23,13 @@ export const Toolbar: React.FC<ToolbarProps> = (props) => {
       spaceBelow < tooltipHeight && spaceAbove > spaceBelow ? 'top' : 'bottom';
   };
 
-  const handleViewportChange = (viewport: { width: number; height: number } | null) =>
-    void handleToolbarViewportChange(viewport, viewModel.derivedState.setCurrentViewport);
+  const handleViewportChange = (viewport: ToolbarViewportSelection, activationEvent?: Event) =>
+    void handleToolbarViewportChange(
+      viewport,
+      viewModel.derivedState.setCurrentViewport,
+      props.mutateViewport,
+      activationEvent ? createTrustedContentActionIntentSource(activationEvent) : undefined
+    );
 
   return (
     <ToolbarShellContent

@@ -159,9 +159,8 @@ async function expectBootstrapRestoresTabCropOverlay() {
       success: true,
       state: {
         captureMode: CaptureMode.TAB_CROP,
-        captureSource: {
-          cropRegion: { x: 10, y: 20, width: 300, height: 200 },
-        },
+        captureSource: null,
+        cropRegion: { x: 10, y: 20, width: 300, height: 200 },
       },
     })
     .mockResolvedValueOnce({
@@ -171,6 +170,10 @@ async function expectBootstrapRestoresTabCropOverlay() {
 
   const { initializeTopLevelContentRuntime } = await import('./bootstrap');
   initializeTopLevelContentRuntime(vi.fn(), createRuntimeServices());
+
+  expect(browserRuntimeMocks.subscribeToMessages.mock.invocationCallOrder[0]).toBeLessThan(
+    runtimeMessagingMocks.sendRuntimeMessage.mock.invocationCallOrder[0]!
+  );
 
   await Promise.resolve();
   await Promise.resolve();

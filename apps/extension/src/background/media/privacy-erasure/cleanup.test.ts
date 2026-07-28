@@ -12,6 +12,9 @@ const {
   getCurrentRecordingIdMock,
   inspectActiveProjectExportJobLedgerEntryMock,
   inspectPersistedLeaseMock,
+  hasOwnerLeaseMock,
+  readCaptureSurfaceJournalMock,
+  releaseOwnersMock,
   requestProjectExportJobCancelMock,
   resetRecordingIdMock,
   resetRecordingTabIdMock,
@@ -28,6 +31,9 @@ const {
   getCurrentRecordingIdMock: vi.fn(),
   inspectActiveProjectExportJobLedgerEntryMock: vi.fn(),
   inspectPersistedLeaseMock: vi.fn(),
+  hasOwnerLeaseMock: vi.fn(),
+  readCaptureSurfaceJournalMock: vi.fn(),
+  releaseOwnersMock: vi.fn(),
   requestProjectExportJobCancelMock: vi.fn(),
   resetRecordingIdMock: vi.fn(),
   resetRecordingTabIdMock: vi.fn(),
@@ -80,6 +86,17 @@ vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/runtime-messaging')>()),
   sendRuntimeMessage: sendRuntimeMessageMock,
 }));
+vi.mock('../../storage/capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../storage/capture-surface')>()),
+  readCaptureSurfaceJournal: readCaptureSurfaceJournalMock,
+}));
+vi.mock('../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture-surface')>()),
+  getCaptureSurfaceService: () => ({
+    hasOwnerLease: hasOwnerLeaseMock,
+    releaseOwners: releaseOwnersMock,
+  }),
+}));
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { mediaPrivacyErasureCleanupAdapter } from './cleanup';
@@ -92,6 +109,9 @@ beforeEach(() => {
   getCurrentRecordingIdMock.mockReturnValue(null);
   inspectActiveProjectExportJobLedgerEntryMock.mockResolvedValue({ status: 'absent' });
   inspectPersistedLeaseMock.mockResolvedValue({ status: 'absent' });
+  hasOwnerLeaseMock.mockReturnValue(false);
+  readCaptureSurfaceJournalMock.mockResolvedValue([]);
+  releaseOwnersMock.mockResolvedValue(undefined);
   requestProjectExportJobCancelMock.mockResolvedValue(null);
   sendRuntimeMessageMock.mockResolvedValue({ success: true, result: 'accepted' });
   stopRecordingForPrivacyErasureMock.mockResolvedValue({ result: 'no-active-recording' });

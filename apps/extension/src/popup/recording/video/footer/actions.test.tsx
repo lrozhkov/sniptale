@@ -85,7 +85,7 @@ function renderVideoSetupFooter(options: {
         duration: options.duration,
         error: null,
         status: options.status,
-        viewportPreset: null,
+        viewportPresetId: null,
       }}
       galleryTitle="Gallery title"
     />

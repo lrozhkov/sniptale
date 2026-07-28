@@ -80,7 +80,6 @@ function createParams(): PopupLifecycleParams {
       setWebcamDevices: vi.fn(),
     },
     browser: {
-      clearAppliedViewportAuthority: vi.fn(),
       refreshActiveTabCapabilities,
       refreshGalleryStatus,
     },

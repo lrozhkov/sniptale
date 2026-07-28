@@ -73,4 +73,42 @@ describe('runtimeActionCaptureMessageContracts', () => {
       })
     ).toThrow();
   });
+
+  it('requires a one-shot content intent for screenshot surface renewal', () => {
+    const contract =
+      runtimeActionCaptureMessageContracts[CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION];
+    expect(
+      contract.parseRequest({
+        contentIntent: { requestId: 'renew-1', token: 'token-1' },
+        type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+      })
+    ).toEqual({
+      contentIntent: { requestId: 'renew-1', token: 'token-1' },
+      type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+    });
+    expect(() =>
+      contract.parseRequest({ type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION })
+    ).toThrow();
+    expect(
+      contract.parseResponse({
+        success: true,
+        surfaceCapabilityToken: 'surface-1',
+        surfaceLeaseGeneration: 2,
+        surfaceOperationGeneration: 2,
+      })
+    ).toEqual({
+      success: true,
+      surfaceCapabilityToken: 'surface-1',
+      surfaceLeaseGeneration: 2,
+      surfaceOperationGeneration: 2,
+    });
+    expect(() =>
+      contract.parseResponse({
+        success: true,
+        surfaceCapabilityToken: 'surface-1',
+        surfaceLeaseGeneration: 1.5,
+        surfaceOperationGeneration: 2,
+      })
+    ).toThrow();
+  });
 });

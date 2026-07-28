@@ -22,12 +22,14 @@ import {
 } from '../../../session-state';
 import {
   clearActiveVideoRecordingLease,
+  ensureActiveVideoRecordingLeaseHydrated,
   restoreCurrentRecordingFromLease,
 } from '../../../recording-control-lease';
 import { clearCameraRecorderControlGrant } from '../../camera-recorder-control';
 import { resetRecordingTabId } from '../../manager';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
-import { createAsyncLifecycleRoute, HANDLED_SYNC_RESULT, type RouteResult } from '../shared';
+import { createAsyncLifecycleRoute, HANDLED_ASYNC_RESULT, type RouteResult } from '../shared';
+import { releaseVideoCaptureSurface } from '../../../capture-surface';
 
 export { handleRecordingState } from './recording-state-response';
 
@@ -60,13 +62,28 @@ export function handleRecordingTabId(
   sendResponse: ResponseSender,
   senderTabId?: number
 ): RouteResult {
+  void sendHydratedRecordingTabId(sendResponse, senderTabId).catch((error) => {
+    logger.warn('Failed to hydrate recording lease before tab response', error);
+    sendRecordingTabIdResponse(sendResponse, senderTabId);
+  });
+  return HANDLED_ASYNC_RESULT;
+}
+
+async function sendHydratedRecordingTabId(
+  sendResponse: ResponseSender,
+  senderTabId?: number
+): Promise<void> {
+  await ensureActiveVideoRecordingLeaseHydrated();
+  sendRecordingTabIdResponse(sendResponse, senderTabId);
+}
+
+function sendRecordingTabIdResponse(sendResponse: ResponseSender, senderTabId?: number): void {
   const recordingTabId = getVideoRecordingTabId();
   sendResponse({
     success: true,
     isCurrentTab: recordingTabId !== null && senderTabId === recordingTabId,
     tabId: recordingTabId ?? undefined,
   });
-  return HANDLED_SYNC_RESULT;
 }
 
 export function handleRecordingDurationUpdated(
@@ -162,6 +179,7 @@ async function handleOffscreenRecordingStoppedIfCurrent(message?: {
   if (!message || !(await isCurrentRecordingLifecycleEvent(message))) {
     return;
   }
+  await releaseVideoCaptureSurface(message.recordingId);
   finishVideoRecordingStop();
   resetCompletedVideoRecordingSession(message.recordingId);
   resetRecordingTabId();

@@ -12,8 +12,6 @@ import { getGalleryTitle, getVideoSetupViewModel } from './view-model';
 
 type VideoSetupViewModelTestProps = Pick<
   VideoSetupPageProps,
-  | 'appliedViewportPresetId'
-  | 'appliedViewportTabId'
   | 'activeTabCapabilities'
   | 'captureMode'
   | 'galleryStatus'
@@ -40,7 +38,6 @@ function createActiveTabCapabilities(
       [CaptureMode.TAB]: { supported: true, reason: null },
       [CaptureMode.TAB_CROP]: { supported: true, reason: null },
       [CaptureMode.CAMERA]: { supported: true, reason: null },
-      [CaptureMode.VIEWPORT_EMULATION]: { supported: true, reason: null },
       [CaptureMode.SCREEN]: { supported: true, reason: null },
     },
     ...overrides,
@@ -52,14 +49,23 @@ function createProps(
 ): VideoSetupViewModelTestProps {
   return {
     activeTabCapabilities: createActiveTabCapabilities(),
-    appliedViewportPresetId: 'preset-1',
-    appliedViewportTabId: 1,
     captureMode: CaptureMode.TAB,
     galleryStatus: { text: '3 projects', pressure: 'healthy' as const },
     isLoadingWebcams: false,
     isStartPending: false,
     selectedPresetId: 'preset-1',
-    viewportPresets: [{ id: 'preset-1', label: 'Preset', width: 1280, height: 720 }],
+    viewportPresets: [
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Preset',
+        target: 'viewport',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 0,
+      },
+    ],
     webcamDevices: [{ deviceId: 'cam-1', label: 'Camera' }],
     ...overrides,
   };
@@ -83,24 +89,7 @@ it('derives a startable setup view model when the preset and mode are available'
   );
 });
 
-it('keeps diagnostics disabled until a viewport preset is applied to tab capture', () => {
-  expect(
-    getVideoSetupViewModel(
-      createProps({
-        appliedViewportPresetId: null,
-        appliedViewportTabId: null,
-        selectedPresetId: 'preset-1',
-      })
-    )
-  ).toEqual(expect.objectContaining({ diagnosticsDisabled: true }));
-  expect(
-    getVideoSetupViewModel(
-      createProps({
-        appliedViewportPresetId: 'preset-1',
-        appliedViewportTabId: 2,
-      })
-    )
-  ).toEqual(expect.objectContaining({ diagnosticsDisabled: true }));
+it('keeps diagnostics disabled outside regular tab capture', () => {
   expect(getVideoSetupViewModel(createProps({ captureMode: CaptureMode.SCREEN }))).toEqual(
     expect.objectContaining({ diagnosticsDisabled: true })
   );

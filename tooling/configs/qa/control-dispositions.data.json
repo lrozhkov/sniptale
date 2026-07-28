@@ -1671,9 +1671,9 @@
         "tooling/qa/core/qa-scope.mjs",
         "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs"
       ],
-      "disposition": "adapt",
+      "disposition": "keep",
       "owner": "qa-platform",
-      "rationale": "This inert scope inventory is validated before use and against its HEAD census."
+      "rationale": "This remains a narrow permanent repository policy with a discovered consumer."
     },
     {
       "path": "tooling/configs/qa/jscpd-baseline.json",
@@ -2240,6 +2240,12 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
+      "tool": "verify-all.scheduler.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
       "tool": "verify-all.scope.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -2283,6 +2289,12 @@
     },
     {
       "tool": "verify-all.violation-steps.runtime.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-all.worker.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
@@ -2372,6 +2384,12 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
+      "tool": "verify-build.scheduler.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
       "tool": "verify-build.scope.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
@@ -2379,6 +2397,12 @@
     },
     {
       "tool": "verify-build.test-profiles.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-build.worker.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
@@ -2546,7 +2570,19 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
+      "tool": "verify-focused.scheduler.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
       "tool": "verify-focused.test-steps.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-focused.worker.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
@@ -2564,7 +2600,19 @@
       "rationale": "The validation row proves a deterministic repository tool or canonical control."
     },
     {
+      "tool": "verify-harness.scheduler.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
       "tool": "verify-harness.state.helpers.mjs",
+      "disposition": "keep",
+      "owner": "qa-platform",
+      "rationale": "The validation row proves a deterministic repository tool or canonical control."
+    },
+    {
+      "tool": "verify-harness.worker.mjs",
       "disposition": "keep",
       "owner": "qa-platform",
       "rationale": "The validation row proves a deterministic repository tool or canonical control."

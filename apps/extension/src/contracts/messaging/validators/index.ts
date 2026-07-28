@@ -34,7 +34,6 @@ export {
   isVideoProjectExportSettings,
   isVideoRecordingRuntimeState,
   isVideoRecordingSettings,
-  isVideoViewportPresetSelection,
   isViewportInfo,
   isViewportRegion,
   isWebcamActualSettings,

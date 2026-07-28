@@ -12,12 +12,11 @@ import {
   loadVideoSettings,
   loadVideoUiState,
 } from '../../../composition/persistence/capture-settings';
-import { type Settings } from '../../../contracts/settings';
+import type { Settings } from '../../../contracts/settings';
+import type { ViewportPresetAvailability } from '../../../features/viewport-presets/contracts';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import {
-  CaptureMode,
-  type VideoViewportPresetSelection,
-} from '@sniptale/runtime-contracts/video/types/types';
+import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureSurfaceError, getCaptureSurfaceService } from '../../capture-surface';
 import { startRecording } from '../../media/lifecycle';
 import { issueFullPageExportContentIntentGrant } from '../../routing-contracts/capabilities/content-action/grants';
 import {
@@ -77,53 +76,58 @@ export async function showContextMenuToast(
   await getBackgroundRuntimeMessaging().sendTabMessage(tabId, createContextMenuToastMessage(args));
 }
 
-export function resolveContextMenuVideoPreset(
-  settings: Settings
-): Promise<VideoViewportPresetSelection | null> {
+export function resolveContextMenuVideoPreset(settings: Settings): Promise<string | null> {
   return loadVideoUiState().then((videoUiState) => {
     const presets = settings.viewportPresets ?? [];
-    const defaultPresetId = settings.defaultVideoPresetId ?? null;
+    const defaultPresetId = settings.defaultViewportPresetId;
     const preferredPresetId = videoUiState.viewportPresetId ?? defaultPresetId;
-    const fallbackPresetId = presets.some((preset) => preset.id === defaultPresetId)
+    const fallbackPresetId = presets.some(
+      (preset) => preset.id === defaultPresetId && preset.enabled
+    )
       ? defaultPresetId
       : null;
-    const resolvedPresetId = presets.some((preset) => preset.id === preferredPresetId)
+    const resolvedPresetId = presets.some(
+      (preset) => preset.id === preferredPresetId && preset.enabled
+    )
       ? preferredPresetId
       : fallbackPresetId;
-    const preset = presets.find((entry) => entry.id === resolvedPresetId);
+    return presets.find((entry) => entry.id === resolvedPresetId)?.id ?? null;
+  });
+}
 
-    return preset
-      ? {
-          id: preset.id,
-          width: preset.width,
-          height: preset.height,
-          label: preset.label,
-        }
-      : null;
+export async function getContextMenuVideoPresetAvailability(
+  tabId: number,
+  settings: Settings
+): Promise<ViewportPresetAvailability | null> {
+  const presetId = await resolveContextMenuVideoPreset(settings);
+  if (!presetId) return null;
+  return getCaptureSurfaceService().getAvailability({
+    tabId,
+    presetId,
+    context: 'video-tab',
   });
 }
 
 export async function startContextMenuVideoRecording(
   tabId: number,
-  captureMode: CaptureMode
+  captureMode: CaptureMode,
+  useViewportPreset = false
 ): Promise<void> {
   const [videoSettings, settings] = await Promise.all([loadVideoSettings(), loadSettings()]);
-  const viewportPreset =
-    captureMode === CaptureMode.VIEWPORT_EMULATION
-      ? await resolveContextMenuVideoPreset(settings)
-      : undefined;
+  const availability = useViewportPreset
+    ? await getContextMenuVideoPresetAvailability(tabId, settings)
+    : null;
+  const viewportPresetId = availability?.presetId ?? null;
 
-  if (captureMode === CaptureMode.VIEWPORT_EMULATION && !viewportPreset) {
+  if (useViewportPreset && !viewportPresetId) {
     throw new Error(translate('popup.video.choosePresetError'));
+  }
+  if (availability?.status === 'unavailable') {
+    throw new CaptureSurfaceError(availability.reason);
   }
 
   const popupOwnerUrl = runtimeInfo.getURL('apps/extension/src/popup/index.html');
-  if (viewportPreset) {
-    await startRecording(tabId, videoSettings, captureMode, viewportPreset, popupOwnerUrl);
-    return;
-  }
-
-  await startRecording(tabId, videoSettings, captureMode, undefined, popupOwnerUrl);
+  await startRecording(tabId, videoSettings, captureMode, viewportPresetId, popupOwnerUrl);
 }
 
 export async function startContextMenuExport(tabId: number): Promise<void> {

@@ -1,5 +1,31 @@
 export const AUDIT_OWNER_MAPPINGS = [
   {
+    owner: 'audit-video-runtime-contracts',
+    productionFile:
+      'apps/extension/src/contracts/messaging/contracts/runtime/video/offscreen/events.ts',
+    exclusive: true,
+    reason:
+      'Offscreen source-ready and lifecycle boundary messages are covered by the focused event parser suites.',
+    testFiles: [
+      'apps/extension/src/contracts/messaging/contracts/runtime/video/offscreen/control.test.ts',
+      'apps/extension/src/contracts/messaging/contracts/runtime/video/offscreen/events.region-selection.test.ts',
+      'apps/extension/src/contracts/messaging/contracts/runtime/video/offscreen/events.test.ts',
+    ],
+  },
+  {
+    owner: 'audit-video-message-validators',
+    productionFile: 'apps/extension/src/contracts/messaging/video/validators.ts',
+    exclusive: true,
+    reason:
+      'Video settings and lifecycle boundary validators are covered by focused validator suites.',
+    testFiles: [
+      'apps/extension/src/contracts/messaging/video/session.test.ts',
+      'apps/extension/src/contracts/messaging/video/validators.live-settings.test.ts',
+      'apps/extension/src/contracts/messaging/video/validators.project-export.test.ts',
+      'apps/extension/src/contracts/messaging/video/validators.test.ts',
+    ],
+  },
+  {
     owner: 'audit-db-read-guards',
     productionPrefix: 'apps/extension/src/composition/persistence/infrastructure/indexed-db/',
     exclusive: true,

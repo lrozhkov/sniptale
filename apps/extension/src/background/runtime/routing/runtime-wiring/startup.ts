@@ -11,7 +11,7 @@ import {
 import { recoverInterruptedSessions } from '../../../diagnostics/lifecycle';
 import { reconcileBackgroundRuntimeStartupState } from '../../../application/runtime-state';
 import {
-  reconcileVideoRecordingLeaseOnStartup,
+  recoverVideoCaptureSurfaceOnStartup,
   resetVideoRecordingRuntimeState,
 } from '../../../media/lifecycle';
 import {
@@ -58,5 +58,7 @@ export function runStartupMaintenance(
   });
 
   resetVideoRecordingRuntimeState();
-  reconcileVideoRecordingLeaseOnStartup();
+  recoverVideoCaptureSurfaceOnStartup().catch((error) => {
+    logger.warn('Capture surface recovery failed; new preset mutations remain blocked', error);
+  });
 }

@@ -1,6 +1,7 @@
 import type { RuntimeRequestByType } from '../../contracts/messaging/contracts/runtime-message';
 import type { TabRequestByType, TabResponseByType } from '../../contracts/messaging/tab';
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { QuickActionOverlay } from '../../contracts/settings';
 
 export const WEB_SNAPSHOT_VIEWER_PORT = 'sniptale:web-snapshot-viewer';
@@ -10,6 +11,7 @@ export const WEB_SNAPSHOT_VIEWER_PREPARATION_REQUEST =
   'sniptale:web-snapshot-viewer-preparation-request';
 export const WEB_SNAPSHOT_VIEWER_PREPARATION_RESPONSE =
   'sniptale:web-snapshot-viewer-preparation-response';
+export const PREPARATION_SURFACE_RESIZE = 'PREPARATION_SURFACE_RESIZE' as const;
 
 export type ViewerPopupExportMessage =
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_PREVIEW]
@@ -53,14 +55,16 @@ export type ViewerPreparationPortResponse = {
 export type ViewerPreparationCommand =
   | { type: typeof MessageType.DISABLE_SCREENSHOT_MODE }
   | {
-      type: typeof MessageType.SET_VIEWPORT;
-      viewport?: { width: number; height: number } | null;
+      type: typeof PREPARATION_SURFACE_RESIZE;
+      viewport?: AppliedViewportPresetPayload | null;
     }
   | {
       type: typeof MessageType.ENABLE_SCREENSHOT_MODE;
       autoStartCaptureType?: 'visible' | 'full';
       autoStartSelection?: boolean;
       quickActionOverlay?: QuickActionOverlay & { delaySeconds?: number };
+      surfaceCapabilityToken?: string;
+      surfaceWarning?: string;
       toolbarVisible?: boolean;
-      viewport?: { width: number; height: number } | null;
+      viewport?: AppliedViewportPresetPayload | null;
     };

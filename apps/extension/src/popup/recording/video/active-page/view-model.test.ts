@@ -11,7 +11,6 @@ vi.mock('../copy', (_importOriginal) => ({
     SCREEN: 'Screen',
     TAB: 'Tab',
     TAB_CROP: 'Area',
-    VIEWPORT_EMULATION: 'Preset',
   })),
   getViewportPresetLabel: vi.fn(() => 'Preset 1280x720'),
 }));
@@ -33,7 +32,7 @@ function createRecordingState(
     duration: 12,
     error: null,
     status: VideoRecordingStatus.RECORDING,
-    viewportPreset: null,
+    viewportPresetId: null,
     ...overrides,
   };
 }

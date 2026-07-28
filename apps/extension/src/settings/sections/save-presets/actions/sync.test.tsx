@@ -47,6 +47,7 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
     defaultExportPresetId: 'preset-export',
     defaultImagePresetId: 'preset-image',
     defaultVideoPresetId: 'preset-video',
+    defaultViewportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
     authenticatedSnapshotAssetsEnabled: true,
@@ -54,6 +55,7 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
     skipWebSnapshotSaveDisclosure: false,
     rawDiagnosticsEnabled: false,
     presets: [createPreset('preset-image')],
+    viewportPresets: [],
     saveCapturesToGallery: true,
     ...overrides,
   };

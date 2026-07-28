@@ -88,7 +88,7 @@ export function buildRecordingOverlayNode(props: {
   cssWidth: number;
   cssX: number;
   cssY: number;
-  indicatorTop: number;
+  indicatorTop: number | null;
 }) {
   ensureRecordingOverlayStyle();
 
@@ -96,6 +96,13 @@ export function buildRecordingOverlayNode(props: {
   createRecordingOverlayMasks(props).forEach((style) => {
     fragment.appendChild(createOverlayMaskSection(style));
   });
-  fragment.appendChild(createRecordingIndicator(props));
+  if (props.indicatorTop !== null) {
+    fragment.appendChild(
+      createRecordingIndicator({
+        cssX: props.cssX,
+        indicatorTop: props.indicatorTop,
+      })
+    );
+  }
   return fragment;
 }

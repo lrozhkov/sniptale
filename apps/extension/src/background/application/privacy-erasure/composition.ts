@@ -5,7 +5,11 @@ import { mediaPrivacyErasureCleanupAdapter } from '../../media/privacy-erasure/c
 import { extensionPageLocalStorageErasureAdapter } from './page-local-storage';
 import type { BackgroundRuntimeState } from '../runtime-state';
 import type { NativeIngestionCleanupPort } from './ports';
-import { backgroundRuntimeCleanupAdapter } from './runtime-cleanup';
+import {
+  backgroundRuntimeCleanupAdapter,
+  configureBackgroundRuntimeScreenshotCleanupPort,
+  type BackgroundRuntimeScreenshotCleanupPort,
+} from './runtime-cleanup';
 import { PrivacyErasureUseCase } from './use-case';
 
 const unavailableNativeIngestionCleanupPort: NativeIngestionCleanupPort = {
@@ -39,6 +43,12 @@ export function configureNativeIngestionPrivacyErasureCleanupPort(
   port: NativeIngestionCleanupPort
 ): void {
   nativeIngestionCleanupPort = port;
+}
+
+export function configureScreenshotPrivacyErasureCleanupPort(
+  port: BackgroundRuntimeScreenshotCleanupPort
+): void {
+  configureBackgroundRuntimeScreenshotCleanupPort(port);
 }
 
 export function eraseLocalExtensionDataFromBackground(

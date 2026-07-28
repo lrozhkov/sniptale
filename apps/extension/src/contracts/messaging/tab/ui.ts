@@ -1,5 +1,6 @@
 import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { RuntimeRequestByType } from '../contracts/runtime-message/index';
 import type { PopupExportStartResponse, ToolbarStatusResponse } from '../contracts/response-types';
 import type {
@@ -9,7 +10,7 @@ import type {
 } from '@sniptale/runtime-contracts/export';
 import type * as ContentIntentTypes from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import type { WebSnapshotSaveResult } from '@sniptale/runtime-contracts/web-snapshot';
-import type { ShowToastPayload, Size2d } from '../contracts/types';
+import type { ShowToastPayload } from '../contracts/types';
 
 type PopupExportContentActionGrant = {
   contentIntentGrant?: ContentIntentTypes.ContentPrivilegedActionAutoStartGrant;
@@ -27,7 +28,7 @@ export type TabUiRequestByType = {
   [MessageType.TOOLBAR_STATUS]: { type: typeof MessageType.TOOLBAR_STATUS; tabId?: number };
   [MessageType.VIEWPORT_CHANGED]: {
     type: typeof MessageType.VIEWPORT_CHANGED;
-    viewport: Size2d | null;
+    viewport: AppliedViewportPresetPayload | null;
   };
   [MessageType.SHOW_SAVE_DIALOG]: {
     type: typeof MessageType.SHOW_SAVE_DIALOG;

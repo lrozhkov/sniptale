@@ -1,4 +1,5 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { TabModeMessage } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   consumeGalleryImageUpdateCapability,
   markPreauthorizedContentActionRouteMessage,
@@ -28,7 +29,7 @@ import {
 export type PrivilegedTabRouteAuthorizationRequest = {
   family: PrivilegedTabRouteFamily;
   kind: 'privileged-tab-route';
-  message?: RouteCaptureMessage | undefined;
+  message?: RouteCaptureMessage | TabModeMessage | undefined;
   resolvedTabId: number;
   sender: chrome.runtime.MessageSender | undefined;
 };
@@ -92,8 +93,8 @@ function authorizeGalleryUpdateRoute(
   return AUTHORIZED;
 }
 
-function authorizeCaptureCapabilityRoute(
-  message: RouteCaptureMessage,
+function authorizePrivilegedTabCapabilityRoute(
+  message: RouteCaptureMessage | TabModeMessage,
   resolvedTabId: number,
   sender: chrome.runtime.MessageSender | undefined
 ): IpcAuthorizationResult {
@@ -138,8 +139,12 @@ export function authorizePrivilegedTabRoute(
   if (reason) {
     return reject(reason);
   }
-  if (request.family === 'capture' && request.message) {
-    return authorizeCaptureCapabilityRoute(request.message, request.resolvedTabId, request.sender);
+  if (request.message) {
+    return authorizePrivilegedTabCapabilityRoute(
+      request.message,
+      request.resolvedTabId,
+      request.sender
+    );
   }
   return AUTHORIZED;
 }

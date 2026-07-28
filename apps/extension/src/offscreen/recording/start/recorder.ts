@@ -69,13 +69,7 @@ function resolveRecorderMimeType(preferredMimeType: string, videoStream: MediaSt
   });
 }
 
-function buildRecorderConfig(
-  settings: VideoRecordingSettings,
-  captureWidth: number | undefined,
-  captureHeight: number | undefined,
-  trackSettings: MediaTrackSettings,
-  videoStream: MediaStream
-) {
+function buildRecorderConfig(settings: VideoRecordingSettings, videoStream: MediaStream) {
   const qualityKey =
     settings.quality && VIDEO_QUALITY_CONFIGS[settings.quality]
       ? settings.quality
@@ -83,32 +77,21 @@ function buildRecorderConfig(
   const qualityConfig = VIDEO_QUALITY_CONFIGS[qualityKey];
   const mimeType = resolveRecorderMimeType(qualityConfig.mimeType, videoStream);
 
-  const actualWidth = captureWidth || trackSettings.width || 1920;
-  const actualHeight = captureHeight || trackSettings.height || 1080;
-  const resolutionScale = Math.max(0.5, Math.min((actualWidth * actualHeight) / (1920 * 1080), 4));
-  const scaledBitrate = Math.round(qualityConfig.videoBitsPerSecond * resolutionScale);
-
   logger.debug('Built recorder config', {
     qualityKey,
     mimeType,
-    actualWidth,
-    actualHeight,
-    frameRate: trackSettings.frameRate,
-    resolutionScale: Number(resolutionScale.toFixed(2)),
-    videoBitsPerSecond: scaledBitrate,
+    videoBitsPerSecond: qualityConfig.videoBitsPerSecond,
   });
 
   return {
     mimeType,
-    videoBitsPerSecond: scaledBitrate,
+    videoBitsPerSecond: qualityConfig.videoBitsPerSecond,
   };
 }
 
 export function finalizeRecordingBootstrap(params: {
   resolvedRecordingId: string;
   settings: VideoRecordingSettings;
-  captureWidth: number | undefined;
-  captureHeight: number | undefined;
   cursorCaptureMode?: VideoCursorCaptureMode | null;
   trackSettings: MediaTrackSettings;
   durationTracker: typeof recordingContext.durationTracker;
@@ -116,13 +99,7 @@ export function finalizeRecordingBootstrap(params: {
   const videoStream = requireRecordingVideoStream();
   const displaySurface = resolveDisplaySurface(params.trackSettings.displaySurface);
   const webcamSettings = getActiveSidecarWebcamSettings();
-  const recorderConfig = buildRecorderConfig(
-    params.settings,
-    params.captureWidth,
-    params.captureHeight,
-    params.trackSettings,
-    videoStream
-  );
+  const recorderConfig = buildRecorderConfig(params.settings, videoStream);
   const mediaRecorder = new MediaRecorder(videoStream, recorderConfig);
   recordingContext.activateRecorder(mediaRecorder);
   recordingContext.recordedChunks.length = 0;
@@ -178,19 +155,31 @@ function attachRecorderHandlers(recordingId: string, mediaRecorder: MediaRecorde
         notifyRecordingStoppedBestEffort('recording-finalized-with-sidecars', recordingId);
       }
       cleanupResources();
-      resolveStop?.();
+      resolveStop?.({ result: 'stopped' });
     } catch (error) {
       cleanupResources();
-      rejectStop?.(error);
+      if (resolveStop) {
+        resolveStop({
+          error: error instanceof Error ? error.message : String(error),
+          result: 'terminal-failure',
+        });
+      } else {
+        rejectStop?.(error);
+      }
     }
   };
 
   mediaRecorder.onerror = (event) => {
     const error = getMediaRecorderError(event, 'The recording failed to stop cleanly.');
+    const resolveStop = recordingContext.stopRecordingResolve;
     const rejectStop = recordingContext.stopRecordingReject;
-    notifyRecordingRuntimeErrorBestEffort(recordingId, error);
     cleanupResources();
-    rejectStop?.(error);
+    if (resolveStop || rejectStop) {
+      resolveStop?.({ error: error.message, result: 'terminal-failure' });
+      if (!resolveStop) rejectStop?.(error);
+      return;
+    }
+    notifyRecordingRuntimeErrorBestEffort(recordingId, error);
   };
 }
 

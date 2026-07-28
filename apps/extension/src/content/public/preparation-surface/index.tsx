@@ -284,7 +284,12 @@ export function PreparationSurface(props: PreparationSurfaceProps) {
   const modeState = usePreparationModeState();
   const frameManager = usePreparationFrameManager(modeState);
   const controllers = usePreparationControllers(modeState, frameManager, props.ports);
-  const layout = createPreparationLayoutProjection({ controllers, frameManager, modeState });
+  const layout = createPreparationLayoutProjection({
+    controllers,
+    frameManager,
+    modeState,
+    ports: props.ports,
+  });
 
   usePreparationCaptureSync(modeState, controllers.screenshotController, props.ports);
   usePreparationFrameCallbacks(props.ports.acceptsElement, frameManager);

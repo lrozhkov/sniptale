@@ -48,7 +48,7 @@ function resolveVideoDynamicState(args: {
   const videoTabEnabled = args.capabilities.videoByMode[CaptureMode.TAB].supported;
   const videoAreaEnabled = args.capabilities.videoByMode[CaptureMode.TAB_CROP].supported;
   const videoPresetEnabled =
-    args.hasVideoPreset && args.capabilities.videoByMode[CaptureMode.VIEWPORT_EMULATION].supported;
+    args.hasVideoPreset && args.capabilities.videoByMode[CaptureMode.TAB].supported;
   const videoWindowEnabled = args.capabilities.videoByMode[CaptureMode.SCREEN].supported;
   const videoVisible =
     args.settings.showVideo &&

@@ -7,8 +7,7 @@ import type {
   QuickAction,
   Settings as UserSettings,
 } from '../../../../contracts/settings';
-import { detachDebugger } from '../../../debugger/session/detach';
-import { clearViewport } from '../../../debugger/workspace';
+import { releaseQuickActionSurface } from './surface';
 import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 import { executeDownload } from '../../download/download-router/index';
 import { openEditorWithImage } from '../../editor/index';
@@ -71,8 +70,8 @@ export async function finalizeQuickActionCapture({
     );
   }
 
-  if (preparedCaptureResult.needsDebugger) {
-    await cleanupQuickActionDebugger(tabId);
+  if (action.exitAfterCapture || preparedCaptureResult.needsDebugger) {
+    await releaseQuickActionSurface(tabId);
   }
 }
 
@@ -181,15 +180,6 @@ async function copyQuickActionCaptureToClipboard(tabId: number, dataUrl: string)
 
   if (!response?.success) {
     throw new Error(response?.error || translate('content.runtime.copyImageFailed'));
-  }
-}
-
-async function cleanupQuickActionDebugger(tabId: number) {
-  try {
-    await clearViewport(tabId);
-    await detachDebugger(tabId, 'screenshot');
-  } catch (error) {
-    logger.warn('Failed to cleanup debugger', error);
   }
 }
 

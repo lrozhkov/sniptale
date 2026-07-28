@@ -1,4 +1,4 @@
-import { type Ref, type RefObject } from 'react';
+import { useId, useState, type Ref, type RefObject } from 'react';
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
@@ -14,11 +14,20 @@ const INLINE_CURTAIN_OPTION_ACTIVE_CLASS_NAME = [
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_10%,transparent)]',
   'text-[var(--sniptale-color-accent)]',
 ].join(' ');
+const INLINE_CURTAIN_DETAIL_CLASS_NAME = [
+  'mx-1.5 mt-1.5 rounded-[7px] px-2 py-1.5 text-[10px] leading-3',
+  'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-secondary)]',
+].join(' ');
 
 export type InlineCurtainOption = {
   value: string;
   label: string;
   description?: string;
+  detail?: string;
+  disabled?: boolean;
+  group?: string;
+  groupDescription?: string;
+  meta?: string;
 };
 
 export function InlineCurtainNotice({ notice }: { notice?: string }) {
@@ -52,6 +61,8 @@ export function InlineCurtainOptionList({
   onChange: (value: string) => void;
   options: InlineCurtainOption[];
 }) {
+  const detailId = useId();
+  const [highlightedDetail, setHighlightedDetail] = useState<string | null | undefined>(undefined);
   if (options.length === 0) {
     return (
       <div className="px-2 py-1.5 text-xs text-[var(--sniptale-color-text-secondary)]">
@@ -60,23 +71,48 @@ export function InlineCurtainOptionList({
     );
   }
 
+  const visibleDetail =
+    highlightedDetail === undefined
+      ? (options.find((option) => option.disabled && option.detail)?.detail ?? null)
+      : highlightedDetail;
+
   return (
     <div ref={listRef} style={{ paddingTop: listOffsetTop }}>
-      {options.map((option) => (
-        <InlineCurtainOptionButton
-          key={option.value}
-          active={option.value === activeValue}
-          buttonRef={
-            option.value === activeValue
-              ? activeOptionRef
-              : options[0] === option
-                ? firstOptionRef
-                : null
-          }
-          onClick={() => onChange(option.value)}
-          option={option}
-        />
+      {options.map((option, index) => (
+        <div key={option.value}>
+          {option.group && options[index - 1]?.group !== option.group ? (
+            <div className="px-1.5 pt-2 pb-1">
+              <div className="text-[10px] font-semibold text-[var(--sniptale-color-text-muted)]">
+                {option.group}
+              </div>
+              {option.groupDescription ? (
+                <div className="mt-0.5 text-[10px] leading-3 text-[var(--sniptale-color-text-dim)]">
+                  {option.groupDescription}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <InlineCurtainOptionButton
+            active={option.value === activeValue}
+            buttonRef={
+              option.value === activeValue
+                ? activeOptionRef
+                : options[0] === option
+                  ? firstOptionRef
+                  : null
+            }
+            onClick={() => onChange(option.value)}
+            detailId={detailId}
+            onHighlight={() => setHighlightedDetail(option.detail ?? null)}
+            option={option}
+          />
+        </div>
       ))}
+      {visibleDetail ? (
+        <div id={detailId} role="status" className={INLINE_CURTAIN_DETAIL_CLASS_NAME}>
+          {visibleDetail}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -84,23 +120,34 @@ export function InlineCurtainOptionList({
 function InlineCurtainOptionButton({
   active,
   buttonRef,
+  detailId,
   onClick,
+  onHighlight,
   option,
 }: {
   active: boolean;
   buttonRef: Ref<HTMLButtonElement> | null;
+  detailId: string;
   onClick: () => void;
+  onHighlight: () => void;
   option: InlineCurtainOption;
 }) {
   return (
     <button
       ref={buttonRef}
       type="button"
+      aria-describedby={option.detail ? detailId : undefined}
+      aria-disabled={option.disabled || undefined}
       className={cx(
         INLINE_CURTAIN_OPTION_CLASS_NAME,
-        active && INLINE_CURTAIN_OPTION_ACTIVE_CLASS_NAME
+        active && INLINE_CURTAIN_OPTION_ACTIVE_CLASS_NAME,
+        option.disabled && 'cursor-not-allowed opacity-55'
       )}
-      onClick={onClick}
+      onClick={() => {
+        if (!option.disabled) onClick();
+      }}
+      onFocus={onHighlight}
+      onMouseEnter={onHighlight}
       aria-current={active ? 'true' : undefined}
     >
       <span className="min-w-0">
@@ -116,6 +163,11 @@ function InlineCurtainOptionButton({
           </span>
         ) : null}
       </span>
+      {option.meta ? (
+        <span className="shrink-0 text-[10px] tabular-nums text-[var(--sniptale-color-text-muted)]">
+          {option.meta}
+        </span>
+      ) : null}
     </button>
   );
 }

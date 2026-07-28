@@ -22,6 +22,7 @@ vi.mock('../../page-access/pinned-toolbar-operation', async (importOriginal) => 
 
 import {
   createModeState,
+  cleanupScreenshotModeAfterTabClose,
   flushMicrotasks,
   handleTabClose,
   removedListenerRef,
@@ -33,13 +34,21 @@ const logger = {
   warn: vi.fn(),
 };
 
-it('clears mode state and delegates tab close handling on tab removal', () => {
+it('restores screenshot ownership before clearing mode state on tab removal', async () => {
   const state = createModeState();
   pinSessionMocks.clearPinToTabSessionStorageState.mockResolvedValue(undefined);
 
   registerTabLifecycleListeners(state, logger);
   removedListenerRef.current?.(7);
+  await flushMicrotasks();
 
+  expect(cleanupScreenshotModeAfterTabClose).toHaveBeenCalledWith(
+    7,
+    state.screenshotModeState,
+    state.viewportState,
+    state.viewportOwnerState,
+    state.webSnapshotViewerPorts
+  );
   expect(state.screenshotModeState.has(7)).toBe(false);
   expect(state.highlighterModeState.has(7)).toBe(false);
   expect(state.quickEditModeState.has(7)).toBe(false);
@@ -63,5 +72,30 @@ it('logs pin-to-tab session cleanup failures without blocking tab close handling
   expect(logger.warn).toHaveBeenCalledWith(
     'Failed to clear pin-to-tab state after tab close',
     cleanupError
+  );
+});
+
+it('waits for video closed-tab cleanup before unwinding screenshot owners', async () => {
+  const state = createModeState();
+  let resolveVideoCleanup!: () => void;
+  handleTabClose.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      resolveVideoCleanup = resolve;
+    })
+  );
+
+  registerTabLifecycleListeners(state, logger);
+  removedListenerRef.current?.(7);
+  await flushMicrotasks();
+  expect(cleanupScreenshotModeAfterTabClose).not.toHaveBeenCalled();
+
+  resolveVideoCleanup();
+  await flushMicrotasks();
+  expect(cleanupScreenshotModeAfterTabClose).toHaveBeenCalledWith(
+    7,
+    state.screenshotModeState,
+    state.viewportState,
+    state.viewportOwnerState,
+    state.webSnapshotViewerPorts
   );
 });

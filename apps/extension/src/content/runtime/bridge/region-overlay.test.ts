@@ -70,6 +70,13 @@ function expectOverlayVisibilityRouting() {
         type: VideoMessageType.REGION_SELECTED,
         ...createRegionSelectionBinding(),
         region: createRegion(),
+        captureViewport: {
+          width: 1280,
+          height: 720,
+          scrollX: 0,
+          scrollY: 0,
+          devicePixelRatio: 2,
+        },
       },
       sendResponse,
       deps

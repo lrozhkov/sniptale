@@ -65,4 +65,39 @@ describe('browser windows adapter', () => {
 
     await expect(browserWindows.get(7)).rejects.toThrow('chrome.windows.get is unavailable');
   });
+
+  it('forwards exact window updates and rejects when update is unavailable', async () => {
+    const update = vi.fn().mockResolvedValue({ height: 720, id: 7, width: 1280 });
+    installChromeGlobal({ windows: { update } });
+
+    await expect(
+      browserWindows.update(7, { height: 720, left: -1280, top: 0, width: 1280 })
+    ).resolves.toEqual({ height: 720, id: 7, width: 1280 });
+    expect(update).toHaveBeenCalledWith(7, {
+      height: 720,
+      left: -1280,
+      top: 0,
+      width: 1280,
+    });
+
+    installChromeGlobal({ windows: {} });
+    await expect(browserWindows.update(7, { state: 'normal' })).rejects.toThrow(
+      'chrome.windows.update is unavailable'
+    );
+  });
+
+  it('subscribes and unsubscribes from bounds changes with an unavailable no-op fallback', () => {
+    const addListener = vi.fn();
+    const removeListener = vi.fn();
+    const listener = vi.fn();
+    installChromeGlobal({ windows: { onBoundsChanged: { addListener, removeListener } } });
+
+    const unsubscribe = browserWindows.subscribeBoundsChanged(listener);
+    expect(addListener).toHaveBeenCalledWith(listener);
+    unsubscribe();
+    expect(removeListener).toHaveBeenCalledWith(listener);
+
+    resetChromeGlobal();
+    expect(() => browserWindows.subscribeBoundsChanged(listener)()).not.toThrow();
+  });
 });

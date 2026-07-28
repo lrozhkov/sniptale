@@ -22,7 +22,6 @@ import {
   isSize2d,
   isVideoRecordingRuntimeState,
   isVideoRecordingSettings,
-  isVideoViewportPresetSelection,
   isViewportInfo,
   isViewportRegion,
 } from '../video/validators';
@@ -47,7 +46,6 @@ it('keeps the shared messaging validators root as a thin facade over owner-local
   expect(facade.isViewportInfo).toBe(isViewportInfo);
   expect(facade.isVideoRecordingSettings).toBe(isVideoRecordingSettings);
   expect(facade.isLiveVideoRecordingSettingsPatch).toBe(isLiveVideoRecordingSettingsPatch);
-  expect(facade.isVideoViewportPresetSelection).toBe(isVideoViewportPresetSelection);
   expect(facade.isVideoRecordingRuntimeState).toBe(isVideoRecordingRuntimeState);
   expect(facade.isRecordingStateHealth).toBe(isRecordingStateHealth);
   expect(facade.isVideoExportCapabilities).toBe(isVideoExportCapabilities);

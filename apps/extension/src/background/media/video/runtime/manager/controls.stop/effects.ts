@@ -1,6 +1,6 @@
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoCursorCaptureMode } from '../../../../../../features/video/project/types';
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { awaitBestEffort, runBestEffort } from '@sniptale/foundation/best-effort';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { saveRecordingTelemetrySafely } from '../../../../../../workflows/media-hub/store';
@@ -14,13 +14,6 @@ import {
   isControlledCursorCaptureEnabled,
   isControlledCursorNavigationPending,
 } from '../../../session-state';
-import { detachDebugger } from '../../../../../debugger/session/detach';
-import {
-  hasAttachedClient,
-  listAttachedDebuggerClientOwners,
-} from '../../../../../debugger/session';
-import { detachDebuggerForPrivacyErasure } from '../../../../../debugger/session/detach.privacy-erasure';
-import { clearViewport } from '../../../../../debugger/workspace';
 import { disableControlledCursorCapture } from '../controlled-cursor/messages';
 import {
   resolveStopFailureLogger,
@@ -118,52 +111,6 @@ async function collectTelemetrySnapshot(
   return getControlledCursorTelemetry();
 }
 
-async function clearAndDetachViewportEmulation(
-  tabId: number,
-  failureLogger: StopFailureLogger
-): Promise<void> {
-  await awaitBestEffort(
-    clearViewport(tabId),
-    failureLogger,
-    'Failed to clear viewport emulation before stop detach',
-    { tabId }
-  );
-  await detachDebugger(tabId, 'video-emulation');
-}
-
-function detachViewportEmulationIfNeeded(
-  context: StopContext,
-  failureLogger: StopFailureLogger
-): void {
-  if (context.mode !== CaptureMode.VIEWPORT_EMULATION || context.tabId === null) {
-    return;
-  }
-
-  runBestEffort(
-    clearAndDetachViewportEmulation(context.tabId, failureLogger),
-    failureLogger,
-    'Ignoring viewport emulation detach failure during stop',
-    { tabId: context.tabId }
-  );
-}
-
-async function clearAndDetachViewportEmulationForPrivacyErasure(tabId: number): Promise<void> {
-  await clearViewport(tabId);
-  await detachDebuggerForPrivacyErasure(tabId, 'video-emulation');
-  if (hasAttachedClient(tabId, 'video-emulation')) {
-    throw new Error('Viewport emulation debugger cleanup verification failed');
-  }
-}
-
-export async function quiesceViewportEmulationForPrivacyErasure(): Promise<void> {
-  for (const owner of listAttachedDebuggerClientOwners('video-emulation')) {
-    await clearAndDetachViewportEmulationForPrivacyErasure(owner.tabId);
-  }
-  if (listAttachedDebuggerClientOwners('video-emulation').length > 0) {
-    throw new Error('Viewport emulation debugger owner cleanup verification failed');
-  }
-}
-
 export function runStopSideEffects(
   context: StopContext,
   failureLogging: StopFailureLogging = 'detailed'
@@ -189,19 +136,7 @@ export function runStopSideEffects(
     backgroundSideEffects = Promise.resolve();
   }
 
-  if (
-    failureLogging === 'fixed' &&
-    context.mode === CaptureMode.VIEWPORT_EMULATION &&
-    context.tabId !== null
-  ) {
-    pendingStopSideEffects = Promise.all([
-      backgroundSideEffects,
-      clearAndDetachViewportEmulationForPrivacyErasure(context.tabId),
-    ]).then(() => undefined);
-  } else {
-    pendingStopSideEffects = backgroundSideEffects;
-    detachViewportEmulationIfNeeded(context, failureLogger);
-  }
+  pendingStopSideEffects = backgroundSideEffects;
 }
 
 export function waitForStopSideEffects(): Promise<void> {

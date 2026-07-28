@@ -97,6 +97,30 @@ it('requests tab capture without the native cursor when controlled cursor captur
   expect(loggerWarnMock).not.toHaveBeenCalled();
 });
 
+it('requests the natural tab source without preset-derived size constraints', async () => {
+  const getUserMedia = vi.fn().mockResolvedValue({
+    getTracks: () => [{ stop: vi.fn() }],
+    getVideoTracks: () => [{ getSettings: () => ({ width: 1024, height: 768 }) }],
+  });
+  installMediaDevicesMocks({ getUserMedia });
+
+  await acquireRecordingSourceStream({
+    captureMode: CaptureMode.TAB,
+    settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
+    streamId: 'tab-stream-viewport',
+  });
+
+  expect(getUserMedia).toHaveBeenCalledWith({
+    audio: false,
+    video: {
+      mandatory: {
+        chromeMediaSource: 'tab',
+        chromeMediaSourceId: 'tab-stream-viewport',
+      },
+    },
+  });
+});
+
 it('keeps tab recordings alive when cursor exclusion cannot be verified', async () => {
   const stop = vi.fn();
   installMediaDevicesMocks({

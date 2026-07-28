@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { type QuickActionOverlay } from '../../../../contracts/settings';
+import {
+  createDisableScreenshotModeRequest,
+  requireScreenshotSurfaceCapabilityToken,
+  setScreenshotSurfaceCapabilityToken,
+} from '../../viewport-selector/capability';
 import { handleScreenshotModeMessage } from './screenshot';
 
 const { isLockEnabledMock } = vi.hoisted(() => ({
@@ -85,8 +90,16 @@ function expectEnableScreenshotModeRouting() {
   expect(
     handleScreenshotModeMessage(
       {
+        surfaceCapabilityToken: 'surface-token-1',
+        surfaceLeaseGeneration: 1,
+        surfaceOperationGeneration: 1,
         type: MessageType.ENABLE_SCREENSHOT_MODE,
-        viewport: { width: 1280, height: 720 },
+        viewport: {
+          presetId: 'test:viewport',
+          target: 'viewport',
+          width: 1280,
+          height: 720,
+        },
         quickActionOverlay: {
           afterCapture: 'copy',
           delaySeconds: 3,
@@ -103,7 +116,12 @@ function expectEnableScreenshotModeRouting() {
   expect(params.modeControls.setScreenshotMode).toHaveBeenCalledWith(true);
   expect(params.modeControls.setNavigationLockEnabled).toHaveBeenCalledWith(true);
   expect(params.modeControls.setIsToolbarVisible).toHaveBeenCalledWith(true);
-  expect(params.viewport.setCurrentViewport).toHaveBeenCalledWith({ width: 1280, height: 720 });
+  expect(params.viewport.setCurrentViewport).toHaveBeenCalledWith({
+    presetId: 'test:viewport',
+    target: 'viewport',
+    width: 1280,
+    height: 720,
+  });
   expect(params.quickAction.setQuickActionOverlay).toHaveBeenCalledWith({
     afterCapture: 'copy',
     delaySeconds: 3,
@@ -120,6 +138,12 @@ function expectEnableScreenshotModeRouting() {
     imageQuality: 100,
   });
   expect(params.quickAction.setTimerDelay).toHaveBeenCalledWith(3);
+  expect(createDisableScreenshotModeRequest()).toEqual({
+    leaseGeneration: 1,
+    operationGeneration: 2,
+    surfaceCapabilityToken: 'surface-token-1',
+    type: MessageType.DISABLE_SCREENSHOT_MODE,
+  });
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
 }
 
@@ -132,6 +156,7 @@ function expectRepeatedPopupPreparationEnableBecomesNoOp() {
   expect(
     handleScreenshotModeMessage(
       {
+        surfaceCapabilityToken: 'refreshed-surface-token',
         type: MessageType.ENABLE_SCREENSHOT_MODE,
       },
       params,
@@ -146,6 +171,7 @@ function expectRepeatedPopupPreparationEnableBecomesNoOp() {
   expect(params.quickAction.setQuickActionOverlay).not.toHaveBeenCalled();
   expect(params.quickAction.setCaptureAction).not.toHaveBeenCalled();
   expect(params.quickAction.setTimerDelay).not.toHaveBeenCalled();
+  expect(requireScreenshotSurfaceCapabilityToken()).toBe('refreshed-surface-token');
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
 }
 
@@ -192,6 +218,9 @@ function expectDestroyToolbarInvalidatesInFlightCapture() {
 }
 
 function runHandleScreenshotModeMessageSuite() {
+  beforeEach(() => {
+    setScreenshotSurfaceCapabilityToken(null);
+  });
   it(
     'routes ENABLE_SCREENSHOT_MODE through grouped viewport and quick-action controls',
     expectEnableScreenshotModeRouting

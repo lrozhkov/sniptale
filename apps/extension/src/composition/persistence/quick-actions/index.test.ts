@@ -76,7 +76,7 @@ function createAction(id: string, origin: 'bundled' | 'user' = 'user'): QuickAct
     bundledId: origin === 'bundled' ? ('default-fullscreen' as const) : null,
     hotkey: null,
     screenshotMode: 'visible',
-    emulation: 'native',
+    viewportPresetId: 'native',
     delay: null,
     afterCapture: 'download_default',
     imageFormat: 'png',

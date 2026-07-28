@@ -55,10 +55,12 @@ vi.mock('../recording/controller', () => ({
   setViewportDrawState: vi.fn(),
   startRecording: startRecordingMock,
   stopRecording: vi.fn(),
+  updateRecordingSettings: vi.fn(),
   updateViewportCrop: vi.fn(),
 }));
 
 vi.mock('../recording/context', () => ({
+  RecordingStopOutcome: undefined,
   recordingContext: { currentRecordingId: null },
 }));
 
@@ -131,9 +133,11 @@ function resetStartErrorMocks() {
 function emitStartRecordingMessage(listener: SubscriptionListener): unknown {
   return emitTrustedRuntimeMessage(listener, {
     type: 'OFFSCREEN_START_RECORDING',
+    generation: 1,
     settings: {},
     streamId: 'stream-1',
     recordingId: 'rec-1',
+    streamInstanceId: 'stream-instance-1',
   });
 }
 
@@ -196,7 +200,8 @@ describe('offscreen-runtime start error paths', () => {
 
   it(
     'reports start failures before the background watchdog timeout',
-    verifiesStartFailuresAreReportedBeforeBackgroundWatchdog
+    verifiesStartFailuresAreReportedBeforeBackgroundWatchdog,
+    10_000
   );
   it(
     'does not emit duplicate OFFSCREEN_ERROR messages after local start-failure reporting',

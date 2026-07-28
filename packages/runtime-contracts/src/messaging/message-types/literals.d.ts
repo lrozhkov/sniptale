@@ -26,7 +26,10 @@ declare module './' {
     type ERASE_LOCAL_EXTENSION_DATA = typeof import('./').MessageType.ERASE_LOCAL_EXTENSION_DATA;
     type LLM_RESPONSE = typeof import('./').MessageType.LLM_RESPONSE;
     type LLM_ERROR = typeof import('./').MessageType.LLM_ERROR;
-    type SET_VIEWPORT = typeof import('./').MessageType.SET_VIEWPORT;
+    type APPLY_VIEWPORT_PRESET = typeof import('./').MessageType.APPLY_VIEWPORT_PRESET;
+    type RELEASE_VIEWPORT_PRESET = typeof import('./').MessageType.RELEASE_VIEWPORT_PRESET;
+    type GET_VIEWPORT_PRESET_AVAILABILITY =
+      typeof import('./').MessageType.GET_VIEWPORT_PRESET_AVAILABILITY;
     type VIEWPORT_CHANGED = typeof import('./').MessageType.VIEWPORT_CHANGED;
     type GET_VIEWPORT_STATUS = typeof import('./').MessageType.GET_VIEWPORT_STATUS;
     type OPEN_EXPORT_MODAL = typeof import('./').MessageType.OPEN_EXPORT_MODAL;
@@ -121,6 +124,8 @@ declare module './' {
     type CAPTURE_SELECTION_COMPLETE =
       typeof import('./').CaptureMessageType.CAPTURE_SELECTION_COMPLETE;
     type CAPTURE_SELECTION_CANCEL = typeof import('./').CaptureMessageType.CAPTURE_SELECTION_CANCEL;
+    type RENEW_SCREENSHOT_SURFACE_SESSION =
+      typeof import('./').CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION;
     type CAPTURE_PROGRESS = typeof import('./').CaptureMessageType.CAPTURE_PROGRESS;
     type CAPTURE_COMPLETE = typeof import('./').CaptureMessageType.CAPTURE_COMPLETE;
     type CAPTURE_ERROR = typeof import('./').CaptureMessageType.CAPTURE_ERROR;

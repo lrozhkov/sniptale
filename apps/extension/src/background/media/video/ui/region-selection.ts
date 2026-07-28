@@ -19,8 +19,13 @@ import {
   toShowRegionSelectorMessage,
 } from './region-selection.request-binding';
 import { type RecordingRegion, showRecordingOverlay } from './shared';
+import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 
 type RegionSelectionMessage = RegionSelectedMessage | RegionSelectionCancelledMessage;
+type RecordingRegionSelection = {
+  captureViewport: ViewportInfo;
+  region: RecordingRegion;
+};
 
 type VideoManagerUiLogger = Pick<Logger, 'debug' | 'error' | 'log' | 'warn'>;
 type MessageSubscription = typeof browserRuntime.subscribeToMessages;
@@ -107,7 +112,7 @@ function isRegionSelectionResponseAccepted(
 }
 
 function showSelectedRegionThenFinish(props: {
-  finish: (region: RecordingRegion | null) => void;
+  finish: (selection: RecordingRegionSelection | null) => void;
   logger: VideoManagerUiLogger;
   message: RegionSelectedMessage;
   showRecordingOverlay: typeof showRecordingOverlay;
@@ -115,12 +120,20 @@ function showSelectedRegionThenFinish(props: {
 }): void {
   props
     .showRecordingOverlay(props.tabId, props.message.region)
-    .catch((error) => props.logger.warn('[VideoManager] Failed to show recording overlay:', error))
-    .finally(() => props.finish(props.message.region));
+    .then(() =>
+      props.finish({
+        captureViewport: props.message.captureViewport,
+        region: props.message.region,
+      })
+    )
+    .catch((error) => {
+      props.logger.warn('[VideoManager] Failed to show recording overlay:', error);
+      props.finish(null);
+    });
 }
 
 function handleAcceptedRegionSelectionMessage(props: {
-  finish: (region: RecordingRegion | null) => void;
+  finish: (selection: RecordingRegionSelection | null) => void;
   logger: VideoManagerUiLogger;
   message: RegionSelectionMessage;
   showRecordingOverlay: typeof showRecordingOverlay;
@@ -136,7 +149,7 @@ function handleAcceptedRegionSelectionMessage(props: {
 }
 
 function createRegionSelectionListener(props: {
-  finish: (region: RecordingRegion | null) => void;
+  finish: (selection: RecordingRegionSelection | null) => void;
   binding: RegionSelectionRequestBinding;
   logger: VideoManagerUiLogger;
   owner: symbol;
@@ -144,9 +157,9 @@ function createRegionSelectionListener(props: {
   tabId: number;
 }) {
   let consumed = false;
-  const finishAndClear = (region: RecordingRegion | null) => {
+  const finishAndClear = (selection: RecordingRegionSelection | null) => {
     clearActiveRegionSelectionRequest(props.tabId, props.owner);
-    props.finish(region);
+    props.finish(selection);
   };
   activeRegionSelectionRequests.set(props.tabId, {
     binding: props.binding,
@@ -186,7 +199,7 @@ function createRegionSelectionListener(props: {
 export function requestRegionSelection(
   tabId: number,
   deps: RegionSelectionRequestDeps = defaultRegionSelectionRequestDeps
-): Promise<RecordingRegion | null> {
+): Promise<RecordingRegionSelection | null> {
   const createRequestBinding = deps.createRequestBinding ?? createRegionSelectionRequestBinding;
   const owner = Symbol('region-selection-request');
   latestRegionSelectionRequestOwners.set(tabId, owner);

@@ -37,7 +37,6 @@ function createActiveTabCapabilities(): ActiveTabCapabilities {
       [CaptureMode.TAB]: supported,
       [CaptureMode.TAB_CROP]: supported,
       [CaptureMode.CAMERA]: supported,
-      [CaptureMode.VIEWPORT_EMULATION]: supported,
     },
   };
 }

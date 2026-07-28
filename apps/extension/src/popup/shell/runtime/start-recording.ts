@@ -3,7 +3,6 @@ import type { RuntimeResponseByType } from '../../../contracts/messaging/contrac
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { openCameraRecorderPage } from '../../../platform/navigation/extension-pages';
 import { translate } from '../../../platform/i18n';
-import type { ViewportPreset } from '../../../contracts/settings';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   CaptureMode,
@@ -17,12 +16,12 @@ import {
   getPopupResponseErrorMessage,
   getPopupRuntimeErrorMessage,
 } from '../../diagnostics/runtime-errors';
-import { getPopupRuntimeServices } from './services';
+import { getPopupRuntimeServices } from '../../runtime-services';
 
 type StartRecordingArgs = {
   videoSettings: VideoRecordingSettings;
   captureMode: CaptureMode;
-  viewportPreset: ViewportPreset | null;
+  viewportPresetId: string | null;
   setRecordingControlCapability: Dispatch<
     SetStateAction<{ controlToken: string; recordingId: string } | null>
   >;
@@ -64,10 +63,6 @@ function sanitizeRecordingSettings(
   };
 }
 
-function getRecordingCaptureMode(captureMode: CaptureMode): CaptureMode {
-  return captureMode === CaptureMode.VIEWPORT_EMULATION ? CaptureMode.TAB : captureMode;
-}
-
 async function ensureCapturePermissions(
   settings: VideoRecordingSettings,
   setStartError: Dispatch<SetStateAction<string | null>>
@@ -97,8 +92,12 @@ function createStartRecordingMessage(args: {
   captureMode: CaptureMode;
   settings: VideoRecordingSettings;
   tabId?: number;
-  viewportPreset: ViewportPreset | null;
+  viewportPresetId: string | null;
 }): StartRecordingMessage {
+  const viewportPresetId =
+    args.captureMode === CaptureMode.TAB || args.captureMode === CaptureMode.TAB_CROP
+      ? args.viewportPresetId
+      : null;
   const baseMessage = {
     type: VideoMessageType.START_RECORDING,
     settings: args.settings,
@@ -106,18 +105,9 @@ function createStartRecordingMessage(args: {
     ...(args.tabId === undefined ? {} : { tabId: args.tabId }),
   };
 
-  if (!args.viewportPreset) {
-    return baseMessage;
-  }
-
   return {
     ...baseMessage,
-    viewportPreset: {
-      id: args.viewportPreset.id,
-      width: args.viewportPreset.width,
-      height: args.viewportPreset.height,
-      label: args.viewportPreset.label,
-    },
+    viewportPresetId,
   };
 }
 
@@ -192,7 +182,7 @@ export async function startRecordingHandler(args: StartRecordingArgs): Promise<v
     setRecordingControlCapability,
     setStartError,
   } = args;
-  const recordingCaptureMode = getRecordingCaptureMode(captureMode);
+  const recordingCaptureMode = captureMode;
   const sanitizedSettings = sanitizeRecordingSettings(videoSettings, recordingCaptureMode);
 
   try {
@@ -211,7 +201,7 @@ export async function startRecordingHandler(args: StartRecordingArgs): Promise<v
       captureMode: recordingCaptureMode,
       settings: sanitizedSettings,
       ...(tabId === null ? {} : { tabId }),
-      viewportPreset: null,
+      viewportPresetId: args.viewportPresetId,
     });
     const response = await getPopupRuntimeServices().messaging.sendRuntimeMessage(startMessage);
 

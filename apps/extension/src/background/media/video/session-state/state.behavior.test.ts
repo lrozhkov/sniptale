@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { setVideoRecordingRuntimeState } = vi.hoisted(() => ({
   setVideoRecordingRuntimeState: vi.fn(),
@@ -14,17 +15,13 @@ import {
   beginVideoRecordingPreparation,
   beginVideoRecordingStop,
   finishVideoRecordingStop,
-  freezeViewportNavigation,
-  clearViewportNavigationPending,
   getVideoRecordingCaptureMode,
   getVideoRecordingCountdownSessionId,
   getVideoRecordingId,
   getVideoRecordingTabId,
-  getViewportNavigationEpoch,
   hasActiveVideoRecordingTab,
   isVideoRecordingPreparationInProgress,
   isVideoRecordingStopInProgress,
-  isViewportNavigationPending,
   markVideoRecordingPreparationSettled,
   resetVideoRecordingStartSession,
   resetCompletedVideoRecordingSession,
@@ -42,34 +39,24 @@ function resetSession(): void {
   videoManagerSession.isStopping = false;
   videoManagerSession.currentCaptureMode = null;
   videoManagerSession.currentCountdownSessionId = null;
-  videoManagerSession.viewportNavigationEpoch = 4;
-  videoManagerSession.viewportNavigationPending = true;
 }
 
 beforeEach(resetSession);
 
-it('enters PREPARING state and resets navigation bookkeeping for a new start', () => {
-  const viewportPreset = {
-    id: 'wide',
-    label: 'Wide',
-    width: 1920,
-    height: 1080,
-  };
-
-  beginVideoRecordingPreparation(CaptureMode.VIEWPORT_EMULATION, viewportPreset);
+it('enters PREPARING state for a new start', () => {
+  beginVideoRecordingPreparation(CaptureMode.TAB, DEFAULT_VIDEO_SETTINGS, 'wide');
 
   expect(videoManagerSession.isStarting).toBe(true);
-  expect(videoManagerSession.currentCaptureMode).toBe(CaptureMode.VIEWPORT_EMULATION);
-  expect(videoManagerSession.viewportNavigationEpoch).toBe(0);
-  expect(videoManagerSession.viewportNavigationPending).toBe(false);
+  expect(videoManagerSession.currentCaptureMode).toBe(CaptureMode.TAB);
   expect(setVideoRecordingRuntimeState).toHaveBeenCalledWith({
     status: VideoRecordingStatus.PREPARING,
     duration: 0,
     countdownEndsAt: null,
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     captureSource: null,
-    viewportPreset,
-    liveMedia: null,
+    cropRegion: null,
+    viewportPresetId: 'wide',
+    liveMedia: expect.any(Object),
     error: null,
   });
 });
@@ -86,8 +73,6 @@ it('resets start bindings while preserving the active recording id', () => {
   expect(videoManagerSession.currentCaptureMode).toBeNull();
   expect(videoManagerSession.currentCountdownSessionId).toBeNull();
   expect(videoManagerSession.currentRecordingId).toBe('recording-1');
-  expect(videoManagerSession.viewportNavigationEpoch).toBe(0);
-  expect(videoManagerSession.viewportNavigationPending).toBe(false);
 });
 
 it('captures stop context and resets start state before stopping', () => {
@@ -192,7 +177,7 @@ it('clears completed recording activity without clearing a newer recording id', 
   expect(videoManagerSession.recordingTabId).toBeNull();
 });
 
-it('exposes session reads and viewport navigation transitions through dedicated helpers', () => {
+it('exposes session reads through dedicated helpers', () => {
   expect(getVideoRecordingTabId()).toBe(11);
   expect(getVideoRecordingId()).toBe('recording-1');
   expect(getVideoRecordingCaptureMode()).toBeNull();
@@ -200,14 +185,4 @@ it('exposes session reads and viewport navigation transitions through dedicated 
   expect(hasActiveVideoRecordingTab()).toBe(true);
   expect(isVideoRecordingPreparationInProgress()).toBe(false);
   expect(isVideoRecordingStopInProgress()).toBe(false);
-  expect(isViewportNavigationPending()).toBe(true);
-  expect(getViewportNavigationEpoch()).toBe(4);
-
-  const navigationEpoch = freezeViewportNavigation();
-  expect(navigationEpoch).toBe(5);
-  expect(getViewportNavigationEpoch()).toBe(5);
-  expect(isViewportNavigationPending()).toBe(true);
-
-  clearViewportNavigationPending();
-  expect(isViewportNavigationPending()).toBe(false);
 });

@@ -82,3 +82,31 @@ it('parses crop responses and rejects malformed scenario payloads', () => {
     })
   ).toThrow(MessageContractError);
 });
+
+it('parses trusted screenshot surface renewal boundaries', () => {
+  expect(
+    parseBackgroundRuntimeMessage({
+      contentIntent: { requestId: 'renew-1', token: 'token-1' },
+      type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+    })
+  ).toEqual({
+    contentIntent: { requestId: 'renew-1', token: 'token-1' },
+    type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+  });
+  expect(() =>
+    parseBackgroundRuntimeMessage({
+      type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+    })
+  ).toThrow(MessageContractError);
+  expect(
+    parseRuntimeResponseForMessage(CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION, {
+      success: true,
+      surfaceCapabilityToken: 'surface-1',
+      surfaceOperationGeneration: 0,
+    })
+  ).toEqual({
+    success: true,
+    surfaceCapabilityToken: 'surface-1',
+    surfaceOperationGeneration: 0,
+  });
+});

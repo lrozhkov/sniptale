@@ -3,12 +3,14 @@ import { expect, it, vi } from 'vitest';
 const {
   configureDownloadPort,
   configureNativeIngestionPrivacyErasureCleanupPort,
+  configureScreenshotPrivacyErasureCleanupPort,
   executeDownloadBlob,
   nativeIngestionCleanupAdapter,
   registerInstallListener,
 } = vi.hoisted(() => ({
   configureDownloadPort: vi.fn(),
   configureNativeIngestionPrivacyErasureCleanupPort: vi.fn(),
+  configureScreenshotPrivacyErasureCleanupPort: vi.fn(),
   executeDownloadBlob: vi.fn(),
   nativeIngestionCleanupAdapter: {},
   registerInstallListener: vi.fn(),
@@ -16,6 +18,7 @@ const {
 
 vi.mock('../../../application/privacy-erasure/composition', () => ({
   configureNativeIngestionPrivacyErasureCleanupPort,
+  configureScreenshotPrivacyErasureCleanupPort,
   eraseLocalExtensionDataFromBackground: vi.fn(),
 }));
 vi.mock('../../native-app/privacy-erasure', () => ({
@@ -60,6 +63,9 @@ it('registers all background listeners through the runtime-wiring owner', () => 
   expect(configureNativeIngestionPrivacyErasureCleanupPort).toHaveBeenCalledWith(
     nativeIngestionCleanupAdapter
   );
+  expect(configureScreenshotPrivacyErasureCleanupPort).toHaveBeenCalledWith({
+    disableScreenshotMode: expect.any(Function),
+  });
   expect(configureNativeIngestionPrivacyErasureCleanupPort).toHaveBeenCalledBefore(
     nativeAppConnect
   );

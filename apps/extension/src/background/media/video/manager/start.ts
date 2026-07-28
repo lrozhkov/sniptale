@@ -7,24 +7,35 @@ import {
   CaptureMode,
   normalizeVideoSourceCount,
   type VideoRecordingSettings,
-  type VideoViewportPresetSelection,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { notifyRecordingStartFailed } from '../runtime/manager';
-import { isStartCancelled, runCountdown } from './flow';
+import { finalizeRecordingStart, isStartCancelled, runCountdown } from './flow';
 import {
   beginVideoRecordingPreparation,
   hasActiveVideoRecordingSession,
   isVideoRecordingPreparationInProgress,
   resetVideoRecordingStartSession,
+  clearVideoRecordingOffscreenStartDispatched,
   setOpenEditorAfterRecording,
   setVideoRecordingId,
 } from '../session-state';
 import { resetVideoRecordingRuntimeState } from '../runtime/session-state';
-import { initializeRecordingContext, normalizeViewportPreset } from './recording-context';
+import { initializeRecordingContext } from './recording-context.prepare';
 import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 import { sanitizeRecordingSettings } from './start-settings';
 import { acquireMediaMutationPermit } from '../../lifecycle-gate';
 import { finalizeAcceptedRecordingStart, type RecordingStartResult } from './start-delivery';
+import { releaseVideoCaptureSurface, waitForVideoCaptureSurfaceRecovery } from '../capture-surface';
+import {
+  clearActiveVideoRecordingLease,
+  issuePreparedVideoRecordingLease,
+} from '../recording-control-lease';
+import {
+  RecordingStartCleanupFailure,
+  requestBoundOffscreenRecordingStop,
+  requiresRecordingAuthorityRetention,
+  type RecordingSourceBinding,
+} from '../offscreen-recording-stop';
 
 const logger = createLogger({ namespace: 'BackgroundVideoManager' });
 
@@ -56,7 +67,7 @@ export async function startRecording(
   tabId: number | undefined,
   settings: VideoRecordingSettings,
   captureMode: CaptureMode = CaptureMode.TAB,
-  viewportPreset?: VideoViewportPresetSelection,
+  viewportPresetId: string | null = null,
   ownerSenderUrl?: string
 ): Promise<RecordingStartResult> {
   if (!ownerSenderUrl) {
@@ -73,7 +84,7 @@ export async function startRecording(
       tabId,
       settings,
       captureMode,
-      viewportPreset,
+      viewportPresetId,
       ownerSenderUrl
     );
   } finally {
@@ -85,9 +96,18 @@ async function startRecordingWithPermit(
   tabId: number | undefined,
   settings: VideoRecordingSettings,
   captureMode: CaptureMode,
-  viewportPreset: VideoViewportPresetSelection | undefined,
+  viewportPresetId: string | null,
   ownerSenderUrl: string
 ): Promise<RecordingStartResult> {
+  try {
+    await waitForVideoCaptureSurfaceRecovery();
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+      result: 'failed',
+    };
+  }
+
   if (isVideoRecordingPreparationInProgress()) {
     logger.warn('Ignoring duplicate start while recording initialization is already in progress');
     return { result: 'duplicate-preparing' };
@@ -97,10 +117,9 @@ async function startRecordingWithPermit(
     return { result: 'already-active' };
   }
 
-  const normalizedViewportPreset = normalizeViewportPreset(captureMode, viewportPreset);
   const sanitizedSettings = sanitizeRecordingSettings(settings, captureMode);
 
-  beginVideoRecordingPreparation(captureMode, sanitizedSettings, normalizedViewportPreset);
+  beginVideoRecordingPreparation(captureMode, sanitizedSettings, viewportPresetId);
 
   try {
     return await executeRecordingStart({
@@ -108,14 +127,21 @@ async function startRecordingWithPermit(
       ownerSenderUrl,
       settings: sanitizedSettings,
       tabId,
-      ...(normalizedViewportPreset === undefined
-        ? {}
-        : { viewportPreset: normalizedViewportPreset }),
+      viewportPresetId,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    notifyRecordingStartFailed(errorMessage);
-    return { error: errorMessage, result: 'failed' };
+    try {
+      await notifyRecordingStartFailed(errorMessage, {
+        retainAuthority: requiresRecordingAuthorityRetention(error),
+      });
+      return { error: errorMessage, result: 'failed' };
+    } catch (releaseError) {
+      const releaseMessage =
+        releaseError instanceof Error ? releaseError.message : String(releaseError);
+      logger.error('Failed to restore capture surface after recording start failure', releaseError);
+      return { error: releaseMessage, result: 'failed' };
+    }
   }
 }
 
@@ -124,15 +150,18 @@ async function executeRecordingStart(props: {
   ownerSenderUrl: string;
   settings: VideoRecordingSettings;
   tabId: number | undefined;
-  viewportPreset?: VideoViewportPresetSelection;
+  viewportPresetId: string | null;
 }): Promise<RecordingStartResult> {
-  const { tabId, captureMode, ownerSenderUrl, viewportPreset, settings } = props;
+  const { tabId, captureMode, ownerSenderUrl, viewportPresetId, settings } = props;
   if (captureMode !== CaptureMode.CAMERA && tabId === undefined) {
     throw new Error('No tab ID');
   }
 
   const recordingId = crypto.randomUUID();
   let preparedContextRequiresDisposal = false;
+  let cleanupAttempted = false;
+  let preparedBindingPersisted = false;
+  let sourceBinding: RecordingSourceBinding | null = null;
   setVideoRecordingId(recordingId);
   setOpenEditorAfterRecording(settings.openEditorAfterRecording);
   logger.log('Starting recording', { captureMode, recordingId, tabId: tabId ?? null });
@@ -142,26 +171,105 @@ async function executeRecordingStart(props: {
       captureMode,
       settings,
       tabId: tabId ?? null,
-      ...(viewportPreset === undefined ? {} : { viewportPreset }),
+      viewportPresetId,
     });
     if (!context) {
+      await releaseVideoCaptureSurface(recordingId);
       rollbackRecordingStartState();
       return { result: 'cancelled' };
     }
     preparedContextRequiresDisposal = true;
-
-    const countdownReady = await runCountdown(tabId ?? null, captureMode, settings);
-    if (!countdownReady || isStartCancelled(tabId ?? null, captureMode)) {
-      await disposePreparedMultiSourceStreams(captureMode, settings);
+    sourceBinding = {
+      generation: context.generation,
+      recordingId,
+      streamInstanceId: crypto.randomUUID(),
+    };
+    const preparedLease = await issuePreparedVideoRecordingLease({
+      captureMode,
+      cropRegion: context.captureSource.cropRegion ?? null,
+      ownerSenderUrl,
+      openEditorAfterRecording: settings.openEditorAfterRecording,
+      surfaceBinding: {
+        generation: sourceBinding.generation,
+        streamInstanceId: sourceBinding.streamInstanceId,
+      },
+      viewportPresetId: context.viewportPresetId,
+    });
+    if (!preparedLease) throw new Error('Failed to issue recording control capability');
+    preparedBindingPersisted = true;
+    if (isStartCancelled(tabId ?? null, captureMode)) {
+      cleanupAttempted = true;
+      await cleanupFailedRecordingStart({
+        captureMode,
+        primaryError: new Error('Recording start was cancelled before source dispatch'),
+        settings,
+        sourceBinding,
+      });
+      await releaseVideoCaptureSurface(recordingId);
       rollbackRecordingStartState();
       return { result: 'cancelled' };
     }
 
-    return await finalizeAcceptedRecordingStart(recordingId, context, ownerSenderUrl);
+    await finalizeRecordingStart({
+      ...context,
+      recordingId,
+      streamInstanceId: sourceBinding.streamInstanceId,
+    });
+
+    const countdownReady = await runCountdown(tabId ?? null, captureMode, settings);
+    if (!countdownReady || isStartCancelled(tabId ?? null, captureMode)) {
+      cleanupAttempted = true;
+      await cleanupFailedRecordingStart({
+        captureMode,
+        primaryError: new Error('Recording start was cancelled'),
+        settings,
+        sourceBinding,
+      });
+      await releaseVideoCaptureSurface(recordingId);
+      rollbackRecordingStartState();
+      return { result: 'cancelled' };
+    }
+
+    return await finalizeAcceptedRecordingStart(
+      recordingId,
+      context,
+      sourceBinding.streamInstanceId
+    );
   } catch (error) {
-    if (preparedContextRequiresDisposal) {
+    if (!cleanupAttempted && sourceBinding && preparedBindingPersisted) {
+      const primaryError =
+        error instanceof RecordingStartCleanupFailure ? error.primaryError : error;
+      await cleanupFailedRecordingStart({
+        captureMode,
+        primaryError,
+        settings,
+        sourceBinding,
+        shouldDisposePreparedContext: preparedContextRequiresDisposal,
+      });
+      throw primaryError;
+    }
+    if (!cleanupAttempted && preparedContextRequiresDisposal) {
       await disposePreparedMultiSourceStreams(captureMode, settings);
     }
     throw error;
+  }
+}
+
+async function cleanupFailedRecordingStart(args: {
+  captureMode: CaptureMode;
+  primaryError: unknown;
+  settings: VideoRecordingSettings;
+  shouldDisposePreparedContext?: boolean;
+  sourceBinding: RecordingSourceBinding;
+}): Promise<void> {
+  if (args.shouldDisposePreparedContext !== false) {
+    await disposePreparedMultiSourceStreams(args.captureMode, args.settings);
+  }
+  try {
+    await requestBoundOffscreenRecordingStop(args.sourceBinding, true);
+    await clearActiveVideoRecordingLease(args.sourceBinding.recordingId);
+    clearVideoRecordingOffscreenStartDispatched();
+  } catch (cleanupError) {
+    throw new RecordingStartCleanupFailure(args.primaryError, cleanupError);
   }
 }

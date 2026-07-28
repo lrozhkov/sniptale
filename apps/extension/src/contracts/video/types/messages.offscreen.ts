@@ -16,7 +16,7 @@ export interface OffscreenStartRecordingMessage {
   settings: VideoRecordingSettings;
   tabId?: number;
   viewport?: ViewportInfo;
-  recordingId?: string;
+  recordingId: string;
   captureMode?: CaptureMode;
   cropRegion?: {
     x: number;
@@ -24,34 +24,40 @@ export interface OffscreenStartRecordingMessage {
     width: number;
     height: number;
   };
-  targetResolution?: {
-    width: number;
-    height: number;
-  };
-  emulatedViewportCssSize?: {
-    width: number;
-    height: number;
-  };
-}
-
-export interface OffscreenUpdateViewportCropMessage {
-  type: typeof VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP;
-  capabilityToken: string;
-  targetResolution?: {
-    width: number;
-    height: number;
-  };
-  emulatedViewportCssSize?: {
+  generation: number;
+  streamInstanceId: string;
+  surface?: {
+    presetId: string;
+    target: 'viewport' | 'window';
     width: number;
     height: number;
   };
 }
 
-export interface OffscreenSetViewportDrawStateMessage {
-  type: typeof VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE;
+export interface OffscreenStopRecordingMessage {
+  type: typeof VideoMessageType.OFFSCREEN_STOP_RECORDING;
   capabilityToken: string;
-  frozen: boolean;
-  navigationEpoch: number;
+  discard?: boolean;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+}
+
+export interface OffscreenBeginRecordingMessage {
+  type: typeof VideoMessageType.OFFSCREEN_BEGIN_RECORDING;
+  capabilityToken: string;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+}
+
+export interface OffscreenRevalidateSourceMessage {
+  type: typeof VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE;
+  capabilityToken: string;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+  viewport?: ViewportInfo;
 }
 
 export interface OffscreenRecordingStartedMessage {
@@ -60,6 +66,16 @@ export interface OffscreenRecordingStartedMessage {
   cursorCaptureMode?: VideoCursorCaptureMode;
   displaySurface?: VideoDisplaySurface;
   webcamSettings?: WebcamActualSettings;
+}
+
+export interface OffscreenSourceReadyMessage {
+  type: typeof VideoMessageType.OFFSCREEN_SOURCE_READY;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+  videoWidth: number;
+  videoHeight: number;
+  trackSettings: { width?: number; height?: number; frameRate?: number };
 }
 
 export interface OffscreenRecordingStoppedMessage {

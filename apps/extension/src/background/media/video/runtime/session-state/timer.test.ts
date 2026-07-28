@@ -12,7 +12,7 @@ function createCountdownState(): VideoRecordingRuntimeState {
     countdownEndsAt: 12_100,
     captureMode: null,
     captureSource: null,
-    viewportPreset: null,
+    viewportPresetId: null,
     error: null,
   };
 }
@@ -24,7 +24,7 @@ function createIdleState(): VideoRecordingRuntimeState {
     countdownEndsAt: null,
     captureMode: null,
     captureSource: null,
-    viewportPreset: null,
+    viewportPresetId: null,
     error: null,
   };
 }

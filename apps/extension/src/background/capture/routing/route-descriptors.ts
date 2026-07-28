@@ -12,6 +12,7 @@ export const captureActionsRouteDescriptor = {
     CaptureMessageType.CAPTURE_VISIBLE,
     CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
     CaptureMessageType.CAPTURE_FULL,
+    CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
   ],
   ownerModule: 'apps/extension/src/background/capture/routing/route/screenshot-adapter.ts',
 } as const;

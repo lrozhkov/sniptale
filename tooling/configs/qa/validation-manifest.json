@@ -2018,6 +2018,94 @@
         "fail",
         "skip"
       ]
+    },
+    {
+      "tool": "verify-all.scheduler.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-all.scheduler.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-all.worker.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/lane-worker-input-contracts.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-build.scheduler.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-build.scheduler.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-build.worker.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/lane-worker-input-contracts.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-focused.scheduler.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-focused.scheduler.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-focused.worker.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/lane-worker-input-contracts.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-harness.scheduler.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/verify-harness.scheduler.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
+    },
+    {
+      "tool": "verify-harness.worker.mjs",
+      "validationMode": "canonical-control-fixture",
+      "testFiles": [
+        "tooling/qa/core/lane-worker-input-contracts.test.ts"
+      ],
+      "states": [
+        "pass",
+        "fail"
+      ]
     }
   ]
 }

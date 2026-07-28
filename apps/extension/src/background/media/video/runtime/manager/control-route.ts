@@ -116,7 +116,7 @@ function handleStartRecording(
   const tabId = message.tabId ?? resolvedTabId;
   logger.debug('Starting video recording', {
     captureMode,
-    hasViewportPreset: Boolean(message.viewportPreset),
+    hasViewportPreset: Boolean(message.viewportPresetId),
     tabId,
   });
 
@@ -143,7 +143,7 @@ async function startRecordingWithPageAccess(
     tabId,
     message.settings,
     captureMode,
-    message.viewportPreset,
+    message.viewportPresetId ?? null,
     ownerSenderUrl
   );
 }

@@ -4,5 +4,4 @@ export {
   ensureOffscreenDocumentReadyOrAbort,
   resolveCaptureSourceForMode,
 } from './transport.resolve';
-export { finalizeRecordingStart } from './transport.finalize';
-export { buildViewportEmulationResult } from './transport.viewport';
+export { beginPreparedRecording, finalizeRecordingStart } from './transport.finalize';

@@ -71,7 +71,7 @@ describe('startRecordingHandler camera mode', () => {
       setRecordingControlCapability,
       setStartError,
       videoSettings: defaultSettings,
-      viewportPreset: null,
+      viewportPresetId: 'retained-tab-preset',
     });
 
     expect(tabsQuery).not.toHaveBeenCalled();
@@ -79,6 +79,7 @@ describe('startRecordingHandler camera mode', () => {
     expect(runtimeSendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         captureMode: CaptureMode.CAMERA,
+        viewportPresetId: null,
         settings: expect.objectContaining({
           controlledCursorCaptureEnabled: false,
           diagnosticsEnabled: false,

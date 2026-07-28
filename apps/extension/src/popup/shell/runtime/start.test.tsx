@@ -131,7 +131,16 @@ describe('usePopupRuntime successful start recording', () => {
         clearStartError,
         isStartPending: false,
         recordingState: createRuntimeRecordingState(VideoRecordingStatus.IDLE),
-        selectedPreset: { id: 'preset-1', height: 720, label: 'Preset', width: 1280 },
+        selectedPreset: {
+          kind: 'user',
+          id: 'preset-1',
+          name: 'Preset',
+          target: 'viewport',
+          width: 1280,
+          height: 720,
+          enabled: true,
+          order: 0,
+        },
         setIsStartPending,
         setRecordingControlCapability,
         setStartError,
@@ -152,7 +161,7 @@ describe('usePopupRuntime successful start recording', () => {
         setIsStartPending,
         setRecordingControlCapability,
         setStartError,
-        viewportPreset: null,
+        viewportPresetId: null,
       })
     );
   });

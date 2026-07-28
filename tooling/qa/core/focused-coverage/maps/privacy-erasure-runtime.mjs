@@ -7,7 +7,6 @@ export const PRIVACY_ERASURE_RUNTIME_OWNER_MAPPINGS = [
     reason: 'Privacy stop awaits strict viewport clear/detach and verifies debugger ownership.',
     testFiles: [
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/effects.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/controls.stop/effects.privacy-erasure.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.privacy-erasure.test.ts',
     ],
   },
@@ -19,6 +18,9 @@ export const PRIVACY_ERASURE_RUNTIME_OWNER_MAPPINGS = [
       'The isolated offscreen boundary erases page-local storage without persistence bootstrap.',
     testFiles: [
       'apps/extension/src/offscreen/runtime/bootstrap.test.ts',
+      'apps/extension/src/offscreen/runtime/desktop-media-options.test.ts',
+      'apps/extension/src/offscreen/runtime/entrypoint.test.ts',
+      'apps/extension/src/offscreen/runtime/freshness.test.ts',
       'apps/extension/src/offscreen/runtime/index.test.ts',
       'apps/extension/src/offscreen/runtime/routing.export.test.ts',
       'apps/extension/src/offscreen/runtime/routing.privacy-erasure.test.ts',

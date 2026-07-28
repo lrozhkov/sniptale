@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { setVideoRecordingRuntimeState } = vi.hoisted(() => ({
   setVideoRecordingRuntimeState: vi.fn(),
@@ -13,18 +14,14 @@ vi.mock('../runtime/session-state', async (importOriginal) => ({
 import {
   beginVideoRecordingPreparation,
   beginVideoRecordingStop,
-  clearViewportNavigationPending,
   finishVideoRecordingStop,
-  freezeViewportNavigation,
   getVideoRecordingCaptureMode,
   getVideoRecordingCountdownSessionId,
   getVideoRecordingId,
   getVideoRecordingTabId,
-  getViewportNavigationEpoch,
   hasActiveVideoRecordingTab,
   isVideoRecordingPreparationInProgress,
   isVideoRecordingStopInProgress,
-  isViewportNavigationPending,
   markVideoRecordingPreparationSettled,
   resetVideoRecordingStartSession,
   setVideoRecordingCountdownSessionId,
@@ -41,13 +38,11 @@ function resetSession(): void {
   videoManagerSession.isStopping = false;
   videoManagerSession.currentCaptureMode = null;
   videoManagerSession.currentCountdownSessionId = null;
-  videoManagerSession.viewportNavigationEpoch = 4;
-  videoManagerSession.viewportNavigationPending = true;
 }
 
 beforeEach(resetSession);
 
-it('reads and mutates the viewport and recording session through the folder facade', () => {
+it('reads the recording session through the folder facade', () => {
   expect(getVideoRecordingTabId()).toBe(11);
   expect(getVideoRecordingId()).toBe('recording-1');
   expect(getVideoRecordingCaptureMode()).toBeNull();
@@ -55,31 +50,21 @@ it('reads and mutates the viewport and recording session through the folder faca
   expect(hasActiveVideoRecordingTab()).toBe(true);
   expect(isVideoRecordingPreparationInProgress()).toBe(false);
   expect(isVideoRecordingStopInProgress()).toBe(false);
-  expect(isViewportNavigationPending()).toBe(true);
-  expect(getViewportNavigationEpoch()).toBe(4);
-
-  expect(freezeViewportNavigation()).toBe(5);
-  clearViewportNavigationPending();
-  expect(isViewportNavigationPending()).toBe(false);
 });
 
 it('transitions preparation and stop state through the folder facade', () => {
-  beginVideoRecordingPreparation(CaptureMode.VIEWPORT_EMULATION, {
-    id: 'wide',
-    label: 'Wide',
-    width: 1920,
-    height: 1080,
-  });
+  beginVideoRecordingPreparation(CaptureMode.TAB, DEFAULT_VIDEO_SETTINGS, 'wide');
 
   expect(videoManagerSession.isStarting).toBe(true);
   expect(setVideoRecordingRuntimeState).toHaveBeenCalledWith({
     status: VideoRecordingStatus.PREPARING,
     duration: 0,
     countdownEndsAt: null,
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     captureSource: null,
-    viewportPreset: expect.objectContaining({ id: 'wide' }),
-    liveMedia: null,
+    cropRegion: null,
+    viewportPresetId: 'wide',
+    liveMedia: expect.any(Object),
     error: null,
   });
 
@@ -93,7 +78,7 @@ it('transitions preparation and stop state through the folder facade', () => {
   expect(context).toEqual({
     tabId: 22,
     mode: null,
-    shouldResetImmediately: true,
+    shouldResetImmediately: false,
   });
 
   finishVideoRecordingStop();
@@ -101,7 +86,7 @@ it('transitions preparation and stop state through the folder facade', () => {
 });
 
 it('writes a null viewport preset when preparation starts without an explicit preset', () => {
-  beginVideoRecordingPreparation(CaptureMode.TAB);
+  beginVideoRecordingPreparation(CaptureMode.TAB, DEFAULT_VIDEO_SETTINGS, null);
 
   expect(setVideoRecordingRuntimeState).toHaveBeenCalledWith({
     status: VideoRecordingStatus.PREPARING,
@@ -109,8 +94,9 @@ it('writes a null viewport preset when preparation starts without an explicit pr
     countdownEndsAt: null,
     captureMode: CaptureMode.TAB,
     captureSource: null,
-    viewportPreset: null,
-    liveMedia: null,
+    cropRegion: null,
+    viewportPresetId: null,
+    liveMedia: expect.any(Object),
     error: null,
   });
 });

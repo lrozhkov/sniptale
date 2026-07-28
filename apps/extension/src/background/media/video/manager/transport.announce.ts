@@ -1,6 +1,5 @@
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import type { VideoViewportPresetSelection } from '@sniptale/runtime-contracts/video/types/types';
 import { runBestEffort } from '@sniptale/foundation/best-effort';
 import type { RuntimeMessagingTransport } from '../../../../platform/runtime-messaging';
 import { setVideoRecordingRuntimeState } from '../runtime/session-state';
@@ -11,7 +10,7 @@ import type { resolveCaptureSource } from './preflight';
 export async function announceCaptureSource(
   captureSource: NonNullable<Awaited<ReturnType<typeof resolveCaptureSource>>>,
   captureMode: CaptureMode,
-  viewportPreset?: VideoViewportPresetSelection,
+  viewportPresetId: string | null,
   transport: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'> = {
     sendRuntimeMessage: (message) => getBackgroundRuntimeMessaging().sendRuntimeMessage(message),
   }
@@ -19,7 +18,8 @@ export async function announceCaptureSource(
   setVideoRecordingRuntimeState({
     captureSource,
     captureMode,
-    viewportPreset: viewportPreset ?? null,
+    cropRegion: captureSource.cropRegion ?? null,
+    viewportPresetId,
   });
   runBestEffort(
     transport.sendRuntimeMessage({

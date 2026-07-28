@@ -5,21 +5,22 @@ const {
   cleanupScreenshotModeAfterNavigationMock,
   disableScreenshotModeMock,
   enableScreenshotModeMock,
-  handleSetViewportMock,
+  handleApplyViewportPresetMock,
 } = vi.hoisted(() => ({
   buildScreenshotModeStatusResponseMock: vi.fn(),
   cleanupScreenshotModeAfterNavigationMock: vi.fn(),
   disableScreenshotModeMock: vi.fn(),
   enableScreenshotModeMock: vi.fn(),
-  handleSetViewportMock: vi.fn(),
+  handleApplyViewportPresetMock: vi.fn(),
 }));
 
-vi.mock('../tab-mode-router-screenshot', () => ({
+vi.mock('../tab-mode-router-screenshot', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../tab-mode-router-screenshot')>()),
   buildScreenshotModeStatusResponse: buildScreenshotModeStatusResponseMock,
   cleanupScreenshotModeAfterNavigation: cleanupScreenshotModeAfterNavigationMock,
-  disableScreenshotMode: disableScreenshotModeMock,
+  disableScreenshotModeForContent: disableScreenshotModeMock,
   enableScreenshotMode: enableScreenshotModeMock,
-  handleSetViewport: handleSetViewportMock,
+  handleApplyViewportPreset: handleApplyViewportPresetMock,
 }));
 
 import {
@@ -27,13 +28,14 @@ import {
   type TabModeMessage,
 } from '@sniptale/runtime-contracts/messaging/message-types';
 import { routeTabModeMessage } from './router';
+import { tabModeRouteDescriptor } from './route-descriptors';
 
 function resetTabModeRouterMocks() {
   vi.clearAllMocks();
   buildScreenshotModeStatusResponseMock.mockReturnValue(true);
   disableScreenshotModeMock.mockResolvedValue(undefined);
   enableScreenshotModeMock.mockResolvedValue(undefined);
-  handleSetViewportMock.mockResolvedValue(undefined);
+  handleApplyViewportPresetMock.mockResolvedValue(undefined);
 }
 
 function createModeMaps() {
@@ -42,7 +44,10 @@ function createModeMaps() {
     highlighterModeState: new Map<number, boolean>(),
     quickEditModeState: new Map<number, boolean>(),
     viewportOwnerState: new Map(),
-    viewportState: new Map<number, { width: number; height: number } | null>(),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
   };
 }
 
@@ -73,26 +78,36 @@ async function verifiesEnableScreenshotModeAsyncSuccess() {
     args.screenshotModeState,
     args.viewportState,
     args.viewportOwnerState,
-    args.webSnapshotViewerPorts
+    args.webSnapshotViewerPorts,
+    {}
   );
   expect(args.sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 }
 
 async function verifiesDisableScreenshotModeAsyncError() {
-  const args = createRouteArgs({ type: MessageType.DISABLE_SCREENSHOT_MODE });
+  const args = createRouteArgs({
+    type: MessageType.DISABLE_SCREENSHOT_MODE,
+    leaseGeneration: 3,
+    operationGeneration: 4,
+    surfaceCapabilityToken: 'surface-token',
+  });
 
   disableScreenshotModeMock.mockRejectedValueOnce('detach failed');
 
   expect(routeTabModeMessage(args)).toBe(true);
   await flushPromises();
 
-  expect(disableScreenshotModeMock).toHaveBeenCalledWith(
-    7,
-    args.screenshotModeState,
-    args.viewportState,
-    args.viewportOwnerState,
-    args.webSnapshotViewerPorts
-  );
+  expect(disableScreenshotModeMock).toHaveBeenCalledWith({
+    leaseGeneration: 3,
+    operationGeneration: 4,
+    screenshotModeState: args.screenshotModeState,
+    senderDocumentId: 'content-document-7',
+    surfaceCapabilityToken: 'surface-token',
+    tabId: 7,
+    viewportOwnerState: args.viewportOwnerState,
+    viewportState: args.viewportState,
+    webSnapshotViewerPorts: args.webSnapshotViewerPorts,
+  });
   expect(args.sendResponse).toHaveBeenCalledWith({
     success: false,
     error: 'detach failed',
@@ -114,18 +129,21 @@ function verifiesScreenshotModeStatusDelegation() {
 
 async function verifiesViewportRoutes() {
   const setViewportArgs = createRouteArgs({
-    type: MessageType.SET_VIEWPORT,
-    width: 1280,
-    height: 720,
+    type: MessageType.APPLY_VIEWPORT_PRESET,
+    operationGeneration: 2,
+    presetId: 'preset-1',
+    surfaceCapabilityToken: 'surface-token',
   });
 
   expect(routeTabModeMessage(setViewportArgs)).toBe(true);
   await flushPromises();
 
-  expect(handleSetViewportMock).toHaveBeenCalledWith(
+  expect(handleApplyViewportPresetMock).toHaveBeenCalledWith(
     7,
-    1280,
-    720,
+    'preset-1',
+    2,
+    'surface-token',
+    'content-document-7',
     setViewportArgs.viewportState,
     setViewportArgs.viewportOwnerState,
     setViewportArgs.webSnapshotViewerPorts
@@ -136,12 +154,22 @@ async function verifiesViewportRoutes() {
   });
 
   const getViewportArgs = createRouteArgs({ type: MessageType.GET_VIEWPORT_STATUS });
-  getViewportArgs.viewportState.set(7, { width: 1440, height: 900 });
+  getViewportArgs.viewportState.set(7, {
+    presetId: 'test:viewport',
+    target: 'viewport' as const,
+    width: 1440,
+    height: 900,
+  });
 
   expect(routeTabModeMessage(getViewportArgs)).toBe(true);
   expect(getViewportArgs.sendResponse).toHaveBeenCalledWith({
     success: true,
-    viewport: { width: 1440, height: 900 },
+    viewport: {
+      presetId: 'test:viewport',
+      target: 'viewport',
+      width: 1440,
+      height: 900,
+    },
   });
 }
 
@@ -199,4 +227,14 @@ describe('tab-mode-router', () => {
   it('handles set/get viewport routes', verifiesViewportRoutes);
   it('toggles and reports highlighter mode state', verifiesHighlighterRoutes);
   it('toggles and reports quick edit mode state', verifiesQuickEditRoutes);
+  it('declares the privileged viewport routes in the tab-mode descriptor', () => {
+    expect(tabModeRouteDescriptor).toMatchObject({
+      authorityFamily: 'tab-mode-privileged-tab-route',
+      messageTypes: expect.arrayContaining([
+        MessageType.APPLY_VIEWPORT_PRESET,
+        MessageType.RELEASE_VIEWPORT_PRESET,
+        MessageType.GET_VIEWPORT_PRESET_AVAILABILITY,
+      ]),
+    });
+  });
 });

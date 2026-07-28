@@ -19,6 +19,7 @@ type RecordingTelemetryViewportInfo = {
   scrollY: number;
   viewportOffsetX?: number;
   viewportOffsetY?: number;
+  visualViewportScale?: number;
   width: number;
 };
 
@@ -45,7 +46,8 @@ export function isViewportInfo(value: unknown): value is RecordingTelemetryViewp
     hasOptionalField(value, 'outerWidth', isNumber) &&
     hasOptionalField(value, 'outerHeight', isNumber) &&
     hasOptionalField(value, 'viewportOffsetX', isNumber) &&
-    hasOptionalField(value, 'viewportOffsetY', isNumber)
+    hasOptionalField(value, 'viewportOffsetY', isNumber) &&
+    hasOptionalField(value, 'visualViewportScale', isNumber)
   );
 }
 

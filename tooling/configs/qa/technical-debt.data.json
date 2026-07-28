@@ -342,6 +342,24 @@
         "apps/extension/src/background/application/runtime-state/index.ts",
         "apps/extension/src/background/application/runtime-state/job-state-authority.ts",
         "apps/extension/src/background/application/runtime-state/restart-semantics.ts",
+        "apps/extension/src/background/capture-surface/availability.ts",
+        "apps/extension/src/background/capture-surface/display-geometry.ts",
+        "apps/extension/src/background/capture-surface/index.ts",
+        "apps/extension/src/background/capture-surface/lease-application.ts",
+        "apps/extension/src/background/capture-surface/lease-disposal.ts",
+        "apps/extension/src/background/capture-surface/lease-mutation.ts",
+        "apps/extension/src/background/capture-surface/lease-preparation.ts",
+        "apps/extension/src/background/capture-surface/lease-reassertion.ts",
+        "apps/extension/src/background/capture-surface/lease-registry.ts",
+        "apps/extension/src/background/capture-surface/lease-release.ts",
+        "apps/extension/src/background/capture-surface/recovery.ts",
+        "apps/extension/src/background/capture-surface/restoration.ts",
+        "apps/extension/src/background/capture-surface/screenshot-session.ts",
+        "apps/extension/src/background/capture-surface/service.ts",
+        "apps/extension/src/background/capture-surface/types.ts",
+        "apps/extension/src/background/capture-surface/viewport-capacity.ts",
+        "apps/extension/src/background/capture-surface/viewport.ts",
+        "apps/extension/src/background/capture-surface/window.ts",
         "apps/extension/src/background/capture/application/complete-capture-use-case.ts",
         "apps/extension/src/background/capture/application/payload.ts",
         "apps/extension/src/background/capture/application/ports.ts",
@@ -408,12 +426,12 @@
         "apps/extension/src/background/capture/popup-export/staged-archive-validation.ts",
         "apps/extension/src/background/capture/popup-export/staged-archives.ts",
         "apps/extension/src/background/capture/quick-actions/capability.ts",
-        "apps/extension/src/background/capture/quick-actions/flow/debugger.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
         "apps/extension/src/background/capture/quick-actions/flow/flows.ts",
         "apps/extension/src/background/capture/quick-actions/flow/load.ts",
         "apps/extension/src/background/capture/quick-actions/flow/process.ts",
         "apps/extension/src/background/capture/quick-actions/flow/shared.ts",
+        "apps/extension/src/background/capture/quick-actions/flow/surface.ts",
         "apps/extension/src/background/capture/quick-actions/index.ts",
         "apps/extension/src/background/capture/quick-actions/notifications.ts",
         "apps/extension/src/background/capture/quick-actions/types.ts",
@@ -528,6 +546,11 @@
         "apps/extension/src/background/media/video/application/export/use-case.ts",
         "apps/extension/src/background/media/video/capture-source/index.ts",
         "apps/extension/src/background/media/video/capture-source/screen-source.ts",
+        "apps/extension/src/background/media/video/capture-surface/index.ts",
+        "apps/extension/src/background/media/video/capture-surface/recovery.ts",
+        "apps/extension/src/background/media/video/capture-surface/session-registry.ts",
+        "apps/extension/src/background/media/video/capture-surface/source-handshake.ts",
+        "apps/extension/src/background/media/video/capture-viewport.ts",
         "apps/extension/src/background/media/video/manager/diagnostics.ts",
         "apps/extension/src/background/media/video/manager/flow-cancellation.ts",
         "apps/extension/src/background/media/video/manager/flow-countdown.ts",
@@ -539,8 +562,6 @@
         "apps/extension/src/background/media/video/manager/preflight.resolve.ts",
         "apps/extension/src/background/media/video/manager/preflight.ts",
         "apps/extension/src/background/media/video/manager/recording-context.prepare.ts",
-        "apps/extension/src/background/media/video/manager/recording-context.ts",
-        "apps/extension/src/background/media/video/manager/recording-context.viewport.ts",
         "apps/extension/src/background/media/video/manager/session.facade.ts",
         "apps/extension/src/background/media/video/manager/session.ts",
         "apps/extension/src/background/media/video/manager/start-activation-watchdog.ts",
@@ -553,13 +574,7 @@
         "apps/extension/src/background/media/video/manager/transport.finalize.ts",
         "apps/extension/src/background/media/video/manager/transport.resolve.ts",
         "apps/extension/src/background/media/video/manager/transport.ts",
-        "apps/extension/src/background/media/video/manager/transport.viewport.ts",
-        "apps/extension/src/background/media/video/manager/viewport.ts",
-        "apps/extension/src/background/media/video/navigation/index.ts",
-        "apps/extension/src/background/media/video/navigation/predicates.ts",
-        "apps/extension/src/background/media/video/navigation/refresh.ts",
-        "apps/extension/src/background/media/video/navigation/shared.ts",
-        "apps/extension/src/background/media/video/navigation/viewport-draw-state.ts",
+        "apps/extension/src/background/media/video/offscreen-recording-stop.ts",
         "apps/extension/src/background/media/video/recording-control-lease/index.ts",
         "apps/extension/src/background/media/video/runtime/authorization/project-export.ts",
         "apps/extension/src/background/media/video/runtime/camera-recorder-control.ts",
@@ -586,7 +601,7 @@
         "apps/extension/src/background/media/video/runtime/manager/control-route.responses.ts",
         "apps/extension/src/background/media/video/runtime/manager/control-route.ts",
         "apps/extension/src/background/media/video/runtime/manager/controlled-cursor/messages.ts",
-        "apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation.ts",
+        "apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation-effects.ts",
         "apps/extension/src/background/media/video/runtime/manager/controls.pause-resume.ts",
         "apps/extension/src/background/media/video/runtime/manager/controls.settings.ts",
         "apps/extension/src/background/media/video/runtime/manager/controls.start-failure.ts",
@@ -601,14 +616,11 @@
         "apps/extension/src/background/media/video/runtime/manager/runtime/index.ts",
         "apps/extension/src/background/media/video/runtime/manager/runtime/recording-state.ts",
         "apps/extension/src/background/media/video/runtime/manager/runtime/tab-close.ts",
-        "apps/extension/src/background/media/video/runtime/manager/runtime/tab-lifecycle.ts",
-        "apps/extension/src/background/media/video/runtime/manager/runtime/tab-update/crop-overlay.ts",
-        "apps/extension/src/background/media/video/runtime/manager/runtime/tab-update/index.ts",
-        "apps/extension/src/background/media/video/runtime/manager/runtime/tab-update/route.ts",
-        "apps/extension/src/background/media/video/runtime/manager/viewport-navigation/freeze.ts",
-        "apps/extension/src/background/media/video/runtime/manager/viewport-navigation/guard.ts",
-        "apps/extension/src/background/media/video/runtime/manager/viewport-navigation/index.ts",
-        "apps/extension/src/background/media/video/runtime/manager/viewport-navigation/refresh.ts",
+        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/binding.ts",
+        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/index.ts",
+        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/page-effects.ts",
+        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/source-validation.ts",
+        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/transaction.ts",
         "apps/extension/src/background/media/video/runtime/offscreen-document-dto.ts",
         "apps/extension/src/background/media/video/runtime/offscreen-manager-state.ts",
         "apps/extension/src/background/media/video/runtime/offscreen-manager.ts",
@@ -632,11 +644,9 @@
         "apps/extension/src/background/media/video/runtime/session-state/timer.ts",
         "apps/extension/src/background/media/video/session-state/controlled-cursor.ts",
         "apps/extension/src/background/media/video/session-state/index.ts",
-        "apps/extension/src/background/media/video/session-state/navigation.ts",
         "apps/extension/src/background/media/video/session-state/preparation.ts",
         "apps/extension/src/background/media/video/session-state/reads.ts",
         "apps/extension/src/background/media/video/session-state/setters.ts",
-        "apps/extension/src/background/media/video/session-state/shared.ts",
         "apps/extension/src/background/media/video/session-state/stop.ts",
         "apps/extension/src/background/media/video/ui/countdown.ts",
         "apps/extension/src/background/media/video/ui/desktop-media.errors.ts",
@@ -817,7 +827,6 @@
         "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/types.ts",
         "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/video-control-adapter.ts",
         "apps/extension/src/background/runtime/routing/tab-dispatch/video-control.ts",
-        "apps/extension/src/background/runtime/tab-mode-router-screenshot/helpers.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/index.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/mode.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/navigation-cleanup.ts",
@@ -897,6 +906,8 @@
         "apps/extension/src/background/scenario/session-service/state.ts",
         "apps/extension/src/background/scenario/session-service/test-support.ts",
         "apps/extension/src/background/scenario/session-service/types.ts",
+        "apps/extension/src/background/storage/capture-surface/contracts.ts",
+        "apps/extension/src/background/storage/capture-surface/index.ts",
         "apps/extension/src/background/storage/diagnostics/active-sessions.ts",
         "apps/extension/src/background/storage/diagnostics/guards.ts",
         "apps/extension/src/background/storage/llm/request-history-codec.ts",
@@ -960,6 +971,24 @@
         "apps/extension/src/background/application/runtime-state/index.ts",
         "apps/extension/src/background/application/runtime-state/job-state-authority.ts",
         "apps/extension/src/background/application/runtime-state/restart-semantics.ts",
+        "apps/extension/src/background/capture-surface/availability.ts",
+        "apps/extension/src/background/capture-surface/display-geometry.ts",
+        "apps/extension/src/background/capture-surface/index.ts",
+        "apps/extension/src/background/capture-surface/lease-application.ts",
+        "apps/extension/src/background/capture-surface/lease-disposal.ts",
+        "apps/extension/src/background/capture-surface/lease-mutation.ts",
+        "apps/extension/src/background/capture-surface/lease-preparation.ts",
+        "apps/extension/src/background/capture-surface/lease-reassertion.ts",
+        "apps/extension/src/background/capture-surface/lease-registry.ts",
+        "apps/extension/src/background/capture-surface/lease-release.ts",
+        "apps/extension/src/background/capture-surface/recovery.ts",
+        "apps/extension/src/background/capture-surface/restoration.ts",
+        "apps/extension/src/background/capture-surface/screenshot-session.ts",
+        "apps/extension/src/background/capture-surface/service.ts",
+        "apps/extension/src/background/capture-surface/types.ts",
+        "apps/extension/src/background/capture-surface/viewport-capacity.ts",
+        "apps/extension/src/background/capture-surface/viewport.ts",
+        "apps/extension/src/background/capture-surface/window.ts",
         "apps/extension/src/background/capture/application/complete-capture-use-case.ts",
         "apps/extension/src/background/capture/application/payload.ts",
         "apps/extension/src/background/capture/application/ports.ts",
@@ -1026,12 +1055,12 @@
         "apps/extension/src/background/capture/popup-export/staged-archive-validation.ts",
         "apps/extension/src/background/capture/popup-export/staged-archives.ts",
         "apps/extension/src/background/capture/quick-actions/capability.ts",
-        "apps/extension/src/background/capture/quick-actions/flow/debugger.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
         "apps/extension/src/background/capture/quick-actions/flow/flows.ts",
         "apps/extension/src/background/capture/quick-actions/flow/load.ts",
         "apps/extension/src/background/capture/quick-actions/flow/process.ts",
         "apps/extension/src/background/capture/quick-actions/flow/shared.ts",
+        "apps/extension/src/background/capture/quick-actions/flow/surface.ts",
         "apps/extension/src/background/capture/quick-actions/index.ts",
         "apps/extension/src/background/capture/quick-actions/notifications.ts",
         "apps/extension/src/background/capture/quick-actions/types.ts",
@@ -1146,6 +1175,11 @@
         "apps/extension/src/background/media/video/application/export/use-case.ts",
         "apps/extension/src/background/media/video/capture-source/index.ts",
         "apps/extension/src/background/media/video/capture-source/screen-source.ts",
+        "apps/extension/src/background/media/video/capture-surface/index.ts",
+        "apps/extension/src/background/media/video/capture-surface/recovery.ts",
+        "apps/extension/src/background/media/video/capture-surface/session-registry.ts",
+        "apps/extension/src/background/media/video/capture-surface/source-handshake.ts",
+        "apps/extension/src/background/media/video/capture-viewport.ts",
         "apps/extension/src/background/media/video/manager/diagnostics.ts",
         "apps/extension/src/background/media/video/manager/flow-cancellation.ts",
         "apps/extension/src/background/media/video/manager/flow-countdown.ts",
@@ -1157,8 +1191,6 @@
         "apps/extension/src/background/media/video/manager/preflight.resolve.ts",
         "apps/extension/src/background/media/video/manager/preflight.ts",
         "apps/extension/src/background/media/video/manager/recording-context.prepare.ts",
-        "apps/extension/src/background/media/video/manager/recording-context.ts",
-        "apps/extension/src/background/media/video/manager/recording-context.viewport.ts",
         "apps/extension/src/background/media/video/manager/session.facade.ts",
         "apps/extension/src/background/media/video/manager/session.ts",
         "apps/extension/src/background/media/video/manager/start-activation-watchdog.ts",
@@ -1171,13 +1203,7 @@
         "apps/extension/src/background/media/video/manager/transport.finalize.ts",
         "apps/extension/src/background/media/video/manager/transport.resolve.ts",
         "apps/extension/src/background/media/video/manager/transport.ts",
-        "apps/extension/src/background/media/video/manager/transport.viewport.ts",
-        "apps/extension/src/background/media/video/manager/viewport.ts",
-        "apps/extension/src/background/media/video/navigation/index.ts",
-        "apps/extension/src/background/media/video/navigation/predicates.ts",
-        "apps/extension/src/background/media/video/navigation/refresh.ts",
-        "apps/extension/src/background/media/video/navigation/shared.ts",
-        "apps/extension/src/background/media/video/navigation/viewport-draw-state.ts",
+        "apps/extension/src/background/media/video/offscreen-recording-stop.ts",
         "apps/extension/src/background/media/video/recording-control-lease/index.ts",
         "apps/extension/src/background/media/video/runtime/authorization/project-export.ts",
         "apps/extension/src/background/media/video/runtime/camera-recorder-control.ts",
@@ -1204,7 +1230,7 @@
         "apps/extension/src/background/media/video/runtime/manager/control-route.responses.ts",
         "apps/extension/src/background/media/video/runtime/manager/control-route.ts",
         "apps/extension/src/background/media/video/runtime/manager/controlled-cursor/messages.ts",
-        "apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation.ts",
+        "apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation-effects.ts",
         "apps/extension/src/background/media/video/runtime/manager/controls.pause-resume.ts",
         "apps/extension/src/background/media/video/runtime/manager/controls.settings.ts",
         "apps/extension/src/background/media/video/runtime/manager/controls.start-failure.ts",
@@ -1219,14 +1245,11 @@
         "apps/extension/src/background/media/video/runtime/manager/runtime/index.ts",
         "apps/extension/src/background/media/video/runtime/manager/runtime/recording-state.ts",
         "apps/extension/src/background/media/video/runtime/manager/runtime/tab-close.ts",
-        "apps/extension/src/background/media/video/runtime/manager/runtime/tab-lifecycle.ts",
-        "apps/extension/src/background/media/video/runtime/manager/runtime/tab-update/crop-overlay.ts",
-        "apps/extension/src/background/media/video/runtime/manager/runtime/tab-update/index.ts",
-        "apps/extension/src/background/media/video/runtime/manager/runtime/tab-update/route.ts",
-        "apps/extension/src/background/media/video/runtime/manager/viewport-navigation/freeze.ts",
-        "apps/extension/src/background/media/video/runtime/manager/viewport-navigation/guard.ts",
-        "apps/extension/src/background/media/video/runtime/manager/viewport-navigation/index.ts",
-        "apps/extension/src/background/media/video/runtime/manager/viewport-navigation/refresh.ts",
+        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/binding.ts",
+        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/index.ts",
+        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/page-effects.ts",
+        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/source-validation.ts",
+        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/transaction.ts",
         "apps/extension/src/background/media/video/runtime/offscreen-document-dto.ts",
         "apps/extension/src/background/media/video/runtime/offscreen-manager-state.ts",
         "apps/extension/src/background/media/video/runtime/offscreen-manager.ts",
@@ -1250,11 +1273,9 @@
         "apps/extension/src/background/media/video/runtime/session-state/timer.ts",
         "apps/extension/src/background/media/video/session-state/controlled-cursor.ts",
         "apps/extension/src/background/media/video/session-state/index.ts",
-        "apps/extension/src/background/media/video/session-state/navigation.ts",
         "apps/extension/src/background/media/video/session-state/preparation.ts",
         "apps/extension/src/background/media/video/session-state/reads.ts",
         "apps/extension/src/background/media/video/session-state/setters.ts",
-        "apps/extension/src/background/media/video/session-state/shared.ts",
         "apps/extension/src/background/media/video/session-state/stop.ts",
         "apps/extension/src/background/media/video/ui/countdown.ts",
         "apps/extension/src/background/media/video/ui/desktop-media.errors.ts",
@@ -1435,7 +1456,6 @@
         "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/types.ts",
         "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/video-control-adapter.ts",
         "apps/extension/src/background/runtime/routing/tab-dispatch/video-control.ts",
-        "apps/extension/src/background/runtime/tab-mode-router-screenshot/helpers.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/index.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/mode.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/navigation-cleanup.ts",
@@ -1515,6 +1535,8 @@
         "apps/extension/src/background/scenario/session-service/state.ts",
         "apps/extension/src/background/scenario/session-service/test-support.ts",
         "apps/extension/src/background/scenario/session-service/types.ts",
+        "apps/extension/src/background/storage/capture-surface/contracts.ts",
+        "apps/extension/src/background/storage/capture-surface/index.ts",
         "apps/extension/src/background/storage/diagnostics/active-sessions.ts",
         "apps/extension/src/background/storage/diagnostics/guards.ts",
         "apps/extension/src/background/storage/llm/request-history-codec.ts",
@@ -2763,6 +2785,7 @@
         "apps/extension/src/content/overlay/video-telemetry/signals.ts",
         "apps/extension/src/content/overlay/video-telemetry/state.ts",
         "apps/extension/src/content/overlay/video-telemetry/types.ts",
+        "apps/extension/src/content/overlay/viewport-selector/capability.ts",
         "apps/extension/src/content/overlay/viewport-selector/index.tsx",
         "apps/extension/src/content/overlay/viewport-selector/menu.ts",
         "apps/extension/src/content/overlay/viewport-selector/presets.ts",
@@ -8180,6 +8203,30 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/features/viewport-presets",
+      "disposition": "rollout",
+      "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/features/viewport-presets/catalog.ts",
+        "apps/extension/src/features/viewport-presets/contracts.ts",
+        "apps/extension/src/features/viewport-presets/display-name.ts",
+        "apps/extension/src/features/viewport-presets/error-message.ts",
+        "apps/extension/src/features/viewport-presets/format.ts",
+        "apps/extension/src/features/viewport-presets/operations.ts",
+        "apps/extension/src/features/viewport-presets/parser.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/features/viewport-presets/catalog.ts",
+        "apps/extension/src/features/viewport-presets/contracts.ts",
+        "apps/extension/src/features/viewport-presets/display-name.ts",
+        "apps/extension/src/features/viewport-presets/error-message.ts",
+        "apps/extension/src/features/viewport-presets/format.ts",
+        "apps/extension/src/features/viewport-presets/operations.ts",
+        "apps/extension/src/features/viewport-presets/parser.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/features/web-snapshot",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -8482,7 +8529,6 @@
         "apps/extension/src/offscreen/recording/controller.ts",
         "apps/extension/src/offscreen/recording/dimensions.ts",
         "apps/extension/src/offscreen/recording/duration.ts",
-        "apps/extension/src/offscreen/recording/edge-padding.ts",
         "apps/extension/src/offscreen/recording/finalization-replay.ts",
         "apps/extension/src/offscreen/recording/finalizer.ts",
         "apps/extension/src/offscreen/recording/multi-source/controls.ts",
@@ -8495,7 +8541,6 @@
         "apps/extension/src/offscreen/recording/multi-source/state.ts",
         "apps/extension/src/offscreen/recording/multi-source/stop.ts",
         "apps/extension/src/offscreen/recording/multi-source/webcam.ts",
-        "apps/extension/src/offscreen/recording/params.ts",
         "apps/extension/src/offscreen/recording/preview.ts",
         "apps/extension/src/offscreen/recording/recorder-error.ts",
         "apps/extension/src/offscreen/recording/recorder-mime.ts",
@@ -8506,7 +8551,6 @@
         "apps/extension/src/offscreen/recording/setup/desktop-media/index.ts",
         "apps/extension/src/offscreen/recording/setup/desktop-media/types.ts",
         "apps/extension/src/offscreen/recording/setup/index.ts",
-        "apps/extension/src/offscreen/recording/setup/video-derived.ts",
         "apps/extension/src/offscreen/recording/setup/video.ts",
         "apps/extension/src/offscreen/recording/sidecar/index.ts",
         "apps/extension/src/offscreen/recording/sidecar/types.ts",
@@ -8515,17 +8559,16 @@
         "apps/extension/src/offscreen/recording/signals/static-frame.ts",
         "apps/extension/src/offscreen/recording/start/cleanup.ts",
         "apps/extension/src/offscreen/recording/start/error-reporting.ts",
+        "apps/extension/src/offscreen/recording/start/gate.ts",
         "apps/extension/src/offscreen/recording/start/index.ts",
         "apps/extension/src/offscreen/recording/start/mime.ts",
         "apps/extension/src/offscreen/recording/start/recorder.ts",
         "apps/extension/src/offscreen/recording/start/session.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer-graph.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer.ts",
-        "apps/extension/src/offscreen/recording/stream/normalization.ts",
-        "apps/extension/src/offscreen/recording/stream/viewport/helpers.ts",
-        "apps/extension/src/offscreen/recording/stream/viewport/index.ts",
-        "apps/extension/src/offscreen/recording/stream/viewport/runtime.ts",
-        "apps/extension/src/offscreen/recording/stream/viewport/video.ts",
+        "apps/extension/src/offscreen/recording/stream/crop-stream.ts",
+        "apps/extension/src/offscreen/recording/stream/tab-output.ts",
+        "apps/extension/src/offscreen/recording/stream/video-source.ts",
         "apps/extension/src/offscreen/recording/update-settings.ts",
         "apps/extension/src/offscreen/runtime-messaging/best-effort.ts",
         "apps/extension/src/offscreen/runtime/authorization.ts",
@@ -8673,7 +8716,6 @@
         "apps/extension/src/offscreen/recording/controller.ts",
         "apps/extension/src/offscreen/recording/dimensions.ts",
         "apps/extension/src/offscreen/recording/duration.ts",
-        "apps/extension/src/offscreen/recording/edge-padding.ts",
         "apps/extension/src/offscreen/recording/finalization-replay.ts",
         "apps/extension/src/offscreen/recording/finalizer.ts",
         "apps/extension/src/offscreen/recording/multi-source/controls.ts",
@@ -8686,7 +8728,6 @@
         "apps/extension/src/offscreen/recording/multi-source/state.ts",
         "apps/extension/src/offscreen/recording/multi-source/stop.ts",
         "apps/extension/src/offscreen/recording/multi-source/webcam.ts",
-        "apps/extension/src/offscreen/recording/params.ts",
         "apps/extension/src/offscreen/recording/preview.ts",
         "apps/extension/src/offscreen/recording/recorder-error.ts",
         "apps/extension/src/offscreen/recording/recorder-mime.ts",
@@ -8697,7 +8738,6 @@
         "apps/extension/src/offscreen/recording/setup/desktop-media/index.ts",
         "apps/extension/src/offscreen/recording/setup/desktop-media/types.ts",
         "apps/extension/src/offscreen/recording/setup/index.ts",
-        "apps/extension/src/offscreen/recording/setup/video-derived.ts",
         "apps/extension/src/offscreen/recording/setup/video.ts",
         "apps/extension/src/offscreen/recording/sidecar/index.ts",
         "apps/extension/src/offscreen/recording/sidecar/types.ts",
@@ -8706,17 +8746,16 @@
         "apps/extension/src/offscreen/recording/signals/static-frame.ts",
         "apps/extension/src/offscreen/recording/start/cleanup.ts",
         "apps/extension/src/offscreen/recording/start/error-reporting.ts",
+        "apps/extension/src/offscreen/recording/start/gate.ts",
         "apps/extension/src/offscreen/recording/start/index.ts",
         "apps/extension/src/offscreen/recording/start/mime.ts",
         "apps/extension/src/offscreen/recording/start/recorder.ts",
         "apps/extension/src/offscreen/recording/start/session.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer-graph.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer.ts",
-        "apps/extension/src/offscreen/recording/stream/normalization.ts",
-        "apps/extension/src/offscreen/recording/stream/viewport/helpers.ts",
-        "apps/extension/src/offscreen/recording/stream/viewport/index.ts",
-        "apps/extension/src/offscreen/recording/stream/viewport/runtime.ts",
-        "apps/extension/src/offscreen/recording/stream/viewport/video.ts",
+        "apps/extension/src/offscreen/recording/stream/crop-stream.ts",
+        "apps/extension/src/offscreen/recording/stream/tab-output.ts",
+        "apps/extension/src/offscreen/recording/stream/video-source.ts",
         "apps/extension/src/offscreen/recording/update-settings.ts",
         "apps/extension/src/offscreen/runtime-messaging/best-effort.ts",
         "apps/extension/src/offscreen/runtime/authorization.ts",
@@ -8864,6 +8903,7 @@
         "apps/extension/src/popup/recording/video/setup/options/microphone-selector.tsx",
         "apps/extension/src/popup/recording/video/setup/options/microphone-settings-panel.tsx",
         "apps/extension/src/popup/recording/video/setup/options/microphone-test-recorder.tsx",
+        "apps/extension/src/popup/recording/video/setup/options/preset-availability.ts",
         "apps/extension/src/popup/recording/video/setup/options/preset-selector.tsx",
         "apps/extension/src/popup/recording/video/setup/options/webcam-preview.tsx",
         "apps/extension/src/popup/recording/video/setup/options/webcam-quality-controls.tsx",
@@ -8884,6 +8924,7 @@
         "apps/extension/src/popup/recording/video/webcam-actual-settings.ts",
         "apps/extension/src/popup/recording/webcam-flow/index.ts",
         "apps/extension/src/popup/recording/webcam/index.ts",
+        "apps/extension/src/popup/runtime-services/index.ts",
         "apps/extension/src/popup/shell/app-shell/applied-styles-actions.ts",
         "apps/extension/src/popup/shell/app-shell/applied-styles-entrypoint.ts",
         "apps/extension/src/popup/shell/app-shell/command-palette-layer.tsx",
@@ -9026,7 +9067,6 @@
         "apps/extension/src/popup/shell/runtime/page-access.ts",
         "apps/extension/src/popup/shell/runtime/recording-control-capability.ts",
         "apps/extension/src/popup/shell/runtime/recording-navigation-effect.ts",
-        "apps/extension/src/popup/shell/runtime/services.ts",
         "apps/extension/src/popup/shell/runtime/start-recording.ts",
         "apps/extension/src/popup/shell/runtime/start/run.ts",
         "apps/extension/src/popup/shell/runtime/state.ts",
@@ -9044,7 +9084,6 @@
         "apps/extension/src/popup/shell/runtime/types/state.ts",
         "apps/extension/src/popup/shell/runtime/types/tabs.ts",
         "apps/extension/src/popup/shell/runtime/types/video-setup.ts",
-        "apps/extension/src/popup/shell/runtime/viewport-apply-generation.ts",
         "apps/extension/src/popup/shell/runtime/webcam.ts",
         "apps/extension/src/popup/shell/tab-access/index.ts",
         "apps/extension/src/popup/shell/tabs/index.tsx"
@@ -9106,6 +9145,7 @@
         "apps/extension/src/popup/recording/video/setup/options/microphone-selector.tsx",
         "apps/extension/src/popup/recording/video/setup/options/microphone-settings-panel.tsx",
         "apps/extension/src/popup/recording/video/setup/options/microphone-test-recorder.tsx",
+        "apps/extension/src/popup/recording/video/setup/options/preset-availability.ts",
         "apps/extension/src/popup/recording/video/setup/options/preset-selector.tsx",
         "apps/extension/src/popup/recording/video/setup/options/webcam-preview.tsx",
         "apps/extension/src/popup/recording/video/setup/options/webcam-quality-controls.tsx",
@@ -9126,6 +9166,7 @@
         "apps/extension/src/popup/recording/video/webcam-actual-settings.ts",
         "apps/extension/src/popup/recording/webcam-flow/index.ts",
         "apps/extension/src/popup/recording/webcam/index.ts",
+        "apps/extension/src/popup/runtime-services/index.ts",
         "apps/extension/src/popup/shell/app-shell/applied-styles-actions.ts",
         "apps/extension/src/popup/shell/app-shell/applied-styles-entrypoint.ts",
         "apps/extension/src/popup/shell/app-shell/command-palette-layer.tsx",
@@ -9268,7 +9309,6 @@
         "apps/extension/src/popup/shell/runtime/page-access.ts",
         "apps/extension/src/popup/shell/runtime/recording-control-capability.ts",
         "apps/extension/src/popup/shell/runtime/recording-navigation-effect.ts",
-        "apps/extension/src/popup/shell/runtime/services.ts",
         "apps/extension/src/popup/shell/runtime/start-recording.ts",
         "apps/extension/src/popup/shell/runtime/start/run.ts",
         "apps/extension/src/popup/shell/runtime/state.ts",
@@ -9286,7 +9326,6 @@
         "apps/extension/src/popup/shell/runtime/types/state.ts",
         "apps/extension/src/popup/shell/runtime/types/tabs.ts",
         "apps/extension/src/popup/shell/runtime/types/video-setup.ts",
-        "apps/extension/src/popup/shell/runtime/viewport-apply-generation.ts",
         "apps/extension/src/popup/shell/runtime/webcam.ts",
         "apps/extension/src/popup/shell/tab-access/index.ts",
         "apps/extension/src/popup/shell/tabs/index.tsx"
@@ -11482,6 +11521,7 @@
         "apps/extension/src/web-snapshot-viewer/preparation/runtime/targets.ts",
         "apps/extension/src/web-snapshot-viewer/preparation/scenario/descriptors.ts",
         "apps/extension/src/web-snapshot-viewer/preparation/scenario/listeners.ts",
+        "apps/extension/src/web-snapshot-viewer/preparation/surface/controller.ts",
         "apps/extension/src/web-snapshot-viewer/shell/app/index.tsx",
         "apps/extension/src/web-snapshot-viewer/shell/app/route.ts",
         "apps/extension/src/web-snapshot-viewer/viewer/asset-objects.ts",
@@ -11706,6 +11746,7 @@
         "packages/platform/src/browser/context-menus.ts",
         "packages/platform/src/browser/debugger.ts",
         "packages/platform/src/browser/desktop-capture.ts",
+        "packages/platform/src/browser/displays.ts",
         "packages/platform/src/browser/downloads.ts",
         "packages/platform/src/browser/iframe-selectors/css.ts",
         "packages/platform/src/browser/iframe-selectors/element.ts",
@@ -11789,6 +11830,7 @@
         "packages/platform/src/browser/context-menus.ts",
         "packages/platform/src/browser/debugger.ts",
         "packages/platform/src/browser/desktop-capture.ts",
+        "packages/platform/src/browser/displays.ts",
         "packages/platform/src/browser/downloads.ts",
         "packages/platform/src/browser/iframe-selectors/css.ts",
         "packages/platform/src/browser/iframe-selectors/element.ts",
@@ -12330,7 +12372,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "acd112715829348b896bd0fde25c792f2adb384fbdf48645972d57880d6f8bf7"
+        "contentHash": "6770d606188250270b02fd25f5680c313ffe3ad5f3f2cbee5244b83f59ce3e76"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -12349,7 +12391,7 @@
       "remediation": "Keep entries file-exact and remove them when the browser side effect moves behind an adapter.",
       "exactSource": {
         "path": "tooling/qa/policy/browser-adapters-owners.mjs",
-        "contentHash": "650c20487b2abb24121d0c5d48bd86b8dec11b1430dc6dbb936b984daba7bdbe"
+        "contentHash": "1cb44cb391d0b98b3cf781bdfc4493b77ea766ff6239345f51873aa7f2ed198c"
       },
       "consumers": [
         "tooling/qa/core/active-path-drift.test.ts",
@@ -12360,7 +12402,8 @@
       "surfaces": [
         "binding:BROADCAST_CHANNEL_OWNER_FILES",
         "binding:HISTORY_OWNER_FILES",
-        "binding:LOCAL_STORAGE_OWNER_FILES"
+        "binding:LOCAL_STORAGE_OWNER_FILES",
+        "binding:SYSTEM_DISPLAY_OWNER_FILES"
       ]
     },
     {
@@ -13864,7 +13907,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/audit.mjs",
-        "contentHash": "5d0159c48fef8661db0aa7b183be4abaed0cd056deea354ddb99b7019439c249"
+        "contentHash": "077750ec6750623bdb9bbd0e04be4bc1448049ee835bf71fb641e9e73e608ca6"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/audit.mjs",
@@ -13875,6 +13918,8 @@
         "property:testFiles",
         "property:testFiles[1]",
         "property:testFiles[10]",
+        "property:testFiles[11]",
+        "property:testFiles[12]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
@@ -13956,7 +14001,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
-        "contentHash": "4fadd1cd8c36bad273d91c10cdc410087854df21a293f51fbeb5a312bfe920b6"
+        "contentHash": "928d6c8cbf8d303a525849211ef4a99a3ca6e33d06937ebdeb66581c1fe23ffc"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
@@ -13966,13 +14011,16 @@
         "binding:BG_RUNTIME_MESSAGING_OWNER_MAPPINGS",
         "property:testFiles",
         "property:testFiles[1]",
+        "property:testFiles[10]",
+        "property:testFiles[11]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
         "property:testFiles[6]",
         "property:testFiles[7]",
-        "property:testFiles[8]"
+        "property:testFiles[8]",
+        "property:testFiles[9]"
       ]
     },
     {
@@ -14049,7 +14097,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/policy/browser-adapters-rules.mjs",
-        "contentHash": "4a90b8da0b3c92de7d3910a6f4a043af5ce69ada61adef432d10c4cecd826503"
+        "contentHash": "d29f123f58133326435831d61a7fd70003227b3d93ce951896b9ad64df1e85ce"
       },
       "consumers": [
         "tooling/qa/policy/browser-adapters-rules.mjs",
@@ -14087,6 +14135,7 @@
         "property:segments[1]",
         "property:segments[2]",
         "property:segments[3]",
+        "property:segments[4]",
         "property:TARGET"
       ]
     },
@@ -15550,7 +15599,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/extension-critical.helpers.ts",
-        "contentHash": "cb41445f11d348a23bc58aaa797ccf74cd95b4d617fee9d2b50d105c26d3f01c"
+        "contentHash": "2dc121a2d59175ad25469aa89df29ffdc8217e9c4d0c1199bb1f9ae5eda68bab"
       },
       "consumers": [
         "tooling/test/e2e/extension-critical-media.spec.ts",
@@ -15930,15 +15979,16 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-controls/generate.mjs",
-        "contentHash": "ff3e7a1db010beb47c08b332e37eaba34f2c4808845cd63bc6f41fef39a1af0d"
+        "contentHash": "eede3f7f493579322940d157b4c61d5f1515a2cfac0ff9cb90fc39eb9b0d22dd"
       },
       "consumers": [
         "tooling/qa/core/qa-controls/generate.mjs",
         "tooling/qa/core/verify-qa-controls.mjs"
       ],
       "surfaces": [
+        "binding:DETERMINISTIC_VALIDATION_ROOTS",
         "binding:PROOF_OVERRIDES",
-        "property:synchronizeValidationManifest/anonymous-53/states"
+        "property:synchronizeValidationManifest/anonymous-99/states"
       ]
     },
     {
@@ -16624,7 +16674,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "de0954b9373f7ed600cdf25e8485657a6f91f371f07b5f00860e3575efd16a0d"
+        "contentHash": "8a91d0116b0cfb34862d6a75a82f94596f20db5447241afbd7d829a9d084eeca"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -16679,6 +16729,7 @@
         "property:testFiles[49]",
         "property:testFiles[5]",
         "property:testFiles[50]",
+        "property:testFiles[51]",
         "property:testFiles[6]",
         "property:testFiles[7]",
         "property:testFiles[8]",
@@ -17670,7 +17721,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/privacy-erasure-runtime.mjs",
-        "contentHash": "fcc71c1e53bb2ade320adabb1f10c301b7937a8a48248ba2288ac18257164d31"
+        "contentHash": "103c03aeeb4e4422c2837352bd41ddd62a34a5b17618074c7800eaab28cae305"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/privacy-erasure-runtime.mjs",
@@ -18394,7 +18445,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/settings.mjs",
-        "contentHash": "8f8cd20c44347b60dee50a846d499672aff7082dd1afd2456f0b771fe8d011b7"
+        "contentHash": "4d8b5d000719875b3ed35c4329026fded64944a7ee6d2c02206b420f8e83f59d"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18408,6 +18459,7 @@
         "property:testFiles[11]",
         "property:testFiles[12]",
         "property:testFiles[13]",
+        "property:testFiles[14]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
@@ -18450,7 +18502,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/shared-facade.mjs",
-        "contentHash": "e6947cccd707557a500d8f34249b8b6f56468a85bde5c4d9bf627a4edefc6034"
+        "contentHash": "22f96aec03fbadc398f01002fbaefa7dd0e6706586b923d639672da2172bd2c0"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -21645,7 +21697,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/video-recording.mjs",
-        "contentHash": "ad73528c4f6445493f338caebb6537c07cb17a2c5f8f3c30f14024ab1f39bb45"
+        "contentHash": "b78f65df4b07b56a11ebd7d9ab46f2a5dfa1d2fc884a472e77b609dfda7b055d"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -21661,6 +21713,7 @@
         "property:testFiles[13]",
         "property:testFiles[14]",
         "property:testFiles[15]",
+        "property:testFiles[16]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",

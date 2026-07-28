@@ -139,7 +139,9 @@ it('routes viewport and crop capture promise selection', async () => {
       viewportCapture,
       cropCapture,
       42,
-      new Map([[42, { width: 1, height: 1 }]])
+      new Map([
+        [42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1, height: 1 }],
+      ])
     )
   ).resolves.toBe('data:image/png;base64,3');
   await expect(

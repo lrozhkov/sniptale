@@ -4,6 +4,7 @@ import {
   translate,
   type TranslationKey,
 } from '../../../platform/i18n';
+import { getViewportPresetErrorMessage } from '../../../features/viewport-presets/error-message';
 
 const STALE_PAGE_RUNTIME_PATTERNS = [
   'Could not establish connection',
@@ -39,6 +40,8 @@ export function isStalePageRuntimeErrorMessage(message: string): boolean {
 
 export function getPopupRuntimeErrorMessage(error: unknown, fallbackKey: TranslationKey): string {
   const message = getErrorMessage(error);
+  const viewportPresetError = getViewportPresetErrorMessage(message);
+  if (viewportPresetError) return viewportPresetError;
 
   if (message && isStalePageRuntimeErrorMessage(message)) {
     return translate('popup.common.stalePageRuntimeHint');

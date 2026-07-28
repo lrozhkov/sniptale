@@ -102,6 +102,14 @@ function resetVisibleFlowMocks() {
   transitionCaptureJobMock.mockResolvedValue(undefined);
 }
 
+function mockExactBitmap(width: number, height: number): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({ blob: vi.fn().mockResolvedValue(new Blob(['image'])) })
+  );
+  vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ close: vi.fn(), height, width }));
+}
+
 function useVisibleFlowTestScope() {
   beforeEach(() => {
     resetVisibleFlowMocks();
@@ -179,6 +187,7 @@ describe('capture-visible-flow viewport capture', () => {
   useVisibleFlowTestScope();
 
   it('captures a viewport through the debugger adapter and post-processes the result', async () => {
+    mockExactBitmap(1280, 720);
     loadSettingsMock.mockResolvedValue({ imageFormat: 'png', imageQuality: 90 });
     buildViewportCaptureScreenshotOptionsMock.mockReturnValue({ clip: { width: 1280 } });
     browserDebuggerSendCommandMock.mockResolvedValue({ data: 'raw-screenshot' });
@@ -226,6 +235,7 @@ describe('capture-visible-flow viewport transaction payloads', () => {
   useVisibleFlowTestScope();
 
   it('returns capture job identity for delivery-owned viewport captures', async () => {
+    mockExactBitmap(1440, 900);
     loadSettingsMock.mockResolvedValue({ imageFormat: 'png', imageQuality: 90 });
     buildViewportCaptureScreenshotOptionsMock.mockReturnValue({ clip: { width: 1440 } });
     browserDebuggerSendCommandMock.mockResolvedValue({ data: 'raw-screenshot' });
