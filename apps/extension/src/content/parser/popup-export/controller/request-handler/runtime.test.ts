@@ -88,10 +88,15 @@ it('routes cancel requests and only cancels when running', () => {
   dispatchPopupExportRequestMock.mockReturnValue(true);
   const handleRequest = createPopupExportRequestHandler(runtime);
 
-  expect(handleRequest({ type: MessageType.EXPORT_POPUP_CANCEL }, sendResponse)).toBe(true);
+  expect(
+    handleRequest(
+      { exportRunId: 'export-run-1', type: MessageType.EXPORT_POPUP_CANCEL },
+      sendResponse
+    )
+  ).toBe(true);
   expect(dispatchPopupExportRequestMock).toHaveBeenCalledWith({
     ...runtime,
-    request: { type: MessageType.EXPORT_POPUP_CANCEL },
+    request: { exportRunId: 'export-run-1', type: MessageType.EXPORT_POPUP_CANCEL },
     sendResponse,
   });
 });

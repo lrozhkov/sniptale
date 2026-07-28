@@ -11,7 +11,14 @@ import {
 } from '../logging';
 import { buildPopupExportOptions } from '../options';
 import { getPopupExportTransportErrorMessage } from '../preview-request';
-import { parsePopupBatchPagePackageAtBoundary } from './batch-package-boundary';
+import {
+  addPopupBatchResourceUsage,
+  assertPopupBatchAggregateResourceUsage,
+  getPopupBatchPagePackageResourceUsage,
+  parsePopupBatchPagePackageAtBoundary,
+  wouldExceedPopupBatchAggregateBudget,
+  type PopupBatchResourceUsage,
+} from './batch-package-boundary';
 import { isCurrentBatchRequest, setBatchExportProgress } from './batch-state';
 
 function prefixTabErrors(tabTitle: string, errors: string[]): string[] {
@@ -38,6 +45,7 @@ async function requestBatchPagePackage(args: {
   });
 
   const response = await args.deps.sendBuildPackageMessage(args.tab.tabId, {
+    batchRequestId: args.requestId,
     type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
     options: buildPopupExportOptions(getPopupExportSelection(args.state)),
   });
@@ -68,6 +76,7 @@ function createBatchCollectionError(tabTitle: string, error: unknown): string {
 }
 
 function handleBatchPackageResponse(args: {
+  aggregateUsage: PopupBatchResourceUsage;
   errors: string[];
   pagePackages: PopupExportBatchPackage[];
   response: Awaited<ReturnType<typeof requestBatchPagePackage>>;
@@ -83,6 +92,24 @@ function handleBatchPackageResponse(args: {
   }
 
   const pagePackage = parsePopupBatchPagePackageAtBoundary(args.response.pagePackage);
+  const packageUsage = getPopupBatchPagePackageResourceUsage(pagePackage);
+  if (
+    wouldExceedPopupBatchAggregateBudget(
+      args.aggregateUsage.decodedBytes,
+      packageUsage.decodedBytes
+    )
+  ) {
+    args.errors.push(`${args.tab.title}: ${translate('popup.export.batchAggregateLimitError')}`);
+    return true;
+  }
+  const nextAggregateUsage = addPopupBatchResourceUsage(args.aggregateUsage, packageUsage);
+  try {
+    assertPopupBatchAggregateResourceUsage(nextAggregateUsage);
+  } catch (error) {
+    args.errors.push(createBatchCollectionError(args.tab.title, error));
+    return true;
+  }
+  Object.assign(args.aggregateUsage, nextAggregateUsage);
   args.pagePackages.push({
     pagePackage,
     tabId: args.tab.tabId as number,
@@ -118,6 +145,11 @@ export async function collectBatchPagePackages(args: {
 }) {
   const pagePackages: PopupExportBatchPackage[] = [];
   const errors: string[] = [];
+  const aggregateUsage: PopupBatchResourceUsage = {
+    decodedBytes: 0,
+    directoryNodes: 0,
+    entries: 0,
+  };
   const total = args.selectedTabs.length;
   for (let index = 0; index < total; index += 1) {
     const tab = args.selectedTabs[index];
@@ -143,7 +175,7 @@ export async function collectBatchPagePackages(args: {
         total,
       });
 
-      if (!handleBatchPackageResponse({ errors, pagePackages, response, tab })) {
+      if (!handleBatchPackageResponse({ aggregateUsage, errors, pagePackages, response, tab })) {
         return null;
       }
     } catch (error) {

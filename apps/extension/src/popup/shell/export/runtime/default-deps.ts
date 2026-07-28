@@ -177,8 +177,9 @@ export function getDefaultPopupExportRuntimeDeps(): PopupExportRuntimeDeps {
       sendPopupExportTabMessage(tabId, message) as Promise<PopupExportBuildPackageResponse>,
     sendSaveWebSnapshotMessage: (tabId, message) =>
       sendPopupExportTabMessage(tabId, message) as Promise<PopupExportSaveWebSnapshotResponse>,
-    sendCancelMessage: (tabId) =>
+    sendCancelMessage: (tabId, exportRunId) =>
       sendPopupExportTabMessage(tabId, {
+        exportRunId,
         type: MessageType.EXPORT_POPUP_CANCEL,
       }) as Promise<PopupExportCancelResponse>,
     sendStartMessage: (tabId, message) =>

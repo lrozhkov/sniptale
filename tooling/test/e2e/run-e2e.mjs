@@ -7,6 +7,7 @@ import { runObservedWrapper } from '../../qa/wrappers/observed/runner.mjs';
 const SUITES = {
   smoke: ['tooling/test/e2e/extension-smoke.spec.ts'],
   critical: [
+    'tooling/test/e2e/extension-critical-full-page.spec.ts',
     'tooling/test/e2e/extension-critical-highlighter-geometry.spec.ts',
     'tooling/test/e2e/extension-critical-media.spec.ts',
     'tooling/test/e2e/extension-critical-offscreen.spec.ts',
@@ -16,6 +17,7 @@ const SUITES = {
   ],
   all: [
     'tooling/test/e2e/extension-smoke.spec.ts',
+    'tooling/test/e2e/extension-critical-full-page.spec.ts',
     'tooling/test/e2e/extension-critical-highlighter-geometry.spec.ts',
     'tooling/test/e2e/extension-critical-media.spec.ts',
     'tooling/test/e2e/extension-critical-offscreen.spec.ts',

@@ -119,7 +119,16 @@ async function renderUtilityButtons() {
 async function renderCaptureButtons() {
   const { ToolbarCaptureButtons } = await import('./capture/options');
 
-  await renderNode(<ToolbarCaptureButtons onTakeScreenshot={() => undefined} />);
+  await renderNode(
+    <ToolbarCaptureButtons
+      compactMenus={false}
+      currentViewport={null}
+      displayMode="horizontal"
+      isLoading={false}
+      onTakeScreenshot={() => undefined}
+      toolbarMenuState={createClosedToolbarMenuState()}
+    />
+  );
 }
 
 function expectClearHighlightsTooltip() {
@@ -172,6 +181,7 @@ describe('toolbar static tooltips', () => {
     expect(buttons.map((button) => button.getAttribute('title'))).toEqual([
       'Снимок видимой области',
       'Снимок всей страницы',
+      'Параметры снимка всей страницы',
       'Выбрать область для снимка',
     ]);
     expect(buttons.every((button) => button.getAttribute('data-tooltip') === null)).toBe(true);

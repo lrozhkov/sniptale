@@ -1,58 +1,411 @@
 import { loadSettings } from '../../../composition/persistence/settings';
-import { blobToDataURL, loadImage } from '../download/index';
-import { getStitchDrawSpec, resolveCaptureBlobOptions } from './helpers';
-import { getPageDimensions } from '../page-state/index';
-import type { CapturePart, FullPageCaptureOptions } from './types';
+import type {
+  FullPageCaptureGeometry,
+  FullPageCaptureMetadata,
+  FullPageCaptureTileState,
+} from '../../../contracts/full-page-capture';
+import { blobToDataURL } from '../download';
+import {
+  assertFullPageGeometryBudget,
+  BYTES_PER_PIXEL,
+  MAX_RASTER_AREA_PX,
+  MAX_RASTER_SIDE_PX,
+  MAX_WORKING_SET_BYTES,
+  MIN_OUTPUT_SCALE,
+} from './budgets';
+import { resolveCaptureBlobOptions } from './helpers';
+import type { FullPageTilePlan } from './planner';
+import type { FullPageCaptureOptions } from './types';
 
-export async function stitchCaptureParts(
-  parts: CapturePart[],
-  devicePixelRatio: number,
-  tabId: number,
-  options: FullPageCaptureOptions
-) {
-  const { scrollWidth, scrollHeight } = await getPageDimensions(tabId);
-  const canvas = new OffscreenCanvas(scrollWidth, scrollHeight);
-  const ctx = canvas.getContext('2d')!;
+const MAX_ENCODED_BYTES = 64 * 1024 * 1024;
+const RETRY_TARGET_BYTES = 60 * 1024 * 1024;
 
-  for (const part of parts) {
-    const img = await loadImage(part.dataUrl);
-    const drawSpec = getStitchDrawSpec({
-      captureHeight: part.captureHeight,
-      devicePixelRatio,
-      imageHeight: img.height,
-      imageWidth: img.width,
-      offsetY: part.offsetY,
-    });
+type OutputCanvas = {
+  canvas: OffscreenCanvas;
+  context: OffscreenCanvasRenderingContext2D;
+  outputScale: number;
+};
 
-    ctx.drawImage(
-      img,
-      drawSpec.sourceX,
-      drawSpec.sourceY,
-      drawSpec.sourceWidth,
-      drawSpec.sourceHeight,
-      drawSpec.destX,
-      drawSpec.destY,
-      drawSpec.destWidth,
-      drawSpec.destHeight
-    );
+type NativeFrameSource = {
+  frameHeight: number;
+  frameWidth: number;
+  scale: number;
+};
+
+export type StreamingStitchResult = {
+  dataUrl: string;
+  metadata: FullPageCaptureMetadata;
+};
+
+type StreamingFullPageStitcher = {
+  drawFrame(
+    dataUrl: string,
+    plan: FullPageTilePlan,
+    state: FullPageCaptureTileState
+  ): Promise<void>;
+  finish(
+    options: FullPageCaptureOptions,
+    abortSignal?: AbortSignal | undefined
+  ): Promise<StreamingStitchResult>;
+};
+
+function throwIfStitchFinalizationAborted(signal?: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw signal.reason instanceof Error
+      ? signal.reason
+      : new Error('Full-page capture was cancelled');
   }
-
-  return createFullPageCaptureDataUrl(canvas, options);
 }
 
-async function createFullPageCaptureDataUrl(
-  canvas: OffscreenCanvas,
-  options: FullPageCaptureOptions
-) {
-  const { imageFormat, imageQuality } = await loadSettings();
-  const resolvedOptions = resolveCaptureBlobOptions({
-    imageFormat,
-    imageQuality,
+function resolveOutputScale(args: {
+  geometry: FullPageCaptureGeometry;
+  nativeScale: number;
+  tileWidth: number;
+  tileHeight: number;
+}): number {
+  const { geometry } = args;
+  assertFullPageGeometryBudget(geometry);
+  const dimensionScale = Math.min(
+    MAX_RASTER_SIDE_PX / geometry.outputWidth,
+    MAX_RASTER_SIDE_PX / geometry.outputHeight
+  );
+  const areaScale = Math.sqrt(
+    MAX_RASTER_AREA_PX / Math.max(1, geometry.outputWidth * geometry.outputHeight)
+  );
+  const tileBytes = args.tileWidth * args.tileHeight * BYTES_PER_PIXEL;
+  const availableCanvasBytes = MAX_WORKING_SET_BYTES - tileBytes;
+  const workingScale = Math.sqrt(
+    Math.max(0, availableCanvasBytes) /
+      Math.max(1, geometry.outputWidth * geometry.outputHeight * BYTES_PER_PIXEL)
+  );
+  const scale = Math.min(args.nativeScale, dimensionScale, areaScale, workingScale);
+  if (!Number.isFinite(scale) || scale < MIN_OUTPUT_SCALE) {
+    throw new Error('Full-page screenshot exceeds raster memory or dimension limits');
+  }
+  return scale;
+}
+
+function createOutputCanvas(geometry: FullPageCaptureGeometry, outputScale: number): OutputCanvas {
+  const width = Math.max(1, Math.floor(geometry.outputWidth * outputScale));
+  const height = Math.max(1, Math.floor(geometry.outputHeight * outputScale));
+  const canvas = new OffscreenCanvas(width, height);
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Unable to create full-page screenshot canvas');
+  return { canvas, context, outputScale };
+}
+
+async function decodeFrame(dataUrl: string): Promise<ImageBitmap> {
+  const response = await fetch(dataUrl);
+  if (!response.ok) throw new Error('Unable to decode full-page screenshot tile');
+  return createImageBitmap(await response.blob());
+}
+
+function assertScaleStable(
+  bitmap: ImageBitmap,
+  geometry: FullPageCaptureGeometry,
+  expectedSource: NativeFrameSource
+): void {
+  const requiredWidth = geometry.viewportWidth * expectedSource.scale;
+  const requiredHeight = geometry.viewportHeight * expectedSource.scale;
+  if (
+    Math.abs(bitmap.width - expectedSource.frameWidth) > 1 ||
+    Math.abs(bitmap.height - expectedSource.frameHeight) > 1 ||
+    bitmap.width + 1 < requiredWidth ||
+    bitmap.height + 1 < requiredHeight
+  ) {
+    throw new Error('Full-page screenshot scale changed during capture');
+  }
+}
+
+function drawDocumentTile(args: {
+  bitmap: ImageBitmap;
+  output: OutputCanvas;
+  plan: FullPageTilePlan;
+  state: FullPageCaptureTileState;
+  nativeSource: NativeFrameSource;
+}): void {
+  const geometry = args.state.geometry;
+  const insetX = args.plan.sourceInsetX;
+  const insetY = args.plan.sourceInsetY;
+  const cssWidth = Math.max(
+    0,
+    Math.min(
+      geometry.rootViewport.width - insetX,
+      geometry.extentWidth - args.state.actualX - insetX
+    )
+  );
+  const cssHeight = Math.max(
+    0,
+    Math.min(
+      geometry.rootViewport.height - insetY,
+      geometry.extentHeight - args.state.actualY - insetY
+    )
+  );
+  if (cssWidth <= 0 || cssHeight <= 0) return;
+  args.output.context.drawImage(
+    args.bitmap,
+    insetX * args.nativeSource.scale,
+    insetY * args.nativeSource.scale,
+    cssWidth * args.nativeSource.scale,
+    cssHeight * args.nativeSource.scale,
+    (args.state.actualX + insetX) * args.output.outputScale,
+    (args.state.actualY + insetY) * args.output.outputScale,
+    cssWidth * args.output.outputScale,
+    cssHeight * args.output.outputScale
+  );
+}
+
+function drawInternalScrollerTile(args: {
+  bitmap: ImageBitmap;
+  firstFrame: boolean;
+  output: OutputCanvas;
+  plan: FullPageTilePlan;
+  state: FullPageCaptureTileState;
+  nativeSource: NativeFrameSource;
+}): void {
+  const geometry = args.state.geometry;
+  if (args.firstFrame) {
+    drawInternalScrollerShell(args.bitmap, args.output, geometry, args.nativeSource);
+  }
+  const viewport = geometry.rootViewport;
+  const insetX = args.plan.sourceInsetX;
+  const insetY = args.plan.sourceInsetY;
+  const cssWidth = Math.max(
+    0,
+    Math.min(viewport.width - insetX, geometry.extentWidth - args.state.actualX - insetX)
+  );
+  const cssHeight = Math.max(
+    0,
+    Math.min(viewport.height - insetY, geometry.extentHeight - args.state.actualY - insetY)
+  );
+  if (cssWidth <= 0 || cssHeight <= 0) return;
+  args.output.context.drawImage(
+    args.bitmap,
+    (viewport.x + insetX) * args.nativeSource.scale,
+    (viewport.y + insetY) * args.nativeSource.scale,
+    cssWidth * args.nativeSource.scale,
+    cssHeight * args.nativeSource.scale,
+    (viewport.x + args.state.actualX + insetX) * args.output.outputScale,
+    (viewport.y + args.state.actualY + insetY) * args.output.outputScale,
+    cssWidth * args.output.outputScale,
+    cssHeight * args.output.outputScale
+  );
+}
+
+function drawInternalScrollerShell(
+  bitmap: ImageBitmap,
+  output: OutputCanvas,
+  geometry: FullPageCaptureGeometry,
+  nativeSource: NativeFrameSource
+): void {
+  const viewport = geometry.rootViewport;
+  const rightWidth = Math.max(0, geometry.viewportWidth - viewport.x - viewport.width);
+  const bottomHeight = Math.max(0, geometry.viewportHeight - viewport.y - viewport.height);
+  const drawSlice = (
+    sourceX: number,
+    sourceY: number,
+    width: number,
+    height: number,
+    destinationX: number,
+    destinationY: number
+  ) => {
+    if (width <= 0 || height <= 0) return;
+    output.context.drawImage(
+      bitmap,
+      sourceX * nativeSource.scale,
+      sourceY * nativeSource.scale,
+      width * nativeSource.scale,
+      height * nativeSource.scale,
+      destinationX * output.outputScale,
+      destinationY * output.outputScale,
+      width * output.outputScale,
+      height * output.outputScale
+    );
+  };
+  drawSlice(0, 0, geometry.viewportWidth, viewport.y, 0, 0);
+  drawSlice(
+    0,
+    viewport.y + viewport.height,
+    geometry.viewportWidth,
+    bottomHeight,
+    0,
+    viewport.y + geometry.extentHeight
+  );
+  drawSlice(0, viewport.y, viewport.x, viewport.height, 0, viewport.y);
+  drawSlice(
+    viewport.x + viewport.width,
+    viewport.y,
+    rightWidth,
+    viewport.height,
+    viewport.x + geometry.extentWidth,
+    viewport.y
+  );
+}
+
+async function encodeCanvas(
+  output: OutputCanvas,
+  options: FullPageCaptureOptions,
+  abortSignal?: AbortSignal | undefined
+): Promise<{ blob: Blob; format: 'png' | 'jpeg' | 'webp' }> {
+  throwIfStitchFinalizationAborted(abortSignal);
+  const settings = await loadSettings();
+  throwIfStitchFinalizationAborted(abortSignal);
+  const resolved = resolveCaptureBlobOptions({
+    imageFormat: settings.imageFormat,
+    imageQuality: settings.imageQuality,
     options,
   });
-  const blob = await canvas.convertToBlob({
-    type: resolvedOptions.type,
-    quality: resolvedOptions.quality,
+  const blob = await output.canvas.convertToBlob({
+    type: resolved.type,
+    quality: resolved.quality,
   });
-  return blobToDataURL(blob);
+  throwIfStitchFinalizationAborted(abortSignal);
+  return {
+    blob,
+    format: resolved.format,
+  };
+}
+
+async function downscaleOversizedEncoding(args: {
+  blob: Blob;
+  format: 'png' | 'jpeg' | 'webp';
+  output: OutputCanvas;
+  options: FullPageCaptureOptions;
+  abortSignal?: AbortSignal | undefined;
+}): Promise<{ blob: Blob; output: OutputCanvas }> {
+  throwIfStitchFinalizationAborted(args.abortSignal);
+  if (args.blob.size <= MAX_ENCODED_BYTES) return { blob: args.blob, output: args.output };
+  const requestedRatio = Math.min(0.9, Math.sqrt(RETRY_TARGET_BYTES / args.blob.size));
+  const nextScale = Math.max(MIN_OUTPUT_SCALE, args.output.outputScale * requestedRatio);
+  if (nextScale >= args.output.outputScale) {
+    throw new Error('Encoded full-page screenshot exceeds the 64 MiB limit');
+  }
+  const ratio = nextScale / args.output.outputScale;
+  const oldCanvasBytes = args.output.canvas.width * args.output.canvas.height * BYTES_PER_PIXEL;
+  const nextCanvasBytes =
+    Math.floor(args.output.canvas.width * ratio) *
+    Math.floor(args.output.canvas.height * ratio) *
+    BYTES_PER_PIXEL;
+  if (oldCanvasBytes + nextCanvasBytes > MAX_WORKING_SET_BYTES) {
+    throw new Error('Full-page screenshot downscale exceeds the working-set limit');
+  }
+  const nextCanvas = new OffscreenCanvas(
+    Math.max(1, Math.floor(args.output.canvas.width * ratio)),
+    Math.max(1, Math.floor(args.output.canvas.height * ratio))
+  );
+  const nextContext = nextCanvas.getContext('2d');
+  if (!nextContext) throw new Error('Unable to create downscaled screenshot canvas');
+  nextContext.drawImage(
+    args.output.canvas,
+    0,
+    0,
+    args.output.canvas.width,
+    args.output.canvas.height,
+    0,
+    0,
+    nextCanvas.width,
+    nextCanvas.height
+  );
+  const nextOutput = { canvas: nextCanvas, context: nextContext, outputScale: nextScale };
+  const encoded = await encodeCanvas(nextOutput, args.options, args.abortSignal);
+  throwIfStitchFinalizationAborted(args.abortSignal);
+  if (encoded.blob.size > MAX_ENCODED_BYTES) {
+    throw new Error('Encoded full-page screenshot exceeds the 64 MiB limit');
+  }
+  return { blob: encoded.blob, output: nextOutput };
+}
+
+export async function createStreamingFullPageStitcher(args: {
+  firstFrameDataUrl: string;
+  geometry: FullPageCaptureGeometry;
+  frozenExtentWarning: boolean;
+  warnings: string[];
+}): Promise<StreamingFullPageStitcher> {
+  const firstBitmap = await decodeFrame(args.firstFrameDataUrl);
+  const nativeScale = args.geometry.devicePixelRatio;
+  const requiredFrameWidth = args.geometry.viewportWidth * nativeScale;
+  const requiredFrameHeight = args.geometry.viewportHeight * nativeScale;
+  if (
+    !Number.isFinite(nativeScale) ||
+    nativeScale <= 0 ||
+    firstBitmap.width + 1 < requiredFrameWidth ||
+    firstBitmap.height + 1 < requiredFrameHeight
+  ) {
+    firstBitmap.close();
+    throw new Error('Full-page screenshot tile does not cover the prepared viewport');
+  }
+  const nativeSource: NativeFrameSource = {
+    frameHeight: firstBitmap.height,
+    frameWidth: firstBitmap.width,
+    scale: nativeScale,
+  };
+  let output: OutputCanvas;
+  try {
+    output = createOutputCanvas(
+      args.geometry,
+      resolveOutputScale({
+        geometry: args.geometry,
+        nativeScale,
+        tileHeight: firstBitmap.height,
+        tileWidth: firstBitmap.width,
+      })
+    );
+  } catch (error) {
+    firstBitmap.close();
+    throw error;
+  }
+  let frameCount = 0;
+  let firstPending: ImageBitmap | null = firstBitmap;
+  let frozenExtentWarning = args.frozenExtentWarning;
+
+  return {
+    async drawFrame(dataUrl, plan, state) {
+      const bitmap = firstPending ?? (await decodeFrame(dataUrl));
+      firstPending = null;
+      try {
+        assertScaleStable(bitmap, state.geometry, nativeSource);
+        frozenExtentWarning ||= state.frozenExtentWarning;
+        const drawArgs = { bitmap, nativeSource, output, plan, state };
+        if (state.geometry.rootKind === 'element') {
+          drawInternalScrollerTile({ ...drawArgs, firstFrame: frameCount === 0 });
+        } else {
+          drawDocumentTile(drawArgs);
+        }
+        frameCount += 1;
+      } finally {
+        bitmap.close();
+      }
+    },
+    async finish(options, abortSignal) {
+      if (firstPending) {
+        firstPending.close();
+        throw new Error('Full-page screenshot produced no tiles');
+      }
+      throwIfStitchFinalizationAborted(abortSignal);
+      const encoded = await encodeCanvas(output, options, abortSignal);
+      const finalized = await downscaleOversizedEncoding({
+        ...encoded,
+        abortSignal,
+        options,
+        output,
+      });
+      throwIfStitchFinalizationAborted(abortSignal);
+      const metadata: FullPageCaptureMetadata = {
+        cssHeight: args.geometry.outputHeight,
+        cssWidth: args.geometry.outputWidth,
+        downscaled: finalized.output.outputScale < nativeScale,
+        frozenExtentWarning,
+        outputHeight: finalized.output.canvas.height,
+        outputScale: finalized.output.outputScale,
+        outputWidth: finalized.output.canvas.width,
+        warnings: [
+          ...args.warnings,
+          ...(frozenExtentWarning ? ['Page extent grew after capture was frozen'] : []),
+        ],
+      };
+      const dataUrl = await blobToDataURL(finalized.blob);
+      throwIfStitchFinalizationAborted(abortSignal);
+      return { dataUrl, metadata };
+    },
+  };
 }

@@ -49,6 +49,7 @@ export function applySelectionToolbarButtonChrome(
   }
   button.classList.add('sniptale-glass-toolbar-button');
   button.classList.remove('sniptale-glass-toolbar-button--active');
+  button.classList.remove('sniptale-split-action-start', 'sniptale-split-action-end');
   delete button.dataset['active'];
 
   if (options.labelled) {
@@ -59,11 +60,11 @@ export function applySelectionToolbarButtonChrome(
   }
 
   if (options.split === 'start') {
-    button.style.borderRadius = 'var(--sniptale-radius-md) 0 0 var(--sniptale-radius-md)';
+    button.classList.add('sniptale-split-action-start');
   } else if (options.split === 'end') {
     button.style.width = '28px';
     button.style.minWidth = '28px';
-    button.style.borderRadius = '0 var(--sniptale-radius-md) var(--sniptale-radius-md) 0';
+    button.classList.add('sniptale-split-action-end');
   } else {
     button.style.borderRadius = 'var(--sniptale-radius-md)';
   }

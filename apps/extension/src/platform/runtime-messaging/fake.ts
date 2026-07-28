@@ -15,6 +15,7 @@ import type {
   TabResponseByType,
 } from '../../contracts/messaging/tab';
 import type { RuntimeMessagingTransport } from './transport';
+import type { TabMessageTarget } from './transport';
 
 type RuntimeHandler<TType extends RuntimeMessageType> = (
   message: RuntimeRequestByType[TType],
@@ -47,7 +48,11 @@ function validateTabRequest<TMessage extends TabRequestByType[TabMessageType]>(
  */
 export class FakeRuntimeMessagingTransport implements RuntimeMessagingTransport {
   readonly runtimeRequests: Array<RuntimeRequestByType[RuntimeMessageType]> = [];
-  readonly tabRequests: Array<{ tabId: number; message: TabRequestByType[TabMessageType] }> = [];
+  readonly tabRequests: Array<{
+    tabId: number;
+    message: TabRequestByType[TabMessageType];
+    target?: TabMessageTarget;
+  }> = [];
 
   private readonly runtimeHandlers = new Map<
     RuntimeMessageType,
@@ -78,10 +83,16 @@ export class FakeRuntimeMessagingTransport implements RuntimeMessagingTransport 
 
   async sendTabMessage<TMessage extends TabRequestByType[TabMessageType]>(
     tabId: number,
-    message: TMessage
+    message: TMessage,
+    target?: TabMessageTarget
   ): Promise<TabResponseByType[TMessage['type']]> {
     const parsedMessage = validateTabRequest(message);
-    const index = this.tabRequests.push({ tabId, message: parsedMessage }) - 1;
+    const index =
+      this.tabRequests.push({
+        tabId,
+        message: parsedMessage,
+        ...(target === undefined ? {} : { target }),
+      }) - 1;
     const handler = this.tabHandlers.get(parsedMessage.type);
     const rawResponse = handler ? await handler(parsedMessage, tabId, index) : undefined;
     return parseTabResponseForRequest(parsedMessage, rawResponse);

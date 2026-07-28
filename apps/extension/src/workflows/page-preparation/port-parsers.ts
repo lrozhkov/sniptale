@@ -84,7 +84,10 @@ function parsePopupExportRequest(request: unknown): ViewerPopupExportMessage | n
   }
 
   if (request['type'] === MessageType.EXPORT_POPUP_BUILD_PACKAGE) {
-    return { type: MessageType.EXPORT_POPUP_BUILD_PACKAGE, options };
+    const batchRequestId = request['batchRequestId'];
+    return isString(batchRequestId)
+      ? { type: MessageType.EXPORT_POPUP_BUILD_PACKAGE, batchRequestId, options }
+      : null;
   }
 
   const requestId = request['requestId'];

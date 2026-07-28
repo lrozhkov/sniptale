@@ -161,6 +161,28 @@ it('rejects forged trusted-content-event requests without a background proof', (
   expect(sendResponse).not.toHaveBeenCalled();
 });
 
+it('does not expose unattended full-page export through trusted content activation', () => {
+  const sender = contentSender();
+  const sendResponse = vi.fn();
+
+  routeContentPrivilegedActionRuntimeTokenRequest(
+    {
+      activationProof: issueContentActionActivationKeyForTest(sender),
+      actionType: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+      requestId: 'unattended-request-1',
+      type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_RUNTIME_TOKEN,
+    },
+    sender,
+    sendResponse,
+    resolveContentSenderBindingForTest(sender)
+  );
+
+  expect(sendResponse.mock.calls[0]?.[0]).toMatchObject({
+    error: 'Unauthorized content action activation proof',
+    success: false,
+  });
+});
+
 it('requires a fresh one-shot trusted-event proof for capability issuance', () => {
   const proof = requestTrustedEventProof({
     actionType: CaptureMessageType.CAPTURE_VISIBLE,

@@ -155,6 +155,12 @@
       "mode": "test-e2e"
     },
     {
+      "outputPath": "tooling/test/harness/full-page-capture.html",
+      "sourcePath": "tooling/test/harness/full-page-capture.html",
+      "rollupName": "testHarnessFullPageCapture",
+      "mode": "test-e2e"
+    },
+    {
       "outputPath": "tooling/test/harness/preview-audio-diagnostic.html",
       "sourcePath": "tooling/test/harness/preview-audio-diagnostic.html",
       "rollupName": "testHarnessPreviewAudioDiagnostic",

@@ -47,6 +47,7 @@ export async function executeInjectedWebSnapshotContentExport(args: {
   allowAnonymousCrossOriginAssets: boolean;
   allowAuthenticatedSameOriginAssets: boolean;
   contentIntentGrant?: InjectedWebSnapshotSaveRequest['contentIntentGrant'];
+  fullPageCaptureAction?: InjectedWebSnapshotSaveRequest['fullPageCaptureAction'];
   requestId: string;
   resolvedTabId: number;
 }): Promise<unknown> {
@@ -63,6 +64,9 @@ export async function executeInjectedWebSnapshotContentExport(args: {
       ...(args.contentIntentGrant === undefined
         ? {}
         : { contentIntentGrant: args.contentIntentGrant }),
+      ...(args.fullPageCaptureAction === undefined
+        ? {}
+        : { fullPageCaptureAction: args.fullPageCaptureAction }),
       requestId: args.requestId,
     },
     stateKey: INJECTED_WEB_SNAPSHOT_RUNNER_STATE_KEY,

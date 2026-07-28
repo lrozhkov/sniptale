@@ -1,5 +1,10 @@
 import type { CaptureActionType } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../features/viewport-presets/contracts';
+import type { FullPageCapturePreferences } from '../full-page-capture';
+export type {
+  FullPageCapturePreferences,
+  FullPageFloatingElementsMode,
+} from '../full-page-capture';
 export type { CaptureActionType } from '@sniptale/runtime-contracts/capture/action';
 export type {
   SystemViewportPreset,
@@ -64,11 +69,16 @@ export interface Settings {
   anonymousCrossOriginSnapshotAssetsEnabled: boolean;
   skipWebSnapshotSaveDisclosure: boolean;
   rawDiagnosticsEnabled: boolean;
+  fullPageCapture?: FullPageCapturePreferences;
 }
 
-export type SettingsPatch = Omit<Partial<Settings>, 'contentToolbar' | 'contextMenu'> & {
+export type SettingsPatch = Omit<
+  Partial<Settings>,
+  'contentToolbar' | 'contextMenu' | 'fullPageCapture'
+> & {
   contentToolbar?: Partial<ContentToolbarPreferences>;
   contextMenu?: Partial<ContextMenuSettings>;
+  fullPageCapture?: Partial<FullPageCapturePreferences>;
 };
 
 export type AIConnectionType = 'chrome-built-in' | 'openai-compatible';

@@ -2,6 +2,7 @@ import type {
   CaptureActionType,
   ContentToolbarDisplayMode,
   ContentToolbarPreferences,
+  FullPageCapturePreferences,
   Settings,
 } from '../../../contracts/settings';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
@@ -115,6 +116,30 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
   };
 }
 
+function parseOptionalFullPageCapture(
+  value: unknown
+): ParsedFieldValue<FullPageCapturePreferences> {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!isRecord(value)) {
+    return INVALID_FIELD;
+  }
+  const floatingElements = value['floatingElements'];
+  if (
+    (floatingElements !== 'hide' && floatingElements !== 'once' && floatingElements !== 'repeat') ||
+    !isBoolean(value['freezeMotion']) ||
+    !isBoolean(value['preloadLazyContent'])
+  ) {
+    return INVALID_FIELD;
+  }
+  return {
+    floatingElements,
+    freezeMotion: value['freezeMotion'],
+    preloadLazyContent: value['preloadLazyContent'],
+  };
+}
+
 function assignParsedSettingsField<TKey extends keyof Settings>(
   target: Partial<Settings>,
   key: TKey,
@@ -201,6 +226,11 @@ function parseScalarSettingsFields(
     nextValue,
     'contentToolbar',
     parseOptionalContentToolbar(value['contentToolbar'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'fullPageCapture',
+    parseOptionalFullPageCapture(value['fullPageCapture'])
   );
   invalidFieldCount += assignParsedContextMenuSettings(nextValue, value['contextMenu']);
   invalidFieldCount += assignParsedSettingsField(

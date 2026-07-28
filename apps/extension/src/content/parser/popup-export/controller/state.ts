@@ -8,6 +8,7 @@ export function createPopupExportState(): PopupExportState {
 }
 
 export function resetPopupExportState(state: PopupExportState): void {
+  delete state.activeAbortController;
   state.activeExportRequestId = null;
   state.isExportRunning = false;
 }

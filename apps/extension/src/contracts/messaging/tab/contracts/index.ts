@@ -3,6 +3,7 @@ import type { TabRequestByType, TabResponseByType } from '../index';
 import { tabPageStyleMessageContracts } from './page-style';
 import { tabUiMessageContracts } from './ui';
 import { tabVideoMessageContracts } from './video';
+import { tabFullPageCaptureMessageContracts } from './full-page-capture';
 
 const defineTabMessageRegistry = defineMessageContractRegistry<
   TabRequestByType,
@@ -13,4 +14,5 @@ export const tabMessageContracts = defineTabMessageRegistry({
   ...tabUiMessageContracts,
   ...tabVideoMessageContracts,
   ...tabPageStyleMessageContracts,
+  ...tabFullPageCaptureMessageContracts,
 });

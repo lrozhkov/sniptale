@@ -54,7 +54,6 @@ export async function prepareWindowSize(
   height: number
 ): Promise<{ prior: WindowSnapshot; expected: WindowSnapshot }> {
   const { snapshot: prior, workArea } = await getWindowWorkArea(windowId);
-  if (prior.state !== 'normal') throw new Error('window-not-normal');
   if (!doesSizeFit(workArea, width, height)) throw new Error('window-too-large');
   const position = clampWindowPosition(workArea, { ...prior, width, height });
   return {
@@ -69,7 +68,9 @@ export async function applyPreparedWindowSize(
   expected: WindowSnapshot
 ): Promise<WindowSnapshot> {
   try {
-    if (prior.state !== 'normal') throw new Error('window-not-normal');
+    if (prior.state !== 'normal') {
+      await browserWindows.update(windowId, { state: 'normal' });
+    }
     await browserWindows.update(windowId, {
       left: expected.left,
       top: expected.top,

@@ -120,10 +120,7 @@ describe('capture-surface availability', () => {
     });
     await expect(
       service.getAvailability({ tabId: 7, presetId: windowPreset.id, context: 'screenshot' })
-    ).resolves.toMatchObject({
-      status: 'unavailable',
-      reason: 'window-not-normal',
-    });
+    ).resolves.toMatchObject({ status: 'available', target: 'window' });
   });
 
   it('reports missing, disabled, unsupported-tab, and platform failures as typed availability', async () => {

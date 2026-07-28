@@ -6,7 +6,10 @@ export {
 export { markPreauthorizedGalleryUpdateRouteMessage } from './routing/authorization/gallery-update';
 export { consumeGalleryImageUpdateCapability } from './routing/gallery-update-capabilities';
 export { routePopupExportArchiveMessage } from './popup-export/archive-route';
-export { authorizeWebSnapshotCaptureRequest } from './routing/web-snapshot/session';
+export {
+  authorizeWebSnapshotCaptureRequest,
+  cancelWebSnapshotCaptureRequest,
+} from './routing/web-snapshot/session';
 export {
   disablePreparationByCapability,
   enablePreparationByCapability,

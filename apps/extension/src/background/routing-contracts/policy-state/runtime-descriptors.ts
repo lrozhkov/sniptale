@@ -55,6 +55,26 @@ export const runtimePolicyStateDescriptors = [
     storageClass: 'browser-session-storage',
   },
   {
+    authorityFamily: 'full-page-capture-session',
+    failClosedOnRestart: false,
+    id: 'full-page-capture-leases',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/background/capture/full-page/session-lease.ts',
+    proofModules: [
+      'apps/extension/src/background/capture/full-page/session-lease.test.ts',
+      'apps/extension/src/background/capture/full-page/lifecycle.test.ts',
+    ],
+    requiresTtl: true,
+    restartBehavior: [
+      'Session storage keeps the active job and document binding for startup reconciliation;',
+      'new work fails closed behind an unexpired lease and interrupted page state is restored best-effort.',
+    ].join(' '),
+    restartClass: 'durable-lease',
+    stateClass: 'runtime-state',
+    storageClass: 'browser-session-storage',
+    ttlMs: 30_000,
+  },
+  {
     authorityFamily: 'diagnostics-erasure-authority',
     failClosedOnRestart: false,
     id: 'diagnostics-erasure-exclusion',

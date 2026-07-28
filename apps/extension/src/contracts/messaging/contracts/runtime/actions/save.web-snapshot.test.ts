@@ -107,6 +107,24 @@ it('parses staged web snapshot blob chunk messages and responses', () => {
   ).toThrow('runtime STAGE_WEB_SNAPSHOT_BLOB_CHUNK message');
 });
 
+it('parses owner-bound staged web snapshot release messages', () => {
+  const contract =
+    runtimeActionWebSnapshotSaveMessageContracts[MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS];
+  const request = {
+    snapshotSessionId: 'snapshot-session-1',
+    type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
+  };
+
+  expect(contract.parseRequest(request)).toEqual(request);
+  expect(contract.parseResponse({ success: true, result: 'released' })).toEqual({
+    result: 'released',
+    success: true,
+  });
+  expect(() => contract.parseRequest({ ...request, snapshotSessionId: '../other' })).toThrow(
+    'runtime RELEASE_WEB_SNAPSHOT_STAGED_BLOBS message'
+  );
+});
+
 it('parses registered web snapshot asset fetch messages and responses', () => {
   const fetchContract =
     runtimeActionWebSnapshotSaveMessageContracts[MessageType.FETCH_WEB_SNAPSHOT_ASSET];

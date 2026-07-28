@@ -6,6 +6,7 @@ import type {
   ExportResult,
 } from '@sniptale/runtime-contracts/export';
 import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
+import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
 import type { PageSnapshotSource } from '../../page-snapshot/source';
 import { getExportErrorMessage } from './runtime';
 import { runExportManagerPackagePipeline, runExportManagerPipeline } from './pipeline';
@@ -19,6 +20,7 @@ import {
 
 type ExportManagerRunContext = {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+  fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
 };
 
 interface ExportManagerService {
@@ -75,6 +77,7 @@ function createExportContentRunner(
     try {
       const result = await runExportManagerPipeline(state, options, warnings, {
         contentIntentSource: context.contentIntentSource,
+        fullPageCaptureIdentity: context.fullPageCaptureIdentity,
         snapshotSource: resolveServiceSnapshotSource(deps),
       });
       return { success: true, ...result, errors: warnings };
@@ -104,6 +107,7 @@ function createBuildPackageRunner(
     try {
       const result = await runExportManagerPackagePipeline(state, options, warnings, {
         contentIntentSource: context.contentIntentSource,
+        fullPageCaptureIdentity: context.fullPageCaptureIdentity,
         snapshotSource: resolveServiceSnapshotSource(deps),
       });
       return result.pagePackage;

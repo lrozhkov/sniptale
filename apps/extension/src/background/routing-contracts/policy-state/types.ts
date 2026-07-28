@@ -2,6 +2,7 @@ export type PolicyStateId =
   | 'ai-settings-mutation-queue'
   | 'ai-secret-unlock-requests'
   | 'capture-download-jobs'
+  | 'full-page-capture-leases'
   | 'capture-surface-leases'
   | 'content-action-activation-keys'
   | 'content-action-auto-start-grants'

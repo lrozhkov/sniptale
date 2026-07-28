@@ -36,6 +36,11 @@ describe('settings guards valid payload coverage', () => {
           showSettings: false,
         },
         rawDiagnosticsEnabled: true,
+        fullPageCapture: {
+          floatingElements: 'hide',
+          freezeMotion: false,
+          preloadLazyContent: true,
+        },
       })
     ).toMatchObject({
       hasInvalidRoot: false,
@@ -55,6 +60,11 @@ describe('settings guards valid payload coverage', () => {
           showSettings: false,
         },
         rawDiagnosticsEnabled: true,
+        fullPageCapture: {
+          floatingElements: 'hide',
+          freezeMotion: false,
+          preloadLazyContent: true,
+        },
       },
     });
   });
@@ -91,5 +101,22 @@ describe('settings guards invalid payload coverage', () => {
       hasInvalidRoot: false,
       value: {},
     });
+  });
+
+  it('rejects a partial or malformed persisted full-page preference object atomically', () => {
+    expect(
+      parseStoredSettings({
+        fullPageCapture: { floatingElements: 'once', freezeMotion: true },
+      })
+    ).toMatchObject({ hasInvalidRoot: false, value: {} });
+    expect(
+      parseStoredSettings({
+        fullPageCapture: {
+          floatingElements: 'all',
+          freezeMotion: true,
+          preloadLazyContent: true,
+        },
+      })
+    ).toMatchObject({ hasInvalidRoot: false, value: {} });
   });
 });

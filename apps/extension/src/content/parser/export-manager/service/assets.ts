@@ -1,5 +1,6 @@
 import type { ExportOptions } from '@sniptale/runtime-contracts/export';
 import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
+import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
 import type { PreparedDOMTreeSnapshot } from '../../dom-tree-parser/snapshot';
 import {
   collectAdvancedLogAssets,
@@ -29,6 +30,7 @@ export function finishExportSuccess(
 
 export async function collectExportExtraAssets(args: {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+  fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
   downloadedFilesCount: number;
   options: ExportOptions;
   snapshot: PreparedDOMTreeSnapshot;
@@ -42,6 +44,7 @@ export async function collectExportExtraAssets(args: {
   args.throwIfCancelled();
   const extraAssets = await captureOptionalArchiveAssets({
     contentIntentSource: args.contentIntentSource,
+    fullPageCaptureIdentity: args.fullPageCaptureIdentity,
     options: args.options,
     updateProgress: (progress) => updateExportManagerProgress(args.state, progress),
     warnings: args.warnings,

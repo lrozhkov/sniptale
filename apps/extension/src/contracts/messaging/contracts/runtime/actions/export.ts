@@ -123,7 +123,12 @@ export const runtimeActionExportMessageContracts = {
       'runtime EXPORT_POPUP_BUILD_PACKAGE message',
       createMessageGuard({
         type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
-        required: { tabId: isNumber, options: isExportOptions, ...popupTabRouteCapabilityFields },
+        required: {
+          batchRequestId: isString,
+          tabId: isNumber,
+          options: isExportOptions,
+          ...popupTabRouteCapabilityFields,
+        },
       })
     ),
     parseResponse: createGuardParser(
@@ -155,7 +160,11 @@ export const runtimeActionExportMessageContracts = {
       'runtime EXPORT_POPUP_CANCEL message',
       createMessageGuard({
         type: MessageType.EXPORT_POPUP_CANCEL,
-        required: { tabId: isNumber, ...popupTabRouteCapabilityFields },
+        required: {
+          exportRunId: isString,
+          tabId: isNumber,
+          ...popupTabRouteCapabilityFields,
+        },
       })
     ),
     parseResponse: createGuardParser(

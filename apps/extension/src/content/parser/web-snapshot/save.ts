@@ -19,56 +19,160 @@ function createWebSnapshotStageError(stage: string, error: unknown): Error {
   return new Error(`${stage}: ${message}`);
 }
 
-async function runWebSnapshotStage<T>(stage: string, work: () => Promise<T>): Promise<T> {
+function throwIfWebSnapshotSaveAborted(signal?: AbortSignal | undefined): void {
+  if (!signal?.aborted) return;
+  throw signal.reason instanceof Error
+    ? signal.reason
+    : new Error('Web snapshot save was cancelled');
+}
+
+async function runWebSnapshotStage<T>(
+  stage: string,
+  work: () => Promise<T>,
+  abortSignal?: AbortSignal | undefined
+): Promise<T> {
+  throwIfWebSnapshotSaveAborted(abortSignal);
   try {
-    return await work();
+    const result = await work();
+    throwIfWebSnapshotSaveAborted(abortSignal);
+    return result;
   } catch (error) {
+    throwIfWebSnapshotSaveAborted(abortSignal);
     throw createWebSnapshotStageError(stage, error);
   }
 }
 
-async function saveStagedWebSnapshot(snapshot: WebSnapshotBuildResult) {
-  const [packageStagedBlobId, screenshotStagedBlobId] = await Promise.all([
-    runWebSnapshotStage('stage web snapshot package', () =>
-      stageWebSnapshotBlobForGallery({
-        blob: snapshot.packageBlob,
-        blobKind: 'package',
-        snapshotSessionId: snapshot.snapshotSessionId,
-      })
-    ),
-    runWebSnapshotStage('stage web snapshot screenshot', () =>
-      stageWebSnapshotBlobForGallery({
-        blob: snapshot.screenshotBlob,
-        blobKind: 'screenshot',
-        snapshotSessionId: snapshot.snapshotSessionId,
-      })
-    ),
-  ]);
-  return runWebSnapshotStage('save web snapshot to gallery', () =>
-    getContentRuntimeServices().messaging.sendRuntimeMessage({
-      manifest: snapshot.manifest,
-      packageStagedBlobId,
-      screenshotMimeType: snapshot.screenshotMimeType,
-      screenshotStagedBlobId,
-      snapshotSessionId: snapshot.snapshotSessionId,
-      type: MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY,
-    })
+function createLinkedWebSnapshotStageAbortController(externalSignal?: AbortSignal | undefined) {
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort(externalSignal?.reason);
+  if (externalSignal?.aborted) {
+    forwardAbort();
+  } else {
+    externalSignal?.addEventListener('abort', forwardAbort, { once: true });
+  }
+  return {
+    controller,
+    release: () => externalSignal?.removeEventListener('abort', forwardAbort),
+  };
+}
+
+async function stageWebSnapshotPayloads(
+  snapshot: WebSnapshotBuildResult,
+  externalSignal?: AbortSignal | undefined
+): Promise<[packageStagedBlobId: string, screenshotStagedBlobId: string]> {
+  const linkedAbort = createLinkedWebSnapshotStageAbortController(externalSignal);
+  const abortOnFailure = async <T>(work: Promise<T>): Promise<T> => {
+    try {
+      return await work;
+    } catch (error) {
+      if (!linkedAbort.controller.signal.aborted) {
+        linkedAbort.controller.abort(error);
+      }
+      throw error;
+    }
+  };
+  const packageStage = abortOnFailure(
+    runWebSnapshotStage(
+      'stage web snapshot package',
+      () =>
+        stageWebSnapshotBlobForGallery({
+          abortSignal: linkedAbort.controller.signal,
+          blob: snapshot.packageBlob,
+          blobKind: 'package',
+          snapshotSessionId: snapshot.snapshotSessionId,
+        }),
+      linkedAbort.controller.signal
+    )
   );
+  const screenshotStage = abortOnFailure(
+    runWebSnapshotStage(
+      'stage web snapshot screenshot',
+      () =>
+        stageWebSnapshotBlobForGallery({
+          abortSignal: linkedAbort.controller.signal,
+          blob: snapshot.screenshotBlob,
+          blobKind: 'screenshot',
+          snapshotSessionId: snapshot.snapshotSessionId,
+        }),
+      linkedAbort.controller.signal
+    )
+  );
+  const [packageResult, screenshotResult] = await Promise.allSettled([
+    packageStage,
+    screenshotStage,
+  ]);
+  linkedAbort.release();
+  if (packageResult.status === 'rejected') throw packageResult.reason;
+  if (screenshotResult.status === 'rejected') throw screenshotResult.reason;
+  return [packageResult.value, screenshotResult.value];
+}
+
+async function saveStagedWebSnapshot(
+  snapshot: WebSnapshotBuildResult,
+  abortSignal?: AbortSignal | undefined
+) {
+  try {
+    const [packageStagedBlobId, screenshotStagedBlobId] = await stageWebSnapshotPayloads(
+      snapshot,
+      abortSignal
+    );
+    throwIfWebSnapshotSaveAborted(abortSignal);
+    return await runWebSnapshotStage(
+      'save web snapshot to gallery',
+      () =>
+        getContentRuntimeServices().messaging.sendRuntimeMessage({
+          manifest: snapshot.manifest,
+          packageStagedBlobId,
+          screenshotMimeType: snapshot.screenshotMimeType,
+          screenshotStagedBlobId,
+          snapshotSessionId: snapshot.snapshotSessionId,
+          type: MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY,
+        }),
+      abortSignal
+    );
+  } catch (error) {
+    try {
+      const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
+        snapshotSessionId: snapshot.snapshotSessionId,
+        type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
+      });
+      if (response.success !== true) {
+        throw new Error(response.error || 'Failed to release staged web snapshot payloads.');
+      }
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'Web snapshot staging and rollback failed');
+    }
+    throw error;
+  }
 }
 
 export async function saveCurrentPageWebSnapshot(
-  request: ContentWebSnapshotSaveRequest
+  request: ContentWebSnapshotSaveRequest & { abortSignal?: AbortSignal | undefined }
 ): Promise<ContentWebSnapshotSaveResponse> {
   const contentIntentSource = request.contentIntentGrant
     ? createBackgroundAutoStartContentActionIntentSource(request.contentIntentGrant.grantToken)
     : undefined;
-  const snapshot = await runWebSnapshotStage('build web snapshot package', () =>
-    buildCurrentPageWebSnapshot({
-      ...request,
-      ...(contentIntentSource === undefined ? {} : { contentIntentSource }),
-    })
+  const snapshot = await runWebSnapshotStage(
+    'build web snapshot package',
+    () =>
+      buildCurrentPageWebSnapshot({
+        ...request,
+        ...(contentIntentSource === undefined ? {} : { contentIntentSource }),
+        ...(request.fullPageCaptureAction === undefined
+          ? {}
+          : {
+              fullPageCaptureIdentity: {
+                action: request.fullPageCaptureAction,
+                exportRunId: request.requestId,
+              },
+            }),
+        ...(request.abortSignal === undefined ? {} : { abortSignal: request.abortSignal }),
+      }),
+    request.abortSignal
   );
-  const response = await saveStagedWebSnapshot(snapshot);
+  throwIfWebSnapshotSaveAborted(request.abortSignal);
+  const response = await saveStagedWebSnapshot(snapshot, request.abortSignal);
+  throwIfWebSnapshotSaveAborted(request.abortSignal);
 
   if (!response.success) {
     throw createWebSnapshotStageError(

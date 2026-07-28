@@ -65,16 +65,20 @@ export function isThinFacadeSource(absolutePath) {
   );
 }
 
+export function parseSuccessfulGitFileList(result) {
+  if (result.status !== 0) {
+    return [];
+  }
+  return result.stdout.split(/\r?\n/u).filter(Boolean);
+}
+
 function collectHeadFiles() {
   const result = spawnSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], {
     cwd: process.cwd(),
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.status !== 0 || result.error) {
-    return [];
-  }
-  return result.stdout.split(/\r?\n/u).filter(Boolean);
+  return parseSuccessfulGitFileList(result);
 }
 
 export function collectWorkspaceNamingDelta() {

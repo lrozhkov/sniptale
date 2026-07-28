@@ -48,6 +48,8 @@ export type ScreenshotModeStatusResponse = RuntimeMessageResponse<{
 export type CaptureResponse = RuntimeMessageResponse<{
   dataUrl?: string;
   action?: CaptureActionType;
+  downscaled?: boolean;
+  frozenExtentWarning?: boolean;
 }>;
 
 export type SaveAssetResponse = RuntimeMessageResponse<{

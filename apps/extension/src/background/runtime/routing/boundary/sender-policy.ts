@@ -57,6 +57,7 @@ const viewerCaptureRoutes = new Set<string>([
   MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
   MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY,
   MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK,
+  MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
   MessageType.TRIGGER_QUICK_ACTION,
 ]);
 

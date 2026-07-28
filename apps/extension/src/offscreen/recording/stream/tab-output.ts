@@ -66,31 +66,23 @@ export function resolveTabOutputGeometry(
     height: requested.height,
   };
 
-  const density = cssViewport.devicePixelRatio;
-  const expectedSourceWidth = cssViewport.width * density;
-  const expectedSourceHeight = cssViewport.height * density;
-  if (
-    !Number.isInteger(expectedSourceWidth) ||
-    !Number.isInteger(expectedSourceHeight) ||
-    source.width !== expectedSourceWidth ||
-    source.height !== expectedSourceHeight
-  ) {
+  const aspectError = Math.abs(
+    source.width * cssViewport.height - source.height * cssViewport.width
+  );
+  if (aspectError > Math.max(source.width, source.height)) {
     throw new Error(
-      'source-dimensions-mismatch: raw tab source does not exactly match the measured viewport density'
+      'source-dimensions-mismatch: raw tab source does not match the measured viewport aspect ratio'
     );
   }
 
+  const scaleX = source.width / cssViewport.width;
+  const scaleY = source.height / cssViewport.height;
   const mappedBounds = [
-    requested.x * density,
-    requested.y * density,
-    (requested.x + requested.width) * density,
-    (requested.y + requested.height) * density,
+    Math.round(requested.x * scaleX),
+    Math.round(requested.y * scaleY),
+    Math.round((requested.x + requested.width) * scaleX),
+    Math.round((requested.y + requested.height) * scaleY),
   ];
-  if (!mappedBounds.every(Number.isInteger)) {
-    throw new Error(
-      'source-dimensions-mismatch: crop bounds do not align to physical source pixels'
-    );
-  }
   const [left, top, right, bottom] = mappedBounds as [number, number, number, number];
   const sourceRect = {
     x: left,

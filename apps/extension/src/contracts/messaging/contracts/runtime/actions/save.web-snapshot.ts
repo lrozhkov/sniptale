@@ -71,4 +71,17 @@ export const runtimeActionWebSnapshotSaveMessageContracts = {
       })
     ),
   },
+  [MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS]: {
+    parseRequest: createGuardParser(
+      'runtime RELEASE_WEB_SNAPSHOT_STAGED_BLOBS message',
+      createMessageGuard({
+        type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
+        required: { snapshotSessionId: isWebSnapshotSessionId },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime RELEASE_WEB_SNAPSHOT_STAGED_BLOBS response',
+      createRuntimeResponseGuard({ optional: { result: isString } })
+    ),
+  },
 } satisfies PartialRuntimeRegistry;

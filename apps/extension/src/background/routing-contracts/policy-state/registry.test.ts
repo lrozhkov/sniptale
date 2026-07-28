@@ -21,6 +21,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'content-action-runtime-tokens',
   'content-action-trusted-event-proofs',
   'diagnostics-erasure-exclusion',
+  'full-page-capture-leases',
   'gallery-image-update-capabilities',
   'llm-session-tokens',
   'native-ingestion-erasure-exclusion',

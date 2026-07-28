@@ -11,7 +11,7 @@ This document explains high-impact grants and manifest topology. `tooling/config
 | Current-tab capture and page tooling | `activeTab`, `scripting` | capture editor, page-access service, browser scripting adapter | Current-tab authority only; inject the full content runtime through page access. |
 | Persistent page tooling and visible capture | optional `<all_urls>` plus dynamic HTTP/HTTPS registration | page-access service, visible capture | User-approved optional access; compact shim registration only, full runtime remains lazy. |
 | Extension pages | no host permission | extension page entrypoints | Settings, gallery, editors, popup, and snapshot viewer remain usable without host access. |
-| Debugger-backed capture and diagnostics | `debugger` | debugger adapter, full-page capture, HAR collector | Feature-gated with explicit denial handling. |
+| Debugger-backed unattended capture and diagnostics | `debugger` | debugger adapter, inactive/bulk archive capture, HAR collector | Interactive and active-tab full-page capture uses native visible-tab pixels without debugger; debugger is reserved for unattended inactive/bulk export and diagnostics, with explicit denial handling. |
 | Browser-window size presets | `system.display` | display adapter and capture-surface owner | Read display bounds and work areas only; presets that do not fit are disabled, and display settings are never changed. |
 | Tab recording | `tabCapture` | tab-capture adapter, capture mode | Required for tab and tab-crop recording modes. |
 | Screen/window recording | `desktopCapture` | desktop-capture adapter and source picker | Background policy filters browser-selected sources. |

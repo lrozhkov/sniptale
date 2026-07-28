@@ -33,14 +33,40 @@ describe('tab output geometry', () => {
     });
   });
 
-  it('rejects a raw source whose aspect ratio cannot be proven from viewport density', () => {
+  it('accepts Chrome tab output scaled independently from page DPR', () => {
+    expect(
+      resolveTabOutputGeometry(
+        { x: 0, y: 0, width: 1425, height: 740 },
+        { width: 1920, height: 998 },
+        { width: 1425, height: 740, devicePixelRatio: 1.25 }
+      )
+    ).toMatchObject({
+      sourceRect: { x: 0, y: 0, width: 1920, height: 998 },
+      outputSize: { width: 1425, height: 740 },
+    });
+  });
+
+  it('maps a selected region through Chrome tab output scaling', () => {
+    expect(
+      resolveTabOutputGeometry(
+        { x: 100, y: 80, width: 300, height: 300 },
+        { width: 1920, height: 998 },
+        { width: 1425, height: 740, devicePixelRatio: 1.25 }
+      )
+    ).toMatchObject({
+      sourceRect: { x: 135, y: 108, width: 404, height: 404 },
+      outputSize: { width: 300, height: 300 },
+    });
+  });
+
+  it('rejects a raw source whose aspect ratio does not match the viewport', () => {
     expect(() =>
       resolveTabOutputGeometry(
         { x: 0, y: 0, width: 1024, height: 768 },
         { width: 2560, height: 1440 },
         { width: 1024, height: 768, devicePixelRatio: 2 }
       )
-    ).toThrow('does not exactly match');
+    ).toThrow('does not match');
   });
 
   it('preserves odd TAB_CROP geometry instead of silently changing the selected area', () => {
@@ -98,13 +124,13 @@ describe('tab output geometry', () => {
     ).toThrow('inside the CSS viewport');
   });
 
-  it('rejects crop boundaries that cannot map to whole source pixels', () => {
-    expect(() =>
+  it('rounds fractional scaled crop boundaries to source pixels', () => {
+    expect(
       resolveTabOutputGeometry(
         { x: 1, y: 0, width: 300, height: 300 },
         { width: 1250, height: 750 },
         { width: 1000, height: 600, devicePixelRatio: 1.25 }
       )
-    ).toThrow('do not align');
+    ).toMatchObject({ sourceRect: { x: 1, y: 0, width: 375, height: 375 } });
   });
 });

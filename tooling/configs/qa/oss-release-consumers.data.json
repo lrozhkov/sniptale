@@ -4,12 +4,12 @@
     {
       "category": "archive-integration",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "3c1624ab0fbe0701085ecddd1004a07f20a141ad3d5c097342968bbf3a83ce22"
+      "sha256": "bcddbf5b47f42fdd255af4345b69ecf5ce42213b3127fa7f89509020b75ca9aa"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "3c1624ab0fbe0701085ecddd1004a07f20a141ad3d5c097342968bbf3a83ce22"
+      "sha256": "bcddbf5b47f42fdd255af4345b69ecf5ce42213b3127fa7f89509020b75ca9aa"
     },
     {
       "category": "bundled-font",
@@ -19,7 +19,7 @@
     {
       "category": "bundled-font",
       "path": "apps/extension/vite.config.ts",
-      "sha256": "f71509f16d741e2da5fa3766e81412cfae9bb7d9e383634cf261a7f0946dfc23"
+      "sha256": "74cd4ef56937fba031f8dd7b443338e804db7759533b953b16491a1c29ea0eef"
     },
     {
       "category": "archive-integration",

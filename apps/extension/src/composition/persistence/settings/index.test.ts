@@ -60,6 +60,11 @@ const PRIVACY_DEFAULTS = {
   skipWebSnapshotSaveDisclosure: false,
   rawDiagnosticsEnabled: false,
 };
+const DEFAULT_FULL_PAGE_CAPTURE = {
+  floatingElements: 'once' as const,
+  freezeMotion: true,
+  preloadLazyContent: true,
+};
 
 function resetSettingsStorageMocks() {
   vi.clearAllMocks();
@@ -132,6 +137,7 @@ async function verifyLoadMigration() {
     defaultExportPresetId: null,
     imageFormat: 'webp',
     imageQuality: 75,
+    fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     ...PRIVACY_DEFAULTS,
   });
   expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
@@ -178,6 +184,7 @@ async function verifyStoredSettings() {
     defaultExportPresetId: 'export-7',
     imageFormat: 'png' as const,
     imageQuality: 100,
+    fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: true,
@@ -259,6 +266,7 @@ const expectedInvalidStoredSettingsResult = {
   defaultExportPresetId: null,
   imageFormat: 'png',
   imageQuality: 100,
+  fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
   ...PRIVACY_DEFAULTS,
 };
 
@@ -291,6 +299,7 @@ async function verifyInvalidRootFallback() {
     defaultExportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
+    fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     ...PRIVACY_DEFAULTS,
   });
 

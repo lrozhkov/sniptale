@@ -3,6 +3,7 @@ import {
   consumeWebSnapshotStagedBlob,
   resetWebSnapshotStagedBlobsForTests,
   releaseWebSnapshotStagedBlobs,
+  releaseWebSnapshotStagedBlobsForSession,
   stageWebSnapshotBlobChunk,
 } from './staged-blobs';
 
@@ -246,4 +247,43 @@ it('rejects staged payload record counts beyond the runtime cap', () => {
   expect(() => stageChunk({ stagedBlobId: 'stage-record-overflow' })).toThrow(
     'Too many web snapshot staged payloads'
   );
+});
+
+it('releases complete and partial staged records for one authenticated session owner', () => {
+  stageChunk({ stagedBlobId: 'stage-owner-package' });
+  stageChunk({
+    chunkIndex: 0,
+    kind: 'screenshot',
+    stagedBlobId: 'stage-owner-screenshot-partial',
+    totalBytes: 2,
+    totalChunks: 2,
+  });
+  stageChunk({
+    snapshotSessionId: 'snapshot-session-2',
+    stagedBlobId: 'stage-other-session',
+  });
+
+  releaseWebSnapshotStagedBlobsForSession({
+    snapshotSessionId: 'snapshot-session-1',
+    tabId: 42,
+  });
+
+  expect(() =>
+    consumeWebSnapshotStagedBlob({
+      expectedKind: 'package',
+      snapshotSessionId: 'snapshot-session-1',
+      stagedBlobId: 'stage-owner-package',
+      tabId: 42,
+      type: 'application/zip',
+    })
+  ).toThrow('missing or incomplete');
+  expect(
+    consumeWebSnapshotStagedBlob({
+      expectedKind: 'package',
+      snapshotSessionId: 'snapshot-session-2',
+      stagedBlobId: 'stage-other-session',
+      tabId: 42,
+      type: 'application/zip',
+    })
+  ).toBeInstanceOf(Blob);
 });

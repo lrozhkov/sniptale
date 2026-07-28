@@ -129,6 +129,31 @@ it('accepts valid popup export package responses', () => {
   ).toBe(true);
 });
 
+it('rejects popup export entries with both content representations', () => {
+  expect(
+    isPopupExportPackageResponse({
+      success: true,
+      pagePackage: {
+        archiveBaseName: 'page',
+        entries: [
+          {
+            binaryBase64: 'ZmFrZQ==',
+            path: 'page.json',
+            textContent: '{}',
+          },
+        ],
+        errors: [],
+        stats: {
+          sectionsCount: 0,
+          rowsCount: 0,
+          filesCount: 0,
+          filesFailed: 0,
+        },
+      },
+    })
+  ).toBe(false);
+});
+
 it('rejects invalid popup export preview payloads', () => {
   expect(
     isPopupExportPreviewResponse({

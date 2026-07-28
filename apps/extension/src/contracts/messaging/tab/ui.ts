@@ -11,9 +11,11 @@ import type {
 import type * as ContentIntentTypes from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import type { WebSnapshotSaveResult } from '@sniptale/runtime-contracts/web-snapshot';
 import type { ShowToastPayload } from '../contracts/types';
+import type { FullPageExportCaptureAction } from '../../full-page-capture';
 
 type PopupExportContentActionGrant = {
   contentIntentGrant?: ContentIntentTypes.ContentPrivilegedActionAutoStartGrant;
+  fullPageCaptureAction?: FullPageExportCaptureAction;
 };
 
 export type TabUiRequestByType = {
@@ -60,6 +62,7 @@ export type TabUiRequestByType = {
     options: ExportOptions;
   } & PopupExportContentActionGrant;
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: {
+    batchRequestId: string;
     type: typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE;
     options: ExportOptions;
   } & PopupExportContentActionGrant;
@@ -68,8 +71,13 @@ export type TabUiRequestByType = {
     allowAnonymousCrossOriginAssets: boolean;
     allowAuthenticatedSameOriginAssets: boolean;
     requestId: string;
+    contentIntentGrant?: ContentIntentTypes.ContentPrivilegedActionAutoStartGrant;
+    fullPageCaptureAction?: FullPageExportCaptureAction;
   };
-  [MessageType.EXPORT_POPUP_CANCEL]: { type: typeof MessageType.EXPORT_POPUP_CANCEL };
+  [MessageType.EXPORT_POPUP_CANCEL]: {
+    exportRunId: string;
+    type: typeof MessageType.EXPORT_POPUP_CANCEL;
+  };
 };
 
 export type TabUiResponseByType = {

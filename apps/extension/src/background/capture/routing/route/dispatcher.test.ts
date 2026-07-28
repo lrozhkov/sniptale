@@ -11,6 +11,7 @@ const {
   handleFetchWebSnapshotAssetMock,
   handleOpenEditorWithImageMock,
   handleRegisterWebSnapshotAssetsMock,
+  handleReleaseWebSnapshotStagedBlobsMock,
   handleRequestGalleryImageUpdateCapabilityMock,
   handleRequestExportHarStartCapabilityMock,
   handleReleaseRecordingDownloadMock,
@@ -34,6 +35,7 @@ const {
   handleFetchWebSnapshotAssetMock: vi.fn(),
   handleOpenEditorWithImageMock: vi.fn(),
   handleRegisterWebSnapshotAssetsMock: vi.fn(),
+  handleReleaseWebSnapshotStagedBlobsMock: vi.fn(),
   handleRequestGalleryImageUpdateCapabilityMock: vi.fn(),
   handleRequestExportHarStartCapabilityMock: vi.fn(),
   handleReleaseRecordingDownloadMock: vi.fn(),
@@ -91,6 +93,7 @@ vi.mock('../actions.quick-action', () => ({
 vi.mock('../actions.web-snapshot', () => ({
   handleFetchWebSnapshotAsset: handleFetchWebSnapshotAssetMock,
   handleRegisterWebSnapshotAssets: handleRegisterWebSnapshotAssetsMock,
+  handleReleaseWebSnapshotStagedBlobs: handleReleaseWebSnapshotStagedBlobsMock,
   handleSaveWebSnapshotToGallery: handleSaveWebSnapshotToGalleryMock,
   handleStageWebSnapshotBlobChunk: handleStageWebSnapshotBlobChunkMock,
 }));
@@ -139,6 +142,7 @@ beforeEach(() => {
   handleFetchWebSnapshotAssetMock.mockReturnValue(true);
   handleOpenEditorWithImageMock.mockReturnValue(true);
   handleRegisterWebSnapshotAssetsMock.mockReturnValue(true);
+  handleReleaseWebSnapshotStagedBlobsMock.mockReturnValue(true);
   handleRequestGalleryImageUpdateCapabilityMock.mockReturnValue(true);
   handleSaveScreenshotToGalleryMock.mockReturnValue(true);
   handleSaveWebSnapshotToGalleryMock.mockReturnValue(true);
@@ -243,7 +247,10 @@ const routeCases: Array<[RouteCaptureMessage, Mock]> = [
   [{ type: CaptureMessageType.CAPTURE_FULL }, handleFullCaptureMock],
   [{ type: MessageType.EXPORT_START_HAR }, handleExportStartHarMock],
   [{ type: MessageType.EXPORT_STOP_HAR }, handleExportStopHarMock],
-  [{ type: MessageType.EXPORT_CAPTURE_FULL_PAGE }, handleExportCaptureFullPageMock],
+  [
+    { exportRunId: 'export-run-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+    handleExportCaptureFullPageMock,
+  ],
   [
     { type: MessageType.OPEN_EDITOR_WITH_IMAGE, dataUrl: 'data:image/png;base64,1' },
     handleOpenEditorWithImageMock,
@@ -287,6 +294,13 @@ const routeCases: Array<[RouteCaptureMessage, Mock]> = [
       requestId: 'req-web',
     },
     handleRegisterWebSnapshotAssetsMock,
+  ],
+  [
+    {
+      type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
+      snapshotSessionId: 'snapshot-session-1',
+    },
+    handleReleaseWebSnapshotStagedBlobsMock,
   ],
   [
     {

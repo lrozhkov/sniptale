@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../../platform/i18n', () => ({
+vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 
@@ -53,6 +54,12 @@ function createState() {
       },
       { disabledReason: null, isCurrent: false, tabId: null, title: 'Fallback tab', url: null },
     ],
+    cancelRetryRef: {
+      current: { exportRunId: 'req-1', tabIds: [1, 2] } as {
+        exportRunId: string;
+        tabIds: number[];
+      } | null,
+    },
     requestIdRef: { current: 'req-1' as string | null },
     setProgress: vi.fn(),
     setResult: vi.fn(),
@@ -99,7 +106,9 @@ describe('batch-state empty result reducer', () => {
       requestId: 'req-1',
       selectedCount: 2,
     });
+    expect(state.cancelRetryRef.current).toBeNull();
     expect(state.requestIdRef.current).toBeNull();
+    expect(state.cancelRetryRef.current).toBeNull();
     expect(state.setResult).toHaveBeenCalledWith({
       success: false,
       errors: [],
@@ -170,6 +179,8 @@ describe('batch-state final result reducer', () => {
       errors: [],
       stats: { filesCount: 1, filesFailed: 0, rowsCount: 4, sectionsCount: 1 },
     });
+    expect(successState.cancelRetryRef.current).toBeNull();
+    expect(errorState.cancelRetryRef.current).toBeNull();
     expect(successState.setProgress).toHaveBeenCalledWith(
       expect.objectContaining({
         message: 'popup.export.batchCompletedMessage',

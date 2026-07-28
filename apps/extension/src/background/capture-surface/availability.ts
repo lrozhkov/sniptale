@@ -51,7 +51,7 @@ export function hasCaptureSurfaceConflict(
 }
 
 type RequiredSize = { width: number; height: number };
-type WindowCapacity = RequiredSize & { state: string };
+type WindowCapacity = RequiredSize;
 
 async function readViewportCapacity(
   args: { context: CaptureSurfaceContext; tabId: number },
@@ -85,9 +85,6 @@ function projectWindowAvailability(
     return unavailable(preset.id, 'platform-rejected', { target: preset.target, required });
   }
   const capacity = measurement.value;
-  if (capacity.state !== 'normal') {
-    return unavailable(preset.id, 'window-not-normal', { target: preset.target, required });
-  }
   const available = { width: capacity.width, height: capacity.height };
   return preset.width > capacity.width || preset.height > capacity.height
     ? unavailable(preset.id, 'window-too-large', {
@@ -200,8 +197,8 @@ export async function getCaptureSurfaceAvailabilities(
       : Promise.resolve<Measurement<RequiredSize>>({ ok: false }),
     needsWindow && windowId !== null
       ? measure(async () => {
-          const { snapshot, workArea } = await getWindowWorkArea(windowId);
-          return { width: workArea.width, height: workArea.height, state: snapshot.state };
+          const { workArea } = await getWindowWorkArea(windowId);
+          return { width: workArea.width, height: workArea.height };
         })
       : Promise.resolve<Measurement<WindowCapacity>>({ ok: false }),
     needsViewport && isVideoContext(args.context)

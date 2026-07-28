@@ -30,6 +30,12 @@ import { usePopupExportMessageListener } from './hook';
 
 function createState() {
   return {
+    cancelRetryRef: {
+      current: { exportRunId: 'req-1', tabIds: [42] } as {
+        exportRunId: string;
+        tabIds: number[];
+      } | null,
+    },
     requestIdRef: { current: 'req-1' as string | null },
     setProgress: vi.fn(),
     setResult: vi.fn(),
@@ -119,5 +125,6 @@ it('passes parsed runtime messages to the apply seam and exposes request clearin
     { clearRequestId: () => void },
   ];
   clearRequestId();
+  expect(state.cancelRetryRef.current).toBeNull();
   expect(state.requestIdRef.current).toBeNull();
 });

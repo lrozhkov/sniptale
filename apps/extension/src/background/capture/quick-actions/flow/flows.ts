@@ -77,8 +77,12 @@ function requiresNativeVisibleCaptureAuthority(
   args: QuickActionFlowArgs,
   message: QuickActionStartMessage
 ): boolean {
-  if ('autoStartCaptureType' in message && message.autoStartCaptureType !== 'visible') {
-    return false;
+  if ('autoStartSelection' in message) {
+    return true;
+  }
+
+  if (message.autoStartCaptureType === 'full') {
+    return true;
   }
 
   const viewport = args.viewportState.get(args.tabId);

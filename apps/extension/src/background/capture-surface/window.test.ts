@@ -71,14 +71,24 @@ describe('capture-surface browser window operations', () => {
     });
   });
 
-  it('rejects non-normal windows before any bounds mutation', async () => {
-    mocks.getWindow.mockResolvedValueOnce({ id: 3, ...maximized });
+  it('normalizes a maximized window before applying exact bounds', async () => {
+    const expected = { ...prior, width: 1280, height: 720, state: 'normal' as const };
+    mocks.getWindow
+      .mockResolvedValueOnce({ id: 3, ...maximized })
+      .mockResolvedValueOnce({ id: 3, ...expected });
 
-    await expect(prepareWindowSize(3, 1280, 720)).rejects.toThrow('window-not-normal');
-    await expect(
-      applyPreparedWindowSize(3, maximized, { ...prior, width: 1280, height: 720 })
-    ).rejects.toMatchObject({ message: 'window-not-normal' });
-    expect(mocks.updateWindow).not.toHaveBeenCalled();
+    await expect(prepareWindowSize(3, 1280, 720)).resolves.toEqual({
+      prior: maximized,
+      expected,
+    });
+    await expect(applyPreparedWindowSize(3, maximized, expected)).resolves.toEqual(expected);
+    expect(mocks.updateWindow).toHaveBeenNthCalledWith(1, 3, { state: 'normal' });
+    expect(mocks.updateWindow).toHaveBeenNthCalledWith(2, 3, {
+      left: expected.left,
+      top: expected.top,
+      width: expected.width,
+      height: expected.height,
+    });
   });
 
   it('fails closed when the window manager clamps requested bounds', async () => {

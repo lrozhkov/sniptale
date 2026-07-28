@@ -11,6 +11,7 @@ const {
   captureVisibleTabTransactionMock,
   downloadFullPageCaptureMock,
   downloadVisibleCaptureMock,
+  transitionCaptureJobMock,
 } = vi.hoisted(() => ({
   captureFullPageMock: vi.fn(),
   captureFullPageTransactionMock: vi.fn(),
@@ -22,6 +23,7 @@ const {
   captureVisibleTabTransactionMock: vi.fn(),
   downloadFullPageCaptureMock: vi.fn(),
   downloadVisibleCaptureMock: vi.fn(),
+  transitionCaptureJobMock: vi.fn(),
 }));
 
 vi.mock('./full-page/workflow', () => ({
@@ -32,6 +34,11 @@ vi.mock('./full-page/workflow', () => ({
 vi.mock('./download/flow', () => ({
   downloadFullPageCapture: downloadFullPageCaptureMock,
   downloadVisibleCapture: downloadVisibleCaptureMock,
+}));
+
+vi.mock('./jobs/state-machine', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./jobs/state-machine')>()),
+  transitionCaptureJob: transitionCaptureJobMock,
 }));
 
 vi.mock('./visible/flow', () => ({
@@ -55,6 +62,7 @@ import {
   captureVisibleTabForCropTransaction,
   captureVisibleTabTransaction,
 } from './index';
+import { cancelFullPageCaptureByExportRunId } from './full-page/cancellation';
 
 function resetCaptureModuleMocks() {
   vi.clearAllMocks();
@@ -85,9 +93,12 @@ async function verifiesFullPageCaptureDownloadFlow() {
   });
   downloadFullPageCaptureMock.mockResolvedValueOnce(undefined);
 
-  await captureAndDownloadFullPage(7, onProgress);
+  await captureAndDownloadFullPage(7, 'document-7', onProgress);
 
-  expect(captureFullPageTransactionMock).toHaveBeenCalledWith(7, onProgress);
+  expect(captureFullPageTransactionMock).toHaveBeenCalledWith(7, onProgress, {
+    backendKind: 'native',
+    documentId: 'document-7',
+  });
   expect(downloadFullPageCaptureMock).toHaveBeenCalledWith(
     'data:image/png;base64,full',
     'capture-job-1'
@@ -95,13 +106,54 @@ async function verifiesFullPageCaptureDownloadFlow() {
 }
 
 async function verifiesArchiveCaptureOptions() {
-  captureFullPageMock.mockResolvedValueOnce('data:image/png;base64,archive');
+  const transaction = {
+    dataUrl: 'data:image/png;base64,archive',
+    jobId: 'capture-job-archive',
+    metadata: { downscaled: false, frozenExtentWarning: false },
+  };
+  captureFullPageTransactionMock.mockResolvedValueOnce(transaction);
 
-  await expect(captureFullPageForArchive(11)).resolves.toBe('data:image/png;base64,archive');
-  expect(captureFullPageMock).toHaveBeenCalledWith(11, undefined, {
+  await expect(
+    captureFullPageForArchive(11, { backendKind: 'native', documentId: 'document-11' })
+  ).resolves.toBe(transaction);
+  expect(captureFullPageTransactionMock).toHaveBeenCalledWith(11, undefined, {
+    backendKind: 'native',
+    documentId: 'document-11',
     format: 'png',
     quality: 1,
   });
+  expect(transitionCaptureJobMock).toHaveBeenCalledWith('capture-job-archive', 'completed');
+}
+
+async function verifiesArchiveCancellationDuringCompletedTransition() {
+  let resolveCompleted: () => void = () => undefined;
+  captureFullPageTransactionMock.mockResolvedValueOnce({
+    dataUrl: 'data:image/png;base64,archive-cancelled',
+    jobId: 'capture-job-archive-cancelled',
+    metadata: { downscaled: false, frozenExtentWarning: false },
+  });
+  transitionCaptureJobMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        resolveCompleted = resolve;
+      })
+  );
+
+  const capture = captureFullPageForArchive(12, {
+    backendKind: 'unattended-cdp',
+    documentId: 'document-12',
+    exportRunId: 'archive-completed-cancelled',
+  });
+  await vi.waitFor(() => expect(transitionCaptureJobMock).toHaveBeenCalled());
+  expect(cancelFullPageCaptureByExportRunId('archive-completed-cancelled')).toBe(true);
+  resolveCompleted();
+
+  await expect(capture).rejects.toThrow('Full-page capture cancelled');
+  expect(captureFullPageTransactionMock).toHaveBeenCalledWith(
+    12,
+    undefined,
+    expect.objectContaining({ abortSignal: expect.any(AbortSignal) })
+  );
 }
 
 function verifiesReExports() {
@@ -128,6 +180,10 @@ describe('capture facade', () => {
   it(
     'requests archive full-page capture with deterministic png options',
     verifiesArchiveCaptureOptions
+  );
+  it(
+    'retains archive cancellation through the completed transition',
+    verifiesArchiveCancellationDuringCompletedTransition
   );
   it('re-exports capture primitives without wrapping them', verifiesReExports);
 });

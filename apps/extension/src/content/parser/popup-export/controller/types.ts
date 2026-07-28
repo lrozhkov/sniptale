@@ -6,23 +6,31 @@ import type {
 } from '@sniptale/runtime-contracts/export';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
+import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
 import type { persistPopupExportArchive } from '../helpers/archive/persist';
 import type { emitPopupExportMessage, PopupSendResponse } from '../helpers/messaging';
 
 export type PopupExportRunner = {
   buildPackage: (
     options: ExportOptions,
-    context?: { contentIntentSource?: ContentPrivilegedActionIntentSource | undefined }
+    context?: {
+      contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+      fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
+    }
   ) => Promise<ExportPagePackage>;
   cancel: () => void;
   export: (
     options: ExportOptions,
-    context?: { contentIntentSource?: ContentPrivilegedActionIntentSource | undefined }
+    context?: {
+      contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+      fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
+    }
   ) => Promise<ExportResult>;
   onProgress: (callback: (progress: ExportProgress) => void) => void;
 };
 
 export type PopupExportState = {
+  activeAbortController?: AbortController | null;
   activeExportRequestId: string | null;
   isExportRunning: boolean;
 };

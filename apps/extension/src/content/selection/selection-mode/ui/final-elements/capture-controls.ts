@@ -74,8 +74,7 @@ export function createSelectionCaptureActionControlsDom(
   if (!hasAlternatives) return;
 
   const splitGroup = document.createElement('div');
-  splitGroup.className = 'sniptale-selection-capture-split-action';
-  Object.assign(splitGroup.style, { display: 'inline-flex', alignItems: 'center', gap: '2px' });
+  splitGroup.className = 'sniptale-split-action sniptale-selection-capture-split-action';
   tooltip.actions.insertBefore(splitGroup, tooltip.confirmButton);
   splitGroup.append(tooltip.confirmButton, createCaptureMenuTrigger(onMenuToggle));
 }

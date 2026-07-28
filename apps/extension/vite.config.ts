@@ -16,6 +16,7 @@ import {
 import { createContentRuntimeBuildId } from './build/content-runtime-build-id';
 import { extensionHtmlInputs } from './build/extension-html-inputs';
 import { createExtensionBuildLayout, extensionRollupInputs, layoutPolicy } from './build/layout';
+import { buildManifestForMode } from './build/manifest';
 
 const APP_ROOT = fileURLToPath(new URL('.', import.meta.url));
 const BUILD_LAYOUT = createExtensionBuildLayout(APP_ROOT);
@@ -57,10 +58,6 @@ function assertRequiredAppHtmlOutputs(): void {
 }
 
 assertRequiredAppHtmlOutputs();
-
-function buildManifest() {
-  return structuredClone(manifest);
-}
 
 function buildDefines(mode: string) {
   return {
@@ -152,7 +149,7 @@ export default defineConfig(({ mode }) => ({
     extensionHtmlInputs(BUILD_LAYOUT),
     copyDevExtensionFonts(),
     react(),
-    crx({ manifest: buildManifest() }),
+    crx({ manifest: buildManifestForMode(manifest, mode) }),
     buildContentRuntime(mode),
     buildContentRuntimeShim(mode),
     buildWebSnapshotInjectedRunner(mode),

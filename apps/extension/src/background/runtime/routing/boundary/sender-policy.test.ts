@@ -186,7 +186,10 @@ it('allows only popup quick-action targeted capture routes without a sender tab'
     )
   ).toBe(true);
   expect(
-    canRoute({ type: MessageType.EXPORT_CAPTURE_FULL_PAGE }, createSender({ url: POPUP_URL }))
+    canRoute(
+      { exportRunId: 'export-run-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+      createSender({ url: POPUP_URL })
+    )
   ).toBe(false);
 });
 
@@ -227,7 +230,7 @@ it('allows editor save routes without allowing arbitrary editor capture routes',
   ).toBe(true);
   expect(
     canRoute(
-      { type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+      { exportRunId: 'export-run-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
       createSender({ tabId: 7, url: EDITOR_URL })
     )
   ).toBe(false);

@@ -80,6 +80,10 @@ function createCaptureArgs(captureMode: 'visible' | 'full') {
     viewportPresetId: 'preset-1',
     imageFormat: 'png' as const,
     imageQuality: 88,
+    pageAccessPort: {
+      ensureActivePageAccessRuntime: vi.fn(),
+      ensureNativeVisibleCaptureAuthority: vi.fn().mockResolvedValue(undefined),
+    },
     screenshotModeState: new Map<number, boolean>(),
     settings: createSettings([
       {

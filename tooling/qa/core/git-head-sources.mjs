@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { normalizeSyncProcessResult } from '../runtime/sync-process-result.mjs';
 
 const GIT_BATCH_MAX_BUFFER = 64 * 1024 * 1024;
 const HEAD_CODE_GLOBS = ['*.ts', '*.tsx', '*.js', '*.jsx', '*.mjs', '*.cjs'];
@@ -8,11 +9,13 @@ function resolveGitExecutable() {
 }
 
 function runHeadQuery(args, acceptedStatuses, { root = process.cwd(), spawnSyncImpl = spawnSync }) {
-  const result = spawnSyncImpl(resolveGitExecutable(), args, {
-    cwd: root,
-    encoding: 'utf8',
-    maxBuffer: GIT_BATCH_MAX_BUFFER,
-  });
+  const result = normalizeSyncProcessResult(
+    spawnSyncImpl(resolveGitExecutable(), args, {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: GIT_BATCH_MAX_BUFFER,
+    })
+  );
   if (result.error || !acceptedStatuses.has(result.status) || typeof result.stdout !== 'string') {
     return { complete: false, files: [] };
   }
@@ -51,11 +54,13 @@ export function readHeadFileTexts(
 
   const sources = new Map();
   for (const relativePath of relativePaths) {
-    const result = spawnSyncImpl(resolveGitExecutable(), ['show', `HEAD:${relativePath}`], {
-      cwd: root,
-      encoding: 'utf8',
-      maxBuffer: GIT_BATCH_MAX_BUFFER,
-    });
+    const result = normalizeSyncProcessResult(
+      spawnSyncImpl(resolveGitExecutable(), ['show', `HEAD:${relativePath}`], {
+        cwd: root,
+        encoding: 'utf8',
+        maxBuffer: GIT_BATCH_MAX_BUFFER,
+      })
+    );
 
     sources.set(
       relativePath,

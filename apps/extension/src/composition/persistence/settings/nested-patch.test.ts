@@ -47,6 +47,11 @@ function arrangeStoredSettingsWithNestedSiblings(): void {
         showGallery: false,
         showSettings: true,
       },
+      fullPageCapture: {
+        floatingElements: 'repeat',
+        freezeMotion: true,
+        preloadLazyContent: false,
+      },
     },
   });
 }
@@ -63,6 +68,11 @@ function expectPersistedNestedMerge(): void {
         showGallery: false,
         showSettings: false,
       }),
+      fullPageCapture: {
+        floatingElements: 'repeat',
+        freezeMotion: false,
+        preloadLazyContent: false,
+      },
     }),
   });
 }
@@ -77,6 +87,7 @@ describe('settings nested patch persistence', () => {
       patchSettings({
         contentToolbar: { position: { x: 96, y: 120 } },
         contextMenu: { showSettings: false },
+        fullPageCapture: { freezeMotion: false },
       })
     ).resolves.toMatchObject({
       contentToolbar: {
@@ -87,6 +98,11 @@ describe('settings nested patch persistence', () => {
       contextMenu: {
         showGallery: false,
         showSettings: false,
+      },
+      fullPageCapture: {
+        floatingElements: 'repeat',
+        freezeMotion: false,
+        preloadLazyContent: false,
       },
     });
 

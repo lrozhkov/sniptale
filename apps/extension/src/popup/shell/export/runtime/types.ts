@@ -36,7 +36,8 @@ export type PopupExportRuntimeDeps = {
     message: PopupExportSaveWebSnapshotMessage
   ) => Promise<TabResponseByType[typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]>;
   sendCancelMessage: (
-    tabId: number
+    tabId: number,
+    exportRunId: string
   ) => Promise<TabResponseByType[typeof MessageType.EXPORT_POPUP_CANCEL]>;
   sendStartMessage: (
     tabId: number,

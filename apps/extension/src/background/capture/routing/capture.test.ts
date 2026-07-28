@@ -47,6 +47,7 @@ vi.mock('./actions.quick-action', () => ({
 vi.mock('./actions.web-snapshot', () => ({
   handleFetchWebSnapshotAsset: vi.fn(),
   handleRegisterWebSnapshotAssets: vi.fn(),
+  handleReleaseWebSnapshotStagedBlobs: vi.fn(),
   handleSaveWebSnapshotToGallery: vi.fn(),
   handleStageWebSnapshotBlobChunk: vi.fn(),
 }));

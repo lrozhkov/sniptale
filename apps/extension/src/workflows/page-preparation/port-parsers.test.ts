@@ -112,13 +112,13 @@ describe('viewer export simple request parser', () => {
     });
     expect(
       parseViewerExportPortRequest({
-        request: { type: MessageType.EXPORT_POPUP_CANCEL },
+        request: { exportRunId: 'export-run-1', type: MessageType.EXPORT_POPUP_CANCEL },
         requestId: 'port-cancel',
         type: WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
         viewerPortGeneration: 'viewer-generation-1',
       })
     ).toEqual({
-      request: { type: MessageType.EXPORT_POPUP_CANCEL },
+      request: { exportRunId: 'export-run-1', type: MessageType.EXPORT_POPUP_CANCEL },
       requestId: 'port-cancel',
       type: WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
       viewerPortGeneration: 'viewer-generation-1',
@@ -131,6 +131,7 @@ describe('viewer export correlated response parser', () => {
     expect(
       parseViewerExportPortRequest({
         request: {
+          batchRequestId: 'batch-1',
           options: EXPORT_OPTIONS,
           requestId: 'export-1',
           type: MessageType.EXPORT_POPUP_START,
@@ -186,6 +187,7 @@ describe('viewer export package request parser', () => {
     expect(
       parseViewerExportPortRequest({
         request: {
+          batchRequestId: 'batch-1',
           options: EXPORT_OPTIONS,
           type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
         },
@@ -194,6 +196,7 @@ describe('viewer export package request parser', () => {
         viewerPortGeneration: 'viewer-generation-1',
       })?.request
     ).toEqual({
+      batchRequestId: 'batch-1',
       options: EXPORT_OPTIONS,
       type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
     });

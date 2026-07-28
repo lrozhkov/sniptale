@@ -17,6 +17,10 @@ export async function startPopupExport(
     return;
   }
 
+  if (state.cancelRetryRef.current) {
+    return;
+  }
+
   try {
     if (state.selectedTabIdsInOrder.length > 1) {
       await startPopupExportBatch(state, deps, state.selectedTabIdsInOrder);

@@ -22,6 +22,7 @@ it('matches the exact protected message type set', () => {
     CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
     CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
     MessageType.EXPORT_CAPTURE_FULL_PAGE,
+    MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
     MessageType.EXECUTE_SAVE,
     MessageType.OPEN_EDITOR_WITH_IMAGE,
     MessageType.SAVE_SCREENSHOT_TO_GALLERY,

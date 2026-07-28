@@ -104,6 +104,13 @@ function authorizePrivilegedTabCapabilityRoute(
     sender,
   };
   if (shouldRequireContentPrivilegedActionCapability(contentActionCapabilityRequest)) {
+    if (
+      (message.type === MessageType.EXPORT_CAPTURE_FULL_PAGE ||
+        message.type === MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED) &&
+      message.contentIntent?.requestId !== message.exportRunId
+    ) {
+      return reject('Full-page export capability identity mismatch');
+    }
     const senderBinding = consumeContentPrivilegedActionCapabilityBinding({
       actionType: contentActionCapabilityRequest.actionType,
       contentIntent: 'contentIntent' in message ? message.contentIntent : undefined,

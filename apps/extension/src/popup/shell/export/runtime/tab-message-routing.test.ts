@@ -54,9 +54,9 @@ function createViewerExportMessages() {
   return [
     { type: MessageType.EXPORT_POPUP_PREVIEW },
     { type: MessageType.EXPORT_POPUP_START, requestId: 'req-1', options },
-    { type: MessageType.EXPORT_POPUP_BUILD_PACKAGE, options },
+    { batchRequestId: 'batch-1', type: MessageType.EXPORT_POPUP_BUILD_PACKAGE, options },
     { type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT, requestId: 'req-web' },
-    { type: MessageType.EXPORT_POPUP_CANCEL },
+    { exportRunId: 'export-run-1', type: MessageType.EXPORT_POPUP_CANCEL },
   ] as const;
 }
 
@@ -85,7 +85,10 @@ it.each(createViewerExportMessages())(
 
 it('routes invalid web snapshot viewer URLs through background runtime authorization', async () => {
   mockRuntimeCapabilityResponses({ success: false });
-  const message = { type: MessageType.EXPORT_POPUP_CANCEL } as const;
+  const message = {
+    exportRunId: 'export-run-1',
+    type: MessageType.EXPORT_POPUP_CANCEL,
+  } as const;
 
   await sendPopupExportTabMessage(7, message);
 

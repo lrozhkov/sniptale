@@ -379,9 +379,18 @@
         "apps/extension/src/background/capture/download/save-directory/guards.ts",
         "apps/extension/src/background/capture/download/save-directory/index.ts",
         "apps/extension/src/background/capture/editor/index.ts",
+        "apps/extension/src/background/capture/full-page/budgets.ts",
+        "apps/extension/src/background/capture/full-page/cancellation.ts",
         "apps/extension/src/background/capture/full-page/capture-parts.ts",
+        "apps/extension/src/background/capture/full-page/cdp-backend.ts",
+        "apps/extension/src/background/capture/full-page/heartbeat.ts",
         "apps/extension/src/background/capture/full-page/helpers.ts",
         "apps/extension/src/background/capture/full-page/lifecycle.ts",
+        "apps/extension/src/background/capture/full-page/native-backend.ts",
+        "apps/extension/src/background/capture/full-page/page-agent-transport.ts",
+        "apps/extension/src/background/capture/full-page/planner.ts",
+        "apps/extension/src/background/capture/full-page/raster.ts",
+        "apps/extension/src/background/capture/full-page/session-lease.ts",
         "apps/extension/src/background/capture/full-page/stitch.ts",
         "apps/extension/src/background/capture/full-page/types.ts",
         "apps/extension/src/background/capture/full-page/workflow.ts",
@@ -470,6 +479,7 @@
         "apps/extension/src/background/capture/routing/web-snapshot/session.ts",
         "apps/extension/src/background/capture/routing/web-snapshot/staged-blob-limits.ts",
         "apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.ts",
+        "apps/extension/src/background/capture/visible/coordinator.ts",
         "apps/extension/src/background/capture/visible/flow.ts",
         "apps/extension/src/background/capture/visible/helpers.ts",
         "apps/extension/src/background/debugger/diagnostics.ts",
@@ -910,6 +920,7 @@
         "apps/extension/src/background/storage/capture-surface/index.ts",
         "apps/extension/src/background/storage/diagnostics/active-sessions.ts",
         "apps/extension/src/background/storage/diagnostics/guards.ts",
+        "apps/extension/src/background/storage/full-page-capture/index.ts",
         "apps/extension/src/background/storage/llm/request-history-codec.ts",
         "apps/extension/src/background/storage/llm/request-history-contract.ts",
         "apps/extension/src/background/storage/llm/request-history.ts",
@@ -1008,9 +1019,18 @@
         "apps/extension/src/background/capture/download/save-directory/guards.ts",
         "apps/extension/src/background/capture/download/save-directory/index.ts",
         "apps/extension/src/background/capture/editor/index.ts",
+        "apps/extension/src/background/capture/full-page/budgets.ts",
+        "apps/extension/src/background/capture/full-page/cancellation.ts",
         "apps/extension/src/background/capture/full-page/capture-parts.ts",
+        "apps/extension/src/background/capture/full-page/cdp-backend.ts",
+        "apps/extension/src/background/capture/full-page/heartbeat.ts",
         "apps/extension/src/background/capture/full-page/helpers.ts",
         "apps/extension/src/background/capture/full-page/lifecycle.ts",
+        "apps/extension/src/background/capture/full-page/native-backend.ts",
+        "apps/extension/src/background/capture/full-page/page-agent-transport.ts",
+        "apps/extension/src/background/capture/full-page/planner.ts",
+        "apps/extension/src/background/capture/full-page/raster.ts",
+        "apps/extension/src/background/capture/full-page/session-lease.ts",
         "apps/extension/src/background/capture/full-page/stitch.ts",
         "apps/extension/src/background/capture/full-page/types.ts",
         "apps/extension/src/background/capture/full-page/workflow.ts",
@@ -1099,6 +1119,7 @@
         "apps/extension/src/background/capture/routing/web-snapshot/session.ts",
         "apps/extension/src/background/capture/routing/web-snapshot/staged-blob-limits.ts",
         "apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.ts",
+        "apps/extension/src/background/capture/visible/coordinator.ts",
         "apps/extension/src/background/capture/visible/flow.ts",
         "apps/extension/src/background/capture/visible/helpers.ts",
         "apps/extension/src/background/debugger/diagnostics.ts",
@@ -1539,6 +1560,7 @@
         "apps/extension/src/background/storage/capture-surface/index.ts",
         "apps/extension/src/background/storage/diagnostics/active-sessions.ts",
         "apps/extension/src/background/storage/diagnostics/guards.ts",
+        "apps/extension/src/background/storage/full-page-capture/index.ts",
         "apps/extension/src/background/storage/llm/request-history-codec.ts",
         "apps/extension/src/background/storage/llm/request-history-contract.ts",
         "apps/extension/src/background/storage/llm/request-history.ts",
@@ -2356,6 +2378,12 @@
         "apps/extension/src/content/application/diagnostics/runtime/logger.lifecycle.ts",
         "apps/extension/src/content/application/diagnostics/runtime/logger.listeners.ts",
         "apps/extension/src/content/application/diagnostics/runtime/logger.ts",
+        "apps/extension/src/content/application/full-page-capture/agent.ts",
+        "apps/extension/src/content/application/full-page-capture/geometry.ts",
+        "apps/extension/src/content/application/full-page-capture/index.ts",
+        "apps/extension/src/content/application/full-page-capture/mutations.ts",
+        "apps/extension/src/content/application/full-page-capture/stability.ts",
+        "apps/extension/src/content/application/full-page-capture/types.ts",
         "apps/extension/src/content/application/message-listener/ownership.ts",
         "apps/extension/src/content/application/mode-session/disabled-listener.ts",
         "apps/extension/src/content/application/mode-session/index.ts",
@@ -2707,6 +2735,8 @@
         "apps/extension/src/content/overlay/state/ai-modal.store.ts",
         "apps/extension/src/content/overlay/toolbar/capture/action-dropdown.tsx",
         "apps/extension/src/content/overlay/toolbar/capture/dropdown.shared.tsx",
+        "apps/extension/src/content/overlay/toolbar/capture/full-page-menu.tsx",
+        "apps/extension/src/content/overlay/toolbar/capture/full-page-preferences.ts",
         "apps/extension/src/content/overlay/toolbar/capture/group.tsx",
         "apps/extension/src/content/overlay/toolbar/capture/history.tsx",
         "apps/extension/src/content/overlay/toolbar/capture/index.tsx",
@@ -3069,6 +3099,7 @@
         "apps/extension/src/content/public/preparation-surface/ui-roots/surfaces.ts",
         "apps/extension/src/content/runtime/bootstrap.ts",
         "apps/extension/src/content/runtime/bridge/core.ts",
+        "apps/extension/src/content/runtime/bridge/full-page-capture.ts",
         "apps/extension/src/content/runtime/bridge/index.ts",
         "apps/extension/src/content/runtime/bridge/page-style/index.ts",
         "apps/extension/src/content/runtime/bridge/region-capture/index.ts",
@@ -3858,6 +3889,18 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/contracts/full-page-capture",
+      "disposition": "rollout",
+      "reason": "The full-page preference and capture metadata contract is covered by deterministic owner and boundary tests.",
+      "productionFiles": [
+        "apps/extension/src/contracts/full-page-capture/index.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/contracts/full-page-capture/index.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/contracts/messaging",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -3917,12 +3960,14 @@
         "apps/extension/src/contracts/messaging/scenario/validators/index.ts",
         "apps/extension/src/contracts/messaging/scenario/validators/session.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/controlled.ts",
+        "apps/extension/src/contracts/messaging/tab/contracts/full-page-capture.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/index.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/page-style.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/ui-export.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/ui.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/video.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/web-snapshot.ts",
+        "apps/extension/src/contracts/messaging/tab/full-page-capture.ts",
         "apps/extension/src/contracts/messaging/tab/index.ts",
         "apps/extension/src/contracts/messaging/tab/page-style.ts",
         "apps/extension/src/contracts/messaging/tab/ui.ts",
@@ -3997,12 +4042,14 @@
         "apps/extension/src/contracts/messaging/scenario/validators/index.ts",
         "apps/extension/src/contracts/messaging/scenario/validators/session.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/controlled.ts",
+        "apps/extension/src/contracts/messaging/tab/contracts/full-page-capture.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/index.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/page-style.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/ui-export.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/ui.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/video.ts",
         "apps/extension/src/contracts/messaging/tab/contracts/web-snapshot.ts",
+        "apps/extension/src/contracts/messaging/tab/full-page-capture.ts",
         "apps/extension/src/contracts/messaging/tab/index.ts",
         "apps/extension/src/contracts/messaging/tab/page-style.ts",
         "apps/extension/src/contracts/messaging/tab/ui.ts",
@@ -12372,7 +12419,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "6770d606188250270b02fd25f5680c313ffe3ad5f3f2cbee5244b83f59ce3e76"
+        "contentHash": "365c68be678e751320e27a1281317e7d54745403dcc5b744a9b017d422eaf73e"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -12790,7 +12837,7 @@
       "remediation": "Burn the exact import population down when owner adapters replace default sends; never add a broad path.",
       "exactSource": {
         "path": "tooling/qa/policy/messaging-default-baseline.mjs",
-        "contentHash": "f3fc731b4cd7dbfd95c7842cd29eca3178f7435fd143838608d0d5b81c3bb0f3"
+        "contentHash": "df61b12875722ec6019ce7fdf64df690106021260129cfaa6ca890af5d5db80e"
       },
       "consumers": [
         "tooling/qa/policy/messaging-default-baseline.mjs",
@@ -15682,6 +15729,7 @@
         "contentHash": "66bd887ef133a708e5a96f1d17012f54da6f59220c063bc1cc173abf35d634fe"
       },
       "consumers": [
+        "tooling/test/e2e/extension-critical-full-page.spec.ts",
         "tooling/test/e2e/extension-critical-highlighter-geometry.spec.ts",
         "tooling/test/e2e/extension-critical-media.spec.ts",
         "tooling/test/e2e/extension-critical-offscreen.spec.ts",
@@ -15886,6 +15934,24 @@
       ]
     },
     {
+      "id": "policy.source.full-page-capture-ts.abe220ec42",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/harness/full-page-capture.ts",
+        "contentHash": "f3cb92ea330a497f4dcb79e7f5746f946d113437d168127947f48dcde40364c7"
+      },
+      "consumers": [
+        "tooling/test/harness/full-page-capture.ts"
+      ],
+      "surfaces": [
+        "property:capture/anonymous-228/options"
+      ]
+    },
+    {
       "id": "policy.source.function-metrics-mjs.6d1ebcfbee",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -16021,7 +16087,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/git-head-sources.mjs",
-        "contentHash": "1ac91786763a2f03ba25317e09dfe4ab2f757da6527f3f52257e939c3bdff4b0"
+        "contentHash": "913ebad3d7d4c39ee4b48b1ce5cc44995171b9f07a9da3906717114c85eedade"
       },
       "consumers": [
         "tooling/qa/core/git-head-sources.mjs",
@@ -18044,7 +18110,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/run-e2e.mjs",
-        "contentHash": "c9413aaa11a954e999e855d440e8f7dfa23b4ccab757fb79186a338139b3a13f"
+        "contentHash": "12a6b0b23001991eaabedbb6a0dac6fbabd78ce293bd6cb9e9cb826e582a0bb7"
       },
       "consumers": [
         "tooling/test/e2e/run-e2e.mjs",
@@ -19833,7 +19899,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.deleted-closure.mjs",
-        "contentHash": "fb7bd97f52b1fd5cc0e15c0c20ac6bc12747f33f570095fa2d623db28341231f"
+        "contentHash": "9a2f50cdc046404c02592bc8f0af5d4dd6aaf8c727744a10250b0efdc6a78b8e"
       },
       "consumers": [
         "tooling/qa/core/verify-build.deleted-closure.mjs",
@@ -20415,7 +20481,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.execution.mjs",
-        "contentHash": "b22aaf6e6eaec45a157923b88eb6c3d407fd805f98ed87079b943aff5032b70b"
+        "contentHash": "04cb85c00eabc0aed13a9c2ec5c405302c03a59148e8ca2af7153f85881e1700"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.dead-exports.helpers.test.ts",
@@ -21248,7 +21314,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-sniptale-identity.mjs",
-        "contentHash": "90c18f1d27a7dae53fb58233fcb850c185973d7ad0fc0b634ae9ccbcdb5b54cf"
+        "contentHash": "bb34736f9c67e6d0a18cf7c5cbcb5b9a1e0fe612eb8987d82eca31c8f75ce08e"
       },
       "consumers": [
         "tooling/qa/core/verify-quality-contract-step-definitions.mjs",
@@ -21798,7 +21864,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "apps/extension/vite.config.ts",
-        "contentHash": "f71509f16d741e2da5fa3766e81412cfae9bb7d9e383634cf261a7f0946dfc23"
+        "contentHash": "74cd4ef56937fba031f8dd7b443338e804db7759533b953b16491a1c29ea0eef"
       },
       "consumers": [
         "apps/extension/vite.config.ts"
@@ -21807,14 +21873,14 @@
         "binding:MANROPE_FONT_FILES",
         "binding:RELEASE_OXC_MINIFY_OPTIONS",
         "binding:REQUIRED_APP_HTML_OUTPUTS",
-        "property:anonymous-146/allow",
-        "property:anonymous-146/build",
-        "property:anonymous-146/fs",
-        "property:anonymous-146/headers",
-        "property:anonymous-146/plugins",
-        "property:anonymous-146/resolve",
-        "property:anonymous-146/server",
-        "property:anonymous-146/worker",
+        "property:anonymous-143/allow",
+        "property:anonymous-143/build",
+        "property:anonymous-143/fs",
+        "property:anonymous-143/headers",
+        "property:anonymous-143/plugins",
+        "property:anonymous-143/resolve",
+        "property:anonymous-143/server",
+        "property:anonymous-143/worker",
         "property:compress",
         "property:createRollupOptions/output"
       ]

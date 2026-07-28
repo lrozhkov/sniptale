@@ -37,7 +37,8 @@ type ProtectedContentActionMessage = {
 export type ContentActionIntentClient = {
   attachContentActionIntent<TMessage extends ProtectedContentActionMessage>(
     message: TMessage,
-    source: ContentPrivilegedActionIntentSource | null | undefined
+    source: ContentPrivilegedActionIntentSource | null | undefined,
+    requestIdOverride?: string
   ): Promise<TMessage>;
   createBackgroundAutoStartContentActionIntentSource(
     grantToken: string
@@ -101,13 +102,14 @@ class ContentActionIntentClientImpl implements ContentActionIntentClient {
 
   async attachContentActionIntent<TMessage extends ProtectedContentActionMessage>(
     message: TMessage,
-    source: ContentPrivilegedActionIntentSource | null | undefined
+    source: ContentPrivilegedActionIntentSource | null | undefined,
+    requestIdOverride?: string
   ): Promise<TMessage> {
     if (!source) {
       return message;
     }
 
-    const requestId = this.randomId();
+    const requestId = requestIdOverride ?? this.randomId();
     const requestSource = await this.resolveContentActionRequestSource({
       actionType: message.type,
       requestId,

@@ -21,6 +21,7 @@ import {
   createContentRuntimeServices,
   type ContentRuntimeServices,
 } from '../application/runtime-services/services';
+import { createFullPageCaptureAgent } from '../application/full-page-capture';
 
 type ViewportInfoReader = () => ViewportInfo;
 export type ContentRuntimeCleanup = () => void;
@@ -127,10 +128,12 @@ export function initializeTopLevelContentRuntime(
 ): ContentRuntimeCleanup {
   const regionSelectorController = createRegionSelectorController({ getViewportInfo });
   const lifecycle: ContentRuntimeLifecycle = { disposed: false };
+  const fullPageCaptureAgent = createFullPageCaptureAgent();
 
   initializePageStyleRuntime();
   const unsubscribe = browserRuntime.subscribeToMessages(
     createContentRuntimeMessageListener(getViewportInfo, {
+      fullPageCaptureAgent,
       regionSelectorController,
     })
   );
@@ -140,6 +143,7 @@ export function initializeTopLevelContentRuntime(
     lifecycle.disposed = true;
     const cleanupSteps: CleanupStep[] = [
       { resource: 'runtime listener', run: unsubscribe },
+      { resource: 'full-page capture agent', run: () => fullPageCaptureAgent.dispose() },
       { resource: 'highlighter mode', run: disableHighlighterMode },
       { resource: 'quick edit mode', run: disableQuickEditMode },
       { resource: 'AI pick mode', run: disableAiPickModeIfLoaded },

@@ -17,6 +17,7 @@ function createState(): PopupExportRuntimeContract {
     requestIdRef: { current: null },
     result: null,
     availableTabs: [],
+    cancelRetryRef: { current: null },
     copyRequestIdRef: { current: 0 },
     copyResetTimeoutRef: { current: null },
     hasLoadedPreferences: true,

@@ -2,9 +2,14 @@ import { expect, it, vi } from 'vitest';
 
 import {
   createHeadFileTextResolver,
+  listHeadCodeFilesContainingText,
   readHeadFileText,
   readHeadFileTexts,
 } from './git-head-sources.mjs';
+
+function createFalseEperm() {
+  return Object.assign(new Error('spawnSync git EPERM'), { code: 'EPERM' });
+}
 
 it('reads HEAD file text without stdin-driven git batch mode', () => {
   const spawnSyncImpl = vi
@@ -47,4 +52,52 @@ it('reads one HEAD source through the same neutral owner', () => {
   const spawnSyncImpl = vi.fn().mockReturnValue({ status: 0, stdout: 'source' });
 
   expect(readHeadFileText('src/example.ts', { spawnSyncImpl })).toBe('source');
+});
+
+it('trusts successful HEAD output when WSL reports a false EPERM', () => {
+  const error = createFalseEperm();
+
+  expect(
+    readHeadFileText('src/example.ts', {
+      spawnSyncImpl: vi.fn(() => ({ error, status: 0, stdout: 'source' })),
+    })
+  ).toBe('source');
+  expect(
+    listHeadCodeFilesContainingText('/example', {
+      spawnSyncImpl: vi.fn(() => ({
+        error,
+        status: 0,
+        stdout: 'HEAD:src/consumer.ts\n',
+      })),
+    })
+  ).toEqual({ complete: true, files: ['src/consumer.ts'] });
+});
+
+it('rejects false EPERM output when git reports a failing status', () => {
+  const error = createFalseEperm();
+
+  expect(
+    readHeadFileText('src/example.ts', {
+      spawnSyncImpl: vi.fn(() => ({ error, status: 128, stdout: '' })),
+    })
+  ).toBeNull();
+});
+
+it('rejects partial output from non-EPERM execution failures even with status zero', () => {
+  const error = Object.assign(new Error('spawnSync git ENOBUFS'), { code: 'ENOBUFS' });
+
+  expect(
+    readHeadFileText('src/example.ts', {
+      spawnSyncImpl: vi.fn(() => ({ error, status: 0, stdout: 'partial source' })),
+    })
+  ).toBeNull();
+  expect(
+    listHeadCodeFilesContainingText('/example', {
+      spawnSyncImpl: vi.fn(() => ({
+        error,
+        status: 0,
+        stdout: 'HEAD:src/partial-consumer.ts\n',
+      })),
+    })
+  ).toEqual({ complete: false, files: [] });
 });

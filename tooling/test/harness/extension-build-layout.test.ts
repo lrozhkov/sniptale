@@ -41,6 +41,9 @@ it('maps physical app and harness sources to stable legacy output ids', () => {
   expect(e2eInputs.testHarnessHighlighterGeometry).toBe(
     path.join(appRoot, 'tooling/test/harness/highlighter-geometry.html')
   );
+  expect(e2eInputs.testHarnessFullPageCapture).toBe(
+    path.join(appRoot, 'tooling/test/harness/full-page-capture.html')
+  );
   expect(extensionHtmlInputSource(layout, e2eInputs.testHarnessPopup)).toBe(
     path.resolve('tooling/test/harness/popup.html')
   );

@@ -94,13 +94,13 @@ it('reports a failed response when the viewer export controller is unavailable',
 
   handleViewerPopupExportRequest({
     controller: null,
-    request: { type: 'EXPORT_POPUP_CANCEL' },
+    request: { exportRunId: 'viewer-export-run', type: 'EXPORT_POPUP_CANCEL' },
     sendResponse,
   });
 
   expect(mocks.handlePreparationPopupExportRequest).toHaveBeenCalledWith({
     controller: null,
-    request: { type: 'EXPORT_POPUP_CANCEL' },
+    request: { exportRunId: 'viewer-export-run', type: 'EXPORT_POPUP_CANCEL' },
     sendResponse,
   });
 });

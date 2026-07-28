@@ -1,5 +1,6 @@
 import type { ExportData, ExportOptions } from '@sniptale/runtime-contracts/export';
 import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
+import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
 import {
   buildExportPagePackage,
   createExportArchiveBlob,
@@ -75,7 +76,10 @@ export async function runExportManagerPipeline(
   state: ExportManagerState,
   options: ExportOptions,
   warnings: string[],
-  pipelineOptions: Pick<PackagePipelineOptions, 'contentIntentSource' | 'snapshotSource'> = {}
+  pipelineOptions: Pick<
+    PackagePipelineOptions,
+    'contentIntentSource' | 'fullPageCaptureIdentity' | 'snapshotSource'
+  > = {}
 ) {
   const shouldCaptureConsole = shouldCaptureConsoleDiagnostics(options);
 
@@ -84,6 +88,7 @@ export async function runExportManagerPipeline(
       binaryMode: 'blob',
       consoleDiagnosticsManaged: shouldCaptureConsole,
       contentIntentSource: pipelineOptions.contentIntentSource,
+      fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
       finishOnPackage: false,
       snapshotSource: pipelineOptions.snapshotSource,
     });
@@ -106,6 +111,7 @@ interface PackagePipelineOptions {
   binaryMode?: ExportArchiveBinaryMode;
   consoleDiagnosticsManaged?: boolean;
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+  fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
   finishOnPackage?: boolean;
   snapshotSource?: PageSnapshotSource | undefined;
 }
@@ -142,7 +148,10 @@ async function collectPackagePipelineInputs(
   state: ExportManagerState,
   options: ExportOptions,
   warnings: string[],
-  pipelineOptions: Pick<PackagePipelineOptions, 'contentIntentSource' | 'snapshotSource'> = {}
+  pipelineOptions: Pick<
+    PackagePipelineOptions,
+    'contentIntentSource' | 'fullPageCaptureIdentity' | 'snapshotSource'
+  > = {}
 ) {
   const snapshot = await prepareExportManagerTreeData(state, pipelineOptions.snapshotSource);
   const captureArtifact = createCaptureArtifact(snapshot);
@@ -161,6 +170,7 @@ async function collectPackagePipelineInputs(
   const downloadedFilesCount = downloadResult?.files.size ?? 0;
   const extraAssets = await collectExportExtraAssets({
     contentIntentSource: pipelineOptions.contentIntentSource,
+    fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
     downloadedFilesCount,
     options,
     snapshot,
@@ -199,6 +209,7 @@ export async function runExportManagerPackagePipeline(
   return runWithConsoleDiagnosticsSession(shouldCaptureConsole, async () => {
     const collected = await collectPackagePipelineInputs(state, options, warnings, {
       contentIntentSource: pipelineOptions.contentIntentSource,
+      fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
       snapshotSource: pipelineOptions.snapshotSource,
     });
     throwIfExportCancelled(state);

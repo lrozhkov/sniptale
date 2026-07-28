@@ -3,6 +3,7 @@ import type { PopupExportRuntimeContract } from '../state';
 
 export function reportStartExportFailure(state: PopupExportRuntimeContract, error: unknown) {
   state.requestIdRef.current = null;
+  state.cancelRetryRef.current = null;
   state.setProgress({
     activeStepKey: null,
     phase: 'error',

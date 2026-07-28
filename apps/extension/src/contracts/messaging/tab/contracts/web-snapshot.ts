@@ -11,6 +11,11 @@ import {
 } from '../../validators/index';
 import { isWebSnapshotManifest } from '../../../../features/web-snapshot/manifest';
 import type { TabRequestByType, TabResponseByType } from '../index';
+import * as contentIntent from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+
+const isFullPageCaptureAction = (value: unknown) =>
+  value === MessageType.EXPORT_CAPTURE_FULL_PAGE ||
+  value === MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED;
 
 type PartialTabRegistry = Partial<MessageContractRegistry<TabRequestByType, TabResponseByType>>;
 
@@ -28,6 +33,10 @@ export const tabWebSnapshotMessageContracts = {
           allowAnonymousCrossOriginAssets: isBoolean,
           allowAuthenticatedSameOriginAssets: isBoolean,
           requestId: isString,
+        },
+        optional: {
+          contentIntentGrant: contentIntent.isContentPrivilegedActionAutoStartGrant,
+          fullPageCaptureAction: isFullPageCaptureAction,
         },
       })
     ),

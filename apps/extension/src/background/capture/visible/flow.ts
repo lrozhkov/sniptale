@@ -11,6 +11,7 @@ import {
   resolveVisibleCaptureApiFormat,
   withHiddenFixedElements,
 } from './helpers';
+import { runNativeVisibleCaptureExclusive } from './coordinator';
 
 const logger = createLogger({ namespace: 'BackgroundVisibleCapture' });
 
@@ -72,19 +73,26 @@ async function captureVisibleTabNative(tabId: number): Promise<string> {
   }
   logger.log('Starting visible-tab capture', { format: settings.imageFormat, tabId });
 
-  const { hiddenCount, result } = await withHiddenFixedElements(tabId, async () => {
-    await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
-    const capturedDataUrl = await browserTabs.captureVisibleTab(tab.windowId, {
-      format: apiFormat,
-      quality: settings.imageQuality,
-    });
+  const { hiddenCount, result } = await runNativeVisibleCaptureExclusive(async (lease) =>
+    withHiddenFixedElements(tabId, async () => {
+      await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
+      const capturedDataUrl = await lease.capture(
+        tab.windowId,
+        {
+          format: apiFormat,
+          quality: settings.imageQuality,
+        },
+        () => assertVisibleCaptureTargetIsActive(tabId, tab.windowId)
+      );
+      await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
 
-    return finalizeCapturedDataUrl({
-      dataUrl: capturedDataUrl,
-      settings,
-      convertPngToWebp,
-    });
-  });
+      return finalizeCapturedDataUrl({
+        dataUrl: capturedDataUrl,
+        settings,
+        convertPngToWebp,
+      });
+    })
+  );
 
   logger.debug('Visible-tab capture masked fixed elements', { hiddenCount, tabId });
   logger.log('Completed visible-tab capture', { format: settings.imageFormat, tabId });

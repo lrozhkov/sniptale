@@ -8,6 +8,7 @@ import {
 } from '../diagnostics';
 import type { ExportHarCaptureHandle, ExportHarCaptureResult } from '../diagnostics';
 import type { ArchiveAsset } from '../archive';
+import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
 
 export function getExportErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -15,6 +16,7 @@ export function getExportErrorMessage(error: unknown, fallback: string): string 
 
 export async function captureOptionalArchiveAssets(args: {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+  fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
   options: ExportOptions;
   updateProgress: (progress: Partial<ExportProgress>) => void;
   warnings: string[];
@@ -33,7 +35,12 @@ export async function captureOptionalArchiveAssets(args: {
   });
 
   try {
-    assets.push(await captureFullPageScreenshotAsset(args.contentIntentSource));
+    const screenshot = await captureFullPageScreenshotAsset(
+      args.contentIntentSource,
+      args.fullPageCaptureIdentity
+    );
+    args.warnings.push(...screenshot.captureWarnings);
+    assets.push(screenshot);
   } catch (error) {
     args.warnings.push(
       getExportErrorMessage(error, translate('content.runtime.captureFullPageScreenshotFailed'))

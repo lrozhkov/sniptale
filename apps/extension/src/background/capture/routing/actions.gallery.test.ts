@@ -5,22 +5,26 @@ import type {
 } from '@sniptale/runtime-contracts/web-snapshot';
 
 const {
+  assertWebSnapshotSessionOwnerMock,
   beginWebSnapshotSaveMock,
   commitWebSnapshotSaveMock,
   consumeWebSnapshotStagedBlobMock,
   fetchWebSnapshotAssetForSessionMock,
   releaseWebSnapshotStagedBlobsMock,
+  releaseWebSnapshotStagedBlobsForSessionMock,
   releaseWebSnapshotSaveMock,
   registerWebSnapshotAssetSessionMock,
   saveScreenshotToMediaHubFromDataUrlMock,
   saveWebSnapshotToMediaHubMock,
   stageWebSnapshotBlobChunkMock,
 } = vi.hoisted(() => ({
+  assertWebSnapshotSessionOwnerMock: vi.fn(),
   beginWebSnapshotSaveMock: vi.fn(),
   commitWebSnapshotSaveMock: vi.fn(),
   consumeWebSnapshotStagedBlobMock: vi.fn(),
   fetchWebSnapshotAssetForSessionMock: vi.fn(),
   releaseWebSnapshotStagedBlobsMock: vi.fn(),
+  releaseWebSnapshotStagedBlobsForSessionMock: vi.fn(),
   releaseWebSnapshotSaveMock: vi.fn(),
   registerWebSnapshotAssetSessionMock: vi.fn(),
   saveScreenshotToMediaHubFromDataUrlMock: vi.fn(),
@@ -43,9 +47,11 @@ vi.mock('./web-snapshot/fetch', () => ({
 
 vi.mock('./web-snapshot/session', () => ({
   assertWebSnapshotSessionOpen: vi.fn(),
+  assertWebSnapshotSessionOwner: assertWebSnapshotSessionOwnerMock,
   authorizeWebSnapshotAssetFetch: vi.fn(),
   authorizeWebSnapshotCaptureRequest: vi.fn(),
   beginWebSnapshotSave: beginWebSnapshotSaveMock,
+  cancelWebSnapshotCaptureRequest: vi.fn(),
   commitWebSnapshotSave: commitWebSnapshotSaveMock,
   releaseWebSnapshotSave: releaseWebSnapshotSaveMock,
   registerWebSnapshotAssetSession: registerWebSnapshotAssetSessionMock,
@@ -55,6 +61,7 @@ vi.mock('./web-snapshot/session', () => ({
 vi.mock('./web-snapshot/staged-blobs', () => ({
   consumeWebSnapshotStagedBlob: consumeWebSnapshotStagedBlobMock,
   releaseWebSnapshotStagedBlobs: releaseWebSnapshotStagedBlobsMock,
+  releaseWebSnapshotStagedBlobsForSession: releaseWebSnapshotStagedBlobsForSessionMock,
   resetWebSnapshotStagedBlobsForTests: vi.fn(),
   stageWebSnapshotBlobChunk: stageWebSnapshotBlobChunkMock,
 }));
@@ -164,6 +171,7 @@ it('saves web snapshot packages into the gallery', async () => {
     screenshotBlob: expect.any(Blob),
   });
   expect(commitWebSnapshotSaveMock).toHaveBeenCalledWith({
+    assetId: 'asset-web',
     sessionId: 'snapshot-session-1',
     tabId: 42,
   });

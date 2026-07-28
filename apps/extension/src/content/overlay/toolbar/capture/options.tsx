@@ -1,20 +1,13 @@
 import React from 'react';
-import {
-  TvMinimal,
-  GalleryVertical,
-  Download,
-  Copy,
-  Pencil,
-  FolderInput,
-  FileStack,
-  Save,
-} from 'lucide-react';
+import { TvMinimal, Download, Copy, Pencil, FolderInput, FileStack, Save } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { CaptureActionType } from '../../../../contracts/settings';
 import { createTrustedContentActionIntentSource } from '../../../application/privileged-action-intent';
 import { PopoverCheckIcon } from '../../icons/icons';
 import type { ToolbarCaptureActionsProps } from '../types';
 import { getCaptureActionDescriptors } from '../../../../features/quick-actions-presets/catalog';
+import { FullPageCaptureSplitButton } from './full-page-menu';
+import { useFullPageCapturePreferences } from './full-page-preferences';
 
 export function renderMenuCheck() {
   return <PopoverCheckIcon />;
@@ -114,9 +107,15 @@ export function getCaptureActionTooltip(captureAction: CaptureActionType) {
 }
 
 export function ToolbarCaptureButtons(props: {
+  compactMenus: boolean;
+  currentViewport: { height: number; width: number } | null;
+  displayMode: 'horizontal' | 'vertical';
+  isLoading: boolean;
   onTakeScreenshot: ToolbarCaptureActionsProps['onTakeScreenshot'];
+  toolbarMenuState: ToolbarCaptureActionsProps['toolbarMenuState'];
 }) {
   const handleTakeScreenshotClick = createTakeScreenshotClickHandler(props.onTakeScreenshot);
+  const fullPage = useFullPageCapturePreferences();
 
   return (
     <>
@@ -125,14 +124,23 @@ export function ToolbarCaptureButtons(props: {
         icon={<TvMinimal size={20} strokeWidth={2} />}
         onClick={handleTakeScreenshotClick('visible')}
         title={translate('content.toolbar.visibleArea')}
+        disabled={props.isLoading}
       />
-      <ToolbarViewportCaptureButton
-        dataUi="content.toolbar.capture-full-button"
-        icon={<GalleryVertical size={20} strokeWidth={2} />}
-        onClick={handleTakeScreenshotClick('full')}
-        title={translate('content.toolbar.fullPage')}
+      <FullPageCaptureSplitButton
+        compactMenus={props.compactMenus}
+        currentViewport={props.currentViewport}
+        disabled={props.isLoading}
+        displayMode={props.displayMode}
+        onPrimaryClick={handleTakeScreenshotClick('full')}
+        onUpdate={fullPage.updatePreferences}
+        preferences={fullPage.preferences}
+        saving={fullPage.saving}
+        toolbarMenuState={props.toolbarMenuState}
       />
-      <ToolbarSelectionCaptureButton onClick={handleTakeScreenshotClick('selection')} />
+      <ToolbarSelectionCaptureButton
+        disabled={props.isLoading}
+        onClick={handleTakeScreenshotClick('selection')}
+      />
     </>
   );
 }
@@ -155,6 +163,7 @@ function ToolbarViewportCaptureButton(props: {
   icon: React.ReactNode;
   onClick: React.MouseEventHandler<HTMLButtonElement>;
   title: string;
+  disabled: boolean;
 }) {
   return (
     <button
@@ -163,6 +172,7 @@ function ToolbarViewportCaptureButton(props: {
       title={props.title}
       data-ui={props.dataUi}
       data-sniptale-activation-bridge="defer"
+      disabled={props.disabled}
     >
       {props.icon}
     </button>
@@ -170,6 +180,7 @@ function ToolbarViewportCaptureButton(props: {
 }
 
 function ToolbarSelectionCaptureButton(props: {
+  disabled: boolean;
   onClick: React.MouseEventHandler<HTMLButtonElement>;
 }) {
   return (
@@ -179,6 +190,7 @@ function ToolbarSelectionCaptureButton(props: {
       title={translate('content.toolbar.selectionArea')}
       data-ui="content.toolbar.capture-selection-button"
       data-sniptale-activation-bridge="defer"
+      disabled={props.disabled}
     >
       <svg
         viewBox="0 0 24 24"

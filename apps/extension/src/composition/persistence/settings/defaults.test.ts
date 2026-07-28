@@ -38,6 +38,7 @@ describe('settings default graph', () => {
     expect(firstSettings.viewportPresets).not.toBe(secondSettings.viewportPresets);
     expect(firstSettings.contextMenu).not.toBe(secondSettings.contextMenu);
     expect(firstSettings.contentToolbar).not.toBe(secondSettings.contentToolbar);
+    expect(firstSettings.fullPageCapture).not.toBe(secondSettings.fullPageCapture);
   });
 
   it('creates fresh nested defaults for direct default-settings consumers', () => {
@@ -47,11 +48,20 @@ describe('settings default graph', () => {
     expect(firstSettings.viewportPresets).not.toBe(secondSettings.viewportPresets);
     expect(firstSettings.contextMenu).not.toBe(secondSettings.contextMenu);
     expect(firstSettings.contentToolbar).not.toBe(secondSettings.contentToolbar);
+    expect(firstSettings.fullPageCapture).not.toBe(secondSettings.fullPageCapture);
   });
 
   it('uses the v1 system catalog and current size as the default', () => {
     const settings = createDefaultSettings();
     expect(settings.viewportPresets).toHaveLength(9);
     expect(settings.defaultViewportPresetId).toBeNull();
+  });
+
+  it('uses safe global full-page capture defaults', () => {
+    expect(createDefaultSettings().fullPageCapture).toEqual({
+      floatingElements: 'once',
+      freezeMotion: true,
+      preloadLazyContent: true,
+    });
   });
 });

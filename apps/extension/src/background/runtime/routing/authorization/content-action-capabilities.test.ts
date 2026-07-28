@@ -283,6 +283,40 @@ it('authorizes content capture routes with a matching one-shot capability', () =
   });
 });
 
+it('binds full-page export identity before consuming its one-shot capability', () => {
+  const contentIntent = issueContentIntent(MessageType.EXPORT_CAPTURE_FULL_PAGE);
+  const mismatchedMessage = {
+    contentIntent,
+    exportRunId: 'different-export-run',
+    type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+  } as const;
+
+  expect(
+    authorizeIPCMessage({
+      family: 'capture',
+      kind: 'privileged-tab-route',
+      message: mismatchedMessage,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual({
+    authorized: false,
+    reason: 'Full-page export capability identity mismatch',
+  });
+  expect(
+    authorizeIPCMessage({
+      family: 'capture',
+      kind: 'privileged-tab-route',
+      message: {
+        ...mismatchedMessage,
+        exportRunId: contentIntent.requestId,
+      },
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual({ authorized: true });
+});
+
 it('requires a document-bound one-shot intent for content-originated screenshot enable', () => {
   const bareMessage = { type: MessageType.ENABLE_SCREENSHOT_MODE } as const;
   expect(

@@ -4,6 +4,10 @@ import {
   isContentEventWithinElement,
 } from '../../../platform/dom-host';
 import type { ToolbarCapturePopoverMenu, ToolbarPopoverMenu } from '../state/menu';
+import {
+  getPointerDistanceFromRect,
+  TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX,
+} from '../menu/floating.helpers';
 
 type MenuType = ToolbarCapturePopoverMenu | null;
 
@@ -47,12 +51,6 @@ function getCurrentToolbarMenuElement(params: {
   return null;
 }
 
-function getDistanceFromRect(event: MouseEvent, rect: DOMRect) {
-  const closestX = Math.max(rect.left, Math.min(event.clientX, rect.right));
-  const closestY = Math.max(rect.top, Math.min(event.clientY, rect.bottom));
-  return Math.sqrt(Math.pow(event.clientX - closestX, 2) + Math.pow(event.clientY - closestY, 2));
-}
-
 function hasToolbarMenuOpen(params: {
   showCaptureMenu: boolean;
   showTimerMenu: boolean;
@@ -76,7 +74,10 @@ function shouldDismissToolbarMenu(event: MouseEvent, menuEl: HTMLElement | null)
     return false;
   }
 
-  return getDistanceFromRect(event, resolvedMenuEl.getBoundingClientRect()) > 250;
+  return (
+    getPointerDistanceFromRect(event, resolvedMenuEl.getBoundingClientRect()) >
+    TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX
+  );
 }
 
 export function useToolbarFocusMenuDismissal(params: {

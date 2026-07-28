@@ -4,7 +4,11 @@ import { sendTabMessage } from '../../../../platform/runtime-messaging';
 import { isOwnedSnapshotViewerPage } from '../../../../features/tab-capabilities/url';
 import { loadSettings } from '../../../../composition/persistence/settings';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { authorizeWebSnapshotCaptureRequest } from '../../../capture/routes';
+import {
+  authorizeWebSnapshotCaptureRequest,
+  cancelWebSnapshotCaptureRequest,
+} from '../../../capture/routes';
+import { deleteMediaLibraryAssetsBatchSafely } from '../../../../workflows/media-hub/store';
 import {
   createWebSnapshotViewerPorts,
   sendViewerPopupExportMessage,
@@ -15,6 +19,8 @@ import type { PopupExportViewerMessage } from '../message-guards/guards/shared';
 import * as contentActionRoute from '../../../routing-contracts/capabilities/content-action/route';
 import type { TabRouteArgs } from './shared';
 import { executeInjectedWebSnapshotContentExport } from './popup-export-injected-runner';
+import type { FullPageExportCaptureAction } from '../../../../contracts/full-page-capture';
+import { cancelFullPageCaptureByExportRunId } from '../../../capture/full-page/cancellation';
 
 type PopupExportRouteArgs = Omit<TabRouteArgs, 'message'> & {
   message: PopupExportViewerMessage;
@@ -67,11 +73,20 @@ function createViewerPopupExportMessage(
   return viewerMessage;
 }
 
-function issueFullPageExportContentIntentGrant(tabId: number) {
+function issueFullPageExportContentIntentGrant(tabId: number, action: FullPageExportCaptureAction) {
   return contentActionRoute.issueContentPrivilegedActionAutoStartGrant({
-    actionTypes: [MessageType.EXPORT_CAPTURE_FULL_PAGE],
+    actionTypes: [action],
     tabId,
   });
+}
+
+function resolveFullPageCaptureAction(
+  message: NonSavePopupExportMessage,
+  target: PopupExportTarget
+): FullPageExportCaptureAction {
+  return message.type === MessageType.EXPORT_POPUP_BUILD_PACKAGE || target.tab.active !== true
+    ? MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED
+    : MessageType.EXPORT_CAPTURE_FULL_PAGE;
 }
 
 function shouldGrantFullPageExportIntent(message: NonSavePopupExportMessage): boolean {
@@ -84,7 +99,8 @@ function shouldGrantFullPageExportIntent(message: NonSavePopupExportMessage): bo
 
 function createContentPopupExportMessage(
   message: NonSavePopupExportMessage,
-  resolvedTabId: number
+  resolvedTabId: number,
+  target: PopupExportTarget
 ): Exclude<
   ViewerPortPopupExportMessage,
   { type: typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT }
@@ -93,10 +109,12 @@ function createContentPopupExportMessage(
     case MessageType.EXPORT_POPUP_PREVIEW:
       return { type: message.type };
     case MessageType.EXPORT_POPUP_START:
+      const startAction = resolveFullPageCaptureAction(message, target);
       return {
         ...(shouldGrantFullPageExportIntent(message)
           ? {
-              contentIntentGrant: issueFullPageExportContentIntentGrant(resolvedTabId),
+              contentIntentGrant: issueFullPageExportContentIntentGrant(resolvedTabId, startAction),
+              fullPageCaptureAction: startAction,
             }
           : {}),
         options: message.options,
@@ -104,17 +122,23 @@ function createContentPopupExportMessage(
         type: message.type,
       };
     case MessageType.EXPORT_POPUP_BUILD_PACKAGE:
+      const packageAction = resolveFullPageCaptureAction(message, target);
       return {
         ...(shouldGrantFullPageExportIntent(message)
           ? {
-              contentIntentGrant: issueFullPageExportContentIntentGrant(resolvedTabId),
+              contentIntentGrant: issueFullPageExportContentIntentGrant(
+                resolvedTabId,
+                packageAction
+              ),
+              fullPageCaptureAction: packageAction,
             }
           : {}),
+        batchRequestId: message.batchRequestId,
         options: message.options,
         type: message.type,
       };
     case MessageType.EXPORT_POPUP_CANCEL:
-      return { type: message.type };
+      return { type: message.type, exportRunId: message.exportRunId };
   }
 }
 
@@ -143,10 +167,13 @@ async function resolvePopupExportTarget(resolvedTabId: number): Promise<PopupExp
   return { isOwnedSnapshotViewer: false, tab };
 }
 
-function sendPopupExportToContent(args: NonSavePopupExportRouteArgs): Promise<unknown> {
+function sendPopupExportToContent(
+  args: NonSavePopupExportRouteArgs,
+  target: PopupExportTarget
+): Promise<unknown> {
   return sendTabMessage(
     args.resolvedTabId,
-    createContentPopupExportMessage(args.message, args.resolvedTabId)
+    createContentPopupExportMessage(args.message, args.resolvedTabId, target)
   );
 }
 
@@ -172,7 +199,16 @@ async function routeWebSnapshotSave(
       executeInjectedWebSnapshotContentExport({
         allowAnonymousCrossOriginAssets: settings.anonymousCrossOriginSnapshotAssetsEnabled,
         allowAuthenticatedSameOriginAssets: settings.authenticatedSnapshotAssetsEnabled,
-        contentIntentGrant: issueFullPageExportContentIntentGrant(args.resolvedTabId),
+        contentIntentGrant: issueFullPageExportContentIntentGrant(
+          args.resolvedTabId,
+          args.target.tab.active === true
+            ? MessageType.EXPORT_CAPTURE_FULL_PAGE
+            : MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED
+        ),
+        fullPageCaptureAction:
+          args.target.tab.active === true
+            ? MessageType.EXPORT_CAPTURE_FULL_PAGE
+            : MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
         requestId: args.message.requestId,
         resolvedTabId: args.resolvedTabId,
       })
@@ -190,6 +226,43 @@ async function routeWebSnapshotSave(
 }
 
 async function routePopupExportMessageWork(args: PopupExportRouteArgs): Promise<unknown> {
+  if (args.message.type === MessageType.EXPORT_POPUP_CANCEL) {
+    cancelFullPageCaptureByExportRunId(args.message.exportRunId);
+    const committedAssetIds = cancelWebSnapshotCaptureRequest(
+      args.resolvedTabId,
+      args.message.exportRunId
+    );
+    let compensationFailure: unknown;
+    try {
+      if (committedAssetIds.length > 0) {
+        await deleteMediaLibraryAssetsBatchSafely(committedAssetIds);
+      }
+    } catch (error) {
+      compensationFailure = error;
+    }
+
+    let forwardingResult: unknown;
+    let forwardingFailure: unknown;
+    try {
+      const target = await resolvePopupExportTarget(args.resolvedTabId);
+      const cancelArgs: NonSavePopupExportRouteArgs = { ...args, message: args.message };
+      forwardingResult = target.isOwnedSnapshotViewer
+        ? await sendPopupExportToViewer(cancelArgs)
+        : await sendPopupExportToContent(cancelArgs, target);
+    } catch (error) {
+      forwardingFailure = error;
+    }
+
+    if (compensationFailure && forwardingFailure) {
+      throw new AggregateError(
+        [compensationFailure, forwardingFailure],
+        'Popup export cancellation cleanup and forwarding failed'
+      );
+    }
+    if (compensationFailure) throw compensationFailure;
+    if (forwardingFailure) throw forwardingFailure;
+    return forwardingResult;
+  }
   const target = await resolvePopupExportTarget(args.resolvedTabId);
   if (args.message.type === MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT) {
     return routeWebSnapshotSave({ ...args, message: args.message, target });
@@ -198,7 +271,7 @@ async function routePopupExportMessageWork(args: PopupExportRouteArgs): Promise<
   const nonSaveArgs: NonSavePopupExportRouteArgs = { ...args, message: args.message };
   return target.isOwnedSnapshotViewer
     ? sendPopupExportToViewer(nonSaveArgs)
-    : sendPopupExportToContent(nonSaveArgs);
+    : sendPopupExportToContent(nonSaveArgs, target);
 }
 
 export function routePopupExportMessage(args: PopupExportRouteArgs): void {

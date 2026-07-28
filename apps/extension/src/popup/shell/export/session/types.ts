@@ -40,6 +40,10 @@ export type PopupExportSessionTransferState = {
 };
 
 export type PopupExportSessionRefs = {
+  cancelRetryRef: MutableRefObject<{
+    exportRunId: string;
+    tabIds: number[];
+  } | null>;
   copyResetTimeoutRef: MutableRefObject<number | null>;
   copyRequestIdRef: MutableRefObject<number>;
   requestIdRef: MutableRefObject<string | null>;

@@ -53,11 +53,11 @@ it('routes viewer export port requests and posts correlated responses', () => {
     type: WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
     requestId: 'port-req-1',
     viewerPortGeneration: 'viewer-generation-1',
-    request: { type: MessageType.EXPORT_POPUP_CANCEL },
+    request: { exportRunId: 'export-run-1', type: MessageType.EXPORT_POPUP_CANCEL },
   });
 
   expect(onPopupExportRequest).toHaveBeenCalledWith(
-    { type: MessageType.EXPORT_POPUP_CANCEL },
+    { exportRunId: 'export-run-1', type: MessageType.EXPORT_POPUP_CANCEL },
     expect.any(Function)
   );
   expect(postMessage).toHaveBeenCalledWith({

@@ -252,6 +252,10 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Общий архив подготовлен',
     en: 'Batch archive is ready',
   },
+  batchAggregateLimitError: {
+    ru: 'Пакет пропущен: общий объём распакованных данных превысил 250 МиБ',
+    en: 'Package skipped: aggregate decoded data exceeded 250 MiB',
+  },
   startProgressMessage: {
     ru: 'Подготовка...',
     en: 'Preparing...',

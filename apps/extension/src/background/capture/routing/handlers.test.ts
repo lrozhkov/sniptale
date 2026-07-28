@@ -188,6 +188,7 @@ async function verifiesVisibleCaptureCopyAndEditFlows() {
   captureFullPageTransactionMock.mockResolvedValue({
     dataUrl: 'data:image/jpeg;base64,3',
     jobId: 'capture-job-full-edit',
+    metadata: { downscaled: false, frozenExtentWarning: false },
   });
   openEditorWithImageMock.mockResolvedValue(undefined);
 

@@ -5,6 +5,9 @@ import * as contentIntent from '@sniptale/runtime-contracts/protocol/content-pri
 import { parsePopupExportControlRequest } from '../../../../../contracts/messaging/parsers/popup-export-control';
 
 const isContentGrant = contentIntent.isContentPrivilegedActionAutoStartGrant;
+const isFullPageCaptureAction = (value: unknown) =>
+  value === MessageType.EXPORT_CAPTURE_FULL_PAGE ||
+  value === MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED;
 
 function isPopupExportType(
   value: unknown
@@ -51,11 +54,16 @@ export function parsePopupExportRequest(request: unknown): PopupExportRequest | 
   }
 
   if (request['type'] === MessageType.EXPORT_POPUP_BUILD_PACKAGE) {
+    if (typeof request['batchRequestId'] !== 'string') return null;
     return {
+      batchRequestId: request['batchRequestId'],
       type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
       options,
       ...(isContentGrant(request['contentIntentGrant'])
         ? { contentIntentGrant: request['contentIntentGrant'] }
+        : {}),
+      ...(isFullPageCaptureAction(request['fullPageCaptureAction'])
+        ? { fullPageCaptureAction: request['fullPageCaptureAction'] }
         : {}),
     };
   }
@@ -72,6 +80,9 @@ export function parsePopupExportRequest(request: unknown): PopupExportRequest | 
     ...(isContentGrant(request['contentIntentGrant'])
       ? { contentIntentGrant: request['contentIntentGrant'] }
       : {}),
+    ...(isFullPageCaptureAction(request['fullPageCaptureAction'])
+      ? { fullPageCaptureAction: request['fullPageCaptureAction'] }
+      : {}),
   };
 }
 
@@ -82,6 +93,8 @@ function parseWebSnapshotExportRequest(
   const requestId = candidate['requestId'];
   const allowAnonymousCrossOriginAssets = candidate['allowAnonymousCrossOriginAssets'];
   const allowAuthenticatedSameOriginAssets = candidate['allowAuthenticatedSameOriginAssets'];
+  const contentIntentGrant = candidate['contentIntentGrant'];
+  const fullPageCaptureAction = candidate['fullPageCaptureAction'];
   return type === MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT &&
     typeof requestId === 'string' &&
     typeof allowAnonymousCrossOriginAssets === 'boolean' &&
@@ -91,6 +104,8 @@ function parseWebSnapshotExportRequest(
         allowAuthenticatedSameOriginAssets,
         requestId,
         type,
+        ...(isContentGrant(contentIntentGrant) ? { contentIntentGrant } : {}),
+        ...(isFullPageCaptureAction(fullPageCaptureAction) ? { fullPageCaptureAction } : {}),
       }
     : null;
 }

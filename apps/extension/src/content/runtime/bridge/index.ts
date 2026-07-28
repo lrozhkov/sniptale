@@ -7,10 +7,12 @@ import { createContentRuntimeMessageHandlers } from './router';
 import type { ContentRuntimeMessage } from './types';
 import type { RegionSelectorController } from '../../selection/region-selector/types';
 import { isTopLevelContentRuntimeMessage } from '../../application/message-listener/ownership';
+import type { FullPageCaptureAgent } from '../../application/full-page-capture';
 
 const logger = createLogger({ namespace: 'ContentRuntimeBridge' });
 
 type ContentRuntimeListenerDeps = {
+  fullPageCaptureAgent?: FullPageCaptureAgent;
   regionSelectorController: Pick<
     RegionSelectorController,
     'hideRecordingOverlay' | 'hideRegionSelector' | 'showRecordingOverlay' | 'showRegionSelector'
@@ -47,7 +49,8 @@ export function createContentRuntimeMessageListener(
       parsedMessage,
       sendResponse,
       getViewportInfo,
-      deps.regionSelectorController
+      deps.regionSelectorController,
+      deps.fullPageCaptureAgent
     );
 
     for (const handler of handlers) {

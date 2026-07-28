@@ -21,7 +21,11 @@ import {
   serializeMessagePayload,
 } from '@sniptale/platform/observability/message-tracer/messaging';
 import { attachRuntimeMessageFreshness } from '@sniptale/platform/security/runtime-message-freshness';
-import type { RuntimeMessagingDeps, RuntimeMessagingTransport } from './transport';
+import type {
+  RuntimeMessagingDeps,
+  RuntimeMessagingTransport,
+  TabMessageTarget,
+} from './transport';
 
 function validateRuntimeRequest<TMessage extends RuntimeRequestByType[RuntimeMessageType]>(
   message: TMessage
@@ -37,9 +41,31 @@ function validateTabRequest<TMessage extends TabRequestByType[TabMessageType]>(
   return message;
 }
 
+function sendChromeTabMessageWithTarget(
+  tabId: number,
+  message: unknown,
+  target: TabMessageTarget
+): Promise<unknown> {
+  return chrome.tabs.sendMessage(tabId, message, target);
+}
+
+function sendChromeTabMessageWithoutTarget(tabId: number, message: unknown): Promise<unknown> {
+  return chrome.tabs.sendMessage(tabId, message);
+}
+
+function sendChromeTabMessage(
+  tabId: number,
+  message: unknown,
+  target?: TabMessageTarget
+): Promise<unknown> {
+  return target
+    ? sendChromeTabMessageWithTarget(tabId, message, target)
+    : sendChromeTabMessageWithoutTarget(tabId, message);
+}
+
 const defaultDeps: RuntimeMessagingDeps = {
   runtimeSendMessage: (message) => chrome.runtime.sendMessage(message),
-  tabSendMessage: (tabId, message) => chrome.tabs.sendMessage(tabId, message),
+  tabSendMessage: sendChromeTabMessage,
 };
 
 /**
@@ -72,7 +98,8 @@ export function createRuntimeMessagingTransport(
     },
     async sendTabMessage<TMessage extends TabRequestByType[TabMessageType]>(
       tabId: number,
-      message: TMessage
+      message: TMessage,
+      target?: TabMessageTarget
     ): Promise<TabResponseByType[TMessage['type']]> {
       const parsedMessage = validateTabRequest(message);
       const tracker = beginSendTrace(
@@ -82,7 +109,7 @@ export function createRuntimeMessagingTransport(
       );
 
       try {
-        const rawResponse = await resolvedDeps.tabSendMessage(tabId, parsedMessage);
+        const rawResponse = await resolvedDeps.tabSendMessage(tabId, parsedMessage, target);
         recordMessageResponse(rawResponse, tracker);
         return parseTabResponseForRequest(parsedMessage, rawResponse);
       } catch (error) {

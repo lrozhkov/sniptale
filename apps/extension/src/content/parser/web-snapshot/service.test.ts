@@ -5,7 +5,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   buildPreparedSnapshotDocument: vi.fn(),
   buildWebSnapshotPackage: vi.fn(),
-  captureWebSnapshotScreenshot: vi.fn(),
+  captureWebSnapshotScreenshotWithWarnings: vi.fn(),
   collectWebSnapshotAssets: vi.fn(),
   serializePreparedSnapshotDocument: vi.fn(),
 }));
@@ -20,8 +20,9 @@ vi.mock('./assets', () => ({
   collectWebSnapshotAssets: mocks.collectWebSnapshotAssets,
 }));
 
-vi.mock('./capture', () => ({
-  captureWebSnapshotScreenshot: mocks.captureWebSnapshotScreenshot,
+vi.mock('./capture', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./capture')>()),
+  captureWebSnapshotScreenshotWithWarnings: mocks.captureWebSnapshotScreenshotWithWarnings,
 }));
 
 vi.mock('./package', () => ({
@@ -60,7 +61,10 @@ beforeEach(() => {
     snapshotSessionId: 'snapshot-session-1',
     warnings: ['Asset skipped'],
   });
-  mocks.captureWebSnapshotScreenshot.mockResolvedValue(new Blob(['shot'], { type: 'image/png' }));
+  mocks.captureWebSnapshotScreenshotWithWarnings.mockResolvedValue({
+    blob: new Blob(['shot'], { type: 'image/png' }),
+    warnings: [],
+  });
   mocks.serializePreparedSnapshotDocument.mockReturnValue('<!doctype html><html>rewritten</html>');
   mocks.buildWebSnapshotPackage.mockResolvedValue({
     manifest: { assets: [], createdAt: 'now', title: 'prepared', version: 1 },
@@ -122,7 +126,9 @@ it('packages the canonical prepared snapshot document after asset rewriting', as
 });
 
 it('keeps web snapshot export usable when full-page screenshot capture fails', async () => {
-  mocks.captureWebSnapshotScreenshot.mockRejectedValueOnce(new Error('window is not defined'));
+  mocks.captureWebSnapshotScreenshotWithWarnings.mockRejectedValueOnce(
+    new Error('window is not defined')
+  );
 
   const result = await buildCurrentPageWebSnapshot({
     allowAnonymousCrossOriginAssets: false,

@@ -3,6 +3,7 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 export type ToolbarPopoverMenu =
   | 'auto-blur'
   | 'capture'
+  | 'full-page'
   | 'mode'
   | 'scenario-mode'
   | 'scenario-project'

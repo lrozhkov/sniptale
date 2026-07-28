@@ -23,7 +23,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({ browserTabs: { get: mocks.getTab } }));
-vi.mock('../../../composition/persistence/settings', () => ({ loadSettings: mocks.loadSettings }));
+vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
+  loadSettings: mocks.loadSettings,
+}));
 vi.mock('../../../features/tab-capabilities/runtime', () => ({
   classifyTabRuntimeCapability: mocks.classify,
 }));

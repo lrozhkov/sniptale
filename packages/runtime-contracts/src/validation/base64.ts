@@ -61,7 +61,7 @@ export function isBoundedBase64(value: unknown, maxDecodedBytes: number): value 
   return isCanonicalBase64(value) && estimateBase64DecodedBytes(value) <= maxDecodedBytes;
 }
 
-export function estimateUtf8Bytes(value: string): number {
+export function estimateUtf8Bytes(value: string, maxBytes = Number.POSITIVE_INFINITY): number {
   let bytes = 0;
 
   for (let index = 0; index < value.length; index += 1) {
@@ -81,13 +81,16 @@ export function estimateUtf8Bytes(value: string): number {
     } else {
       bytes += 3;
     }
+    if (bytes > maxBytes) return bytes;
   }
 
   return bytes;
 }
 
 export function isBoundedUtf8Text(value: unknown, maxBytes: number): value is string {
-  return typeof value === 'string' && value.length > 0 && estimateUtf8Bytes(value) <= maxBytes;
+  return (
+    typeof value === 'string' && value.length > 0 && estimateUtf8Bytes(value, maxBytes) <= maxBytes
+  );
 }
 
 export function isSafeDownloadMimeType(value: unknown): value is string {

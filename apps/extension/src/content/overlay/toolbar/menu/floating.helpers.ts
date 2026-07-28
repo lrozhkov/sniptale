@@ -4,6 +4,7 @@ import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import type { ProductToolbarMenuPlacement } from '@sniptale/ui/product-menus/toolbar';
 
 const TOOLBAR_MENU_GAP_PX = 10;
+export const TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX = 250;
 const TOOLBAR_MENU_VIEWPORT_MARGIN_PX = 8;
 
 function clampValue(value: number, min: number, max: number) {
@@ -16,6 +17,20 @@ function clampValue(value: number, min: number, max: number) {
 
 function isMenuEventWithinRefs(event: Event, refs: Array<RefObject<HTMLElement | null>>) {
   return refs.some((ref) => isContentEventWithinElement(event, ref.current));
+}
+
+export function getPointerDistanceFromRect(event: MouseEvent, rect: DOMRect): number {
+  const closestX = Math.max(rect.left, Math.min(event.clientX, rect.right));
+  const closestY = Math.max(rect.top, Math.min(event.clientY, rect.bottom));
+  return Math.hypot(event.clientX - closestX, event.clientY - closestY);
+}
+
+function getFloatingMenuSurface(menuRef: RefObject<HTMLElement | null>): HTMLElement | null {
+  const menu = menuRef.current;
+  if (!menu) return null;
+  return menu.matches('.sniptale-popover-menu')
+    ? menu
+    : menu.querySelector<HTMLElement>('.sniptale-popover-menu');
 }
 
 export function resolveToolbarMenuPlacement(
@@ -138,9 +153,13 @@ function bindToolbarFloatingMenuDismissalHandlers(handlers: {
   handleEscape: (event: KeyboardEvent) => void;
   handleFocusIn: (event: FocusEvent) => void;
   handlePointerDown: (event: PointerEvent) => void;
+  handlePointerMove?: ((event: MouseEvent) => void) | undefined;
   handleViewportChange: () => void;
 }): () => void {
   document.addEventListener('pointerdown', handlers.handlePointerDown, true);
+  if (handlers.handlePointerMove) {
+    document.addEventListener('mousemove', handlers.handlePointerMove);
+  }
   document.addEventListener('focusin', handlers.handleFocusIn, true);
   window.addEventListener('keydown', handlers.handleEscape, true);
   window.addEventListener('resize', handlers.handleViewportChange);
@@ -148,6 +167,9 @@ function bindToolbarFloatingMenuDismissalHandlers(handlers: {
 
   return () => {
     document.removeEventListener('pointerdown', handlers.handlePointerDown, true);
+    if (handlers.handlePointerMove) {
+      document.removeEventListener('mousemove', handlers.handlePointerMove);
+    }
     document.removeEventListener('focusin', handlers.handleFocusIn, true);
     window.removeEventListener('keydown', handlers.handleEscape, true);
     window.removeEventListener('resize', handlers.handleViewportChange);
@@ -156,12 +178,21 @@ function bindToolbarFloatingMenuDismissalHandlers(handlers: {
 }
 
 export function useToolbarFloatingMenuDismissal(params: {
+  closeOnFarPointer?: boolean;
   open: boolean;
   triggerRef: RefObject<HTMLElement | null>;
   menuRef: RefObject<HTMLElement | null>;
   onClose: () => void;
+  onFarPointerClose?: (() => void) | undefined;
 }) {
-  const { open, triggerRef, menuRef, onClose } = params;
+  const {
+    closeOnFarPointer = false,
+    open,
+    triggerRef,
+    menuRef,
+    onClose,
+    onFarPointerClose,
+  } = params;
 
   useEffect(() => {
     if (!open) {
@@ -192,11 +223,26 @@ export function useToolbarFloatingMenuDismissal(params: {
       onClose();
     };
 
+    const handlePointerMove = closeOnFarPointer
+      ? (event: MouseEvent) => {
+          if (isMenuEventWithinRefs(event, refs)) return;
+          const surface = getFloatingMenuSurface(menuRef);
+          if (
+            surface &&
+            getPointerDistanceFromRect(event, surface.getBoundingClientRect()) >
+              TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX
+          ) {
+            (onFarPointerClose ?? onClose)();
+          }
+        }
+      : undefined;
+
     return bindToolbarFloatingMenuDismissalHandlers({
       handleEscape,
       handleFocusIn,
       handlePointerDown,
+      handlePointerMove,
       handleViewportChange,
     });
-  }, [menuRef, onClose, open, triggerRef]);
+  }, [closeOnFarPointer, menuRef, onClose, onFarPointerClose, open, triggerRef]);
 }

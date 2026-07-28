@@ -16,6 +16,7 @@ describe('settings contracts', () => {
     expectTypeOf<ContentToolbarDisplayMode>().toEqualTypeOf<'horizontal' | 'vertical'>();
     expectTypeOf<QuickActionScreenshotMode>().toEqualTypeOf<'visible' | 'full' | 'selection'>();
     expectTypeOf<SettingsPatch['contextMenu']>().not.toEqualTypeOf<unknown>();
+    expectTypeOf<SettingsPatch['fullPageCapture']>().not.toEqualTypeOf<unknown>();
     expectTypeOf<SettingsPatch['defaultViewportPresetId']>().toEqualTypeOf<
       string | null | undefined
     >();

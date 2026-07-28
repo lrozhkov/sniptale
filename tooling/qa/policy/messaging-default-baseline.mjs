@@ -1,7 +1,5 @@
 const SEND_RUNTIME_MESSAGE_BASELINE_FILES = [
   'apps/extension/src/background/media/privacy-erasure/cleanup.ts',
-  'apps/extension/src/background/media/video/navigation/refresh.ts',
-  'apps/extension/src/background/media/video/navigation/viewport-draw-state.ts',
   'apps/extension/src/background/media/video/runtime/handlers/export/reconcile.ts',
   'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.ts',
   'apps/extension/src/background/media/video/runtime/session-state/service/runtime-state-service.ts',
@@ -21,7 +19,6 @@ const SEND_TAB_MESSAGE_BASELINE_FILES = [
   'apps/extension/src/background/debugger/session/targets.ts',
   'apps/extension/src/background/diagnostics/runtime.ts',
   'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.ts',
-  'apps/extension/src/background/runtime/tab-mode-router-screenshot/viewport.ts',
 ];
 
 function createImportKeys(files, importName) {

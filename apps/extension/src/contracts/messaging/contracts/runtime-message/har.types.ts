@@ -26,6 +26,12 @@ export type RuntimeHarRequestByType = {
   [MessageType.EXPORT_CAPTURE_FULL_PAGE]: {
     type: typeof MessageType.EXPORT_CAPTURE_FULL_PAGE;
     contentIntent?: ContentPrivilegedActionCapability;
+    exportRunId: string;
+  };
+  [MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED]: {
+    type: typeof MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED;
+    contentIntent?: ContentPrivilegedActionCapability;
+    exportRunId: string;
   };
 };
 
@@ -34,4 +40,5 @@ export type RuntimeHarResponseByType = {
   [MessageType.EXPORT_START_HAR]: HarStartResponse;
   [MessageType.EXPORT_STOP_HAR]: HarCaptureResponse;
   [MessageType.EXPORT_CAPTURE_FULL_PAGE]: CaptureResponse;
+  [MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED]: CaptureResponse;
 };

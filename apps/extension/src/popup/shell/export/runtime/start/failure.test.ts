@@ -4,7 +4,13 @@ import { reportStartExportFailure } from './failure';
 
 function createState() {
   return {
-    requestIdRef: { current: 'req-1' },
+    cancelRetryRef: {
+      current: { exportRunId: 'req-1', tabIds: [42] } as {
+        exportRunId: string;
+        tabIds: number[];
+      } | null,
+    },
+    requestIdRef: { current: 'req-1' as string | null },
     setProgress: vi.fn(),
   };
 }
@@ -15,6 +21,7 @@ it('resets the request id and reports a popup export start error', () => {
   reportStartExportFailure(state as never, new Error('boom'));
 
   expect(state.requestIdRef.current).toBeNull();
+  expect(state.cancelRetryRef.current).toBeNull();
   expect(state.setProgress).toHaveBeenCalledWith(
     expect.objectContaining({
       phase: 'error',

@@ -124,6 +124,7 @@ function applyWebSnapshotBatchResult(args: {
   const success = args.snapshotIds.length > 0;
 
   args.state.requestIdRef.current = null;
+  args.state.cancelRetryRef.current = null;
   args.state.setResult(
     createSnapshotResult({
       errors,
@@ -151,6 +152,7 @@ function initializeWebSnapshotBatch(
   tabIds: number[]
 ) {
   state.requestIdRef.current = requestId;
+  state.cancelRetryRef.current = { exportRunId: requestId, tabIds: [...tabIds] };
   state.setResult(null);
   setSnapshotBatchProgress(
     state,

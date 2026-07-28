@@ -4,6 +4,45 @@
   position: relative;
 }
 
+.sniptale-toolbar .sniptale-full-page-wrapper {
+  height: var(--sniptale-toolbar-button-size);
+}
+
+.sniptale-toolbar .sniptale-full-page-primary {
+  flex: 0 0 var(--sniptale-toolbar-button-size);
+  min-width: var(--sniptale-toolbar-button-size);
+  width: var(--sniptale-toolbar-button-size);
+  padding: 0;
+  border-inline-end-width: 0;
+}
+
+.sniptale-toolbar .sniptale-full-page-chevron {
+  flex: 0 0 12px;
+  min-width: 12px;
+  width: 12px;
+  max-width: 12px;
+  padding: 0;
+  border-inline-start-width: 0;
+}
+
+.sniptale-toolbar .sniptale-full-page-chevron svg {
+  width: 10px;
+  height: 10px;
+}
+
+.sniptale-toolbar .sniptale-full-page-chevron:focus-visible {
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--sniptale-color-border-strong);
+}
+
+.sniptale-full-page-menu {
+  width: 300px;
+}
+
+.sniptale-full-page-menu .sniptale-popover-item {
+  min-height: 44px;
+}
+
 .sniptale-timer-btn,
 .sniptale-viewport-btn {
   width: 34px;

@@ -6,6 +6,7 @@ import type {
   SettingsPatch,
   ViewportPreset,
 } from '../../../contracts/settings';
+import { DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES } from '../../../contracts/full-page-capture';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -56,6 +57,7 @@ export const DEFAULT_SETTINGS: Settings = {
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   skipWebSnapshotSaveDisclosure: false,
   rawDiagnosticsEnabled: false,
+  fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
 };
 
 function cloneViewportPresets(presets: readonly ViewportPreset[]): ViewportPreset[] {
@@ -75,11 +77,18 @@ function cloneContentToolbarSettings(
   };
 }
 
+function cloneFullPageCapturePreferences(
+  settings: NonNullable<Settings['fullPageCapture']>
+): NonNullable<Settings['fullPageCapture']> {
+  return { ...settings };
+}
+
 export function createDefaultSettings(): Settings {
   return {
     ...DEFAULT_SETTINGS,
     contentToolbar: cloneContentToolbarSettings(DEFAULT_CONTENT_TOOLBAR_SETTINGS),
     contextMenu: cloneContextMenuSettings(DEFAULT_CONTEXT_MENU_SETTINGS),
+    fullPageCapture: cloneFullPageCapturePreferences(DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES),
     presets: [],
     viewportPresets: cloneViewportPresets(DEFAULT_VIEWPORT_PRESETS),
   };
@@ -121,6 +130,10 @@ function normalizeLoadedSettings(parsedValue: Partial<Settings>): Settings {
     contextMenu: {
       ...DEFAULT_CONTEXT_MENU_SETTINGS,
       ...parsedValue.contextMenu,
+    },
+    fullPageCapture: {
+      ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
+      ...parsedValue.fullPageCapture,
     },
     presets: Array.isArray(parsedValue.presets) ? parsedValue.presets : [],
     viewportPresets: Array.isArray(parsedValue.viewportPresets)
@@ -184,6 +197,11 @@ function applySettingsPatch(currentSettings: Settings, settingsPatch: SettingsPa
     contextMenu: {
       ...currentSettings.contextMenu,
       ...settingsPatch.contextMenu,
+    },
+    fullPageCapture: {
+      ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
+      ...currentSettings.fullPageCapture,
+      ...settingsPatch.fullPageCapture,
     },
   });
 }

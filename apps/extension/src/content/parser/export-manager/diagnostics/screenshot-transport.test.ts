@@ -29,7 +29,7 @@ describe('captureFullPageScreenshotAsset intent', () => {
     vi.mocked(sendRuntimeMessage)
       .mockResolvedValueOnce({
         success: true,
-        contentIntent: { requestId: 'request-1', token: 'token-1' },
+        contentIntent: { requestId: 'export-run-1', token: 'token-1' },
       })
       .mockResolvedValueOnce({
         success: true,
@@ -38,18 +38,25 @@ describe('captureFullPageScreenshotAsset intent', () => {
     vi.mocked(dataUrlToBlob).mockResolvedValueOnce(blob);
 
     await expect(
-      captureFullPageScreenshotAsset({
-        grantToken: 'grant-1',
-        kind: 'background-auto-start',
-      })
+      captureFullPageScreenshotAsset(
+        {
+          grantToken: 'grant-1',
+          kind: 'background-auto-start',
+        },
+        {
+          action: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+          exportRunId: 'export-run-1',
+        }
+      )
     ).resolves.toEqual({
+      captureWarnings: [],
       path: 'page-screenshot.png',
       content: blob,
     });
 
     expect(sendRuntimeMessage).toHaveBeenNthCalledWith(1, {
       actionType: MessageType.EXPORT_CAPTURE_FULL_PAGE,
-      requestId: expect.any(String),
+      requestId: 'export-run-1',
       source: {
         grantToken: 'grant-1',
         kind: 'background-auto-start',
@@ -57,7 +64,8 @@ describe('captureFullPageScreenshotAsset intent', () => {
       type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY,
     });
     expect(sendRuntimeMessage).toHaveBeenNthCalledWith(2, {
-      contentIntent: { requestId: 'request-1', token: 'token-1' },
+      contentIntent: { requestId: 'export-run-1', token: 'token-1' },
+      exportRunId: 'export-run-1',
       type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
     });
   });
@@ -73,10 +81,46 @@ describe('captureFullPageScreenshotAsset response handling', () => {
     vi.mocked(dataUrlToBlob).mockResolvedValueOnce(blob);
 
     await expect(captureFullPageScreenshotAsset()).resolves.toEqual({
+      captureWarnings: [],
       path: 'page-screenshot.png',
       content: blob,
     });
     expect(dataUrlToBlob).toHaveBeenCalledWith('data:image/png;base64,AAAA');
+  });
+
+  it('routes unattended archive capture without accepting a backend boolean', async () => {
+    const blob = new Blob(['image'], { type: 'image/png' });
+    vi.mocked(sendRuntimeMessage)
+      .mockResolvedValueOnce({
+        success: true,
+        contentIntent: { requestId: 'batch-1', token: 'token-1' },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        dataUrl: 'data:image/png;base64,AAAA',
+        downscaled: true,
+        frozenExtentWarning: true,
+      });
+    vi.mocked(dataUrlToBlob).mockResolvedValueOnce(blob);
+
+    await expect(
+      captureFullPageScreenshotAsset(
+        { grantToken: 'grant-1', kind: 'background-auto-start' },
+        {
+          action: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+          exportRunId: 'batch-1',
+        }
+      )
+    ).resolves.toEqual({
+      captureWarnings: [expect.any(String), expect.any(String)],
+      content: blob,
+      path: 'page-screenshot.png',
+    });
+    expect(sendRuntimeMessage).toHaveBeenNthCalledWith(2, {
+      contentIntent: { requestId: 'batch-1', token: 'token-1' },
+      exportRunId: 'batch-1',
+      type: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+    });
   });
 
   it('throws when screenshot capture does not return a data URL', async () => {

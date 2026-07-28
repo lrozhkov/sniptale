@@ -34,6 +34,43 @@
   width: var(--sniptale-toolbar-button-size);
 }
 
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-full-page-wrapper {
+  width: var(--sniptale-toolbar-button-size);
+  height: calc(var(--sniptale-toolbar-button-size) + 12px);
+  flex-direction: column;
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-full-page-primary {
+  flex: 0 0 var(--sniptale-toolbar-button-size);
+  min-width: var(--sniptale-toolbar-button-size);
+  width: var(--sniptale-toolbar-button-size);
+  min-height: var(--sniptale-toolbar-button-size);
+  height: var(--sniptale-toolbar-button-size);
+  padding: 0;
+  border-inline-end-width: 1px;
+  border-block-end-width: 0;
+  border-radius: var(--sniptale-radius-md) var(--sniptale-radius-md) 0 0;
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-full-page-chevron {
+  flex: 0 0 12px;
+  min-width: var(--sniptale-toolbar-button-size);
+  width: var(--sniptale-toolbar-button-size);
+  max-width: var(--sniptale-toolbar-button-size);
+  min-height: 12px;
+  height: 12px;
+  max-height: 12px;
+  border-inline-start-width: 1px;
+  border-block-start-width: 0;
+  border-radius: 0 0 var(--sniptale-radius-md) var(--sniptale-radius-md);
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn.sniptale-full-page-chevron svg {
+  width: 10px;
+  height: 10px;
+  transform: rotate(-90deg);
+}
+
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-glass-toolbar-divider {
   width: 100%;
   height: 1px;

@@ -79,6 +79,9 @@ async function authorizeScreenshotCapture(args: CaptureRouteAdapterContext): Pro
 
 function isNativeVisibleCapture(args: CaptureRouteAdapterContext): boolean {
   const message = args.routeArgs.message;
+  if (message.type === CaptureMessageType.CAPTURE_FULL) {
+    return true;
+  }
   if (
     message.type !== CaptureMessageType.CAPTURE_VISIBLE &&
     message.type !== CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP
