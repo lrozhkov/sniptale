@@ -27,7 +27,7 @@ export function waitForRecordingBegin(binding: StartBinding, activationDelayMs =
   });
 }
 
-export function allowRecordingBegin(binding: StartBinding): void {
+export function assertRecordingBegin(binding: StartBinding): void {
   if (
     !pending ||
     pending.recordingId !== binding.recordingId ||
@@ -36,6 +36,11 @@ export function allowRecordingBegin(binding: StartBinding): void {
   ) {
     throw new Error('Stale or mismatched recording start binding');
   }
+}
+
+export function allowRecordingBegin(binding: StartBinding): void {
+  assertRecordingBegin(binding);
+  if (!pending) return;
   const resolve = pending.resolve;
   clearTimeout(pending.timeout);
   pending = null;

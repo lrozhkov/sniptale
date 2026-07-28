@@ -4,6 +4,7 @@ import { createDurationTracker } from '../duration';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { TabOutputGeometry } from '../stream/tab-output';
+import type { CropStreamControls } from '../stream/crop-stream';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingContext' });
 
@@ -30,6 +31,7 @@ class OffscreenRecordingContext {
   streamInstanceId: string | null = null;
   sourceVideoHeight: number | null = null;
   sourceVideoWidth: number | null = null;
+  tabOutputControls: CropStreamControls | null = null;
   tabOutputGeometry: TabOutputGeometry | null = null;
   stopRecordingResolve: ((outcome?: RecordingStopOutcome) => void) | null = null;
   stopRecordingReject: ((reason?: unknown) => void) | null = null;
@@ -66,6 +68,7 @@ class OffscreenRecordingContext {
     this.streamInstanceId = null;
     this.sourceVideoHeight = null;
     this.sourceVideoWidth = null;
+    this.tabOutputControls = null;
     this.tabOutputGeometry = null;
   }
 
@@ -135,6 +138,7 @@ class OffscreenRecordingContext {
     this.streamInstanceId = null;
     this.sourceVideoHeight = null;
     this.sourceVideoWidth = null;
+    this.tabOutputControls = null;
     this.tabOutputGeometry = null;
     this.recordedChunks.length = 0;
     this.discardOnStop = false;

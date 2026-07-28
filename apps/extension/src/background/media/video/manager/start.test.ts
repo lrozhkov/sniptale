@@ -99,7 +99,8 @@ function resetStartRecordingTestState() {
   runCountdownMock.mockResolvedValue(true);
   sendRuntimeMessageMock.mockImplementation((message: { type?: string }) =>
     Promise.resolve(
-      message.type === VideoMessageType.OFFSCREEN_STOP_RECORDING
+      message.type === VideoMessageType.OFFSCREEN_STOP_RECORDING ||
+        message.type === VideoMessageType.OFFSCREEN_BEGIN_RECORDING
         ? { success: true, result: 'accepted' }
         : undefined
     )

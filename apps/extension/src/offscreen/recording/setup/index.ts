@@ -4,7 +4,11 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { recordingContext } from '../context';
-import { createCropStream, resolveOnePixelEncodingCrop } from '../stream/crop-stream';
+import {
+  createCropStream,
+  resolveOnePixelEncodingCrop,
+  type CropStreamControls,
+} from '../stream/crop-stream';
 import {
   createTabOutputStream,
   resolveTabOutputGeometry,
@@ -32,6 +36,7 @@ export type RecordingSetupResult = {
   rawTrackSettings: MediaTrackSettings;
   rawVideoHeight: number;
   rawVideoWidth: number;
+  tabOutputControls: CropStreamControls | null;
   tabOutputGeometry: TabOutputGeometry | null;
   trackSettings: MediaTrackSettings;
 };
@@ -53,7 +58,11 @@ async function createOutputVideoStream(
   source: MediaStream,
   params: RecordingSetupParams,
   raw: { width: number; height: number }
-): Promise<{ stream: MediaStream; tabOutputGeometry: TabOutputGeometry | null }> {
+): Promise<{
+  controls: CropStreamControls | null;
+  stream: MediaStream;
+  tabOutputGeometry: TabOutputGeometry | null;
+}> {
   if (params.captureMode === CaptureMode.TAB || params.captureMode === CaptureMode.TAB_CROP) {
     if (!params.viewport) throw new Error('Tab recording viewport geometry is unavailable');
     if (!params.viewport.devicePixelRatio) {
@@ -73,14 +82,21 @@ async function createOutputVideoStream(
       { width: raw.width, height: raw.height },
       coordinateSpace
     );
+    const output = await createTabOutputStream(source, tabOutputGeometry, {
+      initiallySuspended: params.surface?.target === 'viewport',
+    });
     return {
-      stream: await createTabOutputStream(source, tabOutputGeometry),
+      controls: params.surface?.target === 'viewport' ? output.controls : null,
+      stream: output.stream,
       tabOutputGeometry,
     };
   }
-  if (params.captureMode !== undefined) return { stream: source, tabOutputGeometry: null };
+  if (params.captureMode !== undefined) {
+    return { controls: null, stream: source, tabOutputGeometry: null };
+  }
   const encodingCrop = resolveOnePixelEncodingCrop(raw);
   return {
+    controls: null,
     stream: encodingCrop ? await createCropStream(source, encodingCrop) : source,
     tabOutputGeometry: null,
   };
@@ -140,6 +156,7 @@ export async function prepareRecordingStream(
     rawTrackSettings: raw.trackSettings,
     rawVideoHeight: raw.height,
     rawVideoWidth: raw.width,
+    tabOutputControls: output.controls,
     tabOutputGeometry: output.tabOutputGeometry,
     trackSettings: outputTrack.getSettings(),
   };

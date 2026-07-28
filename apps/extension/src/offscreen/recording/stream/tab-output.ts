@@ -1,5 +1,6 @@
 import {
-  createCropStream,
+  createGatedCropStream,
+  type GatedCropStream,
   type CropRect,
   type CropStreamGeometry,
   type OutputSize,
@@ -150,7 +151,8 @@ export function revalidateTabOutputGeometry(
 
 export function createTabOutputStream(
   sourceStream: MediaStream,
-  geometry: TabOutputGeometry
-): Promise<MediaStream> {
-  return createCropStream(sourceStream, geometry);
+  geometry: TabOutputGeometry,
+  options: { initiallySuspended?: boolean } = {}
+): Promise<GatedCropStream> {
+  return createGatedCropStream(sourceStream, geometry, options);
 }

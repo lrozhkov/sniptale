@@ -62,6 +62,14 @@ export type RuntimeOffscreenRevalidateSourceMessage = RuntimeOffscreenCommandCap
   viewport?: ViewportInfo;
 };
 
+export type RuntimeOffscreenSetViewportDrawStateMessage = RuntimeOffscreenCommandCapability & {
+  type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE;
+  frozen: boolean;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+};
+
 export type RuntimeOffscreenUpdateSettingsMessage = RuntimeOffscreenCommandCapability & {
   type: VideoMessageType.OFFSCREEN_UPDATE_SETTINGS;
   recordingId: string;

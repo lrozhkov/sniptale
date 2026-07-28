@@ -46,6 +46,7 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 import {
   pauseRecording,
   resumeRecording,
+  setViewportDrawState,
   startRecording,
   stopRecording,
   updateRecordingSettings,
@@ -218,6 +219,40 @@ it('rejects delayed pause, resume, and settings commands from another recording 
   expect(() => updateRecordingSettings(stale, { microphoneEnabled: false })).toThrow(
     'Stale recording source binding'
   );
+
+  completeStart();
+  await start;
+});
+
+it('changes viewport drawing only for the active recording source binding', async () => {
+  let completeStart!: () => void;
+  startRecordingImplMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        completeStart = resolve;
+      })
+  );
+  const suspend = vi.fn();
+  const resume = vi.fn();
+  recordingContext.tabOutputControls = { resume, suspend };
+  const start = startRecording(createStartParams());
+
+  await setViewportDrawState(sourceBinding, true);
+  await setViewportDrawState(sourceBinding, false);
+  expect(suspend).toHaveBeenCalledOnce();
+  expect(resume).toHaveBeenCalledOnce();
+
+  await expect(
+    setViewportDrawState(
+      {
+        generation: 0,
+        recordingId: 'recording-stale',
+        streamInstanceId: 'stream-instance-stale',
+      },
+      true
+    )
+  ).rejects.toThrow('Stale recording source binding');
+  expect(suspend).toHaveBeenCalledOnce();
 
   completeStart();
   await start;

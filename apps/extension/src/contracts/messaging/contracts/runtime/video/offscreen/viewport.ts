@@ -4,6 +4,7 @@ import {
   createMessageGuard,
   createRuntimeResponseGuard,
   isCaptureMode,
+  isBoolean,
   isNumber,
   isString,
   isVideoRecordingSettings,
@@ -62,7 +63,29 @@ export const runtimeVideoOffscreenViewportMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime OFFSCREEN_BEGIN_RECORDING response',
-      createRuntimeResponseGuard({ allowUndefined: true, optional: { result: isString } })
+      createRuntimeResponseGuard({
+        required: { success: isBoolean },
+        optional: { result: isString },
+      })
+    ),
+  },
+  [VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_SET_VIEWPORT_DRAW_STATE message',
+      createMessageGuard({
+        type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+        required: {
+          capabilityToken: isString,
+          frozen: isBoolean,
+          recordingId: isString,
+          generation: isNumber,
+          streamInstanceId: isString,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_SET_VIEWPORT_DRAW_STATE response',
+      createRuntimeResponseGuard({ optional: { result: isString } })
     ),
   },
   [VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE]: {

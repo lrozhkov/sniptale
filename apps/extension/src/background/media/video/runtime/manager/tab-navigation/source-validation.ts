@@ -14,6 +14,24 @@ type TabSourceValidationBinding = {
   tabId: number;
 };
 
+export async function setViewportOutputFrozen(
+  binding: TabSourceValidationBinding,
+  frozen: boolean
+): Promise<void> {
+  const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
+    attachOffscreenCommandCapability({
+      type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+      recordingId: binding.recordingId,
+      generation: binding.generation,
+      streamInstanceId: binding.streamInstanceId,
+      frozen,
+    })
+  );
+  if (response?.success !== true) {
+    throw new Error(response?.error ?? 'Viewport output frame state could not be updated');
+  }
+}
+
 export async function reassertViewportSurface(binding: TabSourceValidationBinding): Promise<void> {
   const applied = getVideoSurfaceSession(binding.recordingId)?.applied;
   if (applied?.target !== 'viewport') return;

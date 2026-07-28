@@ -15,6 +15,7 @@ import type {
   RuntimeOffscreenStopRecordingMessage,
   RuntimeOffscreenUpdateSettingsMessage,
   RuntimeOffscreenRevalidateSourceMessage,
+  RuntimeOffscreenSetViewportDrawStateMessage,
   RuntimeRecordingDurationUpdatedMessage,
   RuntimeRecordingStartFailedMessage,
   RuntimeRecordingStateSyncMessage,
@@ -85,6 +86,7 @@ export type RuntimeVideoSessionRequestByType = {
   [VideoMessageType.OFFSCREEN_SOURCE_READY]: RuntimeOffscreenSourceReadyMessage;
   [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: RuntimeOffscreenBeginRecordingMessage;
   [VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE]: RuntimeOffscreenRevalidateSourceMessage;
+  [VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE]: RuntimeOffscreenSetViewportDrawStateMessage;
   [VideoMessageType.OFFSCREEN_STOP_RECORDING]: RuntimeOffscreenStopRecordingMessage;
   [VideoMessageType.OFFSCREEN_PAUSE_RECORDING]: {
     type: typeof VideoMessageType.OFFSCREEN_PAUSE_RECORDING;

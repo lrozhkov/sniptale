@@ -7,6 +7,7 @@ import type { VideoMessageType } from '@sniptale/runtime-contracts/video/message
 import type { RecordingStateResponse, RecordingTabResponse } from '../contracts/response-types';
 
 type RuntimeRecordingCommandResult = { result?: string };
+type RuntimeRequiredAckResponse = Exclude<RuntimeAckResponse, undefined>;
 type RuntimeRecordingStartResult = RuntimeRecordingCommandResult & {
   cameraLaunchToken?: string;
   controlToken?: string;
@@ -33,12 +34,13 @@ export type RuntimeVideoSessionResponseByType = {
   [VideoMessageType.OFFSCREEN_READY]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.OFFSCREEN_START_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_SOURCE_READY]: RuntimeMessageResponse<{ result?: 'ALLOW' | 'DENY' }>;
-  [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: RuntimeAckResponse;
+  [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: RuntimeRequiredAckResponse;
   [VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE]: RuntimeMessageResponse<{
     result?: 'ALLOW' | 'DENY';
     videoWidth?: number;
     videoHeight?: number;
   }>;
+  [VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE]: RuntimeRequiredAckResponse;
   [VideoMessageType.OFFSCREEN_STOP_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_PAUSE_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_RESUME_RECORDING]: RuntimeAckResponse;

@@ -144,9 +144,9 @@ it('surfaces explicit and fallback source-preparation rejection messages', async
   }
 });
 
-it('begins only the matching prepared stream and surfaces offscreen rejection', async () => {
+it('begins only the matching prepared stream after an explicit offscreen acknowledgement', async () => {
   const transport = new FakeRuntimeMessagingTransport();
-  transport.onRuntimeMessage(VideoMessageType.OFFSCREEN_BEGIN_RECORDING, () => undefined);
+  transport.onRuntimeMessage(VideoMessageType.OFFSCREEN_BEGIN_RECORDING, () => ({ success: true }));
   getBackgroundRuntimeMessagingMock.mockReturnValue(transport);
 
   await expect(
@@ -164,6 +164,17 @@ it('begins only the matching prepared stream and surfaces offscreen rejection', 
       type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
     })
   );
+
+  const missing = new FakeRuntimeMessagingTransport();
+  missing.onRuntimeMessage(VideoMessageType.OFFSCREEN_BEGIN_RECORDING, () => undefined);
+  getBackgroundRuntimeMessagingMock.mockReturnValue(missing);
+  await expect(
+    sendOffscreenBeginRecording({
+      generation: 3,
+      recordingId: 'recording',
+      streamInstanceId: 'stream-instance',
+    })
+  ).rejects.toThrow('Invalid runtime OFFSCREEN_BEGIN_RECORDING response');
 
   const rejected = new FakeRuntimeMessagingTransport();
   rejected.onRuntimeMessage(VideoMessageType.OFFSCREEN_BEGIN_RECORDING, () => ({ success: false }));

@@ -2,8 +2,10 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
   cancelProjectExportMock,
+  cancelRecordingBeginMock,
   consumeProjectExportInputMock,
   allowRecordingBeginMock,
+  assertRecordingBeginMock,
   createSourceVideoMock,
   disposeMultiSourceDesktopMediaMock,
   getProjectExportCapabilitiesMock,
@@ -23,8 +25,10 @@ const {
   waitForSourceMetadataMock,
 } = vi.hoisted(() => ({
   cancelProjectExportMock: vi.fn(),
+  cancelRecordingBeginMock: vi.fn(),
   consumeProjectExportInputMock: vi.fn(),
   allowRecordingBeginMock: vi.fn(),
+  assertRecordingBeginMock: vi.fn(),
   createSourceVideoMock: vi.fn(),
   disposeMultiSourceDesktopMediaMock: vi.fn(),
   getProjectExportCapabilitiesMock: vi.fn(),
@@ -44,6 +48,7 @@ const {
       sourceRect: { x: number; y: number; width: number; height: number };
       outputSize: { width: number; height: number };
     },
+    tabOutputControls: { resume: vi.fn(), suspend: vi.fn() },
     matchesSourceBinding: vi.fn(() => true),
   },
   resumeRecordingMock: vi.fn(),
@@ -81,6 +86,8 @@ vi.mock('../recording/controller', async (importOriginal) => ({
 vi.mock('../recording/start/gate', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../recording/start/gate')>()),
   allowRecordingBegin: allowRecordingBeginMock,
+  assertRecordingBegin: assertRecordingBeginMock,
+  cancelRecordingBegin: cancelRecordingBeginMock,
 }));
 
 vi.mock('../recording/context', async (importOriginal) => ({
@@ -130,6 +137,8 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  assertRecordingBeginMock.mockImplementation(() => undefined);
+  cancelRecordingBeginMock.mockImplementation(() => undefined);
   cancelProjectExportMock.mockResolvedValue(undefined);
   consumeProjectExportInputMock.mockResolvedValue(createProject());
   getProjectExportCapabilitiesMock.mockResolvedValue({ formats: [] });
@@ -182,6 +191,14 @@ async function routeRecordingRuntimeMessages(): Promise<void> {
     streamInstanceId: 'stream-instance-1',
     streamId: 'stream-1',
     settings: createRecordingSettings(),
+  });
+  await handleOffscreenRuntimeMessage({
+    type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+    capabilityToken: 'test-capability',
+    frozen: true,
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
   });
   await handleOffscreenRuntimeMessage({
     type: VideoMessageType.OFFSCREEN_PAUSE_RECORDING,
@@ -240,6 +257,9 @@ it('classifies handled offscreen export message phases and response modes', () =
   expect(resolveOffscreenErrorPhase(VideoMessageType.GET_DESKTOP_MEDIA)).toBe('runtime');
   expect(resolveOffscreenErrorPhase(VideoMessageType.DISPOSE_DESKTOP_MEDIA)).toBe('runtime');
   expect(resolveOffscreenErrorPhase(VideoMessageType.OFFSCREEN_BEGIN_RECORDING)).toBe('runtime');
+  expect(resolveOffscreenErrorPhase(VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE)).toBe(
+    'runtime'
+  );
   expect(resolveOffscreenErrorPhase(VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE)).toBe('runtime');
   expect(resolveOffscreenErrorPhase(VideoMessageType.OFFSCREEN_UPDATE_SETTINGS)).toBe('runtime');
   expect(
@@ -254,6 +274,9 @@ it('classifies handled offscreen export message phases and response modes', () =
   expect(resolveOffscreenRuntimeResponseMode(VideoMessageType.OFFSCREEN_BEGIN_RECORDING)).toBe(
     'deferred-ack'
   );
+  expect(
+    resolveOffscreenRuntimeResponseMode(VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE)
+  ).toBe('deferred-ack');
   expect(resolveOffscreenRuntimeResponseMode(VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE)).toBe(
     'manual'
   );
@@ -301,6 +324,13 @@ it('routes source gate, live settings, and full exact-surface start arguments', 
   expect(allowRecordingBeginMock).toHaveBeenCalledWith(
     expect.objectContaining({ streamInstanceId: 'stream-instance-1' })
   );
+  expect(assertRecordingBeginMock).toHaveBeenCalledWith(
+    expect.objectContaining({ streamInstanceId: 'stream-instance-1' })
+  );
+  expect(assertRecordingBeginMock.mock.invocationCallOrder[0]).toBeLessThan(
+    recordingContextMock.tabOutputControls.resume.mock.invocationCallOrder[0]!
+  );
+  expect(recordingContextMock.tabOutputControls.resume).toHaveBeenCalledOnce();
 
   await handleOffscreenRuntimeMessage({
     type: VideoMessageType.OFFSCREEN_UPDATE_SETTINGS,
@@ -314,6 +344,106 @@ it('routes source gate, live settings, and full exact-surface start arguments', 
     { generation: 4, recordingId: 'recording-1', streamInstanceId: 'stream-instance-1' },
     settings
   );
+});
+
+it('rejects a stale begin before it can open the viewport frame gate', async () => {
+  assertRecordingBeginMock.mockImplementationOnce(() => {
+    throw new Error('Stale or mismatched recording start binding');
+  });
+
+  await expect(
+    handleOffscreenRuntimeMessage({
+      type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
+      capabilityToken: 'test-capability',
+      generation: 3,
+      recordingId: 'stale-recording',
+      streamInstanceId: 'stale-stream',
+    })
+  ).rejects.toThrow('Stale or mismatched recording start binding');
+  expect(recordingContextMock.tabOutputControls.resume).not.toHaveBeenCalled();
+  expect(allowRecordingBeginMock).not.toHaveBeenCalled();
+});
+
+it('invalidates a pending begin when viewport navigation freezes output', async () => {
+  cancelRecordingBeginMock.mockImplementationOnce(() => {
+    assertRecordingBeginMock.mockImplementation(() => {
+      throw new Error('Stale or mismatched recording start binding');
+    });
+  });
+
+  await handleOffscreenRuntimeMessage({
+    type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+    capabilityToken: 'test-capability',
+    frozen: true,
+    generation: 4,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  });
+  expect(setViewportDrawStateMock).toHaveBeenCalledOnce();
+  expect(cancelRecordingBeginMock).toHaveBeenCalledWith(
+    'Recording start was cancelled by viewport navigation'
+  );
+  expect(setViewportDrawStateMock.mock.invocationCallOrder[0]).toBeLessThan(
+    cancelRecordingBeginMock.mock.invocationCallOrder[0]!
+  );
+
+  await expect(
+    handleOffscreenRuntimeMessage({
+      type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
+      capabilityToken: 'test-capability',
+      generation: 4,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+    })
+  ).rejects.toThrow('Stale or mismatched recording start binding');
+  expect(recordingContextMock.tabOutputControls.resume).not.toHaveBeenCalled();
+  expect(allowRecordingBeginMock).not.toHaveBeenCalled();
+});
+
+it('does not allow begin when a navigation cancels its pending fresh-frame wait', async () => {
+  recordingContextMock.tabOutputControls.resume.mockRejectedValueOnce(
+    new Error('Viewport fresh-frame wait was cancelled')
+  );
+
+  await expect(
+    handleOffscreenRuntimeMessage({
+      type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
+      capabilityToken: 'test-capability',
+      generation: 4,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+    })
+  ).rejects.toThrow('fresh-frame wait was cancelled');
+  expect(assertRecordingBeginMock).toHaveBeenCalledOnce();
+  expect(allowRecordingBeginMock).not.toHaveBeenCalled();
+});
+
+it('rechecks begin authority after awaiting the fresh source frame', async () => {
+  let resolveFreshFrame!: () => void;
+  recordingContextMock.tabOutputControls.resume.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      resolveFreshFrame = resolve;
+    })
+  );
+  allowRecordingBeginMock.mockImplementationOnce(() => {
+    throw new Error('Stale or mismatched recording start binding');
+  });
+
+  const routed = handleOffscreenRuntimeMessage({
+    type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
+    capabilityToken: 'test-capability',
+    generation: 4,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  });
+  await vi.waitFor(() =>
+    expect(recordingContextMock.tabOutputControls.resume).toHaveBeenCalledOnce()
+  );
+  resolveFreshFrame();
+
+  await expect(routed).rejects.toThrow('Stale or mismatched recording start binding');
+  expect(assertRecordingBeginMock).toHaveBeenCalledOnce();
+  expect(allowRecordingBeginMock).toHaveBeenCalledOnce();
 });
 
 it('revalidates source metadata and returns typed ALLOW or DENY responses', async () => {
@@ -333,6 +463,7 @@ it('revalidates source metadata and returns typed ALLOW or DENY responses', asyn
     result: 'DENY',
     success: false,
   });
+  expect(recordingContextMock.tabOutputControls.resume).not.toHaveBeenCalled();
 
   Object.assign(recordingContextMock, { sourceStream: { id: 'source-stream' } });
   createSourceVideoMock.mockReturnValue({ videoHeight: 720, videoWidth: 1280 });
@@ -419,6 +550,7 @@ it('revalidates source metadata and returns typed ALLOW or DENY responses', asyn
     result: 'DENY',
     success: false,
   });
+  expect(recordingContextMock.tabOutputControls.resume).not.toHaveBeenCalled();
 });
 
 it('denies a stale source binding when the recording changes during metadata loading', async () => {
@@ -455,6 +587,7 @@ it('denies a stale source binding when the recording changes during metadata loa
     result: 'DENY',
     success: false,
   });
+  expect(recordingContextMock.tabOutputControls.resume).not.toHaveBeenCalled();
   expect(releaseSourceVideoMock).toHaveBeenCalledWith(
     expect.objectContaining({ videoHeight: 720, videoWidth: 1280 })
   );
@@ -509,6 +642,13 @@ it('routes recording and project export runtime messages to their owners', async
     streamInstanceId: 'stream-instance-1',
     settings: createRecordingSettings(),
   });
+  expect(setViewportDrawStateMock).toHaveBeenCalledWith(
+    { generation: 1, recordingId: 'recording-1', streamInstanceId: 'stream-instance-1' },
+    true
+  );
+  expect(cancelRecordingBeginMock).toHaveBeenCalledWith(
+    'Recording start was cancelled by viewport navigation'
+  );
   expect(pauseRecordingMock).toHaveBeenCalledOnce();
   expect(resumeRecordingMock).toHaveBeenCalledOnce();
   expect(stopRecordingMock).toHaveBeenCalledWith(

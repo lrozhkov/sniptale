@@ -1,6 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { allowRecordingBegin, cancelRecordingBegin, waitForRecordingBegin } from './gate';
+import {
+  allowRecordingBegin,
+  assertRecordingBegin,
+  cancelRecordingBegin,
+  waitForRecordingBegin,
+} from './gate';
 
 const binding = { generation: 1, recordingId: 'recording-1', streamInstanceId: 'stream-1' };
 
@@ -33,6 +38,7 @@ it('keeps the activation gate open for the supported ten-second countdown plus i
 
 it('allows only the exact pending recording binding', async () => {
   const pending = waitForRecordingBegin(binding);
+  expect(() => assertRecordingBegin(binding)).not.toThrow();
   allowRecordingBegin(binding);
   await expect(pending).resolves.toBeUndefined();
 });
@@ -45,6 +51,9 @@ it('rejects parallel gates and stale begin signals', async () => {
   expect(() => allowRecordingBegin({ ...binding, streamInstanceId: 'stale-stream' })).toThrow(
     'Stale or mismatched'
   );
+  expect(() => assertRecordingBegin({ ...binding, streamInstanceId: 'stale-stream' })).toThrow(
+    'Stale or mismatched'
+  );
 
   cancelRecordingBegin('source denied');
   await expect(pending).rejects.toThrow('source denied');
@@ -55,4 +64,14 @@ it('cancels safely with and without a pending gate', async () => {
   cancelRecordingBegin();
   await expect(pending).rejects.toThrow('Recording start was cancelled');
   expect(() => cancelRecordingBegin()).not.toThrow();
+});
+
+it('rejects activation when the pending gate is invalidated across an async barrier', async () => {
+  const pending = waitForRecordingBegin(binding);
+  expect(() => assertRecordingBegin(binding)).not.toThrow();
+
+  cancelRecordingBegin('superseded while awaiting a fresh frame');
+
+  expect(() => allowRecordingBegin(binding)).toThrow('Stale or mismatched');
+  await expect(pending).rejects.toThrow('superseded while awaiting a fresh frame');
 });

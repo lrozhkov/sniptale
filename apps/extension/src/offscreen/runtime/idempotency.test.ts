@@ -11,6 +11,7 @@ const handledCommandTypes = [
   VideoMessageType.GET_DESKTOP_MEDIA,
   VideoMessageType.DISPOSE_DESKTOP_MEDIA,
   VideoMessageType.OFFSCREEN_START_RECORDING,
+  VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
   VideoMessageType.OFFSCREEN_STOP_RECORDING,
   VideoMessageType.OFFSCREEN_PAUSE_RECORDING,
   VideoMessageType.OFFSCREEN_RESUME_RECORDING,

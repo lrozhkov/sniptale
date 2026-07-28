@@ -4,6 +4,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { getVideoSurfaceSession } from '../../../capture-surface';
 import { getVideoRecordingRuntimeState } from '../../session-state';
+import { stopRecording } from '../controls.stop';
 import {
   isCurrentNavigationBinding,
   resolveNavigationBinding,
@@ -18,7 +19,11 @@ import {
   type TabNavigationPageEffects,
   type TabNavigationPageAccessVerifier,
 } from './page-effects';
-import { reassertViewportSurface, revalidateTabSource } from './source-validation';
+import {
+  reassertViewportSurface,
+  revalidateTabSource,
+  setViewportOutputFrozen,
+} from './source-validation';
 
 const logger = createLogger({ namespace: 'BackgroundVideoTabNavigationTransaction' });
 
@@ -28,14 +33,25 @@ type TabNavigationTransaction = {
   documentId: string | null;
   effects: TabNavigationPageEffects;
   navigationEpoch: number | null;
+  outputSuspension: Promise<OperationResult>;
   preparation: Promise<boolean>;
   pageAccessVerifier: TabNavigationPageAccessVerifier | null;
   reassertViewport: boolean;
   revalidateSource: boolean;
   shouldResume: boolean;
+  viewportReassertion: Promise<OperationResult> | null;
 };
 
+type OperationResult = { ok: true } | { error: unknown; ok: false };
+
 let activeTransaction: TabNavigationTransaction | null = null;
+
+function observeOperation(work: Promise<void>): Promise<OperationResult> {
+  return work.then(
+    () => ({ ok: true }),
+    (error: unknown) => ({ error, ok: false })
+  );
+}
 
 function isCurrentTransaction(transaction: TabNavigationTransaction): boolean {
   return activeTransaction === transaction && isCurrentNavigationBinding(transaction.binding);
@@ -56,6 +72,42 @@ function abandonCurrentTransaction(transaction: TabNavigationTransaction, error:
   logger.warn('Tab recording page recovery was skipped; media recording continues', error);
   abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
   activeTransaction = null;
+}
+
+async function stopAfterUnconfirmedViewportFreeze(
+  transaction: TabNavigationTransaction,
+  initialError: unknown,
+  retryError: unknown
+): Promise<void> {
+  if (!isCurrentTransaction(transaction)) return;
+  logger.error('Viewport output freeze could not be confirmed; stopping bound recording', {
+    initialError,
+    retryError,
+  });
+  abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
+  activeTransaction = null;
+  try {
+    const result = await stopRecording(false);
+    if (result.result === 'failed') {
+      logger.error('Bound recording stop failed after viewport freeze rejection', result.error);
+    }
+  } catch (error) {
+    logger.error('Bound recording stop threw after viewport freeze rejection', error);
+  }
+}
+
+async function createOutputSuspension(
+  transaction: TabNavigationTransaction,
+  enabled: boolean
+): Promise<OperationResult> {
+  if (!enabled) return { ok: true };
+  const initial = await observeOperation(setViewportOutputFrozen(transaction.binding, true));
+  if (initial.ok || !isCurrentTransaction(transaction)) return initial;
+  logger.warn('Initial viewport output freeze was not acknowledged; retrying', initial.error);
+  const retry = await observeOperation(setViewportOutputFrozen(transaction.binding, true));
+  if (retry.ok || !isCurrentTransaction(transaction)) return retry;
+  await stopAfterUnconfirmedViewportFreeze(transaction, initial.error, retry.error);
+  return retry;
 }
 
 async function prepareTransaction(transaction: TabNavigationTransaction): Promise<boolean> {
@@ -80,6 +132,7 @@ function createTransaction(
     documentId: null,
     effects,
     navigationEpoch: previous?.navigationEpoch ?? beginTabNavigationPageEffects(effects),
+    outputSuspension: Promise.resolve<OperationResult>({ ok: true }),
     preparation: Promise.resolve(false),
     pageAccessVerifier: null,
     reassertViewport,
@@ -87,10 +140,39 @@ function createTransaction(
     shouldResume:
       previous?.shouldResume ??
       getVideoRecordingRuntimeState().status === VideoRecordingStatus.RECORDING,
+    viewportReassertion: null,
   };
   activeTransaction = transaction;
+  transaction.outputSuspension = createOutputSuspension(transaction, reassertViewport);
   transaction.preparation = previous?.preparation ?? prepareTransaction(transaction);
   return transaction;
+}
+
+function startViewportReassertion(transaction: TabNavigationTransaction): void {
+  if (!transaction.reassertViewport || transaction.viewportReassertion) return;
+  transaction.viewportReassertion = transaction.outputSuspension.then((suspension) =>
+    suspension.ok ? observeOperation(reassertViewportSurface(transaction.binding)) : suspension
+  );
+}
+
+async function resumeViewportOutput(transaction: TabNavigationTransaction): Promise<void> {
+  try {
+    await setViewportOutputFrozen(transaction.binding, false);
+  } catch (error) {
+    if (isCurrentTransaction(transaction)) {
+      const refreeze = await observeOperation(setViewportOutputFrozen(transaction.binding, true));
+      if (!refreeze.ok) {
+        logger.warn(
+          'Viewport output could not be re-frozen after a missing resume acknowledgement',
+          {
+            refreezeError: refreeze.error,
+            resumeError: error,
+          }
+        );
+      }
+    }
+    throw error;
+  }
 }
 
 export function beginTabNavigationTransaction(
@@ -109,7 +191,11 @@ async function restoreTransaction(transaction: TabNavigationTransaction): Promis
     if (!(await transaction.preparation) || !isCurrentTransaction(transaction)) return;
     const pageAccessVerifier = transaction.pageAccessVerifier;
     if (!pageAccessVerifier) throw new Error('Recording page access verifier is unavailable');
-    if (transaction.reassertViewport) await reassertViewportSurface(transaction.binding);
+    const outputSuspension = await transaction.outputSuspension;
+    if (!outputSuspension.ok) throw outputSuspension.error;
+    startViewportReassertion(transaction);
+    const viewportReassertion = await transaction.viewportReassertion;
+    if (viewportReassertion && !viewportReassertion.ok) throw viewportReassertion.error;
     if (!isCurrentTransaction(transaction)) return;
 
     const pageEffects = await restoreTabNavigationPageEffects(
@@ -123,6 +209,10 @@ async function restoreTransaction(transaction: TabNavigationTransaction): Promis
     }
     if (transaction.revalidateSource) {
       await revalidateTabSource(transaction.binding, pageEffects.liveViewport, pageAccessVerifier);
+    }
+    if (!isCurrentTransaction(transaction)) return;
+    if (transaction.reassertViewport) {
+      await resumeViewportOutput(transaction);
     }
     if (!isCurrentTransaction(transaction)) return;
     if (activeTransaction === transaction) activeTransaction = null;
@@ -147,6 +237,7 @@ export function bindTabNavigationDocument(tabId: number, documentId: string): bo
   }
   if (!transaction) return false;
   transaction.documentId = documentId;
+  startViewportReassertion(transaction);
   return true;
 }
 

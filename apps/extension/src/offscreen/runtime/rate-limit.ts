@@ -1,4 +1,5 @@
 import { createOffscreenCommandBinding } from '@sniptale/platform/security/offscreen-command-capability';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 const OFFSCREEN_COMMAND_RATE_LIMIT_WINDOW_MS = 60_000;
 const OFFSCREEN_COMMAND_RATE_LIMIT_MAX = 60;
@@ -33,6 +34,12 @@ export function authorizeOffscreenCommandRateLimit(args: {
   nowEpochMs?: number;
   sender: chrome.runtime.MessageSender | undefined;
 }): { authorized: true } | { authorized: false; reason: string } {
+  if (
+    args.message['type'] === VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE &&
+    args.message['frozen'] === true
+  ) {
+    return { authorized: true };
+  }
   const nowEpochMs = args.nowEpochMs ?? Date.now();
   pruneOffscreenCommandRateLimits(nowEpochMs);
 

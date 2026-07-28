@@ -62,6 +62,7 @@ async function startRecordingInternal(
   }
   recordingContext.sourceVideoWidth = prepared.rawVideoWidth;
   recordingContext.sourceVideoHeight = prepared.rawVideoHeight;
+  recordingContext.tabOutputControls = prepared.tabOutputControls;
   recordingContext.tabOutputGeometry = prepared.tabOutputGeometry;
 
   const { streamInstanceId } = params;

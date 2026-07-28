@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 
 const mocks = vi.hoisted(() => ({
@@ -95,6 +96,20 @@ function createSurfaceSession(applied: TestAppliedSurface | null = viewportSurfa
     streamInstanceId: 'stream-1',
     tabId: 7,
   };
+}
+
+function expectViewportDrawStates(states: boolean[]): void {
+  expect(
+    mocks.sendRuntimeMessage.mock.calls.map(([message]) => ({
+      frozen: message.frozen,
+      type: message.type,
+    }))
+  ).toEqual(
+    states.map((frozen) => ({
+      frozen,
+      type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+    }))
+  );
 }
 
 beforeEach(() => {
@@ -199,8 +214,92 @@ it('revalidates viewport recording without interrupting the recorder', async () 
   expect(handleTabRecordingNavigationCompleted(7, 'document-1')).toBe(true);
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
-  expect(order).toEqual(['surface', 'source']);
+  expect(order).toEqual([
+    VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+    'surface',
+    'source',
+    VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+  ]);
+  expectViewportDrawStates([true, false]);
   expect(mocks.stop).not.toHaveBeenCalled();
+});
+
+it('keeps viewport output frozen when final source validation fails', async () => {
+  mocks.revalidateSource.mockRejectedValueOnce(
+    new Error('Raw recording source dimensions changed after navigation')
+  );
+
+  handleTabRecordingNavigationStart(7);
+  handleTabRecordingNavigationCommitted(7, 'document-1');
+  handleTabRecordingNavigationCompleted(7, 'document-1');
+  await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
+
+  expectViewportDrawStates([true]);
+  expect(mocks.stop).not.toHaveBeenCalled();
+});
+
+it('re-freezes viewport output when its resume acknowledgement is missing', async () => {
+  mocks.sendRuntimeMessage.mockImplementation(
+    (message: { frozen?: boolean; type: string }): Promise<{ success: true } | undefined> =>
+      Promise.resolve(
+        message.type === VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE &&
+          message.frozen === false
+          ? undefined
+          : { success: true }
+      )
+  );
+
+  handleTabRecordingNavigationStart(7);
+  handleTabRecordingNavigationCommitted(7, 'document-1');
+  handleTabRecordingNavigationCompleted(7, 'document-1');
+  await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
+
+  expectViewportDrawStates([true, false, true]);
+  expect(mocks.stop).not.toHaveBeenCalled();
+});
+
+it('freezes viewport output before navigation and reasserts it at document commit', async () => {
+  expect(handleTabRecordingNavigationStart(7)).toBe(true);
+  await vi.waitFor(() =>
+    expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        frozen: true,
+        generation: 1,
+        recordingId: 'recording-1',
+        streamInstanceId: 'stream-1',
+        type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+      })
+    )
+  );
+  expect(mocks.reassertViewport).not.toHaveBeenCalled();
+
+  expect(handleTabRecordingNavigationCommitted(7, 'document-1')).toBe(true);
+  await vi.waitFor(() => expect(mocks.reassertViewport).toHaveBeenCalledOnce());
+  expect(mocks.stop).not.toHaveBeenCalled();
+});
+
+it('retries an explicitly rejected initial viewport freeze before recovery', async () => {
+  mocks.sendRuntimeMessage
+    .mockResolvedValueOnce({ error: 'freeze denied', success: false })
+    .mockResolvedValue({ success: true });
+
+  handleTabRecordingNavigationStart(7);
+  handleTabRecordingNavigationCommitted(7, 'document-1');
+  handleTabRecordingNavigationCompleted(7, 'document-1');
+  await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
+
+  expectViewportDrawStates([true, true, false]);
+  expect(mocks.stop).not.toHaveBeenCalled();
+});
+
+it('stops the bound recording when an initial viewport freeze cannot be acknowledged', async () => {
+  mocks.sendRuntimeMessage.mockResolvedValue(undefined);
+
+  handleTabRecordingNavigationStart(7);
+  await vi.waitFor(() => expect(mocks.stop).toHaveBeenCalledWith(false));
+
+  expectViewportDrawStates([true, true]);
+  expect(isTabRecordingNavigationPending()).toBe(false);
 });
 
 it('keeps TAB_CROP recording continuous while page effects are restored', async () => {
@@ -230,8 +329,43 @@ it('does not let stale completion A finish navigation B', async () => {
   expect(handleTabRecordingNavigationCompleted(7, 'document-b')).toBe(true);
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
-  expect(mocks.reassertViewport).toHaveBeenCalledOnce();
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(mocks.reassertViewport).toHaveBeenCalledTimes(2);
+  expectViewportDrawStates([true, true, false]);
+});
+
+it('lets a newer navigation freeze cancel an older pending viewport resume', async () => {
+  let resolveFirstResume!: () => void;
+  let pendingResumeCreated = false;
+  mocks.sendRuntimeMessage.mockImplementation(
+    (message: { frozen?: boolean; type: string }): Promise<{ success: boolean }> => {
+      if (
+        message.type === VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE &&
+        message.frozen === false &&
+        !pendingResumeCreated
+      ) {
+        pendingResumeCreated = true;
+        return new Promise((resolve) => {
+          resolveFirstResume = () => resolve({ success: true });
+        });
+      }
+      return Promise.resolve({ success: true });
+    }
+  );
+
+  handleTabRecordingNavigationStart(7);
+  handleTabRecordingNavigationCommitted(7, 'document-a');
+  handleTabRecordingNavigationCompleted(7, 'document-a');
+  await vi.waitFor(() => expect(pendingResumeCreated).toBe(true));
+
+  handleTabRecordingNavigationStart(7);
+  await vi.waitFor(() => expectViewportDrawStates([true, false, true]));
+  resolveFirstResume();
+  handleTabRecordingNavigationCommitted(7, 'document-b');
+  handleTabRecordingNavigationCompleted(7, 'document-b');
+  await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
+
+  expectViewportDrawStates([true, false, true, false]);
+  expect(mocks.stop).not.toHaveBeenCalled();
 });
 
 it('does not change manual pause state while navigation recovery runs', async () => {
@@ -241,7 +375,7 @@ it('does not change manual pause state while navigation recovery runs', async ()
   handleTabRecordingNavigationCompleted(7, 'document-1');
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expectViewportDrawStates([true, false]);
   expect(mocks.stop).not.toHaveBeenCalled();
 });
 
@@ -302,7 +436,7 @@ it('clears only the current controlled-cursor recovery when page access is unava
     expect.objectContaining({ navigationEpoch: 11, recordingId: 'recording-1', tabId: 7 })
   );
   expect(mocks.stop).not.toHaveBeenCalled();
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expectViewportDrawStates([true]);
 });
 
 it('keeps TAB_CROP recording active when its overlay cannot be restored', async () => {
@@ -315,5 +449,5 @@ it('keeps TAB_CROP recording active when its overlay cannot be restored', async 
 
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
   expect(mocks.stop).not.toHaveBeenCalled();
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expectViewportDrawStates([true]);
 });

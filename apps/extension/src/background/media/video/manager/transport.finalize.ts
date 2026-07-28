@@ -4,7 +4,7 @@ import {
   normalizeVideoSourceCount,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
-import type { AppliedCaptureSurface } from '../../../capture-surface';
+import { getCaptureSurfaceService, type AppliedCaptureSurface } from '../../../capture-surface';
 import { cancelVideoSourceReadyWait, waitForVideoSourceReady } from '../capture-surface';
 import { supportsSystemAudio } from '../capture-source';
 import type { enableAnnotationsIfNeeded, resolveCaptureSource } from './preflight';
@@ -82,6 +82,13 @@ export async function finalizeRecordingStart(context: {
   }
   if (!ready) return context.streamInstanceId;
   const streamInstanceId = await ready;
+  if (context.surface?.target === 'viewport') {
+    await getCaptureSurfaceService().reassert({
+      sessionId: context.surface.sessionId,
+      leaseId: context.surface.leaseId,
+      generation: context.surface.generation,
+    });
+  }
   logger.debug('Raw recording source validated', {
     recordingId: context.recordingId,
     streamInstanceId,

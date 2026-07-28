@@ -60,6 +60,15 @@ export interface OffscreenRevalidateSourceMessage {
   viewport?: ViewportInfo;
 }
 
+export interface OffscreenSetViewportDrawStateMessage {
+  type: typeof VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE;
+  capabilityToken: string;
+  frozen: boolean;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+}
+
 export interface OffscreenRecordingStartedMessage {
   type: typeof VideoMessageType.OFFSCREEN_RECORDING_STARTED;
   recordingId: string;

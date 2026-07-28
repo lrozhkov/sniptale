@@ -9,11 +9,16 @@ import {
 import {
   pauseRecording,
   resumeRecording,
+  setViewportDrawState,
   startRecording,
   stopRecording,
   updateRecordingSettings,
 } from '../recording/controller';
-import { allowRecordingBegin } from '../recording/start/gate';
+import {
+  allowRecordingBegin,
+  assertRecordingBegin,
+  cancelRecordingBegin,
+} from '../recording/start/gate';
 import { recordingContext } from '../recording/context';
 import {
   createSourceVideo,
@@ -82,6 +87,7 @@ export function resolveOffscreenErrorPhase(
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_START_RECORDING:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
+    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
     case VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
@@ -108,6 +114,7 @@ export function resolveOffscreenRuntimeResponseMode(
     case VideoMessageType.GET_DESKTOP_MEDIA:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
+    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
     case VideoMessageType.OFFSCREEN_STOP_RECORDING:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
@@ -159,7 +166,15 @@ export async function handleOffscreenRuntimeMessage(
       await startRecording(buildStartRecordingArgs(message));
       return;
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
+      assertRecordingBegin(message);
+      await recordingContext.tabOutputControls?.resume();
       allowRecordingBegin(message);
+      return;
+    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
+      await setViewportDrawState(resolveRecordingSourceBinding(message), message.frozen);
+      if (message.frozen) {
+        cancelRecordingBegin('Recording start was cancelled by viewport navigation');
+      }
       return;
     case VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE:
       await revalidateSource(message, sendResponse);

@@ -14,7 +14,11 @@ vi.mock('./video-source', () => ({
   waitForSourceMetadata: mocks.waitForSourceMetadata,
 }));
 
-import { createCropStream, resolveOnePixelEncodingCrop } from './crop-stream';
+import {
+  createCropStream,
+  createGatedCropStream,
+  resolveOnePixelEncodingCrop,
+} from './crop-stream';
 import {
   createAudioStream,
   createEmptyStream,
@@ -35,6 +39,76 @@ afterEach(() => {
 });
 
 describe('crop stream', () => {
+  it('holds the last safe canvas frame while drawing is suspended', async () => {
+    const output = createTrackedStream();
+    const context = { drawImage: vi.fn() };
+    const frameCallbacks = new Map<number, VideoFrameRequestCallback>();
+    let nextFrameCallbackId = 1;
+    Object.defineProperty(HTMLCanvasElement.prototype, 'captureStream', {
+      configurable: true,
+      value: vi.fn(() => output),
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      configurable: true,
+      value: vi.fn(() => context),
+    });
+    mocks.createSourceVideo.mockReturnValue({
+      cancelVideoFrameCallback: vi.fn((id: number) => frameCallbacks.delete(id)),
+      requestVideoFrameCallback: vi.fn((callback: VideoFrameRequestCallback) => {
+        const id = nextFrameCallbackId++;
+        frameCallbacks.set(id, callback);
+        return id;
+      }),
+      videoHeight: 720,
+      videoWidth: 1280,
+    });
+
+    const gated = await createGatedCropStream(
+      createStream(1280, 720),
+      {
+        sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
+        outputSize: { width: 1280, height: 720 },
+      },
+      { initiallySuspended: true }
+    );
+
+    expect(context.drawImage).not.toHaveBeenCalled();
+    const cancelledResume = gated.controls.resume();
+    const cancelledResumeExpectation = expect(cancelledResume).rejects.toThrow(
+      'fresh-frame wait was cancelled'
+    );
+    const staleFrameCallback = frameCallbacks.get(1);
+    gated.controls.suspend();
+    await cancelledResumeExpectation;
+    staleFrameCallback?.(0, {} as VideoFrameCallbackMetadata);
+    expect(context.drawImage).not.toHaveBeenCalled();
+
+    const firstResume = gated.controls.resume();
+    frameCallbacks.get(2)?.(0, {} as VideoFrameCallbackMetadata);
+    await firstResume;
+    expect(context.drawImage).toHaveBeenCalledOnce();
+    gated.controls.suspend();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(context.drawImage).toHaveBeenCalledOnce();
+    const secondResume = gated.controls.resume();
+    expect(context.drawImage).toHaveBeenCalledOnce();
+    frameCallbacks.get(3)?.(0, {} as VideoFrameCallbackMetadata);
+    await secondResume;
+    expect(context.drawImage).toHaveBeenCalledTimes(2);
+
+    context.drawImage.mockImplementationOnce(() => {
+      throw new Error('fresh draw failed');
+    });
+    const failedResume = gated.controls.resume();
+    const failedResumeExpectation = expect(failedResume).rejects.toThrow('fresh draw failed');
+    frameCallbacks.get(4)?.(0, {} as VideoFrameCallbackMetadata);
+    await failedResumeExpectation;
+    expect(context.drawImage).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(context.drawImage).toHaveBeenCalledTimes(3);
+    gated.stream.getVideoTracks()[0]?.stop();
+  });
+
   it('draws an explicit raw source rectangle into an independent output size', async () => {
     const output = createTrackedStream();
     const context = { drawImage: vi.fn() };

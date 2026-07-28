@@ -7,10 +7,12 @@ import { OFFSCREEN_COMMAND_RATE_LIMIT_MAX_FOR_TESTS } from './rate-limit';
 const {
   browserRuntimeSubscribeToMessagesMock,
   parseOffscreenRuntimeMessageMock,
+  setViewportDrawStateMock,
   stopRecordingMock,
 } = vi.hoisted(() => ({
   browserRuntimeSubscribeToMessagesMock: vi.fn(),
   parseOffscreenRuntimeMessageMock: vi.fn(),
+  setViewportDrawStateMock: vi.fn(),
   stopRecordingMock: vi.fn(),
 }));
 
@@ -47,7 +49,7 @@ vi.mock('../recording/setup/desktop-media', () => ({
 vi.mock('../recording/controller', () => ({
   pauseRecording: vi.fn(),
   resumeRecording: vi.fn(),
-  setViewportDrawState: vi.fn(),
+  setViewportDrawState: setViewportDrawStateMock,
   startRecording: vi.fn(),
   stopRecording: stopRecordingMock,
   updateRecordingSettings: vi.fn(),
@@ -80,6 +82,16 @@ function createStopCommand() {
   return {
     type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
     discard: true,
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  };
+}
+
+function createViewportFreezeCommand() {
+  return {
+    type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+    frozen: true,
     generation: 1,
     recordingId: 'recording-1',
     streamInstanceId: 'stream-instance-1',
@@ -232,4 +244,22 @@ it('rejects rate-limited commands before dispatch', async () => {
     error: 'Offscreen command rate limit exceeded',
   });
   expect(stopRecordingMock).toHaveBeenCalledTimes(OFFSCREEN_COMMAND_RATE_LIMIT_MAX_FOR_TESTS);
+});
+
+it('always permits the fail-safe viewport freeze transition', async () => {
+  const listener = await captureSubscriptionListener();
+  parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
+
+  for (let index = 0; index <= OFFSCREEN_COMMAND_RATE_LIMIT_MAX_FOR_TESTS; index += 1) {
+    listener(
+      createAuthorizedOffscreenMessage(createViewportFreezeCommand()),
+      generatedBackgroundSender
+    );
+  }
+
+  await vi.waitFor(() =>
+    expect(setViewportDrawStateMock).toHaveBeenCalledTimes(
+      OFFSCREEN_COMMAND_RATE_LIMIT_MAX_FOR_TESTS + 1
+    )
+  );
 });

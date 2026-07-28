@@ -8,6 +8,16 @@ export type CropStreamGeometry = {
   sourceRect: CropRect;
 };
 
+export type CropStreamControls = {
+  resume(): Promise<void>;
+  suspend(): void;
+};
+
+export type GatedCropStream = {
+  controls: CropStreamControls;
+  stream: MediaStream;
+};
+
 function requirePositiveInteger(value: number, label: string): number {
   if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0) {
     throw new Error(`${label} must be a positive integer`);
@@ -34,13 +44,87 @@ function requireCropGeometry(geometry: CropStreamGeometry, source: OutputSize): 
   return geometry;
 }
 
-export async function createCropStream(
+type CropFrameGate = CropStreamControls & {
+  canDraw(): boolean;
+  stop(): void;
+};
+
+function createCropFrameGate(
+  video: HTMLVideoElement,
+  initiallySuspended: boolean,
+  drawFreshFrame: () => void
+): CropFrameGate {
+  let awaitingFreshFrame = false;
+  let pendingFrame: {
+    callbackId: number;
+    reject: (error: Error) => void;
+    resolve: () => void;
+  } | null = null;
+  let stopped = false;
+  let suspended = initiallySuspended;
+
+  const cancelPendingFrame = () => {
+    if (!pendingFrame) return;
+    video.cancelVideoFrameCallback(pendingFrame.callbackId);
+    const reject = pendingFrame.reject;
+    pendingFrame = null;
+    reject(new Error('Viewport fresh-frame wait was cancelled'));
+  };
+
+  return {
+    canDraw: () => !stopped && !suspended && !awaitingFreshFrame,
+    resume: () => {
+      if (stopped) return Promise.resolve();
+      cancelPendingFrame();
+      awaitingFreshFrame = true;
+      suspended = false;
+      if (typeof video.requestVideoFrameCallback !== 'function') {
+        throw new Error('Video frame callback is unavailable for viewport output');
+      }
+      return new Promise<void>((resolve, reject) => {
+        const callbackId = video.requestVideoFrameCallback(() => {
+          if (pendingFrame?.callbackId !== callbackId) {
+            resolve();
+            return;
+          }
+          pendingFrame = null;
+          if (!stopped && !suspended) {
+            try {
+              awaitingFreshFrame = false;
+              drawFreshFrame();
+            } catch (error) {
+              awaitingFreshFrame = true;
+              suspended = true;
+              reject(error instanceof Error ? error : new Error(String(error)));
+              return;
+            }
+          }
+          resolve();
+        });
+        pendingFrame = { callbackId, reject, resolve };
+      });
+    },
+    stop: () => {
+      stopped = true;
+      suspended = true;
+      cancelPendingFrame();
+    },
+    suspend: () => {
+      suspended = true;
+      cancelPendingFrame();
+    },
+  };
+}
+
+export async function createGatedCropStream(
   sourceStream: MediaStream,
-  geometry: CropStreamGeometry
-): Promise<MediaStream> {
+  geometry: CropStreamGeometry,
+  options: { initiallySuspended?: boolean } = {}
+): Promise<GatedCropStream> {
   const video = createSourceVideo(sourceStream);
   let frameTimer: ReturnType<typeof setInterval> | null = null;
   let ownershipTransferred = false;
+  let stopped = false;
   try {
     await waitForSourceMetadata(video);
     const validated = requireCropGeometry(geometry, {
@@ -59,7 +143,9 @@ export async function createCropStream(
         : 30;
     const cropped = canvas.captureStream(frameRate);
     sourceStream.getAudioTracks().forEach((track) => cropped.addTrack(track));
+    let frameGate: CropFrameGate;
     const draw = () => {
+      if (stopped || !frameGate.canDraw()) return;
       const { sourceRect, outputSize } = validated;
       context.drawImage(
         video,
@@ -73,28 +159,39 @@ export async function createCropStream(
         outputSize.height
       );
     };
+    frameGate = createCropFrameGate(video, options.initiallySuspended === true, draw);
     draw();
     frameTimer = setInterval(draw, Math.max(1, Math.round(1000 / frameRate)));
     const track = cropped.getVideoTracks()[0];
     if (!track) throw new Error('Cropped output is missing a video track');
     const stop = track.stop.bind(track);
-    let stopped = false;
     track.stop = () => {
       if (stopped) return;
       stopped = true;
+      frameGate.stop();
       if (frameTimer !== null) clearInterval(frameTimer);
       frameTimer = null;
       releaseSourceVideo(video);
       stop();
     };
     ownershipTransferred = true;
-    return cropped;
+    return {
+      controls: frameGate,
+      stream: cropped,
+    };
   } finally {
     if (!ownershipTransferred) {
       if (frameTimer !== null) clearInterval(frameTimer);
       releaseSourceVideo(video);
     }
   }
+}
+
+export async function createCropStream(
+  sourceStream: MediaStream,
+  geometry: CropStreamGeometry
+): Promise<MediaStream> {
+  return (await createGatedCropStream(sourceStream, geometry)).stream;
 }
 
 export function resolveOnePixelEncodingCrop(source: OutputSize): CropStreamGeometry | null {

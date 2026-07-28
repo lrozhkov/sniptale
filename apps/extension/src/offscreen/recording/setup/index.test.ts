@@ -53,6 +53,7 @@ const geometry = {
   sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
   outputSize: { width: 1280, height: 720 },
 };
+const tabOutputControls = { resume: vi.fn(), suspend: vi.fn() };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -65,7 +66,10 @@ beforeEach(() => {
   mocks.resolveCrop.mockReturnValue(null);
   mocks.resolveTabGeometry.mockReturnValue(geometry);
   mocks.createCrop.mockResolvedValue(createStream(1278, 720));
-  mocks.createTabOutput.mockResolvedValue(createStream(1280, 720));
+  mocks.createTabOutput.mockResolvedValue({
+    controls: tabOutputControls,
+    stream: createStream(1280, 720),
+  });
   mocks.attachMicrophone.mockResolvedValue(undefined);
 });
 
@@ -82,6 +86,7 @@ it('accepts a natural physical TAB source and produces the canonical CSS output'
     rawTrackSettings: { height: 1440, width: 2560 },
     rawVideoHeight: 1440,
     rawVideoWidth: 2560,
+    tabOutputControls: null,
     tabOutputGeometry: geometry,
     trackSettings: { height: 720, width: 1280 },
   });
@@ -97,8 +102,50 @@ it('accepts a natural physical TAB source and produces the canonical CSS output'
     { width: 2560, height: 1440 },
     { width: 1280, height: 720, devicePixelRatio: 2 }
   );
-  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry);
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
+    initiallySuspended: false,
+  });
   expect(mocks.releaseSourceVideo).toHaveBeenCalledOnce();
+});
+
+it('starts viewport-preset output behind a closed frame gate', async () => {
+  const prepared = await prepareRecordingStream({
+    captureMode: CaptureMode.TAB,
+    settings,
+    streamId: 'stream-viewport',
+    surface: {
+      presetId: 'viewport-1',
+      target: 'viewport',
+      width: 1280,
+      height: 720,
+    },
+    viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
+  });
+
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
+    initiallySuspended: true,
+  });
+  expect(prepared.tabOutputControls).toBe(tabOutputControls);
+});
+
+it('keeps a window-preset TAB output outside the viewport frame gate', async () => {
+  const prepared = await prepareRecordingStream({
+    captureMode: CaptureMode.TAB,
+    settings,
+    streamId: 'stream-window',
+    surface: {
+      presetId: 'window-1',
+      target: 'window',
+      width: 1280,
+      height: 720,
+    },
+    viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
+  });
+
+  expect(prepared.tabOutputControls).toBeNull();
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
+    initiallySuspended: false,
+  });
 });
 
 it('uses the selected CSS region for TAB_CROP output mapping', async () => {
@@ -177,7 +224,10 @@ it('fails when the raw or output stream has no video track', async () => {
     cursorCaptureMode: null,
     stream: createStream(2560, 1440),
   });
-  mocks.createTabOutput.mockResolvedValueOnce(createEmptyStream());
+  mocks.createTabOutput.mockResolvedValueOnce({
+    controls: tabOutputControls,
+    stream: createEmptyStream(),
+  });
   await expect(
     prepareRecordingStream({
       captureMode: CaptureMode.TAB,

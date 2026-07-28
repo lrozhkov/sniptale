@@ -354,6 +354,20 @@ export function resumeRecording(binding: RecordingSourceBinding): void {
   );
 }
 
+export async function setViewportDrawState(
+  binding: RecordingSourceBinding,
+  frozen: boolean
+): Promise<void> {
+  assertActiveRecordingBinding(binding);
+  const controls = recordingContext.tabOutputControls;
+  if (!controls) throw new Error('Tab output frame controls are unavailable');
+  if (frozen) {
+    controls.suspend();
+    return;
+  }
+  await controls.resume();
+}
+
 export function updateRecordingSettings(
   binding: RecordingSourceBinding,
   patch: { microphoneEnabled?: boolean; webcamEnabled?: boolean }

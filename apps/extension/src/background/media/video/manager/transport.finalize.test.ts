@@ -6,6 +6,7 @@ const {
   cancelVideoSourceReadyWaitMock,
   isStartCancelledMock,
   markOffscreenStartDispatchedMock,
+  reassertSurfaceMock,
   sendOffscreenStartRecordingMock,
   supportsSystemAudioMock,
   waitForVideoSourceReadyMock,
@@ -14,6 +15,7 @@ const {
   cancelVideoSourceReadyWaitMock: vi.fn(),
   isStartCancelledMock: vi.fn(),
   markOffscreenStartDispatchedMock: vi.fn(),
+  reassertSurfaceMock: vi.fn(),
   sendOffscreenStartRecordingMock: vi.fn(),
   supportsSystemAudioMock: vi.fn(),
   waitForVideoSourceReadyMock: vi.fn(),
@@ -41,6 +43,10 @@ vi.mock('../capture-surface', async (importOriginal) => ({
   cancelVideoSourceReadyWait: cancelVideoSourceReadyWaitMock,
   waitForVideoSourceReady: waitForVideoSourceReadyMock,
 }));
+vi.mock('../../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture-surface')>()),
+  getCaptureSurfaceService: () => ({ reassert: reassertSurfaceMock }),
+}));
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ debug: vi.fn() }),
 }));
@@ -63,6 +69,7 @@ beforeEach(() => {
   supportsSystemAudioMock.mockReturnValue(true);
   isStartCancelledMock.mockReturnValue(false);
   waitForVideoSourceReadyMock.mockResolvedValue('stream-instance-1');
+  reassertSurfaceMock.mockResolvedValue(undefined);
 });
 
 it('does not dispatch a source after cancellation wins during diagnostics', async () => {
@@ -119,6 +126,14 @@ it('dispatches exact surface metadata and waits for source validation', async ()
   });
   expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
     expect.objectContaining({ generation: 2, recordingId: 'recording-42', surface })
+  );
+  expect(reassertSurfaceMock).toHaveBeenCalledWith({
+    generation: 2,
+    leaseId: 'lease-1',
+    sessionId: 'recording-42',
+  });
+  expect(waitForVideoSourceReadyMock.mock.invocationCallOrder[0]).toBeLessThan(
+    reassertSurfaceMock.mock.invocationCallOrder[0]!
   );
 });
 

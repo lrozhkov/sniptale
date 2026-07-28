@@ -83,8 +83,8 @@ export function sendOffscreenBeginRecording(args: {
       })
     )
     .then((response) => {
-      if (response?.success === false) {
-        throw new Error(response.error ?? 'Offscreen rejected recording start');
+      if (response?.success !== true) {
+        throw new Error(response?.error ?? 'Offscreen rejected recording start');
       }
     });
 }

@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -27,7 +28,11 @@ vi.mock('../../../capture-viewport', async (importOriginal) => ({
   readTabCaptureViewport: mocks.readViewport,
 }));
 
-import { reassertViewportSurface, revalidateTabSource } from './source-validation';
+import {
+  reassertViewportSurface,
+  revalidateTabSource,
+  setViewportOutputFrozen,
+} from './source-validation';
 
 const binding = {
   generation: 2,
@@ -86,6 +91,25 @@ it('reasserts only an applied viewport lease', async () => {
   mocks.getSession.mockReturnValueOnce(null);
   await reassertViewportSurface(binding);
   expect(mocks.reassert).toHaveBeenCalledOnce();
+});
+
+it('binds viewport output freezing to the active source generation', async () => {
+  await setViewportOutputFrozen(binding, true);
+
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      frozen: true,
+      generation: 2,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-1',
+      type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+    })
+  );
+
+  mocks.sendRuntimeMessage.mockResolvedValueOnce(undefined);
+  await expect(setViewportOutputFrozen(binding, false)).rejects.toThrow(
+    'Viewport output frame state could not be updated'
+  );
 });
 
 it('reads and forwards the live viewport when the caller has not already measured it', async () => {
