@@ -21,7 +21,7 @@ beforeEach(() => {
   withTimeoutMock.mockImplementation((promise: Promise<unknown>) => promise);
 });
 
-it('applies exact device metrics without a scale parameter', async () => {
+it('pins the visible compositor area to the exact CSS viewport', async () => {
   await overrideDeviceMetrics(9, 1280, 720);
 
   expect(browserDebuggerMock.sendCommand).toHaveBeenCalledWith(
@@ -37,6 +37,7 @@ it('applies exact device metrics without a scale parameter', async () => {
       positionX: 0,
       positionY: 0,
       scrollbarType: 'overlay',
+      viewport: { x: 0, y: 0, width: 1280, height: 720, scale: 1 },
     }
   );
 });

@@ -22,6 +22,7 @@ export async function overrideDeviceMetrics(
       positionX: 0,
       positionY: 0,
       scrollbarType: 'overlay',
+      viewport: { x: 0, y: 0, width, height, scale: 1 },
     }),
     DEBUGGER_TIMEOUT_MS,
     'Emulation.setDeviceMetricsOverride'
