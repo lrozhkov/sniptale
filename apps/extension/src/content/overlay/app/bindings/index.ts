@@ -3,6 +3,10 @@ import { useCallback, useEffect, useRef } from 'react';
 import { registerFrameCallbacks } from '../../../selection/highlighter';
 import { disableNavigationLock } from '../../../selection/locker';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
+import {
+  browserAnnotationSession,
+  subscribeToBrowserAnnotationDocumentNavigation,
+} from '../../../parser/page-preparation/annotations';
 import type { InteractiveFrameComponent } from '../../../selection/frame-runtime/roots/component';
 import type {
   ContentAppModeControls,
@@ -62,6 +66,20 @@ function usePagePreparationHistoryReset(screenshotMode: boolean) {
   }, [screenshotMode]);
 }
 
+function useBrowserAnnotationDocumentReset(clearFrames: () => void) {
+  useEffect(
+    () =>
+      subscribeToBrowserAnnotationDocumentNavigation({
+        onNavigation: () => {
+          clearFrames();
+          browserAnnotationSession.resetForDocument();
+          pagePreparationHistory.clear();
+        },
+      }),
+    [clearFrames]
+  );
+}
+
 function useFrameCallbackRegistration(args: {
   addFrame: (element: HTMLElement) => void;
   addFreeFrame: ReturnType<typeof useFrameManager>['addFreeFrame'];
@@ -106,6 +124,7 @@ export function useContentAppBindings(params: ContentAppBindingsParams) {
   }, [setPinnedToolbarVisible]);
 
   useFrameUIController({ frames: frameManager.frames });
+  useBrowserAnnotationDocumentReset(frameManager.clearFrames);
   useQuickActionHotkeys();
   useNavigationLockCleanup(params.modeFlags);
   usePagePreparationHistoryReset(params.modeFlags.screenshotMode);

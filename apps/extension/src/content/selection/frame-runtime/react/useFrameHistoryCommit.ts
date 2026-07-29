@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FrameData } from '../../../../features/highlighter/contracts';
+import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import type { useFrameManagerControllers } from './useFrameManagerControllers';
 
@@ -36,6 +37,8 @@ export function useHistoryCommitCoordinator(frames: FrameData[]) {
   }, []);
 
   useEffect(() => {
+    browserAnnotationSession.syncFrameIds(frames.map((frame) => frame.id));
+
     if (pendingCommitIdsRef.current.length === 0) {
       return;
     }

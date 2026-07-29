@@ -12,9 +12,26 @@ import { getCurrentBorderPreset as getHoverBorderPreset } from '../../highlighte
 import { createFrameHostLayoutService } from '../host-layout/service';
 
 const mocks = vi.hoisted(() => ({
+  applyAnnotationSnapshot: vi.fn(),
+  captureAnnotationSnapshot: vi.fn(() => ({
+    domRecords: [],
+    frameOrders: [],
+    nextAnnotationId: 1,
+    nextCommentMarker: 1,
+    nextCreationOrder: 1,
+    schemaVersion: 1 as const,
+  })),
   captureFrameSessionSnapshot: vi.fn(),
   hydrateFrameSessionSnapshot: vi.fn(),
   resetFrameUi: vi.fn(),
+}));
+
+vi.mock('../../../parser/page-preparation/annotations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../parser/page-preparation/annotations')>()),
+  browserAnnotationSession: {
+    applySnapshot: mocks.applyAnnotationSnapshot,
+    captureSnapshot: mocks.captureAnnotationSnapshot,
+  },
 }));
 
 vi.mock('../../../parser/page-preparation/history', async (importOriginal) => ({
@@ -137,6 +154,43 @@ describe('frame-manager-history-bridge', () => {
   );
 
   it('captures snapshots from the current frame-manager refs', expectBridgeSnapshotCapture);
+
+  it('restores annotation and frame snapshots through one bridge apply', () => {
+    const refs = createRefs();
+    const frameSession = createAppliedSnapshot();
+    const annotations = mocks.captureAnnotationSnapshot();
+    mocks.hydrateFrameSessionSnapshot.mockReturnValue({ frames: [], stepBadgeOrder: new Map() });
+    const bridge = createPagePreparationHistoryBridge({
+      refs,
+      setFrames: vi.fn(),
+      setFrameStates: vi.fn(),
+    });
+
+    bridge.applySnapshot({ annotations, frameSession });
+
+    expect(mocks.applyAnnotationSnapshot).toHaveBeenCalledWith(annotations);
+  });
+
+  it('does not apply annotations when frame restoration fails', () => {
+    const refs = createRefs();
+    const frameSession = createAppliedSnapshot();
+    const annotations = mocks.captureAnnotationSnapshot();
+    mocks.applyAnnotationSnapshot.mockClear();
+    mocks.hydrateFrameSessionSnapshot.mockReturnValue({ frames: [], stepBadgeOrder: new Map() });
+    vi.spyOn(refs.hostLayoutServiceRef.current, 'restoreFrames').mockImplementation(() => {
+      throw new Error('frame restore failed');
+    });
+    const bridge = createPagePreparationHistoryBridge({
+      refs,
+      setFrames: vi.fn(),
+      setFrameStates: vi.fn(),
+    });
+
+    expect(() => bridge.applySnapshot({ annotations, frameSession })).toThrow(
+      'frame restore failed'
+    );
+    expect(mocks.applyAnnotationSnapshot).not.toHaveBeenCalled();
+  });
 });
 
 function expectHydratedHistorySnapshotApplication() {
@@ -156,7 +210,10 @@ function expectHydratedHistorySnapshotApplication() {
     refs,
     setFrames,
     setFrameStates,
-    snapshot,
+    snapshot: {
+      annotations: mocks.captureAnnotationSnapshot(),
+      frameSession: snapshot,
+    },
   });
   expect(restoreFrames).toHaveBeenCalledWith(frames);
 
@@ -200,7 +257,10 @@ function expectBridgeSnapshotCapture() {
     setFrameStates,
   });
 
-  expect(bridge.captureSnapshot()).toBe(expectedSnapshot);
+  expect(bridge.captureSnapshot()).toEqual({
+    annotations: mocks.captureAnnotationSnapshot(),
+    frameSession: expectedSnapshot,
+  });
   bridge.onHistoryCleared?.();
   expect(retireHistoryBindings).toHaveBeenCalledTimes(1);
   bridge.onHistoryReachabilityChanged?.(['frame-1']);

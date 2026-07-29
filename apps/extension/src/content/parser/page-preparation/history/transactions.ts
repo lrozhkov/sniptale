@@ -7,15 +7,15 @@ import {
   type HistoryStoreRuntimeState,
 } from './store-state';
 import type {
-  FrameSessionSnapshot,
   PageDomMutationBatch,
   PagePreparationHistoryEntry,
+  PagePreparationSessionSnapshot,
 } from './types';
 import { clearHistoryDomLocators } from './dom';
 
 type HistoryEntryArgs = {
-  after?: FrameSessionSnapshot | null;
-  before?: FrameSessionSnapshot | null;
+  after?: PagePreparationSessionSnapshot | null;
+  before?: PagePreparationSessionSnapshot | null;
   domBatch?: PageDomMutationBatch | null;
 };
 

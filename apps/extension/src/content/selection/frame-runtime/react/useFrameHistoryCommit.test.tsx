@@ -13,7 +13,17 @@ const historyMocks = vi.hoisted(() => ({
   hasOpenTransactions: vi.fn(),
 }));
 
-vi.mock('../../../parser/page-preparation/history', () => ({
+const annotationMocks = vi.hoisted(() => ({
+  syncFrameIds: vi.fn(),
+}));
+
+vi.mock('../../../parser/page-preparation/annotations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../parser/page-preparation/annotations')>()),
+  browserAnnotationSession: annotationMocks,
+}));
+
+vi.mock('../../../parser/page-preparation/history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../parser/page-preparation/history')>()),
   pagePreparationHistory: historyMocks,
 }));
 
@@ -76,6 +86,7 @@ describe('frame-manager-history-commit', () => {
     historyMocks.cancelDeferredCommit.mockReset();
     historyMocks.finalizeDeferredCommit.mockReset();
     historyMocks.hasOpenTransactions.mockReset();
+    annotationMocks.syncFrameIds.mockReset();
     historyMocks.beginDeferredCommit.mockReturnValue(11);
     historyMocks.hasOpenTransactions.mockReturnValue(false);
   });
@@ -103,6 +114,7 @@ describe('frame-manager-history-commit', () => {
   );
 
   it('wraps only history-sensitive frame-manager actions', expectHistoryWrappedActions);
+  it('synchronizes frame add, remove, and re-add lifecycles', expectFrameOrderSynchronization);
   it(
     'cancels deferred commits when the wrapped action throws before queueing',
     expectThrownActionRollback
@@ -126,6 +138,10 @@ async function expectDeferredCommitFinalization() {
     await vi.runAllTimersAsync();
   });
 
+  expect(annotationMocks.syncFrameIds).toHaveBeenLastCalledWith(['frame-1']);
+  expect(annotationMocks.syncFrameIds.mock.invocationCallOrder.at(-1)).toBeLessThan(
+    historyMocks.finalizeDeferredCommit.mock.invocationCallOrder[0]!
+  );
   expect(historyMocks.finalizeDeferredCommit).toHaveBeenCalledWith(11);
 }
 
@@ -163,6 +179,16 @@ function expectHistoryWrappedActions() {
   expect(withHistoryCommit).toHaveBeenNthCalledWith(10, frameManager.updateFrameEffect);
   expect(wrapped.updateFrameStepBadge).toBe(frameManager.updateFrameStepBadge);
   expect(wrapped.updateGlobalStepBadgeSettings).toBe(frameManager.updateGlobalStepBadgeSettings);
+}
+
+async function expectFrameOrderSynchronization() {
+  const frame = createFrame('frame-1');
+
+  await renderHarness([frame]);
+  await renderHarness([]);
+  await renderHarness([frame]);
+
+  expect(annotationMocks.syncFrameIds.mock.calls).toEqual([[['frame-1']], [[]], [['frame-1']]]);
 }
 
 async function expectThrownActionRollback() {

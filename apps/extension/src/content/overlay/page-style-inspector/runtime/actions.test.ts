@@ -6,7 +6,10 @@ import {
   type PageStyleRestoreRule,
 } from '@sniptale/runtime-contracts/page-style';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
-import type { FrameSessionSnapshot } from '../../../parser/page-preparation/history';
+import type {
+  FrameSessionSnapshot,
+  PagePreparationSessionSnapshot,
+} from '../../../parser/page-preparation/history';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 import { applyPageStylePatchWithHistory, applyPageStyleRestoreRuleWithHistory } from './actions';
 
@@ -38,7 +41,7 @@ function createRule(overrides: Partial<PageStyleRestoreRule> = {}): PageStyleRes
   };
 }
 
-function createSnapshot(label: string): FrameSessionSnapshot {
+function createFrameSnapshot(label: string): FrameSessionSnapshot {
   return {
     frames: [
       {
@@ -61,14 +64,28 @@ function createSnapshot(label: string): FrameSessionSnapshot {
   };
 }
 
-function cloneSnapshot(snapshot: FrameSessionSnapshot): FrameSessionSnapshot {
-  return JSON.parse(JSON.stringify(snapshot)) as FrameSessionSnapshot;
+function createSnapshot(label: string): PagePreparationSessionSnapshot {
+  return {
+    annotations: {
+      domRecords: [],
+      frameOrders: [],
+      nextAnnotationId: 1,
+      nextCommentMarker: 1,
+      nextCreationOrder: 1,
+      schemaVersion: 1,
+    },
+    frameSession: createFrameSnapshot(label),
+  };
+}
+
+function cloneSnapshot(snapshot: PagePreparationSessionSnapshot): PagePreparationSessionSnapshot {
+  return JSON.parse(JSON.stringify(snapshot)) as PagePreparationSessionSnapshot;
 }
 
 function registerHistoryBridge() {
   let current = createSnapshot('a');
   const bridge = {
-    applySnapshot: (snapshot: FrameSessionSnapshot) => {
+    applySnapshot: (snapshot: PagePreparationSessionSnapshot) => {
       current = cloneSnapshot(snapshot);
     },
     captureSnapshot: () => cloneSnapshot(current),

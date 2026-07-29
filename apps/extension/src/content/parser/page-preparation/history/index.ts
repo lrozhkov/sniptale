@@ -20,6 +20,7 @@ export type {
   PageDomMutationPatch,
   PagePreparationHistoryBridge,
   PagePreparationHistoryEntry,
+  PagePreparationSessionSnapshot,
   PagePreparationHistoryState,
   SerializableFrameData,
 } from './types';

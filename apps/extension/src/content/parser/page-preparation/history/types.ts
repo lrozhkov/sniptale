@@ -8,6 +8,7 @@ import type {
   GlobalStepBadgeSettings,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
+import type { BrowserAnnotationSessionSnapshot } from '../annotations';
 
 export interface SerializableFrameData extends Omit<
   FrameData,
@@ -30,6 +31,11 @@ export interface FrameSessionSnapshot {
   stepBadgeOrder: Array<[string, number]>;
 }
 
+export interface PagePreparationSessionSnapshot {
+  annotations: BrowserAnnotationSessionSnapshot;
+  frameSession: FrameSessionSnapshot;
+}
+
 export interface PageDomElementState {
   attributes: Record<string, string>;
   html: string;
@@ -46,14 +52,14 @@ export interface PageDomMutationBatch {
 }
 
 export interface PagePreparationHistoryEntry {
-  after: FrameSessionSnapshot;
-  before: FrameSessionSnapshot;
+  after: PagePreparationSessionSnapshot;
+  before: PagePreparationSessionSnapshot;
   domBatch: PageDomMutationBatch | null;
 }
 
 export interface PagePreparationHistoryBridge {
-  applySnapshot: (snapshot: FrameSessionSnapshot) => void;
-  captureSnapshot: () => FrameSessionSnapshot;
+  applySnapshot: (snapshot: PagePreparationSessionSnapshot) => void;
+  captureSnapshot: () => PagePreparationSessionSnapshot;
   onHistoryCleared?: () => void;
   onHistoryReachabilityChanged?: (frameIds: readonly string[]) => void;
 }

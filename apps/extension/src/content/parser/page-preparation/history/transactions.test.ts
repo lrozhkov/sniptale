@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHistoryStoreState } from './store-state';
 import { createHistoryStoreCommitApi } from './transactions';
-import type { FrameSessionSnapshot } from './types';
+import type { FrameSessionSnapshot, PagePreparationSessionSnapshot } from './types';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
-function createSnapshot(label: string): FrameSessionSnapshot {
+function createFrameSnapshot(label: string): FrameSessionSnapshot {
   return {
     frames: [
       {
@@ -27,8 +27,22 @@ function createSnapshot(label: string): FrameSessionSnapshot {
   };
 }
 
-function cloneSnapshot(snapshot: FrameSessionSnapshot): FrameSessionSnapshot {
-  return JSON.parse(JSON.stringify(snapshot)) as FrameSessionSnapshot;
+function createSnapshot(label: string): PagePreparationSessionSnapshot {
+  return {
+    annotations: {
+      domRecords: [],
+      frameOrders: [],
+      nextAnnotationId: 1,
+      nextCommentMarker: 1,
+      nextCreationOrder: 1,
+      schemaVersion: 1,
+    },
+    frameSession: createFrameSnapshot(label),
+  };
+}
+
+function cloneSnapshot(snapshot: PagePreparationSessionSnapshot): PagePreparationSessionSnapshot {
+  return JSON.parse(JSON.stringify(snapshot)) as PagePreparationSessionSnapshot;
 }
 
 function createTransactionHarness(initialSnapshot = createSnapshot('a')) {
@@ -41,7 +55,7 @@ function createTransactionHarness(initialSnapshot = createSnapshot('a')) {
 
   return {
     api: createHistoryStoreCommitApi(state),
-    setCurrentSnapshot(snapshot: FrameSessionSnapshot) {
+    setCurrentSnapshot(snapshot: PagePreparationSessionSnapshot) {
       currentSnapshot = cloneSnapshot(snapshot);
     },
     state,
@@ -91,8 +105,8 @@ describe('page-preparation-history transaction commits', () => {
 
     expect(harness.state.transactions.size).toBe(0);
     expect(harness.state.past).toHaveLength(1);
-    expect(harness.state.past[0]?.before.frames[0]?.id).toBe('frame-a');
-    expect(harness.state.past[0]?.after.frames[0]?.id).toBe('frame-b');
+    expect(harness.state.past[0]?.before.frameSession.frames[0]?.id).toBe('frame-a');
+    expect(harness.state.past[0]?.after.frameSession.frames[0]?.id).toBe('frame-b');
   });
 
   it('publishes when an open transaction closes without a history entry', () => {

@@ -3,10 +3,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createPagePreparationHistoryStore } from './store';
 import { captureDomStateMap, createDomMutationBatch, hydrateFrameSessionSnapshot } from '.';
-import type { FrameSessionSnapshot } from './types';
+import type { FrameSessionSnapshot, PagePreparationSessionSnapshot } from './types';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
-function createSnapshot(label: string): FrameSessionSnapshot {
+function createFrameSnapshot(label: string): FrameSessionSnapshot {
   return {
     frames: [
       {
@@ -29,8 +29,22 @@ function createSnapshot(label: string): FrameSessionSnapshot {
   };
 }
 
-function cloneSnapshot(snapshot: FrameSessionSnapshot): FrameSessionSnapshot {
-  return JSON.parse(JSON.stringify(snapshot)) as FrameSessionSnapshot;
+function createSnapshot(label: string): PagePreparationSessionSnapshot {
+  return {
+    annotations: {
+      domRecords: [],
+      frameOrders: [],
+      nextAnnotationId: 1,
+      nextCommentMarker: 1,
+      nextCreationOrder: 1,
+      schemaVersion: 1,
+    },
+    frameSession: createFrameSnapshot(label),
+  };
+}
+
+function cloneSnapshot(snapshot: PagePreparationSessionSnapshot): PagePreparationSessionSnapshot {
+  return JSON.parse(JSON.stringify(snapshot)) as PagePreparationSessionSnapshot;
 }
 
 function getRequiredValue<T>(value: T | null | undefined, label: string): T {
@@ -51,7 +65,7 @@ function createSnapshotBridge(initialSnapshot = createSnapshot('a')) {
 
   return {
     getCurrentSnapshot: () => current,
-    setCurrentSnapshot: (snapshot: FrameSessionSnapshot) => {
+    setCurrentSnapshot: (snapshot: PagePreparationSessionSnapshot) => {
       current = cloneSnapshot(snapshot);
     },
     store,
@@ -73,11 +87,11 @@ function verifyCommitUndoRedoOrder() {
   expect(bridge.store.getState()).toMatchObject({ canRedo: false, canUndo: true });
 
   bridge.store.undo();
-  expect(bridge.getCurrentSnapshot().frames[0]?.id).toBe('frame-b');
+  expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe('frame-b');
   expect(bridge.store.getState()).toMatchObject({ canRedo: true, canUndo: true });
 
   bridge.store.redo();
-  expect(bridge.getCurrentSnapshot().frames[0]?.id).toBe('frame-c');
+  expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe('frame-c');
 
   bridge.store.undo();
   bridge.setCurrentSnapshot(snapshotD);
@@ -86,7 +100,7 @@ function verifyCommitUndoRedoOrder() {
   expect(bridge.store.getState()).toMatchObject({ canRedo: false, canUndo: true });
 
   bridge.store.redo();
-  expect(bridge.getCurrentSnapshot().frames[0]?.id).toBe('frame-d');
+  expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe('frame-d');
 }
 
 function verifyApplyGuard() {
@@ -111,11 +125,11 @@ function verifyApplyGuard() {
   store.commitEntry({ after: snapshotB, before: snapshotA });
   store.undo();
 
-  expect(current.frames[0]?.id).toBe('frame-a');
+  expect(current.frameSession.frames[0]?.id).toBe('frame-a');
   expect(store.getState()).toMatchObject({ canRedo: true, canUndo: false });
 
   store.redo();
-  expect(current.frames[0]?.id).toBe('frame-b');
+  expect(current.frameSession.frames[0]?.id).toBe('frame-b');
   expect(store.getState()).toMatchObject({ canRedo: false, canUndo: true });
 }
 
@@ -144,15 +158,15 @@ function verifyGroupedDomMutationReplay() {
 
 function verifyDetachedOverlayFallback() {
   const snapshot = createSnapshot('x');
-  const firstFrame = getRequiredValue(snapshot.frames[0], 'snapshot frame');
-  snapshot.frames[0] = {
+  const firstFrame = getRequiredValue(snapshot.frameSession.frames[0], 'snapshot frame');
+  snapshot.frameSession.frames[0] = {
     ...firstFrame,
     linkedElementSelector: '#missing-element',
   };
 
   const querySelector = vi.spyOn(document, 'querySelector');
   const querySelectorAll = vi.spyOn(document, 'querySelectorAll');
-  const hydrated = hydrateFrameSessionSnapshot(snapshot);
+  const hydrated = hydrateFrameSessionSnapshot(snapshot.frameSession);
 
   expect(hydrated.frames).toHaveLength(1);
   expect(hydrated.frames[0]?.id).toBe('frame-x');
@@ -195,22 +209,24 @@ function verifyInterleavedDeferredCommitUndoRedoTimeline() {
   expect(bridge.store.getState()).toMatchObject({ canRedo: false, canUndo: true });
 
   bridge.store.undo();
-  expect(bridge.getCurrentSnapshot().frames[0]?.id).toBe('frame-b');
+  expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe('frame-b');
 
   bridge.store.undo();
-  expect(bridge.getCurrentSnapshot().frames[0]?.id).toBe(snapshotA.frames[0]?.id);
+  expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe(
+    snapshotA.frameSession.frames[0]?.id
+  );
 
   bridge.store.redo();
-  expect(bridge.getCurrentSnapshot().frames[0]?.id).toBe('frame-c');
+  expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe('frame-c');
 
   bridge.store.redo();
-  expect(bridge.getCurrentSnapshot().frames[0]?.id).toBe('frame-d');
+  expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe('frame-d');
 
   bridge.store.undo();
-  expect(bridge.getCurrentSnapshot().frames[0]?.id).toBe('frame-b');
+  expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe('frame-b');
 
   bridge.store.redo();
-  expect(bridge.getCurrentSnapshot().frames[0]?.id).toBe('frame-d');
+  expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe('frame-d');
 }
 
 function verifyHostElementAttributesAreRestored() {
@@ -254,9 +270,14 @@ function verifyUndoRollbackOnSnapshotFailure() {
   bridge.setCurrentSnapshot(createSnapshot('b'));
   bridge.store.commitTransaction('rollback-batch', createDomMutationBatch([target], beforeStates));
 
+  let applyCount = 0;
   bridge.store.registerBridge({
-    applySnapshot: () => {
-      throw new Error('bridge failed');
+    applySnapshot: (snapshot) => {
+      applyCount += 1;
+      bridge.setCurrentSnapshot(snapshot);
+      if (applyCount === 1) {
+        throw new Error('bridge failed');
+      }
     },
     captureSnapshot: () => cloneSnapshot(bridge.getCurrentSnapshot()),
   });
@@ -264,6 +285,8 @@ function verifyUndoRollbackOnSnapshotFailure() {
   bridge.store.undo();
 
   expect(target.textContent).toBe('after');
+  expect(applyCount).toBe(2);
+  expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe('frame-b');
   expect(bridge.store.getState()).toMatchObject({ canRedo: false, canUndo: true });
 }
 

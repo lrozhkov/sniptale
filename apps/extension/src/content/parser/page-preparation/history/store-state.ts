@@ -1,22 +1,22 @@
 import { applyDomMutationBatch } from './dom';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
-  FrameSessionSnapshot,
   PageDomMutationBatch,
   PagePreparationHistoryBridge,
   PagePreparationHistoryEntry,
+  PagePreparationSessionSnapshot,
   PagePreparationHistoryState,
 } from './types';
 
 const logger = createLogger({ namespace: 'ContentPagePreparationHistoryApply' });
 
 type DeferredCommit = {
-  before: FrameSessionSnapshot;
+  before: PagePreparationSessionSnapshot;
   id: number;
 };
 
 type OpenTransaction = {
-  before: FrameSessionSnapshot;
+  before: PagePreparationSessionSnapshot;
   domBatch: PageDomMutationBatch | null;
 };
 
@@ -105,8 +105,28 @@ function historyValueEqual(left: unknown, right: unknown): boolean {
   return false;
 }
 
-function snapshotsEqual(left: FrameSessionSnapshot, right: FrameSessionSnapshot): boolean {
-  return historyValueEqual(left, right);
+function snapshotsEqual(
+  left: PagePreparationSessionSnapshot,
+  right: PagePreparationSessionSnapshot
+): boolean {
+  return historyValueEqual(
+    {
+      annotations: {
+        domRecords: left.annotations.domRecords,
+        frameOrders: left.annotations.frameOrders,
+        schemaVersion: left.annotations.schemaVersion,
+      },
+      frameSession: left.frameSession,
+    },
+    {
+      annotations: {
+        domRecords: right.annotations.domRecords,
+        frameOrders: right.annotations.frameOrders,
+        schemaVersion: right.annotations.schemaVersion,
+      },
+      frameSession: right.frameSession,
+    }
+  );
 }
 
 function domBatchEqual(
@@ -142,12 +162,15 @@ export function readHistoryState(state: HistoryStoreRuntimeState): PagePreparati
 
 export function captureHistorySnapshot(
   state: HistoryStoreRuntimeState
-): FrameSessionSnapshot | null {
+): PagePreparationSessionSnapshot | null {
   return state.bridge?.captureSnapshot() ?? null;
 }
 
-function collectSnapshotFrameIds(snapshot: FrameSessionSnapshot, frameIds: Set<string>): void {
-  snapshot.frames.forEach((frame) => frameIds.add(frame.id));
+function collectSnapshotFrameIds(
+  snapshot: PagePreparationSessionSnapshot,
+  frameIds: Set<string>
+): void {
+  snapshot.frameSession.frames.forEach((frame) => frameIds.add(frame.id));
 }
 
 export function notifyHistoryReachabilityChanged(state: HistoryStoreRuntimeState): void {
@@ -197,6 +220,11 @@ export function applyHistoryEntry(
     return false;
   }
 
+  const previousSnapshot = captureHistorySnapshot(state);
+  if (!previousSnapshot) {
+    return false;
+  }
+
   state.isApplying = true;
   try {
     const domApplyResult = applyDomMutationBatch(entry.domBatch, direction);
@@ -217,6 +245,14 @@ export function applyHistoryEntry(
     if (!rollbackResult.success) {
       logger.error('Failed to rollback DOM history state after snapshot apply failure', {
         missingLocators: rollbackResult.missingLocators,
+      });
+    }
+
+    try {
+      state.bridge.applySnapshot(previousSnapshot);
+    } catch (rollbackError) {
+      logger.error('Failed to rollback page-preparation snapshot after history apply failure', {
+        error: rollbackError,
       });
     }
 
