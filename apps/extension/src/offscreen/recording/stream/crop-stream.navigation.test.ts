@@ -89,7 +89,28 @@ afterEach(() => {
 });
 
 describe('crop stream navigation output', () => {
-  it('activates a suspended viewport immediately and schedules source-driven rendering', async () => {
+  it('keeps drawing live frames when video-frame callbacks are available but starved', async () => {
+    const harness = installNavigationHarness();
+    const gated = await createGatedCropStream(createStream(1280, 720), {
+      sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
+      outputSize: { width: 1280, height: 720 },
+    });
+
+    expect(harness.context.drawImage).toHaveBeenCalledOnce();
+    expect(harness.requestVideoFrameCallback).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(harness.context.drawImage.mock.calls.length).toBeGreaterThan(1);
+    expect(harness.context.drawImage.mock.calls.every(([source]) => source === harness.video)).toBe(
+      true
+    );
+    const callsBeforeStop = harness.context.drawImage.mock.calls.length;
+    gated.stream.getVideoTracks()[0]?.stop();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(harness.context.drawImage).toHaveBeenCalledTimes(callsBeforeStop);
+  });
+
+  it('activates a suspended viewport immediately without coupling rendering to source callbacks', async () => {
     const harness = installNavigationHarness();
     const gated = await createGatedCropStream(
       createStream(1280, 720),
@@ -103,7 +124,7 @@ describe('crop stream navigation output', () => {
     gated.controls.activate();
 
     expect(harness.context.drawImage).toHaveBeenCalledOnce();
-    expect(harness.requestVideoFrameCallback).toHaveBeenCalledOnce();
+    expect(harness.requestVideoFrameCallback).not.toHaveBeenCalled();
     gated.stream.getVideoTracks()[0]?.stop();
   });
 

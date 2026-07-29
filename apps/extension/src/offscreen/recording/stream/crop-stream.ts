@@ -6,7 +6,6 @@ import {
   type CropStreamGeometry,
   type OutputSize,
 } from './crop-frame-gate';
-import { createVideoRenderLoop, type VideoRenderLoop } from './render-loop';
 
 export type {
   CropRect,
@@ -53,7 +52,7 @@ export async function createGatedCropStream(
   options: { initiallySuspended?: boolean } = {}
 ): Promise<GatedCropStream> {
   const video = createSourceVideo(sourceStream);
-  let renderLoop: VideoRenderLoop | null = null;
+  let frameTimer: ReturnType<typeof setInterval> | null = null;
   let ownershipTransferred = false;
   let stopped = false;
   try {
@@ -96,6 +95,14 @@ export async function createGatedCropStream(
       // navigation freeze keeps the encoded timeline alive without sampling the new page.
       context.drawImage(canvas, 0, 0);
     };
+    const drawFrame = () => {
+      if (stopped) return;
+      if (frameGate.canDraw()) {
+        drawSourceFrame();
+        return;
+      }
+      drawHeldFrame();
+    };
     const applyGeometry = (nextGeometry: CropStreamGeometry) => {
       const validated = requireCropGeometry(nextGeometry, {
         width: video.videoWidth,
@@ -117,20 +124,17 @@ export async function createGatedCropStream(
     });
     const track = cropped.getVideoTracks()[0];
     if (!track) throw new Error('Cropped output is missing a video track');
-    renderLoop = createVideoRenderLoop({
-      drawHeldFrame,
-      drawSourceFrame,
-      frameIntervalMs: Math.max(1, Math.round(1000 / frameRate)),
-      video,
-    });
-    renderLoop.start();
+    drawFrame();
+    frameTimer = setInterval(drawFrame, Math.max(1, Math.round(1000 / frameRate)));
     const stop = track.stop.bind(track);
     track.stop = () => {
       if (stopped) return;
       stopped = true;
       frameGate.stop();
-      renderLoop?.stop();
-      renderLoop = null;
+      if (frameTimer !== null) {
+        clearInterval(frameTimer);
+        frameTimer = null;
+      }
       releaseSourceVideo(video);
       stop();
     };
@@ -141,7 +145,7 @@ export async function createGatedCropStream(
     };
   } finally {
     if (!ownershipTransferred) {
-      renderLoop?.stop();
+      if (frameTimer !== null) clearInterval(frameTimer);
       releaseSourceVideo(video);
     }
   }
