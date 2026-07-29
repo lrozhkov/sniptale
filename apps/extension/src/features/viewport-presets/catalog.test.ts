@@ -7,15 +7,16 @@ import {
 import { parseViewportPresetCatalog } from './parser';
 
 describe('viewport preset catalog', () => {
-  it('defines the stable grouped v1 system catalog', () => {
+  it('defines the stable grouped v2 system catalog', () => {
     const catalog = createSystemViewportPresetCatalog();
-    expect(catalog).toHaveLength(9);
+    expect(catalog).toHaveLength(10);
     expect(catalog.map((preset) => preset.id)).toEqual([
       'system:viewport-mobile-portrait',
       'system:viewport-mobile-landscape',
       'system:viewport-tablet-portrait',
       'system:viewport-tablet-landscape',
       'system:viewport-hd',
+      'system:viewport-full-hd',
       'system:window-hd',
       'system:window-laptop',
       'system:window-desktop',
@@ -42,6 +43,7 @@ describe('viewport preset catalog', () => {
       'viewportTabletPortrait',
       'viewportTabletLandscape',
       'viewportHd',
+      'viewportFullHd',
       'windowHd',
       'windowLaptop',
       'windowDesktop',

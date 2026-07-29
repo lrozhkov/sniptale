@@ -30,7 +30,7 @@ const secondViewportPreset: UserViewportPreset = {
   order: 1,
 };
 const systemWindowPreset: SystemViewportPreset = {
-  catalogRevision: 1,
+  catalogRevision: 2,
   customized: false,
   enabled: true,
   height: 720,

@@ -20,6 +20,16 @@ const viewportSelectorMocks = vi.hoisted(() => ({
       enabled: true,
       order: 0,
     },
+    {
+      kind: 'user',
+      id: 'window-hd',
+      name: 'Window HD',
+      target: 'window',
+      width: 1280,
+      height: 720,
+      enabled: true,
+      order: 0,
+    },
   ],
   resolveToolbarFloatingMenuStyleMock: vi.fn(() => ({ top: '10px', left: 0 })),
 }));
@@ -73,7 +83,7 @@ it('uses native button click activation for keyboard-selected presets', async ()
   await act(async () => toggle.click());
   const presetButton = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('button') ?? []
-  ).find((candidate) => candidate.textContent?.includes('HD'));
+  ).find((candidate) => candidate.textContent?.startsWith('HD'));
   if (!presetButton) throw new Error('Expected preset button');
 
   await act(async () => {
@@ -133,6 +143,9 @@ it('renders the selector without a synthetic loading contract and opens the menu
   expect(viewportSelectorMocks.menuStateChangeMock).toHaveBeenCalledWith(true);
   expect(container?.textContent).toContain('content.toolbar.viewportNativeLabel');
   expect(container?.textContent).toContain('HD');
+  expect(container?.textContent?.indexOf('viewportPresets.groups.window')).toBeLessThan(
+    container?.textContent?.indexOf('viewportPresets.groups.viewport') ?? -1
+  );
   expect(container?.textContent).not.toContain('viewportPresets.availability.checking');
   const presetButton = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('button') ?? []
@@ -157,4 +170,38 @@ it('renders the selector without a synthetic loading contract and opens the menu
   expect(
     container?.querySelector('.sniptale-popover-menu')?.querySelector('.sniptale-popover-icon')
   ).toBeNull();
+});
+
+it('renders the active availability notification above the preset list', async () => {
+  const [viewportPreset, windowPreset] = viewportSelectorMocks.presetsMock;
+  if (!viewportPreset || !windowPreset) throw new Error('Expected selector fixtures');
+  viewportSelectorMocks.availabilityByIdMock.set(viewportPreset.id, {
+    presetId: viewportPreset.id,
+    required: { width: viewportPreset.width, height: viewportPreset.height },
+    status: 'available',
+    target: viewportPreset.target,
+  });
+  viewportSelectorMocks.availabilityByIdMock.set(windowPreset.id, {
+    presetId: windowPreset.id,
+    reason: 'surface-busy',
+    required: { width: windowPreset.width, height: windowPreset.height },
+    status: 'unavailable',
+    target: windowPreset.target,
+  });
+  await renderSelector();
+
+  await act(async () => container?.querySelector<HTMLButtonElement>('button')?.click());
+
+  const notification = container?.querySelector('.sniptale-toolbar-menu-detail');
+  const firstPreset = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
+  ).find((button) => button.textContent?.includes('Window HD'));
+  expect(notification?.textContent).toBe('viewportPresets.availability.busy');
+  expect(
+    notification && firstPreset
+      ? Boolean(
+          notification.compareDocumentPosition(firstPreset) & Node.DOCUMENT_POSITION_FOLLOWING
+        )
+      : false
+  ).toBe(true);
 });

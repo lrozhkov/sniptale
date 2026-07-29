@@ -51,6 +51,13 @@ const entries: readonly CatalogEntry[] = [
     height: 720,
   },
   {
+    id: 'system:viewport-full-hd',
+    systemKey: 'viewportFullHd',
+    target: 'viewport',
+    width: 1920,
+    height: 1080,
+  },
+  {
     id: 'system:window-hd',
     systemKey: 'windowHd',
     target: 'window',

@@ -115,7 +115,7 @@ it('marks a system display name as untouched when only dimensions change', async
     onClose: vi.fn(),
     onSave,
     preset: {
-      catalogRevision: 1,
+      catalogRevision: 2,
       customized: false,
       enabled: true,
       height: 720,

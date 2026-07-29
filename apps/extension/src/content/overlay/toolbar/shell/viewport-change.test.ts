@@ -110,6 +110,22 @@ describe('toolbar viewport change action', () => {
     expect(consoleError).toHaveBeenCalledTimes(2);
   });
 
+  it('resets the toolbar selection when another surface owns the window size', async () => {
+    const setCurrentViewport = vi.fn();
+    viewportChangeMocks.sendRuntimeMessage.mockResolvedValueOnce({
+      success: false,
+      error: 'surface-busy',
+    });
+
+    await handleToolbarViewportChange(
+      { height: 1080, presetId: 'window-full-hd', target: 'window', width: 1920 },
+      setCurrentViewport
+    );
+
+    expect(setCurrentViewport).toHaveBeenLastCalledWith(null);
+    expect(viewportChangeMocks.sendRuntimeMessage).toHaveBeenCalledOnce();
+  });
+
   it('refreshes an expired background capability and retries the mutation once', async () => {
     const setCurrentViewport = vi.fn();
     viewportChangeMocks.sendRuntimeMessage

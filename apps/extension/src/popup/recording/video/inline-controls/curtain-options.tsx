@@ -78,6 +78,11 @@ export function InlineCurtainOptionList({
 
   return (
     <div ref={listRef} style={{ paddingTop: listOffsetTop }}>
+      {visibleDetail ? (
+        <div id={detailId} role="status" className={INLINE_CURTAIN_DETAIL_CLASS_NAME}>
+          {visibleDetail}
+        </div>
+      ) : null}
       {options.map((option, index) => (
         <div key={option.value}>
           {option.group && options[index - 1]?.group !== option.group ? (
@@ -108,11 +113,6 @@ export function InlineCurtainOptionList({
           />
         </div>
       ))}
-      {visibleDetail ? (
-        <div id={detailId} role="status" className={INLINE_CURTAIN_DETAIL_CLASS_NAME}>
-          {visibleDetail}
-        </div>
-      ) : null}
     </div>
   );
 }

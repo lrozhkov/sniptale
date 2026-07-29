@@ -126,6 +126,10 @@ export function ToolbarCaptureButtons(props: {
         title={translate('content.toolbar.visibleArea')}
         disabled={props.isLoading}
       />
+      <ToolbarSelectionCaptureButton
+        disabled={props.isLoading}
+        onClick={handleTakeScreenshotClick('selection')}
+      />
       <FullPageCaptureSplitButton
         compactMenus={props.compactMenus}
         currentViewport={props.currentViewport}
@@ -136,10 +140,6 @@ export function ToolbarCaptureButtons(props: {
         preferences={fullPage.preferences}
         saving={fullPage.saving}
         toolbarMenuState={props.toolbarMenuState}
-      />
-      <ToolbarSelectionCaptureButton
-        disabled={props.isLoading}
-        onClick={handleTakeScreenshotClick('selection')}
       />
     </>
   );

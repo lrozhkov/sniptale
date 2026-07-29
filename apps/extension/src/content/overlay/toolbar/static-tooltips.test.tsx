@@ -180,9 +180,9 @@ describe('toolbar static tooltips', () => {
 
     expect(buttons.map((button) => button.getAttribute('title'))).toEqual([
       'Снимок видимой области',
+      'Выбрать область для снимка',
       'Снимок всей страницы',
       'Параметры снимка всей страницы',
-      'Выбрать область для снимка',
     ]);
     expect(buttons.every((button) => button.getAttribute('data-tooltip') === null)).toBe(true);
   });

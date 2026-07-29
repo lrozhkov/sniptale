@@ -41,7 +41,7 @@ const viewportTwo: UserViewportPreset = {
   width: 1024,
 };
 const systemWindow: SystemViewportPreset = {
-  catalogRevision: 1,
+  catalogRevision: 2,
   customized: true,
   enabled: true,
   height: 720,

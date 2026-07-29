@@ -12,7 +12,7 @@ describe('settings array guards', () => {
     });
   });
 
-  it('accepts only the complete v1 viewport catalog', () => {
+  it('accepts only the complete current viewport catalog', () => {
     const catalog = createSystemViewportPresetCatalog();
     expect(parseViewportPresets(catalog)).toEqual({
       hasInvalidRoot: false,
@@ -21,7 +21,7 @@ describe('settings array guards', () => {
     });
     expect(parseViewportPresets(catalog.slice(1))).toEqual({
       hasInvalidRoot: false,
-      invalidEntryCount: 8,
+      invalidEntryCount: 9,
       value: undefined,
     });
   });

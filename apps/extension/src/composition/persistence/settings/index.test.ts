@@ -323,4 +323,35 @@ describe('settings', () => {
       imageFormat: 'png',
     });
   });
+
+  it('reads revision-1 viewport settings with the new system preset without writing storage', async () => {
+    const legacyCatalog = createSystemViewportPresetCatalog()
+      .filter((preset) => preset.id !== 'system:viewport-full-hd')
+      .map((preset) => ({ ...preset, catalogRevision: 1 }));
+    const userPreset = {
+      kind: 'user' as const,
+      id: 'user-wide',
+      name: 'Wide',
+      target: 'viewport' as const,
+      width: 1600,
+      height: 900,
+      enabled: true,
+      order: 5,
+    };
+    browserStorageSyncGetMock.mockResolvedValue({
+      sniptale_settings: {
+        viewportPresets: [...legacyCatalog.slice(0, 5), userPreset, ...legacyCatalog.slice(5)],
+        defaultViewportPresetId: userPreset.id,
+      },
+    });
+
+    const settings = await loadSettings();
+
+    expect(settings.viewportPresets).toContainEqual(
+      expect.objectContaining({ id: 'system:viewport-full-hd', width: 1920, height: 1080 })
+    );
+    expect(settings.viewportPresets).toContainEqual(expect.objectContaining({ id: userPreset.id }));
+    expect(settings.defaultViewportPresetId).toBe(userPreset.id);
+    expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+  });
 });

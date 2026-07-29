@@ -9,6 +9,7 @@ import type { ViewportPreset } from '../../../../../contracts/settings';
 import { getViewportPresetDisplayName } from '../../../../../features/viewport-presets/display-name';
 import { formatViewportPresetDimensions } from '../../../../../features/viewport-presets/format';
 import { isViewportPresetAllowedForVideoCaptureMode } from '../../../../../features/viewport-presets/video-recording-policy';
+import { orderViewportPresetsForSelector } from '../../../../../features/viewport-presets/operations';
 import type { ViewportPresetAvailabilityPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { InlineCurtainSelect } from '../../inline-controls/curtain-select';
@@ -143,7 +144,7 @@ export function VideoPresetSelector({
       value: '',
       label: translate('viewportPresets.section.nativeOption'),
     },
-    ...viewportPresets.map((preset) =>
+    ...orderViewportPresetsForSelector(viewportPresets).map((preset) =>
       createPresetOption({
         availability: availabilityById.get(preset.id),
         captureMode,

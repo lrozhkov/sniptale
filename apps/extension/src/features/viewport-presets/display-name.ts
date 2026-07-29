@@ -8,6 +8,7 @@ const nameKeys: Record<SystemViewportPresetKey, TranslationKey> = {
   viewportTabletPortrait: 'viewportPresets.systemNames.viewportTabletPortrait',
   viewportTabletLandscape: 'viewportPresets.systemNames.viewportTabletLandscape',
   viewportHd: 'viewportPresets.systemNames.viewportHd',
+  viewportFullHd: 'viewportPresets.systemNames.viewportFullHd',
   windowHd: 'viewportPresets.systemNames.windowHd',
   windowLaptop: 'viewportPresets.systemNames.windowLaptop',
   windowDesktop: 'viewportPresets.systemNames.windowDesktop',

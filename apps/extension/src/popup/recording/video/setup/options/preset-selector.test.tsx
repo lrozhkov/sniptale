@@ -229,6 +229,14 @@ it('keeps a preset disabled when runtime availability fails', async () => {
   expect(presetButton?.disabled).toBe(false);
   expect(presetButton?.getAttribute('aria-disabled')).toBe('true');
   expect(container?.textContent).toContain('t:viewportPresets.availability.platformRejected');
+  const notification = container?.querySelector('[role="status"]');
+  expect(
+    notification && presetButton
+      ? Boolean(
+          notification.compareDocumentPosition(presetButton) & Node.DOCUMENT_POSITION_FOLLOWING
+        )
+      : false
+  ).toBe(true);
   act(() => presetButton?.click());
   expect(onPresetChange).not.toHaveBeenCalled();
 });
@@ -395,6 +403,9 @@ it('disables viewport presets but keeps window presets selectable for crop recor
   const windowButton = buttons.find((button) => button.textContent?.includes('Window'));
   expect(viewportButton?.getAttribute('aria-disabled')).toBe('true');
   expect(windowButton?.getAttribute('aria-disabled')).not.toBe('true');
+  expect(container?.textContent?.indexOf('t:viewportPresets.groups.window')).toBeLessThan(
+    container?.textContent?.indexOf('t:viewportPresets.groups.viewport') ?? -1
+  );
   expect(container?.textContent).toContain(
     't:viewportPresets.availability.cropViewportUnsupported'
   );

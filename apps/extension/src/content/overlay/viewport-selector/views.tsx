@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type MouseEvent } from 'react';
+import { Fragment, useState, type CSSProperties, type MouseEvent } from 'react';
 import { Scaling } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -19,6 +19,7 @@ import { getViewportPresetDisplayName } from '../../../features/viewport-presets
 import { formatViewportPresetDimensions } from '../../../features/viewport-presets/format';
 import { PopoverCheckIcon } from '../icons/icons';
 import { getViewportPresetErrorMessage } from '../../../features/viewport-presets/error-message';
+import { groupViewportPresetsForSelector } from '../../../features/viewport-presets/operations';
 import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
 
 const AVAILABILITY_STATUS_DELAY_MS = 400;
@@ -199,8 +200,7 @@ export function ViewportSelectorMenu(props: {
 }) {
   const locale = useAppLocale();
   const [highlightedDetail, setHighlightedDetail] = useState<string | null | undefined>(undefined);
-  const viewportPresets = props.presets.filter((preset) => preset.target === 'viewport');
-  const windowPresets = props.presets.filter((preset) => preset.target === 'window');
+  const presetGroups = groupViewportPresetsForSelector(props.presets);
   const detailId = 'sniptale-viewport-menu-detail';
   const checkingAvailability = props.presets.some(
     (preset) => !props.availabilityById.has(preset.id)
@@ -228,6 +228,9 @@ export function ViewportSelectorMenu(props: {
           }
         />
       ) : null}
+      {visibleDetail ? (
+        <ProductToolbarMenuDetail id={detailId}>{visibleDetail}</ProductToolbarMenuDetail>
+      ) : null}
       <ViewportMenuItem
         label={translate('content.toolbar.viewportNativeLabel')}
         onHighlight={() => setHighlightedDetail(null)}
@@ -235,32 +238,21 @@ export function ViewportSelectorMenu(props: {
         selected={props.currentViewport === null}
       />
       {props.presets.length > 0 ? <ProductToolbarMenuDivider /> : null}
-      <PresetGroup
-        availabilityById={props.availabilityById}
-        currentViewport={props.currentViewport}
-        label={translate('viewportPresets.groups.viewport')}
-        detailId={detailId}
-        onHighlightDetail={setHighlightedDetail}
-        onSelectPreset={props.onSelectPreset}
-        presets={viewportPresets}
-        target="viewport"
-      />
-      {viewportPresets.length > 0 && windowPresets.length > 0 ? (
-        <ProductToolbarMenuDivider />
-      ) : null}
-      <PresetGroup
-        availabilityById={props.availabilityById}
-        currentViewport={props.currentViewport}
-        label={translate('viewportPresets.groups.window')}
-        detailId={detailId}
-        onHighlightDetail={setHighlightedDetail}
-        onSelectPreset={props.onSelectPreset}
-        presets={windowPresets}
-        target="window"
-      />
-      {visibleDetail ? (
-        <ProductToolbarMenuDetail id={detailId}>{visibleDetail}</ProductToolbarMenuDetail>
-      ) : null}
+      {presetGroups.map((group, index) => (
+        <Fragment key={group.target}>
+          {index > 0 ? <ProductToolbarMenuDivider /> : null}
+          <PresetGroup
+            availabilityById={props.availabilityById}
+            currentViewport={props.currentViewport}
+            label={translate(`viewportPresets.groups.${group.target}`)}
+            detailId={detailId}
+            onHighlightDetail={setHighlightedDetail}
+            onSelectPreset={props.onSelectPreset}
+            presets={group.presets}
+            target={group.target}
+          />
+        </Fragment>
+      ))}
     </ProductToolbarMenu>
   );
 }

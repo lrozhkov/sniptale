@@ -115,6 +115,19 @@ function registerCaptureActionOptionTests() {
         ?.getAttribute('data-sniptale-activation-bridge')
     ).toBe('defer');
   });
+
+  it('places selection capture immediately after visible-area capture', () => {
+    const buttons = Array.from(renderCaptureButtons().querySelectorAll('[data-ui]')).map((button) =>
+      button.getAttribute('data-ui')
+    );
+
+    expect(buttons).toEqual([
+      'content.toolbar.capture-visible-button',
+      'content.toolbar.capture-selection-button',
+      'content.toolbar.capture-full-button',
+      'content.toolbar.capture-full-settings-button',
+    ]);
+  });
 }
 
 function registerCaptureButtonIntentTests() {

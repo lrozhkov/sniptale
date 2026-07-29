@@ -3,14 +3,32 @@ import { createSystemViewportPresetCatalog } from './catalog';
 import {
   createUserViewportPreset,
   normalizeViewportPresetOrder,
+  orderViewportPresetsForSelector,
   resetSystemViewportPreset,
 } from './operations';
 import { parseViewportPresetCatalog } from './parser';
 
 describe('viewport preset operations', () => {
+  it('projects browser-window presets before page-viewport presets for selectors', () => {
+    const ordered = orderViewportPresetsForSelector(createSystemViewportPresetCatalog());
+
+    expect(ordered.map((preset) => preset.target)).toEqual([
+      'window',
+      'window',
+      'window',
+      'window',
+      'viewport',
+      'viewport',
+      'viewport',
+      'viewport',
+      'viewport',
+      'viewport',
+    ]);
+  });
+
   it('groups targets and normalizes order', () => {
     const catalog = createSystemViewportPresetCatalog();
-    const normalized = normalizeViewportPresetOrder([catalog[5]!, catalog[0]!]);
+    const normalized = normalizeViewportPresetOrder([catalog[6]!, catalog[0]!]);
     expect(normalized.map((preset) => [preset.target, preset.order])).toEqual([
       ['viewport', 0],
       ['window', 0],

@@ -124,6 +124,12 @@ export async function handleToolbarViewportChange(
       return;
     }
 
+    if (response?.error === 'surface-busy') {
+      setCurrentViewport(null);
+      showToast(translate('content.toolbar.viewportConflictError'), 'error', 5000);
+      return;
+    }
+
     const errorMessage =
       getViewportPresetErrorMessage(response?.error) ??
       response?.error ??
@@ -133,6 +139,7 @@ export async function handleToolbarViewportChange(
       errorMessage.includes(translate('background.runtime.debuggerConflictKeywordExtension')) ||
       errorMessage.includes(translate('background.runtime.debuggerConflictKeywordConflict'))
     ) {
+      setCurrentViewport(null);
       showToast(translate('content.toolbar.viewportConflictError'), 'error', 5000);
       return;
     }

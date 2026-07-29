@@ -9,6 +9,12 @@ import {
 import { getCanonicalSystemViewportPreset } from './catalog';
 
 const targetOrder: readonly ViewportPresetTarget[] = ['viewport', 'window'];
+const selectorTargetOrder: readonly ViewportPresetTarget[] = ['window', 'viewport'];
+
+type ViewportPresetSelectorGroup = {
+  presets: ViewportPreset[];
+  target: ViewportPresetTarget;
+};
 
 export function isValidViewportPresetDimension(value: unknown): value is number {
   return (
@@ -57,6 +63,21 @@ export function normalizeViewportPresetOrder(presets: readonly ViewportPreset[])
           : reordered;
       })
   );
+}
+
+export function groupViewportPresetsForSelector(
+  presets: readonly ViewportPreset[]
+): ViewportPresetSelectorGroup[] {
+  return selectorTargetOrder.flatMap((target) => {
+    const groupedPresets = presets.filter((preset) => preset.target === target);
+    return groupedPresets.length > 0 ? [{ presets: groupedPresets, target }] : [];
+  });
+}
+
+export function orderViewportPresetsForSelector(
+  presets: readonly ViewportPreset[]
+): ViewportPreset[] {
+  return groupViewportPresetsForSelector(presets).flatMap((group) => group.presets);
 }
 
 export function createUserViewportPreset(params: {

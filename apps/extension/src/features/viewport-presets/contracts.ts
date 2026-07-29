@@ -1,4 +1,4 @@
-export const VIEWPORT_PRESET_CATALOG_REVISION = 1 as const;
+export const VIEWPORT_PRESET_CATALOG_REVISION = 2 as const;
 export const VIEWPORT_PRESET_MAX_DIMENSION = 16_384;
 export const VIEWPORT_PRESET_MAX_NAME_LENGTH = 80;
 
@@ -10,6 +10,7 @@ export type SystemViewportPresetKey =
   | 'viewportTabletPortrait'
   | 'viewportTabletLandscape'
   | 'viewportHd'
+  | 'viewportFullHd'
   | 'windowHd'
   | 'windowLaptop'
   | 'windowDesktop'

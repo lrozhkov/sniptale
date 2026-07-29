@@ -10,7 +10,7 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 import { getViewportPresetDisplayName } from './display-name';
 
 const systemPreset: SystemViewportPreset = {
-  catalogRevision: 1,
+  catalogRevision: 2,
   customized: false,
   enabled: true,
   height: 720,

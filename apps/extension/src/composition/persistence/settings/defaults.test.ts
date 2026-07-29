@@ -51,9 +51,17 @@ describe('settings default graph', () => {
     expect(firstSettings.fullPageCapture).not.toBe(secondSettings.fullPageCapture);
   });
 
-  it('uses the v1 system catalog and current size as the default', () => {
+  it('uses the v2 system catalog and current size as the default', () => {
     const settings = createDefaultSettings();
-    expect(settings.viewportPresets).toHaveLength(9);
+    expect(settings.viewportPresets).toHaveLength(10);
+    expect(settings.viewportPresets).toContainEqual(
+      expect.objectContaining({
+        height: 1080,
+        id: 'system:viewport-full-hd',
+        target: 'viewport',
+        width: 1920,
+      })
+    );
     expect(settings.defaultViewportPresetId).toBeNull();
   });
 
