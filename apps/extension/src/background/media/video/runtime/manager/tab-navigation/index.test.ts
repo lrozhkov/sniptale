@@ -413,6 +413,14 @@ it('freezes viewport output before navigation and reasserts it at document commi
   expect(mocks.stop).not.toHaveBeenCalled();
 });
 
+it('dispatches the first viewport freeze without an empty promise-queue delay', async () => {
+  expect(handleTabRecordingNavigationStart(7)).toBe(true);
+  const statesAtReturn = mocks.sendRuntimeMessage.mock.calls.map(([message]) => message.frozen);
+
+  await vi.waitFor(() => expectViewportDrawStates([true]));
+  expect(statesAtReturn).toEqual([true]);
+});
+
 it('retries an explicitly rejected initial viewport freeze before recovery', async () => {
   mocks.sendRuntimeMessage
     .mockResolvedValueOnce({ error: 'freeze denied', success: false })
@@ -527,7 +535,9 @@ it('does not let stale completion A finish navigation B', async () => {
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
   expect(mocks.reassertViewport).toHaveBeenCalledOnce();
-  expectViewportDrawStates([true, false]);
+  expectViewportDrawStates([true, true, false]);
+  const transitions = mocks.sendRuntimeMessage.mock.calls.map(([message]) => message.transitionId);
+  expect(transitions).toEqual(['navigation-1', 'navigation-2', 'navigation-2']);
 });
 
 it('serializes superseding viewport freezes so an older command cannot arrive last', async () => {

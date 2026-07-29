@@ -93,13 +93,14 @@ it('hydrates the persisted recording lease before routing tab and navigation eve
   );
 });
 
-it('does not drop a completion event while worker lease hydration is pending', async () => {
+it('retries an unhandled completion after worker lease hydration', async () => {
   let finishHydration!: () => void;
   ensureActiveVideoRecordingLeaseHydrated.mockReturnValueOnce(
     new Promise((resolve) => {
       finishHydration = () => resolve(null);
     })
   );
+  handleTabRecordingNavigationCompleted.mockReturnValueOnce(false).mockReturnValueOnce(true);
   registerNavigationListeners(createModeState());
 
   parseTopLevelDocumentNavigation.mockReturnValue({
@@ -109,13 +110,35 @@ it('does not drop a completion event while worker lease hydration is pending', a
   });
   navigationCompletedListenerRef.current?.({ documentId: 'document-1', frameId: 0, tabId: 7 });
   await flushMicrotasks();
-  expect(handleTabRecordingNavigationCompleted).not.toHaveBeenCalled();
+  expect(handleTabRecordingNavigationCompleted).toHaveBeenCalledOnce();
 
   finishHydration();
   await flushMicrotasks();
-  expect(handleTabRecordingNavigationCompleted).toHaveBeenCalledWith(
+  expect(handleTabRecordingNavigationCompleted).toHaveBeenCalledTimes(2);
+  expect(handleTabRecordingNavigationCompleted).toHaveBeenLastCalledWith(
     7,
     'document-1',
     expect.any(Function)
   );
+});
+
+it('routes an active navigation start before asynchronous lease hydration', async () => {
+  let finishHydration: (() => void) | undefined;
+  ensureActiveVideoRecordingLeaseHydrated.mockReturnValueOnce(
+    new Promise((resolve) => {
+      finishHydration = () => resolve(null);
+    })
+  );
+  handleTabRecordingNavigationStart.mockReturnValueOnce(true);
+  registerNavigationListeners(createModeState());
+  parseTopLevelNavigation.mockReturnValue({ frameId: 0, tabId: 7 });
+
+  navigationListenerRef.current?.({ frameId: 0, tabId: 7 });
+  const callsBeforeHydration = handleTabRecordingNavigationStart.mock.calls.length;
+
+  finishHydration?.();
+  await flushMicrotasks();
+  expect(callsBeforeHydration).toBe(1);
+  expect(handleTabRecordingNavigationStart).toHaveBeenCalledOnce();
+  expect(ensureActiveVideoRecordingLeaseHydrated).not.toHaveBeenCalled();
 });

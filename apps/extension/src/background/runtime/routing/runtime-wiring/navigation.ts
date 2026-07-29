@@ -23,9 +23,15 @@ import { ensureActivePageAccessRuntime } from '../../page-access/service';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeNavigationWiring' });
 
-function runAfterVideoLeaseHydration(description: string, work: () => void): void {
+function runWithVideoLeaseHydrationFallback(description: string, work: () => boolean): void {
+  try {
+    if (work()) return;
+  } catch (error) {
+    logger.warn(`Failed to ${description} from active recording state`, error);
+    return;
+  }
   void ensureActiveVideoRecordingLeaseHydrated()
-    .then(work)
+    .then(() => work())
     .catch((error) => {
       logger.warn(`Failed to ${description} after recording lease hydration`, error);
     });
@@ -61,10 +67,10 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
     ).catch((error) => {
       logger.warn('Failed to clean screenshot mode after navigation', error);
     });
-    runAfterVideoLeaseHydration('process recording navigation', () => {
-      handleRegionSelectionNavigationStart(navigation.tabId);
-      handleTabRecordingNavigationStart(navigation.tabId);
-    });
+    handleRegionSelectionNavigationStart(navigation.tabId);
+    runWithVideoLeaseHydrationFallback('process recording navigation', () =>
+      handleTabRecordingNavigationStart(navigation.tabId)
+    );
     void handleExportHarNavigationStart(navigation.tabId).catch((error) => {
       logger.warn('Failed to clean HAR export after navigation', error);
     });
@@ -73,32 +79,32 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
   browserWebNavigation.subscribeToCommitted((details: unknown) => {
     const navigation = parseTopLevelDocumentNavigation(details);
     if (!navigation) return;
-    runAfterVideoLeaseHydration('bind recording navigation document', () => {
-      handleTabRecordingNavigationCommitted(navigation.tabId, navigation.documentId);
-    });
+    runWithVideoLeaseHydrationFallback('bind recording navigation document', () =>
+      handleTabRecordingNavigationCommitted(navigation.tabId, navigation.documentId)
+    );
   });
 
   browserWebNavigation.subscribeToCompleted((details: unknown) => {
     const navigation = parseTopLevelDocumentNavigation(details);
     if (!navigation) return;
-    runAfterVideoLeaseHydration('complete recording navigation', () => {
+    runWithVideoLeaseHydrationFallback('complete recording navigation', () =>
       handleTabRecordingNavigationCompleted(
         navigation.tabId,
         navigation.documentId,
         ensureActivePageAccessRuntime
-      );
-    });
+      )
+    );
   });
 
   browserWebNavigation.subscribeToErrorOccurred((details: unknown) => {
     const navigation = parseTopLevelDocumentNavigation(details);
     if (!navigation) return;
-    runAfterVideoLeaseHydration('reconcile failed recording navigation', () => {
+    runWithVideoLeaseHydrationFallback('reconcile failed recording navigation', () =>
       handleTabRecordingNavigationError(
         navigation.tabId,
         navigation.documentId,
         ensureActivePageAccessRuntime
-      );
-    });
+      )
+    );
   });
 }

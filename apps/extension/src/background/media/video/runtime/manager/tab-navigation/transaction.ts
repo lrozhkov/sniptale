@@ -51,7 +51,7 @@ type TabNavigationTransaction = {
 type OperationResult = { ok: true } | { error: unknown; ok: false };
 
 let activeTransaction: TabNavigationTransaction | null = null;
-let exactOutputFreezeQueue: Promise<void> = Promise.resolve();
+let exactOutputFreezeQueue: Promise<void> | null = null;
 
 function observeOperation(work: Promise<void>): Promise<OperationResult> {
   return work.then(
@@ -168,11 +168,24 @@ function enqueueOutputFreeze(
 ): Promise<OperationResult> {
   const runIfCurrent = (): Promise<OperationResult> | OperationResult =>
     isCurrentTransaction(transaction) ? work() : { ok: true };
-  const queued = exactOutputFreezeQueue.then(runIfCurrent, runIfCurrent);
-  exactOutputFreezeQueue = queued.then(
+  let queued: Promise<OperationResult>;
+  if (exactOutputFreezeQueue) {
+    queued = exactOutputFreezeQueue.then(runIfCurrent, runIfCurrent);
+  } else {
+    try {
+      queued = Promise.resolve(runIfCurrent());
+    } catch (error) {
+      queued = Promise.reject(error);
+    }
+  }
+  const tail = queued.then(
     () => undefined,
     () => undefined
   );
+  exactOutputFreezeQueue = tail;
+  void tail.then(() => {
+    if (exactOutputFreezeQueue === tail) exactOutputFreezeQueue = null;
+  });
   return queued;
 }
 
@@ -434,5 +447,5 @@ export function markTabNavigationManuallyPaused(): void {
 
 export function resetTabNavigationTransactionForTests(): void {
   activeTransaction = null;
-  exactOutputFreezeQueue = Promise.resolve();
+  exactOutputFreezeQueue = null;
 }
