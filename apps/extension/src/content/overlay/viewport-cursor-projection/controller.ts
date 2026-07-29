@@ -4,9 +4,9 @@ import type { ViewportCursorProjectionAuthority } from '@sniptale/runtime-contra
 import {
   createProjectedCursorGlyph,
   projectedCursorSizeCssPx,
-  resolveProjectedCursorKind,
   type ProjectedCursorKind,
 } from './appearance';
+import { createNativeCursorProjection } from './native-cursor';
 
 type ViewportCursorProjectionControllerDeps = {
   addOverlayNode?: (node: HTMLElement) => void;
@@ -20,6 +20,8 @@ type ProjectionState = {
   cancelPendingFrame: () => void;
   handlePointerMove: EventListener;
   handlePointerOut: EventListener;
+  pointerMoveEventName: 'pointermove' | 'pointerrawupdate';
+  disposeNativeCursor: () => void;
   root: HTMLDivElement;
   style: HTMLStyleElement;
 };
@@ -66,13 +68,6 @@ function createProjectionRoot(
   return root;
 }
 
-function createCursorHidingStyle(ownerDocument: Document): HTMLStyleElement {
-  const style = ownerDocument.createElement('style');
-  style.dataset['sniptaleViewportCursorStyle'] = '';
-  style.textContent = 'html, html * { cursor: none !important; }';
-  return style;
-}
-
 function resolvePointerTarget(event: Event): Element | null {
   const target = event
     .composedPath()
@@ -80,26 +75,11 @@ function resolvePointerTarget(event: Event): Element | null {
   return (target as Element | undefined) ?? null;
 }
 
-function readProjectedCursorKind(
-  ownerDocument: Document,
-  hidingStyle: HTMLStyleElement,
-  target: Element | null
-): ProjectedCursorKind {
-  if (!target) return 'default';
-  const hidingCss = hidingStyle.textContent;
-  hidingStyle.disabled = true;
-  hidingStyle.textContent = '';
-  try {
-    const computed = ownerDocument.defaultView?.getComputedStyle(target);
-    return resolveProjectedCursorKind(
-      computed?.cursor ?? 'auto',
-      target,
-      computed?.userSelect ?? 'auto'
-    );
-  } finally {
-    hidingStyle.textContent = hidingCss;
-    hidingStyle.disabled = false;
-  }
+function readLatestPointerPosition(event: PointerEvent): { clientX: number; clientY: number } {
+  const coalesced =
+    typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [];
+  const latest = coalesced.at(-1) ?? event;
+  return { clientX: latest.clientX, clientY: latest.clientY };
 }
 
 export function createViewportCursorProjectionController(
@@ -120,10 +100,10 @@ export function createViewportCursorProjectionController(
   function removeProjection(): void {
     if (!state) return;
     state.cancelPendingFrame();
-    ownerDocument.removeEventListener('pointermove', state.handlePointerMove, true);
+    ownerDocument.removeEventListener(state.pointerMoveEventName, state.handlePointerMove, true);
     ownerDocument.removeEventListener('pointerout', state.handlePointerOut, true);
     state.root.remove();
-    state.style.remove();
+    state.disposeNativeCursor();
     state = null;
   }
 
@@ -141,7 +121,12 @@ export function createViewportCursorProjectionController(
     removeProjection();
 
     const root = createProjectionRoot(ownerDocument, applyRootStyle);
-    const style = createCursorHidingStyle(ownerDocument);
+    const nativeCursor = createNativeCursorProjection(ownerDocument);
+    const style = nativeCursor.style;
+    const pointerMoveEventName =
+      ownerDocument.defaultView && 'onpointerrawupdate' in ownerDocument.defaultView
+        ? 'pointerrawupdate'
+        : 'pointermove';
     let cursorKind: ProjectedCursorKind = 'default';
     let cursorGlyph = createProjectedCursorGlyph(ownerDocument, cursorKind);
     let hasResolvedAppearance = false;
@@ -156,10 +141,14 @@ export function createViewportCursorProjectionController(
       pendingSample = null;
     };
     const applyPointerSample = (sample: PointerProjectionSample) => {
+      if (appearanceTarget === sample.target && !nativeCursor.isOwnedTarget(sample.target)) {
+        appearanceTarget = null;
+        hasResolvedAppearance = false;
+      }
       if (!hasResolvedAppearance || appearanceTarget !== sample.target) {
         appearanceTarget = sample.target;
         hasResolvedAppearance = true;
-        const nextCursorKind = readProjectedCursorKind(ownerDocument, style, sample.target);
+        const nextCursorKind = nativeCursor.resolveAndHide(sample.target);
         if (nextCursorKind !== cursorKind) {
           cursorKind = nextCursorKind;
           cursorGlyph = createProjectedCursorGlyph(ownerDocument, cursorKind);
@@ -185,10 +174,11 @@ export function createViewportCursorProjectionController(
     };
     const handlePointerMove: EventListener = (event) => {
       const pointer = event as PointerEvent;
-      if (!Number.isFinite(pointer.clientX) || !Number.isFinite(pointer.clientY)) return;
+      const position = readLatestPointerPosition(pointer);
+      if (!Number.isFinite(position.clientX) || !Number.isFinite(position.clientY)) return;
       pendingSample = {
-        clientX: pointer.clientX,
-        clientY: pointer.clientY,
+        clientX: position.clientX,
+        clientY: position.clientY,
         target: resolvePointerTarget(event),
       };
       pendingFrameId ??= requestAnimationFrame(flushPointerFrame);
@@ -196,6 +186,7 @@ export function createViewportCursorProjectionController(
     const handlePointerOut: EventListener = (event) => {
       if ((event as PointerEvent).relatedTarget === null) {
         cancelPendingFrame();
+        nativeCursor.restore();
         appearanceTarget = null;
         hasResolvedAppearance = false;
         root.style.visibility = 'hidden';
@@ -204,13 +195,15 @@ export function createViewportCursorProjectionController(
 
     addPageStyle(style);
     addOverlayNode(root);
-    ownerDocument.addEventListener('pointermove', handlePointerMove, true);
+    ownerDocument.addEventListener(pointerMoveEventName, handlePointerMove, true);
     ownerDocument.addEventListener('pointerout', handlePointerOut, true);
     state = {
       authorityId,
       cancelPendingFrame,
       handlePointerMove,
       handlePointerOut,
+      pointerMoveEventName,
+      disposeNativeCursor: nativeCursor.dispose,
       root,
       style,
     };

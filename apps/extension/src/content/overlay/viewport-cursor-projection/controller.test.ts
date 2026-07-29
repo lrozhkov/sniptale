@@ -83,7 +83,10 @@ it('switches between standard pointer, text, and blocked cursor roles', () => {
   link.href = '#target';
   const input = document.createElement('input');
   const blocked = document.createElement('button');
-  blocked.style.cursor = 'not-allowed';
+  blocked.className = 'blocked-target';
+  const pageStyle = document.createElement('style');
+  pageStyle.textContent = '.blocked-target { cursor: not-allowed; }';
+  document.head.append(pageStyle);
   document.body.append(link, input, blocked);
   controller.enable(authority);
   const root = document.querySelector<HTMLElement>('[data-sniptale-viewport-cursor]');
@@ -102,6 +105,11 @@ it('switches between standard pointer, text, and blocked cursor roles', () => {
   flushAnimationFrames();
   expect(root?.dataset['cursorKind']).toBe('not-allowed');
   expect(root?.querySelector('svg')?.dataset['cursorGlyph']).toBe('not-allowed');
+  expect(blocked.getAttribute('data-sniptale-viewport-native-cursor')).not.toBeNull();
+  expect(blocked.getAttribute('data-sniptale-viewport-native-cursor')).not.toBe('owned');
+
+  controller.disable(authority);
+  expect(blocked.hasAttribute('data-sniptale-viewport-native-cursor')).toBe(false);
 });
 
 it('keeps hyperlink semantics when the projection hiding rule is the computed cursor', () => {
@@ -270,4 +278,50 @@ it('updates every pointer frame without recomputing cursor appearance on a stabl
 
   expect(readStyle).toHaveBeenCalledTimes(2);
   expect(root?.style.transform).toBe('translate3d(99px, 109px, 0)');
+});
+
+it('does not mutate the global cursor-hiding stylesheet while resolving a new target', () => {
+  const { controller } = createHarness();
+  const target = document.createElement('a');
+  target.href = '#target';
+  document.body.append(target);
+  controller.enable(authority);
+  const style = document.querySelector<HTMLStyleElement>('[data-sniptale-viewport-cursor-style]');
+  if (!style) throw new Error('Cursor-hiding stylesheet is unavailable');
+  const observer = new MutationObserver(() => undefined);
+  observer.observe(style, { childList: true, characterData: true, subtree: true });
+
+  target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 40, clientY: 50 }));
+  flushAnimationFrames();
+
+  expect(observer.takeRecords()).toHaveLength(0);
+  observer.disconnect();
+});
+
+it('uses the latest coalesced raw pointer sample before the animation frame', () => {
+  vi.stubGlobal('onpointerrawupdate', null);
+  const { addListener, controller, removeListener } = createHarness();
+  const target = document.createElement('div');
+  document.body.append(target);
+  controller.enable(authority);
+  const rawUpdate = new MouseEvent('pointerrawupdate', {
+    bubbles: true,
+    clientX: 20,
+    clientY: 30,
+  });
+  Object.defineProperty(rawUpdate, 'getCoalescedEvents', {
+    value: () => [
+      new MouseEvent('pointerrawupdate', { clientX: 60, clientY: 70 }),
+      new MouseEvent('pointerrawupdate', { clientX: 100, clientY: 110 }),
+    ],
+  });
+
+  target.dispatchEvent(rawUpdate);
+  flushAnimationFrames();
+
+  const root = document.querySelector<HTMLElement>('[data-sniptale-viewport-cursor]');
+  expect(addListener).toHaveBeenCalledWith('pointerrawupdate', expect.any(Function), true);
+  expect(root?.style.transform).toBe('translate3d(99px, 109px, 0)');
+  controller.dispose();
+  expect(removeListener).toHaveBeenCalledWith('pointerrawupdate', expect.any(Function), true);
 });
