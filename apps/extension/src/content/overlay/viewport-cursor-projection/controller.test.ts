@@ -242,3 +242,32 @@ it('coalesces rapid pointer samples into the latest animation-frame projection',
   expect(root?.style.transform).toBe('translate3d(72px, 88px, 0)');
   expect(root?.style.visibility).toBe('visible');
 });
+
+it('updates every pointer frame without recomputing cursor appearance on a stable target', () => {
+  const readStyle = vi.spyOn(window, 'getComputedStyle');
+  const { controller } = createHarness();
+  const target = document.createElement('div');
+  document.body.append(target);
+  controller.enable(authority);
+
+  target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 20, clientY: 30 }));
+  flushAnimationFrames();
+  target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 40, clientY: 50 }));
+  flushAnimationFrames();
+  target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 80, clientY: 90 }));
+  flushAnimationFrames();
+
+  const root = document.querySelector<HTMLElement>('[data-sniptale-viewport-cursor]');
+  expect(requestFrame).toHaveBeenCalledTimes(3);
+  expect(readStyle).toHaveBeenCalledOnce();
+  expect(root?.style.transform).toBe('translate3d(79px, 89px, 0)');
+
+  document.dispatchEvent(new MouseEvent('pointerout', { relatedTarget: null }));
+  target.dispatchEvent(
+    new MouseEvent('pointermove', { bubbles: true, clientX: 100, clientY: 110 })
+  );
+  flushAnimationFrames();
+
+  expect(readStyle).toHaveBeenCalledTimes(2);
+  expect(root?.style.transform).toBe('translate3d(99px, 109px, 0)');
+});

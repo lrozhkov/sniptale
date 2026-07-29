@@ -144,6 +144,8 @@ export function createViewportCursorProjectionController(
     const style = createCursorHidingStyle(ownerDocument);
     let cursorKind: ProjectedCursorKind = 'default';
     let cursorGlyph = createProjectedCursorGlyph(ownerDocument, cursorKind);
+    let hasResolvedAppearance = false;
+    let appearanceTarget: Element | null = null;
     let pendingFrameId: number | null = null;
     let pendingSample: PointerProjectionSample | null = null;
     root.dataset['cursorKind'] = cursorKind;
@@ -154,12 +156,16 @@ export function createViewportCursorProjectionController(
       pendingSample = null;
     };
     const applyPointerSample = (sample: PointerProjectionSample) => {
-      const nextCursorKind = readProjectedCursorKind(ownerDocument, style, sample.target);
-      if (nextCursorKind !== cursorKind) {
-        cursorKind = nextCursorKind;
-        cursorGlyph = createProjectedCursorGlyph(ownerDocument, cursorKind);
-        root.dataset['cursorKind'] = cursorKind;
-        root.replaceChildren(...(cursorGlyph.node ? [cursorGlyph.node] : []));
+      if (!hasResolvedAppearance || appearanceTarget !== sample.target) {
+        appearanceTarget = sample.target;
+        hasResolvedAppearance = true;
+        const nextCursorKind = readProjectedCursorKind(ownerDocument, style, sample.target);
+        if (nextCursorKind !== cursorKind) {
+          cursorKind = nextCursorKind;
+          cursorGlyph = createProjectedCursorGlyph(ownerDocument, cursorKind);
+          root.dataset['cursorKind'] = cursorKind;
+          root.replaceChildren(...(cursorGlyph.node ? [cursorGlyph.node] : []));
+        }
       }
       if (!cursorGlyph.node) {
         root.style.visibility = 'hidden';
@@ -190,6 +196,8 @@ export function createViewportCursorProjectionController(
     const handlePointerOut: EventListener = (event) => {
       if ((event as PointerEvent).relatedTarget === null) {
         cancelPendingFrame();
+        appearanceTarget = null;
+        hasResolvedAppearance = false;
         root.style.visibility = 'hidden';
       }
     };
