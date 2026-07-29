@@ -21,11 +21,18 @@ export function createQuickEditHistoryTracker() {
       }
 
       const beforeStates = historyDomStateById.get(id);
-      pagePreparationHistory.commitTransaction(
-        `quick-edit:${id}`,
-        beforeStates ? createDomMutationBatch([element], beforeStates) : null
-      );
-      historyDomStateById.delete(id);
+      const transactionId = `quick-edit:${id}`;
+      try {
+        pagePreparationHistory.commitTransaction(
+          transactionId,
+          beforeStates ? createDomMutationBatch([element], beforeStates) : null
+        );
+        historyDomStateById.delete(id);
+      } catch (error) {
+        pagePreparationHistory.cancelTransaction(transactionId);
+        historyDomStateById.delete(id);
+        throw error;
+      }
     },
     cancel(id: string | undefined) {
       if (!id) {

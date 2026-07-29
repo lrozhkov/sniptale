@@ -1,12 +1,12 @@
-import {
-  clearRetainedSniptaleIds,
-  findElementBySelector,
-  retainSniptaleId,
-} from '../../../platform/frame';
-import { createCompositeSelector } from '../../../platform/frame/selectors';
 import { sanitizeHtmlFragment } from '@sniptale/platform/security/sanitizers/html';
-import { hasUnsafeHistoryAttributes, normalizeHistoryAttributes } from './attributes';
+import {
+  hasUnsafeHistoryAttributes,
+  isManagedHistoryAttribute,
+  normalizeHistoryAttributes,
+} from './attributes';
+import { hasExactHistoryLocatorBinding, withHistoryLocatorCapture } from './dom-locators';
 import type { PageDomElementState, PageDomMutationBatch, PageDomMutationPatch } from './types';
+import type { PagePreparationDomElement } from './types';
 
 const HISTORY_DOM_SANITIZER_OPTIONS = {
   allowedAttributes: [
@@ -63,10 +63,9 @@ const HISTORY_DOM_SANITIZER_OPTIONS = {
     'ul',
   ],
 };
-let pagePreparationHistoryElementId = 0;
-const retainedHistoryLocatorIds = new Set<string>();
+const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
 
-function replaceWithSanitizedFragment(target: HTMLElement, html: string): void {
+function replaceWithSanitizedFragment(target: PagePreparationDomElement, html: string): void {
   const sanitizedHtml = sanitizeHtmlFragment(html, HISTORY_DOM_SANITIZER_OPTIONS);
   const range = target.ownerDocument.createRange();
 
@@ -74,39 +73,16 @@ function replaceWithSanitizedFragment(target: HTMLElement, html: string): void {
   target.replaceChildren(range.createContextualFragment(sanitizedHtml));
 }
 
-function ensureStableHistoryLocator(element: HTMLElement): void {
-  let id = element.dataset['sniptaleId'];
-  if (!id) {
-    pagePreparationHistoryElementId += 1;
-    id = `history-${pagePreparationHistoryElementId}`;
-    element.dataset['sniptaleId'] = id;
-  }
-
-  retainedHistoryLocatorIds.add(id);
-  retainSniptaleId(id);
-}
-
-export function clearHistoryDomLocators(): void {
-  clearRetainedSniptaleIds(retainedHistoryLocatorIds);
-  retainedHistoryLocatorIds.clear();
-}
-
-function buildCompositeLocator(element: HTMLElement): string {
-  ensureStableHistoryLocator(element);
-  const selector = createCompositeSelector(element);
-  return selector.iframeSelector
-    ? `${selector.iframeSelector} => ${selector.elementSelector}`
-    : selector.elementSelector;
-}
-
-function captureSafeAttributes(element: HTMLElement): Record<string, string> {
+function captureSafeAttributes(element: PagePreparationDomElement): Record<string, string> {
   const rawAttributes: Record<string, string> = {};
 
   Array.from(element.attributes).forEach((attribute) => {
-    rawAttributes[attribute.name] = attribute.value;
+    if (isManagedHistoryAttribute(element, attribute)) {
+      rawAttributes[attribute.name] = attribute.value;
+    }
   });
 
-  return normalizeHistoryAttributes(element.ownerDocument, rawAttributes);
+  return normalizeHistoryAttributes(element, rawAttributes);
 }
 
 function areElementAttributesEqual(
@@ -123,17 +99,25 @@ function areElementStatesEqual(left: PageDomElementState, right: PageDomElementS
   return left.html === right.html && areElementAttributesEqual(left.attributes, right.attributes);
 }
 
-function applyElementAttributes(target: HTMLElement, attributes: Record<string, string>): void {
-  const nextAttributes = normalizeHistoryAttributes(target.ownerDocument, attributes);
+function applyElementAttributes(
+  target: PagePreparationDomElement,
+  attributes: Record<string, string>
+): void {
+  const nextAttributes = normalizeHistoryAttributes(target, attributes);
 
   Array.from(target.attributes).forEach((attribute) => {
-    if (attribute.name.toLowerCase().startsWith('on')) {
-      target.removeAttribute(attribute.name);
+    if (!isManagedHistoryAttribute(target, attribute)) {
       return;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(nextAttributes, attribute.name)) {
-      target.removeAttribute(attribute.name);
+    const normalizedCurrent = normalizeHistoryAttributes(target, {
+      [attribute.name]: attribute.value,
+    });
+    if (
+      normalizedCurrent[attribute.name] !== attribute.value ||
+      !Object.prototype.hasOwnProperty.call(nextAttributes, attribute.name)
+    ) {
+      target.removeAttributeNode(attribute);
     }
   });
 
@@ -144,61 +128,73 @@ function applyElementAttributes(target: HTMLElement, attributes: Record<string, 
   });
 }
 
-function applyElementState(target: HTMLElement, nextState: PageDomElementState): void {
-  if (target.innerHTML !== nextState.html) {
+function applyElementState(
+  target: PagePreparationDomElement,
+  nextState: PageDomElementState
+): void {
+  if (target.namespaceURI === HTML_NAMESPACE && target.innerHTML !== nextState.html) {
     replaceWithSanitizedFragment(target, nextState.html);
   }
 
   applyElementAttributes(target, nextState.attributes);
 }
 
-export function captureDomElementState(element: HTMLElement): PageDomElementState {
+export function captureDomElementState(element: PagePreparationDomElement): PageDomElementState {
   return {
     attributes: captureSafeAttributes(element),
-    html: element.innerHTML,
+    // SVG history is intentionally inline-style-only; HTML tag policy must not rewrite SVG children.
+    html: element.namespaceURI === HTML_NAMESPACE ? element.innerHTML : '',
   };
 }
 
-export function createDomMutationPatch(element: HTMLElement): PageDomMutationPatch {
-  const locator = buildCompositeLocator(element);
-  const before = captureDomElementState(element);
+export function createDomMutationPatch(element: PagePreparationDomElement): PageDomMutationPatch {
+  return withHistoryLocatorCapture((getLocator) => {
+    const locator = getLocator(element);
+    const before = captureDomElementState(element);
 
-  return {
-    after: before,
-    before,
-    locator,
-  };
+    return {
+      after: before,
+      before,
+      locator,
+      target: element,
+    };
+  });
 }
 
 export function createDomMutationBatch(
-  elements: Iterable<HTMLElement>,
+  elements: Iterable<PagePreparationDomElement>,
   beforeStates = new Map<string, PageDomElementState>()
 ): PageDomMutationBatch {
-  const patches: PageDomMutationPatch[] = [];
+  return withHistoryLocatorCapture((getLocator) => {
+    const patches: PageDomMutationPatch[] = [];
 
-  for (const element of elements) {
-    const locator = buildCompositeLocator(element);
-    const before = beforeStates.get(locator) ?? captureDomElementState(element);
-    patches.push({
-      after: captureDomElementState(element),
-      before,
-      locator,
-    });
-  }
+    for (const element of elements) {
+      const locator = getLocator(element);
+      const before = beforeStates.get(locator) ?? captureDomElementState(element);
+      patches.push({
+        after: captureDomElementState(element),
+        before,
+        locator,
+        target: element,
+      });
+    }
 
-  return { patches };
+    return { patches };
+  });
 }
 
 export function captureDomStateMap(
-  elements: Iterable<HTMLElement>
+  elements: Iterable<PagePreparationDomElement>
 ): Map<string, PageDomElementState> {
-  const result = new Map<string, PageDomElementState>();
+  return withHistoryLocatorCapture((getLocator) => {
+    const result = new Map<string, PageDomElementState>();
 
-  for (const element of elements) {
-    result.set(buildCompositeLocator(element), captureDomElementState(element));
-  }
+    for (const element of elements) {
+      result.set(getLocator(element), captureDomElementState(element));
+    }
 
-  return result;
+    return result;
+  });
 }
 
 export function applyDomMutationBatch(
@@ -209,10 +205,13 @@ export function applyDomMutationBatch(
     return { missingLocators: [], success: true };
   }
 
-  const resolvedPatches = batch.patches.map((patch) => ({
-    patch,
-    target: findElementBySelector(patch.locator),
-  }));
+  const resolvedPatches = batch.patches.map((patch) => {
+    const hasExactBoundTarget = hasExactHistoryLocatorBinding(patch.target, patch.locator);
+    return {
+      patch,
+      target: hasExactBoundTarget ? patch.target : null,
+    };
+  });
 
   const missingLocators = resolvedPatches
     .filter((resolvedPatch) => !resolvedPatch.target)
@@ -222,7 +221,7 @@ export function applyDomMutationBatch(
   }
 
   resolvedPatches.forEach((resolvedPatch) => {
-    const target = resolvedPatch.target as HTMLElement;
+    const target = resolvedPatch.target as PagePreparationDomElement;
     const nextState = direction === 'undo' ? resolvedPatch.patch.before : resolvedPatch.patch.after;
     if (
       hasUnsafeHistoryAttributes(target) ||

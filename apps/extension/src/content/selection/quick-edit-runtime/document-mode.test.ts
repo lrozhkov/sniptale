@@ -17,7 +17,8 @@ const historyMocks = vi.hoisted(() => ({
   createDomMutationBatch: vi.fn(() => ({ patches: [{ changed: true }] })),
 }));
 
-vi.mock('../../parser/page-preparation/history', () => ({
+vi.mock('../../parser/page-preparation/history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../parser/page-preparation/history')>()),
   captureDomStateMap: historyMocks.captureDomStateMap,
   createDomMutationBatch: historyMocks.createDomMutationBatch,
   pagePreparationHistory: {

@@ -67,11 +67,17 @@ function commitPendingPageStyleHistory(): void {
 
   clearPendingHistoryTimer();
   const pending = pendingHistoryCommit;
-  pendingHistoryCommit = null;
-  pagePreparationHistory.commitTransaction(
-    pending.transactionId,
-    createDomMutationBatch([pending.element], pending.beforeStates)
-  );
+  try {
+    pagePreparationHistory.commitTransaction(
+      pending.transactionId,
+      createDomMutationBatch([pending.element], pending.beforeStates)
+    );
+    pendingHistoryCommit = null;
+  } catch (error) {
+    pagePreparationHistory.cancelTransaction(pending.transactionId);
+    pendingHistoryCommit = null;
+    throw error;
+  }
 }
 
 function cancelPendingPageStyleHistory(): void {

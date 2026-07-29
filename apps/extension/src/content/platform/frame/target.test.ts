@@ -12,7 +12,7 @@ vi.mock('./core', () => ({
   isIframeAccessible: iframeUtilsCoreMocks.isIframeAccessibleMock,
 }));
 
-import { resolveIframeEventTarget } from './target';
+import { resolveIframeEventElement, resolveIframeEventTarget } from './target';
 
 function createPointerEvent(
   overrides: Partial<Event & { clientX?: number; clientY?: number }> = {}
@@ -79,6 +79,16 @@ describe('iframe-utils-target basic fallbacks', () => {
     });
 
     expect(resolveIframeEventTarget(event)).toBe(target);
+  });
+
+  it('keeps SVG targets available through the universal element API', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    svg.append(circle);
+    const event = createPointerEvent({ target: circle });
+
+    expect(resolveIframeEventElement(event)).toBe(circle);
+    expect(resolveIframeEventTarget(event)).toBeNull();
   });
 });
 

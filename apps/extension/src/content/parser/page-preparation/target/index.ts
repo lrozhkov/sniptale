@@ -1,5 +1,5 @@
 import { isContentOwnedElement } from '../../../platform/dom-host';
-import { resolveIframeEventTarget } from '../../../platform/frame';
+import { resolveIframeEventElement, resolveIframePointTarget } from '../../../platform/frame';
 
 const HOST_MODAL_BACKDROP_SELECTOR = [
   '.b-lightbox-form__darkening',
@@ -10,6 +10,12 @@ const HOST_MODAL_BACKDROP_SELECTOR = [
 const HOST_MODAL_DIALOG_SELECTOR = ['.gwt-DialogBox', '.b-lightbox-form', '[role="dialog"]'].join(
   ','
 );
+const PASS_THROUGH_FRAME_CHROME_CLASSES = new Set([
+  'sniptale-frame-container',
+  'sniptale-interactive-frame',
+  'sniptale-interactive-frame-fill',
+  'sniptale-interactive-frame-stroke',
+]);
 
 type PointerLikeEvent = Event & {
   clientX?: number;
@@ -23,18 +29,25 @@ function hasClientPoint(event: PointerLikeEvent): event is PointerLikeEvent & {
   return typeof event.clientX === 'number' && typeof event.clientY === 'number';
 }
 
-function isHostBackdrop(element: HTMLElement): boolean {
+function isHostBackdrop(element: Element): boolean {
   return element.matches(HOST_MODAL_BACKDROP_SELECTOR);
 }
 
-function isHostDialogElement(element: HTMLElement): boolean {
+function isHostDialogElement(element: Element): boolean {
   return Boolean(element.closest(HOST_MODAL_DIALOG_SELECTOR));
+}
+
+function isPassThroughFrameChrome(element: Element): boolean {
+  return Array.from(element.classList).some((className) =>
+    PASS_THROUGH_FRAME_CHROME_CLASSES.has(className)
+  );
 }
 
 function resolveUnderlyingElement(
   event: PointerLikeEvent,
-  target: HTMLElement
-): HTMLElement | null {
+  target: Element,
+  options: { skipHostDialogs: boolean }
+): Element | null {
   if (!hasClientPoint(event) || typeof target.ownerDocument.elementsFromPoint !== 'function') {
     return null;
   }
@@ -42,24 +55,54 @@ function resolveUnderlyingElement(
   const elements = target.ownerDocument.elementsFromPoint(event.clientX, event.clientY);
   return (
     elements.find(
-      (element): element is HTMLElement =>
-        element instanceof HTMLElement &&
+      (element): element is Element =>
         element !== target &&
         !isHostBackdrop(element) &&
-        !isHostDialogElement(element) &&
+        (!options.skipHostDialogs || !isHostDialogElement(element)) &&
         !isContentOwnedElement(element)
     ) ?? null
   );
+}
+
+function resolveUnderlyingPageElement(
+  event: PointerLikeEvent,
+  target: Element,
+  options: { skipHostDialogs: boolean }
+): Element | null {
+  const underlying = resolveUnderlyingElement(event, target, options);
+  if (underlying instanceof HTMLIFrameElement && hasClientPoint(event)) {
+    return resolveIframePointTarget(underlying, event.clientX, event.clientY);
+  }
+  return underlying;
+}
+
+export function resolvePagePreparationElement(
+  event: Event,
+  iframe?: HTMLIFrameElement,
+  options: { passThroughFrameChrome?: boolean } = {}
+): Element | null {
+  const target = resolveIframeEventElement(event, iframe);
+  if (!target) {
+    return null;
+  }
+
+  if (isContentOwnedElement(target)) {
+    return options.passThroughFrameChrome && isPassThroughFrameChrome(target)
+      ? resolveUnderlyingPageElement(event, target, { skipHostDialogs: false })
+      : target;
+  }
+
+  if (!isHostBackdrop(target)) {
+    return target;
+  }
+
+  return resolveUnderlyingPageElement(event, target, { skipHostDialogs: true }) ?? target;
 }
 
 export function resolvePagePreparationTarget(
   event: Event,
   iframe?: HTMLIFrameElement
 ): HTMLElement | null {
-  const target = resolveIframeEventTarget(event, iframe);
-  if (!target || isContentOwnedElement(target) || !isHostBackdrop(target)) {
-    return target;
-  }
-
-  return resolveUnderlyingElement(event, target) ?? target;
+  const target = resolvePagePreparationElement(event, iframe);
+  return target?.namespaceURI === 'http://www.w3.org/1999/xhtml' ? (target as HTMLElement) : null;
 }

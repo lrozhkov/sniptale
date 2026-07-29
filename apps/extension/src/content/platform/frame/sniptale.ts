@@ -1,8 +1,10 @@
+// policyStateIds: [] - transient DOM identity cleanup state grants no capability or authorization.
 import { getAccessibleIframes, getIframeDocument, isIframeAccessible } from './core';
 import { escapeCssIdentifier } from '@sniptale/platform/browser/iframe-selectors/css';
 
 type SniptaleLookup = { element: HTMLElement; iframe?: HTMLIFrameElement } | null;
 const retainedSniptaleIds = new Set<string>();
+let sniptaleIdCleanupGeneration = 0;
 
 function findElementBySniptaleIdInDocument(doc: Document, id: string): HTMLElement | null {
   return doc.querySelector(`[data-sniptale-id="${escapeCssIdentifier(id)}"]`) as HTMLElement | null;
@@ -96,7 +98,12 @@ export function findElementBySniptaleId(id: string): SniptaleLookup {
  * Clear unretained data-sniptale-id attributes from all documents (top-level + iframes).
  */
 export function clearAllSniptaleIds(): void {
+  sniptaleIdCleanupGeneration += 1;
   clearMatchingSniptaleIds((id) => !retainedSniptaleIds.has(id));
+}
+
+export function getSniptaleIdCleanupGeneration(): number {
+  return sniptaleIdCleanupGeneration;
 }
 
 /**
@@ -109,11 +116,15 @@ export function retainSniptaleId(id: string): void {
   }
 }
 
+export function releaseSniptaleId(id: string): void {
+  retainedSniptaleIds.delete(id);
+}
+
 /**
  * Releases and removes only the ids retained by a completed owner session.
  */
 export function clearRetainedSniptaleIds(ids: Iterable<string>): void {
   const idsToClear = new Set(ids);
-  idsToClear.forEach((id) => retainedSniptaleIds.delete(id));
+  idsToClear.forEach(releaseSniptaleId);
   clearMatchingSniptaleIds((id) => idsToClear.has(id));
 }

@@ -10,6 +10,8 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import type { BrowserAnnotationSessionSnapshot } from '../annotations';
 
+export type PagePreparationDomElement = HTMLElement | SVGElement;
+
 export interface SerializableFrameData extends Omit<
   FrameData,
   'borderSettings' | 'blurSettings' | 'focusSettings'
@@ -45,6 +47,7 @@ export interface PageDomMutationPatch {
   after: PageDomElementState;
   before: PageDomElementState;
   locator: string;
+  target: PagePreparationDomElement;
 }
 
 export interface PageDomMutationBatch {

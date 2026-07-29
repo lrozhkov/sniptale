@@ -1,4 +1,4 @@
-import { findElementBySelector, findElementBySniptaleId } from '../../../../../platform/frame';
+import { findElementBySniptaleId, findHtmlElementBySelector } from '../../../../../platform/frame';
 import { escapeCssIdentifier } from '@sniptale/platform/browser/iframe-selectors/css';
 import type { TargetRef } from '@sniptale/runtime-contracts/dom-tree';
 
@@ -11,7 +11,7 @@ export function findElementByTarget(nodeId: string, targetRef?: TargetRef): HTML
   }
 
   for (const selector of targetRef?.selectors ?? []) {
-    const selectorResult = findElementBySelector(selector);
+    const selectorResult = findHtmlElementBySelector(selector);
     if (selectorResult) {
       return selectorResult;
     }
@@ -45,5 +45,5 @@ export function findElementByTargetOrSelector(
     return null;
   }
 
-  return findElementBySelector(selector);
+  return findHtmlElementBySelector(selector);
 }

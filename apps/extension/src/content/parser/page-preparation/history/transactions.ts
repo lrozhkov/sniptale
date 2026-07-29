@@ -11,7 +11,7 @@ import type {
   PagePreparationHistoryEntry,
   PagePreparationSessionSnapshot,
 } from './types';
-import { clearHistoryDomLocators } from './dom';
+import { clearHistoryDomLocators } from './dom-locators';
 
 type HistoryEntryArgs = {
   after?: PagePreparationSessionSnapshot | null;

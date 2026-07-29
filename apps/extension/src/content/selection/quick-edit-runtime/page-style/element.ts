@@ -1,9 +1,9 @@
-import { findElementBySelector, findElementBySniptaleId } from '../../../platform/frame';
+import { findElementBySniptaleId, findHtmlElementBySelector } from '../../../platform/frame';
 import type { PageStyleRestoreRule } from '@sniptale/runtime-contracts/page-style';
 
 function resolveByLocator(locator: string): HTMLElement | null {
   try {
-    return findElementBySelector(locator);
+    return findHtmlElementBySelector(locator);
   } catch {
     return null;
   }

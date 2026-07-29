@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
+import type { AIEditChange, ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 
 const {
   applyAIChangesMock,
@@ -16,6 +16,7 @@ const {
   findAIChangeTargetsMock: vi.fn(),
   pagePreparationHistoryMock: {
     beginTransaction: vi.fn(),
+    cancelTransaction: vi.fn(),
     commitTransaction: vi.fn(),
   },
 }));
@@ -28,7 +29,8 @@ vi.mock('../../runtime/target-resolution/change-targets', () => ({
   findAIChangeTargets: findAIChangeTargetsMock,
 }));
 
-vi.mock('../../../../../parser/page-preparation/history', () => ({
+vi.mock('../../../../../parser/page-preparation/history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../parser/page-preparation/history')>()),
   captureDomStateMap: captureDomStateMapMock,
   createDomMutationBatch: createDomMutationBatchMock,
   pagePreparationHistory: pagePreparationHistoryMock,
@@ -56,11 +58,13 @@ beforeEach(() => {
 describe('ai-pick-controller-submit-history', () => {
   it('captures target state, commits page-preparation history, and returns apply counts', () => {
     const tree = createTree();
-    const changes = [{ fieldId: 'field-1', newValue: 'updated', type: 'field' }] as const;
+    const changes: AIEditChange[] = [
+      { fieldId: 'field-1', fieldName: 'Field 1', newValue: 'updated', type: 'field' },
+    ];
     const targets = [document.createElement('div')];
     findAIChangeTargetsMock.mockReturnValue(targets);
 
-    const result = applyAiChangesWithHistory(tree, changes as never);
+    const result = applyAiChangesWithHistory(tree, changes);
 
     expect(findAIChangeTargetsMock).toHaveBeenCalledWith(tree, changes);
     expect(captureDomStateMapMock).toHaveBeenCalledWith(expect.any(Array));
@@ -73,5 +77,18 @@ describe('ai-pick-controller-submit-history', () => {
       { mutations: [] }
     );
     expect(result).toEqual({ appliedCount: 1, notFoundCount: 0, targets });
+  });
+
+  it('cancels the transaction and surfaces DOM batch creation failure', () => {
+    const failure = new Error('locator allocation failed');
+    createDomMutationBatchMock.mockImplementationOnce(() => {
+      throw failure;
+    });
+
+    expect(() => applyAiChangesWithHistory(createTree(), [])).toThrow(failure);
+    expect(pagePreparationHistoryMock.cancelTransaction).toHaveBeenCalledWith(
+      expect.stringMatching(/^ai-apply:/)
+    );
+    expect(pagePreparationHistoryMock.commitTransaction).not.toHaveBeenCalled();
   });
 });

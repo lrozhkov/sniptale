@@ -108,6 +108,7 @@ function expectSuggestedEventLoggingFlow() {
 
   const target = document.createElement('button');
   target.textContent = 'Submit';
+  document.body.append(target);
   resolveIframeEventTargetMock.mockReturnValue(target as HTMLElement | null);
 
   const cleanup = registerScenarioSuggestedEventListeners('project-1');
@@ -128,6 +129,7 @@ function expectSyntheticSuggestedEventsAreIgnored() {
 
   const target = document.createElement('button');
   target.textContent = 'Submit';
+  document.body.append(target);
   resolveIframeEventTargetMock.mockReturnValue(target as HTMLElement | null);
   trustedEventMocks.isTrustedDomEvent.mockReturnValue(false);
   trustedEventMocks.isTrustedKeyboardEvent.mockReturnValue(false);

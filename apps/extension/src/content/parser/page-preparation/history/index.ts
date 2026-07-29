@@ -12,6 +12,7 @@ export {
   createDomMutationBatch,
   createDomMutationPatch,
 } from './dom';
+export { HistoryLocatorAllocationError } from './dom-locators';
 export { captureFrameSessionSnapshot, hydrateFrameSessionSnapshot } from './frame-session';
 export type {
   FrameSessionSnapshot,
@@ -22,5 +23,6 @@ export type {
   PagePreparationHistoryEntry,
   PagePreparationSessionSnapshot,
   PagePreparationHistoryState,
+  PagePreparationDomElement,
   SerializableFrameData,
 } from './types';

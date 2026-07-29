@@ -1,4 +1,4 @@
-import { findElementBySelector } from '../../../../../platform/frame';
+import { findHtmlElementBySelector } from '../../../../../platform/frame';
 import { escapeCssIdentifier } from '@sniptale/platform/browser/iframe-selectors/css';
 import type { TargetRef } from '@sniptale/runtime-contracts/dom-tree';
 import { findElementByTarget } from './target-lookup';
@@ -14,7 +14,7 @@ export function findElementWithLegacyFallback(
   }
 
   if (selector) {
-    const selectorMatch = findElementBySelector(selector);
+    const selectorMatch = findHtmlElementBySelector(selector);
     if (selectorMatch) {
       return selectorMatch;
     }

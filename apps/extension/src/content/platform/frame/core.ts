@@ -56,7 +56,7 @@ export function getViewportClientPoint(
 /**
  * Get absolute position of an element, accounting for iframe offsets.
  */
-export function getAbsolutePosition(element: HTMLElement): {
+export function getAbsolutePosition(element: Element): {
   x: number;
   y: number;
   width: number;
@@ -89,7 +89,7 @@ export function getAbsolutePosition(element: HTMLElement): {
 /**
  * Get the iframe that contains an element, if any.
  */
-export function getContainingIframe(element: HTMLElement): HTMLIFrameElement | null {
+export function getContainingIframe(element: Element): HTMLIFrameElement | null {
   const doc = element.ownerDocument;
   if (doc === document) {
     return null;

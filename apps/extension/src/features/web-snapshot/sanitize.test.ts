@@ -72,6 +72,15 @@ it('drops obfuscated CSS fetch vectors without stripping benign string content',
   expect(benign).toContain('content: "url(example)"');
 });
 
+it.each(['\n', '\r', '\r\n', '\f'])(
+  'drops a suffix fetch after a bad CSS string terminated by %j',
+  (lineBreak) => {
+    const css = `.x { color: "broken${lineBreak}; background-image: url(https://attacker.example/pixel); }`;
+
+    expect(sanitizeWebSnapshotCssText(css)).toBe('');
+  }
+);
+
 it('drops decoded unsafe CSS protocols and expression functions', () => {
   expect(sanitizeWebSnapshotCssText('.x { color: "\\6a avascript:alert(1)"; }')).toContain(
     '\\6a avascript'

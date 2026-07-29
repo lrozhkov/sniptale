@@ -5,7 +5,10 @@ import {
   PAGE_STYLE_SCOPE_TYPES,
   type PageStyleRestoreRule,
 } from '@sniptale/runtime-contracts/page-style';
-import { pagePreparationHistory } from '../../../parser/page-preparation/history';
+import {
+  HistoryLocatorAllocationError,
+  pagePreparationHistory,
+} from '../../../parser/page-preparation/history';
 import type {
   FrameSessionSnapshot,
   PagePreparationSessionSnapshot,
@@ -172,5 +175,30 @@ it('groups rapid inspector previews into one history entry', async () => {
   pagePreparationHistory.redo();
   expect(target.style.color).toBe('rgb(255, 0, 0)');
   expect(target.style.fontSize).toBe('24px');
+  unregisterBridge();
+});
+
+it('cancels and clears a pending inspector transaction when locator validation fails', async () => {
+  const unregisterBridge = registerHistoryBridge();
+  const target = document.createElement('p');
+  target.id = 'target';
+  target.setAttribute('data-sniptale-id', 'page-owned-id');
+  document.body.append(target);
+
+  await applyPageStylePatchWithHistory({
+    element: target,
+    patch: { assets: [], declarations: [{ property: 'color', value: 'rgb(255, 0, 0)' }] },
+  });
+  target.setAttribute('data-sniptale-id', 'page-replacement');
+
+  expect(() => vi.advanceTimersByTime(500)).toThrow(HistoryLocatorAllocationError);
+  expect(pagePreparationHistory.getState().canUndo).toBe(false);
+
+  await applyPageStylePatchWithHistory({
+    element: target,
+    patch: { assets: [], declarations: [{ property: 'font-size', value: '24px' }] },
+  });
+  expect(() => vi.advanceTimersByTime(500)).not.toThrow();
+  expect(pagePreparationHistory.getState().canUndo).toBe(true);
   unregisterBridge();
 });

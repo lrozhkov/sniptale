@@ -3,14 +3,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const iframeUtils = vi.hoisted(() => ({
-  resolveIframeEventTarget: vi.fn(),
+  resolveIframeEventElement: vi.fn(),
+  resolveIframePointTarget: vi.fn(),
 }));
 
 vi.mock('../../../platform/frame', () => iframeUtils);
 
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { initializeContentUiRoots } from '../../../platform/dom-host';
-import { resolvePagePreparationTarget } from '.';
+import { resolvePagePreparationElement, resolvePagePreparationTarget } from '.';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -18,7 +19,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-function createPointEvent(target: HTMLElement): MouseEvent {
+function createPointEvent(target: Element): MouseEvent {
   const event = new MouseEvent('click', {
     clientX: 20,
     clientY: 30,
@@ -45,10 +46,10 @@ function registerStableTargetTests(): void {
     const dialogButton = document.createElement('button');
     dialog.append(dialogButton);
 
-    iframeUtils.resolveIframeEventTarget.mockReturnValueOnce(ordinaryTarget);
+    iframeUtils.resolveIframeEventElement.mockReturnValueOnce(ordinaryTarget);
     expect(resolvePagePreparationTarget(createPointEvent(ordinaryTarget))).toBe(ordinaryTarget);
 
-    iframeUtils.resolveIframeEventTarget.mockReturnValueOnce(dialogButton);
+    iframeUtils.resolveIframeEventElement.mockReturnValueOnce(dialogButton);
     expect(resolvePagePreparationTarget(createPointEvent(dialogButton))).toBe(dialogButton);
   });
 }
@@ -63,7 +64,7 @@ function registerBackdropBypassTest(): void {
     const event = createPointEvent(backdrop);
 
     mockElementsFromPoint([backdrop, dialog, pageTarget, document.body]);
-    iframeUtils.resolveIframeEventTarget.mockReturnValue(backdrop);
+    iframeUtils.resolveIframeEventElement.mockReturnValue(backdrop);
 
     expect(resolvePagePreparationTarget(event)).toBe(pageTarget);
   });
@@ -84,9 +85,65 @@ function registerOwnedContentSkipTest(): void {
     const event = createPointEvent(backdrop);
 
     mockElementsFromPoint([backdrop, ownedButton, pageTarget]);
-    iframeUtils.resolveIframeEventTarget.mockReturnValue(backdrop);
+    iframeUtils.resolveIframeEventElement.mockReturnValue(backdrop);
 
     expect(resolvePagePreparationTarget(event)).toBe(pageTarget);
+  });
+}
+
+function registerUniversalElementTests(): void {
+  it('returns SVG targets through the universal element contract', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    svg.append(circle);
+    document.body.append(svg);
+    const event = createPointEvent(svg);
+    iframeUtils.resolveIframeEventElement.mockReturnValue(circle);
+
+    expect(resolvePagePreparationElement(event)).toBe(circle);
+    expect(resolvePagePreparationTarget(event)).toBeNull();
+  });
+
+  it('passes through owned frame chrome to the underlying page element', () => {
+    const host = document.createElement('div');
+    host.id = CONTENT_ROOT_ID;
+    document.body.append(host);
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(shadowRoot);
+    const frameChrome = document.createElement('div');
+    frameChrome.className = 'sniptale-interactive-frame';
+    shadowRoot.append(frameChrome);
+    const pageTarget = document.createElement('button');
+    document.body.append(pageTarget);
+    const event = createPointEvent(frameChrome);
+
+    mockElementsFromPoint([frameChrome, pageTarget]);
+    iframeUtils.resolveIframeEventElement.mockReturnValue(frameChrome);
+
+    expect(resolvePagePreparationElement(event, undefined, { passThroughFrameChrome: true })).toBe(
+      pageTarget
+    );
+  });
+
+  it('keeps owned inspector controls selected when frame pass-through is enabled', () => {
+    const host = document.createElement('div');
+    host.id = CONTENT_ROOT_ID;
+    document.body.append(host);
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(shadowRoot);
+    const inspectorButton = document.createElement('button');
+    inspectorButton.className = 'sniptale-page-style-inspector-control';
+    shadowRoot.append(inspectorButton);
+    const pageTarget = document.createElement('div');
+    document.body.append(pageTarget);
+    const event = createPointEvent(inspectorButton);
+
+    mockElementsFromPoint([inspectorButton, pageTarget]);
+    iframeUtils.resolveIframeEventElement.mockReturnValue(inspectorButton);
+
+    expect(resolvePagePreparationElement(event, undefined, { passThroughFrameChrome: true })).toBe(
+      inspectorButton
+    );
   });
 }
 
@@ -94,4 +151,5 @@ describe('page preparation target resolution', () => {
   registerStableTargetTests();
   registerBackdropBypassTest();
   registerOwnedContentSkipTest();
+  registerUniversalElementTests();
 });

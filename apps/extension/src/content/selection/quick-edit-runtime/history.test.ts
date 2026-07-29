@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
   captureDomStateMap: vi.fn(() => new Map([['before', new Map()]])),
 }));
 
-vi.mock('../../parser/page-preparation/history', () => ({
+vi.mock('../../parser/page-preparation/history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../parser/page-preparation/history')>()),
   captureDomStateMap: mocks.captureDomStateMap,
   createDomMutationBatch: mocks.createDomMutationBatch,
   pagePreparationHistory: {
@@ -61,4 +62,20 @@ it('cancels only transactions with an editable id', () => {
 
   expect(mocks.cancelTransaction).toHaveBeenCalledTimes(1);
   expect(mocks.cancelTransaction).toHaveBeenCalledWith('quick-edit:editable-1');
+});
+
+it('cancels and clears the transaction when DOM batch creation fails', () => {
+  const tracker = createQuickEditHistoryTracker();
+  const element = document.createElement('div');
+  const failure = new Error('locator allocation failed');
+  tracker.begin(element, 'editable-1');
+  mocks.createDomMutationBatch.mockImplementationOnce(() => {
+    throw failure;
+  });
+
+  expect(() => tracker.commit(element, 'editable-1')).toThrow(failure);
+  expect(mocks.cancelTransaction).toHaveBeenCalledWith('quick-edit:editable-1');
+
+  tracker.commit(element, 'editable-1');
+  expect(mocks.commitTransaction).toHaveBeenLastCalledWith('quick-edit:editable-1', null);
 });

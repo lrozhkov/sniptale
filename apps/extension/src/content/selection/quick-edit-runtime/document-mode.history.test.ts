@@ -43,7 +43,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('../../parser/page-preparation/history', () => ({
+vi.mock('../../parser/page-preparation/history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../parser/page-preparation/history')>()),
   captureDomStateMap: mocks.captureDomStateMap,
   createDomMutationBatch: mocks.createDomMutationBatch,
   pagePreparationHistory: {
@@ -106,6 +107,7 @@ function readLastCommittedBatch() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -120,6 +122,7 @@ it('begins a document-mode history transaction', () => {
   tracker.begin();
 
   expect(mocks.beginTransaction).toHaveBeenCalledWith('quick-edit-document-mode');
+  tracker.cancel();
 });
 
 it('captures before-state before text mutation and commits the changed root', () => {
@@ -217,4 +220,21 @@ it('skips disconnected dirty roots during cleanup without throwing', () => {
   expect(() => tracker.commit()).not.toThrow();
   expect(mocks.createDomMutationBatch).not.toHaveBeenCalled();
   expect(mocks.cancelTransaction).toHaveBeenCalledWith('quick-edit-document-mode');
+});
+
+it('cancels and resets when before-state locator capture fails inside the transaction', () => {
+  const tracker = createQuickEditDocumentModeHistoryTracker();
+  const paragraph = appendParagraph('Before');
+  mocks.captureDomStateMap.mockImplementationOnce(() => {
+    throw new Error('locator allocation failed');
+  });
+
+  tracker.begin();
+  dispatchInputSequence(paragraph, () => {
+    paragraph.textContent = 'After';
+  });
+  tracker.commit();
+
+  expect(mocks.cancelTransaction).toHaveBeenCalledWith('quick-edit-document-mode');
+  expect(mocks.commitTransaction).not.toHaveBeenCalled();
 });

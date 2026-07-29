@@ -149,9 +149,24 @@ function beginDocumentModeHistory(state: DocumentModeHistoryState): void {
   state.isActive = true;
   pagePreparationHistory.beginTransaction(DOCUMENT_MODE_HISTORY_KEY);
   state.cleanupListeners = registerDocumentModeHistoryListeners({
-    onBeforeInput: (event) => recordPotentialEditTarget(state, event.target),
-    onInput: (event) => markDirtyTarget(state, event.target),
+    onBeforeInput: (event) =>
+      runDocumentModeHistoryStep(state, () => {
+        recordPotentialEditTarget(state, event.target);
+      }),
+    onInput: (event) =>
+      runDocumentModeHistoryStep(state, () => {
+        markDirtyTarget(state, event.target);
+      }),
   });
+}
+
+function runDocumentModeHistoryStep(state: DocumentModeHistoryState, operation: () => void): void {
+  try {
+    operation();
+  } catch (error) {
+    logger.error('Failed to capture document-mode history state', error);
+    cancelDocumentModeHistory(state);
+  }
 }
 
 function cancelDocumentModeHistory(state: DocumentModeHistoryState): void {

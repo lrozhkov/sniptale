@@ -1,12 +1,16 @@
-import { escapeCssIdentifier } from '@sniptale/platform/browser/iframe-selectors/css';
+import {
+  escapeCssIdentifier,
+  escapeCssString,
+} from '@sniptale/platform/browser/iframe-selectors/css';
 
 function getNthOfTypeSegment(element: Element): string {
   const parent = element.parentElement;
-  if (!parent) return element.localName;
+  const tagName = escapeCssIdentifier(element.localName);
+  if (!parent) return tagName;
   const sameTypeSiblings = Array.from(parent.children).filter(
     (sibling) => sibling.localName === element.localName
   );
-  return `${element.localName}:nth-of-type(${sameTypeSiblings.indexOf(element) + 1})`;
+  return `${tagName}:nth-of-type(${sameTypeSiblings.indexOf(element) + 1})`;
 }
 
 function isUniqueSelector(rootDocument: Document, selector: string, element: Element): boolean {
@@ -27,7 +31,7 @@ function getScopedStructuralSelector(iframe: HTMLIFrameElement, rootDocument: Do
     if (isUniqueSelector(rootDocument, selector, iframe)) return selector;
     segments.unshift(
       current.id
-        ? `${current.localName}#${escapeCssIdentifier(current.id)}`
+        ? `${escapeCssIdentifier(current.localName)}#${escapeCssIdentifier(current.id)}`
         : getNthOfTypeSegment(current)
     );
     current = current.parentElement;
@@ -49,14 +53,14 @@ export function getIframeSelector(
   if (src && !src.startsWith('about:')) {
     const srcMatch = src.match(/[^/]+$/);
     if (srcMatch) {
-      const selector = `iframe[src*="${srcMatch[0]}"]`;
+      const selector = `iframe[src*="${escapeCssString(srcMatch[0])}"]`;
       if (isUniqueSelector(rootDocument, selector, iframe)) return selector;
     }
   }
 
   const appCode = iframe.getAttribute('data-application-code');
   if (appCode) {
-    const selector = `iframe[data-application-code="${appCode}"]`;
+    const selector = `iframe[data-application-code="${escapeCssString(appCode)}"]`;
     if (isUniqueSelector(rootDocument, selector, iframe)) return selector;
   }
 

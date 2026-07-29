@@ -1,4 +1,5 @@
 import { isPageStyleProperty } from '@sniptale/runtime-contracts/page-style';
+import { containsCssFunction } from '@sniptale/platform/security/css-safety';
 import {
   containsUnsafeCssSyntax,
   sanitizeWebSnapshotCssText,
@@ -6,6 +7,7 @@ import {
 
 const HISTORY_ATTRIBUTE_URL_BASE = 'https://sniptale.invalid';
 const SAFE_HISTORY_URL_PROTOCOLS = new Set(['blob:', 'http:', 'https:', 'mailto:', 'tel:']);
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 
 function sanitizeHistoryStyleAttribute(document: Document, value: string): string | null {
   const sanitizedValue = sanitizeWebSnapshotCssText(value);
@@ -24,7 +26,10 @@ function sanitizeHistoryStyleAttribute(document: Document, value: string): strin
     }
 
     const propertyValue = probe.style.getPropertyValue(property);
-    if (containsUnsafeCssSyntax(`${property}: ${propertyValue};`)) {
+    if (
+      containsUnsafeCssSyntax(`${property}: ${propertyValue};`) ||
+      containsCssFunction(propertyValue, 'var')
+    ) {
       continue;
     }
 
@@ -36,8 +41,8 @@ function sanitizeHistoryStyleAttribute(document: Document, value: string): strin
 }
 
 function isSafeHistoryUrlAttribute(name: string, value: string): boolean {
-  const normalizedName = name.toLowerCase();
-  if (normalizedName !== 'href' && normalizedName !== 'src') {
+  const qualifiedLocalName = name.toLowerCase().split(':').at(-1);
+  if (qualifiedLocalName !== 'href' && qualifiedLocalName !== 'src') {
     return true;
   }
 
@@ -66,25 +71,41 @@ function mergeBlankTargetRel(value: string | undefined): string {
   return Array.from(tokens).join(' ');
 }
 
-function hasSafeBlankRel(element: HTMLElement): boolean {
+function hasSafeBlankRel(element: Element): boolean {
   const tokens = new Set((element.getAttribute('rel') ?? '').toLowerCase().split(/\s+/));
   return tokens.has('noopener') && tokens.has('noreferrer');
 }
 
+export function isManagedHistoryAttribute(element: Element, attribute: Attr | string): boolean {
+  if (element.namespaceURI !== SVG_NAMESPACE) {
+    return true;
+  }
+
+  return typeof attribute === 'string'
+    ? attribute === 'style'
+    : attribute.namespaceURI === null &&
+        attribute.localName === 'style' &&
+        attribute.name === 'style';
+}
+
 export function normalizeHistoryAttributes(
-  document: Document,
+  element: Element,
   attributes: Record<string, string>
 ): Record<string, string> {
   const normalizedAttributes: Record<string, string> = {};
 
   Object.entries(attributes).forEach(([attributeName, attributeValue]) => {
     const name = attributeName.toLowerCase();
-    if (name.startsWith('on') || !isSafeHistoryUrlAttribute(name, attributeValue)) {
+    if (
+      !isManagedHistoryAttribute(element, attributeName) ||
+      name.startsWith('on') ||
+      !isSafeHistoryUrlAttribute(name, attributeValue)
+    ) {
       return;
     }
 
     if (name === 'style') {
-      const sanitizedStyle = sanitizeHistoryStyleAttribute(document, attributeValue);
+      const sanitizedStyle = sanitizeHistoryStyleAttribute(element.ownerDocument, attributeValue);
       if (sanitizedStyle) {
         normalizedAttributes[attributeName] = sanitizedStyle;
       }
@@ -101,17 +122,17 @@ export function normalizeHistoryAttributes(
   return normalizedAttributes;
 }
 
-export function hasUnsafeHistoryAttributes(element: HTMLElement): boolean {
+export function hasUnsafeHistoryAttributes(element: Element): boolean {
   return Array.from(element.attributes).some((attribute) => {
+    if (!isManagedHistoryAttribute(element, attribute)) {
+      return false;
+    }
+
+    const normalized = normalizeHistoryAttributes(element, {
+      [attribute.name]: attribute.value,
+    });
+    if (normalized[attribute.name] !== attribute.value) return true;
     const name = attribute.name.toLowerCase();
-    if (name.startsWith('on') || !isSafeHistoryUrlAttribute(name, attribute.value)) {
-      return true;
-    }
-    if (name === 'style') {
-      return (
-        sanitizeHistoryStyleAttribute(element.ownerDocument, attribute.value) !== attribute.value
-      );
-    }
     return (
       name === 'target' && attribute.value.toLowerCase() === '_blank' && !hasSafeBlankRel(element)
     );

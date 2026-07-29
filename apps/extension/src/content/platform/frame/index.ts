@@ -23,11 +23,17 @@ export {
 } from './page-placement';
 export { waitForAccessibleIframeReady, type AccessibleIframeReadyResult } from './ready';
 export { addScrollListenersToAllWindows } from './scroll-listeners';
-export { findElementBySelector } from './selectors';
+export { findElementBySelector, findHtmlElementBySelector } from './selectors';
 export {
   clearAllSniptaleIds,
   clearRetainedSniptaleIds,
   findElementBySniptaleId,
+  getSniptaleIdCleanupGeneration,
+  releaseSniptaleId,
   retainSniptaleId,
 } from './sniptale';
-export { resolveIframeEventTarget } from './target';
+export {
+  resolveIframeEventElement,
+  resolveIframeEventTarget,
+  resolveIframePointTarget,
+} from './target';

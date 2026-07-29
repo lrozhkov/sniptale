@@ -3,7 +3,7 @@ import { getElementSelector } from '@sniptale/platform/browser/iframe-selectors/
 import { getIframeSelector } from './iframe';
 import type { CompositeSelector } from './types';
 
-export function createCompositeSelector(element: HTMLElement): CompositeSelector {
+export function createCompositeSelector(element: Element): CompositeSelector {
   const iframe = getContainingIframe(element);
   const elementSelector = getElementSelector(element);
 

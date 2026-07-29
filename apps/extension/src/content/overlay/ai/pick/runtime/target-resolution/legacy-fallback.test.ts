@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../../platform/frame', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/frame')>()),
-  findElementBySelector: mocks.selector,
+  findHtmlElementBySelector: mocks.selector,
 }));
 
 vi.mock('./target-lookup', async (importOriginal) => ({

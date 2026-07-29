@@ -44,6 +44,10 @@ export function createAddFrameHandler({
   calculateFrameCoords,
 }: CreateAddFrameHandlerArgs) {
   return (element: HTMLElement) => {
+    if (!element.isConnected) {
+      return null;
+    }
+
     const frameData = buildFrameForAdd({
       calculateFrameCoords,
       element,
