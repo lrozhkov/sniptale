@@ -1,5 +1,6 @@
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { areDescriptorListsEqual } from '../effects/descriptor-equality';
+import type { AnchorPresentation } from '../host-layout/service';
 
 export type FrameRenderDescriptor = {
   blurAmount: number | undefined;
@@ -50,6 +51,7 @@ export type FrameRenderDescriptor = {
   pagePlacementPath: string;
   pagePlacementX: number | undefined;
   pagePlacementY: number | undefined;
+  presentation: AnchorPresentation;
   state: FrameState | undefined;
   stepBadgeAlphabet: string | undefined;
   stepBadgeAnchor: string | undefined;
@@ -67,9 +69,12 @@ export type FrameRenderDescriptor = {
 
 export function buildFrameRenderDescriptors(
   currentFrames: FrameData[],
-  currentFrameStates: Map<string, FrameState>
+  currentFrameStates: Map<string, FrameState>,
+  presentations: ReadonlyMap<string, AnchorPresentation> = new Map()
 ): FrameRenderDescriptor[] {
-  return currentFrames.map((frame) => buildFrameRenderDescriptor(frame, currentFrameStates));
+  return currentFrames.map((frame) =>
+    buildFrameRenderDescriptor(frame, currentFrameStates, presentations)
+  );
 }
 
 export function areFrameRenderDescriptorsEqual(
@@ -81,7 +86,8 @@ export function areFrameRenderDescriptorsEqual(
 
 function buildFrameRenderDescriptor(
   frame: FrameData,
-  currentFrameStates: Map<string, FrameState>
+  currentFrameStates: Map<string, FrameState>,
+  presentations: ReadonlyMap<string, AnchorPresentation>
 ): FrameRenderDescriptor {
   return {
     ...buildFrameBorderDescriptor(frame),
@@ -97,6 +103,7 @@ function buildFrameRenderDescriptor(
     focusShowBorder: frame.focusSettings?.showBorder,
     height: frame.height,
     id: frame.id,
+    presentation: presentations.get(frame.id) ?? 'visible',
     state: currentFrameStates.get(frame.id),
     width: frame.width,
     x: frame.x,

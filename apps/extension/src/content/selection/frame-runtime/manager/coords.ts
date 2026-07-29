@@ -1,5 +1,5 @@
 import type { BorderPreset, FrameData } from '../../../../features/highlighter/contracts';
-import { getAbsolutePosition } from '../../../platform/frame';
+import { createDocumentPagePlacement, getAbsolutePosition } from '../../../platform/frame';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   calculateFrameContainerCoords,
@@ -39,6 +39,11 @@ export function createFrameDataFromElement(
   borderSettings?: BorderPreset
 ): FrameData {
   const frameCoords = calculateFrameViewportCoords(element, borderSettings);
+  const pagePlacement = createDocumentPagePlacement(
+    element.ownerDocument,
+    frameCoords.x,
+    frameCoords.y
+  );
   const diagnostics = getFrameIframeDiagnostics(element);
   if (diagnostics) {
     logger.log('createFrameDataFromElement', {
@@ -51,7 +56,7 @@ export function createFrameDataFromElement(
   return {
     id: frameId,
     ...frameCoords,
-    linkedElement: element,
+    ...(pagePlacement ? { pagePlacement } : {}),
   };
 }
 

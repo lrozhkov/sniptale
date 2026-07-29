@@ -1,7 +1,13 @@
 import React from 'react';
 import type { CSSProperties } from 'react';
-import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
-import { getContentUiElementById, resolveContentOverlayRoot } from '../../../platform/dom-host';
+import {
+  getContentUiElementById,
+  isContentOwnedElement,
+  isContentUiBootstrapFallbackAllowed,
+  resolveContentOverlayRoot,
+  resolveContentShadowRoot,
+  ensureContentUiMountTarget,
+} from '../../../platform/dom-host';
 import { applyIsolatedContentRootStyle } from '../../../platform/dom-host/isolated';
 import {
   mergeThemeScopedStyle,
@@ -50,24 +56,33 @@ export function updateEffectOverlay(
 }
 
 function resolveContentThemeOwner(): HTMLElement | null {
-  if (typeof document === 'undefined') {
-    return null;
-  }
-
-  return document.getElementById(CONTENT_ROOT_ID);
+  const host = resolveContentShadowRoot()?.host;
+  return host instanceof HTMLElement ? host : null;
 }
 
 export function resolveContentPortalTarget(
   anchorEl?: HTMLElement | null
 ): ShadowRoot | DocumentFragment | HTMLElement {
-  return (
-    resolveContentOverlayRoot() ??
-    resolveThemeSafePortalTarget(anchorEl ?? resolveContentThemeOwner())
-  );
+  const overlayRoot = resolveContentOverlayRoot();
+  if (overlayRoot) {
+    return overlayRoot;
+  }
+
+  if (isContentUiBootstrapFallbackAllowed()) {
+    return resolveThemeSafePortalTarget(anchorEl ?? resolveContentThemeOwner());
+  }
+
+  return ensureContentUiMountTarget('overlay');
 }
 
 export function useContentPortalTheme(source?: HTMLElement | null) {
-  return useResolvedPortalTheme(source ?? resolveContentThemeOwner());
+  const contentThemeOwner = resolveContentThemeOwner();
+  const themeSource = source ?? contentThemeOwner;
+  const theme = useResolvedPortalTheme(themeSource);
+  const canUseThemeSource = source
+    ? isContentOwnedElement(source) || isContentUiBootstrapFallbackAllowed()
+    : contentThemeOwner !== null;
+  return canUseThemeSource ? theme : null;
 }
 
 export function getThemedPortalStyle(

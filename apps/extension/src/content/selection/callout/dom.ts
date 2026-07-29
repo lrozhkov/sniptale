@@ -1,4 +1,4 @@
-import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
+import { resolveContentShadowRoot } from '../../platform/dom-host';
 import {
   sanitizeHtmlFragment,
   type HtmlSanitizerOptions,
@@ -10,11 +10,8 @@ export const CALLOUT_HTML_SANITIZER_OPTIONS: HtmlSanitizerOptions = {
 };
 
 export function resolveCalloutThemeOwner(): HTMLElement | null {
-  if (typeof document === 'undefined') {
-    return null;
-  }
-
-  return document.getElementById(CONTENT_ROOT_ID);
+  const host = resolveContentShadowRoot()?.host;
+  return host instanceof HTMLElement ? host : null;
 }
 
 export function sanitizeCalloutHtml(html: string): string {

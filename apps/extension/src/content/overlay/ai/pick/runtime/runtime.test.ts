@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  CONTENT_APP_CONTAINER_ID,
-  CONTENT_OVERLAY_ROOT_ID,
-  CONTENT_ROOT_ID,
-} from '@sniptale/ui/branding';
+import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
+import { initializeContentUiRoots } from '../../../../platform/dom-host';
 import { resolveAiPickInteractionTarget } from './runtime';
 
 function mockElementsFromPoint(elements: Element[]) {
@@ -104,6 +101,7 @@ describe('ai-pick shadow-host overlay passthrough', () => {
     const host = document.createElement('div');
     host.id = CONTENT_ROOT_ID;
     const shadowRoot = host.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(shadowRoot);
     const overlay = document.createElement('div');
     overlay.className = 'sniptale-blocking-overlay';
     shadowRoot.appendChild(overlay);
@@ -132,6 +130,7 @@ describe('ai-pick shadow-host frame root passthrough', () => {
     const host = document.createElement('div');
     host.id = CONTENT_ROOT_ID;
     const shadowRoot = host.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(shadowRoot);
     const frameRoot = document.createElement('div');
     frameRoot.id = 'frame-container-test-frame';
     shadowRoot.appendChild(frameRoot);
@@ -160,11 +159,7 @@ describe('ai-pick shadow-host scaffold passthrough', () => {
     const host = document.createElement('div');
     host.id = CONTENT_ROOT_ID;
     const shadowRoot = host.attachShadow({ mode: 'open' });
-    const appRoot = document.createElement('div');
-    appRoot.id = CONTENT_APP_CONTAINER_ID;
-    const overlayRoot = document.createElement('div');
-    overlayRoot.id = CONTENT_OVERLAY_ROOT_ID;
-    shadowRoot.append(appRoot, overlayRoot);
+    const { appContainer: appRoot, overlayRoot } = initializeContentUiRoots(shadowRoot);
     const underlying = document.createElement('div');
     document.body.append(host, underlying);
 
@@ -190,6 +185,7 @@ describe('ai-pick shadow-host toolbar passthrough', () => {
     const host = document.createElement('div');
     host.id = CONTENT_ROOT_ID;
     const shadowRoot = host.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(shadowRoot);
     const toolbarButton = document.createElement('button');
     toolbarButton.className = 'sniptale-btn';
     shadowRoot.appendChild(toolbarButton);

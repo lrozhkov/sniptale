@@ -15,6 +15,10 @@ import {
 import { getResizeHandleStyle } from '../../../apps/extension/src/content/selection/interactive-frame/layout/resize-handle-position';
 import { getInteractiveFrameDisplay } from '../../../apps/extension/src/content/selection/interactive-frame/render-model/render-model';
 import { composeViewerCaptureOverlays } from '../../../apps/extension/src/web-snapshot-viewer/preparation/capture/overlays/composer';
+import {
+  DynamicAnchorLifecycleHarness,
+  parseDynamicAnchorScenario,
+} from './highlighter-dynamic-anchor';
 
 const SURFACE = { x: 30.25, y: 28.5, width: 132.5, height: 84.25 } as const;
 const CELL = { width: 194, height: 140 } as const;
@@ -346,7 +350,12 @@ function ViewerParity() {
 }
 
 function App() {
-  const requestedZoom = Number(new URLSearchParams(window.location.search).get('zoom') ?? 100);
+  const searchParams = new URLSearchParams(window.location.search);
+  const dynamicScenario = parseDynamicAnchorScenario(searchParams.get('dynamic'));
+  if (dynamicScenario) {
+    return <DynamicAnchorLifecycleHarness scenario={dynamicScenario} />;
+  }
+  const requestedZoom = Number(searchParams.get('zoom') ?? 100);
   const zoom = [80, 100, 125, 200].includes(requestedZoom) ? requestedZoom / 100 : 1;
 
   return (

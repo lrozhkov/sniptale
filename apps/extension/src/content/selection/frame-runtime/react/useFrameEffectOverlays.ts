@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import { queryAllContentUiElements } from '../../../platform/dom-host';
 import type { FrameData } from '../../../../features/highlighter/contracts';
+import type { FrameHostLayoutSnapshot } from '../host-layout/service';
 import {
   ensureBlurFiltersSvgContainer,
   registerImmediateBlurOverlayUpdates,
@@ -22,10 +23,19 @@ import {
 type UseFrameEffectOverlaysArgs = {
   frames: FrameData[];
   framesRef: MutableRefObject<FrameData[]>;
+  hostLayoutSnapshot: FrameHostLayoutSnapshot;
 };
 
-export function useFrameEffectOverlays({ frames, framesRef }: UseFrameEffectOverlaysArgs): void {
+export function useFrameEffectOverlays({
+  frames,
+  framesRef,
+  hostLayoutSnapshot,
+}: UseFrameEffectOverlaysArgs): void {
   const overlayRefs = useFrameEffectOverlayRefs();
+  const renderableFramesRef = useRef<FrameData[]>([]);
+  renderableFramesRef.current = framesRef.current.filter(
+    (frame) => (hostLayoutSnapshot.presentations.get(frame.id) ?? 'visible') === 'visible'
+  );
   const ensureBlurFiltersSvg = useCallback(
     () => ensureBlurFiltersSvgContainer(overlayRefs),
     [overlayRefs]
@@ -43,12 +53,13 @@ export function useFrameEffectOverlays({ frames, framesRef }: UseFrameEffectOver
 
   useFrameEffectSync(
     frames,
-    framesRef,
+    renderableFramesRef,
+    hostLayoutSnapshot.version,
     overlayRefs,
     ensureBlurFiltersSvg,
     updateDistortionFilterScale
   );
-  useImmediateFrameOverlayUpdates(framesRef, overlayRefs);
+  useImmediateFrameOverlayUpdates(renderableFramesRef, overlayRefs);
   useFrameOverlayUnmountCleanup(overlayRefs);
 }
 
@@ -76,6 +87,7 @@ function useFrameEffectOverlayRefs(): OverlayRefs {
 function useFrameEffectSync(
   frames: FrameData[],
   framesRef: MutableRefObject<FrameData[]>,
+  presentationVersion: number,
   overlayRefs: OverlayRefs,
   ensureBlurFiltersSvg: () => void,
   updateDistortionFilterScale: (scale: number) => void
@@ -91,7 +103,7 @@ function useFrameEffectSync(
 
     prevFocusDescriptorsRef.current = focusDescriptors;
     updateFocusOverlayMask(framesRef.current, overlayRefs);
-  }, [frames, framesRef, overlayRefs]);
+  }, [frames, framesRef, overlayRefs, presentationVersion]);
 
   useEffect(() => {
     const blurDescriptors = buildBlurFrameDescriptors(framesRef.current);
@@ -106,7 +118,14 @@ function useFrameEffectSync(
       ensureBlurFiltersSvg,
       updateDistortionFilterScale
     );
-  }, [ensureBlurFiltersSvg, frames, framesRef, overlayRefs, updateDistortionFilterScale]);
+  }, [
+    ensureBlurFiltersSvg,
+    frames,
+    framesRef,
+    overlayRefs,
+    presentationVersion,
+    updateDistortionFilterScale,
+  ]);
 }
 
 function useImmediateFrameOverlayUpdates(

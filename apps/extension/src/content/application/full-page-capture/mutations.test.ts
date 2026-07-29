@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
+import { initializeContentUiRoots } from '../../platform/dom-host';
 import {
   applyFloatingPolicyForTile,
   collectFloatingCandidates,
@@ -66,6 +68,15 @@ function documentRoot() {
   return { element: document.documentElement, kind: 'document' as const };
 }
 
+function mountContentHost(): { host: HTMLDivElement; shadowRoot: ShadowRoot } {
+  const host = document.createElement('div');
+  host.id = CONTENT_ROOT_ID;
+  document.body.append(host);
+  const shadowRoot = host.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(shadowRoot);
+  return { host, shadowRoot };
+}
+
 function createCandidate(
   element: HTMLElement,
   overrides: Partial<FloatingCandidate> = {}
@@ -127,15 +138,13 @@ it('keeps captured annotations visible while hiding only transient extension chr
   document.documentElement.classList.add('sniptale-full-page-scrollbar-hidden');
   const pageContent = document.createElement('main');
   pageContent.className = 'sniptale-page-owned-class';
-  const ownedRoot = document.createElement('div');
-  ownedRoot.id = 'sniptale-extension-root';
-  const shadowRoot = ownedRoot.attachShadow({ mode: 'open' });
+  document.body.append(pageContent);
+  const { host: ownedRoot, shadowRoot } = mountContentHost();
   const annotation = document.createElement('div');
   annotation.className = 'sniptale-callout';
   const transientToolbar = document.createElement('div');
   transientToolbar.className = 'sniptale-action-toolbar';
   shadowRoot.append(annotation, transientToolbar);
-  document.body.append(pageContent, ownedRoot);
   const session = createSession([]);
 
   preparePageMutations(session);
@@ -154,10 +163,43 @@ it('keeps captured annotations visible while hiding only transient extension chr
   expect(ownedRoot.classList.contains('sniptale-capture-ui-hidden')).toBe(false);
 });
 
+it('keeps earlier same-id page UI actionable while hiding only the exact content host', () => {
+  const pageLookalike = document.createElement('div');
+  pageLookalike.id = CONTENT_ROOT_ID;
+  pageLookalike.style.position = 'fixed';
+  const pageAction = document.createElement('button');
+  pageAction.style.position = 'fixed';
+  pageLookalike.append(pageAction);
+  document.body.append(pageLookalike);
+  vi.spyOn(pageLookalike, 'getBoundingClientRect').mockReturnValue(rect({}));
+  vi.spyOn(pageAction, 'getBoundingClientRect').mockReturnValue(rect({}));
+
+  const { host, shadowRoot } = mountContentHost();
+  host.style.position = 'fixed';
+  vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(rect({}));
+  const recoveryUi = document.createElement('div');
+  recoveryUi.setAttribute('data-floating-ui-capture-transient', 'true');
+  recoveryUi.style.position = 'fixed';
+  shadowRoot.append(recoveryUi);
+  vi.spyOn(recoveryUi, 'getBoundingClientRect').mockReturnValue(rect({}));
+
+  const candidates = collectFloatingCandidates(documentRoot()).map(({ element }) => element);
+  expect(candidates).toEqual([pageLookalike, pageAction]);
+
+  const session = createSession([]);
+  preparePageMutations(session);
+
+  expect(pageLookalike.classList.contains('sniptale-capture-ui-hidden')).toBe(false);
+  expect(host.classList.contains('sniptale-capture-ui-hidden')).toBe(true);
+  expect(recoveryUi.getRootNode()).toBe(shadowRoot);
+  expect(candidates).not.toContain(recoveryUi);
+
+  restorePageMutations(session);
+  expect(host.classList.contains('sniptale-capture-ui-hidden')).toBe(false);
+});
+
 it('preserves capture-hidden classes owned by the surrounding screenshot lifecycle', () => {
-  const ownedRoot = document.createElement('div');
-  ownedRoot.id = 'sniptale-extension-root';
-  document.body.append(ownedRoot);
+  const { host: ownedRoot } = mountContentHost();
   document.body.classList.add('sniptale-capture-ui-hidden');
   ownedRoot.classList.add('sniptale-capture-ui-hidden');
   const session = createSession([]);

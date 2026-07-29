@@ -4,6 +4,7 @@ import type {
   FrameData,
 } from '../../../../features/highlighter/contracts';
 import { createCompositeSelector } from '../../../platform/frame/selectors';
+import { createDocumentPagePlacement } from '../../../platform/frame';
 import {
   DEFAULT_BORDER_PRESET,
   DEFAULT_FOCUS_SETTINGS,
@@ -16,7 +17,6 @@ import {
   type AutoBlurClearInput,
   type AutoBlurSyncInput,
 } from '../../auto-blur-runtime';
-import { shouldDropLinkedElement } from '../roots/scroll/linked-elements';
 import type { UseFrameMutationActionHelperOptions } from './types';
 import { createGenerateFrameId } from './frame-factory';
 import { useFrameUIStore } from '../state/frame-ui.store';
@@ -26,7 +26,7 @@ import { calculateFrameOffsetFromElement } from '../manager/coords';
 type CreateAddAutoBlurFramesHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
   | 'framesRef'
-  | 'linkedElementsRef'
+  | 'hostLayoutServiceRef'
   | 'highlighterSettingsCacheRef'
   | 'sessionFocusSettingsRef'
   | 'setFrames'
@@ -69,12 +69,17 @@ function createAutoBlurFrame(args: {
     createFrameCalcSettings(args.borderSettings)
   );
 
+  const pagePlacement = createDocumentPagePlacement(
+    args.target.element.ownerDocument,
+    frameCoords.x,
+    frameCoords.y
+  );
   return {
     id: args.generateFrameId(),
     createdBy: 'auto-blur',
     ...frameCoords,
-    linkedElement: args.target.element,
     linkedElementSelector: createLinkedElementSelector(args.target.element),
+    ...(pagePlacement ? { pagePlacement } : {}),
     offset: calculateFrameOffsetFromElement(frameCoords, args.target.element),
     effectMode: 'blur',
     borderSettings: args.borderSettings,
@@ -96,15 +101,15 @@ function shouldRemoveAutoBlurFrame(frame: FrameData, input: AutoBlurClearInput):
 }
 
 function shouldPruneAutoBlurFrame(args: {
+  anchorNode: HTMLElement | undefined;
   frame: FrameData;
-  linkedElement: HTMLElement | undefined;
   targets: AutoBlurSyncInput['targets'];
 }): boolean {
   if (args.frame.createdBy !== 'auto-blur') {
     return false;
   }
 
-  if (!args.linkedElement || shouldDropLinkedElement(args.linkedElement)) {
+  if (!args.anchorNode?.isConnected) {
     return true;
   }
 
@@ -112,7 +117,10 @@ function shouldPruneAutoBlurFrame(args: {
 }
 
 function removeAutoBlurFrames(
-  args: Pick<CreateAddAutoBlurFramesHandlerArgs, 'framesRef' | 'linkedElementsRef' | 'setFrames'>,
+  args: Pick<
+    CreateAddAutoBlurFramesHandlerArgs,
+    'framesRef' | 'hostLayoutServiceRef' | 'setFrames'
+  >,
   shouldRemoveFrame: (frame: FrameData) => boolean,
   invalidateOnRemove = true
 ): string[] {
@@ -124,7 +132,7 @@ function removeAutoBlurFrames(
   args.setFrames((prev) => prev.filter((frame) => !removedIdSet.has(frame.id)));
 
   removedIds.forEach((frameId) => {
-    args.linkedElementsRef.current.delete(frameId);
+    args.hostLayoutServiceRef.current.unlink(frameId);
     useFrameUIStore.getState().dismissFrame(frameId);
   });
 
@@ -148,27 +156,36 @@ export function createAddAutoBlurFramesHandler(args: CreateAddAutoBlurFramesHand
         return;
       }
 
-      addedFrames.push(
-        createAutoBlurFrame({
-          borderSettings,
-          blurSettings: input.blurSettings,
-          focusSettings,
-          generateFrameId,
-          target,
-        })
+      const frame = createAutoBlurFrame({
+        borderSettings,
+        blurSettings: input.blurSettings,
+        focusSettings,
+        generateFrameId,
+        target,
+      });
+      if (!frame.pagePlacement || !frame.linkedElementSelector) return;
+      const accepted = args.hostLayoutServiceRef.current.link(
+        frame.id,
+        target.element,
+        frame.linkedElementSelector,
+        {
+          pagePlacement: frame.pagePlacement,
+          rect: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+        },
+        { requireAcceptedInitial: true }
       );
+      if (!accepted) return;
+      addedFrames.push({
+        ...frame,
+        ...accepted.rect,
+        pagePlacement: accepted.pagePlacement,
+      });
     });
 
     if (addedFrames.length > 0) {
       args.framesRef.current = [...args.framesRef.current, ...addedFrames];
       args.setFrames((prev) => [...prev, ...addedFrames]);
     }
-
-    addedFrames.forEach((frame) => {
-      if (frame.linkedElement) {
-        args.linkedElementsRef.current.set(frame.id, frame.linkedElement);
-      }
-    });
 
     if (addedFrames.length > 0) {
       invalidateFrameCache();
@@ -182,7 +199,7 @@ export function createAddAutoBlurFramesHandler(args: CreateAddAutoBlurFramesHand
 }
 
 export function createClearAutoBlurFramesHandler(
-  args: Pick<CreateAddAutoBlurFramesHandlerArgs, 'framesRef' | 'linkedElementsRef' | 'setFrames'>
+  args: Pick<CreateAddAutoBlurFramesHandlerArgs, 'framesRef' | 'hostLayoutServiceRef' | 'setFrames'>
 ) {
   return (input: AutoBlurClearInput) => {
     const removedIds = removeAutoBlurFrames(args, (frame) =>
@@ -201,8 +218,8 @@ export function createSyncAutoBlurFramesHandler(args: CreateAddAutoBlurFramesHan
       args,
       (frame) =>
         shouldPruneAutoBlurFrame({
+          anchorNode: args.hostLayoutServiceRef.current.getNode(frame.id) ?? undefined,
           frame,
-          linkedElement: args.linkedElementsRef.current.get(frame.id) ?? frame.linkedElement,
           targets: input.targets,
         }),
       false

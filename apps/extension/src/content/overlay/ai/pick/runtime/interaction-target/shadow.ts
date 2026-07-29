@@ -3,7 +3,11 @@ import {
   CONTENT_OVERLAY_ROOT_ID,
   CONTENT_ROOT_ID,
 } from '@sniptale/ui/branding';
-import { resolveContentShadowRoot } from '../../../../../platform/dom-host';
+import {
+  isContentOwnedElement,
+  isContentUiBootstrapFallbackAllowed,
+  resolveContentShadowRoot,
+} from '../../../../../platform/dom-host';
 import { createLogger } from '@sniptale/platform/observability/logger';
 
 const AI_PICK_SHADOW_SCAFFOLD_IDS = new Set([
@@ -15,6 +19,10 @@ const AI_PICK_FRAME_CONTAINER_ID_PREFIX = 'frame-container-';
 const logger = createLogger({ namespace: 'ContentAiPickTarget' });
 
 export function isAiPickShadowScaffoldElement(target: HTMLElement): boolean {
+  if (!isContentOwnedElement(target) && !isContentUiBootstrapFallbackAllowed()) {
+    return false;
+  }
+
   return (
     AI_PICK_SHADOW_SCAFFOLD_IDS.has(target.id) ||
     target.id.startsWith(AI_PICK_FRAME_CONTAINER_ID_PREFIX)

@@ -19,6 +19,7 @@ import type {
   AutoBlurClearInput,
   AutoBlurSyncInput,
 } from '../../auto-blur-runtime';
+import type { FrameHostLayoutService } from '../host-layout/service';
 
 export type FrameSetter = Dispatch<SetStateAction<FrameData[]>>;
 export type FrameStateSetter = Dispatch<SetStateAction<Map<string, FrameState>>>;
@@ -38,8 +39,8 @@ export interface FrameManagerRefs {
   globalStepBadgeAutoModeRef: FrameMutableRef<boolean>;
   globalStepBadgeSettingsRef: FrameMutableRef<GlobalStepBadgeSettings>;
   highlighterSettingsCacheRef: FrameMutableRef<HighlighterSettings | null>;
+  hostLayoutServiceRef: FrameMutableRef<FrameHostLayoutService>;
   isClearingRef: FrameMutableRef<boolean>;
-  linkedElementsRef: FrameMutableRef<Map<string, HTMLElement>>;
   prevFrameStatesRef: FrameMutableRef<Map<string, FrameState>>;
   prevFramesRef: FrameMutableRef<FrameData[]>;
   rootsRef: FrameMutableRef<Map<string, Root>>;
@@ -54,10 +55,11 @@ export interface FrameMutations {
     addedCount: number;
     skippedCount: number;
   };
-  addFrame: (element: HTMLElement) => FrameData;
+  addFrame: (element: HTMLElement) => FrameData | null;
   addFreeFrame: (input: FreeFrameInput) => FrameData;
   clearAutoBlurFrames: (input: AutoBlurClearInput) => { removedCount: number };
   clearFrames: () => void;
+  pinFrameAtLastPlacement: (frameId: string) => boolean;
   removeFrame: (frameId: string) => void;
   syncAutoBlurFrames: (input: AutoBlurSyncInput) => {
     addedCount: number;

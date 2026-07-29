@@ -4,6 +4,7 @@ export {
   getContentEventTargetElement,
   getContentUiElementById,
   initializeContentUiRoots,
+  isContentUiBootstrapFallbackAllowed,
   isContentEventWithinAnyElement,
   isContentEventWithinElement,
   isContentOwnedElement,
@@ -13,6 +14,6 @@ export {
   resolveContentAppContainer,
   resolveContentOverlayRoot,
   resolveContentShadowRoot,
-  resolveContentUiMountTarget,
+  ensureContentUiMountTarget,
   toggleContentHostClass,
 } from './ui';

@@ -14,6 +14,7 @@ import { createFrameDataFixture } from '../react/test-support';
 import { createAddFrameHandler, createAddFreeFrameHandler } from './frame-factory';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import { setFrameSessionBorderPreset } from '../session/border-preset';
+import { createFrameHostLayoutService } from '../host-layout/service';
 
 const invalidateFrameCache = vi.hoisted(() => vi.fn());
 
@@ -87,7 +88,7 @@ function createOptions(initialFrames: Array<ReturnType<typeof createFrameDataFix
   const setFrames = vi.fn<Dispatch<SetStateAction<typeof currentFrames>>>((updater) => {
     currentFrames = typeof updater === 'function' ? updater(currentFrames) : updater;
   });
-  const linkedElementsRef = { current: new Map<string, HTMLElement>() };
+  const hostLayoutServiceRef = { current: createFrameHostLayoutService() };
   const recalculateStepBadgesRef = { current: vi.fn<(excludeFrameId?: string) => void>() };
   const highlighterSettings = createHighlighterSettings();
   setFrameSessionBorderPreset(highlighterSettings.borderPresets[0]!);
@@ -95,12 +96,12 @@ function createOptions(initialFrames: Array<ReturnType<typeof createFrameDataFix
   return {
     currentFrames: () => currentFrames,
     setFrames,
-    linkedElementsRef,
+    hostLayoutServiceRef,
     recalculateStepBadgesRef,
     options: {
       setFrames,
       framesRef: { current: currentFrames },
-      linkedElementsRef,
+      hostLayoutServiceRef,
       globalEffectModeRef: { current: 'border' as const },
       globalStepBadgeAutoModeRef: { current: true },
       sessionBlurSettingsRef: { current: createBlurSettings() },
@@ -110,10 +111,10 @@ function createOptions(initialFrames: Array<ReturnType<typeof createFrameDataFix
       },
       highlighterSettingsCacheRef: { current: highlighterSettings },
       recalculateStepBadgesRef,
-      calculateFrameCoords: (element: HTMLElement, borderSettings?: BorderPreset) =>
+      calculateFrameCoords: (_element: HTMLElement, borderSettings?: BorderPreset) =>
         createFrameDataFixture('frame-1', {
-          linkedElement: element,
           ...(borderSettings === undefined ? {} : { borderSettings }),
+          pagePlacement: { iframePath: [], pageX: 10, pageY: 20 },
           width: 100,
         }),
     },
@@ -123,17 +124,34 @@ function createOptions(initialFrames: Array<ReturnType<typeof createFrameDataFix
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
+  document.body.replaceChildren();
   useFrameUIStore.getState().reset();
 });
 
+function createVisibleElement(tagName = 'button') {
+  const element = document.createElement(tagName);
+  const rect = DOMRect.fromRect({ x: 10, y: 20, width: 120, height: 80 });
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(rect);
+  vi.spyOn(element, 'getClientRects').mockReturnValue({
+    0: rect,
+    [Symbol.iterator]: () => [rect][Symbol.iterator](),
+    item: (index) => (index === 0 ? rect : null),
+    length: 1,
+  });
+  document.body.append(element);
+  return element;
+}
+
 function verifyAddFrameUsesSessionDefaultsAndBadgeAutoMode() {
-  const { currentFrames, linkedElementsRef, recalculateStepBadgesRef, options } = createOptions();
+  const { currentFrames, hostLayoutServiceRef, recalculateStepBadgesRef, options } =
+    createOptions();
   const addFrame = createAddFrameHandler(options);
-  const element = document.createElement('button');
+  const element = createVisibleElement();
 
   const frame = addFrame(element);
   vi.runAllTimers();
 
+  expect(frame).not.toBeNull();
   expect(frame).toMatchObject({
     id: 'frame-1',
     effectMode: 'border',
@@ -150,7 +168,7 @@ function verifyAddFrameUsesSessionDefaultsAndBadgeAutoMode() {
     }),
   });
   expect(currentFrames()).toHaveLength(1);
-  expect(linkedElementsRef.current.get('frame-1')).toBe(element);
+  expect(hostLayoutServiceRef.current.getNode('frame-1')).toBe(element);
   expect(invalidateFrameCache).toHaveBeenCalledTimes(1);
   expect(recalculateStepBadgesRef.current).toHaveBeenCalledWith();
 }
@@ -161,7 +179,7 @@ function verifyAddFrameSkipsBadgeRecalcWithoutTemplate() {
   options.sessionStepBadgeTemplateRef.current = null;
   const addFrame = createAddFrameHandler(options);
 
-  addFrame(document.createElement('div'));
+  addFrame(createVisibleElement('div'));
   vi.runAllTimers();
 
   expect(currentFrames()[0]).not.toHaveProperty('stepBadge');
@@ -188,8 +206,10 @@ describe('frame mutation action frame factory', () => {
     });
     const { options } = createOptions([previousFrame]);
 
-    const frame = createAddFrameHandler(options)(document.createElement('button'));
+    const frame = createAddFrameHandler(options)(createVisibleElement());
 
+    expect(frame).not.toBeNull();
+    if (!frame) throw new Error('Expected accepted linked frame');
     expect(frame.effectMode).toBe('border');
     expect(frame.blurSettings).toEqual(createBlurSettings());
     expect(frame.focusSettings).toEqual(createFocusSettings());
@@ -216,5 +236,46 @@ describe('frame mutation action frame factory', () => {
       hoveredFrameId: null,
       selectedFrameId: 'free-frame',
     });
+  });
+
+  it.each([
+    ['hidden target', (element: HTMLElement) => (element.hidden = true)],
+    ['detached target', (element: HTMLElement) => element.remove()],
+  ])('does not append linked intent with unaccepted geometry for a %s', (_label, invalidate) => {
+    const { currentFrames, hostLayoutServiceRef, options } = createOptions();
+    const element = createVisibleElement();
+    invalidate(element);
+
+    const frame = createAddFrameHandler(options)(element);
+
+    expect(frame).toBeNull();
+    expect(currentFrames()).toEqual([]);
+    expect(hostLayoutServiceRef.current.getNode('frame-1')).toBeNull();
+    expect(invalidateFrameCache).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['zero width', { kind: 'width', value: 0 }],
+    ['non-finite x', { kind: 'x', value: Number.NaN }],
+  ])('does not append linked intent with %s geometry', (_label, invalidGeometry) => {
+    const { currentFrames, hostLayoutServiceRef, options } = createOptions();
+    options.calculateFrameCoords = (_element, borderSettings) =>
+      createFrameDataFixture('frame-1', {
+        ...(borderSettings ? { borderSettings } : {}),
+        pagePlacement: {
+          iframePath: [],
+          pageX: invalidGeometry.kind === 'x' ? invalidGeometry.value : 10,
+          pageY: 20,
+        },
+        ...(invalidGeometry.kind === 'x'
+          ? { x: invalidGeometry.value }
+          : { width: invalidGeometry.value }),
+      });
+
+    const frame = createAddFrameHandler(options)(createVisibleElement());
+
+    expect(frame).toBeNull();
+    expect(currentFrames()).toEqual([]);
+    expect(hostLayoutServiceRef.current.getNode('frame-1')).toBeNull();
   });
 });

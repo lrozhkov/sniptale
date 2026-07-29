@@ -17,7 +17,7 @@ import {
 } from './lifecycle';
 import { useInteractiveFrameViewState } from './view-state';
 
-function cloneFrameData(frame: FrameData, options?: { omitLinkedElement?: boolean }): FrameData {
+function cloneFrameData(frame: FrameData): FrameData {
   return {
     id: frame.id,
     x: frame.x,
@@ -27,9 +27,6 @@ function cloneFrameData(frame: FrameData, options?: { omitLinkedElement?: boolea
     ...(frame.linkedElementSelector === undefined
       ? {}
       : { linkedElementSelector: frame.linkedElementSelector }),
-    ...(options?.omitLinkedElement || frame.linkedElement === undefined
-      ? {}
-      : { linkedElement: frame.linkedElement }),
     ...(frame.effectMode === undefined ? {} : { effectMode: frame.effectMode }),
     ...(frame.borderSettings === undefined ? {} : { borderSettings: frame.borderSettings }),
     ...(frame.blurSettings === undefined ? {} : { blurSettings: frame.blurSettings }),
@@ -89,7 +86,7 @@ function useInteractiveFrameRuntimeState(params: {
   viewState: ReturnType<typeof useInteractiveFrameViewState>;
 }) {
   const frameWithoutLinkedElement = React.useMemo(
-    () => cloneFrameData(params.frame, { omitLinkedElement: true }),
+    () => cloneFrameData(params.frame),
     [params.frame]
   );
   const currentFrame = resolveInteractiveCurrentFrame({

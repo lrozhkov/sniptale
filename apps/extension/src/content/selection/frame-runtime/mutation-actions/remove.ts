@@ -5,20 +5,22 @@ import type { UseFrameMutationActionHelperOptions } from './types';
 
 export function createRemoveFrameHandler({
   framesRef,
-  linkedElementsRef,
+  hostLayoutServiceRef,
   recalculateStepBadgesRef,
   setFrames,
 }: Pick<
   UseFrameMutationActionHelperOptions,
-  'framesRef' | 'linkedElementsRef' | 'recalculateStepBadgesRef' | 'setFrames'
+  'framesRef' | 'hostLayoutServiceRef' | 'recalculateStepBadgesRef' | 'setFrames'
 >) {
   return (frameId: string) => {
     useFrameUIStore.getState().dismissFrame(frameId);
 
     const hadStepBadge = framesRef.current.find((frame) => frame.id === frameId)?.stepBadge
       ?.enabled;
-    setFrames((prev) => prev.filter((frame) => frame.id !== frameId));
-    linkedElementsRef.current.delete(frameId);
+    const frames = framesRef.current.filter((frame) => frame.id !== frameId);
+    framesRef.current = frames;
+    setFrames(frames);
+    hostLayoutServiceRef.current.unlink(frameId);
     invalidateFrameCache();
 
     if (hadStepBadge) {

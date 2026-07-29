@@ -3,6 +3,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
+import { initializeContentUiRoots } from '../../../platform/dom-host';
 import { createDiagnosticActionHandlers } from './logger.actions';
 
 function createState() {
@@ -66,6 +67,40 @@ it('captures user actions outside the extension root with target metadata', () =
   handlers.handleUserAction(clickEvent);
 
   expect(sendEvent).not.toHaveBeenCalled();
+});
+
+it('ignores exact shadow UI without trusting same-id or host-light-DOM lookalikes', () => {
+  const { handlers, sendEvent } = createHandlers();
+  const pageLookalike = document.createElement('div');
+  pageLookalike.id = CONTENT_ROOT_ID;
+  const pageButton = document.createElement('button');
+  pageLookalike.append(pageButton);
+  document.body.append(pageLookalike);
+  const host = document.createElement('div');
+  host.id = CONTENT_ROOT_ID;
+  document.body.append(host);
+  const shadowRoot = host.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(shadowRoot);
+  const ownedButton = document.createElement('button');
+  shadowRoot.append(ownedButton);
+  const lightDomButton = document.createElement('button');
+  host.append(lightDomButton);
+
+  for (const target of [ownedButton, pageButton, lightDomButton]) {
+    const event = new MouseEvent('click', { bubbles: true });
+    Object.defineProperty(event, 'target', { value: target });
+    handlers.handleUserAction(event);
+  }
+
+  expect(sendEvent).toHaveBeenCalledTimes(2);
+  expect(sendEvent).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ message: 'click on button' })
+  );
+  expect(sendEvent).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({ message: 'click on button' })
+  );
 });
 
 it('captures only special key presses for enabled targets', () => {

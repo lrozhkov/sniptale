@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
   const mutations = {
     addFrame: vi.fn(),
     clearFrames: vi.fn(),
+    pinFrameAtLastPlacement: vi.fn(),
     removeFrame: vi.fn(),
     syncFocusOpacity: vi.fn(),
     syncAutoBlurFrames: vi.fn(),
@@ -127,8 +128,8 @@ function createArgs(): Parameters<typeof useFrameManagerControllers>[0] {
         },
       },
       highlighterSettingsCacheRef: { current: null },
+      hostLayoutServiceRef: { current: {} },
       isClearingRef: { current: false },
-      linkedElementsRef: { current: new Map() },
       prevFrameStatesRef: { current: new Map() },
       prevFramesRef: { current: [] },
       rootsRef: { current: new Map() },

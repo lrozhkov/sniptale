@@ -9,20 +9,13 @@ import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/
 
 type FrameDataFixtureOverrides = Omit<
   Partial<FrameData>,
-  | 'borderSettings'
-  | 'blurSettings'
-  | 'focusSettings'
-  | 'stepBadge'
-  | 'callout'
-  | 'linkedElement'
-  | 'offset'
+  'borderSettings' | 'blurSettings' | 'focusSettings' | 'stepBadge' | 'callout' | 'offset'
 > & {
   borderSettings?: BorderPreset | null;
   blurSettings?: BlurSettings | null;
   focusSettings?: FocusSettings | null;
   stepBadge?: StepBadgeSettings | null;
   callout?: CalloutSettings | null;
-  linkedElement?: HTMLElement | null;
   offset?: FrameData['offset'] | null;
 };
 
@@ -104,16 +97,8 @@ export function createFrameDataFixture(
   id: string,
   overrides: FrameDataFixtureOverrides = {}
 ): FrameData {
-  const {
-    borderSettings,
-    blurSettings,
-    callout,
-    focusSettings,
-    linkedElement,
-    offset,
-    stepBadge,
-    ...rest
-  } = overrides;
+  const { borderSettings, blurSettings, callout, focusSettings, offset, stepBadge, ...rest } =
+    overrides;
 
   return {
     id,
@@ -128,7 +113,6 @@ export function createFrameDataFixture(
     ...(focusSettings == null ? {} : { focusSettings }),
     ...(stepBadge == null ? {} : { stepBadge }),
     ...(callout == null ? {} : { callout }),
-    ...(linkedElement == null ? {} : { linkedElement }),
     ...(offset == null ? {} : { offset }),
   };
 }

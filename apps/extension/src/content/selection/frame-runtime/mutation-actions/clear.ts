@@ -11,11 +11,12 @@ export function createClearFramesHandler({
   isClearingRef,
   rootsRef,
   containerRef,
-  linkedElementsRef,
+  framesRef,
+  hostLayoutServiceRef,
   setFrames,
 }: Pick<
   UseFrameMutationActionHelperOptions,
-  'isClearingRef' | 'rootsRef' | 'containerRef' | 'linkedElementsRef' | 'setFrames'
+  'isClearingRef' | 'rootsRef' | 'containerRef' | 'framesRef' | 'hostLayoutServiceRef' | 'setFrames'
 >) {
   return () => {
     isClearingRef.current = true;
@@ -32,7 +33,8 @@ export function createClearFramesHandler({
     removeFrameContainer(containerRef);
     removeFrameOverlays();
 
-    linkedElementsRef.current.clear();
+    framesRef.current = [];
+    hostLayoutServiceRef.current.clear();
     setFrames([]);
     invalidateFrameCache();
 

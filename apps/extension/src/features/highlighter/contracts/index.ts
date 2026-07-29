@@ -56,14 +56,15 @@ export interface FrameData {
   y: number;
   width: number;
   height: number;
+  /** Working placement for free frames; last valid recovery placement for linked frames. */
   pagePlacement?: {
     iframePath: string[];
     pageX: number;
     pageY: number;
   };
+  /** Linked intent. The live DOM node is runtime-owned and never serialized here. */
   linkedElementSelector?: string;
   createdBy?: 'auto-blur';
-  linkedElement?: HTMLElement; // Ссылка на элемент для синхронизации при скролле
   effectMode?: EffectMode; // Эффект выделения: 'border' (default), 'blur' или 'focus'
   // Снимок настроек на момент создания рамки (чтобы не менялись при смене глобальных настроек)
   borderSettings?: BorderPreset;
@@ -73,7 +74,7 @@ export interface FrameData {
   stepBadge?: StepBadgeSettings;
   // Настройки callout (комментария)
   callout?: CalloutSettings;
-  // Смещение относительно linkedElement после ручного редактирования
+  // Смещение относительно связанного DOM-якоря после ручного редактирования
   // Если задано - рамка следует за элементом с учетом этого смещения
   offset?: {
     x: number; // смещение по X: frame.x - elementRect.x

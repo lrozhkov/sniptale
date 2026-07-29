@@ -21,7 +21,8 @@ import {
   resolveContentAppContainer,
   resolveContentOverlayRoot,
   resolveContentShadowRoot,
-  resolveContentUiMountTarget,
+  ensureContentUiMountTarget,
+  toggleContentHostClass,
 } from './ui';
 
 function mountContentHost() {
@@ -40,36 +41,66 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('content-root pre-bootstrap compatibility', () => {
+  it('uses light-DOM lookup and mount fallbacks only before the first registration', () => {
+    const bodyMatch = document.createElement('div');
+    bodyMatch.id = 'body-target';
+    bodyMatch.className = 'shared-target';
+    document.body.append(bodyMatch);
+
+    expect(resolveContentShadowRoot()).toBeNull();
+    expect(resolveContentAppContainer()).toBeNull();
+    expect(resolveContentOverlayRoot()).toBeNull();
+    expect(ensureContentUiMountTarget()).toBe(document.body);
+    expect(getContentUiElementById('body-target')).toBe(bodyMatch);
+    expect(queryContentUiElement('#body-target')).toBe(bodyMatch);
+    expect(queryAllContentUiElements('.shared-target')).toEqual([bodyMatch]);
+
+    const marker = document.createElement('div');
+    expect(appendToContentOverlayRoot(marker)).toBe(marker);
+    expect(document.body.contains(marker)).toBe(true);
+  });
+});
+
 describe('content-root ui initialization', () => {
   it('creates and resolves canonical app and overlay roots inside the content shadow tree', () => {
     const { shadowRoot } = mountContentHost();
 
-    expect(resolveContentShadowRoot()).toBe(shadowRoot);
+    expect(resolveContentShadowRoot()).toBeNull();
 
     const { appContainer, overlayRoot } = initializeContentUiRoots(shadowRoot);
 
+    expect(resolveContentShadowRoot()).toBe(shadowRoot);
     expect(appContainer.id).toBe(CONTENT_APP_CONTAINER_ID);
     expect(overlayRoot.id).toBe(CONTENT_OVERLAY_ROOT_ID);
     expect(overlayRoot.style.display).toBe('contents');
     expect(resolveContentAppContainer()).toBe(appContainer);
     expect(resolveContentOverlayRoot()).toBe(overlayRoot);
-    expect(resolveContentUiMountTarget('app')).toBe(appContainer);
-    expect(resolveContentUiMountTarget()).toBe(overlayRoot);
+    expect(ensureContentUiMountTarget('app')).toBe(appContainer);
+    expect(ensureContentUiMountTarget()).toBe(overlayRoot);
 
     const secondPass = initializeContentUiRoots(shadowRoot);
     expect(secondPass.appContainer).toBe(appContainer);
     expect(secondPass.overlayRoot).toBe(overlayRoot);
   });
 
-  it('falls back to document.body when content roots are not available', () => {
-    expect(resolveContentShadowRoot()).toBeNull();
-    expect(resolveContentAppContainer()).toBeNull();
-    expect(resolveContentOverlayRoot()).toBeNull();
-    expect(resolveContentUiMountTarget()).toBe(document.body);
+  it('recreates a missing mount target inside the registered shadow root', () => {
+    const { shadowRoot } = mountContentHost();
+    const { overlayRoot } = initializeContentUiRoots(shadowRoot);
+    overlayRoot.remove();
+    const pageLookalike = document.createElement('div');
+    pageLookalike.id = CONTENT_OVERLAY_ROOT_ID;
+    document.body.append(pageLookalike);
 
     const marker = document.createElement('div');
-    expect(appendToContentOverlayRoot(marker)).toBe(marker);
-    expect(document.body.contains(marker)).toBe(true);
+    appendToContentOverlayRoot(marker);
+
+    const recreated = resolveContentOverlayRoot();
+    expect(recreated).not.toBeNull();
+    expect(recreated).not.toBe(overlayRoot);
+    expect(recreated?.getRootNode()).toBe(shadowRoot);
+    expect(recreated?.contains(marker)).toBe(true);
+    expect(pageLookalike.contains(marker)).toBe(false);
   });
 });
 
@@ -79,11 +110,14 @@ describe('content-root ui ownership and events', () => {
     const { appContainer } = initializeContentUiRoots(shadowRoot);
     const shadowButton = document.createElement('button');
     appContainer.append(shadowButton);
+    const lightDomChild = document.createElement('button');
+    host.append(lightDomChild);
     const outsideElement = document.createElement('div');
     document.body.append(outsideElement);
 
     expect(isContentOwnedElement(host)).toBe(true);
     expect(isContentOwnedElement(shadowButton)).toBe(true);
+    expect(isContentOwnedElement(lightDomChild)).toBe(false);
     expect(isContentOwnedElement(outsideElement)).toBe(false);
     expect(isContentOwnedElement(null)).toBe(false);
 
@@ -100,6 +134,54 @@ describe('content-root ui ownership and events', () => {
     expect(isContentOwnedEvent({ target: outsideElement })).toBe(false);
     expect(getContentEventTargetElement({ target: outsideElement })).toBe(outsideElement);
     expect(getContentEventTargetElement({ target: null })).toBeNull();
+  });
+
+  it('does not treat a same-id host lookalike as content-owned', () => {
+    const lookalike = document.createElement('div');
+    lookalike.id = CONTENT_ROOT_ID;
+    const lookalikeChild = document.createElement('button');
+    lookalike.append(lookalikeChild);
+    document.body.append(lookalike);
+    const { host, shadowRoot } = mountContentHost();
+    const { appContainer } = initializeContentUiRoots(shadowRoot);
+    const shadowButton = document.createElement('button');
+    appContainer.append(shadowButton);
+
+    toggleContentHostClass('sniptale-test-active', true);
+
+    expect(resolveContentShadowRoot()).toBe(shadowRoot);
+    expect(isContentOwnedElement(host)).toBe(true);
+    expect(isContentOwnedElement(shadowButton)).toBe(true);
+    expect(isContentOwnedElement(lookalike)).toBe(false);
+    expect(isContentOwnedElement(lookalikeChild)).toBe(false);
+    expect(host.classList.contains('sniptale-test-active')).toBe(true);
+    expect(lookalike.classList.contains('sniptale-test-active')).toBe(false);
+    expect(
+      isContentOwnedEvent({
+        composedPath: () => [lookalikeChild, lookalike],
+        target: lookalikeChild,
+      })
+    ).toBe(false);
+  });
+
+  it('retires remove-reinserted identity and accepts only an explicitly initialized replacement', () => {
+    const { host, shadowRoot } = mountContentHost();
+    initializeContentUiRoots(shadowRoot);
+    host.remove();
+    document.body.append(host);
+
+    expect(resolveContentShadowRoot()).toBeNull();
+    expect(isContentOwnedElement(host)).toBe(false);
+
+    initializeContentUiRoots(shadowRoot);
+    expect(resolveContentShadowRoot()).toBeNull();
+    expect(isContentOwnedElement(host)).toBe(false);
+
+    const { host: replacementHost, shadowRoot: replacementShadowRoot } = mountContentHost();
+    initializeContentUiRoots(replacementShadowRoot);
+    expect(resolveContentShadowRoot()).toBe(replacementShadowRoot);
+    expect(isContentOwnedElement(replacementHost)).toBe(true);
+    expect(isContentOwnedElement(host)).toBe(false);
   });
 
   it('checks whether events flow through one or more candidate elements', () => {
@@ -125,32 +207,51 @@ describe('content-root ui ownership and events', () => {
 });
 
 describe('content-root ui lookup helpers', () => {
-  it('queries shadow-root elements before falling back to the light DOM', () => {
+  it('never returns page light-DOM lookalikes after exact shadow-root registration', () => {
+    const pageLookalike = document.createElement('div');
+    pageLookalike.id = 'shared-target';
+    pageLookalike.className = 'shared-target';
+    const pageOnlyMatch = document.createElement('div');
+    pageOnlyMatch.id = 'page-only-target';
+    pageOnlyMatch.className = 'page-only-target';
+    document.body.append(pageLookalike, pageOnlyMatch);
+
     const { shadowRoot } = mountContentHost();
-    const { appContainer, overlayRoot } = initializeContentUiRoots(shadowRoot);
+    const { appContainer } = initializeContentUiRoots(shadowRoot);
     const shadowMatch = document.createElement('div');
-    shadowMatch.id = 'shadow-target';
+    shadowMatch.id = 'shared-target';
     shadowMatch.className = 'shared-target';
     appContainer.append(shadowMatch);
 
-    const lightMatch = document.createElement('div');
-    lightMatch.id = 'light-target';
-    lightMatch.className = 'shared-target';
-    overlayRoot.append(lightMatch);
+    expect(getContentUiElementById('shared-target')).toBe(shadowMatch);
+    expect(queryContentUiElement('#shared-target')).toBe(shadowMatch);
+    expect(queryAllContentUiElements('.shared-target')).toEqual([shadowMatch]);
+    expect(getContentUiElementById('page-only-target')).toBeNull();
+    expect(queryContentUiElement('#page-only-target')).toBeNull();
+    expect(queryAllContentUiElements('.page-only-target')).toEqual([]);
+  });
 
-    const bodyFallback = document.createElement('div');
-    bodyFallback.id = 'body-target';
-    bodyFallback.className = 'shared-target';
-    document.body.append(bodyFallback);
+  it('fails closed for lookup and mount after the active host is removed and reinserted', () => {
+    const pageLookalike = document.createElement('div');
+    pageLookalike.id = 'retired-target';
+    pageLookalike.className = 'retired-target';
+    document.body.append(pageLookalike);
+    const { host, shadowRoot } = mountContentHost();
+    initializeContentUiRoots(shadowRoot);
 
-    expect(getContentUiElementById('shadow-target')).toBe(shadowMatch);
-    expect(getContentUiElementById('body-target')).toBe(bodyFallback);
-    expect(queryContentUiElement('#shadow-target')).toBe(shadowMatch);
-    expect(queryContentUiElement('#body-target')).toBe(bodyFallback);
-    expect(queryAllContentUiElements('.shared-target')).toEqual([
-      shadowMatch,
-      lightMatch,
-      bodyFallback,
-    ]);
+    host.remove();
+    document.body.append(host);
+
+    expect(resolveContentShadowRoot()).toBeNull();
+    expect(getContentUiElementById('retired-target')).toBeNull();
+    expect(queryContentUiElement('#retired-target')).toBeNull();
+    expect(queryAllContentUiElements('.retired-target')).toEqual([]);
+
+    const failClosedMount = ensureContentUiMountTarget();
+    const marker = document.createElement('div');
+    appendToContentOverlayRoot(marker);
+    expect(failClosedMount.isConnected).toBe(false);
+    expect(failClosedMount.contains(marker)).toBe(true);
+    expect(document.body.contains(marker)).toBe(false);
   });
 });

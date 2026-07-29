@@ -3181,6 +3181,14 @@
         "apps/extension/src/content/selection/frame-runtime/effects/geometry.ts",
         "apps/extension/src/content/selection/frame-runtime/effects/overlay-descriptors.ts",
         "apps/extension/src/content/selection/frame-runtime/history/bridge.ts",
+        "apps/extension/src/content/selection/frame-runtime/host-layout/anchor-identity.ts",
+        "apps/extension/src/content/selection/frame-runtime/host-layout/anchor-registry.ts",
+        "apps/extension/src/content/selection/frame-runtime/host-layout/document-signals.ts",
+        "apps/extension/src/content/selection/frame-runtime/host-layout/iframe-signals.ts",
+        "apps/extension/src/content/selection/frame-runtime/host-layout/reconcile.ts",
+        "apps/extension/src/content/selection/frame-runtime/host-layout/scheduler.ts",
+        "apps/extension/src/content/selection/frame-runtime/host-layout/service.ts",
+        "apps/extension/src/content/selection/frame-runtime/host-layout/visibility.ts",
         "apps/extension/src/content/selection/frame-runtime/manager/coords.ts",
         "apps/extension/src/content/selection/frame-runtime/manager/layering.ts",
         "apps/extension/src/content/selection/frame-runtime/manager/runtime-mutations.ts",
@@ -3196,13 +3204,16 @@
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/frame-factory.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/frame-post-add.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/index.ts",
+        "apps/extension/src/content/selection/frame-runtime/mutation-actions/pin.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/remove.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/types.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/update-resolver.ts",
         "apps/extension/src/content/selection/frame-runtime/mutation-actions/update.ts",
+        "apps/extension/src/content/selection/frame-runtime/react/anchor-recovery-notice.tsx",
         "apps/extension/src/content/selection/frame-runtime/react/test-support.ts",
         "apps/extension/src/content/selection/frame-runtime/react/useFrameEffectOverlays.ts",
         "apps/extension/src/content/selection/frame-runtime/react/useFrameHistoryCommit.ts",
+        "apps/extension/src/content/selection/frame-runtime/react/useFrameHostLayoutSync.ts",
         "apps/extension/src/content/selection/frame-runtime/react/useFrameManager.ts",
         "apps/extension/src/content/selection/frame-runtime/react/useFrameManagerControllers.ts",
         "apps/extension/src/content/selection/frame-runtime/react/useFrameManagerMutations.ts",
@@ -3212,18 +3223,12 @@
         "apps/extension/src/content/selection/frame-runtime/react/useFrameManagerRuntimeSyncEffects.ts",
         "apps/extension/src/content/selection/frame-runtime/react/useFrameManagerSessionEffects.ts",
         "apps/extension/src/content/selection/frame-runtime/react/useFrameRootsRenderer.ts",
-        "apps/extension/src/content/selection/frame-runtime/react/useFrameScrollSync.ts",
         "apps/extension/src/content/selection/frame-runtime/react/useFrameSessionSync.ts",
         "apps/extension/src/content/selection/frame-runtime/roots/component.ts",
         "apps/extension/src/content/selection/frame-runtime/roots/descriptors.ts",
         "apps/extension/src/content/selection/frame-runtime/roots/dom.ts",
         "apps/extension/src/content/selection/frame-runtime/roots/element.ts",
         "apps/extension/src/content/selection/frame-runtime/roots/prepare.ts",
-        "apps/extension/src/content/selection/frame-runtime/roots/scroll/debounce.ts",
-        "apps/extension/src/content/selection/frame-runtime/roots/scroll/frame-updates.ts",
-        "apps/extension/src/content/selection/frame-runtime/roots/scroll/iframe-observer.ts",
-        "apps/extension/src/content/selection/frame-runtime/roots/scroll/iframe-registration.ts",
-        "apps/extension/src/content/selection/frame-runtime/roots/scroll/linked-elements.ts",
         "apps/extension/src/content/selection/frame-runtime/selection-frame-visual.ts",
         "apps/extension/src/content/selection/frame-runtime/session/border-preset.ts",
         "apps/extension/src/content/selection/frame-runtime/session/callout-defaults.ts",
@@ -16266,6 +16271,37 @@
       ]
     },
     {
+      "id": "policy.source.highlighter-dynamic-anchor-tsx.008a999e53",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/harness/highlighter-dynamic-anchor.tsx",
+        "contentHash": "517de580a63f42f7e2e9144681a1313dd51f508618a1cc02313f0e8c81ea8077"
+      },
+      "consumers": [
+        "tooling/test/harness/highlighter-dynamic-anchor.tsx",
+        "tooling/test/harness/highlighter-geometry.tsx"
+      ],
+      "surfaces": [
+        "binding:DYNAMIC_ANCHOR_STYLE",
+        "binding:DYNAMIC_MANUAL_ADJUSTMENT",
+        "binding:DYNAMIC_PRESET",
+        "property:createDynamicFrame/focusSettings",
+        "property:DynamicAnchorLifecycleHarness/iframe",
+        "property:DynamicAnchorLifecycleHarness/nestedHost",
+        "property:DynamicAnchorLifecycleHarness/nestedScroller",
+        "property:DynamicAnchorLifecycleHarness/slide",
+        "property:DynamicAnchorLifecycleHarness/target",
+        "property:DynamicAnchorLifecycleHarness/track",
+        "property:padding",
+        "property:start/current",
+        "property:start/frameStatesRef"
+      ]
+    },
+    {
       "id": "policy.source.highlighter-geometry-tsx.13f22b389d",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -16274,7 +16310,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/highlighter-geometry.tsx",
-        "contentHash": "927a4114c2b71c6ff0bf589aa87e9da9feb8f0d0bda16481b4c9e4e7a6468b4b"
+        "contentHash": "ee6417da2822bb5e8e66c69cbd81e32c20bbd57039a086c49df59ea866a121c6"
       },
       "consumers": [
         "tooling/test/harness/highlighter-geometry.tsx"
@@ -16288,7 +16324,7 @@
         "property:createFrame/borderSettings",
         "property:createFrame/focusSettings",
         "property:padding",
-        "property:ViewerParity/anonymous-295/frames"
+        "property:ViewerParity/anonymous-299/frames"
       ]
     },
     {
@@ -16740,7 +16776,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "8a91d0116b0cfb34862d6a75a82f94596f20db5447241afbd7d829a9d084eeca"
+        "contentHash": "9e190d937535d416d9dc3d0b88495b224eca4ba360d128f3a38d0e926de79c89"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",

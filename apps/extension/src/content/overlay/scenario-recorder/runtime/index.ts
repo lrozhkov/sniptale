@@ -1,6 +1,6 @@
 import { getAbsolutePosition } from '../../../platform/frame/core';
 import { createCompositeSelector } from '../../../platform/frame/selectors';
-import { isContentOwnedElement } from '../../../platform/dom-host';
+import { isContentRuntimeUiElement } from '../../../platform/page-context/dom';
 import { normalizeHotkeyKey } from '../../../../features/keyboard-shortcuts/hotkeys';
 import type {
   ScenarioFramePadding,
@@ -58,7 +58,7 @@ export function isScenarioEligibleInteractionTarget(
     return false;
   }
 
-  return !isContentOwnedElement(target) && !target.closest('.sniptale-app');
+  return !isContentRuntimeUiElement(target);
 }
 
 export function describeScenarioTarget(target: ScenarioTargetDescriptor | null): string {

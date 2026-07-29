@@ -341,7 +341,8 @@ export const LOCAL_OWNER_MAPPINGS = [
       'apps/extension/src/content/selection/frame-runtime/effects/geometry.test.ts',
       'apps/extension/src/content/selection/frame-runtime/effects/overlay-descriptors.test.ts',
       'apps/extension/src/content/selection/frame-runtime/history/bridge.test.ts',
-      'apps/extension/src/content/selection/frame-runtime/roots/scroll/frame-updates.test.ts',
+      'apps/extension/src/content/selection/frame-runtime/host-layout/reconcile.test.ts',
+      'apps/extension/src/content/selection/frame-runtime/host-layout/service.test.ts',
     ],
   },
   {

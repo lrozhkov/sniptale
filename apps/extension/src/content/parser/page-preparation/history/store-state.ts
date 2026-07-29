@@ -146,6 +146,31 @@ export function captureHistorySnapshot(
   return state.bridge?.captureSnapshot() ?? null;
 }
 
+function collectSnapshotFrameIds(snapshot: FrameSessionSnapshot, frameIds: Set<string>): void {
+  snapshot.frames.forEach((frame) => frameIds.add(frame.id));
+}
+
+export function notifyHistoryReachabilityChanged(state: HistoryStoreRuntimeState): void {
+  const notify = state.bridge?.onHistoryReachabilityChanged;
+  if (!notify) return;
+  const frameIds = new Set<string>();
+  state.past.forEach((entry) => {
+    collectSnapshotFrameIds(entry.before, frameIds);
+    collectSnapshotFrameIds(entry.after, frameIds);
+  });
+  state.future.forEach((entry) => {
+    collectSnapshotFrameIds(entry.before, frameIds);
+    collectSnapshotFrameIds(entry.after, frameIds);
+  });
+  state.deferredCommits.forEach((commit) => collectSnapshotFrameIds(commit.before, frameIds));
+  state.transactions.forEach((transaction) =>
+    collectSnapshotFrameIds(transaction.before, frameIds)
+  );
+  const current = captureHistorySnapshot(state);
+  if (current) collectSnapshotFrameIds(current, frameIds);
+  notify(Array.from(frameIds).sort());
+}
+
 export function pushHistoryEntry(
   state: HistoryStoreRuntimeState,
   entry: PagePreparationHistoryEntry
@@ -157,6 +182,7 @@ export function pushHistoryEntry(
 
   state.past = [...state.past, { ...entry, domBatch }];
   state.future = [];
+  notifyHistoryReachabilityChanged(state);
   publishHistoryState(state);
   return true;
 }

@@ -7,6 +7,7 @@ import type {
   HighlighterSettings,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
+import type { FrameHostLayoutService } from '../host-layout/service';
 
 type FrameSetter = React.Dispatch<React.SetStateAction<FrameData[]>>;
 
@@ -15,7 +16,7 @@ export type MutableRef<T> = React.MutableRefObject<T>;
 export type UseFrameMutationActionHelperOptions = {
   setFrames: FrameSetter;
   framesRef: MutableRef<FrameData[]>;
-  linkedElementsRef: MutableRef<Map<string, HTMLElement>>;
+  hostLayoutServiceRef: MutableRef<FrameHostLayoutService>;
   containerRef: MutableRef<HTMLDivElement | null>;
   rootsRef: MutableRef<Map<string, Root>>;
   isClearingRef: MutableRef<boolean>;

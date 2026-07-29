@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
+import { initializeContentUiRoots } from '../../../platform/dom-host';
 import { isSelectionModeExtensionUiElement } from './extension-ui';
 
 afterEach(() => {
@@ -67,18 +68,28 @@ function runContentHostTests() {
   it('treats content-owned descendants as extension UI', () => {
     const contentRoot = document.createElement('div');
     contentRoot.id = CONTENT_ROOT_ID;
+    const shadowRoot = contentRoot.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(shadowRoot);
     const child = document.createElement('button');
-    contentRoot.appendChild(child);
+    shadowRoot.appendChild(child);
     document.body.appendChild(contentRoot);
 
     expect(isSelectionModeExtensionUiElement(child)).toBe(true);
   });
 
-  it('does not treat host-page nodes as extension UI', () => {
+  it('rejects page markers and exact-host light-DOM children after registration', () => {
+    const contentRoot = document.createElement('div');
+    contentRoot.id = CONTENT_ROOT_ID;
+    document.body.append(contentRoot);
+    initializeContentUiRoots(contentRoot.attachShadow({ mode: 'open' }));
     const target = document.createElement('div');
+    target.className = 'sniptale-selection-frame';
     document.body.appendChild(target);
+    const lightDomTarget = target.cloneNode() as HTMLElement;
+    contentRoot.append(lightDomTarget);
 
     expect(isSelectionModeExtensionUiElement(target)).toBe(false);
+    expect(isSelectionModeExtensionUiElement(lightDomTarget)).toBe(false);
   });
 }
 

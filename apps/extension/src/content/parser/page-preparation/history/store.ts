@@ -2,6 +2,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   applyHistoryEntry,
   createHistoryStoreState,
+  notifyHistoryReachabilityChanged,
   publishHistoryState,
   readHistoryState,
   type HistoryListener,
@@ -57,6 +58,7 @@ function createHistoryStoreNavigationApi(state: HistoryStoreRuntimeState) {
         return;
       }
 
+      notifyHistoryReachabilityChanged(state);
       publishHistoryState(state);
     },
     undo(): void {
@@ -75,6 +77,7 @@ function createHistoryStoreNavigationApi(state: HistoryStoreRuntimeState) {
         return;
       }
 
+      notifyHistoryReachabilityChanged(state);
       publishHistoryState(state);
     },
   };
@@ -85,6 +88,7 @@ function createHistoryStoreSubscriptionApi(state: HistoryStoreRuntimeState) {
     addPagePreparationHistoryAppliedListener,
     registerBridge(nextBridge: PagePreparationHistoryBridge): void {
       state.bridge = nextBridge;
+      notifyHistoryReachabilityChanged(state);
       logger.debug('Registered page preparation history bridge');
     },
     subscribe(listener: HistoryListener): () => void {

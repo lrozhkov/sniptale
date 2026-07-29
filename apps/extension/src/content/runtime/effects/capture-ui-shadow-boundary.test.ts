@@ -4,6 +4,7 @@ import { afterEach, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
+import { initializeContentUiRoots } from '../../platform/dom-host';
 import { createNavigationLocker } from '../../selection/locker/runtime';
 
 const runtimeEffectsStylesheet = readFileSync(
@@ -21,6 +22,7 @@ it('bridges live capture visibility from the capture owner into the rendered sha
   host.id = CONTENT_ROOT_ID;
   document.body.append(host);
   const shadowRoot = host.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(shadowRoot);
   const style = document.createElement('style');
   style.textContent = runtimeEffectsStylesheet;
   const transientHandle = document.createElement('button');

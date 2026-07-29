@@ -12,15 +12,25 @@ import {
 
 const iframeUtilsMocks = vi.hoisted(() => ({
   createCompositeSelector: vi.fn(),
+  createDocumentPagePlacement: vi.fn((_doc: Document, x: number, y: number) => ({
+    iframePath: [],
+    pageX: x,
+    pageY: y,
+  })),
   getAbsolutePosition: vi.fn(),
   getContainingIframe: vi.fn(),
+  getDocumentViewportBounds: vi.fn(),
+  getTopViewportPoint: vi.fn(),
   invalidateFrameCache: vi.fn(),
   resolveDocumentPagePlacement: vi.fn(),
 }));
 
 vi.mock('../../../platform/frame', () => ({
+  createDocumentPagePlacement: iframeUtilsMocks.createDocumentPagePlacement,
   getAbsolutePosition: iframeUtilsMocks.getAbsolutePosition,
   getContainingIframe: iframeUtilsMocks.getContainingIframe,
+  getDocumentViewportBounds: iframeUtilsMocks.getDocumentViewportBounds,
+  getTopViewportPoint: iframeUtilsMocks.getTopViewportPoint,
   resolveDocumentPagePlacement: iframeUtilsMocks.resolveDocumentPagePlacement,
 }));
 
@@ -39,12 +49,35 @@ import {
 } from './auto-blur';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import { getBlurOverlayBox } from '../effects/geometry';
-import { syncFramePositionOnScroll } from '../roots/scroll/frame-updates';
+import { createFrameHostLayoutService } from '../host-layout/service';
 
 type HandlerArgs = Parameters<typeof createAddAutoBlurFramesHandler>[0];
 
+function createRectList(rect: DOMRect): DOMRectList {
+  return {
+    0: rect,
+    [Symbol.iterator]: () => [rect][Symbol.iterator](),
+    item: (index) => (index === 0 ? rect : null),
+    length: 1,
+  };
+}
+
 function createHandlerScenario() {
   const element = document.createElement('span');
+  document.body.appendChild(element);
+  vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() =>
+    DOMRect.fromRect(
+      iframeUtilsMocks.getAbsolutePosition() ?? {
+        height: 30,
+        width: 90,
+        x: 5,
+        y: 10,
+      }
+    )
+  );
+  vi.spyOn(element, 'getClientRects').mockImplementation(() =>
+    createRectList(element.getBoundingClientRect())
+  );
   const existingFrame = createFrameDataFixture('existing-blur', {
     effectMode: 'blur',
     height: 20,
@@ -70,7 +103,7 @@ function createHandlerScenario() {
         defaultFocusSettings: createFocusSettingsFixture(),
       },
     },
-    linkedElementsRef: { current: new Map() },
+    hostLayoutServiceRef: { current: createFrameHostLayoutService() },
     sessionFocusSettingsRef: { current: createFocusSettingsFixture({ opacity: 0.7 }) },
     setFrames,
   };
@@ -100,13 +133,12 @@ function createAutoBlurInput(element: HTMLElement) {
   };
 }
 
-function expectAddedFrame(frame: FrameData | undefined, element: HTMLElement) {
+function expectAddedFrame(frame: FrameData | undefined, _element: HTMLElement) {
   expect(frame).toMatchObject({
     blurSettings: { amount: 22, blurType: 'solid', showBorder: true },
     createdBy: 'auto-blur',
     effectMode: 'blur',
     height: 22,
-    linkedElement: element,
     linkedElementSelector: '#target',
     offset: { height: -8, width: -16, x: 93, y: 108 },
     width: 74,
@@ -125,7 +157,9 @@ function expectAutoBlurFramesAdded() {
   const addedFrame = scenario.getFrames()[1];
   expect(result).toEqual({ addedCount: 1, skippedCount: 1 });
   expectAddedFrame(addedFrame, scenario.element);
-  expect(scenario.args.linkedElementsRef.current.get(addedFrame?.id ?? '')).toBe(scenario.element);
+  expect(scenario.args.hostLayoutServiceRef.current.getNode(addedFrame?.id ?? '')).toBe(
+    scenario.element
+  );
   expect(iframeUtilsMocks.invalidateFrameCache).toHaveBeenCalledTimes(1);
 }
 
@@ -146,7 +180,7 @@ function expectOnlyAutoBlurFramesCleared() {
     x: 100,
     y: 120,
   });
-  scenario.args.linkedElementsRef.current.set(autoBlur.id, scenario.element);
+  scenario.args.hostLayoutServiceRef.current.link(autoBlur.id, scenario.element, '#target');
   scenario.args.setFrames([manualBlur, autoBlur]);
   useFrameUIStore.getState().selectFrame(autoBlur.id, { x: 12, y: 16 });
   useFrameUIStore.getState().togglePopover(autoBlur.id, 'frame-settings');
@@ -164,7 +198,7 @@ function expectOnlyAutoBlurFramesCleared() {
 
   expect(result).toEqual({ removedCount: 1 });
   expect(scenario.getFrames()).toEqual([manualBlur]);
-  expect(scenario.args.linkedElementsRef.current.has(autoBlur.id)).toBe(false);
+  expect(scenario.args.hostLayoutServiceRef.current.getNode(autoBlur.id)).toBeNull();
   expect(useFrameUIStore.getState()).toMatchObject({
     activePopover: null,
     selectedFrameId: null,
@@ -179,12 +213,16 @@ function expectAutoBlurFramesSyncedToCurrentTargets() {
     createdBy: 'auto-blur',
     effectMode: 'blur',
     height: 18,
-    linkedElement: detachedElement,
+    linkedElementSelector: '#stale-target',
     width: 70,
     x: 300,
     y: 320,
   });
-  scenario.args.linkedElementsRef.current.set(staleAutoBlur.id, detachedElement);
+  scenario.args.hostLayoutServiceRef.current.link(
+    staleAutoBlur.id,
+    detachedElement,
+    '#stale-target'
+  );
   scenario.args.setFrames([staleAutoBlur]);
   useFrameUIStore.getState().selectFrame(staleAutoBlur.id, { x: 8, y: 10 });
   useFrameUIStore.getState().togglePopover(staleAutoBlur.id, 'frame-settings');
@@ -194,7 +232,7 @@ function expectAutoBlurFramesSyncedToCurrentTargets() {
 
   expect(result).toEqual({ addedCount: 2, removedCount: 1, skippedCount: 0 });
   expect(scenario.getFrames().some((frame) => frame.id === staleAutoBlur.id)).toBe(false);
-  expect(scenario.args.linkedElementsRef.current.has(staleAutoBlur.id)).toBe(false);
+  expect(scenario.args.hostLayoutServiceRef.current.getNode(staleAutoBlur.id)).toBeNull();
   expect(scenario.getFrames()).toHaveLength(2);
   expect(useFrameUIStore.getState()).toMatchObject({
     activePopover: null,
@@ -219,6 +257,19 @@ describe('createAddAutoBlurFramesHandler', () => {
       y: 10,
     });
     iframeUtilsMocks.getContainingIframe.mockReturnValue(null);
+    iframeUtilsMocks.getDocumentViewportBounds.mockReturnValue({
+      height: window.innerHeight,
+      width: window.innerWidth,
+      x: 0,
+      y: 0,
+    });
+    iframeUtilsMocks.getTopViewportPoint.mockImplementation(
+      (_document: Document, x: number, y: number) => ({ x, y })
+    );
+    iframeUtilsMocks.resolveDocumentPagePlacement.mockImplementation((placement) => ({
+      x: placement.pageX,
+      y: placement.pageY,
+    }));
   });
 
   it('adds blur frames for selected targets and skips duplicate blur rectangles', () => {
@@ -248,12 +299,11 @@ describe('createAddAutoBlurFramesHandler', () => {
     expectAutoBlurFramesSyncedToCurrentTargets();
   });
 
-  it('registers an offscreen DOM anchor before a deferred React update and follows scroll', () => {
+  it('rejects an offscreen DOM anchor before frame state is published', () => {
     const scenario = createHandlerScenario();
     const committedBeforeAdd = scenario.getFrames();
     const pendingUpdates: SetStateAction<FrameData[]>[] = [];
     scenario.args.setFrames = vi.fn((update) => pendingUpdates.push(update));
-    document.body.appendChild(scenario.element);
     iframeUtilsMocks.getAbsolutePosition.mockReturnValue({
       height: 30,
       width: 90,
@@ -272,55 +322,24 @@ describe('createAddAutoBlurFramesHandler', () => {
       ],
     });
 
-    expect(result).toEqual({ addedCount: 1, skippedCount: 0 });
-    const pendingUpdate = pendingUpdates[0];
-    const committedFrames =
-      typeof pendingUpdate === 'function' ? pendingUpdate(committedBeforeAdd) : pendingUpdate!;
-    const frame = committedFrames.at(-1)!;
-    expect(scenario.args.linkedElementsRef.current.get(frame.id)).toBe(scenario.element);
-    expect(getBlurOverlayBox(frame)).toEqual({
-      height: 22,
-      width: 74,
-      x: 98,
-      y: 2418,
-    });
-
-    iframeUtilsMocks.getAbsolutePosition.mockReturnValue({
-      height: 30,
-      width: 90,
-      x: 5,
-      y: 100,
-    });
-    const setFramesAfterScroll = vi.fn();
-    syncFramePositionOnScroll({
-      frame,
-      frameState: undefined,
-      linkedElement: scenario.args.linkedElementsRef.current.get(frame.id),
-      linkedElementsRef: scenario.args.linkedElementsRef,
-      setFrames: setFramesAfterScroll,
-    });
-
-    const scrollUpdate = setFramesAfterScroll.mock.calls[0]?.[0] as SetStateAction<FrameData[]>;
-    const scrolledFrames =
-      typeof scrollUpdate === 'function' ? scrollUpdate(committedFrames) : scrollUpdate;
-    expect(getBlurOverlayBox(scrolledFrames.at(-1)!)).toEqual({
-      height: 22,
-      width: 74,
-      x: 98,
-      y: 118,
-    });
+    expect(result).toEqual({ addedCount: 0, skippedCount: 1 });
+    expect(scenario.getFrames()).toBe(committedBeforeAdd);
+    expect(pendingUpdates).toEqual([]);
+    expect(scenario.args.hostLayoutServiceRef.current.getSnapshot().presentations.size).toBe(0);
   });
 
   it('cleans transient UI before a deferred React frame updater is flushed', () => {
     const element = document.createElement('span');
     const autoBlur = createFrameDataFixture('auto-blur', {
       createdBy: 'auto-blur',
-      linkedElement: element,
+      linkedElementSelector: '#target',
     });
     let committedFrames = [autoBlur];
     const pendingUpdates: SetStateAction<FrameData[]>[] = [];
     const framesRef = { current: committedFrames };
-    const linkedElementsRef = { current: new Map([[autoBlur.id, element]]) };
+    const hostLayoutService = createFrameHostLayoutService();
+    hostLayoutService.link(autoBlur.id, element, '#target');
+    const hostLayoutServiceRef = { current: hostLayoutService };
     const setFrames = vi.fn<Dispatch<SetStateAction<FrameData[]>>>((update) => {
       pendingUpdates.push(update);
     });
@@ -329,14 +348,14 @@ describe('createAddAutoBlurFramesHandler', () => {
 
     const result = createClearAutoBlurFramesHandler({
       framesRef,
-      linkedElementsRef,
+      hostLayoutServiceRef,
       setFrames,
     })({ targets: [] });
 
     expect(result).toEqual({ removedCount: 1 });
     expect(committedFrames).toEqual([autoBlur]);
     expect(framesRef.current).toEqual([]);
-    expect(linkedElementsRef.current.has(autoBlur.id)).toBe(false);
+    expect(hostLayoutService.getNode(autoBlur.id)).toBeNull();
     expect(useFrameUIStore.getState()).toMatchObject({
       activePopover: null,
       selectedFrameId: null,

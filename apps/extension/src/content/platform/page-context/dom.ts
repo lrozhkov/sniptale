@@ -1,5 +1,8 @@
-import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
-import { isContentOwnedElement } from '../dom-host';
+import {
+  isContentOwnedElement,
+  isContentUiBootstrapFallbackAllowed,
+  resolveContentShadowRoot,
+} from '../dom-host';
 import { resolvePortalTheme } from '@sniptale/ui/theme/safe-portal';
 
 const DEFAULT_CONTENT_RUNTIME_TREE_CLASSES = [
@@ -52,6 +55,10 @@ export function isContentRuntimeUiElement(
   target: HTMLElement,
   options: ContentRuntimeUiOptions = {}
 ): boolean {
+  if (!isContentOwnedElement(target) && !isContentUiBootstrapFallbackAllowed()) {
+    return false;
+  }
+
   if (options.classPrefixes?.some((prefix) => hasClassNamePrefix(target, prefix))) {
     return true;
   }
@@ -79,8 +86,8 @@ export function createContentRuntimeUiGuard(options: ContentRuntimeUiOptions) {
 }
 
 export function applyContentRuntimeTheme(container: HTMLElement): void {
-  const themeOwner = document.getElementById(CONTENT_ROOT_ID);
-  const theme = resolvePortalTheme(themeOwner);
+  const themeOwner = resolveContentShadowRoot()?.host ?? null;
+  const theme = themeOwner ? resolvePortalTheme(themeOwner) : null;
 
   if (!theme) {
     container.removeAttribute('data-theme');

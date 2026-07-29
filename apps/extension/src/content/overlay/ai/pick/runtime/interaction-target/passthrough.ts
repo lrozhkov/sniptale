@@ -1,3 +1,8 @@
+import {
+  isContentOwnedElement,
+  isContentUiBootstrapFallbackAllowed,
+} from '../../../../../platform/dom-host';
+
 const AI_PICK_PASSTHROUGH_UI_SELECTOR = [
   '.sniptale-blocking-overlay',
   '.sniptale-editing-blocking-overlay',
@@ -8,5 +13,9 @@ const AI_PICK_PASSTHROUGH_UI_SELECTOR = [
 ].join(', ');
 
 export function isAiPickPassThroughUiElement(target: HTMLElement): boolean {
+  if (!isContentOwnedElement(target) && !isContentUiBootstrapFallbackAllowed()) {
+    return false;
+  }
+
   return Boolean(target.closest(AI_PICK_PASSTHROUGH_UI_SELECTOR));
 }

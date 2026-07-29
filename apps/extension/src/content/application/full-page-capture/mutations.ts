@@ -1,5 +1,4 @@
-import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
-import { isContentOwnedElement } from '../../platform/dom-host';
+import { isContentOwnedElement, resolveContentShadowRoot } from '../../platform/dom-host';
 import type {
   FloatingAnchor,
   FloatingCandidate,
@@ -81,7 +80,7 @@ function isExtensionOwnedElement(element: HTMLElement): boolean {
   if (
     isContentOwnedElement(element) ||
     element.id === 'sniptale-toolbar-portal' ||
-    element.closest(`#${CONTENT_ROOT_ID}, #sniptale-toolbar-portal`) !== null
+    element.closest('#sniptale-toolbar-portal') !== null
   ) {
     return true;
   }
@@ -196,12 +195,12 @@ export function preparePageMutations(session: FullPageAgentSession): void {
   if (document.body) {
     addOwnedClass(session.classMutations, document.body, CAPTURE_UI_HIDDEN_CLASS);
   }
-  const contentRoot = document.getElementById(CONTENT_ROOT_ID);
-  if (contentRoot instanceof HTMLElement) {
-    addOwnedClass(session.classMutations, contentRoot, CAPTURE_UI_HIDDEN_CLASS);
+  const contentHost = resolveContentShadowRoot()?.host;
+  if (contentHost instanceof HTMLElement) {
+    addOwnedClass(session.classMutations, contentHost, CAPTURE_UI_HIDDEN_CLASS);
   }
   const legacyToolbarPortal = document.getElementById('sniptale-toolbar-portal');
-  if (legacyToolbarPortal instanceof HTMLElement && legacyToolbarPortal !== contentRoot) {
+  if (legacyToolbarPortal instanceof HTMLElement && legacyToolbarPortal !== contentHost) {
     setOwnedStyle(session.mutations, legacyToolbarPortal, 'visibility', 'hidden', 'important');
   }
 

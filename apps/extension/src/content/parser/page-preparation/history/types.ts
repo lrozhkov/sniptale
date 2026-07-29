@@ -11,7 +11,7 @@ import type {
 
 export interface SerializableFrameData extends Omit<
   FrameData,
-  'linkedElement' | 'borderSettings' | 'blurSettings' | 'focusSettings'
+  'borderSettings' | 'blurSettings' | 'focusSettings'
 > {
   borderSettings?: BorderPreset;
   blurSettings?: BlurSettings;
@@ -54,6 +54,8 @@ export interface PagePreparationHistoryEntry {
 export interface PagePreparationHistoryBridge {
   applySnapshot: (snapshot: FrameSessionSnapshot) => void;
   captureSnapshot: () => FrameSessionSnapshot;
+  onHistoryCleared?: () => void;
+  onHistoryReachabilityChanged?: (frameIds: readonly string[]) => void;
 }
 
 export interface PagePreparationHistoryState {

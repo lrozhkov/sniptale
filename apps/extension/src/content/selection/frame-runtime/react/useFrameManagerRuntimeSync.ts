@@ -1,12 +1,13 @@
 import { useCallback } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import type { InteractiveFrameComponent } from '../roots/component';
 import type { useFrameManagerRefs } from './useFrameManagerRefs';
 import type { FrameMutations } from '../contracts';
 import { useFrameEffectOverlays } from './useFrameEffectOverlays';
 import { useFrameRootsRenderer } from './useFrameRootsRenderer';
-import { useFrameScrollSync } from './useFrameScrollSync';
+import { useFrameHostLayoutSync } from './useFrameHostLayoutSync';
+import { useAnchorRecoveryNotice } from './anchor-recovery-notice';
 
 interface FrameManagerRuntimeSyncState {
   frames: FrameData[];
@@ -20,7 +21,7 @@ interface FrameManagerRuntimeSyncRefs {
   frameStatesRef: ReturnType<typeof useFrameManagerRefs>['frameStatesRef'];
   globalEffectModeRef: ReturnType<typeof useFrameManagerRefs>['globalEffectModeRef'];
   isClearingRef: ReturnType<typeof useFrameManagerRefs>['isClearingRef'];
-  linkedElementsRef: ReturnType<typeof useFrameManagerRefs>['linkedElementsRef'];
+  hostLayoutServiceRef: ReturnType<typeof useFrameManagerRefs>['hostLayoutServiceRef'];
   rootsRef: ReturnType<typeof useFrameManagerRefs>['rootsRef'];
 }
 
@@ -43,15 +44,24 @@ export interface FrameManagerRuntimeSyncParams {
  * Wires frame scroll/effect/root sync side effects.
  */
 export function useFrameManagerRuntimeSync(params: FrameManagerRuntimeSyncParams) {
-  const updateFrameState = useFrameStateUpdater(params.state.setFrameStates);
+  const updateFrameState = useFrameStateUpdater(
+    params.state.setFrameStates,
+    params.refs.frameStatesRef
+  );
 
-  useFrameScrollSync({
+  const hostLayoutSnapshot = useFrameHostLayoutSync({
     framesRef: params.refs.framesRef,
     frameStatesRef: params.refs.frameStatesRef,
-    linkedElementsRef: params.refs.linkedElementsRef,
+    hostLayoutService: params.refs.hostLayoutServiceRef.current,
     setFrames: params.state.setFrames,
+    setFrameStates: params.state.setFrameStates,
   });
-  useFrameEffectOverlays({ frames: params.state.frames, framesRef: params.refs.framesRef });
+  useAnchorRecoveryNotice({ mutations: params.effects.mutations, snapshot: hostLayoutSnapshot });
+  useFrameEffectOverlays({
+    frames: params.state.frames,
+    framesRef: params.refs.framesRef,
+    hostLayoutSnapshot,
+  });
   useFrameRootsRenderer({
     containerRef: params.refs.containerRef,
     frames: params.state.frames,
@@ -66,18 +76,21 @@ export function useFrameManagerRuntimeSync(params: FrameManagerRuntimeSyncParams
     updateFrame: params.effects.mutations.updateFrame,
     removeFrame: params.effects.mutations.removeFrame,
     updateFrameEffect: params.effects.mutations.updateFrameEffect,
+    hostLayoutSnapshot,
   });
 }
 
-function useFrameStateUpdater(setFrameStates: Dispatch<SetStateAction<Map<string, FrameState>>>) {
+function useFrameStateUpdater(
+  setFrameStates: Dispatch<SetStateAction<Map<string, FrameState>>>,
+  frameStatesRef: MutableRefObject<Map<string, FrameState>>
+) {
   return useCallback(
     (frameId: string, newState: FrameState) => {
-      setFrameStates((prev) => {
-        const next = new Map(prev);
-        next.set(frameId, newState);
-        return next;
-      });
+      const next = new Map(frameStatesRef.current);
+      next.set(frameId, newState);
+      frameStatesRef.current = next;
+      setFrameStates(next);
     },
-    [setFrameStates]
+    [frameStatesRef, setFrameStates]
   );
 }

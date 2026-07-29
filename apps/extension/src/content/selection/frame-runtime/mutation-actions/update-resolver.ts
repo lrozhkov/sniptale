@@ -1,14 +1,14 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { calculateFrameOffsetFromElement, calculateFrameViewportCoords } from '../manager/coords';
-import { updateDocumentPagePlacement } from '../../../platform/frame';
+import { createDocumentPagePlacement, updateDocumentPagePlacement } from '../../../platform/frame';
 
 const logger = createLogger({ namespace: 'ContentFrameMutationUpdate' });
 
 export function resolveUpdatedFrame(args: {
+  anchorNode?: HTMLElement;
   frame: FrameData;
   frameId: string;
-  linkedElement?: HTMLElement;
   newFrame: FrameData;
 }): FrameData {
   if (haveFrameCoordsChanged(args.frame, args.newFrame)) {
@@ -16,20 +16,19 @@ export function resolveUpdatedFrame(args: {
   }
 
   if (
-    args.linkedElement?.isConnected &&
+    args.anchorNode?.isConnected &&
     args.frame.offset === undefined &&
     haveFrameBorderMetricsChanged(args.frame, args.newFrame)
   ) {
     return resolveBorderMetricsUpdatedFrame({
       ...args,
-      linkedElement: args.linkedElement,
+      anchorNode: args.anchorNode,
     });
   }
 
-  if (args.linkedElement?.isConnected) {
+  if (args.anchorNode?.isConnected) {
     return {
       ...mergeFrameOverlayState(args.frame, args.newFrame),
-      linkedElement: args.linkedElement,
       ...(args.frame.offset === undefined ? {} : { offset: args.frame.offset }),
     };
   }
@@ -50,12 +49,12 @@ function haveFrameCoordsChanged(frame: FrameData, newFrame: FrameData) {
 }
 
 function resolveCoordsUpdatedFrame(args: {
+  anchorNode?: HTMLElement;
   frame: FrameData;
   frameId: string;
-  linkedElement?: HTMLElement;
   newFrame: FrameData;
 }): FrameData {
-  if (!args.linkedElement?.isConnected) {
+  if (!args.anchorNode?.isConnected) {
     logger.debug('Frame coordinates changed without linked element', {
       frameId: args.frameId,
       old: { x: args.frame.x, y: args.frame.y, w: args.frame.width, h: args.frame.height },
@@ -78,7 +77,12 @@ function resolveCoordsUpdatedFrame(args: {
     };
   }
 
-  const offset = calculateFrameOffsetFromElement(args.newFrame, args.linkedElement);
+  const offset = calculateFrameOffsetFromElement(args.newFrame, args.anchorNode);
+  const pagePlacement = createDocumentPagePlacement(
+    args.anchorNode.ownerDocument,
+    args.newFrame.x,
+    args.newFrame.y
+  );
   logger.debug('Frame coordinates changed, calculating viewport-relative offset', {
     frameId: args.frameId,
     frame: {
@@ -87,13 +91,13 @@ function resolveCoordsUpdatedFrame(args: {
       w: args.newFrame.width,
       h: args.newFrame.height,
     },
-    element: args.linkedElement.getBoundingClientRect(),
+    element: args.anchorNode.getBoundingClientRect(),
     offset,
   });
 
   return {
     ...mergeFrameOverlayState(args.frame, args.newFrame),
-    linkedElement: args.linkedElement,
+    ...(pagePlacement ? { pagePlacement } : {}),
     offset,
   };
 }
@@ -111,12 +115,17 @@ function haveFrameBorderMetricsChanged(frame: FrameData, newFrame: FrameData) {
 }
 
 function resolveBorderMetricsUpdatedFrame(args: {
+  anchorNode: HTMLElement;
   frame: FrameData;
   frameId: string;
-  linkedElement: HTMLElement;
   newFrame: FrameData;
 }): FrameData {
-  const coords = calculateFrameViewportCoords(args.linkedElement, args.newFrame.borderSettings);
+  const coords = calculateFrameViewportCoords(args.anchorNode, args.newFrame.borderSettings);
+  const pagePlacement = createDocumentPagePlacement(
+    args.anchorNode.ownerDocument,
+    coords.x,
+    coords.y
+  );
   logger.debug('Frame settings changed, recalculating coordinates', {
     frameId: args.frameId,
     oldPadding: args.frame.borderSettings?.padding,
@@ -129,18 +138,12 @@ function resolveBorderMetricsUpdatedFrame(args: {
   return {
     ...mergeFrameOverlayState(args.frame, args.newFrame),
     ...coords,
-    linkedElement: args.linkedElement,
+    ...(pagePlacement ? { pagePlacement } : {}),
   };
 }
 
 function mergeFrameOverlayState(frame: FrameData, newFrame: FrameData): FrameData {
-  const {
-    callout: _callout,
-    stepBadge: _stepBadge,
-    linkedElement: _linkedElement,
-    offset: _offset,
-    ...nextFrame
-  } = newFrame;
+  const { callout: _callout, stepBadge: _stepBadge, offset: _offset, ...nextFrame } = newFrame;
 
   return {
     ...frame,

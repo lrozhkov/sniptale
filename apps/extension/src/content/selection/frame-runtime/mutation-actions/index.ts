@@ -14,6 +14,7 @@ import {
 import { createClearFramesHandler } from './clear';
 import { createRemoveFrameHandler } from './remove';
 import { createUpdateFrameHandler } from './update';
+import { createPinFrameAtLastPlacementHandler } from './pin';
 import type { UseFrameMutationActionHelperOptions } from './types';
 
 type FrameSetter = React.Dispatch<React.SetStateAction<FrameData[]>>;
@@ -86,6 +87,7 @@ export function buildFrameMutationActions(options: UseFrameMutationActionHelperO
     updateFrame: createUpdateFrameHandler(options),
     removeFrame: createRemoveFrameHandler(options),
     clearFrames: createClearFramesHandler(options),
+    pinFrameAtLastPlacement: createPinFrameAtLastPlacementHandler(options),
     updateFrameEffect: createUpdateFrameEffectHandler(options),
   };
 }

@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
+import { initializeContentUiRoots } from '../../platform/dom-host';
 
 beforeEach(() => {
   document.body.replaceChildren();
@@ -50,6 +51,7 @@ describe('region-selector-ui config theme', () => {
     themeOwner.id = CONTENT_ROOT_ID;
     themeOwner.setAttribute('data-theme', 'dark');
     document.body.appendChild(themeOwner);
+    initializeContentUiRoots(themeOwner.attachShadow({ mode: 'open' }));
 
     const container = document.createElement('div');
     const { applyRegionSelectorTheme } = await import('./config');

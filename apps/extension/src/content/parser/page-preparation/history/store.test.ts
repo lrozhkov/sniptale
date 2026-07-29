@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createPagePreparationHistoryStore } from './store';
 import { captureDomStateMap, createDomMutationBatch, hydrateFrameSessionSnapshot } from '.';
 import type { FrameSessionSnapshot } from './types';
@@ -150,12 +150,15 @@ function verifyDetachedOverlayFallback() {
     linkedElementSelector: '#missing-element',
   };
 
+  const querySelector = vi.spyOn(document, 'querySelector');
+  const querySelectorAll = vi.spyOn(document, 'querySelectorAll');
   const hydrated = hydrateFrameSessionSnapshot(snapshot);
 
   expect(hydrated.frames).toHaveLength(1);
   expect(hydrated.frames[0]?.id).toBe('frame-x');
-  expect(hydrated.frames[0]?.linkedElement).toBeUndefined();
-  expect(hydrated.linkedElements.size).toBe(0);
+  expect(hydrated.frames[0]?.linkedElementSelector).toBe('#missing-element');
+  expect(querySelector).not.toHaveBeenCalled();
+  expect(querySelectorAll).not.toHaveBeenCalled();
 }
 
 function verifyEquivalentSnapshotCommitIsSkipped() {
@@ -288,6 +291,69 @@ function verifyUndoSkipsMissingDomTargets() {
 }
 
 describe('pagePreparationHistory store', () => {
+  it('notifies the registered runtime when history identity is retired', () => {
+    const store = createPagePreparationHistoryStore();
+    const onHistoryCleared = vi.fn();
+    store.registerBridge({
+      applySnapshot: vi.fn(),
+      captureSnapshot: () => createSnapshot('a'),
+      onHistoryCleared,
+    });
+
+    store.clear();
+
+    expect(onHistoryCleared).toHaveBeenCalledTimes(1);
+  });
+
+  it('retires frame identities that become unreachable on a divergent redo branch', () => {
+    const store = createPagePreparationHistoryStore();
+    let current = createSnapshot('a');
+    const onHistoryReachabilityChanged = vi.fn();
+    store.registerBridge({
+      applySnapshot: (snapshot) => {
+        current = cloneSnapshot(snapshot);
+      },
+      captureSnapshot: () => cloneSnapshot(current),
+      onHistoryReachabilityChanged,
+    });
+    const snapshotA = cloneSnapshot(current);
+    const snapshotB = createSnapshot('b');
+    current = snapshotB;
+    store.commitEntry({ before: snapshotA, after: snapshotB });
+    store.undo();
+
+    expect(onHistoryReachabilityChanged).toHaveBeenLastCalledWith(['frame-a', 'frame-b']);
+
+    const snapshotC = createSnapshot('c');
+    current = snapshotC;
+    store.commitEntry({ before: snapshotA, after: snapshotC });
+
+    expect(onHistoryReachabilityChanged).toHaveBeenLastCalledWith(['frame-a', 'frame-c']);
+  });
+
+  it('keeps identities reachable from open boundaries and past or future snapshots', () => {
+    const store = createPagePreparationHistoryStore();
+    let current = createSnapshot('a');
+    const onHistoryReachabilityChanged = vi.fn();
+    store.registerBridge({
+      applySnapshot: (snapshot) => {
+        current = cloneSnapshot(snapshot);
+      },
+      captureSnapshot: () => cloneSnapshot(current),
+      onHistoryReachabilityChanged,
+    });
+    store.beginTransaction('edit');
+    current = createSnapshot('b');
+    const deferredId = store.beginDeferredCommit();
+    current = createSnapshot('c');
+
+    store.cancelDeferredCommit(deferredId!);
+
+    expect(onHistoryReachabilityChanged).toHaveBeenLastCalledWith(['frame-a', 'frame-c']);
+    store.commitTransaction('edit');
+    store.undo();
+    expect(onHistoryReachabilityChanged).toHaveBeenLastCalledWith(['frame-a', 'frame-c']);
+  });
   it('tracks commit, undo, redo, and clears redo after a new branch', verifyCommitUndoRedoOrder);
   it('does not record nested commits while an undo or redo apply is in progress', verifyApplyGuard);
   it(
