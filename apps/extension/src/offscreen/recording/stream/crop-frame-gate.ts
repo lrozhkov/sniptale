@@ -17,6 +17,7 @@ export type CropStreamControls = {
 
 export type CropFrameGate = CropStreamControls & {
   canDraw(): boolean;
+  canEmitHeldFrame(): boolean;
   stop(): void;
 };
 
@@ -96,6 +97,10 @@ class CropFrameGateController implements CropFrameGate {
 
   canDraw(): boolean {
     return !this.#stopped && this.#activated && this.#frozenBy === null;
+  }
+
+  canEmitHeldFrame(): boolean {
+    return !this.#stopped && this.#activated && this.#frozenBy !== null;
   }
 
   setFrozen(transitionId: string, frozen: boolean): CropStreamDrawStateResult {

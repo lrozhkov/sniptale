@@ -6,6 +6,7 @@ import {
   type CropStreamGeometry,
   type OutputSize,
 } from './crop-frame-gate';
+import { createVideoRenderLoop, type VideoRenderLoop } from './render-loop';
 
 export type {
   CropRect,
@@ -52,7 +53,7 @@ export async function createGatedCropStream(
   options: { initiallySuspended?: boolean } = {}
 ): Promise<GatedCropStream> {
   const video = createSourceVideo(sourceStream);
-  let frameTimer: ReturnType<typeof setInterval> | null = null;
+  let renderLoop: VideoRenderLoop | null = null;
   let ownershipTransferred = false;
   let stopped = false;
   try {
@@ -74,7 +75,7 @@ export async function createGatedCropStream(
     const cropped = canvas.captureStream(frameRate);
     sourceStream.getAudioTracks().forEach((track) => cropped.addTrack(track));
     let frameGate: CropFrameGate;
-    const draw = () => {
+    const drawSourceFrame = () => {
       if (stopped || !frameGate.canDraw()) return;
       const { sourceRect, outputSize } = activeGeometry;
       context.drawImage(
@@ -88,6 +89,12 @@ export async function createGatedCropStream(
         outputSize.width,
         outputSize.height
       );
+    };
+    const drawHeldFrame = () => {
+      if (stopped || !frameGate.canEmitHeldFrame()) return;
+      // captureStream advances only after a canvas paint. Repaint the last safe output so a
+      // navigation freeze keeps the encoded timeline alive without sampling the new page.
+      context.drawImage(canvas, 0, 0);
     };
     const applyGeometry = (nextGeometry: CropStreamGeometry) => {
       const validated = requireCropGeometry(nextGeometry, {
@@ -104,21 +111,26 @@ export async function createGatedCropStream(
     };
     frameGate = createCropFrameGate({
       applyGeometry,
-      drawCurrentFrame: draw,
+      drawCurrentFrame: drawSourceFrame,
       initiallySuspended: options.initiallySuspended === true,
       video,
     });
-    draw();
-    frameTimer = setInterval(draw, Math.max(1, Math.round(1000 / frameRate)));
     const track = cropped.getVideoTracks()[0];
     if (!track) throw new Error('Cropped output is missing a video track');
+    renderLoop = createVideoRenderLoop({
+      drawHeldFrame,
+      drawSourceFrame,
+      frameIntervalMs: Math.max(1, Math.round(1000 / frameRate)),
+      video,
+    });
+    renderLoop.start();
     const stop = track.stop.bind(track);
     track.stop = () => {
       if (stopped) return;
       stopped = true;
       frameGate.stop();
-      if (frameTimer !== null) clearInterval(frameTimer);
-      frameTimer = null;
+      renderLoop?.stop();
+      renderLoop = null;
       releaseSourceVideo(video);
       stop();
     };
@@ -129,7 +141,7 @@ export async function createGatedCropStream(
     };
   } finally {
     if (!ownershipTransferred) {
-      if (frameTimer !== null) clearInterval(frameTimer);
+      renderLoop?.stop();
       releaseSourceVideo(video);
     }
   }

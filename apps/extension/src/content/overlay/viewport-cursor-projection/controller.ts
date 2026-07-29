@@ -17,10 +17,17 @@ type ViewportCursorProjectionControllerDeps = {
 
 type ProjectionState = {
   authorityId: string;
+  cancelPendingFrame: () => void;
   handlePointerMove: EventListener;
   handlePointerOut: EventListener;
   root: HTMLDivElement;
   style: HTMLStyleElement;
+};
+
+type PointerProjectionSample = {
+  clientX: number;
+  clientY: number;
+  target: Element | null;
 };
 
 type ViewportCursorProjectionController = {
@@ -112,6 +119,7 @@ export function createViewportCursorProjectionController(
 
   function removeProjection(): void {
     if (!state) return;
+    state.cancelPendingFrame();
     ownerDocument.removeEventListener('pointermove', state.handlePointerMove, true);
     ownerDocument.removeEventListener('pointerout', state.handlePointerOut, true);
     state.root.remove();
@@ -136,16 +144,17 @@ export function createViewportCursorProjectionController(
     const style = createCursorHidingStyle(ownerDocument);
     let cursorKind: ProjectedCursorKind = 'default';
     let cursorGlyph = createProjectedCursorGlyph(ownerDocument, cursorKind);
+    let pendingFrameId: number | null = null;
+    let pendingSample: PointerProjectionSample | null = null;
     root.dataset['cursorKind'] = cursorKind;
     if (cursorGlyph.node) root.append(cursorGlyph.node);
-    const handlePointerMove: EventListener = (event) => {
-      const pointer = event as PointerEvent;
-      if (!Number.isFinite(pointer.clientX) || !Number.isFinite(pointer.clientY)) return;
-      const nextCursorKind = readProjectedCursorKind(
-        ownerDocument,
-        style,
-        resolvePointerTarget(event)
-      );
+    const cancelPendingFrame = () => {
+      if (pendingFrameId !== null) cancelAnimationFrame(pendingFrameId);
+      pendingFrameId = null;
+      pendingSample = null;
+    };
+    const applyPointerSample = (sample: PointerProjectionSample) => {
+      const nextCursorKind = readProjectedCursorKind(ownerDocument, style, sample.target);
       if (nextCursorKind !== cursorKind) {
         cursorKind = nextCursorKind;
         cursorGlyph = createProjectedCursorGlyph(ownerDocument, cursorKind);
@@ -156,13 +165,31 @@ export function createViewportCursorProjectionController(
         root.style.visibility = 'hidden';
         return;
       }
-      const projectedX = pointer.clientX - cursorGlyph.hotspot.x;
-      const projectedY = pointer.clientY - cursorGlyph.hotspot.y;
+      const projectedX = sample.clientX - cursorGlyph.hotspot.x;
+      const projectedY = sample.clientY - cursorGlyph.hotspot.y;
       root.style.transform = `translate3d(${projectedX}px, ${projectedY}px, 0)`;
       root.style.visibility = 'visible';
     };
+    const flushPointerFrame: FrameRequestCallback = () => {
+      pendingFrameId = null;
+      const sample = pendingSample;
+      pendingSample = null;
+      if (!sample || state?.authorityId !== authorityId || state.root !== root) return;
+      applyPointerSample(sample);
+    };
+    const handlePointerMove: EventListener = (event) => {
+      const pointer = event as PointerEvent;
+      if (!Number.isFinite(pointer.clientX) || !Number.isFinite(pointer.clientY)) return;
+      pendingSample = {
+        clientX: pointer.clientX,
+        clientY: pointer.clientY,
+        target: resolvePointerTarget(event),
+      };
+      pendingFrameId ??= requestAnimationFrame(flushPointerFrame);
+    };
     const handlePointerOut: EventListener = (event) => {
       if ((event as PointerEvent).relatedTarget === null) {
+        cancelPendingFrame();
         root.style.visibility = 'hidden';
       }
     };
@@ -171,7 +198,14 @@ export function createViewportCursorProjectionController(
     addOverlayNode(root);
     ownerDocument.addEventListener('pointermove', handlePointerMove, true);
     ownerDocument.addEventListener('pointerout', handlePointerOut, true);
-    state = { authorityId, handlePointerMove, handlePointerOut, root, style };
+    state = {
+      authorityId,
+      cancelPendingFrame,
+      handlePointerMove,
+      handlePointerOut,
+      root,
+      style,
+    };
     return true;
   }
 

@@ -1,11 +1,42 @@
 // @vitest-environment jsdom
 
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createViewportCursorProjectionController } from './controller';
+
+let nextFrameId = 1;
+let requestFrame: ReturnType<typeof vi.fn>;
+let scheduledFrames = new Map<number, FrameRequestCallback>();
+let activeControllers: Array<ReturnType<typeof createViewportCursorProjectionController>> = [];
+
+function flushAnimationFrames(): void {
+  const callbacks = [...scheduledFrames.values()];
+  scheduledFrames.clear();
+  callbacks.forEach((callback) => callback(16));
+}
 
 beforeEach(() => {
   document.head.innerHTML = '';
   document.body.innerHTML = '';
+  nextFrameId = 1;
+  scheduledFrames = new Map();
+  activeControllers = [];
+  requestFrame = vi.fn((callback: FrameRequestCallback) => {
+    const frameId = nextFrameId;
+    nextFrameId += 1;
+    scheduledFrames.set(frameId, callback);
+    return frameId;
+  });
+  vi.stubGlobal('requestAnimationFrame', requestFrame);
+  vi.stubGlobal(
+    'cancelAnimationFrame',
+    vi.fn((frameId: number) => scheduledFrames.delete(frameId))
+  );
+});
+
+afterEach(() => {
+  activeControllers.forEach((controller) => controller.dispose());
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function createHarness() {
@@ -19,6 +50,7 @@ function createHarness() {
     },
     document,
   });
+  activeControllers.push(controller);
   return { addListener, controller, removeListener };
 }
 
@@ -31,6 +63,7 @@ it('projects a system-size fixed cursor at the exact pointer hotspot', () => {
   document.dispatchEvent(
     new MouseEvent('pointermove', { bubbles: true, clientX: 200, clientY: 120 })
   );
+  flushAnimationFrames();
 
   const root = document.querySelector<HTMLElement>('[data-sniptale-viewport-cursor]');
   expect(root).not.toBeNull();
@@ -56,14 +89,17 @@ it('switches between standard pointer, text, and blocked cursor roles', () => {
   const root = document.querySelector<HTMLElement>('[data-sniptale-viewport-cursor]');
 
   link.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 40, clientY: 50 }));
+  flushAnimationFrames();
   expect(root?.dataset['cursorKind']).toBe('pointer');
   expect(root?.querySelector('svg')?.dataset['cursorGlyph']).toBe('pointer');
 
   input.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 60, clientY: 70 }));
+  flushAnimationFrames();
   expect(root?.dataset['cursorKind']).toBe('text');
   expect(root?.querySelector('svg')?.dataset['cursorGlyph']).toBe('text');
 
   blocked.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 80, clientY: 90 }));
+  flushAnimationFrames();
   expect(root?.dataset['cursorKind']).toBe('not-allowed');
   expect(root?.querySelector('svg')?.dataset['cursorGlyph']).toBe('not-allowed');
 });
@@ -80,6 +116,7 @@ it('keeps hyperlink semantics when the projection hiding rule is the computed cu
   controller.enable(authority);
 
   link.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 40, clientY: 50 }));
+  flushAnimationFrames();
 
   const root = document.querySelector<HTMLElement>('[data-sniptale-viewport-cursor]');
   expect(root?.dataset['cursorKind']).toBe('pointer');
@@ -113,10 +150,27 @@ it('hides the projection when the pointer leaves the document', () => {
   const { controller } = createHarness();
   controller.enable(authority);
   document.dispatchEvent(new MouseEvent('pointermove', { clientX: 20, clientY: 30 }));
+  flushAnimationFrames();
 
   const root = document.querySelector<HTMLElement>('[data-sniptale-viewport-cursor]');
   document.dispatchEvent(new MouseEvent('pointerout', { relatedTarget: null }));
 
+  expect(root?.style.visibility).toBe('hidden');
+});
+
+it('cancels a queued pointer sample when the pointer leaves before the frame', () => {
+  const { controller } = createHarness();
+  const readStyle = vi.spyOn(window, 'getComputedStyle');
+  controller.enable(authority);
+  document.dispatchEvent(new MouseEvent('pointermove', { clientX: 20, clientY: 30 }));
+
+  expect(scheduledFrames.size).toBe(1);
+  document.dispatchEvent(new MouseEvent('pointerout', { relatedTarget: null }));
+  flushAnimationFrames();
+
+  const root = document.querySelector<HTMLElement>('[data-sniptale-viewport-cursor]');
+  expect(scheduledFrames.size).toBe(0);
+  expect(readStyle).not.toHaveBeenCalled();
   expect(root?.style.visibility).toBe('hidden');
 });
 
@@ -162,4 +216,29 @@ it('removes unbound page effects on runtime disposal and can initialize again', 
   expect(controller.enable(authority)).toBe(true);
   expect(document.querySelectorAll('[data-sniptale-viewport-cursor]')).toHaveLength(1);
   expect(document.querySelectorAll('[data-sniptale-viewport-cursor-style]')).toHaveLength(1);
+});
+
+it('coalesces rapid pointer samples into the latest animation-frame projection', () => {
+  const readStyle = vi.spyOn(window, 'getComputedStyle');
+  const { controller } = createHarness();
+  const link = document.createElement('a');
+  link.href = '#target';
+  document.body.append(link);
+  controller.enable(authority);
+
+  link.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 20, clientY: 30 }));
+  link.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 40, clientY: 50 }));
+  link.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 80, clientY: 90 }));
+
+  const root = document.querySelector<HTMLElement>('[data-sniptale-viewport-cursor]');
+  expect(requestFrame).toHaveBeenCalledOnce();
+  expect(readStyle).not.toHaveBeenCalled();
+  expect(root?.style.visibility).toBe('hidden');
+
+  flushAnimationFrames();
+
+  expect(readStyle).toHaveBeenCalledOnce();
+  expect(root?.dataset['cursorKind']).toBe('pointer');
+  expect(root?.style.transform).toBe('translate3d(72px, 88px, 0)');
+  expect(root?.style.visibility).toBe('visible');
 });
