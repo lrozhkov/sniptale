@@ -30,6 +30,7 @@ type PointerProjectionSample = {
   clientX: number;
   clientY: number;
   target: Element | null;
+  targetRevision: number;
 };
 
 type ViewportCursorProjectionController = {
@@ -129,8 +130,9 @@ export function createViewportCursorProjectionController(
         : 'pointermove';
     let cursorKind: ProjectedCursorKind = 'default';
     let cursorGlyph = createProjectedCursorGlyph(ownerDocument, cursorKind);
-    let hasResolvedAppearance = false;
-    let appearanceTarget: Element | null = null;
+    let appearanceRevision = -1;
+    let hiddenTarget: Element | null = null;
+    let hiddenTargetRevision = 0;
     let pendingFrameId: number | null = null;
     let pendingSample: PointerProjectionSample | null = null;
     root.dataset['cursorKind'] = cursorKind;
@@ -141,14 +143,9 @@ export function createViewportCursorProjectionController(
       pendingSample = null;
     };
     const applyPointerSample = (sample: PointerProjectionSample) => {
-      if (appearanceTarget === sample.target && !nativeCursor.isOwnedTarget(sample.target)) {
-        appearanceTarget = null;
-        hasResolvedAppearance = false;
-      }
-      if (!hasResolvedAppearance || appearanceTarget !== sample.target) {
-        appearanceTarget = sample.target;
-        hasResolvedAppearance = true;
-        const nextCursorKind = nativeCursor.resolveAndHide(sample.target);
+      if (appearanceRevision !== sample.targetRevision) {
+        appearanceRevision = sample.targetRevision;
+        const nextCursorKind = nativeCursor.readAppearance(sample.target);
         if (nextCursorKind !== cursorKind) {
           cursorKind = nextCursorKind;
           cursorGlyph = createProjectedCursorGlyph(ownerDocument, cursorKind);
@@ -176,10 +173,17 @@ export function createViewportCursorProjectionController(
       const pointer = event as PointerEvent;
       const position = readLatestPointerPosition(pointer);
       if (!Number.isFinite(position.clientX) || !Number.isFinite(position.clientY)) return;
+      const target = resolvePointerTarget(event);
+      if (hiddenTarget !== target || (target !== null && !nativeCursor.isOwnedTarget(target))) {
+        nativeCursor.hide(target);
+        hiddenTarget = target;
+        hiddenTargetRevision += 1;
+      }
       pendingSample = {
         clientX: position.clientX,
         clientY: position.clientY,
-        target: resolvePointerTarget(event),
+        target,
+        targetRevision: hiddenTargetRevision,
       };
       pendingFrameId ??= requestAnimationFrame(flushPointerFrame);
     };
@@ -187,8 +191,8 @@ export function createViewportCursorProjectionController(
       if ((event as PointerEvent).relatedTarget === null) {
         cancelPendingFrame();
         nativeCursor.restore();
-        appearanceTarget = null;
-        hasResolvedAppearance = false;
+        hiddenTarget = null;
+        hiddenTargetRevision += 1;
         root.style.visibility = 'hidden';
       }
     };

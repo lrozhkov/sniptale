@@ -325,3 +325,28 @@ it('uses the latest coalesced raw pointer sample before the animation frame', ()
   controller.dispose();
   expect(removeListener).toHaveBeenCalledWith('pointerrawupdate', expect.any(Function), true);
 });
+
+it('hides each newly hit native cursor before the animation frame paints', () => {
+  const { controller } = createHarness();
+  const firstTarget = document.createElement('div');
+  const secondTarget = document.createElement('a');
+  secondTarget.href = '#target';
+  document.body.append(firstTarget, secondTarget);
+  controller.enable(authority);
+
+  firstTarget.dispatchEvent(
+    new MouseEvent('pointermove', { bubbles: true, clientX: 20, clientY: 30 })
+  );
+
+  const root = document.querySelector<HTMLElement>('[data-sniptale-viewport-cursor]');
+  expect(firstTarget.getAttribute('data-sniptale-viewport-native-cursor')).not.toBeNull();
+  expect(root?.style.visibility).toBe('hidden');
+
+  secondTarget.dispatchEvent(
+    new MouseEvent('pointermove', { bubbles: true, clientX: 40, clientY: 50 })
+  );
+
+  expect(firstTarget.hasAttribute('data-sniptale-viewport-native-cursor')).toBe(false);
+  expect(secondTarget.getAttribute('data-sniptale-viewport-native-cursor')).not.toBeNull();
+  expect(requestFrame).toHaveBeenCalledOnce();
+});

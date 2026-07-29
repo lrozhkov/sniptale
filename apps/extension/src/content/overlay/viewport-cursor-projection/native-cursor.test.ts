@@ -21,7 +21,8 @@ it('resolves the page cursor before hiding only the active target', () => {
   const projection = createNativeCursorProjection(document, ownershipToken);
   document.head.append(projection.style);
 
-  expect(projection.resolveAndHide(target)).toBe('not-allowed');
+  projection.hide(target);
+  expect(projection.readAppearance(target)).toBe('not-allowed');
   expect(target.getAttribute(nativeCursorAttribute)).toBe(ownershipToken);
   expect(projection.style.textContent).not.toContain('html *');
 
@@ -36,11 +37,11 @@ it('restores prior target state without overwriting a page-owned concurrent chan
   const projection = createNativeCursorProjection(document, ownershipToken);
   document.head.append(projection.style);
 
-  projection.resolveAndHide(target);
+  projection.hide(target);
   projection.restore();
   expect(target.getAttribute(nativeCursorAttribute)).toBe('page-before');
 
-  projection.resolveAndHide(target);
+  projection.hide(target);
   target.setAttribute(nativeCursorAttribute, 'page-after');
   projection.dispose();
   expect(target.getAttribute(nativeCursorAttribute)).toBe('page-after');
@@ -65,7 +66,8 @@ it('does not hide or misread page elements that already use the former marker va
 
   expect(getComputedStyle(inactiveTarget).cursor).toBe('not-allowed');
   expect(projection.style.textContent).not.toContain('="owned"');
-  expect(projection.resolveAndHide(activeTarget)).toBe('not-allowed');
+  projection.hide(activeTarget);
+  expect(projection.readAppearance(activeTarget)).toBe('not-allowed');
   expect(activeTarget.getAttribute(nativeCursorAttribute)).toBe(ownershipToken);
   expect(inactiveTarget.getAttribute(nativeCursorAttribute)).toBe('owned');
 
@@ -82,7 +84,7 @@ it('owns and restores a shadow-root target with a root-local hiding style', () =
   const projection = createNativeCursorProjection(document, ownershipToken);
   document.head.append(projection.style);
 
-  projection.resolveAndHide(target);
+  projection.hide(target);
 
   const shadowStyle = shadowRoot.querySelector<HTMLStyleElement>(
     '[data-sniptale-viewport-cursor-style]'

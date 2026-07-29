@@ -11,8 +11,9 @@ type NativeCursorOverride = {
 
 type NativeCursorProjection = {
   dispose(): void;
+  hide(target: Element | null): void;
   isOwnedTarget(target: Element | null): boolean;
-  resolveAndHide(target: Element | null): ProjectedCursorKind;
+  readAppearance(target: Element | null): ProjectedCursorKind;
   restore(): void;
   style: HTMLStyleElement;
 };
@@ -70,6 +71,11 @@ export function createNativeCursorProjection(
     }
     current.target.setAttribute(NATIVE_CURSOR_ATTRIBUTE, current.previousValue);
   };
+  const isOwnedTarget = (target: Element | null): boolean => {
+    const current = override;
+    if (!current || current.target !== target) return false;
+    return current.target.getAttribute(NATIVE_CURSOR_ATTRIBUTE) === ownershipToken;
+  };
 
   return {
     dispose(): void {
@@ -78,31 +84,38 @@ export function createNativeCursorProjection(
       shadowCursorStyles.forEach((shadowStyle) => shadowStyle.remove());
       shadowCursorStyles.clear();
     },
-    isOwnedTarget(target): boolean {
-      const current = override;
-      if (!current || current.target !== target) return false;
-      return current.target.getAttribute(NATIVE_CURSOR_ATTRIBUTE) === ownershipToken;
-    },
-    resolveAndHide(target): ProjectedCursorKind {
+    hide(target): void {
+      if (target && override?.target === target && isOwnedTarget(target)) return;
       restore();
-      if (!target) return 'default';
-      const previousValue = target.getAttribute(NATIVE_CURSOR_ATTRIBUTE);
-      if (previousValue === ownershipToken) {
-        target.removeAttribute(NATIVE_CURSOR_ATTRIBUTE);
-      }
-      let nextCursorKind: ProjectedCursorKind;
-      try {
-        nextCursorKind = readProjectedCursorKind(ownerDocument, target);
-      } catch (error) {
-        if (previousValue === ownershipToken) {
-          target.setAttribute(NATIVE_CURSOR_ATTRIBUTE, previousValue);
-        }
-        throw error;
-      }
+      if (!target) return;
+      const nextOverride = {
+        previousValue: target.getAttribute(NATIVE_CURSOR_ATTRIBUTE),
+        target,
+      };
       ensureCursorStyleForTarget(target);
+      override = nextOverride;
       target.setAttribute(NATIVE_CURSOR_ATTRIBUTE, ownershipToken);
-      override = { previousValue, target };
-      return nextCursorKind;
+    },
+    isOwnedTarget,
+    readAppearance(target): ProjectedCursorKind {
+      if (!target) return 'default';
+      const current = override;
+      if (!current || current.target !== target || !isOwnedTarget(target)) {
+        return readProjectedCursorKind(ownerDocument, target);
+      }
+      if (current.previousValue === null) {
+        target.removeAttribute(NATIVE_CURSOR_ATTRIBUTE);
+      } else {
+        target.setAttribute(NATIVE_CURSOR_ATTRIBUTE, current.previousValue);
+      }
+      try {
+        return readProjectedCursorKind(ownerDocument, target);
+      } finally {
+        const exposedValue = target.getAttribute(NATIVE_CURSOR_ATTRIBUTE);
+        if (override === current && exposedValue === current.previousValue) {
+          target.setAttribute(NATIVE_CURSOR_ATTRIBUTE, ownershipToken);
+        }
+      }
     },
     restore,
     style,
