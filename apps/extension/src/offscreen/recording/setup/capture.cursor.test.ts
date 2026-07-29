@@ -126,6 +126,70 @@ it('requests a viewport-shaped source for current-size tab recording', async () 
   });
 });
 
+it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
+  'excludes the native cursor from viewport-projected %s without enabling action telemetry',
+  async (captureMode) => {
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getTracks: () => [{ stop: vi.fn() }],
+      getVideoTracks: () => [{ getSettings: () => ({ cursor: 'never' }), readyState: 'live' }],
+      id: 'tab-stream',
+    });
+    installMediaDevicesMocks({ getUserMedia });
+
+    await expect(
+      acquireRecordingSourceStream({
+        captureMode,
+        excludeNativeCursor: true,
+        settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
+        streamId: 'tab-stream-viewport-cursor',
+      })
+    ).resolves.toEqual(expect.objectContaining({ cursorCaptureMode: null }));
+
+    expect(getUserMedia).toHaveBeenCalledWith({
+      audio: false,
+      video: {
+        cursor: 'never',
+        mandatory: {
+          chromeMediaSource: 'tab',
+          chromeMediaSourceId: 'tab-stream-viewport-cursor',
+        },
+      },
+    });
+    expect(loggerDebugMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('Controlled cursor capture'),
+      expect.anything()
+    );
+  }
+);
+
+it('fails closed and releases the source when native cursor exclusion is not honored', async () => {
+  const videoTrack = {
+    getSettings: () => ({ cursor: 'always' }),
+    readyState: 'live',
+    stop: vi.fn(),
+  };
+  const audioTrack = { stop: vi.fn() };
+  installMediaDevicesMocks({
+    getUserMedia: vi.fn().mockResolvedValue({
+      getTracks: () => [videoTrack, audioTrack],
+      getVideoTracks: () => [videoTrack],
+      id: 'tab-stream',
+    }),
+  });
+
+  await expect(
+    acquireRecordingSourceStream({
+      captureMode: CaptureMode.TAB,
+      excludeNativeCursor: true,
+      settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
+      streamId: 'tab-stream-cursor-leak',
+    })
+  ).rejects.toThrow('Native cursor exclusion could not be verified');
+
+  expect(videoTrack.stop).toHaveBeenCalledOnce();
+  expect(audioTrack.stop).toHaveBeenCalledOnce();
+});
+
 it('keeps tab recordings alive when cursor exclusion cannot be verified', async () => {
   const stop = vi.fn();
   installMediaDevicesMocks({

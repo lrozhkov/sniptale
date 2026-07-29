@@ -39,6 +39,6 @@ it('forwards startup recovery with and without live session ids', async () => {
   expect(mocks.instances[0]?.recover).toHaveBeenCalledWith({});
 
   const liveSessionIds = new Set(['recording-1']);
-  await recoverCaptureSurfaces(liveSessionIds);
+  await recoverCaptureSurfaces({ liveSessionIds });
   expect(mocks.instances[0]?.recover).toHaveBeenLastCalledWith({ liveSessionIds });
 });

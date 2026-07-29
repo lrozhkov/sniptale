@@ -259,4 +259,21 @@ describe('popup-bootstrap video owner', () => {
     'returns an empty webcam list when bootstrap webcam loading fails',
     verifiesWebcamBootstrapFailureFallback
   );
+
+  it('drops a stored viewport preset when TAB_CROP state is restored', async () => {
+    mocks.loadVideoUiStateMock.mockResolvedValue(
+      createVideoUiState({
+        captureMode: CaptureMode.TAB_CROP,
+        viewportPresetId: 'preset-1',
+      })
+    );
+
+    const module = await importPopupVideoModule();
+    const result = await module.loadPopupBootstrapVideoData(
+      module.createPopupVideoBootstrapPromises()
+    );
+
+    expect(result.captureMode).toBe(CaptureMode.TAB_CROP);
+    expect(result.selectedPresetId).toBeNull();
+  });
 });

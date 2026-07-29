@@ -112,6 +112,27 @@ describe('capture-surface recovery', () => {
     });
   });
 
+  it('retains an abandoned video surface when owner cleanup is not acknowledged', async () => {
+    const beforeAbandonedRestore = vi.fn().mockRejectedValue(new Error('cursor disable denied'));
+    mocks.readJournal.mockResolvedValue([journalEntry()]);
+    const service = new DefaultCaptureSurfaceService();
+
+    await service.recover({ beforeAbandonedRestore });
+
+    expect(beforeAbandonedRestore).toHaveBeenCalledWith({
+      generation: 3,
+      owner: 'video',
+      sessionId: 'recording-live',
+      tabId: 7,
+      target: 'viewport',
+    });
+    expect(mocks.restoreViewportSnapshot).not.toHaveBeenCalled();
+    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]).toMatchObject({
+      leaseId: 'lease-journal-1',
+      phase: 'conflict',
+    });
+  });
+
   it('detaches an inspection-only debugger acquisition after prepared-before-mutation recovery', async () => {
     const releaseAcquisition = vi.fn().mockResolvedValue(undefined);
     mocks.readJournal.mockResolvedValue([journalEntry({ phase: 'prepared' })]);

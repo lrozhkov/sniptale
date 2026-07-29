@@ -53,7 +53,12 @@ const geometry = {
   sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
   outputSize: { width: 1280, height: 720 },
 };
-const tabOutputControls = { resume: vi.fn(), suspend: vi.fn() };
+const tabOutputControls = {
+  activate: vi.fn(),
+  applyFreshGeometry: vi.fn(() => 'applied' as const),
+  setFrozen: vi.fn(),
+  waitForFreshFrame: vi.fn(),
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -125,6 +130,9 @@ it('starts viewport-preset output behind a closed frame gate', async () => {
   expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
     initiallySuspended: true,
   });
+  expect(mocks.acquire).toHaveBeenCalledWith(
+    expect.objectContaining({ excludeNativeCursor: true, streamId: 'stream-viewport' })
+  );
   expect(prepared.tabOutputControls).toBe(tabOutputControls);
 });
 
@@ -150,7 +158,7 @@ it('keeps a window-preset TAB output outside the viewport frame gate', async () 
 
 it('uses the selected CSS region for TAB_CROP output mapping', async () => {
   const crop = { height: 300, width: 300, x: 10, y: 20 };
-  await prepareRecordingStream({
+  const prepared = await prepareRecordingStream({
     captureMode: CaptureMode.TAB_CROP,
     cropRegion: crop,
     settings,
@@ -162,6 +170,31 @@ it('uses the selected CSS region for TAB_CROP output mapping', async () => {
     { width: 2560, height: 1440 },
     { width: 1280, height: 720, devicePixelRatio: 2 }
   );
+  expect(prepared.tabOutputControls).toBe(tabOutputControls);
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
+    initiallySuspended: false,
+  });
+});
+
+it('retains exact-output controls for TAB_CROP with a window preset', async () => {
+  const prepared = await prepareRecordingStream({
+    captureMode: CaptureMode.TAB_CROP,
+    cropRegion: { height: 300, width: 300, x: 10, y: 20 },
+    settings,
+    streamId: 'stream-crop-window',
+    surface: {
+      presetId: 'window-1',
+      target: 'window',
+      width: 1280,
+      height: 720,
+    },
+    viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
+  });
+
+  expect(prepared.tabOutputControls).toBe(tabOutputControls);
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
+    initiallySuspended: false,
+  });
 });
 
 it('fails TAB/TAB_CROP when the CSS viewport is unavailable', async () => {

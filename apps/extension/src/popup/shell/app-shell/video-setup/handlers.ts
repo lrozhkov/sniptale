@@ -1,4 +1,5 @@
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { resolveVideoViewportPresetId } from '../../../../features/viewport-presets/video-recording-policy';
 import type { PopupVideoSetupRuntime } from '../../runtime/types/video-setup';
 type RecordingControls = PopupVideoSetupRuntime['recording'];
 type VideoSettings = PopupVideoSetupRuntime['recording']['videoSettings'];
@@ -15,6 +16,14 @@ export function createPopupVideoSetupHandlers(runtime: PopupVideoSetupRuntime) {
   return {
     onCaptureModeChange: (mode: PopupVideoSetupRuntime['recording']['videoCaptureMode']) => {
       clearStartError();
+      const selectedPresetId = resolveVideoViewportPresetId(
+        mode,
+        runtime.home.viewportPresets,
+        runtime.recording.selectedPresetId
+      );
+      if (selectedPresetId !== runtime.recording.selectedPresetId) {
+        runtime.recording.setSelectedPresetId(selectedPresetId);
+      }
       setVideoCaptureMode(mode);
       if (mode === CaptureMode.CAMERA) {
         forceCameraModeSettings(runtime);
@@ -64,7 +73,12 @@ function forceCameraModeSettings(runtime: PopupVideoSetupRuntime): void {
 function createPresetChangeHandler(runtime: PopupVideoSetupRuntime, recording: RecordingControls) {
   return (presetId: string | null) => {
     recording.clearStartError();
-    const exists = runtime.home.viewportPresets.some((preset) => preset.id === presetId);
-    recording.setSelectedPresetId(exists ? presetId : null);
+    recording.setSelectedPresetId(
+      resolveVideoViewportPresetId(
+        recording.videoCaptureMode,
+        runtime.home.viewportPresets,
+        presetId
+      )
+    );
   };
 }

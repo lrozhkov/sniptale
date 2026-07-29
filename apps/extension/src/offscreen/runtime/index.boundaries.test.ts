@@ -62,6 +62,7 @@ vi.mock('../recording/setup/desktop-media', () => ({
 }));
 
 vi.mock('../recording/controller', () => ({
+  activateViewportOutput: vi.fn(),
   pauseRecording: pauseRecordingMock,
   resumeRecording: resumeRecordingMock,
   setViewportDrawState: setViewportDrawStateMock,
@@ -151,6 +152,7 @@ function resetBoundaryMocks() {
   vi.clearAllMocks();
   vi.resetModules();
   requestDesktopMediaMock.mockResolvedValue(undefined);
+  setViewportDrawStateMock.mockReturnValue('applied');
   startRecordingMock.mockResolvedValue(undefined);
 }
 
@@ -275,6 +277,37 @@ async function verifiesTrustedBackgroundSenderVariantsCanInvokeOffscreenHandlers
   expect(startRecordingResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 }
 
+async function verifiesViewportDrawStateReturnsItsCorrelatedOutcome() {
+  const listener = await captureSubscriptionListener();
+  const sendResponse = vi.fn();
+  parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
+
+  const routeReturn = listener(
+    createAuthorizedOffscreenMessage(
+      {
+        type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+        frozen: true,
+        generation: 1,
+        recordingId: 'recording-1',
+        streamInstanceId: 'stream-instance-1',
+        transitionId: 'navigation-1',
+      },
+      'viewport-draw-state-nonce'
+    ),
+    generatedBackgroundSender,
+    sendResponse
+  );
+  await flushRuntimeRouting();
+
+  expect(routeReturn).toBe(true);
+  expect(setViewportDrawStateMock).toHaveBeenCalledWith(
+    { generation: 1, recordingId: 'recording-1', streamInstanceId: 'stream-instance-1' },
+    true,
+    'navigation-1'
+  );
+  expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'applied' });
+}
+
 describe('offscreen-runtime boundaries', () => {
   beforeEach(resetBoundaryMocks);
   it(
@@ -288,5 +321,9 @@ describe('offscreen-runtime boundaries', () => {
   it(
     'accepts trusted background sender variants with extension document metadata',
     verifiesTrustedBackgroundSenderVariantsCanInvokeOffscreenHandlers
+  );
+  it(
+    'returns the correlated viewport draw-state outcome to background',
+    verifiesViewportDrawStateReturnsItsCorrelatedOutcome
   );
 });

@@ -16,6 +16,7 @@ import { disableSelectionMode } from '../selection/selection-mode';
 import { hideVideoCountdown } from '../overlay/video-countdown';
 import { disableVideoAnnotations } from '../overlay/video-annotations';
 import { disableVideoTelemetry } from '../overlay/video-telemetry';
+import { disposeViewportCursorProjection } from '../overlay/viewport-cursor-projection';
 import type { RegionSelectorController } from '../selection/region-selector/types';
 import {
   createContentRuntimeServices,
@@ -152,6 +153,7 @@ export function initializeTopLevelContentRuntime(
       { resource: 'video countdown', run: hideVideoCountdown },
       { resource: 'video annotations', run: disableVideoAnnotations },
       { resource: 'video telemetry', run: disableVideoTelemetry },
+      { resource: 'viewport cursor projection', run: disposeViewportCursorProjection },
       { resource: 'region selector controller', run: () => regionSelectorController.dispose() },
     ];
 

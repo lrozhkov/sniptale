@@ -1,10 +1,16 @@
 import { expect, it, vi } from 'vitest';
 
 const migrateHighlighterSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
+const ensureActivePageAccessRuntime = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock('../../../../composition/persistence/highlighter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/highlighter')>()),
   migrateHighlighterSystemPresetCatalog,
+}));
+
+vi.mock('../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/service')>()),
+  ensureActivePageAccessRuntime,
 }));
 
 import {
@@ -54,7 +60,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   expect(initializeAiStorageAccess).toHaveBeenCalledOnce();
   expect(migrateHighlighterSystemPresetCatalog).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeState).toHaveBeenCalledOnce();
-  expect(recoverVideoCaptureSurfaceOnStartup).toHaveBeenCalledOnce();
+  expect(recoverVideoCaptureSurfaceOnStartup).toHaveBeenCalledWith(ensureActivePageAccessRuntime);
   expect(logger.warn).toHaveBeenCalledWith(
     'Failed to request persistent storage',
     expect.any(Error)

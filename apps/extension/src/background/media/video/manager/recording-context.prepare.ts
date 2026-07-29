@@ -7,7 +7,11 @@ import { translate } from '../../../../platform/i18n';
 import { acquireVideoCaptureSurface } from '../capture-surface';
 import { setVideoRecordingTabId } from '../session-state';
 import { announceCaptureSource, resolveCaptureSourceForMode } from './flow';
-import { enableAnnotationsOrAbort, ensureOffscreenDocumentReadyOrAbort } from './transport.resolve';
+import {
+  enableAnnotationsOrAbort,
+  enableViewportCursorProjectionOrAbort,
+  ensureOffscreenDocumentReadyOrAbort,
+} from './transport.resolve';
 import { getVideoRecordingId } from '../session-state';
 import { ensureOffscreenDocumentReady } from './preflight.offscreen';
 import { captureViewportsEqual, readTabCaptureViewport } from '../capture-viewport';
@@ -85,6 +89,15 @@ export async function initializeRecordingContext(props: {
 
   const viewport = await enableAnnotationsOrAbort(tabId, captureMode, settings, recordingId);
   if (viewport === null) return null;
+  if (
+    surface?.target === 'viewport' &&
+    !(await enableViewportCursorProjectionOrAbort(tabId, captureMode, {
+      generation: surface.generation,
+      recordingId,
+    }))
+  ) {
+    return null;
+  }
 
   // The stream ID is intentionally acquired only after the final surface and crop UI are ready.
   const captureSource = await resolveCaptureSourceForMode(tabId, tab, captureMode, settings);

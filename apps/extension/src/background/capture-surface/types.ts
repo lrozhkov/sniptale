@@ -34,17 +34,54 @@ export interface AppliedCaptureSurface {
   height: number;
 }
 
+export interface AppliedCaptureSurfaceBinding {
+  applied: AppliedCaptureSurface;
+  tabId: number;
+}
+
 export interface CaptureSurfaceReleaseRequest {
   sessionId: string;
   leaseId: string;
   generation: number;
 }
 
+export type CaptureSurfaceLeaseIdentity = {
+  generation: number;
+  owner: CaptureSurfaceOwner;
+  sessionId: string;
+  tabId: number;
+  target: ViewportPresetTarget;
+};
+
+export type BeforeAbandonedCaptureSurfaceRestore = (
+  surface: CaptureSurfaceLeaseIdentity
+) => Promise<void>;
+
+export type BeforeAbandonedCaptureSurfaceStackRestore = (
+  surfaces: readonly CaptureSurfaceLeaseIdentity[]
+) => Promise<void>;
+
+export type BeforeCaptureSurfaceOwnerRelease = (
+  surface: CaptureSurfaceLeaseIdentity
+) => Promise<void>;
+
+export type CaptureSurfaceRecoveryOptions = {
+  beforeAbandonedRestore?: BeforeAbandonedCaptureSurfaceRestore;
+  beforeAbandonedStackRestore?: BeforeAbandonedCaptureSurfaceStackRestore;
+  liveSessionIds?: ReadonlySet<string> | Promise<ReadonlySet<string>>;
+};
+
+export type CaptureSurfaceOwnerReleaseOptions = {
+  beforeRelease?: BeforeCaptureSurfaceOwnerRelease;
+};
+
 export interface CaptureSurfaceService {
   apply(request: CaptureSurfaceLeaseRequest): Promise<AppliedCaptureSurface>;
   replace(request: CaptureSurfaceLeaseRequest): Promise<AppliedCaptureSurface>;
   getApplied(tabId: number): AppliedCaptureSurface | null;
+  getAppliedBindingForSession(sessionId: string): AppliedCaptureSurfaceBinding | null;
   getAppliedForSession(sessionId: string): AppliedCaptureSurface | null;
+  hasSessionLease(sessionId: string): boolean;
   handleDebuggerDetach(tabId: number): Promise<readonly CaptureSurfaceOwner[]>;
   hasOwnerLease(owner: CaptureSurfaceOwner): boolean;
   getAvailability(args: {
@@ -57,12 +94,13 @@ export interface CaptureSurfaceService {
     presetIds: readonly string[];
     context: CaptureSurfaceContext;
   }): Promise<ViewportPresetAvailability[]>;
-  recover(args?: {
-    liveSessionIds?: ReadonlySet<string> | Promise<ReadonlySet<string>>;
-  }): Promise<void>;
+  recover(args?: CaptureSurfaceRecoveryOptions): Promise<void>;
   reassert(request: CaptureSurfaceReleaseRequest): Promise<void>;
   release(request: CaptureSurfaceReleaseRequest): Promise<void>;
-  releaseOwners(owners: readonly CaptureSurfaceOwner[]): Promise<void>;
+  releaseOwners(
+    owners: readonly CaptureSurfaceOwner[],
+    options?: CaptureSurfaceOwnerReleaseOptions
+  ): Promise<void>;
   releaseTabOwners(tabId: number, owners: readonly CaptureSurfaceOwner[]): Promise<void>;
   terminateClosedTab(tabId: number, owners: readonly CaptureSurfaceOwner[]): Promise<void>;
 }

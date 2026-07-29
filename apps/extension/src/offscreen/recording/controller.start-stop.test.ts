@@ -44,6 +44,7 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 }));
 
 import {
+  activateViewportOutput,
   pauseRecording,
   resumeRecording,
   setViewportDrawState,
@@ -232,27 +233,35 @@ it('changes viewport drawing only for the active recording source binding', asyn
         completeStart = resolve;
       })
   );
-  const suspend = vi.fn();
-  const resume = vi.fn();
-  recordingContext.tabOutputControls = { resume, suspend };
+  const activate = vi.fn();
+  const setFrozen = vi.fn(() => 'applied' as const);
+  recordingContext.tabOutputControls = {
+    activate,
+    applyFreshGeometry: vi.fn(() => 'applied' as const),
+    setFrozen,
+    waitForFreshFrame: vi.fn(),
+  };
   const start = startRecording(createStartParams());
 
-  await setViewportDrawState(sourceBinding, true);
-  await setViewportDrawState(sourceBinding, false);
-  expect(suspend).toHaveBeenCalledOnce();
-  expect(resume).toHaveBeenCalledOnce();
+  activateViewportOutput(sourceBinding);
+  expect(activate).toHaveBeenCalledOnce();
+  expect(setViewportDrawState(sourceBinding, true, 'navigation-1')).toBe('applied');
+  expect(setViewportDrawState(sourceBinding, false, 'navigation-1')).toBe('applied');
+  expect(setFrozen).toHaveBeenNthCalledWith(1, 'navigation-1', true);
+  expect(setFrozen).toHaveBeenNthCalledWith(2, 'navigation-1', false);
 
-  await expect(
+  expect(() =>
     setViewportDrawState(
       {
         generation: 0,
         recordingId: 'recording-stale',
         streamInstanceId: 'stream-instance-stale',
       },
-      true
+      true,
+      'navigation-stale'
     )
-  ).rejects.toThrow('Stale recording source binding');
-  expect(suspend).toHaveBeenCalledOnce();
+  ).toThrow('Stale recording source binding');
+  expect(setFrozen).toHaveBeenCalledTimes(2);
 
   completeStart();
   await start;

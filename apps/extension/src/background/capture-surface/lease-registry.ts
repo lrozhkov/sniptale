@@ -3,7 +3,11 @@ import type {
   CaptureSurfaceJournalEntry,
   CaptureSurfaceOwner,
 } from '../storage/capture-surface/contracts';
-import type { AppliedCaptureSurface, CaptureSurfaceLeaseState } from './types';
+import type {
+  AppliedCaptureSurface,
+  AppliedCaptureSurfaceBinding,
+  CaptureSurfaceLeaseState,
+} from './types';
 import { CaptureSurfaceError } from './types';
 
 export class CaptureSurfaceLeaseRegistry {
@@ -38,15 +42,23 @@ export class CaptureSurfaceLeaseRegistry {
   }
 
   getAppliedForSession(sessionId: string): AppliedCaptureSurface | null {
-    return (
-      [...this.leasesById.values()].find(
-        (state) => state.applied.sessionId === sessionId && state.entry.phase === 'applied'
-      )?.applied ?? null
+    return this.getAppliedBindingForSession(sessionId)?.applied ?? null;
+  }
+
+  getAppliedBindingForSession(sessionId: string): AppliedCaptureSurfaceBinding | null {
+    const state = [...this.leasesById.values()].find(
+      (candidate) =>
+        candidate.applied.sessionId === sessionId && candidate.entry.phase === 'applied'
     );
+    return state ? { applied: state.applied, tabId: state.entry.tabId } : null;
   }
 
   hasOwnerLease(owner: CaptureSurfaceOwner): boolean {
     return [...this.leasesById.values()].some((state) => state.entry.owner === owner);
+  }
+
+  hasSessionLease(sessionId: string): boolean {
+    return [...this.leasesById.values()].some((state) => state.entry.sessionId === sessionId);
   }
 
   assertNextGeneration(sessionId: string, generation: number): void {

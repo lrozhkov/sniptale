@@ -1,17 +1,19 @@
 import { createSourceVideo, releaseSourceVideo, waitForSourceMetadata } from './video-source';
+import {
+  createCropFrameGate,
+  type CropFrameGate,
+  type CropStreamControls,
+  type CropStreamGeometry,
+  type OutputSize,
+} from './crop-frame-gate';
 
-export type CropRect = { x: number; y: number; width: number; height: number };
-export type OutputSize = { width: number; height: number };
-
-export type CropStreamGeometry = {
-  outputSize: OutputSize;
-  sourceRect: CropRect;
-};
-
-export type CropStreamControls = {
-  resume(): Promise<void>;
-  suspend(): void;
-};
+export type {
+  CropRect,
+  CropStreamControls,
+  CropStreamDrawStateResult,
+  CropStreamGeometry,
+  OutputSize,
+} from './crop-frame-gate';
 
 export type GatedCropStream = {
   controls: CropStreamControls;
@@ -44,78 +46,6 @@ function requireCropGeometry(geometry: CropStreamGeometry, source: OutputSize): 
   return geometry;
 }
 
-type CropFrameGate = CropStreamControls & {
-  canDraw(): boolean;
-  stop(): void;
-};
-
-function createCropFrameGate(
-  video: HTMLVideoElement,
-  initiallySuspended: boolean,
-  drawFreshFrame: () => void
-): CropFrameGate {
-  let awaitingFreshFrame = false;
-  let pendingFrame: {
-    callbackId: number;
-    reject: (error: Error) => void;
-    resolve: () => void;
-  } | null = null;
-  let stopped = false;
-  let suspended = initiallySuspended;
-
-  const cancelPendingFrame = () => {
-    if (!pendingFrame) return;
-    video.cancelVideoFrameCallback(pendingFrame.callbackId);
-    const reject = pendingFrame.reject;
-    pendingFrame = null;
-    reject(new Error('Viewport fresh-frame wait was cancelled'));
-  };
-
-  return {
-    canDraw: () => !stopped && !suspended && !awaitingFreshFrame,
-    resume: () => {
-      if (stopped) return Promise.resolve();
-      cancelPendingFrame();
-      awaitingFreshFrame = true;
-      suspended = false;
-      if (typeof video.requestVideoFrameCallback !== 'function') {
-        throw new Error('Video frame callback is unavailable for viewport output');
-      }
-      return new Promise<void>((resolve, reject) => {
-        const callbackId = video.requestVideoFrameCallback(() => {
-          if (pendingFrame?.callbackId !== callbackId) {
-            resolve();
-            return;
-          }
-          pendingFrame = null;
-          if (!stopped && !suspended) {
-            try {
-              awaitingFreshFrame = false;
-              drawFreshFrame();
-            } catch (error) {
-              awaitingFreshFrame = true;
-              suspended = true;
-              reject(error instanceof Error ? error : new Error(String(error)));
-              return;
-            }
-          }
-          resolve();
-        });
-        pendingFrame = { callbackId, reject, resolve };
-      });
-    },
-    stop: () => {
-      stopped = true;
-      suspended = true;
-      cancelPendingFrame();
-    },
-    suspend: () => {
-      suspended = true;
-      cancelPendingFrame();
-    },
-  };
-}
-
 export async function createGatedCropStream(
   sourceStream: MediaStream,
   geometry: CropStreamGeometry,
@@ -127,13 +57,13 @@ export async function createGatedCropStream(
   let stopped = false;
   try {
     await waitForSourceMetadata(video);
-    const validated = requireCropGeometry(geometry, {
+    let activeGeometry = requireCropGeometry(geometry, {
       width: video.videoWidth,
       height: video.videoHeight,
     });
     const canvas = document.createElement('canvas');
-    canvas.width = validated.outputSize.width;
-    canvas.height = validated.outputSize.height;
+    canvas.width = activeGeometry.outputSize.width;
+    canvas.height = activeGeometry.outputSize.height;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('2D canvas is unavailable for the requested crop');
     const sourceFrameRate = sourceStream.getVideoTracks()[0]?.getSettings().frameRate;
@@ -146,7 +76,7 @@ export async function createGatedCropStream(
     let frameGate: CropFrameGate;
     const draw = () => {
       if (stopped || !frameGate.canDraw()) return;
-      const { sourceRect, outputSize } = validated;
+      const { sourceRect, outputSize } = activeGeometry;
       context.drawImage(
         video,
         sourceRect.x,
@@ -159,7 +89,25 @@ export async function createGatedCropStream(
         outputSize.height
       );
     };
-    frameGate = createCropFrameGate(video, options.initiallySuspended === true, draw);
+    const applyGeometry = (nextGeometry: CropStreamGeometry) => {
+      const validated = requireCropGeometry(nextGeometry, {
+        width: video.videoWidth,
+        height: video.videoHeight,
+      });
+      if (
+        validated.outputSize.width !== canvas.width ||
+        validated.outputSize.height !== canvas.height
+      ) {
+        throw new Error('Fresh crop geometry cannot change the encoded output dimensions');
+      }
+      activeGeometry = validated;
+    };
+    frameGate = createCropFrameGate({
+      applyGeometry,
+      drawCurrentFrame: draw,
+      initiallySuspended: options.initiallySuspended === true,
+      video,
+    });
     draw();
     frameTimer = setInterval(draw, Math.max(1, Math.round(1000 / frameRate)));
     const track = cropped.getVideoTracks()[0];

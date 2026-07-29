@@ -107,6 +107,27 @@ function verifyControlledCursorCaptureLifecycleContracts() {
   });
 }
 
+function verifyViewportCursorProjectionContracts() {
+  for (const type of [
+    VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION,
+    VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION,
+  ]) {
+    expect(
+      tabVideoMessageContracts[type]?.parseRequest({
+        generation: 4,
+        recordingId: 'recording-1',
+        type,
+      })
+    ).toEqual({ generation: 4, recordingId: 'recording-1', type });
+    expect(() => tabVideoMessageContracts[type]?.parseRequest({ type })).toThrow(
+      MessageContractError
+    );
+    expect(tabVideoMessageContracts[type]?.parseResponse({ success: true })).toEqual({
+      success: true,
+    });
+  }
+}
+
 function verifyRegionCaptureStartContract() {
   expect(
     tabVideoMessageContracts[RegionCaptureControlMessageType.START]?.parseRequest({
@@ -241,6 +262,10 @@ describe('tab-contracts/video region capture contracts', () => {
   it(
     'validates controlled cursor capture pause and resume contracts',
     verifyControlledCursorCaptureLifecycleContracts
+  );
+  it(
+    'validates viewport cursor projection lifecycle contracts',
+    verifyViewportCursorProjectionContracts
   );
   it('validates the start-region-capture contract', verifyRegionCaptureStartContract);
   it('validates the stop-region-capture contract', verifyRegionCaptureStopContract);

@@ -19,6 +19,7 @@ import {
   type BackgroundModeState,
   type RuntimeWiringLogger,
 } from './shared';
+import { ensureActivePageAccessRuntime } from '../../page-access/service';
 
 export function runStartupMaintenance(
   state: BackgroundModeState,
@@ -58,7 +59,7 @@ export function runStartupMaintenance(
   });
 
   resetVideoRecordingRuntimeState();
-  recoverVideoCaptureSurfaceOnStartup().catch((error) => {
+  recoverVideoCaptureSurfaceOnStartup(ensureActivePageAccessRuntime).catch((error) => {
     logger.warn('Capture surface recovery failed; new preset mutations remain blocked', error);
   });
 }

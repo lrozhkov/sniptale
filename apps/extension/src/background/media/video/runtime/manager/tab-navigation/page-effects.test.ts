@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   beginCursor: vi.fn(),
   cursorEnabled: false,
   ensurePageAccess: vi.fn(),
+  enableViewportCursorProjection: vi.fn(),
   getRuntimeState: vi.fn(),
   loggerWarn: vi.fn(),
   readViewport: vi.fn(),
@@ -34,6 +35,10 @@ vi.mock('../../../capture-viewport', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../capture-viewport')>()),
   readTabCaptureViewport: mocks.readViewport,
 }));
+vi.mock('../../../capture-surface/cursor-projection', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture-surface/cursor-projection')>()),
+  enableViewportCursorProjection: mocks.enableViewportCursorProjection,
+}));
 vi.mock('../controlled-cursor/navigation-effects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../controlled-cursor/navigation-effects')>()),
   abandonControlledCursorNavigationEffects: mocks.abandonCursor,
@@ -47,10 +52,12 @@ import {
   beginTabNavigationPageEffects,
   resolveTabNavigationPageEffects,
   restoreTabNavigationPageEffects,
+  restoreViewportCursorProjectionBeforeThaw,
   suspendTabNavigationPageEffects,
 } from './page-effects';
 
 const binding = {
+  generation: 4,
   isCurrent: () => true,
   navigationEpoch: 11,
   recordingId: 'recording-1',
@@ -63,6 +70,7 @@ beforeEach(() => {
   mocks.beginCursor.mockReturnValue(11);
   mocks.cursorEnabled = false;
   mocks.ensurePageAccess.mockResolvedValue(undefined);
+  mocks.enableViewportCursorProjection.mockResolvedValue(undefined);
   mocks.getRuntimeState.mockReturnValue({ captureMode: CaptureMode.TAB, cropRegion: null });
   mocks.readViewport.mockResolvedValue({
     devicePixelRatio: 2,
@@ -81,13 +89,88 @@ beforeEach(() => {
 
 it('resolves only page-owned effects and does nothing for plain TAB', async () => {
   const effects = resolveTabNavigationPageEffects();
-  expect(effects).toEqual({ controlledCursor: false, cropOverlay: false });
+  expect(effects).toEqual({
+    controlledCursor: false,
+    cropOverlay: false,
+    viewportCursorProjection: false,
+  });
   expect(beginTabNavigationPageEffects(effects)).toBeNull();
 
   await suspendTabNavigationPageEffects(effects, binding);
   await restoreTabNavigationPageEffects(effects, binding, mocks.ensurePageAccess);
   expect(mocks.ensurePageAccess).not.toHaveBeenCalled();
   expect(mocks.suspendCursor).not.toHaveBeenCalled();
+});
+
+it('restores viewport cursor projection after canonical page access without making failure critical', async () => {
+  const effects = resolveTabNavigationPageEffects(true);
+
+  await expect(
+    restoreTabNavigationPageEffects(effects, binding, mocks.ensurePageAccess)
+  ).resolves.toEqual({ controlledCursorRestored: true, liveViewport: null });
+  expect(mocks.ensurePageAccess).toHaveBeenCalledWith(7, expect.any(String));
+  expect(mocks.enableViewportCursorProjection).toHaveBeenCalledWith(7, {
+    generation: 4,
+    recordingId: 'recording-1',
+  });
+
+  mocks.enableViewportCursorProjection.mockRejectedValueOnce(new Error('receiver unavailable'));
+  await expect(
+    restoreTabNavigationPageEffects(effects, binding, mocks.ensurePageAccess)
+  ).resolves.toEqual({ controlledCursorRestored: true, liveViewport: null });
+  expect(mocks.loggerWarn).toHaveBeenCalledWith(
+    'Viewport cursor projection could not be restored after navigation',
+    expect.any(Error)
+  );
+});
+
+it('prepares viewport cursor projection before thaw and keeps preparation fail-soft', async () => {
+  const effects = resolveTabNavigationPageEffects(true);
+
+  await restoreViewportCursorProjectionBeforeThaw(effects, binding, mocks.ensurePageAccess);
+  expect(mocks.ensurePageAccess).toHaveBeenCalledWith(7, expect.any(String));
+  expect(mocks.enableViewportCursorProjection).toHaveBeenCalledWith(7, {
+    generation: 4,
+    recordingId: 'recording-1',
+  });
+  expect(mocks.ensurePageAccess.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.enableViewportCursorProjection.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+  );
+
+  mocks.ensurePageAccess.mockRejectedValueOnce(new Error('receiver unavailable'));
+  mocks.enableViewportCursorProjection.mockClear();
+  await expect(
+    restoreViewportCursorProjectionBeforeThaw(effects, binding, mocks.ensurePageAccess)
+  ).resolves.toBeUndefined();
+  expect(mocks.enableViewportCursorProjection).not.toHaveBeenCalled();
+  expect(mocks.loggerWarn).toHaveBeenCalledWith(
+    'Viewport cursor projection could not be prepared before output resumed',
+    expect.any(Error)
+  );
+});
+
+it('does not restore viewport projection after page access outlives its binding', async () => {
+  let resolvePageAccess!: () => void;
+  let current = true;
+  const delayedAccess = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        resolvePageAccess = resolve;
+      })
+  );
+  const staleBinding = { ...binding, isCurrent: () => current };
+
+  const restoration = restoreTabNavigationPageEffects(
+    resolveTabNavigationPageEffects(true),
+    staleBinding,
+    delayedAccess
+  );
+  await vi.waitFor(() => expect(delayedAccess).toHaveBeenCalledOnce());
+  current = false;
+  resolvePageAccess();
+  await restoration;
+
+  expect(mocks.enableViewportCursorProjection).not.toHaveBeenCalled();
 });
 
 it('uses canonical page access before restoring cursor and crop overlay', async () => {
@@ -115,7 +198,11 @@ it('uses canonical page access before restoring cursor and crop overlay', async 
 });
 
 it('delegates token-scoped controlled-cursor cleanup on abandonment', () => {
-  const effects = { controlledCursor: true, cropOverlay: false };
+  const effects = {
+    controlledCursor: true,
+    cropOverlay: false,
+    viewportCursorProjection: false,
+  };
 
   abandonTabNavigationPageEffects(effects, binding);
 
@@ -123,7 +210,11 @@ it('delegates token-scoped controlled-cursor cleanup on abandonment', () => {
 });
 
 it('fails closed when required crop page access or cursor restoration is unavailable', async () => {
-  const effects = { controlledCursor: true, cropOverlay: true };
+  const effects = {
+    controlledCursor: true,
+    cropOverlay: true,
+    viewportCursorProjection: false,
+  };
   mocks.ensurePageAccess.mockRejectedValueOnce(new Error('activeTab revoked'));
   await expect(
     restoreTabNavigationPageEffects(effects, binding, mocks.ensurePageAccess)
@@ -147,7 +238,7 @@ it('fails crop-only restoration when the page runtime is unavailable', async () 
   mocks.ensurePageAccess.mockRejectedValueOnce(new Error('activeTab revoked'));
   await expect(
     restoreTabNavigationPageEffects(
-      { controlledCursor: false, cropOverlay: true },
+      { controlledCursor: false, cropOverlay: true, viewportCursorProjection: false },
       binding,
       mocks.ensurePageAccess
     )
@@ -163,7 +254,7 @@ it('fails crop restoration when the overlay cannot be restored', async () => {
 
   await expect(
     restoreTabNavigationPageEffects(
-      { controlledCursor: false, cropOverlay: true },
+      { controlledCursor: false, cropOverlay: true, viewportCursorProjection: false },
       binding,
       mocks.ensurePageAccess
     )

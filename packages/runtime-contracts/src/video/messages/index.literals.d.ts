@@ -49,6 +49,10 @@ declare module './index' {
     type GET_RECORDING_TAB_ID = typeof import('./index').VideoMessageType.GET_RECORDING_TAB_ID;
     type ENABLE_ANNOTATIONS = typeof import('./index').VideoMessageType.ENABLE_ANNOTATIONS;
     type DISABLE_ANNOTATIONS = typeof import('./index').VideoMessageType.DISABLE_ANNOTATIONS;
+    type ENABLE_VIEWPORT_CURSOR_PROJECTION =
+      typeof import('./index').VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION;
+    type DISABLE_VIEWPORT_CURSOR_PROJECTION =
+      typeof import('./index').VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION;
     type ENABLE_CONTROLLED_CURSOR_CAPTURE =
       typeof import('./index').VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE;
     type DISABLE_CONTROLLED_CURSOR_CAPTURE =

@@ -236,7 +236,9 @@ test('native full-page capture composes one dominant internal scroller with its 
   ]);
 });
 
-test('viewport compositor preserves a non-zero CSS crop at 2x display scale', async () => {
+test('viewport compositor keeps a fixed crop mask pinned while scrolling at 2x display scale', async ({
+  hostOrigin,
+}) => {
   test.setTimeout(30_000);
   const browser = await chromium.launch({
     headless: false,
@@ -246,27 +248,55 @@ test('viewport compositor preserves a non-zero CSS crop at 2x display scale', as
   try {
     const context = await browser.newContext({ viewport: null });
     const page = await context.newPage();
-    await page.setContent(`
-      <style>
-        html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
-        .tile { position: absolute; width: 50%; height: 50%; }
-        .top-left { left: 0; top: 0; background: rgb(255, 0, 0); }
-        .top-right { right: 0; top: 0; background: rgb(0, 255, 0); }
-        .bottom-left { bottom: 0; left: 0; background: rgb(0, 0, 255); }
-        .bottom-right { bottom: 0; right: 0; background: rgb(255, 255, 0); }
-      </style>
-      <div class="tile top-left"></div>
-      <div class="tile top-right"></div>
-      <div class="tile bottom-left"></div>
-      <div class="tile bottom-right"></div>
-    `);
+    await page.goto(`${hostOrigin}/fixtures/viewport-compositor.html`);
     const cdp = await context.newCDPSession(page);
     const viewport = { height: 300, width: 400 };
+    const crop = { height: 220, width: 300, x: 50, y: 40 };
     const compositorScale = buildViewportCompositorScale(await cdp.send('Page.getLayoutMetrics'));
     await cdp.send(
       'Emulation.setDeviceMetricsOverride',
       buildDeviceMetricsOverrideParams(viewport.width, viewport.height, compositorScale)
     );
+    await page.evaluate((cropRegion) => {
+      const host = document.createElement('div');
+      host.style.cssText =
+        'position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: visible; z-index: 2147483647;';
+      const shadow = host.attachShadow({ mode: 'open' });
+      const root = document.createElement('div');
+      root.style.cssText = 'all: initial; display: block; position: fixed; inset: 0;';
+      const maskStyles: Array<Partial<CSSStyleDeclaration>> = [
+        { inset: '0 0 auto 0', height: `${cropRegion.y}px` },
+        {
+          bottom: '0',
+          left: '0',
+          right: '0',
+          top: `${cropRegion.y + cropRegion.height}px`,
+        },
+        {
+          height: `${cropRegion.height}px`,
+          left: '0',
+          top: `${cropRegion.y}px`,
+          width: `${cropRegion.x}px`,
+        },
+        {
+          height: `${cropRegion.height}px`,
+          left: `${cropRegion.x + cropRegion.width}px`,
+          right: '0',
+          top: `${cropRegion.y}px`,
+        },
+      ];
+      maskStyles.forEach((style) => {
+        const mask = document.createElement('div');
+        Object.assign(mask.style, {
+          background: 'rgb(255, 0, 255)',
+          position: 'absolute',
+          ...style,
+        });
+        root.append(mask);
+      });
+      shadow.append(root);
+      document.body.append(host);
+    }, crop);
     await page.evaluate(
       () =>
         new Promise<void>((resolve) =>
@@ -282,43 +312,77 @@ test('viewport compositor preserves a non-zero CSS crop at 2x display scale', as
           width: window.innerWidth,
         }))
       )
-      .toEqual({ devicePixelRatio: 1, height: viewport.height, width: viewport.width });
+      .toEqual({
+        devicePixelRatio: compositorScale,
+        height: viewport.height,
+        width: viewport.width,
+      });
 
-    const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png' });
-    const crop = { height: 220, width: 300, x: 50, y: 40 };
-    const sampled = await page.evaluate(
-      async ({ data, points }) => {
-        const image = new Image();
-        image.src = `data:image/png;base64,${data}`;
-        await image.decode();
-        const canvas = document.createElement('canvas');
-        canvas.width = image.width;
-        canvas.height = image.height;
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('Viewport compositor sample context is unavailable');
-        context.drawImage(image, 0, 0);
-        return {
-          pixels: points.map(({ x, y }) => Array.from(context.getImageData(x, y, 1, 1).data)),
-          size: { height: image.height, width: image.width },
-        };
-      },
-      {
-        data: screenshot.data,
-        points: [
-          { x: crop.x + 50, y: crop.y + 40 },
-          { x: crop.x + 210, y: crop.y + 40 },
-          { x: crop.x + 50, y: crop.y + 160 },
-          { x: crop.x + 210, y: crop.y + 160 },
-        ],
-      }
-    );
+    const sampleViewport = async () => {
+      const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png' });
+      return page.evaluate(
+        async ({ data, points, scale }) => {
+          const image = new Image();
+          image.src = `data:image/png;base64,${data}`;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          const context = canvas.getContext('2d');
+          if (!context) throw new Error('Viewport compositor sample context is unavailable');
+          context.drawImage(image, 0, 0);
+          return {
+            pixels: points.map(({ x, y }) =>
+              Array.from(context.getImageData(x * scale, y * scale, 1, 1).data)
+            ),
+            size: { height: image.height, width: image.width },
+          };
+        },
+        {
+          data: screenshot.data,
+          scale: compositorScale,
+          points: [
+            { x: 10, y: 10 },
+            { x: crop.x + 50, y: crop.y + 40 },
+            { x: crop.x + 210, y: crop.y + 40 },
+            { x: crop.x + 50, y: crop.y + 160 },
+            { x: crop.x + 210, y: crop.y + 160 },
+            { x: 200, y: 290 },
+          ],
+        }
+      );
+    };
 
-    expect(sampled.size).toEqual(viewport);
-    expect(sampled.pixels).toEqual([
+    const beforeScroll = await sampleViewport();
+    expect(beforeScroll.size).toEqual({
+      height: viewport.height * compositorScale,
+      width: viewport.width * compositorScale,
+    });
+    expect(beforeScroll.pixels).toEqual([
+      [255, 0, 255, 255],
       [255, 0, 0, 255],
       [0, 255, 0, 255],
       [0, 0, 255, 255],
       [255, 255, 0, 255],
+      [255, 0, 255, 255],
+    ]);
+
+    await page.evaluate(() => window.scrollTo(0, 300));
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
+    );
+    const afterScroll = await sampleViewport();
+    expect(afterScroll.size).toEqual(beforeScroll.size);
+    expect(afterScroll.pixels).toEqual([
+      [255, 0, 255, 255],
+      [0, 255, 255, 255],
+      [0, 0, 0, 255],
+      [255, 255, 255, 255],
+      [255, 128, 0, 255],
+      [255, 0, 255, 255],
     ]);
   } finally {
     await browser.close();

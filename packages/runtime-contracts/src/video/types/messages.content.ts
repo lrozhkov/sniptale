@@ -11,6 +11,19 @@ export interface DisableAnnotationsMessage {
   type: typeof VideoMessageType.DISABLE_ANNOTATIONS;
 }
 
+export interface ViewportCursorProjectionAuthority {
+  generation: number;
+  recordingId: string;
+}
+
+export interface EnableViewportCursorProjectionMessage extends ViewportCursorProjectionAuthority {
+  type: typeof VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION;
+}
+
+export interface DisableViewportCursorProjectionMessage extends ViewportCursorProjectionAuthority {
+  type: typeof VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION;
+}
+
 export interface EnableControlledCursorCaptureMessage {
   type: typeof VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE;
   recordingId: string;
@@ -151,6 +164,8 @@ export interface DesktopMediaFailedMessage {
 export type ContentVideoMessage =
   | EnableAnnotationsMessage
   | DisableAnnotationsMessage
+  | EnableViewportCursorProjectionMessage
+  | DisableViewportCursorProjectionMessage
   | EnableControlledCursorCaptureMessage
   | DisableControlledCursorCaptureMessage
   | PauseControlledCursorCaptureMessage

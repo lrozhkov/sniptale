@@ -10,19 +10,19 @@ export async function overrideDeviceMetrics(
   tabId: number,
   width: number,
   height: number,
-  viewportScale: number
+  deviceScaleFactor: number
 ): Promise<void> {
   logger.debug('Calling Emulation.setDeviceMetricsOverride', {
     tabId,
     width,
     height,
-    viewportScale,
+    deviceScaleFactor,
   });
   await withTimeout(
     browserDebugger.sendCommand(
       { tabId },
       'Emulation.setDeviceMetricsOverride',
-      buildDeviceMetricsOverrideParams(width, height, viewportScale)
+      buildDeviceMetricsOverrideParams(width, height, deviceScaleFactor)
     ),
     DEBUGGER_TIMEOUT_MS,
     'Emulation.setDeviceMetricsOverride'
@@ -30,7 +30,7 @@ export async function overrideDeviceMetrics(
   logger.debug('Viewport metrics override applied', {
     width,
     height,
-    viewportScale,
+    deviceScaleFactor,
   });
 }
 

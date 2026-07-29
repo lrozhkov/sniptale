@@ -16,6 +16,7 @@ import { finishVideoRecordingStop, resetVideoRecordingStartSession } from '../vi
 import { inspectPersistedLease } from '../../storage/video/recording-control-lease';
 import { readCaptureSurfaceJournal } from '../../storage/capture-surface';
 import { getCaptureSurfaceService } from '../../capture-surface';
+import { disableViewportCursorProjection } from '../video/capture-surface/cursor-projection';
 import { failed, RECORDING_PARTICIPANT_ID, verified } from './result';
 
 export function resetRecordingRuntimeStateForPrivacyErasure(): void {
@@ -40,7 +41,16 @@ async function verifyVideoCaptureSurfacesAbsent(): Promise<boolean> {
 
 export async function cleanupVideoCaptureSurfacesForPrivacyErasure(): Promise<boolean> {
   try {
-    await getCaptureSurfaceService().releaseOwners(['video']);
+    await getCaptureSurfaceService().releaseOwners(['video'], {
+      beforeRelease: async (surface) => {
+        if (surface.target === 'viewport') {
+          await disableViewportCursorProjection(surface.tabId, {
+            generation: surface.generation,
+            recordingId: surface.sessionId,
+          });
+        }
+      },
+    });
   } catch {
     return false;
   }

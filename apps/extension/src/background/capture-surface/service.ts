@@ -10,8 +10,11 @@ import { CaptureSurfaceLeaseRelease } from './lease-release';
 import { recoverCaptureSurfaceLeases } from './recovery';
 import type {
   AppliedCaptureSurface,
+  AppliedCaptureSurfaceBinding,
   CaptureSurfaceContext,
   CaptureSurfaceLeaseRequest,
+  CaptureSurfaceOwnerReleaseOptions,
+  CaptureSurfaceRecoveryOptions,
   CaptureSurfaceReleaseRequest,
   CaptureSurfaceService,
 } from './types';
@@ -50,6 +53,10 @@ export class DefaultCaptureSurfaceService implements CaptureSurfaceService {
     return this.registry.getAppliedForSession(sessionId);
   }
 
+  getAppliedBindingForSession(sessionId: string): AppliedCaptureSurfaceBinding | null {
+    return this.registry.getAppliedBindingForSession(sessionId);
+  }
+
   handleDebuggerDetach(tabId: number): Promise<readonly CaptureSurfaceOwner[]> {
     const ready = this.recovery ?? Promise.resolve();
     return ready.then(() => this.enqueue(() => this.disposal.handleDebuggerDetach(tabId)));
@@ -71,12 +78,17 @@ export class DefaultCaptureSurfaceService implements CaptureSurfaceService {
     return this.afterRecovery(() => getCaptureSurfaceAvailabilities(args, this.registry.values()));
   }
 
-  recover(
-    args: { liveSessionIds?: ReadonlySet<string> | Promise<ReadonlySet<string>> } = {}
-  ): Promise<void> {
+  recover(args: CaptureSurfaceRecoveryOptions = {}): Promise<void> {
     const liveSessionIds = Promise.resolve(args.liveSessionIds ?? new Set<string>());
     this.recovery ??= liveSessionIds.then((live) =>
-      this.enqueue(() => recoverCaptureSurfaceLeases(this.registry, live))
+      this.enqueue(() =>
+        recoverCaptureSurfaceLeases(
+          this.registry,
+          live,
+          args.beforeAbandonedRestore,
+          args.beforeAbandonedStackRestore
+        )
+      )
     );
     return this.recovery;
   }
@@ -89,9 +101,16 @@ export class DefaultCaptureSurfaceService implements CaptureSurfaceService {
     return this.registry.hasOwnerLease(owner);
   }
 
-  releaseOwners(owners: readonly CaptureSurfaceOwner[]): Promise<void> {
+  hasSessionLease(sessionId: string): boolean {
+    return this.registry.hasSessionLease(sessionId);
+  }
+
+  releaseOwners(
+    owners: readonly CaptureSurfaceOwner[],
+    options: CaptureSurfaceOwnerReleaseOptions = {}
+  ): Promise<void> {
     return this.afterRecovery(() =>
-      this.enqueue(() => this.releaseOwner.releaseOwners(new Set(owners)))
+      this.enqueue(() => this.releaseOwner.releaseOwners(new Set(owners), options.beforeRelease))
     );
   }
 

@@ -71,18 +71,17 @@ describe('exact debugger workspace helpers', () => {
     ).toThrow('compositor metrics');
   });
 
-  it('builds a DPR-one override with an explicit compositor scale', () => {
+  it('keeps native cursor and fixed crop UI in the page device-scale coordinate space', () => {
     expect(buildDeviceMetricsOverrideParams(1280, 720, 2)).toEqual({
       width: 1280,
       height: 720,
-      deviceScaleFactor: 1,
+      deviceScaleFactor: 2,
       mobile: false,
       screenWidth: 1280,
       screenHeight: 720,
       positionX: 0,
       positionY: 0,
       scrollbarType: 'overlay',
-      viewport: { x: 0, y: 0, width: 1280, height: 720, scale: 2 },
     });
   });
 

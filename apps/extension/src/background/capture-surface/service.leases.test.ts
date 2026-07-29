@@ -119,6 +119,7 @@ describe('capture-surface leases and journal', () => {
       code: 'stale-generation',
     });
     expect(service.getAppliedForSession('session-1')).toEqual(applied);
+    expect(service.getAppliedBindingForSession('session-1')).toEqual({ applied, tabId: 7 });
     expect(service.getAppliedForSession('missing')).toBeNull();
   });
 

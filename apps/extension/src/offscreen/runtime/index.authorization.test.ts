@@ -47,6 +47,7 @@ vi.mock('../recording/setup/desktop-media', () => ({
 }));
 
 vi.mock('../recording/controller', () => ({
+  activateViewportOutput: vi.fn(),
   pauseRecording: vi.fn(),
   resumeRecording: vi.fn(),
   setViewportDrawState: setViewportDrawStateMock,
@@ -95,6 +96,7 @@ function createViewportFreezeCommand() {
     generation: 1,
     recordingId: 'recording-1',
     streamInstanceId: 'stream-instance-1',
+    transitionId: 'navigation-1',
   };
 }
 

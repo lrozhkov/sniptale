@@ -76,6 +76,29 @@ describe('capture-surface terminal cleanup', () => {
     expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
   });
 
+  it('retains owner leases when their pre-release cleanup is not acknowledged', async () => {
+    const beforeRelease = vi.fn().mockRejectedValue(new Error('cursor disable denied'));
+    const service = new DefaultCaptureSurfaceService();
+    const applied = await service.apply(
+      request({ context: 'video-tab', owner: 'video', sessionId: 'recording-1' })
+    );
+    mocks.restoreViewportSnapshot.mockClear();
+
+    await expect(service.releaseOwners(['video'], { beforeRelease })).rejects.toThrow(
+      'cursor disable denied'
+    );
+
+    expect(beforeRelease).toHaveBeenCalledWith({
+      generation: 1,
+      owner: 'video',
+      sessionId: 'recording-1',
+      tabId: 7,
+      target: 'viewport',
+    });
+    expect(service.getApplied(7)).toEqual(applied);
+    expect(mocks.restoreViewportSnapshot).not.toHaveBeenCalled();
+  });
+
   it('transfers a same-owner viewport acquisition back to its nested parent', async () => {
     const service = new DefaultCaptureSurfaceService();
     const parent = await service.apply(request());

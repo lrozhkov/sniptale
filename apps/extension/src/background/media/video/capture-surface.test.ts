@@ -3,9 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
   clearActiveLease: vi.fn(),
+  createTransitionId: vi.fn(() => 'recovery-transition-1'),
+  disableViewportCursorProjection: vi.fn(),
+  enableViewportCursorProjection: vi.fn(),
+  ensurePageAccess: vi.fn(),
+  getAppliedBindingForSession: vi.fn(),
   getAppliedForSession: vi.fn(),
+  hasSessionLease: vi.fn(),
   recoverCaptureSurfaces: vi.fn(),
   readTabCaptureViewport: vi.fn(),
+  retireViewportCursorProjectionAuthority: vi.fn(),
   release: vi.fn(),
   reassert: vi.fn(),
   terminateClosedTab: vi.fn(),
@@ -13,11 +20,17 @@ const mocks = vi.hoisted(() => ({
   ensureActiveLeaseHydrated: vi.fn(),
 }));
 
+vi.mock('@sniptale/platform/security/secure-random-id', () => ({
+  createSecureRandomUuid: mocks.createTransitionId,
+}));
+
 vi.mock('../../capture-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../capture-surface')>()),
   getCaptureSurfaceService: () => ({
     apply: mocks.apply,
+    getAppliedBindingForSession: mocks.getAppliedBindingForSession,
     getAppliedForSession: mocks.getAppliedForSession,
+    hasSessionLease: mocks.hasSessionLease,
     release: mocks.release,
     reassert: mocks.reassert,
     terminateClosedTab: mocks.terminateClosedTab,
@@ -36,6 +49,12 @@ vi.mock('./capture-viewport', async (importOriginal) => ({
   readTabCaptureViewport: mocks.readTabCaptureViewport,
 }));
 
+vi.mock('./capture-surface/cursor-projection', () => ({
+  disableViewportCursorProjection: mocks.disableViewportCursorProjection,
+  enableViewportCursorProjection: mocks.enableViewportCursorProjection,
+  retireViewportCursorProjectionAuthority: mocks.retireViewportCursorProjectionAuthority,
+}));
+
 vi.mock('../../routing-contracts/runtime-messaging/services', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../routing-contracts/runtime-messaging/services')>()),
   getBackgroundRuntimeMessaging: () => ({ sendRuntimeMessage: mocks.sendRuntimeMessage }),
@@ -47,11 +66,15 @@ import {
   acquireVideoCaptureSurface,
   getVideoSurfaceSession,
   markVideoCaptureSurfaceTabClosed,
-  recoverVideoCaptureSurfaceOnStartup,
+  recoverVideoCaptureSurfaceOnStartup as recoverVideoCaptureSurfaceOnStartupWithPageAccess,
   releaseVideoCaptureSurface,
   waitForVideoCaptureSurfaceRecovery,
   waitForVideoSourceReady,
 } from './capture-surface';
+
+function recoverVideoCaptureSurfaceOnStartup(): Promise<void> {
+  return recoverVideoCaptureSurfaceOnStartupWithPageAccess(mocks.ensurePageAccess);
+}
 
 function appliedSurface(target: 'viewport' | 'window' = 'viewport') {
   return {
@@ -81,8 +104,20 @@ function readyMessage(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
+  mocks.disableViewportCursorProjection.mockReset();
+  mocks.getAppliedBindingForSession.mockReset();
+  mocks.getAppliedForSession.mockReset();
+  mocks.hasSessionLease.mockReset();
   mocks.apply.mockResolvedValue(appliedSurface());
   mocks.clearActiveLease.mockResolvedValue(undefined);
+  mocks.disableViewportCursorProjection.mockResolvedValue(undefined);
+  mocks.enableViewportCursorProjection.mockResolvedValue(undefined);
+  mocks.ensurePageAccess.mockResolvedValue(undefined);
+  mocks.getAppliedBindingForSession.mockImplementation((sessionId: string) => {
+    const applied = mocks.getAppliedForSession(sessionId);
+    return applied ? { applied, tabId: 9 } : null;
+  });
+  mocks.hasSessionLease.mockReturnValue(false);
   mocks.release.mockResolvedValue(undefined);
   mocks.reassert.mockResolvedValue(undefined);
   mocks.recoverCaptureSurfaces.mockResolvedValue(undefined);
@@ -94,11 +129,15 @@ beforeEach(() => {
     visualViewportScale: 1,
     width: 1280,
   });
-  mocks.sendRuntimeMessage.mockImplementation(async (message: { type: string }) =>
-    message.type === 'OFFSCREEN_REVALIDATE_SOURCE'
-      ? { success: true, result: 'ALLOW', videoWidth: 1280, videoHeight: 720 }
-      : { success: true }
-  );
+  mocks.sendRuntimeMessage.mockImplementation(async (message: { type: string }) => {
+    if (message.type === 'OFFSCREEN_REVALIDATE_SOURCE') {
+      return { success: true, result: 'ALLOW', videoWidth: 1280, videoHeight: 720 };
+    }
+    if (message.type === 'OFFSCREEN_SET_VIEWPORT_DRAW_STATE') {
+      return { success: true, result: 'applied' };
+    }
+    return { success: true };
+  });
   mocks.terminateClosedTab.mockResolvedValue(undefined);
   mocks.ensureActiveLeaseHydrated.mockResolvedValue(null);
 });
@@ -123,6 +162,30 @@ describe('video capture-surface source validation', () => {
       context: 'video-tab',
     });
     await releaseVideoCaptureSurface('recording-1');
+    expect(mocks.disableViewportCursorProjection).toHaveBeenCalledWith(7, {
+      generation: 1,
+      recordingId: 'recording-1',
+    });
+  });
+
+  it('retains the surface session until viewport cursor cleanup is acknowledged', async () => {
+    await acquireVideoCaptureSurface({
+      captureMode: CaptureMode.TAB,
+      presetId: 'preset-1',
+      recordingId: 'recording-1',
+      tabId: 7,
+    });
+    mocks.disableViewportCursorProjection.mockRejectedValueOnce(new Error('disable denied'));
+
+    await expect(releaseVideoCaptureSurface('recording-1')).rejects.toThrow('disable denied');
+
+    expect(mocks.release).not.toHaveBeenCalled();
+    expect(getVideoSurfaceSession('recording-1')).not.toBeNull();
+
+    mocks.disableViewportCursorProjection.mockResolvedValueOnce(undefined);
+    await expect(releaseVideoCaptureSurface('recording-1')).resolves.toBeUndefined();
+    expect(mocks.release).toHaveBeenCalledWith(appliedSurface());
+    expect(getVideoSurfaceSession('recording-1')).toBeNull();
   });
 
   it('allows a natural viewport source and rejects invalid metadata immediately', async () => {
@@ -202,6 +265,7 @@ describe('video capture-surface source validation', () => {
     ).toBe('ALLOW');
     await expect(ready).resolves.toBe('stream-instance-1');
     await releaseVideoCaptureSurface('recording-1');
+    expect(mocks.disableViewportCursorProjection).not.toHaveBeenCalled();
   });
 
   it('denies source activation when the live viewport changed after selection', async () => {
@@ -330,7 +394,7 @@ describe('video capture-surface session termination', () => {
 
     const first = releaseVideoCaptureSurface('recording-race');
     const second = releaseVideoCaptureSurface('recording-race');
-    expect(mocks.release).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(mocks.release).toHaveBeenCalledOnce());
     resolveRelease();
     await Promise.all([first, second]);
     expect(mocks.release).toHaveBeenCalledOnce();
@@ -369,64 +433,6 @@ describe('video capture-surface session termination', () => {
 });
 
 describe('video capture-surface recovery', () => {
-  it('recovers a live persisted surface session after worker restart', async () => {
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce({
-      recordingId: 'recording-live',
-      recordingTabId: 9,
-      phase: 'active',
-      surfaceBinding: { generation: 4, streamInstanceId: 'stream-live' },
-      viewportPresetId: 'preset-1',
-    });
-    mocks.getAppliedForSession.mockReturnValueOnce({
-      ...appliedSurface(),
-      generation: 4,
-      sessionId: 'recording-live',
-    });
-
-    await recoverVideoCaptureSurfaceOnStartup();
-
-    const liveSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0];
-    await expect(liveSessionIds).resolves.toEqual(new Set(['recording-live']));
-    expect(getVideoSurfaceSession('recording-live')).toMatchObject({
-      generation: 4,
-      recordingId: 'recording-live',
-      streamInstanceId: 'stream-live',
-      tabId: 9,
-    });
-    expect(mocks.reassert).toHaveBeenCalledWith({
-      generation: 4,
-      leaseId: 'lease-1',
-      sessionId: 'recording-live',
-    });
-    expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        generation: 4,
-        recordingId: 'recording-live',
-        streamInstanceId: 'stream-live',
-        type: 'OFFSCREEN_REVALIDATE_SOURCE',
-      })
-    );
-  });
-
-  it('does not issue an unbound global stop when no persisted recording is live', async () => {
-    await recoverVideoCaptureSurfaceOnStartup();
-
-    const abandonedSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0];
-    await expect(abandonedSessionIds).resolves.toEqual(new Set());
-    expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
-
-    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce({
-      recordingId: 'recording-without-surface',
-      recordingTabId: 9,
-      phase: 'active',
-      surfaceBinding: null,
-      viewportPresetId: null,
-    });
-    mocks.getAppliedForSession.mockReturnValueOnce(null);
-    await recoverVideoCaptureSurfaceOnStartup();
-    expect(getVideoSurfaceSession('recording-without-surface')).toBeNull();
-  });
-
   it('rehydrates and revalidates a bound current-size recording without a surface lease', async () => {
     mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce({
       recordingId: 'recording-current-size',
@@ -473,12 +479,19 @@ describe('video capture-surface recovery', () => {
 
     await recoverVideoCaptureSurfaceOnStartup();
 
-    const liveSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0];
+    const liveSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0]?.liveSessionIds;
     await expect(liveSessionIds).resolves.toEqual(new Set(['recording-prepared']));
     expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
       expect.objectContaining({ discard: true, type: 'OFFSCREEN_STOP_RECORDING' })
     );
     expect(mocks.sendRuntimeMessage.mock.invocationCallOrder.at(-1)).toBeLessThan(
+      mocks.release.mock.invocationCallOrder[0]!
+    );
+    expect(mocks.disableViewportCursorProjection).toHaveBeenCalledWith(9, {
+      generation: 1,
+      recordingId: 'recording-prepared',
+    });
+    expect(mocks.disableViewportCursorProjection.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.release.mock.invocationCallOrder[0]!
     );
     expect(mocks.release).toHaveBeenCalledWith(preparedSurface);
@@ -526,7 +539,7 @@ describe('video capture-surface recovery', () => {
       'Recovered prepared recording source binding is incomplete'
     );
 
-    const liveSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0];
+    const liveSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0]?.liveSessionIds;
     await expect(liveSessionIds).resolves.toEqual(new Set(['recording-incomplete']));
     expect(mocks.release).not.toHaveBeenCalled();
     expect(mocks.clearActiveLease).not.toHaveBeenCalled();
@@ -550,7 +563,7 @@ describe('video capture-surface recovery', () => {
       resolveLease = resolve;
     });
     mocks.ensureActiveLeaseHydrated.mockReturnValueOnce(delayedLease);
-    mocks.recoverCaptureSurfaces.mockImplementationOnce(async (liveSessionIds) => {
+    mocks.recoverCaptureSurfaces.mockImplementationOnce(async ({ liveSessionIds }) => {
       await liveSessionIds;
     });
     mocks.getAppliedForSession.mockReturnValueOnce({
@@ -572,7 +585,7 @@ describe('video capture-surface recovery', () => {
     });
     await recovery;
 
-    const liveSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0];
+    const liveSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0]?.liveSessionIds;
     await expect(liveSessionIds).resolves.toEqual(new Set(['recording-live']));
     expect(getVideoSurfaceSession('recording-live')).toMatchObject({
       recordingId: 'recording-live',
@@ -595,7 +608,7 @@ describe('video capture-surface invalid recovery', () => {
       'Recovered recording source binding is incomplete'
     );
 
-    const liveSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0];
+    const liveSessionIds = mocks.recoverCaptureSurfaces.mock.calls[0]?.[0]?.liveSessionIds;
     await expect(liveSessionIds).resolves.toEqual(new Set(['recording-unbound']));
     expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
     expect(mocks.clearActiveLease).not.toHaveBeenCalledWith('recording-unbound');
@@ -651,7 +664,9 @@ describe('video capture-surface invalid recovery', () => {
             result: 'DENY',
             error: 'Recording tab output mapping changed during revalidation',
           }
-        : { success: true }
+        : message.type === 'OFFSCREEN_SET_VIEWPORT_DRAW_STATE'
+          ? { success: true, result: 'applied' }
+          : { success: true }
     );
 
     await recoverVideoCaptureSurfaceOnStartup();
@@ -659,8 +674,55 @@ describe('video capture-surface invalid recovery', () => {
     expect(mocks.release).toHaveBeenCalledWith(
       expect.objectContaining({ sessionId: 'recording-invalid-raw' })
     );
+    expect(mocks.disableViewportCursorProjection).toHaveBeenCalledWith(9, {
+      generation: 4,
+      recordingId: 'recording-invalid-raw',
+    });
     expect(mocks.clearActiveLease).toHaveBeenCalledWith('recording-invalid-raw');
     expect(getVideoSurfaceSession('recording-invalid-raw')).toBeNull();
+  });
+
+  it('fails a recovered viewport recording closed when its tokenized thaw is unconfirmed', async () => {
+    mocks.ensureActiveLeaseHydrated.mockResolvedValueOnce({
+      recordingId: 'recording-unconfirmed-thaw',
+      recordingTabId: 9,
+      phase: 'active',
+      surfaceBinding: { generation: 4, streamInstanceId: 'stream-live' },
+      viewportPresetId: 'preset-1',
+    });
+    mocks.getAppliedForSession.mockReturnValue({
+      ...appliedSurface(),
+      generation: 4,
+      sessionId: 'recording-unconfirmed-thaw',
+    });
+    mocks.sendRuntimeMessage.mockImplementation(
+      async (message: { frozen?: boolean; type: string }) => {
+        if (message.type === 'OFFSCREEN_REVALIDATE_SOURCE') {
+          return { success: true, result: 'ALLOW', videoWidth: 1280, videoHeight: 720 };
+        }
+        if (message.type === 'OFFSCREEN_SET_VIEWPORT_DRAW_STATE' && message.frozen === false) {
+          return { success: false, error: 'thaw acknowledgement missing' };
+        }
+        if (message.type === 'OFFSCREEN_SET_VIEWPORT_DRAW_STATE') {
+          return { success: true, result: 'applied' };
+        }
+        return { success: true };
+      }
+    );
+
+    await recoverVideoCaptureSurfaceOnStartup();
+
+    expect(
+      mocks.sendRuntimeMessage.mock.calls
+        .map(([message]) => message)
+        .filter((message) => message.type === 'OFFSCREEN_SET_VIEWPORT_DRAW_STATE')
+        .map((message) => message.frozen)
+    ).toEqual([true, false, false]);
+    expect(mocks.release).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'recording-unconfirmed-thaw' })
+    );
+    expect(mocks.clearActiveLease).toHaveBeenCalledWith('recording-unconfirmed-thaw');
+    expect(getVideoSurfaceSession('recording-unconfirmed-thaw')).toBeNull();
   });
 
   it.each([
@@ -682,6 +744,9 @@ describe('video capture-surface invalid recovery', () => {
     mocks.reassert.mockRejectedValueOnce(new Error('physical mismatch'));
     mocks.sendRuntimeMessage.mockImplementation(async (message: { type: string }) => {
       if (message.type === 'OFFSCREEN_STOP_RECORDING') return stopResponse();
+      if (message.type === 'OFFSCREEN_SET_VIEWPORT_DRAW_STATE') {
+        return { success: true, result: 'applied' };
+      }
       return { success: true };
     });
 

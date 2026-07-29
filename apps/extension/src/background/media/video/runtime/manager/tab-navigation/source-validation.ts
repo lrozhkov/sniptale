@@ -5,7 +5,6 @@ import { getBackgroundRuntimeMessaging } from '../../../../../routing-contracts/
 import { getVideoSurfaceSession } from '../../../capture-surface';
 import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 import { readTabCaptureViewport } from '../../../capture-viewport';
-import type { TabNavigationPageAccessVerifier } from './page-effects';
 
 type TabSourceValidationBinding = {
   generation: number;
@@ -13,24 +12,6 @@ type TabSourceValidationBinding = {
   streamInstanceId: string;
   tabId: number;
 };
-
-export async function setViewportOutputFrozen(
-  binding: TabSourceValidationBinding,
-  frozen: boolean
-): Promise<void> {
-  const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
-    attachOffscreenCommandCapability({
-      type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
-      recordingId: binding.recordingId,
-      generation: binding.generation,
-      streamInstanceId: binding.streamInstanceId,
-      frozen,
-    })
-  );
-  if (response?.success !== true) {
-    throw new Error(response?.error ?? 'Viewport output frame state could not be updated');
-  }
-}
 
 export async function reassertViewportSurface(binding: TabSourceValidationBinding): Promise<void> {
   const applied = getVideoSurfaceSession(binding.recordingId)?.applied;
@@ -45,16 +26,10 @@ export async function reassertViewportSurface(binding: TabSourceValidationBindin
 export async function revalidateTabSource(
   binding: TabSourceValidationBinding,
   liveViewport: ViewportInfo | null,
-  ensurePageAccess: TabNavigationPageAccessVerifier
+  transitionId?: string
 ): Promise<void> {
   const session = getVideoSurfaceSession(binding.recordingId);
   if (!session) throw new Error('Video surface session is unavailable after navigation');
-  if (liveViewport === null) {
-    await ensurePageAccess(
-      binding.tabId,
-      'Recording source cannot be verified on the navigated page.'
-    );
-  }
   const verifiedViewport = liveViewport ?? (await readTabCaptureViewport(binding.tabId));
   const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
     attachOffscreenCommandCapability({
@@ -62,6 +37,7 @@ export async function revalidateTabSource(
       recordingId: binding.recordingId,
       generation: binding.generation,
       streamInstanceId: binding.streamInstanceId,
+      ...(transitionId ? { transitionId } : {}),
       viewport: verifiedViewport,
     })
   );
@@ -69,11 +45,16 @@ export async function revalidateTabSource(
     throw new Error(response?.error ?? 'Tab source mapping revalidation failed');
   }
   if (
-    typeof session.sourceVideoWidth === 'number' &&
-    typeof session.sourceVideoHeight === 'number' &&
-    (response.videoWidth !== session.sourceVideoWidth ||
-      response.videoHeight !== session.sourceVideoHeight)
+    !Number.isFinite(response.videoWidth) ||
+    !Number.isFinite(response.videoHeight) ||
+    (response.videoWidth ?? 0) <= 0 ||
+    (response.videoHeight ?? 0) <= 0
   ) {
-    throw new Error('Raw recording source dimensions changed after navigation');
+    throw new Error('Raw recording source dimensions are unavailable after navigation');
   }
+  if (getVideoSurfaceSession(binding.recordingId) !== session) {
+    throw new Error('Video surface session changed during source revalidation');
+  }
+  session.sourceVideoWidth = response.videoWidth ?? null;
+  session.sourceVideoHeight = response.videoHeight ?? null;
 }

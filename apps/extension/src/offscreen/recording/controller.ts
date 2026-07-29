@@ -22,6 +22,7 @@ import {
   stopMultiSourceRecording,
 } from './multi-source';
 import { updateRecordingSettings as applyRecordingSettings } from './update-settings';
+import type { CropStreamDrawStateResult } from './stream/crop-stream';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingController' });
 const runtimeMessaging = createRuntimeMessagingTransport();
@@ -354,18 +355,20 @@ export function resumeRecording(binding: RecordingSourceBinding): void {
   );
 }
 
-export async function setViewportDrawState(
+export function activateViewportOutput(binding: RecordingSourceBinding): void {
+  assertActiveRecordingBinding(binding);
+  recordingContext.tabOutputControls?.activate();
+}
+
+export function setViewportDrawState(
   binding: RecordingSourceBinding,
-  frozen: boolean
-): Promise<void> {
+  frozen: boolean,
+  transitionId: string
+): CropStreamDrawStateResult {
   assertActiveRecordingBinding(binding);
   const controls = recordingContext.tabOutputControls;
   if (!controls) throw new Error('Tab output frame controls are unavailable');
-  if (frozen) {
-    controls.suspend();
-    return;
-  }
-  await controls.resume();
+  return controls.setFrozen(transitionId, frozen);
 }
 
 export function updateRecordingSettings(

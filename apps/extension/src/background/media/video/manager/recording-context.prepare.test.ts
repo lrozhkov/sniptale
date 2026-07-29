@@ -4,6 +4,7 @@ const {
   announceCaptureSourceMock,
   browserTabsGetMock,
   enableAnnotationsOrAbortMock,
+  enableViewportCursorProjectionOrAbortMock,
   ensureOffscreenDocumentReadyMock,
   ensureOffscreenDocumentReadyOrAbortMock,
   getVideoCaptureModeCapabilityMock,
@@ -15,6 +16,7 @@ const {
   announceCaptureSourceMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   enableAnnotationsOrAbortMock: vi.fn(),
+  enableViewportCursorProjectionOrAbortMock: vi.fn(),
   ensureOffscreenDocumentReadyMock: vi.fn(),
   ensureOffscreenDocumentReadyOrAbortMock: vi.fn(),
   getVideoCaptureModeCapabilityMock: vi.fn(),
@@ -48,6 +50,7 @@ vi.mock('./flow', async (importOriginal) => ({
 }));
 vi.mock('./transport.resolve', () => ({
   enableAnnotationsOrAbort: enableAnnotationsOrAbortMock,
+  enableViewportCursorProjectionOrAbort: enableViewportCursorProjectionOrAbortMock,
   ensureOffscreenDocumentReadyOrAbort: ensureOffscreenDocumentReadyOrAbortMock,
 }));
 vi.mock('./preflight.offscreen', () => ({
@@ -82,6 +85,7 @@ beforeEach(() => {
   prepareVideoCaptureSurfaceMock.mockResolvedValue(null);
   ensureOffscreenDocumentReadyOrAbortMock.mockResolvedValue(true);
   enableAnnotationsOrAbortMock.mockResolvedValue(undefined);
+  enableViewportCursorProjectionOrAbortMock.mockResolvedValue(true);
   readLiveViewportMock.mockResolvedValue({
     devicePixelRatio: 2,
     height: 720,
@@ -174,11 +178,45 @@ it('applies the final surface before acquiring the tab stream', async () => {
   expect(prepareVideoCaptureSurfaceMock.mock.invocationCallOrder[0]).toBeLessThan(
     resolveCaptureSourceForModeMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
   );
+  expect(enableViewportCursorProjectionOrAbortMock).toHaveBeenCalledWith(42, CaptureMode.TAB, {
+    generation: 1,
+    recordingId: 'recording-1',
+  });
+  expect(enableAnnotationsOrAbortMock.mock.invocationCallOrder[0]).toBeLessThan(
+    enableViewportCursorProjectionOrAbortMock.mock.invocationCallOrder[0] ??
+      Number.POSITIVE_INFINITY
+  );
+  expect(enableViewportCursorProjectionOrAbortMock.mock.invocationCallOrder[0]).toBeLessThan(
+    resolveCaptureSourceForModeMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+  );
   expect(announceCaptureSourceMock).toHaveBeenCalledWith(
     { mode: CaptureMode.TAB, streamId: 'stream-1' },
     CaptureMode.TAB,
     'preset-1'
   );
+});
+
+it('aborts before source acquisition when viewport cursor projection cannot be prepared', async () => {
+  prepareVideoCaptureSurfaceMock.mockResolvedValue({
+    generation: 1,
+    height: 720,
+    leaseId: 'lease-1',
+    presetId: 'preset-1',
+    sessionId: 'recording-1',
+    target: 'viewport',
+    width: 1280,
+  });
+  enableViewportCursorProjectionOrAbortMock.mockResolvedValue(false);
+
+  await expect(
+    initializeRecordingContext({
+      captureMode: CaptureMode.TAB,
+      settings: createSettings(),
+      tabId: 42,
+      viewportPresetId: 'preset-1',
+    })
+  ).resolves.toBeNull();
+  expect(resolveCaptureSourceForModeMock).not.toHaveBeenCalled();
 });
 
 it('fails before mutation when the capture mode is unsupported', async () => {

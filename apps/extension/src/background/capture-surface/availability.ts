@@ -6,6 +6,8 @@ import type {
   ViewportPresetAvailabilityReason,
   ViewportPresetTarget,
 } from '../../features/viewport-presets/contracts';
+import { isViewportPresetAllowedForVideoCaptureMode } from '../../features/viewport-presets/video-recording-policy';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import type { CaptureSurfaceLeaseState, CaptureSurfaceContext } from './types';
 import { getTabZoom } from './viewport';
 import { readViewportCapacity as readPageViewportCapacity } from './viewport-capacity';
@@ -146,6 +148,12 @@ function projectStaticAvailability(args: {
     return unavailable(preset.id, 'disabled', { target: preset.target, required });
   }
   if (context === 'video-screen') {
+    return unavailable(preset.id, 'unsupported-context', { target: preset.target, required });
+  }
+  if (
+    context === 'video-tab-crop' &&
+    !isViewportPresetAllowedForVideoCaptureMode(CaptureMode.TAB_CROP, preset)
+  ) {
     return unavailable(preset.id, 'unsupported-context', { target: preset.target, required });
   }
   if (windowId === null) {

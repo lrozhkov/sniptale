@@ -123,6 +123,57 @@ describe('capture-surface availability', () => {
     ).resolves.toMatchObject({ status: 'available', target: 'window' });
   });
 
+  it('rejects viewport mutation but permits window sizing for TAB_CROP video', async () => {
+    const service = new DefaultCaptureSurfaceService();
+
+    await expect(
+      service.apply({
+        sessionId: 'crop-viewport',
+        generation: 1,
+        owner: 'video',
+        tabId: 7,
+        presetId: viewportPreset.id,
+        context: 'video-tab-crop',
+      })
+    ).rejects.toMatchObject({ code: 'unsupported-context' });
+    expect(mocks.prepareViewportSurface).not.toHaveBeenCalled();
+
+    await expect(
+      service.apply({
+        sessionId: 'crop-window',
+        generation: 1,
+        owner: 'video',
+        tabId: 7,
+        presetId: windowPreset.id,
+        context: 'video-tab-crop',
+      })
+    ).resolves.toMatchObject({ target: 'window' });
+  });
+
+  it('revalidates TAB_CROP policy against the final preset snapshot before mutation', async () => {
+    const service = new DefaultCaptureSurfaceService();
+    mocks.loadSettings
+      .mockResolvedValueOnce({ viewportPresets: [windowPreset] })
+      .mockResolvedValueOnce({
+        viewportPresets: [{ ...viewportPreset, id: windowPreset.id }],
+      });
+
+    await expect(
+      service.apply({
+        sessionId: 'crop-preset-race',
+        generation: 1,
+        owner: 'video',
+        tabId: 7,
+        presetId: windowPreset.id,
+        context: 'video-tab-crop',
+      })
+    ).rejects.toMatchObject({ code: 'unsupported-context' });
+
+    expect(mocks.prepareViewportSurface).not.toHaveBeenCalled();
+    expect(mocks.prepareWindowSize).not.toHaveBeenCalled();
+    expect(mocks.writeJournal).not.toHaveBeenCalled();
+  });
+
   it('reports missing, disabled, unsupported-tab, and platform failures as typed availability', async () => {
     const service = new DefaultCaptureSurfaceService();
     await expect(

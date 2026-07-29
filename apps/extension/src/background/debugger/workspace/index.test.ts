@@ -65,10 +65,10 @@ it('applies and verifies exact viewport metrics', async () => {
     { tabId: 9 },
     'Emulation.setDeviceMetricsOverride',
     expect.objectContaining({
-      deviceScaleFactor: 1,
-      viewport: expect.objectContaining({ scale: 2 }),
+      deviceScaleFactor: 2,
     })
   );
+  expect(browserDebuggerMock.sendCommand.mock.calls[1]?.[2]).not.toHaveProperty('viewport');
   expect(browserDebuggerMock.sendCommand).toHaveBeenNthCalledWith(
     3,
     { tabId: 9 },
@@ -141,12 +141,10 @@ it('reapplies once when the tab moves to a differently scaled display during pai
     ([, method]) => method === 'Emulation.setDeviceMetricsOverride'
   );
   expect(overrideCalls).toHaveLength(2);
-  expect(overrideCalls[0]?.[2]).toEqual(
-    expect.objectContaining({ viewport: expect.objectContaining({ scale: 1.25 }) })
-  );
-  expect(overrideCalls[1]?.[2]).toEqual(
-    expect.objectContaining({ viewport: expect.objectContaining({ scale: 1.5 }) })
-  );
+  expect(overrideCalls[0]?.[2]).toEqual(expect.objectContaining({ deviceScaleFactor: 1.25 }));
+  expect(overrideCalls[1]?.[2]).toEqual(expect.objectContaining({ deviceScaleFactor: 1.5 }));
+  expect(overrideCalls[0]?.[2]).not.toHaveProperty('viewport');
+  expect(overrideCalls[1]?.[2]).not.toHaveProperty('viewport');
 });
 
 it('reports owned viewport state when compositor scale keeps changing', async () => {

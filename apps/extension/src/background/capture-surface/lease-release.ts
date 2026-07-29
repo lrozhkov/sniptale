@@ -1,6 +1,10 @@
 import type { CaptureSurfaceOwner } from '../storage/capture-surface/contracts';
 import { releaseViewportSurfaceAcquisition } from './viewport';
-import type { CaptureSurfaceLeaseState, CaptureSurfaceReleaseRequest } from './types';
+import type {
+  BeforeCaptureSurfaceOwnerRelease,
+  CaptureSurfaceLeaseState,
+  CaptureSurfaceReleaseRequest,
+} from './types';
 import { CaptureSurfaceError } from './types';
 import type { CaptureSurfaceLeaseRegistry } from './lease-registry';
 import {
@@ -55,7 +59,10 @@ export class CaptureSurfaceLeaseRelease {
     }
   }
 
-  async releaseOwners(owners: ReadonlySet<CaptureSurfaceOwner>): Promise<void> {
+  async releaseOwners(
+    owners: ReadonlySet<CaptureSurfaceOwner>,
+    beforeRelease?: BeforeCaptureSurfaceOwnerRelease
+  ): Promise<void> {
     while ([...this.registry.values()].some((state) => owners.has(state.entry.owner))) {
       const top = [...this.registry.stacks()]
         .map((stack) => stack.at(-1))
@@ -68,6 +75,13 @@ export class CaptureSurfaceLeaseRelease {
           'A requested owner lease is suspended beneath another surface'
         );
       }
+      await beforeRelease?.({
+        generation: top.entry.generation,
+        owner: top.entry.owner,
+        sessionId: top.entry.sessionId,
+        tabId: top.entry.tabId,
+        target: top.entry.target,
+      });
       await this.release(top.applied);
     }
   }

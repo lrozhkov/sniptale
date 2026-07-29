@@ -1,5 +1,7 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import type { ViewportPreset } from '../../features/viewport-presets/contracts';
+import { isViewportPresetAllowedForVideoCaptureMode } from '../../features/viewport-presets/video-recording-policy';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import type { CaptureSurfaceSnapshot } from '../storage/capture-surface/contracts';
 import {
   getCaptureSurfaceAvailability,
@@ -44,6 +46,12 @@ export class CaptureSurfaceLeasePreparation {
     }
     const preset = await resolveCaptureSurfacePreset(request.presetId);
     if (!preset?.enabled) throw new CaptureSurfaceError(preset ? 'disabled' : 'missing');
+    if (
+      request.context === 'video-tab-crop' &&
+      !isViewportPresetAllowedForVideoCaptureMode(CaptureMode.TAB_CROP, preset)
+    ) {
+      throw new CaptureSurfaceError('unsupported-context');
+    }
     const tab = await browserTabs.get(request.tabId);
     if (!tab.windowId) throw new CaptureSurfaceError('unsupported-context');
     if (

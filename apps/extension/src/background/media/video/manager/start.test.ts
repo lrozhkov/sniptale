@@ -264,7 +264,7 @@ async function verifiesCropGeometryPersistence(): Promise<void> {
     },
   });
 
-  await startRecordingFromPopup(defaultSettings, CaptureMode.TAB_CROP, viewportPreset.id);
+  await startRecordingFromPopup(defaultSettings, CaptureMode.TAB_CROP);
 
   expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith(
     expect.objectContaining({ captureMode: CaptureMode.TAB_CROP, cropRegion })

@@ -6,19 +6,27 @@ const mocks = vi.hoisted(() => ({
   abandonEffects: vi.fn(),
   beginEffects: vi.fn(),
   captureMode: 'TAB' as CaptureMode,
+  createTransitionId: vi.fn(),
   deferRecovery: vi.fn(),
-  effects: { controlledCursor: false, cropOverlay: false },
+  effects: { controlledCursor: false, cropOverlay: false, viewportCursorProjection: false },
   getRecordingId: vi.fn(),
   getRecordingTabId: vi.fn(),
   getRuntimeState: vi.fn(),
   getSurfaceSession: vi.fn(),
+  pageAccessVerifier: vi.fn(),
   reassertViewport: vi.fn(),
+  resolveEffects: vi.fn(),
   restoreEffects: vi.fn(),
+  restoreViewportProjection: vi.fn(),
   revalidateSource: vi.fn(),
   sendRuntimeMessage: vi.fn(),
   setRuntimeState: vi.fn(),
   stop: vi.fn(),
   suspendEffects: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/security/secure-random-id', () => ({
+  createSecureRandomUuid: mocks.createTransitionId,
 }));
 
 vi.mock('../../../capture-surface', async (importOriginal) => ({
@@ -51,8 +59,9 @@ vi.mock('./page-effects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./page-effects')>()),
   abandonTabNavigationPageEffects: mocks.abandonEffects,
   beginTabNavigationPageEffects: mocks.beginEffects,
-  resolveTabNavigationPageEffects: () => mocks.effects,
+  resolveTabNavigationPageEffects: mocks.resolveEffects,
   restoreTabNavigationPageEffects: mocks.restoreEffects,
+  restoreViewportCursorProjectionBeforeThaw: mocks.restoreViewportProjection,
   suspendTabNavigationPageEffects: mocks.suspendEffects,
 }));
 vi.mock('./source-validation', async (importOriginal) => ({
@@ -62,15 +71,35 @@ vi.mock('./source-validation', async (importOriginal) => ({
 }));
 
 import {
-  handleTabRecordingDebuggerDetach,
+  handleTabRecordingDebuggerDetach as handleTabRecordingDebuggerDetachWithPageAccess,
   handleTabRecordingNavigationCommitted,
-  handleTabRecordingNavigationCompleted,
-  handleTabRecordingNavigationError,
+  handleTabRecordingNavigationCompleted as handleTabRecordingNavigationCompletedWithPageAccess,
+  handleTabRecordingNavigationError as handleTabRecordingNavigationErrorWithPageAccess,
   handleTabRecordingNavigationStart,
   isTabRecordingNavigationPending,
   markTabRecordingManuallyPaused,
   resetTabRecordingNavigationForTests,
 } from '.';
+
+function handleTabRecordingDebuggerDetach(tabId: number): boolean {
+  return handleTabRecordingDebuggerDetachWithPageAccess(tabId, mocks.pageAccessVerifier);
+}
+
+function handleTabRecordingNavigationCompleted(tabId: number, documentId: string): boolean {
+  return handleTabRecordingNavigationCompletedWithPageAccess(
+    tabId,
+    documentId,
+    mocks.pageAccessVerifier
+  );
+}
+
+function handleTabRecordingNavigationError(tabId: number, documentId: string): boolean {
+  return handleTabRecordingNavigationErrorWithPageAccess(
+    tabId,
+    documentId,
+    mocks.pageAccessVerifier
+  );
+}
 
 const viewportSurface = {
   generation: 1,
@@ -117,7 +146,16 @@ beforeEach(() => {
   resetTabRecordingNavigationForTests();
   mocks.beginEffects.mockReturnValue(null);
   mocks.captureMode = CaptureMode.TAB;
-  mocks.effects = { controlledCursor: false, cropOverlay: false };
+  mocks.createTransitionId.mockReset();
+  mocks.createTransitionId
+    .mockReturnValueOnce('navigation-1')
+    .mockReturnValueOnce('navigation-2')
+    .mockReturnValue('navigation-3');
+  mocks.effects = {
+    controlledCursor: false,
+    cropOverlay: false,
+    viewportCursorProjection: false,
+  };
   mocks.deferRecovery.mockReturnValue(false);
   mocks.getRecordingId.mockReturnValue('recording-1');
   mocks.getRecordingTabId.mockReturnValue(7);
@@ -126,7 +164,9 @@ beforeEach(() => {
     status: VideoRecordingStatus.RECORDING,
   });
   mocks.getSurfaceSession.mockReturnValue(createSurfaceSession());
+  mocks.pageAccessVerifier.mockResolvedValue(undefined);
   mocks.reassertViewport.mockResolvedValue(undefined);
+  mocks.resolveEffects.mockImplementation(() => mocks.effects);
   mocks.restoreEffects.mockResolvedValue({
     controlledCursorRestored: true,
     liveViewport: {
@@ -137,8 +177,13 @@ beforeEach(() => {
       width: 1280,
     },
   });
+  mocks.restoreViewportProjection.mockResolvedValue(true);
   mocks.revalidateSource.mockResolvedValue(undefined);
-  mocks.sendRuntimeMessage.mockResolvedValue({ success: true });
+  mocks.sendRuntimeMessage.mockImplementation(async (message: { type: string }) =>
+    message.type === VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE
+      ? { success: true, result: 'applied' }
+      : { success: true }
+  );
   mocks.stop.mockResolvedValue({ result: 'accepted' });
   mocks.suspendEffects.mockResolvedValue(undefined);
 });
@@ -204,10 +249,19 @@ it('revalidates viewport recording without interrupting the recorder', async () 
   const order: string[] = [];
   mocks.sendRuntimeMessage.mockImplementation(async (message: { type: string }) => {
     order.push(message.type);
-    return { success: true };
+    return { success: true, result: 'applied' };
   });
   mocks.reassertViewport.mockImplementation(async () => order.push('surface'));
+  mocks.pageAccessVerifier.mockImplementation(async () => order.push('access'));
   mocks.revalidateSource.mockImplementation(async () => order.push('source'));
+  mocks.restoreViewportProjection.mockImplementation(async () => {
+    order.push('projection');
+    return true;
+  });
+  mocks.restoreEffects.mockImplementation(async () => {
+    order.push('page');
+    return { controlledCursorRestored: true, liveViewport: null };
+  });
 
   expect(handleTabRecordingNavigationStart(7)).toBe(true);
   expect(handleTabRecordingNavigationCommitted(7, 'document-1')).toBe(true);
@@ -217,14 +271,39 @@ it('revalidates viewport recording without interrupting the recorder', async () 
   expect(order).toEqual([
     VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
     'surface',
+    'access',
+    'projection',
     'source',
     VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
+    'page',
   ]);
+  expect(mocks.revalidateSource).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1' }),
+    null,
+    'navigation-1'
+  );
   expectViewportDrawStates([true, false]);
   expect(mocks.stop).not.toHaveBeenCalled();
 });
 
-it('keeps viewport output frozen when final source validation fails', async () => {
+it('stops exact viewport output before source validation when page access cannot be restored', async () => {
+  mocks.pageAccessVerifier.mockRejectedValueOnce(new Error('page access unavailable'));
+
+  handleTabRecordingNavigationStart(7);
+  handleTabRecordingNavigationCommitted(7, 'document-1');
+  handleTabRecordingNavigationCompleted(7, 'document-1');
+  await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
+
+  expect(mocks.pageAccessVerifier).toHaveBeenCalledWith(
+    7,
+    'Recording page access is required to restore exact tab output.'
+  );
+  expect(mocks.revalidateSource).not.toHaveBeenCalled();
+  expectViewportDrawStates([true]);
+  expect(mocks.stop).toHaveBeenCalledOnce();
+});
+
+it('stops a viewport recording instead of leaving output frozen after source validation fails', async () => {
   mocks.revalidateSource.mockRejectedValueOnce(
     new Error('Raw recording source dimensions changed after navigation')
   );
@@ -235,17 +314,72 @@ it('keeps viewport output frozen when final source validation fails', async () =
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
   expectViewportDrawStates([true]);
-  expect(mocks.stop).not.toHaveBeenCalled();
+  expect(mocks.stop).toHaveBeenCalledOnce();
+  expect(mocks.setRuntimeState).toHaveBeenCalledWith(
+    expect.objectContaining({
+      error: 'Raw recording source dimensions changed after navigation',
+    })
+  );
 });
 
-it('re-freezes viewport output when its resume acknowledgement is missing', async () => {
+it('compensates with the same viewport thaw when the critical bound stop is rejected', async () => {
+  mocks.revalidateSource.mockRejectedValueOnce(
+    new Error('Raw recording source dimensions changed')
+  );
+  mocks.stop.mockResolvedValueOnce({ error: 'stop transport unavailable', result: 'failed' });
+
+  handleTabRecordingNavigationStart(7);
+  handleTabRecordingNavigationCommitted(7, 'document-1');
+  handleTabRecordingNavigationCompleted(7, 'document-1');
+  await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
+
+  expect(mocks.stop).toHaveBeenCalledOnce();
+  expectViewportDrawStates([true, false]);
+  const transitions = mocks.sendRuntimeMessage.mock.calls.map(([message]) => message.transitionId);
+  expect(transitions).toEqual(['navigation-1', 'navigation-1']);
+  expect(mocks.setRuntimeState).toHaveBeenCalledWith(
+    expect.objectContaining({ error: 'Raw recording source dimensions changed' })
+  );
+});
+
+it('retains viewport transition authority when both critical stop and compensating thaw fail', async () => {
+  mocks.revalidateSource.mockRejectedValueOnce(
+    new Error('Raw recording source dimensions changed')
+  );
+  mocks.stop.mockResolvedValueOnce({ error: 'stop transport unavailable', result: 'failed' });
   mocks.sendRuntimeMessage.mockImplementation(
-    (message: { frozen?: boolean; type: string }): Promise<{ success: true } | undefined> =>
+    (message: {
+      frozen?: boolean;
+      type: string;
+    }): Promise<{ result: 'applied'; success: true } | undefined> =>
       Promise.resolve(
         message.type === VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE &&
           message.frozen === false
           ? undefined
-          : { success: true }
+          : { success: true, result: 'applied' }
+      )
+  );
+
+  handleTabRecordingNavigationStart(7);
+  handleTabRecordingNavigationCommitted(7, 'document-1');
+  handleTabRecordingNavigationCompleted(7, 'document-1');
+  await vi.waitFor(() => expectViewportDrawStates([true, false, false]));
+
+  expect(mocks.stop).toHaveBeenCalledOnce();
+  expect(isTabRecordingNavigationPending()).toBe(true);
+});
+
+it('retries an ambiguous viewport thaw and stops when it cannot be acknowledged', async () => {
+  mocks.sendRuntimeMessage.mockImplementation(
+    (message: {
+      frozen?: boolean;
+      type: string;
+    }): Promise<{ result: 'applied'; success: true } | undefined> =>
+      Promise.resolve(
+        message.type === VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE &&
+          message.frozen === false
+          ? undefined
+          : { success: true, result: 'applied' }
       )
   );
 
@@ -254,12 +388,13 @@ it('re-freezes viewport output when its resume acknowledgement is missing', asyn
   handleTabRecordingNavigationCompleted(7, 'document-1');
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
-  expectViewportDrawStates([true, false, true]);
-  expect(mocks.stop).not.toHaveBeenCalled();
+  expectViewportDrawStates([true, false, false]);
+  expect(mocks.stop).toHaveBeenCalledOnce();
 });
 
 it('freezes viewport output before navigation and reasserts it at document commit', async () => {
   expect(handleTabRecordingNavigationStart(7)).toBe(true);
+  expect(mocks.resolveEffects).toHaveBeenCalledWith(true);
   await vi.waitFor(() =>
     expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -281,7 +416,7 @@ it('freezes viewport output before navigation and reasserts it at document commi
 it('retries an explicitly rejected initial viewport freeze before recovery', async () => {
   mocks.sendRuntimeMessage
     .mockResolvedValueOnce({ error: 'freeze denied', success: false })
-    .mockResolvedValue({ success: true });
+    .mockResolvedValue({ success: true, result: 'applied' });
 
   handleTabRecordingNavigationStart(7);
   handleTabRecordingNavigationCommitted(7, 'document-1');
@@ -302,9 +437,30 @@ it('stops the bound recording when an initial viewport freeze cannot be acknowle
   expect(isTabRecordingNavigationPending()).toBe(false);
 });
 
-it('keeps TAB_CROP recording continuous while page effects are restored', async () => {
+it('fails closed when secure viewport transition identity cannot be created', async () => {
+  mocks.createTransitionId.mockReset();
+  mocks.createTransitionId.mockImplementationOnce(() => {
+    throw new Error('secure random unavailable');
+  });
+
+  expect(() => handleTabRecordingNavigationStart(7)).not.toThrow();
+  await vi.waitFor(() => expect(mocks.stop).toHaveBeenCalledWith(false));
+
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(mocks.reassertViewport).not.toHaveBeenCalled();
+  expect(mocks.setRuntimeState).toHaveBeenCalledWith(
+    expect.objectContaining({ error: 'secure random unavailable' })
+  );
+  expect(isTabRecordingNavigationPending()).toBe(false);
+});
+
+it('guards current-size TAB_CROP output with a tokenized navigation transaction', async () => {
   mocks.captureMode = CaptureMode.TAB_CROP;
-  mocks.effects = { controlledCursor: false, cropOverlay: true };
+  mocks.effects = {
+    controlledCursor: false,
+    cropOverlay: true,
+    viewportCursorProjection: false,
+  };
   mocks.getSurfaceSession.mockReturnValue(createSurfaceSession(null));
 
   handleTabRecordingNavigationStart(7);
@@ -313,9 +469,50 @@ it('keeps TAB_CROP recording continuous while page effects are restored', async 
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
   expect(mocks.restoreEffects).toHaveBeenCalledOnce();
-  expect(mocks.revalidateSource).toHaveBeenCalledOnce();
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(mocks.revalidateSource).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1' }),
+    null,
+    'navigation-1'
+  );
+  expectViewportDrawStates([true, false]);
   expect(mocks.stop).not.toHaveBeenCalled();
+});
+
+it('guards window-preset TAB_CROP output without reasserting viewport metrics', async () => {
+  mocks.captureMode = CaptureMode.TAB_CROP;
+  mocks.getSurfaceSession.mockReturnValue(
+    createSurfaceSession({ ...viewportSurface, target: 'window' })
+  );
+
+  handleTabRecordingNavigationStart(7);
+  handleTabRecordingNavigationCommitted(7, 'document-1');
+  handleTabRecordingNavigationCompleted(7, 'document-1');
+  await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
+
+  expect(mocks.reassertViewport).not.toHaveBeenCalled();
+  expect(mocks.revalidateSource).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1' }),
+    null,
+    'navigation-1'
+  );
+  expectViewportDrawStates([true, false]);
+});
+
+it('stops current-size TAB_CROP when its fresh output mapping cannot be restored', async () => {
+  mocks.captureMode = CaptureMode.TAB_CROP;
+  mocks.getSurfaceSession.mockReturnValue(createSurfaceSession(null));
+  mocks.revalidateSource.mockRejectedValueOnce(new Error('Fresh crop geometry is unavailable'));
+
+  handleTabRecordingNavigationStart(7);
+  handleTabRecordingNavigationCommitted(7, 'document-1');
+  handleTabRecordingNavigationCompleted(7, 'document-1');
+  await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
+
+  expectViewportDrawStates([true]);
+  expect(mocks.stop).toHaveBeenCalledOnce();
+  expect(mocks.setRuntimeState).toHaveBeenCalledWith(
+    expect.objectContaining({ error: 'Fresh crop geometry is unavailable' })
+  );
 });
 
 it('does not let stale completion A finish navigation B', async () => {
@@ -329,15 +526,59 @@ it('does not let stale completion A finish navigation B', async () => {
   expect(handleTabRecordingNavigationCompleted(7, 'document-b')).toBe(true);
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
-  expect(mocks.reassertViewport).toHaveBeenCalledTimes(2);
+  expect(mocks.reassertViewport).toHaveBeenCalledOnce();
+  expectViewportDrawStates([true, false]);
+});
+
+it('serializes superseding viewport freezes so an older command cannot arrive last', async () => {
+  let resolveFirstFreeze!: () => void;
+  let firstFreezePending = true;
+  mocks.sendRuntimeMessage.mockImplementation(
+    (message: {
+      frozen?: boolean;
+      type: string;
+    }): Promise<{ result: 'applied'; success: true }> => {
+      if (
+        message.type === VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE &&
+        message.frozen === true &&
+        firstFreezePending
+      ) {
+        firstFreezePending = false;
+        return new Promise((resolve) => {
+          resolveFirstFreeze = () => resolve({ success: true, result: 'applied' });
+        });
+      }
+      return Promise.resolve({ success: true, result: 'applied' });
+    }
+  );
+
+  handleTabRecordingNavigationStart(7);
+  await vi.waitFor(() => expectViewportDrawStates([true]));
+
+  handleTabRecordingNavigationStart(7);
+  await Promise.resolve();
+  expectViewportDrawStates([true]);
+
+  resolveFirstFreeze();
+  await vi.waitFor(() => expectViewportDrawStates([true, true]));
+  handleTabRecordingNavigationCommitted(7, 'document-b');
+  handleTabRecordingNavigationCompleted(7, 'document-b');
+  await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
+
   expectViewportDrawStates([true, true, false]);
+  const transitions = mocks.sendRuntimeMessage.mock.calls.map(([message]) => message.transitionId);
+  expect(transitions).toEqual(['navigation-1', 'navigation-2', 'navigation-2']);
+  expect(mocks.stop).not.toHaveBeenCalled();
 });
 
 it('lets a newer navigation freeze cancel an older pending viewport resume', async () => {
   let resolveFirstResume!: () => void;
   let pendingResumeCreated = false;
   mocks.sendRuntimeMessage.mockImplementation(
-    (message: { frozen?: boolean; type: string }): Promise<{ success: boolean }> => {
+    (message: {
+      frozen?: boolean;
+      type: string;
+    }): Promise<{ result: 'applied' | 'stale'; success: true }> => {
       if (
         message.type === VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE &&
         message.frozen === false &&
@@ -345,10 +586,10 @@ it('lets a newer navigation freeze cancel an older pending viewport resume', asy
       ) {
         pendingResumeCreated = true;
         return new Promise((resolve) => {
-          resolveFirstResume = () => resolve({ success: true });
+          resolveFirstResume = () => resolve({ success: true, result: 'stale' });
         });
       }
-      return Promise.resolve({ success: true });
+      return Promise.resolve({ success: true, result: 'applied' });
     }
   );
 
@@ -365,6 +606,8 @@ it('lets a newer navigation freeze cancel an older pending viewport resume', asy
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
   expectViewportDrawStates([true, false, true, false]);
+  const transitions = mocks.sendRuntimeMessage.mock.calls.map(([message]) => message.transitionId);
+  expect(transitions).toEqual(['navigation-1', 'navigation-1', 'navigation-2', 'navigation-2']);
   expect(mocks.stop).not.toHaveBeenCalled();
 });
 
@@ -405,7 +648,11 @@ it('reconciles an explicit navigation error through the same single completion',
 });
 
 it('keeps TAB recording active when controlled-cursor bootstrap is unavailable', async () => {
-  mocks.effects = { controlledCursor: true, cropOverlay: false };
+  mocks.effects = {
+    controlledCursor: true,
+    cropOverlay: false,
+    viewportCursorProjection: false,
+  };
   mocks.getSurfaceSession.mockReturnValue(createSurfaceSession(null));
   mocks.restoreEffects.mockResolvedValue({
     controlledCursorRestored: false,
@@ -422,7 +669,11 @@ it('keeps TAB recording active when controlled-cursor bootstrap is unavailable',
 });
 
 it('clears only the current controlled-cursor recovery when page access is unavailable', async () => {
-  mocks.effects = { controlledCursor: true, cropOverlay: false };
+  mocks.effects = {
+    controlledCursor: true,
+    cropOverlay: false,
+    viewportCursorProjection: false,
+  };
   mocks.beginEffects.mockReturnValue(11);
   mocks.restoreEffects.mockRejectedValueOnce(new Error('page access unavailable'));
 
@@ -436,18 +687,32 @@ it('clears only the current controlled-cursor recovery when page access is unava
     expect.objectContaining({ navigationEpoch: 11, recordingId: 'recording-1', tabId: 7 })
   );
   expect(mocks.stop).not.toHaveBeenCalled();
-  expectViewportDrawStates([true]);
+  expectViewportDrawStates([true, false]);
 });
 
 it('keeps TAB_CROP recording active when its overlay cannot be restored', async () => {
   mocks.captureMode = CaptureMode.TAB_CROP;
-  mocks.effects = { controlledCursor: false, cropOverlay: true };
-  mocks.restoreEffects.mockRejectedValueOnce(new Error('page access unavailable'));
+  mocks.effects = {
+    controlledCursor: false,
+    cropOverlay: true,
+    viewportCursorProjection: false,
+  };
+  mocks.restoreEffects.mockRejectedValueOnce(
+    new Error("Could not load file: 'assets/contentRuntime.js'.")
+  );
   handleTabRecordingNavigationStart(7);
   handleTabRecordingNavigationCommitted(7, 'document-1');
   handleTabRecordingNavigationCompleted(7, 'document-1');
 
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
+  expect(mocks.revalidateSource).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1', tabId: 7 }),
+    null,
+    'navigation-1'
+  );
+  expect(mocks.revalidateSource.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.restoreEffects.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+  );
   expect(mocks.stop).not.toHaveBeenCalled();
-  expectViewportDrawStates([true]);
+  expectViewportDrawStates([true, false]);
 });

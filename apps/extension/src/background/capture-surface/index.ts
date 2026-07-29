@@ -1,11 +1,19 @@
 // policyStateId: capture-surface-leases - the service rehydrates session-storage WAL before admitting mutations.
 import { DefaultCaptureSurfaceService } from './service';
+import type { CaptureSurfaceRecoveryOptions } from './types';
 
 export type {
   AppliedCaptureSurface,
+  AppliedCaptureSurfaceBinding,
+  BeforeAbandonedCaptureSurfaceRestore,
+  BeforeAbandonedCaptureSurfaceStackRestore,
+  BeforeCaptureSurfaceOwnerRelease,
   CaptureSurfaceContext,
   CaptureSurfaceLeaseRequest,
+  CaptureSurfaceLeaseIdentity,
+  CaptureSurfaceOwnerReleaseOptions,
   CaptureSurfaceReleaseRequest,
+  CaptureSurfaceRecoveryOptions,
   CaptureSurfaceService,
 } from './types';
 export { CaptureSurfaceError } from './types';
@@ -18,10 +26,8 @@ export function getCaptureSurfaceService(): DefaultCaptureSurfaceService {
   return defaultService;
 }
 
-export function recoverCaptureSurfaces(
-  liveSessionIds?: ReadonlySet<string> | Promise<ReadonlySet<string>>
-): Promise<void> {
-  return getCaptureSurfaceService().recover(liveSessionIds === undefined ? {} : { liveSessionIds });
+export function recoverCaptureSurfaces(args: CaptureSurfaceRecoveryOptions = {}): Promise<void> {
+  return getCaptureSurfaceService().recover(args);
 }
 
 export function resetCaptureSurfaceServiceForTests(): void {

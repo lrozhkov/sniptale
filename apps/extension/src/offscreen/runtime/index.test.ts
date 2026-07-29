@@ -48,6 +48,7 @@ vi.mock('../recording/setup/desktop-media', () => ({
 }));
 
 vi.mock('../recording/controller', () => ({
+  activateViewportOutput: vi.fn(),
   pauseRecording: pauseRecordingMock,
   resumeRecording: resumeRecordingMock,
   setViewportDrawState: vi.fn(),

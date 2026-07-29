@@ -7,6 +7,7 @@ import {
   requestDesktopMedia,
 } from '../recording/setup/desktop-media';
 import {
+  activateViewportOutput,
   pauseRecording,
   resumeRecording,
   setViewportDrawState,
@@ -25,7 +26,11 @@ import {
   releaseSourceVideo,
   waitForSourceMetadata,
 } from '../recording/stream/video-source';
-import { revalidateTabOutputGeometry } from '../recording/stream/tab-output';
+import {
+  resolveTabOutputGeometry,
+  revalidateTabOutputGeometry,
+} from '../recording/stream/tab-output';
+import type { OutputSize } from '../recording/stream/crop-stream';
 import type { RecordingStopOutcome } from '../recording/context';
 import { buildDesktopMediaRequestOptions } from './desktop-media-options';
 import {
@@ -147,7 +152,7 @@ function buildStartRecordingArgs(
 export async function handleOffscreenRuntimeMessage(
   message: HandledMessage,
   sendResponse?: ResponseSender
-): Promise<void | RecordingStopOutcome> {
+): Promise<void | RecordingStopOutcome | 'applied' | 'stale'> {
   switch (message.type) {
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
       handlePageStoragePrivacyErasure(message, sendResponse);
@@ -167,15 +172,20 @@ export async function handleOffscreenRuntimeMessage(
       return;
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
       assertRecordingBegin(message);
-      await recordingContext.tabOutputControls?.resume();
-      allowRecordingBegin(message);
-      return;
-    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
-      await setViewportDrawState(resolveRecordingSourceBinding(message), message.frozen);
-      if (message.frozen) {
-        cancelRecordingBegin('Recording start was cancelled by viewport navigation');
+      try {
+        activateViewportOutput(resolveRecordingSourceBinding(message));
+        allowRecordingBegin(message);
+      } catch (error) {
+        cancelRecordingBegin(error instanceof Error ? error.message : String(error));
+        throw error;
       }
       return;
+    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
+      return setViewportDrawState(
+        resolveRecordingSourceBinding(message),
+        message.frozen,
+        message.transitionId
+      );
     case VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE:
       await revalidateSource(message, sendResponse);
       return;
@@ -217,26 +227,31 @@ function resolveRecordingSourceBinding(message: {
   };
 }
 
-async function revalidateSource(
-  message: Extract<HandledMessage, { type: typeof VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE }>,
-  sendResponse?: ResponseSender
-): Promise<void> {
+type SourceRevalidationMessage = Extract<
+  HandledMessage,
+  { type: typeof VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE }
+>;
+
+function assertCurrentRecordingSource(message: SourceRevalidationMessage, stream: MediaStream) {
   const binding = {
     recordingId: message.recordingId,
     generation: message.generation,
     streamInstanceId: message.streamInstanceId,
   };
-  const stream = recordingContext.sourceStream;
-  if (!stream || !recordingContext.matchesSourceBinding(binding)) {
-    sendResponse?.({ success: false, result: 'DENY', error: 'Recording source is unavailable' });
-    return;
+  if (recordingContext.sourceStream !== stream || !recordingContext.matchesSourceBinding(binding)) {
+    throw new Error('Recording source geometry changed during revalidation');
   }
+}
+
+async function revalidateStaticSource(
+  message: SourceRevalidationMessage,
+  stream: MediaStream
+): Promise<OutputSize> {
   const video = createSourceVideo(stream);
   try {
     await waitForSourceMetadata(video);
+    assertCurrentRecordingSource(message, stream);
     if (
-      recordingContext.sourceStream !== stream ||
-      !recordingContext.matchesSourceBinding(binding) ||
       video.videoWidth !== recordingContext.sourceVideoWidth ||
       video.videoHeight !== recordingContext.sourceVideoHeight
     ) {
@@ -262,11 +277,69 @@ async function revalidateSource(
     ) {
       throw new Error('Recording tab output mapping changed during revalidation');
     }
+    return { height: video.videoHeight, width: video.videoWidth };
+  } finally {
+    releaseSourceVideo(video);
+  }
+}
+
+async function refreshFrozenTabOutput(
+  message: SourceRevalidationMessage,
+  stream: MediaStream
+): Promise<OutputSize> {
+  const controls = recordingContext.tabOutputControls;
+  const geometry = recordingContext.tabOutputGeometry;
+  if (!controls || !geometry) throw new Error('Frozen tab output geometry is unavailable');
+  if (!message.transitionId) {
+    throw new Error('Viewport source revalidation transition ID is unavailable');
+  }
+  const sourceSize = await controls.waitForFreshFrame(message.transitionId);
+  assertCurrentRecordingSource(message, stream);
+  if (
+    recordingContext.tabOutputControls !== controls ||
+    recordingContext.tabOutputGeometry !== geometry
+  ) {
+    throw new Error('Recording tab output changed during source revalidation');
+  }
+  const coordinateSpace = message.viewport
+    ? {
+        width: message.viewport.width,
+        height: message.viewport.height,
+        devicePixelRatio: message.viewport.devicePixelRatio,
+      }
+    : geometry.coordinateSpace;
+  const nextGeometry = resolveTabOutputGeometry(
+    geometry.requestedCrop,
+    sourceSize,
+    coordinateSpace
+  );
+  if (controls.applyFreshGeometry(message.transitionId, nextGeometry) !== 'applied') {
+    throw new Error('Viewport source revalidation was superseded');
+  }
+  recordingContext.sourceVideoHeight = sourceSize.height;
+  recordingContext.sourceVideoWidth = sourceSize.width;
+  recordingContext.tabOutputGeometry = nextGeometry;
+  return sourceSize;
+}
+
+async function revalidateSource(
+  message: SourceRevalidationMessage,
+  sendResponse?: ResponseSender
+): Promise<void> {
+  const stream = recordingContext.sourceStream;
+  if (!stream || !recordingContext.matchesSourceBinding(resolveRecordingSourceBinding(message))) {
+    sendResponse?.({ success: false, result: 'DENY', error: 'Recording source is unavailable' });
+    return;
+  }
+  try {
+    const sourceSize = recordingContext.tabOutputControls
+      ? await refreshFrozenTabOutput(message, stream)
+      : await revalidateStaticSource(message, stream);
     sendResponse?.({
       success: true,
       result: 'ALLOW',
-      videoWidth: video.videoWidth,
-      videoHeight: video.videoHeight,
+      videoWidth: sourceSize.width,
+      videoHeight: sourceSize.height,
     });
   } catch (error) {
     sendResponse?.({
@@ -274,7 +347,5 @@ async function revalidateSource(
       result: 'DENY',
       error: error instanceof Error ? error.message : String(error),
     });
-  } finally {
-    releaseSourceVideo(video);
   }
 }

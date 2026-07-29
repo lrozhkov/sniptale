@@ -16,6 +16,7 @@ export async function acquireRecordingSourceStream(params: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
+  excludeNativeCursor?: boolean;
   viewport?: { width: number; height: number };
 }) {
   if (params.captureMode === CaptureMode.SCREEN) {
@@ -67,6 +68,7 @@ async function acquireCameraStream(settings: VideoRecordingSettings) {
 function createTabVideoConstraints(params: {
   streamId: string;
   controlledCursorCaptureEnabled?: boolean;
+  excludeNativeCursor?: boolean;
   viewport?: { width: number; height: number };
 }): MediaTrackConstraints {
   const mandatory: Record<string, unknown> = {
@@ -83,7 +85,9 @@ function createTabVideoConstraints(params: {
   };
   return {
     mandatory,
-    ...(params.controlledCursorCaptureEnabled === true ? { cursor: 'never' as const } : {}),
+    ...(params.controlledCursorCaptureEnabled === true || params.excludeNativeCursor === true
+      ? { cursor: 'never' as const }
+      : {}),
   } as MediaTrackConstraints;
 }
 
@@ -91,11 +95,13 @@ async function acquireTabStream({
   streamId,
   settings,
   captureMode,
+  excludeNativeCursor,
   viewport,
 }: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
+  excludeNativeCursor?: boolean;
   viewport?: { width: number; height: number };
 }) {
   const audioConstraints: MediaTrackConstraints | false = settings.systemAudioEnabled
@@ -113,12 +119,14 @@ async function acquireTabStream({
     ...(settings.controlledCursorCaptureEnabled === undefined
       ? {}
       : { controlledCursorCaptureEnabled: settings.controlledCursorCaptureEnabled }),
+    ...(excludeNativeCursor === undefined ? {} : { excludeNativeCursor }),
   });
 
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: audioConstraints,
     video: videoConstraints,
   });
+  if (excludeNativeCursor === true) assertNativeCursorExcluded(stream);
   const cursorCaptureMode = resolveCursorCaptureMode(stream, settings, captureMode);
   logger.debug('Acquired tab capture stream', {
     hasAudio: Boolean(audioConstraints),
@@ -129,16 +137,49 @@ async function acquireTabStream({
   };
 }
 
-function getTrackSettings(
-  stream: MediaStream
-): (MediaTrackSettings & { cursor?: string; displaySurface?: string }) | undefined {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readStringSetting(settings: unknown, key: string): string | null {
+  if (!isRecord(settings)) return null;
+  const value = settings[key];
+  return typeof value === 'string' ? value : null;
+}
+
+function getTrackSettings(stream: MediaStream): {
+  cursor: string | null;
+  displaySurface: string | null;
+} {
   const videoTrack = stream.getVideoTracks()[0];
-  return videoTrack?.getSettings() as
-    | (MediaTrackSettings & {
-        cursor?: string;
-        displaySurface?: string;
-      })
-    | undefined;
+  const settings: unknown = videoTrack?.getSettings();
+  return {
+    cursor: readStringSetting(settings, 'cursor'),
+    displaySurface: readStringSetting(settings, 'displaySurface'),
+  };
+}
+
+function stopAcquiredStream(stream: MediaStream): void {
+  for (const track of stream.getTracks()) {
+    try {
+      track.stop();
+    } catch (error) {
+      logger.warn('Failed to stop a rejected tab capture track', error);
+    }
+  }
+}
+
+function assertNativeCursorExcluded(stream: MediaStream): void {
+  let cursorSetting: string | null;
+  try {
+    cursorSetting = getTrackSettings(stream).cursor;
+  } catch (error) {
+    stopAcquiredStream(stream);
+    throw new Error('Native cursor exclusion could not be verified', { cause: error });
+  }
+  if (cursorSetting === 'never') return;
+  stopAcquiredStream(stream);
+  throw new Error('Native cursor exclusion could not be verified');
 }
 
 function resolveCursorCaptureMode(
@@ -152,10 +193,10 @@ function resolveCursorCaptureMode(
 
   const videoTrack = stream.getVideoTracks()[0];
   const trackSettings = getTrackSettings(stream);
-  const cursorSetting = trackSettings?.cursor ?? null;
+  const cursorSetting = trackSettings.cursor;
   const sharedLogContext = {
     cursorSetting,
-    displaySurface: trackSettings?.displaySurface ?? null,
+    displaySurface: trackSettings.displaySurface,
     hasVideoTrack: videoTrack !== undefined,
     readyState: videoTrack?.readyState ?? null,
   };

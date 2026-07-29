@@ -11,6 +11,7 @@ import {
   getVideoSurfaceSession,
   registerVideoSurfaceRelease,
 } from './session-registry';
+import { releaseAppliedVideoCaptureSurface } from './release-applied';
 
 function getContext(mode: CaptureMode) {
   return mode === CaptureMode.TAB_CROP ? ('video-tab-crop' as const) : ('video-tab' as const);
@@ -64,11 +65,7 @@ async function releaseVideoCaptureSurfaceInternal(recordingId: string): Promise<
     deleteVideoSurfaceSession(recordingId);
     return;
   }
-  await getCaptureSurfaceService().release({
-    sessionId: recordingId,
-    leaseId: session.applied.leaseId,
-    generation: session.generation,
-  });
+  await releaseAppliedVideoCaptureSurface(session.applied, session.tabId);
   deleteVideoSurfaceSession(recordingId);
 }
 

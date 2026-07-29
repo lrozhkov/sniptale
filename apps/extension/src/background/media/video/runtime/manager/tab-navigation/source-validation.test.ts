@@ -1,9 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
-  ensurePageRuntime: vi.fn(),
   readViewport: vi.fn(),
   reassert: vi.fn(),
   sendRuntimeMessage: vi.fn(),
@@ -28,11 +26,7 @@ vi.mock('../../../capture-viewport', async (importOriginal) => ({
   readTabCaptureViewport: mocks.readViewport,
 }));
 
-import {
-  reassertViewportSurface,
-  revalidateTabSource,
-  setViewportOutputFrozen,
-} from './source-validation';
+import { reassertViewportSurface, revalidateTabSource } from './source-validation';
 
 const binding = {
   generation: 2,
@@ -63,8 +57,9 @@ const session = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  session.sourceVideoHeight = 1440;
+  session.sourceVideoWidth = 2560;
   mocks.getSession.mockReturnValue(session);
-  mocks.ensurePageRuntime.mockResolvedValue(undefined);
   mocks.readViewport.mockResolvedValue(viewport);
   mocks.reassert.mockResolvedValue(undefined);
   mocks.sendRuntimeMessage.mockResolvedValue({
@@ -93,38 +88,16 @@ it('reasserts only an applied viewport lease', async () => {
   expect(mocks.reassert).toHaveBeenCalledOnce();
 });
 
-it('binds viewport output freezing to the active source generation', async () => {
-  await setViewportOutputFrozen(binding, true);
-
-  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
-    expect.objectContaining({
-      frozen: true,
-      generation: 2,
-      recordingId: 'recording-1',
-      streamInstanceId: 'stream-1',
-      type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
-    })
-  );
-
-  mocks.sendRuntimeMessage.mockResolvedValueOnce(undefined);
-  await expect(setViewportOutputFrozen(binding, false)).rejects.toThrow(
-    'Viewport output frame state could not be updated'
-  );
-});
-
 it('reads and forwards the live viewport when the caller has not already measured it', async () => {
-  await revalidateTabSource(binding, null, mocks.ensurePageRuntime);
+  await revalidateTabSource(binding, null, 'navigation-1');
 
-  expect(mocks.ensurePageRuntime).toHaveBeenCalledWith(
-    7,
-    'Recording source cannot be verified on the navigated page.'
-  );
   expect(mocks.readViewport).toHaveBeenCalledWith(7);
   expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
     expect.objectContaining({
       generation: 2,
       recordingId: 'recording-1',
       streamInstanceId: 'stream-1',
+      transitionId: 'navigation-1',
       type: 'OFFSCREEN_REVALIDATE_SOURCE',
       viewport,
     })
@@ -132,24 +105,19 @@ it('reads and forwards the live viewport when the caller has not already measure
 });
 
 it('uses an atomically restored viewport without reading it twice', async () => {
-  await revalidateTabSource(binding, viewport, mocks.ensurePageRuntime);
-  expect(mocks.ensurePageRuntime).not.toHaveBeenCalled();
+  await revalidateTabSource(binding, viewport);
   expect(mocks.readViewport).not.toHaveBeenCalled();
 });
 
-it('fails closed before raw validation when the navigated page runtime is unavailable', async () => {
-  mocks.ensurePageRuntime.mockRejectedValueOnce(new Error('runtime unavailable'));
-
-  await expect(revalidateTabSource(binding, null, mocks.ensurePageRuntime)).rejects.toThrow(
-    'runtime unavailable'
-  );
-  expect(mocks.readViewport).not.toHaveBeenCalled();
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+it('revalidates the raw source without depending on the navigated page runtime', async () => {
+  await expect(revalidateTabSource(binding, null)).resolves.toBeUndefined();
+  expect(mocks.readViewport).toHaveBeenCalledWith(7);
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledOnce();
 });
 
 it('rejects missing sessions and denied offscreen validation', async () => {
   mocks.getSession.mockReturnValueOnce(null);
-  await expect(revalidateTabSource(binding, viewport, mocks.ensurePageRuntime)).rejects.toThrow(
+  await expect(revalidateTabSource(binding, viewport)).rejects.toThrow(
     'surface session is unavailable'
   );
 
@@ -158,33 +126,31 @@ it('rejects missing sessions and denied offscreen validation', async () => {
     result: 'DENY',
     error: 'mapping changed',
   });
-  await expect(revalidateTabSource(binding, viewport, mocks.ensurePageRuntime)).rejects.toThrow(
-    'mapping changed'
-  );
+  await expect(revalidateTabSource(binding, viewport)).rejects.toThrow('mapping changed');
 
   mocks.sendRuntimeMessage.mockResolvedValueOnce({ success: true, result: 'DENY' });
-  await expect(revalidateTabSource(binding, viewport, mocks.ensurePageRuntime)).rejects.toThrow(
+  await expect(revalidateTabSource(binding, viewport)).rejects.toThrow(
     'mapping revalidation failed'
   );
 });
 
-it('rejects changed raw dimensions and skips absent historical metadata', async () => {
+it('accepts remapped raw dimensions and rejects missing fresh source metadata', async () => {
   mocks.sendRuntimeMessage.mockResolvedValueOnce({
     success: true,
     result: 'ALLOW',
     videoWidth: 1920,
     videoHeight: 1080,
   });
-  await expect(revalidateTabSource(binding, viewport, mocks.ensurePageRuntime)).rejects.toThrow(
-    'Raw recording source dimensions changed'
-  );
+  await expect(revalidateTabSource(binding, viewport, 'navigation-1')).resolves.toBeUndefined();
+  expect(session).toMatchObject({ sourceVideoHeight: 1080, sourceVideoWidth: 1920 });
 
-  mocks.getSession.mockReturnValueOnce({
-    ...session,
-    sourceVideoWidth: undefined,
-    sourceVideoHeight: undefined,
+  mocks.sendRuntimeMessage.mockResolvedValueOnce({
+    success: true,
+    result: 'ALLOW',
+    videoWidth: undefined,
+    videoHeight: undefined,
   });
-  await expect(
-    revalidateTabSource(binding, viewport, mocks.ensurePageRuntime)
-  ).resolves.toBeUndefined();
+  await expect(revalidateTabSource(binding, viewport)).rejects.toThrow(
+    'Raw recording source dimensions are unavailable'
+  );
 });

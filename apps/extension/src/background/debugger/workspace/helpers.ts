@@ -8,22 +8,25 @@ const MAX_COMPOSITOR_SCALE_RELATIVE_DRIFT = 0.005;
 export function buildDeviceMetricsOverrideParams(
   width: number,
   height: number,
-  viewportScale: number
+  deviceScaleFactor: number
 ) {
-  if (!isPositiveInteger(width) || !isPositiveInteger(height) || !isPositiveFinite(viewportScale)) {
+  if (
+    !isPositiveInteger(width) ||
+    !isPositiveInteger(height) ||
+    !isPositiveFinite(deviceScaleFactor)
+  ) {
     throw new Error('Viewport override dimensions and compositor scale must be positive');
   }
   return {
     width,
     height,
-    deviceScaleFactor: 1,
+    deviceScaleFactor,
     mobile: false,
     screenWidth: width,
     screenHeight: height,
     positionX: 0,
     positionY: 0,
     scrollbarType: 'overlay',
-    viewport: { x: 0, y: 0, width, height, scale: viewportScale },
   };
 }
 

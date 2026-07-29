@@ -336,6 +336,75 @@ it('shows the screen limitation once instead of repeating it for every preset', 
   expect(container?.textContent).not.toContain('t:viewportPresets.availability.pendingVideo');
 });
 
+it('disables viewport presets but keeps window presets selectable for crop recording', async () => {
+  runtimeMocks.sendRuntimeMessage.mockResolvedValue({
+    success: true,
+    availabilities: [
+      {
+        status: 'requires-start-validation',
+        presetId: 'viewport-1',
+        target: 'viewport',
+        required: { width: 1280, height: 720 },
+      },
+      {
+        status: 'available',
+        presetId: 'window-1',
+        target: 'window',
+        required: { width: 1280, height: 720 },
+      },
+    ],
+  });
+  const onPresetChange = vi.fn();
+  renderNode(
+    <VideoPresetSelector
+      captureMode={CaptureMode.TAB_CROP}
+      viewportPresets={[
+        {
+          kind: 'user',
+          id: 'viewport-1',
+          name: 'Viewport',
+          target: 'viewport',
+          width: 1280,
+          height: 720,
+          enabled: true,
+          order: 0,
+        },
+        {
+          kind: 'user',
+          id: 'window-1',
+          name: 'Window',
+          target: 'window',
+          width: 1280,
+          height: 720,
+          enabled: true,
+          order: 0,
+        },
+      ]}
+      selectedPresetId={null}
+      onPresetChange={onPresetChange}
+    />
+  );
+
+  await act(async () => {
+    container?.querySelector<HTMLButtonElement>('button')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+  const viewportButton = buttons.find((button) => button.textContent?.includes('Viewport'));
+  const windowButton = buttons.find((button) => button.textContent?.includes('Window'));
+  expect(viewportButton?.getAttribute('aria-disabled')).toBe('true');
+  expect(windowButton?.getAttribute('aria-disabled')).not.toBe('true');
+  expect(container?.textContent).toContain(
+    't:viewportPresets.availability.cropViewportUnsupported'
+  );
+
+  act(() => viewportButton?.click());
+  expect(onPresetChange).not.toHaveBeenCalled();
+  act(() => windowButton?.click());
+  expect(onPresetChange).toHaveBeenCalledWith('window-1');
+});
+
 it('can hide the preset selector when switching from tab capture to camera', async () => {
   const props = {
     viewportPresets: [

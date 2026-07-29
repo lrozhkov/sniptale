@@ -59,6 +59,7 @@ export type RuntimeOffscreenRevalidateSourceMessage = RuntimeOffscreenCommandCap
   recordingId: string;
   generation: number;
   streamInstanceId: string;
+  transitionId?: string;
   viewport?: ViewportInfo;
 };
 
@@ -68,6 +69,7 @@ export type RuntimeOffscreenSetViewportDrawStateMessage = RuntimeOffscreenComman
   recordingId: string;
   generation: number;
   streamInstanceId: string;
+  transitionId: string;
 };
 
 export type RuntimeOffscreenUpdateSettingsMessage = RuntimeOffscreenCommandCapability & {

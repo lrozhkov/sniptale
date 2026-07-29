@@ -86,7 +86,10 @@ async function createOutputVideoStream(
       initiallySuspended: params.surface?.target === 'viewport',
     });
     return {
-      controls: params.surface?.target === 'viewport' ? output.controls : null,
+      controls:
+        params.captureMode === CaptureMode.TAB_CROP || params.surface?.target === 'viewport'
+          ? output.controls
+          : null,
       stream: output.stream,
       tabOutputGeometry,
     };
@@ -138,6 +141,7 @@ export async function prepareRecordingStream(
   const { stream: sourceStream, cursorCaptureMode } = await acquireRecordingSourceStream({
     streamId: params.streamId,
     settings: params.settings,
+    ...(params.surface?.target === 'viewport' ? { excludeNativeCursor: true } : {}),
     ...(params.captureMode === undefined ? {} : { captureMode: params.captureMode }),
     ...(params.viewport === undefined
       ? {}

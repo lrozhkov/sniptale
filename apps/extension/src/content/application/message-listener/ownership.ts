@@ -46,6 +46,8 @@ const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
   VideoMessageType.HIDE_COUNTDOWN,
   VideoMessageType.ENABLE_ANNOTATIONS,
   VideoMessageType.DISABLE_ANNOTATIONS,
+  VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION,
+  VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION,
   VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE,

@@ -222,6 +222,14 @@ export const viewportPresetsMessages = defineMessageSource({
       ru: 'Для записи экрана пресеты недоступны: источник выбирается в системном окне.',
       en: 'Presets are unavailable for screen recording because the source is selected by the system picker.',
     },
+    cropViewportUnsupported: {
+      ru:
+        'Размер области страницы недоступен при записи выбранной области. ' +
+        'Используйте текущий размер или размер окна.',
+      en:
+        'Page viewport sizing is unavailable while recording a selected area. ' +
+        'Use the current size or a window size.',
+    },
     viewportTooLarge: {
       ru: 'Не помещается в текущей области вкладки.',
       en: 'Does not fit the current tab area.',

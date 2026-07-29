@@ -57,6 +57,7 @@ export interface OffscreenRevalidateSourceMessage {
   recordingId: string;
   generation: number;
   streamInstanceId: string;
+  transitionId?: string;
   viewport?: ViewportInfo;
 }
 
@@ -67,6 +68,7 @@ export interface OffscreenSetViewportDrawStateMessage {
   recordingId: string;
   generation: number;
   streamInstanceId: string;
+  transitionId: string;
 }
 
 export interface OffscreenRecordingStartedMessage {

@@ -40,7 +40,9 @@ export type RuntimeVideoSessionResponseByType = {
     videoWidth?: number;
     videoHeight?: number;
   }>;
-  [VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE]: RuntimeRequiredAckResponse;
+  [VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE]: RuntimeMessageResponse<{
+    result: 'applied' | 'stale';
+  }>;
   [VideoMessageType.OFFSCREEN_STOP_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_PAUSE_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_RESUME_RECORDING]: RuntimeAckResponse;

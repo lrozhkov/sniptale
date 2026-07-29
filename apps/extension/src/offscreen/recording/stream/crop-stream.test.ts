@@ -39,11 +39,10 @@ afterEach(() => {
 });
 
 describe('crop stream', () => {
-  it('holds the last safe canvas frame while drawing is suspended', async () => {
+  it('activates a suspended static viewport output without waiting for another source frame', async () => {
     const output = createTrackedStream();
     const context = { drawImage: vi.fn() };
-    const frameCallbacks = new Map<number, VideoFrameRequestCallback>();
-    let nextFrameCallbackId = 1;
+    const requestVideoFrameCallback = vi.fn(() => 1);
     Object.defineProperty(HTMLCanvasElement.prototype, 'captureStream', {
       configurable: true,
       value: vi.fn(() => output),
@@ -53,11 +52,44 @@ describe('crop stream', () => {
       value: vi.fn(() => context),
     });
     mocks.createSourceVideo.mockReturnValue({
-      cancelVideoFrameCallback: vi.fn((id: number) => frameCallbacks.delete(id)),
-      requestVideoFrameCallback: vi.fn((callback: VideoFrameRequestCallback) => {
-        const id = nextFrameCallbackId++;
-        frameCallbacks.set(id, callback);
-        return id;
+      cancelVideoFrameCallback: vi.fn(),
+      requestVideoFrameCallback,
+      videoHeight: 720,
+      videoWidth: 1280,
+    });
+
+    const gated = await createGatedCropStream(
+      createStream(1280, 720),
+      {
+        sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
+        outputSize: { width: 1280, height: 720 },
+      },
+      { initiallySuspended: true }
+    );
+    gated.controls.activate();
+
+    expect(context.drawImage).toHaveBeenCalledOnce();
+    expect(requestVideoFrameCallback).not.toHaveBeenCalled();
+    gated.stream.getVideoTracks()[0]?.stop();
+  });
+
+  it('keeps navigation freezes tokenized and retries a failed thaw deterministically', async () => {
+    const output = createTrackedStream();
+    const context = { drawImage: vi.fn() };
+    const freshFrameCallbacks: Array<() => void> = [];
+    Object.defineProperty(HTMLCanvasElement.prototype, 'captureStream', {
+      configurable: true,
+      value: vi.fn(() => output),
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      configurable: true,
+      value: vi.fn(() => context),
+    });
+    mocks.createSourceVideo.mockReturnValue({
+      cancelVideoFrameCallback: vi.fn(),
+      requestVideoFrameCallback: vi.fn((callback: () => void) => {
+        freshFrameCallbacks.push(callback);
+        return freshFrameCallbacks.length;
       }),
       videoHeight: 720,
       videoWidth: 1280,
@@ -73,40 +105,104 @@ describe('crop stream', () => {
     );
 
     expect(context.drawImage).not.toHaveBeenCalled();
-    const cancelledResume = gated.controls.resume();
-    const cancelledResumeExpectation = expect(cancelledResume).rejects.toThrow(
-      'fresh-frame wait was cancelled'
-    );
-    const staleFrameCallback = frameCallbacks.get(1);
-    gated.controls.suspend();
-    await cancelledResumeExpectation;
-    staleFrameCallback?.(0, {} as VideoFrameCallbackMetadata);
+    expect(gated.controls.setFrozen('navigation-1', true)).toBe('applied');
+    gated.controls.activate();
     expect(context.drawImage).not.toHaveBeenCalled();
 
-    const firstResume = gated.controls.resume();
-    frameCallbacks.get(2)?.(0, {} as VideoFrameCallbackMetadata);
-    await firstResume;
-    expect(context.drawImage).toHaveBeenCalledOnce();
-    gated.controls.suspend();
+    expect(gated.controls.setFrozen('navigation-2', true)).toBe('applied');
+    expect(gated.controls.setFrozen('navigation-1', false)).toBe('stale');
     await vi.advanceTimersByTimeAsync(100);
-    expect(context.drawImage).toHaveBeenCalledOnce();
-    const secondResume = gated.controls.resume();
-    expect(context.drawImage).toHaveBeenCalledOnce();
-    frameCallbacks.get(3)?.(0, {} as VideoFrameCallbackMetadata);
-    await secondResume;
-    expect(context.drawImage).toHaveBeenCalledTimes(2);
+    expect(context.drawImage).not.toHaveBeenCalled();
 
+    const navigationTwoFrame = gated.controls.waitForFreshFrame('navigation-2');
+    freshFrameCallbacks.shift()?.();
+    await navigationTwoFrame;
+    expect(
+      gated.controls.applyFreshGeometry('navigation-2', {
+        sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
+        outputSize: { width: 1280, height: 720 },
+      })
+    ).toBe('applied');
+    expect(gated.controls.setFrozen('navigation-2', false)).toBe('applied');
+    expect(context.drawImage).toHaveBeenCalledOnce();
+    expect(gated.controls.setFrozen('navigation-2', false)).toBe('applied');
+    expect(gated.controls.setFrozen('navigation-2', true)).toBe('stale');
+    expect(context.drawImage).toHaveBeenCalledOnce();
+
+    expect(gated.controls.setFrozen('navigation-3', true)).toBe('applied');
+    const navigationThreeFrame = gated.controls.waitForFreshFrame('navigation-3');
+    freshFrameCallbacks.shift()?.();
+    await navigationThreeFrame;
+    expect(
+      gated.controls.applyFreshGeometry('navigation-3', {
+        sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
+        outputSize: { width: 1280, height: 720 },
+      })
+    ).toBe('applied');
     context.drawImage.mockImplementationOnce(() => {
       throw new Error('fresh draw failed');
     });
-    const failedResume = gated.controls.resume();
-    const failedResumeExpectation = expect(failedResume).rejects.toThrow('fresh draw failed');
-    frameCallbacks.get(4)?.(0, {} as VideoFrameCallbackMetadata);
-    await failedResumeExpectation;
-    expect(context.drawImage).toHaveBeenCalledTimes(3);
+    expect(() => gated.controls.setFrozen('navigation-3', false)).toThrow('fresh draw failed');
     await vi.advanceTimersByTimeAsync(100);
+    expect(context.drawImage).toHaveBeenCalledTimes(2);
+    expect(gated.controls.setFrozen('navigation-3', false)).toBe('applied');
     expect(context.drawImage).toHaveBeenCalledTimes(3);
+
     gated.stream.getVideoTracks()[0]?.stop();
+    expect(gated.controls.setFrozen('navigation-4', true)).toBe('stale');
+  });
+
+  it('keeps a viewport crop frozen until fresh post-navigation geometry is applied', async () => {
+    const output = createTrackedStream();
+    const context = { drawImage: vi.fn() };
+    let presentFreshFrame!: () => void;
+    Object.defineProperty(HTMLCanvasElement.prototype, 'captureStream', {
+      configurable: true,
+      value: vi.fn(() => output),
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      configurable: true,
+      value: vi.fn(() => context),
+    });
+    const video = {
+      cancelVideoFrameCallback: vi.fn(),
+      requestVideoFrameCallback: vi.fn((callback: () => void) => {
+        presentFreshFrame = callback;
+        return 17;
+      }),
+      videoHeight: 720,
+      videoWidth: 1280,
+    };
+    mocks.createSourceVideo.mockReturnValue(video);
+
+    const gated = await createGatedCropStream(
+      createStream(1280, 720),
+      {
+        sourceRect: { x: 100, y: 80, width: 300, height: 300 },
+        outputSize: { width: 300, height: 300 },
+      },
+      { initiallySuspended: true }
+    );
+    gated.controls.activate();
+    expect(gated.controls.setFrozen('navigation-1', true)).toBe('applied');
+
+    const freshFrame = gated.controls.waitForFreshFrame('navigation-1');
+    expect(() => gated.controls.setFrozen('navigation-1', false)).toThrow('fresh source geometry');
+    await vi.advanceTimersByTimeAsync(100);
+    expect(context.drawImage).toHaveBeenCalledOnce();
+
+    video.videoWidth = 1920;
+    video.videoHeight = 1080;
+    presentFreshFrame();
+    await expect(freshFrame).resolves.toEqual({ height: 1080, width: 1920 });
+    expect(
+      gated.controls.applyFreshGeometry('navigation-1', {
+        sourceRect: { x: 150, y: 120, width: 450, height: 450 },
+        outputSize: { width: 300, height: 300 },
+      })
+    ).toBe('applied');
+    expect(gated.controls.setFrozen('navigation-1', false)).toBe('applied');
+    expect(context.drawImage).toHaveBeenLastCalledWith(video, 150, 120, 450, 450, 0, 0, 300, 300);
   });
 
   it('draws an explicit raw source rectangle into an independent output size', async () => {

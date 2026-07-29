@@ -163,6 +163,9 @@ function buildOffscreenCommandSuccessResponse(result: unknown) {
       error: result.error,
     };
   }
+  if (result === 'applied' || result === 'stale') {
+    return { success: true, result };
+  }
   return { success: true, result: 'accepted' };
 }
 

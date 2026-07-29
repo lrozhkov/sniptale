@@ -1,5 +1,10 @@
 import { readCaptureSurfaceJournal } from '../storage/capture-surface';
-import type { CaptureSurfaceLeaseState } from './types';
+import type {
+  BeforeAbandonedCaptureSurfaceRestore,
+  BeforeAbandonedCaptureSurfaceStackRestore,
+  CaptureSurfaceLeaseIdentity,
+  CaptureSurfaceLeaseState,
+} from './types';
 import type { CaptureSurfaceLeaseRegistry } from './lease-registry';
 import {
   captureSurfaceSnapshotsEqual,
@@ -9,11 +14,19 @@ import {
 
 async function unwindRecoveredStack(
   registry: CaptureSurfaceLeaseRegistry,
-  stack: CaptureSurfaceLeaseState[]
+  stack: CaptureSurfaceLeaseState[],
+  beforeAbandonedRestore?: BeforeAbandonedCaptureSurfaceRestore
 ): Promise<void> {
   while (stack.length > 0) {
     const state = stack.at(-1)!;
     try {
+      await beforeAbandonedRestore?.({
+        generation: state.entry.generation,
+        owner: state.entry.owner,
+        sessionId: state.entry.sessionId,
+        tabId: state.entry.tabId,
+        target: state.entry.target,
+      });
       const observation = await readCurrentSurfaceSnapshot(state);
       try {
         if (captureSurfaceSnapshotsEqual(state.entry.applied, observation.current)) {
@@ -37,7 +50,9 @@ async function unwindRecoveredStack(
 
 export async function recoverCaptureSurfaceLeases(
   registry: CaptureSurfaceLeaseRegistry,
-  liveSessionIds: ReadonlySet<string>
+  liveSessionIds: ReadonlySet<string>,
+  beforeAbandonedRestore?: BeforeAbandonedCaptureSurfaceRestore,
+  beforeAbandonedStackRestore?: BeforeAbandonedCaptureSurfaceStackRestore
 ): Promise<void> {
   const journal = (await readCaptureSurfaceJournal()).sort(
     (left, right) => left.updatedAt - right.updatedAt
@@ -51,5 +66,15 @@ export async function recoverCaptureSurfaceLeases(
         (state.entry.phase !== 'applied' && state.entry.phase !== 'suspended')
     )
   );
-  for (const stack of invalidStacks) await unwindRecoveredStack(registry, stack);
+  for (const stack of invalidStacks) {
+    const identities: CaptureSurfaceLeaseIdentity[] = stack.map((state) => ({
+      generation: state.entry.generation,
+      owner: state.entry.owner,
+      sessionId: state.entry.sessionId,
+      tabId: state.entry.tabId,
+      target: state.entry.target,
+    }));
+    await beforeAbandonedStackRestore?.(identities);
+    await unwindRecoveredStack(registry, stack, beforeAbandonedRestore);
+  }
 }
