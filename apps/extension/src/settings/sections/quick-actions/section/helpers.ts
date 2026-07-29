@@ -1,17 +1,24 @@
 import type { QuickAction, QuickActionDelay, ViewportPreset } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n';
 import { getSettingsCountLabel } from '../../../section-surface/text.helpers';
+import { getViewportPresetDisplayName } from '../../../../features/viewport-presets/display-name';
+import { formatViewportPresetDimensions } from '../../../../features/viewport-presets/format';
 
-export function getEmulationLabel(
+export function getViewportPresetLabel(
   viewportPresets: ViewportPreset[] | undefined,
-  emulationId: string | null | undefined
+  presetId: string | null | undefined
 ): string {
-  if (!emulationId || emulationId === 'native') {
+  if (!presetId) {
     return translate('settings.quickActions.emulationNone');
   }
 
-  const preset = viewportPresets?.find((item) => item.id === emulationId);
-  return preset ? `${preset.label} (${preset.width}×${preset.height})` : emulationId;
+  const preset = viewportPresets?.find((item) => item.id === presetId);
+  return preset
+    ? `${getViewportPresetDisplayName(preset)} (${formatViewportPresetDimensions(
+        preset.width,
+        preset.height
+      )})`
+    : presetId;
 }
 
 export function getDelayLabel(delay: QuickActionDelay | null | undefined): string {
@@ -42,7 +49,7 @@ export function createDefaultQuickAction(): QuickAction {
     bundledId: null,
     hotkey: null,
     screenshotMode: 'visible',
-    emulation: 'native',
+    viewportPresetId: null,
     delay: null,
     afterCapture: 'download_default',
     imageFormat: null,

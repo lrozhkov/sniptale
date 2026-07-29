@@ -19,6 +19,7 @@ type InlineCurtainSelectProps = {
   label: string;
   notice?: string;
   onChange: (value: string) => void;
+  onOpenChange?: (open: boolean) => void;
   options: InlineCurtainOption[];
   secondaryAction?: InlineCurtainSecondaryAction;
   selectedLabel?: string;
@@ -31,6 +32,7 @@ export function InlineCurtainSelect({
   label,
   notice,
   onChange,
+  onOpenChange,
   options,
   secondaryAction,
   selectedLabel,
@@ -47,6 +49,7 @@ export function InlineCurtainSelect({
     rootRef,
     setOpen: (open) => setOpenPanel(open ? openPanel : null),
   });
+  useEffect(() => onOpenChange?.(openPanel === 'options'), [onOpenChange, openPanel]);
   return (
     <div ref={rootRef} className={INLINE_CURTAIN_ROW_CLASS_NAME} data-open={openPanel !== null}>
       <InlineCurtainSelectTrigger

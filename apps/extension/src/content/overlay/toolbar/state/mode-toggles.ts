@@ -4,6 +4,11 @@ import { getContentRuntimeServices } from '../../../application/runtime-services
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { logToolbarReactActionReached } from '../shell/event-diagnostics';
 import type { ToolbarProps } from '../types';
+import { createDisableScreenshotModeRequest } from '../../viewport-selector/capability';
+import {
+  attachContentActionIntent,
+  createTrustedContentActionIntentSource,
+} from '../../../application/privileged-action-intent';
 
 const logger = createLogger({ namespace: 'ContentToolbarModeToggles' });
 
@@ -79,21 +84,35 @@ export function useToolbarModeToggles(params: UseToolbarModeTogglesParams) {
     useState<PendingToolbarInteractionMode>(null);
   const toggles = createModeToggles(params);
 
-  const toggleMode = async (mode: ToolbarToggleMode) => {
+  const toggleMode = async (mode: ToolbarToggleMode, activationEvent?: Event) => {
     logToolbarReactActionReached(`toggle-mode:${mode}`);
     if (inFlightRef.current) {
       return;
     }
 
     const next = toggles[mode];
+    const contentIntentSource =
+      mode === 'screenshot' && next.enabled && activationEvent
+        ? createTrustedContentActionIntentSource(activationEvent)
+        : undefined;
     setPendingInteractionMode(resolvePendingInteractionMode(mode, next.enabled));
 
     inFlightRef.current = true;
     params.setIsLoading(true);
     try {
-      const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
-        type: next.enabled ? next.enable : next.disable,
-      });
+      const response =
+        mode === 'screenshot' && next.enabled
+          ? await getContentRuntimeServices().messaging.sendRuntimeMessage(
+              await attachContentActionIntent(
+                { type: MessageType.ENABLE_SCREENSHOT_MODE },
+                contentIntentSource
+              )
+            )
+          : await getContentRuntimeServices().messaging.sendRuntimeMessage(
+              mode === 'screenshot' && !next.enabled
+                ? createDisableScreenshotModeRequest()
+                : { type: next.enabled ? next.enable : next.disable }
+            );
 
       if (!response?.success) {
         logger.error('Failed to toggle mode', response?.error);

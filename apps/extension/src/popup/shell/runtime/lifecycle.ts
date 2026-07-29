@@ -1,6 +1,5 @@
 import { usePopupLifecycleEffect } from '../lifecycle/effect';
 import type { PopupRuntimeStateSlice } from './state';
-import { invalidateViewportPresetApplyGeneration } from './viewport-apply-generation';
 
 export function usePopupLifecycleSync(state: PopupRuntimeStateSlice) {
   usePopupLifecycleEffect(() => ({
@@ -23,11 +22,6 @@ export function usePopupLifecycleSync(state: PopupRuntimeStateSlice) {
       setStartError: state.recording.setStartError,
     },
     browser: {
-      clearAppliedViewportAuthority: () => {
-        invalidateViewportPresetApplyGeneration();
-        state.presets.setAppliedViewportPresetId(null);
-        state.presets.setAppliedViewportTabId(null);
-      },
       refreshActiveTabCapabilities: state.actions.refreshActiveTabCapabilities,
       refreshGalleryStatus: state.actions.refreshGalleryStatus,
     },

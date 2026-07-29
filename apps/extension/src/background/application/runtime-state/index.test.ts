@@ -42,7 +42,7 @@ it('creates factory-owned runtime maps for each service-worker state instance', 
   const first = createBackgroundRuntimeState();
   const second = createBackgroundRuntimeState();
   first.screenshotModeState.set(7, true);
-  first.viewportOwnerState.set(7, 'debugger');
+  first.viewportOwnerState.set(7, 'capture-surface');
   first.webSnapshotViewerPorts?.set(7, createViewerPortRegistration({}));
 
   expect(second.screenshotModeState.has(7)).toBe(false);
@@ -58,8 +58,13 @@ it('clears reconstructible tab state and delegates durable tab cleanup', async (
   state.screenshotModeState.set(7, true);
   state.highlighterModeState.set(7, true);
   state.quickEditModeState.set(7, true);
-  state.viewportOwnerState.set(7, 'debugger');
-  state.viewportState.set(7, { width: 1280, height: 720 });
+  state.viewportOwnerState.set(7, 'capture-surface');
+  state.viewportState.set(7, {
+    presetId: 'test:viewport',
+    target: 'viewport' as const,
+    width: 1280,
+    height: 720,
+  });
   state.webSnapshotViewerPorts?.set(7, createViewerPortRegistration({}));
 
   await clearBackgroundRuntimeTabState(state, 7);
@@ -78,8 +83,13 @@ it('clears navigation-scoped tab mode state without durable tab cleanup', () => 
   state.screenshotModeState.set(7, true);
   state.highlighterModeState.set(7, true);
   state.quickEditModeState.set(7, true);
-  state.viewportOwnerState.set(7, 'debugger');
-  state.viewportState.set(7, { width: 1280, height: 720 });
+  state.viewportOwnerState.set(7, 'capture-surface');
+  state.viewportState.set(7, {
+    presetId: 'test:viewport',
+    target: 'viewport' as const,
+    width: 1280,
+    height: 720,
+  });
   state.webSnapshotViewerPorts?.set(7, createViewerPortRegistration({}));
 
   clearBackgroundRuntimeTabModeState(state, 7);
@@ -99,8 +109,13 @@ it('reconciles MV3 startup state without replacing durable owners', () => {
   state.screenshotModeState.set(7, true);
   state.highlighterModeState.set(7, true);
   state.quickEditModeState.set(7, true);
-  state.viewportOwnerState.set(7, 'debugger');
-  state.viewportState.set(7, { width: 1280, height: 720 });
+  state.viewportOwnerState.set(7, 'capture-surface');
+  state.viewportState.set(7, {
+    presetId: 'test:viewport',
+    target: 'viewport' as const,
+    width: 1280,
+    height: 720,
+  });
   state.captureGuardState.isCapturing = true;
   state.webSnapshotViewerPorts?.set(7, createViewerPortRegistration({}));
 

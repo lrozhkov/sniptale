@@ -60,8 +60,7 @@ function getPageAccessDisabledReasonForCaptureMode(
 ): string | undefined {
   if (
     runtime.recording.videoCaptureMode === CaptureMode.TAB ||
-    runtime.recording.videoCaptureMode === CaptureMode.TAB_CROP ||
-    runtime.recording.videoCaptureMode === CaptureMode.VIEWPORT_EMULATION
+    runtime.recording.videoCaptureMode === CaptureMode.TAB_CROP
   ) {
     return getPageAccessDisabledReason(runtime);
   }

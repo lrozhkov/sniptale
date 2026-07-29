@@ -4,11 +4,13 @@ const {
   captureFullPageForArchiveMock,
   isExportHarStopPreauthorizedMock,
   issueExportHarStartCapabilityMock,
+  getPreauthorizedContentActionRouteMessageMock,
   stopPreauthorizedExportHarSessionMock,
 } = vi.hoisted(() => ({
   captureFullPageForArchiveMock: vi.fn(),
   isExportHarStopPreauthorizedMock: vi.fn(),
   issueExportHarStartCapabilityMock: vi.fn(),
+  getPreauthorizedContentActionRouteMessageMock: vi.fn(),
   stopPreauthorizedExportHarSessionMock: vi.fn(),
 }));
 
@@ -24,17 +26,35 @@ vi.mock('../../diagnostics/public/har-export', async (importOriginal) => ({
   stopPreauthorizedExportHarSession: stopPreauthorizedExportHarSessionMock,
 }));
 
+vi.mock('./authorization/content-action', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./authorization/content-action')>()),
+  getPreauthorizedContentActionRouteMessage: getPreauthorizedContentActionRouteMessageMock,
+}));
+
 import {
   handleExportCaptureFullPage,
   handleRequestExportHarStartCapability,
   handleExportStopHar,
 } from './actions.export';
+import type { PageAccessPort } from '../../routing-contracts/page-access-port';
+import { cancelFullPageCaptureByExportRunId } from '../full-page/cancellation';
+
+function createPageAccessPort(): PageAccessPort {
+  return {
+    ensureActivePageAccessRuntime: vi.fn().mockResolvedValue(undefined),
+    ensureNativeVisibleCaptureAuthority: vi.fn().mockResolvedValue(undefined),
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
   captureFullPageForArchiveMock.mockResolvedValue('data:image/png;base64,7');
   isExportHarStopPreauthorizedMock.mockReturnValue(true);
   issueExportHarStartCapabilityMock.mockReturnValue('start-capability-token');
+  getPreauthorizedContentActionRouteMessageMock.mockReturnValue({
+    documentId: 'document-42',
+    tabId: 42,
+  });
   stopPreauthorizedExportHarSessionMock.mockResolvedValue({
     har: { entries: [] },
     rawDiagnosticsEnabled: false,
@@ -187,22 +207,136 @@ it('handles HAR stop validation, success, and failure branches', async () => {
 it('handles archive capture success and failure', async () => {
   const successResponse = vi.fn();
   const failureResponse = vi.fn();
+  const pageAccessPort = createPageAccessPort();
+  const message = {
+    contentIntent: { requestId: 'export-run-1', token: 'token-1' },
+    exportRunId: 'export-run-1',
+    type: 'EXPORT_CAPTURE_FULL_PAGE' as const,
+  };
 
   captureFullPageForArchiveMock
-    .mockResolvedValueOnce('data:image/png;base64,7')
+    .mockResolvedValueOnce({
+      dataUrl: 'data:image/png;base64,7',
+      metadata: { downscaled: true, frozenExtentWarning: false },
+    })
     .mockRejectedValueOnce(new Error('archive failed'));
 
-  expect(handleExportCaptureFullPage(42, successResponse)).toBe(true);
-  expect(handleExportCaptureFullPage(42, failureResponse)).toBe(true);
-
-  await flushPromises();
+  expect(handleExportCaptureFullPage(message, 42, successResponse, pageAccessPort)).toBe(true);
+  await vi.waitFor(() => expect(successResponse).toHaveBeenCalled());
+  expect(handleExportCaptureFullPage(message, 42, failureResponse, pageAccessPort)).toBe(true);
+  await vi.waitFor(() => expect(failureResponse).toHaveBeenCalled());
 
   expect(successResponse).toHaveBeenCalledWith({
     success: true,
     dataUrl: 'data:image/png;base64,7',
+    downscaled: true,
+    frozenExtentWarning: false,
   });
   expect(failureResponse).toHaveBeenCalledWith({
     success: false,
     error: 'archive failed',
   });
+  expect(captureFullPageForArchiveMock).toHaveBeenCalledWith(42, {
+    abortSignal: expect.any(AbortSignal),
+    backendKind: 'native',
+    documentId: 'document-42',
+    exportRunId: 'export-run-1',
+  });
+});
+
+it('uses owner-scoped unattended capture without requesting active-tab authority', async () => {
+  const sendResponse = vi.fn();
+  const ensureActivePageAccessRuntime = vi.fn().mockResolvedValue(undefined);
+  const ensureNativeVisibleCaptureAuthority = vi.fn().mockResolvedValue(undefined);
+  const pageAccessPort: PageAccessPort = {
+    ensureActivePageAccessRuntime,
+    ensureNativeVisibleCaptureAuthority,
+  };
+  captureFullPageForArchiveMock.mockResolvedValueOnce({
+    dataUrl: 'data:image/png;base64,unattended',
+    metadata: { downscaled: false, frozenExtentWarning: false },
+  });
+
+  handleExportCaptureFullPage(
+    {
+      contentIntent: { requestId: 'batch-1', token: 'token-1' },
+      exportRunId: 'batch-1',
+      type: 'EXPORT_CAPTURE_FULL_PAGE_UNATTENDED',
+    },
+    42,
+    sendResponse,
+    pageAccessPort
+  );
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+  expect(ensureActivePageAccessRuntime).toHaveBeenCalledWith(42);
+  expect(ensureNativeVisibleCaptureAuthority).not.toHaveBeenCalled();
+  expect(captureFullPageForArchiveMock).toHaveBeenCalledWith(42, {
+    abortSignal: expect.any(AbortSignal),
+    backendKind: 'unattended-cdp',
+    documentId: 'document-42',
+    exportRunId: 'batch-1',
+  });
+});
+
+it('does not publish success when cancellation arrives before the archive response', async () => {
+  let resolveCapture: (value: {
+    dataUrl: string;
+    metadata: { downscaled: boolean; frozenExtentWarning: boolean };
+  }) => void = () => undefined;
+  captureFullPageForArchiveMock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveCapture = resolve;
+      })
+  );
+  const sendResponse = vi.fn();
+
+  handleExportCaptureFullPage(
+    {
+      contentIntent: { requestId: 'batch-publish-cancelled', token: 'token-1' },
+      exportRunId: 'batch-publish-cancelled',
+      type: 'EXPORT_CAPTURE_FULL_PAGE_UNATTENDED',
+    },
+    42,
+    sendResponse,
+    createPageAccessPort()
+  );
+  await vi.waitFor(() => expect(captureFullPageForArchiveMock).toHaveBeenCalled());
+  expect(cancelFullPageCaptureByExportRunId('batch-publish-cancelled')).toBe(true);
+  resolveCapture({
+    dataUrl: 'data:image/png;base64,discarded',
+    metadata: { downscaled: false, frozenExtentWarning: false },
+  });
+
+  await vi.waitFor(() => {
+    expect(sendResponse).toHaveBeenCalledWith({
+      error: 'Full-page capture cancelled',
+      success: false,
+    });
+  });
+  expect(sendResponse).not.toHaveBeenCalledWith(
+    expect.objectContaining({ dataUrl: expect.any(String), success: true })
+  );
+});
+
+it('rejects export-run and capability identity mismatches before privileged effects', () => {
+  const sendResponse = vi.fn();
+
+  handleExportCaptureFullPage(
+    {
+      contentIntent: { requestId: 'export-run-old', token: 'token-1' },
+      exportRunId: 'export-run-new',
+      type: 'EXPORT_CAPTURE_FULL_PAGE_UNATTENDED',
+    },
+    42,
+    sendResponse,
+    createPageAccessPort()
+  );
+
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: 'Full-page export capability identity mismatch',
+    success: false,
+  });
+  expect(captureFullPageForArchiveMock).not.toHaveBeenCalled();
 });

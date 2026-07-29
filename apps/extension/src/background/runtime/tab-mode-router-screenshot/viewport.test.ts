@@ -1,280 +1,492 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
 
-const {
-  attachDebuggerMock,
-  browserTabsGetMock,
-  clearViewportMock,
-  detachDebuggerMock,
-  isDebuggerAttachedMock,
-  loggerDebugMock,
-  loggerErrorMock,
-  loggerWarnMock,
-  resetZoomMock,
-  sendTabMessageMock,
-  setViewportMock,
-} = vi.hoisted(() => ({
-  attachDebuggerMock: vi.fn(),
-  browserTabsGetMock: vi.fn(),
-  clearViewportMock: vi.fn(),
-  detachDebuggerMock: vi.fn(),
-  isDebuggerAttachedMock: vi.fn(),
-  loggerDebugMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
-  loggerWarnMock: vi.fn(),
-  resetZoomMock: vi.fn(),
-  sendTabMessageMock: vi.fn(),
-  setViewportMock: vi.fn(),
+const mocks = vi.hoisted(() => ({
+  apply: vi.fn(),
+  authorize: vi.fn(),
+  claimApply: vi.fn(),
+  claimRelease: vi.fn(),
+  classify: vi.fn(),
+  getApplied: vi.fn(),
+  getAvailabilities: vi.fn(),
+  getSession: vi.fn(),
+  getTab: vi.fn(),
+  loadSettings: vi.fn(),
+  markApplied: vi.fn(),
+  markReleased: vi.fn(),
+  nextGeneration: vi.fn(),
+  release: vi.fn(),
+  replace: vi.fn(),
+  runOperation: vi.fn(async (_tabId: number, operation: () => Promise<void>) => operation()),
+  sendTabMessage: vi.fn(),
+  sendViewerPreparationCommand: vi.fn(),
 }));
 
-vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
-  runtimeInfo: {
-    getURL: (path: string) => `chrome-extension://test/${path}`,
-  },
+vi.mock('@sniptale/platform/browser/tabs', () => ({ browserTabs: { get: mocks.getTab } }));
+vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
+  loadSettings: mocks.loadSettings,
 }));
-
-vi.mock('@sniptale/platform/browser/tabs', () => ({
-  browserTabs: { get: browserTabsGetMock },
+vi.mock('../../../features/tab-capabilities/runtime', () => ({
+  classifyTabRuntimeCapability: mocks.classify,
 }));
-
-vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/runtime-messaging')>()),
-  sendTabMessage: sendTabMessageMock,
-}));
-
-vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({
-    debug: loggerDebugMock,
-    error: loggerErrorMock,
-    warn: loggerWarnMock,
+vi.mock('../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture-surface')>()),
+  getCaptureSurfaceService: () => ({
+    apply: mocks.apply,
+    getApplied: mocks.getApplied,
+    getAvailabilities: mocks.getAvailabilities,
+    replace: mocks.replace,
+    release: mocks.release,
   }),
 }));
-
-vi.mock('../../debugger/session/attach', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../debugger/session/attach')>()),
-  attachDebugger: attachDebuggerMock,
+vi.mock('../../capture-surface/screenshot-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture-surface/screenshot-session')>()),
+  authorizeScreenshotSurfaceMutation: mocks.authorize,
+  claimScreenshotSurfaceApply: mocks.claimApply,
+  claimScreenshotSurfaceRelease: mocks.claimRelease,
+  getScreenshotSurfaceSession: mocks.getSession,
+  markScreenshotSurfaceApplied: mocks.markApplied,
+  markScreenshotSurfaceReleased: mocks.markReleased,
+  nextScreenshotSurfaceGeneration: mocks.nextGeneration,
 }));
-
-vi.mock('../../debugger/session/detach', () => ({
-  detachDebugger: detachDebuggerMock,
+vi.mock('../../routing-contracts/runtime-messaging/services', () => ({
+  getBackgroundRuntimeMessaging: () => ({ sendTabMessage: mocks.sendTabMessage }),
 }));
-
-vi.mock('../../debugger/session/status', () => ({
-  isDebuggerAttached: isDebuggerAttachedMock,
+vi.mock('../../capture/lifecycle', () => ({
+  sendViewerPreparationCommand: mocks.sendViewerPreparationCommand,
 }));
+vi.mock('./operation-queue', () => ({ runScreenshotModeOperation: mocks.runOperation }));
 
-vi.mock('../../debugger/workspace', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../debugger/workspace')>()),
-  clearViewport: clearViewportMock,
-  resetZoom: resetZoomMock,
-  setViewport: setViewportMock,
-}));
+import {
+  getScreenshotPresetAvailabilities,
+  handleApplyViewportPreset,
+  handleReleaseViewportPreset,
+} from './viewport';
 
-import { handleSetViewport } from './viewport';
-import { createAckingViewerPortRegistration } from '../../capture/page-preparation/viewer-ports.test-support';
+const viewportPreset = {
+  enabled: true,
+  height: 720,
+  id: 'viewport-1',
+  kind: 'user' as const,
+  name: 'HD viewport',
+  order: 0,
+  target: 'viewport' as const,
+  width: 1280,
+};
+const windowPreset = { ...viewportPreset, id: 'window-1', target: 'window' as const };
+
+function stateMaps() {
+  return {
+    viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
-  browserTabsGetMock.mockResolvedValue({ id: 5, url: 'https://example.com/page' });
+  mocks.authorize.mockReturnValue(true);
+  mocks.claimApply.mockReturnValue({ generation: 2, sessionId: 'screenshot-session-1' });
+  mocks.claimRelease.mockReturnValue({ generation: 2, sessionId: 'screenshot-session-1' });
+  mocks.classify.mockReturnValue(TabRuntimeCapability.Regular);
+  mocks.getTab.mockResolvedValue({ id: 7, url: 'https://example.com' });
+  mocks.loadSettings.mockResolvedValue({ viewportPresets: [viewportPreset, windowPreset] });
+  mocks.nextGeneration.mockReturnValue({ generation: 2, sessionId: 'screenshot-session-1' });
+  mocks.apply.mockResolvedValue({
+    generation: 2,
+    height: 720,
+    leaseId: 'lease-2',
+    presetId: 'viewport-1',
+    sessionId: 'screenshot-session-1',
+    target: 'viewport',
+    width: 1280,
+  });
+  mocks.release.mockResolvedValue(undefined);
+  mocks.replace.mockResolvedValue({
+    generation: 2,
+    height: 720,
+    leaseId: 'lease-2',
+    presetId: 'viewport-1',
+    sessionId: 'screenshot-session-1',
+    target: 'viewport',
+    width: 1280,
+  });
+  mocks.sendTabMessage.mockResolvedValue(undefined);
+  mocks.sendViewerPreparationCommand.mockResolvedValue(undefined);
+  mocks.getAvailabilities.mockResolvedValue([
+    {
+      status: 'available',
+      presetId: 'viewport-1',
+      required: { height: 720, width: 1280 },
+      target: 'viewport',
+    },
+  ]);
 });
 
-async function verifySwitchToNativeViewportWithoutDebuggerDetach() {
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'debugger']]);
-  const viewportState = new Map<number, { width: number; height: number } | null>([
-    [5, { width: 1440, height: 900 }],
-  ]);
+it('applies an authorized regular preset by ID and notifies content after exact application', async () => {
+  const maps = stateMaps();
+  await handleApplyViewportPreset(
+    7,
+    'viewport-1',
+    2,
+    'capability-1',
+    'document-1',
+    maps.viewportState,
+    maps.viewportOwnerState
+  );
 
-  isDebuggerAttachedMock.mockResolvedValue(false);
-  sendTabMessageMock.mockResolvedValue(undefined);
+  expect(mocks.apply).toHaveBeenCalledWith({
+    context: 'screenshot',
+    generation: 2,
+    owner: 'screenshot',
+    presetId: 'viewport-1',
+    sessionId: 'screenshot-session-1',
+    tabId: 7,
+  });
+  expect(maps.viewportOwnerState.get(7)).toBe('capture-surface');
+  expect(maps.viewportState.get(7)).toMatchObject({ presetId: 'viewport-1' });
+  expect(mocks.sendTabMessage).toHaveBeenCalledWith(
+    7,
+    expect.objectContaining({ type: 'VIEWPORT_CHANGED' })
+  );
+});
 
-  await handleSetViewport(5, null, null, viewportState, viewportOwnerState);
+it('replaces a previous matching surface transactionally', async () => {
+  mocks.getSession.mockReturnValue({ sessionId: 'screenshot-session-1' });
+  mocks.getApplied.mockReturnValue({
+    generation: 1,
+    height: 720,
+    leaseId: 'lease-1',
+    presetId: 'viewport-1',
+    sessionId: 'screenshot-session-1',
+    target: 'viewport',
+    width: 1280,
+  });
+  const maps = stateMaps();
 
-  expect(viewportState.get(5)).toBeNull();
-  expect(viewportOwnerState.has(5)).toBe(false);
-  expect(sendTabMessageMock).toHaveBeenCalledWith(5, {
+  await handleApplyViewportPreset(
+    7,
+    'viewport-1',
+    2,
+    'capability-1',
+    'document-1',
+    maps.viewportState,
+    maps.viewportOwnerState
+  );
+
+  expect(mocks.replace).toHaveBeenCalledWith(
+    expect.objectContaining({ generation: 2, presetId: 'viewport-1' })
+  );
+  expect(mocks.release).not.toHaveBeenCalled();
+});
+
+it.each([
+  ['viewport', 'window-1', 'window'],
+  ['window', 'viewport-1', 'viewport'],
+] as const)(
+  'transactionally switches from %s to the opposite target',
+  async (currentTarget, nextPresetId, nextTarget) => {
+    const currentPresetId = currentTarget === 'viewport' ? 'viewport-1' : 'window-1';
+    const current = {
+      generation: 1,
+      height: 720,
+      leaseId: 'lease-1',
+      presetId: currentPresetId,
+      sessionId: 'screenshot-session-1',
+      target: currentTarget,
+      width: 1280,
+    };
+    mocks.getApplied.mockReturnValue(current);
+    mocks.replace.mockResolvedValueOnce({
+      ...current,
+      generation: 2,
+      leaseId: 'lease-2',
+      presetId: nextPresetId,
+      target: nextTarget,
+    });
+    const maps = stateMaps();
+
+    await handleApplyViewportPreset(
+      7,
+      nextPresetId,
+      2,
+      'capability-1',
+      'document-1',
+      maps.viewportState,
+      maps.viewportOwnerState
+    );
+
+    expect(mocks.replace).toHaveBeenCalledWith(
+      expect.objectContaining({ generation: 2, presetId: nextPresetId })
+    );
+    expect(mocks.release).not.toHaveBeenCalled();
+    expect(mocks.apply).not.toHaveBeenCalled();
+    expect(maps.viewportState.get(7)).toMatchObject({ target: nextTarget });
+  }
+);
+
+it('leaves cross-target rollback to the atomic capture-surface owner', async () => {
+  const current = {
+    generation: 1,
+    height: 720,
+    leaseId: 'lease-1',
+    presetId: 'viewport-1',
+    sessionId: 'screenshot-session-1',
+    target: 'viewport' as const,
+    width: 1280,
+  };
+  mocks.getApplied.mockReturnValue(current);
+  mocks.nextGeneration.mockReturnValueOnce({
+    generation: 2,
+    sessionId: 'screenshot-session-1',
+  });
+  mocks.replace.mockRejectedValueOnce(new Error('window mutation failed'));
+  mocks.getApplied.mockReturnValueOnce(current).mockReturnValueOnce(null);
+  const maps = stateMaps();
+  maps.viewportOwnerState.set(7, 'capture-surface');
+  maps.viewportState.set(7, {
+    presetId: 'viewport-1',
+    target: 'viewport',
+    width: 1280,
+    height: 720,
+  });
+
+  await expect(
+    handleApplyViewportPreset(
+      7,
+      'window-1',
+      2,
+      'capability-1',
+      'document-1',
+      maps.viewportState,
+      maps.viewportOwnerState
+    )
+  ).rejects.toThrow('window mutation failed');
+
+  expect(mocks.replace).toHaveBeenCalledWith(
+    expect.objectContaining({ generation: 2, presetId: 'window-1' })
+  );
+  expect(mocks.apply).not.toHaveBeenCalled();
+  expect(mocks.release).not.toHaveBeenCalled();
+  expect(maps.viewportOwnerState.has(7)).toBe(false);
+  expect(maps.viewportState.get(7)).toBeNull();
+  expect(mocks.sendTabMessage).toHaveBeenCalledWith(7, {
     type: 'VIEWPORT_CHANGED',
     viewport: null,
   });
-  expect(clearViewportMock).not.toHaveBeenCalled();
-  expect(detachDebuggerMock).not.toHaveBeenCalled();
-}
+});
 
-async function verifyNativeViewportCleanupWarnings() {
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'debugger']]);
-  const viewportState = new Map<number, { width: number; height: number } | null>([
-    [5, { width: 1440, height: 900 }],
-  ]);
+it('rejects unauthorized and restricted mutations before privileged effects', async () => {
+  const maps = stateMaps();
+  mocks.authorize.mockReturnValueOnce(false);
+  await expect(
+    handleApplyViewportPreset(
+      7,
+      'viewport-1',
+      2,
+      'bad-token',
+      'document-1',
+      maps.viewportState,
+      maps.viewportOwnerState
+    )
+  ).rejects.toThrow('authorization-expired');
 
-  isDebuggerAttachedMock.mockResolvedValue(true);
-  sendTabMessageMock.mockResolvedValue(undefined);
-  clearViewportMock.mockRejectedValueOnce(new Error('clear failed'));
-  detachDebuggerMock.mockRejectedValueOnce(new Error('detach failed'));
+  mocks.classify.mockReturnValueOnce(TabRuntimeCapability.Restricted);
+  await expect(
+    handleApplyViewportPreset(
+      7,
+      'viewport-1',
+      2,
+      'capability-1',
+      'document-1',
+      maps.viewportState,
+      maps.viewportOwnerState
+    )
+  ).rejects.toThrow('unsupported-context');
+  expect(mocks.apply).not.toHaveBeenCalled();
+});
 
-  await handleSetViewport(5, null, null, viewportState, viewportOwnerState);
+it('rejects stale apply and release identities before privileged effects', async () => {
+  const maps = stateMaps();
+  mocks.claimApply.mockReturnValueOnce(null);
 
-  expect(clearViewportMock).toHaveBeenCalledWith(5);
-  expect(detachDebuggerMock).toHaveBeenCalledWith(5, 'screenshot');
-  expect(loggerWarnMock).toHaveBeenCalledWith(
-    'Failed to clear viewport before returning to native mode',
-    expect.any(Error)
+  await expect(
+    handleApplyViewportPreset(
+      7,
+      'viewport-1',
+      1,
+      'capability-1',
+      'document-1',
+      maps.viewportState,
+      maps.viewportOwnerState
+    )
+  ).rejects.toThrow('stale-generation');
+
+  mocks.claimRelease.mockReturnValueOnce(null);
+  await expect(
+    handleReleaseViewportPreset(
+      7,
+      2,
+      1,
+      'capability-1',
+      'document-1',
+      maps.viewportState,
+      maps.viewportOwnerState
+    )
+  ).rejects.toThrow('stale-generation');
+
+  expect(mocks.apply).not.toHaveBeenCalled();
+  expect(mocks.replace).not.toHaveBeenCalled();
+  expect(mocks.release).not.toHaveBeenCalled();
+});
+
+it('resizes an owned viewer locally and keeps browser-window presets disabled', async () => {
+  mocks.classify.mockReturnValue(TabRuntimeCapability.OwnedSnapshotViewer);
+  const maps = stateMaps();
+  const ports = new Map();
+
+  await handleApplyViewportPreset(
+    7,
+    'viewport-1',
+    2,
+    'capability-1',
+    'document-1',
+    maps.viewportState,
+    maps.viewportOwnerState,
+    ports
   );
-  expect(loggerWarnMock).toHaveBeenCalledWith(
-    'Failed to detach debugger after switching to native viewport',
-    expect.any(Error)
-  );
-}
-
-async function verifyApplyCustomViewport() {
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>();
-  const viewportState = new Map<number, { width: number; height: number } | null>();
-
-  isDebuggerAttachedMock.mockResolvedValue(false);
-  sendTabMessageMock.mockResolvedValue(undefined);
-
-  await handleSetViewport(5, 1280, 720, viewportState, viewportOwnerState);
-
-  expect(attachDebuggerMock).toHaveBeenCalledWith(
-    5,
-    'screenshot',
-    expect.objectContaining({ token: expect.any(String) })
-  );
-  expect(setViewportMock).toHaveBeenCalledWith(5, 1280, 720);
-  expect(resetZoomMock).toHaveBeenCalledWith(5);
-  expect(viewportState.get(5)).toEqual({ width: 1280, height: 720 });
-  expect(viewportOwnerState.get(5)).toBe('debugger');
-  expect(sendTabMessageMock).toHaveBeenCalledWith(5, {
-    type: 'VIEWPORT_CHANGED',
-    viewport: { width: 1280, height: 720 },
-  });
-}
-
-async function verifyViewportChangeRollbackOnNotificationFailure() {
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'debugger']]);
-  const viewportState = new Map<number, { width: number; height: number } | null>([
-    [5, { width: 1024, height: 768 }],
-  ]);
-
-  isDebuggerAttachedMock.mockResolvedValue(true);
-  sendTabMessageMock.mockRejectedValueOnce(new Error('content unavailable'));
-
-  await expect(handleSetViewport(5, 1280, 720, viewportState, viewportOwnerState)).rejects.toThrow(
-    'content unavailable'
-  );
-
-  expect(setViewportMock).toHaveBeenNthCalledWith(1, 5, 1280, 720);
-  expect(setViewportMock).toHaveBeenNthCalledWith(2, 5, 1024, 768);
-  expect(resetZoomMock).toHaveBeenCalledTimes(2);
-  expect(viewportState.get(5)).toEqual({ width: 1024, height: 768 });
-  expect(viewportOwnerState.get(5)).toBe('debugger');
-}
-
-async function verifyViewportRollbackToNativeWhenNoPreviousViewportExists() {
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>();
-  const viewportState = new Map<number, { width: number; height: number } | null>();
-
-  isDebuggerAttachedMock.mockResolvedValue(false);
-  sendTabMessageMock.mockRejectedValueOnce(new Error('content unavailable'));
-
-  await expect(handleSetViewport(5, 1280, 720, viewportState, viewportOwnerState)).rejects.toThrow(
-    'content unavailable'
-  );
-
-  expect(clearViewportMock).toHaveBeenCalledWith(5);
-  expect(detachDebuggerMock).toHaveBeenCalledWith(5, 'screenshot');
-  expect(viewportState.get(5)).toBeNull();
-  expect(viewportOwnerState.has(5)).toBe(false);
-}
-
-async function verifyOwnedViewerViewportRoutesThroughPort() {
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>();
-  const viewportState = new Map<number, { width: number; height: number } | null>();
-  const registration = createAckingViewerPortRegistration();
-  const ports = new Map([[5, registration]]);
-
-  browserTabsGetMock.mockResolvedValueOnce({
-    id: 5,
-    url: 'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html?snapshotId=s1',
-  });
-
-  await handleSetViewport(5, 390, 844, viewportState, viewportOwnerState, ports);
-
-  expect(registration.port.postMessage).toHaveBeenCalledWith(
+  expect(mocks.sendViewerPreparationCommand).toHaveBeenCalledWith(
+    ports,
+    7,
     expect.objectContaining({
-      command: { type: 'SET_VIEWPORT', viewport: { width: 390, height: 844 } },
+      type: 'PREPARATION_SURFACE_RESIZE',
+      viewport: expect.objectContaining({ presetId: 'viewport-1', target: 'viewport' }),
     })
   );
-  expect(viewportState.get(5)).toEqual({ width: 390, height: 844 });
-  expect(viewportOwnerState.get(5)).toBe('viewer');
-  expect(attachDebuggerMock).not.toHaveBeenCalled();
-  expect(setViewportMock).not.toHaveBeenCalled();
-  expect(sendTabMessageMock).not.toHaveBeenCalled();
-}
+  expect(maps.viewportOwnerState.get(7)).toBe('viewer');
+  expect(mocks.sendTabMessage).not.toHaveBeenCalled();
 
-async function verifyOwnedViewerViewportRollbackOnMissingPort() {
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'viewer']]);
-  const viewportState = new Map<number, { width: number; height: number } | null>([
-    [5, { width: 1024, height: 768 }],
+  await expect(
+    handleApplyViewportPreset(
+      7,
+      'window-1',
+      3,
+      'capability-1',
+      'document-1',
+      maps.viewportState,
+      maps.viewportOwnerState,
+      ports
+    )
+  ).rejects.toThrow('unsupported-context');
+});
+
+it('releases regular and viewer surfaces and clears projected state', async () => {
+  mocks.getSession.mockReturnValue({ sessionId: 'screenshot-session-1' });
+  mocks.getApplied
+    .mockReturnValueOnce({
+      generation: 2,
+      leaseId: 'lease-2',
+      sessionId: 'screenshot-session-1',
+    })
+    .mockReturnValue(null);
+  const regular = stateMaps();
+  await handleReleaseViewportPreset(
+    7,
+    3,
+    2,
+    'capability-1',
+    'document-1',
+    regular.viewportState,
+    regular.viewportOwnerState
+  );
+  expect(mocks.release).toHaveBeenCalledOnce();
+  expect(mocks.sendTabMessage).toHaveBeenCalledWith(7, {
+    type: 'VIEWPORT_CHANGED',
+    viewport: null,
+  });
+  expect(regular.viewportState.get(7)).toBeNull();
+
+  mocks.classify.mockReturnValue(TabRuntimeCapability.OwnedSnapshotViewer);
+  const viewer = stateMaps();
+  const ports = new Map();
+  await handleReleaseViewportPreset(
+    7,
+    4,
+    3,
+    'capability-1',
+    'document-1',
+    viewer.viewportState,
+    viewer.viewportOwnerState,
+    ports
+  );
+  expect(mocks.sendViewerPreparationCommand).toHaveBeenLastCalledWith(ports, 7, {
+    type: 'PREPARATION_SURFACE_RESIZE',
+    viewport: null,
+  });
+});
+
+it('rejects Current size while the screenshot lease is suspended beneath video', async () => {
+  mocks.getSession.mockReturnValue({ sessionId: 'screenshot-session-1' });
+  mocks.getApplied.mockReturnValue({
+    generation: 1,
+    leaseId: 'video-lease',
+    sessionId: 'recording-1',
+  });
+  const maps = stateMaps();
+
+  await expect(
+    handleReleaseViewportPreset(
+      7,
+      2,
+      1,
+      'capability-1',
+      'document-1',
+      maps.viewportState,
+      maps.viewportOwnerState
+    )
+  ).rejects.toMatchObject({ code: 'surface-busy' });
+
+  expect(mocks.release).not.toHaveBeenCalled();
+  expect(mocks.sendTabMessage).not.toHaveBeenCalled();
+});
+
+it('projects viewer, restricted, and regular availability in one batch without hidden fallback', async () => {
+  mocks.classify.mockReturnValue(TabRuntimeCapability.OwnedSnapshotViewer);
+  await expect(
+    getScreenshotPresetAvailabilities(7, ['viewport-1', 'window-1', 'missing'])
+  ).resolves.toEqual([
+    expect.objectContaining({ status: 'available', target: 'viewport' }),
+    expect.objectContaining({
+      status: 'unavailable',
+      reason: 'unsupported-context',
+      target: 'window',
+    }),
+    expect.objectContaining({ status: 'unavailable', reason: 'missing' }),
+  ]);
+  mocks.loadSettings.mockResolvedValueOnce({
+    viewportPresets: [{ ...viewportPreset, enabled: false }],
+  });
+  await expect(getScreenshotPresetAvailabilities(7, ['viewport-1'])).resolves.toEqual([
+    expect.objectContaining({
+      status: 'unavailable',
+      reason: 'disabled',
+      target: 'viewport',
+    }),
   ]);
 
-  browserTabsGetMock.mockResolvedValueOnce({
-    id: 5,
-    url: 'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html?snapshotId=s1',
+  mocks.classify.mockReturnValueOnce(TabRuntimeCapability.Restricted);
+  await expect(getScreenshotPresetAvailabilities(7, ['viewport-1'])).resolves.toEqual([
+    expect.objectContaining({ status: 'unavailable', reason: 'unsupported-context' }),
+  ]);
+
+  mocks.classify.mockReturnValueOnce(TabRuntimeCapability.Regular);
+  await getScreenshotPresetAvailabilities(7, ['viewport-1', 'window-1'], 'video');
+  expect(mocks.getAvailabilities).toHaveBeenCalledWith({
+    context: 'video-tab',
+    presetIds: ['viewport-1', 'window-1'],
+    tabId: 7,
   });
-
-  await expect(
-    handleSetViewport(5, 390, 844, viewportState, viewportOwnerState, new Map())
-  ).rejects.toThrow('Web snapshot viewer is not ready');
-
-  expect(viewportState.get(5)).toEqual({ width: 1024, height: 768 });
-  expect(viewportOwnerState.get(5)).toBe('viewer');
-  expect(attachDebuggerMock).not.toHaveBeenCalled();
-  expect(setViewportMock).not.toHaveBeenCalled();
-}
-
-async function verifyRestrictedViewportPageRejectsWithoutDebugger() {
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>();
-  const viewportState = new Map<number, { width: number; height: number } | null>();
-
-  browserTabsGetMock.mockResolvedValueOnce({ id: 5, url: 'chrome://settings' });
-
-  await expect(
-    handleSetViewport(5, 390, 844, viewportState, viewportOwnerState, new Map())
-  ).rejects.toThrow('Viewport emulation is unavailable');
-
-  expect(attachDebuggerMock).not.toHaveBeenCalled();
-  expect(setViewportMock).not.toHaveBeenCalled();
-  expect(viewportState.has(5)).toBe(false);
-  expect(viewportOwnerState.has(5)).toBe(false);
-}
-
-describe('tab-mode-router-screenshot viewport handling', () => {
-  it(
-    'switches to native viewport without detaching when no debugger is attached',
-    verifySwitchToNativeViewportWithoutDebuggerDetach
-  );
-  it(
-    'warns when native viewport cleanup cannot clear or detach the debugger',
-    verifyNativeViewportCleanupWarnings
-  );
-  it('applies a custom viewport and notifies the content script', verifyApplyCustomViewport);
-  it(
-    'restores the previous viewport when post-apply notification fails',
-    verifyViewportChangeRollbackOnNotificationFailure
-  );
-  it(
-    'rolls back to the native viewport when no previous viewport exists',
-    verifyViewportRollbackToNativeWhenNoPreviousViewportExists
-  );
-  it(
-    'routes owned snapshot viewer viewport changes through the viewer port',
-    verifyOwnedViewerViewportRoutesThroughPort
-  );
-  it(
-    'restores cached viewer viewport when the viewer port is missing',
-    verifyOwnedViewerViewportRollbackOnMissingPort
-  );
-  it(
-    'keeps generic restricted pages out of debugger viewport emulation',
-    verifyRestrictedViewportPageRejectsWithoutDebugger
-  );
 });

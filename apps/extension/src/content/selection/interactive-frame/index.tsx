@@ -3,27 +3,16 @@ import { areInteractiveFramePropsEqual } from './render-model/comparison';
 import { InteractiveFrameContent } from './content';
 import type { InteractiveFrameProps } from './types';
 import { useInteractiveFrameRenderModel } from './controller/render-model';
+import type { FrameSurfaceRect } from '../../../features/highlighter/frame-surface';
 
 // Расширение Window для типов pause/resume и focus/blur mask update
 declare global {
   interface Window {
     pauseHighlighter?: () => void;
     resumeHighlighter?: () => void;
-    sniptaleUpdateFocusMaskImmediate?: (
-      frameId: string,
-      x: number,
-      y: number,
-      width: number,
-      height: number
-    ) => void;
+    sniptaleUpdateFocusMaskImmediate?: (frameId: string, geometry: FrameSurfaceRect) => void;
     sniptaleGetFocusSvgRef?: () => SVGSVGElement | null;
-    sniptaleUpdateBlurOverlayImmediate?: (
-      frameId: string,
-      x: number,
-      y: number,
-      width: number,
-      height: number
-    ) => void;
+    sniptaleUpdateBlurOverlayImmediate?: (frameId: string, geometry: FrameSurfaceRect) => void;
   }
 }
 
@@ -39,6 +28,8 @@ export const InteractiveFrame: React.FC<InteractiveFrameProps> = React.memo((pro
     stepBadgePopoverAnchorRef: model.refs.stepBadgePopoverAnchorRef,
     calloutPopoverAnchorRef: model.refs.calloutPopoverAnchorRef,
     frameStyle: model.frameStyle,
+    fillStyle: model.fillStyle,
+    strokeStyle: model.strokeStyle,
     frameZIndex: model.frameZIndex,
     isPopoverOpen: model.isPopoverOpen,
     isFrameActive: model.isFrameActive,

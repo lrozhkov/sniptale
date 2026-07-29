@@ -2,7 +2,7 @@ import { PAGE_STYLE_INSPECTOR_TABS } from '@sniptale/runtime-contracts/page-styl
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getPopupResponseErrorMessage } from '../../diagnostics/runtime-errors';
 import { getActiveTabId } from '../tab-access';
-import { getPopupRuntimeServices } from '../runtime/services';
+import { getPopupRuntimeServices } from '../../runtime-services';
 
 export async function getCurrentPageAppliedStyleCount(): Promise<number> {
   const tabId = await getActiveTabId();

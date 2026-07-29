@@ -10,7 +10,8 @@ import type {
   VideoRecordingRuntimeState,
   ViewportInfo,
 } from '@sniptale/runtime-contracts/video/types/types';
-import type { ScenarioSessionPayload, Size2d, ViewportCoordsPayload } from './types';
+import type { ScenarioSessionPayload, ViewportCoordsPayload } from './types';
+import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 
 export const recordingStateHealthValues = ['healthy', 'degraded', 'failed'] as const;
 
@@ -36,14 +37,19 @@ export type ScreenshotModeStatusResponse = RuntimeMessageResponse<{
   documentId?: string;
   enabled?: boolean;
   supported?: boolean;
+  surfaceLeaseGeneration?: number;
+  surfaceOperationGeneration?: number;
+  surfaceCapabilityToken?: string;
   tabId?: number;
   unsupportedReason?: string | null;
-  viewport?: Size2d | null;
+  viewport?: AppliedViewportPresetPayload | null;
 }>;
 
 export type CaptureResponse = RuntimeMessageResponse<{
   dataUrl?: string;
   action?: CaptureActionType;
+  downscaled?: boolean;
+  frozenExtentWarning?: boolean;
 }>;
 
 export type SaveAssetResponse = RuntimeMessageResponse<{

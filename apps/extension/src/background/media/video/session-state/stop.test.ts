@@ -5,12 +5,11 @@ import { beginVideoRecordingStop, finishVideoRecordingStop } from './stop';
 
 beforeEach(() => {
   videoManagerSession.recordingTabId = 23;
-  videoManagerSession.currentCaptureMode = CaptureMode.VIEWPORT_EMULATION;
+  videoManagerSession.currentCaptureMode = CaptureMode.TAB;
   videoManagerSession.currentCountdownSessionId = null;
   videoManagerSession.isStarting = false;
   videoManagerSession.isStopping = false;
-  videoManagerSession.viewportNavigationEpoch = 2;
-  videoManagerSession.viewportNavigationPending = true;
+  videoManagerSession.offscreenStartDispatched = false;
   videoManagerSession.openEditorAfterRecording = true;
   videoManagerSession.controlledCursorCaptureEnabled = true;
   videoManagerSession.controlledCursorAutoPaused = true;
@@ -27,13 +26,12 @@ beforeEach(() => {
 
 it('preserves tab and mode until deferred stop cleanup when no immediate reset is needed', () => {
   expect(beginVideoRecordingStop()).toEqual({
-    mode: CaptureMode.VIEWPORT_EMULATION,
+    mode: CaptureMode.TAB,
     shouldResetImmediately: false,
     tabId: 23,
   });
   expect(videoManagerSession.recordingTabId).toBe(23);
-  expect(videoManagerSession.currentCaptureMode).toBe(CaptureMode.VIEWPORT_EMULATION);
-  expect(videoManagerSession.viewportNavigationPending).toBe(false);
+  expect(videoManagerSession.currentCaptureMode).toBe(CaptureMode.TAB);
 });
 
 it('resets active session fields immediately when start/countdown teardown is still in flight', () => {
@@ -41,7 +39,7 @@ it('resets active session fields immediately when start/countdown teardown is st
   videoManagerSession.currentCountdownSessionId = 'countdown-7';
 
   expect(beginVideoRecordingStop()).toEqual({
-    mode: CaptureMode.VIEWPORT_EMULATION,
+    mode: CaptureMode.TAB,
     shouldResetImmediately: true,
     tabId: 23,
   });
@@ -57,4 +55,18 @@ it('resets active session fields immediately when start/countdown teardown is st
   expect(videoManagerSession.controlledCursorNavigationPending).toBe(false);
   expect(videoManagerSession.controlledCursorOffsetSeconds).toBe(0);
   expect(videoManagerSession.controlledCursorTelemetry).toBeNull();
+});
+
+it('keeps countdown authority until a dispatched source can be stopped by identity', () => {
+  videoManagerSession.isStarting = true;
+  videoManagerSession.offscreenStartDispatched = true;
+  videoManagerSession.currentCountdownSessionId = 'countdown-7';
+
+  expect(beginVideoRecordingStop()).toEqual({
+    mode: CaptureMode.TAB,
+    shouldResetImmediately: false,
+    tabId: 23,
+  });
+  expect(videoManagerSession.recordingTabId).toBe(23);
+  expect(videoManagerSession.currentCaptureMode).toBe(CaptureMode.TAB);
 });

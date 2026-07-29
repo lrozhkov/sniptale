@@ -1,6 +1,7 @@
 import {
   captureHistorySnapshot,
   normalizeHistoryDomBatch,
+  notifyHistoryReachabilityChanged,
   publishHistoryState,
   pushHistoryEntry,
   type HistoryStoreRuntimeState,
@@ -50,6 +51,7 @@ function beginDeferredCommitBoundary(state: HistoryStoreRuntimeState): number | 
     before,
     id: state.deferredCommitId,
   });
+  notifyHistoryReachabilityChanged(state);
   return state.deferredCommitId;
 }
 
@@ -113,6 +115,7 @@ function beginHistoryTransaction(
   }
 
   state.transactions.set(key, { before, domBatch });
+  notifyHistoryReachabilityChanged(state);
   publishHistoryState(state);
 }
 
@@ -122,6 +125,7 @@ function cancelHistoryTransaction(state: HistoryStoreRuntimeState, key: string):
   }
 
   state.transactions.delete(key);
+  notifyHistoryReachabilityChanged(state);
   publishHistoryState(state);
 }
 
@@ -138,12 +142,14 @@ function commitHistoryTransaction(
   const entry = commitTransactionEntry({ domBatch, key, state });
   if (entry) {
     if (!pushHistoryEntry(state, entry)) {
+      notifyHistoryReachabilityChanged(state);
       publishHistoryState(state);
     }
     return;
   }
 
   if (hadTransaction) {
+    notifyHistoryReachabilityChanged(state);
     publishHistoryState(state);
   }
 }
@@ -154,12 +160,14 @@ function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
       return beginDeferredCommitBoundary(state);
     },
     cancelDeferredCommit(id: number): void {
-      state.deferredCommits.delete(id);
+      if (state.deferredCommits.delete(id)) notifyHistoryReachabilityChanged(state);
     },
     finalizeDeferredCommit(id: number, domBatch: PageDomMutationBatch | null = null): void {
       const entry = finalizeDeferredEntry({ domBatch, id, state });
       if (entry) {
-        pushHistoryEntry(state, entry);
+        if (!pushHistoryEntry(state, entry)) notifyHistoryReachabilityChanged(state);
+      } else {
+        notifyHistoryReachabilityChanged(state);
       }
     },
   };
@@ -179,6 +187,7 @@ function createTransactionCommitApi(state: HistoryStoreRuntimeState) {
       state.deferredCommits.clear();
       state.transactions.clear();
       clearHistoryDomLocators();
+      state.bridge?.onHistoryCleared?.();
       publishHistoryState(state);
     },
     commitEntry(args: HistoryEntryArgs): void {
@@ -188,7 +197,7 @@ function createTransactionCommitApi(state: HistoryStoreRuntimeState) {
 
       const entry = createEntryFromArgs(state, args);
       if (entry) {
-        pushHistoryEntry(state, entry);
+        if (!pushHistoryEntry(state, entry)) notifyHistoryReachabilityChanged(state);
       }
     },
     commitTransaction(key: string, domBatch: PageDomMutationBatch | null = null): void {

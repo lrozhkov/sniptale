@@ -2,82 +2,42 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
-import type { ViewportPreset } from '../../../../contracts/settings';
-import type { ProductModalHeaderProps, ProductModalProps } from '@sniptale/ui/product-modal';
-
-type EditorContentProps = {
-  height: number;
-  isDisabled: boolean;
-  label: string;
-  onSubmit: (event: React.FormEvent) => Promise<void>;
-  setHeight: React.Dispatch<React.SetStateAction<number>>;
-  setLabel: React.Dispatch<React.SetStateAction<string>>;
-  setWidth: React.Dispatch<React.SetStateAction<number>>;
-  width: number;
-};
-
-type EditorFooterProps = {
-  disabled: boolean;
-  isSaving: boolean;
-  label: string;
-  onClose: () => void;
-  onSubmit: (event: React.FormEvent) => Promise<void>;
-  preset?: ViewportPreset;
-};
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type { UserViewportPreset } from '../../../../contracts/settings';
 
 const mocks = vi.hoisted(() => ({
-  modalMock: vi.fn(),
-  headerMock: vi.fn(),
-  resolveTitleMock: vi.fn(() => 'Preset title'),
-  useStateMock: vi.fn(() => ({
-    handleKeyDown: vi.fn(),
-    handleSubmit: vi.fn(),
-    height: 720,
-    isDisabled: false,
-    isSaving: false,
-    label: 'Desktop',
-    setHeight: vi.fn(),
-    setLabel: vi.fn(),
-    setWidth: vi.fn(),
-    width: 1280,
-  })),
-  contentMock: vi.fn(),
-  footerMock: vi.fn(),
+  content: vi.fn(),
+  footer: vi.fn(),
+  header: vi.fn(),
+  modal: vi.fn(),
+  resolveTitle: vi.fn(() => 'Preset title'),
+  useState: vi.fn(),
 }));
 
 vi.mock('@sniptale/ui/product-modal', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/ui/product-modal')>()),
-  ProductModal: (props: ProductModalProps) => {
-    mocks.modalMock(props);
-    return <div data-testid="modal">{props.children}</div>;
+  ProductModal: (props: React.PropsWithChildren<Record<string, unknown>>) => {
+    mocks.modal(props);
+    return <div>{props.children}</div>;
   },
-  ProductModalHeader: (props: ProductModalHeaderProps) => {
-    mocks.headerMock(props);
-    return <div data-testid="header">{props.title}</div>;
+  ProductModalHeader: (props: Record<string, unknown>) => {
+    mocks.header(props);
+    return <div />;
   },
 }));
-
 vi.mock('./helpers', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./helpers')>()),
-  resolveViewportPresetEditorTitle: mocks.resolveTitleMock,
+  resolveViewportPresetEditorTitle: mocks.resolveTitle,
 }));
-
-vi.mock('./state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./state')>()),
-  useViewportPresetEditorState: mocks.useStateMock,
-}));
-
-vi.mock('./views', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./views')>()),
-  ViewportPresetEditorContent: (props: EditorContentProps) => {
-    mocks.contentMock(props);
-    return <div data-testid="content">content</div>;
+vi.mock('./state', () => ({ useViewportPresetEditorState: mocks.useState }));
+vi.mock('./views', () => ({
+  ViewportPresetEditorContent: (props: Record<string, unknown>) => {
+    mocks.content(props);
+    return <div />;
   },
-  ViewportPresetEditorFooter: (props: EditorFooterProps) => {
-    mocks.footerMock(props);
-    return <div data-testid="footer">footer</div>;
+  ViewportPresetEditorFooter: (props: Record<string, unknown>) => {
+    mocks.footer(props);
+    return <div />;
   },
 }));
 
@@ -86,70 +46,84 @@ import { ViewportPresetEditor } from '.';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function render(node: React.ReactNode) {
-  if (!container) {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  }
-
-  act(() => {
-    root?.render(node);
-  });
-}
-
-afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
-  container?.remove();
-  root = null;
-  container = null;
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.clearAllMocks();
+  mocks.useState.mockReturnValue({
+    form: {
+      height: 720,
+      label: 'Desktop',
+      setHeight: vi.fn(),
+      setLabel: vi.fn(),
+      setTarget: vi.fn(),
+      setWidth: vi.fn(),
+      target: 'window',
+      width: 1280,
+    },
+    handlers: { handleKeyDown: vi.fn(), handleSubmit: vi.fn() },
+    status: { isDisabled: false, isSaving: false },
+  });
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
 });
 
-describe('ViewportPresetEditor', () => {
-  it('wires state and child views into the modal surface', () => {
-    const onClose = vi.fn();
-    const onSave = vi.fn();
-    const preset = {
-      id: 'desktop',
-      label: 'Desktop',
-      width: 1280,
-      height: 720,
-    } satisfies ViewportPreset;
+afterEach(() => {
+  act(() => root?.unmount());
+  root = null;
+  container?.remove();
+  container = null;
+  vi.unstubAllGlobals();
+});
 
-    render(
+it('wires edit mode through the modal, form, and footer role contracts', () => {
+  const preset: UserViewportPreset = {
+    enabled: true,
+    height: 900,
+    id: 'window-1',
+    kind: 'user',
+    name: 'Desktop',
+    order: 0,
+    target: 'window',
+    width: 1440,
+  };
+  const onClose = vi.fn();
+  const onSave = vi.fn();
+
+  act(() =>
+    root?.render(
       <ViewportPresetEditor isOpen onClose={onClose} onSave={onSave} preset={preset} isLoading />
-    );
+    )
+  );
 
-    expect(mocks.useStateMock).toHaveBeenCalledWith({
-      isLoading: true,
-      isOpen: true,
-      onClose,
-      onSave,
-      preset,
-    });
-    expect(mocks.resolveTitleMock).toHaveBeenCalledWith(preset);
-    expect(mocks.headerMock).toHaveBeenCalledWith(
-      expect.objectContaining({ disabled: false, title: 'Preset title' })
-    );
-    expect(mocks.contentMock).toHaveBeenCalled();
-    expect(mocks.footerMock).toHaveBeenCalled();
+  expect(mocks.useState).toHaveBeenCalledWith({
+    isLoading: true,
+    isOpen: true,
+    onClose,
+    onSave,
+    preset,
   });
+  expect(mocks.modal).toHaveBeenCalledWith(
+    expect.objectContaining({ isOpen: true, width: '420px' })
+  );
+  expect(mocks.header).toHaveBeenCalledWith(
+    expect.objectContaining({ disabled: false, title: 'Preset title' })
+  );
+  expect(mocks.content).toHaveBeenCalledWith(expect.objectContaining({ target: 'window' }));
+  expect(mocks.footer).toHaveBeenCalledWith(expect.objectContaining({ preset }));
+});
 
-  it('builds create-mode state args without an optional preset', () => {
-    const onClose = vi.fn();
-    const onSave = vi.fn();
+it('omits optional preset data in create mode', () => {
+  const onClose = vi.fn();
+  const onSave = vi.fn();
+  act(() => root?.render(<ViewportPresetEditor isOpen onClose={onClose} onSave={onSave} />));
 
-    render(<ViewportPresetEditor isOpen onClose={onClose} onSave={onSave} />);
-
-    expect(mocks.useStateMock).toHaveBeenCalledWith({
-      isLoading: false,
-      isOpen: true,
-      onClose,
-      onSave,
-    });
-    expect(mocks.resolveTitleMock).toHaveBeenCalledWith(undefined);
+  expect(mocks.useState).toHaveBeenCalledWith({
+    isLoading: false,
+    isOpen: true,
+    onClose,
+    onSave,
   });
+  expect(mocks.resolveTitle).toHaveBeenCalledWith(undefined);
+  expect(mocks.footer.mock.calls.at(-1)?.[0]).not.toHaveProperty('preset');
 });

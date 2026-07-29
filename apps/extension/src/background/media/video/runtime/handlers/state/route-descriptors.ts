@@ -21,6 +21,7 @@ export const offscreenLifecycleRouteDescriptor = {
   messageTypes: [
     VideoMessageType.RECORDING_DURATION_UPDATED,
     VideoMessageType.OFFSCREEN_RECORDING_STARTED,
+    VideoMessageType.OFFSCREEN_SOURCE_READY,
     VideoMessageType.OFFSCREEN_RECORDING_STOPPED,
     VideoMessageType.OFFSCREEN_RECORDING_PAUSED,
     VideoMessageType.OFFSCREEN_RECORDING_RESUMED,

@@ -4,6 +4,7 @@ import { requestStartExport } from './request';
 
 function createState() {
   return {
+    cancelRetryRef: { current: null },
     includeBasicLogs: false,
     includeCssDiagnostics: false,
     includeFiles: false,

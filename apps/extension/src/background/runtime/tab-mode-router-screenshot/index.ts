@@ -1,4 +1,16 @@
-export { cleanupScreenshotModeAfterNavigation } from './navigation-cleanup';
-export { disableScreenshotMode, enableScreenshotMode, enableScreenshotModeGuarded } from './mode';
+export {
+  cleanupScreenshotModeAfterNavigation,
+  cleanupScreenshotModeAfterTabClose,
+} from './navigation-cleanup';
+export {
+  disableScreenshotMode,
+  disableScreenshotModeForContent,
+  enableScreenshotMode,
+  enableScreenshotModeGuarded,
+} from './mode';
 export { buildScreenshotModeStatusResponse } from './status';
-export { handleSetViewport } from './viewport';
+export {
+  getScreenshotPresetAvailabilities,
+  handleApplyViewportPreset,
+  handleReleaseViewportPreset,
+} from './viewport';

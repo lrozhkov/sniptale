@@ -30,6 +30,7 @@ it('rejects package builds while another export is already running', () => {
         buildPackage: vi.fn(),
       } as never,
       request: {
+        batchRequestId: 'batch-busy',
         type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
         options: createExportOptions(),
       },
@@ -71,6 +72,7 @@ it('returns the built page package and clears the running flag after completion'
         buildPackage,
       } as never,
       request: {
+        batchRequestId: 'batch-success',
         contentIntentGrant: { grantToken: 'grant-package' },
         type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
         options: createExportOptions(),
@@ -95,7 +97,7 @@ it('returns the built page package and clears the running flag after completion'
       kind: 'background-auto-start',
     },
   });
-  expect(state.isExportRunning).toBe(false);
+  expect(state).toEqual({ activeExportRequestId: null, isExportRunning: false });
 });
 
 it('returns an error response when package building fails', async () => {
@@ -111,6 +113,7 @@ it('returns an error response when package building fails', async () => {
         buildPackage: vi.fn().mockRejectedValue(new Error('build failed')),
       } as never,
       request: {
+        batchRequestId: 'batch-failure',
         type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
         options: createExportOptions(),
       },

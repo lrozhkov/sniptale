@@ -20,10 +20,13 @@ declare module './index' {
     type COUNTDOWN_COMPLETE = typeof import('./index').VideoMessageType.COUNTDOWN_COMPLETE;
     type OFFSCREEN_START_RECORDING =
       typeof import('./index').VideoMessageType.OFFSCREEN_START_RECORDING;
-    type OFFSCREEN_UPDATE_VIEWPORT_CROP =
-      typeof import('./index').VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP;
+    type OFFSCREEN_SOURCE_READY = typeof import('./index').VideoMessageType.OFFSCREEN_SOURCE_READY;
+    type OFFSCREEN_BEGIN_RECORDING =
+      typeof import('./index').VideoMessageType.OFFSCREEN_BEGIN_RECORDING;
     type OFFSCREEN_SET_VIEWPORT_DRAW_STATE =
       typeof import('./index').VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE;
+    type OFFSCREEN_REVALIDATE_SOURCE =
+      typeof import('./index').VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE;
     type OFFSCREEN_STOP_RECORDING =
       typeof import('./index').VideoMessageType.OFFSCREEN_STOP_RECORDING;
     type OFFSCREEN_PAUSE_RECORDING =
@@ -46,6 +49,10 @@ declare module './index' {
     type GET_RECORDING_TAB_ID = typeof import('./index').VideoMessageType.GET_RECORDING_TAB_ID;
     type ENABLE_ANNOTATIONS = typeof import('./index').VideoMessageType.ENABLE_ANNOTATIONS;
     type DISABLE_ANNOTATIONS = typeof import('./index').VideoMessageType.DISABLE_ANNOTATIONS;
+    type ENABLE_VIEWPORT_CURSOR_PROJECTION =
+      typeof import('./index').VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION;
+    type DISABLE_VIEWPORT_CURSOR_PROJECTION =
+      typeof import('./index').VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION;
     type ENABLE_CONTROLLED_CURSOR_CAPTURE =
       typeof import('./index').VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE;
     type DISABLE_CONTROLLED_CURSOR_CAPTURE =

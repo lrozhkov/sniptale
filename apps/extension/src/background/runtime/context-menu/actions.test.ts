@@ -24,6 +24,7 @@ import { installBackgroundRuntimeMessagingMock } from '../../routing-contracts/r
 
 const {
   browserScriptingExecuteScriptMock,
+  captureSurfaceGetAvailabilityMock,
   ensureActivePageAccessRuntimeMock,
   handleQuickActionMock,
   loadPopupExportPreferencesMock,
@@ -36,6 +37,7 @@ const {
   startRecordingMock,
 } = vi.hoisted(() => ({
   browserScriptingExecuteScriptMock: vi.fn(),
+  captureSurfaceGetAvailabilityMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
   handleQuickActionMock: vi.fn(),
   loadPopupExportPreferencesMock: vi.fn(),
@@ -46,6 +48,13 @@ const {
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
   sendTabMessageMock: vi.fn(),
   startRecordingMock: vi.fn(),
+}));
+
+vi.mock('../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture-surface')>()),
+  getCaptureSurfaceService: vi.fn(() => ({
+    getAvailability: captureSurfaceGetAvailabilityMock,
+  })),
 }));
 
 vi.mock('@sniptale/platform/browser/scripting', async (importOriginal) => ({
@@ -115,8 +124,11 @@ function createDeps() {
   return {
     captureGuardState: { isCapturing: false },
     screenshotModeState: new Map<number, boolean>(),
-    viewportOwnerState: new Map<number, 'debugger' | 'viewer'>(),
-    viewportState: new Map<number, { width: number; height: number } | null>(),
+    viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
   };
 }
 
@@ -130,8 +142,26 @@ function seedContextMenuActionMocks() {
     ...contextMenuSettingsFixture,
     defaultVideoPresetId: 'preset-2',
     viewportPresets: [
-      { id: 'preset-1', width: 1280, height: 720, label: 'HD' },
-      { id: 'preset-2', width: 1920, height: 1080, label: 'Full HD' },
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'HD',
+        target: 'viewport',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 0,
+      },
+      {
+        kind: 'user',
+        id: 'preset-2',
+        name: 'Full HD',
+        target: 'viewport',
+        width: 1920,
+        height: 1080,
+        enabled: true,
+        order: 0,
+      },
     ],
   });
   loadVideoSettingsMock.mockResolvedValue(contextMenuVideoSettingsFixture);
@@ -139,6 +169,14 @@ function seedContextMenuActionMocks() {
     captureMode: CaptureMode.TAB,
     viewportPresetId: 'preset-1',
   });
+  captureSurfaceGetAvailabilityMock.mockImplementation(({ presetId }: { presetId: string }) =>
+    Promise.resolve({
+      status: 'requires-start-validation',
+      presetId,
+      target: 'viewport',
+      required: { width: 1280, height: 720 },
+    })
+  );
   loadPopupExportPreferencesMock.mockResolvedValue(contextMenuPopupExportPreferencesFixture);
   sendTabMessageMock.mockResolvedValue({ success: true });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
@@ -156,8 +194,8 @@ async function verifyPresetRecordingRouting() {
   expect(startRecordingMock).toHaveBeenCalledWith(
     11,
     expect.any(Object),
-    CaptureMode.VIEWPORT_EMULATION,
-    expect.objectContaining({ id: 'preset-1', width: 1280, height: 720 }),
+    CaptureMode.TAB,
+    'preset-1',
     'chrome-extension://test/apps/extension/src/popup/index.html'
   );
 }

@@ -56,6 +56,11 @@ type StageWebSnapshotBlobChunkMessage = {
   type: MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK;
 } & WebSnapshotStageBlobChunkPayload;
 
+type ReleaseWebSnapshotStagedBlobsMessage = {
+  snapshotSessionId: string;
+  type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS;
+};
+
 type StageWebSnapshotBlobChunkResponse = RuntimeMessageResponse<{
   complete?: boolean;
   stagedBlobId?: string;
@@ -110,6 +115,7 @@ export type RuntimeActionSaveRequestByType = {
   [MessageType.REGISTER_WEB_SNAPSHOT_ASSETS]: RegisterWebSnapshotAssetsMessage;
   [MessageType.FETCH_WEB_SNAPSHOT_ASSET]: FetchWebSnapshotAssetMessage;
   [MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK]: StageWebSnapshotBlobChunkMessage;
+  [MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS]: ReleaseWebSnapshotStagedBlobsMessage;
   [MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY]: RequestGalleryImageUpdateCapabilityMessage;
   [MessageType.UPDATE_GALLERY_IMAGE_ASSET]: UpdateGalleryImageAssetMessage;
   [MessageType.STAGE_RECORDING_DOWNLOAD_CHUNK]: StageRecordingDownloadChunkMessage;
@@ -127,6 +133,7 @@ export type RuntimeActionSaveResponseByType = {
   [MessageType.REGISTER_WEB_SNAPSHOT_ASSETS]: RegisterWebSnapshotAssetsResponse;
   [MessageType.FETCH_WEB_SNAPSHOT_ASSET]: FetchWebSnapshotAssetResponse;
   [MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK]: StageWebSnapshotBlobChunkResponse;
+  [MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS]: RuntimeMessageResponse<{ result?: string }>;
   [MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY]: RequestGalleryImageUpdateCapabilityResponse;
   [MessageType.UPDATE_GALLERY_IMAGE_ASSET]: SaveAssetResponse;
   [MessageType.STAGE_RECORDING_DOWNLOAD_CHUNK]: StageRecordingDownloadChunkResponse;

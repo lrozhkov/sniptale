@@ -12,5 +12,6 @@ export async function detachDebugger(tabId: number, client: DebuggerClient): Pro
     logger.log('Not attached, skipping detach');
   } else if (result.status === 'failed') {
     logger.error('Failed to detach', result.error);
+    throw result.error instanceof Error ? result.error : new Error(String(result.error));
   }
 }

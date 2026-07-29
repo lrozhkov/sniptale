@@ -9,6 +9,7 @@ const iframeUtils = vi.hoisted(() => ({
 vi.mock('../../../platform/frame', () => iframeUtils);
 
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
+import { initializeContentUiRoots } from '../../../platform/dom-host';
 import { resolvePagePreparationTarget } from '.';
 
 afterEach(() => {
@@ -74,6 +75,7 @@ function registerOwnedContentSkipTest(): void {
     host.id = CONTENT_ROOT_ID;
     document.body.append(host);
     const shadowRoot = host.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(shadowRoot);
     const ownedButton = document.createElement('button');
     shadowRoot.append(ownedButton);
     const backdrop = document.createElement('div');

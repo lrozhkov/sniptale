@@ -151,19 +151,56 @@ function shouldPreservePresetFillAndStrokeRatiosUnderUniformOpacity(): void {
   expect(overlay.style.backgroundColor).toBe('rgba(96, 165, 250, 0.08)');
 }
 
-function shouldReplaceInheritedCustomCssOnTheReusedOverlay(): void {
+function shouldKeepCanonicalGeometryAndStrokeWhilePreservingCustomDecoration(): void {
   const state = createState();
   const position = { height: 10, width: 12, x: 1, y: 2 };
 
   showHoverOverlay(state, position, {
     ...storage.DEFAULT_BORDER_PRESET,
-    customCss: 'outline: 4px solid red; outline-offset: 7px; transition: none;',
+    customCss: [
+      'background-color: red',
+      'background-image: linear-gradient(red, blue)',
+      'box-shadow: 0 0 4px red',
+      'border: 20px dashed blue',
+      'border-radius: 50px',
+      'outline: 4px solid red',
+      'outline-offset: 7px',
+      'clip-path: inset(10px)',
+      'clip: rect(0, 0, 0, 0)',
+      'inset: 0',
+      "offset-path: path('M 0 0 L 100 100')",
+      'all: unset',
+      'zoom: 2',
+      'transition: none',
+      '-webkit-transform: scale(2)',
+      '-webkit-clip-path: inset(10px)',
+      '-webkit-mask: linear-gradient(black, transparent)',
+    ].join('; '),
     inheritCustomCss: true,
   });
   const overlay = state.hoverOverlay;
+  expect(overlay?.style.boxSizing).toBe('border-box');
+  expect(overlay?.style.borderWidth).toBe('2px');
+  expect(overlay?.style.borderStyle).toBe('solid');
+  expect(overlay?.style.borderColor).toBe('rgb(255, 255, 0)');
+  expect(overlay?.style.borderRadius).toBe('6px');
+  expect(overlay?.style.backgroundColor).toBe('red');
+  expect(overlay?.style.backgroundImage).toBe('linear-gradient(red, blue)');
+  expect(overlay?.style.boxShadow).toBe('0 0 4px red');
   expect(overlay?.style.outline).toBe('4px solid red');
   expect(overlay?.style.outlineOffset).toBe('7px');
-  expect(overlay?.style.transition).toBe('none');
+  expect(overlay?.style.clipPath).toBe('none');
+  expect(overlay?.style.transition).toContain('opacity 0.2s');
+  expect(overlay?.style.top).toBe('16px');
+  expect(overlay?.style.left).toBe('12px');
+  expect(overlay?.style.width).toBe('40px');
+  expect(overlay?.style.height).toBe('30px');
+  expect(overlay?.style.clip).toBe('');
+  expect(overlay?.style.getPropertyValue('zoom')).toBe('');
+  expect(overlay?.style.getPropertyValue('-webkit-transform')).toBe('');
+  expect(overlay?.style.getPropertyValue('-webkit-clip-path')).toBe('');
+  expect(overlay?.style.getPropertyValue('-webkit-mask')).toBe('');
+  expect(overlay?.style.zIndex).toBe('2147483645');
 
   showHoverOverlay(state, position, {
     ...storage.DEFAULT_BORDER_PRESET,
@@ -172,8 +209,9 @@ function shouldReplaceInheritedCustomCssOnTheReusedOverlay(): void {
   });
 
   expect(state.hoverOverlay).toBe(overlay);
-  expect(overlay?.style.outline).toBe('');
+  expect(overlay?.style.outline).toBe('none');
   expect(overlay?.style.outlineOffset).toBe('');
+  expect(overlay?.style.clipPath).toBe('none');
   expect(overlay?.style.transition).toContain('opacity 0.2s');
 }
 
@@ -244,8 +282,8 @@ describe('highlighter hover overlay', () => {
     shouldPreservePresetFillAndStrokeRatiosUnderUniformOpacity
   );
   it(
-    'replaces inherited custom CSS on the reused overlay',
-    shouldReplaceInheritedCustomCssOnTheReusedOverlay
+    'keeps canonical geometry and stroke while preserving custom decoration',
+    shouldKeepCanonicalGeometryAndStrokeWhilePreservingCustomDecoration
   );
   it(
     'disables motion for reduced-motion preference',

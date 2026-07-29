@@ -3,11 +3,13 @@ import { detachCachedPreview } from '../setup/desktop-media';
 import { logOffscreenDebugError } from '../../runtime-messaging/best-effort';
 import { recordingContext } from '../context';
 import { cleanupActiveSidecarRecorders } from '../sidecar';
+import { cancelRecordingBegin } from './gate';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingStart' });
 
 export function cleanupResources(): void {
   logger.debug('Cleaning up recording resources');
+  cancelRecordingBegin();
 
   detachCachedPreview();
   cleanupActiveSidecarRecorders();

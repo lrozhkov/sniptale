@@ -100,10 +100,9 @@ function createBuildArgs() {
   };
 
   return {
-    calculateFrameCoords: (element: HTMLElement, nextBorder?: BorderPreset) =>
+    calculateFrameCoords: (_element: HTMLElement, nextBorder?: BorderPreset) =>
       createFrameDataFixture('frame-1', {
         borderSettings: nextBorder ?? borderSettings,
-        linkedElement: element,
         width: 100,
       }),
     element: document.createElement('button'),
@@ -186,7 +185,6 @@ describe('frame-mutation-actions-frame-build', () => {
       effectMode: 'border',
       borderSettings: { id: 'preset-1' },
     });
-    expect(frame.linkedElement).toBeUndefined();
     expect(frame.linkedElementSelector).toBeUndefined();
     expect(frame.offset).toBeUndefined();
   });

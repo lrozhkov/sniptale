@@ -6,8 +6,6 @@ import { installBackgroundRuntimeMessagingMock } from '../../../../../routing-co
 const {
   awaitBestEffortMock,
   appendControlledCursorTelemetryMock,
-  clearViewportMock,
-  detachDebuggerMock,
   disableControlledCursorCaptureMock,
   getControlledCursorDisplaySurfaceMock,
   getControlledCursorVerifiedModeMock,
@@ -22,8 +20,6 @@ const {
 } = vi.hoisted(() => ({
   awaitBestEffortMock: vi.fn(),
   appendControlledCursorTelemetryMock: vi.fn(),
-  clearViewportMock: vi.fn(),
-  detachDebuggerMock: vi.fn(),
   disableControlledCursorCaptureMock: vi.fn(),
   getControlledCursorDisplaySurfaceMock: vi.fn(),
   getControlledCursorVerifiedModeMock: vi.fn(),
@@ -72,15 +68,6 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   isControlledCursorNavigationPending: isControlledCursorNavigationPendingMock,
 }));
 
-vi.mock('../../../../../debugger/session/detach', () => ({
-  detachDebugger: detachDebuggerMock,
-}));
-
-vi.mock('../../../../../debugger/workspace', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../debugger/workspace')>()),
-  clearViewport: clearViewportMock,
-}));
-
 vi.mock('../controlled-cursor/messages', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../controlled-cursor/messages')>()),
   disableControlledCursorCapture: disableControlledCursorCaptureMock,
@@ -92,8 +79,6 @@ beforeEach(() => {
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   vi.clearAllMocks();
   sendTabMessageMock.mockResolvedValue(undefined);
-  clearViewportMock.mockResolvedValue(undefined);
-  detachDebuggerMock.mockResolvedValue(undefined);
   awaitBestEffortMock.mockImplementation((promise: Promise<unknown>) => promise);
   runBestEffortMock.mockImplementation((promise: Promise<unknown>) => promise);
   saveRecordingTelemetrySafelyMock.mockResolvedValue(undefined);
@@ -166,9 +151,9 @@ function createControlledCursorTelemetry() {
   };
 }
 
-it('hides stop overlays and clears viewport before detach when viewport emulation stops', async () => {
+it('hides stop overlays and disables annotations when tab recording stops', async () => {
   runStopSideEffects({
-    mode: CaptureMode.VIEWPORT_EMULATION,
+    mode: CaptureMode.TAB,
     tabId: 7,
   });
 
@@ -180,21 +165,15 @@ it('hides stop overlays and clears viewport before detach when viewport emulatio
   expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
     type: VideoMessageType.DISABLE_ANNOTATIONS,
   });
-  expect(clearViewportMock).toHaveBeenCalledWith(7);
-  expect(detachDebuggerMock).toHaveBeenCalledWith(7, 'video-emulation');
-  expect(clearViewportMock.mock.invocationCallOrder[0]!).toBeLessThan(
-    detachDebuggerMock.mock.invocationCallOrder[0]!
-  );
 });
 
-it('skips side effects when no tab is available and when the mode is not viewport emulation', () => {
+it('skips tab side effects when no tab is available', () => {
   runStopSideEffects({
     mode: CaptureMode.TAB,
     tabId: null,
   });
 
   expect(sendTabMessageMock).not.toHaveBeenCalled();
-  expect(detachDebuggerMock).not.toHaveBeenCalled();
 });
 
 it('does not persist annotation telemetry when cursor telemetry capture is disabled', async () => {

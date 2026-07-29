@@ -1,7 +1,6 @@
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { videoManagerSession } from '../manager/session';
 import { resetControlledCursorCaptureState } from './controlled-cursor';
-import { resetViewportNavigationState } from './shared';
 
 type VideoManagerStopContext = {
   mode: CaptureMode | null;
@@ -15,15 +14,12 @@ export function beginVideoRecordingStop(): VideoManagerStopContext {
     tabId: videoManagerSession.recordingTabId,
     mode: videoManagerSession.currentCaptureMode,
     shouldResetImmediately:
-      (videoManagerSession.isStarting && !videoManagerSession.offscreenStartDispatched) ||
-      videoManagerSession.currentCountdownSessionId !== null,
+      videoManagerSession.isStarting && !videoManagerSession.offscreenStartDispatched,
   };
 
   videoManagerSession.isStarting = false;
   videoManagerSession.offscreenStartDispatched = false;
   videoManagerSession.currentCountdownSessionId = null;
-  resetViewportNavigationState();
-
   if (context.shouldResetImmediately) {
     videoManagerSession.recordingTabId = null;
     videoManagerSession.currentCaptureMode = null;
@@ -53,5 +49,4 @@ export function resetCompletedVideoRecordingSession(recordingId?: string): void 
   videoManagerSession.currentCountdownSessionId = null;
   videoManagerSession.isStarting = false;
   videoManagerSession.offscreenStartDispatched = false;
-  resetViewportNavigationState();
 }

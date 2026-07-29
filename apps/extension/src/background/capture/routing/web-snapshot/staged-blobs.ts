@@ -214,6 +214,17 @@ export function releaseWebSnapshotStagedBlobs(args: {
   }
 }
 
+export function releaseWebSnapshotStagedBlobsForSession(args: {
+  snapshotSessionId: string;
+  tabId: number;
+}): void {
+  for (const [stagedBlobId, record] of stagedBlobs) {
+    if (record.snapshotSessionId === args.snapshotSessionId && record.tabId === args.tabId) {
+      stagedBlobs.delete(stagedBlobId);
+    }
+  }
+}
+
 function releaseOwnedStagedBlob(
   stagedBlobId: string,
   owner: { snapshotSessionId: string; tabId: number }

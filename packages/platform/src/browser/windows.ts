@@ -1,3 +1,5 @@
+import { subscribeToChromeEvent } from './callback';
+
 /**
  * Shared browser windows seam for extension-owned window flows.
  */
@@ -8,6 +10,7 @@ interface BrowserWindowsAdapter {
     windowId: number,
     updateInfo: chrome.windows.UpdateInfo
   ): Promise<chrome.windows.Window | undefined>;
+  subscribeBoundsChanged(listener: (window: chrome.windows.Window) => void): () => void;
 }
 
 export const browserWindows: BrowserWindowsAdapter = {
@@ -33,5 +36,12 @@ export const browserWindows: BrowserWindowsAdapter = {
     }
 
     return chrome.windows.update(windowId, updateInfo);
+  },
+
+  subscribeBoundsChanged(listener) {
+    return subscribeToChromeEvent(
+      typeof chrome === 'undefined' ? undefined : chrome.windows?.onBoundsChanged,
+      listener
+    );
   },
 };

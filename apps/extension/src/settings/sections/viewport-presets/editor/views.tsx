@@ -1,12 +1,17 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 
 import { translate } from '../../../../platform/i18n';
-import type { ViewportPreset } from '../../../../contracts/settings';
+import type { ViewportPreset, ViewportPresetTarget } from '../../../../contracts/settings';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ProductField, ProductInput } from '@sniptale/ui/product-form-controls';
+import { ProductField, ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
-import { settingsModalFieldSurfaceClassName } from '../../../section-surface/panel-controls';
-import { clampViewportDimension, resolveViewportPresetSubmitLabel } from './helpers';
+import {
+  clampViewportDimension,
+  maxViewportPresetDimension,
+  resolveViewportPresetSubmitLabel,
+} from './helpers';
+import { VIEWPORT_PRESET_MAX_NAME_LENGTH } from '../../../../features/viewport-presets/contracts';
+import { isValidViewportPresetName } from '../../../../features/viewport-presets/operations';
 
 function ViewportPresetNameField(props: {
   disabled: boolean;
@@ -14,12 +19,16 @@ function ViewportPresetNameField(props: {
   setLabel: Dispatch<SetStateAction<string>>;
 }) {
   return (
-    <ProductField label={translate('viewportPresets.editor.nameLabel')}>
+    <ProductField
+      label={translate('viewportPresets.editor.nameLabel')}
+      hint={translate('viewportPresets.editor.nameHint')}
+    >
       <ProductInput
         type="text"
         value={props.label}
         onChange={(event) => props.setLabel(event.target.value)}
         placeholder={translate('viewportPresets.editor.namePlaceholder')}
+        maxLength={VIEWPORT_PRESET_MAX_NAME_LENGTH}
         required
         disabled={props.disabled}
         autoFocus
@@ -42,9 +51,11 @@ function ViewportPresetDimensionFields(props: {
           <ProductInput
             type="number"
             value={props.width}
-            onChange={(event) => props.setWidth(clampViewportDimension(event.target.value, 3840))}
+            onChange={(event) =>
+              props.setWidth(clampViewportDimension(event.target.value, maxViewportPresetDimension))
+            }
             min={1}
-            max={3840}
+            max={maxViewportPresetDimension}
             required
             disabled={props.disabled}
             style={{ MozAppearance: 'textfield', WebkitAppearance: 'none' }}
@@ -57,9 +68,13 @@ function ViewportPresetDimensionFields(props: {
           <ProductInput
             type="number"
             value={props.height}
-            onChange={(event) => props.setHeight(clampViewportDimension(event.target.value, 2160))}
+            onChange={(event) =>
+              props.setHeight(
+                clampViewportDimension(event.target.value, maxViewportPresetDimension)
+              )
+            }
             min={1}
-            max={2160}
+            max={maxViewportPresetDimension}
             required
             disabled={props.disabled}
             style={{ MozAppearance: 'textfield', WebkitAppearance: 'none' }}
@@ -96,7 +111,7 @@ export function ViewportPresetEditorFooter(props: {
       <ProductActionButton
         type="submit"
         onClick={props.onSubmit}
-        disabled={props.disabled || !props.label.trim()}
+        disabled={props.disabled || !isValidViewportPresetName(props.label)}
         tone="primary"
       >
         {resolveViewportPresetSubmitLabel(submitLabelArgs)}
@@ -112,19 +127,38 @@ export function ViewportPresetEditorContent(props: {
   onSubmit: (event: FormEvent) => Promise<void>;
   setHeight: Dispatch<SetStateAction<number>>;
   setLabel: Dispatch<SetStateAction<string>>;
+  setTarget: Dispatch<SetStateAction<ViewportPresetTarget>>;
   setWidth: Dispatch<SetStateAction<number>>;
   width: number;
+  target: ViewportPresetTarget;
 }) {
   return (
     <ProductModalBody compact asForm onSubmit={props.onSubmit}>
-      <div className={settingsModalFieldSurfaceClassName}>
+      <div className="space-y-4">
         <ViewportPresetNameField
           disabled={props.isDisabled}
           label={props.label}
           setLabel={props.setLabel}
         />
-      </div>
-      <div className={settingsModalFieldSurfaceClassName}>
+        <ProductField label={translate('viewportPresets.editor.targetLabel')}>
+          <ProductSelect<ViewportPresetTarget>
+            value={props.target}
+            onChange={props.setTarget}
+            disabled={props.isDisabled}
+            options={[
+              {
+                value: 'viewport',
+                label: translate('viewportPresets.editor.targetViewport'),
+                description: translate('viewportPresets.editor.targetViewportHint'),
+              },
+              {
+                value: 'window',
+                label: translate('viewportPresets.editor.targetWindow'),
+                description: translate('viewportPresets.editor.targetWindowHint'),
+              },
+            ]}
+          />
+        </ProductField>
         <ViewportPresetDimensionFields
           disabled={props.isDisabled}
           height={props.height}

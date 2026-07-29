@@ -4,13 +4,15 @@ import type { PopupExportRequestHandlerRuntime, PopupExportRunner } from '../typ
 
 type PopupExportCancelRequestHandlerProps = Pick<PopupExportRequestHandlerRuntime, 'state'> & {
   exportRunner: Pick<PopupExportRunner, 'cancel'>;
+  exportRunId: string;
   sendResponse: PopupSendResponse;
 };
 
 export function handlePopupExportCancelRuntime(
   props: PopupExportCancelRequestHandlerProps
 ): boolean {
-  if (props.state.isExportRunning) {
+  if (props.state.isExportRunning && props.state.activeExportRequestId === props.exportRunId) {
+    props.state.activeAbortController?.abort(new Error('Web snapshot save was cancelled'));
     props.exportRunner.cancel();
     resetPopupExportState(props.state);
   }

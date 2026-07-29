@@ -24,7 +24,7 @@ function createUserAction(
     afterCapture: 'download_default',
     bundledId: null,
     delay: null,
-    emulation: 'native',
+    viewportPresetId: 'native',
     exitAfterCapture: true,
     hotkey: null,
     icon: 'UserIcon',

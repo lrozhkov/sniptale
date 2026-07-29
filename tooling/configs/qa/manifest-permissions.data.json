@@ -59,13 +59,24 @@
     {
       "name": "debugger",
       "owner": "packages/platform/src/browser/debugger.ts",
-      "feature": "Full-page capture, viewport emulation, and HAR diagnostics",
+      "feature": "Full-page capture, exact page-viewport sizing, and HAR diagnostics",
       "runtimeRoute": "shared debugger adapter consumed by background capture and HAR owners",
       "capabilityPolicy": "Attach/detach requires the owning background route, resolved tab, and feature session.",
       "failureBehavior": "Attach denial or missing permission aborts the feature flow before debugger side effects.",
       "justification": "Supports debugger-backed capture/export diagnostics and HAR-style inspection flows.",
       "reviewNote": "Keep attach/detach and event handling behind the shared debugger adapter.",
       "userFacingDisclosure": "settings.permissions.requiredDebuggerDescription"
+    },
+    {
+      "name": "system.display",
+      "owner": "packages/platform/src/browser/displays.ts",
+      "feature": "Browser-window preset fit and work-area selection",
+      "runtimeRoute": "display adapter consumed only by the background capture-surface owner",
+      "capabilityPolicy": "Read-only display bounds and work areas are resolved for an authorized screenshot or video surface session; display settings are never mutated.",
+      "failureBehavior": "Unavailable display data or a preset larger than the selected work area disables or rejects the preset without resizing the window.",
+      "justification": "Determines whether an exact outer Chrome window size fits the physical display work area and safely clamps its position across multi-display coordinates.",
+      "reviewNote": "Keep direct chrome.system.display access confined to packages/platform/src/browser/displays.ts and retain the deterministic browser-adapter guard.",
+      "userFacingDisclosure": "settings.permissions.requiredSystemDisplayDescription"
     },
     {
       "name": "activeTab",

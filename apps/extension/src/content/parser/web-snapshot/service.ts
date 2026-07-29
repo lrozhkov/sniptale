@@ -1,8 +1,9 @@
 import { collectWebSnapshotAssets } from './assets';
-import { captureWebSnapshotScreenshot } from './capture';
+import { captureWebSnapshotScreenshotWithWarnings } from './capture';
 import { buildWebSnapshotPackage } from './package';
 import { sanitizeDiagnosticMessage } from '@sniptale/platform/observability/diagnostics/sanitizer';
 import type { ContentPrivilegedActionIntentSource } from '../../platform/privileged-action-intent/client';
+import type { FullPageExportCaptureIdentity } from '../../../contracts/full-page-capture';
 import {
   buildPreparedSnapshotDocument,
   serializePreparedSnapshotDocument,
@@ -19,6 +20,13 @@ const FALLBACK_SCREENSHOT_BYTES = Uint8Array.from([
   255, 93, 23, 41, 205, 0, 0, 0, 6, 73, 68, 65, 84, 3, 0, 0, 15, 0, 3, 36, 55, 125, 233, 0, 0, 0, 0,
   73, 69, 78, 68, 174, 66, 96, 130,
 ]);
+
+function throwIfWebSnapshotBuildAborted(signal?: AbortSignal | undefined): void {
+  if (!signal?.aborted) return;
+  throw signal.reason instanceof Error
+    ? signal.reason
+    : new Error('Web snapshot save was cancelled');
+}
 
 function createWarningStats(args: {
   networkWarnings: string[];
@@ -101,17 +109,26 @@ function resolveCurrentPageViewport(
 }
 
 async function captureWebSnapshotScreenshotOrFallback(
-  contentIntentSource?: ContentPrivilegedActionIntentSource | undefined
+  contentIntentSource?: ContentPrivilegedActionIntentSource | undefined,
+  captureIdentity?: FullPageExportCaptureIdentity | undefined,
+  abortSignal?: AbortSignal | undefined
 ): Promise<{
   screenshotBlob: Blob;
   warnings: string[];
 }> {
+  throwIfWebSnapshotBuildAborted(abortSignal);
   try {
+    const screenshot = await captureWebSnapshotScreenshotWithWarnings(
+      contentIntentSource,
+      captureIdentity
+    );
+    throwIfWebSnapshotBuildAborted(abortSignal);
     return {
-      screenshotBlob: await captureWebSnapshotScreenshot(contentIntentSource),
-      warnings: [],
+      screenshotBlob: screenshot.blob,
+      warnings: screenshot.warnings,
     };
   } catch (error) {
+    throwIfWebSnapshotBuildAborted(abortSignal);
     const message =
       error instanceof Error ? sanitizeDiagnosticMessage(error.message) : 'unknown error';
     return {
@@ -122,15 +139,19 @@ async function captureWebSnapshotScreenshotOrFallback(
 }
 
 export async function buildCurrentPageWebSnapshot(args: {
+  abortSignal?: AbortSignal | undefined;
   allowAnonymousCrossOriginAssets: boolean;
   allowAuthenticatedSameOriginAssets: boolean;
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+  fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
   requestId: string;
 }): Promise<WebSnapshotBuildResult> {
+  throwIfWebSnapshotBuildAborted(args.abortSignal);
   const source = resolveCurrentPageSource();
   const preparedSnapshot = await buildPreparedSnapshotDocument({
     contextLabel: 'web-snapshot',
   });
+  throwIfWebSnapshotBuildAborted(args.abortSignal);
   const snapshotDocument = preparedSnapshot.document;
   const [assetResult, screenshotResult] = await Promise.all([
     collectWebSnapshotAssets(snapshotDocument, {
@@ -138,9 +159,15 @@ export async function buildCurrentPageWebSnapshot(args: {
       allowAuthenticatedSameOriginAssets: args.allowAuthenticatedSameOriginAssets,
       requestId: args.requestId,
       sourceUrl: source.url,
+      ...(args.abortSignal === undefined ? {} : { abortSignal: args.abortSignal }),
     }),
-    captureWebSnapshotScreenshotOrFallback(args.contentIntentSource),
+    captureWebSnapshotScreenshotOrFallback(
+      args.contentIntentSource,
+      args.fullPageCaptureIdentity,
+      args.abortSignal
+    ),
   ]);
+  throwIfWebSnapshotBuildAborted(args.abortSignal);
   const { assets, privacyWarnings, snapshotSessionId, warnings } = assetResult;
   const warningSummary = createNormalizedWarningSummary({
     networkWarnings: warnings,
@@ -149,6 +176,7 @@ export async function buildCurrentPageWebSnapshot(args: {
     screenshotWarnings: screenshotResult.warnings,
   });
   const html = serializePreparedSnapshotDocument(snapshotDocument);
+  throwIfWebSnapshotBuildAborted(args.abortSignal);
   const packaged = await buildWebSnapshotPackage({
     assets,
     diagnosticsSource: {
@@ -162,6 +190,7 @@ export async function buildCurrentPageWebSnapshot(args: {
     warnings: warningSummary.warnings,
     warningStats: warningSummary.warningStats,
   });
+  throwIfWebSnapshotBuildAborted(args.abortSignal);
 
   return {
     ...packaged,

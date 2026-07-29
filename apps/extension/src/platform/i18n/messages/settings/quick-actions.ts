@@ -30,8 +30,8 @@ export const settingsQuickActionsMessages = defineMessageSource({
     en: 'Advanced',
   },
   advancedDescription: {
-    ru: 'Задержка, эмуляция, формат и дополнительные действия',
-    en: 'Delay, emulation, format, and extra actions',
+    ru: 'Задержка, размер страницы или окна, формат и дополнительные действия',
+    en: 'Delay, page or window size, format, and extra actions',
   },
   showAdvanced: {
     ru: 'Показать дополнительные настройки',
@@ -74,8 +74,8 @@ export const settingsQuickActionsMessages = defineMessageSource({
     en: 'Screenshot mode',
   },
   screenEmulationLabel: {
-    ru: 'Эмуляция экрана',
-    en: 'Screen emulation',
+    ru: 'Пресет размера',
+    en: 'Size preset',
   },
   delayLabel: {
     ru: 'Задержка скриншота',
@@ -190,8 +190,8 @@ export const settingsQuickActionsMessages = defineMessageSource({
     en: 'sec',
   },
   emulationNone: {
-    ru: 'Без эмуляции',
-    en: 'No emulation',
+    ru: 'Текущий размер',
+    en: 'Current size',
   },
   statusOff: {
     ru: 'Выключить',

@@ -30,6 +30,7 @@ export type RuntimePopupExportRequestByType = {
     options: ExportOptions;
   } & PopupTabRouteCapabilityPayload;
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: {
+    batchRequestId: string;
     type: typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE;
     tabId: number;
     options: ExportOptions;
@@ -40,6 +41,7 @@ export type RuntimePopupExportRequestByType = {
     requestId: string;
   } & PopupTabRouteCapabilityPayload;
   [MessageType.EXPORT_POPUP_CANCEL]: {
+    exportRunId: string;
     type: typeof MessageType.EXPORT_POPUP_CANCEL;
     tabId: number;
   } & PopupTabRouteCapabilityPayload;

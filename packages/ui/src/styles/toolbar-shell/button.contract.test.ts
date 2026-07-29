@@ -9,5 +9,7 @@ describe('toolbar-shell button contract', () => {
     expect(toolbarShellButtonStylesheet).toContain('.sniptale-btn {');
     expect(toolbarShellButtonStylesheet).toContain(".sniptale-toggle[data-active='true']");
     expect(toolbarShellButtonStylesheet).toContain('.sniptale-btn-danger:hover:not(:disabled)');
+    expect(toolbarShellButtonStylesheet).toContain('.sniptale-split-action {');
+    expect(toolbarShellButtonStylesheet).not.toContain('.sniptale-split-action-end::before {');
   });
 });

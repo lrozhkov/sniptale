@@ -7,6 +7,15 @@ export const VIDEO_RECORDING_OWNER_MAPPINGS = [
   ...VIDEO_RECORDING_LEASE_OWNER_MAPPINGS,
   ...VIDEO_RECORDING_RUNTIME_ROUTING_OWNER_MAPPINGS,
   {
+    owner: 'background-video-capture-surface-session',
+    productionPrefix: 'apps/extension/src/background/media/video/capture-surface/',
+    exclusive: true,
+    reason:
+      'Video capture-surface session registration, source handshake, recovery, and release ' +
+      'are covered by the focused capture-surface suite.',
+    testFiles: ['apps/extension/src/background/media/video/capture-surface.test.ts'],
+  },
+  {
     owner: 'background-video-recording-start-watchdog',
     productionFile:
       'apps/extension/src/background/media/video/manager/start-activation-watchdog.ts',
@@ -67,10 +76,11 @@ export const VIDEO_RECORDING_OWNER_MAPPINGS = [
     reason:
       'Offscreen start/stop exclusion and delayed activation draining are covered by controller suites.',
     testFiles: [
-      'apps/extension/src/offscreen/recording/controller.test.ts',
       'apps/extension/src/offscreen/recording/controller.start-stop.test.ts',
       'apps/extension/src/offscreen/recording/controller.stop.test.ts',
       'apps/extension/src/offscreen/recording/controller.multi-source.lifecycle.test.ts',
+      'apps/extension/src/offscreen/recording/controller.multi-source.test.ts',
+      'apps/extension/src/offscreen/recording/controller.sidecar.test.ts',
     ],
   },
   {
@@ -82,7 +92,7 @@ export const VIDEO_RECORDING_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/offscreen/recording/start/helpers.notifications.test.ts',
       'apps/extension/src/offscreen/recording/start/helpers.test.ts',
-      'apps/extension/src/offscreen/recording/start/index.test.ts',
+      'apps/extension/src/offscreen/recording/start.test.ts',
       'apps/extension/src/offscreen/recording/start/recorder.error.test.ts',
       'apps/extension/src/offscreen/runtime/index.start-error.test.ts',
     ],
@@ -106,6 +116,10 @@ export const VIDEO_RECORDING_OWNER_MAPPINGS = [
       'apps/extension/src/background/media/video/runtime/handlers/state/root.test.ts',
       'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.test.ts',
       'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/camera-recorder-registration.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.project-export.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.ready.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.saved-replay.test.ts',
     ],
   },
   {

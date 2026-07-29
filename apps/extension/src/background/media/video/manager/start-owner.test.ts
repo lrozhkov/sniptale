@@ -3,36 +3,40 @@ import { installBackgroundRuntimeMessagingMock } from '../../../routing-contract
 
 const {
   beginVideoRecordingPreparationMock,
+  beginPreparedRecordingMock,
   clearActiveVideoRecordingLeaseMock,
-  clearRecordingStartActivationWatchdogMock,
   finalizeRecordingStartMock,
   initializeRecordingContextMock,
-  hasActiveVideoRecordingTabMock,
-  issueActiveVideoRecordingLeaseMock,
+  hasActiveVideoRecordingSessionMock,
+  issuePreparedVideoRecordingLeaseMock,
   isStartCancelledMock,
   isVideoRecordingPreparationInProgressMock,
   notifyRecordingStartFailedMock,
   runCountdownMock,
+  releaseVideoCaptureSurfaceMock,
   scheduleRecordingStartActivationWatchdogMock,
   sendRuntimeMessageMock,
   setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
+  waitForVideoCaptureSurfaceRecoveryMock,
 } = vi.hoisted(() => ({
   beginVideoRecordingPreparationMock: vi.fn(),
+  beginPreparedRecordingMock: vi.fn(),
   clearActiveVideoRecordingLeaseMock: vi.fn(),
-  clearRecordingStartActivationWatchdogMock: vi.fn(),
   finalizeRecordingStartMock: vi.fn(),
   initializeRecordingContextMock: vi.fn(),
-  hasActiveVideoRecordingTabMock: vi.fn(),
-  issueActiveVideoRecordingLeaseMock: vi.fn(),
+  hasActiveVideoRecordingSessionMock: vi.fn(),
+  issuePreparedVideoRecordingLeaseMock: vi.fn(),
   isStartCancelledMock: vi.fn(),
   isVideoRecordingPreparationInProgressMock: vi.fn(),
   notifyRecordingStartFailedMock: vi.fn(),
   runCountdownMock: vi.fn(),
+  releaseVideoCaptureSurfaceMock: vi.fn(),
   scheduleRecordingStartActivationWatchdogMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
+  waitForVideoCaptureSurfaceRecoveryMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -49,33 +53,38 @@ vi.mock('../runtime/manager', async (importOriginal) => ({
 vi.mock('../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../session-state')>()),
   beginVideoRecordingPreparation: beginVideoRecordingPreparationMock,
-  hasActiveVideoRecordingTab: hasActiveVideoRecordingTabMock,
+  hasActiveVideoRecordingSession: hasActiveVideoRecordingSessionMock,
   isVideoRecordingPreparationInProgress: isVideoRecordingPreparationInProgressMock,
   setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
 vi.mock('../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../recording-control-lease')>()),
+  activateVideoRecordingLease: vi.fn().mockResolvedValue({ controlToken: 'control-token-1' }),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
-  issueActiveVideoRecordingLease: issueActiveVideoRecordingLeaseMock,
+  issuePreparedVideoRecordingLease: issuePreparedVideoRecordingLeaseMock,
 }));
 vi.mock('./flow', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./flow')>()),
   finalizeRecordingStart: finalizeRecordingStartMock,
+  beginPreparedRecording: beginPreparedRecordingMock,
   isStartCancelled: isStartCancelledMock,
   runCountdown: runCountdownMock,
 }));
-vi.mock('./recording-context', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./recording-context')>()),
+vi.mock('../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../capture-surface')>()),
+  releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
+  waitForVideoCaptureSurfaceRecovery: waitForVideoCaptureSurfaceRecoveryMock,
+}));
+vi.mock('./recording-context.prepare', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./recording-context.prepare')>()),
   initializeRecordingContext: initializeRecordingContextMock,
 }));
 vi.mock('./start-activation-watchdog', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./start-activation-watchdog')>()),
-  clearRecordingStartActivationWatchdog: clearRecordingStartActivationWatchdogMock,
   scheduleRecordingStartActivationWatchdog: scheduleRecordingStartActivationWatchdogMock,
 }));
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
-import { RECORDING_START_DELIVERY_TIMEOUT_MS } from '@sniptale/runtime-contracts/video/types/timeouts';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { startRecording } from './start';
 import { reserveMediaErasureExclusion } from '../../lifecycle-gate';
@@ -95,23 +104,35 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'recording-1') });
   clearActiveVideoRecordingLeaseMock.mockResolvedValue(undefined);
-  hasActiveVideoRecordingTabMock.mockReturnValue(false);
+  hasActiveVideoRecordingSessionMock.mockReturnValue(false);
   isStartCancelledMock.mockReturnValue(false);
   isVideoRecordingPreparationInProgressMock.mockReturnValue(false);
   runCountdownMock.mockResolvedValue(true);
-  finalizeRecordingStartMock.mockResolvedValue(undefined);
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
+  beginPreparedRecordingMock.mockResolvedValue(undefined);
+  finalizeRecordingStartMock.mockResolvedValue('stream-instance-1');
+  releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
+  waitForVideoCaptureSurfaceRecoveryMock.mockResolvedValue(undefined);
+  sendRuntimeMessageMock.mockImplementation((message: { type?: string }) =>
+    message.type === VideoMessageType.OFFSCREEN_STOP_RECORDING
+      ? Promise.resolve({ success: true, result: 'accepted' })
+      : Promise.resolve(undefined)
+  );
   installBackgroundRuntimeMessagingMock({ sendRuntimeMessage: sendRuntimeMessageMock });
   initializeRecordingContextMock.mockResolvedValue({
     captureMode: CaptureMode.TAB,
     captureSource: { mode: CaptureMode.TAB, streamId: 'stream-1' },
+    generation: 1,
     settings,
+    surface: null,
     tabId: 17,
     viewport: null,
   });
-  issueActiveVideoRecordingLeaseMock.mockResolvedValue({
+  issuePreparedVideoRecordingLeaseMock.mockResolvedValue({
     controlToken: 'control-token-1',
     recordingId: 'recording-1',
+  });
+  notifyRecordingStartFailedMock.mockImplementation(async () => {
+    await releaseVideoCaptureSurfaceMock('recording-1');
   });
 });
 
@@ -151,10 +172,13 @@ it('issues an owner-bound control lease before accepting a recording start', asy
 
   expect(setVideoRecordingIdMock).toHaveBeenCalledWith('recording-1');
   expect(scheduleRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('recording-1');
-  expect(issueActiveVideoRecordingLeaseMock).toHaveBeenCalledWith({
+  expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
+    cropRegion: null,
     openEditorAfterRecording: false,
     ownerSenderUrl,
+    surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
+    viewportPresetId: undefined,
   });
   expect(finalizeRecordingStartMock).toHaveBeenCalledTimes(1);
   expect(finalizeRecordingStartMock.mock.invocationCallOrder[0]).toBeLessThan(
@@ -183,9 +207,76 @@ it('fails visibly before preparation while local data erasure owns media lifecyc
   await erasure;
 });
 
-it('does not arm the activation watchdog until offscreen start delivery is accepted', async () => {
-  let acceptOffscreenStart!: () => void;
-  const offscreenStartDelivery = new Promise<void>((resolve) => {
+it('waits for startup recovery before inspecting session state or preparing a current-size start', async () => {
+  let finishRecovery!: () => void;
+  waitForVideoCaptureSurfaceRecoveryMock.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finishRecovery = resolve;
+    })
+  );
+  const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
+
+  const start = startRecording(17, settings, CaptureMode.TAB, null, ownerSenderUrl);
+  await Promise.resolve();
+
+  expect(isVideoRecordingPreparationInProgressMock).not.toHaveBeenCalled();
+  expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+  expect(initializeRecordingContextMock).not.toHaveBeenCalled();
+  expect(issuePreparedVideoRecordingLeaseMock).not.toHaveBeenCalled();
+  expect(finalizeRecordingStartMock).not.toHaveBeenCalled();
+
+  finishRecovery();
+
+  await expect(start).resolves.toMatchObject({ result: 'accepted' });
+  expect(isVideoRecordingPreparationInProgressMock).toHaveBeenCalledOnce();
+  expect(beginVideoRecordingPreparationMock).toHaveBeenCalledOnce();
+  expect(initializeRecordingContextMock).toHaveBeenCalledOnce();
+});
+
+it('detects an active recording hydrated by startup recovery before preparing a new start', async () => {
+  let finishRecovery!: () => void;
+  waitForVideoCaptureSurfaceRecoveryMock.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finishRecovery = resolve;
+    })
+  );
+  const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
+
+  const start = startRecording(17, settings, CaptureMode.TAB, null, ownerSenderUrl);
+  await Promise.resolve();
+  expect(hasActiveVideoRecordingSessionMock).not.toHaveBeenCalled();
+
+  hasActiveVideoRecordingSessionMock.mockReturnValueOnce(true);
+  finishRecovery();
+
+  await expect(start).resolves.toEqual({ result: 'already-active' });
+  expect(hasActiveVideoRecordingSessionMock).toHaveBeenCalledOnce();
+  expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+  expect(initializeRecordingContextMock).not.toHaveBeenCalled();
+});
+
+it('rejects a new start while retryable startup recovery still owns the previous source', async () => {
+  waitForVideoCaptureSurfaceRecoveryMock.mockRejectedValueOnce(
+    new Error('Previous recording recovery is awaiting an exact stop acknowledgement')
+  );
+  const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
+
+  await expect(
+    startRecording(17, settings, CaptureMode.TAB, null, ownerSenderUrl)
+  ).resolves.toEqual({
+    error: 'Previous recording recovery is awaiting an exact stop acknowledgement',
+    result: 'failed',
+  });
+
+  expect(isVideoRecordingPreparationInProgressMock).not.toHaveBeenCalled();
+  expect(hasActiveVideoRecordingSessionMock).not.toHaveBeenCalled();
+  expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+  expect(issuePreparedVideoRecordingLeaseMock).not.toHaveBeenCalled();
+});
+
+it('persists source authority before delivery and waits to arm the activation watchdog', async () => {
+  let acceptOffscreenStart!: (streamInstanceId: string) => void;
+  const offscreenStartDelivery = new Promise<string>((resolve) => {
     acceptOffscreenStart = resolve;
   });
   finalizeRecordingStartMock.mockReturnValueOnce(offscreenStartDelivery);
@@ -194,19 +285,40 @@ it('does not arm the activation watchdog until offscreen start delivery is accep
   const start = startRecording(17, settings, CaptureMode.TAB, undefined, ownerSenderUrl);
   await waitForMockCall(finalizeRecordingStartMock);
 
-  expect(issueActiveVideoRecordingLeaseMock).toHaveBeenCalledWith({
+  expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
+    cropRegion: null,
     openEditorAfterRecording: false,
     ownerSenderUrl,
+    surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
+    viewportPresetId: undefined,
+  });
+  expect(issuePreparedVideoRecordingLeaseMock.mock.invocationCallOrder[0]).toBeLessThan(
+    finalizeRecordingStartMock.mock.invocationCallOrder[0]!
+  );
+  expect(scheduleRecordingStartActivationWatchdogMock).not.toHaveBeenCalled();
+  acceptOffscreenStart('stream-instance-1');
+  await start;
+
+  expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
+    captureMode: CaptureMode.TAB,
+    cropRegion: null,
+    openEditorAfterRecording: false,
+    ownerSenderUrl,
+    surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
+    viewportPresetId: undefined,
   });
   expect(finalizeRecordingStartMock).toHaveBeenCalledTimes(1);
-  expect(scheduleRecordingStartActivationWatchdogMock).not.toHaveBeenCalled();
-  acceptOffscreenStart();
-  await start;
+  expect(beginPreparedRecordingMock).toHaveBeenCalledWith({
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: 'recording-1',
+  });
+  expect(scheduleRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('recording-1');
 });
 
-it('fails before offscreen start when recording control lease cannot be issued', async () => {
-  issueActiveVideoRecordingLeaseMock.mockResolvedValueOnce(null);
+it('fails before beginning the prepared recording when its control lease cannot be issued', async () => {
+  issuePreparedVideoRecordingLeaseMock.mockResolvedValueOnce(null);
   const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 
   await expect(
@@ -217,25 +329,28 @@ it('fails before offscreen start when recording control lease cannot be issued',
   });
 
   expect(finalizeRecordingStartMock).not.toHaveBeenCalled();
+  expect(beginPreparedRecordingMock).not.toHaveBeenCalled();
   expect(scheduleRecordingStartActivationWatchdogMock).not.toHaveBeenCalled();
   expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(
-    'Failed to issue recording control capability'
+    'Failed to issue recording control capability',
+    { retainAuthority: false }
   );
 });
 
-it('keeps the start failure visible when delivery cleanup effects reject', async () => {
-  finalizeRecordingStartMock.mockRejectedValueOnce(new Error('offscreen failed'));
-  clearActiveVideoRecordingLeaseMock.mockRejectedValueOnce(new Error('lease cleanup failed'));
+it('retains start authority when identity-bound delivery cleanup is not acknowledged', async () => {
+  beginPreparedRecordingMock.mockRejectedValueOnce(new Error('offscreen failed'));
   sendRuntimeMessageMock.mockRejectedValueOnce(new Error('offscreen cleanup failed'));
   const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 
   await expect(
     startRecording(17, settings, CaptureMode.TAB, undefined, ownerSenderUrl)
-  ).resolves.toEqual({ error: 'offscreen failed', result: 'failed' });
+  ).resolves.toEqual({
+    error: 'Recording start failed and identity-bound offscreen cleanup was not acknowledged',
+    result: 'failed',
+  });
 
   expect(scheduleRecordingStartActivationWatchdogMock).not.toHaveBeenCalled();
-  expect(clearRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('recording-1');
-  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('recording-1');
+  expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({
       type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
@@ -243,41 +358,66 @@ it('keeps the start failure visible when delivery cleanup effects reject', async
       discard: true,
     })
   );
-  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('offscreen failed');
+  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(
+    'Recording start failed and identity-bound offscreen cleanup was not acknowledged',
+    { retainAuthority: true }
+  );
 });
 
-it('rolls back and cleans up when offscreen start delivery never accepts', async () => {
-  vi.useFakeTimers();
-  finalizeRecordingStartMock.mockReturnValueOnce(new Promise<void>(() => undefined));
+it('retains start authority when the bound source stops but durable lease cleanup fails', async () => {
+  beginPreparedRecordingMock.mockRejectedValueOnce(new Error('offscreen failed'));
+  clearActiveVideoRecordingLeaseMock.mockRejectedValueOnce(new Error('lease cleanup failed'));
   const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 
-  try {
-    const resultPromise = startRecording(17, settings, CaptureMode.TAB, undefined, ownerSenderUrl);
-    await waitForMockCall(finalizeRecordingStartMock);
+  await expect(
+    startRecording(17, settings, CaptureMode.TAB, undefined, ownerSenderUrl)
+  ).resolves.toEqual({
+    error: 'Recording start failed and identity-bound offscreen cleanup was not acknowledged',
+    result: 'failed',
+  });
 
-    expect(scheduleRecordingStartActivationWatchdogMock).not.toHaveBeenCalled();
+  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('recording-1');
+  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(
+    'Recording start failed and identity-bound offscreen cleanup was not acknowledged',
+    { retainAuthority: true }
+  );
+});
 
-    await vi.advanceTimersByTimeAsync(RECORDING_START_DELIVERY_TIMEOUT_MS);
-    const result = await resultPromise;
+it('rolls back and cleans up when raw source validation times out', async () => {
+  finalizeRecordingStartMock.mockRejectedValueOnce(
+    new Error('Timed out while validating the recording source')
+  );
+  const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 
-    expect(result).toEqual({ error: expect.any(String), result: 'failed' });
-    expect(scheduleRecordingStartActivationWatchdogMock).not.toHaveBeenCalled();
-    expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('recording-1');
-    expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
-        capabilityToken: expect.any(String),
-        discard: true,
-      })
-    );
-    expect(result.result).toBe('failed');
-    if (result.result !== 'failed') {
-      throw new Error('Expected recording start to fail after delivery timeout');
-    }
-    expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(result.error);
-  } finally {
-    vi.useRealTimers();
+  const result = await startRecording(17, settings, CaptureMode.TAB, undefined, ownerSenderUrl);
+
+  expect(result).toEqual({
+    error: 'Timed out while validating the recording source',
+    result: 'failed',
+  });
+  expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
+    captureMode: CaptureMode.TAB,
+    cropRegion: null,
+    openEditorAfterRecording: false,
+    ownerSenderUrl,
+    surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
+    viewportPresetId: undefined,
+  });
+  expect(scheduleRecordingStartActivationWatchdogMock).not.toHaveBeenCalled();
+  expect(releaseVideoCaptureSurfaceMock).toHaveBeenCalledWith('recording-1');
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
+      capabilityToken: expect.any(String),
+      discard: true,
+    })
+  );
+  if (result.result !== 'failed') {
+    throw new Error('Expected recording start to fail after source validation timeout');
   }
+  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(result.error, {
+    retainAuthority: false,
+  });
 });
 
 it('stringifies non-Error preparation failures before notifying the runtime', async () => {
@@ -286,5 +426,7 @@ it('stringifies non-Error preparation failures before notifying the runtime', as
 
   await startRecording(17, settings, CaptureMode.TAB, undefined, ownerSenderUrl);
 
-  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('capture blocked');
+  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('capture blocked', {
+    retainAuthority: false,
+  });
 });

@@ -6,6 +6,8 @@ import type {
   CaptureMessageType,
   MessageType,
 } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { ViewportPresetAvailabilityPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ViewportStatusResponse } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { CaptureActionType, QuickActionOverlay } from '../../../settings';
 import type {
@@ -17,7 +19,6 @@ import type {
   RuntimePopupExportResultMessage,
   ContentPrivilegedActionGrantPayload,
   ScenarioRuntimeCapturePayload,
-  Size2d,
 } from '../types';
 import type { ContentPrivilegedActionCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import type {
@@ -62,15 +63,23 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
   RuntimePrivacyErasureRequestByType & {
     [MessageType.ENABLE_SCREENSHOT_MODE]: {
       type: typeof MessageType.ENABLE_SCREENSHOT_MODE;
+      contentIntent?: ContentPrivilegedActionCapability;
       tabId?: number;
-      viewport?: Size2d | null;
+      viewport?: AppliedViewportPresetPayload | null;
       quickActionOverlay?: QuickActionOverlay & { delaySeconds?: number };
       autoStartSelection?: boolean;
       autoStartCaptureType?: 'visible' | 'full';
       toolbarVisible?: boolean;
+      surfaceCapabilityToken?: string;
+      surfaceLeaseGeneration?: number;
+      surfaceOperationGeneration?: number;
+      surfaceWarning?: string;
     } & ContentPrivilegedActionGrantPayload;
     [MessageType.DISABLE_SCREENSHOT_MODE]: {
       type: typeof MessageType.DISABLE_SCREENSHOT_MODE;
+      leaseGeneration?: number;
+      operationGeneration?: number;
+      surfaceCapabilityToken?: string;
       tabId?: number;
     };
     [MessageType.SCREENSHOT_MODE_STATUS]: {
@@ -101,10 +110,24 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       type: typeof MessageType.QUICK_EDIT_MODE_STATUS;
       tabId?: number;
     };
-    [MessageType.SET_VIEWPORT]: {
-      type: typeof MessageType.SET_VIEWPORT;
-      width?: number;
-      height?: number;
+    [MessageType.APPLY_VIEWPORT_PRESET]: {
+      type: typeof MessageType.APPLY_VIEWPORT_PRESET;
+      operationGeneration: number;
+      presetId: string;
+      surfaceCapabilityToken: string;
+      tabId?: number;
+    };
+    [MessageType.RELEASE_VIEWPORT_PRESET]: {
+      type: typeof MessageType.RELEASE_VIEWPORT_PRESET;
+      leaseGeneration: number;
+      operationGeneration: number;
+      surfaceCapabilityToken: string;
+      tabId?: number;
+    };
+    [MessageType.GET_VIEWPORT_PRESET_AVAILABILITY]: {
+      type: typeof MessageType.GET_VIEWPORT_PRESET_AVAILABILITY;
+      context?: 'screenshot' | 'video';
+      presetIds: string[];
       tabId?: number;
     };
     [MessageType.GET_VIEWPORT_STATUS]: {
@@ -142,6 +165,10 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       type: typeof CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP;
       contentIntent?: ContentPrivilegedActionCapability;
     };
+    [CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION]: {
+      type: typeof CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION;
+      contentIntent: ContentPrivilegedActionCapability;
+    };
   };
 
 type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
@@ -157,7 +184,11 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
     [MessageType.ENABLE_QUICK_EDIT_MODE]: RuntimeEmptyResponse;
     [MessageType.DISABLE_QUICK_EDIT_MODE]: RuntimeEmptyResponse;
     [MessageType.QUICK_EDIT_MODE_STATUS]: ModeStatusResponse;
-    [MessageType.SET_VIEWPORT]: RuntimeEmptyResponse;
+    [MessageType.APPLY_VIEWPORT_PRESET]: RuntimeEmptyResponse;
+    [MessageType.RELEASE_VIEWPORT_PRESET]: RuntimeEmptyResponse;
+    [MessageType.GET_VIEWPORT_PRESET_AVAILABILITY]: RuntimeMessageResponse<{
+      availabilities?: ViewportPresetAvailabilityPayload[];
+    }>;
     [MessageType.GET_VIEWPORT_STATUS]: ViewportStatusResponse;
     [MessageType.PAGE_ACCESS]: PageAccessResponse;
     [MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY]: PopupTabRouteCapabilityResponse;
@@ -172,6 +203,11 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
     [CaptureMessageType.CAPTURE_VISIBLE]: CaptureResponse;
     [CaptureMessageType.CAPTURE_FULL]: CaptureResponse;
     [CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP]: CaptureResponse;
+    [CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION]: RuntimeMessageResponse<{
+      surfaceCapabilityToken: string;
+      surfaceLeaseGeneration?: number;
+      surfaceOperationGeneration: number;
+    }>;
   };
 
 export type RuntimeCoreRequestByType = RuntimeCoreBaseRequestByType &

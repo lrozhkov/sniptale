@@ -13,6 +13,10 @@ export const webSnapshotViewerMessages = defineMessageSource({
       ru: 'Скрыть заголовок снимка',
       en: 'Hide snapshot header',
     },
+    pngDprHint: {
+      ru: 'PNG сохраняется с естественной плотностью пикселей экрана (DPR) без подгонки размера.',
+      en: 'PNG export keeps the display’s natural pixel density (DPR) without resizing.',
+    },
     loading: {
       ru: 'Загрузка снимка...',
       en: 'Loading snapshot...',

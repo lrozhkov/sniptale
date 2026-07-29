@@ -11,6 +11,9 @@ import { createMessageGuard, createRuntimeResponseGuard, isString } from '../../
 import type { TabRequestByType, TabResponseByType } from '../index';
 
 const isContentGrant = contentIntent.isContentPrivilegedActionAutoStartGrant;
+const isFullPageCaptureAction = (value: unknown) =>
+  value === MessageType.EXPORT_CAPTURE_FULL_PAGE ||
+  value === MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED;
 
 export const tabUiExportMessageContracts = {
   [MessageType.EXPORT_POPUP_PREVIEW]: {
@@ -35,7 +38,10 @@ export const tabUiExportMessageContracts = {
       >({
         type: MessageType.EXPORT_POPUP_START,
         required: { requestId: isString, options: isExportOptions },
-        optional: { contentIntentGrant: isContentGrant },
+        optional: {
+          contentIntentGrant: isContentGrant,
+          fullPageCaptureAction: isFullPageCaptureAction,
+        },
       })
     ),
     parseResponse: createGuardParser(
@@ -51,8 +57,11 @@ export const tabUiExportMessageContracts = {
         TabRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
       >({
         type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
-        required: { options: isExportOptions },
-        optional: { contentIntentGrant: isContentGrant },
+        required: { batchRequestId: isString, options: isExportOptions },
+        optional: {
+          contentIntentGrant: isContentGrant,
+          fullPageCaptureAction: isFullPageCaptureAction,
+        },
       })
     ),
     parseResponse: createGuardParser(
@@ -66,7 +75,7 @@ export const tabUiExportMessageContracts = {
       createMessageGuard<
         typeof MessageType.EXPORT_POPUP_CANCEL,
         TabRequestByType[typeof MessageType.EXPORT_POPUP_CANCEL]
-      >({ type: MessageType.EXPORT_POPUP_CANCEL })
+      >({ type: MessageType.EXPORT_POPUP_CANCEL, required: { exportRunId: isString } })
     ),
     parseResponse: createGuardParser(
       'tab EXPORT_POPUP_CANCEL response',

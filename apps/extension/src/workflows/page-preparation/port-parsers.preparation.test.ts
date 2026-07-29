@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
+  PREPARATION_SURFACE_RESIZE,
   WEB_SNAPSHOT_VIEWER_PREPARATION_REQUEST,
   WEB_SNAPSHOT_VIEWER_PREPARATION_RESPONSE,
 } from './contracts';
@@ -57,7 +58,15 @@ it('parses correlated preparation response envelopes', () => {
 it('rejects malformed preparation request and response envelopes', () => {
   expect(
     parseViewerPreparationPortRequest({
-      command: { type: MessageType.SET_VIEWPORT, viewport: { height: 720, width: '1280' } },
+      command: {
+        type: PREPARATION_SURFACE_RESIZE,
+        viewport: {
+          presetId: 'test:viewport',
+          target: 'viewport',
+          height: 720,
+          width: '1280',
+        },
+      },
       requestId: 'prep-1',
       type: WEB_SNAPSHOT_VIEWER_PREPARATION_REQUEST,
       viewerPortGeneration: 'viewer-generation-1',

@@ -48,6 +48,7 @@ function createState(): PopupExportRuntimeContract {
     canExport: true,
     copiedFormat: null,
     copyingFormat: null,
+    cancelRetryRef: { current: null },
     copyRequestIdRef: { current: 0 },
     copyResetTimeoutRef: { current: null },
     exportDisabledReason: null,
@@ -177,6 +178,7 @@ async function verifySuccessfulBatchCollection() {
     total: 1,
   });
   expect(deps.sendBuildPackageMessage).toHaveBeenCalledWith(7, {
+    batchRequestId: 'req-1',
     type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
     options: { includeMarkdown: true },
   });
@@ -274,6 +276,39 @@ async function verifyUnsafePackageResponseRejected() {
   });
 }
 
+async function verifyAggregateEntryLimitIsTabScoped() {
+  const deps = createDeps();
+  const selectedTabs = Array.from({ length: 6 }, (_, index) =>
+    createTab({ tabId: index + 1, title: `Tab ${index + 1}` })
+  );
+  deps.sendBuildPackageMessage.mockImplementation(async (tabId) => ({
+    pagePackage: {
+      ...createPagePackage(),
+      archiveBaseName: `page_${tabId}`,
+      entries: Array.from({ length: 2_000 }, (_, index) => ({
+        path: `entry-${index}.txt`,
+        textContent: '',
+      })),
+      errors: [],
+    },
+    success: true,
+  }));
+  previewMocks.getPopupExportTransportErrorMessage.mockImplementation((error) =>
+    error instanceof Error ? error.message : 'transport failed'
+  );
+
+  const collected = await collectBatchPagePackages({
+    deps,
+    requestId: 'req-1',
+    selectedTabs,
+    state: createState(),
+  });
+
+  expect(collected?.pagePackages).toHaveLength(5);
+  expect(collected?.errors).toEqual(['Tab 6: Popup batch export aggregate exceeds 10000 entries']);
+  expect(loggingMocks.logPopupExportBatchUnexpectedFailure).not.toHaveBeenCalled();
+}
+
 describe('collectBatchPagePackages', () => {
   it(
     'collects successful page packages and prefixes per-page export errors',
@@ -290,5 +325,9 @@ describe('collectBatchPagePackages', () => {
   it(
     'rejects unsafe successful package responses before collection',
     verifyUnsafePackageResponseRejected
+  );
+  it(
+    'skips the tab that exceeds the aggregate entry limit even when packages are zero-byte',
+    verifyAggregateEntryLimitIsTabScoped
   );
 });

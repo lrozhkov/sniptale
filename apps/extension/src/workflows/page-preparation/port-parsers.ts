@@ -4,6 +4,7 @@ import { isQuickActionOverlay } from '../../contracts/messaging/validators/ui';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { parsePopupExportControlRequest } from '../../contracts/messaging/parsers/popup-export-control';
 import {
+  PREPARATION_SURFACE_RESIZE,
   WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
   WEB_SNAPSHOT_VIEWER_EXPORT_RESPONSE,
   WEB_SNAPSHOT_VIEWER_PREPARATION_REQUEST,
@@ -20,18 +21,34 @@ function hasOwn(record: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(record, key);
 }
 
-function parseViewport(value: unknown): { width: number; height: number } | null | undefined {
+function parseViewport(
+  value: unknown
+):
+  | { presetId: string; target: 'viewport' | 'window'; width: number; height: number }
+  | null
+  | undefined {
   if (value === undefined) {
     return undefined;
   }
   if (value === null) {
     return null;
   }
-  if (!isRecord(value) || !isNumber(value['width']) || !isNumber(value['height'])) {
+  if (
+    !isRecord(value) ||
+    !isString(value['presetId']) ||
+    (value['target'] !== 'viewport' && value['target'] !== 'window') ||
+    !isNumber(value['width']) ||
+    !isNumber(value['height'])
+  ) {
     return undefined;
   }
 
-  return { width: value['width'], height: value['height'] };
+  return {
+    presetId: value['presetId'],
+    target: value['target'],
+    width: value['width'],
+    height: value['height'],
+  };
 }
 
 function isCaptureType(value: unknown): value is 'visible' | 'full' {
@@ -67,7 +84,10 @@ function parsePopupExportRequest(request: unknown): ViewerPopupExportMessage | n
   }
 
   if (request['type'] === MessageType.EXPORT_POPUP_BUILD_PACKAGE) {
-    return { type: MessageType.EXPORT_POPUP_BUILD_PACKAGE, options };
+    const batchRequestId = request['batchRequestId'];
+    return isString(batchRequestId)
+      ? { type: MessageType.EXPORT_POPUP_BUILD_PACKAGE, batchRequestId, options }
+      : null;
   }
 
   const requestId = request['requestId'];
@@ -202,10 +222,10 @@ export function parseViewerPreparationCommand(message: unknown): ViewerPreparati
     return null;
   }
 
-  if (message['type'] === MessageType.SET_VIEWPORT) {
+  if (message['type'] === PREPARATION_SURFACE_RESIZE) {
     return viewport === undefined
-      ? { type: MessageType.SET_VIEWPORT }
-      : { type: MessageType.SET_VIEWPORT, viewport };
+      ? { type: PREPARATION_SURFACE_RESIZE }
+      : { type: PREPARATION_SURFACE_RESIZE, viewport };
   }
 
   if (message['type'] !== MessageType.ENABLE_SCREENSHOT_MODE) {
@@ -239,6 +259,14 @@ export function parseViewerPreparationCommand(message: unknown): ViewerPreparati
       return null;
     }
     command.toolbarVisible = message['toolbarVisible'];
+  }
+  if (hasOwn(message, 'surfaceCapabilityToken')) {
+    if (typeof message['surfaceCapabilityToken'] !== 'string') return null;
+    command.surfaceCapabilityToken = message['surfaceCapabilityToken'];
+  }
+  if (hasOwn(message, 'surfaceWarning')) {
+    if (typeof message['surfaceWarning'] !== 'string') return null;
+    command.surfaceWarning = message['surfaceWarning'];
   }
 
   return command;

@@ -1,290 +1,114 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installBackgroundRuntimeMessagingMock } from '../../routing-contracts/runtime-messaging/mock';
 
-const {
-  attachDebuggerMock,
-  browserTabsGetMock,
-  clearViewportMock,
-  detachDebuggerMock,
-  isDebuggerAttachedMock,
-  loadSettingsMock,
-  loggerWarnMock,
-  resetZoomMock,
-  sendTabMessageMock,
-  setViewportMock,
-} = vi.hoisted(() => ({
-  attachDebuggerMock: vi.fn(),
-  browserTabsGetMock: vi.fn(),
-  clearViewportMock: vi.fn(),
-  detachDebuggerMock: vi.fn(),
-  isDebuggerAttachedMock: vi.fn(),
-  loadSettingsMock: vi.fn(),
-  loggerWarnMock: vi.fn(),
-  resetZoomMock: vi.fn(),
-  sendTabMessageMock: vi.fn(),
-  setViewportMock: vi.fn(),
+const mocks = vi.hoisted(() => ({
+  getApplied: vi.fn(),
+  loggerWarn: vi.fn(),
+  release: vi.fn(),
+  releaseTabOwners: vi.fn(),
+  sendTabMessage: vi.fn(),
+  terminateClosedTab: vi.fn(),
 }));
 
-vi.mock('@sniptale/platform/browser/tabs', () => ({
-  browserTabs: {
-    get: browserTabsGetMock,
-  },
-}));
-
-vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
-
-  loadSettings: loadSettingsMock,
-}));
-
-vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/runtime-messaging')>()),
-  sendTabMessage: sendTabMessageMock,
-}));
-
-vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
-  runtimeInfo: {
-    getURL: (path: string) => `chrome-extension://test/${path}`,
-  },
-}));
-
-vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({
-    child: vi.fn(),
-    debug: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    log: vi.fn(),
-    warn: loggerWarnMock,
+vi.mock('../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture-surface')>()),
+  getCaptureSurfaceService: () => ({
+    getApplied: mocks.getApplied,
+    release: mocks.release,
+    releaseTabOwners: mocks.releaseTabOwners,
+    terminateClosedTab: mocks.terminateClosedTab,
   }),
 }));
 
-vi.mock('../../debugger/session/detach', () => ({
-  detachDebugger: detachDebuggerMock,
+vi.mock('@sniptale/platform/observability/logger', () => ({
+  createLogger: () => ({ debug: vi.fn(), error: vi.fn(), log: vi.fn(), warn: mocks.loggerWarn }),
 }));
 
-vi.mock('../../debugger/session/attach', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../debugger/session/attach')>()),
-  attachDebugger: attachDebuggerMock,
-}));
+import {
+  beginScreenshotSurfaceSession,
+  nextScreenshotSurfaceGeneration,
+  resetScreenshotSurfaceSessionsForTests,
+} from '../../capture-surface/screenshot-session';
+import {
+  cleanupScreenshotModeAfterNavigation,
+  cleanupScreenshotModeAfterTabClose,
+} from './navigation-cleanup';
 
-vi.mock('../../debugger/session/status', () => ({
-  isDebuggerAttached: isDebuggerAttachedMock,
-}));
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetScreenshotSurfaceSessionsForTests();
+  vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'session-1') });
+  installBackgroundRuntimeMessagingMock({ sendTabMessage: mocks.sendTabMessage });
+  mocks.sendTabMessage.mockResolvedValue(undefined);
+  mocks.release.mockResolvedValue(undefined);
+  mocks.releaseTabOwners.mockResolvedValue(undefined);
+  mocks.terminateClosedTab.mockResolvedValue(undefined);
+});
 
-vi.mock('../../debugger/workspace', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../debugger/workspace')>()),
-  clearViewport: clearViewportMock,
-  resetZoom: resetZoomMock,
-  setViewport: setViewportMock,
-}));
+it('terminates closed-tab capture authority before deleting its projections', async () => {
+  const screenshot = new Map([[5, true]]);
+  const viewport = new Map([[5, null]]);
+  const owner = new Map<number, 'capture-surface' | 'viewer'>([[5, 'capture-surface']]);
 
-import { createAckingViewerPortRegistration } from '../../capture/page-preparation/viewer-ports.test-support';
+  await cleanupScreenshotModeAfterTabClose(5, screenshot, viewport, owner);
 
-function resetNavigationCleanupMocks() {
-  attachDebuggerMock.mockReset();
-  browserTabsGetMock.mockReset();
-  clearViewportMock.mockReset();
-  detachDebuggerMock.mockReset();
-  isDebuggerAttachedMock.mockReset();
-  loadSettingsMock.mockReset();
-  loggerWarnMock.mockReset();
-  resetZoomMock.mockReset();
-  sendTabMessageMock.mockReset();
-  installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
-  setViewportMock.mockReset();
-  browserTabsGetMock.mockResolvedValue({ id: 5, url: 'https://example.com' });
-  clearViewportMock.mockResolvedValue(undefined);
-  detachDebuggerMock.mockResolvedValue(undefined);
-  isDebuggerAttachedMock.mockResolvedValue(false);
-  loadSettingsMock.mockResolvedValue({
-    defaultViewportId: 'wide',
-    viewportPresets: [{ id: 'wide', label: 'Wide', width: 1440, height: 900 }],
+  expect(mocks.terminateClosedTab).toHaveBeenCalledWith(5, ['quick-action', 'screenshot']);
+  expect(screenshot.has(5)).toBe(false);
+  expect(viewport.has(5)).toBe(false);
+  expect(owner.has(5)).toBe(false);
+});
+
+describe('screenshot navigation cleanup', () => {
+  it('releases the matching surface lease and clears every session projection', async () => {
+    const session = nextScreenshotSurfaceGeneration(5);
+    mocks.getApplied
+      .mockReturnValueOnce({
+        sessionId: session.sessionId,
+        leaseId: 'lease-1',
+        generation: session.generation,
+        presetId: 'wide',
+        target: 'viewport',
+        width: 1440,
+        height: 900,
+      })
+      .mockReturnValueOnce(null);
+    const screenshot = new Map([[5, true]]);
+    const viewport = new Map([
+      [5, { presetId: 'wide', target: 'viewport' as const, width: 1440, height: 900 }],
+    ]);
+    const owner = new Map<number, 'capture-surface' | 'viewer'>([[5, 'capture-surface']]);
+
+    await cleanupScreenshotModeAfterNavigation(5, screenshot, viewport, owner);
+
+    expect(mocks.sendTabMessage).toHaveBeenCalledWith(5, { type: 'DISABLE_SCREENSHOT_MODE' });
+    expect(mocks.releaseTabOwners).toHaveBeenCalledWith(5, ['quick-action', 'screenshot']);
+    expect(screenshot.has(5)).toBe(false);
+    expect(viewport.has(5)).toBe(false);
+    expect(owner.has(5)).toBe(false);
   });
-  resetZoomMock.mockResolvedValue(undefined);
-  sendTabMessageMock.mockResolvedValue(undefined);
-  setViewportMock.mockResolvedValue(undefined);
-}
 
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (error: unknown) => void;
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
+  it('keeps owner projections retryable when surface restoration fails', async () => {
+    const session = beginScreenshotSurfaceSession(5);
+    mocks.getApplied.mockReturnValue({
+      sessionId: session.sessionId,
+      leaseId: 'lease-1',
+      generation: 1,
+    });
+    mocks.sendTabMessage.mockRejectedValueOnce(new Error('content gone'));
+    mocks.releaseTabOwners.mockRejectedValueOnce(new Error('restore conflict'));
+
+    const screenshot = new Map([[5, true]]);
+    const viewport = new Map([[5, null]]);
+    const owner = new Map<number, 'capture-surface' | 'viewer'>([[5, 'capture-surface']]);
+    await expect(
+      cleanupScreenshotModeAfterNavigation(5, screenshot, viewport, owner)
+    ).rejects.toThrow('restore conflict');
+
+    expect(mocks.loggerWarn).toHaveBeenCalledWith(
+      'Failed to disable preparation after navigation',
+      expect.any(Error)
+    );
+    expect(screenshot.get(5)).toBe(true);
+    expect(owner.get(5)).toBe('capture-surface');
   });
-
-  return { promise, reject, resolve };
-}
-
-function waitForQueuedOperation(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function verifyNavigationCleanupClearsPresetSideEffects() {
-  const { cleanupScreenshotModeAfterNavigation } = await import('./navigation-cleanup');
-  const screenshotModeState = new Map<number, boolean>([[5, true]]);
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'debugger']]);
-  const viewportState = new Map<number, { width: number; height: number } | null>([
-    [5, { width: 1440, height: 900 }],
-  ]);
-
-  await cleanupScreenshotModeAfterNavigation(
-    5,
-    screenshotModeState,
-    viewportState,
-    viewportOwnerState
-  );
-
-  expect(screenshotModeState.has(5)).toBe(false);
-  expect(viewportState.has(5)).toBe(false);
-  expect(viewportOwnerState.has(5)).toBe(false);
-  expect(sendTabMessageMock).toHaveBeenCalledWith(5, { type: 'DISABLE_SCREENSHOT_MODE' });
-  expect(clearViewportMock).toHaveBeenCalledWith(5);
-  expect(detachDebuggerMock).toHaveBeenCalledWith(5, 'screenshot');
-}
-
-async function verifyNavigationCleanupKeepsCompensatingAfterNotifyFailure() {
-  const { cleanupScreenshotModeAfterNavigation } = await import('./navigation-cleanup');
-  const screenshotModeState = new Map<number, boolean>([[5, true]]);
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'debugger']]);
-  const viewportState = new Map<number, { width: number; height: number } | null>([
-    [5, { width: 1440, height: 900 }],
-  ]);
-
-  sendTabMessageMock.mockRejectedValueOnce(new Error('navigation detached content'));
-
-  await cleanupScreenshotModeAfterNavigation(
-    5,
-    screenshotModeState,
-    viewportState,
-    viewportOwnerState
-  );
-
-  expect(screenshotModeState.has(5)).toBe(false);
-  expect(viewportState.has(5)).toBe(false);
-  expect(loggerWarnMock).toHaveBeenCalledWith(
-    'Failed to notify screenshot mode cleanup after navigation',
-    expect.any(Error)
-  );
-  expect(clearViewportMock).toHaveBeenCalledWith(5);
-  expect(detachDebuggerMock).toHaveBeenCalledWith(5, 'screenshot');
-}
-
-async function verifyNavigationCleanupClearsViewerPort() {
-  const { cleanupScreenshotModeAfterNavigation } = await import('./navigation-cleanup');
-  const screenshotModeState = new Map<number, boolean>([[5, true]]);
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>();
-  const viewportState = new Map<number, { width: number; height: number } | null>([[5, null]]);
-  const webSnapshotViewerPorts = new Map([[5, createAckingViewerPortRegistration()]]);
-
-  await cleanupScreenshotModeAfterNavigation(
-    5,
-    screenshotModeState,
-    viewportState,
-    viewportOwnerState,
-    webSnapshotViewerPorts
-  );
-
-  expect(sendTabMessageMock).not.toHaveBeenCalled();
-  expect(webSnapshotViewerPorts.has(5)).toBe(false);
-  expect(screenshotModeState.has(5)).toBe(false);
-  expect(viewportState.has(5)).toBe(false);
-}
-
-async function verifyNavigationCleanupClearsInactiveViewerPort() {
-  const { cleanupScreenshotModeAfterNavigation } = await import('./navigation-cleanup');
-  const webSnapshotViewerPorts = new Map([[5, createAckingViewerPortRegistration()]]);
-
-  await cleanupScreenshotModeAfterNavigation(
-    5,
-    new Map(),
-    new Map(),
-    new Map(),
-    webSnapshotViewerPorts
-  );
-
-  expect(sendTabMessageMock).not.toHaveBeenCalled();
-  expect(webSnapshotViewerPorts.has(5)).toBe(false);
-}
-
-async function verifyNewPresetEnableWaitsForNavigationCleanup() {
-  const { cleanupScreenshotModeAfterNavigation } = await import('./navigation-cleanup');
-  const { enableScreenshotModeGuarded } = await import('./mode');
-  const screenshotModeState = new Map<number, boolean>([[5, true]]);
-  const viewportOwnerState = new Map<number, 'debugger' | 'viewer'>([[5, 'debugger']]);
-  const viewportState = new Map<number, { width: number; height: number } | null>([
-    [5, { width: 1280, height: 720 }],
-  ]);
-  const viewportClear = createDeferred<void>();
-  const readPreparationState = vi.fn(async () => ({
-    screenshotMode: false,
-    visible: false,
-  }));
-
-  clearViewportMock.mockReturnValueOnce(viewportClear.promise);
-
-  const cleanupPromise = cleanupScreenshotModeAfterNavigation(
-    5,
-    screenshotModeState,
-    viewportState,
-    viewportOwnerState
-  );
-  await waitForQueuedOperation();
-  expect(clearViewportMock).toHaveBeenCalledWith(5);
-
-  const enablePromise = enableScreenshotModeGuarded(
-    5,
-    screenshotModeState,
-    viewportState,
-    viewportOwnerState,
-    new Map(),
-    { commitGuard: async () => true, readPreparationState, toolbarVisible: false }
-  );
-  await waitForQueuedOperation();
-
-  expect(browserTabsGetMock).not.toHaveBeenCalled();
-  expect(readPreparationState).not.toHaveBeenCalled();
-
-  viewportClear.resolve(undefined);
-  await cleanupPromise;
-  await enablePromise;
-
-  expect(detachDebuggerMock).toHaveBeenCalledWith(5, 'screenshot');
-  expect(detachDebuggerMock.mock.invocationCallOrder[0]!).toBeLessThan(
-    browserTabsGetMock.mock.invocationCallOrder[0]!
-  );
-  expect(detachDebuggerMock.mock.invocationCallOrder[0]!).toBeLessThan(
-    readPreparationState.mock.invocationCallOrder[0]!
-  );
-  expect(setViewportMock).toHaveBeenCalledWith(5, 1440, 900);
-  expect(clearViewportMock.mock.invocationCallOrder[0]!).toBeLessThan(
-    setViewportMock.mock.invocationCallOrder[0]!
-  );
-  expect(screenshotModeState.get(5)).toBe(true);
-  expect(viewportState.get(5)).toEqual({ width: 1440, height: 900 });
-  expect(viewportOwnerState.get(5)).toBe('debugger');
-}
-
-describe('tab-mode-router-screenshot navigation cleanup', () => {
-  beforeEach(resetNavigationCleanupMocks);
-
-  it(
-    'cleans preset screenshot mode side effects after top-level navigation',
-    verifyNavigationCleanupClearsPresetSideEffects
-  );
-  it(
-    'keeps cleaning viewport side effects when navigation notify fails',
-    verifyNavigationCleanupKeepsCompensatingAfterNotifyFailure
-  );
-  it('clears owned viewer ports after navigation cleanup', verifyNavigationCleanupClearsViewerPort);
-  it(
-    'clears inactive owned viewer ports after navigation cleanup',
-    verifyNavigationCleanupClearsInactiveViewerPort
-  );
-  it(
-    'queues a newer preset enable behind delayed navigation cleanup',
-    verifyNewPresetEnableWaitsForNavigationCleanup
-  );
 });

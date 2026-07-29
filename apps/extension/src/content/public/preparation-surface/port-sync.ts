@@ -2,7 +2,6 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import { disableAiPickModeIfLoaded } from '../../../content/overlay/ai/pick/runtime/lazy';
 import { disableHighlighterMode } from '../../../content/selection/highlighter';
 import { disableQuickEditMode } from '../../../content/selection/quick-edit';
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   buildContentModeControls,
   buildContentModeFlags,
@@ -18,14 +17,17 @@ import type {
 } from '../../../content/overlay/app/message-bridge/types';
 import type { ScreenshotStartContext } from '../../../content/overlay/screenshot/types';
 import type { ContentAppModeState } from '../../../content/overlay/app/mode';
-import type { ViewerPreparationCommand } from '../../../workflows/page-preparation';
+import {
+  PREPARATION_SURFACE_RESIZE,
+  type ViewerPreparationCommand,
+} from '../../../workflows/page-preparation';
 import type { PreparationPortConnector } from './types';
 
 function handlePreparationPortCommand(
   command: ViewerPreparationCommand,
   bridgeParamsRef: MutableRefObject<RuntimeMessageBridgeParams>
 ): void {
-  if (command.type === MessageType.SET_VIEWPORT) {
+  if (command.type === PREPARATION_SURFACE_RESIZE) {
     bridgeParamsRef.current.viewport.setCurrentViewport(command.viewport ?? null);
     return;
   }
@@ -102,7 +104,7 @@ export function usePreparationSurfacePortSync(
   );
 
   useEffect(() => {
-    return connectPort((command: ViewerPreparationCommand) => {
+    return connectPort(async (command: ViewerPreparationCommand) => {
       handlePreparationPortCommand(command, bridgeParamsRef);
     }, onPopupExportRequest);
   }, [connectPort, onPopupExportRequest]);

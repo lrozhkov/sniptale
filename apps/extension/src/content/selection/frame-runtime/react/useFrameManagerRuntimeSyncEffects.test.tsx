@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     addFreeFrame: vi.fn(),
     clearAutoBlurFrames: vi.fn(),
     clearFrames: vi.fn(),
+    pinFrameAtLastPlacement: vi.fn(),
     removeFrame: vi.fn(),
     syncFocusOpacity: vi.fn(),
     syncAutoBlurFrames: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock('./useFrameManagerRuntimeSync', async (importOriginal) => ({
 }));
 
 import { useFrameManagerRuntimeSyncEffects } from './useFrameManagerRuntimeSyncEffects';
+import { createFrameHostLayoutService } from '../host-layout/service';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -53,6 +55,7 @@ function createArgs(): Parameters<typeof useFrameManagerRuntimeSyncEffects>[0] {
     addFreeFrame: vi.fn(),
     clearAutoBlurFrames: vi.fn(),
     clearFrames: vi.fn(),
+    pinFrameAtLastPlacement: vi.fn(),
     removeFrame: vi.fn(),
     syncFocusOpacity: vi.fn(),
     syncAutoBlurFrames: vi.fn(),
@@ -72,8 +75,8 @@ function createArgs(): Parameters<typeof useFrameManagerRuntimeSyncEffects>[0] {
       globalStepBadgeAutoModeRef: { current: false },
       globalStepBadgeSettingsRef: { current: { autoMode: false } },
       highlighterSettingsCacheRef: { current: null },
+      hostLayoutServiceRef: { current: createFrameHostLayoutService() },
       isClearingRef: { current: false },
-      linkedElementsRef: { current: new Map() },
       prevFrameStatesRef: { current: new Map() },
       prevFramesRef: { current: [] },
       rootsRef: { current: new Map() },
@@ -143,7 +146,7 @@ describe('frame-manager-runtime-sync-effects', () => {
           containerRef: currentArgs.refs.containerRef,
           framesRef: currentArgs.refs.framesRef,
           frameStatesRef: currentArgs.refs.frameStatesRef,
-          linkedElementsRef: currentArgs.refs.linkedElementsRef,
+          hostLayoutServiceRef: currentArgs.refs.hostLayoutServiceRef,
         }),
         state: {
           frames: currentArgs.frames,

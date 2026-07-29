@@ -47,6 +47,31 @@ const desktopMediaSourcePositionGuard = { sourceCount: isNumber, sourceIndex: is
 const V = VideoMessageType;
 
 export const runtimeVideoOffscreenEventMessageContracts = {
+  [V.OFFSCREEN_SOURCE_READY]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_SOURCE_READY message',
+      createMessageGuard({
+        type: V.OFFSCREEN_SOURCE_READY,
+        required: {
+          recordingId: isString,
+          generation: isNumber,
+          streamInstanceId: isString,
+          videoWidth: isNumber,
+          videoHeight: isNumber,
+          trackSettings: (value) =>
+            typeof value === 'object' &&
+            value !== null &&
+            (!('width' in value) || isNumber(value.width)) &&
+            (!('height' in value) || isNumber(value.height)) &&
+            (!('frameRate' in value) || isNumber(value.frameRate)),
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_SOURCE_READY response',
+      createRuntimeResponseGuard({ optional: { result: isString } })
+    ),
+  },
   [V.OFFSCREEN_RECORDING_STARTED]: {
     parseRequest: createGuardParser(
       'runtime OFFSCREEN_RECORDING_STARTED message',

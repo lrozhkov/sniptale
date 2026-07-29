@@ -19,7 +19,7 @@ export function useStartRecordingHandler(state: PopupRuntimeStateSlice) {
       setRecordingControlCapability: state.recording.setRecordingControlCapability,
       setStartError: state.recording.setStartError,
       videoSettings: state.recording.videoSettings,
-      viewportPreset: null,
+      viewportPresetId: state.presets.selectedPresetId,
     });
   }, [state]);
 }

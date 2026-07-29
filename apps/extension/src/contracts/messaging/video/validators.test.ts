@@ -8,7 +8,6 @@ import {
   isSize2d,
   isVideoRecordingRuntimeState,
   isVideoRecordingSettings,
-  isVideoViewportPresetSelection,
   isViewportInfo,
   isViewportRegion,
 } from './validators';
@@ -158,19 +157,6 @@ it('rejects invalid video recording settings flag and source count values', () =
   ).toBe(false);
 });
 
-it('accepts viewport presets with and without optional labels', () => {
-  expect(
-    isVideoViewportPresetSelection({
-      height: 720,
-      id: 'preset-1',
-      label: 'HD',
-      width: 1280,
-    })
-  ).toBe(true);
-  expect(isVideoViewportPresetSelection({ height: 720, width: 1280 })).toBe(true);
-  expect(isVideoViewportPresetSelection({ height: 720, id: 1, width: 1280 })).toBe(false);
-});
-
 it('validates telemetry snapshots with cursor and action sidecars', () => {
   expect(isRecordingTelemetrySnapshot(createTelemetrySnapshot())).toBe(true);
   expect(isViewportInfo(createTelemetrySnapshot().viewport)).toBe(true);
@@ -219,7 +205,7 @@ it('accepts runtime state snapshots with nullable capture fields', () => {
       duration: 456,
       error: null,
       status: 'idle',
-      viewportPreset: null,
+      viewportPresetId: null,
     })
   ).toBe(true);
 });
@@ -232,7 +218,7 @@ it('validates runtime state capture source variants', () => {
     duration: 456,
     error: null,
     status: 'recording',
-    viewportPreset: { height: 720, id: 'preset-1', label: 'HD', width: 1280 },
+    viewportPresetId: 'preset-1',
   };
 
   expect(isVideoRecordingRuntimeState(state)).toBe(true);

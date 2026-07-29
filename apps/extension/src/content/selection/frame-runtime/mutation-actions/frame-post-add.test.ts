@@ -51,6 +51,7 @@ function createFrameData(withStepBadge = true) {
     focusSettings: createFocusSettingsFixture({ opacity: 0.45 }),
     ...(withStepBadge ? { stepBadge: createStepBadgeSettingsFixture({ sizeLevel: 2 }) } : {}),
     width: 100,
+    linkedElementSelector: '#frame-anchor',
   });
 }
 
@@ -59,21 +60,16 @@ beforeEach(() => {
   vi.useFakeTimers();
 });
 
-function expectPostAddSideEffectsLinkFrameAndScheduleBadgeRecalc() {
-  const linkedElementsRef = { current: new Map<string, HTMLElement>() };
+function expectPostAddSideEffectsScheduleBadgeRecalc() {
   const recalculateStepBadgesRef = { current: vi.fn<(excludeFrameId?: string) => void>() };
-  const element = document.createElement('button');
 
   applyAddedFrameSideEffects({
-    element,
     frameData: createFrameData(),
     isAutoMode: true,
-    linkedElementsRef,
     recalculateStepBadgesRef,
   });
   vi.runAllTimers();
 
-  expect(linkedElementsRef.current.get('frame-1')).toBe(element);
   expect(invalidateFrameCache).toHaveBeenCalledTimes(1);
   expect(recalculateStepBadgesRef.current).toHaveBeenCalledWith();
   expect(loggerLog).toHaveBeenCalledWith(
@@ -91,14 +87,11 @@ function expectPostAddSideEffectsLinkFrameAndScheduleBadgeRecalc() {
 }
 
 function expectPostAddSkipsBadgeRecalcWhenFrameHasNoBadge() {
-  const linkedElementsRef = { current: new Map<string, HTMLElement>() };
   const recalculateStepBadgesRef = { current: vi.fn<(excludeFrameId?: string) => void>() };
 
   applyAddedFrameSideEffects({
-    element: document.createElement('div'),
     frameData: createFrameData(false),
     isAutoMode: true,
-    linkedElementsRef,
     recalculateStepBadgesRef,
   });
   vi.runAllTimers();
@@ -109,8 +102,8 @@ function expectPostAddSkipsBadgeRecalcWhenFrameHasNoBadge() {
 
 describe('frame-mutation-actions-frame-post-add', () => {
   it(
-    'links the added frame, invalidates caches, logs, and schedules step badge recalculation',
-    expectPostAddSideEffectsLinkFrameAndScheduleBadgeRecalc
+    'invalidates caches, logs, and schedules step badge recalculation after an accepted add',
+    expectPostAddSideEffectsScheduleBadgeRecalc
   );
   it(
     'skips step badge scheduling when the added frame has no badge',

@@ -1,8 +1,5 @@
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import type {
-  VideoRecordingSettings,
-  VideoViewportPresetSelection,
-} from '@sniptale/runtime-contracts/video/types/types';
+import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import {
   defaultAnnotationSetupDeps,
   defaultCaptureSourceResolverDeps,
@@ -11,20 +8,31 @@ import {
   type CaptureSourceResolverDeps,
   type OffscreenSetupDeps,
 } from './transport.deps';
+import { enableViewportCursorProjection } from '../capture-surface/cursor-projection';
+import { abortVideoRecordingStartIfCancelled } from './flow-cancellation';
+import type { ViewportCursorProjectionAuthority } from '@sniptale/runtime-contracts/video/types/messages.content';
+
+type ViewportCursorProjectionSetupDeps = {
+  abortStart: typeof abortVideoRecordingStartIfCancelled;
+  enableViewportCursorProjection: typeof enableViewportCursorProjection;
+};
+
+const defaultViewportCursorProjectionSetupDeps: ViewportCursorProjectionSetupDeps = {
+  abortStart: abortVideoRecordingStartIfCancelled,
+  enableViewportCursorProjection,
+};
 
 export async function resolveCaptureSourceForMode(
   tabId: number | null,
   tab: chrome.tabs.Tab | null,
   captureMode: CaptureMode,
   settings?: VideoRecordingSettings,
-  viewportPreset?: VideoViewportPresetSelection,
   deps: CaptureSourceResolverDeps = defaultCaptureSourceResolverDeps
 ) {
   deps.logger.debug('Resolving capture source', {
     captureMode,
     controlledCursorCaptureEnabled: settings?.controlledCursorCaptureEnabled === true,
     tabId,
-    viewportPreset,
   });
   return deps.resolveCaptureSource({
     tabId,
@@ -34,7 +42,6 @@ export async function resolveCaptureSourceForMode(
       ? { controlledCursorCaptureEnabled: true }
       : {}),
     ...(settings?.sourceCount === undefined ? {} : { sourceCount: settings.sourceCount }),
-    ...(viewportPreset === undefined ? {} : { viewportPreset }),
   });
 }
 
@@ -71,4 +78,14 @@ export async function enableAnnotationsOrAbort(
     return null;
   }
   return viewport;
+}
+
+export async function enableViewportCursorProjectionOrAbort(
+  tabId: number,
+  captureMode: CaptureMode,
+  authority: ViewportCursorProjectionAuthority,
+  deps: ViewportCursorProjectionSetupDeps = defaultViewportCursorProjectionSetupDeps
+): Promise<boolean> {
+  await deps.enableViewportCursorProjection(tabId, authority);
+  return !deps.abortStart(tabId, captureMode, 'viewport cursor projection setup');
 }

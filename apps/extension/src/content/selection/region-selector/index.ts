@@ -3,7 +3,6 @@ import { appendToContentOverlayRoot } from '../../platform/dom-host';
 import { applyIsolatedContentRootStyle } from '../../platform/dom-host/isolated';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { toDevicePixelRegion } from './helpers';
 import { sendRegionSelectorRuntimeMessage } from './messaging';
 import { createRegionSelectorDocumentHandlers, detachRegionSelectorListeners } from './events';
 import {
@@ -17,6 +16,7 @@ import {
   type RegionSelectorController,
   type RegionSelectorControllerDeps,
 } from './types';
+import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 
 const logger = createLogger({ namespace: 'ContentRegionSelectorUi' });
 
@@ -27,8 +27,23 @@ function createResolvedRegionSelectorDeps(
     appendToContentOverlayRoot,
     applyIsolatedContentRootStyle,
     sendRuntimeMessage: sendRegionSelectorRuntimeMessage,
+    getViewportInfo: readDefaultViewportInfo,
     ...deps,
   } satisfies Required<RegionSelectorControllerDeps>;
+}
+
+function readDefaultViewportInfo(): ViewportInfo {
+  const visualViewport = window.visualViewport;
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    scrollX: window.scrollX,
+    scrollY: window.scrollY,
+    devicePixelRatio: window.devicePixelRatio || 1,
+    viewportOffsetX: visualViewport?.offsetLeft ?? 0,
+    viewportOffsetY: visualViewport?.offsetTop ?? 0,
+    visualViewportScale: visualViewport?.scale ?? 1,
+  };
 }
 
 function hideRegionSelector(args: {
@@ -53,8 +68,8 @@ function createRegionSelectorMessagingActions(args: {
   return {
     handleRegionSelected(region: RegionSelectorBounds) {
       const binding = args.state.activeRequestBinding;
-      const devicePixelRegion = toDevicePixelRegion(region);
-      args.state.selectedRegion = devicePixelRegion;
+      const captureRegion = { ...region };
+      args.state.selectedRegion = captureRegion;
       args.hideRegionSelector();
       if (!binding) {
         return;
@@ -64,7 +79,8 @@ function createRegionSelectorMessagingActions(args: {
         args.resolvedDeps.sendRuntimeMessage({
           type: VideoMessageType.REGION_SELECTED,
           ...binding,
-          region: devicePixelRegion,
+          region: captureRegion,
+          captureViewport: args.resolvedDeps.getViewportInfo(),
         }),
         logger,
         'Failed to notify selected region',

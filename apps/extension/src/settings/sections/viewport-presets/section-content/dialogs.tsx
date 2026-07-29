@@ -1,6 +1,7 @@
 import { ViewportPresetEditor } from '../editor';
 import type { ViewportPreset } from '../../../../contracts/settings';
 import { ViewportConfirmDialog } from './viewport-confirm-dialog';
+import type { ViewportPresetDraft } from '../helpers';
 
 export function PresetsDialogs(props: {
   closeViewportDeleteDialog: () => void;
@@ -8,7 +9,7 @@ export function PresetsDialogs(props: {
   confirmDeleteViewport: () => Promise<void>;
   deleteMessage: string;
   editingViewport?: ViewportPreset;
-  handleSaveViewportPreset: (label: string, width: number, height: number) => Promise<void>;
+  handleSaveViewportPreset: (draft: ViewportPresetDraft) => Promise<void>;
   isLoading: boolean;
   isViewportEditorOpen: boolean;
   viewportConfirmOpen: boolean;

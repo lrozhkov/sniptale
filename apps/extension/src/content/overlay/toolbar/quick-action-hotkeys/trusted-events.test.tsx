@@ -54,7 +54,7 @@ function createQuickAction(): QuickAction {
     afterCapture: 'copy',
     bundledId: null,
     delay: null,
-    emulation: null,
+    viewportPresetId: null,
     exitAfterCapture: false,
     hotkey: {
       altKey: false,

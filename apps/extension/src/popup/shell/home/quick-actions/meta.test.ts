@@ -45,10 +45,21 @@ function verifiesHotkeyFormatting() {
 }
 
 function verifiesQuickActionMeta() {
-  const presets: ViewportPreset[] = [{ id: 'preset-1', label: 'Preset', width: 1280, height: 720 }];
+  const presets: ViewportPreset[] = [
+    {
+      kind: 'user',
+      id: 'preset-1',
+      name: 'Preset',
+      target: 'viewport',
+      width: 1280,
+      height: 720,
+      enabled: true,
+      order: 0,
+    },
+  ];
   const quickActionWithUnknownAfterCapture = createQuickAction({
     screenshotMode: 'visible',
-    emulation: 'native',
+    viewportPresetId: 'native',
     delay: 5,
   });
   Object.assign(quickActionWithUnknownAfterCapture, { afterCapture: 'unknown-action' });
@@ -57,7 +68,7 @@ function verifiesQuickActionMeta() {
     getQuickActionMeta(
       createQuickAction({
         screenshotMode: 'selection',
-        emulation: 'preset-1',
+        viewportPresetId: 'preset-1',
         delay: 0,
         afterCapture: 'copy',
       }),

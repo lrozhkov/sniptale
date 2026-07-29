@@ -70,6 +70,13 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     nameKey: 'settings.permissions.requiredDebuggerName',
   },
   {
+    descriptionKey: 'settings.permissions.requiredSystemDisplayDescription',
+    icon: MonitorUp,
+    id: 'system.display',
+    kind: 'permission',
+    nameKey: 'settings.permissions.requiredSystemDisplayName',
+  },
+  {
     descriptionKey: 'settings.permissions.requiredActiveTabDescription',
     icon: MousePointerClick,
     id: 'activeTab',

@@ -1,76 +1,167 @@
-import { recordingContext } from '../context';
-import { createLogger } from '@sniptale/platform/observability/logger';
 import type { VideoCursorCaptureMode } from '../../../features/video/project/types/interaction';
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
-import { appendRecordingViewportParams } from '../params';
-import { acquireRecordingSourceStream, resolveCaptureDimensions } from './capture';
-import { attachMicrophoneAudioIfEnabled, createRecordingVideoStream } from './video';
-
-const logger = createLogger({ namespace: 'OffscreenRecordingSetup' });
+import {
+  CaptureMode,
+  type VideoRecordingSettings,
+} from '@sniptale/runtime-contracts/video/types/types';
+import { recordingContext } from '../context';
+import {
+  createCropStream,
+  resolveOnePixelEncodingCrop,
+  type CropStreamControls,
+} from '../stream/crop-stream';
+import {
+  createTabOutputStream,
+  resolveTabOutputGeometry,
+  type TabOutputGeometry,
+} from '../stream/tab-output';
+import {
+  createSourceVideo,
+  releaseSourceVideo,
+  waitForSourceMetadata,
+} from '../stream/video-source';
+import { acquireRecordingSourceStream } from './capture';
+import { attachMicrophoneAudioIfEnabled } from './video';
 
 type RecordingSetupParams = {
   streamId: string;
   settings: VideoRecordingSettings;
-  viewport?: { width: number; height: number; devicePixelRatio?: number };
   captureMode?: CaptureMode;
   cropRegion?: { x: number; y: number; width: number; height: number };
-  targetResolution?: { width: number; height: number };
-  emulatedViewportCssSize?: { width: number; height: number };
+  viewport?: { width: number; height: number; devicePixelRatio?: number };
+  surface?: { presetId: string; target: 'viewport' | 'window'; width: number; height: number };
 };
 
-type RecordingSetupResult = {
-  captureWidth?: number;
-  captureHeight?: number;
+export type RecordingSetupResult = {
   cursorCaptureMode: VideoCursorCaptureMode | null;
+  rawTrackSettings: MediaTrackSettings;
+  rawVideoHeight: number;
+  rawVideoWidth: number;
+  tabOutputControls: CropStreamControls | null;
+  tabOutputGeometry: TabOutputGeometry | null;
   trackSettings: MediaTrackSettings;
 };
+
+async function readRawSource(stream: MediaStream) {
+  const video = createSourceVideo(stream);
+  try {
+    await waitForSourceMetadata(video);
+    const result = { width: video.videoWidth, height: video.videoHeight };
+    const track = stream.getVideoTracks()[0];
+    if (!track) throw new Error('Recording source is missing a video track');
+    return { ...result, trackSettings: track.getSettings() };
+  } finally {
+    releaseSourceVideo(video);
+  }
+}
+
+async function createOutputVideoStream(
+  source: MediaStream,
+  params: RecordingSetupParams,
+  raw: { width: number; height: number }
+): Promise<{
+  controls: CropStreamControls | null;
+  stream: MediaStream;
+  tabOutputGeometry: TabOutputGeometry | null;
+}> {
+  if (params.captureMode === CaptureMode.TAB || params.captureMode === CaptureMode.TAB_CROP) {
+    if (!params.viewport) throw new Error('Tab recording viewport geometry is unavailable');
+    if (!params.viewport.devicePixelRatio) {
+      throw new Error('Tab recording viewport density is unavailable');
+    }
+    const coordinateSpace = {
+      width: params.viewport.width,
+      height: params.viewport.height,
+      devicePixelRatio: params.viewport.devicePixelRatio,
+    };
+    const requestedCrop =
+      params.captureMode === CaptureMode.TAB_CROP && params.cropRegion
+        ? params.cropRegion
+        : { x: 0, y: 0, width: coordinateSpace.width, height: coordinateSpace.height };
+    const tabOutputGeometry = resolveTabOutputGeometry(
+      requestedCrop,
+      { width: raw.width, height: raw.height },
+      coordinateSpace
+    );
+    const output = await createTabOutputStream(source, tabOutputGeometry, {
+      initiallySuspended: params.surface?.target === 'viewport',
+    });
+    return {
+      controls:
+        params.captureMode === CaptureMode.TAB_CROP || params.surface?.target === 'viewport'
+          ? output.controls
+          : null,
+      stream: output.stream,
+      tabOutputGeometry,
+    };
+  }
+  if (params.captureMode !== undefined) {
+    return { controls: null, stream: source, tabOutputGeometry: null };
+  }
+  const encodingCrop = resolveOnePixelEncodingCrop(raw);
+  return {
+    controls: null,
+    stream: encodingCrop ? await createCropStream(source, encodingCrop) : source,
+    tabOutputGeometry: null,
+  };
+}
+
+function assertTabSourceGeometry(
+  params: RecordingSetupParams,
+  raw: { width: number; height: number }
+): void {
+  if (params.captureMode !== CaptureMode.TAB && params.captureMode !== CaptureMode.TAB_CROP) {
+    return;
+  }
+  if (!params.viewport) {
+    if (params.captureMode === CaptureMode.TAB_CROP && params.cropRegion) {
+      throw new Error('TAB_CROP viewport geometry is unavailable');
+    }
+    throw new Error('source-dimensions-mismatch: tab viewport geometry is unavailable');
+  }
+  if (
+    !Number.isFinite(raw.width) ||
+    !Number.isFinite(raw.height) ||
+    raw.width <= 0 ||
+    raw.height <= 0
+  ) {
+    throw new Error('source-dimensions-mismatch: tab source geometry is invalid');
+  }
+  if (
+    params.surface?.target === 'viewport' &&
+    (params.viewport.width !== params.surface.width ||
+      params.viewport.height !== params.surface.height)
+  ) {
+    throw new Error('source-dimensions-mismatch: applied viewport geometry is unavailable');
+  }
+}
 
 export async function prepareRecordingStream(
   params: RecordingSetupParams
 ): Promise<RecordingSetupResult> {
-  const { streamId, settings, captureMode, targetResolution, emulatedViewportCssSize } = params;
-  const { captureWidth, captureHeight } = resolveCaptureDimensions(params);
-  const { stream: fullStream, cursorCaptureMode } = await acquireRecordingSourceStream({
-    streamId,
-    settings,
-    ...(captureMode === undefined ? {} : { captureMode }),
-    ...(captureWidth === undefined ? {} : { captureWidth }),
-    ...(captureHeight === undefined ? {} : { captureHeight }),
+  const { stream: sourceStream, cursorCaptureMode } = await acquireRecordingSourceStream({
+    streamId: params.streamId,
+    settings: params.settings,
+    ...(params.surface?.target === 'viewport' ? { excludeNativeCursor: true } : {}),
+    ...(params.captureMode === undefined ? {} : { captureMode: params.captureMode }),
+    ...(params.viewport === undefined
+      ? {}
+      : { viewport: { width: params.viewport.width, height: params.viewport.height } }),
   });
-  recordingContext.sourceStream = fullStream;
-  recordingContext.videoStream = await createRecordingVideoStream(
-    appendRecordingViewportParams(
-      {
-        fullStream,
-        settings,
-      },
-      params
-    )
-  );
-  await attachMicrophoneAudioIfEnabled(settings);
-
-  const [videoTrack] = recordingContext.videoStream?.getVideoTracks() ?? [];
-  if (!videoTrack) {
-    throw new Error('Recording stream is missing a video track.');
-  }
-
-  const trackSettings = videoTrack.getSettings();
-
-  if (captureMode === CaptureMode.VIEWPORT_EMULATION && targetResolution) {
-    logger.debug('Viewport preset stream ready', {
-      targetResolution,
-      viewportSizeInPixels: emulatedViewportCssSize,
-      trackSettingsWidth: trackSettings.width,
-      trackSettingsHeight: trackSettings.height,
-      trackSettingsFrameRate: trackSettings.frameRate,
-    });
-  }
-
+  recordingContext.sourceStream = sourceStream;
+  const raw = await readRawSource(sourceStream);
+  assertTabSourceGeometry(params, raw);
+  const output = await createOutputVideoStream(sourceStream, params, raw);
+  recordingContext.videoStream = output.stream;
+  await attachMicrophoneAudioIfEnabled(params.settings);
+  const outputTrack = recordingContext.videoStream?.getVideoTracks()[0];
+  if (!outputTrack) throw new Error('Recording output is missing a video track');
   return {
     cursorCaptureMode,
-    trackSettings,
-    ...(captureWidth === undefined ? {} : { captureWidth }),
-    ...(captureHeight === undefined ? {} : { captureHeight }),
+    rawTrackSettings: raw.trackSettings,
+    rawVideoHeight: raw.height,
+    rawVideoWidth: raw.width,
+    tabOutputControls: output.controls,
+    tabOutputGeometry: output.tabOutputGeometry,
+    trackSettings: outputTrack.getSettings(),
   };
 }

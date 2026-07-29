@@ -113,6 +113,62 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     ru: 'Снимок всей страницы',
     en: 'Capture full page',
   },
+  fullPageSettingsTitle: {
+    ru: 'Параметры снимка всей страницы',
+    en: 'Full-page capture settings',
+  },
+  fullPageFloatingTitle: {
+    ru: 'Плавающие элементы',
+    en: 'Floating elements',
+  },
+  fullPageFloatingOnce: {
+    ru: 'Показать один раз',
+    en: 'Show once',
+  },
+  fullPageFloatingOnceHint: {
+    ru: 'Закреплённые элементы попадут в итоговый снимок только один раз',
+    en: 'Pinned elements appear only once in the final screenshot',
+  },
+  fullPageFloatingHide: {
+    ru: 'Скрыть',
+    en: 'Hide',
+  },
+  fullPageFloatingHideHint: {
+    ru: 'Не добавлять закреплённые элементы в итоговый снимок',
+    en: 'Exclude pinned elements from the final screenshot',
+  },
+  fullPageFloatingRepeat: {
+    ru: 'Повторять',
+    en: 'Repeat',
+  },
+  fullPageFloatingRepeatHint: {
+    ru: 'Оставлять закреплённые элементы в каждом видимом фрагменте',
+    en: 'Keep pinned elements in every visible tile',
+  },
+  fullPageLazyContent: {
+    ru: 'Загрузить ленивый контент',
+    en: 'Load lazy content',
+  },
+  fullPageLazyContentHint: {
+    ru: 'Прокрутить страницу перед снимком, чтобы подгрузить изображения и блоки',
+    en: 'Warm up the page before capture so images and sections can load',
+  },
+  fullPageFreezeMotion: {
+    ru: 'Остановить анимации и видео',
+    en: 'Pause animations and video',
+  },
+  fullPageFreezeMotionHint: {
+    ru: 'Приостановить CSS-анимации и воспроизводимое видео на время снимка',
+    en: 'Pause CSS animations and playing video while the screenshot is captured',
+  },
+  fullPageCustomViewportHint: {
+    ru: 'Снимок использует активный пользовательский размер страницы.',
+    en: 'Capture uses the active custom page viewport.',
+  },
+  fullPageSettingsSaveError: {
+    ru: 'Не удалось сохранить параметры снимка всей страницы',
+    en: 'Could not save full-page capture settings',
+  },
   selectionArea: {
     ru: 'Выбрать область для снимка',
     en: 'Select an area to capture',
@@ -138,16 +194,16 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     en: 'Delay before screenshot',
   },
   viewportButton: {
-    ru: 'Размер страницы для снимка',
-    en: 'Page size for screenshot',
+    ru: 'Размер страницы или окна для снимка',
+    en: 'Page or window size for screenshot',
   },
   viewportMenuTitle: {
-    ru: 'Размер страницы',
-    en: 'Page size',
+    ru: 'Размер страницы или окна',
+    en: 'Page or window size',
   },
   viewportNativeLabel: {
-    ru: 'Текущий размер вкладки',
-    en: 'Current tab size',
+    ru: 'Текущий размер',
+    en: 'Current size',
   },
   viewportNativeHint: {
     ru: 'Использовать текущий размер вкладки для снимков',

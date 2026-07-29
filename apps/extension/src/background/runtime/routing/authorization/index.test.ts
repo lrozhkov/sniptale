@@ -104,8 +104,10 @@ function issueContentIntent(tabId: number) {
 }
 
 function captureMessage(tabId: number): RouteCaptureMessage {
+  const contentIntent = issueContentIntent(tabId);
   return {
-    contentIntent: issueContentIntent(tabId),
+    contentIntent,
+    exportRunId: contentIntent.requestId,
     type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
   };
 }

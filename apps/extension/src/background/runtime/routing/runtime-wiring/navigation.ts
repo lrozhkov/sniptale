@@ -10,23 +10,38 @@ import {
 } from '../../../diagnostics/lifecycle';
 import { clearBackgroundRuntimeTabEditingState } from '../../../application/runtime-state';
 import {
-  handleControlledCursorNavigationStart,
+  ensureActiveVideoRecordingLeaseHydrated,
   handleRegionSelectionNavigationStart,
-  handleTabUpdated,
-  handleViewportRecordingNavigationStart,
+  handleTabRecordingNavigationCommitted,
+  handleTabRecordingNavigationCompleted,
+  handleTabRecordingNavigationError,
+  handleTabRecordingNavigationStart,
 } from '../../../media/lifecycle';
-import { parseTopLevelNavigation } from './parsers';
+import { parseTopLevelDocumentNavigation, parseTopLevelNavigation } from './parsers';
 import type { BackgroundModeState } from './shared';
+import { ensureActivePageAccessRuntime } from '../../page-access/service';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeNavigationWiring' });
+
+function runWithVideoLeaseHydrationFallback(description: string, work: () => boolean): void {
+  try {
+    if (work()) return;
+  } catch (error) {
+    logger.warn(`Failed to ${description} from active recording state`, error);
+    return;
+  }
+  void ensureActiveVideoRecordingLeaseHydrated()
+    .then(() => work())
+    .catch((error) => {
+      logger.warn(`Failed to ${description} after recording lease hydration`, error);
+    });
+}
 
 export function registerNavigationListeners(state: BackgroundModeState): void {
   browserTabs.subscribeToUpdated((tabId, changeInfo, tab) => {
     if (changeInfo.status === 'loading' && tab.url) {
       handleTabNavigation(tabId, tab.url);
     }
-
-    handleTabUpdated(tabId, changeInfo);
 
     if (changeInfo.status === 'complete') {
       void restorePinnedToolbarAfterNavigation(tabId, state).catch((error) => {
@@ -53,10 +68,43 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
       logger.warn('Failed to clean screenshot mode after navigation', error);
     });
     handleRegionSelectionNavigationStart(navigation.tabId);
+    runWithVideoLeaseHydrationFallback('process recording navigation', () =>
+      handleTabRecordingNavigationStart(navigation.tabId)
+    );
     void handleExportHarNavigationStart(navigation.tabId).catch((error) => {
       logger.warn('Failed to clean HAR export after navigation', error);
     });
-    handleViewportRecordingNavigationStart(navigation.tabId);
-    handleControlledCursorNavigationStart(navigation.tabId);
+  });
+
+  browserWebNavigation.subscribeToCommitted((details: unknown) => {
+    const navigation = parseTopLevelDocumentNavigation(details);
+    if (!navigation) return;
+    runWithVideoLeaseHydrationFallback('bind recording navigation document', () =>
+      handleTabRecordingNavigationCommitted(navigation.tabId, navigation.documentId)
+    );
+  });
+
+  browserWebNavigation.subscribeToCompleted((details: unknown) => {
+    const navigation = parseTopLevelDocumentNavigation(details);
+    if (!navigation) return;
+    runWithVideoLeaseHydrationFallback('complete recording navigation', () =>
+      handleTabRecordingNavigationCompleted(
+        navigation.tabId,
+        navigation.documentId,
+        ensureActivePageAccessRuntime
+      )
+    );
+  });
+
+  browserWebNavigation.subscribeToErrorOccurred((details: unknown) => {
+    const navigation = parseTopLevelDocumentNavigation(details);
+    if (!navigation) return;
+    runWithVideoLeaseHydrationFallback('reconcile failed recording navigation', () =>
+      handleTabRecordingNavigationError(
+        navigation.tabId,
+        navigation.documentId,
+        ensureActivePageAccessRuntime
+      )
+    );
   });
 }

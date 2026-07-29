@@ -18,6 +18,7 @@ vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
 }));
 
 import { useToolbarViewportStatus } from './viewport-status';
+import { requireScreenshotSurfaceCapabilityToken } from '../../viewport-selector/capability';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -67,6 +68,8 @@ describe('useToolbarViewportStatus', () => {
     const setCurrentViewport = vi.fn();
     viewportStatusMocks.sendRuntimeMessage.mockResolvedValueOnce({
       success: true,
+      enabled: true,
+      surfaceCapabilityToken: 'surface-token-2',
       viewport: { width: 640, height: 480 },
     });
 
@@ -80,6 +83,7 @@ describe('useToolbarViewportStatus', () => {
     });
     expect(viewportStatusMocks.sendRuntimeMessage).toHaveBeenCalledTimes(1);
     expect(setCurrentViewport).toHaveBeenCalledWith({ width: 640, height: 480 });
+    expect(requireScreenshotSurfaceCapabilityToken()).toBe('surface-token-2');
   });
 
   it('logs screenshot status failures without mutating the viewport', async () => {

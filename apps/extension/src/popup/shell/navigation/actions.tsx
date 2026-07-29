@@ -6,7 +6,7 @@ import { buildEditorUrl } from '../../../platform/navigation/extension-pages/edi
 import { buildScenarioEditorUrl } from '../../../platform/navigation/extension-pages/scenario-editor';
 import { getPopupResponseErrorMessage } from '../../diagnostics/runtime-errors';
 import { getActiveTabId } from '../tab-access';
-import { getPopupRuntimeServices } from '../runtime/services';
+import { getPopupRuntimeServices } from '../../runtime-services';
 
 export type PopupPage = 'home' | 'video' | 'export';
 

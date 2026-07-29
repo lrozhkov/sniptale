@@ -14,6 +14,13 @@ export type WebSnapshotAssetContext = {
 };
 type FetchSameOriginAssetBlob = (resolved: URL) => Promise<Blob>;
 
+function throwIfAssetCaptureAborted(signal?: AbortSignal | undefined): void {
+  if (!signal?.aborted) return;
+  throw signal.reason instanceof Error
+    ? signal.reason
+    : new Error('Web snapshot save was cancelled');
+}
+
 export function createAssetBudget(): AssetByteBudget {
   return { totalBytes: 0 };
 }
@@ -99,11 +106,13 @@ async function captureSrcsetAssets(args: {
   startIndex: number;
   snapshotSessionId: string;
   warnings: string[];
+  abortSignal?: AbortSignal | undefined;
 }): Promise<{ assets: WebSnapshotAssetEntry[]; nextIndex: number }> {
   const assets: WebSnapshotAssetEntry[] = [];
   const candidates = parseSrcset(args.target.url);
 
   for (const [candidateIndex, candidate] of candidates.entries()) {
+    throwIfAssetCaptureAborted(args.abortSignal);
     if (!hasAssetBudgetCapacity(args.budget)) {
       pushAssetBudgetWarning(
         args.warnings,
@@ -126,6 +135,7 @@ async function captureSrcsetAssets(args: {
       candidate.url = `../${asset.localPath}`;
       assets.push(asset);
     } catch (error) {
+      throwIfAssetCaptureAborted(args.abortSignal);
       pushAssetCaptureWarning(args.warnings, candidate.url, args.context.baseUrl, error);
     }
   }
@@ -162,7 +172,9 @@ async function captureSingleAsset(args: {
   snapshotSessionId: string;
   target: AssetTarget;
   warnings: string[];
+  abortSignal?: AbortSignal | undefined;
 }): Promise<WebSnapshotAssetEntry | null> {
+  throwIfAssetCaptureAborted(args.abortSignal);
   try {
     const asset = await fetchSnapshotAsset({ ...args, url: args.target.url });
     if (!acceptAssetWithinBudget(asset, args.budget, args.warnings)) {
@@ -172,6 +184,7 @@ async function captureSingleAsset(args: {
     args.target.element.setAttribute(args.target.attribute, `../${asset.localPath}`);
     return asset;
   } catch (error) {
+    throwIfAssetCaptureAborted(args.abortSignal);
     removeFailedAssetReference(args.target);
     pushAssetCaptureWarning(args.warnings, args.target.url, args.context.baseUrl, error);
     return null;
@@ -188,7 +201,9 @@ export async function captureAssetTarget(args: {
   snapshotSessionId: string;
   target: AssetTarget;
   warnings: string[];
+  abortSignal?: AbortSignal | undefined;
 }): Promise<number> {
+  throwIfAssetCaptureAborted(args.abortSignal);
   if (args.target.attribute === 'srcset') {
     const srcsetResult = await captureSrcsetAssets({
       ...args,

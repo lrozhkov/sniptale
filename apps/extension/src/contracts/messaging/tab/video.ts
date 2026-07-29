@@ -15,6 +15,7 @@ import type {
   StopRegionCaptureMessage,
 } from '../contracts/types';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import type { ViewportCursorProjectionAuthority } from '@sniptale/runtime-contracts/video/types/messages.content';
 
 export type TabVideoRequestByType = {
   [VideoMessageType.ENABLE_ANNOTATIONS]: {
@@ -24,6 +25,12 @@ export type TabVideoRequestByType = {
   };
   [VideoMessageType.DISABLE_ANNOTATIONS]: {
     type: typeof VideoMessageType.DISABLE_ANNOTATIONS;
+  };
+  [VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION]: ViewportCursorProjectionAuthority & {
+    type: typeof VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION;
+  };
+  [VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION]: ViewportCursorProjectionAuthority & {
+    type: typeof VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION;
   };
   [VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE]: {
     type: typeof VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE;
@@ -82,6 +89,12 @@ export type TabVideoRequestByType = {
 export type TabVideoResponseByType = {
   [VideoMessageType.ENABLE_ANNOTATIONS]: ViewportCoordsResponse;
   [VideoMessageType.DISABLE_ANNOTATIONS]: RecordingTelemetryResponse;
+  [VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION]: RuntimeMessageResponse<
+    Record<string, never>
+  >;
+  [VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION]: RuntimeMessageResponse<
+    Record<string, never>
+  >;
   [VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE]: ViewportCoordsResponse;
   [VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE]: RecordingTelemetryResponse;
   [VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE]: RuntimeMessageResponse<Record<string, never>>;

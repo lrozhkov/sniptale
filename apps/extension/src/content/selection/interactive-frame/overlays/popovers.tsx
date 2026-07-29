@@ -9,7 +9,6 @@ export interface InteractiveFramePopoversProps {
   frame: FrameData;
   currentFrame: FrameData;
   frameZIndex: number;
-  borderWidth: number;
   effectMode: EffectMode;
   isPopoverOpen: boolean;
   isSelected: boolean;
@@ -100,7 +99,6 @@ function renderCalloutOverlay(props: InteractiveFramePopoversProps) {
       frame={props.frame}
       currentFrame={props.currentFrame}
       frameZIndex={props.frameZIndex}
-      borderWidth={props.borderWidth}
       isCalloutEditing={props.isCalloutEditing}
       isCalloutPopoverOpen={props.isCalloutPopoverOpen}
       calloutPopoverAnchorRef={props.calloutPopoverAnchorRef}

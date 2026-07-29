@@ -21,8 +21,11 @@ export function routeExportMessage(args: RouteCaptureMessageArgs): boolean {
   if (message.type === MessageType.EXPORT_STOP_HAR) {
     return handleExportStopHar(message, resolvedTabId, sendResponse);
   }
-  if (message.type === MessageType.EXPORT_CAPTURE_FULL_PAGE) {
-    return handleExportCaptureFullPage(resolvedTabId, sendResponse);
+  if (
+    message.type === MessageType.EXPORT_CAPTURE_FULL_PAGE ||
+    message.type === MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED
+  ) {
+    return handleExportCaptureFullPage(message, resolvedTabId, sendResponse, args.pageAccessPort);
   }
   return false;
 }

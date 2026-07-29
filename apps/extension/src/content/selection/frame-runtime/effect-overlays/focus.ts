@@ -2,6 +2,7 @@ import type { MutableRefObject } from 'react';
 import { appendToContentOverlayRoot } from '../../../platform/dom-host';
 import { applyIsolatedContentRootStyle } from '../../../platform/dom-host/isolated';
 import type { FrameData } from '../../../../features/highlighter/contracts';
+import { resolveFrameSurface } from '../../../../features/highlighter/frame-surface';
 import { createFocusMaskRectNodes, getFocusMaskBox } from '../effects/geometry';
 import type { OverlayRefs } from './types';
 
@@ -31,31 +32,28 @@ export function registerImmediateFocusOverlayUpdates(
   framesRef: MutableRefObject<FrameData[]>,
   { focusSvgRef }: OverlayRefs
 ) {
-  window.sniptaleUpdateFocusMaskImmediate = (
-    frameId: string,
-    x: number,
-    y: number,
-    width: number,
-    height: number
-  ) => {
+  window.sniptaleUpdateFocusMaskImmediate = (frameId: string, geometry) => {
     const rect = focusSvgRef.current?.querySelector(`rect[data-frame-id="${frameId}"]`);
     if (!rect) {
       return;
     }
 
     const frame = framesRef.current.find((currentFrame) => currentFrame.id === frameId);
-    const focusMaskBox = getFocusMaskBox({
-      x,
-      y,
-      width,
-      height,
-      ...(frame?.borderSettings === undefined ? {} : { borderSettings: frame.borderSettings }),
-      ...(frame?.focusSettings === undefined ? {} : { focusSettings: frame.focusSettings }),
-    });
+    if (!frame) {
+      return;
+    }
+    const liveFrame = {
+      ...frame,
+      ...geometry,
+    };
+    const focusMaskBox = getFocusMaskBox(liveFrame);
+    const surface = resolveFrameSurface(liveFrame);
     rect.setAttribute('x', String(focusMaskBox.x));
     rect.setAttribute('y', String(focusMaskBox.y));
     rect.setAttribute('width', String(focusMaskBox.width));
     rect.setAttribute('height', String(focusMaskBox.height));
+    rect.setAttribute('rx', String(surface.geometry.radius));
+    rect.setAttribute('ry', String(surface.geometry.radius));
   };
 
   window.sniptaleGetFocusSvgRef = () => focusSvgRef.current;

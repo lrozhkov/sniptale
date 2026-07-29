@@ -94,7 +94,7 @@ it('renders shared popup action controls and asks before discarding', () => {
         duration: 12,
         error: null,
         status: VideoRecordingStatus.RECORDING,
-        viewportPreset: null,
+        viewportPresetId: null,
       }}
       onPauseResume={onPauseResume}
       onStop={onStop}
@@ -152,7 +152,7 @@ it('continues a paused recording from the cancel confirmation', () => {
         duration: 12,
         error: null,
         status: VideoRecordingStatus.PAUSED,
-        viewportPreset: null,
+        viewportPresetId: null,
       }}
       onPauseResume={onPauseResume}
       onStop={vi.fn()}
@@ -196,7 +196,7 @@ it('cancels countdown immediately without showing discard confirmation', () => {
         duration: 0,
         error: null,
         status: VideoRecordingStatus.COUNTDOWN,
-        viewportPreset: null,
+        viewportPresetId: null,
       }}
       onPauseResume={onPauseResume}
       onStop={vi.fn()}

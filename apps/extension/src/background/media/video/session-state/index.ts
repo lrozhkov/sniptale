@@ -6,7 +6,6 @@ export {
   resetVideoRecordingStartSession,
   restoreVideoRecordingOffscreenStartPending,
 } from './preparation';
-export { clearViewportNavigationPending, freezeViewportNavigation } from './navigation';
 export {
   beginControlledCursorNavigation,
   clearControlledCursorNavigationPending,
@@ -33,12 +32,10 @@ export {
   getVideoRecordingId,
   shouldOpenVideoEditorAfterRecording,
   getVideoRecordingTabId,
-  getViewportNavigationEpoch,
   hasActiveVideoRecordingSession,
   hasActiveVideoRecordingTab,
   isVideoRecordingPreparationInProgress,
   isVideoRecordingStopInProgress,
-  isViewportNavigationPending,
 } from './reads';
 export {
   beginVideoRecordingStop,

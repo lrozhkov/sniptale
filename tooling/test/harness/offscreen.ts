@@ -76,7 +76,12 @@ function setMediaRecorderState(state: HarnessMediaRecorderState) {
     return;
   }
 
-  recordingContext.beginRecordingSession('recording-e2e-harness');
+  recordingContext.beginRecordingSession('recording-e2e-harness', 1);
+  recordingContext.bindStreamInstance({
+    generation: 1,
+    recordingId: 'recording-e2e-harness',
+    streamInstanceId: 'stream-instance-e2e-harness',
+  });
   recordingContext.activateRecorder(harnessMediaRecorder as unknown as MediaRecorder);
 }
 

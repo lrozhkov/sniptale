@@ -133,6 +133,30 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Ошибка сохранения',
     en: 'Save failed',
   },
+  anchorTemporarilyHidden: {
+    ru: 'Элемент временно скрыт. Рамка вернётся вместе с ним',
+    en: 'The element is temporarily hidden. Its frame will return with it',
+  },
+  anchorMissing: {
+    ru: 'Связанный элемент больше не найден.',
+    en: 'The linked element can no longer be found.',
+  },
+  anchorAmbiguous: {
+    ru: 'Найдено несколько возможных элементов. Рамка не была перепривязана.',
+    en: 'Several possible elements were found. The frame was not rebound.',
+  },
+  anchorPin: {
+    ru: 'Закрепить на прежнем месте',
+    en: 'Pin at previous position',
+  },
+  anchorDelete: {
+    ru: 'Удалить',
+    en: 'Delete',
+  },
+  anchorRecoveryCounter: {
+    ru: '{current} из {total}',
+    en: '{current} of {total}',
+  },
   formatBold: {
     ru: 'Жирный (Ctrl+B)',
     en: 'Bold (Ctrl+B)',

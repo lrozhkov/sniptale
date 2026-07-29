@@ -53,8 +53,11 @@ function createDeferred<T>() {
 function createRestoreState() {
   return {
     screenshotModeState: new Map<number, boolean>(),
-    viewportOwnerState: new Map<number, 'debugger' | 'viewer'>(),
-    viewportState: new Map<number, { height: number; width: number } | null>(),
+    viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
     webSnapshotViewerPorts: new Map(),
   };
 }
@@ -202,8 +205,11 @@ it('rejects and rolls back a delayed final enable when all-sites authority is re
     async (
       _tabId: number,
       _screenshotModeState: Map<number, boolean>,
-      _viewportState: Map<number, { height: number; width: number } | null>,
-      _viewportOwnerState: Map<number, 'debugger' | 'viewer'>,
+      _viewportState: Map<
+        number,
+        { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      >,
+      _viewportOwnerState: Map<number, 'capture-surface' | 'viewer'>,
       _ports: Map<number, unknown>,
       options: { commitGuard: () => Promise<boolean> }
     ) => {

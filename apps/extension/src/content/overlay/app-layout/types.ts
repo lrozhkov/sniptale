@@ -14,6 +14,7 @@ import type {
 import type { UseAiPickControllerResult } from '../ai/pick/controller/types';
 import type { AutoBlurController } from '../auto-blur/controller';
 import type { UseToolbarModeControllerResult } from '../toolbar/mode-controller/types';
+import type { ToolbarViewportSelection } from '../toolbar/types';
 
 type ContentAppAiController = Omit<UseAiPickControllerResult, 'handleCancelAIPrompt'> & {
   handleCancelAIPrompt?: UseAiPickControllerResult['handleCancelAIPrompt'];
@@ -96,6 +97,7 @@ export type ContentAppLayoutToolbarProps = {
   pinToTabAvailable: boolean;
   setCaptureAction: (action: CaptureActionType) => void;
   setCurrentViewport: (viewport: { width: number; height: number } | null) => void;
+  mutateViewport?: (viewport: ToolbarViewportSelection) => Promise<void>;
   setPinToTab: (value: boolean, contentIntentSource?: ContentPrivilegedActionIntentSource) => void;
   setPinnedToolbarVisible: (visible: boolean) => void;
   setTimerDelay: (delay: number) => void;

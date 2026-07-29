@@ -18,7 +18,14 @@ export function ToolbarCaptureActionGroup(
     <>
       <ContentToolbarDivider />
       <ContentToolbarGroup>
-        <ToolbarCaptureButtons onTakeScreenshot={captureProps.onTakeScreenshot} />
+        <ToolbarCaptureButtons
+          compactMenus={captureProps.compactMenus}
+          currentViewport={captureProps.currentViewport}
+          displayMode={captureProps.displayMode}
+          isLoading={captureProps.isLoading}
+          onTakeScreenshot={captureProps.onTakeScreenshot}
+          toolbarMenuState={captureProps.toolbarMenuState}
+        />
       </ContentToolbarGroup>
       <ContentToolbarDivider />
       <ContentToolbarGroup>

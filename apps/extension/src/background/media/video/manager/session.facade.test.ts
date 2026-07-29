@@ -17,7 +17,6 @@ describe('video-manager-session-facade', () => {
     facade.isStarting = true;
     facade.offscreenStartDispatched = true;
     facade.openEditorAfterRecording = true;
-    facade.viewportNavigationEpoch = 3;
     facade.controlledCursorNavigationEpoch = 5;
     facade.controlledCursorDisplaySurface = 'browser';
 
@@ -25,10 +24,8 @@ describe('video-manager-session-facade', () => {
     expect(session.isStarting).toBe(true);
     expect(session.offscreenStartDispatched).toBe(true);
     expect(session.openEditorAfterRecording).toBe(true);
-    expect(session.viewportNavigationEpoch).toBe(3);
     expect(session.controlledCursorNavigationEpoch).toBe(5);
     expect(session.controlledCursorDisplaySurface).toBe('browser');
-    expect(facade.viewportNavigationEpoch).toBe(3);
     expect(facade.controlledCursorNavigationEpoch).toBe(5);
     expect(facade.controlledCursorDisplaySurface).toBe('browser');
   });

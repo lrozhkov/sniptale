@@ -9,6 +9,7 @@ function createMutations(): FrameMutations {
     addFreeFrame: vi.fn(),
     clearAutoBlurFrames: vi.fn(),
     clearFrames: vi.fn(),
+    pinFrameAtLastPlacement: vi.fn(),
     removeFrame: vi.fn(),
     syncFocusOpacity: vi.fn(),
     syncAutoBlurFrames: vi.fn(),
@@ -27,12 +28,13 @@ describe('frame-manager-runtime-mutations', () => {
 
     const runtimeMutations = createRuntimeHistoryWrappedMutations(mutations, withHistoryCommit);
 
-    expect(withHistoryCommitSpy).toHaveBeenCalledTimes(6);
+    expect(withHistoryCommitSpy).toHaveBeenCalledTimes(7);
     expect(runtimeMutations.updateFrame).toBe(mutations.updateFrame);
     expect(runtimeMutations.updateFrameEffect).toBe(mutations.updateFrameEffect);
     expect(runtimeMutations.removeFrame).toBe(mutations.removeFrame);
     expect(runtimeMutations.addAutoBlurFrames).toBe(mutations.addAutoBlurFrames);
     expect(runtimeMutations.clearAutoBlurFrames).toBe(mutations.clearAutoBlurFrames);
+    expect(runtimeMutations.pinFrameAtLastPlacement).toBe(mutations.pinFrameAtLastPlacement);
     expect(runtimeMutations.syncAutoBlurFrames).toBe(mutations.syncAutoBlurFrames);
     expect(runtimeMutations.addFrame).toBe(mutations.addFrame);
     expect(runtimeMutations.addFreeFrame).toBe(mutations.addFreeFrame);

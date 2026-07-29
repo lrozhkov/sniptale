@@ -6,43 +6,15 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 
 const {
-  clearViewport,
-  createLogger,
-  detachDebugger,
   isVideoRecordingStartCancelled,
-  logger,
-  notifyRecordingStartFailed,
   setVideoRecordingCountdownSessionId,
   setVideoRecordingRuntimeState,
-  translate,
   waitForCountdownTimer,
 } = vi.hoisted(() => ({
-  clearViewport: vi.fn(),
-  createLogger: vi.fn(() => logger),
-  detachDebugger: vi.fn(),
   isVideoRecordingStartCancelled: vi.fn(),
-  logger: {
-    warn: vi.fn(),
-  },
-  notifyRecordingStartFailed: vi.fn(),
   setVideoRecordingCountdownSessionId: vi.fn(),
   setVideoRecordingRuntimeState: vi.fn(),
-  translate: vi.fn(),
   waitForCountdownTimer: vi.fn(),
-}));
-
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
-  translate,
-}));
-
-vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger,
-}));
-
-vi.mock('../runtime/manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../runtime/manager')>()),
-  notifyRecordingStartFailed,
 }));
 
 vi.mock('../session-state', async (importOriginal) => ({
@@ -57,15 +29,6 @@ vi.mock('../runtime/session-state', async (importOriginal) => ({
 
 vi.mock('../ui/countdown', () => ({
   waitForCountdownTimer,
-}));
-
-vi.mock('../../../debugger/session/detach', () => ({
-  detachDebugger,
-}));
-
-vi.mock('../../../debugger/workspace', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../debugger/workspace')>()),
-  clearViewport,
 }));
 
 vi.mock('./flow-cancellation', async (importOriginal) => ({
@@ -97,10 +60,7 @@ function resetCountdownState(): void {
   });
   vi.setSystemTime(new Date('2026-03-21T09:00:00.000Z'));
   videoManagerSession.currentCountdownSessionId = null;
-  translate.mockReturnValue('countdown incomplete');
   waitForCountdownTimer.mockResolvedValue(true);
-  clearViewport.mockResolvedValue(undefined);
-  detachDebugger.mockResolvedValue(undefined);
   isVideoRecordingStartCancelled.mockReturnValue(false);
 }
 
@@ -140,56 +100,19 @@ it('runs incomplete-countdown cleanup when the timer does not complete', async (
   waitForCountdownTimer.mockResolvedValue(false);
   videoManagerSession.currentCountdownSessionId = 'session-1';
 
-  await expect(
-    runVideoRecordingCountdown(5, CaptureMode.VIEWPORT_EMULATION, defaultSettings)
-  ).resolves.toBe(false);
-
-  expect(clearViewport).toHaveBeenCalledWith(5);
-  expect(detachDebugger).toHaveBeenCalledWith(5, 'video-emulation');
-  expect(clearViewport.mock.invocationCallOrder[0]!).toBeLessThan(
-    detachDebugger.mock.invocationCallOrder[0]!
+  await expect(runVideoRecordingCountdown(5, CaptureMode.TAB, defaultSettings)).resolves.toBe(
+    false
   );
-  expect(translate).toHaveBeenCalledWith('background.runtime.countdownIncomplete');
-  expect(notifyRecordingStartFailed).toHaveBeenCalledWith('countdown incomplete');
+
+  expect(setVideoRecordingCountdownSessionId).toHaveBeenLastCalledWith(null);
 });
 
-it('skips viewport cleanup for camera countdown sessions without a tab', async () => {
+it('clears an incomplete camera countdown session without requiring a tab', async () => {
   videoManagerSession.currentCountdownSessionId = 'session-1';
 
   await handleIncompleteVideoRecordingCountdown('session-1', null);
 
-  expect(clearViewport).not.toHaveBeenCalled();
-  expect(detachDebugger).not.toHaveBeenCalled();
-  expect(notifyRecordingStartFailed).toHaveBeenCalledWith('countdown incomplete');
-});
-
-it('continues incomplete-countdown cleanup when viewport clear fails', async () => {
-  videoManagerSession.currentCountdownSessionId = 'session-1';
-  clearViewport.mockRejectedValueOnce(new Error('clear failed'));
-
-  await handleIncompleteVideoRecordingCountdown('session-1', 5);
-
-  expect(logger.warn).toHaveBeenCalledWith(
-    'Failed to clear viewport emulation before incomplete-countdown detach',
-    { tabId: 5 },
-    expect.any(Error)
-  );
-  expect(detachDebugger).toHaveBeenCalledWith(5, 'video-emulation');
-  expect(notifyRecordingStartFailed).toHaveBeenCalledWith('countdown incomplete');
-});
-
-it('logs a warning when countdown cleanup cannot detach the debugger', async () => {
-  videoManagerSession.currentCountdownSessionId = 'session-1';
-  detachDebugger.mockRejectedValueOnce(new Error('detach failed'));
-
-  await handleIncompleteVideoRecordingCountdown('session-1', 5);
-
-  expect(logger.warn).toHaveBeenCalledWith(
-    'Failed to detach viewport emulation debugger after incomplete countdown',
-    { tabId: 5 },
-    expect.any(Error)
-  );
-  expect(notifyRecordingStartFailed).toHaveBeenCalledWith('countdown incomplete');
+  expect(setVideoRecordingCountdownSessionId).toHaveBeenCalledWith(null);
 });
 
 it('skips incomplete-countdown cleanup when another session has replaced the timer', async () => {
@@ -198,7 +121,4 @@ it('skips incomplete-countdown cleanup when another session has replaced the tim
   await handleIncompleteVideoRecordingCountdown('session-1', 12);
 
   expect(setVideoRecordingCountdownSessionId).not.toHaveBeenCalled();
-  expect(clearViewport).not.toHaveBeenCalled();
-  expect(detachDebugger).not.toHaveBeenCalled();
-  expect(notifyRecordingStartFailed).not.toHaveBeenCalled();
 });

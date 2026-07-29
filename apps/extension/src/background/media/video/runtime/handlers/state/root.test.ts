@@ -17,6 +17,7 @@ const {
   shouldOpenVideoEditorAfterRecordingMock,
   ensureActiveVideoRecordingLeaseHydratedMock,
   restoreCurrentRecordingFromLeaseMock,
+  releaseVideoCaptureSurfaceMock,
   translateMock,
 } = vi.hoisted(() => ({
   finalizeRecordingDiagnosticsMock: vi.fn(),
@@ -34,6 +35,7 @@ const {
   shouldOpenVideoEditorAfterRecordingMock: vi.fn(() => false),
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
   restoreCurrentRecordingFromLeaseMock: vi.fn(),
+  releaseVideoCaptureSurfaceMock: vi.fn(),
   translateMock: vi.fn((key: string) => `t:${key}`),
 }));
 
@@ -105,6 +107,10 @@ vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
   restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
 }));
+vi.mock('../../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture-surface')>()),
+  releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
+}));
 
 import {
   handleInternalVideoSignal,
@@ -142,14 +148,18 @@ function resetStateFlowMocks() {
   getVideoRecordingTabIdMock.mockReturnValue(17);
   ensureActiveVideoRecordingLeaseHydratedMock.mockResolvedValue(null);
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
+  releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
 }
 
-function verifyRecordingTabIdLifecycle(sendResponse: ReturnType<typeof createSendResponse>) {
+async function verifyRecordingTabIdLifecycle(
+  sendResponse: ReturnType<typeof createSendResponse>
+): Promise<void> {
   expect(handleRecordingTabId(sendResponse, 17)).toEqual({
     handled: true,
-    keepChannelOpen: false,
+    keepChannelOpen: true,
   });
+  await flushAsyncRoute();
   expect(sendResponse).toHaveBeenCalledWith({
     success: true,
     isCurrentTab: true,
@@ -157,6 +167,7 @@ function verifyRecordingTabIdLifecycle(sendResponse: ReturnType<typeof createSen
   });
 
   handleRecordingTabId(sendResponse, 22);
+  await flushAsyncRoute();
   expect(sendResponse).toHaveBeenLastCalledWith({
     success: true,
     isCurrentTab: false,
@@ -243,7 +254,7 @@ async function verifyRecordingStateLifecycle(sendResponse: ReturnType<typeof cre
       duration: 0,
     },
   });
-  verifyRecordingTabIdLifecycle(sendResponse);
+  await verifyRecordingTabIdLifecycle(sendResponse);
   await verifyRecordingStartStopLifecycle(sendResponse);
   await verifyRecordingPauseResumeLifecycle(sendResponse);
 }

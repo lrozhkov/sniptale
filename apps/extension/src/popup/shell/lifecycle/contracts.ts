@@ -38,7 +38,6 @@ export type PopupLifecycleBootstrapParams = {
 export type PopupLifecycleBootstrapParamsGetter = () => PopupLifecycleBootstrapParams;
 
 type PopupLifecycleBrowserListenerParams = {
-  clearAppliedViewportAuthority: () => void;
   refreshActiveTabCapabilities: () => Promise<void>;
   refreshGalleryStatus: () => Promise<void>;
 };

@@ -38,13 +38,6 @@ const defaultSettings = {
   controlledCursorCaptureEnabled: false,
 };
 
-const viewportPreset = {
-  id: 'hd',
-  label: 'HD',
-  width: 1920,
-  height: 1080,
-};
-
 const setIsStartPending = vi.fn();
 const setRecordingControlCapability = vi.fn();
 const setStartError = vi.fn();
@@ -74,7 +67,7 @@ function installChromeMocks() {
   });
 }
 
-function buildStartMessage(captureMode: CaptureMode, nextViewportPreset?: typeof viewportPreset) {
+function buildStartMessage(captureMode: CaptureMode, viewportPresetId: string | null = 'hd') {
   return {
     type: VideoMessageType.START_RECORDING,
     settings: {
@@ -84,7 +77,7 @@ function buildStartMessage(captureMode: CaptureMode, nextViewportPreset?: typeof
     },
     tabId: 123,
     captureMode,
-    ...(nextViewportPreset ? { viewportPreset: nextViewportPreset } : {}),
+    viewportPresetId,
   };
 }
 
@@ -99,7 +92,7 @@ function createStartArgs(
   return {
     videoSettings: defaultSettings,
     captureMode: CaptureMode.TAB,
-    viewportPreset,
+    viewportPresetId: 'hd',
     setIsStartPending,
     setRecordingControlCapability,
     setStartError,
@@ -118,7 +111,7 @@ async function verifiesTabModeMessage() {
 async function verifiesViewportPresetMessage() {
   await startRecordingHandler(
     createStartArgs({
-      captureMode: CaptureMode.VIEWPORT_EMULATION,
+      captureMode: CaptureMode.TAB,
     })
   );
 
@@ -130,13 +123,13 @@ async function verifiesViewportPresetMessage() {
 async function verifiesMissingPresetEarlyReturn() {
   await startRecordingHandler(
     createStartArgs({
-      captureMode: CaptureMode.VIEWPORT_EMULATION,
-      viewportPreset: null,
+      captureMode: CaptureMode.TAB,
+      viewportPresetId: null,
     })
   );
 
   expect(runtimeSendMessage).toHaveBeenCalledWith(
-    expect.objectContaining(buildStartMessage(CaptureMode.TAB))
+    expect.objectContaining(buildStartMessage(CaptureMode.TAB, null))
   );
   expect(setStartError).not.toHaveBeenCalled();
 }
@@ -218,7 +211,7 @@ async function verifiesControlledCursorSanitization() {
   );
 
   expect(runtimeSendMessage).toHaveBeenCalledWith(
-    expect.objectContaining(buildStartMessage(CaptureMode.SCREEN))
+    expect.objectContaining(buildStartMessage(CaptureMode.SCREEN, null))
   );
   expect(runtimeSendMessage).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -251,12 +244,9 @@ async function verifiesControlledCursorPreservedForTabCapture() {
 function runStartRecordingHandlerSuite() {
   beforeEach(resetStartRecordingMocks);
 
-  it('does not send a viewport preset outside VIEWPORT_EMULATION mode', verifiesTabModeMessage);
-  it('normalizes legacy viewport emulation mode to tab recording', verifiesViewportPresetMessage);
-  it(
-    'does not require a preset for legacy viewport emulation mode',
-    verifiesMissingPresetEarlyReturn
-  );
+  it('sends the selected preset ID for tab recording', verifiesTabModeMessage);
+  it('keeps the selected preset ID in the recording draft message', verifiesViewportPresetMessage);
+  it('uses the current size when no preset is selected', verifiesMissingPresetEarlyReturn);
   it(
     'requests microphone permission when microphone recording is enabled',
     verifiesMicrophonePermissionRequest

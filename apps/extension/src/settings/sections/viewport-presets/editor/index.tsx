@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react';
 import { ProductModal, ProductModalHeader } from '@sniptale/ui/product-modal';
 import type { ViewportPreset } from '../../../../contracts/settings';
+import type { ViewportPresetDraft } from '../helpers';
 import { resolveViewportPresetEditorTitle } from './helpers';
 import { useViewportPresetEditorState } from './state';
 import { ViewportPresetEditorContent, ViewportPresetEditorFooter } from './views';
@@ -9,7 +10,7 @@ interface ViewportPresetEditorProps {
   isLoading?: boolean;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (label: string, width: number, height: number) => Promise<void>;
+  onSave: (draft: ViewportPresetDraft) => Promise<void>;
   preset?: ViewportPreset;
 }
 
@@ -61,31 +62,33 @@ function renderViewportPresetEditorBody(args: {
       maxHeight="85vh"
       scrollable
       onClose={args.onClose}
-      onKeyDown={args.state.handleKeyDown}
+      onKeyDown={args.state.handlers.handleKeyDown}
     >
       <ProductModalHeader
         compact
         title={resolveViewportPresetEditorTitle(args.preset)}
         onClose={args.onClose}
-        disabled={args.state.isDisabled}
+        disabled={args.state.status.isDisabled}
       />
       <ViewportPresetEditorContent
-        height={args.state.height}
-        isDisabled={args.state.isDisabled}
-        label={args.state.label}
-        onSubmit={args.state.handleSubmit}
-        setHeight={args.state.setHeight}
-        setLabel={args.state.setLabel}
-        setWidth={args.state.setWidth}
-        width={args.state.width}
+        height={args.state.form.height}
+        isDisabled={args.state.status.isDisabled}
+        label={args.state.form.label}
+        onSubmit={args.state.handlers.handleSubmit}
+        setHeight={args.state.form.setHeight}
+        setLabel={args.state.form.setLabel}
+        setTarget={args.state.form.setTarget}
+        setWidth={args.state.form.setWidth}
+        width={args.state.form.width}
+        target={args.state.form.target}
       />
       <ViewportPresetEditorFooter
         {...createViewportPresetEditorFooterProps({
-          isDisabled: args.state.isDisabled,
-          isSaving: args.state.isSaving,
-          label: args.state.label,
+          isDisabled: args.state.status.isDisabled,
+          isSaving: args.state.status.isSaving,
+          label: args.state.form.label,
           onClose: args.onClose,
-          onSubmit: args.state.handleSubmit,
+          onSubmit: args.state.handlers.handleSubmit,
           ...(args.preset === undefined ? {} : { preset: args.preset }),
         })}
       />

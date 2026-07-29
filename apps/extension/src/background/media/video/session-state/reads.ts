@@ -21,14 +21,6 @@ export function getVideoRecordingCountdownSessionId(): string | null {
   return videoManagerSession.currentCountdownSessionId;
 }
 
-export function getViewportNavigationEpoch(): number {
-  return videoManagerSession.viewportNavigationEpoch;
-}
-
-export function isViewportNavigationPending(): boolean {
-  return videoManagerSession.viewportNavigationPending;
-}
-
 export function isVideoRecordingPreparationInProgress(): boolean {
   return videoManagerSession.isStarting;
 }

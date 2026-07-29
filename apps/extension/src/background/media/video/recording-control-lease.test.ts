@@ -57,9 +57,11 @@ vi.mock('./runtime/session-state', async (importOriginal) => ({
 }));
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import {
+  activateVideoRecordingLease,
   clearActiveVideoRecordingLease,
+  ensureActiveVideoRecordingLeaseHydrated,
   hydrateActiveVideoRecordingLease,
-  issueActiveVideoRecordingLease,
+  issuePreparedVideoRecordingLease,
   resetActiveVideoRecordingLeaseForTests,
   restoreCurrentRecordingFromLease,
   validateRecordingControlCapability,
@@ -88,10 +90,11 @@ afterEach(() => {
 });
 
 it('persists an owner-bound recording control lease and validates exact controls', async () => {
-  const lease = await issueActiveVideoRecordingLease({
+  const lease = await issuePreparedVideoRecordingLease({
     captureMode: CaptureMode.TAB,
     ownerSenderUrl,
     openEditorAfterRecording: true,
+    surfaceBinding: { generation: 2, streamInstanceId: 'stream-instance-1' },
   });
 
   expect(lease).toEqual(
@@ -100,6 +103,7 @@ it('persists an owner-bound recording control lease and validates exact controls
       ownerSenderUrl,
       recordingId: 'recording-1',
       recordingTabId: 42,
+      surfaceBinding: { generation: 2, streamInstanceId: 'stream-instance-1' },
     })
   );
   expect(browserStorageSessionSetMock).toHaveBeenCalledWith({
@@ -108,6 +112,18 @@ it('persists an owner-bound recording control lease and validates exact controls
       controlToken: 'control-token-1',
       recordingId: 'recording-1',
     }),
+  });
+  expect(
+    validateRecordingControlCapability({
+      controlToken: 'control-token-1',
+      ownerSenderUrl,
+      recordingId: 'recording-1',
+    })
+  ).toBe(false);
+  await activateVideoRecordingLease({
+    generation: 2,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
   });
   expect(
     validateRecordingControlCapability({
@@ -128,7 +144,7 @@ it('persists an owner-bound recording control lease and validates exact controls
 it('persists a camera recording control lease without a recording tab id', async () => {
   getVideoRecordingTabIdMock.mockReturnValue(null);
 
-  const lease = await issueActiveVideoRecordingLease({
+  const lease = await issuePreparedVideoRecordingLease({
     captureMode: CaptureMode.CAMERA,
     ownerSenderUrl,
     openEditorAfterRecording: false,
@@ -155,7 +171,7 @@ it('does not issue non-camera recording leases without a recording tab id', asyn
   getVideoRecordingTabIdMock.mockReturnValue(null);
 
   await expect(
-    issueActiveVideoRecordingLease({
+    issuePreparedVideoRecordingLease({
       captureMode: CaptureMode.TAB,
       ownerSenderUrl,
       openEditorAfterRecording: true,
@@ -165,16 +181,26 @@ it('does not issue non-camera recording leases without a recording tab id', asyn
   expect(browserStorageSessionSetMock).not.toHaveBeenCalled();
 });
 
+it('reads an absent persisted lease only once per worker lifetime', async () => {
+  await expect(ensureActiveVideoRecordingLeaseHydrated()).resolves.toBeNull();
+  await expect(ensureActiveVideoRecordingLeaseHydrated()).resolves.toBeNull();
+
+  expect(browserStorageSessionGetMock).toHaveBeenCalledOnce();
+});
+
 it('hydrates active recording state from a persisted lease after restart', async () => {
   browserStorageSessionGetMock.mockResolvedValue({
     [storageKey]: {
-      captureMode: CaptureMode.SCREEN,
+      captureMode: CaptureMode.TAB_CROP,
       controlToken: 'control-token-2',
+      cropRegion: { x: 10, y: 20, width: 300, height: 200 },
       expiresAt: Date.now() + 60_000,
       openEditorAfterRecording: false,
       ownerSenderUrl,
+      phase: 'active',
       recordingId: 'recording-2',
       recordingTabId: 77,
+      surfaceBinding: null,
       version: 1,
     },
   });
@@ -187,19 +213,47 @@ it('hydrates active recording state from a persisted lease after restart', async
   expect(setVideoRecordingTabIdMock).toHaveBeenCalledWith(77);
   expect(setOpenEditorAfterRecordingMock).toHaveBeenCalledWith(false);
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
-    captureMode: CaptureMode.SCREEN,
+    captureMode: CaptureMode.TAB_CROP,
     countdownEndsAt: null,
+    cropRegion: { x: 10, y: 20, width: 300, height: 200 },
     error: null,
     status: VideoRecordingStatus.RECORDING,
+    viewportPresetId: null,
   });
   await expect(restoreCurrentRecordingFromLease('recording-2')).resolves.toBe(true);
+});
+
+it('keeps a recovered prepared lease out of active runtime state', async () => {
+  browserStorageSessionGetMock.mockResolvedValue({
+    [storageKey]: {
+      captureMode: CaptureMode.TAB,
+      controlToken: 'control-token-prepared',
+      expiresAt: Date.now() + 60_000,
+      openEditorAfterRecording: false,
+      ownerSenderUrl,
+      phase: 'prepared',
+      recordingId: 'recording-prepared',
+      recordingTabId: 77,
+      surfaceBinding: { generation: 1, streamInstanceId: 'stream-prepared' },
+      version: 1,
+      viewportPresetId: 'preset-1',
+    },
+  });
+
+  await expect(hydrateActiveVideoRecordingLease()).resolves.toMatchObject({
+    phase: 'prepared',
+    recordingId: 'recording-prepared',
+  });
+  expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
+  expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  await expect(restoreCurrentRecordingFromLease('recording-prepared')).resolves.toBe(false);
 });
 
 it('does not expose a control capability when session lease persistence fails', async () => {
   browserStorageSessionSetMock.mockRejectedValueOnce(new Error('storage failed'));
 
   await expect(
-    issueActiveVideoRecordingLease({
+    issuePreparedVideoRecordingLease({
       captureMode: CaptureMode.TAB,
       ownerSenderUrl,
       openEditorAfterRecording: true,
@@ -237,7 +291,7 @@ it('drops expired or malformed persisted leases before exposing recording state'
 });
 
 it('clears only the matching active recording lease', async () => {
-  await issueActiveVideoRecordingLease({
+  await issuePreparedVideoRecordingLease({
     captureMode: CaptureMode.TAB,
     ownerSenderUrl,
     openEditorAfterRecording: true,
@@ -258,8 +312,10 @@ it('clears a matching persisted lease when no in-memory lease has hydrated yet',
       expiresAt: Date.now() + 60_000,
       openEditorAfterRecording: false,
       ownerSenderUrl,
+      phase: 'active',
       recordingId: 'recording-4',
       recordingTabId: 42,
+      surfaceBinding: null,
       version: 1,
     },
   });
@@ -279,8 +335,10 @@ it('hydrates a persisted lease before restoring a post-restart lifecycle event',
       expiresAt: Date.now() + 60_000,
       openEditorAfterRecording: true,
       ownerSenderUrl,
+      phase: 'active',
       recordingId: 'recording-5',
       recordingTabId: 17,
+      surfaceBinding: null,
       version: 1,
     },
   });

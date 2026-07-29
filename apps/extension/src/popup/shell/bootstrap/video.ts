@@ -5,7 +5,7 @@ import {
   loadVideoUiState,
 } from '../../../composition/persistence/capture-settings';
 import {
-  CaptureMode,
+  type CaptureMode,
   type VideoRecordingSettings,
   type VideoRecordingUiState,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -21,6 +21,7 @@ import {
   type WebcamOption,
 } from '../../recording/webcam';
 import { trackPopupPerfAsync } from '../../diagnostics/performance';
+import { resolveVideoViewportPresetId } from '../../../features/viewport-presets/video-recording-policy';
 
 const logger = createLogger({ namespace: 'PopupBootstrap' });
 
@@ -149,13 +150,8 @@ function buildPopupBootstrapVideoData(
   const { settings, storedVideoSettings, storedVideoUiState } = data;
   const viewportPresets = settings.viewportPresets ?? [];
   const rawPresetId = storedVideoUiState.viewportPresetId ?? null;
-  const selectedPresetId = viewportPresets.some((preset) => preset.id === rawPresetId)
-    ? rawPresetId
-    : null;
-  const captureMode =
-    storedVideoUiState.captureMode === CaptureMode.VIEWPORT_EMULATION
-      ? CaptureMode.TAB
-      : storedVideoUiState.captureMode;
+  const captureMode = storedVideoUiState.captureMode;
+  const selectedPresetId = resolveVideoViewportPresetId(captureMode, viewportPresets, rawPresetId);
 
   return {
     captureMode,

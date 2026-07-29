@@ -59,7 +59,7 @@ function createRecordingState(status = VideoRecordingStatus.RECORDING) {
       webcamSelected: true,
     },
     status,
-    viewportPreset: null,
+    viewportPresetId: null,
   };
 }
 

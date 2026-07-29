@@ -69,7 +69,7 @@ function createFrameManagerRuntimeSyncParams(args: {
       frameStatesRef: args.refs.frameStatesRef,
       globalEffectModeRef: args.refs.globalEffectModeRef,
       isClearingRef: args.refs.isClearingRef,
-      linkedElementsRef: args.refs.linkedElementsRef,
+      hostLayoutServiceRef: args.refs.hostLayoutServiceRef,
       rootsRef: args.refs.rootsRef,
     },
     effects: {

@@ -3,10 +3,10 @@ import {
   CaptureMode,
   VideoQuality,
   type VideoRecordingSettings,
-  type VideoViewportPresetSelection,
 } from '@sniptale/runtime-contracts/video/types/types';
 import {
   enableAnnotationsOrAbort,
+  enableViewportCursorProjectionOrAbort,
   ensureOffscreenDocumentReadyOrAbort,
   resolveCaptureSourceForMode,
 } from './transport.resolve';
@@ -25,15 +25,6 @@ function createVideoSettings(): VideoRecordingSettings {
     openEditorAfterRecording: false,
     quality: VideoQuality.HIGH,
     systemAudioEnabled: true,
-  };
-}
-
-function createViewportPreset(): VideoViewportPresetSelection {
-  return {
-    height: 720,
-    id: 'wide',
-    label: 'Wide',
-    width: 1280,
   };
 }
 
@@ -76,7 +67,7 @@ it('returns null when annotation setup completes after cancellation', async () =
 
 it('resolves capture sources through injected mode-specific dependencies', async () => {
   const resolveCaptureSource = vi.fn(async () => ({
-    mode: CaptureMode.VIEWPORT_EMULATION,
+    mode: CaptureMode.TAB,
     streamId: 'stream-2',
   }));
 
@@ -84,25 +75,23 @@ it('resolves capture sources through injected mode-specific dependencies', async
     resolveCaptureSourceForMode(
       17,
       { id: 17, url: 'https://example.test' } as chrome.tabs.Tab,
-      CaptureMode.VIEWPORT_EMULATION,
+      CaptureMode.TAB,
       { ...createVideoSettings(), sourceCount: 3 },
-      createViewportPreset(),
       {
         logger: { debug: vi.fn(), log: vi.fn() },
         resolveCaptureSource,
       }
     )
   ).resolves.toEqual({
-    mode: CaptureMode.VIEWPORT_EMULATION,
+    mode: CaptureMode.TAB,
     streamId: 'stream-2',
   });
 
   expect(resolveCaptureSource).toHaveBeenCalledWith({
     tabId: 17,
     tab: { id: 17, url: 'https://example.test' },
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     sourceCount: 3,
-    viewportPreset: createViewportPreset(),
   });
 });
 
@@ -118,7 +107,6 @@ it('omits viewport presets when capture mode resolution does not need them', asy
       { id: 18, url: 'https://example.test/tab' } as chrome.tabs.Tab,
       CaptureMode.TAB,
       createVideoSettings(),
-      undefined,
       {
         logger: { debug: vi.fn(), log: vi.fn() },
         resolveCaptureSource,
@@ -166,4 +154,31 @@ it('returns the annotation viewport when setup succeeds without cancellation', a
       enableAnnotationsIfNeeded: enableAnnotations,
     })
   ).resolves.toBe(viewport);
+});
+
+it('enables viewport cursor projection before observing start cancellation', async () => {
+  const enableViewportCursorProjection = vi.fn(async () => undefined);
+  const abortStart = vi.fn(() => false);
+
+  await expect(
+    enableViewportCursorProjectionOrAbort(
+      12,
+      CaptureMode.TAB_CROP,
+      { generation: 1, recordingId: 'recording-1' },
+      {
+        abortStart,
+        enableViewportCursorProjection,
+      }
+    )
+  ).resolves.toBe(true);
+
+  expect(enableViewportCursorProjection).toHaveBeenCalledWith(12, {
+    generation: 1,
+    recordingId: 'recording-1',
+  });
+  expect(abortStart).toHaveBeenCalledWith(
+    12,
+    CaptureMode.TAB_CROP,
+    'viewport cursor projection setup'
+  );
 });

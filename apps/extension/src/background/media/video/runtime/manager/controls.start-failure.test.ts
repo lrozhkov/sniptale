@@ -13,6 +13,9 @@ const {
   setVideoRecordingIdMock,
   loggerErrorMock,
   loggerWarnMock,
+  getVideoRecordingIdMock,
+  releaseVideoCaptureSurfaceMock,
+  cancelVideoSourceReadyWaitMock,
   runBestEffortMock,
 } = vi.hoisted(() => ({
   getVideoRecordingTabIdMock: vi.fn(),
@@ -25,6 +28,9 @@ const {
   setVideoRecordingIdMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerWarnMock: vi.fn(),
+  getVideoRecordingIdMock: vi.fn(),
+  releaseVideoCaptureSurfaceMock: vi.fn(),
+  cancelVideoSourceReadyWaitMock: vi.fn(),
   runBestEffortMock: vi.fn(),
 }));
 
@@ -60,10 +66,16 @@ vi.mock('../session-state', async (importOriginal) => ({
 vi.mock('../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../session-state')>()),
   getVideoRecordingTabId: getVideoRecordingTabIdMock,
+  getVideoRecordingId: getVideoRecordingIdMock,
   isControlledCursorCaptureEnabled: isControlledCursorCaptureEnabledMock,
   resetVideoRecordingStartSession: resetVideoRecordingStartSessionMock,
   setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
+}));
+vi.mock('../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture-surface')>()),
+  cancelVideoSourceReadyWait: cancelVideoSourceReadyWaitMock,
+  releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
 }));
 
 import { notifyRecordingStartFailed } from './controls.start-failure';
@@ -71,9 +83,11 @@ import { notifyRecordingStartFailed } from './controls.start-failure';
 beforeEach(() => {
   vi.clearAllMocks();
   getVideoRecordingTabIdMock.mockReturnValue(7);
+  getVideoRecordingIdMock.mockReturnValue('recording-1');
   isControlledCursorCaptureEnabledMock.mockReturnValue(false);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   sendTabMessageMock.mockResolvedValue(undefined);
+  releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
   installBackgroundRuntimeMessagingMock({
     sendRuntimeMessage: sendRuntimeMessageMock,
     sendTabMessage: sendTabMessageMock,
@@ -132,10 +146,14 @@ function expectRuntimeStateReset(): void {
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
 }
 
-function verifyStartFailureBroadcast(): void {
-  notifyRecordingStartFailed('permission denied');
+async function verifyStartFailureBroadcast(): Promise<void> {
+  await notifyRecordingStartFailed('permission denied');
 
   expect(loggerErrorMock).toHaveBeenCalledWith('Recording start failed', 'permission denied');
+  expect(cancelVideoSourceReadyWaitMock).toHaveBeenCalledWith(
+    'recording-1',
+    expect.objectContaining({ message: 'permission denied' })
+  );
   expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
     type: VideoMessageType.HIDE_RECORDING_OVERLAY,
   });
@@ -143,10 +161,10 @@ function verifyStartFailureBroadcast(): void {
   expectStartFailureBroadcast();
 }
 
-function verifyControlledCursorTeardown(): void {
+async function verifyControlledCursorTeardown(): Promise<void> {
   isControlledCursorCaptureEnabledMock.mockReturnValue(true);
 
-  notifyRecordingStartFailed('permission denied');
+  await notifyRecordingStartFailed('permission denied');
 
   expect(sendTabMessageMock).toHaveBeenNthCalledWith(1, 7, {
     type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
@@ -163,7 +181,7 @@ async function verifyFailSoftWarningLogs(): Promise<void> {
   sendTabMessageMock.mockRejectedValueOnce(new Error('overlay closed'));
   sendRuntimeMessageMock.mockRejectedValueOnce(new Error('popup closed'));
 
-  notifyRecordingStartFailed('permission denied');
+  await notifyRecordingStartFailed('permission denied');
   await flushPromises();
 
   expect(loggerWarnMock).toHaveBeenCalledWith(
@@ -177,12 +195,36 @@ async function verifyFailSoftWarningLogs(): Promise<void> {
   );
 }
 
-function verifyNoRecordingTabReset(): void {
+async function verifyNoRecordingTabReset(): Promise<void> {
   getVideoRecordingTabIdMock.mockReturnValue(null);
 
-  notifyRecordingStartFailed('permission denied');
+  await notifyRecordingStartFailed('permission denied');
 
   expect(sendTabMessageMock).not.toHaveBeenCalled();
   expectRuntimeStateReset();
   expectStartFailureBroadcast();
 }
+
+it('preserves recording authority when the capture surface cannot be restored', async () => {
+  releaseVideoCaptureSurfaceMock.mockRejectedValueOnce(new Error('restore-conflict'));
+
+  await expect(notifyRecordingStartFailed('permission denied')).rejects.toThrow('restore-conflict');
+
+  expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingStartSessionMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+});
+
+it('reports a cleanup failure without releasing durable session authority', async () => {
+  await notifyRecordingStartFailed('offscreen unavailable', { retainAuthority: true });
+
+  expect(releaseVideoCaptureSurfaceMock).not.toHaveBeenCalled();
+  expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingStartSessionMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: VideoMessageType.RECORDING_START_FAILED,
+    error: 'offscreen unavailable',
+  });
+});

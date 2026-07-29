@@ -9,6 +9,5 @@ export function createVideoCapabilities(
     [CaptureMode.TAB]: capability,
     [CaptureMode.TAB_CROP]: capability,
     [CaptureMode.CAMERA]: capability,
-    [CaptureMode.VIEWPORT_EMULATION]: capability,
   };
 }

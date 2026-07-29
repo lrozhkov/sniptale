@@ -12,6 +12,7 @@ function createState(
 ): PopupExportRuntimeContract {
   return {
     availableTabs: [],
+    cancelRetryRef: { current: null },
     exportDisabledReason: null,
     isExporting: false,
     progress: { current: 0, errors: [], message: '', phase: 'idle', total: 0 },

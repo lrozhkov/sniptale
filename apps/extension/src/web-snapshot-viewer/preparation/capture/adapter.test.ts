@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@sniptale/platform/browser/media/image-crop', () => ({
   cropImage: mocks.cropImage,
 }));
-vi.mock('./overlays', () => ({
+vi.mock('./overlays/composer', () => ({
   composeViewerCaptureOverlays: mocks.composeViewerCaptureOverlays,
 }));
 vi.mock('./render', () => ({

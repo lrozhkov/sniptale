@@ -85,6 +85,7 @@ function createState(): PopupExportRuntimeContract {
     canExport: true,
     copiedFormat: null,
     copyingFormat: null,
+    cancelRetryRef: { current: null },
     copyRequestIdRef: { current: 0 },
     copyResetTimeoutRef: { current: null },
     exportDisabledReason: null,

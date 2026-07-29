@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import {
   createBlurSettingsFixture,
+  createBorderSettingsFixture,
   createFocusSettingsFixture,
   createFrameDataFixture,
 } from './test-support';
@@ -41,18 +42,31 @@ function createFrame(id: string, effectMode: 'focus' | 'blur'): FrameData {
   });
 }
 
-function Harness({ frames }: { frames: FrameData[] }) {
+function Harness({
+  frames,
+  presentations = new Map(),
+  version = 0,
+}: {
+  frames: FrameData[];
+  presentations?: ReadonlyMap<string, 'visible' | 'suspended'>;
+  version?: number;
+}) {
   const framesRef = useRef(frames);
   framesRef.current = frames;
 
   useFrameEffectOverlays({
     frames,
     framesRef,
+    hostLayoutSnapshot: { presentations, recoveries: [], version },
   });
   return null;
 }
 
-async function renderHarness(frames: FrameData[]) {
+async function renderHarness(
+  frames: FrameData[],
+  presentations?: ReadonlyMap<string, 'visible' | 'suspended'>,
+  version?: number
+) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -60,7 +74,13 @@ async function renderHarness(frames: FrameData[]) {
   }
 
   await act(async () => {
-    root?.render(<Harness frames={frames} />);
+    root?.render(
+      <Harness
+        frames={frames}
+        {...(presentations === undefined ? {} : { presentations })}
+        {...(version === undefined ? {} : { version })}
+      />
+    );
   });
 }
 
@@ -106,6 +126,23 @@ async function expectRelevantOverlayChangesRetriggerOnlyTheirOwner() {
   expect(domMocks.updateBlurOverlayNodes).toHaveBeenCalledTimes(1);
 }
 
+async function expectFocusRadiusChangeRetriggersFocusOwner() {
+  const initialFrames = [createFrame('focus-1', 'focus'), createFrame('blur-1', 'blur')];
+  const nextFrames = [
+    {
+      ...createFrame('focus-1', 'focus'),
+      borderSettings: createBorderSettingsFixture({ radius: 18 }),
+    },
+    createFrame('blur-1', 'blur'),
+  ];
+
+  await renderHarness(initialFrames);
+  await renderHarness(nextFrames);
+
+  expect(domMocks.updateFocusOverlayMask).toHaveBeenCalledTimes(2);
+  expect(domMocks.updateBlurOverlayNodes).toHaveBeenCalledTimes(1);
+}
+
 async function expectUnmountCleanupRemovesOverlayArtifacts() {
   const focusOverlay = document.createElement('div');
   focusOverlay.className = 'sniptale-focus-overlay';
@@ -127,6 +164,43 @@ async function expectUnmountCleanupRemovesOverlayArtifacts() {
   expect(document.querySelector('#sniptale-blur-filters-test')).toBeNull();
 }
 
+async function expectSuspensionAtomicallyHidesAndRestoresEffects() {
+  const frames = [createFrame('focus-1', 'focus'), createFrame('blur-1', 'blur')];
+  await renderHarness(frames);
+  await renderHarness(
+    frames,
+    new Map([
+      ['focus-1', 'suspended'],
+      ['blur-1', 'suspended'],
+    ]),
+    1
+  );
+
+  expect(domMocks.updateFocusOverlayMask).toHaveBeenLastCalledWith([], expect.any(Object));
+  expect(domMocks.updateBlurOverlayNodes).toHaveBeenLastCalledWith(
+    [],
+    expect.any(Object),
+    expect.any(Function),
+    expect.any(Function)
+  );
+
+  await renderHarness(
+    frames,
+    new Map([
+      ['focus-1', 'visible'],
+      ['blur-1', 'visible'],
+    ]),
+    2
+  );
+  expect(domMocks.updateFocusOverlayMask).toHaveBeenLastCalledWith(frames, expect.any(Object));
+  expect(domMocks.updateBlurOverlayNodes).toHaveBeenLastCalledWith(
+    frames,
+    expect.any(Object),
+    expect.any(Function),
+    expect.any(Function)
+  );
+}
+
 describe('useFrameEffectOverlays', () => {
   it(
     'does not retrigger overlay updates when equivalent frame descriptors are rerendered',
@@ -137,5 +211,13 @@ describe('useFrameEffectOverlays', () => {
     'retriggers only the changed overlay owner when relevant descriptor fields change',
     expectRelevantOverlayChangesRetriggerOnlyTheirOwner
   );
+  it(
+    'rebuilds the focus mask when its canonical corner radius changes',
+    expectFocusRadiusChangeRetriggersFocusOwner
+  );
   it('removes overlay artifacts on unmount cleanup', expectUnmountCleanupRemovesOverlayArtifacts);
+  it(
+    'atomically hides and restores focus and blur effects with anchor presentation',
+    expectSuspensionAtomicallyHidesAndRestoresEffects
+  );
 });

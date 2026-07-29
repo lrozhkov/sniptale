@@ -1,299 +1,271 @@
 // @vitest-environment jsdom
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Settings, ViewportPreset } from '../../../contracts/settings';
-import { useViewportPresetsSection } from './controller';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type {
+  Settings,
+  SystemViewportPreset,
+  UserViewportPreset,
+} from '../../../contracts/settings';
 
-const { toastSuccessMock, useSettingsStoreMock } = vi.hoisted(() => ({
-  toastSuccessMock: vi.fn(),
-  useSettingsStoreMock: vi.fn(),
+const mocks = vi.hoisted(() => ({
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+  useSettingsStore: vi.fn(),
 }));
+
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal()),
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
-vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
-  ...(await importOriginal()),
-  toast: {
-    success: toastSuccessMock,
-  },
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({
+  toast: { error: mocks.toastError, success: mocks.toastSuccess },
 }));
 vi.mock('../../runtime/store/useSettingsStore', async (importOriginal) => ({
-  ...(await importOriginal()),
-  useSettingsStore: useSettingsStoreMock,
+  ...(await importOriginal<typeof import('../../runtime/store/useSettingsStore')>()),
+  useSettingsStore: mocks.useSettingsStore,
 }));
 
-let container: HTMLDivElement | null = null;
-let latestState: ReturnType<typeof useViewportPresetsSection> | null = null;
-let root: Root | null = null;
-function createViewportPreset(overrides: Partial<ViewportPreset> = {}): ViewportPreset {
+import { useViewportPresetsSection } from './controller';
+
+const viewportPreset: UserViewportPreset = {
+  enabled: true,
+  height: 720,
+  id: 'viewport-1',
+  kind: 'user',
+  name: 'HD viewport',
+  order: 0,
+  target: 'viewport',
+  width: 1280,
+};
+const windowPreset: UserViewportPreset = {
+  ...viewportPreset,
+  height: 900,
+  id: 'window-1',
+  name: 'Desktop window',
+  target: 'window',
+  width: 1440,
+};
+const customizedSystemPreset: SystemViewportPreset = {
+  catalogRevision: 2,
+  customized: true,
+  enabled: false,
+  height: 700,
+  id: 'system:viewport-mobile-landscape',
+  kind: 'system',
+  nameOverride: 'Custom system HD',
+  order: 1,
+  systemKey: 'viewportMobileLandscape',
+  target: 'viewport',
+  width: 1200,
+};
+
+function createSettings(): Settings {
   return {
-    id: overrides.id ?? 'preset-1',
-    label: overrides.label ?? 'Desktop',
-    width: overrides.width ?? 1440,
-    height: overrides.height ?? 900,
-  };
-}
-function createSettings(overrides: Partial<Settings> = {}): Settings {
-  return {
+    authenticatedSnapshotAssetsEnabled: true,
+    anonymousCrossOriginSnapshotAssetsEnabled: false,
     captureAction: 'download_default',
     contextMenu: {
       enabled: true,
-      showScreenshots: true,
-      showVideo: true,
       showExport: true,
-      showImageEditor: true,
-      showVideoEditor: true,
       showGallery: true,
+      showImageEditor: true,
       showPageLinkCopy: true,
+      showScreenshots: true,
       showSettings: true,
+      showVideo: true,
+      showVideoEditor: true,
     },
-    saveCapturesToGallery: false,
-    viewportPresets: [createViewportPreset()],
-    defaultViewportId: 'preset-1',
-    presets: [],
-    defaultImagePresetId: null,
-    defaultVideoPresetId: null,
-    defaultExportPresetId: null,
+    defaultViewportPresetId: 'viewport-1',
     imageFormat: 'png',
-    imageQuality: 100,
-    authenticatedSnapshotAssetsEnabled: true,
-    anonymousCrossOriginSnapshotAssetsEnabled: false,
-    skipWebSnapshotSaveDisclosure: false,
+    imageQuality: 90,
     rawDiagnosticsEnabled: false,
-    ...overrides,
+    saveCapturesToGallery: false,
+    skipWebSnapshotSaveDisclosure: false,
+    viewportPresets: [viewportPreset, customizedSystemPreset, windowPreset],
   };
 }
 
-function createSettingsStore(settings: Settings) {
-  const store = {
-    error: null,
-    isLoading: false,
-    settings,
-    clearSettings: vi.fn(async () => undefined),
-    loadSettings: vi.fn(async () => undefined),
-    updateSettings: vi.fn(async (nextSettings: Partial<Settings>) => {
-      store.settings = { ...store.settings, ...nextSettings };
-    }),
-  };
-  return store;
-}
+let container: HTMLDivElement | null = null;
+let latest: ReturnType<typeof useViewportPresetsSection> | null = null;
+let root: Root | null = null;
 
-function ViewportPresetsHarness() {
-  latestState = useViewportPresetsSection();
+function Harness() {
+  latest = useViewportPresetsSection();
   return null;
 }
 
-async function flushEffects() {
-  await act(async () => {
-    await Promise.resolve();
-  });
+function requireState(): ReturnType<typeof useViewportPresetsSection> {
+  if (!latest) throw new Error('Viewport settings state is unavailable');
+  return latest;
 }
 
-async function renderHarness(settings: Settings = createSettings()) {
-  if (!container) {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  }
-
-  const store = createSettingsStore(settings);
-  useSettingsStoreMock.mockReturnValue(store);
-
-  await act(async () => {
-    root?.render(<ViewportPresetsHarness />);
-  });
-  await flushEffects();
-  return store;
-}
-
-function getState() {
-  if (!latestState) {
-    throw new Error('Viewport preset state is not ready');
-  }
-  return latestState;
+async function renderHarness(updateSettings = vi.fn().mockResolvedValue(undefined)) {
+  const store = { isLoading: false, settings: createSettings(), updateSettings };
+  mocks.useSettingsStore.mockReturnValue(store);
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () => root?.render(<Harness />));
+  return { store, updateSettings };
 }
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
-  toastSuccessMock.mockReset();
-  useSettingsStoreMock.mockReset();
+  vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'user-created') });
+  vi.clearAllMocks();
 });
 
 afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
+  act(() => root?.unmount());
   root = null;
-  latestState = null;
+  latest = null;
   container?.remove();
   container = null;
-  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-async function verifyViewportPresetCreationFlow() {
-  const store = await renderHarness();
-  expect(getState().presetsCountLabel).toBe('viewportPresets.section.countOne');
-  expect(getState().defaultViewportId).toBe('preset-1');
-  act(() => {
-    getState().handleAddViewportPreset();
-  });
-  expect(getState().editingViewport).toBeUndefined();
-  expect(getState().isViewportEditorOpen).toBe(true);
-  await act(async () => {
-    await getState().handleSaveViewportPreset('Tablet', 1280, 720);
-  });
-  expect(getState().viewportPresets).toEqual([
-    createViewportPreset(),
-    {
-      id: '11111111-1111-4111-8111-111111111111',
-      label: 'Tablet',
-      width: 1280,
-      height: 720,
-    },
-  ]);
-  expect(store.updateSettings).toHaveBeenCalledWith({
-    viewportPresets: expect.arrayContaining([
-      expect.objectContaining({ id: '11111111-1111-4111-8111-111111111111' }),
-    ]),
-  });
-  expect(getState().isViewportEditorOpen).toBe(false);
-  expect(toastSuccessMock).toHaveBeenCalledWith('viewportPresets.messages.presetCreated');
-  await act(async () => {
-    await getState().handleDefaultViewportChange('11111111-1111-4111-8111-111111111111');
-  });
-  expect(getState().defaultViewportId).toBe('11111111-1111-4111-8111-111111111111');
-  expect(store.updateSettings).toHaveBeenLastCalledWith({
-    defaultViewportId: '11111111-1111-4111-8111-111111111111',
-  });
-  expect(toastSuccessMock).toHaveBeenLastCalledWith('viewportPresets.messages.defaultUpdated');
-}
+it('creates, edits across target groups, moves, and selects presets through atomic settings writes', async () => {
+  const { updateSettings } = await renderHarness();
+  expect(requireState().model.presets).toHaveLength(3);
+  expect(requireState().list.countLabel).toBe('viewportPresets.section.countFew');
 
-async function verifyViewportPresetEditDeleteFlow() {
-  const presetA = createViewportPreset({ id: 'preset-a', label: 'Desktop' });
-  const presetB = createViewportPreset({
-    id: 'preset-b',
-    label: 'Phone',
-    width: 390,
-    height: 844,
-  });
-  const store = await renderHarness(
-    createSettings({
-      viewportPresets: [presetA, presetB],
-      defaultViewportId: 'preset-b',
+  act(() => requireState().editor.onAdd());
+  expect(requireState().editor.isOpen).toBe(true);
+  await act(async () =>
+    requireState().editor.onSave({
+      height: 844,
+      name: '  Phone  ',
+      target: 'viewport',
+      width: 390,
     })
   );
-  await verifyViewportPresetEditFlow(presetA, presetB);
-  await verifyViewportPresetDeleteFlow(store);
-}
+  expect(requireState().model.presets).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'user-created', name: 'Phone', target: 'viewport' }),
+    ])
+  );
 
-async function verifyViewportPresetEditFlow(presetA: ViewportPreset, presetB: ViewportPreset) {
-  act(() => {
-    getState().handleEditViewportPreset(presetA);
+  act(() => requireState().list.onEdit(viewportPreset));
+  await act(async () =>
+    requireState().editor.onSave({
+      height: 800,
+      name: 'Moved window',
+      target: 'window',
+      width: 1300,
+    })
+  );
+  expect(requireState().model.presets.find((preset) => preset.id === 'viewport-1')).toMatchObject({
+    name: 'Moved window',
+    target: 'window',
   });
 
-  expect(getState().editingViewport).toEqual(presetA);
-  expect(getState().isViewportEditorOpen).toBe(true);
+  await act(async () => requireState().list.onMove('window-1', -1));
+  await act(async () => requireState().defaultField.onChange('window-1'));
+  expect(requireState().defaultField.selectedPresetId).toBe('window-1');
+  expect(updateSettings).toHaveBeenCalledWith({ defaultViewportPresetId: 'window-1' });
+  expect(mocks.toastSuccess).toHaveBeenCalledWith('viewportPresets.messages.defaultUpdated');
+});
 
-  await act(async () => {
-    await getState().handleSaveViewportPreset('Desktop XL', 1600, 1000);
+it('clears disabled/deleted defaults, protects system deletion, and resets customized system data', async () => {
+  await renderHarness();
+
+  await act(async () => requireState().list.onToggle(viewportPreset));
+  expect(requireState().defaultField.selectedPresetId).toBeNull();
+  expect(requireState().model.presets.find((preset) => preset.id === 'viewport-1')).toMatchObject({
+    enabled: false,
   });
 
-  expect(getState().viewportPresets).toEqual([
-    {
-      id: 'preset-a',
-      label: 'Desktop XL',
-      width: 1600,
-      height: 1000,
-    },
-    presetB,
-  ]);
-  expect(toastSuccessMock).toHaveBeenCalledWith('viewportPresets.messages.presetUpdated');
-}
+  act(() => requireState().list.onDelete(customizedSystemPreset));
+  expect(requireState().deletion.isOpen).toBe(false);
 
-async function verifyViewportPresetDeleteFlow(store: ReturnType<typeof createSettingsStore>) {
+  act(() => requireState().list.onDelete(windowPreset));
+  expect(requireState().deletion.isOpen).toBe(true);
+  expect(requireState().deletion.message).toContain('Desktop window');
+  await act(async () => requireState().deletion.confirm());
+  expect(requireState().model.presets.some((preset) => preset.id === 'window-1')).toBe(false);
+
+  const currentSystem = requireState().model.presets.find(
+    (preset) => preset.id === customizedSystemPreset.id
+  );
+  if (!currentSystem) throw new Error('Expected system viewport preset');
+  await act(async () => requireState().list.onReset(currentSystem));
+  expect(
+    requireState().model.presets.find((preset) => preset.id === currentSystem.id)
+  ).toMatchObject({
+    customized: false,
+    enabled: true,
+    height: 390,
+    target: 'viewport',
+    width: 844,
+  });
+});
+
+it('rolls optimistic state back when persistence rejects and closes both dialogs explicitly', async () => {
+  const updateSettings = vi.fn().mockRejectedValue(new Error('storage failed'));
+  await renderHarness(updateSettings);
+
+  await act(async () => requireState().list.onToggle(viewportPreset));
+  expect(requireState().model.presets.find((preset) => preset.id === 'viewport-1')).toMatchObject({
+    enabled: true,
+  });
+  expect(requireState().defaultField.selectedPresetId).toBe('viewport-1');
+  expect(mocks.toastError).toHaveBeenCalledWith('viewportPresets.messages.updateFailed');
+
   act(() => {
-    getState().handleDeleteViewportPreset(
-      createViewportPreset({
-        id: 'preset-b',
-        label: 'Phone',
-        width: 390,
-        height: 844,
+    requireState().editor.onAdd();
+    requireState().list.onDelete(windowPreset);
+  });
+  act(() => {
+    requireState().editor.close();
+    requireState().deletion.close();
+  });
+  expect(requireState().editor.isOpen).toBe(false);
+  expect(requireState().deletion.isOpen).toBe(false);
+  await act(async () => requireState().deletion.confirm());
+});
+
+it('blocks overlapping mutations so a failed optimistic write cannot be resurrected', async () => {
+  let rejectWrite!: (reason: unknown) => void;
+  const updateSettings = vi.fn(
+    () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectWrite = reject;
       })
-    );
-  });
-
-  expect(getState().viewportConfirmOpen).toBe(true);
-  expect(getState().deleteMessage).toContain('"Phone"');
-
-  await act(async () => {
-    await getState().confirmDeleteViewport();
-  });
-
-  expect(getState().viewportPresets).toEqual([
-    {
-      id: 'preset-a',
-      label: 'Desktop XL',
-      width: 1600,
-      height: 1000,
-    },
-  ]);
-  expect(store.updateSettings).toHaveBeenLastCalledWith({
-    defaultViewportId: 'native',
-    viewportPresets: [
-      {
-        id: 'preset-a',
-        label: 'Desktop XL',
-        width: 1600,
-        height: 1000,
-      },
-    ],
-  });
-  expect(getState().viewportConfirmOpen).toBe(false);
-  expect(toastSuccessMock).toHaveBeenLastCalledWith('viewportPresets.messages.presetDeleted');
-}
-
-describe('useViewportPresetsSection creation flow', () => {
-  it(
-    'opens the editor, creates a preset, and updates the default viewport id',
-    verifyViewportPresetCreationFlow
   );
+  await renderHarness(updateSettings);
+
+  let first!: Promise<void>;
+  act(() => {
+    first = requireState().list.onToggle(viewportPreset);
+  });
+  expect(requireState().model.isLoading).toBe(true);
+  await act(async () => requireState().list.onMove(windowPreset.id, -1));
+  expect(updateSettings).toHaveBeenCalledTimes(1);
+
+  rejectWrite(new Error('storage failed'));
+  await act(async () => first);
+  expect(
+    requireState().model.presets.find((preset) => preset.id === viewportPreset.id)
+  ).toMatchObject({ enabled: true });
+  expect(requireState().model.isLoading).toBe(false);
 });
 
-describe('useViewportPresetsSection edit and delete flow', () => {
-  it(
-    'edits a preset, exposes delete copy, and removes the selected preset on confirm',
-    verifyViewportPresetEditDeleteFlow
-  );
-});
+it('rejects an overlong preset name without writing settings', async () => {
+  const { updateSettings } = await renderHarness();
+  act(() => requireState().editor.onAdd());
 
-describe('useViewportPresetsSection dialog helpers', () => {
-  it('closes dialogs and ignores delete confirmation without a selected preset', async () => {
-    await renderHarness();
-
-    act(() => {
-      getState().handleAddViewportPreset();
-      getState().handleDeleteViewportPreset(createViewportPreset());
-    });
-
-    expect(getState().isViewportEditorOpen).toBe(true);
-    expect(getState().viewportConfirmOpen).toBe(true);
-
-    act(() => {
-      getState().closeViewportEditor();
-      getState().closeViewportDeleteDialog();
-    });
-
-    expect(getState().isViewportEditorOpen).toBe(false);
-    expect(getState().viewportConfirmOpen).toBe(false);
-
-    await act(async () => {
-      await getState().confirmDeleteViewport();
-    });
-
-    expect(toastSuccessMock).not.toHaveBeenCalled();
-  });
+  await expect(
+    act(async () =>
+      requireState().editor.onSave({
+        height: 720,
+        name: 'a'.repeat(81),
+        target: 'viewport',
+        width: 1280,
+      })
+    )
+  ).rejects.toThrow('name is invalid');
+  expect(updateSettings).not.toHaveBeenCalled();
+  expect(requireState().model.presets).toHaveLength(3);
 });

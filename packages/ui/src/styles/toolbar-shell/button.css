@@ -37,6 +37,22 @@
   cursor: default;
 }
 
+.sniptale-split-action {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  border-radius: var(--sniptale-radius-md);
+}
+
+.sniptale-split-action-start {
+  border-radius: var(--sniptale-radius-md) 0 0 var(--sniptale-radius-md);
+}
+
+.sniptale-split-action-end {
+  border-radius: 0 var(--sniptale-radius-md) var(--sniptale-radius-md) 0;
+}
+
 .sniptale-btn svg {
   width: 18px;
   height: 18px;

@@ -4,6 +4,7 @@ import {
   createMessageGuard,
   createRuntimeResponseGuard,
   isString,
+  isViewportInfo,
   isViewportRegion,
 } from '../../../../validators/index';
 import type { PartialRuntimeRegistry } from '../../../runtime-message.registry.ts';
@@ -21,7 +22,11 @@ export const runtimeVideoRegionSelectionEventContracts = {
       'runtime REGION_SELECTED message',
       createMessageGuard({
         type: V.REGION_SELECTED,
-        required: { ...regionSelectionBindingGuard, region: isViewportRegion },
+        required: {
+          ...regionSelectionBindingGuard,
+          region: isViewportRegion,
+          captureViewport: isViewportInfo,
+        },
       })
     ),
     parseResponse: createGuardParser(

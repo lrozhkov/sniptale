@@ -1,13 +1,15 @@
 import { runBestEffort } from '@sniptale/foundation/best-effort';
 import { translate } from '../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 import { RECORDING_START_ACTIVATION_TIMEOUT_MS } from '@sniptale/runtime-contracts/video/types/timeouts';
 import { getVideoRecordingId, isVideoRecordingPreparationInProgress } from '../session-state';
 import { notifyRecordingStartFailed } from '../runtime/manager';
 import { clearActiveVideoRecordingLease } from '../recording-control-lease';
+import { getActiveVideoRecordingLeaseSnapshot } from '../recording-control-lease';
+import {
+  requestBoundOffscreenRecordingStop,
+  type RecordingSourceBinding,
+} from '../offscreen-recording-stop';
 
 const logger = createLogger({ namespace: 'BackgroundVideoStartActivationWatchdog' });
 
@@ -18,12 +20,9 @@ type WatchdogDeps = {
     recordingId?: string,
     options?: { shouldClear?: () => boolean }
   ) => Promise<void>;
-  notifyStartFailed: (error: string) => void;
-  sendRuntimeMessage: (message: {
-    capabilityToken: string;
-    discard: true;
-    type: typeof VideoMessageType.OFFSCREEN_STOP_RECORDING;
-  }) => Promise<unknown>;
+  notifyStartFailed: (error: string) => void | Promise<void>;
+  getSourceBinding: (recordingId: string) => RecordingSourceBinding | null;
+  stopOffscreenRecording: (binding: RecordingSourceBinding) => Promise<boolean>;
   translate: (key: 'background.runtime.recordingStartTimeout') => string;
 };
 
@@ -32,7 +31,14 @@ const defaultDeps: WatchdogDeps = {
   isPreparing: isVideoRecordingPreparationInProgress,
   clearActiveLease: clearActiveVideoRecordingLease,
   notifyStartFailed: notifyRecordingStartFailed,
-  sendRuntimeMessage: (message) => getBackgroundRuntimeMessaging().sendRuntimeMessage(message),
+  getSourceBinding: (recordingId) => {
+    const lease = getActiveVideoRecordingLeaseSnapshot();
+    return lease?.recordingId === recordingId && lease.surfaceBinding
+      ? { recordingId, ...lease.surfaceBinding }
+      : null;
+  },
+  stopOffscreenRecording: (binding) =>
+    requestBoundOffscreenRecordingStop(binding, true).then(() => true),
   translate,
 };
 
@@ -47,34 +53,28 @@ async function handleRecordingStartActivationTimeout(
   recordingId: string,
   deps: WatchdogDeps
 ): Promise<void> {
-  try {
-    await deps.clearActiveLease(recordingId, {
-      shouldClear: () => isRecordingStartActivationStillTimedOut(recordingId, deps),
+  const binding = deps.getSourceBinding(recordingId);
+  if (!binding) {
+    logger.warn('Retaining recording authority after activation timeout without source binding', {
+      recordingId,
     });
+    return;
+  }
+
+  try {
+    if ((await deps.stopOffscreenRecording(binding)) !== true) {
+      throw new Error('Offscreen recording stop acknowledgement missing');
+    }
   } catch (error) {
-    logger.warn('Failed to clear recording control lease after recording start timeout', {
+    logger.warn('Retaining recording authority after activation-timeout cleanup failure', {
       error,
       recordingId,
     });
     return;
   }
 
-  if (!isRecordingStartActivationStillTimedOut(recordingId, deps)) {
-    return;
-  }
-
-  deps.notifyStartFailed(deps.translate('background.runtime.recordingStartTimeout'));
-  runBestEffort(
-    deps.sendRuntimeMessage({
-      ...attachOffscreenCommandCapability({
-        type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
-        discard: true,
-      }),
-    }),
-    logger,
-    'Failed to request offscreen cleanup after recording start timeout',
-    { recordingId }
-  );
+  await deps.notifyStartFailed(deps.translate('background.runtime.recordingStartTimeout'));
+  await deps.clearActiveLease(recordingId);
 }
 
 export function clearRecordingStartActivationWatchdog(recordingId?: string): void {

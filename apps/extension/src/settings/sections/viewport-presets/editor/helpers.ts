@@ -1,10 +1,14 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { translate } from '../../../../platform/i18n';
 import type { ViewportPreset } from '../../../../contracts/settings';
+import { VIEWPORT_PRESET_MAX_DIMENSION } from '../../../../features/viewport-presets/contracts';
+import { getViewportPresetDisplayName } from '../../../../features/viewport-presets/display-name';
 
 export function clampViewportDimension(value: string, max: number) {
   return Math.min(max, Math.max(1, Number.parseInt(value, 10) || 1));
 }
+
+export const maxViewportPresetDimension = VIEWPORT_PRESET_MAX_DIMENSION;
 
 export function resolveViewportPresetEditorTitle(preset?: ViewportPreset) {
   return preset
@@ -32,13 +36,13 @@ export function syncViewportPresetForm(
   setHeight: Dispatch<SetStateAction<number>>
 ) {
   if (preset) {
-    setLabel(preset.label);
+    setLabel(getViewportPresetDisplayName(preset));
     setWidth(preset.width);
     setHeight(preset.height);
     return;
   }
 
   setLabel('');
-  setWidth(1920);
-  setHeight(1080);
+  setWidth(1280);
+  setHeight(720);
 }

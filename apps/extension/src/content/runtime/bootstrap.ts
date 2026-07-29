@@ -16,11 +16,13 @@ import { disableSelectionMode } from '../selection/selection-mode';
 import { hideVideoCountdown } from '../overlay/video-countdown';
 import { disableVideoAnnotations } from '../overlay/video-annotations';
 import { disableVideoTelemetry } from '../overlay/video-telemetry';
+import { disposeViewportCursorProjection } from '../overlay/viewport-cursor-projection';
 import type { RegionSelectorController } from '../selection/region-selector/types';
 import {
   createContentRuntimeServices,
   type ContentRuntimeServices,
 } from '../application/runtime-services/services';
+import { createFullPageCaptureAgent } from '../application/full-page-capture';
 
 type ViewportInfoReader = () => ViewportInfo;
 export type ContentRuntimeCleanup = () => void;
@@ -87,7 +89,8 @@ async function restoreTabCropOverlayOnBootstrap(
       return;
     }
 
-    const cropRegion = stateResult.value.state?.captureSource?.cropRegion;
+    const cropRegion =
+      stateResult.value.state?.cropRegion ?? stateResult.value.state?.captureSource?.cropRegion;
     if (
       !tabResult.value.isCurrentTab ||
       stateResult.value.state?.captureMode !== CaptureMode.TAB_CROP ||
@@ -124,22 +127,24 @@ export function initializeTopLevelContentRuntime(
   getViewportInfo: ViewportInfoReader,
   services: ContentRuntimeServices = createContentRuntimeServices()
 ): ContentRuntimeCleanup {
-  const regionSelectorController = createRegionSelectorController();
+  const regionSelectorController = createRegionSelectorController({ getViewportInfo });
   const lifecycle: ContentRuntimeLifecycle = { disposed: false };
+  const fullPageCaptureAgent = createFullPageCaptureAgent();
 
   initializePageStyleRuntime();
-  void restoreTabCropOverlayOnBootstrap(regionSelectorController, lifecycle, services);
-
   const unsubscribe = browserRuntime.subscribeToMessages(
     createContentRuntimeMessageListener(getViewportInfo, {
+      fullPageCaptureAgent,
       regionSelectorController,
     })
   );
+  void restoreTabCropOverlayOnBootstrap(regionSelectorController, lifecycle, services);
 
   return () => {
     lifecycle.disposed = true;
     const cleanupSteps: CleanupStep[] = [
       { resource: 'runtime listener', run: unsubscribe },
+      { resource: 'full-page capture agent', run: () => fullPageCaptureAgent.dispose() },
       { resource: 'highlighter mode', run: disableHighlighterMode },
       { resource: 'quick edit mode', run: disableQuickEditMode },
       { resource: 'AI pick mode', run: disableAiPickModeIfLoaded },
@@ -148,6 +153,7 @@ export function initializeTopLevelContentRuntime(
       { resource: 'video countdown', run: hideVideoCountdown },
       { resource: 'video annotations', run: disableVideoAnnotations },
       { resource: 'video telemetry', run: disableVideoTelemetry },
+      { resource: 'viewport cursor projection', run: disposeViewportCursorProjection },
       { resource: 'region selector controller', run: () => regionSelectorController.dispose() },
     ];
 

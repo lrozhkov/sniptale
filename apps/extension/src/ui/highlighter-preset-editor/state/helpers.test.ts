@@ -9,13 +9,22 @@ import {
 import type { BorderPresetDraftSetters } from '../useBorderPresetEditorState/types';
 
 vi.mock('../../../features/highlighter/css-sanitizer/css', () => ({
-  validateCssString: vi.fn(() => ({
+  validateCssString: vi.fn((css: string) => ({
     blockedProps: [],
     hasBlockedProps: false,
     rawError: null,
-    styles: {
-      outline: '1px solid red',
-    },
+    styles: css.includes('geometry-escape')
+      ? {
+          all: 'unset',
+          backgroundImage: 'linear-gradient(red, blue)',
+          border: '20px dashed blue',
+          boxShadow: '0 0 4px red',
+          clip: 'rect(0, 0, 0, 0)',
+          outline: '1px solid red',
+          WebkitTransform: 'scale(2)',
+          zoom: '2',
+        }
+      : { outline: '1px solid red' },
   })),
 }));
 
@@ -101,5 +110,33 @@ describe('border-preset-editor-state preview style', () => {
       outline: '1px solid red',
       width: '80px',
     });
+  });
+
+  it('keeps canonical preview geometry above accepted custom css', () => {
+    const style = buildBorderPresetPreviewStyle({
+      color: '#ff6600',
+      customCss: 'geometry-escape',
+      fillColor: '#00ff00',
+      fillOpacity: 25,
+      inheritCustomCss: true,
+      radius: 12,
+      shadow: 0,
+      strokeOpacity: 50,
+      style: 'solid',
+      width: 4,
+    });
+
+    expect(style).toMatchObject({
+      backgroundImage: 'linear-gradient(red, blue)',
+      boxShadow: '0 0 4px red',
+      height: '80px',
+      outline: '1px solid red',
+      width: '80px',
+    });
+    expect(style).not.toHaveProperty('all');
+    expect(style).not.toHaveProperty('border');
+    expect(style).not.toHaveProperty('clip');
+    expect(style).not.toHaveProperty('WebkitTransform');
+    expect(style).not.toHaveProperty('zoom');
   });
 });

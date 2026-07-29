@@ -291,3 +291,35 @@ it('rejects malformed and oversized base64 before writing ZIP entries', async ()
     )
   ).rejects.toThrow('Popup export package entry exceeds');
 });
+
+it('independently rejects aggregate entry overflow before constructing the archive', async () => {
+  const packages = Array.from({ length: 6 }, (_, packageIndex) =>
+    createBatchPackage({
+      archiveBaseName: `page_${packageIndex}`,
+      entries: Array.from({ length: packageIndex === 5 ? 1 : 2_000 }, (_, entryIndex) => ({
+        path: `entry-${entryIndex}.txt`,
+        textContent: '',
+      })),
+    })
+  );
+
+  await expect(createBatchArchiveBlob(packages, 'grouped')).rejects.toThrow(
+    'Popup batch export aggregate exceeds 10000 entries'
+  );
+});
+
+it('independently rejects aggregate directory-node overflow before constructing the archive', async () => {
+  const packages = Array.from({ length: 2 }, (_, packageIndex) =>
+    createBatchPackage({
+      archiveBaseName: `page_${packageIndex}`,
+      entries: Array.from({ length: 1_700 }, (_, entryIndex) => ({
+        path: `root-${entryIndex}/a/b/c/d/e/file.txt`,
+        textContent: '',
+      })),
+    })
+  );
+
+  await expect(createBatchArchiveBlob(packages, 'grouped')).rejects.toThrow(
+    'Popup batch export aggregate exceeds 20000 directory nodes'
+  );
+});

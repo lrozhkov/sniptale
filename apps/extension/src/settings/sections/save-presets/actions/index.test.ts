@@ -41,6 +41,8 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
       showSettings: true,
     },
     saveCapturesToGallery: false,
+    viewportPresets: [],
+    defaultViewportPresetId: null,
     presets: [createPreset('a', 0), createPreset('b', 1)],
     defaultImagePresetId: 'a',
     defaultVideoPresetId: null,

@@ -6,7 +6,12 @@ export { armDebuggerActivation } from '../debugger/session/activation';
 export { attachDebugger } from '../debugger/session/attach';
 export { detachDebugger } from '../debugger/session/detach';
 export { isDebuggerAttached } from '../debugger/session/status';
-export { clearViewport, resetZoom, setViewport } from '../debugger/workspace';
+export {
+  clearViewport,
+  getViewportWorkspace,
+  setViewport,
+  ViewportMutationError,
+} from '../debugger/workspace';
 export {
   handleDebuggerEvent,
   handleForcedDetach as handleDiagnosticsForcedDetach,

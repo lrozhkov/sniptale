@@ -4,7 +4,7 @@ import type {
   TabModeMessage,
 } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { WebSnapshotViewerPorts } from '../../capture/lifecycle';
-import type { ViewportOwnerState } from '../../routing-contracts/tab-mode-state';
+import type { ViewportOwnerState, ViewportState } from '../../routing-contracts/tab-mode-state';
 
 type HighlighterModeMessage =
   | Extract<TabModeMessage, { type: 'ENABLE_HIGHLIGHTER_MODE' }>
@@ -56,7 +56,7 @@ export type RouteTabModeMessageArgs = {
   highlighterModeState: Map<number, boolean>;
   quickEditModeState: Map<number, boolean>;
   viewportOwnerState: ViewportOwnerState;
-  viewportState: Map<number, { width: number; height: number } | null>;
+  viewportState: ViewportState;
   webSnapshotViewerPorts?: WebSnapshotViewerPorts;
 };
 

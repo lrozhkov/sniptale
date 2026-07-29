@@ -20,7 +20,13 @@ it('parses popup export requests and rejects malformed payloads', () => {
   expect(parsePopupExportRequest({ type: MessageType.EXPORT_POPUP_PREVIEW })).toEqual({
     type: MessageType.EXPORT_POPUP_PREVIEW,
   });
-  expect(parsePopupExportRequest({ type: MessageType.EXPORT_POPUP_CANCEL })).toEqual({
+  expect(
+    parsePopupExportRequest({
+      exportRunId: 'export-run-1',
+      type: MessageType.EXPORT_POPUP_CANCEL,
+    })
+  ).toEqual({
+    exportRunId: 'export-run-1',
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
   expect(
@@ -36,10 +42,12 @@ it('parses popup export requests and rejects malformed payloads', () => {
   });
   expect(
     parsePopupExportRequest({
+      batchRequestId: 'batch-1',
       options: createExportOptions(),
       type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
     })
   ).toEqual({
+    batchRequestId: 'batch-1',
     options: createExportOptions(),
     type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   });
@@ -84,11 +92,13 @@ it('preserves popup export content intent grants', () => {
 
   expect(
     parsePopupExportRequest({
+      batchRequestId: 'batch-2',
       contentIntentGrant: { grantToken: 'grant-package' },
       options: createExportOptions(),
       type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
     })
   ).toEqual({
+    batchRequestId: 'batch-2',
     contentIntentGrant: { grantToken: 'grant-package' },
     options: createExportOptions(),
     type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,

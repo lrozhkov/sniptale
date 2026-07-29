@@ -14,14 +14,14 @@ export function applyHistorySnapshotToFrameManager(args: {
   setFrameStates: FrameStateSetter;
   snapshot: ReturnType<PagePreparationHistoryBridge['captureSnapshot']>;
 }) {
-  const { frames, linkedElements, stepBadgeOrder } = hydrateFrameSessionSnapshot(args.snapshot);
+  const { frames, stepBadgeOrder } = hydrateFrameSessionSnapshot(args.snapshot);
   const nextFrameStates = new Map<string, FrameState>(frames.map((frame) => [frame.id, 'idle']));
 
   args.refs.framesRef.current = frames;
   args.refs.prevFramesRef.current = frames;
   args.refs.frameStatesRef.current = nextFrameStates;
   args.refs.prevFrameStatesRef.current = nextFrameStates;
-  args.refs.linkedElementsRef.current = linkedElements;
+  args.refs.hostLayoutServiceRef.current.restoreFrames(frames);
   args.refs.stepBadgeOrderRef.current = stepBadgeOrder;
   args.refs.globalEffectModeRef.current = args.snapshot.globalEffectMode;
   args.refs.globalStepBadgeSettingsRef.current = { ...args.snapshot.globalStepBadgeSettings };
@@ -74,5 +74,8 @@ export function createPagePreparationHistoryBridge(args: {
         sessionStepBadgeTemplate: args.refs.sessionStepBadgeTemplateRef.current,
         stepBadgeOrder: args.refs.stepBadgeOrderRef.current,
       }),
+    onHistoryCleared: () => args.refs.hostLayoutServiceRef.current.retireHistoryBindings(),
+    onHistoryReachabilityChanged: (frameIds) =>
+      args.refs.hostLayoutServiceRef.current.retireHistoryBindings(frameIds),
   };
 }

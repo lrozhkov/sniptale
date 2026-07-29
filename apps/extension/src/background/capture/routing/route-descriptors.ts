@@ -12,6 +12,7 @@ export const captureActionsRouteDescriptor = {
     CaptureMessageType.CAPTURE_VISIBLE,
     CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
     CaptureMessageType.CAPTURE_FULL,
+    CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
   ],
   ownerModule: 'apps/extension/src/background/capture/routing/route/screenshot-adapter.ts',
 } as const;
@@ -50,6 +51,7 @@ export const captureExportRouteDescriptor = {
     MessageType.EXPORT_START_HAR,
     MessageType.EXPORT_STOP_HAR,
     MessageType.EXPORT_CAPTURE_FULL_PAGE,
+    MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
   ],
   ownerModule: 'apps/extension/src/background/capture/routing/actions.export.ts',
 } as const;
@@ -73,6 +75,7 @@ export const webSnapshotRouteDescriptor = {
     MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
     MessageType.FETCH_WEB_SNAPSHOT_ASSET,
     MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK,
+    MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
   ],
   ownerModule: 'apps/extension/src/background/capture/routing/actions.web-snapshot.ts',
 } as const;

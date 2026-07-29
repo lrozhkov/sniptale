@@ -1,7 +1,7 @@
 import type { RuntimeRequestByType } from '../../../../contracts/messaging/contracts/runtime-message';
 import type { TabRequestByType, TabResponseByType } from '../../../../contracts/messaging/tab';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { getPopupRuntimeServices } from '../../runtime/services';
+import { getPopupRuntimeServices } from '../../../runtime-services';
 
 type PopupExportMessageType =
   | typeof MessageType.EXPORT_POPUP_PREVIEW

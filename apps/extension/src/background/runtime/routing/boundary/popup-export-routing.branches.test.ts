@@ -66,7 +66,7 @@ function createPopupExportOptions(includeFullPageScreenshot: boolean) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  browserTabsGetMock.mockResolvedValue({ id: 62, url: 'https://example.test/page' });
+  browserTabsGetMock.mockResolvedValue({ active: true, id: 62, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
   isOwnedSnapshotViewerPageMock.mockReturnValue(false);
   sendTabMessageMock.mockResolvedValue({ success: true });
@@ -126,10 +126,46 @@ it('adds full-page content grants to content popup export starts', async () => {
     62,
     expect.objectContaining({
       contentIntentGrant: { grantToken: expect.any(String) },
+      fullPageCaptureAction: MessageType.EXPORT_CAPTURE_FULL_PAGE,
       requestId: 'export-request-1',
       type: MessageType.EXPORT_POPUP_START,
     })
   );
+  expect(sendResponse).toHaveBeenCalledWith({ success: true });
+});
+
+it('uses unattended capture for an inactive single-tab archive without activating the tab', async () => {
+  const sendResponse = vi.fn();
+  browserTabsGetMock.mockResolvedValue({
+    active: false,
+    id: 62,
+    url: 'https://example.test/page',
+  });
+
+  routePopupExportMessage({
+    deps: createBackgroundRuntimeState(),
+    message: {
+      options: createPopupExportOptions(true),
+      requestId: 'inactive-export-1',
+      tabId: 62,
+      tabRouteCapabilityToken: 'cap-1',
+      tabRouteRequestId: 'req-inactive',
+      type: MessageType.EXPORT_POPUP_START,
+    },
+    resolvedTabId: 62,
+    sendResponse,
+    sender: undefined,
+  });
+  await flushRouteWork();
+
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    62,
+    expect.objectContaining({
+      fullPageCaptureAction: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+      requestId: 'inactive-export-1',
+    })
+  );
+  expect(browserTabsGetMock).toHaveBeenCalledWith(62);
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
 });
 
@@ -139,6 +175,7 @@ it('omits full-page grants from content popup export package builds without scre
   routePopupExportMessage({
     deps: createBackgroundRuntimeState(),
     message: {
+      batchRequestId: 'req-build',
       options: createPopupExportOptions(false),
       tabId: 62,
       tabRouteCapabilityToken: 'cap-1',
@@ -158,12 +195,13 @@ it('omits full-page grants from content popup export package builds without scre
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
 });
 
-it('routes content popup export cancellation without extra payload', async () => {
+it('routes content popup export cancellation with its export identity', async () => {
   const sendResponse = vi.fn();
 
   routePopupExportMessage({
     deps: createBackgroundRuntimeState(),
     message: {
+      exportRunId: 'export-run-cancel',
       tabId: 62,
       tabRouteCapabilityToken: 'cap-1',
       tabRouteRequestId: 'req-cancel',
@@ -176,6 +214,7 @@ it('routes content popup export cancellation without extra payload', async () =>
   await flushRouteWork();
 
   expect(sendTabMessageMock).toHaveBeenCalledWith(62, {
+    exportRunId: 'export-run-cancel',
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
   expect(sendResponse).toHaveBeenCalledWith({ success: true });

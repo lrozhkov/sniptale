@@ -51,6 +51,7 @@ export function finishEmptyBatchExport(args: {
     selectedCount: args.selectedCount,
   });
   args.state.requestIdRef.current = null;
+  args.state.cancelRetryRef.current = null;
   args.state.setResult({
     success: false,
     errors: args.errors,
@@ -85,6 +86,7 @@ export function setBatchSaveFailureProgress(args: {
   const errors = [failureMessage, ...args.errors.filter((error) => error !== failureMessage)];
 
   args.state.requestIdRef.current = null;
+  args.state.cancelRetryRef.current = null;
   args.state.setResult({
     success: false,
     errors,
@@ -113,6 +115,7 @@ export function applyBatchExportResult(args: {
   });
 
   args.state.requestIdRef.current = null;
+  args.state.cancelRetryRef.current = null;
   args.state.setResult(result);
   args.state.setProgress({
     activeStepKey: null,

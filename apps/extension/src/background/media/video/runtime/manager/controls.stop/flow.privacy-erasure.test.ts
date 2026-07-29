@@ -9,18 +9,22 @@ const {
   getVideoRecordingRuntimeStateMock,
   isVideoRecordingStopInProgressMock,
   loggerErrorMock,
+  releaseVideoCaptureSurfaceMock,
   runStopSideEffectsMock,
   sendRuntimeMessageMock,
   setVideoRecordingRuntimeStateMock,
+  getVideoSurfaceSessionMock,
 } = vi.hoisted(() => ({
   beginVideoRecordingStopMock: vi.fn(),
   finishVideoRecordingStopMock: vi.fn(),
   getVideoRecordingRuntimeStateMock: vi.fn(),
   isVideoRecordingStopInProgressMock: vi.fn(),
   loggerErrorMock: vi.fn(),
+  releaseVideoCaptureSurfaceMock: vi.fn(),
   runStopSideEffectsMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   setVideoRecordingRuntimeStateMock: vi.fn(),
+  getVideoSurfaceSessionMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -41,6 +45,17 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   isVideoRecordingStopInProgress: isVideoRecordingStopInProgressMock,
   resetCompletedVideoRecordingSession: vi.fn(),
   restoreVideoRecordingOffscreenStartPending: vi.fn(),
+  getVideoRecordingId: vi.fn(() => 'recording-1'),
+}));
+vi.mock('../../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture-surface')>()),
+  getVideoSurfaceSession: getVideoSurfaceSessionMock,
+  releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
+}));
+vi.mock('../../../recording-control-lease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
+  clearActiveVideoRecordingLease: vi.fn(),
+  ensureActiveVideoRecordingLeaseHydrated: vi.fn(() => Promise.resolve(null)),
 }));
 vi.mock('./effects', () => ({
   quiesceViewportEmulationForPrivacyErasure: vi.fn(),
@@ -64,6 +79,12 @@ beforeEach(() => {
   });
   isVideoRecordingStopInProgressMock.mockReturnValue(false);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
+  releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
+  getVideoSurfaceSessionMock.mockReturnValue({
+    generation: 2,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  });
   installBackgroundRuntimeMessagingMock({ sendRuntimeMessage: sendRuntimeMessageMock });
 });
 
@@ -84,6 +105,7 @@ it('requires an explicit deferred acknowledgement for privacy erasure', async ()
       discard: true,
     })
   );
+  expect(releaseVideoCaptureSurfaceMock).not.toHaveBeenCalled();
 });
 
 it('accepts privacy erasure stop only after the offscreen recorder settles', async () => {
@@ -92,6 +114,9 @@ it('accepts privacy erasure stop only after the offscreen recorder settles', asy
   await expect(stopRecordingForPrivacyErasure()).resolves.toEqual({ result: 'accepted' });
 
   expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock.mock.invocationCallOrder[0]).toBeLessThan(
+    releaseVideoCaptureSurfaceMock.mock.invocationCallOrder[0]!
+  );
   expect(runStopSideEffectsMock).toHaveBeenCalledWith(
     { mode: CaptureMode.TAB, shouldResetImmediately: false, tabId: 9 },
     'fixed'

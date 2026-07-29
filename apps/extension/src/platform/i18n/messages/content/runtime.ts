@@ -93,6 +93,14 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Не удалось снять скриншот всей страницы',
     en: 'Failed to capture the full-page screenshot',
   },
+  captureFullPageDownscaledWarning: {
+    ru: 'Снимок всей страницы уменьшен, чтобы сохранить его одним изображением',
+    en: 'The full-page screenshot was downscaled to keep it as one image',
+  },
+  captureFullPageFrozenExtentWarning: {
+    ru: 'Размер страницы изменился после прогрева; снимок использует зафиксированную область',
+    en: 'The page grew after warm-up; the screenshot uses the frozen capture extent',
+  },
   captureFullPageScreenshotRetryHint: {
     ru: 'Не удалось снять скриншот. Попробуйте закрыть режим разработчика или обновить страницу',
     en: 'Failed to capture the screenshot. Try closing DevTools or refreshing the page',
@@ -104,6 +112,10 @@ export const contentRuntimeMessages = defineMessageSource({
   exportCancelled: {
     ru: 'Экспорт отменён пользователем',
     en: 'Export was cancelled by the user',
+  },
+  exportCancelFailed: {
+    ru: 'Не удалось отменить экспорт и очистить сохранённые данные. Повторите отмену.',
+    en: 'Failed to cancel the export and clean up saved data. Try cancelling again.',
   },
   downloadFilesPrefix: {
     ru: 'Скачивание файлов',

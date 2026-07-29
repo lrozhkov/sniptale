@@ -95,8 +95,11 @@ function createSendResponse() {
 }
 
 function createContext(): CaptureRouteContext {
-  const viewportState: Map<number, { width: number; height: number } | null> = new Map([
-    [42, { width: 1280, height: 720 }],
+  const viewportState: Map<
+    number,
+    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+  > = new Map([
+    [42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }],
   ]);
 
   return {
@@ -137,6 +140,8 @@ async function verifiesVisibleCaptureDownloadFlow() {
 
   expect(loggerLogMock).toHaveBeenCalledWith('Handling visible capture request', { tabId: 42 });
   expect(captureViewportWithClipTransactionMock).toHaveBeenCalledWith(42, {
+    presetId: 'test:viewport',
+    target: 'viewport',
     width: 1280,
     height: 720,
   });
@@ -183,6 +188,7 @@ async function verifiesVisibleCaptureCopyAndEditFlows() {
   captureFullPageTransactionMock.mockResolvedValue({
     dataUrl: 'data:image/jpeg;base64,3',
     jobId: 'capture-job-full-edit',
+    metadata: { downscaled: false, frozenExtentWarning: false },
   });
   openEditorWithImageMock.mockResolvedValue(undefined);
 

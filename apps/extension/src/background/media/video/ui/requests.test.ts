@@ -12,6 +12,17 @@ import {
 import { requestRegionSelection } from './region-selection';
 import type { RegionSelectionRequestBinding } from './region-selection.request-binding';
 
+const captureViewport = {
+  devicePixelRatio: 2,
+  height: 720,
+  scrollX: 0,
+  scrollY: 0,
+  viewportOffsetX: 0,
+  viewportOffsetY: 0,
+  visualViewportScale: 1,
+  width: 1280,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -168,12 +179,13 @@ async function verifyRegionSelectionSuccess(): Promise<void> {
     {
       type: VideoMessageType.REGION_SELECTED,
       ...createRegionSelectionMessageBinding(request.binding),
+      captureViewport,
       region,
     },
     createRegionSelectionSender()
   );
 
-  await expect(request.resultPromise).resolves.toEqual(region);
+  await expect(request.resultPromise).resolves.toEqual({ captureViewport, region });
   expect(request.sendTabMessage).toHaveBeenCalledWith(42, {
     type: VideoMessageType.SHOW_REGION_SELECTOR,
     ...createRegionSelectionMessageBinding(request.binding),
@@ -190,6 +202,7 @@ async function verifyRegionSelectionIgnoresOtherTabs(): Promise<void> {
     {
       type: VideoMessageType.REGION_SELECTED,
       ...createRegionSelectionMessageBinding(request.binding),
+      captureViewport,
       region: { x: 1, y: 2, width: 3, height: 4 },
     },
     createRegionSelectionSender({ tab: { id: 7 } as chrome.tabs.Tab })
@@ -211,7 +224,7 @@ async function verifyRegionSelectionIgnoresOtherTabs(): Promise<void> {
 }
 
 describe('requestRegionSelection failure paths', () => {
-  it('still resolves with the selected region when overlay restoration fails', async () => {
+  it('cancels selection when its recording overlay cannot be shown', async () => {
     const runtime = createRuntimeSubscriptionHarness();
     const binding = createRegionSelectionBinding();
     const sendTabMessage = vi.fn().mockResolvedValue(undefined);
@@ -231,12 +244,13 @@ describe('requestRegionSelection failure paths', () => {
       {
         type: VideoMessageType.REGION_SELECTED,
         ...createRegionSelectionMessageBinding(binding),
+        captureViewport,
         region,
       },
       createRegionSelectionSender()
     );
 
-    await expect(resultPromise).resolves.toEqual(region);
+    await expect(resultPromise).resolves.toBeNull();
     expect(showRecordingOverlay).toHaveBeenCalledWith(42, region);
     expect(runtime.unsubscribe).toHaveBeenCalledOnce();
   });

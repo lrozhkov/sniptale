@@ -32,7 +32,7 @@ it('keeps the viewer port registry when tab-mode deps provide it', async () => {
   handleTabMessage({
     deps,
     logger: { error: loggerErrorMock, warn: loggerWarnMock },
-    message: { type: MessageType.ENABLE_SCREENSHOT_MODE },
+    message: { type: MessageType.ENABLE_HIGHLIGHTER_MODE },
     resolvedTabId: 17,
     sendResponse,
     sender: createTopLevelContentSender(17, 'https://example.test/page'),

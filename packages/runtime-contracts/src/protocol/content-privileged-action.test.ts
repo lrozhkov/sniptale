@@ -16,10 +16,13 @@ import {
 
 it('matches the exact protected message type set', () => {
   expect(CONTENT_PRIVILEGED_ACTION_TYPES).toEqual([
+    MessageType.ENABLE_SCREENSHOT_MODE,
     CaptureMessageType.CAPTURE_VISIBLE,
     CaptureMessageType.CAPTURE_FULL,
     CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
+    CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
     MessageType.EXPORT_CAPTURE_FULL_PAGE,
+    MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
     MessageType.EXECUTE_SAVE,
     MessageType.OPEN_EDITOR_WITH_IMAGE,
     MessageType.SAVE_SCREENSHOT_TO_GALLERY,

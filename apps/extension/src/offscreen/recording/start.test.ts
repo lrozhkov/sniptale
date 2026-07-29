@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const {
   cleanupResourcesMock,
@@ -6,46 +6,44 @@ const {
   finalizeRecordingBootstrapMock,
   handleRecordingStartErrorMock,
   initializeRecordingSessionMock,
-  prepareRecordingStreamMock,
   initializeSidecarRecordersMock,
+  prepareRecordingStreamMock,
   recordingContextMock,
+  sendRuntimeMessageMock,
 } = vi.hoisted(() => ({
   cleanupResourcesMock: vi.fn(),
   durationTrackerMock: { publishDuration: vi.fn() },
   finalizeRecordingBootstrapMock: vi.fn(),
-  handleRecordingStartErrorMock: vi.fn(),
+  handleRecordingStartErrorMock: vi.fn((error: unknown) => error),
   initializeRecordingSessionMock: vi.fn(() => 'recording-1'),
-  prepareRecordingStreamMock: vi.fn(),
   initializeSidecarRecordersMock: vi.fn(),
+  prepareRecordingStreamMock: vi.fn(),
   recordingContextMock: {
+    bindStreamInstance: vi.fn(),
     currentRecordingId: 'recording-1' as string | null,
     durationTracker: { publishDuration: vi.fn() },
     lifecycleState: 'starting' as 'idle' | 'starting' | 'recording' | 'stopping',
+    sourceVideoHeight: null as number | null,
+    sourceVideoWidth: null as number | null,
+    tabOutputGeometry: null as unknown,
   },
+  sendRuntimeMessageMock: vi.fn(),
 }));
 
 vi.mock('./context', () => ({
+  RecordingStopOutcome: undefined,
   recordingContext: recordingContextMock,
 }));
-
-vi.mock('./setup', () => ({
+vi.mock('./setup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./setup')>()),
   prepareRecordingStream: prepareRecordingStreamMock,
 }));
-
-vi.mock('./sidecar', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./sidecar')>();
-  return {
-    ...actual,
-    initializeSidecarRecorders: initializeSidecarRecordersMock,
-  };
-});
-
-vi.mock('./start/cleanup', () => ({
-  cleanupResources: cleanupResourcesMock,
+vi.mock('./sidecar', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./sidecar')>()),
+  initializeSidecarRecorders: initializeSidecarRecordersMock,
 }));
-vi.mock('./start/recorder', () => ({
-  finalizeRecordingBootstrap: finalizeRecordingBootstrapMock,
-}));
+vi.mock('./start/cleanup', () => ({ cleanupResources: cleanupResourcesMock }));
+vi.mock('./start/recorder', () => ({ finalizeRecordingBootstrap: finalizeRecordingBootstrapMock }));
 vi.mock('./start/session', () => ({
   handleRecordingStartError: handleRecordingStartErrorMock,
   initializeRecordingSession: initializeRecordingSessionMock,
@@ -53,102 +51,186 @@ vi.mock('./start/session', () => ({
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { startRecording } from './start/index';
 import { createSettings } from './start/helpers.test-support';
+import { allowRecordingBegin, cancelRecordingBegin } from './start/gate';
 
-type StartRecordingParams = Parameters<typeof startRecording>[0];
+const prepared = {
+  cursorCaptureMode: null,
+  rawTrackSettings: { width: 1280, height: 720, frameRate: 30 },
+  rawVideoHeight: 720,
+  rawVideoWidth: 1280,
+  tabOutputGeometry: null,
+  trackSettings: { width: 1280, height: 720, frameRate: 30 },
+};
+const messaging = { sendRuntimeMessage: sendRuntimeMessageMock };
 
-function createStartParams(overrides: Partial<StartRecordingParams> = {}): StartRecordingParams {
-  return {
-    streamId: 'stream-1',
-    settings: createSettings(),
-    ...overrides,
-  };
-}
-
-function resetStartRecordingMocks() {
+beforeEach(() => {
   vi.clearAllMocks();
   recordingContextMock.currentRecordingId = 'recording-1';
   recordingContextMock.durationTracker = durationTrackerMock;
   recordingContextMock.lifecycleState = 'starting';
-  initializeSidecarRecordersMock.mockResolvedValue(undefined);
-}
+  prepareRecordingStreamMock.mockResolvedValue(prepared);
+  cleanupResourcesMock.mockImplementation(() => cancelRecordingBegin());
+  sendRuntimeMessageMock.mockImplementation(
+    async (message: { generation: number; recordingId: string; streamInstanceId: string }) => {
+      allowRecordingBegin({
+        generation: message.generation,
+        recordingId: message.recordingId,
+        streamInstanceId: message.streamInstanceId,
+      });
+      return { success: true, result: 'ALLOW' };
+    }
+  );
+});
 
-it('skips bootstrap when the recording session is reset before stream setup completes', async () => {
-  resetStartRecordingMocks();
-  prepareRecordingStreamMock.mockResolvedValue({
-    captureWidth: 1280,
-    captureHeight: 720,
-    trackSettings: { width: 1280, height: 720, frameRate: 30 },
+afterEach(() => {
+  cancelRecordingBegin();
+  vi.useRealTimers();
+});
+
+it('announces raw source metadata and starts only after background ALLOW', async () => {
+  const surface = {
+    presetId: 'preset-1',
+    target: 'viewport' as const,
+    width: 1280,
+    height: 720,
+  };
+
+  await startRecording(
+    {
+      captureMode: CaptureMode.TAB,
+      generation: 3,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+      settings: createSettings(),
+      streamId: 'stream-1',
+      surface,
+    },
+    messaging
+  );
+
+  expect(prepareRecordingStreamMock).toHaveBeenCalledWith({
+    captureMode: CaptureMode.TAB,
+    settings: expect.any(Object),
+    streamId: 'stream-1',
+    surface,
   });
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: 'OFFSCREEN_SOURCE_READY',
+      generation: 3,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+      videoWidth: 1280,
+      videoHeight: 720,
+      trackSettings: { width: 1280, height: 720, frameRate: 30 },
+    })
+  );
+  expect(finalizeRecordingBootstrapMock).toHaveBeenCalledOnce();
+});
+
+it('survives the supported ten-second countdown before background activation', async () => {
+  vi.useFakeTimers();
+  sendRuntimeMessageMock.mockImplementationOnce(
+    (message: { generation: number; recordingId: string; streamInstanceId: string }) =>
+      new Promise((resolve) => {
+        setTimeout(() => {
+          allowRecordingBegin({
+            generation: message.generation,
+            recordingId: message.recordingId,
+            streamInstanceId: message.streamInstanceId,
+          });
+          resolve({ success: true, result: 'ALLOW' });
+        }, 10_000);
+      })
+  );
+
+  const start = startRecording(
+    {
+      captureMode: CaptureMode.TAB,
+      generation: 3,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+      settings: { ...createSettings(), countdownSeconds: 10 },
+      streamId: 'stream-1',
+    },
+    messaging
+  );
+  await vi.advanceTimersByTimeAsync(10_000);
+
+  await expect(start).resolves.toBeUndefined();
+  expect(finalizeRecordingBootstrapMock).toHaveBeenCalledOnce();
+});
+
+it('fails closed when background denies the raw source', async () => {
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: true, result: 'DENY' });
+
+  await expect(
+    startRecording(
+      {
+        generation: 1,
+        recordingId: 'recording-1',
+        streamInstanceId: 'stream-instance-1',
+        settings: createSettings(),
+        streamId: 'stream-1',
+      },
+      messaging
+    )
+  ).rejects.toThrow('source-dimensions-mismatch');
+  expect(finalizeRecordingBootstrapMock).not.toHaveBeenCalled();
+  expect(cleanupResourcesMock).toHaveBeenCalled();
+});
+
+it('settles the real begin gate before propagating a SOURCE_READY transport failure', async () => {
+  sendRuntimeMessageMock.mockRejectedValueOnce(new Error('background unavailable'));
+
+  await expect(
+    startRecording(
+      {
+        generation: 1,
+        recordingId: 'recording-1',
+        streamInstanceId: 'stream-instance-1',
+        settings: createSettings(),
+        streamId: 'stream-1',
+      },
+      messaging
+    )
+  ).rejects.toThrow('background unavailable');
+  expect(cleanupResourcesMock).toHaveBeenCalled();
+});
+
+it('cleans up when the session becomes stale during setup', async () => {
   recordingContextMock.currentRecordingId = null;
   recordingContextMock.lifecycleState = 'idle';
 
-  await startRecording({
-    streamId: 'stream-stale',
-    settings: createSettings(),
-  });
+  await startRecording(
+    {
+      generation: 1,
+      recordingId: 'recording-stale',
+      streamInstanceId: 'stream-instance-stale',
+      settings: createSettings(),
+      streamId: 'stream-stale',
+    },
+    messaging
+  );
 
   expect(cleanupResourcesMock).toHaveBeenCalledOnce();
-  expect(finalizeRecordingBootstrapMock).not.toHaveBeenCalled();
-  expect(handleRecordingStartErrorMock).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
 });
 
-it('passes recording stream params directly into prepareRecordingStream and bootstrap', async () => {
-  resetStartRecordingMocks();
-  const params = createStartParams({
-    streamId: 'stream-1',
-    viewport: { width: 1440, height: 900, devicePixelRatio: 2 },
-    captureMode: CaptureMode.TAB_CROP,
-    cropRegion: { x: 10, y: 20, width: 300, height: 200 },
-    targetResolution: { width: 1280, height: 720 },
-    emulatedViewportCssSize: { width: 720, height: 450 },
-  });
-
-  prepareRecordingStreamMock.mockResolvedValue({
-    captureWidth: 1280,
-    captureHeight: 720,
-    trackSettings: { width: 1280, height: 720, frameRate: 30 },
-  });
-
-  await startRecording(params);
-
-  expect(initializeRecordingSessionMock).toHaveBeenCalledWith(params);
-  expect(prepareRecordingStreamMock).toHaveBeenCalledWith({
-    streamId: 'stream-1',
-    settings: params.settings,
-    viewport: params.viewport,
-    captureMode: CaptureMode.TAB_CROP,
-    cropRegion: params.cropRegion,
-    targetResolution: params.targetResolution,
-    emulatedViewportCssSize: params.emulatedViewportCssSize,
-  });
-  expect(finalizeRecordingBootstrapMock).toHaveBeenCalledWith({
-    resolvedRecordingId: 'recording-1',
-    settings: params.settings,
-    captureWidth: 1280,
-    captureHeight: 720,
-    trackSettings: { width: 1280, height: 720, frameRate: 30 },
-    durationTracker: durationTrackerMock,
-  });
-  expect(initializeSidecarRecordersMock).toHaveBeenCalledWith({
-    baseRecordingId: 'recording-1',
-    captureMode: CaptureMode.TAB_CROP,
-    settings: params.settings,
-  });
-  expect(handleRecordingStartErrorMock).not.toHaveBeenCalled();
-});
-
-it('rethrows startup errors after owner-local cleanup runs', async () => {
-  resetStartRecordingMocks();
-  const startupError = new Error('stream failed');
-  prepareRecordingStreamMock.mockRejectedValueOnce(startupError);
-  handleRecordingStartErrorMock.mockImplementationOnce((error: unknown) => error);
+it('routes setup errors through the shared start-error path', async () => {
+  prepareRecordingStreamMock.mockRejectedValueOnce(new Error('stream failed'));
 
   await expect(
-    startRecording({
-      streamId: 'stream-error',
-      settings: createSettings(),
-    })
+    startRecording(
+      {
+        generation: 1,
+        recordingId: 'recording-error',
+        streamInstanceId: 'stream-instance-error',
+        settings: createSettings(),
+        streamId: 'stream-error',
+      },
+      messaging
+    )
   ).rejects.toThrow('stream failed');
-
-  expect(handleRecordingStartErrorMock).toHaveBeenCalledWith(startupError, undefined);
+  expect(handleRecordingStartErrorMock).toHaveBeenCalledWith(expect.any(Error), 'recording-error');
 });

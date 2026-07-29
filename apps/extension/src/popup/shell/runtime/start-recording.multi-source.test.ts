@@ -50,7 +50,7 @@ it('disables system audio for multi-source screen recording', async () => {
     setRecordingControlCapability,
     setStartError,
     videoSettings: { ...defaultSettings, sourceCount: 2 },
-    viewportPreset: null,
+    viewportPresetId: null,
   });
 
   expect(runtimeSendMessage).toHaveBeenCalledWith(
@@ -72,7 +72,7 @@ it('does not disable webcam for multi-source screen recording', async () => {
       webcamEnabled: true,
       webcamDeviceId: 'cam-1',
     },
-    viewportPreset: null,
+    viewportPresetId: null,
   });
 
   expect(runtimeSendMessage).toHaveBeenCalledWith(
@@ -94,7 +94,7 @@ it('resets source count outside screen capture mode', async () => {
     setRecordingControlCapability,
     setStartError,
     videoSettings: { ...defaultSettings, sourceCount: 3 },
-    viewportPreset: null,
+    viewportPresetId: null,
   });
 
   expect(runtimeSendMessage).toHaveBeenCalledWith(

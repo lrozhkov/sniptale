@@ -39,6 +39,8 @@ vi.mock('./descriptors', async (importOriginal) => ({
 
 import { prepareFrameRootsRender } from './prepare';
 
+const hostLayoutSnapshot = { presentations: new Map(), recoveries: [], version: 0 };
+
 function createFrame(id: string) {
   return {
     borderSettings: {
@@ -109,6 +111,7 @@ function expectRemovedFrameRootUnmountsAfterRenderTick() {
     framesRef: { current: [createFrame('frame-1')] },
     getOrCreateContainer: () => container,
     isClearingRef: { current: false },
+    hostLayoutSnapshot,
     prevRenderDescriptorsRef: { current: [] },
     rootsRef,
   });
@@ -138,6 +141,7 @@ function expectDeferredUnmountErrorsAreLogged() {
     framesRef: { current: [] },
     getOrCreateContainer: () => container,
     isClearingRef: { current: false },
+    hostLayoutSnapshot,
     prevRenderDescriptorsRef: { current: [] },
     rootsRef: { current: new Map<string, Root>([['frame-1', removedRoot]]) },
   });
@@ -157,6 +161,7 @@ function expectRendererSkipsClearingAndDetachedContainer() {
       framesRef: { current: [createFrame('frame-1')] },
       getOrCreateContainer: () => detachedContainer,
       isClearingRef: { current: true },
+      hostLayoutSnapshot,
       prevRenderDescriptorsRef: { current: [] },
       rootsRef: { current: new Map<string, Root>() },
     })
@@ -168,6 +173,7 @@ function expectRendererSkipsClearingAndDetachedContainer() {
       framesRef: { current: [createFrame('frame-1')] },
       getOrCreateContainer: () => detachedContainer,
       isClearingRef: { current: false },
+      hostLayoutSnapshot,
       prevRenderDescriptorsRef: { current: [] },
       rootsRef: { current: new Map<string, Root>() },
     })
@@ -186,6 +192,7 @@ function expectMissingFrameRootsRenderState() {
     framesRef: { current: [createFrame('frame-1')] },
     getOrCreateContainer: () => container,
     isClearingRef: { current: false },
+    hostLayoutSnapshot,
     prevRenderDescriptorsRef: { current: [] },
     rootsRef: { current: new Map<string, Root>() },
   });
@@ -194,6 +201,33 @@ function expectMissingFrameRootsRenderState() {
   expect(prepareMocks.applyIsolatedContentRootStyle).toHaveBeenCalledTimes(1);
   expect(renderState?.container).toBe(container);
   expect(renderState?.currentFrames).toHaveLength(1);
+}
+
+function expectUnavailableFrameRootsStayUnmounted() {
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  appendFrameContainer(container, 'frame-1');
+  const root = createRootStub();
+  const rootsRef = { current: new Map<string, Root>([['frame-1', root]]) };
+
+  prepareFrameRootsRender({
+    currentFrameStates: new Map<string, FrameState>([['frame-1', 'idle']]),
+    framesRef: { current: [createFrame('frame-1')] },
+    getOrCreateContainer: () => container,
+    isClearingRef: { current: false },
+    hostLayoutSnapshot: {
+      presentations: new Map([['frame-1', 'suspended']]),
+      recoveries: [],
+      version: 1,
+    },
+    prevRenderDescriptorsRef: { current: [] },
+    rootsRef,
+  });
+
+  expect(root.unmount).toHaveBeenCalledTimes(1);
+  expect(rootsRef.current.has('frame-1')).toBe(false);
+  expect(document.getElementById('frame-container-frame-1')).toBeNull();
+  expect(prepareMocks.createRoot).not.toHaveBeenCalled();
 }
 
 function registerPrepareFrameRootsRenderTests() {
@@ -209,6 +243,7 @@ function registerPrepareFrameRootsRenderTests() {
     'defers unmounting removed frame roots until after the current render tick',
     expectRemovedFrameRootUnmountsAfterRenderTick
   );
+  it('keeps unavailable frame roots fully unmounted', expectUnavailableFrameRootsStayUnmounted);
   it('logs deferred removed root unmount failures', expectDeferredUnmountErrorsAreLogged);
 }
 

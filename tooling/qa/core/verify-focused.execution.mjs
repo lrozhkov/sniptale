@@ -95,19 +95,23 @@ function runManualMockExportParityStep(targetFiles) {
   );
 }
 
-function runFocusedCodeSteps(codeFiles) {
+async function runFocusedCodeSteps(codeFiles) {
   const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
-  return FOCUSED_CODE_VIOLATION_STEPS.map(([label, header, runner]) =>
-    timeSyncStep(() => {
-      return createViolationStep(
-        label,
-        header,
-        runCodeStep(behavioralCodeFiles, () =>
-          runner({ files: behavioralCodeFiles, scope: 'workspace' })
+  const steps = [];
+  for (const [label, header, runner] of FOCUSED_CODE_VIOLATION_STEPS) {
+    steps.push(
+      await timeAsyncStep(async () =>
+        createViolationStep(
+          label,
+          header,
+          await runCodeStep(behavioralCodeFiles, () =>
+            runner({ files: behavioralCodeFiles, scope: 'workspace' })
+          )
         )
-      );
-    })
-  );
+      )
+    );
+  }
+  return steps;
 }
 
 function runConditionalViolationStep(label, shouldRun, header, runner) {
@@ -201,7 +205,7 @@ export function runFocusedPolicySteps({ shouldRunManifestPermissions, shouldRunR
   ];
 }
 
-export function collectFocusedLightLane({
+export async function collectFocusedLightLane({
   baseline,
   codeFiles,
   existingTargetFiles,
@@ -219,7 +223,7 @@ export function collectFocusedLightLane({
       timeSyncStep(() => runAiHygieneStep(qualityCodeFiles, baseline)),
       timeSyncStep(() => runStructuralRiskStep(qualityCodeFiles)),
       timeSyncStep(() => runManualMockExportParityStep(qualityTargetFiles)),
-      ...runFocusedCodeSteps(qualityCodeFiles),
+      ...(await runFocusedCodeSteps(qualityCodeFiles)),
     ],
     triggeredStaticSteps: runFocusedTriggeredStaticChecks({
       deferOwnerGuards: true,

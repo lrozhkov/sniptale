@@ -88,8 +88,6 @@ function bootstrapRecorder() {
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
     settings: { quality: VideoQuality.HIGH } as never,
-    captureWidth: 1280,
-    captureHeight: 720,
     cursorCaptureMode: 'separate',
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker: {
@@ -179,7 +177,7 @@ function registerCleanFinalizeTest() {
 }
 
 function registerFinalizeFailureTest() {
-  it('ignores empty chunks and rejects when finalizeRecording fails', async () => {
+  it('ignores empty chunks and resolves one terminal outcome when finalization fails', async () => {
     installMediaRecorderMock(['video/webm;codecs=vp8']);
     finalizeRecordingMock.mockRejectedValueOnce(new Error('finalize failed'));
     recordingContext.videoStream = createVideoStream();
@@ -200,8 +198,11 @@ function registerFinalizeFailureTest() {
       notifyStopped: true,
     });
     expect(cleanupResourcesMock).toHaveBeenCalled();
-    expect(resolveStop).not.toHaveBeenCalled();
-    expect(rejectStop).toHaveBeenCalledWith(expect.any(Error));
+    expect(resolveStop).toHaveBeenCalledWith({
+      error: 'finalize failed',
+      result: 'terminal-failure',
+    });
+    expect(rejectStop).not.toHaveBeenCalled();
   });
 }
 

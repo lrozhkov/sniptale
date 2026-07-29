@@ -111,6 +111,24 @@ it('stops when cancellation is observed during archive creation', async () => {
   expect(loggingMocks.logPopupExportBatchArchiveSaveStart).not.toHaveBeenCalled();
 });
 
+it('does not save an archive when cancellation wins immediately before the save effect', async () => {
+  stateMocks.isCurrentBatchRequest.mockReturnValueOnce(true).mockReturnValueOnce(false);
+  const deps = createDeps();
+
+  await finishBatchExport({
+    deps,
+    errors: [],
+    layout: 'grouped',
+    pagePackages: [createPagePackage()],
+    requestId: 'req-1',
+    state: createState(),
+  });
+
+  expect(archiveMocks.createBatchArchiveBlob).toHaveBeenCalledOnce();
+  expect(deps.saveArchiveBlob).not.toHaveBeenCalled();
+  expect(loggingMocks.logPopupExportBatchArchiveSaveStart).not.toHaveBeenCalled();
+});
+
 describe('finishBatchExport archive save failure', () => {
   it('logs archive save failures and delegates failure progress updates', async () => {
     stateMocks.isCurrentBatchRequest.mockReturnValue(true);

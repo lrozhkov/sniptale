@@ -26,7 +26,10 @@ declare module './' {
     type ERASE_LOCAL_EXTENSION_DATA = typeof import('./').MessageType.ERASE_LOCAL_EXTENSION_DATA;
     type LLM_RESPONSE = typeof import('./').MessageType.LLM_RESPONSE;
     type LLM_ERROR = typeof import('./').MessageType.LLM_ERROR;
-    type SET_VIEWPORT = typeof import('./').MessageType.SET_VIEWPORT;
+    type APPLY_VIEWPORT_PRESET = typeof import('./').MessageType.APPLY_VIEWPORT_PRESET;
+    type RELEASE_VIEWPORT_PRESET = typeof import('./').MessageType.RELEASE_VIEWPORT_PRESET;
+    type GET_VIEWPORT_PRESET_AVAILABILITY =
+      typeof import('./').MessageType.GET_VIEWPORT_PRESET_AVAILABILITY;
     type VIEWPORT_CHANGED = typeof import('./').MessageType.VIEWPORT_CHANGED;
     type GET_VIEWPORT_STATUS = typeof import('./').MessageType.GET_VIEWPORT_STATUS;
     type OPEN_EXPORT_MODAL = typeof import('./').MessageType.OPEN_EXPORT_MODAL;
@@ -41,6 +44,8 @@ declare module './' {
     type RELEASE_POPUP_EXPORT_ARCHIVE =
       typeof import('./').MessageType.RELEASE_POPUP_EXPORT_ARCHIVE;
     type EXPORT_POPUP_CANCEL = typeof import('./').MessageType.EXPORT_POPUP_CANCEL;
+    type RELEASE_WEB_SNAPSHOT_STAGED_BLOBS =
+      typeof import('./').MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS;
     type REQUEST_POPUP_TAB_ROUTE_CAPABILITY =
       typeof import('./').MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY;
     type REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY =
@@ -59,6 +64,13 @@ declare module './' {
     type EXPORT_START_HAR = typeof import('./').MessageType.EXPORT_START_HAR;
     type EXPORT_STOP_HAR = typeof import('./').MessageType.EXPORT_STOP_HAR;
     type EXPORT_CAPTURE_FULL_PAGE = typeof import('./').MessageType.EXPORT_CAPTURE_FULL_PAGE;
+    type EXPORT_CAPTURE_FULL_PAGE_UNATTENDED =
+      typeof import('./').MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED;
+    type PREPARE_FULL_PAGE_CAPTURE = typeof import('./').MessageType.PREPARE_FULL_PAGE_CAPTURE;
+    type HEARTBEAT_FULL_PAGE_CAPTURE = typeof import('./').MessageType.HEARTBEAT_FULL_PAGE_CAPTURE;
+    type PREPARE_FULL_PAGE_TILE = typeof import('./').MessageType.PREPARE_FULL_PAGE_TILE;
+    type VERIFY_FULL_PAGE_TILE = typeof import('./').MessageType.VERIFY_FULL_PAGE_TILE;
+    type RESTORE_FULL_PAGE_CAPTURE = typeof import('./').MessageType.RESTORE_FULL_PAGE_CAPTURE;
     type OPEN_EDITOR_WITH_IMAGE = typeof import('./').MessageType.OPEN_EDITOR_WITH_IMAGE;
     type IMAGE_DATA_FOR_EDITOR = typeof import('./').MessageType.IMAGE_DATA_FOR_EDITOR;
     type SAVE_SCREENSHOT_TO_GALLERY = typeof import('./').MessageType.SAVE_SCREENSHOT_TO_GALLERY;
@@ -121,6 +133,8 @@ declare module './' {
     type CAPTURE_SELECTION_COMPLETE =
       typeof import('./').CaptureMessageType.CAPTURE_SELECTION_COMPLETE;
     type CAPTURE_SELECTION_CANCEL = typeof import('./').CaptureMessageType.CAPTURE_SELECTION_CANCEL;
+    type RENEW_SCREENSHOT_SURFACE_SESSION =
+      typeof import('./').CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION;
     type CAPTURE_PROGRESS = typeof import('./').CaptureMessageType.CAPTURE_PROGRESS;
     type CAPTURE_COMPLETE = typeof import('./').CaptureMessageType.CAPTURE_COMPLETE;
     type CAPTURE_ERROR = typeof import('./').CaptureMessageType.CAPTURE_ERROR;

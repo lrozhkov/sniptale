@@ -1,4 +1,5 @@
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
+import { isContentRuntimeUiElement } from '../../../platform/page-context/dom';
 import {
   sanitizeDiagnosticData,
   sanitizeDiagnosticMessage,
@@ -20,7 +21,10 @@ type DiagnosticElementDescription = {
 };
 
 export function isDiagnosticLoggerTargetEnabled(target: EventTarget | null): target is HTMLElement {
-  return target instanceof HTMLElement && !target.closest(`#${CONTENT_ROOT_ID}`);
+  return (
+    target instanceof HTMLElement &&
+    !isContentRuntimeUiElement(target, { closestSelectors: [`#${CONTENT_ROOT_ID}`] })
+  );
 }
 
 export function buildUserActionMessage(

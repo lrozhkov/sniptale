@@ -181,6 +181,17 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/overlay/toolbar/capture/menus.test.tsx'],
   },
   {
+    owner: 'content-overlay-toolbar-viewport-mutation',
+    productionFile: 'apps/extension/src/content/overlay/toolbar/view.tsx',
+    exclusive: true,
+    reason:
+      'Toolbar viewport changes use the shared owner and its injected viewer-local mutation port.',
+    testFiles: [
+      'apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts',
+      'apps/extension/src/content/overlay/toolbar/shell/view.test.tsx',
+    ],
+  },
+  {
     owner: 'content-page-preparation-local-save-hook',
     productionFile: 'apps/extension/src/content/parser/page-preparation/local-save/hook/index.ts',
     exclusive: true,
@@ -330,7 +341,8 @@ export const LOCAL_OWNER_MAPPINGS = [
       'apps/extension/src/content/selection/frame-runtime/effects/geometry.test.ts',
       'apps/extension/src/content/selection/frame-runtime/effects/overlay-descriptors.test.ts',
       'apps/extension/src/content/selection/frame-runtime/history/bridge.test.ts',
-      'apps/extension/src/content/selection/frame-runtime/roots/scroll/frame-updates.test.ts',
+      'apps/extension/src/content/selection/frame-runtime/host-layout/reconcile.test.ts',
+      'apps/extension/src/content/selection/frame-runtime/host-layout/service.test.ts',
     ],
   },
   {

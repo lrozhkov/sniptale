@@ -8,6 +8,7 @@ export type {
   FocusSettings,
 } from '@sniptale/ui/highlighter-style/types';
 export { colorToRgba, resolveBorderPresetVisual, type ResolvedBorderPresetVisual } from './visual';
+export { projectFrameDecorationCssStyles } from './decoration';
 export {
   BORDER_SHADOW_HARD_INTENSITY,
   BORDER_SHADOW_SOFT_INTENSITY,

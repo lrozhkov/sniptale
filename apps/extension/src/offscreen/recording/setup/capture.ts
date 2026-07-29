@@ -5,7 +5,6 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { consumeDesktopStream, detachCachedPreview } from './desktop-media';
-import { resolveRecordingSafeDimension } from '../dimensions';
 import {
   buildWebcamQualityConstraints,
   resolveWebcamQualitySettings,
@@ -13,33 +12,12 @@ import {
 
 const logger = createLogger({ namespace: 'OffscreenRecordingSetup' });
 
-export function resolveCaptureDimensions(params: {
-  viewport?: { width: number; height: number; devicePixelRatio?: number };
-  captureMode?: CaptureMode;
-  targetResolution?: { width: number; height: number };
-}) {
-  const dpr = params.viewport?.devicePixelRatio || 1;
-  let captureWidth = params.viewport
-    ? resolveRecordingSafeDimension(params.viewport.width * dpr)
-    : undefined;
-  let captureHeight = params.viewport
-    ? resolveRecordingSafeDimension(params.viewport.height * dpr)
-    : undefined;
-
-  if (params.captureMode === CaptureMode.VIEWPORT_EMULATION && params.targetResolution) {
-    captureWidth = resolveRecordingSafeDimension(params.targetResolution.width);
-    captureHeight = resolveRecordingSafeDimension(params.targetResolution.height);
-  }
-
-  return { captureWidth, captureHeight };
-}
-
 export async function acquireRecordingSourceStream(params: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
-  captureWidth?: number;
-  captureHeight?: number;
+  excludeNativeCursor?: boolean;
+  viewport?: { width: number; height: number };
 }) {
   if (params.captureMode === CaptureMode.SCREEN) {
     return acquireDesktopStream(params.settings);
@@ -89,22 +67,27 @@ async function acquireCameraStream(settings: VideoRecordingSettings) {
 
 function createTabVideoConstraints(params: {
   streamId: string;
-  captureWidth?: number;
-  captureHeight?: number;
   controlledCursorCaptureEnabled?: boolean;
+  excludeNativeCursor?: boolean;
+  viewport?: { width: number; height: number };
 }): MediaTrackConstraints {
   const mandatory: Record<string, unknown> = {
     chromeMediaSource: 'tab',
     chromeMediaSourceId: params.streamId,
+    ...(params.viewport
+      ? {
+          minWidth: params.viewport.width,
+          maxWidth: params.viewport.width,
+          minHeight: params.viewport.height,
+          maxHeight: params.viewport.height,
+        }
+      : {}),
   };
-  if (params.captureWidth && params.captureHeight) {
-    mandatory['maxWidth'] = params.captureWidth;
-    mandatory['maxHeight'] = params.captureHeight;
-  }
-
   return {
     mandatory,
-    ...(params.controlledCursorCaptureEnabled === true ? { cursor: 'never' as const } : {}),
+    ...(params.controlledCursorCaptureEnabled === true || params.excludeNativeCursor === true
+      ? { cursor: 'never' as const }
+      : {}),
   } as MediaTrackConstraints;
 }
 
@@ -112,14 +95,14 @@ async function acquireTabStream({
   streamId,
   settings,
   captureMode,
-  captureWidth,
-  captureHeight,
+  excludeNativeCursor,
+  viewport,
 }: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
-  captureWidth?: number;
-  captureHeight?: number;
+  excludeNativeCursor?: boolean;
+  viewport?: { width: number; height: number };
 }) {
   const audioConstraints: MediaTrackConstraints | false = settings.systemAudioEnabled
     ? ({
@@ -132,22 +115,21 @@ async function acquireTabStream({
 
   const videoConstraints = createTabVideoConstraints({
     streamId,
-    ...(captureHeight === undefined ? {} : { captureHeight }),
-    ...(captureWidth === undefined ? {} : { captureWidth }),
+    ...(viewport === undefined ? {} : { viewport }),
     ...(settings.controlledCursorCaptureEnabled === undefined
       ? {}
       : { controlledCursorCaptureEnabled: settings.controlledCursorCaptureEnabled }),
+    ...(excludeNativeCursor === undefined ? {} : { excludeNativeCursor }),
   });
 
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: audioConstraints,
     video: videoConstraints,
   });
+  if (excludeNativeCursor === true) assertNativeCursorExclusionNotContradicted(stream);
   const cursorCaptureMode = resolveCursorCaptureMode(stream, settings, captureMode);
   logger.debug('Acquired tab capture stream', {
     hasAudio: Boolean(audioConstraints),
-    captureWidth,
-    captureHeight,
   });
   return {
     stream,
@@ -155,16 +137,62 @@ async function acquireTabStream({
   };
 }
 
-function getTrackSettings(
-  stream: MediaStream
-): (MediaTrackSettings & { cursor?: string; displaySurface?: string }) | undefined {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readStringSetting(settings: unknown, key: string): string | null {
+  if (!isRecord(settings)) return null;
+  const value = settings[key];
+  return typeof value === 'string' ? value : null;
+}
+
+function getTrackSettings(stream: MediaStream): {
+  cursor: string | null;
+  displaySurface: string | null;
+} {
   const videoTrack = stream.getVideoTracks()[0];
-  return videoTrack?.getSettings() as
-    | (MediaTrackSettings & {
-        cursor?: string;
-        displaySurface?: string;
-      })
-    | undefined;
+  const settings: unknown = videoTrack?.getSettings();
+  return {
+    cursor: readStringSetting(settings, 'cursor'),
+    displaySurface: readStringSetting(settings, 'displaySurface'),
+  };
+}
+
+function stopAcquiredStream(stream: MediaStream): void {
+  for (const track of stream.getTracks()) {
+    try {
+      track.stop();
+    } catch (error) {
+      logger.warn('Failed to stop a rejected tab capture track', error);
+    }
+  }
+}
+
+function assertNativeCursorExclusionNotContradicted(stream: MediaStream): void {
+  if (!stream.getVideoTracks()[0]) {
+    stopAcquiredStream(stream);
+    throw new Error('Native cursor exclusion could not be verified');
+  }
+  let cursorSetting: string | null;
+  let displaySurface: string | null;
+  try {
+    const trackSettings = getTrackSettings(stream);
+    cursorSetting = trackSettings.cursor;
+    displaySurface = trackSettings.displaySurface;
+  } catch (error) {
+    stopAcquiredStream(stream);
+    throw new Error('Native cursor exclusion could not be verified', { cause: error });
+  }
+  if (cursorSetting === 'never') return;
+  if (cursorSetting === null) {
+    logger.debug('Tab capture accepted cursor-free constraints without cursor track settings', {
+      displaySurface,
+    });
+    return;
+  }
+  stopAcquiredStream(stream);
+  throw new Error('Native cursor exclusion could not be verified');
 }
 
 function resolveCursorCaptureMode(
@@ -178,10 +206,10 @@ function resolveCursorCaptureMode(
 
   const videoTrack = stream.getVideoTracks()[0];
   const trackSettings = getTrackSettings(stream);
-  const cursorSetting = trackSettings?.cursor ?? null;
+  const cursorSetting = trackSettings.cursor;
   const sharedLogContext = {
     cursorSetting,
-    displaySurface: trackSettings?.displaySurface ?? null,
+    displaySurface: trackSettings.displaySurface,
     hasVideoTrack: videoTrack !== undefined,
     readyState: videoTrack?.readyState ?? null,
   };
@@ -203,7 +231,6 @@ function resolveCursorCaptureMode(
       return VideoCursorCaptureMode.EMBEDDED_FALLBACK;
     case CaptureMode.TAB:
     case CaptureMode.TAB_CROP:
-    case CaptureMode.VIEWPORT_EMULATION:
       logger.debug('Controlled cursor capture will use embedded cursor telemetry', {
         ...sharedLogContext,
         captureMode,

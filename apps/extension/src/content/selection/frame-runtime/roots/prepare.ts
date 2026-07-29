@@ -4,6 +4,7 @@ import { getContentUiElementById } from '../../../platform/dom-host';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { applyIsolatedContentRootStyle } from '../../../platform/dom-host/isolated';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
+import type { FrameHostLayoutSnapshot } from '../host-layout/service';
 import {
   areFrameRenderDescriptorsEqual,
   buildFrameRenderDescriptors,
@@ -17,6 +18,7 @@ export function prepareFrameRootsRender(args: {
   framesRef: MutableRefObject<FrameData[]>;
   getOrCreateContainer: () => HTMLDivElement;
   isClearingRef: MutableRefObject<boolean>;
+  hostLayoutSnapshot: FrameHostLayoutSnapshot;
   prevRenderDescriptorsRef: MutableRefObject<FrameRenderDescriptor[]>;
   rootsRef: MutableRefObject<Map<string, Root>>;
 }) {
@@ -30,9 +32,13 @@ export function prepareFrameRootsRender(args: {
   }
 
   const currentFrames = args.framesRef.current;
-  syncFrameRoots(container, currentFrames, args.rootsRef);
+  syncFrameRoots(container, currentFrames, args.hostLayoutSnapshot.presentations, args.rootsRef);
 
-  const nextRenderDescriptors = buildFrameRenderDescriptors(currentFrames, args.currentFrameStates);
+  const nextRenderDescriptors = buildFrameRenderDescriptors(
+    currentFrames,
+    args.currentFrameStates,
+    args.hostLayoutSnapshot.presentations
+  );
   if (
     areFrameRenderDescriptorsEqual(nextRenderDescriptors, args.prevRenderDescriptorsRef.current)
   ) {
@@ -40,36 +46,56 @@ export function prepareFrameRootsRender(args: {
   }
 
   args.prevRenderDescriptorsRef.current = nextRenderDescriptors;
-  return { container, currentFrames, currentFrameStates: args.currentFrameStates };
+  return {
+    container,
+    currentFrames,
+    currentFrameStates: args.currentFrameStates,
+    presentations: args.hostLayoutSnapshot.presentations,
+  };
 }
 
 function syncFrameRoots(
   container: HTMLDivElement,
   currentFrames: FrameData[],
+  presentations: FrameHostLayoutSnapshot['presentations'],
   rootsRef: MutableRefObject<Map<string, Root>>
 ) {
   const currentFrameIds = new Set(currentFrames.map((frame) => frame.id));
   const rootsToRemove: string[] = [];
 
   rootsRef.current.forEach((root, frameId) => {
-    if (currentFrameIds.has(frameId)) {
+    const currentFrame = currentFrameIds.has(frameId);
+    const renderable = (presentations.get(frameId) ?? 'visible') === 'visible';
+    if (currentFrame && renderable) {
       return;
     }
 
     rootsToRemove.push(frameId);
     getContentUiElementById(`frame-container-${frameId}`)?.remove();
-    scheduleRemovedFrameRootUnmount(root);
+    if (currentFrame) unmountUnavailableFrameRoot(root);
+    else scheduleRemovedFrameRootUnmount(root);
   });
   rootsToRemove.forEach((frameId) => rootsRef.current.delete(frameId));
 
   currentFrames.forEach((frameData) => {
-    if (rootsRef.current.has(frameData.id)) {
+    if (
+      rootsRef.current.has(frameData.id) ||
+      (presentations.get(frameData.id) ?? 'visible') !== 'visible'
+    ) {
       return;
     }
 
     const frameContainer = getOrCreateFrameContainer(container, frameData.id);
     rootsRef.current.set(frameData.id, createRoot(frameContainer));
   });
+}
+
+function unmountUnavailableFrameRoot(root: Root) {
+  try {
+    root.unmount();
+  } catch (error) {
+    logger.error('Error unmounting unavailable frame root', error);
+  }
 }
 
 function scheduleRemovedFrameRootUnmount(root: Root) {

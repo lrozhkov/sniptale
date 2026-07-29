@@ -12,6 +12,7 @@ export function usePopupExportSessionState(): PopupExportSessionState {
   const copyResetTimeoutRef = useRef<number | null>(null);
   const copyRequestIdRef = useRef(0);
   const requestIdRef = useRef<string | null>(null);
+  const cancelRetryRef = useRef<{ exportRunId: string; tabIds: number[] } | null>(null);
 
   return {
     actions: {
@@ -25,6 +26,7 @@ export function usePopupExportSessionState(): PopupExportSessionState {
       copyingFormat,
     },
     refs: {
+      cancelRetryRef,
       copyRequestIdRef,
       copyResetTimeoutRef,
       requestIdRef,

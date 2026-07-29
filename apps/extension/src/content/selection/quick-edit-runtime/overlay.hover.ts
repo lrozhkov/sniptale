@@ -12,7 +12,7 @@ export function ensureQuickEditHoverOverlay(state: QuickEditOverlayState): HTMLE
   hoverOverlay.style.cssText = `
     position: fixed;
     border: ${EDITABLE_BORDER};
-    box-sizing: content-box;
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
     border-radius: 0;

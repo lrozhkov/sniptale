@@ -14,6 +14,7 @@ export async function requestStartExport(
   const requestId = deps.createRequestId();
 
   state.requestIdRef.current = requestId;
+  state.cancelRetryRef.current = { exportRunId: requestId, tabIds: [tabId] };
   state.setResult(null);
   setStartExportProgress(state);
 

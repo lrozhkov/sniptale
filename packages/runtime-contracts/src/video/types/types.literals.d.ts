@@ -4,7 +4,6 @@ declare module './types' {
     type TAB_CROP = typeof import('./types').CaptureMode.TAB_CROP;
     type CAMERA = typeof import('./types').CaptureMode.CAMERA;
     type SCREEN = typeof import('./types').CaptureMode.SCREEN;
-    type VIEWPORT_EMULATION = typeof import('./types').CaptureMode.VIEWPORT_EMULATION;
   }
 
   export namespace VideoRecordingStatus {

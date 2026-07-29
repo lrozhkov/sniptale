@@ -7,13 +7,14 @@ import { initializeContentUiRoots } from '../../platform/dom-host';
 import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../../features/web-snapshot/manifest';
 import { installContentRuntimeMessagingMock } from '../../platform/runtime-services/services.test-support';
 
-const { captureWebSnapshotScreenshotMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
-  captureWebSnapshotScreenshotMock: vi.fn(),
+const { captureWebSnapshotScreenshotWithWarningsMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
+  captureWebSnapshotScreenshotWithWarningsMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
 }));
 
-vi.mock('./capture', () => ({
-  captureWebSnapshotScreenshot: captureWebSnapshotScreenshotMock,
+vi.mock('./capture', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./capture')>()),
+  captureWebSnapshotScreenshotWithWarnings: captureWebSnapshotScreenshotWithWarningsMock,
 }));
 
 vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
@@ -126,7 +127,10 @@ beforeEach(() => {
   document.body.replaceChildren();
   document.title = 'Prepared web snapshot';
   window.history.replaceState(null, '', '/snapshot');
-  captureWebSnapshotScreenshotMock.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+  captureWebSnapshotScreenshotWithWarningsMock.mockResolvedValue({
+    blob: new Blob(['png'], { type: 'image/png' }),
+    warnings: [],
+  });
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response('asset', { headers: { 'content-type': 'image/png' } }))

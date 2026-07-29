@@ -1,29 +1,9 @@
 // Capture Source Manager — управление получением streamId для разных режимов захвата
 
 import { browserTabCapture } from '@sniptale/platform/browser/tab-capture';
-import { createLazyDefaultOwner } from '@sniptale/foundation/default-owner';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import type { CaptureSource } from '@sniptale/runtime-contracts/video/types/types';
 import { getScreenCaptureSource } from './screen-source';
-
-export function createCaptureModeService() {
-  let pendingCaptureSource: CaptureSource | null = null;
-
-  function setPendingCaptureSource(source: CaptureSource | null): void {
-    pendingCaptureSource = source;
-  }
-
-  function getPendingCaptureSource(): CaptureSource | null {
-    return pendingCaptureSource;
-  }
-
-  return {
-    setPendingCaptureSource,
-    getPendingCaptureSource,
-  };
-}
-
-const defaultCaptureModeService = createLazyDefaultOwner(createCaptureModeService);
 
 /**
  * Получает streamId для режима TAB (активная вкладка)
@@ -88,10 +68,6 @@ export async function getCaptureSource(
         streamId: 'camera',
       };
 
-    case CaptureMode.VIEWPORT_EMULATION:
-      if (!tabId) throw new Error('VIEWPORT_EMULATION mode requires tabId');
-      return getTabStreamId(tabId);
-
     default:
       throw new Error(`Unknown capture mode: ${mode}`);
   }
@@ -126,37 +102,15 @@ export function updateCaptureSourceCropRegion(
 }
 
 /**
- * Сохраняет pending источник (до завершения выбора области)
- */
-export function setPendingCaptureSource(source: CaptureSource | null): void {
-  defaultCaptureModeService.getOwner().setPendingCaptureSource(source);
-}
-
-/**
- * Получает pending источник
- */
-export function getPendingCaptureSource(): CaptureSource | null {
-  return defaultCaptureModeService.getOwner().getPendingCaptureSource();
-}
-
-/**
  * Проверяет, поддерживает ли режим аннотации
  */
 export function supportsAnnotations(mode: CaptureMode): boolean {
-  return (
-    mode === CaptureMode.TAB ||
-    mode === CaptureMode.TAB_CROP ||
-    mode === CaptureMode.VIEWPORT_EMULATION
-  );
+  return mode === CaptureMode.TAB || mode === CaptureMode.TAB_CROP;
 }
 
 /**
  * Проверяет, поддерживает ли режим системный звук вкладки
  */
 export function supportsSystemAudio(mode: CaptureMode): boolean {
-  return (
-    mode === CaptureMode.TAB ||
-    mode === CaptureMode.TAB_CROP ||
-    mode === CaptureMode.VIEWPORT_EMULATION
-  );
+  return mode === CaptureMode.TAB || mode === CaptureMode.TAB_CROP;
 }

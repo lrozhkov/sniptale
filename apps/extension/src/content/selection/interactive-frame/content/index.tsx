@@ -13,6 +13,8 @@ interface InteractiveFrameContentProps
   frameRef: React.RefObject<HTMLDivElement | null>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   frameStyle: React.CSSProperties;
+  fillStyle: React.CSSProperties;
+  strokeStyle: React.CSSProperties;
   borderColor: string;
   borderWidth: number;
   borderShadow?: NonNullable<FrameData['borderSettings']>['shadow'];
@@ -88,7 +90,6 @@ function getInteractiveFramePopoverProps(props: InteractiveFrameContentProps) {
     setTempFrame: props.setTempFrame,
     closePopover: props.closePopover,
     frameZIndex: props.frameZIndex,
-    borderWidth: props.borderWidth,
     onUpdate: props.onUpdate,
   };
 }

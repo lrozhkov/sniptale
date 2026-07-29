@@ -87,13 +87,18 @@ function registerTabCropSuccessTest() {
       tabId: 42,
     };
     const requestRegionSelection = vi.fn(async () => ({
-      height: 200,
-      width: 300,
-      x: 10,
-      y: 20,
+      region: { height: 200, width: 300, x: 10, y: 20 },
+      captureViewport: {
+        width: 1280,
+        height: 720,
+        scrollX: 0,
+        scrollY: 0,
+        devicePixelRatio: 2,
+      },
     }));
+    const getCaptureSource = vi.fn(async () => captureSource);
     const deps = createResolveCaptureSourceDeps({
-      getCaptureSource: vi.fn(async () => captureSource),
+      getCaptureSource,
       requestRegionSelection,
     });
 
@@ -113,6 +118,13 @@ function registerTabCropSuccessTest() {
       )
     ).resolves.toEqual({
       ...captureSource,
+      captureViewport: {
+        devicePixelRatio: 2,
+        height: 720,
+        scrollX: 0,
+        scrollY: 0,
+        width: 1280,
+      },
       cropRegion: {
         height: 200,
         width: 300,
@@ -125,6 +137,9 @@ function registerTabCropSuccessTest() {
     });
 
     expect(requestRegionSelection).toHaveBeenCalledWith(42);
+    expect(requestRegionSelection.mock.invocationCallOrder[0]).toBeLessThan(
+      getCaptureSource.mock.invocationCallOrder[0] ?? 0
+    );
   });
 }
 
@@ -156,6 +171,7 @@ function registerTabCropCancellationTest() {
 
     expect(localize).toHaveBeenCalledWith('background.runtime.areaSelectionCancelled');
     expect(notifyStartFailed).toHaveBeenCalledWith('area selection cancelled');
+    expect(deps.getCaptureSource).not.toHaveBeenCalled();
   });
 }
 

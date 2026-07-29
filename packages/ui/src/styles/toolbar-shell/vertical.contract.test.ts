@@ -18,5 +18,24 @@ describe('toolbar-shell vertical contract', () => {
       ".sniptale-toolbar[data-display-mode='vertical'] .sniptale-drag-handle svg {"
     );
     expect(toolbarShellVerticalStylesheet).toContain('transform: rotate(90deg);');
+    expect(toolbarShellVerticalStylesheet).toContain(
+      ".sniptale-toolbar[data-display-mode='vertical'] .sniptale-full-page-wrapper {"
+    );
+    expect(toolbarShellVerticalStylesheet).toContain('flex-direction: column;');
+    expect(toolbarShellVerticalStylesheet).toMatch(
+      /\.sniptale-full-page-wrapper \{[^}]*height: calc\(var\(--sniptale-toolbar-button-size\) \+ 12px\);/su
+    );
+    expect(toolbarShellVerticalStylesheet).toMatch(
+      /\.sniptale-full-page-primary \{[^}]*height: var\(--sniptale-toolbar-button-size\);[^}]*border-block-end-width: 0;/su
+    );
+    expect(toolbarShellVerticalStylesheet).toContain(
+      ".sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn.sniptale-full-page-chevron svg {"
+    );
+    expect(toolbarShellVerticalStylesheet).toMatch(
+      /\.sniptale-btn\.sniptale-full-page-chevron svg \{[^}]*width: 10px;[^}]*height: 10px;[^}]*transform: rotate\(-90deg\);/su
+    );
+    expect(toolbarShellVerticalStylesheet).toMatch(
+      /\.sniptale-full-page-chevron \{[^}]*flex: 0 0 12px;[^}]*min-height: 12px;[^}]*height: 12px;[^}]*max-height: 12px;[^}]*border-inline-start-width: 1px;[^}]*border-block-start-width: 0;/su
+    );
   });
 });

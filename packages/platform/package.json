@@ -14,6 +14,7 @@
     "./browser/context-menus": "./src/browser/context-menus.ts",
     "./browser/debugger": "./src/browser/debugger.ts",
     "./browser/desktop-capture": "./src/browser/desktop-capture.ts",
+    "./browser/displays": "./src/browser/displays.ts",
     "./browser/downloads": "./src/browser/downloads.ts",
     "./browser/native-messaging": "./src/browser/native-messaging.ts",
     "./browser/offscreen": "./src/browser/offscreen.ts",

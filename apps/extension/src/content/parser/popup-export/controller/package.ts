@@ -4,13 +4,16 @@ import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-
 import type * as ContentIntentTypes from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import * as contentIntent from '../../../platform/privileged-action-intent/client';
 import type { PopupExportRequestHandlerRuntime } from './types';
+import type { FullPageExportCaptureAction } from '../../../../contracts/full-page-capture';
 
 type ContentActionGrant = ContentIntentTypes.ContentPrivilegedActionAutoStartGrant;
 const createAutoStartIntentSource =
   contentIntent.createBackgroundAutoStartContentActionIntentSource;
 
 type PopupExportBuildPackageRequest = {
+  batchRequestId: string;
   contentIntentGrant?: ContentActionGrant;
+  fullPageCaptureAction?: FullPageExportCaptureAction;
   options: ExportOptions;
   type: MessageType.EXPORT_POPUP_BUILD_PACKAGE;
 };
@@ -45,9 +48,18 @@ export function handlePopupExportBuildPackageRuntime(
   }
 
   props.state.isExportRunning = true;
+  props.state.activeExportRequestId = props.request.batchRequestId;
   void props.exportRunner
     .buildPackage(props.request.options, {
       contentIntentSource: resolveExportContentIntentSource(props.request.contentIntentGrant),
+      ...(props.request.fullPageCaptureAction === undefined
+        ? {}
+        : {
+            fullPageCaptureIdentity: {
+              action: props.request.fullPageCaptureAction,
+              exportRunId: props.request.batchRequestId,
+            },
+          }),
     })
     .then((pagePackage) => {
       props.sendResponse({
@@ -63,7 +75,10 @@ export function handlePopupExportBuildPackageRuntime(
       });
     })
     .finally(() => {
-      props.state.isExportRunning = false;
+      if (props.state.activeExportRequestId === props.request.batchRequestId) {
+        props.state.activeExportRequestId = null;
+        props.state.isExportRunning = false;
+      }
     });
 
   return true;

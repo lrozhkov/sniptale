@@ -12,6 +12,7 @@ const {
   resetVideoRecordingRuntimeStateMock,
   sendRuntimeMessageMock,
   restoreCurrentRecordingFromLeaseMock,
+  releaseVideoCaptureSurfaceMock,
 } = vi.hoisted(() => ({
   clearActiveVideoRecordingLeaseMock: vi.fn(),
   finishVideoRecordingStopMock: vi.fn(),
@@ -24,6 +25,7 @@ const {
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   restoreCurrentRecordingFromLeaseMock: vi.fn(),
+  releaseVideoCaptureSurfaceMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/foundation/best-effort', async (importOriginal) => ({
@@ -61,6 +63,10 @@ vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
   restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+}));
+vi.mock('../../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture-surface')>()),
+  releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
 }));
 vi.mock('../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../session-state')>()),
@@ -114,6 +120,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   getVideoRecordingIdMock.mockReturnValue('rec-saved-replay');
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
+  releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
   clearActiveVideoRecordingLeaseMock.mockResolvedValue(undefined);
   loadActiveProjectExportJobLedgerEntryMock.mockResolvedValue({
     abortController: new AbortController(),

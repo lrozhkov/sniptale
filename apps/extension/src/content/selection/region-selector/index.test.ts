@@ -17,7 +17,6 @@ const mocks = vi.hoisted(() => ({
       document.body.appendChild(args.state.regionSelectorContainer);
     },
   })),
-  toDevicePixelRegionMock: vi.fn((region) => ({ ...region, scale: 2 })),
   updateRegionSelectorUiMock: vi.fn(),
 }));
 
@@ -42,7 +41,6 @@ vi.mock('../../../platform/runtime-messaging', (_importOriginal) => ({
 }));
 
 vi.mock('./helpers', (_importOriginal) => ({
-  toDevicePixelRegion: mocks.toDevicePixelRegionMock,
   updateDraggingRegion: vi.fn(() => ({ height: 20, width: 30, x: 5, y: 7 })),
   updateResizingRegion: vi.fn(() => ({ height: 25, width: 35, x: 6, y: 8 })),
 }));
@@ -76,5 +74,50 @@ describe('region selector controller', () => {
     expect(mocks.bestEffortMock).toHaveBeenCalled();
     expect(mocks.hideRecordingOverlayMock).toHaveBeenCalled();
     expect(controller.getSelectedRegion()).toBeNull();
+  });
+
+  it('keeps TAB_CROP coordinates in the final CSS viewport coordinate space', () => {
+    installContentRuntimeMessagingMock(mocks.sendRuntimeMessageMock);
+    const captureViewport = {
+      devicePixelRatio: 2,
+      height: 720,
+      scrollX: 0,
+      scrollY: 0,
+      viewportOffsetX: 0,
+      viewportOffsetY: 0,
+      visualViewportScale: 1,
+      width: 1280,
+    };
+    const getViewportInfo = vi.fn(() => captureViewport);
+    const controller = createRegionSelectorController({ getViewportInfo });
+    controller.showRegionSelector(requestBinding);
+
+    const actions = mocks.surfaceActionsMock.mock.calls.at(-1)?.[0] as
+      | {
+          handleRegionSelected?: (region: {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+          }) => void;
+        }
+      | undefined;
+    actions?.handleRegionSelected?.({ x: 10, y: 20, width: 300, height: 200 });
+
+    expect(controller.getSelectedRegion()).toEqual({ x: 10, y: 20, width: 300, height: 200 });
+    expect(mocks.bestEffortMock).toHaveBeenCalledWith(
+      expect.any(Promise),
+      expect.anything(),
+      expect.any(String),
+      expect.objectContaining({ type: 'REGION_SELECTED' })
+    );
+    expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        captureViewport,
+        region: { x: 10, y: 20, width: 300, height: 200 },
+        type: 'REGION_SELECTED',
+      })
+    );
+    expect(getViewportInfo).toHaveBeenCalledOnce();
   });
 });

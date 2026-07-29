@@ -113,7 +113,12 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     productionPrefix: 'apps/extension/src/settings/sections/viewport-presets/editor',
     exclusive: true,
     reason: 'Viewport preset suites.',
-    testFiles: ['apps/extension/src/settings/sections/viewport-presets/editor/views.test.tsx'],
+    testFiles: [
+      'apps/extension/src/settings/sections/viewport-presets/editor/helpers.test.ts',
+      'apps/extension/src/settings/sections/viewport-presets/editor/index.test.tsx',
+      'apps/extension/src/settings/sections/viewport-presets/editor/state.test.tsx',
+      'apps/extension/src/settings/sections/viewport-presets/editor/views.test.tsx',
+    ],
   },
   {
     owner: 'sf-offscreen-multi-source',

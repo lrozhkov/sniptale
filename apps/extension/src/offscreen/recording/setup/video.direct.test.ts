@@ -1,26 +1,38 @@
 // @vitest-environment jsdom
 
 import { beforeEach, expect, it, vi } from 'vitest';
+import {
+  TestMediaStream,
+  createAudioStream,
+  createEmptyStream,
+  createStream,
+} from '../multi-source/media-stream.test-support';
+import {
+  VideoQuality,
+  type VideoRecordingSettings,
+} from '@sniptale/runtime-contracts/video/types/types';
 
-const { loggerWarnMock } = vi.hoisted(() => ({
+const { audioMixerInstances, loggerWarnMock } = vi.hoisted(() => ({
+  audioMixerInstances: [] as Array<{
+    addMicrophone: ReturnType<typeof vi.fn>;
+    addTabAudio: ReturnType<typeof vi.fn>;
+    getMixedStream: ReturnType<typeof vi.fn>;
+    initialize: ReturnType<typeof vi.fn>;
+  }>,
   loggerWarnMock: vi.fn(),
 }));
 
 vi.mock('../stream/audio-mixer', () => ({
   AudioMixer: class {
-    addMicrophone = vi.fn();
-    addTabAudio = vi.fn();
-    getMixedStream = vi.fn();
-    initialize = vi.fn();
-  },
-}));
+    addMicrophone = vi.fn().mockResolvedValue(undefined);
+    addTabAudio = vi.fn().mockResolvedValue(undefined);
+    getMixedStream = vi.fn(() => createAudioStream());
+    initialize = vi.fn().mockResolvedValue(undefined);
 
-vi.mock('../stream/viewport', () => ({
-  applyCanvasCrop: vi.fn(),
-  createViewportPresetStream: vi.fn(),
-}));
-vi.mock('../stream/normalization', () => ({
-  normalizeRecordingStreamDimensions: vi.fn(async (stream) => stream),
+    constructor() {
+      audioMixerInstances.push(this);
+    }
+  },
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -32,26 +44,34 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 
 import { recordingContext } from '../context';
 import { attachMicrophoneAudioIfEnabled } from './video';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 
-class MediaStreamMock {
-  constructor(private readonly tracks: Array<{ kind: string }>) {}
-
-  getAudioTracks() {
-    return this.tracks.filter((track) => track.kind === 'audio');
-  }
-
-  getVideoTracks() {
-    return this.tracks.filter((track) => track.kind === 'video');
-  }
+function createSettings(overrides: Partial<VideoRecordingSettings> = {}): VideoRecordingSettings {
+  return {
+    autoFadeDelay: 0,
+    countdownSeconds: 3,
+    diagnosticsEnabled: false,
+    microphoneDeviceId: null,
+    microphoneEnabled: false,
+    openEditorAfterRecording: false,
+    quality: VideoQuality.HIGH,
+    systemAudioEnabled: false,
+    ...overrides,
+  };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('MediaStream', MediaStreamMock as unknown as typeof MediaStream);
+  audioMixerInstances.length = 0;
+  vi.stubGlobal('MediaStream', TestMediaStream);
   recordingContext.audioMixer = null;
   recordingContext.sourceStream = null;
   recordingContext.videoStream = null;
+});
+
+it('leaves audio untouched when microphone capture is disabled', async () => {
+  await attachMicrophoneAudioIfEnabled(createSettings());
+
+  expect(audioMixerInstances).toHaveLength(0);
 });
 
 it('skips direct microphone access when the current recording stream has no video track', async () => {
@@ -61,41 +81,85 @@ it('skips direct microphone access when the current recording stream has no vide
     configurable: true,
     value: { getUserMedia },
   });
-  recordingContext.videoStream = new MediaStreamMock([]) as never;
+  recordingContext.videoStream = createEmptyStream();
 
-  await attachMicrophoneAudioIfEnabled({
-    autoFadeDelay: 0,
-    countdownSeconds: 3,
-    diagnosticsEnabled: false,
-    microphoneDeviceId: 'mic-1',
-    microphoneEnabled: true,
-    openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
-    systemAudioEnabled: false,
-  } as never);
+  await attachMicrophoneAudioIfEnabled(
+    createSettings({
+      microphoneDeviceId: 'mic-1',
+      microphoneEnabled: true,
+    })
+  );
 
   expect(getUserMedia).not.toHaveBeenCalled();
 });
 
-it('warns when direct microphone access returns no audio tracks', async () => {
-  const getUserMedia = vi.fn().mockResolvedValue(new MediaStreamMock([]));
+it('keeps the direct video track when microphone access returns no audio tracks', async () => {
+  const getUserMedia = vi.fn().mockResolvedValue(createEmptyStream());
 
   Object.defineProperty(globalThis.navigator, 'mediaDevices', {
     configurable: true,
     value: { getUserMedia },
   });
-  recordingContext.videoStream = new MediaStreamMock([{ kind: 'video' }]) as never;
+  const videoStream = createStream(1280, 720);
+  recordingContext.videoStream = videoStream;
 
-  await attachMicrophoneAudioIfEnabled({
-    autoFadeDelay: 0,
-    countdownSeconds: 3,
-    diagnosticsEnabled: false,
-    microphoneDeviceId: 'mic-1',
-    microphoneEnabled: true,
-    openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
-    systemAudioEnabled: false,
-  } as never);
+  await attachMicrophoneAudioIfEnabled(
+    createSettings({
+      microphoneDeviceId: 'mic-1',
+      microphoneEnabled: true,
+    })
+  );
 
-  expect(loggerWarnMock).toHaveBeenCalledWith('Direct microphone stream returned no audio tracks');
+  expect(videoStream.getVideoTracks()).toHaveLength(1);
+  expect(videoStream.getAudioTracks()).toHaveLength(0);
+  expect(loggerWarnMock).not.toHaveBeenCalled();
+});
+
+it('mixes source and microphone audio when system audio is enabled', async () => {
+  const source = new TestMediaStream([
+    ...createAudioStream().getAudioTracks(),
+    ...createStream(1280, 720).getVideoTracks(),
+  ]);
+  recordingContext.sourceStream = source;
+  recordingContext.videoStream = source;
+
+  await attachMicrophoneAudioIfEnabled(
+    createSettings({
+      microphoneEnabled: true,
+      systemAudioEnabled: true,
+    })
+  );
+
+  expect(audioMixerInstances).toHaveLength(1);
+  expect(audioMixerInstances[0]?.initialize).toHaveBeenCalledOnce();
+  expect(audioMixerInstances[0]?.addTabAudio).toHaveBeenCalledWith(source);
+  expect(audioMixerInstances[0]?.addMicrophone).toHaveBeenCalledOnce();
+  expect(recordingContext.videoStream?.getAudioTracks()).toHaveLength(1);
+});
+
+it('uses the mixer for non-unity direct microphone gain and reports direct failures', async () => {
+  recordingContext.videoStream = createStream(1280, 720);
+  await attachMicrophoneAudioIfEnabled(
+    createSettings({
+      microphoneEnabled: true,
+      microphoneGain: 0.5,
+    })
+  );
+  expect(audioMixerInstances[0]?.addMicrophone).toHaveBeenCalledOnce();
+
+  Object.defineProperty(globalThis.navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: vi.fn().mockRejectedValue(new Error('microphone denied')) },
+  });
+  recordingContext.videoStream = createStream(1280, 720);
+  await attachMicrophoneAudioIfEnabled(
+    createSettings({
+      microphoneEnabled: true,
+      microphoneGain: 1,
+    })
+  );
+  expect(loggerWarnMock).toHaveBeenCalledWith(
+    'Failed to attach direct microphone track',
+    expect.any(Error)
+  );
 });

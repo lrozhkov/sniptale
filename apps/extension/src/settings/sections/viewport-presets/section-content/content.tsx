@@ -2,7 +2,6 @@ import { settingsDividerClassName, settingsSectionClassName } from '../../../sec
 import { PresetsHeader } from './header';
 import { DefaultViewportField } from './default-viewport';
 import { PresetsList } from './list/view';
-import { AddViewportPresetButton } from './add-button';
 import { PresetsDialogs } from './dialogs';
 import type { PresetsSectionContentProps } from './types';
 
@@ -11,35 +10,40 @@ export function PresetsSectionContent(props: PresetsSectionContentProps) {
     <div className={settingsSectionClassName}>
       <PresetsHeader />
       <DefaultViewportField
-        defaultViewportId={props.defaultViewportId}
-        isLoading={props.isLoading}
-        onChange={props.handleDefaultViewportChange}
-        viewportPresets={props.viewportPresets}
+        defaultViewportPresetId={props.defaultField.selectedPresetId}
+        isLoading={props.model.isLoading}
+        onChange={props.defaultField.onChange}
+        viewportPresets={props.model.presets}
       />
 
       <div className={`mb-6 ${settingsDividerClassName}`} />
 
       <PresetsList
-        hoveredViewportId={props.hoveredViewportId}
-        onDelete={props.handleDeleteViewportPreset}
-        onEdit={props.handleEditViewportPreset}
-        onHoverChange={props.setHoveredViewportId}
-        presetsCountLabel={props.presetsCountLabel}
-        viewportPresets={props.viewportPresets}
+        isLoading={props.model.isLoading}
+        hoveredViewportId={props.list.hoveredPresetId}
+        onDelete={props.list.onDelete}
+        onEdit={props.list.onEdit}
+        onMove={props.list.onMove}
+        onReset={props.list.onReset}
+        onToggle={props.list.onToggle}
+        onHoverChange={props.list.onHoverChange}
+        onAdd={props.editor.onAdd}
+        presetsCountLabel={props.list.countLabel}
+        viewportPresets={props.model.presets}
       />
 
-      <AddViewportPresetButton onClick={props.handleAddViewportPreset} />
-
       <PresetsDialogs
-        closeViewportDeleteDialog={props.closeViewportDeleteDialog}
-        closeViewportEditor={props.closeViewportEditor}
-        confirmDeleteViewport={props.confirmDeleteViewport}
-        deleteMessage={props.deleteMessage}
-        handleSaveViewportPreset={props.handleSaveViewportPreset}
-        isLoading={props.isLoading}
-        isViewportEditorOpen={props.isViewportEditorOpen}
-        viewportConfirmOpen={props.viewportConfirmOpen}
-        {...(props.editingViewport === undefined ? {} : { editingViewport: props.editingViewport })}
+        closeViewportDeleteDialog={props.deletion.close}
+        closeViewportEditor={props.editor.close}
+        confirmDeleteViewport={props.deletion.confirm}
+        deleteMessage={props.deletion.message}
+        handleSaveViewportPreset={props.editor.onSave}
+        isLoading={props.model.isLoading}
+        isViewportEditorOpen={props.editor.isOpen}
+        viewportConfirmOpen={props.deletion.isOpen}
+        {...(props.editor.editingPreset === undefined
+          ? {}
+          : { editingViewport: props.editor.editingPreset })}
       />
     </div>
   );

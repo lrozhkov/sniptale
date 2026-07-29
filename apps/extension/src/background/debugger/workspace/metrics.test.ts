@@ -1,131 +1,102 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchLayoutMetrics, getAvailableWorkspace } from './metrics';
-import { DEBUGGER_BANNER_HEIGHT } from '../constants';
-import { DEFAULT_WORKSPACE_SIZE } from './helpers';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import {
+  readIsolatedViewportMetrics,
+  readViewportCompositorScale,
+  waitForIsolatedViewportPaint,
+} from './metrics';
 
-const {
-  browserDebuggerMock,
-  browserTabsMock,
-  browserWindowsMock,
-  loggerWarnMock,
-  withTimeoutMock,
-} = vi.hoisted(() => ({
-  browserDebuggerMock: {
-    sendCommand: vi.fn(),
-  },
-  browserTabsMock: {
-    get: vi.fn(),
-  },
-  browserWindowsMock: {
-    get: vi.fn(),
-  },
-  loggerWarnMock: vi.fn(),
+const { browserDebuggerMock, executeScriptMock, withTimeoutMock } = vi.hoisted(() => ({
+  browserDebuggerMock: { sendCommand: vi.fn() },
+  executeScriptMock: vi.fn(),
   withTimeoutMock: vi.fn(),
 }));
 
-vi.mock('@sniptale/platform/browser/debugger', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/debugger')>()),
-  browserDebugger: browserDebuggerMock,
+vi.mock('@sniptale/platform/browser/debugger', () => ({ browserDebugger: browserDebuggerMock }));
+vi.mock('@sniptale/platform/browser/scripting', () => ({
+  browserScripting: { executeScript: executeScriptMock },
 }));
-
-vi.mock('@sniptale/platform/browser/tabs', () => ({
-  browserTabs: browserTabsMock,
-}));
-
-vi.mock('@sniptale/platform/browser/windows', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/windows')>()),
-  browserWindows: browserWindowsMock,
-}));
-
 vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    log: vi.fn(),
-    warn: loggerWarnMock,
-  }),
+  createLogger: () => ({ debug: vi.fn() }),
 }));
-
 vi.mock('../infra', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infra')>()),
   withTimeout: withTimeoutMock,
 }));
-
 beforeEach(() => {
   vi.clearAllMocks();
   withTimeoutMock.mockImplementation((promise: Promise<unknown>) => promise);
-  browserTabsMock.get.mockResolvedValue({ windowId: 3 });
-  browserWindowsMock.get.mockResolvedValue({ width: 1600, height: 1000 });
 });
 
-function registerLayoutMetricTests() {
-  it('fetches layout metrics through the timeout wrapper', async () => {
-    const layoutMetrics = { visualViewport: { clientWidth: 1200, clientHeight: 900 } };
-    browserDebuggerMock.sendCommand.mockResolvedValue(layoutMetrics);
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
-    await expect(fetchLayoutMetrics(9)).resolves.toEqual(layoutMetrics);
-    expect(browserDebuggerMock.sendCommand).toHaveBeenCalledWith(
-      { tabId: 9 },
-      'Page.getLayoutMetrics'
-    );
+it('reads exact window viewport metrics in an explicit isolated world', async () => {
+  executeScriptMock.mockResolvedValue([{ result: { width: 1200, height: 900 } }]);
+  await expect(readIsolatedViewportMetrics(9)).resolves.toEqual({
+    cssWidth: 1200,
+    cssHeight: 900,
+  });
+  expect(executeScriptMock).toHaveBeenCalledWith({
+    target: { tabId: 9 },
+    world: 'ISOLATED',
+    func: expect.any(Function),
+  });
+});
+
+it('fails closed when exact workspace metrics are missing', async () => {
+  executeScriptMock.mockResolvedValue([]);
+  await expect(readIsolatedViewportMetrics(9)).rejects.toThrow('window.innerWidth');
+});
+
+it('reads the live isolated-world viewport inside the injected function', async () => {
+  vi.stubGlobal('window', { innerWidth: 1365, innerHeight: 767 });
+  executeScriptMock.mockImplementationOnce(
+    async (options: { func: () => { width: number; height: number } }) => [
+      { result: options.func() },
+    ]
+  );
+
+  await expect(readIsolatedViewportMetrics(9)).resolves.toEqual({
+    cssWidth: 1365,
+    cssHeight: 767,
+  });
+});
+
+it('reads and parses the live compositor scale through the debugger boundary', async () => {
+  browserDebuggerMock.sendCommand.mockResolvedValue({
+    layoutViewport: { clientWidth: 800, clientHeight: 600 },
+    cssLayoutViewport: { clientWidth: 400, clientHeight: 300 },
+    cssVisualViewport: { zoom: 1 },
   });
 
-  it('resolves workspace from CDP layout metrics when available', async () => {
-    browserDebuggerMock.sendCommand.mockResolvedValue({
-      visualViewport: { clientWidth: 1400, clientHeight: 900 },
-    });
+  await expect(readViewportCompositorScale(9)).resolves.toBe(2);
+  expect(browserDebuggerMock.sendCommand).toHaveBeenCalledWith(
+    { tabId: 9 },
+    'Page.getLayoutMetrics'
+  );
+});
 
-    await expect(getAvailableWorkspace(9)).resolves.toEqual({
-      width: 1400,
-      height: 900 - DEBUGGER_BANNER_HEIGHT,
-    });
-    expect(browserTabsMock.get).not.toHaveBeenCalled();
+it('fails closed when debugger compositor metrics are malformed', async () => {
+  browserDebuggerMock.sendCommand.mockResolvedValue({});
+  await expect(readViewportCompositorScale(9)).rejects.toThrow('compositor metrics');
+});
+
+it('waits for two isolated animation frames before capture continues', async () => {
+  const requestAnimationFrameMock = vi.fn((callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
   });
-}
+  vi.stubGlobal('requestAnimationFrame', requestAnimationFrameMock);
+  executeScriptMock.mockImplementationOnce(async (options: { func: () => Promise<void> }) => [
+    { result: await options.func() },
+  ]);
 
-function registerWorkspaceFallbackTests() {
-  it('falls back to the window API when CDP layout metrics are unavailable', async () => {
-    browserDebuggerMock.sendCommand.mockRejectedValue(new Error('cdp unavailable'));
-
-    await expect(getAvailableWorkspace(11)).resolves.toEqual({
-      width: 1600,
-      height: 1000 - DEBUGGER_BANNER_HEIGHT,
-    });
-    expect(browserTabsMock.get).toHaveBeenCalledWith(11);
-    expect(browserWindowsMock.get).toHaveBeenCalledWith(3);
+  await waitForIsolatedViewportPaint(9);
+  expect(requestAnimationFrameMock).toHaveBeenCalledTimes(2);
+  expect(executeScriptMock).toHaveBeenCalledWith({
+    target: { tabId: 9 },
+    world: 'ISOLATED',
+    func: expect.any(Function),
   });
-
-  it('uses default dimensions when the fallback window omits them', async () => {
-    browserDebuggerMock.sendCommand.mockRejectedValue(new Error('cdp unavailable'));
-    browserWindowsMock.get.mockResolvedValue({});
-
-    await expect(getAvailableWorkspace(12)).resolves.toEqual({
-      width: DEFAULT_WORKSPACE_SIZE.width,
-      height: DEFAULT_WORKSPACE_SIZE.height - DEBUGGER_BANNER_HEIGHT,
-    });
-  });
-
-  it('uses the default workspace when the fallback tab has no window id', async () => {
-    browserDebuggerMock.sendCommand.mockRejectedValue(new Error('cdp unavailable'));
-    browserTabsMock.get.mockResolvedValue({ windowId: undefined });
-
-    await expect(getAvailableWorkspace(13)).resolves.toEqual(DEFAULT_WORKSPACE_SIZE);
-  });
-
-  it('uses the default workspace when the fallback window lookup fails', async () => {
-    browserDebuggerMock.sendCommand.mockRejectedValue(new Error('cdp unavailable'));
-    browserWindowsMock.get.mockRejectedValue(new Error('window unavailable'));
-
-    await expect(getAvailableWorkspace(15)).resolves.toEqual(DEFAULT_WORKSPACE_SIZE);
-    expect(loggerWarnMock).toHaveBeenCalledWith(
-      'Failed to get workspace, using default workspace',
-      expect.any(Error)
-    );
-  });
-}
-
-describe('debugger-workspace-metrics layout resolution', () => {
-  registerLayoutMetricTests();
-  registerWorkspaceFallbackTests();
 });

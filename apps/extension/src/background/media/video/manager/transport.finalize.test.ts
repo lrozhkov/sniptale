@@ -1,272 +1,250 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  CaptureMode,
-  type CaptureSource,
-  VideoQuality,
-  type VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 
 const {
   attemptDiagnosticsStartMock,
-  loggerDebugMock,
-  loggerErrorMock,
-  notifyRecordingStartFailedMock,
+  cancelVideoSourceReadyWaitMock,
+  isStartCancelledMock,
+  markOffscreenStartDispatchedMock,
+  reassertSurfaceMock,
   sendOffscreenStartRecordingMock,
   supportsSystemAudioMock,
-  getVideoRecordingIdMock,
-  getVideoRecordingTabIdMock,
+  waitForVideoSourceReadyMock,
 } = vi.hoisted(() => ({
   attemptDiagnosticsStartMock: vi.fn(),
-  loggerDebugMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
-  notifyRecordingStartFailedMock: vi.fn(),
+  cancelVideoSourceReadyWaitMock: vi.fn(),
+  isStartCancelledMock: vi.fn(),
+  markOffscreenStartDispatchedMock: vi.fn(),
+  reassertSurfaceMock: vi.fn(),
   sendOffscreenStartRecordingMock: vi.fn(),
   supportsSystemAudioMock: vi.fn(),
-  getVideoRecordingIdMock: vi.fn(() => 'recording-42'),
-  getVideoRecordingTabIdMock: vi.fn(() => 12),
+  waitForVideoSourceReadyMock: vi.fn(),
 }));
 
-vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/observability/logger')>()),
-  createLogger: () => ({
-    debug: loggerDebugMock,
-    error: loggerErrorMock,
-    info: vi.fn(),
-    log: vi.fn(),
-    warn: vi.fn(),
-  }),
+vi.mock('./diagnostics', () => ({ attemptDiagnosticsStart: attemptDiagnosticsStartMock }));
+vi.mock('./flow-cancellation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./flow-cancellation')>()),
+  isVideoRecordingStartCancelled: isStartCancelledMock,
 }));
-
-vi.mock('../runtime/manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../runtime/manager')>()),
-  notifyRecordingStartFailed: notifyRecordingStartFailedMock,
-}));
-
-vi.mock('./diagnostics', () => ({
-  attemptDiagnosticsStart: attemptDiagnosticsStartMock,
-}));
-
-vi.mock('./start-helpers', () => ({
-  sendOffscreenStartRecording: sendOffscreenStartRecordingMock,
-}));
-
-vi.mock('../capture-source', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../capture-source')>();
-
-  return {
-    ...actual,
-    supportsSystemAudio: supportsSystemAudioMock,
-  };
-});
-
 vi.mock('../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../session-state')>()),
-  getVideoRecordingId: getVideoRecordingIdMock,
-  getVideoRecordingTabId: getVideoRecordingTabIdMock,
+  markVideoRecordingOffscreenStartDispatched: markOffscreenStartDispatchedMock,
+}));
+vi.mock('./start-helpers', () => ({
+  sendOffscreenBeginRecording: vi.fn(),
+  sendOffscreenStartRecording: sendOffscreenStartRecordingMock,
+}));
+vi.mock('../capture-source', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../capture-source')>()),
+  supportsSystemAudio: supportsSystemAudioMock,
+}));
+vi.mock('../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../capture-surface')>()),
+  cancelVideoSourceReadyWait: cancelVideoSourceReadyWaitMock,
+  waitForVideoSourceReady: waitForVideoSourceReadyMock,
+}));
+vi.mock('../../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture-surface')>()),
+  getCaptureSurfaceService: () => ({ reassert: reassertSurfaceMock }),
+}));
+vi.mock('@sniptale/platform/observability/logger', () => ({
+  createLogger: () => ({ debug: vi.fn() }),
 }));
 
 import { finalizeRecordingStart } from './transport.finalize';
 
-function createSettings(): VideoRecordingSettings {
-  return {
-    autoFadeDelay: 0,
-    countdownSeconds: 3,
-    diagnosticsEnabled: true,
-    microphoneDeviceId: null,
-    microphoneEnabled: true,
-    openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
-    systemAudioEnabled: true,
-  };
-}
+const settings = {
+  autoFadeDelay: 0,
+  countdownSeconds: 3,
+  diagnosticsEnabled: true,
+  microphoneDeviceId: null,
+  microphoneEnabled: true,
+  openEditorAfterRecording: false,
+  quality: VideoQuality.HIGH,
+  systemAudioEnabled: true,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
-  attemptDiagnosticsStartMock.mockResolvedValue(undefined);
-  sendOffscreenStartRecordingMock.mockResolvedValue(undefined);
   supportsSystemAudioMock.mockReturnValue(true);
-  getVideoRecordingIdMock.mockReturnValue('recording-42');
-  getVideoRecordingTabIdMock.mockReturnValue(12);
+  isStartCancelledMock.mockReturnValue(false);
+  waitForVideoSourceReadyMock.mockResolvedValue('stream-instance-1');
+  reassertSurfaceMock.mockResolvedValue(undefined);
 });
 
-function runTransportFinalizeUnsupportedAudioSuite() {
-  it('finalizes recording start with system audio disabled for unsupported modes', async () => {
-    const settings = createSettings();
-    supportsSystemAudioMock.mockReturnValue(false);
-
-    await finalizeRecordingStart({
-      captureMode: CaptureMode.SCREEN,
-      captureSource: { mode: CaptureMode.SCREEN, streamId: 'screen-1' } as never,
-      settings,
-      tabId: 12,
-      viewport: {
-        devicePixelRatio: 1,
-        height: 720,
-        scrollX: 0,
-        scrollY: 0,
-        width: 1280,
-      },
-    });
-
-    expect(attemptDiagnosticsStartMock).toHaveBeenCalledWith({
-      captureMode: CaptureMode.SCREEN,
-      settings,
-      tabId: 12,
-      viewport: expect.any(Object),
-    });
-    expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        currentRecordingId: 'recording-42',
-        recordingTabId: 12,
-        settings: expect.objectContaining({
-          systemAudioEnabled: false,
-        }),
-      })
-    );
+it('does not dispatch a source after cancellation wins during diagnostics', async () => {
+  attemptDiagnosticsStartMock.mockImplementationOnce(async () => {
+    isStartCancelledMock.mockReturnValue(true);
   });
-}
 
-function runTransportFinalizeSupportedAudioSuite() {
-  it('keeps system audio enabled for supported capture modes', async () => {
-    const settings = createSettings();
-
-    await finalizeRecordingStart({
+  await expect(
+    finalizeRecordingStart({
       captureMode: CaptureMode.TAB,
-      captureSource: { mode: CaptureMode.TAB, streamId: 'tab-1' } as never,
+      captureSource: { mode: CaptureMode.TAB, streamId: 'tab-1' },
+      generation: 1,
+      recordingId: 'recording-42',
+      streamInstanceId: 'stream-instance-1',
       settings,
+      surface: null,
       tabId: 12,
-      viewport: {
-        devicePixelRatio: 1,
-        height: 720,
-        scrollX: 0,
-        scrollY: 0,
-        width: 1280,
-      },
-    });
+    })
+  ).rejects.toThrow('Recording start was cancelled before source dispatch');
 
-    expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        settings,
-      })
-    );
+  expect(markOffscreenStartDispatchedMock.mock.invocationCallOrder[0]).toBeLessThan(
+    attemptDiagnosticsStartMock.mock.invocationCallOrder[0]!
+  );
+  expect(sendOffscreenStartRecordingMock).not.toHaveBeenCalled();
+});
+
+it('dispatches exact surface metadata and waits for source validation', async () => {
+  const surface = {
+    presetId: 'preset-1',
+    target: 'viewport' as const,
+    width: 1280,
+    height: 720,
+    sessionId: 'recording-42',
+    leaseId: 'lease-1',
+    generation: 2,
+  };
+  await expect(
+    finalizeRecordingStart({
+      captureMode: CaptureMode.TAB,
+      captureSource: { mode: CaptureMode.TAB, streamId: 'tab-1' },
+      generation: 2,
+      recordingId: 'recording-42',
+      streamInstanceId: 'stream-instance-1',
+      settings,
+      surface,
+      tabId: 12,
+    })
+  ).resolves.toBe('stream-instance-1');
+  expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
+    expectedStreamInstanceId: 'stream-instance-1',
+    expectedViewport: null,
+    recordingId: 'recording-42',
+    tabId: 12,
   });
+  expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
+    expect.objectContaining({ generation: 2, recordingId: 'recording-42', surface })
+  );
+  expect(reassertSurfaceMock).toHaveBeenCalledWith({
+    generation: 2,
+    leaseId: 'lease-1',
+    sessionId: 'recording-42',
+  });
+  expect(waitForVideoSourceReadyMock.mock.invocationCallOrder[0]).toBeLessThan(
+    reassertSurfaceMock.mock.invocationCallOrder[0]!
+  );
+});
 
-  it('disables system audio for multi-source screen capture', async () => {
-    const settings = { ...createSettings(), sourceCount: 2 };
+it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
+  'validates %s source readiness against its initiating tab viewport',
+  async (captureMode) => {
+    const viewport = {
+      devicePixelRatio: 2,
+      height: 720,
+      scrollX: 0,
+      scrollY: 0,
+      width: 1280,
+    };
 
     await finalizeRecordingStart({
+      captureMode,
+      captureSource: { mode: captureMode, streamId: 'tab-1' },
+      generation: 1,
+      recordingId: 'recording-42',
+      streamInstanceId: 'stream-instance-1',
+      settings,
+      surface: null,
+      tabId: 12,
+      viewport,
+    });
+
+    expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
+      expectedStreamInstanceId: 'stream-instance-1',
+      expectedViewport: viewport,
+      recordingId: 'recording-42',
+      tabId: 12,
+    });
+  }
+);
+
+it('does not validate a SCREEN source against the initiating tab viewport', async () => {
+  supportsSystemAudioMock.mockReturnValue(false);
+  const viewport = {
+    devicePixelRatio: 2,
+    height: 720,
+    scrollX: 0,
+    scrollY: 0,
+    width: 1280,
+  };
+  await finalizeRecordingStart({
+    captureMode: CaptureMode.SCREEN,
+    captureSource: { mode: CaptureMode.SCREEN, streamId: 'screen-1' },
+    generation: 1,
+    recordingId: 'recording-42',
+    streamInstanceId: 'stream-instance-1',
+    settings,
+    surface: null,
+    tabId: 12,
+    viewport,
+  });
+  expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
+    expectedStreamInstanceId: 'stream-instance-1',
+    expectedViewport: null,
+    recordingId: 'recording-42',
+    tabId: 12,
+  });
+  expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      settings: expect.objectContaining({ systemAudioEnabled: false }),
+      viewport,
+    })
+  );
+});
+
+it('does not wait for a single-source handshake in multi-source screen mode', async () => {
+  await expect(
+    finalizeRecordingStart({
       captureMode: CaptureMode.SCREEN,
-      captureSource: { mode: CaptureMode.SCREEN, streamId: 'desktop-multi' } as never,
-      settings,
+      captureSource: { mode: CaptureMode.SCREEN, streamId: 'screen-1' },
+      generation: 1,
+      recordingId: 'recording-42',
+      streamInstanceId: 'stream-instance-1',
+      settings: { ...settings, sourceCount: 2 },
+      surface: null,
       tabId: 12,
-      viewport: undefined,
-    });
+    })
+  ).resolves.toBe('stream-instance-1');
+  expect(waitForVideoSourceReadyMock).not.toHaveBeenCalled();
+});
 
-    expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        settings: expect.objectContaining({
-          sourceCount: 2,
-          systemAudioEnabled: false,
-        }),
-      })
-    );
-  });
-}
+it('settles source validation when offscreen start delivery rejects', async () => {
+  let rejectReady!: (reason: unknown) => void;
+  waitForVideoSourceReadyMock.mockReturnValueOnce(
+    new Promise<string>((_resolve, reject) => {
+      rejectReady = reject;
+    })
+  );
+  cancelVideoSourceReadyWaitMock.mockImplementationOnce((_recordingId: string, reason: unknown) =>
+    rejectReady(reason)
+  );
+  sendOffscreenStartRecordingMock.mockRejectedValueOnce(new Error('offscreen unavailable'));
 
-function runTransportFinalizeCameraSuite() {
-  it('sends camera starts without a recording tab id', async () => {
-    const settings = createSettings();
-    const captureSource: CaptureSource = { mode: CaptureMode.CAMERA, streamId: 'camera' };
-
-    await finalizeRecordingStart({
-      captureMode: CaptureMode.CAMERA,
-      captureSource,
+  await expect(
+    finalizeRecordingStart({
+      captureMode: CaptureMode.TAB,
+      captureSource: { mode: CaptureMode.TAB, streamId: 'tab-1' },
+      generation: 1,
+      recordingId: 'recording-42',
+      streamInstanceId: 'stream-instance-1',
       settings,
-      tabId: null,
-      shouldAbortBeforeOffscreenStart: () => false,
-    });
-
-    expect(attemptDiagnosticsStartMock).toHaveBeenCalledWith({
-      captureMode: CaptureMode.CAMERA,
-      settings,
-    });
-    expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        recordingTabId: null,
-      })
-    );
-  });
-
-  it('marks offscreen dispatch before invoking the start transport', async () => {
-    const onBeforeOffscreenStartDispatch = vi.fn();
-
-    await finalizeRecordingStart({
-      captureMode: CaptureMode.CAMERA,
-      captureSource: { mode: CaptureMode.CAMERA, streamId: 'camera' },
-      onBeforeOffscreenStartDispatch,
-      settings: createSettings(),
-      tabId: null,
-    });
-
-    expect(onBeforeOffscreenStartDispatch).toHaveBeenCalledOnce();
-    expect(onBeforeOffscreenStartDispatch.mock.invocationCallOrder[0]).toBeLessThan(
-      sendOffscreenStartRecordingMock.mock.invocationCallOrder[0] ?? 0
-    );
-  });
-}
-
-function runTransportFinalizeViewportSuite() {
-  it('preserves viewport-emulation payloads and surfaces offscreen start failures', async () => {
-    sendOffscreenStartRecordingMock.mockRejectedValueOnce(new Error('offscreen failed'));
-
-    await expect(
-      finalizeRecordingStart({
-        captureMode: CaptureMode.VIEWPORT_EMULATION,
-        captureSource: { mode: CaptureMode.VIEWPORT_EMULATION, streamId: 'stream-2' } as never,
-        settings: createSettings(),
-        tabId: 12,
-        viewport: undefined,
-        viewportEmulationResult: {
-          cssHeight: 720,
-          cssWidth: 1280,
-          scale: 1,
-        },
-        viewportPreset: {
-          id: 'wide',
-          label: 'Wide',
-          width: 1280,
-          height: 720,
-        },
-      })
-    ).rejects.toThrow('offscreen failed');
-
-    expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        viewportEmulationResult: {
-          cssHeight: 720,
-          cssWidth: 1280,
-          scale: 1,
-        },
-        viewportPreset: {
-          id: 'wide',
-          label: 'Wide',
-          width: 1280,
-          height: 720,
-        },
-      })
-    );
-    expect(notifyRecordingStartFailedMock).not.toHaveBeenCalled();
-    expect(loggerErrorMock).not.toHaveBeenCalled();
-  });
-}
-
-describe(
-  'video-manager transport finalize unsupported audio handling',
-  runTransportFinalizeUnsupportedAudioSuite
-);
-describe(
-  'video-manager transport finalize supported audio handling',
-  runTransportFinalizeSupportedAudioSuite
-);
-describe('video-manager transport finalize camera handling', runTransportFinalizeCameraSuite);
-describe('video-manager transport finalize viewport handling', runTransportFinalizeViewportSuite);
+      surface: null,
+      tabId: 12,
+    })
+  ).rejects.toThrow('offscreen unavailable');
+  expect(cancelVideoSourceReadyWaitMock).toHaveBeenCalledWith(
+    'recording-42',
+    expect.objectContaining({ message: 'offscreen unavailable' })
+  );
+});

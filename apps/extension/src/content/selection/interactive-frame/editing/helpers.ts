@@ -51,14 +51,12 @@ export function applyDragUpdate(params: {
   const nextFrame = { ...params.startFrame, x: newX, y: newY };
   if (params.tempFrameRef) params.tempFrameRef.current = nextFrame;
   params.setTempFrame(nextFrame);
-  updateEffectOverlay(
-    params.effectMode,
-    params.frameId,
-    newX,
-    newY,
-    params.startFrame.width,
-    params.startFrame.height
-  );
+  updateEffectOverlay(params.effectMode, params.frameId, {
+    x: newX,
+    y: newY,
+    width: params.startFrame.width,
+    height: params.startFrame.height,
+  });
 }
 
 function getResizedFrame(
@@ -114,12 +112,5 @@ export function applyResizeUpdate(params: {
   const nextFrame = { ...params.startFrame, ...resizedFrame };
   if (params.tempFrameRef) params.tempFrameRef.current = nextFrame;
   params.setTempFrame(nextFrame);
-  updateEffectOverlay(
-    params.effectMode,
-    params.frameId,
-    resizedFrame.x,
-    resizedFrame.y,
-    resizedFrame.width,
-    resizedFrame.height
-  );
+  updateEffectOverlay(params.effectMode, params.frameId, resizedFrame);
 }

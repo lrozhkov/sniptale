@@ -6,8 +6,19 @@ type RecordingOverlayMetrics = {
   cssWidth: number;
   cssX: number;
   cssY: number;
-  indicatorTop: number;
+  indicatorTop: number | null;
 };
+
+const RECORDING_INDICATOR_HEIGHT = 30;
+const RECORDING_INDICATOR_GAP = 8;
+
+function resolveRecordingIndicatorTop(region: RegionBounds): number | null {
+  if (region.y >= RECORDING_INDICATOR_HEIGHT + RECORDING_INDICATOR_GAP) {
+    return region.y - RECORDING_INDICATOR_HEIGHT;
+  }
+  const below = region.y + region.height + RECORDING_INDICATOR_GAP;
+  return below + RECORDING_INDICATOR_HEIGHT <= window.innerHeight ? below : null;
+}
 
 const regionSelectorRootStyle = `
   position: fixed;
@@ -37,21 +48,18 @@ export function getRecordingOverlayRootStyle(): string {
   return recordingOverlayRootStyle;
 }
 
-export function getRecordingOverlayMetrics(
-  region: RegionBounds,
-  dpr = window.devicePixelRatio || 1
-): RecordingOverlayMetrics {
-  const cssX = region.x / dpr;
-  const cssY = region.y / dpr;
-  const cssWidth = region.width / dpr;
-  const cssHeight = region.height / dpr;
+export function getRecordingOverlayMetrics(region: RegionBounds): RecordingOverlayMetrics {
+  const cssX = region.x;
+  const cssY = region.y;
+  const cssWidth = region.width;
+  const cssHeight = region.height;
 
   return {
     cssHeight,
     cssWidth,
     cssX,
     cssY,
-    indicatorTop: Math.max(8, cssY - 30),
+    indicatorTop: resolveRecordingIndicatorTop(region),
   };
 }
 

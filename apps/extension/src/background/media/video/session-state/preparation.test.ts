@@ -33,18 +33,22 @@ beforeEach(() => {
 });
 
 it('resets controlled cursor state when a new recording preparation begins', () => {
-  beginVideoRecordingPreparation(CaptureMode.TAB, {
-    autoFadeDelay: 0,
-    countdownSeconds: 3,
-    diagnosticsEnabled: false,
-    microphoneDeviceId: 'mic-1',
-    microphoneEnabled: true,
-    openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
-    systemAudioEnabled: true,
-    webcamDeviceId: 'cam-1',
-    webcamEnabled: true,
-  });
+  beginVideoRecordingPreparation(
+    CaptureMode.TAB,
+    {
+      autoFadeDelay: 0,
+      countdownSeconds: 3,
+      diagnosticsEnabled: false,
+      microphoneDeviceId: 'mic-1',
+      microphoneEnabled: true,
+      openEditorAfterRecording: false,
+      quality: VideoQuality.HIGH,
+      systemAudioEnabled: true,
+      webcamDeviceId: 'cam-1',
+      webcamEnabled: true,
+    },
+    null
+  );
 
   expect(videoManagerSession.controlledCursorCaptureEnabled).toBe(false);
   expect(videoManagerSession.controlledCursorAutoPaused).toBe(false);
@@ -58,7 +62,8 @@ it('resets controlled cursor state when a new recording preparation begins', () 
     countdownEndsAt: null,
     captureMode: CaptureMode.TAB,
     captureSource: null,
-    viewportPreset: null,
+    cropRegion: null,
+    viewportPresetId: null,
     liveMedia: {
       microphoneDeviceId: 'mic-1',
       microphoneEnabled: true,

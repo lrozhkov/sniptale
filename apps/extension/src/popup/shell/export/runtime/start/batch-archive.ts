@@ -2,7 +2,13 @@ import type { PopupExportResult } from '@sniptale/runtime-contracts/export';
 import { getMoscowFilenameTimestamp } from '@sniptale/foundation/utils/export-timestamp';
 import type { PopupExportBatchPackage } from '../types';
 import type { PopupBatchArchiveLayout } from './batch-layout';
-import { parsePopupBatchPagePackageAtBoundary } from './batch-package-boundary';
+import {
+  addPopupBatchResourceUsage,
+  assertPopupBatchAggregateResourceUsage,
+  getPopupBatchPagePackageResourceUsage,
+  parsePopupBatchPagePackageAtBoundary,
+  type PopupBatchResourceUsage,
+} from './batch-package-boundary';
 
 export type { PopupBatchArchiveLayout } from './batch-layout';
 
@@ -125,17 +131,36 @@ function throwIfBatchArchiveCancelled(options: CreateBatchArchiveBlobOptions | u
   }
 }
 
+function validateBatchArchivePackages(
+  packages: PopupExportBatchPackage[]
+): PopupExportBatchPackage[] {
+  let aggregateUsage: PopupBatchResourceUsage = {
+    decodedBytes: 0,
+    directoryNodes: 0,
+    entries: 0,
+  };
+  const validatedPackages = packages.map((item) => {
+    const pagePackage = parsePopupBatchPagePackageAtBoundary(item.pagePackage);
+    aggregateUsage = addPopupBatchResourceUsage(
+      aggregateUsage,
+      getPopupBatchPagePackageResourceUsage(pagePackage)
+    );
+    assertPopupBatchAggregateResourceUsage(aggregateUsage);
+    return { ...item, pagePackage };
+  });
+
+  return validatedPackages;
+}
+
 export async function createBatchArchiveBlob(
   packages: PopupExportBatchPackage[],
   layout: PopupBatchArchiveLayout,
   options?: CreateBatchArchiveBlobOptions
 ): Promise<Blob> {
   const { default: JSZip } = await import('jszip');
+  throwIfBatchArchiveCancelled(options);
+  const validatedPackages = validateBatchArchivePackages(packages);
   const zip = new JSZip();
-  const validatedPackages = packages.map((item) => ({
-    ...item,
-    pagePackage: parsePopupBatchPagePackageAtBoundary(item.pagePackage),
-  }));
 
   const uniqueBaseNames = createUniqueBatchBaseNames(validatedPackages);
 

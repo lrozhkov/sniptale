@@ -3,6 +3,7 @@ import { clearPinToTabSessionStorageState } from '../../../../composition/persis
 import { clearPinnedToolbarOperationState } from '../../page-access/pinned-toolbar-operation';
 import { clearBackgroundRuntimeTabState } from '../../../application/runtime-state';
 import { handleTabClose } from '../../../media/lifecycle';
+import { cleanupScreenshotModeAfterTabClose } from '../../tab-mode-router-screenshot';
 import type { BackgroundModeState, RuntimeWiringLogger } from './shared';
 
 export function registerTabLifecycleListeners(
@@ -11,14 +12,28 @@ export function registerTabLifecycleListeners(
 ): void {
   browserTabs.subscribeToRemoved((tabId) => {
     clearPinnedToolbarOperationState(tabId);
-    void clearBackgroundRuntimeTabState(state, tabId).catch((error) => {
-      logger.warn('Failed to clear persisted tab state after tab close', error);
-    });
+    void (async () => {
+      try {
+        await handleTabClose(tabId);
+      } catch (error) {
+        logger.warn('Failed to stop recording after tab close', error);
+      }
+      try {
+        await cleanupScreenshotModeAfterTabClose(
+          tabId,
+          state.screenshotModeState,
+          state.viewportState,
+          state.viewportOwnerState,
+          state.webSnapshotViewerPorts
+        );
+        await clearBackgroundRuntimeTabState(state, tabId);
+      } catch (error) {
+        logger.warn('Failed to restore screenshot state after tab close', error);
+      }
+    })();
     void clearPinToTabSessionStorageState(tabId).catch((error) => {
       logger.warn('Failed to clear pin-to-tab state after tab close', error);
     });
     logger.log('Tab closed, state cleared', tabId);
-
-    handleTabClose(tabId);
   });
 }

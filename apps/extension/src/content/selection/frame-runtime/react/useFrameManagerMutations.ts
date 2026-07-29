@@ -13,7 +13,7 @@ export function useFrameManagerMutations(
   const {
     containerRef,
     rootsRef,
-    linkedElementsRef,
+    hostLayoutServiceRef,
     isClearingRef,
     framesRef,
     globalEffectModeRef,
@@ -26,7 +26,7 @@ export function useFrameManagerMutations(
   const mutations = buildFrameMutationActions({
     setFrames,
     framesRef,
-    linkedElementsRef,
+    hostLayoutServiceRef,
     containerRef,
     rootsRef,
     isClearingRef,
@@ -42,15 +42,13 @@ export function useFrameManagerMutations(
 
   const hasFrameForElement = useCallback(
     (element: HTMLElement): boolean => {
-      for (const [frameId, linkedElement] of linkedElementsRef.current.entries()) {
-        if (linkedElement === element) {
-          logger.log('Element already has a frame', frameId);
-          return true;
-        }
+      if (hostLayoutServiceRef.current.hasElement(element)) {
+        logger.log('Element already has a frame');
+        return true;
       }
       return false;
     },
-    [linkedElementsRef]
+    [hostLayoutServiceRef]
   );
 
   return { hasFrameForElement, mutations };

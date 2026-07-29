@@ -47,6 +47,7 @@ it('formats error messages from real Error instances and unknown values', () => 
 it('captures optional screenshot assets only when the option is enabled', async () => {
   const updateProgress = vi.fn();
   const asset = {
+    captureWarnings: [],
     path: 'page-screenshot.png',
     content: new Blob(['png']),
   };

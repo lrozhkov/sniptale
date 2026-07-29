@@ -3,7 +3,7 @@ import { isRecord } from '../validators';
 
 export type PopupExportControlRequest =
   | { type: typeof MessageType.EXPORT_POPUP_PREVIEW }
-  | { type: typeof MessageType.EXPORT_POPUP_CANCEL };
+  | { type: typeof MessageType.EXPORT_POPUP_CANCEL; exportRunId: string };
 
 export function parsePopupExportControlRequest(value: unknown): PopupExportControlRequest | null {
   if (!isRecord(value)) {
@@ -14,7 +14,8 @@ export function parsePopupExportControlRequest(value: unknown): PopupExportContr
     return { type: MessageType.EXPORT_POPUP_PREVIEW };
   }
 
-  return value['type'] === MessageType.EXPORT_POPUP_CANCEL
-    ? { type: MessageType.EXPORT_POPUP_CANCEL }
+  return value['type'] === MessageType.EXPORT_POPUP_CANCEL &&
+    typeof value['exportRunId'] === 'string'
+    ? { type: MessageType.EXPORT_POPUP_CANCEL, exportRunId: value['exportRunId'] }
     : null;
 }

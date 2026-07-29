@@ -1,9 +1,9 @@
+import { CONTENT_APP_CONTAINER_ID, CONTENT_OVERLAY_ROOT_ID } from '@sniptale/ui/branding';
 import {
-  CONTENT_APP_CONTAINER_ID,
-  CONTENT_OVERLAY_ROOT_ID,
-  CONTENT_ROOT_ID,
-} from '@sniptale/ui/branding';
-import { initializeContentUiRoots } from './ui-roots';
+  initializeContentUiRoots,
+  isContentUiBootstrapFallbackAllowed,
+  resolveInitializedContentShadowRoot,
+} from './ui-roots';
 import {
   getComposedEventTargetElement,
   isComposedEventWithinAnyElement,
@@ -11,18 +11,17 @@ import {
 } from '@sniptale/ui/dom-events';
 
 export { initializeContentUiRoots };
+export { isContentUiBootstrapFallbackAllowed };
 
 type ContentUiSurface = 'app' | 'overlay';
 type ContentEventLike = Pick<Event, 'target'> & {
   composedPath?: () => EventTarget[];
 };
 
-function resolveContentHost(): HTMLElement | null {
-  if (typeof document === 'undefined') {
-    return null;
-  }
+const failClosedMountTargets = new Map<ContentUiSurface, HTMLElement>();
 
-  return document.getElementById(CONTENT_ROOT_ID);
+function resolveContentHost(): Element | null {
+  return resolveInitializedContentShadowRoot()?.host ?? null;
 }
 
 /**
@@ -37,23 +36,19 @@ export function toggleContentHostClass(className: string, enabled: boolean): voi
  * Returns the live content-script shadow root when the content runtime has bootstrapped.
  */
 export function resolveContentShadowRoot(): ShadowRoot | null {
-  return resolveContentHost()?.shadowRoot ?? null;
+  return resolveInitializedContentShadowRoot();
 }
 
 /**
  * Returns true when a node belongs to the extension-owned content runtime surface.
  */
 export function isContentOwnedElement(node: Node | null): boolean {
-  if (!(node instanceof Element)) {
+  if (!node) {
     return false;
   }
 
-  if (node.id === CONTENT_ROOT_ID) {
-    return true;
-  }
-
   const shadowRoot = resolveContentShadowRoot();
-  return Boolean(shadowRoot && node.getRootNode() === shadowRoot);
+  return Boolean(shadowRoot && (node === shadowRoot.host || node.getRootNode() === shadowRoot));
 }
 
 function getContentEventPathTargets(event: ContentEventLike): EventTarget[] {
@@ -136,14 +131,30 @@ export function resolveContentOverlayRoot(): HTMLDivElement | null {
  * Resolves the current mount target for content-owned UI. Tests can fall back to `document.body`
  * before the real content runtime bootstraps.
  */
-export function resolveContentUiMountTarget(surface: ContentUiSurface = 'overlay'): HTMLElement {
+export function ensureContentUiMountTarget(surface: ContentUiSurface = 'overlay'): HTMLElement {
+  const shadowRoot = resolveContentShadowRoot();
   const ownedTarget =
     surface === 'overlay' ? resolveContentOverlayRoot() : resolveContentAppContainer();
   if (ownedTarget) {
     return ownedTarget;
   }
 
-  return document.body ?? document.documentElement;
+  if (shadowRoot) {
+    const roots = initializeContentUiRoots(shadowRoot);
+    return surface === 'overlay' ? roots.overlayRoot : roots.appContainer;
+  }
+
+  if (isContentUiBootstrapFallbackAllowed()) {
+    return document.body ?? document.documentElement;
+  }
+
+  let failClosedTarget = failClosedMountTargets.get(surface);
+  if (!failClosedTarget || failClosedTarget.ownerDocument !== document) {
+    // why: after a registered host retires, extension UI must never mount into page-owned DOM.
+    failClosedTarget = document.createElement('div');
+    failClosedMountTargets.set(surface, failClosedTarget);
+  }
+  return failClosedTarget;
 }
 
 /**
@@ -151,18 +162,23 @@ export function resolveContentUiMountTarget(surface: ContentUiSurface = 'overlay
  * runtime has not been initialized yet.
  */
 export function appendToContentOverlayRoot<T extends Node>(node: T): T {
-  resolveContentUiMountTarget('overlay').appendChild(node);
+  ensureContentUiMountTarget('overlay').appendChild(node);
   return node;
 }
 
 /**
- * Looks up an owned content element inside the shadow tree before falling back to light-DOM
- * legacy locations used by isolated unit tests.
+ * Looks up an owned content element in the exact registered shadow tree. Isolated tests may use
+ * the light DOM only before content-root initialization.
  */
 export function getContentUiElementById<T extends HTMLElement = HTMLElement>(id: string): T | null {
-  const shadowMatch = resolveContentShadowRoot()?.getElementById(id);
-  if (shadowMatch instanceof HTMLElement) {
-    return shadowMatch as T;
+  const shadowRoot = resolveContentShadowRoot();
+  if (shadowRoot) {
+    const shadowMatch = shadowRoot.getElementById(id);
+    return shadowMatch instanceof HTMLElement ? (shadowMatch as T) : null;
+  }
+
+  if (!isContentUiBootstrapFallbackAllowed()) {
+    return null;
   }
 
   const documentMatch = document.getElementById(id);
@@ -170,34 +186,33 @@ export function getContentUiElementById<T extends HTMLElement = HTMLElement>(id:
 }
 
 /**
- * Queries the content shadow tree first so extension-owned UI can be resolved after the shadow
- * migration without breaking older tests that still mount into `document.body`.
+ * Queries the exact registered content shadow tree, with a pre-initialization light-DOM fallback
+ * for isolated tests.
  */
 export function queryContentUiElement<T extends Element = HTMLElement>(selector: string): T | null {
-  const shadowMatch = resolveContentShadowRoot()?.querySelector<T>(selector);
-  if (shadowMatch) {
-    return shadowMatch;
+  const shadowRoot = resolveContentShadowRoot();
+  if (shadowRoot) {
+    return shadowRoot.querySelector<T>(selector);
+  }
+
+  if (!isContentUiBootstrapFallbackAllowed()) {
+    return null;
   }
 
   return document.querySelector<T>(selector);
 }
 
 /**
- * Queries all matching content-owned elements across the shadow tree and any fallback light-DOM
- * mounts that might still exist in unit tests.
+ * Queries all matching elements in the exact registered content shadow tree, or a pre-bootstrap
+ * light-DOM test mount when no registered root is available.
  */
 export function queryAllContentUiElements<T extends Element = HTMLElement>(selector: string): T[] {
   const shadowRoot = resolveContentShadowRoot();
-  const shadowMatches = shadowRoot ? Array.from(shadowRoot.querySelectorAll<T>(selector)) : [];
-  const documentMatches = Array.from(document.querySelectorAll<T>(selector));
-  const seen = new Set<Element>();
+  if (shadowRoot) {
+    return Array.from(shadowRoot.querySelectorAll<T>(selector));
+  }
 
-  return [...shadowMatches, ...documentMatches].filter((element) => {
-    if (seen.has(element)) {
-      return false;
-    }
-
-    seen.add(element);
-    return true;
-  });
+  return isContentUiBootstrapFallbackAllowed()
+    ? Array.from(document.querySelectorAll<T>(selector))
+    : [];
 }

@@ -1,50 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  createCapturePart,
-  getStitchDrawSpec,
-  getTotalCaptureParts,
-  parseCaptureScreenshotResult,
-  resolveCaptureBlobOptions,
-} from './helpers';
-
-describe('capture-full-page part helpers', () => {
-  it('builds a capture part from a debugger screenshot payload', () => {
-    expect(
-      createCapturePart({
-        captureHeight: 900,
-        data: 'abc123',
-        offsetY: 1200,
-      })
-    ).toEqual({
-      captureHeight: 900,
-      dataUrl: 'data:image/png;base64,abc123',
-      offsetY: 1200,
-    });
-  });
-
-  it('calculates stitch draw coordinates in css and device pixels', () => {
-    expect(
-      getStitchDrawSpec({
-        captureHeight: 400,
-        devicePixelRatio: 2,
-        imageHeight: 1200,
-        imageWidth: 1600,
-        offsetY: 800,
-      })
-    ).toMatchObject({
-      destHeight: 400,
-      destWidth: 800,
-      destY: 800,
-      sourceHeight: 800,
-      sourceY: 400,
-    });
-  });
-});
+import { parseCaptureScreenshotResult, resolveCaptureBlobOptions } from './helpers';
 
 describe('capture-full-page result helpers', () => {
-  it('resolves total parts and final blob options from settings defaults', () => {
-    expect(getTotalCaptureParts(2500, 800)).toBe(4);
+  it('resolves final blob options from settings defaults', () => {
     expect(
       resolveCaptureBlobOptions({
         imageFormat: 'webp',

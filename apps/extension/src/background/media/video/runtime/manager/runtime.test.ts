@@ -5,7 +5,6 @@ const {
   getCurrentRecordingIdFromOwner,
   getRecordingTabIdFromOwner,
   handleTabCloseFromOwner,
-  handleTabUpdatedFromOwner,
   isRecordingFromOwner,
   resetRecordingIdFromOwner,
   resetRecordingTabIdFromOwner,
@@ -14,7 +13,6 @@ const {
   getCurrentRecordingIdFromOwner: vi.fn(),
   getRecordingTabIdFromOwner: vi.fn(),
   handleTabCloseFromOwner: vi.fn(),
-  handleTabUpdatedFromOwner: vi.fn(),
   isRecordingFromOwner: vi.fn(),
   resetRecordingIdFromOwner: vi.fn(),
   resetRecordingTabIdFromOwner: vi.fn(),
@@ -29,9 +27,8 @@ vi.mock('./runtime/recording-state', () => ({
   resetRecordingTabId: resetRecordingTabIdFromOwner,
 }));
 
-vi.mock('./runtime/tab-lifecycle', () => ({
+vi.mock('./runtime/tab-close', () => ({
   handleTabClose: handleTabCloseFromOwner,
-  handleTabUpdated: handleTabUpdatedFromOwner,
 }));
 
 import {
@@ -39,7 +36,6 @@ import {
   getCurrentRecordingId,
   getRecordingTabId,
   handleTabClose,
-  handleTabUpdated,
   isRecording,
   resetRecordingId,
   resetRecordingTabId,
@@ -50,7 +46,6 @@ it('re-exports runtime seams without wrapping', () => {
   expect(getCurrentRecordingId).toBe(getCurrentRecordingIdFromOwner);
   expect(getRecordingTabId).toBe(getRecordingTabIdFromOwner);
   expect(handleTabClose).toBe(handleTabCloseFromOwner);
-  expect(handleTabUpdated).toBe(handleTabUpdatedFromOwner);
   expect(isRecording).toBe(isRecordingFromOwner);
   expect(resetRecordingId).toBe(resetRecordingIdFromOwner);
   expect(resetRecordingTabId).toBe(resetRecordingTabIdFromOwner);

@@ -61,3 +61,19 @@ it('reuses the injected recording-overlay style on subsequent renders', () => {
 
   expect(document.querySelectorAll('#sniptale-recording-overlay-style')).toHaveLength(1);
 });
+
+it('omits the indicator when it cannot be placed outside the selected region', () => {
+  const host = document.createElement('div');
+  host.appendChild(
+    buildRecordingOverlayNode({
+      cssHeight: 700,
+      cssWidth: 700,
+      cssX: 0,
+      cssY: 0,
+      indicatorTop: null,
+    })
+  );
+
+  expect(host.children).toHaveLength(4);
+  expect(host.textContent).toBe('');
+});

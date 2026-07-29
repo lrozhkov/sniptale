@@ -90,7 +90,7 @@ function createProps(): React.ComponentProps<typeof VideoSetupBody> {
       duration: 0,
       error: null,
       status: VideoRecordingStatus.IDLE,
-      viewportPreset: null,
+      viewportPresetId: null,
     },
     selectedPresetId: null,
     settings: createBodySettings(),
@@ -172,7 +172,7 @@ it('passes actual webcam settings into the active recording panel', async () => 
         webcamSettings: { frameRate: 30, height: 720, width: 1280 },
       },
       status: VideoRecordingStatus.RECORDING,
-      viewportPreset: null,
+      viewportPresetId: null,
     },
     webcamDevices: [{ deviceId: 'cam-1', label: 'Desk camera' }],
   });

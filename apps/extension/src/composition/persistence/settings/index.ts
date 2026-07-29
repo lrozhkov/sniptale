@@ -6,20 +6,21 @@ import type {
   SettingsPatch,
   ViewportPreset,
 } from '../../../contracts/settings';
+import { DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES } from '../../../contracts/full-page-capture';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseStoredSettings } from './guards';
+import {
+  cloneViewportPreset,
+  createSystemViewportPresetCatalog,
+} from '../../../features/viewport-presets/catalog';
 
 const STORAGE_KEY = 'sniptale_settings';
 const logger = createLogger({ namespace: 'SharedSettingsStorage' });
 let settingsMutationQueue = Promise.resolve<Settings | null>(null);
 
-// Built-in viewport presets used when storage has no saved settings yet.
-const DEFAULT_VIEWPORT_PRESETS: ViewportPreset[] = [
-  { id: 'fhd', width: 1920, height: 1080, label: 'Full HD' },
-  { id: 'hd', width: 1280, height: 720, label: 'HD' },
-];
+const DEFAULT_VIEWPORT_PRESETS: ViewportPreset[] = createSystemViewportPresetCatalog();
 
 const DEFAULT_CONTEXT_MENU_SETTINGS: ContextMenuSettings = {
   enabled: true,
@@ -45,7 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   contextMenu: DEFAULT_CONTEXT_MENU_SETTINGS,
   saveCapturesToGallery: false,
   viewportPresets: DEFAULT_VIEWPORT_PRESETS,
-  defaultViewportId: 'native',
+  defaultViewportPresetId: null,
   presets: [],
   defaultImagePresetId: null,
   defaultVideoPresetId: null,
@@ -56,10 +57,11 @@ export const DEFAULT_SETTINGS: Settings = {
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   skipWebSnapshotSaveDisclosure: false,
   rawDiagnosticsEnabled: false,
+  fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
 };
 
 function cloneViewportPresets(presets: readonly ViewportPreset[]): ViewportPreset[] {
-  return presets.map((preset) => ({ ...preset }));
+  return presets.map(cloneViewportPreset);
 }
 
 function cloneContextMenuSettings(settings: ContextMenuSettings): ContextMenuSettings {
@@ -75,11 +77,18 @@ function cloneContentToolbarSettings(
   };
 }
 
+function cloneFullPageCapturePreferences(
+  settings: NonNullable<Settings['fullPageCapture']>
+): NonNullable<Settings['fullPageCapture']> {
+  return { ...settings };
+}
+
 export function createDefaultSettings(): Settings {
   return {
     ...DEFAULT_SETTINGS,
     contentToolbar: cloneContentToolbarSettings(DEFAULT_CONTENT_TOOLBAR_SETTINGS),
     contextMenu: cloneContextMenuSettings(DEFAULT_CONTEXT_MENU_SETTINGS),
+    fullPageCapture: cloneFullPageCapturePreferences(DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES),
     presets: [],
     viewportPresets: cloneViewportPresets(DEFAULT_VIEWPORT_PRESETS),
   };
@@ -122,7 +131,21 @@ function normalizeLoadedSettings(parsedValue: Partial<Settings>): Settings {
       ...DEFAULT_CONTEXT_MENU_SETTINGS,
       ...parsedValue.contextMenu,
     },
+    fullPageCapture: {
+      ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
+      ...parsedValue.fullPageCapture,
+    },
     presets: Array.isArray(parsedValue.presets) ? parsedValue.presets : [],
+    viewportPresets: Array.isArray(parsedValue.viewportPresets)
+      ? cloneViewportPresets(parsedValue.viewportPresets)
+      : cloneViewportPresets(DEFAULT_VIEWPORT_PRESETS),
+    defaultViewportPresetId:
+      parsedValue.defaultViewportPresetId !== undefined &&
+      parsedValue.viewportPresets?.some(
+        (preset) => preset.id === parsedValue.defaultViewportPresetId && preset.enabled
+      )
+        ? parsedValue.defaultViewportPresetId
+        : null,
     defaultImagePresetId: parsedValue.defaultImagePresetId ?? null,
     defaultVideoPresetId: parsedValue.defaultVideoPresetId ?? null,
     defaultExportPresetId: parsedValue.defaultExportPresetId ?? null,
@@ -174,6 +197,11 @@ function applySettingsPatch(currentSettings: Settings, settingsPatch: SettingsPa
     contextMenu: {
       ...currentSettings.contextMenu,
       ...settingsPatch.contextMenu,
+    },
+    fullPageCapture: {
+      ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
+      ...currentSettings.fullPageCapture,
+      ...settingsPatch.fullPageCapture,
     },
   });
 }

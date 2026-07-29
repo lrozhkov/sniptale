@@ -129,6 +129,7 @@ async function runSaveWebSnapshotRequest(
 ): Promise<SaveWebSnapshotResult> {
   const requestId = deps.createRequestId();
   state.requestIdRef.current = requestId;
+  state.cancelRetryRef.current = { exportRunId: requestId, tabIds: [tabId] };
 
   const response = await sendSaveWebSnapshotRequest(state, tabId, deps, requestId);
 
@@ -137,6 +138,8 @@ async function runSaveWebSnapshotRequest(
       getPopupExportTransportErrorMessage(response?.error, 'popup.export.startExportError')
     );
     setWebSnapshotError(state, error);
+    state.requestIdRef.current = null;
+    state.cancelRetryRef.current = null;
     throw error;
   }
 
@@ -147,6 +150,8 @@ async function runSaveWebSnapshotRequest(
   const result = readSnapshotResponseAsset(response);
 
   applySaveWebSnapshotResult(state, result);
+  state.requestIdRef.current = null;
+  state.cancelRetryRef.current = null;
   return result;
 }
 

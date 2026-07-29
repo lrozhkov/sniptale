@@ -21,6 +21,7 @@ const {
   setControlledCursorDisplaySurfaceMock,
   setControlledCursorVerifiedModeMock,
   setVideoRecordingRuntimeStateMock,
+  releaseVideoCaptureSurfaceMock,
 } = vi.hoisted(() => ({
   finishVideoRecordingStopMock: vi.fn(),
   clearRecordingStartActivationWatchdogMock: vi.fn(),
@@ -41,6 +42,7 @@ const {
   setControlledCursorDisplaySurfaceMock: vi.fn(),
   setControlledCursorVerifiedModeMock: vi.fn(),
   setVideoRecordingRuntimeStateMock: vi.fn(),
+  releaseVideoCaptureSurfaceMock: vi.fn(),
 }));
 
 vi.mock('../../session-state/service/runtime-state-service', async (importOriginal) => ({
@@ -85,6 +87,10 @@ vi.mock('../../camera-recorder-control', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../camera-recorder-control')>()),
   isAuthorizedCameraRecorderDocument: isAuthorizedCameraRecorderDocumentMock,
 }));
+vi.mock('../../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture-surface')>()),
+  releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
+}));
 
 import {
   handleOffscreenRecordingPaused,
@@ -101,8 +107,7 @@ function createSendResponse() {
 }
 
 async function flushAsyncRoute() {
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function createDeferred() {
@@ -135,6 +140,7 @@ beforeEach(() => {
   resolveTrustedCameraRecorderRuntimeSenderUrlMock.mockReturnValue(null);
   resolveTrustedPopupRuntimeSenderUrlMock.mockReturnValue(null);
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
+  releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
 });
 
 it('handles recording state and tab lookup through the recording owner', async () => {
@@ -147,10 +153,8 @@ it('handles recording state and tab lookup through the recording owner', async (
     success: true,
     state: { duration: 0, status: VideoRecordingStatus.IDLE },
   });
-  expect(handleRecordingTabId(sendResponse, 17)).toEqual({
-    handled: true,
-    keepChannelOpen: false,
-  });
+  expectAsyncRoute(handleRecordingTabId(sendResponse, 17));
+  await flushAsyncRoute();
   expect(sendResponse).toHaveBeenLastCalledWith({
     success: true,
     isCurrentTab: true,
@@ -233,7 +237,25 @@ it('handles recording start and stop lifecycle mutations through the recording o
   expect(resetRecordingTabIdMock).toHaveBeenCalledTimes(1);
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledTimes(1);
   expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-1');
+  expect(releaseVideoCaptureSurfaceMock.mock.invocationCallOrder[0]).toBeLessThan(
+    finishVideoRecordingStopMock.mock.invocationCallOrder[0] ?? 0
+  );
   expectAcceptedLifecycleResponse(sendResponse);
+});
+
+it('preserves recording identity when stopped-event surface restoration fails', async () => {
+  const sendResponse = createSendResponse();
+  releaseVideoCaptureSurfaceMock.mockRejectedValueOnce(new Error('restore-conflict'));
+
+  handleOffscreenRecordingStopped({ recordingId: 'rec-1' }, sendResponse);
+  await flushAsyncRoute();
+
+  expect(sendResponse).toHaveBeenLastCalledWith({ success: false, error: 'Internal error' });
+  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+  expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
+  expect(resetRecordingTabIdMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
 });
 
 it('waits for stopped-recording lease cleanup before acknowledging the lifecycle route', async () => {

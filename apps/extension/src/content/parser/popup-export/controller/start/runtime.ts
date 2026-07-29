@@ -11,6 +11,10 @@ import { attachPopupExportStartProgress } from './progress';
 import { settlePopupExportStartFlow } from './settle';
 import type { ContentPrivilegedActionIntentSource } from '../../../../platform/privileged-action-intent/client';
 import type { PopupExportRequestHandlerRuntime, PopupExportRunner } from '../types';
+import type {
+  FullPageExportCaptureAction,
+  FullPageExportCaptureIdentity,
+} from '../../../../../contracts/full-page-capture';
 
 type ContentActionGrant = ContentIntentTypes.ContentPrivilegedActionAutoStartGrant;
 const createAutoStartIntentSource =
@@ -18,6 +22,7 @@ const createAutoStartIntentSource =
 
 type PopupExportStartRequest = {
   contentIntentGrant?: ContentActionGrant;
+  fullPageCaptureAction?: FullPageExportCaptureAction;
   options: ExportOptions;
   requestId: string;
   type: MessageType.EXPORT_POPUP_START;
@@ -43,6 +48,7 @@ type PopupExportStartRequestHandlerProps = PopupExportStartRuntime & {
 
 type PopupExportStartFlowProps = PopupExportStartRuntime & {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+  fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
   options: ExportOptions;
   requestId: string;
 };
@@ -103,6 +109,14 @@ export function handlePopupExportStartRuntime(props: PopupExportStartRequestHand
     persistArchive: props.persistArchive,
     requestId: props.request.requestId,
     state: props.state,
+    ...(props.request.fullPageCaptureAction === undefined
+      ? {}
+      : {
+          fullPageCaptureIdentity: {
+            action: props.request.fullPageCaptureAction,
+            exportRunId: props.request.requestId,
+          },
+        }),
   });
   return true;
 }

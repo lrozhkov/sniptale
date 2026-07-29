@@ -5,6 +5,7 @@ import { getContentRuntimeServices } from '../../../platform/runtime-services/se
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
 import type { ArchiveAsset } from '../archive';
+import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
 
 function isDebuggerScreenshotFailure(message: string): boolean {
   return [
@@ -31,15 +32,28 @@ function getFullPageScreenshotErrorMessage(error: unknown): string {
  * Capture a full-page screenshot through background and return it as an archive asset.
  */
 export async function captureFullPageScreenshotAsset(
-  contentIntentSource?: ContentPrivilegedActionIntentSource | undefined
-): Promise<ArchiveAsset> {
+  contentIntentSource?: ContentPrivilegedActionIntentSource | undefined,
+  captureIdentity: FullPageExportCaptureIdentity = {
+    action: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+    exportRunId: crypto.randomUUID(),
+  }
+): Promise<ArchiveAsset & { captureWarnings: string[] }> {
   const services = getContentRuntimeServices();
+  const request =
+    captureIdentity.action === MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED
+      ? {
+          type: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+          exportRunId: captureIdentity.exportRunId,
+        }
+      : {
+          type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+          exportRunId: captureIdentity.exportRunId,
+        };
   const response = await services.messaging.sendRuntimeMessage(
     await services.contentActionIntent.attachContentActionIntent(
-      {
-        type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
-      },
-      contentIntentSource
+      request,
+      contentIntentSource,
+      captureIdentity.exportRunId
     )
   );
 
@@ -48,6 +62,14 @@ export async function captureFullPageScreenshotAsset(
   }
 
   return {
+    captureWarnings: [
+      ...(response.downscaled
+        ? [translate('content.runtime.captureFullPageDownscaledWarning')]
+        : []),
+      ...(response.frozenExtentWarning
+        ? [translate('content.runtime.captureFullPageFrozenExtentWarning')]
+        : []),
+    ],
     path: 'page-screenshot.png',
     content: await dataUrlToBlob(response.dataUrl),
   };

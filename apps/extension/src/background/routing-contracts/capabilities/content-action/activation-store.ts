@@ -62,9 +62,11 @@ function getPurposeActionTypes(
   }
 
   return [
+    MessageType.ENABLE_SCREENSHOT_MODE,
     CaptureMessageType.CAPTURE_VISIBLE,
     CaptureMessageType.CAPTURE_FULL,
     CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
+    CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
     MessageType.EXPORT_CAPTURE_FULL_PAGE,
     MessageType.EXECUTE_SAVE,
     MessageType.OPEN_EDITOR_WITH_IMAGE,

@@ -8,6 +8,7 @@ export function createRuntimeHistoryWrappedMutations(
     ...mutations,
     addAutoBlurFrames: withHistoryCommit(mutations.addAutoBlurFrames),
     clearAutoBlurFrames: withHistoryCommit(mutations.clearAutoBlurFrames),
+    pinFrameAtLastPlacement: withHistoryCommit(mutations.pinFrameAtLastPlacement),
     removeFrame: withHistoryCommit(mutations.removeFrame),
     syncAutoBlurFrames: withHistoryCommit(mutations.syncAutoBlurFrames),
     updateFrame: withHistoryCommit(mutations.updateFrame),

@@ -187,7 +187,10 @@ it('keeps the response channel open for tab-routed messages', () => {
     resolvedTabId: undefined,
     route: {
       kind: 'tab',
-      tabMessage: { type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+      tabMessage: {
+        exportRunId: 'export-run-1',
+        type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+      },
     },
   });
 

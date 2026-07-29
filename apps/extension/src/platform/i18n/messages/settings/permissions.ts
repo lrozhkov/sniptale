@@ -135,6 +135,14 @@ export const settingsPermissionsMessages = defineMessageSource({
     ru: 'Нужен для длинных скриншотов, точного захвата окна просмотра и диагностики, которую запускаете вы.',
     en: 'Powers full-page screenshots, precise viewport capture, and diagnostics you start.',
   },
+  requiredSystemDisplayName: {
+    ru: 'Размер и рабочая область экрана',
+    en: 'Display size and work area',
+  },
+  requiredSystemDisplayDescription: {
+    ru: 'Проверяет, поместится ли выбранный размер окна Chrome на текущем экране, не меняя настройки дисплея.',
+    en: 'Checks whether the selected Chrome window size fits the current display without changing display settings.',
+  },
   requiredActiveTabName: {
     ru: 'Текущая вкладка',
     en: 'Current tab',

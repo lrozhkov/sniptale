@@ -13,6 +13,7 @@ import type {
   ViewerPreparationCommand,
 } from '../../../workflows/page-preparation';
 import type { FrameData } from '../../../features/highlighter/contracts';
+import type { ToolbarViewportSelection } from '../../overlay/toolbar/types';
 
 export type PreparationAiPickSourceAdapter = AiPickSourceAdapter;
 export type PreparationFrameSource = {
@@ -22,7 +23,7 @@ export type PreparationPopupSendResponse = PopupSendResponse;
 export type PreparationPageSnapshotSource = PageSnapshotSource;
 
 export type PreparationPortConnector = (
-  onCommand: (command: ViewerPreparationCommand) => void,
+  onCommand: (command: ViewerPreparationCommand) => void | Promise<void>,
   onPopupExportRequest?: (
     request: ViewerPopupExportMessage,
     sendResponse: PreparationPopupSendResponse
@@ -43,6 +44,7 @@ export interface PreparationHostPorts {
     request: ViewerPopupExportMessage,
     sendResponse: PreparationPopupSendResponse
   ) => void;
+  mutateViewport?: (viewport: ToolbarViewportSelection) => Promise<void>;
 }
 
 export interface PreparationSurfaceProps {

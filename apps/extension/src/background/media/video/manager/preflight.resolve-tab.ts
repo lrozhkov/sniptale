@@ -16,11 +16,16 @@ export async function resolveTabCaptureSource(
   }
 
   if (!tab || tabId === null) {
-    deps.notifyStartFailed(deps.localize('background.runtime.recordingUnavailable'));
+    await deps.notifyStartFailed(deps.localize('background.runtime.recordingUnavailable'));
     return null;
   }
 
   try {
+    const cropSelection = await resolveTabCropRegion(captureMode, tabId, deps);
+    if (captureMode === CaptureMode.TAB_CROP && !cropSelection) {
+      return null;
+    }
+
     const captureSource = enrichCaptureSourceWithTabInfo(
       await deps.getCaptureSource(captureMode, tab),
       {
@@ -30,47 +35,37 @@ export async function resolveTabCaptureSource(
       }
     );
 
-    return await finalizeTabCaptureSource({ captureMode, captureSource, deps, tabId });
+    const resolvedSource = cropSelection
+      ? {
+          ...captureSource,
+          cropRegion: cropSelection.region,
+          captureViewport: cropSelection.captureViewport,
+        }
+      : captureSource;
+    deps.logger.debug('Capture source resolved', resolvedSource.mode);
+    return resolvedSource;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    deps.notifyStartFailed(message);
+    await deps.notifyStartFailed(message);
     return null;
   }
 }
 
-async function finalizeTabCaptureSource(params: {
-  captureMode: CaptureMode;
-  captureSource: CaptureSource;
-  deps: ResolveCaptureSourceDeps;
-  tabId: number;
-}): Promise<CaptureSource | null> {
-  const captureSource = await attachTabCropRegionIfNeeded(params);
-  if (!captureSource) {
+async function resolveTabCropRegion(
+  captureMode: CaptureMode,
+  tabId: number,
+  deps: ResolveCaptureSourceDeps
+) {
+  if (captureMode !== CaptureMode.TAB_CROP) {
     return null;
   }
 
-  params.deps.logger.debug('Capture source resolved', captureSource.mode);
-  return captureSource;
-}
-
-async function attachTabCropRegionIfNeeded(params: {
-  captureMode: CaptureMode;
-  captureSource: CaptureSource;
-  deps: ResolveCaptureSourceDeps;
-  tabId: number;
-}): Promise<CaptureSource | null> {
-  if (params.captureMode !== CaptureMode.TAB_CROP) {
-    return params.captureSource;
-  }
-
-  params.deps.logger.debug('Requesting crop region for TAB_CROP mode');
-  const cropRegion = await params.deps.requestRegionSelection(params.tabId);
-  if (!cropRegion) {
-    params.deps.notifyStartFailed(
-      params.deps.localize('background.runtime.areaSelectionCancelled')
-    );
+  deps.logger.debug('Requesting crop region before acquiring the one-time TAB_CROP stream ID');
+  const cropSelection = await deps.requestRegionSelection(tabId);
+  if (!cropSelection) {
+    await deps.notifyStartFailed(deps.localize('background.runtime.areaSelectionCancelled'));
     return null;
   }
 
-  return { ...params.captureSource, cropRegion };
+  return cropSelection;
 }

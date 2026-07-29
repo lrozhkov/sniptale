@@ -13,6 +13,7 @@ import type {
   PreparedCaptureAction,
   StartCapturePorts,
 } from './ports';
+import type { ViewportState } from '../../routing-contracts/tab-mode-state';
 
 const defaultStartCapturePorts: StartCapturePorts = {
   generateFilename,
@@ -29,10 +30,10 @@ export function createVisibleCapturePromise(
   ) => Promise<CaptureDeliveryPayload>,
   captureVisibleTabForCrop: (tabId: number) => Promise<CaptureDeliveryPayload>,
   resolvedTabId: number,
-  viewportState: Map<number, { width: number; height: number } | null>
+  viewportState: ViewportState
 ): Promise<CaptureDeliveryPayload> {
   const viewport = viewportState.get(resolvedTabId);
-  const useViewportCapture = viewport !== null && viewport !== undefined;
+  const useViewportCapture = viewport?.target === 'viewport';
   return useViewportCapture
     ? captureViewportWithClip(resolvedTabId, viewport)
     : captureVisibleTabForCrop(resolvedTabId);

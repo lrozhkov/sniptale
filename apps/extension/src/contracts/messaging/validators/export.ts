@@ -25,14 +25,19 @@ function isExportProgressStepKey(value: unknown): value is ExportProgressStepKey
 }
 
 function isExportPagePackageEntry(value: unknown): value is ExportPagePackageEntry {
-  return (
-    isRecord(value) &&
-    isString(value['path']) &&
-    hasOptionalField(value, 'textContent', isString) &&
-    hasOptionalField(value, 'binaryBase64', isString) &&
-    hasOptionalField(value, 'mimeType', isString) &&
-    (isString(value['textContent']) || isString(value['binaryBase64']))
-  );
+  if (
+    !isRecord(value) ||
+    !isString(value['path']) ||
+    !hasOptionalField(value, 'textContent', isString) ||
+    !hasOptionalField(value, 'binaryBase64', isString) ||
+    !hasOptionalField(value, 'mimeType', isString)
+  ) {
+    return false;
+  }
+
+  const hasTextContent = isString(value['textContent']);
+  const hasBinaryContent = isString(value['binaryBase64']);
+  return hasTextContent !== hasBinaryContent;
 }
 
 export function isExportOptions(value: unknown): value is ExportOptions {

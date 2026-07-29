@@ -97,7 +97,6 @@ function createMissingTabCapabilitiesExpectation() {
       [CaptureMode.TAB]: unsupported,
       [CaptureMode.TAB_CROP]: unsupported,
       [CaptureMode.CAMERA]: supported,
-      [CaptureMode.VIEWPORT_EMULATION]: unsupported,
       [CaptureMode.SCREEN]: unsupported,
     },
   };
@@ -136,10 +135,6 @@ function createRestrictedTabCapabilitiesExpectation() {
         reason: createRestrictedVideoReason('popup.labels.captureModeArea', 'devtools://'),
       },
       [CaptureMode.CAMERA]: supported,
-      [CaptureMode.VIEWPORT_EMULATION]: {
-        supported: false,
-        reason: createRestrictedVideoReason('popup.labels.captureModePreset', 'devtools://'),
-      },
       [CaptureMode.SCREEN]: supported,
     },
   };
@@ -260,9 +255,9 @@ describe('tab-capabilities restricted-page reasons', () => {
       supported: false,
       reason: createRestrictedVideoReason('popup.labels.captureModeArea', 'chrome-extension://'),
     });
-    expect(getVideoCaptureModeCapability(CaptureMode.VIEWPORT_EMULATION, aboutTab)).toEqual({
+    expect(getVideoCaptureModeCapability(CaptureMode.TAB, aboutTab)).toEqual({
       supported: false,
-      reason: createRestrictedVideoReason('popup.labels.captureModePreset', 'about://'),
+      reason: createRestrictedVideoReason('popup.labels.captureModeTab', 'about://'),
     });
   });
 });

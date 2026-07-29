@@ -31,7 +31,7 @@ async function verifiesTabModeRoutingWithSenderTabId() {
   const { deps, listener, sendResponse } = registerListener();
   parseBackgroundRuntimeMessageMock.mockReturnValue({
     tabId: 99,
-    type: MessageType.ENABLE_SCREENSHOT_MODE,
+    type: MessageType.ENABLE_HIGHLIGHTER_MODE,
   });
   isBackgroundTabMessageMock.mockReturnValue(true);
   isTabModeMessageMock.mockReturnValue(true);
@@ -39,13 +39,13 @@ async function verifiesTabModeRoutingWithSenderTabId() {
   expectListenerResult(
     true,
     listener,
-    { tabId: 99, type: MessageType.ENABLE_SCREENSHOT_MODE },
+    { tabId: 99, type: MessageType.ENABLE_HIGHLIGHTER_MODE },
     createTopLevelContentSender(17, CONTENT_URL),
     sendResponse
   );
   await flushPromises();
   expect(routeTabModeMessageMock).toHaveBeenCalledWith({
-    message: { tabId: 17, type: MessageType.ENABLE_SCREENSHOT_MODE },
+    message: { tabId: 17, type: MessageType.ENABLE_HIGHLIGHTER_MODE },
     resolvedTabId: 17,
     senderDocumentId: 'document-17',
     sendResponse,

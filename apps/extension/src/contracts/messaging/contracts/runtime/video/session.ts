@@ -15,7 +15,6 @@ import {
   isString,
   isVideoRecordingRuntimeState,
   isVideoRecordingSettings,
-  isVideoViewportPresetSelection,
 } from '../../../validators/index';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
@@ -36,7 +35,7 @@ function isStartRecordingRequest(
     optional: {
       captureMode: isCaptureMode,
       tabId: isNumber,
-      viewportPreset: isVideoViewportPresetSelection,
+      viewportPresetId: (value) => value === null || isString(value),
     },
   });
 

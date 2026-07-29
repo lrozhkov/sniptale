@@ -1,12 +1,27 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseSavePresets, parseViewportPresets } from './array.guards.ts';
+import { createSystemViewportPresetCatalog } from '../../../features/viewport-presets/catalog';
 
 describe('settings array guards', () => {
   it('returns undefined when every viewport preset entry is invalid', () => {
     expect(parseViewportPresets([{ id: 'broken' }])).toEqual({
       hasInvalidRoot: false,
       invalidEntryCount: 1,
+      value: undefined,
+    });
+  });
+
+  it('accepts only the complete current viewport catalog', () => {
+    const catalog = createSystemViewportPresetCatalog();
+    expect(parseViewportPresets(catalog)).toEqual({
+      hasInvalidRoot: false,
+      invalidEntryCount: 0,
+      value: catalog,
+    });
+    expect(parseViewportPresets(catalog.slice(1))).toEqual({
+      hasInvalidRoot: false,
+      invalidEntryCount: 9,
       value: undefined,
     });
   });

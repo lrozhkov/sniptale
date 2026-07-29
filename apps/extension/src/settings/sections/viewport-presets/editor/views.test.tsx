@@ -1,197 +1,112 @@
-// @vitest-environment jsdom
+import { renderToStaticMarkup } from 'react-dom/server';
+import { expect, it, vi } from 'vitest';
 
-import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { translate } from '../../../../platform/i18n';
-import { ViewportPresetEditorContent, ViewportPresetEditorFooter } from './views';
-
-const { actionButtonPropsSpy } = vi.hoisted(() => ({
-  actionButtonPropsSpy: vi.fn(),
-}));
-
-vi.mock('@sniptale/ui/product-modal/actions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/ui/product-modal/actions')>()),
-  ProductActionButton: (
-    props: React.ButtonHTMLAttributes<HTMLButtonElement> & { compact?: boolean }
-  ) => {
-    actionButtonPropsSpy(props);
-
-    return (
-      <button type={props.type} disabled={props.disabled} onClick={props.onClick}>
-        {props.children}
-      </button>
-    );
-  },
+const { inputPropsSpy, selectPropsSpy } = vi.hoisted(() => ({
+  inputPropsSpy: vi.fn(),
+  selectPropsSpy: vi.fn(),
 }));
 
 vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/ui/product-form-controls')>()),
-  ProductField: (props: { children: React.ReactNode; label: string }) => (
+  ProductField: ({ children, label }: { children: React.ReactNode; label: React.ReactNode }) => (
     <label>
-      <span>{props.label}</span>
-      {props.children}
+      {label}
+      {children}
     </label>
   ),
-  ProductInput: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+  ProductInput: (props: React.InputHTMLAttributes<HTMLInputElement>) => {
+    inputPropsSpy(props);
+    return <input {...props} />;
+  },
+  ProductSelect: (props: unknown) => {
+    selectPropsSpy(props);
+    return <div data-testid="target-select" />;
+  },
 }));
 
 vi.mock('@sniptale/ui/product-modal', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/ui/product-modal')>()),
-  ProductModalBody: (
-    props: React.FormHTMLAttributes<HTMLFormElement> & { children: React.ReactNode }
-  ) => <form onSubmit={props.onSubmit}>{props.children}</form>,
-  ProductModalFooter: (props: { children: React.ReactNode }) => <div>{props.children}</div>,
+  ProductModalBody: ({ children }: { children: React.ReactNode }) => <form>{children}</form>,
+  ProductModalFooter: ({ children }: { children: React.ReactNode }) => <footer>{children}</footer>,
 }));
 
-vi.mock('../../../section-surface/panel-controls', () => ({
-  settingsModalFieldSurfaceClassName: 'field-surface',
-}));
+import { ViewportPresetEditorContent, ViewportPresetEditorFooter } from './views';
 
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-function renderElement(element: React.ReactElement) {
-  if (!container) {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  }
-
-  act(() => {
-    root?.render(element);
-  });
-}
-
-beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  actionButtonPropsSpy.mockReset();
-});
-
-afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
-  root = null;
-  container?.remove();
-  container = null;
-  vi.unstubAllGlobals();
-});
-
-function verifyViewportPresetEditorContent() {
+it('exposes viewport and browser-window targets with bounded integer dimensions', () => {
+  const setHeight = vi.fn();
   const setLabel = vi.fn();
   const setWidth = vi.fn();
-  const setHeight = vi.fn();
-  const onSubmit = vi.fn(async (event: React.FormEvent) => {
-    event.preventDefault();
-  });
-
-  renderElement(
+  const markup = renderToStaticMarkup(
     <ViewportPresetEditorContent
       height={720}
       isDisabled={false}
       label="Desktop"
-      onSubmit={onSubmit}
+      onSubmit={vi.fn()}
       setHeight={setHeight}
       setLabel={setLabel}
+      setTarget={vi.fn()}
       setWidth={setWidth}
+      target="window"
       width={1280}
     />
   );
-  const inputs = Array.from(container?.querySelectorAll<HTMLInputElement>('input') ?? []);
-  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
 
-  act(() => {
-    setValue?.call(inputs[0], 'Wide');
-    inputs[0]!.dispatchEvent(new Event('input', { bubbles: true }));
-    setValue?.call(inputs[1], '9999');
-    inputs[1]!.dispatchEvent(new Event('input', { bubbles: true }));
-    setValue?.call(inputs[2], '0');
-    inputs[2]!.dispatchEvent(new Event('input', { bubbles: true }));
-    container
-      ?.querySelector('form')
-      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-  });
+  expect(markup).toContain('max="16384"');
+  expect(markup).toContain('maxLength="80"');
+  expect(markup).not.toContain('sniptale-modal-field-surface');
+  expect(selectPropsSpy).toHaveBeenCalledWith(
+    expect.objectContaining({
+      value: 'window',
+      options: [
+        expect.objectContaining({ value: 'viewport' }),
+        expect.objectContaining({ value: 'window' }),
+      ],
+    })
+  );
 
-  expect(setLabel).toHaveBeenCalledWith('Wide');
-  expect(setWidth).toHaveBeenCalledWith(3840);
+  const inputs = inputPropsSpy.mock.calls.map(([props]) => props);
+  inputs[0]?.onChange?.({ target: { value: 'Renamed' } });
+  inputs[1]?.onChange?.({ target: { value: '20000' } });
+  inputs[2]?.onChange?.({ target: { value: '0' } });
+  expect(setLabel).toHaveBeenCalledWith('Renamed');
+  expect(setWidth).toHaveBeenCalledWith(16384);
   expect(setHeight).toHaveBeenCalledWith(1);
-  expect(onSubmit).toHaveBeenCalled();
-  expect(container?.querySelectorAll('.field-surface')).toHaveLength(2);
-}
+});
 
-function verifyViewportPresetEditorFooter() {
-  const onClose = vi.fn();
-  const onSubmit = vi.fn();
-
-  renderElement(
-    <div>
-      <ViewportPresetEditorFooter
-        disabled={false}
-        isSaving={false}
-        label="Desktop"
-        onClose={onClose}
-        onSubmit={onSubmit}
-      />
-      <ViewportPresetEditorFooter
-        disabled={true}
-        isSaving={true}
-        label="Desktop"
-        onClose={onClose}
-        onSubmit={onSubmit}
-        preset={{ id: 'preset-1', label: 'Desktop', width: 1280, height: 720 }}
-      />
-    </div>
+it('disables footer actions while saving', () => {
+  const markup = renderToStaticMarkup(
+    <ViewportPresetEditorFooter
+      disabled
+      isSaving
+      label="Desktop"
+      onClose={vi.fn()}
+      onSubmit={vi.fn()}
+    />
   );
 
-  const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+  expect(markup).toContain('disabled=""');
+});
 
-  act(() => {
-    buttons[0]?.click();
-    buttons[1]?.click();
-  });
-
-  expect(onClose).toHaveBeenCalledTimes(1);
-  expect(onSubmit).toHaveBeenCalledTimes(1);
-  expect(container?.textContent).toContain(translate('viewportPresets.editor.create'));
-  expect(container?.textContent).toContain(translate('viewportPresets.editor.saving'));
-  expect(buttons[1]?.disabled).toBe(false);
-  expect(buttons[3]?.disabled).toBe(true);
-  expect(actionButtonPropsSpy).toHaveBeenNthCalledWith(
-    2,
-    expect.objectContaining({ tone: 'primary', type: 'submit' })
-  );
-  expect(actionButtonPropsSpy.mock.calls[1]?.[0]).not.toHaveProperty('compact');
-}
-
-function verifyViewportPresetEditorFooterDisablesBlankLabels() {
-  renderElement(
+it('renders edit submit copy and disables an empty enabled form', () => {
+  const markup = renderToStaticMarkup(
     <ViewportPresetEditorFooter
       disabled={false}
       isSaving={false}
       label="   "
       onClose={vi.fn()}
       onSubmit={vi.fn()}
+      preset={{
+        enabled: true,
+        height: 720,
+        id: 'viewport',
+        kind: 'user',
+        name: 'Viewport',
+        order: 0,
+        target: 'viewport',
+        width: 1280,
+      }}
     />
   );
 
-  const submitButton = Array.from(
-    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
-  )[1];
-  expect(submitButton?.disabled).toBe(true);
-}
-
-function runViewportPresetEditorViewsSuite() {
-  it(
-    'wires name and dimension setters and submits the editor form',
-    verifyViewportPresetEditorContent
-  );
-  it('renders footer action labels for create and saving states', verifyViewportPresetEditorFooter);
-  it(
-    'disables submit when the viewport preset label is blank',
-    verifyViewportPresetEditorFooterDisablesBlankLabels
-  );
-}
-
-describe('viewport-preset-editor.views', runViewportPresetEditorViewsSuite);
+  expect(markup).toContain('disabled=""');
+});

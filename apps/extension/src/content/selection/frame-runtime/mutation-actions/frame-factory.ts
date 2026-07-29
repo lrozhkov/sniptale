@@ -12,7 +12,7 @@ import { useFrameUIStore } from '../state/frame-ui.store';
 type CreateAddFrameHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
   | 'setFrames'
-  | 'linkedElementsRef'
+  | 'hostLayoutServiceRef'
   | 'globalEffectModeRef'
   | 'globalStepBadgeAutoModeRef'
   | 'sessionBlurSettingsRef'
@@ -34,7 +34,7 @@ export function createCalculateFrameCoords(generateFrameId: () => string) {
 
 export function createAddFrameHandler({
   setFrames,
-  linkedElementsRef,
+  hostLayoutServiceRef,
   globalEffectModeRef,
   globalStepBadgeAutoModeRef,
   sessionBlurSettingsRef,
@@ -54,15 +54,40 @@ export function createAddFrameHandler({
       sessionStepBadgeTemplateRef,
     });
 
-    setFrames((prev) => [...prev, frameData]);
+    const selector = frameData.linkedElementSelector;
+    const placement = frameData.pagePlacement;
+    const accepted =
+      selector && placement
+        ? hostLayoutServiceRef.current.link(
+            frameData.id,
+            element,
+            selector,
+            {
+              pagePlacement: placement,
+              rect: {
+                x: frameData.x,
+                y: frameData.y,
+                width: frameData.width,
+                height: frameData.height,
+              },
+            },
+            { requireAcceptedInitial: true }
+          )
+        : null;
+    if (!accepted) return null;
+
+    const acceptedFrameData = {
+      ...frameData,
+      ...accepted.rect,
+      pagePlacement: accepted.pagePlacement,
+    };
+    setFrames((prev) => [...prev, acceptedFrameData]);
     applyAddedFrameSideEffects({
-      element,
-      frameData,
+      frameData: acceptedFrameData,
       isAutoMode: globalStepBadgeAutoModeRef.current,
-      linkedElementsRef,
       recalculateStepBadgesRef,
     });
-    return frameData;
+    return acceptedFrameData;
   };
 }
 
@@ -85,7 +110,6 @@ export function createAddFreeFrameHandler(
     applyAddedFrameSideEffects({
       frameData,
       isAutoMode: args.globalStepBadgeAutoModeRef.current,
-      linkedElementsRef: args.linkedElementsRef,
       recalculateStepBadgesRef: args.recalculateStepBadgesRef,
     });
     useFrameUIStore.getState().selectFrame(frameData.id);

@@ -56,24 +56,36 @@ export function FrameSettingsPopoverContent(props: {
   pendingPresetIds: ReadonlySet<string>;
   selectedPresetId: string;
 }) {
+  const decorationEnabled =
+    props.effectMode === 'border' ||
+    (props.effectMode === 'blur'
+      ? (props.localBlurSettings.showBorder ?? false)
+      : (props.localFocusSettings.showBorder ?? false));
+  const handleDecorationToggle =
+    props.effectMode === 'blur'
+      ? props.handleBlurShowBorderChange
+      : props.effectMode === 'focus'
+        ? props.handleFocusShowBorderChange
+        : undefined;
+
   return (
     <>
-      {props.effectMode === 'border' ? (
-        <FrameBorderSection
-          borderPresets={props.globalSettings.borderPresets}
-          handleAddPreset={props.handleAddPreset}
-          handleEditPreset={props.handleEditPreset}
-          handleSelectPreset={props.handleSelectPreset}
-          handleTogglePresetEnabled={props.handleTogglePresetEnabled}
-          pendingPresetIds={props.pendingPresetIds}
-          selectedPresetId={props.selectedPresetId}
-        />
-      ) : null}
+      <FrameBorderSection
+        borderPresets={props.globalSettings.borderPresets}
+        decorationEnabled={decorationEnabled}
+        effectMode={props.effectMode}
+        handleAddPreset={props.handleAddPreset}
+        handleEditPreset={props.handleEditPreset}
+        handleSelectPreset={props.handleSelectPreset}
+        handleTogglePresetEnabled={props.handleTogglePresetEnabled}
+        pendingPresetIds={props.pendingPresetIds}
+        selectedPresetId={props.selectedPresetId}
+        {...(handleDecorationToggle === undefined ? {} : { handleDecorationToggle })}
+      />
 
       {props.effectMode === 'blur' ? (
         <FrameBlurSection
           handleBlurChange={props.handleBlurChange}
-          handleBlurShowBorderChange={props.handleBlurShowBorderChange}
           handleBlurTypeChange={props.handleBlurTypeChange}
           localBlurSettings={props.localBlurSettings}
         />
@@ -82,7 +94,6 @@ export function FrameSettingsPopoverContent(props: {
       {props.effectMode === 'focus' ? (
         <FrameFocusSection
           handleFocusChange={props.handleFocusChange}
-          handleFocusShowBorderChange={props.handleFocusShowBorderChange}
           localFocusSettings={props.localFocusSettings}
         />
       ) : null}
@@ -92,7 +103,10 @@ export function FrameSettingsPopoverContent(props: {
 
 function FrameBorderSection(props: {
   borderPresets: BorderPreset[];
+  decorationEnabled: boolean;
+  effectMode: EffectMode;
   handleAddPreset: () => void;
+  handleDecorationToggle?: (showBorder: boolean) => void;
   handleEditPreset: (preset: BorderPreset) => void;
   handleSelectPreset: (preset: BorderPreset) => void;
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
@@ -108,93 +122,108 @@ function FrameBorderSection(props: {
       className="sniptale-frame-style-section"
       title={translate('content.overlayControls.frameStyleLabel')}
     >
-      <ProductGlassPresetList>
-        {props.borderPresets.map((preset) => {
-          const displayName = getBorderPresetDisplayName(preset, locale);
-          const isEnabled = preset.enabled !== false;
-          const isLastEnabled = isEnabled && enabledPresetCount <= 1;
-          const isPending = props.pendingPresetIds.has(preset.id);
-          const isSelected = props.selectedPresetId === preset.id;
-          const visibilityActionLabel = translate(
-            isLastEnabled
-              ? 'highlighter.section.lastEnabledPresetDisabled'
-              : isEnabled
-                ? 'content.overlayControls.hideFrameStyle'
-                : 'content.overlayControls.restoreFrameStyle'
-          );
+      {props.effectMode === 'border' ? null : (
+        <ProductGlassToggleRow
+          title={translate('content.overlayControls.showBorderTitle')}
+          hint={translate('content.overlayControls.showBorderHint')}
+          control={
+            <ProductGlassSwitch
+              onClick={() => props.handleDecorationToggle?.(!props.decorationEnabled)}
+              on={props.decorationEnabled}
+            />
+          }
+        />
+      )}
+      {props.decorationEnabled ? (
+        <ProductGlassPresetList>
+          {props.borderPresets.map((preset) => {
+            const displayName = getBorderPresetDisplayName(preset, locale);
+            const isEnabled = preset.enabled !== false;
+            const isLastEnabled = isEnabled && enabledPresetCount <= 1;
+            const isPending = props.pendingPresetIds.has(preset.id);
+            const isSelected = props.selectedPresetId === preset.id;
+            const visibilityActionLabel = translate(
+              isLastEnabled
+                ? 'highlighter.section.lastEnabledPresetDisabled'
+                : isEnabled
+                  ? 'content.overlayControls.hideFrameStyle'
+                  : 'content.overlayControls.restoreFrameStyle'
+            );
 
-          return (
-            <div
-              className="sniptale-frame-style-preset-row"
-              data-enabled={String(isEnabled)}
-              key={preset.id}
-            >
-              <ProductGlassPresetItem
-                disabled={!isEnabled}
-                onClick={(event) => {
-                  if (!createTrustedContentActionIntentSource(event.nativeEvent)) return;
-                  props.handleSelectPreset(preset);
-                }}
-                active={isSelected}
+            return (
+              <div
+                className="sniptale-frame-style-preset-row"
+                data-enabled={String(isEnabled)}
+                key={preset.id}
               >
-                <ProductGlassPresetPreview style={getBorderPresetPreviewStyle(preset)} />
-                <ProductGlassPresetMeta>
-                  <FramePresetName name={displayName} />
-                </ProductGlassPresetMeta>
-              </ProductGlassPresetItem>
-              <span className="sniptale-frame-style-preset-actions">
-                <button
-                  aria-label={translate('content.overlayControls.configureFrameStyle')}
-                  className="sniptale-frame-style-preset-action"
-                  data-frame-style-action="edit"
-                  disabled={isPending}
+                <ProductGlassPresetItem
+                  disabled={!isEnabled}
                   onClick={(event) => {
                     if (!createTrustedContentActionIntentSource(event.nativeEvent)) return;
-                    props.handleEditPreset(preset);
+                    props.handleSelectPreset(preset);
                   }}
-                  title={translate('content.overlayControls.configureFrameStyle')}
-                  type="button"
+                  active={isSelected}
                 >
-                  <Settings2 size={15} />
-                </button>
-                <button
-                  aria-label={visibilityActionLabel}
-                  className="sniptale-frame-style-preset-action"
-                  data-frame-style-action="toggle-visibility"
-                  disabled={isPending || isLastEnabled}
-                  onClick={(event) => {
-                    if (!createTrustedContentActionIntentSource(event.nativeEvent)) return;
-                    props.handleTogglePresetEnabled(preset);
-                  }}
-                  title={visibilityActionLabel}
-                  type="button"
-                >
-                  {isEnabled ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </span>
-            </div>
-          );
-        })}
-      </ProductGlassPresetList>
-      <button
-        className="sniptale-frame-style-add"
-        data-frame-style-action="add"
-        onClick={(event) => {
-          if (!createTrustedContentActionIntentSource(event.nativeEvent)) return;
-          props.handleAddPreset();
-        }}
-        type="button"
-      >
-        <Plus size={15} />
-        <span>{translate('content.overlayControls.addFrameStyle')}</span>
-      </button>
+                  <ProductGlassPresetPreview style={getBorderPresetPreviewStyle(preset)} />
+                  <ProductGlassPresetMeta>
+                    <FramePresetName name={displayName} />
+                  </ProductGlassPresetMeta>
+                </ProductGlassPresetItem>
+                <span className="sniptale-frame-style-preset-actions">
+                  <button
+                    aria-label={translate('content.overlayControls.configureFrameStyle')}
+                    className="sniptale-frame-style-preset-action"
+                    data-frame-style-action="edit"
+                    disabled={isPending}
+                    onClick={(event) => {
+                      if (!createTrustedContentActionIntentSource(event.nativeEvent)) return;
+                      props.handleEditPreset(preset);
+                    }}
+                    title={translate('content.overlayControls.configureFrameStyle')}
+                    type="button"
+                  >
+                    <Settings2 size={15} />
+                  </button>
+                  <button
+                    aria-label={visibilityActionLabel}
+                    className="sniptale-frame-style-preset-action"
+                    data-frame-style-action="toggle-visibility"
+                    disabled={isPending || isLastEnabled}
+                    onClick={(event) => {
+                      if (!createTrustedContentActionIntentSource(event.nativeEvent)) return;
+                      props.handleTogglePresetEnabled(preset);
+                    }}
+                    title={visibilityActionLabel}
+                    type="button"
+                  >
+                    {isEnabled ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </ProductGlassPresetList>
+      ) : null}
+      {props.decorationEnabled ? (
+        <button
+          className="sniptale-frame-style-add"
+          data-frame-style-action="add"
+          onClick={(event) => {
+            if (!createTrustedContentActionIntentSource(event.nativeEvent)) return;
+            props.handleAddPreset();
+          }}
+          type="button"
+        >
+          <Plus size={15} />
+          <span>{translate('content.overlayControls.addFrameStyle')}</span>
+        </button>
+      ) : null}
     </ContentPopoverSection>
   );
 }
 
 function FrameBlurSection(props: {
   handleBlurChange: (amount: number) => void;
-  handleBlurShowBorderChange: (showBorder: boolean) => void;
   handleBlurTypeChange: (blurType: BlurType) => void;
   localBlurSettings: BlurSettings;
 }) {
@@ -206,9 +235,7 @@ function FrameBlurSection(props: {
       />
       <FrameBlurTypeSection
         blurType={props.localBlurSettings.blurType}
-        handleBlurShowBorderChange={props.handleBlurShowBorderChange}
         handleBlurTypeChange={props.handleBlurTypeChange}
-        showBorder={props.localBlurSettings.showBorder ?? false}
       />
     </>
   );
@@ -240,9 +267,7 @@ function FrameBlurStrengthSection(props: {
 
 function FrameBlurTypeSection(props: {
   blurType: BlurType;
-  handleBlurShowBorderChange: (showBorder: boolean) => void;
   handleBlurTypeChange: (blurType: BlurType) => void;
-  showBorder: boolean;
 }) {
   return (
     <ContentPopoverSection title={translate('content.overlayControls.blurTypeLabel')}>
@@ -266,24 +291,12 @@ function FrameBlurTypeSection(props: {
           );
         })}
       </ProductGlassOptionGrid>
-
-      <ProductGlassToggleRow
-        title={translate('content.overlayControls.showBorderTitle')}
-        hint={translate('content.overlayControls.showBorderHint')}
-        control={
-          <ProductGlassSwitch
-            onClick={() => props.handleBlurShowBorderChange(!props.showBorder)}
-            on={props.showBorder}
-          />
-        }
-      />
     </ContentPopoverSection>
   );
 }
 
 function FrameFocusSection(props: {
   handleFocusChange: (opacity: number) => void;
-  handleFocusShowBorderChange: (showBorder: boolean) => void;
   localFocusSettings: FocusSettings;
 }) {
   const title = `${translate('content.overlayControls.focusDimmingLabelPrefix')} ${Math.round(
@@ -304,19 +317,6 @@ function FrameFocusSection(props: {
         <span>55%</span>
         <span>100%</span>
       </ProductGlassRangeMeta>
-
-      <ProductGlassToggleRow
-        title={translate('content.overlayControls.showBorderTitle')}
-        hint={translate('content.overlayControls.focusBorderHint')}
-        control={
-          <ProductGlassSwitch
-            onClick={() =>
-              props.handleFocusShowBorderChange(!(props.localFocusSettings.showBorder ?? false))
-            }
-            on={props.localFocusSettings.showBorder ?? false}
-          />
-        }
-      />
     </ContentPopoverSection>
   );
 }

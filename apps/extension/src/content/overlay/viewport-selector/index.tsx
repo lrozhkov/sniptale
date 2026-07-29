@@ -14,15 +14,23 @@ interface ViewportSelectorProps {
   compactMenus?: boolean;
   currentViewport: { width: number; height: number } | null;
   displayMode?: ContentToolbarDisplayMode;
-  onViewportChange: (viewport: { width: number; height: number } | null) => void;
+  onViewportChange: (
+    viewport: {
+      presetId: string;
+      target: 'viewport' | 'window';
+      width: number;
+      height: number;
+    } | null,
+    activationEvent?: Event
+  ) => void;
   disabled?: boolean;
   menuPosition?: 'up' | 'down';
   onMenuStateChange?: (isOpen: boolean) => void;
 }
 
 interface ViewportSelectorMenuState {
-  handleSelectNative: () => void;
-  handleSelectPreset: (preset: ViewportPreset) => void;
+  handleSelectNative: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  handleSelectPreset: (preset: ViewportPreset, event: React.MouseEvent<HTMLButtonElement>) => void;
   handleToggleMenu: (event: React.MouseEvent<HTMLButtonElement>) => void;
   menuRef: React.RefObject<HTMLDivElement | null>;
   setShowMenu: React.Dispatch<React.SetStateAction<boolean>>;
@@ -50,9 +58,10 @@ function renderViewportSelectorMenu(props: {
   currentViewport: { width: number; height: number } | null;
   menuPlacement: ProductToolbarMenuPlacement;
   menuStyle: React.CSSProperties | null;
-  onSelectNative: () => void;
-  onSelectPreset: (preset: ViewportPreset) => void;
-  presets: ReturnType<typeof useViewportSelectorPresets>;
+  onSelectNative: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onSelectPreset: (preset: ViewportPreset, event: React.MouseEvent<HTMLButtonElement>) => void;
+  presets: ReturnType<typeof useViewportSelectorPresets>['presets'];
+  availabilityById: ReturnType<typeof useViewportSelectorPresets>['availabilityById'];
   menuRef: React.RefObject<HTMLDivElement | null>;
   showMenu: boolean;
 }) {
@@ -70,15 +79,16 @@ function renderViewportSelectorMenu(props: {
         onSelectNative={props.onSelectNative}
         onSelectPreset={props.onSelectPreset}
         presets={props.presets}
+        availabilityById={props.availabilityById}
       />
     </div>
   );
 }
 
 function useViewportSelectorRuntime(props: ViewportSelectorProps): {
-  presets: ReturnType<typeof useViewportSelectorPresets>;
+  presets: ReturnType<typeof useViewportSelectorPresets>['presets'];
+  availabilityById: ReturnType<typeof useViewportSelectorPresets>['availabilityById'];
 } & ViewportSelectorMenuState {
-  const presets = useViewportSelectorPresets();
   const menuState = useViewportSelectorMenu({
     disabled: props.disabled ?? false,
     onViewportChange: props.onViewportChange,
@@ -86,9 +96,10 @@ function useViewportSelectorRuntime(props: ViewportSelectorProps): {
       ? {}
       : { onMenuStateChange: props.onMenuStateChange }),
   });
+  const presetState = useViewportSelectorPresets(menuState.showMenu);
 
   return {
-    presets,
+    ...presetState,
     ...menuState,
   };
 }
@@ -123,6 +134,7 @@ export const ViewportSelector = forwardRef<ViewportSelectorRef, ViewportSelector
     useAppLocale();
     const {
       presets,
+      availabilityById,
       handleSelectNative,
       handleSelectPreset,
       handleToggleMenu,
@@ -163,6 +175,7 @@ export const ViewportSelector = forwardRef<ViewportSelectorRef, ViewportSelector
           onSelectNative: handleSelectNative,
           onSelectPreset: handleSelectPreset,
           presets,
+          availabilityById,
           menuRef,
           showMenu,
         })}

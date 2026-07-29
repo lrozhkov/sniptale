@@ -259,11 +259,11 @@ function hasCurrentProviderRedirect(frontier, providers, productionCodeFiles, ro
   });
 }
 
-function createHeadSourceResolver() {
+function createHeadSourceResolver(root) {
   const sourcesByFile = new Map();
   return function cacheHeadSource(file) {
     if (!sourcesByFile.has(file)) {
-      sourcesByFile.set(file, readHeadFileText(file));
+      sourcesByFile.set(file, readHeadFileText(file, { root }));
     }
     return sourcesByFile.get(file);
   };
@@ -309,7 +309,7 @@ function resolveAggregateProviderProof({
 
 export function collectDeletedTargetSuccessors({
   headImporterResolver,
-  providerOwnerTestResolver = resolveDeterministicFocusedCoverageOwnerTests,
+  providerOwnerTestResolver,
   productionCodeFiles = [],
   productionTargetFiles = [],
   root = process.cwd(),
@@ -322,7 +322,10 @@ export function collectDeletedTargetSuccessors({
     ? indexEdges(currentGraph.codeEdges, 'importer', 'target')
     : new Map();
   const successorsByFile = new Map();
-  const readHeadSource = createHeadSourceResolver();
+  const readHeadSource = createHeadSourceResolver(root);
+  const resolveProviderOwnerTests =
+    providerOwnerTestResolver ??
+    ((file) => resolveDeterministicFocusedCoverageOwnerTests(file, { root }));
   const resolveHeadImporters = createHeadImporterResolver({
     headImporterResolver,
     readHeadSource,
@@ -366,7 +369,7 @@ export function collectDeletedTargetSuccessors({
       aggregateProviderSet,
       frontier: frontier.frontier,
       productionCodeFiles,
-      providerOwnerTestResolver,
+      providerOwnerTestResolver: resolveProviderOwnerTests,
       root,
     });
     if (aggregateProviderProof) {

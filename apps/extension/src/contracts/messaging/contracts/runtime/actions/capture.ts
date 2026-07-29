@@ -4,6 +4,7 @@ import {
   createMessageGuard,
   createRuntimeResponseGuard,
   isCaptureActionType,
+  isNumber,
   isNullable,
   isRecord,
   isString,
@@ -83,6 +84,29 @@ export const runtimeActionCaptureMessageContracts = {
     parseResponse: createGuardParser(
       'runtime CAPTURE_VISIBLE_FOR_CROP response',
       createRuntimeResponseGuard({ optional: { dataUrl: isString } })
+    ),
+  },
+  [CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION]: {
+    parseRequest: createGuardParser(
+      'runtime RENEW_SCREENSHOT_SURFACE_SESSION message',
+      createMessageGuard({
+        type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+        required: { contentIntent: isContentPrivilegedActionCapability },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime RENEW_SCREENSHOT_SURFACE_SESSION response',
+      createRuntimeResponseGuard({
+        required: {
+          surfaceCapabilityToken: isString,
+          surfaceOperationGeneration: (value) =>
+            isNumber(value) && Number.isSafeInteger(value) && value >= 0,
+        },
+        optional: {
+          surfaceLeaseGeneration: (value) =>
+            isNumber(value) && Number.isSafeInteger(value) && value >= 0,
+        },
+      })
     ),
   },
 } satisfies PartialRuntimeRegistry;

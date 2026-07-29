@@ -18,7 +18,7 @@ vi.mock('../../recording/video/copy', (_importOriginal) => ({
     duration: 0,
     error: null,
     status: VideoRecordingStatus.IDLE,
-    viewportPreset: null,
+    viewportPresetId: null,
   },
 }));
 
@@ -30,7 +30,7 @@ function createRecordingState(status = VideoRecordingStatus.RECORDING) {
     duration: 12,
     error: null,
     status,
-    viewportPreset: null,
+    viewportPresetId: null,
   };
 }
 

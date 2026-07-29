@@ -26,8 +26,7 @@ export function getVideoActiveViewModel(
   const viewportPresetLabel = getViewportPresetLabel(recordingState);
   const sourceLabel = describeCaptureSource(
     recordingState.captureSource,
-    recordingState.captureMode,
-    viewportPresetLabel
+    recordingState.captureMode
   );
   const captureModeLabels = getCaptureModeLabels();
   const modeLabel = recordingState.captureMode

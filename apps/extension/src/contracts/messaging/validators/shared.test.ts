@@ -21,7 +21,6 @@ import {
   isVideoExportCapabilities,
   isVideoRecordingRuntimeState,
   isVideoRecordingSettings,
-  isVideoViewportPresetSelection,
   isViewportInfo,
   isViewportRegion,
 } from './index';
@@ -156,22 +155,6 @@ describe('shared messaging validators recording settings', () => {
         webcamEnabled: false,
       })
     ).toBe(false);
-
-    expect(
-      isVideoViewportPresetSelection({
-        height: 720,
-        id: 'preset-1',
-        label: 'HD',
-        width: 1280,
-      })
-    ).toBe(true);
-    expect(
-      isVideoViewportPresetSelection({
-        height: 720,
-        id: 1,
-        width: 1280,
-      })
-    ).toBe(false);
   });
 });
 
@@ -208,12 +191,7 @@ describe('shared messaging validators runtime state', () => {
         duration: 456,
         error: null,
         status: 'recording',
-        viewportPreset: {
-          height: 720,
-          id: 'preset-1',
-          label: 'HD',
-          width: 1280,
-        },
+        viewportPresetId: 'preset-1',
       })
     ).toBe(true);
     expect(
@@ -224,7 +202,7 @@ describe('shared messaging validators runtime state', () => {
         duration: 456,
         error: null,
         status: 'recording',
-        viewportPreset: null,
+        viewportPresetId: null,
       })
     ).toBe(false);
 
@@ -239,7 +217,7 @@ describe('shared messaging validators runtime state', () => {
         duration: 456,
         error: 'failed',
         status: 'recording',
-        viewportPreset: null,
+        viewportPresetId: null,
       })
     ).toBe(false);
   });

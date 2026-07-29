@@ -9,6 +9,7 @@ import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/de
 import { cloneBorderPreset } from '../../../../features/highlighter/presets/catalog';
 import { getFrameSessionBorderPreset, setFrameSessionBorderPreset } from '../session/border-preset';
 import { getCurrentBorderPreset as getHoverBorderPreset } from '../../highlighter-hover-preview/session';
+import { createFrameHostLayoutService } from '../host-layout/service';
 
 const mocks = vi.hoisted(() => ({
   captureFrameSessionSnapshot: vi.fn(),
@@ -40,7 +41,7 @@ function createRefs(): FrameManagerRefs {
   return {
     containerRef: { current: null },
     rootsRef: { current: new Map() },
-    linkedElementsRef: { current: new Map() },
+    hostLayoutServiceRef: { current: createFrameHostLayoutService() },
     isClearingRef: { current: false },
     framesRef: { current: [] as FrameData[] },
     frameStatesRef: { current: new Map() },
@@ -91,7 +92,6 @@ function createAppliedSnapshot() {
 function expectAppliedSnapshotState(args: {
   refs: ReturnType<typeof createRefs>;
   frames: FrameData[];
-  linkedElements: Map<string, HTMLDivElement>;
   setFrames: ReturnType<typeof vi.fn>;
   setFrameStates: ReturnType<typeof vi.fn>;
   snapshot: ReturnType<typeof createAppliedSnapshot>;
@@ -99,7 +99,7 @@ function expectAppliedSnapshotState(args: {
 }) {
   expect(args.refs.framesRef.current).toEqual(args.frames);
   expect(args.refs.prevFramesRef.current).toEqual(args.frames);
-  expect(args.refs.linkedElementsRef.current).toBe(args.linkedElements);
+  expect(args.refs.hostLayoutServiceRef.current.getSnapshot()).toBeDefined();
   expect(args.refs.stepBadgeOrderRef.current).toBe(args.stepBadgeOrder);
   expect(args.refs.globalEffectModeRef.current).toBe('blur');
   expect(args.refs.globalStepBadgeSettingsRef.current).toEqual({ autoMode: false });
@@ -141,15 +141,14 @@ describe('frame-manager-history-bridge', () => {
 
 function expectHydratedHistorySnapshotApplication() {
   const refs = createRefs();
+  const restoreFrames = vi.spyOn(refs.hostLayoutServiceRef.current, 'restoreFrames');
   const setFrames = vi.fn();
   const setFrameStates = vi.fn();
   const frames = [createFrame('frame-1')];
-  const linkedElements = new Map([['frame-1', document.createElement('div')]]);
   const stepBadgeOrder = new Map([['frame-1', 0]]);
   const snapshot = createAppliedSnapshot();
   mocks.hydrateFrameSessionSnapshot.mockReturnValue({
     frames,
-    linkedElements,
     stepBadgeOrder,
   });
 
@@ -159,11 +158,11 @@ function expectHydratedHistorySnapshotApplication() {
     setFrameStates,
     snapshot,
   });
+  expect(restoreFrames).toHaveBeenCalledWith(frames);
 
   expectAppliedSnapshotState({
     refs,
     frames,
-    linkedElements,
     setFrames,
     setFrameStates,
     snapshot,
@@ -173,6 +172,10 @@ function expectHydratedHistorySnapshotApplication() {
 
 function expectBridgeSnapshotCapture() {
   const refs = createRefs();
+  const retireHistoryBindings = vi.spyOn(
+    refs.hostLayoutServiceRef.current,
+    'retireHistoryBindings'
+  );
   const setFrames = vi.fn();
   const setFrameStates = vi.fn();
   const frames = [createFrame('frame-1')];
@@ -198,6 +201,10 @@ function expectBridgeSnapshotCapture() {
   });
 
   expect(bridge.captureSnapshot()).toBe(expectedSnapshot);
+  bridge.onHistoryCleared?.();
+  expect(retireHistoryBindings).toHaveBeenCalledTimes(1);
+  bridge.onHistoryReachabilityChanged?.(['frame-1']);
+  expect(retireHistoryBindings).toHaveBeenLastCalledWith(['frame-1']);
   expect(mocks.captureFrameSessionSnapshot).toHaveBeenCalledWith({
     frames,
     globalEffectMode: 'focus',

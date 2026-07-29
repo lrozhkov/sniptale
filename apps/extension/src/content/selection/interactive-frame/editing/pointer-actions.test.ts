@@ -149,6 +149,31 @@ function flushRaf(id = 1) {
 }
 
 describe('transient frame resize', () => {
+  it.each([
+    ['n', { x: 20, y: 40, width: 100, height: 70 }],
+    ['ne', { x: 20, y: 40, width: 115, height: 70 }],
+    ['e', { x: 20, y: 30, width: 115, height: 80 }],
+    ['se', { x: 20, y: 30, width: 115, height: 90 }],
+    ['s', { x: 20, y: 30, width: 100, height: 90 }],
+    ['sw', { x: 35, y: 30, width: 85, height: 90 }],
+    ['w', { x: 35, y: 30, width: 85, height: 80 }],
+    ['nw', { x: 35, y: 40, width: 85, height: 70 }],
+  ] as const)('keeps canonical live geometry for %s resize', (direction, expected) => {
+    const fixture = createFixture();
+    fixture.start(reactPointer(100, 100), direction);
+    createInteractiveFramePointerMoveHandler(fixture.listenerConfig)(domPointer(115, 110));
+
+    flushRaf();
+
+    expect(fixture.refs.tempFrameRef.current).toMatchObject(expected);
+    expect(fixture.container.style.left).toBe(`${expected.x}px`);
+    expect(fixture.container.style.top).toBe(`${expected.y}px`);
+    expect(fixture.container.style.width).toBe(`${expected.width}px`);
+    expect(fixture.container.style.height).toBe(`${expected.height}px`);
+    expect(fixture.visibleFrame.style.width).toBe(`${expected.width}px`);
+    expect(fixture.visibleFrame.style.height).toBe(`${expected.height}px`);
+  });
+
   it('does not open the frame toolbar from a resize-handle pointerdown', () => {
     const fixture = createFixture();
 

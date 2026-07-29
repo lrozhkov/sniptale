@@ -6,20 +6,26 @@ import type {
 
 const {
   assertWebSnapshotSessionOpenMock,
+  assertWebSnapshotSessionOwnerMock,
   beginWebSnapshotSaveMock,
   commitWebSnapshotSaveMock,
   consumeWebSnapshotStagedBlobMock,
+  deleteMediaLibraryAssetsBatchSafelyMock,
   releaseWebSnapshotStagedBlobsMock,
+  releaseWebSnapshotStagedBlobsForSessionMock,
   releaseWebSnapshotSaveMock,
   saveScreenshotToMediaHubFromDataUrlMock,
   saveWebSnapshotToMediaHubMock,
   stageWebSnapshotBlobChunkMock,
 } = vi.hoisted(() => ({
   assertWebSnapshotSessionOpenMock: vi.fn(),
+  assertWebSnapshotSessionOwnerMock: vi.fn(),
   beginWebSnapshotSaveMock: vi.fn(),
   commitWebSnapshotSaveMock: vi.fn(),
   consumeWebSnapshotStagedBlobMock: vi.fn(),
+  deleteMediaLibraryAssetsBatchSafelyMock: vi.fn(),
   releaseWebSnapshotStagedBlobsMock: vi.fn(),
+  releaseWebSnapshotStagedBlobsForSessionMock: vi.fn(),
   releaseWebSnapshotSaveMock: vi.fn(),
   saveScreenshotToMediaHubFromDataUrlMock: vi.fn(),
   saveWebSnapshotToMediaHubMock: vi.fn(),
@@ -35,15 +41,22 @@ vi.mock('../../media-hub/web-snapshot', () => ({
   saveWebSnapshotToMediaHub: saveWebSnapshotToMediaHubMock,
 }));
 
+vi.mock('../../../workflows/media-hub/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../workflows/media-hub/store')>()),
+  deleteMediaLibraryAssetsBatchSafely: deleteMediaLibraryAssetsBatchSafelyMock,
+}));
+
 vi.mock('./web-snapshot/fetch', () => ({
   fetchWebSnapshotAssetForSession: vi.fn(),
 }));
 
 vi.mock('./web-snapshot/session', () => ({
   assertWebSnapshotSessionOpen: assertWebSnapshotSessionOpenMock,
+  assertWebSnapshotSessionOwner: assertWebSnapshotSessionOwnerMock,
   authorizeWebSnapshotAssetFetch: vi.fn(),
   authorizeWebSnapshotCaptureRequest: vi.fn(),
   beginWebSnapshotSave: beginWebSnapshotSaveMock,
+  cancelWebSnapshotCaptureRequest: vi.fn(),
   commitWebSnapshotSave: commitWebSnapshotSaveMock,
   releaseWebSnapshotSave: releaseWebSnapshotSaveMock,
   registerWebSnapshotAssetSession: vi.fn(),
@@ -53,11 +66,13 @@ vi.mock('./web-snapshot/session', () => ({
 vi.mock('./web-snapshot/staged-blobs', () => ({
   consumeWebSnapshotStagedBlob: consumeWebSnapshotStagedBlobMock,
   releaseWebSnapshotStagedBlobs: releaseWebSnapshotStagedBlobsMock,
+  releaseWebSnapshotStagedBlobsForSession: releaseWebSnapshotStagedBlobsForSessionMock,
   resetWebSnapshotStagedBlobsForTests: vi.fn(),
   stageWebSnapshotBlobChunk: stageWebSnapshotBlobChunkMock,
 }));
 
 import { handleSaveWebSnapshotToGallery, handleStageWebSnapshotBlobChunk } from './actions.gallery';
+import { handleReleaseWebSnapshotStagedBlobs } from './actions.web-snapshot';
 
 function createWebSnapshotManifest(): WebSnapshotManifest {
   return {
@@ -106,6 +121,7 @@ beforeEach(() => {
       })
   );
   saveWebSnapshotToMediaHubMock.mockResolvedValue('asset-web');
+  deleteMediaLibraryAssetsBatchSafelyMock.mockResolvedValue(undefined);
   stageWebSnapshotBlobChunkMock.mockReturnValue({
     complete: true,
     stagedBlobId: 'stage-package-1',
@@ -176,7 +192,7 @@ it('rejects web snapshot chunks before allocation when the session is invalid', 
   });
 });
 
-it('does not release staged refs when save-session ownership is not acquired', async () => {
+it('releases only payload-owned staged refs when save-session ownership is not acquired', async () => {
   const saveFailureResponse = vi.fn();
   const payload = createStagedSavePayload();
   beginWebSnapshotSaveMock.mockImplementationOnce(() => {
@@ -187,9 +203,48 @@ it('does not release staged refs when save-session ownership is not acquired', a
   await flushPromises();
 
   expect(saveWebSnapshotToMediaHubMock).not.toHaveBeenCalled();
-  expect(releaseWebSnapshotStagedBlobsMock).not.toHaveBeenCalled();
+  expect(releaseWebSnapshotStagedBlobsMock).toHaveBeenCalledWith({ ...payload, tabId: 42 });
   expect(releaseWebSnapshotSaveMock).not.toHaveBeenCalled();
   expect(saveFailureResponse).toHaveBeenCalledWith({
+    error: 'Invalid web snapshot session',
+    success: false,
+  });
+});
+
+it('releases all staged refs only after validating the tab-bound session owner', async () => {
+  const response = vi.fn();
+
+  expect(
+    handleReleaseWebSnapshotStagedBlobs({ snapshotSessionId: 'snapshot-session-1' }, 42, response)
+  ).toBe(true);
+  await flushPromises();
+
+  expect(assertWebSnapshotSessionOwnerMock).toHaveBeenCalledWith({
+    sessionId: 'snapshot-session-1',
+    tabId: 42,
+  });
+  expect(releaseWebSnapshotStagedBlobsForSessionMock).toHaveBeenCalledWith({
+    snapshotSessionId: 'snapshot-session-1',
+    tabId: 42,
+  });
+  expect(response).toHaveBeenCalledWith({ result: 'released', success: true });
+});
+
+it('does not release staged refs for a mismatched session owner', async () => {
+  const response = vi.fn();
+  assertWebSnapshotSessionOwnerMock.mockImplementationOnce(() => {
+    throw new Error('Invalid web snapshot session');
+  });
+
+  handleReleaseWebSnapshotStagedBlobs(
+    { snapshotSessionId: 'snapshot-session-other' },
+    42,
+    response
+  );
+  await flushPromises();
+
+  expect(releaseWebSnapshotStagedBlobsForSessionMock).not.toHaveBeenCalled();
+  expect(response).toHaveBeenCalledWith({
     error: 'Invalid web snapshot session',
     success: false,
   });
@@ -235,6 +290,23 @@ it('releases staged web snapshot refs even when save-session rollback fails', as
   });
   expect(saveFailureResponse).toHaveBeenCalledWith({
     error: 'snapshot failed',
+    success: false,
+  });
+});
+
+it('compensates the gallery write when cancellation wins the commit race', async () => {
+  const response = vi.fn();
+  const payload = createStagedSavePayload();
+  commitWebSnapshotSaveMock.mockImplementationOnce(() => {
+    throw new Error('Web snapshot save was cancelled');
+  });
+
+  handleSaveWebSnapshotToGallery(payload, 42, response);
+  await flushPromises();
+
+  expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledWith(['asset-web']);
+  expect(response).toHaveBeenCalledWith({
+    error: 'Web snapshot save was cancelled',
     success: false,
   });
 });

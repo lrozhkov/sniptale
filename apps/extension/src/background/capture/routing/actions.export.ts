@@ -1,4 +1,5 @@
 import { captureFullPageForArchive } from '../index';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   issueExportHarStartCapability,
   isExportHarStartPreauthorized,
@@ -8,6 +9,13 @@ import {
 } from '../../diagnostics/public/har-export';
 import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { SendResponse } from './types';
+import type { RouteCaptureMessage } from './types';
+import type { PageAccessPort } from '../../routing-contracts/page-access-port';
+import { getPreauthorizedContentActionRouteMessage } from './authorization/content-action';
+import {
+  registerFullPageExportRun,
+  throwIfFullPageCaptureAborted,
+} from '../full-page/cancellation';
 
 export function handleRequestExportHarStartCapability(
   payload: { rawDiagnosticsEnabled?: boolean; sessionId?: string },
@@ -94,11 +102,68 @@ export function handleExportStopHar(
 }
 
 export function handleExportCaptureFullPage(
+  message: Extract<
+    RouteCaptureMessage,
+    {
+      type: 'EXPORT_CAPTURE_FULL_PAGE' | 'EXPORT_CAPTURE_FULL_PAGE_UNATTENDED';
+    }
+  >,
   resolvedTabId: number,
-  sendResponse: SendResponse
+  sendResponse: SendResponse,
+  pageAccessPort?: PageAccessPort
 ): boolean {
-  captureFullPageForArchive(resolvedTabId)
-    .then((dataUrl) => sendResponse({ success: true, dataUrl }))
-    .catch((error) => sendResponse(createRouteErrorResponse(error)));
+  const binding = getPreauthorizedContentActionRouteMessage(message);
+  if (!binding || binding.tabId !== resolvedTabId) {
+    sendResponse(createRouteErrorResponse('Full-page export document binding is unavailable'));
+    return true;
+  }
+  if (message.contentIntent?.requestId !== message.exportRunId) {
+    sendResponse(createRouteErrorResponse('Full-page export capability identity mismatch'));
+    return true;
+  }
+  const unattended = message.type === MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED;
+  let exportRun: ReturnType<typeof registerFullPageExportRun>;
+  try {
+    exportRun = registerFullPageExportRun(message.exportRunId);
+  } catch (error) {
+    sendResponse(createRouteErrorResponse(error));
+    return true;
+  }
+  const abortSignal = exportRun.signal;
+  if (!abortSignal) {
+    exportRun.release();
+    sendResponse(
+      createRouteErrorResponse('Full-page export cancellation authority is unavailable')
+    );
+    return true;
+  }
+  const authorize = async () => {
+    if (!pageAccessPort) throw new Error('Page access port unavailable.');
+    await pageAccessPort.ensureActivePageAccessRuntime(resolvedTabId);
+    if (!unattended) {
+      await pageAccessPort.ensureNativeVisibleCaptureAuthority(resolvedTabId);
+    }
+  };
+  void authorize()
+    .then(() => {
+      throwIfFullPageCaptureAborted(abortSignal);
+      return captureFullPageForArchive(resolvedTabId, {
+        abortSignal,
+        backendKind: unattended ? 'unattended-cdp' : 'native',
+        documentId: binding.documentId,
+        exportRunId: message.exportRunId,
+      });
+    })
+    .then((capture) => {
+      throwIfFullPageCaptureAborted(abortSignal);
+      sendResponse({
+        success: true,
+        dataUrl: capture.dataUrl,
+        downscaled: capture.metadata.downscaled,
+        frozenExtentWarning: capture.metadata.frozenExtentWarning,
+      });
+    })
+    .catch((error) => sendResponse(createRouteErrorResponse(error)))
+    .finally(() => exportRun.release());
   return true;
 }

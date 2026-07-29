@@ -6,6 +6,7 @@ const handleViewportMessage = vi.fn();
 const handleRegionCaptureMessage = vi.fn();
 const handleRegionOverlayMessage = vi.fn();
 const createRegionOverlayBridgeDeps = vi.fn();
+const handleFullPageCaptureMessage = vi.fn();
 
 vi.mock('./core', () => ({
   handleCoreModeMessage,
@@ -26,6 +27,10 @@ vi.mock('./region-capture', () => ({
 vi.mock('./region-overlay', () => ({
   createRegionOverlayBridgeDeps,
   handleRegionOverlayMessage,
+}));
+
+vi.mock('./full-page-capture', () => ({
+  handleFullPageCaptureMessage,
 }));
 
 function createViewportInfo() {
@@ -63,15 +68,17 @@ describe('createContentRuntimeMessageHandlers', () => {
     const sendResponse = vi.fn();
     const getViewportInfo = vi.fn(createViewportInfo);
     const regionSelectorController = createRegionSelectorController();
+    const fullPageCaptureAgent = { dispose: vi.fn(), handle: vi.fn() };
 
     const handlers = createContentRuntimeMessageHandlers(
       message,
       sendResponse,
       getViewportInfo,
-      regionSelectorController
+      regionSelectorController,
+      fullPageCaptureAgent
     );
 
-    expect(handlers).toHaveLength(5);
+    expect(handlers).toHaveLength(6);
     handlers.forEach((handler) => handler());
 
     expect(handleCoreModeMessage).toHaveBeenCalledWith(message);
@@ -87,5 +94,10 @@ describe('createContentRuntimeMessageHandlers', () => {
     expect(handleRegionOverlayMessage).toHaveBeenCalledWith(message, sendResponse, {
       overlay: 'deps',
     });
+    expect(handleFullPageCaptureMessage).toHaveBeenCalledWith(
+      message,
+      sendResponse,
+      fullPageCaptureAgent
+    );
   });
 });

@@ -37,6 +37,52 @@ function applyHoverCustomCssStyles(
   appliedHoverCustomCssProperties.set(element, Object.keys(styles));
 }
 
+function applyHoverVisualDefaults(
+  element: HTMLElement,
+  visual: ReturnType<typeof resolveBorderPresetVisual>
+): void {
+  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
+    visual.strokeColor,
+    visual.strokeOpacity
+  )}`;
+  element.style.borderRadius = `${visual.radius}px`;
+  element.style.boxSizing = 'border-box';
+  element.style.margin = '0';
+  element.style.padding = '0';
+  element.style.outline = 'none';
+  element.style.clipPath = 'none';
+  element.style.boxShadow =
+    resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none';
+  element.style.backgroundColor = colorToRgba(visual.fillColor, visual.fillOpacity);
+}
+
+function applyCanonicalHoverVisual(
+  element: HTMLElement,
+  visual: ReturnType<typeof resolveBorderPresetVisual>
+): void {
+  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
+    visual.strokeColor,
+    visual.strokeOpacity
+  )}`;
+  element.style.borderRadius = `${visual.radius}px`;
+  element.style.boxSizing = 'border-box';
+  element.style.margin = '0';
+  element.style.padding = '0';
+  element.style.clipPath = 'none';
+}
+
+function applyCanonicalHoverGeometry(
+  element: HTMLElement,
+  geometry?: ReturnType<typeof calculateFrameContainerCoords>
+): void {
+  element.style.position = 'absolute';
+  element.style.inset = 'auto';
+  element.style.top = geometry ? `${geometry.y}px` : 'auto';
+  element.style.left = geometry ? `${geometry.x}px` : 'auto';
+  element.style.width = geometry ? `${geometry.width}px` : '0px';
+  element.style.height = geometry ? `${geometry.height}px` : '0px';
+}
+
 function getHoverPreviewTransition(): string {
   if (
     typeof window.matchMedia === 'function' &&
@@ -97,22 +143,18 @@ export function ensureHoverOverlay(session: HoverDomSession, preset: BorderPrese
   hoverOverlay.className = 'sniptale-highlight-hover';
   hoverOverlay.style.cssText = `
     position: absolute;
-    border: ${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
-      visual.strokeColor,
-      visual.strokeOpacity
-    )};
-    border-radius: ${visual.radius}px;
-    box-sizing: content-box;
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
     pointer-events: none;
     opacity: 0.72;
     transition: ${getHoverPreviewTransition()};
     z-index: 2147483645;
-    box-shadow: ${resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none'};
-    background-color: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
   `;
+  applyHoverVisualDefaults(hoverOverlay, visual);
   applyHoverCustomCssStyles(hoverOverlay, visual.customCssStyles);
+  applyCanonicalHoverVisual(hoverOverlay, visual);
+  applyCanonicalHoverGeometry(hoverOverlay);
   ensureHighlighterOverlayContainer(session).appendChild(hoverOverlay);
   session.hoverOverlay = hoverOverlay;
   return hoverOverlay;
@@ -147,20 +189,12 @@ export function showHoverOverlay(
     position,
     createFrameCalcSettings({ width: visual.strokeWidth, padding: visual.padding })
   );
-  hoverOverlay.style.top = `${coords.y}px`;
-  hoverOverlay.style.left = `${coords.x}px`;
-  hoverOverlay.style.width = `${coords.width}px`;
-  hoverOverlay.style.height = `${coords.height}px`;
-  hoverOverlay.style.borderWidth = `${visual.strokeWidth}px`;
-  hoverOverlay.style.borderStyle = visual.strokeStyle;
-  hoverOverlay.style.borderColor = colorToRgba(visual.strokeColor, visual.strokeOpacity);
-  hoverOverlay.style.borderRadius = `${visual.radius}px`;
   hoverOverlay.style.opacity = '0.72';
-  hoverOverlay.style.boxShadow =
-    resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none';
-  hoverOverlay.style.backgroundColor = colorToRgba(visual.fillColor, visual.fillOpacity);
   hoverOverlay.style.transition = getHoverPreviewTransition();
+  applyHoverVisualDefaults(hoverOverlay, visual);
   applyHoverCustomCssStyles(hoverOverlay, visual.customCssStyles);
+  applyCanonicalHoverVisual(hoverOverlay, visual);
+  applyCanonicalHoverGeometry(hoverOverlay, coords);
   hoverOverlay.style.display = 'block';
 }
 

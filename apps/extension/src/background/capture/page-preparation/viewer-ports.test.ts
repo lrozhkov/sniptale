@@ -167,6 +167,7 @@ it('sends popup export messages through the viewer port and resolves correlated 
   const ports = createPorts(21, port);
 
   const resultPromise = sendViewerPopupExportMessage(ports, 21, {
+    exportRunId: 'export-run-21',
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
   const request = vi.mocked(port.postMessage).mock.calls[0]?.[0];
@@ -175,7 +176,7 @@ it('sends popup export messages through the viewer port and resolves correlated 
     type: WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
     requestId: expect.any(String),
     viewerPortGeneration: 'viewer-generation-1',
-    request: { type: MessageType.EXPORT_POPUP_CANCEL },
+    request: { exportRunId: 'export-run-21', type: MessageType.EXPORT_POPUP_CANCEL },
   });
 
   emitViewerExportResponse(port, {
@@ -194,6 +195,7 @@ it('ignores export responses with mismatched request ids', async () => {
   const ports = createPorts(23, port);
 
   const resultPromise = sendViewerPopupExportMessage(ports, 23, {
+    exportRunId: 'export-run-23',
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
 
@@ -214,6 +216,7 @@ it('rejects viewer popup export messages when the viewer port disconnects', asyn
   const ports = createPorts(22, port);
 
   const resultPromise = sendViewerPopupExportMessage(ports, 22, {
+    exportRunId: 'export-run-22',
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
   disconnectListeners.forEach((disconnect) => disconnect());
@@ -234,6 +237,7 @@ it('ignores stale generation responses and rejects when the viewer is replaced',
   listeners[0]?.(oldPort);
 
   const resultPromise = sendViewerPopupExportMessage(ports, 24, {
+    exportRunId: 'export-run-24',
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
   const request = vi.mocked(oldPort.postMessage).mock.calls[0]?.[0];
@@ -256,6 +260,7 @@ it('times out pending viewer popup export requests', async () => {
   const ports = createPorts(25, port);
 
   const resultPromise = sendViewerPopupExportMessage(ports, 25, {
+    exportRunId: 'export-run-25',
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
   const rejection = expect(resultPromise).rejects.toThrow('export timed out');
@@ -274,6 +279,7 @@ it('cleans up pending viewer popup export requests when posting fails', async ()
   const ports = createPorts(26, port);
 
   const resultPromise = sendViewerPopupExportMessage(ports, 26, {
+    exportRunId: 'export-run-26',
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
 

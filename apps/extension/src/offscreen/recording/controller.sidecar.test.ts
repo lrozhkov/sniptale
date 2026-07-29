@@ -116,36 +116,55 @@ it('rejects duplicate starts when only a webcam sidecar session is active', asyn
 
 it('kicks off webcam sidecar flush when stopping the main recorder', async () => {
   recordingContext.beginRecordingSession('recording-1');
+  const binding = {
+    generation: 0,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  };
+  recordingContext.bindStreamInstance(binding);
   recordingContext.activateRecorder({
     requestData: vi.fn(),
     state: 'recording',
     stop: vi.fn(),
   } as never);
 
-  const stopPromise = stopRecording();
+  const stopPromise = stopRecording(binding);
   recordingContext.stopRecordingResolve?.();
 
   expect(stopActiveSidecarRecordersWithFlushMock).toHaveBeenCalledOnce();
-  await expect(stopPromise).resolves.toBeUndefined();
+  await expect(stopPromise).resolves.toEqual({ result: 'stopped' });
 });
 
 it('keeps sidecar stop rejection handled while the main recorder owns stop completion', async () => {
   stopActiveSidecarRecordersWithFlushMock.mockRejectedValueOnce(new Error('sidecar failed'));
   recordingContext.beginRecordingSession('recording-1');
+  const binding = {
+    generation: 0,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  };
+  recordingContext.bindStreamInstance(binding);
   recordingContext.activateRecorder({
     requestData: vi.fn(),
     state: 'recording',
     stop: vi.fn(),
   } as never);
 
-  const stopPromise = stopRecording();
+  const stopPromise = stopRecording(binding);
   await Promise.resolve();
   recordingContext.stopRecordingResolve?.();
 
-  await expect(stopPromise).resolves.toBeUndefined();
+  await expect(stopPromise).resolves.toEqual({ result: 'stopped' });
 });
 
 it('routes pause and resume to active webcam sidecars', () => {
+  const binding = {
+    generation: 0,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  };
+  recordingContext.beginRecordingSession(binding.recordingId);
+  recordingContext.bindStreamInstance(binding);
   recordingContext.mediaRecorder = {
     pause: vi.fn(function pause(this: { state: RecordingState }) {
       this.state = 'paused';
@@ -154,7 +173,7 @@ it('routes pause and resume to active webcam sidecars', () => {
     state: 'recording',
   } as never;
 
-  pauseRecording();
+  pauseRecording(binding);
   expect(pauseActiveSidecarRecordersMock).toHaveBeenCalledOnce();
 
   recordingContext.mediaRecorder = {
@@ -162,6 +181,6 @@ it('routes pause and resume to active webcam sidecars', () => {
     state: 'paused',
   } as never;
 
-  resumeRecording();
+  resumeRecording(binding);
   expect(resumeActiveSidecarRecordersMock).toHaveBeenCalledOnce();
 });

@@ -21,7 +21,7 @@ interface AttemptDiagnosticsParams {
 
 export async function attemptDiagnosticsStart(params: AttemptDiagnosticsParams): Promise<void> {
   const { captureMode, settings, viewport, tabId } = params;
-  const diagnosticsAllowed = captureMode === CaptureMode.VIEWPORT_EMULATION;
+  const diagnosticsAllowed = captureMode === CaptureMode.TAB;
   if (
     !settings.diagnosticsEnabled ||
     !diagnosticsAllowed ||
@@ -30,7 +30,7 @@ export async function attemptDiagnosticsStart(params: AttemptDiagnosticsParams):
     !supportsAnnotations(captureMode)
   ) {
     if (settings.diagnosticsEnabled && !diagnosticsAllowed) {
-      logger.log('Diagnostics skipped outside VIEWPORT_EMULATION to avoid CDP debugger banner');
+      logger.log('Diagnostics skipped outside full-tab capture');
     }
     return;
   }

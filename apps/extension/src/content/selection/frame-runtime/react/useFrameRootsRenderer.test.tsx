@@ -90,6 +90,7 @@ function Harness(props: HarnessProps) {
       return hostRef.current;
     },
     globalEffectModeRef,
+    hostLayoutSnapshot: { presentations: new Map(), recoveries: [], version: 0 },
     isClearingRef,
     removeFrame: props.removeFrame,
     rootsRef,

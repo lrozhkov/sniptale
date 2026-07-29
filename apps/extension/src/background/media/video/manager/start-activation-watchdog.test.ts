@@ -3,7 +3,6 @@ import {
   OFFSCREEN_RECORDING_START_TIMEOUT_MS,
   RECORDING_START_ACTIVATION_TIMEOUT_MS,
 } from '@sniptale/runtime-contracts/video/types/timeouts';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   clearRecordingStartActivationWatchdog,
   scheduleRecordingStartActivationWatchdog,
@@ -15,7 +14,12 @@ function createDeps() {
     isPreparing: vi.fn(() => true),
     clearActiveLease: vi.fn(() => Promise.resolve()),
     notifyStartFailed: vi.fn(),
-    sendRuntimeMessage: vi.fn(() => Promise.resolve({ success: true, result: 'accepted' })),
+    getSourceBinding: vi.fn(() => ({
+      generation: 2,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+    })),
+    stopOffscreenRecording: vi.fn(() => Promise.resolve(true)),
     translate: vi.fn((key: string) => `t:${key}`),
   };
 }
@@ -47,17 +51,12 @@ it('fails preparing starts when offscreen never reports recorder activation', as
 
   expect(deps.translate).toHaveBeenCalledWith('background.runtime.recordingStartTimeout');
   expect(deps.notifyStartFailed).toHaveBeenCalledWith('t:background.runtime.recordingStartTimeout');
-  expect(deps.clearActiveLease).toHaveBeenCalledWith(
-    'recording-1',
-    expect.objectContaining({ shouldClear: expect.any(Function) })
-  );
-  expect(deps.sendRuntimeMessage).toHaveBeenCalledWith(
-    expect.objectContaining({
-      type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
-      capabilityToken: expect.any(String),
-      discard: true,
-    })
-  );
+  expect(deps.stopOffscreenRecording).toHaveBeenCalledWith({
+    generation: 2,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  });
+  expect(deps.clearActiveLease).toHaveBeenCalledWith('recording-1');
 });
 
 it('keeps the background watchdog behind the offscreen start timeout', () => {
@@ -66,66 +65,55 @@ it('keeps the background watchdog behind the offscreen start timeout', () => {
   );
 });
 
-it('clears the stale lease before exposing a retryable start failure', async () => {
+it('keeps durable authority until identity-bound offscreen cleanup succeeds', async () => {
   const deps = createDeps();
-  const cleanup = createDeferred<void>();
-  deps.clearActiveLease.mockReturnValueOnce(cleanup.promise);
+  const cleanup = createDeferred<boolean>();
+  deps.stopOffscreenRecording.mockReturnValueOnce(cleanup.promise);
 
   scheduleRecordingStartActivationWatchdog('recording-1', deps);
   await vi.advanceTimersByTimeAsync(RECORDING_START_ACTIVATION_TIMEOUT_MS);
 
-  expect(deps.clearActiveLease).toHaveBeenCalledWith(
-    'recording-1',
-    expect.objectContaining({ shouldClear: expect.any(Function) })
-  );
   expect(deps.notifyStartFailed).not.toHaveBeenCalled();
-  expect(deps.sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(deps.clearActiveLease).not.toHaveBeenCalled();
 
-  cleanup.resolve();
+  cleanup.resolve(true);
   await vi.runOnlyPendingTimersAsync();
   await Promise.resolve();
 
   expect(deps.notifyStartFailed).toHaveBeenCalledWith('t:background.runtime.recordingStartTimeout');
-  expect(deps.sendRuntimeMessage).toHaveBeenCalledWith(
-    expect.objectContaining({
-      type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
-      capabilityToken: expect.any(String),
-      discard: true,
-    })
-  );
+  expect(deps.clearActiveLease).toHaveBeenCalledWith('recording-1');
 });
 
-it('does not fail a recording that activates while timeout cleanup is pending', async () => {
+it('finishes timeout cleanup when activation races with an accepted bound stop', async () => {
   const deps = createDeps();
-  const cleanup = createDeferred<void>();
-  deps.clearActiveLease.mockReturnValueOnce(cleanup.promise);
+  const cleanup = createDeferred<boolean>();
+  deps.stopOffscreenRecording.mockReturnValueOnce(cleanup.promise);
 
   scheduleRecordingStartActivationWatchdog('recording-1', deps);
   await vi.advanceTimersByTimeAsync(RECORDING_START_ACTIVATION_TIMEOUT_MS);
 
   deps.isPreparing.mockReturnValue(false);
-  cleanup.resolve();
+  cleanup.resolve(true);
   await vi.runOnlyPendingTimersAsync();
   await Promise.resolve();
 
-  expect(deps.notifyStartFailed).not.toHaveBeenCalled();
-  expect(deps.sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(deps.notifyStartFailed).toHaveBeenCalledOnce();
+  expect(deps.clearActiveLease).toHaveBeenCalledWith('recording-1');
 });
 
-it('does not expose a retryable failure when stale lease cleanup fails', async () => {
+it.each([
+  ['rejection', () => Promise.reject(new Error('offscreen unavailable'))],
+  ['resolved false', () => Promise.resolve(false)],
+])('retains authority when activation-timeout cleanup has a %s', async (_label, createResult) => {
   const deps = createDeps();
-  deps.clearActiveLease.mockRejectedValueOnce(new Error('storage unavailable'));
+  deps.stopOffscreenRecording.mockImplementationOnce(createResult);
 
   scheduleRecordingStartActivationWatchdog('recording-1', deps);
   await vi.advanceTimersByTimeAsync(RECORDING_START_ACTIVATION_TIMEOUT_MS);
   await Promise.resolve();
 
-  expect(deps.clearActiveLease).toHaveBeenCalledWith(
-    'recording-1',
-    expect.objectContaining({ shouldClear: expect.any(Function) })
-  );
   expect(deps.notifyStartFailed).not.toHaveBeenCalled();
-  expect(deps.sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(deps.clearActiveLease).not.toHaveBeenCalled();
 });
 
 it('does not fail stale or cleared activation waits', async () => {

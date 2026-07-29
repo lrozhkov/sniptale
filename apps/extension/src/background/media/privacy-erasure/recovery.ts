@@ -9,7 +9,10 @@ import {
 import { waitForStopSideEffects } from '../video/runtime/manager/controls.stop/effects';
 import { closeOffscreenDocumentForPrivacyErasure } from '../video/runtime/offscreen-manager';
 import { inspectPersistedLease } from '../../storage/video/recording-control-lease';
-import { resetRecordingRuntimeStateForPrivacyErasure } from './recording';
+import {
+  cleanupVideoCaptureSurfacesForPrivacyErasure,
+  resetRecordingRuntimeStateForPrivacyErasure,
+} from './recording';
 import {
   failed,
   failedExportParticipants,
@@ -22,6 +25,9 @@ export async function recoverInvalidDurableMediaState() {
   try {
     await closeOffscreenDocumentForPrivacyErasure();
     await waitForStopSideEffects();
+    if (!(await cleanupVideoCaptureSurfacesForPrivacyErasure())) {
+      throw new Error('invalid-media-state-surface-recovery-unverified');
+    }
     await clearActiveVideoRecordingLease();
     await clearProjectExportJobLedgerForPrivacyErasure();
 

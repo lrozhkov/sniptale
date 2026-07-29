@@ -106,7 +106,7 @@ function updateEditorSelections(
 
   expect(state.updateFormField).toHaveBeenCalledWith('screenshotMode', 'selection');
   expect(state.updateFormField).toHaveBeenCalledWith('afterCapture', 'copy');
-  expect(state.updateFormField).toHaveBeenCalledWith('emulation', 'desktop-1440');
+  expect(state.updateFormField).toHaveBeenCalledWith('viewportPresetId', 'desktop-1440');
   expect(state.updateFormField).toHaveBeenCalledWith('delay', 5);
   expect(state.updateFormField).toHaveBeenCalledWith('imageFormat', 'jpeg');
   expect(state.updateFormField).toHaveBeenCalledWith('imageQuality', 90);

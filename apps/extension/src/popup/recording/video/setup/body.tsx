@@ -154,12 +154,14 @@ function VideoIdleSetupSection(props: VideoSetupBodyProps) {
         onWebcamDeviceChange={props.onWebcamDeviceChange}
         onSettingsChange={props.onSettingsChange}
       />
-      <VideoPresetSelector
-        viewportPresets={props.viewportPresets}
-        selectedPresetId={props.selectedPresetId}
-        onPresetChange={props.onPresetChange}
-        hidden={props.captureMode === CaptureMode.CAMERA}
-      />
+      {props.captureMode === CaptureMode.CAMERA ? null : (
+        <VideoPresetSelector
+          captureMode={props.captureMode}
+          viewportPresets={props.viewportPresets}
+          selectedPresetId={props.selectedPresetId}
+          onPresetChange={props.onPresetChange}
+        />
+      )}
       <VideoSettingsGrid
         captureMode={props.captureMode}
         settings={props.settings}

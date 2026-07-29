@@ -1,10 +1,12 @@
 import { saveWebSnapshotToMediaHub } from '../../media-hub/web-snapshot';
+import { deleteMediaLibraryAssetsBatchSafely } from '../../../workflows/media-hub/store';
 import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { WebSnapshotSaveToGalleryPayload } from '@sniptale/runtime-contracts/web-snapshot';
 import type { SendResponse } from './types';
 import { fetchWebSnapshotAssetForSession } from './web-snapshot/fetch';
 import {
   assertWebSnapshotSessionOpen,
+  assertWebSnapshotSessionOwner,
   beginWebSnapshotSave,
   commitWebSnapshotSave,
   releaseWebSnapshotSave,
@@ -12,6 +14,7 @@ import {
 } from './web-snapshot/session';
 import {
   releaseWebSnapshotStagedBlobs,
+  releaseWebSnapshotStagedBlobsForSession,
   stageWebSnapshotBlobChunk,
 } from './web-snapshot/staged-blobs';
 import { resolveWebSnapshotPayloadBlobs } from './web-snapshot/payload-blobs';
@@ -92,12 +95,34 @@ export function handleStageWebSnapshotBlobChunk(
   return true;
 }
 
+export function handleReleaseWebSnapshotStagedBlobs(
+  payload: { snapshotSessionId: string },
+  resolvedTabId: number,
+  sendResponse: SendResponse
+): boolean {
+  Promise.resolve()
+    .then(() => {
+      assertWebSnapshotSessionOwner({
+        sessionId: payload.snapshotSessionId,
+        tabId: resolvedTabId,
+      });
+      releaseWebSnapshotStagedBlobsForSession({
+        snapshotSessionId: payload.snapshotSessionId,
+        tabId: resolvedTabId,
+      });
+      sendResponse({ success: true, result: 'released' });
+    })
+    .catch((error) => sendResponse(createRouteErrorResponse(error)));
+  return true;
+}
+
 export function handleSaveWebSnapshotToGallery(
   payload: WebSnapshotSaveToGalleryPayload,
   resolvedTabId: number,
   sendResponse: SendResponse
 ): boolean {
   let saveStarted = false;
+  let savedAssetId: string | null = null;
 
   Promise.resolve()
     .then(() => {
@@ -112,7 +137,9 @@ export function handleSaveWebSnapshotToGallery(
       });
     })
     .then((assetId) => {
+      savedAssetId = assetId;
       commitWebSnapshotSave({
+        assetId,
         sessionId: payload.snapshotSessionId,
         tabId: resolvedTabId,
       });
@@ -122,12 +149,24 @@ export function handleSaveWebSnapshotToGallery(
       });
       sendResponse({ success: true, assetId });
     })
-    .catch((error) => {
+    .catch(async (error: unknown) => {
+      let finalError: unknown = error;
+      if (savedAssetId) {
+        try {
+          await deleteMediaLibraryAssetsBatchSafely([savedAssetId]);
+          savedAssetId = null;
+        } catch (cleanupError) {
+          finalError = new AggregateError(
+            [error, cleanupError],
+            'Web snapshot save cancellation cleanup failed'
+          );
+        }
+      }
+      releaseWebSnapshotStagedBlobs({
+        ...payload,
+        tabId: resolvedTabId,
+      });
       if (saveStarted) {
-        releaseWebSnapshotStagedBlobs({
-          ...payload,
-          tabId: resolvedTabId,
-        });
         try {
           releaseWebSnapshotSave({
             sessionId: payload.snapshotSessionId,
@@ -137,7 +176,7 @@ export function handleSaveWebSnapshotToGallery(
           // Preserve the original save failure for the runtime response.
         }
       }
-      sendResponse(createRouteErrorResponse(error));
+      sendResponse(createRouteErrorResponse(finalError));
     });
   return true;
 }

@@ -18,7 +18,7 @@ vi.mock('../infra', async (importOriginal) => ({
 
 import { detachDebugger } from './detach';
 import { detachDebuggerForPrivacyErasure } from './detach.privacy-erasure';
-import { detachDebuggerClient } from './detach-core';
+import { detachDebuggerClient, detachPersistedDebuggerClient } from './detach-core';
 import * as debuggerSession from './index';
 import {
   getDebuggerSessionSnapshotForTests,
@@ -89,6 +89,81 @@ it('returns early when the tab has no attached debugger clients', async () => {
   expect(getDebuggerSessionSnapshotForTests(7)).toEqual({ clients: [], targetId: null });
 });
 
+it('detaches a persisted debugger owner after a cold worker start', async () => {
+  await expect(detachPersistedDebuggerClient(17, 'screenshot')).resolves.toBeUndefined();
+
+  expect(browserDebugger.detach).toHaveBeenCalledWith({ tabId: 17 });
+  expect(withTimeout).toHaveBeenCalledWith(
+    expect.any(Promise),
+    expect.any(Number),
+    'debugger.detach'
+  );
+});
+
+it('accepts an already-detached persisted debugger owner after a cold worker start', async () => {
+  withTimeout.mockRejectedValueOnce(new Error('Not attached to the debugger'));
+
+  await expect(detachPersistedDebuggerClient(18, 'screenshot')).resolves.toBeUndefined();
+});
+
+it('accepts a missing tab as terminal only for persisted debugger recovery', async () => {
+  const missingTab = new Error('No tab with id: 18');
+  withTimeout.mockRejectedValueOnce(missingTab);
+
+  await expect(detachPersistedDebuggerClient(18, 'screenshot')).resolves.toBeUndefined();
+
+  seedDebuggerSessionStateForTests(18, ['screenshot'], 'target-18');
+  withTimeout.mockRejectedValueOnce(missingTab);
+  await expect(detachDebuggerClient(18, 'screenshot')).resolves.toEqual({
+    error: missingTab,
+    status: 'failed',
+  });
+  expect(getDebuggerSessionSnapshotForTests(18).clients).toEqual(['screenshot']);
+});
+
+it('clears a recovered in-memory owner after its persisted tab disappeared', async () => {
+  seedDebuggerSessionStateForTests(23, ['screenshot'], 'target-23');
+  withTimeout.mockRejectedValueOnce(new Error('No tab with id: 23'));
+
+  await expect(detachPersistedDebuggerClient(23, 'screenshot')).resolves.toBeUndefined();
+
+  expect(getDebuggerSessionSnapshotForTests(23)).toEqual({ clients: [], targetId: null });
+});
+
+it('retains persisted cleanup authority when cold-start detach fails', async () => {
+  const failure = new Error('cold detach failed');
+  withTimeout.mockRejectedValueOnce(failure);
+
+  await expect(detachPersistedDebuggerClient(19, 'screenshot')).rejects.toBe(failure);
+});
+
+it('does not detach a persisted owner over a different current debugger owner', async () => {
+  seedDebuggerSessionStateForTests(20, ['diagnostics'], 'target-20');
+
+  await expect(detachPersistedDebuggerClient(20, 'screenshot')).rejects.toThrow(
+    'conflicts with a current debugger owner'
+  );
+  expect(browserDebugger.detach).not.toHaveBeenCalled();
+});
+
+it('releases a persisted client through the current shared debugger ownership', async () => {
+  seedDebuggerSessionStateForTests(21, ['screenshot', 'diagnostics'], 'target-21');
+
+  await expect(detachPersistedDebuggerClient(21, 'screenshot')).resolves.toBeUndefined();
+
+  expect(browserDebugger.detach).not.toHaveBeenCalled();
+  expect(getDebuggerSessionSnapshotForTests(21).clients).toEqual(['diagnostics']);
+});
+
+it('surfaces current-owner detach failure during persisted cleanup', async () => {
+  const failure = new Error('current detach failed');
+  seedDebuggerSessionStateForTests(22, ['screenshot'], 'target-22');
+  withTimeout.mockRejectedValueOnce(failure);
+
+  await expect(detachPersistedDebuggerClient(22, 'screenshot')).rejects.toBe(failure);
+  expect(getDebuggerSessionSnapshotForTests(22).clients).toEqual(['screenshot']);
+});
+
 it('keeps the debugger attached while other clients still own the tab', async () => {
   seedDebuggerSessionStateForTests(7, ['screenshot', 'diagnostics']);
 
@@ -122,12 +197,12 @@ it('swallows not-attached detach failures for the last client', async () => {
   await expect(detachDebugger(7, 'screenshot')).resolves.toBeUndefined();
 });
 
-it('logs and swallows unexpected detach failures for the last client', async () => {
+it('logs and surfaces unexpected detach failures for the last client', async () => {
   const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   seedDebuggerSessionStateForTests(7, ['screenshot'], 'target-7');
   withTimeout.mockRejectedValue(new Error('detach failed'));
 
-  await expect(detachDebugger(7, 'screenshot')).resolves.toBeUndefined();
+  await expect(detachDebugger(7, 'screenshot')).rejects.toThrow('detach failed');
 
   expect(consoleErrorSpy).toHaveBeenCalledWith(
     '[BackgroundDebuggerDetach]',

@@ -48,7 +48,7 @@ function createRuntimeState(): PopupRuntimeState {
       countdownEndsAt: null,
       captureMode: null,
       captureSource: null,
-      viewportPreset: null,
+      viewportPresetId: null,
       error: null,
     },
     selectedPresetId: null,
@@ -73,7 +73,7 @@ function createQuickAction(id = 'quick-1'): QuickAction {
     afterCapture: 'download_default',
     bundledId: null,
     delay: null,
-    emulation: 'native',
+    viewportPresetId: 'native',
     exitAfterCapture: true,
     hotkey: {
       altKey: false,
@@ -242,7 +242,7 @@ it('keeps screen recording available in the command palette while page access is
 it('does not require a viewport preset before starting from the command palette', async () => {
   const { buildPopupCommandPaletteActions } = await import('./actions');
   const runtime = createRuntimeState();
-  runtime.recording.videoCaptureMode = CaptureMode.VIEWPORT_EMULATION;
+  runtime.recording.videoCaptureMode = CaptureMode.TAB;
   runtime.recording.selectedPresetId = null;
 
   const actions = buildPopupCommandPaletteActions(runtime);

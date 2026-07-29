@@ -5,7 +5,6 @@ const {
   getCurrentRecordingIdFromOwner,
   getRecordingTabIdFromOwner,
   handleTabCloseFromOwner,
-  handleTabUpdatedFromOwner,
   isRecordingFromOwner,
   resetRecordingIdFromOwner,
   resetRecordingTabIdFromOwner,
@@ -13,14 +12,16 @@ const {
   pauseRecordingFromOwner,
   resumeRecordingFromOwner,
   stopRecordingFromOwner,
-  handleViewportRecordingDebuggerDetachFromOwner,
-  handleViewportRecordingNavigationStartFromOwner,
+  handleTabRecordingDebuggerDetachFromOwner,
+  handleTabRecordingNavigationCommittedFromOwner,
+  handleTabRecordingNavigationCompletedFromOwner,
+  handleTabRecordingNavigationErrorFromOwner,
+  handleTabRecordingNavigationStartFromOwner,
 } = vi.hoisted(() => ({
   finalizeRecordingDiagnosticsFromOwner: vi.fn(),
   getCurrentRecordingIdFromOwner: vi.fn(),
   getRecordingTabIdFromOwner: vi.fn(),
   handleTabCloseFromOwner: vi.fn(),
-  handleTabUpdatedFromOwner: vi.fn(),
   isRecordingFromOwner: vi.fn(),
   resetRecordingIdFromOwner: vi.fn(),
   resetRecordingTabIdFromOwner: vi.fn(),
@@ -28,8 +29,11 @@ const {
   pauseRecordingFromOwner: vi.fn(),
   resumeRecordingFromOwner: vi.fn(),
   stopRecordingFromOwner: vi.fn(),
-  handleViewportRecordingDebuggerDetachFromOwner: vi.fn(),
-  handleViewportRecordingNavigationStartFromOwner: vi.fn(),
+  handleTabRecordingDebuggerDetachFromOwner: vi.fn(),
+  handleTabRecordingNavigationCommittedFromOwner: vi.fn(),
+  handleTabRecordingNavigationCompletedFromOwner: vi.fn(),
+  handleTabRecordingNavigationErrorFromOwner: vi.fn(),
+  handleTabRecordingNavigationStartFromOwner: vi.fn(),
 }));
 
 vi.mock('./runtime', () => ({
@@ -37,7 +41,6 @@ vi.mock('./runtime', () => ({
   getCurrentRecordingId: getCurrentRecordingIdFromOwner,
   getRecordingTabId: getRecordingTabIdFromOwner,
   handleTabClose: handleTabCloseFromOwner,
-  handleTabUpdated: handleTabUpdatedFromOwner,
   isRecording: isRecordingFromOwner,
   resetRecordingId: resetRecordingIdFromOwner,
   resetRecordingTabId: resetRecordingTabIdFromOwner,
@@ -50,9 +53,13 @@ vi.mock('./controls', () => ({
   stopRecording: stopRecordingFromOwner,
 }));
 
-vi.mock('./viewport-navigation', () => ({
-  handleViewportRecordingDebuggerDetach: handleViewportRecordingDebuggerDetachFromOwner,
-  handleViewportRecordingNavigationStart: handleViewportRecordingNavigationStartFromOwner,
+vi.mock('./tab-navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./tab-navigation')>()),
+  handleTabRecordingDebuggerDetach: handleTabRecordingDebuggerDetachFromOwner,
+  handleTabRecordingNavigationCommitted: handleTabRecordingNavigationCommittedFromOwner,
+  handleTabRecordingNavigationCompleted: handleTabRecordingNavigationCompletedFromOwner,
+  handleTabRecordingNavigationError: handleTabRecordingNavigationErrorFromOwner,
+  handleTabRecordingNavigationStart: handleTabRecordingNavigationStartFromOwner,
 }));
 
 import {
@@ -60,9 +67,11 @@ import {
   getCurrentRecordingId,
   getRecordingTabId,
   handleTabClose,
-  handleTabUpdated,
-  handleViewportRecordingDebuggerDetach,
-  handleViewportRecordingNavigationStart,
+  handleTabRecordingDebuggerDetach,
+  handleTabRecordingNavigationCommitted,
+  handleTabRecordingNavigationCompleted,
+  handleTabRecordingNavigationError,
+  handleTabRecordingNavigationStart,
   isRecording,
   notifyRecordingStartFailed,
   pauseRecording,
@@ -77,13 +86,15 @@ it('re-exports the runtime facade without wrapping', () => {
   expect(getCurrentRecordingId).toBe(getCurrentRecordingIdFromOwner);
   expect(getRecordingTabId).toBe(getRecordingTabIdFromOwner);
   expect(handleTabClose).toBe(handleTabCloseFromOwner);
-  expect(handleTabUpdated).toBe(handleTabUpdatedFromOwner);
-  expect(handleViewportRecordingDebuggerDetach).toBe(
-    handleViewportRecordingDebuggerDetachFromOwner
+  expect(handleTabRecordingDebuggerDetach).toBe(handleTabRecordingDebuggerDetachFromOwner);
+  expect(handleTabRecordingNavigationCommitted).toBe(
+    handleTabRecordingNavigationCommittedFromOwner
   );
-  expect(handleViewportRecordingNavigationStart).toBe(
-    handleViewportRecordingNavigationStartFromOwner
+  expect(handleTabRecordingNavigationCompleted).toBe(
+    handleTabRecordingNavigationCompletedFromOwner
   );
+  expect(handleTabRecordingNavigationError).toBe(handleTabRecordingNavigationErrorFromOwner);
+  expect(handleTabRecordingNavigationStart).toBe(handleTabRecordingNavigationStartFromOwner);
   expect(isRecording).toBe(isRecordingFromOwner);
   expect(notifyRecordingStartFailed).toBe(notifyRecordingStartFailedFromOwner);
   expect(pauseRecording).toBe(pauseRecordingFromOwner);

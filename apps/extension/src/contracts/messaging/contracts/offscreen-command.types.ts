@@ -26,27 +26,57 @@ export type RuntimeOffscreenStartRecordingMessage = RuntimeOffscreenCommandCapab
   settings: VideoRecordingSettings;
   tabId?: number;
   viewport?: ViewportInfo;
-  recordingId?: string;
+  recordingId: string;
   captureMode?: CaptureMode;
   cropRegion?: ViewportRegionPayload;
-  targetResolution?: Size2dPayload;
-  emulatedViewportCssSize?: Size2dPayload;
+  generation: number;
+  streamInstanceId: string;
+  surface?: {
+    presetId: string;
+    target: 'viewport' | 'window';
+    width: number;
+    height: number;
+  };
 };
 
-export type RuntimeOffscreenUpdateViewportCropMessage = RuntimeOffscreenCommandCapability & {
-  type: VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP;
-  targetResolution?: Size2dPayload;
-  emulatedViewportCssSize?: Size2dPayload;
+export type RuntimeOffscreenStopRecordingMessage = RuntimeOffscreenCommandCapability & {
+  type: VideoMessageType.OFFSCREEN_STOP_RECORDING;
+  discard?: boolean;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+};
+
+export type RuntimeOffscreenBeginRecordingMessage = RuntimeOffscreenCommandCapability & {
+  type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+};
+
+export type RuntimeOffscreenRevalidateSourceMessage = RuntimeOffscreenCommandCapability & {
+  type: VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+  transitionId?: string;
+  viewport?: ViewportInfo;
 };
 
 export type RuntimeOffscreenSetViewportDrawStateMessage = RuntimeOffscreenCommandCapability & {
   type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE;
   frozen: boolean;
-  navigationEpoch: number;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+  transitionId: string;
 };
 
 export type RuntimeOffscreenUpdateSettingsMessage = RuntimeOffscreenCommandCapability & {
   type: VideoMessageType.OFFSCREEN_UPDATE_SETTINGS;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
   settings: Partial<VideoRecordingSettings>;
 };
 

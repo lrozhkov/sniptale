@@ -7,7 +7,7 @@ function createQuickAction(id: string): QuickAction {
     afterCapture: 'download_default',
     bundledId: null,
     delay: null,
-    emulation: 'native',
+    viewportPresetId: 'native',
     exitAfterCapture: false,
     hotkey: null,
     icon: 'Camera',

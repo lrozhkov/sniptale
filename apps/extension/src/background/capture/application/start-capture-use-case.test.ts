@@ -54,11 +54,26 @@ it('selects viewport capture when viewport dimensions are available', async () =
       viewportCapture,
       cropCapture,
       7,
-      new Map([[7, { height: 200, width: 300 }]])
+      new Map([
+        [
+          7,
+          {
+            presetId: 'test:viewport',
+            target: 'viewport' as const,
+            height: 200,
+            width: 300,
+          },
+        ],
+      ])
     )
   ).resolves.toBe('data:image/png;base64,viewport');
 
-  expect(viewportCapture).toHaveBeenCalledWith(7, { height: 200, width: 300 });
+  expect(viewportCapture).toHaveBeenCalledWith(7, {
+    presetId: 'test:viewport',
+    target: 'viewport' as const,
+    height: 200,
+    width: 300,
+  });
   expect(cropCapture).not.toHaveBeenCalled();
 });
 

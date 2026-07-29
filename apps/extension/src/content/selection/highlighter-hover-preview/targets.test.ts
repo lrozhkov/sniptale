@@ -32,6 +32,7 @@ describe('highlighter hover target policy', () => {
   it('detects direct classes and delegates portal/closest ownership checks', () => {
     const directTarget = document.createElement('button');
     directTarget.classList.add('sniptale-highlight');
+    pageContext.isContentRuntimeUiElement.mockReturnValueOnce(true);
     expect(isHighlighterExtensionUiElement(directTarget)).toBe(true);
 
     const target = document.createElement('span');
@@ -42,7 +43,10 @@ describe('highlighter hover target policy', () => {
     expect(isHighlighterExtensionUiElement(target)).toBe(true);
     expect(pageContext.isContentRuntimeUiElement).toHaveBeenCalledWith(
       target,
-      expect.objectContaining({ portalElements: [portal] })
+      expect.objectContaining({
+        classNames: expect.arrayContaining(['sniptale-highlight']),
+        portalElements: [portal],
+      })
     );
   });
 
@@ -51,6 +55,7 @@ describe('highlighter hover target policy', () => {
     (className) => {
       const target = document.createElement('button');
       target.className = className;
+      pageContext.isContentRuntimeUiElement.mockReturnValueOnce(true);
 
       expect(isHighlighterExtensionUiElement(target)).toBe(true);
     }

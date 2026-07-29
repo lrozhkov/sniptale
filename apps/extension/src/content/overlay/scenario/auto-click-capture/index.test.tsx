@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import type { ScenarioSessionState } from '@sniptale/runtime-contracts/scenario/types/session';
+import { initializeContentUiRoots } from '../../../platform/dom-host';
 import type { BuildScenarioCapturePayload } from './types';
 
 const trustedEventMocks = vi.hoisted(() => ({
@@ -186,6 +187,7 @@ function registerSidebarPreviewBypassTests() {
     const contentRoot = document.createElement('div');
     contentRoot.id = CONTENT_ROOT_ID;
     const shadowRoot = contentRoot.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(shadowRoot);
     const previewButton = document.createElement('button');
     previewButton.textContent = 'Preview';
     const previewOverlay = document.createElement('div');

@@ -75,7 +75,7 @@ function createRecordingState(status: VideoRecordingStatus) {
     duration: 12,
     error: null,
     status,
-    viewportPreset: null,
+    viewportPresetId: null,
   };
 }
 
@@ -92,7 +92,7 @@ function createEffectsState(overrides: Partial<Parameters<typeof usePopupRuntime
       duration: 0,
       error: null,
       status: VideoRecordingStatus.IDLE,
-      viewportPreset: null,
+      viewportPresetId: null,
     },
     refreshMicrophones: vi.fn(async () => []),
     refreshWebcams: vi.fn(async () => []),

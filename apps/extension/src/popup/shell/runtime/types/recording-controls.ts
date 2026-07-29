@@ -14,8 +14,6 @@ export interface PopupRuntimeRecordingControls {
   videoCaptureMode: CaptureMode;
   selectedPresetId: string | null;
   selectedPreset: ViewportPreset | null;
-  appliedViewportPresetId: string | null;
-  appliedViewportTabId: number | null;
   videoSettings: VideoRecordingSettings;
   recordingState: VideoRecordingRuntimeState;
   startError: string | null;
@@ -27,8 +25,6 @@ export interface PopupRuntimeRecordingControls {
   isLoadingWebcams: boolean;
   setVideoCaptureMode: Dispatch<SetStateAction<CaptureMode>>;
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;
-  setAppliedViewportPresetId: Dispatch<SetStateAction<string | null>>;
-  setAppliedViewportTabId: Dispatch<SetStateAction<number | null>>;
   setStartError: Dispatch<SetStateAction<string | null>>;
   setVideoSettings: Dispatch<SetStateAction<VideoRecordingSettings>>;
   setRecordingState: Dispatch<SetStateAction<VideoRecordingRuntimeState>>;

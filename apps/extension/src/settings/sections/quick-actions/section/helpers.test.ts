@@ -1,23 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { translate } from '../../../../platform/i18n';
+import { formatViewportPresetDimensions } from '../../../../features/viewport-presets/format';
 import {
   createDefaultQuickAction,
   getDelayLabel,
-  getEmulationLabel,
+  getViewportPresetLabel,
   getQuickActionCountLabel,
   reorderQuickActions,
 } from './helpers';
 
 function verifyEmulationAndDelayLabels() {
-  expect(getEmulationLabel(undefined, 'native')).toBe(
+  expect(getViewportPresetLabel(undefined, null)).toBe(
     translate('settings.quickActions.emulationNone')
   );
-  expect(getEmulationLabel(undefined, null)).toBe(translate('settings.quickActions.emulationNone'));
   expect(
-    getEmulationLabel([{ id: 'preset-1', label: 'Desktop', width: 1440, height: 900 }], 'preset-1')
-  ).toBe('Desktop (1440×900)');
-  expect(getEmulationLabel(undefined, 'custom-id')).toBe('custom-id');
+    getViewportPresetLabel(
+      [
+        {
+          kind: 'user',
+          id: 'preset-1',
+          name: 'Desktop',
+          target: 'viewport',
+          width: 1440,
+          height: 900,
+          enabled: true,
+          order: 0,
+        },
+      ],
+      'preset-1'
+    )
+  ).toBe(`Desktop (${formatViewportPresetDimensions(1440, 900)})`);
+  expect(getViewportPresetLabel(undefined, 'custom-id')).toBe('custom-id');
 
   expect(getDelayLabel(null)).toBe('');
   expect(getDelayLabel(undefined)).toBe('');
@@ -34,7 +48,7 @@ function verifyQuickActionCountAndDefaultAction() {
     expect.objectContaining({
       id: 'quick-action-id',
       screenshotMode: 'visible',
-      emulation: 'native',
+      viewportPresetId: null,
       afterCapture: 'download_default',
     })
   );

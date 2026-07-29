@@ -49,7 +49,10 @@ function createArgs() {
     actionId: 'action-1',
     tabId: 12,
     tab: { id: 12, url: 'https://example.test' } as chrome.tabs.Tab,
-    viewportState: new Map<number, { width: number; height: number } | null>(),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
     screenshotModeState: new Map<number, boolean>(),
     captureGuardState: { isCapturing: false },
     pageAccessPort: {

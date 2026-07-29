@@ -59,6 +59,7 @@ function createSessionState() {
   return {
     copiedFormat: null,
     copyingFormat: null,
+    cancelRetryRef: { current: null },
     copyRequestIdRef: { current: 1 },
     copyResetTimeoutRef: { current: null },
     progress: { current: 0, errors: [], message: '', phase: 'idle' as const, total: 0 },

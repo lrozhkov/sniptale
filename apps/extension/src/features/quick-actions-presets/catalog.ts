@@ -139,7 +139,7 @@ export function createBundledQuickAction(config: BundledQuickActionConfig): Quic
     bundledId: config.id,
     hotkey: null,
     screenshotMode: config.screenshotMode,
-    emulation: 'native',
+    viewportPresetId: null,
     delay: config.delay,
     afterCapture: config.afterCapture,
     imageFormat: 'png',

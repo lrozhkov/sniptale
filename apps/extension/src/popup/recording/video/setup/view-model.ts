@@ -7,8 +7,6 @@ type VideoSetupViewModelArgs = Pick<
   VideoSetupPageProps,
   | 'captureMode'
   | 'selectedPresetId'
-  | 'appliedViewportPresetId'
-  | 'appliedViewportTabId'
   | 'viewportPresets'
   | 'activeTabCapabilities'
   | 'pageAccessDisabledReason'
@@ -76,12 +74,6 @@ function getModeCapabilities(params: {
         params.activeTabCapabilities.videoByMode[CaptureMode.TAB_CROP].reason ??
         params.pageAccessDisabledReason,
     },
-    [CaptureMode.VIEWPORT_EMULATION]: {
-      supported: false,
-      reason:
-        params.activeTabCapabilities.videoByMode[CaptureMode.VIEWPORT_EMULATION].reason ??
-        params.pageAccessDisabledReason,
-    },
   };
 }
 
@@ -104,8 +96,6 @@ function getStartButtonLabel(params: {
 export function getVideoSetupViewModel({
   captureMode,
   selectedPresetId,
-  appliedViewportPresetId,
-  appliedViewportTabId,
   viewportPresets,
   activeTabCapabilities,
   pageAccessDisabledReason,
@@ -115,8 +105,6 @@ export function getVideoSetupViewModel({
   isLoadingWebcams,
 }: VideoSetupViewModelArgs): VideoSetupViewModel {
   const selectedPreset = viewportPresets.find((preset) => preset.id === selectedPresetId) ?? null;
-  const appliedViewportPreset =
-    viewportPresets.find((preset) => preset.id === appliedViewportPresetId) ?? null;
   const modeCapabilities = getModeCapabilities({
     activeTabCapabilities,
     isLoadingWebcams,
@@ -129,9 +117,6 @@ export function getVideoSetupViewModel({
   });
   const canStart = !isStartPending && !startDisabledReason;
   const recordingOptionState = getRecordingOptionState({
-    activeTabId: activeTabCapabilities.tabId,
-    appliedViewportPreset,
-    appliedViewportTabId,
     captureMode,
   });
   const { controlledCursorDisabled, controlledCursorDisabledReason } =
@@ -152,21 +137,12 @@ export function getVideoSetupViewModel({
   };
 }
 
-function getRecordingOptionState(params: {
-  activeTabId: number | null;
-  appliedViewportPreset: VideoSetupViewModel['selectedPreset'];
-  appliedViewportTabId: number | null;
-  captureMode: CaptureMode;
-}) {
+function getRecordingOptionState(params: { captureMode: CaptureMode }) {
   return {
     systemAudioDisabled:
       params.captureMode === CaptureMode.SCREEN || params.captureMode === CaptureMode.CAMERA,
     diagnosticsDisabled:
-      params.captureMode === CaptureMode.CAMERA ||
-      params.captureMode !== CaptureMode.TAB ||
-      params.activeTabId === null ||
-      params.appliedViewportTabId !== params.activeTabId ||
-      params.appliedViewportPreset === null,
+      params.captureMode === CaptureMode.CAMERA || params.captureMode !== CaptureMode.TAB,
   };
 }
 

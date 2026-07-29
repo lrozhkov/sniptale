@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment jsdom
+
+import { act, createElement, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { areFrameRenderDescriptorsEqual, buildFrameRenderDescriptors } from './descriptors';
+import { renderInteractiveFrames } from './dom';
 
 function createFrame(id: string): FrameData {
   return {
@@ -190,6 +196,90 @@ function expectTailFrameChangesInvalidateDescriptors() {
   ).toBe(false);
 }
 
+function expectPresentationChangesHideAndRestoreTheWholeFrameRoot() {
+  const frame = createFrame('frame-1');
+  const container = document.createElement('div');
+  const frameContainer = document.createElement('div');
+  frameContainer.id = 'frame-container-frame-1';
+  container.appendChild(frameContainer);
+  document.body.appendChild(container);
+  const root = { render: vi.fn(), unmount: vi.fn() } satisfies Root;
+  const shared = {
+    actionRefs: {
+      removeFrameRef: { current: vi.fn() },
+      updateFrameEffectRef: { current: vi.fn() },
+      updateFrameRef: { current: vi.fn() },
+      updateFrameStateRef: { current: vi.fn() },
+    },
+    container,
+    currentFrames: [frame],
+    currentFrameStates: new Map<string, FrameState>([['frame-1', 'idle']]),
+    globalEffectModeRef: { current: 'border' as const },
+    InteractiveFrameComponent: vi.fn(() => null),
+    rootsRef: { current: new Map([['frame-1', root]]) },
+  };
+
+  renderInteractiveFrames({ ...shared, presentations: new Map([['frame-1', 'suspended']]) });
+  expect(frameContainer.isConnected).toBe(false);
+  expect(root.render).not.toHaveBeenCalled();
+  expect(root.unmount).toHaveBeenCalledTimes(1);
+  expect(shared.rootsRef.current.has('frame-1')).toBe(false);
+
+  container.remove();
+}
+
+async function expectSuspensionUnmountsPortalsAndRestoresFromIdle() {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const frame = createFrame('frame-1');
+  const container = document.createElement('div');
+  const frameContainer = document.createElement('div');
+  frameContainer.id = 'frame-container-frame-1';
+  container.appendChild(frameContainer);
+  document.body.appendChild(container);
+  const cleanup = vi.fn();
+  function PortalFrame() {
+    useEffect(() => cleanup, []);
+    return createPortal(
+      createElement('div', { 'data-testid': 'frame-portal' }, 'Portal frame UI'),
+      document.body
+    );
+  }
+  const rootsRef = { current: new Map<string, Root>([['frame-1', createRoot(frameContainer)]]) };
+  const shared = {
+    actionRefs: {
+      removeFrameRef: { current: vi.fn() },
+      updateFrameEffectRef: { current: vi.fn() },
+      updateFrameRef: { current: vi.fn() },
+      updateFrameStateRef: { current: vi.fn() },
+    },
+    container,
+    currentFrames: [frame],
+    currentFrameStates: new Map<string, FrameState>([['frame-1', 'idle']]),
+    globalEffectModeRef: { current: 'border' as const },
+    InteractiveFrameComponent: PortalFrame,
+    rootsRef,
+  };
+
+  await act(async () => {
+    renderInteractiveFrames({ ...shared, presentations: new Map([['frame-1', 'visible']]) });
+  });
+  expect(document.querySelector('[data-testid="frame-portal"]')).not.toBeNull();
+
+  await act(async () => {
+    renderInteractiveFrames({ ...shared, presentations: new Map([['frame-1', 'missing']]) });
+  });
+  expect(document.querySelector('[data-testid="frame-portal"]')).toBeNull();
+  expect(cleanup).toHaveBeenCalledTimes(1);
+  expect(rootsRef.current.has('frame-1')).toBe(false);
+  expect(frameContainer.isConnected).toBe(false);
+  container.remove();
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  document.body.replaceChildren();
+});
+
 describe('frame-roots-renderer-dom descriptors', () => {
   it(
     'treats equivalent frame descriptors as equal without string serialization',
@@ -218,5 +308,13 @@ describe('frame-roots-renderer-dom descriptors', () => {
   it(
     'treats a tail-frame-only change as render invalidation',
     expectTailFrameChangesInvalidateDescriptors
+  );
+  it(
+    'hides and restores the entire frame root from presentation state',
+    expectPresentationChangesHideAndRestoreTheWholeFrameRoot
+  );
+  it(
+    'unmounts portaled interaction effects while an anchor is unavailable',
+    expectSuspensionUnmountsPortalsAndRestoresFromIdle
   );
 });

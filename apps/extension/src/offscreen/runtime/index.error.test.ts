@@ -10,7 +10,6 @@ const {
   sendRuntimeMessageMock,
   startProjectExportMock,
   stopRecordingMock,
-  updateViewportCropMock,
 } = vi.hoisted(() => ({
   browserRuntimeSubscribeToMessagesMock: vi.fn(),
   consumeProjectExportInputMock: vi.fn(),
@@ -21,7 +20,6 @@ const {
   sendRuntimeMessageMock: vi.fn(),
   startProjectExportMock: vi.fn(),
   stopRecordingMock: vi.fn(),
-  updateViewportCropMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
@@ -60,15 +58,18 @@ vi.mock('../recording/setup/desktop-media', () => ({
 }));
 
 vi.mock('../recording/controller', () => ({
+  activateViewportOutput: vi.fn(),
   pauseRecording: vi.fn(),
   resumeRecording: vi.fn(),
   setViewportDrawState: vi.fn(),
   startRecording: vi.fn(),
   stopRecording: stopRecordingMock,
-  updateViewportCrop: updateViewportCropMock,
+  updateRecordingSettings: vi.fn(),
+  updateViewportCrop: vi.fn(),
 }));
 
 vi.mock('../recording/context', () => ({
+  RecordingStopOutcome: undefined,
   recordingContext: recordingContextMock,
 }));
 
@@ -93,6 +94,7 @@ import {
   createProject,
   createProjectExportInputReference,
 } from './test-support';
+import { registerOffscreenRuntimeMessageListener } from './index';
 
 type SubscriptionListener = (
   message: unknown,
@@ -132,7 +134,6 @@ async function captureSubscriptionListener(): Promise<SubscriptionListener> {
     return vi.fn();
   });
 
-  const { registerOffscreenRuntimeMessageListener } = await import('./index');
   registerOffscreenRuntimeMessageListener();
 
   if (!listener) {
@@ -144,14 +145,11 @@ async function captureSubscriptionListener(): Promise<SubscriptionListener> {
 
 function resetOffscreenRuntimeErrorMocks() {
   vi.clearAllMocks();
-  vi.resetModules();
-  freshnessNonceSequence = 0;
   consumeProjectExportInputMock.mockResolvedValue(createProject());
   requestDesktopMediaMock.mockResolvedValue(undefined);
   recordingContextMock.currentRecordingId = null;
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   startProjectExportMock.mockResolvedValue(undefined);
-  updateViewportCropMock.mockReturnValue(undefined);
 }
 
 async function verifiesRejectedRuntimeHandlersBecomeTypedOffscreenErrors() {
@@ -234,26 +232,6 @@ async function verifiesExportPhaseErrorsBecomeTypedOffscreenErrors() {
   });
 }
 
-async function verifiesViewportCropFailuresBecomeTypedOffscreenErrors() {
-  const listener = await captureSubscriptionListener();
-  parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
-  updateViewportCropMock.mockImplementationOnce(() => {
-    throw new Error('crop failed');
-  });
-
-  emitTrustedRuntimeMessage(listener, {
-    type: VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP,
-    targetResolution: { width: 1920, height: 1080 },
-  });
-  await flushRuntimeRouting();
-
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: VideoMessageType.OFFSCREEN_ERROR,
-    error: 'crop failed',
-    phase: 'runtime',
-  });
-}
-
 async function verifiesUnknownRuntimeFailuresAreStringifiedBeforeNotification() {
   const listener = await captureSubscriptionListener();
   parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
@@ -280,7 +258,6 @@ describe('offscreen-runtime error paths', () => {
   it('reports runtime-phase errors', verifiesRuntimePhaseErrorsBecomeTypedOffscreenErrors);
   it('reports rejected async handlers', verifiesRejectedRuntimeHandlersBecomeTypedOffscreenErrors);
   it('reports export errors', verifiesExportPhaseErrorsBecomeTypedOffscreenErrors);
-  it('reports viewport-crop errors', verifiesViewportCropFailuresBecomeTypedOffscreenErrors);
   it(
     'stringifies unknown runtime failures before notifying the main runtime',
     verifiesUnknownRuntimeFailuresAreStringifiedBeforeNotification

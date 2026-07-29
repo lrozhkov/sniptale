@@ -1,5 +1,3 @@
-import { findElementBySelector } from '../../../platform/frame';
-import { createCompositeSelector } from '../../../platform/frame/selectors';
 import type {
   BlurSettings,
   BorderPreset,
@@ -14,20 +12,8 @@ import type { FrameSessionSnapshot, SerializableFrameData } from './types';
 import { cloneBorderPreset } from '../../../../features/highlighter/presets/catalog';
 
 function cloneFrameSettings(frame: FrameData): SerializableFrameData {
-  const { linkedElement, ...rest } = frame;
-  const linkedElementSelector =
-    frame.linkedElementSelector ??
-    (linkedElement?.isConnected
-      ? (() => {
-          const selector = createCompositeSelector(linkedElement);
-          return selector.iframeSelector
-            ? `${selector.iframeSelector} => ${selector.elementSelector}`
-            : selector.elementSelector;
-        })()
-      : undefined);
-
   return {
-    ...rest,
+    ...frame,
     ...(frame.blurSettings ? { blurSettings: { ...frame.blurSettings } } : {}),
     ...(frame.borderSettings
       ? {
@@ -48,7 +34,6 @@ function cloneFrameSettings(frame: FrameData): SerializableFrameData {
         }
       : {}),
     ...(frame.focusSettings ? { focusSettings: { ...frame.focusSettings } } : {}),
-    ...(linkedElementSelector === undefined ? {} : { linkedElementSelector }),
     ...(frame.offset ? { offset: { ...frame.offset } } : {}),
     ...(frame.pagePlacement
       ? {
@@ -106,28 +91,10 @@ export function captureFrameSessionSnapshot(args: {
 
 export function hydrateFrameSessionSnapshot(snapshot: FrameSessionSnapshot): {
   frames: FrameData[];
-  linkedElements: Map<string, HTMLElement>;
   stepBadgeOrder: Map<string, number>;
 } {
-  const linkedElements = new Map<string, HTMLElement>();
-  const frames = snapshot.frames.map((frame) => {
-    const linkedElement = frame.linkedElementSelector
-      ? findElementBySelector(frame.linkedElementSelector)
-      : null;
-
-    if (linkedElement) {
-      linkedElements.set(frame.id, linkedElement);
-    }
-
-    return {
-      ...frame,
-      ...(linkedElement === null ? {} : { linkedElement }),
-    };
-  });
-
   return {
-    frames,
-    linkedElements,
+    frames: snapshot.frames.map((frame) => cloneFrameSettings(frame)),
     stepBadgeOrder: new Map(snapshot.stepBadgeOrder),
   };
 }

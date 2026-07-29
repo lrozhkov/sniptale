@@ -201,7 +201,7 @@ it('lets non-capture messages fall through without page access refresh', () => {
   handleTabMessage({
     deps,
     logger: { error: loggerErrorMock, warn: loggerWarnMock },
-    message: { type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+    message: { exportRunId: 'export-run-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
     resolvedTabId: 17,
     sendResponse,
     sender: createTopLevelContentSender(17, 'https://example.test/page'),

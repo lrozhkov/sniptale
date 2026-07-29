@@ -42,7 +42,6 @@ export function createPopupAppShellActiveTabCapabilities(
       [CaptureMode.TAB]: supported,
       [CaptureMode.TAB_CROP]: supported,
       [CaptureMode.CAMERA]: supported,
-      [CaptureMode.VIEWPORT_EMULATION]: supported,
     },
     ...overrides,
   };
@@ -76,7 +75,16 @@ function createRuntimeHome(overrides: PopupRuntimeStateOverrides) {
     quickActions: overrides.quickActions ?? [],
     quickActionsReady: overrides.quickActionsReady ?? true,
     viewportPresets: overrides.viewportPresets ?? [
-      { id: 'preset-1', label: '', width: 1280, height: 720 },
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Preset 1',
+        target: 'viewport',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 0,
+      },
     ],
     ...overrides.home,
   };
@@ -96,8 +104,6 @@ function createRuntimeRecording(overrides: PopupRuntimeStateOverrides) {
   return {
     recordingControlCapability: overrides.recordingControlCapability ?? null,
     clearStartError: overrides.clearStartError ?? vi.fn(),
-    appliedViewportPresetId: overrides.appliedViewportPresetId ?? null,
-    appliedViewportTabId: overrides.appliedViewportTabId ?? null,
     handlePauseResume: overrides.handlePauseResume ?? vi.fn(),
     handleStartRecording: overrides.handleStartRecording ?? vi.fn(),
     handleStop: overrides.handleStop ?? vi.fn(),
@@ -113,14 +119,12 @@ function createRuntimeRecording(overrides: PopupRuntimeStateOverrides) {
     selectedPreset: overrides.selectedPreset ?? null,
     selectedPresetId: overrides.selectedPresetId ?? 'preset-1',
     setSelectedPresetId: overrides.setSelectedPresetId ?? vi.fn(),
-    setAppliedViewportPresetId: overrides.setAppliedViewportPresetId ?? vi.fn(),
-    setAppliedViewportTabId: overrides.setAppliedViewportTabId ?? vi.fn(),
     setStartError: overrides.setStartError ?? vi.fn(),
     setVideoCaptureMode: overrides.setVideoCaptureMode ?? vi.fn(),
     setRecordingState: overrides.setRecordingState ?? vi.fn(),
     setVideoSettings: overrides.setVideoSettings ?? vi.fn(),
     startError: overrides.startError ?? null,
-    videoCaptureMode: overrides.videoCaptureMode ?? CaptureMode.VIEWPORT_EMULATION,
+    videoCaptureMode: overrides.videoCaptureMode ?? CaptureMode.TAB,
     videoSettings: overrides.videoSettings ?? DEFAULT_VIDEO_SETTINGS,
     webcamDevices: overrides.webcamDevices ?? [{ deviceId: 'cam-1', label: '' }],
     ...overrides.recording,
@@ -135,7 +139,7 @@ function createRuntimeRecordingState() {
     duration: 0,
     error: null,
     status: VideoRecordingStatus.RECORDING,
-    viewportPreset: null,
+    viewportPresetId: null,
   };
 }
 

@@ -1,255 +1,186 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 
-const {
-  browserDebuggerMock,
-  browserTabsMock,
-  loggerDebugMock,
-  loggerErrorMock,
-  loggerWarnMock,
-  withTimeoutMock,
-} = vi.hoisted(() => ({
-  browserDebuggerMock: {
-    sendCommand: vi.fn(),
-  },
-  browserTabsMock: {
-    get: vi.fn(),
-    setZoom: vi.fn(),
-  },
-  loggerDebugMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
-  loggerWarnMock: vi.fn(),
+const { browserDebuggerMock, executeScriptMock, withTimeoutMock } = vi.hoisted(() => ({
+  browserDebuggerMock: { sendCommand: vi.fn() },
+  executeScriptMock: vi.fn(),
   withTimeoutMock: vi.fn(),
 }));
 
-vi.mock('@sniptale/platform/browser/debugger', () => ({
-  browserDebugger: browserDebuggerMock,
+vi.mock('@sniptale/platform/browser/debugger', () => ({ browserDebugger: browserDebuggerMock }));
+vi.mock('@sniptale/platform/browser/scripting', () => ({
+  browserScripting: { executeScript: executeScriptMock },
 }));
-
-vi.mock('@sniptale/platform/browser/tabs', () => ({
-  browserTabs: browserTabsMock,
-}));
-
 vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({
-    debug: loggerDebugMock,
-    error: loggerErrorMock,
-    info: vi.fn(),
-    log: vi.fn(),
-    warn: loggerWarnMock,
-  }),
+  createLogger: () => ({ debug: vi.fn(), error: vi.fn() }),
 }));
-
-vi.mock('../infra', () => ({
-  keepServiceWorkerAlive: vi.fn(),
+vi.mock('../infra', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infra')>()),
   withTimeout: withTimeoutMock,
 }));
 
-import { clearViewport, resetZoom, setViewport } from './index';
+import { clearViewport, getViewportWorkspace, setViewport, ViewportMutationError } from './index';
+
+function compositorMetrics(scale: number, width = 1280, height = 720) {
+  return {
+    layoutViewport: {
+      clientWidth: Math.round(width * scale),
+      clientHeight: Math.round(height * scale),
+    },
+    cssLayoutViewport: { clientWidth: width, clientHeight: height },
+    cssVisualViewport: { zoom: 1 },
+  };
+}
+
+function queuePaint(width = 1280, height = 720): void {
+  executeScriptMock
+    .mockResolvedValueOnce([{ result: undefined }])
+    .mockResolvedValueOnce([{ result: { width, height } }]);
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  browserDebuggerMock.sendCommand.mockReset();
+  executeScriptMock.mockReset();
   withTimeoutMock.mockImplementation((promise: Promise<unknown>) => promise);
-  browserDebuggerMock.sendCommand.mockResolvedValue({
-    visualViewport: { clientWidth: 1280, clientHeight: 720 },
-  });
-  browserTabsMock.get.mockResolvedValue({ windowId: 3 });
-  browserTabsMock.setZoom.mockResolvedValue(undefined);
-  Object.defineProperty(globalThis, 'chrome', {
-    configurable: true,
-    value: {
-      windows: {
-        get: vi.fn().mockResolvedValue({ width: 1600, height: 1000 }),
-      },
-    },
-  });
 });
 
-async function verifyViewportEmulationAppliesFromFreshMetrics() {
+it('applies and verifies exact viewport metrics', async () => {
   browserDebuggerMock.sendCommand
+    .mockResolvedValueOnce(compositorMetrics(2))
     .mockResolvedValueOnce(undefined)
-    .mockResolvedValueOnce({
-      visualViewport: { clientWidth: 1400, clientHeight: 900 },
-    })
-    .mockResolvedValueOnce(undefined)
-    .mockResolvedValueOnce({
-      visualViewport: { clientWidth: 1280, clientHeight: 720 },
-      contentSize: { width: 1280, height: 720 },
-    });
+    .mockResolvedValueOnce(compositorMetrics(2));
+  queuePaint();
 
   await expect(setViewport(9, 1280, 720)).resolves.toEqual({
-    cssHeight: 720,
     cssWidth: 1280,
-    scale: 1,
+    cssHeight: 720,
   });
-
   expect(browserDebuggerMock.sendCommand).toHaveBeenNthCalledWith(
     1,
     { tabId: 9 },
-    'Emulation.clearDeviceMetricsOverride'
+    'Page.getLayoutMetrics'
   );
   expect(browserDebuggerMock.sendCommand).toHaveBeenNthCalledWith(
     2,
     { tabId: 9 },
-    'Page.getLayoutMetrics'
+    'Emulation.setDeviceMetricsOverride',
+    expect.objectContaining({
+      deviceScaleFactor: 2,
+    })
   );
+  expect(browserDebuggerMock.sendCommand.mock.calls[1]?.[2]).not.toHaveProperty('viewport');
   expect(browserDebuggerMock.sendCommand).toHaveBeenNthCalledWith(
     3,
     { tabId: 9 },
-    'Emulation.setDeviceMetricsOverride',
-    expect.objectContaining({ height: 720, scale: 1, width: 1280 })
-  );
-  expect(browserDebuggerMock.sendCommand).toHaveBeenNthCalledWith(
-    4,
-    { tabId: 9 },
     'Page.getLayoutMetrics'
   );
-}
+});
 
-async function verifyViewportEmulationFallsBackToWindowMetrics() {
+it('verifies isolated window metrics instead of page-controlled or scrollbar-excluding values', async () => {
   browserDebuggerMock.sendCommand
+    .mockResolvedValueOnce(compositorMetrics(1))
     .mockResolvedValueOnce(undefined)
-    .mockRejectedValueOnce(new Error('cdp unavailable'))
+    .mockResolvedValueOnce(compositorMetrics(1));
+  queuePaint();
+
+  await expect(setViewport(9, 1280, 720)).resolves.toEqual({
+    cssWidth: 1280,
+    cssHeight: 720,
+  });
+  expect(executeScriptMock).toHaveBeenCalledWith(
+    expect.objectContaining({ target: { tabId: 9 }, world: 'ISOLATED' })
+  );
+});
+
+it('reports the owned intermediate on mismatch and leaves rollback to the surface owner', async () => {
+  browserDebuggerMock.sendCommand
+    .mockResolvedValueOnce(compositorMetrics(1))
+    .mockResolvedValueOnce(undefined);
+  executeScriptMock
+    .mockResolvedValueOnce([{ result: undefined }])
+    .mockResolvedValueOnce([{ result: { width: 1000, height: 700 } }]);
+  const error = await setViewport(9, 1280, 720).catch((caught) => caught);
+  expect(error).toBeInstanceOf(ViewportMutationError);
+  expect(error).toMatchObject({ observed: { cssWidth: 1000, cssHeight: 700 } });
+  expect(browserDebuggerMock.sendCommand).toHaveBeenCalledTimes(2);
+});
+
+it('rejects missing isolated metrics without independently clearing owner state', async () => {
+  browserDebuggerMock.sendCommand
+    .mockResolvedValueOnce(compositorMetrics(1))
+    .mockResolvedValueOnce(undefined);
+  executeScriptMock.mockResolvedValueOnce([{ result: undefined }]).mockResolvedValueOnce([]);
+
+  await expect(setViewport(9, 1280, 720)).rejects.toThrow('window.innerWidth');
+  expect(browserDebuggerMock.sendCommand).toHaveBeenCalledTimes(2);
+});
+
+it('fails before mutation when initial compositor metrics are malformed', async () => {
+  browserDebuggerMock.sendCommand.mockResolvedValueOnce({});
+
+  await expect(setViewport(9, 1280, 720)).rejects.toThrow('compositor metrics');
+  expect(browserDebuggerMock.sendCommand).toHaveBeenCalledOnce();
+  expect(executeScriptMock).not.toHaveBeenCalled();
+});
+
+it('reapplies once when the tab moves to a differently scaled display during paint', async () => {
+  browserDebuggerMock.sendCommand
+    .mockResolvedValueOnce(compositorMetrics(1.25))
     .mockResolvedValueOnce(undefined)
-    .mockResolvedValueOnce({
-      visualViewport: { clientWidth: 960, clientHeight: 540 },
-    });
+    .mockResolvedValueOnce(compositorMetrics(1.5))
+    .mockResolvedValueOnce(undefined)
+    .mockResolvedValueOnce(compositorMetrics(1.5));
+  queuePaint();
+  queuePaint();
 
-  await expect(setViewport(11, 1920, 1080)).resolves.toEqual({
-    cssHeight: 540,
-    cssWidth: 960,
-    scale: 0.8333333333333334,
+  await expect(setViewport(9, 1280, 720)).resolves.toEqual({
+    cssWidth: 1280,
+    cssHeight: 720,
   });
+  const overrideCalls = browserDebuggerMock.sendCommand.mock.calls.filter(
+    ([, method]) => method === 'Emulation.setDeviceMetricsOverride'
+  );
+  expect(overrideCalls).toHaveLength(2);
+  expect(overrideCalls[0]?.[2]).toEqual(expect.objectContaining({ deviceScaleFactor: 1.25 }));
+  expect(overrideCalls[1]?.[2]).toEqual(expect.objectContaining({ deviceScaleFactor: 1.5 }));
+  expect(overrideCalls[0]?.[2]).not.toHaveProperty('viewport');
+  expect(overrideCalls[1]?.[2]).not.toHaveProperty('viewport');
+});
 
-  expect(browserTabsMock.get).toHaveBeenCalledWith(11);
-}
+it('reports owned viewport state when compositor scale keeps changing', async () => {
+  browserDebuggerMock.sendCommand
+    .mockResolvedValueOnce(compositorMetrics(1.25))
+    .mockResolvedValueOnce(undefined)
+    .mockResolvedValueOnce(compositorMetrics(1.5))
+    .mockResolvedValueOnce(undefined)
+    .mockResolvedValueOnce(compositorMetrics(2));
+  queuePaint();
+  queuePaint();
 
-async function verifyReplayedPresetClearsStaleEmulatedMetrics() {
-  let clearSeen = false;
-  browserDebuggerMock.sendCommand.mockImplementation((_target, method, params) => {
-    if (method === 'Emulation.clearDeviceMetricsOverride') {
-      clearSeen = true;
-      return Promise.resolve(undefined);
-    }
+  const error = await setViewport(9, 1280, 720).catch((caught) => caught);
+  expect(error).toBeInstanceOf(ViewportMutationError);
+  expect(error).toMatchObject({ observed: { cssWidth: 1280, cssHeight: 720 } });
+});
 
-    if (method === 'Page.getLayoutMetrics') {
-      return Promise.resolve({
-        visualViewport: clearSeen
-          ? { clientWidth: 1600, clientHeight: 940 }
-          : { clientWidth: 1280, clientHeight: 760 },
-      });
-    }
+it('reports owned viewport state when post-mutation compositor metrics are malformed', async () => {
+  browserDebuggerMock.sendCommand
+    .mockResolvedValueOnce(compositorMetrics(1))
+    .mockResolvedValueOnce(undefined)
+    .mockResolvedValueOnce({});
+  queuePaint();
 
-    return Promise.resolve(params);
-  });
+  const error = await setViewport(9, 1280, 720).catch((caught) => caught);
+  expect(error).toBeInstanceOf(ViewportMutationError);
+  expect(error).toMatchObject({ observed: { cssWidth: 1280, cssHeight: 720 } });
+});
 
-  await expect(setViewport(17, 1920, 1080)).resolves.toEqual({
-    cssHeight: 940,
-    cssWidth: 1600,
-    scale: 0.8333333333333334,
-  });
-
-  expect(browserDebuggerMock.sendCommand).toHaveBeenNthCalledWith(
-    1,
-    { tabId: 17 },
+it('reads and clears the exact workspace', async () => {
+  executeScriptMock.mockResolvedValueOnce([{ result: { width: 1440, height: 900 } }]);
+  await expect(getViewportWorkspace(4)).resolves.toEqual({ width: 1440, height: 900 });
+  browserDebuggerMock.sendCommand.mockResolvedValueOnce(undefined);
+  await expect(clearViewport(4)).resolves.toBeUndefined();
+  expect(browserDebuggerMock.sendCommand).toHaveBeenLastCalledWith(
+    { tabId: 4 },
     'Emulation.clearDeviceMetricsOverride'
   );
-  expect(browserDebuggerMock.sendCommand).toHaveBeenNthCalledWith(
-    2,
-    { tabId: 17 },
-    'Page.getLayoutMetrics'
-  );
-  expect(browserDebuggerMock.sendCommand).toHaveBeenNthCalledWith(
-    3,
-    { tabId: 17 },
-    'Emulation.setDeviceMetricsOverride',
-    expect.objectContaining({ height: 1080, scale: 0.8333333333333334, width: 1920 })
-  );
-}
-
-function runDebuggerWorkspaceSetViewportSuite() {
-  it(
-    'applies viewport emulation and returns CSS dimensions from layout metrics',
-    verifyViewportEmulationAppliesFromFreshMetrics
-  );
-  it(
-    'falls back to window metrics when CDP layout metrics are unavailable',
-    verifyViewportEmulationFallsBackToWindowMetrics
-  );
-  it(
-    'clears stale emulated metrics before measuring the workspace for a replayed preset',
-    verifyReplayedPresetClearsStaleEmulatedMetrics
-  );
-}
-
-function runDebuggerWorkspaceCleanupSuite() {
-  it('clears viewport emulation through the debugger transport', async () => {
-    await expect(clearViewport(5)).resolves.toBeUndefined();
-
-    expect(browserDebuggerMock.sendCommand).toHaveBeenCalledWith(
-      { tabId: 5 },
-      'Emulation.clearDeviceMetricsOverride'
-    );
-  });
-
-  it('resets tab zoom through the shared tabs adapter', async () => {
-    await expect(resetZoom(4)).resolves.toBeUndefined();
-    expect(browserTabsMock.setZoom).toHaveBeenCalledWith(4, 1);
-  });
-}
-
-function runDebuggerWorkspaceFallbackSuite() {
-  it('uses the default workspace when the fallback tab has no window id', async () => {
-    browserDebuggerMock.sendCommand
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error('cdp unavailable'))
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce({
-        visualViewport: { clientWidth: 800, clientHeight: 600 },
-      });
-    browserTabsMock.get.mockResolvedValue({ windowId: undefined });
-
-    await expect(setViewport(13, 1920, 1080)).resolves.toEqual({
-      cssHeight: 600,
-      cssWidth: 800,
-      scale: 1,
-    });
-  });
-
-  it('uses layout-viewport workspace metrics when visual viewport details are unavailable', async () => {
-    browserDebuggerMock.sendCommand
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce({
-        layoutViewport: { clientWidth: 1500, clientHeight: 900 },
-      })
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce({
-        visualViewport: { clientWidth: 1000, clientHeight: 600 },
-      });
-
-    await expect(setViewport(21, 1920, 1080)).resolves.toEqual({
-      cssHeight: 600,
-      cssWidth: 1000,
-      scale: 0.78125,
-    });
-  });
-}
-
-function runDebuggerWorkspaceErrorSuite() {
-  it('rethrows clear/reset failures after logging them', async () => {
-    const clearError = new Error('clear failed');
-    const zoomError = new Error('zoom failed');
-
-    browserDebuggerMock.sendCommand.mockRejectedValueOnce(clearError);
-    browserTabsMock.setZoom.mockRejectedValueOnce(zoomError);
-
-    await expect(clearViewport(5)).rejects.toThrow('clear failed');
-    await expect(resetZoom(4)).rejects.toThrow('zoom failed');
-    expect(loggerErrorMock).toHaveBeenCalledWith('Failed to clear viewport', clearError);
-    expect(loggerErrorMock).toHaveBeenCalledWith('Failed to reset zoom', zoomError);
-  });
-}
-
-describe('debugger-workspace setViewport', runDebuggerWorkspaceSetViewportSuite);
-describe('debugger-workspace cleanup', runDebuggerWorkspaceCleanupSuite);
-describe('debugger-workspace fallback', runDebuggerWorkspaceFallbackSuite);
-describe('debugger-workspace errors', runDebuggerWorkspaceErrorSuite);
+});

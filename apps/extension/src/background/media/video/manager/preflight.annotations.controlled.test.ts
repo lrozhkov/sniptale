@@ -142,7 +142,7 @@ it('requires a recording id and viewport metadata for controlled cursor bootstra
 it('uses the dedicated controlled cursor bootstrap message for recording telemetry modes', async () => {
   await expectDedicatedControlledCursorBootstrap(CaptureMode.TAB);
   await expectDedicatedControlledCursorBootstrap(CaptureMode.TAB_CROP);
-  await expectDedicatedControlledCursorBootstrap(CaptureMode.VIEWPORT_EMULATION);
+  await expectDedicatedControlledCursorBootstrap(CaptureMode.TAB);
 });
 
 it('skips unsupported capture modes when cursor telemetry is disabled', async () => {

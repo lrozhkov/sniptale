@@ -12,7 +12,10 @@ function createContext(): TabModeContext {
     highlighterModeState: new Map<number, boolean>(),
     quickEditModeState: new Map<number, boolean>(),
     viewportOwnerState: new Map(),
-    viewportState: new Map<number, { width: number; height: number } | null>(),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
   };
 }
 

@@ -34,6 +34,8 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 }));
 
 import { clearSettings, loadSettings, saveSettings } from './index';
+import { createSystemViewportPresetCatalog } from '../../../features/viewport-presets/catalog';
+import { normalizeViewportPresetOrder } from '../../../features/viewport-presets/operations';
 
 const DEFAULT_CONTENT_TOOLBAR = {
   displayMode: 'horizontal' as const,
@@ -51,15 +53,17 @@ const DEFAULT_CONTEXT_MENU = {
   showPageLinkCopy: true,
   showSettings: true,
 };
-const DEFAULT_VIEWPORT_PRESETS = [
-  { id: 'fhd', width: 1920, height: 1080, label: 'Full HD' },
-  { id: 'hd', width: 1280, height: 720, label: 'HD' },
-];
+const DEFAULT_VIEWPORT_PRESETS = createSystemViewportPresetCatalog();
 const PRIVACY_DEFAULTS = {
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   authenticatedSnapshotAssetsEnabled: false,
   skipWebSnapshotSaveDisclosure: false,
   rawDiagnosticsEnabled: false,
+};
+const DEFAULT_FULL_PAGE_CAPTURE = {
+  floatingElements: 'once' as const,
+  freezeMotion: true,
+  preloadLazyContent: true,
 };
 
 function resetSettingsStorageMocks() {
@@ -90,7 +94,7 @@ async function verifySaveAndClearContracts() {
     },
     saveCapturesToGallery: true,
     viewportPresets: [],
-    defaultViewportId: 'custom',
+    defaultViewportPresetId: 'custom',
     presets: [],
     defaultImagePresetId: 'image-1',
     defaultVideoPresetId: 'video-1',
@@ -126,18 +130,33 @@ async function verifyLoadMigration() {
     contextMenu: DEFAULT_CONTEXT_MENU,
     saveCapturesToGallery: true,
     viewportPresets: DEFAULT_VIEWPORT_PRESETS,
-    defaultViewportId: 'native',
+    defaultViewportPresetId: null,
     presets: [],
     defaultImagePresetId: null,
     defaultVideoPresetId: null,
     defaultExportPresetId: null,
     imageFormat: 'webp',
     imageQuality: 75,
+    fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     ...PRIVACY_DEFAULTS,
   });
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
 }
 
 async function verifyStoredSettings() {
+  const storedViewportPresets = normalizeViewportPresetOrder([
+    ...DEFAULT_VIEWPORT_PRESETS,
+    {
+      kind: 'user' as const,
+      id: 'mobile',
+      name: 'Mobile',
+      target: 'viewport' as const,
+      width: 390,
+      height: 844,
+      enabled: true,
+      order: 9,
+    },
+  ]);
   const storedSettings = {
     captureAction: 'copy' as const,
     contentToolbar: {
@@ -157,14 +176,15 @@ async function verifyStoredSettings() {
       showSettings: true,
     },
     saveCapturesToGallery: false,
-    viewportPresets: [{ id: 'mobile', width: 390, height: 844, label: 'Mobile' }],
-    defaultViewportId: 'mobile',
+    viewportPresets: storedViewportPresets,
+    defaultViewportPresetId: 'mobile',
     presets: [],
     defaultImagePresetId: 'image-7',
     defaultVideoPresetId: 'video-7',
     defaultExportPresetId: 'export-7',
     imageFormat: 'png' as const,
     imageQuality: 100,
+    fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: true,
@@ -195,10 +215,19 @@ const invalidStoredSettingsFixture = {
   },
   saveCapturesToGallery: true,
   viewportPresets: [
-    { id: 'mobile', width: 390, height: 844, label: 'Mobile' },
+    {
+      kind: 'user',
+      id: 'mobile',
+      name: 'Mobile',
+      target: 'viewport',
+      width: 390,
+      height: 844,
+      enabled: true,
+      order: 0,
+    },
     { id: 'broken-preset' },
   ],
-  defaultViewportId: 42,
+  defaultViewportPresetId: 42,
   presets: [
     { id: 'preset-1', name: 'Screens', path: 'screens', enabled: true, order: 0 },
     { id: 'broken-save-preset' },
@@ -229,14 +258,15 @@ const expectedInvalidStoredSettingsResult = {
     showSettings: false,
   },
   saveCapturesToGallery: true,
-  viewportPresets: [{ id: 'mobile', width: 390, height: 844, label: 'Mobile' }],
-  defaultViewportId: 'native',
+  viewportPresets: DEFAULT_VIEWPORT_PRESETS,
+  defaultViewportPresetId: null,
   presets: [{ id: 'preset-1', name: 'Screens', path: 'screens', enabled: true, order: 0 }],
   defaultImagePresetId: null,
   defaultVideoPresetId: 'video-9',
   defaultExportPresetId: null,
   imageFormat: 'png',
   imageQuality: 100,
+  fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
   ...PRIVACY_DEFAULTS,
 };
 
@@ -262,13 +292,14 @@ async function verifyInvalidRootFallback() {
     contextMenu: DEFAULT_CONTEXT_MENU,
     saveCapturesToGallery: false,
     viewportPresets: DEFAULT_VIEWPORT_PRESETS,
-    defaultViewportId: 'native',
+    defaultViewportPresetId: null,
     presets: [],
     defaultImagePresetId: null,
     defaultVideoPresetId: null,
     defaultExportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
+    fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     ...PRIVACY_DEFAULTS,
   });
 
@@ -288,8 +319,39 @@ describe('settings', () => {
   it('keeps default settings stable when storage returns no payload', async () => {
     browserStorageSyncGetMock.mockResolvedValueOnce({});
     await expect(loadSettings()).resolves.toMatchObject({
-      defaultViewportId: 'native',
+      defaultViewportPresetId: null,
       imageFormat: 'png',
     });
+  });
+
+  it('reads revision-1 viewport settings with the new system preset without writing storage', async () => {
+    const legacyCatalog = createSystemViewportPresetCatalog()
+      .filter((preset) => preset.id !== 'system:viewport-full-hd')
+      .map((preset) => ({ ...preset, catalogRevision: 1 }));
+    const userPreset = {
+      kind: 'user' as const,
+      id: 'user-wide',
+      name: 'Wide',
+      target: 'viewport' as const,
+      width: 1600,
+      height: 900,
+      enabled: true,
+      order: 5,
+    };
+    browserStorageSyncGetMock.mockResolvedValue({
+      sniptale_settings: {
+        viewportPresets: [...legacyCatalog.slice(0, 5), userPreset, ...legacyCatalog.slice(5)],
+        defaultViewportPresetId: userPreset.id,
+      },
+    });
+
+    const settings = await loadSettings();
+
+    expect(settings.viewportPresets).toContainEqual(
+      expect.objectContaining({ id: 'system:viewport-full-hd', width: 1920, height: 1080 })
+    );
+    expect(settings.viewportPresets).toContainEqual(expect.objectContaining({ id: userPreset.id }));
+    expect(settings.defaultViewportPresetId).toBe(userPreset.id);
+    expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
   });
 });

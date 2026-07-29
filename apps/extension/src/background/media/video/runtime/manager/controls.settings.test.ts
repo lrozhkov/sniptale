@@ -7,6 +7,7 @@ const {
   hasActiveVideoRecordingSessionMock,
   loggerErrorMock,
   loggerWarnMock,
+  requireActiveVideoRecordingSourceBindingMock,
   sendRuntimeMessageMock,
   setVideoRecordingRuntimeStateMock,
 } = vi.hoisted(() => ({
@@ -14,6 +15,7 @@ const {
   hasActiveVideoRecordingSessionMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerWarnMock: vi.fn(),
+  requireActiveVideoRecordingSourceBindingMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   setVideoRecordingRuntimeStateMock: vi.fn(),
 }));
@@ -31,6 +33,11 @@ vi.mock('../../session-state', async (importOriginal) => ({
   hasActiveVideoRecordingSession: hasActiveVideoRecordingSessionMock,
 }));
 
+vi.mock('../../recording-control-lease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording-control-lease')>()),
+  requireActiveVideoRecordingSourceBinding: requireActiveVideoRecordingSourceBindingMock,
+}));
+
 vi.mock('../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../session-state')>()),
   getVideoRecordingRuntimeState: getVideoRecordingRuntimeStateMock,
@@ -42,6 +49,11 @@ import { updateRecordingSettings } from './controls.settings';
 beforeEach(() => {
   vi.clearAllMocks();
   hasActiveVideoRecordingSessionMock.mockReturnValue(true);
+  requireActiveVideoRecordingSourceBindingMock.mockResolvedValue({
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  });
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   installBackgroundRuntimeMessagingMock({ sendRuntimeMessage: sendRuntimeMessageMock });
   getVideoRecordingRuntimeStateMock.mockReturnValue({

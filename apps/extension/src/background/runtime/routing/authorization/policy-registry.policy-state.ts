@@ -39,6 +39,10 @@ export const SCENARIO_PRIVILEGED_TAB_POLICY_STATE_IDS = [
 ] as const satisfies readonly PolicyStateId[];
 
 export const TAB_MODE_PRIVILEGED_TAB_POLICY_STATE_IDS = [
+  'content-action-activation-keys',
+  'content-action-capabilities',
+  'content-action-runtime-tokens',
+  'content-action-trusted-event-proofs',
   'tab-mode-runtime-state',
 ] as const satisfies readonly PolicyStateId[];
 

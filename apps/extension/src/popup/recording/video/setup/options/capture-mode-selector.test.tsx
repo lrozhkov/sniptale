@@ -60,7 +60,6 @@ function createCapabilities(): ActiveTabCapabilities {
       [CaptureMode.TAB]: { supported: true, reason: null },
       [CaptureMode.TAB_CROP]: { supported: false, reason: 'blocked area' },
       [CaptureMode.CAMERA]: { supported: true, reason: null },
-      [CaptureMode.VIEWPORT_EMULATION]: { supported: true, reason: null },
       [CaptureMode.SCREEN]: { supported: true, reason: null },
     },
   };

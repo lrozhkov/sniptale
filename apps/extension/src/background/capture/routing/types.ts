@@ -6,7 +6,7 @@ import type { ScenarioSessionService } from '../../scenario/session-service/inde
 import type { PageAccessPort } from '../../routing-contracts/page-access-port';
 import type { WebSnapshotViewerPorts } from '../page-preparation/viewer-ports';
 
-export type ViewportState = Map<number, { width: number; height: number } | null>;
+export type ViewportState = import('../../routing-contracts/tab-mode-state').ViewportState;
 
 export type CaptureGuardState = { isCapturing: boolean };
 
@@ -47,6 +47,10 @@ export type RouteCaptureMessage =
       contentIntent?: ContentPrivilegedActionCapability;
     }
   | {
+      type: 'RENEW_SCREENSHOT_SURFACE_SESSION';
+      contentIntent?: ContentPrivilegedActionCapability;
+    }
+  | {
       type: 'EXECUTE_SAVE';
       dataUrl: string;
       filename: string;
@@ -72,6 +76,12 @@ export type RouteCaptureMessage =
   | {
       type: 'EXPORT_CAPTURE_FULL_PAGE';
       contentIntent?: ContentPrivilegedActionCapability;
+      exportRunId: string;
+    }
+  | {
+      type: 'EXPORT_CAPTURE_FULL_PAGE_UNATTENDED';
+      contentIntent?: ContentPrivilegedActionCapability;
+      exportRunId: string;
     }
   | {
       type: 'OPEN_EDITOR_WITH_IMAGE';
@@ -100,6 +110,10 @@ export type RouteCaptureMessage =
   | ({
       type: 'STAGE_WEB_SNAPSHOT_BLOB_CHUNK';
     } & import('@sniptale/runtime-contracts/web-snapshot').WebSnapshotStageBlobChunkPayload)
+  | {
+      type: 'RELEASE_WEB_SNAPSHOT_STAGED_BLOBS';
+      snapshotSessionId: string;
+    }
   | {
       type: 'REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY';
       assetId: string;

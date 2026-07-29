@@ -5,14 +5,21 @@ import {
   authorizeWebSnapshotAssetFetch,
   authorizeWebSnapshotCaptureRequest,
   beginWebSnapshotSave,
+  cancelWebSnapshotCaptureRequest,
   commitWebSnapshotSave,
   releaseWebSnapshotSave,
   registerWebSnapshotAssetSession,
   resetWebSnapshotAssetSessionsForTests,
 } from './session';
+import {
+  consumeWebSnapshotStagedBlob,
+  resetWebSnapshotStagedBlobsForTests,
+  stageWebSnapshotBlobChunk,
+} from './staged-blobs';
 
 beforeEach(() => {
   resetWebSnapshotAssetSessionsForTests();
+  resetWebSnapshotStagedBlobsForTests();
   vi.stubGlobal('crypto', {
     randomUUID: vi.fn(() => 'snapshot-session-1'),
   });
@@ -20,6 +27,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetWebSnapshotAssetSessionsForTests();
+  resetWebSnapshotStagedBlobsForTests();
   vi.unstubAllGlobals();
 });
 
@@ -27,6 +35,17 @@ it('requires a background-authorized capture request before asset registration',
   expect(() =>
     registerWebSnapshotAssetSession(42, 'req-1', ['https://cdn.example.com/image.png'])
   ).toThrow('Web snapshot capture request is not authorized');
+});
+
+it('retains an early cancellation tombstone so authorization cannot race it', () => {
+  expect(cancelWebSnapshotCaptureRequest(42, 'req-cancelled')).toEqual([]);
+
+  expect(() => authorizeWebSnapshotCaptureRequest(42, 'req-cancelled')).toThrow(
+    'Web snapshot save was cancelled'
+  );
+  expect(() => registerWebSnapshotAssetSession(42, 'req-cancelled', [])).toThrow(
+    'Web snapshot save was cancelled'
+  );
 });
 
 it('binds registered asset URLs to the issuing tab session', () => {
@@ -94,13 +113,80 @@ it('allows a snapshot save once for the issuing tab', () => {
   );
   expect(() => releaseWebSnapshotSave({ sessionId, tabId: 42 })).not.toThrow();
   expect(() => beginWebSnapshotSave({ sessionId, tabId: 42 })).not.toThrow();
-  expect(() => commitWebSnapshotSave({ sessionId, tabId: 42 })).not.toThrow();
+  expect(() => commitWebSnapshotSave({ assetId: 'asset-1', sessionId, tabId: 42 })).not.toThrow();
   expect(() => beginWebSnapshotSave({ sessionId, tabId: 42 })).toThrow(
     'Web snapshot session was already saved'
   );
   expect(() => beginWebSnapshotSave({ sessionId, tabId: 43 })).toThrow(
     'Invalid web snapshot session'
   );
+});
+
+it('blocks a pending commit and identifies an already committed asset for compensation', () => {
+  authorizeWebSnapshotCaptureRequest(42, 'req-saving');
+  const savingSessionId = registerWebSnapshotAssetSession(42, 'req-saving', []);
+  beginWebSnapshotSave({ sessionId: savingSessionId, tabId: 42 });
+  expect(cancelWebSnapshotCaptureRequest(42, 'req-saving')).toEqual([]);
+  expect(() =>
+    commitWebSnapshotSave({
+      assetId: 'asset-saving',
+      sessionId: savingSessionId,
+      tabId: 42,
+    })
+  ).toThrow('Web snapshot save was cancelled');
+
+  vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'snapshot-session-2') });
+  authorizeWebSnapshotCaptureRequest(42, 'req-saved');
+  const savedSessionId = registerWebSnapshotAssetSession(42, 'req-saved', []);
+  beginWebSnapshotSave({ sessionId: savedSessionId, tabId: 42 });
+  commitWebSnapshotSave({ assetId: 'asset-saved', sessionId: savedSessionId, tabId: 42 });
+  expect(cancelWebSnapshotCaptureRequest(42, 'req-saved')).toEqual(['asset-saved']);
+});
+
+it('releases every complete or partial staged blob owned by a cancelled capture session', () => {
+  authorizeWebSnapshotCaptureRequest(42, 'req-staged');
+  const sessionId = registerWebSnapshotAssetSession(42, 'req-staged', []);
+  stageWebSnapshotBlobChunk({
+    base64: 'cG5n',
+    chunkIndex: 0,
+    kind: 'screenshot',
+    snapshotSessionId: sessionId,
+    stagedBlobId: 'complete-stage',
+    tabId: 42,
+    totalBytes: 3,
+    totalChunks: 1,
+  });
+  stageWebSnapshotBlobChunk({
+    base64: 'YQ==',
+    chunkIndex: 0,
+    kind: 'package',
+    snapshotSessionId: sessionId,
+    stagedBlobId: 'partial-stage',
+    tabId: 42,
+    totalBytes: 2,
+    totalChunks: 2,
+  });
+
+  cancelWebSnapshotCaptureRequest(42, 'req-staged');
+
+  expect(() =>
+    consumeWebSnapshotStagedBlob({
+      expectedKind: 'screenshot',
+      snapshotSessionId: sessionId,
+      stagedBlobId: 'complete-stage',
+      tabId: 42,
+      type: 'image/png',
+    })
+  ).toThrow('missing or incomplete');
+  expect(() =>
+    consumeWebSnapshotStagedBlob({
+      expectedKind: 'package',
+      snapshotSessionId: sessionId,
+      stagedBlobId: 'partial-stage',
+      tabId: 42,
+      type: 'application/zip',
+    })
+  ).toThrow('missing or incomplete');
 });
 
 it('exposes an open-session guard for staged snapshot payload allocation', () => {

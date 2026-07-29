@@ -10,8 +10,8 @@ import {
 
 export const contentOverlayControlsMessages = defineMessageSource({
   frameStyleLabel: {
-    ru: 'Стиль рамки',
-    en: 'Frame style',
+    ru: 'Рамка и заливка',
+    en: 'Frame and fill',
   },
   configureFrameStyle: {
     ru: 'Настроить стиль',
@@ -44,12 +44,12 @@ export const contentOverlayControlsMessages = defineMessageSource({
   blurTypePixelate: blurTypePixelateMessage,
   blurTypeSolid: blurTypeSolidMessage,
   showBorderTitle: {
-    ru: 'Показывать границу',
-    en: 'Show border',
+    ru: 'Показывать рамку и заливку',
+    en: 'Show frame and fill',
   },
   showBorderHint: {
-    ru: 'Оставляет контур рамки поверх blur-эффекта',
-    en: 'Keeps the frame outline over the blur effect',
+    ru: 'Накладывает выбранную рамку и её заливку поверх эффекта, не меняя размер области',
+    en: 'Overlays the selected frame and its fill without changing the area size',
   },
   focusBorderHint: {
     ru: 'Сохраняет контур рамки поверх затемнения',

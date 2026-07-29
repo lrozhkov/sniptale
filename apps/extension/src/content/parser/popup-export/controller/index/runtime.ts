@@ -31,6 +31,7 @@ export function createPopupExportControllerRuntime(
   return {
     ...props,
     dispose: () => {
+      state.activeAbortController?.abort(new Error('Popup export controller was disposed'));
       if (state.isExportRunning) {
         props.exportRunner.cancel();
       }

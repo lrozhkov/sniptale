@@ -1,5 +1,9 @@
 import { vi } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import {
+  VideoQuality,
+  type VideoRecordingSettings,
+} from '@sniptale/runtime-contracts/video/types/types';
 
 type MediaRecorderMockInstance = {
   config: { mimeType: string; videoBitsPerSecond: number };
@@ -61,6 +65,8 @@ export function createVideoStream(params?: { audioTrackCount?: number; trackStop
   } as unknown as MediaStream;
 }
 
-export function createSettings(quality: VideoQuality | undefined = VideoQuality.HIGH) {
-  return { quality } as never;
+export function createSettings(
+  quality: VideoQuality | undefined = VideoQuality.HIGH
+): VideoRecordingSettings {
+  return { ...DEFAULT_VIDEO_SETTINGS, quality: quality ?? DEFAULT_VIDEO_SETTINGS.quality };
 }

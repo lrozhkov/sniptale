@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import type { Root } from 'react-dom/client';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { createClearFramesHandler } from './clear';
+import { createFrameHostLayoutService } from '../host-layout/service';
 
 const queryAllContentUiElements = vi.hoisted(() => vi.fn());
 const invalidateFrameCache = vi.hoisted(() => vi.fn());
@@ -58,6 +59,9 @@ function createClearFramesRoots() {
 function createClearFramesRefs(rootOne: Root, rootTwo: Root) {
   const container = document.createElement('div');
 
+  const hostLayoutService = createFrameHostLayoutService();
+  const linkedElement = document.createElement('div');
+  hostLayoutService.link('frame-1', linkedElement, '#frame-1');
   return {
     container,
     removeSpy: vi.spyOn(container, 'remove'),
@@ -69,7 +73,7 @@ function createClearFramesRefs(rootOne: Root, rootTwo: Root) {
       ]),
     },
     containerRef: { current: container },
-    linkedElementsRef: { current: new Map([['frame-1', document.createElement('div')]]) },
+    hostLayoutServiceRef: { current: hostLayoutService },
   };
 }
 
@@ -112,7 +116,8 @@ function createClearFramesScenario() {
     isClearingRef: refs.isClearingRef,
     rootsRef: refs.rootsRef,
     containerRef: refs.containerRef,
-    linkedElementsRef: refs.linkedElementsRef,
+    framesRef: { current: currentFrames },
+    hostLayoutServiceRef: refs.hostLayoutServiceRef,
     setFrames,
   });
 
@@ -128,7 +133,7 @@ function createClearFramesScenario() {
     isClearingRef: refs.isClearingRef,
     rootsRef: refs.rootsRef,
     containerRef: refs.containerRef,
-    linkedElementsRef: refs.linkedElementsRef,
+    hostLayoutServiceRef: refs.hostLayoutServiceRef,
     trackedClearFrames,
   };
 }
@@ -153,7 +158,7 @@ function expectClearFramesUnmountsRootsAndOverlays() {
   expect(scenario.removeOverlayTwo).toHaveBeenCalledTimes(1);
   expect(scenario.containerRef.current).toBeNull();
   expect(scenario.rootsRef.current.size).toBe(0);
-  expect(scenario.linkedElementsRef.current.size).toBe(0);
+  expect(scenario.hostLayoutServiceRef.current.getNode('frame-1')).toBeNull();
   expect(scenario.currentFrames()).toEqual([]);
   expect(invalidateFrameCache).toHaveBeenCalledTimes(1);
   expect(scenario.isClearingRef.current).toBe(false);

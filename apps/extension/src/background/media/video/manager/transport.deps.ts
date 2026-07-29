@@ -6,8 +6,6 @@ import {
   enableAnnotationsIfNeeded,
   resolveCaptureSource as resolveCaptureSourceImpl,
 } from './preflight';
-import { cleanupViewportEmulation, configureViewportEmulation } from './viewport';
-import { notifyRecordingStartFailed } from '../runtime/manager';
 import { abortVideoRecordingStartIfCancelled } from './flow-cancellation';
 
 export type CaptureSourceResolverDeps = {
@@ -26,13 +24,6 @@ export type AnnotationSetupDeps = {
   abortStart: typeof abortVideoRecordingStartIfCancelled;
 };
 
-export type ViewportSetupDeps = {
-  configureViewportEmulation: typeof configureViewportEmulation;
-  cleanupViewportEmulation: typeof cleanupViewportEmulation;
-  abortStart: typeof abortVideoRecordingStartIfCancelled;
-  notifyStartFailed: typeof notifyRecordingStartFailed;
-};
-
 export const defaultCaptureSourceResolverDeps: CaptureSourceResolverDeps = {
   logger: createLogger({ namespace: 'BackgroundVideoFlowTransport:CaptureSource' }),
   resolveCaptureSource: resolveCaptureSourceImpl,
@@ -47,13 +38,6 @@ export const defaultOffscreenSetupDeps: OffscreenSetupDeps = {
 export const defaultAnnotationSetupDeps: AnnotationSetupDeps = {
   abortStart: abortVideoRecordingStartIfCancelled,
   enableAnnotationsIfNeeded,
-};
-
-export const defaultViewportSetupDeps: ViewportSetupDeps = {
-  abortStart: abortVideoRecordingStartIfCancelled,
-  cleanupViewportEmulation,
-  configureViewportEmulation,
-  notifyStartFailed: notifyRecordingStartFailed,
 };
 
 export const announceCaptureSourceLogger = createLogger({

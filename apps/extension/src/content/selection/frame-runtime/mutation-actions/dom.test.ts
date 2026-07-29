@@ -32,6 +32,7 @@ vi.mock('../state/frame-ui.store', () => ({
 
 import { createClearFramesHandler } from './clear';
 import { createRemoveFrameHandler } from './remove';
+import { createFrameHostLayoutService } from '../host-layout/service';
 
 function createFrame(frameId: string, withStepBadge = false) {
   return createFrameDataFixture(frameId, {
@@ -61,12 +62,10 @@ function verifyRemoveFrameResetsUiAndRecalculatesBadges() {
   const setFrames = vi.fn<React.Dispatch<React.SetStateAction<typeof currentFrames>>>((updater) => {
     currentFrames = typeof updater === 'function' ? updater(currentFrames) : updater;
   });
-  const linkedElementsRef = {
-    current: new Map<string, HTMLElement>([
-      ['frame-1', document.createElement('div')],
-      ['frame-2', document.createElement('div')],
-    ]),
-  };
+  const hostLayoutService = createFrameHostLayoutService();
+  hostLayoutService.link('frame-1', document.createElement('div'), '#frame-1');
+  hostLayoutService.link('frame-2', document.createElement('div'), '#frame-2');
+  const hostLayoutServiceRef = { current: hostLayoutService };
   const dismissFrame = vi.fn();
   getStoreState.mockReturnValue({
     hoveredFrameId: null,
@@ -80,7 +79,7 @@ function verifyRemoveFrameResetsUiAndRecalculatesBadges() {
 
   const removeFrame = createRemoveFrameHandler({
     framesRef: { current: currentFrames },
-    linkedElementsRef,
+    hostLayoutServiceRef,
     recalculateStepBadgesRef: recalculateRef,
     setFrames,
   });
@@ -91,7 +90,8 @@ function verifyRemoveFrameResetsUiAndRecalculatesBadges() {
 
   expect(dismissFrame).toHaveBeenCalledWith('frame-1');
   expect(currentFrames).toEqual([]);
-  expect(linkedElementsRef.current.size).toBe(0);
+  expect(hostLayoutService.getNode('frame-1')).toBeNull();
+  expect(hostLayoutService.getNode('frame-2')).toBeNull();
   expect(recalculateRef.current).toHaveBeenCalledWith('frame-1');
   expect(invalidateFrameCache).toHaveBeenCalledTimes(2);
 }
@@ -114,6 +114,8 @@ function createClearFramesRoots() {
 function createClearFramesRefs(rootOne: Root, rootTwo: Root) {
   const container = document.createElement('div');
 
+  const hostLayoutService = createFrameHostLayoutService();
+  hostLayoutService.link('frame-1', document.createElement('div'), '#frame-1');
   return {
     container,
     removeSpy: vi.spyOn(container, 'remove'),
@@ -125,7 +127,7 @@ function createClearFramesRefs(rootOne: Root, rootTwo: Root) {
       ]),
     },
     containerRef: { current: container },
-    linkedElementsRef: { current: new Map([['frame-1', document.createElement('div')]]) },
+    hostLayoutServiceRef: { current: hostLayoutService },
   };
 }
 
@@ -157,7 +159,8 @@ function createClearFramesScenario() {
     isClearingRef: refs.isClearingRef,
     rootsRef: refs.rootsRef,
     containerRef: refs.containerRef,
-    linkedElementsRef: refs.linkedElementsRef,
+    framesRef: { current: currentFrames },
+    hostLayoutServiceRef: refs.hostLayoutServiceRef,
     setFrames,
   });
 
@@ -173,7 +176,7 @@ function createClearFramesScenario() {
     isClearingRef: refs.isClearingRef,
     rootsRef: refs.rootsRef,
     containerRef: refs.containerRef,
-    linkedElementsRef: refs.linkedElementsRef,
+    hostLayoutServiceRef: refs.hostLayoutServiceRef,
     trackedClearFrames,
   };
 }
@@ -198,7 +201,7 @@ function verifyClearFramesUnmountsRootsAndOverlays() {
   expect(scenario.removeOverlayTwo).toHaveBeenCalledTimes(1);
   expect(scenario.containerRef.current).toBeNull();
   expect(scenario.rootsRef.current.size).toBe(0);
-  expect(scenario.linkedElementsRef.current.size).toBe(0);
+  expect(scenario.hostLayoutServiceRef.current.getNode('frame-1')).toBeNull();
   expect(scenario.currentFrames()).toEqual([]);
   expect(invalidateFrameCache).toHaveBeenCalledTimes(1);
   expect(scenario.isClearingRef.current).toBe(false);

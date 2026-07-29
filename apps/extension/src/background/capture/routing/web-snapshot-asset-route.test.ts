@@ -13,6 +13,7 @@ const {
   handleFullCaptureMock,
   handleOpenEditorWithImageMock,
   handleRegisterWebSnapshotAssetsMock,
+  handleReleaseWebSnapshotStagedBlobsMock,
   handleRequestGalleryImageUpdateCapabilityMock,
   handleRequestExportHarStartCapabilityMock,
   handleReleaseRecordingDownloadMock,
@@ -34,6 +35,7 @@ const {
   handleFullCaptureMock: vi.fn(),
   handleOpenEditorWithImageMock: vi.fn(),
   handleRegisterWebSnapshotAssetsMock: vi.fn(),
+  handleReleaseWebSnapshotStagedBlobsMock: vi.fn(),
   handleRequestGalleryImageUpdateCapabilityMock: vi.fn(),
   handleRequestExportHarStartCapabilityMock: vi.fn(),
   handleReleaseRecordingDownloadMock: vi.fn(),
@@ -89,6 +91,7 @@ vi.mock('./actions.quick-action', () => ({
 vi.mock('./actions.web-snapshot', () => ({
   handleFetchWebSnapshotAsset: handleFetchWebSnapshotAssetMock,
   handleRegisterWebSnapshotAssets: handleRegisterWebSnapshotAssetsMock,
+  handleReleaseWebSnapshotStagedBlobs: handleReleaseWebSnapshotStagedBlobsMock,
   handleSaveWebSnapshotToGallery: handleSaveWebSnapshotToGalleryMock,
   handleStageWebSnapshotBlobChunk: handleStageWebSnapshotBlobChunkMock,
 }));
@@ -160,6 +163,7 @@ beforeEach(() => {
   mockRoutesAsHandled(handleFetchWebSnapshotAssetMock, handleOpenEditorWithImageMock);
   mockRoutesAsHandled(
     handleRegisterWebSnapshotAssetsMock,
+    handleReleaseWebSnapshotStagedBlobsMock,
     handleRequestGalleryImageUpdateCapabilityMock
   );
   mockRoutesAsHandled(handleSaveRecordingForDownloadMock, handleSaveScreenshotToGalleryMock);
@@ -181,6 +185,23 @@ it('routes registered web snapshot asset fetches to the capture action owner', (
       type: MessageType.FETCH_WEB_SNAPSHOT_ASSET,
       snapshotSessionId: 'snapshot-session-1',
       url: 'https://upload.wikimedia.org/example.svg',
+    },
+    42,
+    sendResponse
+  );
+});
+
+it('routes owner-bound staged blob release to the capture action owner', () => {
+  const { routed, sendResponse } = routeMessage({
+    type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
+    snapshotSessionId: 'snapshot-session-1',
+  });
+
+  expect(routed).toBe(true);
+  expect(handleReleaseWebSnapshotStagedBlobsMock).toHaveBeenCalledWith(
+    {
+      type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
+      snapshotSessionId: 'snapshot-session-1',
     },
     42,
     sendResponse

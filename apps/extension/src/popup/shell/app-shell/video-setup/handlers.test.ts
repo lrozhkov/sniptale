@@ -1,6 +1,5 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   CaptureMode,
@@ -8,28 +7,10 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupVideoSetupRuntime } from '../../runtime/types/video-setup';
 import {
-  resetPopupRuntimeServicesForTests,
-  setPopupRuntimeServicesForTests,
-} from '../../runtime/services';
-import { invalidateViewportPresetApplyGeneration } from '../../runtime/viewport-apply-generation';
-import {
   createPopupAppShellRuntime,
   type PopupRuntimeStateOverrides,
 } from '../test-support/runtime';
 import { createPopupVideoSetupHandlers } from './handlers';
-
-const sendRuntimeMessageMock = vi.fn();
-
-function createDeferred<T = unknown>() {
-  let resolve: (value: T) => void = () => undefined;
-  let reject: (reason?: unknown) => void = () => undefined;
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve;
-    reject = promiseReject;
-  });
-
-  return { promise, resolve, reject };
-}
 
 function createRuntime(overrides: PopupRuntimeStateOverrides = {}): PopupVideoSetupRuntime {
   return createPopupAppShellRuntime({
@@ -39,180 +20,72 @@ function createRuntime(overrides: PopupRuntimeStateOverrides = {}): PopupVideoSe
   });
 }
 
-function stubRuntimeMessaging() {
-  sendRuntimeMessageMock.mockResolvedValue({ success: true });
-  setPopupRuntimeServicesForTests({
-    messaging: {
-      sendRuntimeMessage: sendRuntimeMessageMock,
-      sendTabMessage: vi.fn(),
-    },
-  });
-}
-
-afterEach(() => {
-  resetPopupRuntimeServicesForTests();
-  vi.clearAllMocks();
-});
-
-it('clears errors before changing capture mode and applying a preset viewport', async () => {
+it('updates only the recording draft when an existing preset is selected', () => {
   const runtime = createRuntime();
-  stubRuntimeMessaging();
   const handlers = createPopupVideoSetupHandlers(runtime);
 
-  handlers.onCaptureModeChange(CaptureMode.SCREEN);
-  await handlers.onPresetChange('preset-1');
+  handlers.onPresetChange('preset-1');
 
-  expect(runtime.recording.clearStartError).toHaveBeenCalledTimes(2);
-  expect(runtime.recording.setVideoCaptureMode).toHaveBeenCalledWith(CaptureMode.SCREEN);
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: MessageType.SET_VIEWPORT,
-    tabId: 1,
-    width: 1280,
-    height: 720,
-  });
+  expect(runtime.recording.clearStartError).toHaveBeenCalledOnce();
   expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledWith('preset-1');
-  expect(runtime.recording.setAppliedViewportPresetId).toHaveBeenCalledWith('preset-1');
-  expect(runtime.recording.setAppliedViewportTabId).toHaveBeenCalledWith(1);
   expect(runtime.recording.setVideoSettings).not.toHaveBeenCalled();
 });
 
-it('clears viewport emulation before committing native preset selection', async () => {
+it('normalizes missing presets to current size', () => {
   const runtime = createRuntime();
-  stubRuntimeMessaging();
-  const handlers = createPopupVideoSetupHandlers(runtime);
 
-  await handlers.onPresetChange(null);
+  createPopupVideoSetupHandlers(runtime).onPresetChange('missing');
 
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: MessageType.SET_VIEWPORT,
-    tabId: 1,
-  });
   expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledWith(null);
-  expect(runtime.recording.setAppliedViewportPresetId).toHaveBeenCalledWith(null);
-  expect(runtime.recording.setAppliedViewportTabId).toHaveBeenCalledWith(null);
 });
 
-it('omits null tab id when applying viewport through the active tab route fallback', async () => {
+it('clears an active viewport preset when capture changes to TAB_CROP', () => {
   const runtime = createRuntime({
-    activeTabCapabilities: {
-      ...createRuntime().environment.activeTabCapabilities,
-      tabId: null,
-    },
+    selectedPresetId: 'preset-1',
+    videoCaptureMode: CaptureMode.TAB,
   });
-  stubRuntimeMessaging();
-  const handlers = createPopupVideoSetupHandlers(runtime);
 
-  await handlers.onPresetChange('preset-1');
+  createPopupVideoSetupHandlers(runtime).onCaptureModeChange(CaptureMode.TAB_CROP);
 
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: MessageType.SET_VIEWPORT,
-    width: 1280,
-    height: 720,
-  });
-  expect(runtime.recording.setAppliedViewportPresetId).toHaveBeenCalledWith('preset-1');
-  expect(runtime.recording.setAppliedViewportTabId).toHaveBeenCalledWith(null);
+  expect(runtime.recording.setVideoCaptureMode).toHaveBeenCalledWith(CaptureMode.TAB_CROP);
+  expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledWith(null);
 });
 
-it('does not commit preset selection when viewport apply fails', async () => {
-  const runtime = createRuntime();
-  stubRuntimeMessaging();
-  sendRuntimeMessageMock.mockRejectedValueOnce(new Error('blocked'));
-  const handlers = createPopupVideoSetupHandlers(runtime);
+it('preserves a window preset when capture changes to TAB_CROP', () => {
+  const runtime = createRuntime({
+    selectedPresetId: 'window-1',
+    videoCaptureMode: CaptureMode.TAB,
+    viewportPresets: [
+      {
+        kind: 'user',
+        id: 'window-1',
+        name: 'Window',
+        target: 'window',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 0,
+      },
+    ],
+  });
 
-  await handlers.onPresetChange('preset-1');
+  createPopupVideoSetupHandlers(runtime).onCaptureModeChange(CaptureMode.TAB_CROP);
 
   expect(runtime.recording.setSelectedPresetId).not.toHaveBeenCalled();
-  expect(runtime.recording.setAppliedViewportPresetId).not.toHaveBeenCalled();
-  expect(runtime.recording.setAppliedViewportTabId).not.toHaveBeenCalled();
-  expect(runtime.recording.setStartError).toHaveBeenCalledWith('blocked');
 });
 
-it('ignores stale preset apply success after a newer native selection commits', async () => {
-  const runtime = createRuntime();
-  const firstApply = createDeferred();
-  const secondApply = createDeferred();
-  stubRuntimeMessaging();
-  sendRuntimeMessageMock
-    .mockReturnValueOnce(firstApply.promise)
-    .mockReturnValueOnce(secondApply.promise);
-  const handlers = createPopupVideoSetupHandlers(runtime);
+it('normalizes a viewport preset selected through a stale TAB_CROP UI', () => {
+  const runtime = createRuntime({ videoCaptureMode: CaptureMode.TAB_CROP });
 
-  const firstSelection = handlers.onPresetChange('preset-1');
-  const secondSelection = handlers.onPresetChange(null);
+  createPopupVideoSetupHandlers(runtime).onPresetChange('preset-1');
 
-  secondApply.resolve({ success: true });
-  await secondSelection;
-  firstApply.resolve({ success: true });
-  await firstSelection;
-
-  expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledTimes(1);
   expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledWith(null);
-  expect(runtime.recording.setAppliedViewportPresetId).toHaveBeenCalledTimes(1);
-  expect(runtime.recording.setAppliedViewportPresetId).toHaveBeenCalledWith(null);
-  expect(runtime.recording.setAppliedViewportTabId).toHaveBeenCalledTimes(1);
-  expect(runtime.recording.setAppliedViewportTabId).toHaveBeenCalledWith(null);
-  expect(runtime.recording.setStartError).not.toHaveBeenCalled();
 });
 
-it('ignores stale preset apply failure after a newer selection commits', async () => {
-  const runtime = createRuntime({
-    home: {
-      viewportPresets: [
-        { id: 'preset-1', label: '', width: 1280, height: 720 },
-        { id: 'preset-2', label: '', width: 1440, height: 900 },
-      ],
-    },
-  });
-  const firstApply = createDeferred();
-  const secondApply = createDeferred();
-  stubRuntimeMessaging();
-  sendRuntimeMessageMock
-    .mockReturnValueOnce(firstApply.promise)
-    .mockReturnValueOnce(secondApply.promise);
-  const handlers = createPopupVideoSetupHandlers(runtime);
-
-  const firstSelection = handlers.onPresetChange('preset-1');
-  const secondSelection = handlers.onPresetChange('preset-2');
-
-  secondApply.resolve({ success: true });
-  await secondSelection;
-  firstApply.reject(new Error('older failure'));
-  await firstSelection;
-
-  expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledTimes(1);
-  expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledWith('preset-2');
-  expect(runtime.recording.setAppliedViewportPresetId).toHaveBeenCalledTimes(1);
-  expect(runtime.recording.setAppliedViewportPresetId).toHaveBeenCalledWith('preset-2');
-  expect(runtime.recording.setAppliedViewportTabId).toHaveBeenCalledTimes(1);
-  expect(runtime.recording.setAppliedViewportTabId).toHaveBeenCalledWith(1);
-  expect(runtime.recording.setStartError).not.toHaveBeenCalled();
-});
-
-it('ignores preset apply success after lifecycle invalidates viewport authority', async () => {
-  const runtime = createRuntime();
-  const apply = createDeferred();
-  stubRuntimeMessaging();
-  sendRuntimeMessageMock.mockReturnValueOnce(apply.promise);
-  const handlers = createPopupVideoSetupHandlers(runtime);
-
-  const selection = handlers.onPresetChange('preset-1');
-
-  invalidateViewportPresetApplyGeneration();
-  apply.resolve({ success: true });
-  await selection;
-
-  expect(runtime.recording.setSelectedPresetId).not.toHaveBeenCalled();
-  expect(runtime.recording.setAppliedViewportPresetId).not.toHaveBeenCalled();
-  expect(runtime.recording.setAppliedViewportTabId).not.toHaveBeenCalled();
-  expect(runtime.recording.setStartError).not.toHaveBeenCalled();
-});
-
-it('patches media settings and toggles media devices through the runtime', async () => {
+it('patches media settings and toggles media devices through the runtime', () => {
   const runtime = createRuntime();
   const handlers = createPopupVideoSetupHandlers(runtime);
-  const patch: Partial<VideoRecordingSettings> = {
-    microphoneDeviceId: 'mic-2',
-  };
+  const patch: Partial<VideoRecordingSettings> = { microphoneDeviceId: 'mic-2' };
 
   handlers.onMicrophoneDeviceChange('mic-2');
   handlers.onWebcamDeviceChange('cam-2');
@@ -220,41 +93,27 @@ it('patches media settings and toggles media devices through the runtime', async
   handlers.onToggleMicrophone();
   handlers.onToggleWebcam();
 
-  expect(runtime.recording.setVideoSettings).toHaveBeenNthCalledWith(1, expect.any(Function));
-  expect(runtime.recording.setVideoSettings).toHaveBeenNthCalledWith(2, expect.any(Function));
-  expect(runtime.recording.setVideoSettings).toHaveBeenNthCalledWith(3, expect.any(Function));
-  expect(runtime.recording.handleToggleMicrophone).toHaveBeenCalledTimes(1);
-  expect(runtime.recording.handleToggleWebcam).toHaveBeenCalledTimes(1);
+  expect(runtime.recording.setVideoSettings).toHaveBeenCalledTimes(3);
+  expect(runtime.recording.handleToggleMicrophone).toHaveBeenCalledOnce();
+  expect(runtime.recording.handleToggleWebcam).toHaveBeenCalledOnce();
 });
 
 it('preserves controlled cursor settings while changing capture modes', () => {
-  const runtime = createRuntime({
-    videoCaptureMode: CaptureMode.SCREEN,
-  });
+  const runtime = createRuntime({ videoCaptureMode: CaptureMode.SCREEN });
   const handlers = createPopupVideoSetupHandlers(runtime);
 
   handlers.onCaptureModeChange(CaptureMode.SCREEN);
-  handlers.onSettingsChange({
-    controlledCursorCaptureEnabled: true,
-  });
+  handlers.onSettingsChange({ controlledCursorCaptureEnabled: true });
 
   const applyPatch = vi.mocked(runtime.recording.setVideoSettings).mock.calls[0]?.[0] as (
     settings: VideoRecordingSettings
   ) => VideoRecordingSettings;
-
-  expect(
-    applyPatch({
-      ...DEFAULT_VIDEO_SETTINGS,
-      controlledCursorCaptureEnabled: false,
-    })
-  ).toEqual(
-    expect.objectContaining({
-      controlledCursorCaptureEnabled: true,
-    })
+  expect(applyPatch(DEFAULT_VIDEO_SETTINGS)).toEqual(
+    expect.objectContaining({ controlledCursorCaptureEnabled: true })
   );
 });
 
-it('forces webcam recording settings and disables incompatible options for camera mode', () => {
+it('forces camera-compatible recording settings', () => {
   const runtime = createRuntime({
     videoSettings: {
       ...DEFAULT_VIDEO_SETTINGS,
@@ -266,15 +125,13 @@ it('forces webcam recording settings and disables incompatible options for camer
     },
     webcamDevices: [{ deviceId: 'cam-2', label: 'Camera 2' }],
   });
-  const handlers = createPopupVideoSetupHandlers(runtime);
 
-  handlers.onCaptureModeChange(CaptureMode.CAMERA);
+  createPopupVideoSetupHandlers(runtime).onCaptureModeChange(CaptureMode.CAMERA);
 
   expect(runtime.recording.setVideoCaptureMode).toHaveBeenCalledWith(CaptureMode.CAMERA);
   const applyPatch = vi.mocked(runtime.recording.setVideoSettings).mock.calls[0]?.[0] as (
     settings: VideoRecordingSettings
   ) => VideoRecordingSettings;
-
   expect(applyPatch(runtime.recording.videoSettings)).toEqual(
     expect.objectContaining({
       controlledCursorCaptureEnabled: false,

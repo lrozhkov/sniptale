@@ -16,8 +16,6 @@ export interface VideoSetupPageProps {
   settings: VideoRecordingSettings;
   captureMode: CaptureMode;
   selectedPresetId: string | null;
-  appliedViewportPresetId: string | null;
-  appliedViewportTabId: number | null;
   viewportPresets: ViewportPreset[];
   microphoneDevices: Array<{ deviceId: string; label: string }>;
   isLoadingMicrophones: boolean;

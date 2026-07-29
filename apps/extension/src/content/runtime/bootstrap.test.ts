@@ -25,6 +25,11 @@ const contentRuntimeBridgeMocks = vi.hoisted(() => ({
   createContentRuntimeMessageListener: vi.fn(),
 }));
 
+const fullPageCaptureAgentMocks = vi.hoisted(() => ({
+  agent: { dispose: vi.fn(), handle: vi.fn() },
+  createFullPageCaptureAgent: vi.fn(),
+}));
+
 const runtimeCleanupMocks = vi.hoisted(() => ({
   disableAiPickModeIfLoaded: vi.fn(),
   disableHighlighterMode: vi.fn(),
@@ -48,7 +53,8 @@ vi.mock('../selection/region-selector', () => ({
   createRegionSelectorController: regionSelectorControllerMocks.createRegionSelectorController,
 }));
 
-vi.mock('../selection/highlighter', () => ({
+vi.mock('../selection/highlighter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../selection/highlighter')>()),
   clearAllHighlights: vi.fn(),
   clearFrameEditing: vi.fn(),
   disableHighlighterMode: runtimeCleanupMocks.disableHighlighterMode,
@@ -113,6 +119,11 @@ vi.mock('./bridge', () => ({
     contentRuntimeBridgeMocks.createContentRuntimeMessageListener,
 }));
 
+vi.mock('../application/full-page-capture', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../application/full-page-capture')>()),
+  createFullPageCaptureAgent: fullPageCaptureAgentMocks.createFullPageCaptureAgent,
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   browserRuntimeMocks.subscribeToMessages.mockReturnValue(vi.fn());
@@ -120,6 +131,9 @@ beforeEach(() => {
     regionSelectorControllerMocks.controller
   );
   contentRuntimeBridgeMocks.createContentRuntimeMessageListener.mockReturnValue(vi.fn());
+  fullPageCaptureAgentMocks.createFullPageCaptureAgent.mockReturnValue(
+    fullPageCaptureAgentMocks.agent
+  );
   runtimeMessagingMocks.sendRuntimeMessage.mockResolvedValue({ success: false });
 });
 
@@ -141,11 +155,12 @@ async function expectBootstrapSubscribesTopLevelListener() {
   const getViewportInfo = vi.fn();
 
   const { initializeTopLevelContentRuntime } = await import('./bootstrap');
-  const cleanup = initializeTopLevelContentRuntime(getViewportInfo);
+  const cleanup = initializeTopLevelContentRuntime(getViewportInfo, createRuntimeServices());
 
   expect(contentRuntimeBridgeMocks.createContentRuntimeMessageListener).toHaveBeenCalledWith(
     getViewportInfo,
     {
+      fullPageCaptureAgent: fullPageCaptureAgentMocks.agent,
       regionSelectorController: regionSelectorControllerMocks.controller,
     }
   );
@@ -159,9 +174,8 @@ async function expectBootstrapRestoresTabCropOverlay() {
       success: true,
       state: {
         captureMode: CaptureMode.TAB_CROP,
-        captureSource: {
-          cropRegion: { x: 10, y: 20, width: 300, height: 200 },
-        },
+        captureSource: null,
+        cropRegion: { x: 10, y: 20, width: 300, height: 200 },
       },
     })
     .mockResolvedValueOnce({
@@ -171,6 +185,10 @@ async function expectBootstrapRestoresTabCropOverlay() {
 
   const { initializeTopLevelContentRuntime } = await import('./bootstrap');
   initializeTopLevelContentRuntime(vi.fn(), createRuntimeServices());
+
+  expect(browserRuntimeMocks.subscribeToMessages.mock.invocationCallOrder[0]).toBeLessThan(
+    runtimeMessagingMocks.sendRuntimeMessage.mock.invocationCallOrder[0]!
+  );
 
   await Promise.resolve();
   await Promise.resolve();
@@ -251,6 +269,7 @@ async function expectBootstrapSkipsStaleOverlayRestoreAfterCleanup() {
   await Promise.resolve();
 
   expect(regionSelectorControllerMocks.controller.showRecordingOverlay).not.toHaveBeenCalled();
+  expect(fullPageCaptureAgentMocks.agent.dispose).toHaveBeenCalledTimes(1);
 }
 
 describe('initializeTopLevelContentRuntime', () => {

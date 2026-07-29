@@ -61,4 +61,24 @@ describe('selection-mode ui style helpers', () => {
       'box-sizing: border-box'
     );
   });
+
+  it('places safe custom decoration above paint defaults and below protected stroke fields', () => {
+    const cssText = getSelectionDragFrameStyle(
+      createSelectionVisual({
+        customCssStyles: {
+          backgroundImage: 'linear-gradient(red, blue)',
+          boxShadow: '0 0 4px red',
+        },
+      })
+    );
+
+    expect(cssText).toContain('background-image: linear-gradient(red, blue);');
+    expect(cssText).toContain('box-shadow: 0 0 4px red;');
+    expect(cssText.lastIndexOf('box-shadow: 0 0 4px red;')).toBeGreaterThan(
+      cssText.indexOf('box-shadow: color-mix')
+    );
+    expect(cssText.indexOf('border: 3px dashed')).toBeGreaterThan(
+      cssText.indexOf('background-image: linear-gradient(red, blue);')
+    );
+  });
 });

@@ -19,7 +19,7 @@ const IDLE_STATE: VideoRecordingRuntimeState = {
   countdownEndsAt: null,
   captureMode: null,
   captureSource: null,
-  viewportPreset: null,
+  viewportPresetId: null,
   liveMedia: null,
   error: null,
 };

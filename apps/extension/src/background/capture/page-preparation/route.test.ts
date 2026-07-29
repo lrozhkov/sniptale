@@ -21,13 +21,29 @@ it('routes regular page preparation through the content-script message', async (
   await enablePreparationByCapability({
     capability: TabRuntimeCapability.Regular,
     ports: new Map(),
+    surfaceCapabilityToken: 'surface-token',
+    surfaceLeaseGeneration: 2,
+    surfaceOperationGeneration: 3,
     tabId: 7,
-    viewport: { width: 320, height: 240 },
+    viewport: {
+      presetId: 'test:viewport',
+      target: 'viewport',
+      width: 320,
+      height: 240,
+    },
   });
 
   expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
     type: MessageType.ENABLE_SCREENSHOT_MODE,
-    viewport: { width: 320, height: 240 },
+    surfaceCapabilityToken: 'surface-token',
+    surfaceLeaseGeneration: 2,
+    surfaceOperationGeneration: 3,
+    viewport: {
+      presetId: 'test:viewport',
+      target: 'viewport',
+      width: 320,
+      height: 240,
+    },
   });
 
   await disablePreparationByCapability({
@@ -45,12 +61,16 @@ it('forwards pinned-toolbar visibility through regular page preparation', async 
   await enablePreparationByCapability({
     capability: TabRuntimeCapability.Regular,
     ports: new Map(),
+    surfaceCapabilityToken: 'surface-token',
+    surfaceOperationGeneration: 0,
     tabId: 7,
     toolbarVisible: false,
     viewport: null,
   });
 
   expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
+    surfaceCapabilityToken: 'surface-token',
+    surfaceOperationGeneration: 0,
     toolbarVisible: false,
     type: MessageType.ENABLE_SCREENSHOT_MODE,
     viewport: null,
@@ -64,6 +84,8 @@ it('routes owned snapshot viewer preparation through the registered port', async
   await enablePreparationByCapability({
     capability: TabRuntimeCapability.OwnedSnapshotViewer,
     ports,
+    surfaceCapabilityToken: 'surface-token',
+    surfaceOperationGeneration: 0,
     tabId: 9,
     viewport: null,
   });
@@ -76,7 +98,11 @@ it('routes owned snapshot viewer preparation through the registered port', async
   expect(registration.port.postMessage).toHaveBeenNthCalledWith(
     1,
     expect.objectContaining({
-      command: { type: MessageType.ENABLE_SCREENSHOT_MODE, viewport: null },
+      command: {
+        type: MessageType.ENABLE_SCREENSHOT_MODE,
+        surfaceCapabilityToken: 'surface-token',
+        viewport: null,
+      },
     })
   );
   expect(registration.port.postMessage).toHaveBeenNthCalledWith(
@@ -93,6 +119,8 @@ it('rejects missing owned snapshot viewer ports with a clear error', async () =>
     enablePreparationByCapability({
       capability: TabRuntimeCapability.OwnedSnapshotViewer,
       ports: new Map(),
+      surfaceCapabilityToken: 'surface-token',
+      surfaceOperationGeneration: 0,
       tabId: 9,
       viewport: null,
     })
@@ -104,6 +132,8 @@ it('rejects restricted enable requests and ignores restricted disable requests',
     enablePreparationByCapability({
       capability: TabRuntimeCapability.Restricted,
       ports: new Map(),
+      surfaceCapabilityToken: 'surface-token',
+      surfaceOperationGeneration: 0,
       tabId: 13,
       viewport: null,
     })

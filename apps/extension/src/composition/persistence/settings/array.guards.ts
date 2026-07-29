@@ -1,20 +1,11 @@
 import type { SavePreset, ViewportPreset } from '../../../contracts/settings';
+import { parseViewportPresetCatalog } from '../../../features/viewport-presets/parser';
 import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
 
 interface ParsedArrayField<TValue> {
   hasInvalidRoot: boolean;
   invalidEntryCount: number;
   value: TValue[] | undefined;
-}
-
-function isViewportPreset(value: unknown): value is ViewportPreset {
-  return (
-    isRecord(value) &&
-    isString(value['id']) &&
-    isNumber(value['width']) &&
-    isNumber(value['height']) &&
-    isString(value['label'])
-  );
 }
 
 function isSavePreset(value: unknown): value is SavePreset {
@@ -37,14 +28,10 @@ export function parseViewportPresets(value: unknown): ParsedArrayField<ViewportP
     return { hasInvalidRoot: true, invalidEntryCount: 0, value: undefined };
   }
 
-  const parsedPresets = value.filter(isViewportPreset);
-  const invalidEntryCount = value.length - parsedPresets.length;
-
-  if (value.length > 0 && parsedPresets.length === 0) {
-    return { hasInvalidRoot: false, invalidEntryCount, value: undefined };
-  }
-
-  return { hasInvalidRoot: false, invalidEntryCount, value: parsedPresets };
+  const parsedPresets = parseViewportPresetCatalog(value);
+  return parsedPresets === undefined
+    ? { hasInvalidRoot: false, invalidEntryCount: value.length || 1, value: undefined }
+    : { hasInvalidRoot: false, invalidEntryCount: 0, value: parsedPresets };
 }
 
 export function parseSavePresets(value: unknown): ParsedArrayField<SavePreset> {

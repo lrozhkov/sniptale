@@ -33,6 +33,20 @@ export type RuntimeOffscreenRecordingStartedMessage = {
   webcamSettings?: WebcamActualSettings;
 };
 
+export type RuntimeOffscreenSourceReadyMessage = {
+  type: VideoMessageType.OFFSCREEN_SOURCE_READY;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+  videoWidth: number;
+  videoHeight: number;
+  trackSettings: {
+    width?: number;
+    height?: number;
+    frameRate?: number;
+  };
+};
+
 export type RuntimeOffscreenRecordingPausedMessage = {
   type: VideoMessageType.OFFSCREEN_RECORDING_PAUSED;
   recordingId: string;

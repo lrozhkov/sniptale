@@ -29,6 +29,7 @@ export type {
   RuntimeOffscreenRecordingResumedMessage,
   RuntimeOffscreenRecordingStartedMessage,
   RuntimeOffscreenRecordingStoppedMessage,
+  RuntimeOffscreenSourceReadyMessage,
   RuntimeRecordingDurationUpdatedMessage,
 } from './video-recording-lifecycle.types.ts';
 
@@ -145,10 +146,12 @@ export type {
   RuntimeDisposeDesktopMediaMessage,
   RuntimeGetDesktopMediaMessage,
   RuntimeOffscreenGetProjectExportCapabilitiesMessage,
-  RuntimeOffscreenSetViewportDrawStateMessage,
+  RuntimeOffscreenBeginRecordingMessage,
   RuntimeOffscreenStartRecordingMessage,
+  RuntimeOffscreenStopRecordingMessage,
   RuntimeOffscreenUpdateSettingsMessage,
-  RuntimeOffscreenUpdateViewportCropMessage,
+  RuntimeOffscreenRevalidateSourceMessage,
+  RuntimeOffscreenSetViewportDrawStateMessage,
 } from './offscreen-command.types.ts';
 
 export type RuntimePopupExportProgressMessage = {

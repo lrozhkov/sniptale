@@ -1,48 +1,19 @@
 import type { FrameData } from '../../../../features/highlighter/contracts';
+import { resolveFrameSurface } from '../../../../features/highlighter/frame-surface';
 
 type FrameBox = Pick<FrameData, 'x' | 'y' | 'width' | 'height'>;
 type FrameEffectBox = FrameBox &
   Pick<FrameData, 'borderSettings' | 'blurSettings' | 'focusSettings'>;
 
-function getExpandedFrameBox(frame: FrameBox, borderWidth: number): FrameBox {
-  return {
-    x: frame.x,
-    y: frame.y,
-    width: frame.width + borderWidth * 2,
-    height: frame.height + borderWidth * 2,
-  };
-}
-
-function getBorderWidth(frame: Pick<FrameData, 'borderSettings'>): number {
-  return frame.borderSettings?.width ?? 3;
-}
-
-function getInsetBlurFrameBox(frame: FrameBox, borderWidth: number): FrameBox {
-  return {
-    x: frame.x + borderWidth,
-    y: frame.y + borderWidth,
-    width: frame.width,
-    height: frame.height,
-  };
-}
-
-function getInnerFrameBox(frame: FrameEffectBox): FrameBox {
-  return getInsetBlurFrameBox(frame, getBorderWidth(frame));
-}
-
 export function getFocusMaskBox(frame: FrameEffectBox): FrameBox {
-  const showBorder = frame.focusSettings?.showBorder ?? false;
-  if (!showBorder) {
-    return getInnerFrameBox(frame);
-  }
-
-  return getExpandedFrameBox(frame, getBorderWidth(frame));
+  const { x, y, width, height } = resolveFrameSurface({ id: '', ...frame }).geometry;
+  return { x, y, width, height };
 }
 
 export function createFocusMaskRectNodes(frames: FrameData[]): SVGRectElement[] {
   return frames.map((frame) => {
     const focusMaskBox = getFocusMaskBox(frame);
-    const radius = frame.borderSettings?.radius ?? 0;
+    const radius = resolveFrameSurface(frame).geometry.radius;
     const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
 
     rect.dataset['frameId'] = frame.id;
@@ -61,7 +32,8 @@ export function createFocusMaskRectNodes(frames: FrameData[]): SVGRectElement[] 
 }
 
 export function getBlurOverlayBox(frame: FrameEffectBox): FrameBox {
-  return getInnerFrameBox(frame);
+  const { x, y, width, height } = resolveFrameSurface({ id: '', ...frame }).geometry;
+  return { x, y, width, height };
 }
 
 export function getBlurBackdropStyle(frame: Pick<FrameData, 'blurSettings'>): {

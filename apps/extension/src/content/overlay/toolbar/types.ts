@@ -2,6 +2,13 @@ import type { CaptureActionType, ContentToolbarDisplayMode } from '../../../cont
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ToolbarMenuState } from './state/menu';
 
+export type ToolbarViewportSelection = {
+  presetId?: string;
+  target?: 'viewport' | 'window';
+  width: number;
+  height: number;
+} | null;
+
 export interface ToolbarCaptureActionsProps {
   screenshotMode: boolean;
   isLoading: boolean;
@@ -81,6 +88,7 @@ export interface ToolbarProps {
   onTimerDelayChange: (delay: number) => void;
   currentViewport?: { width: number; height: number } | null;
   onViewportChange?: (viewport: { width: number; height: number } | null) => void;
+  mutateViewport?: (viewport: ToolbarViewportSelection) => Promise<void>;
   framesCount?: number;
   scenario?: {
     byClickDisabled: boolean;

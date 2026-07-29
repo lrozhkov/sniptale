@@ -91,7 +91,11 @@ it('routes full-page export capture after page access refresh and content intent
   handleTabMessage({
     deps,
     logger: { error: loggerErrorMock, warn: loggerWarnMock },
-    message: { contentIntent, type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+    message: {
+      contentIntent,
+      exportRunId: contentIntent.requestId,
+      type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+    },
     resolvedTabId: 17,
     sendResponse,
     sender: createTopLevelContentSender(17, CONTENT_URL),
@@ -101,20 +105,24 @@ it('routes full-page export capture after page access refresh and content intent
   expect(ensureActivePageAccessRuntimeMock).toHaveBeenCalledWith(17);
   expect(routeCaptureMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({
-      message: { contentIntent, type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+      message: {
+        contentIntent,
+        exportRunId: contentIntent.requestId,
+        type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+      },
       resolvedTabId: 17,
     })
   );
 });
 
-it('rejects full-page export capture without content intent before refreshing access', async () => {
+it('rejects full-page export capture without matching content intent before refreshing access', async () => {
   const { deps } = registerListener();
   const sendResponse = createSendResponse();
 
   handleTabMessage({
     deps,
     logger: { error: loggerErrorMock, warn: loggerWarnMock },
-    message: { type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+    message: { exportRunId: 'full-page-request-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
     resolvedTabId: 17,
     sendResponse,
     sender: createTopLevelContentSender(17, CONTENT_URL),
@@ -125,7 +133,7 @@ it('rejects full-page export capture without content intent before refreshing ac
   expect(ensureActivePageAccessRuntimeMock).not.toHaveBeenCalled();
   expect(routeCaptureMessageMock).not.toHaveBeenCalled();
   expect(sendResponse).toHaveBeenCalledWith({
-    error: 'Unauthorized content action capability',
+    error: 'Full-page export capability identity mismatch',
     success: false,
   });
 });
@@ -139,7 +147,11 @@ it('does not dispatch full-page export capture when page-access refresh fails', 
   handleTabMessage({
     deps,
     logger: { error: loggerErrorMock, warn: loggerWarnMock },
-    message: { contentIntent, type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+    message: {
+      contentIntent,
+      exportRunId: contentIntent.requestId,
+      type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+    },
     resolvedTabId: 17,
     sendResponse,
     sender: createTopLevelContentSender(17, CONTENT_URL),
@@ -159,7 +171,11 @@ it('does not burn full-page export intent when page access is inactive', async (
   const { deps } = registerListener();
   const sendResponse = createSendResponse();
   const contentIntent = issueFullPageExportContentIntent();
-  const message = { contentIntent, type: MessageType.EXPORT_CAPTURE_FULL_PAGE };
+  const message = {
+    contentIntent,
+    exportRunId: contentIntent.requestId,
+    type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+  };
   hasActivePageAccessMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
 
   handleTabMessage({

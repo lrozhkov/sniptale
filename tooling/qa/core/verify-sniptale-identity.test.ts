@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import JSZip from 'jszip';
 import { afterEach, expect, it } from 'vitest';
 
-import { sniptaleIdentityViolations } from './verify-sniptale-identity.mjs';
+import { runSniptaleIdentityCheck } from './verify-sniptale-identity.mjs';
 
 const roots: string[] = [];
 const retiredProducts = [
@@ -41,25 +41,25 @@ it('accepts clean paths, UTF-8 content and ZIP payloads', async () => {
   write(root, 'fixtures/clean.zip', await zip.generateAsync({ type: 'nodebuffer' }));
   write(root, 'src/identity.ts', `export const product = 'Sniptale';\n`);
 
-  expect(
-    sniptaleIdentityViolations({ root, paths: ['fixtures/clean.zip', 'src/identity.ts'] })
-  ).toEqual([]);
+  await expect(
+    runSniptaleIdentityCheck({ root, paths: ['fixtures/clean.zip', 'src/identity.ts'] })
+  ).resolves.toEqual({ violations: [] });
 });
 
-it('skips missing paths and directories while scanning symlink identity text', () => {
+it('skips missing paths and directories while scanning symlink identity text', async () => {
   const root = fixture();
   mkdirSync(join(root, 'src'), { recursive: true });
   symlinkSync(`../${retiredProducts[0]}`, join(root, 'src/product-link'));
 
-  expect(
-    sniptaleIdentityViolations({
+  await expect(
+    runSniptaleIdentityCheck({
       root,
       paths: ['missing.ts', 'src', 'src/product-link'],
     })
-  ).toEqual([expect.stringContaining('retired product root')]);
+  ).resolves.toEqual({ violations: [expect.stringContaining('retired product root')] });
 });
 
-it('rejects every retired product root and Effect public version spelling', () => {
+it('rejects every retired product root and Effect public version spelling', async () => {
   const root = fixture();
   const paths = retiredProducts.map((product, index) => {
     const path = `src/legacy-${index}.ts`;
@@ -72,7 +72,7 @@ it('rejects every retired product root and Effect public version spelling', () =
     paths.push(path);
   }
 
-  const violations = sniptaleIdentityViolations({ root, paths });
+  const { violations } = await runSniptaleIdentityCheck({ root, paths });
   for (let index = 0; index < retiredProducts.length; index += 1) {
     expect(violations).toContainEqual(expect.stringContaining(`retired product root ${index + 1}`));
   }
@@ -81,7 +81,7 @@ it('rejects every retired product root and Effect public version spelling', () =
   ).toHaveLength(retiredEffects.length);
 });
 
-it('rejects standalone retired Effect versions only inside EffectV1 runtime owners', () => {
+it('rejects standalone retired Effect versions only inside EffectV1 runtime owners', async () => {
   const root = fixture();
   const retiredVersion = ['v', '4'].join('');
   const contractPath = 'packages/runtime-contracts/src/effect-v1/validation.ts';
@@ -96,11 +96,17 @@ it('rejects standalone retired Effect versions only inside EffectV1 runtime owne
     `export const protocol = 'IPv${retiredVersion.at(-1)}'; export const score = 'CVSS${retiredVersion}';\n`
   );
 
-  expect(sniptaleIdentityViolations({ root, paths: [contractPath, interpreterPath] })).toEqual([
-    expect.stringContaining('retired standalone Effect version'),
-    expect.stringContaining('retired standalone Effect version'),
-  ]);
-  expect(sniptaleIdentityViolations({ root, paths: [unrelatedPath] })).toEqual([]);
+  await expect(
+    runSniptaleIdentityCheck({ root, paths: [contractPath, interpreterPath] })
+  ).resolves.toEqual({
+    violations: [
+      expect.stringContaining('retired standalone Effect version'),
+      expect.stringContaining('retired standalone Effect version'),
+    ],
+  });
+  await expect(runSniptaleIdentityCheck({ root, paths: [unrelatedPath] })).resolves.toEqual({
+    violations: [],
+  });
 });
 
 it('rejects retired identities in ZIP entry names and text payloads', async () => {
@@ -110,10 +116,29 @@ it('rejects retired identities in ZIP entry names and text payloads', async () =
   zip.file('effects/payload.json', JSON.stringify({ schema: retiredEffects[0] }));
   write(root, 'fixtures/archive.zip', await zip.generateAsync({ type: 'nodebuffer' }));
 
-  expect(sniptaleIdentityViolations({ root, paths: ['fixtures/archive.zip'] })).toEqual(
-    expect.arrayContaining([
+  await expect(
+    runSniptaleIdentityCheck({ root, paths: ['fixtures/archive.zip'] })
+  ).resolves.toEqual({
+    violations: expect.arrayContaining([
       expect.stringContaining('retired product root'),
       expect.stringContaining('retired Effect public version'),
-    ])
+    ]),
+  });
+});
+
+it('rejects a high-ratio ZIP in the isolated archive worker before expansion', async () => {
+  const root = fixture();
+  const zip = new JSZip();
+  zip.file('fixtures/repeated.bin', Buffer.alloc(9 * 1024 * 1024));
+  write(
+    root,
+    'fixtures/high-ratio.zip',
+    await zip.generateAsync({ compression: 'DEFLATE', type: 'nodebuffer' })
   );
+
+  await expect(
+    runSniptaleIdentityCheck({ root, paths: ['fixtures/high-ratio.zip'] })
+  ).resolves.toEqual({
+    violations: [expect.stringContaining('archive per-entry size limit exceeded')],
+  });
 });

@@ -32,8 +32,19 @@ let root: Root | null = null;
 
 function createRuntime(): PopupVideoSetupRuntime {
   return createPopupAppShellRuntime({
-    videoCaptureMode: CaptureMode.VIEWPORT_EMULATION,
-    viewportPresets: [{ id: 'preset-1', label: 'Preset', width: 1280, height: 720 }],
+    videoCaptureMode: CaptureMode.TAB,
+    viewportPresets: [
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Preset',
+        target: 'viewport',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 0,
+      },
+    ],
   });
 }
 

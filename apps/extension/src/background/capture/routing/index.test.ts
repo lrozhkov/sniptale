@@ -60,6 +60,7 @@ vi.mock('./actions.quick-action', () => ({
 vi.mock('./actions.web-snapshot', () => ({
   handleFetchWebSnapshotAsset: vi.fn(),
   handleRegisterWebSnapshotAssets: vi.fn(),
+  handleReleaseWebSnapshotStagedBlobs: vi.fn(),
   handleSaveWebSnapshotToGallery: vi.fn(),
   handleStageWebSnapshotBlobChunk: vi.fn(),
 }));
@@ -74,7 +75,9 @@ function createRouteArgs() {
   return {
     resolvedTabId: 42,
     sendResponse: vi.fn(),
-    viewportState: new Map([[42, { width: 1280, height: 720 }]]),
+    viewportState: new Map([
+      [42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }],
+    ]),
     screenshotModeState: new Map([[42, true]]),
     captureGuardState: { isCapturing: false },
     pageAccessPort: {
@@ -148,9 +151,17 @@ function verifiesExportRoutes(args: ReturnType<typeof createRouteArgs>) {
   );
 
   expect(
-    routeCaptureMessage({ ...args, message: { type: MessageType.EXPORT_CAPTURE_FULL_PAGE } })
+    routeCaptureMessage({
+      ...args,
+      message: { exportRunId: 'export-run-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+    })
   ).toBe(true);
-  expect(handleExportCaptureFullPageMock).toHaveBeenCalledWith(42, args.sendResponse);
+  expect(handleExportCaptureFullPageMock).toHaveBeenCalledWith(
+    { exportRunId: 'export-run-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+    42,
+    args.sendResponse,
+    args.pageAccessPort
+  );
 }
 
 function verifiesSaveAndExportRoutes() {

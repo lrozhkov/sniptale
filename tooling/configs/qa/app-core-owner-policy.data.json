@@ -7,6 +7,11 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/contracts/full-page-capture",
+      "ownerId": "app-core.full-page-capture-contract",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/contracts/messaging",
       "ownerId": "app-core.runtime-messaging-contracts",
       "ownerClass": "app-core"
@@ -79,6 +84,11 @@
     {
       "sourcePrefix": "apps/extension/src/features/video",
       "ownerId": "feature.video",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/viewport-presets",
+      "ownerId": "feature.viewport-presets",
       "ownerClass": "feature"
     },
     {

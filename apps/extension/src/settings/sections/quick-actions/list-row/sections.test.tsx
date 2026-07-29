@@ -23,7 +23,7 @@ vi.mock('../../../../platform/i18n', () => ({
   compareStrings: vi.fn(),
   createTranslator: vi.fn(),
   formatDateTime: vi.fn(),
-  formatNumber: vi.fn(),
+  formatNumber: (value: number) => String(value),
   getCurrentLocale: vi.fn(),
   getDictionary: vi.fn(),
   getStoredLocalePreference: vi.fn(),
@@ -123,7 +123,7 @@ function createAction(overrides: Record<string, unknown> = {}) {
     bundledId: null,
     status: true,
     screenshotMode: 'visible',
-    emulation: 'desktop-1440',
+    viewportPresetId: 'desktop-1440',
     delay: 5,
     imageFormat: 'png',
     afterCapture: 'download_default',
@@ -218,7 +218,18 @@ async function verifyUserActionMetaAndControls() {
     <>
       <QuickActionRowSummary
         action={action as never}
-        viewportPresets={[{ id: 'desktop-1440', label: 'Desktop', width: 1440, height: 900 }]}
+        viewportPresets={[
+          {
+            kind: 'user',
+            id: 'desktop-1440',
+            name: 'Desktop',
+            target: 'viewport',
+            width: 1440,
+            height: 900,
+            enabled: true,
+            order: 0,
+          },
+        ]}
       />
       <QuickActionRowActions
         action={action as never}
@@ -233,7 +244,7 @@ async function verifyUserActionMetaAndControls() {
 
   expect(container?.textContent).toContain('Visible capture');
   expect(container?.textContent).toContain('settings.quickActions.screenshotModeVisible');
-  expect(container?.textContent).toContain('Desktop (1440×900)');
+  expect(container?.textContent).toContain('Desktop (1440 × 900)');
   expect(container?.textContent).toContain('5 settings.quickActions.delayShortSuffix');
   expect(container?.textContent).toContain('PNG');
   expect(container?.textContent).toContain('settings.quickActions.afterCaptureDownloadDefault');

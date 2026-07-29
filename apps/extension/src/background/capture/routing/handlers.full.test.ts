@@ -8,7 +8,9 @@ const {
   openEditorWithImageMock,
   persistScenarioCaptureFromBackgroundMock,
   saveScreenshotToMediaHubFromDataUrlMock,
+  sendTabMessageMock,
   transitionCaptureJobMock,
+  getPreauthorizedContentActionRouteMessageMock,
 } = vi.hoisted(() => ({
   captureFullPageTransactionMock: vi.fn(),
   executeDownloadMock: vi.fn(),
@@ -17,7 +19,9 @@ const {
   openEditorWithImageMock: vi.fn(),
   persistScenarioCaptureFromBackgroundMock: vi.fn(),
   saveScreenshotToMediaHubFromDataUrlMock: vi.fn(),
+  sendTabMessageMock: vi.fn(),
   transitionCaptureJobMock: vi.fn(),
+  getPreauthorizedContentActionRouteMessageMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -41,6 +45,16 @@ vi.mock('@sniptale/foundation/utils/filename', async (importOriginal) => ({
 vi.mock('../index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../index')>()),
   captureFullPageTransaction: captureFullPageTransactionMock,
+}));
+
+vi.mock('./authorization/content-action', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./authorization/content-action')>()),
+  getPreauthorizedContentActionRouteMessage: getPreauthorizedContentActionRouteMessageMock,
+}));
+
+vi.mock('../../routing-contracts/runtime-messaging/services', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../routing-contracts/runtime-messaging/services')>()),
+  getBackgroundRuntimeMessaging: () => ({ sendTabMessage: sendTabMessageMock }),
 }));
 
 vi.mock('../download/download-router/index', async (importOriginal) => ({
@@ -79,7 +93,9 @@ function createContext(): CaptureRouteContext {
   return {
     resolvedTabId: 42,
     sendResponse: createSendResponse(),
-    viewportState: new Map([[42, { width: 1280, height: 720 }]]),
+    viewportState: new Map([
+      [42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }],
+    ]),
     screenshotModeState: new Map([[42, true]]),
     captureGuardState: { isCapturing: false },
     scenarioSessionService: createScenarioSessionServiceStub(),
@@ -101,12 +117,15 @@ beforeEach(() => {
   captureFullPageTransactionMock.mockResolvedValue({
     dataUrl: 'data:image/jpeg;base64,3',
     jobId: 'capture-job-full',
+    metadata: { downscaled: false, frozenExtentWarning: false },
   });
   openEditorWithImageMock.mockResolvedValue(undefined);
   executeDownloadMock.mockResolvedValue(undefined);
   persistScenarioCaptureFromBackgroundMock.mockResolvedValue(undefined);
   saveScreenshotToMediaHubFromDataUrlMock.mockResolvedValue(undefined);
   transitionCaptureJobMock.mockResolvedValue(undefined);
+  getPreauthorizedContentActionRouteMessageMock.mockReturnValue(undefined);
+  sendTabMessageMock.mockResolvedValue({ success: true });
 });
 
 describe('capture-router-handlers.full', () => {
@@ -118,6 +137,7 @@ describe('capture-router-handlers.full', () => {
     captureFullPageTransactionMock.mockResolvedValueOnce({
       dataUrl: 'data:image/png;base64,job',
       jobId: 'capture-job-1',
+      metadata: { downscaled: false, frozenExtentWarning: false },
     });
 
     expect(handleFullCapture(context)).toBe(true);
@@ -133,6 +153,33 @@ describe('capture-router-handlers.full', () => {
     );
     expect(context.sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
   });
+
+  it('targets the bound document and reports downscale and frozen-extent warnings', async () => {
+    const context = createContext();
+    context.message = { actionType: 'download_default' };
+    getPreauthorizedContentActionRouteMessageMock.mockReturnValue({
+      documentId: 'document-42',
+      tabId: 42,
+    });
+    captureFullPageTransactionMock.mockResolvedValueOnce({
+      dataUrl: 'data:image/png;base64,warned',
+      jobId: 'capture-job-warned',
+      metadata: { downscaled: true, frozenExtentWarning: true },
+    });
+
+    expect(handleFullCapture(context)).toBe(true);
+    await flushPromises();
+    await flushPromises();
+
+    expect(captureFullPageTransactionMock).toHaveBeenCalledWith(42, undefined, {
+      backendKind: 'native',
+      documentId: 'document-42',
+    });
+    expect(sendTabMessageMock).toHaveBeenCalledWith(42, {
+      payload: { message: expect.any(String), type: 'warning' },
+      type: 'SHOW_TOAST',
+    });
+  });
 });
 
 async function verifiesFullCaptureFailures() {
@@ -147,6 +194,7 @@ async function verifiesFullCaptureFailures() {
   captureFullPageTransactionMock.mockResolvedValue({
     dataUrl: 'data:image/png;base64,5',
     jobId: 'capture-job-full-download',
+    metadata: { downscaled: false, frozenExtentWarning: false },
   });
   executeDownloadMock.mockRejectedValue(new Error('download failed'));
 
@@ -180,6 +228,7 @@ describe('capture-router-handlers.full edit actions', () => {
     captureFullPageTransactionMock.mockResolvedValueOnce({
       dataUrl: 'data:image/jpeg;base64,9',
       jobId: 'capture-job-full-edit',
+      metadata: { downscaled: false, frozenExtentWarning: false },
     });
 
     expect(handleFullCapture(context)).toBe(true);

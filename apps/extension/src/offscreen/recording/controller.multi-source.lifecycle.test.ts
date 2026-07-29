@@ -37,7 +37,6 @@ vi.mock('../../platform/runtime-messaging/index', async (importOriginal) => {
 });
 
 import { pauseRecording, resumeRecording, stopRecording } from './controller';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,24 +46,23 @@ beforeEach(() => {
   stopMultiSourceRecordingMock.mockResolvedValue(undefined);
 });
 
-it('delegates stop requests to the active multi-source session', async () => {
-  await expect(stopRecording(true)).resolves.toBeUndefined();
+it('rejects an unbound stop even when a multi-source session is active', async () => {
+  await expect(
+    stopRecording(
+      { generation: 1, recordingId: 'multi-1', streamInstanceId: 'unknown-stream' },
+      true
+    )
+  ).rejects.toThrow('Recording source binding is unavailable');
 
-  expect(stopMultiSourceRecordingMock).toHaveBeenCalledWith(true);
+  expect(stopMultiSourceRecordingMock).not.toHaveBeenCalled();
 });
 
-it('routes pause and resume controls to active multi-source recorders', () => {
-  pauseRecording();
-  resumeRecording();
+it('rejects pause and resume controls without the active multi-source identity', () => {
+  const stale = { generation: 1, recordingId: 'multi-1', streamInstanceId: 'stale-stream' };
+  expect(() => pauseRecording(stale)).toThrow('Recording source binding is unavailable');
+  expect(() => resumeRecording(stale)).toThrow('Recording source binding is unavailable');
 
-  expect(pauseMultiSourceRecordingMock).toHaveBeenCalledOnce();
-  expect(resumeMultiSourceRecordingMock).toHaveBeenCalledOnce();
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: VideoMessageType.OFFSCREEN_RECORDING_PAUSED,
-    recordingId: 'multi-1',
-  });
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: VideoMessageType.OFFSCREEN_RECORDING_RESUMED,
-    recordingId: 'multi-1',
-  });
+  expect(pauseMultiSourceRecordingMock).not.toHaveBeenCalled();
+  expect(resumeMultiSourceRecordingMock).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
 });

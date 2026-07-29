@@ -84,8 +84,10 @@ afterEach(() => {
 
 it('allows content-tab capture routes from the sender tab', async () => {
   const { listener, sendResponse } = registerListener();
+  const contentIntent = issueFullPageContentIntent(44);
   const message = {
-    contentIntent: issueFullPageContentIntent(44),
+    contentIntent,
+    exportRunId: contentIntent.requestId,
     type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
   };
   parseBackgroundRuntimeMessageMock.mockReturnValue(message);

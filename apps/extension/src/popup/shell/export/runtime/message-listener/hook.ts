@@ -6,7 +6,7 @@ import { parsePopupExportRuntimeMessage } from './parse';
 import type { PopupExportRuntimeContract } from '../types';
 
 export function usePopupExportMessageListener(state: PopupExportRuntimeContract) {
-  const { requestIdRef, setProgress, setResult } = state;
+  const { cancelRetryRef, requestIdRef, setProgress, setResult } = state;
 
   useEffect(() => {
     const handleMessage = (message: unknown) => {
@@ -21,11 +21,12 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
         setProgress,
         setResult,
         clearRequestId: () => {
+          cancelRetryRef.current = null;
           requestIdRef.current = null;
         },
       });
     };
 
     return browserRuntime.subscribeToMessages(handleMessage);
-  }, [requestIdRef, setProgress, setResult]);
+  }, [cancelRetryRef, requestIdRef, setProgress, setResult]);
 }

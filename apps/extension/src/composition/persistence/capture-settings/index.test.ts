@@ -80,7 +80,7 @@ async function verifyVideoUiStateContracts() {
   browserStorageLocalGetMock
     .mockResolvedValueOnce({
       sniptale_video_ui_state: {
-        captureMode: CaptureMode.VIEWPORT_EMULATION,
+        captureMode: CaptureMode.TAB,
         viewportPresetId: 42,
       },
     })
@@ -89,7 +89,7 @@ async function verifyVideoUiStateContracts() {
     });
 
   await expect(loadVideoUiState()).resolves.toEqual({
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     viewportPresetId: null,
   });
 

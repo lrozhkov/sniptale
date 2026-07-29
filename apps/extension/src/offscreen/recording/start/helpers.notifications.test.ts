@@ -121,8 +121,6 @@ async function verifyNotificationFailureTrace() {
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-3',
     settings: createSettings(),
-    captureWidth: 1280,
-    captureHeight: 720,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker,
   });

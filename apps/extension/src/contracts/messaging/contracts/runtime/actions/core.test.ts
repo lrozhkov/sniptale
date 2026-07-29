@@ -16,6 +16,8 @@ const contentRuntimeWakeupContract =
   runtimeActionCoreMessageContracts[MessageType.CONTENT_RUNTIME_WAKEUP];
 const offscreenPageStorageContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE];
+const unattendedFullPageContract =
+  runtimeActionCoreMessageContracts[MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED];
 
 it('parses page-access requests', () => {
   expect(
@@ -214,6 +216,25 @@ it('strictly parses the offscreen page-storage privacy command and result', () =
       capabilityToken: 'capability-1',
       operation: 'drop-all',
       preservePreferences: true,
+    })
+  ).toThrow();
+});
+
+it('requires an explicit export identity for unattended full-page capture', () => {
+  expect(
+    unattendedFullPageContract.parseRequest({
+      contentIntent: { requestId: 'batch-1', token: 'token-1' },
+      exportRunId: 'batch-1',
+      type: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+    })
+  ).toEqual({
+    contentIntent: { requestId: 'batch-1', token: 'token-1' },
+    exportRunId: 'batch-1',
+    type: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+  });
+  expect(() =>
+    unattendedFullPageContract.parseRequest({
+      type: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
     })
   ).toThrow();
 });

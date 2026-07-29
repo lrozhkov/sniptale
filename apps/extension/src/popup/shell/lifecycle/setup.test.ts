@@ -65,7 +65,18 @@ function createBootstrapState() {
     recordingState: { status: 'idle' } as const,
     selectedPresetId: 'preset-1',
     videoSettings: { microphoneId: 'mic-1' },
-    viewportPresets: [{ id: 'preset-1', label: 'Desktop', height: 768, width: 1366 }],
+    viewportPresets: [
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Desktop',
+        target: 'viewport',
+        width: 1366,
+        height: 768,
+        enabled: true,
+        order: 0,
+      },
+    ],
   };
 }
 
@@ -95,7 +106,6 @@ function createParams(): PopupLifecycleParams {
       setWebcamDevices: vi.fn(),
     },
     browser: {
-      clearAppliedViewportAuthority: vi.fn(),
       refreshActiveTabCapabilities,
       refreshGalleryStatus,
     },

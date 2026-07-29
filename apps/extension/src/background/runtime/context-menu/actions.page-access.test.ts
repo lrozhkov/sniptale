@@ -79,8 +79,11 @@ function createDeps() {
   return {
     captureGuardState: { isCapturing: false },
     screenshotModeState: new Map<number, boolean>(),
-    viewportOwnerState: new Map<number, 'debugger' | 'viewer'>(),
-    viewportState: new Map<number, { width: number; height: number } | null>(),
+    viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
   };
 }
 

@@ -28,14 +28,16 @@ function getSelectionFrameCss(visual: ResolvedBorderPresetVisual): string {
   const frameShadow = resolveBorderShadowVisual(visual.shadow, visual.strokeColor).frameBoxShadow;
 
   return `
+    background-color: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
+    outline: none;
+    ${frameShadow ? `box-shadow: ${frameShadow};` : ''}
+    ${customCss}
     border: ${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
       visual.strokeColor,
       visual.strokeOpacity
     )};
     border-radius: ${visual.radius}px;
-    background-color: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
-    ${frameShadow ? `box-shadow: ${frameShadow};` : ''}
-    ${customCss}
+    clip-path: none;
   `;
 }
 

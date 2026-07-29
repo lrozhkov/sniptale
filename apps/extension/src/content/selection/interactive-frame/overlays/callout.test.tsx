@@ -15,7 +15,7 @@ import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 
 vi.mock('../../callout', () => ({
   Callout: (props: {
-    frameRect: { width: number; height: number };
+    frameRect: { x: number; y: number; width: number; height: number };
     onContentChange: (html: string) => void;
     onPositionChange: (placement: { centerOffsetX: number; centerOffsetY: number }) => void;
     onSettingsClick: () => void;
@@ -52,7 +52,7 @@ vi.mock('../../callout', () => ({
         move tail end
       </button>
       <output data-ui="callout-frame-size">
-        {props.frameRect.width}×{props.frameRect.height}
+        {props.frameRect.x},{props.frameRect.y},{props.frameRect.width}×{props.frameRect.height}
       </output>
       <button
         data-ui="callout-move"
@@ -132,7 +132,6 @@ describe('interactive frame callout overlay', () => {
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
-        borderWidth={3}
         isCalloutEditing
         setIsCalloutEditing={vi.fn()}
         setTempFrame={setTempFrame}
@@ -169,7 +168,6 @@ describe('interactive frame callout overlay', () => {
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
-        borderWidth={3}
         isCalloutEditing={false}
         setIsCalloutEditing={vi.fn()}
         setTempFrame={vi.fn()}
@@ -201,7 +199,6 @@ describe('interactive frame callout overlay', () => {
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
-        borderWidth={3}
         isCalloutEditing={false}
         setIsCalloutEditing={vi.fn()}
         setTempFrame={vi.fn()}
@@ -234,7 +231,6 @@ describe('interactive frame callout overlay', () => {
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
-        borderWidth={3}
         isCalloutEditing={false}
         setIsCalloutEditing={vi.fn()}
         setTempFrame={vi.fn()}
@@ -264,7 +260,6 @@ describe('interactive frame callout overlay', () => {
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
-        borderWidth={3}
         isCalloutEditing={false}
         setIsCalloutEditing={vi.fn()}
         setTempFrame={vi.fn()}
@@ -284,7 +279,7 @@ describe('interactive frame callout overlay', () => {
     );
   });
 
-  it('connects the callout to the outer content-box border', () => {
+  it('connects the callout to the exact canonical outer-frame geometry', () => {
     const frame = createFrame();
 
     renderNode(
@@ -293,7 +288,6 @@ describe('interactive frame callout overlay', () => {
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
-        borderWidth={3}
         isCalloutEditing={false}
         setIsCalloutEditing={vi.fn()}
         setTempFrame={vi.fn()}
@@ -302,7 +296,7 @@ describe('interactive frame callout overlay', () => {
     );
 
     expect(container?.querySelector('[data-ui="callout-frame-size"]')?.textContent).toBe(
-      `${frame.width + 6}×${frame.height + 6}`
+      `${frame.x},${frame.y},${frame.width}×${frame.height}`
     );
   });
 
@@ -316,7 +310,6 @@ describe('interactive frame callout overlay', () => {
         frame={frame}
         currentFrame={frame}
         frameZIndex={100}
-        borderWidth={3}
         isCalloutEditing={false}
         setIsCalloutEditing={vi.fn()}
         setTempFrame={vi.fn()}

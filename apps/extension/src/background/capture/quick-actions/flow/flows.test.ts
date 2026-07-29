@@ -5,15 +5,21 @@ import { installBackgroundRuntimeMessagingMock } from '../../../routing-contract
 const {
   issueContentPrivilegedActionAutoStartGrantMock,
   ensureNativeVisibleCaptureAuthorityMock,
+  getScreenshotSurfaceBindingMock,
+  prepareQuickActionSurfaceMock,
+  releaseQuickActionSurfaceAfterFailureMock,
+  releaseQuickActionSurfaceMock,
   sendTabMessageMock,
   sendViewerPreparationCommandMock,
-  setupQuickActionDebuggerMock,
 } = vi.hoisted(() => ({
   issueContentPrivilegedActionAutoStartGrantMock: vi.fn(),
   ensureNativeVisibleCaptureAuthorityMock: vi.fn(),
+  getScreenshotSurfaceBindingMock: vi.fn(),
+  prepareQuickActionSurfaceMock: vi.fn(),
+  releaseQuickActionSurfaceAfterFailureMock: vi.fn(),
+  releaseQuickActionSurfaceMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
   sendViewerPreparationCommandMock: vi.fn(),
-  setupQuickActionDebuggerMock: vi.fn(),
 }));
 
 vi.mock('../../../../platform/runtime-messaging/index', async (importOriginal) => ({
@@ -30,10 +36,16 @@ vi.mock('../../../routing-contracts/capabilities/content-action/route', async (i
   >()),
   issueContentPrivilegedActionAutoStartGrant: issueContentPrivilegedActionAutoStartGrantMock,
 }));
+vi.mock('../../../capture-surface/screenshot-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture-surface/screenshot-session')>()),
+  getScreenshotSurfaceBinding: getScreenshotSurfaceBindingMock,
+}));
 
-vi.mock('./debugger', () => ({
-  isDebuggerRequired: vi.fn((emulation: string) => emulation !== 'native'),
-  setupQuickActionDebugger: setupQuickActionDebuggerMock,
+vi.mock('./surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./surface')>()),
+  applyQuickActionSurface: prepareQuickActionSurfaceMock,
+  releaseQuickActionSurfaceAfterFailure: releaseQuickActionSurfaceAfterFailureMock,
+  releaseQuickActionSurface: releaseQuickActionSurfaceMock,
 }));
 
 import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -56,7 +68,7 @@ function createSettings(viewportPresets: ViewportPreset[]): Settings {
       showSettings: true,
     },
     saveCapturesToGallery: false,
-    defaultViewportId: 'native',
+    defaultViewportPresetId: null,
     imageFormat: 'png',
     imageQuality: 90,
     authenticatedSnapshotAssetsEnabled: true,
@@ -96,7 +108,7 @@ function createSelectionArgs() {
     }),
     afterCapture: 'copy' as const,
     delaySeconds: 2,
-    emulation: 'native',
+    viewportPresetId: null,
     imageFormat: 'jpeg' as const,
     imageQuality: 75,
     pageAccessPort: {
@@ -106,7 +118,10 @@ function createSelectionArgs() {
     screenshotModeState: new Map<number, boolean>(),
     settings: createSettings([]),
     tabId: 17,
-    viewportState: new Map<number, { width: number; height: number } | null>(),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
   };
 }
 
@@ -119,7 +134,7 @@ function createCaptureArgs() {
     afterCapture: 'download_default' as const,
     captureMode: 'visible' as const,
     delaySeconds: 0,
-    emulation: 'preset-1',
+    viewportPresetId: 'preset-1',
     imageFormat: 'png' as const,
     imageQuality: 88,
     pageAccessPort: {
@@ -127,24 +142,63 @@ function createCaptureArgs() {
       ensureNativeVisibleCaptureAuthority: ensureNativeVisibleCaptureAuthorityMock,
     },
     screenshotModeState: new Map<number, boolean>(),
-    settings: createSettings([{ id: 'preset-1', width: 1440, height: 900, label: 'Preset 1' }]),
-    tabId: 21,
-    viewportState: new Map<number, { width: number; height: number } | null>([
-      [21, { width: 1440, height: 900 }],
+    settings: createSettings([
+      {
+        kind: 'user',
+        id: 'preset-1',
+        name: 'Preset 1',
+        target: 'viewport' as const,
+        width: 1440,
+        height: 900,
+        enabled: true,
+        order: 0,
+      },
     ]),
+    tabId: 21,
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >([[21, { presetId: 'test:viewport', target: 'viewport' as const, width: 1440, height: 900 }]]),
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   issueContentPrivilegedActionAutoStartGrantMock.mockReturnValue({ grantToken: 'grant-token-1' });
+  getScreenshotSurfaceBindingMock.mockImplementation((tabId: number) => ({
+    surfaceCapabilityToken: 'surface-token-1',
+    surfaceOperationGeneration: tabId === 17 ? 0 : 1,
+    ...(tabId === 17 ? {} : { surfaceLeaseGeneration: 1 }),
+  }));
   sendTabMessageMock.mockResolvedValue(undefined);
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   sendViewerPreparationCommandMock.mockResolvedValue(undefined);
-  setupQuickActionDebuggerMock.mockResolvedValue({
-    cleanup: vi.fn().mockResolvedValue(undefined),
-    ready: true,
-  });
+  prepareQuickActionSurfaceMock.mockImplementation(
+    async (args: ReturnType<typeof createCaptureArgs>) => {
+      if (args.viewportPresetId) {
+        args.viewportState.set(args.tabId, {
+          presetId: args.viewportPresetId,
+          target: 'viewport' as const,
+          width: 1440,
+          height: 900,
+        });
+      } else {
+        args.viewportState.set(args.tabId, null);
+      }
+      return { surfaceCapabilityToken: 'surface-token-1' };
+    }
+  );
+  releaseQuickActionSurfaceMock.mockResolvedValue(undefined);
+  releaseQuickActionSurfaceAfterFailureMock.mockImplementation(
+    async (tabId: number, viewportState: unknown, cause: unknown) => {
+      try {
+        await releaseQuickActionSurfaceMock(tabId, viewportState);
+      } catch (rollbackError) {
+        throw new AggregateError([cause, rollbackError], 'rollback failed');
+      }
+      throw cause;
+    }
+  );
   ensureNativeVisibleCaptureAuthorityMock.mockResolvedValue(undefined);
 });
 
@@ -165,6 +219,8 @@ it('starts screenshot selection and marks the tab active', async () => {
       imageQuality: 75,
     },
     autoStartSelection: true,
+    surfaceCapabilityToken: 'surface-token-1',
+    surfaceOperationGeneration: 0,
   });
   expect(ensureNativeVisibleCaptureAuthorityMock).toHaveBeenCalledWith(17);
   expect(issueContentPrivilegedActionAutoStartGrantMock).toHaveBeenCalledWith({
@@ -180,7 +236,7 @@ it('skips debugger setup for native selection flows and keeps viewport null', as
 
   await runSelectionFlow(args);
 
-  expect(setupQuickActionDebuggerMock).not.toHaveBeenCalled();
+  expect(prepareQuickActionSurfaceMock).toHaveBeenCalledWith(args);
   expect(sendTabMessageMock).toHaveBeenCalledWith(
     17,
     expect.objectContaining({
@@ -199,7 +255,7 @@ it('routes owned viewer selection flows through the viewer port without debugger
 
   await runSelectionFlow(args);
 
-  expect(setupQuickActionDebuggerMock).not.toHaveBeenCalled();
+  expect(prepareQuickActionSurfaceMock).toHaveBeenCalledWith(args);
   expect(sendTabMessageMock).not.toHaveBeenCalled();
   expect(sendViewerPreparationCommandMock).toHaveBeenCalledWith(
     args.webSnapshotViewerPorts,
@@ -221,7 +277,12 @@ it('starts capture mode with the resolved viewport and marks the tab active', as
 
   expect(sendTabMessageMock).toHaveBeenCalledWith(21, {
     type: MessageType.ENABLE_SCREENSHOT_MODE,
-    viewport: { width: 1440, height: 900 },
+    viewport: {
+      presetId: 'preset-1',
+      target: 'viewport' as const,
+      width: 1440,
+      height: 900,
+    },
     contentIntentGrant: { grantToken: 'grant-token-1' },
     quickActionOverlay: {
       afterCapture: 'download_default',
@@ -231,6 +292,9 @@ it('starts capture mode with the resolved viewport and marks the tab active', as
       imageQuality: 88,
     },
     autoStartCaptureType: 'visible',
+    surfaceCapabilityToken: 'surface-token-1',
+    surfaceLeaseGeneration: 1,
+    surfaceOperationGeneration: 1,
   });
   expect(issueContentPrivilegedActionAutoStartGrantMock).toHaveBeenCalledWith({
     actionTypes: [CaptureMessageType.CAPTURE_VISIBLE],
@@ -244,30 +308,50 @@ it('starts capture mode with the resolved viewport and marks the tab active', as
 it('blocks native visible quick actions without native visible-capture authority', async () => {
   const args = {
     ...createCaptureArgs(),
-    emulation: 'native',
-    viewportState: new Map<number, { width: number; height: number } | null>(),
+    viewportPresetId: null,
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >(),
   };
   ensureNativeVisibleCaptureAuthorityMock.mockRejectedValueOnce(new Error('capture authority'));
 
   await expect(runCaptureFlow(args)).rejects.toThrow('capture authority');
 
   expect(sendTabMessageMock).not.toHaveBeenCalled();
-  expect(setupQuickActionDebuggerMock).not.toHaveBeenCalled();
+  expect(releaseQuickActionSurfaceMock).toHaveBeenCalledWith(21, args.viewportState);
 });
 
-it('stops before messaging when debugger attachment fails', async () => {
+it('stops before messaging when surface preparation fails', async () => {
   const args = createCaptureArgs();
-  setupQuickActionDebuggerMock.mockResolvedValue({ ready: false });
-  args.emulation = 'preset-2';
+  prepareQuickActionSurfaceMock.mockRejectedValueOnce(new Error('surface unavailable'));
+  args.viewportPresetId = 'preset-2';
   args.imageQuality = 90;
-  args.settings = createSettings([{ id: 'preset-2', width: 1280, height: 720, label: 'Preset 2' }]);
   args.tabId = 29;
-  args.viewportState = new Map<number, { width: number; height: number } | null>();
+  args.viewportState = new Map<
+    number,
+    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+  >();
 
-  await runCaptureFlow(args);
+  await expect(runCaptureFlow(args)).rejects.toThrow('surface unavailable');
 
   expect(sendTabMessageMock).not.toHaveBeenCalled();
   expect(args.screenshotModeState.has(29)).toBe(false);
+  expect(releaseQuickActionSurfaceMock).toHaveBeenCalledWith(29, args.viewportState);
+});
+
+it('surfaces both content delivery and privileged rollback failures', async () => {
+  const args = createCaptureArgs();
+  sendTabMessageMock.mockRejectedValueOnce(new Error('content delivery failed'));
+  releaseQuickActionSurfaceMock.mockRejectedValueOnce(new Error('restore failed'));
+
+  const error = await runCaptureFlow(args).catch((cause: unknown) => cause);
+
+  expect(error).toBeInstanceOf(AggregateError);
+  expect((error as AggregateError).errors).toEqual([
+    expect.objectContaining({ message: 'content delivery failed' }),
+    expect.objectContaining({ message: 'restore failed' }),
+  ]);
 });
 
 it('routes owned viewer capture flows through the viewer port with preset viewport', async () => {
@@ -279,11 +363,16 @@ it('routes owned viewer capture flows through the viewer port with preset viewpo
 
   await runCaptureFlow(args);
 
-  expect(setupQuickActionDebuggerMock).not.toHaveBeenCalled();
+  expect(prepareQuickActionSurfaceMock).toHaveBeenCalledWith(args);
   expect(sendTabMessageMock).not.toHaveBeenCalled();
   expect(sendViewerPreparationCommandMock).toHaveBeenCalledWith(args.webSnapshotViewerPorts, 21, {
     type: MessageType.ENABLE_SCREENSHOT_MODE,
-    viewport: { width: 1440, height: 900 },
+    viewport: {
+      presetId: 'preset-1',
+      target: 'viewport' as const,
+      width: 1440,
+      height: 900,
+    },
     quickActionOverlay: {
       afterCapture: 'download_default',
       delaySeconds: 0,

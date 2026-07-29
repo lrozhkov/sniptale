@@ -119,7 +119,16 @@ async function renderUtilityButtons() {
 async function renderCaptureButtons() {
   const { ToolbarCaptureButtons } = await import('./capture/options');
 
-  await renderNode(<ToolbarCaptureButtons onTakeScreenshot={() => undefined} />);
+  await renderNode(
+    <ToolbarCaptureButtons
+      compactMenus={false}
+      currentViewport={null}
+      displayMode="horizontal"
+      isLoading={false}
+      onTakeScreenshot={() => undefined}
+      toolbarMenuState={createClosedToolbarMenuState()}
+    />
+  );
 }
 
 function expectClearHighlightsTooltip() {
@@ -148,13 +157,13 @@ describe('toolbar static tooltips', () => {
   it('keeps viewport tooltip static even when emulation is active', async () => {
     await renderViewportButton(null);
     expect(document.querySelector('button')?.getAttribute('title')).toBe(
-      'Размер страницы для снимка'
+      'Размер страницы или окна для снимка'
     );
     expect(document.querySelector('button')?.getAttribute('data-tooltip')).toBeNull();
 
     await renderViewportButton({ width: 1440, height: 900 });
     expect(document.querySelector('button')?.getAttribute('title')).toBe(
-      'Размер страницы для снимка'
+      'Размер страницы или окна для снимка'
     );
     expect(document.querySelector('button')?.getAttribute('data-tooltip')).toBeNull();
     expect(document.querySelector('button')?.getAttribute('data-active')).toBe('true');
@@ -171,8 +180,9 @@ describe('toolbar static tooltips', () => {
 
     expect(buttons.map((button) => button.getAttribute('title'))).toEqual([
       'Снимок видимой области',
-      'Снимок всей страницы',
       'Выбрать область для снимка',
+      'Снимок всей страницы',
+      'Параметры снимка всей страницы',
     ]);
     expect(buttons.every((button) => button.getAttribute('data-tooltip') === null)).toBe(true);
   });

@@ -15,6 +15,10 @@ import {
   setUIHidden,
 } from '../../selection/locker';
 import { createScreenshotControllerSession } from './session/state';
+import { installContentRuntimeMessagingMock } from '../../application/runtime-services/services.test-support';
+import { setScreenshotSurfaceBinding } from '../viewport-selector/capability';
+
+const sendRuntimeMessageMock = vi.fn();
 
 vi.mock('../../selection/locker', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../selection/locker')>()),
@@ -26,6 +30,13 @@ vi.mock('../../selection/locker', async (importOriginal) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sendRuntimeMessageMock.mockResolvedValue(undefined);
+  installContentRuntimeMessagingMock(sendRuntimeMessageMock);
+  setScreenshotSurfaceBinding({
+    leaseGeneration: 3,
+    operationGeneration: 4,
+    token: 'surface-token',
+  });
   vi.mocked(isLockEnabled).mockReset();
   vi.mocked(isLockEnabled).mockReturnValue(true);
 });
@@ -180,6 +191,12 @@ function expectQuickActionCloseRestoresUnlockedBaseline() {
   expect(enableNavigationLock).not.toHaveBeenCalled();
   expect(runtime.setNavigationLockEnabled).toHaveBeenCalledWith(false);
   expect(params.quickActionOverlayRef.current).toBeNull();
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    leaseGeneration: 3,
+    operationGeneration: 5,
+    surfaceCapabilityToken: 'surface-token',
+    type: 'DISABLE_SCREENSHOT_MODE',
+  });
 }
 
 function expectQuickActionCloseRestoresPreLockedBaseline() {

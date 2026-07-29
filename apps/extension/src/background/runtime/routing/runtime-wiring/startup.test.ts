@@ -1,10 +1,16 @@
 import { expect, it, vi } from 'vitest';
 
 const migrateHighlighterSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
+const ensureActivePageAccessRuntime = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock('../../../../composition/persistence/highlighter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/highlighter')>()),
   migrateHighlighterSystemPresetCatalog,
+}));
+
+vi.mock('../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/service')>()),
+  ensureActivePageAccessRuntime,
 }));
 
 import {
@@ -17,6 +23,7 @@ import {
   reconcileCaptureJobDownloadOnStartup,
   reconcileCaptureJobsOnStartup,
   recoverInterruptedSessions,
+  recoverVideoCaptureSurfaceOnStartup,
   resetVideoRecordingRuntimeState,
   createModeState,
 } from '../../../../../../../tooling/test/support/background-runtime-wiring.test-support';
@@ -36,6 +43,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   cleanupOldRecordings.mockRejectedValue(new Error('cleanup failed'));
   cleanupExpiredProjectExportInputs.mockRejectedValue(new Error('export input cleanup failed'));
   recoverInterruptedSessions.mockRejectedValue(new Error('recovery failed'));
+  recoverVideoCaptureSurfaceOnStartup.mockRejectedValue(new Error('surface recovery failed'));
   reconcileCaptureJobsOnStartup.mockRejectedValue(new Error('capture reconcile failed'));
   initializeAiStorageAccess.mockRejectedValue(new Error('ai init failed'));
 
@@ -52,6 +60,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   expect(initializeAiStorageAccess).toHaveBeenCalledOnce();
   expect(migrateHighlighterSystemPresetCatalog).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeState).toHaveBeenCalledOnce();
+  expect(recoverVideoCaptureSurfaceOnStartup).toHaveBeenCalledWith(ensureActivePageAccessRuntime);
   expect(logger.warn).toHaveBeenCalledWith(
     'Failed to request persistent storage',
     expect.any(Error)
@@ -71,6 +80,10 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   );
   expect(logger.warn).toHaveBeenCalledWith(
     'AI storage initialization failed (non-critical)',
+    expect.any(Error)
+  );
+  expect(logger.warn).toHaveBeenCalledWith(
+    'Capture surface recovery failed; new preset mutations remain blocked',
     expect.any(Error)
   );
 });

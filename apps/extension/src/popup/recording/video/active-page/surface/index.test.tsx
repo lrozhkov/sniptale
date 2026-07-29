@@ -33,7 +33,7 @@ function createRecordingState(
     countdownEndsAt: null,
     captureMode: null,
     captureSource: null,
-    viewportPreset: null,
+    viewportPresetId: null,
     error: null,
     ...overrides,
   };

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   mutations: {
     addFrame: vi.fn(),
     clearFrames: vi.fn(),
+    pinFrameAtLastPlacement: vi.fn(),
     removeFrame: vi.fn(),
     syncFocusOpacity: vi.fn(),
     syncAutoBlurFrames: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('../mutation-actions', async (importOriginal) => ({
 }));
 
 import { useFrameManagerMutations } from './useFrameManagerMutations';
+import { createFrameHostLayoutService } from '../host-layout/service';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -49,8 +51,8 @@ function createArgs() {
       globalStepBadgeAutoModeRef: { current: false },
       globalStepBadgeSettingsRef: { current: { autoMode: false } },
       highlighterSettingsCacheRef: { current: null },
+      hostLayoutServiceRef: { current: createFrameHostLayoutService() },
       isClearingRef: { current: false },
-      linkedElementsRef: { current: new Map() },
       prevFrameStatesRef: { current: new Map() },
       prevFramesRef: { current: [] },
       rootsRef: { current: new Map() },
@@ -95,7 +97,7 @@ describe('frame-manager-mutations-hook', () => {
   it('routes canonical mutation deps and reports duplicate linked elements through the owner seam', async () => {
     currentArgs = createArgs();
     const element = document.createElement('div');
-    currentArgs.refs.linkedElementsRef.current.set('frame-1', element);
+    currentArgs.refs.hostLayoutServiceRef.current.link('frame-1', element, '#frame-1');
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -108,7 +110,7 @@ describe('frame-manager-mutations-hook', () => {
       expect.objectContaining({
         containerRef: currentArgs.refs.containerRef,
         highlighterSettingsCacheRef: currentArgs.refs.highlighterSettingsCacheRef,
-        linkedElementsRef: currentArgs.refs.linkedElementsRef,
+        hostLayoutServiceRef: currentArgs.refs.hostLayoutServiceRef,
         recalculateStepBadgesRef: currentArgs.recalculateStepBadgesRef,
         rootsRef: currentArgs.refs.rootsRef,
         setFrames: currentArgs.setFrames,
@@ -116,7 +118,7 @@ describe('frame-manager-mutations-hook', () => {
     );
     expect(latestResult?.mutations).toBe(mocks.mutations);
     expect(latestResult?.hasFrameForElement(element)).toBe(true);
-    expect(mocks.logger.log).toHaveBeenCalledWith('Element already has a frame', 'frame-1');
+    expect(mocks.logger.log).toHaveBeenCalledWith('Element already has a frame');
     expect(latestResult?.hasFrameForElement(document.createElement('div'))).toBe(false);
   });
 });

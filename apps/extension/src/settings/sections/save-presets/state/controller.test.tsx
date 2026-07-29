@@ -62,6 +62,7 @@ function createSettings(): Settings {
     defaultExportPresetId: 'used',
     defaultImagePresetId: null,
     defaultVideoPresetId: null,
+    defaultViewportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
     authenticatedSnapshotAssetsEnabled: true,
@@ -69,6 +70,7 @@ function createSettings(): Settings {
     skipWebSnapshotSaveDisclosure: false,
     rawDiagnosticsEnabled: false,
     presets: [createPreset('used'), createPreset('unused')],
+    viewportPresets: [],
     saveCapturesToGallery: false,
   };
 }

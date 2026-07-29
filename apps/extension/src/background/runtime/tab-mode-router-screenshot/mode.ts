@@ -1,50 +1,45 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
-import { translate } from '../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { loadSettings } from '../../../composition/persistence/settings';
-import { classifyTabRuntimeCapability } from '../../../features/tab-capabilities/runtime';
-import { getScreenshotModeCapability } from '../../../features/tab-capabilities/capabilities';
 import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
-import {
-  armDebuggerActivation,
-  attachDebugger,
-  clearViewport,
-  detachDebugger,
-  isDebuggerAttached,
-  resetZoom,
-  setViewport,
-} from '../../diagnostics/lifecycle';
+import { loadSettings } from '../../../composition/persistence/settings';
+import { getScreenshotModeCapability } from '../../../features/tab-capabilities/capabilities';
+import { classifyTabRuntimeCapability } from '../../../features/tab-capabilities/runtime';
+import { translate } from '../../../platform/i18n';
 import {
   disablePreparationByCapability,
   enablePreparationByCapability,
 } from '../../capture/routes';
 import { createWebSnapshotViewerPorts, type WebSnapshotViewerPorts } from '../../capture/lifecycle';
-import { resolveDefaultScreenshotViewport } from './helpers';
-import { runScreenshotModeOperation } from './operation-queue';
+import { releaseQuickActionSurface } from '../../capture/quick-actions/flow/surface';
+import { getCaptureSurfaceService } from '../../capture-surface';
+import {
+  authorizeScreenshotSurfaceMutation,
+  beginScreenshotSurfaceSession,
+  bindScreenshotSurfaceSession,
+  claimScreenshotModeDisable,
+  endScreenshotSurfaceSession,
+  getScreenshotSurfaceBinding,
+  getScreenshotSurfaceSession,
+  markScreenshotSurfaceApplied,
+  nextScreenshotSurfaceGeneration,
+} from '../../capture-surface/screenshot-session';
 import type {
   ModeState,
   ScreenshotViewport,
   ViewportOwnerState,
   ViewportState,
 } from '../../routing-contracts/tab-mode-state';
+import { runScreenshotModeOperation } from './operation-queue';
 
 const logger = createLogger({ namespace: 'BackgroundScreenshotMode' });
 
 type ScreenshotModeCommitGuard = () => boolean | Promise<boolean>;
-type ScreenshotModePreparationState = {
-  screenshotMode: boolean;
-  visible: boolean;
-};
-
-type ScreenshotModeEnableEffect = {
-  capability: TabRuntimeCapability;
-  viewportApply: { wasAttachedBefore: boolean } | null;
-};
-
-type ScreenshotModeTransactionArgs = {
+type ScreenshotModePreparationState = { screenshotMode: boolean; visible: boolean };
+type EnableScreenshotModeArgs = {
   options: {
     commitGuard?: ScreenshotModeCommitGuard;
     readPreparationState?: () => Promise<ScreenshotModePreparationState>;
+    surfaceDocumentId?: string;
     toolbarVisible?: boolean;
   };
   screenshotModeState: ModeState;
@@ -54,196 +49,235 @@ type ScreenshotModeTransactionArgs = {
   webSnapshotViewerPorts: WebSnapshotViewerPorts;
 };
 
-type MapEntrySnapshot<T> = { present: false } | { present: true; value: T };
-
-function snapshotMapEntry<T>(state: Map<number, T>, tabId: number): MapEntrySnapshot<T> {
-  if (!state.has(tabId)) {
-    return { present: false };
-  }
-  return { present: true, value: state.get(tabId) as T };
-}
-
-function restoreMapEntry<T>(
-  state: Map<number, T>,
-  tabId: number,
-  snapshot: MapEntrySnapshot<T>
-): void {
-  if (snapshot.present) {
-    state.set(tabId, snapshot.value);
-    return;
-  }
-  state.delete(tabId);
-}
-
-async function notifyScreenshotModeEnabled(
-  tabId: number,
-  viewport: ScreenshotViewport | undefined,
-  ports: WebSnapshotViewerPorts,
-  capability: TabRuntimeCapability,
-  toolbarVisible?: boolean
-): Promise<void> {
-  await enablePreparationByCapability({
-    capability,
-    ports,
-    tabId,
-    ...(toolbarVisible === undefined ? {} : { toolbarVisible }),
-    viewport: viewport ?? null,
-  });
-}
-
-async function applyViewportPreset(
-  tabId: number,
-  viewport: Exclude<ScreenshotViewport, null>
-): Promise<{ wasAttachedBefore: boolean }> {
-  const wasAttachedBefore = await isDebuggerAttached(tabId);
-  if (!wasAttachedBefore) {
-    await attachDebugger(
-      tabId,
-      'screenshot',
-      armDebuggerActivation({ client: 'screenshot', reason: 'enable-screenshot-mode', tabId })
-    );
-  }
-  await setViewport(tabId, viewport.width, viewport.height);
-  await resetZoom(tabId);
-  return { wasAttachedBefore };
-}
-
-async function rollbackViewportPreset(tabId: number, wasAttachedBefore: boolean): Promise<void> {
-  try {
-    await clearViewport(tabId);
-  } catch (error) {
-    logger.warn('Failed to clear viewport after screenshot-mode setup error', error);
-  }
-
-  if (wasAttachedBefore) {
-    return;
-  }
-
-  try {
-    await detachDebugger(tabId, 'screenshot');
-  } catch (error) {
-    logger.warn('Failed to detach debugger after screenshot-mode setup error', error);
-  }
-}
-
-async function enablePresetScreenshotMode(args: {
-  capability: TabRuntimeCapability;
-  ports: WebSnapshotViewerPorts;
+type DisableScreenshotModeArgs = {
+  screenshotModeState: ModeState;
   tabId: number;
-  viewport: Exclude<ScreenshotViewport, null>;
   viewportOwnerState: ViewportOwnerState;
   viewportState: ViewportState;
-  toolbarVisible?: boolean;
-}): Promise<ScreenshotModeEnableEffect> {
-  const viewportApply = await applyViewportPreset(args.tabId, args.viewport);
+  webSnapshotViewerPorts: WebSnapshotViewerPorts;
+};
 
+async function evaluateGuard(guard?: ScreenshotModeCommitGuard): Promise<boolean> {
+  return guard ? guard() : true;
+}
+
+async function releaseRegularScreenshotSurface(tabId: number): Promise<void> {
+  await getCaptureSurfaceService().releaseTabOwners(tabId, ['screenshot']);
+}
+
+async function resolveDefaultSurface(args: {
+  capability: TabRuntimeCapability;
+  tabId: number;
+}): Promise<{ viewport: ScreenshotViewport; warning: string | null }> {
+  const settings = await loadSettings();
+  const presetId = settings.defaultViewportPresetId;
+  if (!presetId) return { viewport: null, warning: null };
+  const preset = settings.viewportPresets.find((candidate) => candidate.id === presetId);
+  if (!preset?.enabled) {
+    return { viewport: null, warning: translate('viewportPresets.messages.defaultUnavailable') };
+  }
+  if (args.capability === TabRuntimeCapability.OwnedSnapshotViewer) {
+    if (preset.target === 'window') {
+      return {
+        viewport: null,
+        warning: translate('viewportPresets.messages.viewerWindowDisabled'),
+      };
+    }
+    return {
+      viewport: {
+        presetId: preset.id,
+        target: 'viewport',
+        width: preset.width,
+        height: preset.height,
+      },
+      warning: null,
+    };
+  }
+  const availability = await getCaptureSurfaceService().getAvailability({
+    tabId: args.tabId,
+    presetId,
+    context: 'screenshot',
+  });
+  if (availability.status === 'unavailable') {
+    return { viewport: null, warning: translate('viewportPresets.messages.defaultUnavailable') };
+  }
+  const session = nextScreenshotSurfaceGeneration(args.tabId);
+  const applied = await getCaptureSurfaceService().apply({
+    sessionId: session.sessionId,
+    generation: session.generation,
+    owner: 'screenshot',
+    tabId: args.tabId,
+    presetId,
+    context: 'screenshot',
+  });
+  markScreenshotSurfaceApplied(args.tabId, session.generation);
+  return {
+    viewport: {
+      presetId: applied.presetId,
+      target: applied.target,
+      width: applied.width,
+      height: applied.height,
+    },
+    warning: null,
+  };
+}
+
+async function reenableScreenshotMode(
+  args: EnableScreenshotModeArgs,
+  capability: TabRuntimeCapability
+): Promise<boolean> {
+  const session = getScreenshotSurfaceSession(args.tabId);
+  if (!session) throw new Error('Screenshot surface session is unavailable');
+  if (
+    args.options.surfaceDocumentId &&
+    !bindScreenshotSurfaceSession({
+      documentId: args.options.surfaceDocumentId,
+      tabId: args.tabId,
+    })
+  ) {
+    throw new Error('authorization-expired');
+  }
+  const surfaceBinding = getScreenshotSurfaceBinding(args.tabId);
+  if (!surfaceBinding) throw new Error('Screenshot surface binding is unavailable');
+  const previous = args.options.readPreparationState
+    ? await args.options.readPreparationState()
+    : { screenshotMode: true, visible: true };
+  const enable = (toolbarVisible: boolean) =>
+    enablePreparationByCapability({
+      capability,
+      ports: args.webSnapshotViewerPorts,
+      tabId: args.tabId,
+      toolbarVisible,
+      viewport: args.viewportState.get(args.tabId) ?? null,
+      ...surfaceBinding,
+    });
   try {
-    await notifyScreenshotModeEnabled(
-      args.tabId,
-      args.viewport,
-      args.ports,
-      args.capability,
-      args.toolbarVisible
-    );
+    await enable(args.options.toolbarVisible ?? previous.visible);
+    if (await evaluateGuard(args.options.commitGuard)) return true;
+    await enable(previous.visible);
+    return false;
   } catch (error) {
+    await enable(previous.visible).catch((rollbackError) => {
+      logger.error('Failed to restore screenshot preparation state', rollbackError);
+    });
+    throw error;
+  }
+}
+
+function commitScreenshotMode(
+  args: EnableScreenshotModeArgs,
+  capability: TabRuntimeCapability,
+  resolved: Awaited<ReturnType<typeof resolveDefaultSurface>>
+): void {
+  args.screenshotModeState.set(args.tabId, true);
+  args.viewportState.set(args.tabId, resolved.viewport);
+  if (resolved.viewport) {
+    args.viewportOwnerState.set(
+      args.tabId,
+      capability === TabRuntimeCapability.OwnedSnapshotViewer ? 'viewer' : 'capture-surface'
+    );
+  } else {
     args.viewportOwnerState.delete(args.tabId);
-    args.viewportState.set(args.tabId, null);
-    await rollbackViewportPreset(args.tabId, viewportApply.wasAttachedBefore);
+  }
+  if (resolved.warning) logger.warn(resolved.warning, { tabId: args.tabId });
+}
+
+async function rollbackUncommittedScreenshotMode(
+  args: EnableScreenshotModeArgs,
+  capability: TabRuntimeCapability,
+  surfaceApplied: boolean
+): Promise<unknown[]> {
+  const failures: unknown[] = [];
+  await disablePreparationByCapability({
+    capability,
+    ports: args.webSnapshotViewerPorts,
+    tabId: args.tabId,
+  }).catch((error) => failures.push(error));
+
+  let surfaceReleased = !surfaceApplied;
+  if (surfaceApplied) {
+    await releaseRegularScreenshotSurface(args.tabId)
+      .then(() => {
+        surfaceReleased = true;
+      })
+      .catch((error) => failures.push(error));
+  }
+  if (surfaceReleased) endScreenshotSurfaceSession(args.tabId);
+  return failures;
+}
+
+function throwRollbackFailures(primary: unknown, rollbackFailures: unknown[]): never {
+  throw new AggregateError(
+    [primary, ...rollbackFailures],
+    'Screenshot mode operation and rollback both failed'
+  );
+}
+
+async function enableNewScreenshotMode(
+  args: EnableScreenshotModeArgs,
+  capability: TabRuntimeCapability
+): Promise<boolean> {
+  beginScreenshotSurfaceSession(args.tabId);
+  if (
+    args.options.surfaceDocumentId &&
+    !bindScreenshotSurfaceSession({
+      documentId: args.options.surfaceDocumentId,
+      tabId: args.tabId,
+    })
+  ) {
+    endScreenshotSurfaceSession(args.tabId);
+    throw new Error('authorization-expired');
+  }
+  let surfaceApplied = false;
+  let preparationAttempted = false;
+  try {
+    const resolved = await resolveDefaultSurface({ capability, tabId: args.tabId });
+    const surfaceBinding = getScreenshotSurfaceBinding(args.tabId);
+    if (!surfaceBinding) throw new Error('Screenshot surface binding is unavailable');
+    surfaceApplied = capability === TabRuntimeCapability.Regular && resolved.viewport !== null;
+    preparationAttempted = true;
+    await enablePreparationByCapability({
+      capability,
+      ports: args.webSnapshotViewerPorts,
+      tabId: args.tabId,
+      ...(args.options.toolbarVisible === undefined
+        ? {}
+        : { toolbarVisible: args.options.toolbarVisible }),
+      viewport: resolved.viewport,
+      ...surfaceBinding,
+      ...(resolved.warning === null ? {} : { surfaceWarning: resolved.warning }),
+    });
+    if (await evaluateGuard(args.options.commitGuard)) {
+      commitScreenshotMode(args, capability, resolved);
+      return true;
+    }
+  } catch (error) {
+    if (preparationAttempted || surfaceApplied) {
+      const rollbackFailures = await rollbackUncommittedScreenshotMode(
+        args,
+        capability,
+        surfaceApplied
+      );
+      if (rollbackFailures.length > 0) throwRollbackFailures(error, rollbackFailures);
+    } else {
+      endScreenshotSurfaceSession(args.tabId);
+    }
     throw error;
   }
 
-  args.viewportOwnerState.set(args.tabId, 'debugger');
-  args.viewportState.set(args.tabId, args.viewport);
-  logger.debug('Applied default screenshot viewport preset', {
-    tabId: args.tabId,
-    viewport: args.viewport,
-  });
-  return { capability: args.capability, viewportApply };
-}
-
-async function enableNativeScreenshotMode(args: {
-  capability: TabRuntimeCapability;
-  ports: WebSnapshotViewerPorts;
-  tabId: number;
-  viewportOwnerState: ViewportOwnerState;
-  viewportState: ViewportState;
-  toolbarVisible?: boolean;
-}): Promise<ScreenshotModeEnableEffect> {
-  args.viewportOwnerState.delete(args.tabId);
-  args.viewportState.set(args.tabId, null);
-  await notifyScreenshotModeEnabled(
-    args.tabId,
-    null,
-    args.ports,
-    args.capability,
-    args.toolbarVisible
+  const rollbackFailures = await rollbackUncommittedScreenshotMode(
+    args,
+    capability,
+    surfaceApplied
   );
-  logger.debug('Using native screenshot viewport', { tabId: args.tabId });
-  return { capability: args.capability, viewportApply: null };
+  if (rollbackFailures.length > 0) {
+    throw new AggregateError(rollbackFailures, 'Screenshot mode rollback failed');
+  }
+  return false;
 }
 
-async function rollbackGuardedScreenshotModeEnable(args: {
-  effect: ScreenshotModeEnableEffect;
-  ports: WebSnapshotViewerPorts;
-  previousPreparation: ScreenshotModePreparationState;
-  previousViewport: MapEntrySnapshot<ScreenshotViewport>;
-  previousViewportOwner: MapEntrySnapshot<'debugger' | 'viewer'>;
-  tabId: number;
-}): Promise<void> {
-  if (args.previousPreparation.screenshotMode) {
-    if (args.effect.viewportApply) {
-      const previousDebuggerViewport =
-        args.previousViewportOwner.present &&
-        args.previousViewportOwner.value === 'debugger' &&
-        args.previousViewport.present
-          ? args.previousViewport.value
-          : null;
-      if (previousDebuggerViewport) {
-        await setViewport(
-          args.tabId,
-          previousDebuggerViewport.width,
-          previousDebuggerViewport.height
-        );
-        await resetZoom(args.tabId);
-      } else {
-        await rollbackViewportPreset(args.tabId, args.effect.viewportApply.wasAttachedBefore);
-      }
-    }
-
-    await notifyScreenshotModeEnabled(
-      args.tabId,
-      args.previousViewport.present ? args.previousViewport.value : null,
-      args.ports,
-      args.effect.capability,
-      args.previousPreparation.visible
-    );
-    return;
-  }
-
-  let rollbackError: unknown;
-  try {
-    await disablePreparationByCapability({
-      capability: args.effect.capability,
-      ports: args.ports,
-      tabId: args.tabId,
-    });
-  } catch (error) {
-    rollbackError = error;
-    logger.warn('Failed to disable superseded screenshot-mode preparation', error);
-  }
-
-  if (args.effect.viewportApply) {
-    await rollbackViewportPreset(args.tabId, args.effect.viewportApply.wasAttachedBefore);
-  }
-
-  if (rollbackError) {
-    throw rollbackError;
-  }
-}
-
-async function applyScreenshotModeEnable(
-  args: ScreenshotModeTransactionArgs
-): Promise<ScreenshotModeEnableEffect> {
+async function enableScreenshotModeOperation(args: EnableScreenshotModeArgs): Promise<boolean> {
+  if (!(await evaluateGuard(args.options.commitGuard))) return false;
   const tab = await browserTabs.get(args.tabId);
   const screenshotCapability = getScreenshotModeCapability(tab);
   if (!screenshotCapability.supported) {
@@ -252,126 +286,9 @@ async function applyScreenshotModeEnable(
     );
   }
   const capability = classifyTabRuntimeCapability(tab);
-  const defaultViewport = resolveDefaultScreenshotViewport(await loadSettings());
-  const shared = {
-    capability,
-    ports: args.webSnapshotViewerPorts,
-    tabId: args.tabId,
-    viewportOwnerState: args.viewportOwnerState,
-    viewportState: args.viewportState,
-    ...(args.options.toolbarVisible === undefined
-      ? {}
-      : { toolbarVisible: args.options.toolbarVisible }),
-  };
-
-  if (defaultViewport && capability === TabRuntimeCapability.Regular) {
-    return enablePresetScreenshotMode({ ...shared, viewport: defaultViewport });
-  }
-  return enableNativeScreenshotMode(shared);
-}
-
-async function evaluateCommitGuard(
-  commitGuard: ScreenshotModeCommitGuard | undefined
-): Promise<{ allowed: boolean; error?: unknown }> {
-  if (!commitGuard) {
-    return { allowed: true };
-  }
-  try {
-    return { allowed: await commitGuard() };
-  } catch (error) {
-    return { allowed: false, error };
-  }
-}
-
-async function commitGuardedScreenshotModeEnable(args: {
-  effect: ScreenshotModeEnableEffect;
-  guard: ScreenshotModeCommitGuard | undefined;
-  previousPreparation: ScreenshotModePreparationState;
-  previousScreenshotMode: MapEntrySnapshot<boolean>;
-  previousViewport: MapEntrySnapshot<ScreenshotViewport>;
-  previousViewportOwner: MapEntrySnapshot<'debugger' | 'viewer'>;
-  transaction: ScreenshotModeTransactionArgs;
-}): Promise<boolean> {
-  const decision = await evaluateCommitGuard(args.guard);
-  if (decision.allowed) {
-    return true;
-  }
-
-  try {
-    await rollbackGuardedScreenshotModeEnable({
-      effect: args.effect,
-      ports: args.transaction.webSnapshotViewerPorts,
-      previousPreparation: args.previousPreparation,
-      previousViewport: args.previousViewport,
-      previousViewportOwner: args.previousViewportOwner,
-      tabId: args.transaction.tabId,
-    });
-  } finally {
-    restoreMapEntry(args.transaction.viewportState, args.transaction.tabId, args.previousViewport);
-    restoreMapEntry(
-      args.transaction.viewportOwnerState,
-      args.transaction.tabId,
-      args.previousViewportOwner
-    );
-    restoreMapEntry(
-      args.transaction.screenshotModeState,
-      args.transaction.tabId,
-      args.previousScreenshotMode
-    );
-  }
-  logger.debug('Rolled back superseded screenshot mode enable', {
-    tabId: args.transaction.tabId,
-  });
-  if (decision.error) {
-    throw decision.error;
-  }
-  return false;
-}
-
-async function enableScreenshotModeTransaction(
-  args: ScreenshotModeTransactionArgs
-): Promise<boolean> {
-  return runScreenshotModeOperation(args.tabId, async () => {
-    const initialDecision = await evaluateCommitGuard(args.options.commitGuard);
-    if (!initialDecision.allowed) {
-      if (initialDecision.error) {
-        throw initialDecision.error;
-      }
-      return false;
-    }
-
-    const previousPreparation = args.options.readPreparationState
-      ? await args.options.readPreparationState()
-      : {
-          screenshotMode: args.screenshotModeState.get(args.tabId) === true,
-          visible: args.options.toolbarVisible ?? true,
-        };
-    const previousScreenshotMode = snapshotMapEntry(args.screenshotModeState, args.tabId);
-    const previousViewport = snapshotMapEntry(args.viewportState, args.tabId);
-    const previousViewportOwner = snapshotMapEntry(args.viewportOwnerState, args.tabId);
-    try {
-      const effect = await applyScreenshotModeEnable(args);
-      const canCommit = await commitGuardedScreenshotModeEnable({
-        effect,
-        guard: args.options.commitGuard,
-        previousPreparation,
-        previousScreenshotMode,
-        previousViewport,
-        previousViewportOwner,
-        transaction: args,
-      });
-      if (!canCommit) {
-        return false;
-      }
-
-      args.screenshotModeState.set(args.tabId, true);
-      logger.debug('Enabled screenshot mode', { tabId: args.tabId });
-      return true;
-    } catch (error) {
-      logger.error('Failed to enable screenshot mode', error);
-      throw error;
-    }
-  });
+  return args.screenshotModeState.get(args.tabId)
+    ? reenableScreenshotMode(args, capability)
+    : enableNewScreenshotMode(args, capability);
 }
 
 export async function enableScreenshotMode(
@@ -380,16 +297,18 @@ export async function enableScreenshotMode(
   viewportState: ViewportState,
   viewportOwnerState: ViewportOwnerState,
   webSnapshotViewerPorts: WebSnapshotViewerPorts = new Map(),
-  options: { toolbarVisible?: boolean } = {}
+  options: { surfaceDocumentId?: string; toolbarVisible?: boolean } = {}
 ): Promise<void> {
-  await enableScreenshotModeTransaction({
-    options,
-    screenshotModeState,
-    tabId,
-    viewportOwnerState,
-    viewportState,
-    webSnapshotViewerPorts,
-  });
+  await runScreenshotModeOperation(tabId, () =>
+    enableScreenshotModeOperation({
+      options,
+      screenshotModeState,
+      tabId,
+      viewportOwnerState,
+      viewportState,
+      webSnapshotViewerPorts,
+    })
+  );
 }
 
 export function enableScreenshotModeGuarded(
@@ -404,14 +323,16 @@ export function enableScreenshotModeGuarded(
     toolbarVisible?: boolean;
   }
 ): Promise<boolean> {
-  return enableScreenshotModeTransaction({
-    options,
-    screenshotModeState,
-    tabId,
-    viewportOwnerState,
-    viewportState,
-    webSnapshotViewerPorts: webSnapshotViewerPorts ?? createWebSnapshotViewerPorts(),
-  });
+  return runScreenshotModeOperation(tabId, () =>
+    enableScreenshotModeOperation({
+      options,
+      screenshotModeState,
+      tabId,
+      viewportOwnerState,
+      viewportState,
+      webSnapshotViewerPorts: webSnapshotViewerPorts ?? createWebSnapshotViewerPorts(),
+    })
+  );
 }
 
 export async function disableScreenshotMode(
@@ -421,35 +342,69 @@ export async function disableScreenshotMode(
   viewportOwnerState: ViewportOwnerState,
   webSnapshotViewerPorts: WebSnapshotViewerPorts = new Map()
 ): Promise<void> {
-  return runScreenshotModeOperation(tabId, async () => {
-    try {
-      logger.log('Disabling screenshot mode', { tabId });
+  return runScreenshotModeOperation(tabId, () =>
+    disableScreenshotModeOperation({
+      screenshotModeState,
+      tabId,
+      viewportOwnerState,
+      viewportState,
+      webSnapshotViewerPorts,
+    })
+  );
+}
 
-      const tab = await browserTabs.get(tabId);
-      const capability = classifyTabRuntimeCapability(tab);
-      await disablePreparationByCapability({
-        capability,
-        ports: webSnapshotViewerPorts,
-        tabId,
-      });
+async function disableScreenshotModeOperation(args: DisableScreenshotModeArgs): Promise<void> {
+  const tab = await browserTabs.get(args.tabId);
+  const capability = classifyTabRuntimeCapability(tab);
+  await disablePreparationByCapability({
+    capability,
+    ports: args.webSnapshotViewerPorts,
+    tabId: args.tabId,
+  });
+  if (capability === TabRuntimeCapability.Regular) {
+    await releaseQuickActionSurface(args.tabId, args.viewportState);
+    await releaseRegularScreenshotSurface(args.tabId);
+  }
+  endScreenshotSurfaceSession(args.tabId);
+  args.viewportOwnerState.delete(args.tabId);
+  args.viewportState.delete(args.tabId);
+  args.screenshotModeState.delete(args.tabId);
+  logger.debug('Disabled screenshot mode and restored the capture surface', {
+    tabId: args.tabId,
+  });
+}
 
-      const viewportOwner = viewportOwnerState.get(tabId) ?? null;
-      if (capability === TabRuntimeCapability.Regular && viewportOwner === 'debugger') {
-        try {
-          await clearViewport(tabId);
-        } catch (error) {
-          logger.warn('Failed to clear viewport before disabling screenshot mode', error);
-        }
-
-        await detachDebugger(tabId, 'screenshot');
-      }
-      viewportOwnerState.delete(tabId);
-      viewportState.delete(tabId);
-      screenshotModeState.delete(tabId);
-      logger.debug('Disabled screenshot mode', { tabId });
-    } catch (error) {
-      logger.error('Failed to disable screenshot mode', error);
-      throw error;
+export async function disableScreenshotModeForContent(
+  args: DisableScreenshotModeArgs & {
+    leaseGeneration: number | null | undefined;
+    operationGeneration: number | undefined;
+    senderDocumentId: string | null | undefined;
+    surfaceCapabilityToken: string | undefined;
+  }
+): Promise<void> {
+  return runScreenshotModeOperation(args.tabId, async () => {
+    const surfaceCapabilityToken = args.surfaceCapabilityToken;
+    if (
+      !surfaceCapabilityToken ||
+      !authorizeScreenshotSurfaceMutation({
+        capabilityToken: surfaceCapabilityToken,
+        documentId: args.senderDocumentId,
+        tabId: args.tabId,
+      })
+    ) {
+      throw new Error('authorization-expired');
     }
+    if (
+      !claimScreenshotModeDisable({
+        capabilityToken: surfaceCapabilityToken,
+        documentId: args.senderDocumentId,
+        leaseGeneration: args.leaseGeneration,
+        operationGeneration: args.operationGeneration,
+        tabId: args.tabId,
+      })
+    ) {
+      throw new Error('stale-generation');
+    }
+    await disableScreenshotModeOperation(args);
   });
 }

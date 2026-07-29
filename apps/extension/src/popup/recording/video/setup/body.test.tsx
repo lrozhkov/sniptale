@@ -79,7 +79,7 @@ function createBodyProps(): React.ComponentProps<typeof VideoSetupBody> {
 
   return {
     activeTabCapabilities: createActiveTabCapabilities(),
-    captureMode: CaptureMode.VIEWPORT_EMULATION,
+    captureMode: CaptureMode.TAB,
     isLoadingMicrophones: false,
     isLoadingWebcams: false,
     microphoneDevices: [{ deviceId: 'mic-1', label: 'USB Mic' }],
@@ -99,7 +99,7 @@ function createBodyProps(): React.ComponentProps<typeof VideoSetupBody> {
       duration: 0,
       error: null,
       status: VideoRecordingStatus.IDLE,
-      viewportPreset: null,
+      viewportPresetId: null,
     },
     selectedPresetId: 'preset-1',
     settings: createBodySettings(),
@@ -192,7 +192,7 @@ function expectSetupSectionOrder() {
 function expectSelectorProps(props: React.ComponentProps<typeof VideoSetupBody>) {
   expect(videoSetupBodyMocks.captureModeSelectorMock).toHaveBeenCalledWith(
     expect.objectContaining({
-      captureMode: CaptureMode.VIEWPORT_EMULATION,
+      captureMode: CaptureMode.TAB,
     })
   );
   expect(videoSetupBodyMocks.presetSelectorMock).toHaveBeenCalledWith(
@@ -206,7 +206,7 @@ function expectSelectorProps(props: React.ComponentProps<typeof VideoSetupBody>)
 function expectSetupControlProps(props: React.ComponentProps<typeof VideoSetupBody>) {
   expect(videoSetupBodyMocks.toggleGridMock).toHaveBeenCalledWith(
     expect.objectContaining({
-      captureMode: CaptureMode.VIEWPORT_EMULATION,
+      captureMode: CaptureMode.TAB,
       controlledCursorDisabled: true,
       controlledCursorDisabledReason: 'Desktop app required',
       diagnosticsDisabled: false,
@@ -228,7 +228,7 @@ function expectSetupControlProps(props: React.ComponentProps<typeof VideoSetupBo
   );
   expect(videoSetupBodyMocks.settingsGridMock).toHaveBeenCalledWith(
     expect.objectContaining({
-      captureMode: CaptureMode.VIEWPORT_EMULATION,
+      captureMode: CaptureMode.TAB,
       onSettingsChange: props.onSettingsChange,
       settings: props.settings,
     })
@@ -264,9 +264,7 @@ it('locks webcam and hides screen preset controls in camera mode', async () => {
     root?.render(<VideoSetupBody {...props} />);
   });
 
-  expect(videoSetupBodyMocks.presetSelectorMock).toHaveBeenCalledWith(
-    expect.objectContaining({ hidden: true })
-  );
+  expect(videoSetupBodyMocks.presetSelectorMock).not.toHaveBeenCalled();
   expect(videoSetupBodyMocks.toggleGridMock).toHaveBeenCalledWith(
     expect.objectContaining({ captureMode: CaptureMode.CAMERA, webcamLocked: true })
   );

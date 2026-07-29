@@ -47,8 +47,6 @@ it('publishes actual webcam settings on recording start', () => {
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-webcam',
     settings: createSettings(),
-    captureWidth: 1280,
-    captureHeight: 720,
     cursorCaptureMode: 'separate',
     trackSettings: { displaySurface: 'window', frameRate: 30, height: 720, width: 1280 },
     durationTracker: recordingContext.durationTracker,
@@ -74,42 +72,38 @@ it('fails fast when the recording video stream is missing', () => {
     finalizeRecordingBootstrap({
       resolvedRecordingId: 'recording-missing-stream',
       settings: createSettings(),
-      captureWidth: 1280,
-      captureHeight: 720,
       trackSettings: { frameRate: 30, height: 720, width: 1280 },
       durationTracker: recordingContext.durationTracker,
     })
   ).toThrow('Recording video stream is not initialized');
 });
 
-it('notifies runtime and rejects the stop waiter when the recorder fails', () => {
+it('resolves one terminal stop outcome without a parallel runtime error', () => {
+  const resolveStop = vi.fn();
   const rejectStop = vi.fn();
   recordingContext.beginRecordingSession('recording-error');
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-error',
     settings: createSettings(),
-    captureWidth: 1280,
-    captureHeight: 720,
     trackSettings: { frameRate: 30, height: 720, width: 1280 },
     durationTracker: recordingContext.durationTracker,
   });
-  recordingContext.beginStopRequest({ reject: rejectStop, resolve: vi.fn() });
+  recordingContext.beginStopRequest({ reject: rejectStop, resolve: resolveStop });
 
   mediaRecorderTestState.lastInstance?.onerror?.(
     Object.assign(new Event('error'), { error: new Error('recorder failed') })
   );
 
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalledWith(
     expect.objectContaining({
-      payload: expect.objectContaining({
-        type: VideoMessageType.OFFSCREEN_ERROR,
-        error: 'recorder failed',
-        phase: 'stop',
-        recordingId: 'recording-error',
-      }),
+      payload: expect.objectContaining({ type: VideoMessageType.OFFSCREEN_ERROR }),
     })
   );
-  expect(rejectStop).toHaveBeenCalledWith(expect.any(Error));
+  expect(resolveStop).toHaveBeenCalledWith({
+    error: 'recorder failed',
+    result: 'terminal-failure',
+  });
+  expect(rejectStop).not.toHaveBeenCalled();
   expect(recordingContext.videoStream).toBeNull();
 });
 
@@ -118,8 +112,6 @@ it('uses the fallback recorder error when native error details are absent', () =
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-fallback-error',
     settings: createSettings(),
-    captureWidth: 1280,
-    captureHeight: 720,
     trackSettings: { frameRate: 30, height: 720, width: 1280 },
     durationTracker: recordingContext.durationTracker,
   });

@@ -151,6 +151,8 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
     skipWebSnapshotSaveDisclosure: false,
     rawDiagnosticsEnabled: false,
     saveCapturesToGallery: false,
+    defaultViewportPresetId: null,
+    viewportPresets: [],
     ...overrides,
   };
 }

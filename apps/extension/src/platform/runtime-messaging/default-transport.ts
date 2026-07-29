@@ -10,6 +10,7 @@ import type {
 } from '../../contracts/messaging/tab';
 import { createRuntimeMessagingTransport } from './chrome-transport';
 import type { RuntimeMessagingTransport } from './transport';
+import type { TabMessageTarget } from './transport';
 
 let defaultTransport: RuntimeMessagingTransport | null = null;
 
@@ -32,7 +33,8 @@ export function sendRuntimeMessage<TMessage extends RuntimeRequestByType[Runtime
  */
 export function sendTabMessage<TMessage extends TabRequestByType[TabMessageType]>(
   tabId: number,
-  message: TMessage
+  message: TMessage,
+  target?: TabMessageTarget
 ): Promise<TabResponseByType[TMessage['type']]> {
-  return getDefaultTransport().sendTabMessage(tabId, message);
+  return getDefaultTransport().sendTabMessage(tabId, message, target);
 }

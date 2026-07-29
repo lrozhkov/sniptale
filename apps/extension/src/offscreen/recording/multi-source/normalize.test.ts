@@ -2,21 +2,15 @@
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { createRecordingVideoElementMock, waitForVideoReadyMock, wrapCanvasTrackStopMock } =
-  vi.hoisted(() => ({
-    createRecordingVideoElementMock: vi.fn(),
-    waitForVideoReadyMock: vi.fn(),
-    wrapCanvasTrackStopMock: vi.fn((track: MediaStreamTrack, cleanup: () => void) => {
-      Object.assign(track, { cleanup });
-    }),
-  }));
+const { createSourceVideoMock, waitForSourceMetadataMock } = vi.hoisted(() => ({
+  createSourceVideoMock: vi.fn(),
+  waitForSourceMetadataMock: vi.fn(),
+}));
 
-vi.mock('../stream/viewport/video', () => ({
-  createRecordingVideoElement: createRecordingVideoElementMock,
-  startCanvasBackedFrameLoop: vi.fn(),
-  startVideoBackedFrameLoop: vi.fn(),
-  waitForVideoReady: waitForVideoReadyMock,
-  wrapCanvasTrackStop: wrapCanvasTrackStopMock,
+vi.mock('../stream/video-source', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../stream/video-source')>()),
+  createSourceVideo: createSourceVideoMock,
+  waitForSourceMetadata: waitForSourceMetadataMock,
 }));
 
 import { normalizeMultiSourceVideoStream } from './normalize';
@@ -66,7 +60,7 @@ beforeEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
   vi.restoreAllMocks();
-  waitForVideoReadyMock.mockResolvedValue(undefined);
+  waitForSourceMetadataMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -89,7 +83,7 @@ it('records multi-source video through a fixed-size canvas when source dimension
   const { canvas, ctx } = installCanvasFixture(canvasStream);
   const video = { pause: vi.fn(), srcObject: sourceStream, videoHeight: 1304, videoWidth: 2560 };
 
-  createRecordingVideoElementMock.mockReturnValue(video);
+  createSourceVideoMock.mockReturnValue(video);
 
   const result = await normalizeMultiSourceVideoStream(sourceStream, VideoQuality.HIGH);
   video.videoHeight = 1192;
@@ -103,9 +97,7 @@ it('records multi-source video through a fixed-size canvas when source dimension
   expect(canvas.getContext).toHaveBeenCalledWith('2d', { alpha: false });
   expect(ctx.drawImage).toHaveBeenLastCalledWith(video, 0, 0);
   expect(requestFrame).toHaveBeenCalledTimes(2);
-  expect(wrapCanvasTrackStopMock).toHaveBeenCalledWith(canvasTrack, expect.any(Function));
-
-  (canvasTrack as unknown as { cleanup: () => void }).cleanup();
+  canvasTrack.stop();
   expect(sourceStream.track.stop).toHaveBeenCalled();
   expect(video.pause).toHaveBeenCalled();
 });
@@ -122,20 +114,21 @@ it('falls back to timed canvas capture when manual frame requests are unavailabl
   canvas.captureStream
     .mockReturnValueOnce(manualStream as unknown as MediaStream)
     .mockReturnValueOnce(timedStream as unknown as MediaStream);
-  createRecordingVideoElementMock.mockReturnValue(video);
+  createSourceVideoMock.mockReturnValue(video);
 
   const result = await normalizeMultiSourceVideoStream(sourceStream, VideoQuality.HIGH);
 
   expect(result.stream).toBe(timedStream);
   expect(manualTrack.stop).toHaveBeenCalled();
-  expect(wrapCanvasTrackStopMock).toHaveBeenCalledWith(timedTrack, expect.any(Function));
+  timedTrack.stop();
+  expect(sourceStream.track.stop).toHaveBeenCalled();
 });
 
 it('cleans up the source stream when fixed canvas creation fails', async () => {
   const sourceStream = createSourceStream();
   const video = { pause: vi.fn(), srcObject: sourceStream, videoHeight: 720, videoWidth: 1280 };
 
-  createRecordingVideoElementMock.mockReturnValue(video);
+  createSourceVideoMock.mockReturnValue(video);
   installBrokenCanvasFixture({ stream: {} as MediaStream, withContext: false });
 
   await expect(normalizeMultiSourceVideoStream(sourceStream, VideoQuality.HIGH)).rejects.toThrow(
@@ -152,7 +145,7 @@ it('rejects canvas streams without a video track', async () => {
   const video = { pause: vi.fn(), srcObject: sourceStream, videoHeight: 720, videoWidth: 1280 };
   const canvasStream = { getVideoTracks: () => [] } as unknown as MediaStream;
 
-  createRecordingVideoElementMock.mockReturnValue(video);
+  createSourceVideoMock.mockReturnValue(video);
   installBrokenCanvasFixture({ stream: canvasStream, withContext: true });
 
   await expect(normalizeMultiSourceVideoStream(sourceStream, VideoQuality.HIGH)).rejects.toThrow(

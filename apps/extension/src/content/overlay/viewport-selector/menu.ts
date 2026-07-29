@@ -28,7 +28,15 @@ function useViewportMenuOutsideClick(
 export function useViewportSelectorMenu(props: {
   disabled: boolean;
   onMenuStateChange?: (isOpen: boolean) => void;
-  onViewportChange: (viewport: { width: number; height: number } | null) => void;
+  onViewportChange: (
+    viewport: {
+      presetId: string;
+      target: 'viewport' | 'window';
+      width: number;
+      height: number;
+    } | null,
+    activationEvent?: Event
+  ) => void;
 }) {
   const { disabled, onMenuStateChange, onViewportChange } = props;
   const [showMenu, setShowMenu] = useState(false);
@@ -48,13 +56,24 @@ export function useViewportSelectorMenu(props: {
     }
   };
 
-  const handleSelectNative = () => {
-    onViewportChange(null);
+  const handleSelectNative = (event: React.MouseEvent<HTMLButtonElement>) => {
+    onViewportChange(null, event.nativeEvent);
     setShowMenu(false);
   };
 
-  const handleSelectPreset = (preset: ViewportPreset) => {
-    onViewportChange({ width: preset.width, height: preset.height });
+  const handleSelectPreset = (
+    preset: ViewportPreset,
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    onViewportChange(
+      {
+        presetId: preset.id,
+        target: preset.target,
+        width: preset.width,
+        height: preset.height,
+      },
+      event.nativeEvent
+    );
     setShowMenu(false);
   };
 

@@ -5,6 +5,7 @@ function createRuntimeSessionState(): Pick<
   PopupExportRuntimeContract,
   | 'copiedFormat'
   | 'copyingFormat'
+  | 'cancelRetryRef'
   | 'copyRequestIdRef'
   | 'copyResetTimeoutRef'
   | 'progress'
@@ -18,6 +19,7 @@ function createRuntimeSessionState(): Pick<
   return {
     copiedFormat: null,
     copyingFormat: null,
+    cancelRetryRef: { current: null },
     copyRequestIdRef: { current: 0 },
     copyResetTimeoutRef: { current: null },
     progress: { activeStepKey: null, current: 0, errors: [], message: '', phase: 'idle', total: 0 },

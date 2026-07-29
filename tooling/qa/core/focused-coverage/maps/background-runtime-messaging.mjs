@@ -66,6 +66,7 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
       'apps/extension/src/background/media/video/manager/preflight.resolve.test.ts',
       'apps/extension/src/background/media/video/manager/preflight.resolve.multi-source.test.ts',
       'apps/extension/src/background/media/video/manager/preflight.resolve.multi-source-failure.test.ts',
+      'apps/extension/src/background/media/video/manager/recording-context.prepare.test.ts',
       'apps/extension/src/background/media/video/manager/session.facade.test.ts',
       'apps/extension/src/background/media/video/manager/start-activation-watchdog.test.ts',
       'apps/extension/src/background/media/video/manager/start-helpers.test.ts',
@@ -98,15 +99,55 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
       'runtime manager suites.',
     testFiles: [
       'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/messages.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/' +
-        'navigation.stale-continuation.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation.stale-epoch.test.ts',
+      'apps/extension/src/background/media/video/runtime/manager/controlled-cursor/navigation-effects.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.pause-resume.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.start-failure.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.privacy-erasure.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/effects.test.ts',
+      'apps/extension/src/background/media/video/runtime/manager/tab-navigation/index.test.ts',
+      'apps/extension/src/background/media/video/runtime/manager/tab-navigation/source-validation.test.ts',
+    ],
+  },
+  {
+    owner: 'background-visible-capture',
+    productionFile: 'apps/extension/src/background/capture/visible/flow.ts',
+    exclusive: true,
+    reason:
+      'Visible capture natural-size, native fallback failure, and encoded output behavior are ' +
+      'covered by focused flow suites.',
+    testFiles: [
+      'apps/extension/src/background/capture/visible/flow.native-failure.test.ts',
+      'apps/extension/src/background/capture/visible/flow.test.ts',
+      'apps/extension/src/background/capture/visible/flow.webp.test.ts',
+    ],
+  },
+  {
+    owner: 'background-screenshot-mode-router',
+    productionPrefix: 'apps/extension/src/background/runtime/tab-mode-router-screenshot/',
+    exclusive: true,
+    reason:
+      'Screenshot mode, navigation, viewer preparation, and viewport capability routing are ' +
+      'covered by focused router suites.',
+    testFiles: [
+      'apps/extension/src/background/runtime/tab-mode-router-screenshot/index.test.ts',
+      'apps/extension/src/background/runtime/tab-mode-router-screenshot/mode-navigation-viewer.test.ts',
+      'apps/extension/src/background/runtime/tab-mode-router-screenshot/mode-navigation.test.ts',
+      'apps/extension/src/background/runtime/tab-mode-router-screenshot/mode.test.ts',
+      'apps/extension/src/background/runtime/tab-mode-router-screenshot/mode.viewer.test.ts',
+      'apps/extension/src/background/runtime/tab-mode-router-screenshot/viewport.test.ts',
+    ],
+  },
+  {
+    owner: 'background-tab-mode-router',
+    productionPrefix: 'apps/extension/src/background/runtime/tab-mode-router/',
+    exclusive: true,
+    reason:
+      'Tab mode screenshot dispatch and route descriptors are covered by focused router and screenshot suites.',
+    testFiles: [
+      'apps/extension/src/background/runtime/tab-mode-router/editing.test.ts',
+      'apps/extension/src/background/runtime/tab-mode-router/router.test.ts',
+      'apps/extension/src/background/runtime/tab-mode-router/screenshot.test.ts',
     ],
   },
 ];

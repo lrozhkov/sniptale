@@ -14,8 +14,6 @@ interface VideoManagerSessionState {
   isStopping: boolean;
   currentCaptureMode: CaptureMode | null;
   currentCountdownSessionId: string | null;
-  viewportNavigationEpoch: number;
-  viewportNavigationPending: boolean;
   controlledCursorCaptureEnabled: boolean;
   controlledCursorAutoPaused: boolean;
   controlledCursorNavigationEpoch: number;
@@ -37,8 +35,6 @@ const VIDEO_MANAGER_SESSION_FIELDS = [
   'isStopping',
   'currentCaptureMode',
   'currentCountdownSessionId',
-  'viewportNavigationEpoch',
-  'viewportNavigationPending',
   'controlledCursorCaptureEnabled',
   'controlledCursorAutoPaused',
   'controlledCursorNavigationEpoch',
@@ -61,8 +57,6 @@ function createVideoManagerSessionState(): VideoManagerSessionState {
     isStopping: false,
     currentCaptureMode: null,
     currentCountdownSessionId: null,
-    viewportNavigationEpoch: 0,
-    viewportNavigationPending: false,
     controlledCursorCaptureEnabled: false,
     controlledCursorAutoPaused: false,
     controlledCursorNavigationEpoch: 0,

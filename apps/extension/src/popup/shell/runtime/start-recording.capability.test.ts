@@ -56,7 +56,7 @@ it('stores the background-issued recording control capability after accepted sta
     setRecordingControlCapability,
     setStartError,
     videoSettings: settings,
-    viewportPreset: null,
+    viewportPresetId: null,
   });
 
   expect(setRecordingControlCapability).toHaveBeenCalledWith({
@@ -74,7 +74,7 @@ it('clears stale recording control capability after non-accepted start', async (
     setRecordingControlCapability,
     setStartError,
     videoSettings: settings,
-    viewportPreset: null,
+    viewportPresetId: null,
   });
 
   expect(setRecordingControlCapability).toHaveBeenCalledWith(null);

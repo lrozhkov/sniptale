@@ -19,6 +19,7 @@ vi.mock('./shared.mjs', async (importOriginal) => {
 });
 
 import { collectNamingViolations, runNamingCheck } from './verify-naming.mjs';
+import { parseSuccessfulGitFileList } from './verify-naming.facades.mjs';
 
 const tempDirs: string[] = [];
 
@@ -147,6 +148,16 @@ function verifiesManifestOwnedEntrypointException() {
   expect(collectNamingViolations([file], { includeRepeatedPrefix: true })).toEqual([]);
 }
 
+function verifiesSuccessfulGitOutputSurvivesWorkerSpawnNoise() {
+  expect(
+    parseSuccessfulGitFileList({
+      error: new Error('spawnSync git EPERM'),
+      status: 0,
+      stdout: 'apps/extension/src/content/example.ts\n',
+    })
+  ).toEqual(['apps/extension/src/content/example.ts']);
+}
+
 function verifiesRepeatedChildPrefixTopology() {
   const root = createTempRoot();
   const runtime = writeFile(
@@ -238,6 +249,10 @@ describe('collectNamingViolations', () => {
   it(
     'allows manifest-owned entrypoint naming exceptions',
     verifiesManifestOwnedEntrypointException
+  );
+  it(
+    'uses successful git output when a worker reports non-fatal spawn noise',
+    verifiesSuccessfulGitOutputSurvivesWorkerSpawnNoise
   );
   it('flags repeated child-prefix owner topology', verifiesRepeatedChildPrefixTopology);
   it(

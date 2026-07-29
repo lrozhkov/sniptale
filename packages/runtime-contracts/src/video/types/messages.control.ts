@@ -1,17 +1,12 @@
 import type { VideoMessageType } from '../messages/index';
-import type {
-  CaptureMode,
-  VideoRecordingSettings,
-  VideoRecordingStatus,
-  VideoViewportPresetSelection,
-} from './types';
+import type { CaptureMode, VideoRecordingSettings, VideoRecordingStatus } from './types';
 
 export interface StartRecordingMessage {
   type: typeof VideoMessageType.START_RECORDING;
   settings: VideoRecordingSettings;
   tabId?: number;
   captureMode?: CaptureMode;
-  viewportPreset?: VideoViewportPresetSelection;
+  viewportPresetId?: string | null;
 }
 
 export interface StopRecordingMessage {

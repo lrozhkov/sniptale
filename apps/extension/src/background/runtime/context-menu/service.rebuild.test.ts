@@ -94,7 +94,7 @@ function createSettings(enabled = true) {
     defaultExportPresetId: null,
     defaultImagePresetId: null,
     defaultVideoPresetId: null,
-    defaultViewportId: 'native',
+    defaultViewportPresetId: 'native',
     imageFormat: 'png',
     imageQuality: 100,
     presets: [],
@@ -116,6 +116,18 @@ function createDeferred() {
   return {
     promise,
     resolve: () => resolve?.(),
+  };
+}
+
+function createBooleanDeferred() {
+  let resolve: ((value: boolean) => void) | null = null;
+  const promise = new Promise<boolean>((nextResolve) => {
+    resolve = nextResolve;
+  });
+
+  return {
+    promise,
+    resolve: (value: boolean) => resolve?.(value),
   };
 }
 
@@ -241,6 +253,7 @@ it('refreshes dynamic visibility and logs update failures per item', async () =>
 
   await refreshContextMenuVisibility(createTab());
 
+  expect(hasContextMenuVideoPresetMock).toHaveBeenCalledWith(createTab());
   expect(resolveContextMenuDynamicStateMock).toHaveBeenCalledWith({
     hasVideoPreset: true,
     settings: createSettings().contextMenu,
@@ -260,9 +273,44 @@ it('refreshes dynamic visibility and logs update failures per item', async () =>
 it('refreshes dynamic visibility without a tab payload when no tab is available', async () => {
   await refreshContextMenuVisibility();
 
+  expect(hasContextMenuVideoPresetMock).toHaveBeenCalledWith(undefined);
   expect(resolveContextMenuDynamicStateMock).toHaveBeenCalledWith({
     hasVideoPreset: true,
     settings: createSettings().contextMenu,
+  });
+  expect(browserContextMenusRefreshMock).toHaveBeenCalledOnce();
+});
+
+it('does not let a delayed tab refresh overwrite the latest shown-tab state', async () => {
+  const firstAvailability = createBooleanDeferred();
+  const firstTab = createTab(5);
+  const latestTab = createTab(6);
+  hasContextMenuVideoPresetMock
+    .mockImplementationOnce(() => firstAvailability.promise)
+    .mockResolvedValueOnce(false);
+  resolveContextMenuDynamicStateMock.mockImplementation(({ hasVideoPreset, tab }) => ({
+    'sniptale.video': { enabled: hasVideoPreset, title: `tab-${String(tab?.id)}` },
+  }));
+
+  const delayedRefresh = refreshContextMenuVisibility(firstTab);
+  await vi.waitFor(() => {
+    expect(hasContextMenuVideoPresetMock).toHaveBeenCalledWith(firstTab);
+  });
+
+  await refreshContextMenuVisibility(latestTab);
+  firstAvailability.resolve(true);
+  await delayedRefresh;
+
+  expect(resolveContextMenuDynamicStateMock).toHaveBeenCalledOnce();
+  expect(resolveContextMenuDynamicStateMock).toHaveBeenCalledWith({
+    hasVideoPreset: false,
+    settings: createSettings().contextMenu,
+    tab: latestTab,
+  });
+  expect(browserContextMenusUpdateMock).toHaveBeenCalledOnce();
+  expect(browserContextMenusUpdateMock).toHaveBeenCalledWith('sniptale.video', {
+    enabled: false,
+    title: 'tab-6',
   });
   expect(browserContextMenusRefreshMock).toHaveBeenCalledOnce();
 });

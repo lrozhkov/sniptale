@@ -11,6 +11,7 @@ import {
   resolveVisibleCaptureApiFormat,
   withHiddenFixedElements,
 } from './helpers';
+import { runNativeVisibleCaptureExclusive } from './coordinator';
 
 const logger = createLogger({ namespace: 'BackgroundVisibleCapture' });
 
@@ -72,19 +73,26 @@ async function captureVisibleTabNative(tabId: number): Promise<string> {
   }
   logger.log('Starting visible-tab capture', { format: settings.imageFormat, tabId });
 
-  const { hiddenCount, result } = await withHiddenFixedElements(tabId, async () => {
-    await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
-    const capturedDataUrl = await browserTabs.captureVisibleTab(tab.windowId, {
-      format: apiFormat,
-      quality: settings.imageQuality,
-    });
+  const { hiddenCount, result } = await runNativeVisibleCaptureExclusive(async (lease) =>
+    withHiddenFixedElements(tabId, async () => {
+      await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
+      const capturedDataUrl = await lease.capture(
+        tab.windowId,
+        {
+          format: apiFormat,
+          quality: settings.imageQuality,
+        },
+        () => assertVisibleCaptureTargetIsActive(tabId, tab.windowId)
+      );
+      await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
 
-    return finalizeCapturedDataUrl({
-      dataUrl: capturedDataUrl,
-      settings,
-      convertPngToWebp,
-    });
-  });
+      return finalizeCapturedDataUrl({
+        dataUrl: capturedDataUrl,
+        settings,
+        convertPngToWebp,
+      });
+    })
+  );
 
   logger.debug('Visible-tab capture masked fixed elements', { hiddenCount, tabId });
   logger.log('Completed visible-tab capture', { format: settings.imageFormat, tabId });
@@ -142,11 +150,13 @@ async function captureViewportWithClipNative(
     const parsedResult = parseCaptureScreenshotResult(rawResult);
     const capturedDataUrl = createDebuggerCaptureDataUrl(parsedResult.data, settings.imageFormat);
 
-    return finalizeCapturedDataUrl({
+    const finalized = await finalizeCapturedDataUrl({
       dataUrl: capturedDataUrl,
       settings,
       convertPngToWebp,
     });
+    await assertExactCaptureDimensions(finalized, viewport);
+    return finalized;
   });
 
   logger.debug('Viewport capture masked fixed elements', {
@@ -156,6 +166,25 @@ async function captureViewportWithClipNative(
   });
   logger.log('Completed viewport capture', { format: settings.imageFormat, tabId, viewport });
   return result;
+}
+
+async function assertExactCaptureDimensions(
+  dataUrl: string,
+  expected: { width: number; height: number }
+): Promise<void> {
+  const bitmap = await createImageBitmap(await (await fetch(dataUrl)).blob());
+  try {
+    if (bitmap.width !== expected.width || bitmap.height !== expected.height) {
+      throw new Error(
+        [
+          `Viewport capture verification failed: expected ${expected.width}x${expected.height},`,
+          `received ${bitmap.width}x${bitmap.height}`,
+        ].join(' ')
+      );
+    }
+  } finally {
+    bitmap.close();
+  }
 }
 
 export async function captureViewportWithClip(

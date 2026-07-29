@@ -203,12 +203,39 @@ export const runtimeActionCoreMessageContracts = {
       'runtime EXPORT_CAPTURE_FULL_PAGE message',
       createMessageGuard({
         type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+        required: { exportRunId: isString },
         optional: { contentIntent: isContentPrivilegedActionCapability },
       })
     ),
     parseResponse: createGuardParser(
       'runtime EXPORT_CAPTURE_FULL_PAGE response',
-      createRuntimeResponseGuard({ optional: { dataUrl: isString } })
+      createRuntimeResponseGuard({
+        optional: {
+          dataUrl: isString,
+          downscaled: isBoolean,
+          frozenExtentWarning: isBoolean,
+        },
+      })
+    ),
+  },
+  [MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED]: {
+    parseRequest: createGuardParser(
+      'runtime EXPORT_CAPTURE_FULL_PAGE_UNATTENDED message',
+      createMessageGuard({
+        type: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+        required: { exportRunId: isString },
+        optional: { contentIntent: isContentPrivilegedActionCapability },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime EXPORT_CAPTURE_FULL_PAGE_UNATTENDED response',
+      createRuntimeResponseGuard({
+        optional: {
+          dataUrl: isString,
+          downscaled: isBoolean,
+          frozenExtentWarning: isBoolean,
+        },
+      })
     ),
   },
   ...contentActionRuntimeContracts,

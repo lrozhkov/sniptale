@@ -35,6 +35,8 @@ import {
   type QuickAction,
   type ViewportPreset,
 } from '../../../../contracts/settings';
+import { getViewportPresetDisplayName } from '../../../../features/viewport-presets/display-name';
+import { formatViewportPresetDimensions } from '../../../../features/viewport-presets/format';
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Camera,
@@ -104,10 +106,15 @@ export function getQuickActionMeta(action: QuickAction, presets: ViewportPreset[
     screenshotModeLabels[action.screenshotMode] || translate('popup.labels.screenshotMode'),
   ];
 
-  if (action.emulation && action.emulation !== 'native') {
-    const preset = presets.find((item) => item.id === action.emulation);
+  if (action.viewportPresetId) {
+    const preset = presets.find((item) => item.id === action.viewportPresetId);
     if (preset) {
-      parts.push(`${preset.label} ${preset.width}×${preset.height}`);
+      parts.push(
+        `${getViewportPresetDisplayName(preset)} ${formatViewportPresetDimensions(
+          preset.width,
+          preset.height
+        )}`
+      );
     }
   }
 

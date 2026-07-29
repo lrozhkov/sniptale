@@ -86,7 +86,7 @@ it('renders the active recording status, value, and error through the active-pag
     duration: 8,
     error: 'Failed to sync',
     status: VideoRecordingStatus.RECORDING,
-    viewportPreset: null,
+    viewportPresetId: null,
   };
 
   renderNode(

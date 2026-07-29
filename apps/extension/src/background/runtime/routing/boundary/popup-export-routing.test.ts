@@ -9,6 +9,8 @@ const {
   isOwnedSnapshotViewerPageMock,
   sendTabMessageMock,
   sendViewerPopupExportMessageMock,
+  cancelWebSnapshotCaptureRequestMock,
+  deleteMediaLibraryAssetsBatchSafelyMock,
 } = vi.hoisted(() => ({
   authorizeWebSnapshotCaptureRequestMock: vi.fn(),
   browserScriptingExecuteScriptMock: vi.fn(),
@@ -18,6 +20,8 @@ const {
   loadSettingsMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
   sendViewerPopupExportMessageMock: vi.fn(),
+  cancelWebSnapshotCaptureRequestMock: vi.fn(),
+  deleteMediaLibraryAssetsBatchSafelyMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/scripting', async (importOriginal) => ({
@@ -57,6 +61,12 @@ vi.mock('../../../../features/tab-capabilities/url', async (importOriginal) => (
 vi.mock('../../../capture/routing/web-snapshot/session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../capture/routing/web-snapshot/session')>()),
   authorizeWebSnapshotCaptureRequest: authorizeWebSnapshotCaptureRequestMock,
+  cancelWebSnapshotCaptureRequest: cancelWebSnapshotCaptureRequestMock,
+}));
+
+vi.mock('../../../../workflows/media-hub/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../workflows/media-hub/store')>()),
+  deleteMediaLibraryAssetsBatchSafely: deleteMediaLibraryAssetsBatchSafelyMock,
 }));
 
 vi.mock('../../../capture/page-preparation/viewer-ports', async (importOriginal) => ({
@@ -106,6 +116,65 @@ beforeEach(() => {
   isOwnedSnapshotViewerPageMock.mockReturnValue(false);
   browserTabsGetMock.mockResolvedValue({ id: 62, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
+  cancelWebSnapshotCaptureRequestMock.mockReturnValue([]);
+  deleteMediaLibraryAssetsBatchSafelyMock.mockResolvedValue(undefined);
+});
+
+it('compensates a committed web snapshot before acknowledging cancellation', async () => {
+  const sendResponse = vi.fn();
+  cancelWebSnapshotCaptureRequestMock.mockReturnValueOnce(['asset-cancelled']);
+  sendTabMessageMock.mockResolvedValueOnce({ success: true });
+
+  routePopupExportMessage({
+    deps: createBackgroundRuntimeState(),
+    message: {
+      exportRunId: 'req-web-cancelled',
+      tabId: 62,
+      tabRouteCapabilityToken: 'cap-cancel',
+      tabRouteRequestId: 'req-cancel',
+      type: MessageType.EXPORT_POPUP_CANCEL,
+    },
+    resolvedTabId: 62,
+    sendResponse,
+    sender: undefined,
+  });
+  await flushRouteWork();
+
+  expect(cancelWebSnapshotCaptureRequestMock).toHaveBeenCalledWith(62, 'req-web-cancelled');
+  expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledWith(['asset-cancelled']);
+  expect(sendTabMessageMock).toHaveBeenCalledWith(62, {
+    exportRunId: 'req-web-cancelled',
+    type: MessageType.EXPORT_POPUP_CANCEL,
+  });
+  expect(sendResponse).toHaveBeenCalledWith({ success: true });
+});
+
+it('still forwards content cancellation and reports failed snapshot compensation', async () => {
+  const sendResponse = vi.fn();
+  cancelWebSnapshotCaptureRequestMock.mockReturnValueOnce(['asset-cancelled']);
+  deleteMediaLibraryAssetsBatchSafelyMock.mockRejectedValueOnce(new Error('delete failed'));
+  sendTabMessageMock.mockResolvedValueOnce({ success: true });
+
+  routePopupExportMessage({
+    deps: createBackgroundRuntimeState(),
+    message: {
+      exportRunId: 'req-web-cancelled',
+      tabId: 62,
+      tabRouteCapabilityToken: 'cap-cancel',
+      tabRouteRequestId: 'req-cancel',
+      type: MessageType.EXPORT_POPUP_CANCEL,
+    },
+    resolvedTabId: 62,
+    sendResponse,
+    sender: undefined,
+  });
+  await flushRouteWork();
+
+  expect(sendTabMessageMock).toHaveBeenCalledWith(62, {
+    exportRunId: 'req-web-cancelled',
+    type: MessageType.EXPORT_POPUP_CANCEL,
+  });
+  expect(sendResponse).toHaveBeenCalledWith({ error: 'delete failed', success: false });
 });
 
 it('routes normal popup export preview messages to the content tab', async () => {

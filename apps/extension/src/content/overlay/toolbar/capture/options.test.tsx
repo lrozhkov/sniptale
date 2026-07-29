@@ -21,9 +21,39 @@ vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
 import { getCaptureActionOptions, getCaptureActionTooltip, ToolbarCaptureButtons } from './options';
 import type { ToolbarCaptureActionsProps } from '../types';
 import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
+import type { ToolbarMenuState } from '../state/menu';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+
+function createClosedToolbarMenuState(): ToolbarMenuState {
+  return {
+    activeMenuType: null,
+    closeMenu: vi.fn(),
+    closeMenus: vi.fn(),
+    setActiveMenuType: vi.fn(),
+    setShowCaptureMenu: vi.fn(),
+    setShowTimerMenu: vi.fn(),
+    setViewportMenuOpen: vi.fn(),
+    showCaptureMenu: false,
+    showTimerMenu: false,
+    toggleMenu: vi.fn(),
+    viewportMenuOpen: false,
+  };
+}
+
+function createCaptureButtonProps(
+  onTakeScreenshot: ToolbarCaptureActionsProps['onTakeScreenshot']
+) {
+  return {
+    compactMenus: false,
+    currentViewport: null,
+    displayMode: 'horizontal' as const,
+    isLoading: false,
+    onTakeScreenshot,
+    toolbarMenuState: createClosedToolbarMenuState(),
+  };
+}
 
 function renderCaptureButtons() {
   container = document.createElement('div');
@@ -31,7 +61,7 @@ function renderCaptureButtons() {
   root = createRoot(container);
 
   act(() => {
-    root?.render(<ToolbarCaptureButtons onTakeScreenshot={vi.fn()} />);
+    root?.render(<ToolbarCaptureButtons {...createCaptureButtonProps(vi.fn())} />);
   });
 
   return container;
@@ -85,6 +115,19 @@ function registerCaptureActionOptionTests() {
         ?.getAttribute('data-sniptale-activation-bridge')
     ).toBe('defer');
   });
+
+  it('places selection capture immediately after visible-area capture', () => {
+    const buttons = Array.from(renderCaptureButtons().querySelectorAll('[data-ui]')).map((button) =>
+      button.getAttribute('data-ui')
+    );
+
+    expect(buttons).toEqual([
+      'content.toolbar.capture-visible-button',
+      'content.toolbar.capture-selection-button',
+      'content.toolbar.capture-full-button',
+      'content.toolbar.capture-full-settings-button',
+    ]);
+  });
 }
 
 function registerCaptureButtonIntentTests() {
@@ -136,7 +179,7 @@ function renderCaptureButtonsWithHandler(
   root = createRoot(container);
 
   act(() => {
-    root?.render(<ToolbarCaptureButtons onTakeScreenshot={onTakeScreenshot} />);
+    root?.render(<ToolbarCaptureButtons {...createCaptureButtonProps(onTakeScreenshot)} />);
   });
 
   return container;

@@ -7,6 +7,7 @@ import type { FrameRenderDescriptor } from '../roots/descriptors';
 import type { FrameRootActionRefs } from '../roots/element';
 import { renderInteractiveFrames } from '../roots/dom';
 import { prepareFrameRootsRender } from '../roots/prepare';
+import type { FrameHostLayoutSnapshot } from '../host-layout/service';
 
 type UseFrameRootsRendererArgs = {
   containerRef: MutableRefObject<HTMLDivElement | null>;
@@ -22,6 +23,7 @@ type UseFrameRootsRendererArgs = {
   updateFrame: (frameId: string, newFrame: FrameData) => void;
   removeFrame: (frameId: string) => void;
   updateFrameEffect: (frameId: string, mode: EffectMode) => void;
+  hostLayoutSnapshot: FrameHostLayoutSnapshot;
 };
 
 export function useFrameRootsRenderer({
@@ -38,6 +40,7 @@ export function useFrameRootsRenderer({
   updateFrame,
   removeFrame,
   updateFrameEffect,
+  hostLayoutSnapshot,
 }: UseFrameRootsRendererArgs): void {
   const prevRenderDescriptorsRef = useRef<FrameRenderDescriptor[]>([]);
   const currentFrameStates = frameStatesRef.current;
@@ -57,6 +60,7 @@ export function useFrameRootsRenderer({
     InteractiveFrameComponent,
     getOrCreateContainer,
     isClearingRef,
+    hostLayoutSnapshot,
     prevRenderDescriptorsRef,
     rootsRef,
   });
@@ -102,6 +106,7 @@ function useFrameRootsRenderEffect(args: {
   InteractiveFrameComponent: InteractiveFrameComponent;
   getOrCreateContainer: () => HTMLDivElement;
   isClearingRef: MutableRefObject<boolean>;
+  hostLayoutSnapshot: FrameHostLayoutSnapshot;
   prevRenderDescriptorsRef: MutableRefObject<FrameRenderDescriptor[]>;
   rootsRef: MutableRefObject<Map<string, Root>>;
 }) {
@@ -111,6 +116,7 @@ function useFrameRootsRenderEffect(args: {
       framesRef: args.framesRef,
       getOrCreateContainer: args.getOrCreateContainer,
       isClearingRef: args.isClearingRef,
+      hostLayoutSnapshot: args.hostLayoutSnapshot,
       prevRenderDescriptorsRef: args.prevRenderDescriptorsRef,
       rootsRef: args.rootsRef,
     });
@@ -126,6 +132,7 @@ function useFrameRootsRenderEffect(args: {
       globalEffectModeRef: args.globalEffectModeRef,
       InteractiveFrameComponent: args.InteractiveFrameComponent,
       rootsRef: args.rootsRef,
+      presentations: renderState.presentations,
     });
     return undefined;
   }, [
@@ -137,6 +144,7 @@ function useFrameRootsRenderEffect(args: {
     args.globalEffectModeRef,
     args.InteractiveFrameComponent,
     args.isClearingRef,
+    args.hostLayoutSnapshot,
     args.prevRenderDescriptorsRef,
     args.rootsRef,
   ]);

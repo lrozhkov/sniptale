@@ -7,10 +7,8 @@ const {
   pauseRecordingMock,
   requestDesktopMediaMock,
   resumeRecordingMock,
-  setViewportDrawStateMock,
   startRecordingMock,
   stopRecordingMock,
-  updateViewportCropMock,
 } = vi.hoisted(() => ({
   browserRuntimeSubscribeToMessagesMock: vi.fn(),
   loggerDebugMock: vi.fn(),
@@ -18,10 +16,8 @@ const {
   pauseRecordingMock: vi.fn(),
   requestDesktopMediaMock: vi.fn(),
   resumeRecordingMock: vi.fn(),
-  setViewportDrawStateMock: vi.fn(),
   startRecordingMock: vi.fn(),
   stopRecordingMock: vi.fn(),
-  updateViewportCropMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
@@ -52,12 +48,13 @@ vi.mock('../recording/setup/desktop-media', () => ({
 }));
 
 vi.mock('../recording/controller', () => ({
+  activateViewportOutput: vi.fn(),
   pauseRecording: pauseRecordingMock,
   resumeRecording: resumeRecordingMock,
-  setViewportDrawState: setViewportDrawStateMock,
+  setViewportDrawState: vi.fn(),
   startRecording: startRecordingMock,
   stopRecording: stopRecordingMock,
-  updateViewportCrop: updateViewportCropMock,
+  updateRecordingSettings: vi.fn(),
 }));
 
 vi.mock('../project-export/index', () => ({
@@ -71,6 +68,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { attachRuntimeMessageFreshness } from '@sniptale/platform/security/runtime-message-freshness';
 import { createExportSettings } from './test-support';
+import { registerOffscreenRuntimeMessageListener } from './index';
 
 type SubscriptionListener = (
   message: unknown,
@@ -108,28 +106,21 @@ function emitValidatedRecordingMessages(
   });
   emitTrustedRuntimeMessage(listener, {
     type: VideoMessageType.OFFSCREEN_START_RECORDING,
+    generation: 1,
     streamId: 'stream-1',
     settings,
     tabId: 7,
     viewport: { width: 1440, height: 900, devicePixelRatio: 2 },
     recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
     captureMode: CaptureMode.TAB,
     cropRegion: { x: 1, y: 2, width: 3, height: 4 },
-    targetResolution: { width: 1920, height: 1080 },
-    emulatedViewportCssSize: { width: 960, height: 540 },
-  });
-  emitTrustedRuntimeMessage(listener, {
-    type: VideoMessageType.OFFSCREEN_UPDATE_VIEWPORT_CROP,
-    targetResolution: { width: 1920, height: 1080 },
-    emulatedViewportCssSize: { width: 960, height: 540 },
-  });
-  emitTrustedRuntimeMessage(listener, {
-    type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE,
-    frozen: true,
-    navigationEpoch: 12,
   });
   emitTrustedRuntimeMessage(listener, {
     type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
+    recordingId: 'recording-1',
+    generation: 1,
+    streamInstanceId: 'stream-instance-1',
   });
   emitTrustedRuntimeMessage(listener, {
     type: VideoMessageType.OFFSCREEN_PAUSE_RECORDING,
@@ -152,16 +143,8 @@ function expectValidatedRecordingRoutes(settings: ReturnType<typeof createExport
     recordingId: 'recording-1',
     captureMode: CaptureMode.TAB,
     cropRegion: { x: 1, y: 2, width: 3, height: 4 },
-    targetResolution: { width: 1920, height: 1080 },
-    emulatedViewportCssSize: { width: 960, height: 540 },
-  });
-  expect(updateViewportCropMock).toHaveBeenCalledWith({
-    targetResolution: { width: 1920, height: 1080 },
-    viewportSizeInPixels: { width: 960, height: 540 },
-  });
-  expect(setViewportDrawStateMock).toHaveBeenCalledWith({
-    frozen: true,
-    navigationEpoch: 12,
+    generation: 1,
+    streamInstanceId: 'stream-instance-1',
   });
   expect(stopRecordingMock).toHaveBeenCalledOnce();
   expect(pauseRecordingMock).toHaveBeenCalledOnce();
@@ -175,7 +158,6 @@ async function captureSubscriptionListener(): Promise<SubscriptionListener> {
     return vi.fn();
   });
 
-  const { registerOffscreenRuntimeMessageListener } = await import('./index');
   registerOffscreenRuntimeMessageListener();
 
   if (!listener) {
@@ -190,9 +172,16 @@ async function flushRuntimeRouting() {
   await Promise.resolve();
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
+
 function resetOffscreenRuntimeMocks() {
   vi.clearAllMocks();
-  vi.resetModules();
   requestDesktopMediaMock.mockResolvedValue(undefined);
   startRecordingMock.mockResolvedValue(undefined);
   stopRecordingMock.mockResolvedValue(undefined);
@@ -236,20 +225,36 @@ async function verifiesOptionalRuntimeFieldsStayOmittedWhenAbsent() {
 
   emitTrustedRuntimeMessage(listener, {
     type: VideoMessageType.OFFSCREEN_START_RECORDING,
+    generation: 1,
+    recordingId: 'recording-minimal',
     streamId: 'stream-minimal',
+    streamInstanceId: 'stream-instance-minimal',
     settings: createExportSettings(),
   });
   emitTrustedRuntimeMessage(listener, {
     type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
     discard: true,
+    generation: 1,
+    recordingId: 'recording-minimal',
+    streamInstanceId: 'stream-instance-minimal',
   });
   await flushRuntimeRouting();
 
   expect(startRecordingMock).toHaveBeenCalledWith({
+    generation: 1,
+    recordingId: 'recording-minimal',
     settings: createExportSettings(),
     streamId: 'stream-minimal',
+    streamInstanceId: 'stream-instance-minimal',
   });
-  expect(stopRecordingMock).toHaveBeenCalledWith(true);
+  expect(stopRecordingMock).toHaveBeenCalledWith(
+    {
+      generation: 1,
+      recordingId: 'recording-minimal',
+      streamInstanceId: 'stream-instance-minimal',
+    },
+    true
+  );
 }
 
 async function verifiesStartRecordingAcknowledgesAcceptedCommandImmediately() {
@@ -262,7 +267,10 @@ async function verifiesStartRecordingAcknowledgesAcceptedCommandImmediately() {
     listener,
     {
       type: VideoMessageType.OFFSCREEN_START_RECORDING,
+      generation: 1,
+      recordingId: 'recording-ack',
       streamId: 'stream-ack',
+      streamInstanceId: 'stream-instance-ack',
       settings: createExportSettings(),
     },
     sendResponse
@@ -271,6 +279,70 @@ async function verifiesStartRecordingAcknowledgesAcceptedCommandImmediately() {
   expect(keepChannelOpen).toBe(false);
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
   expect(startRecordingMock).toHaveBeenCalledOnce();
+}
+
+async function verifiesDuplicateBoundStopsShareOneDeferredOutcome() {
+  const listener = await captureSubscriptionListener();
+  const firstResponse = vi.fn();
+  const duplicateResponse = vi.fn();
+  const stop = createDeferred<{ result: 'stopped' }>();
+  parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
+  stopRecordingMock.mockReturnValueOnce(stop.promise);
+  const command = attachOffscreenCommandCapability({
+    type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
+    generation: 7,
+    recordingId: 'recording-duplicate-stop',
+    streamInstanceId: 'stream-duplicate-stop',
+  });
+  const emitStop = (nonce: string, response: (value?: unknown) => void) =>
+    listener(
+      attachRuntimeMessageFreshness(command, {
+        issuedAtEpochMs: Date.now(),
+        nonce,
+      }),
+      trustedBackgroundSender,
+      response
+    );
+
+  expect(emitStop('duplicate-stop-first', firstResponse)).toBe(true);
+  expect(emitStop('duplicate-stop-second', duplicateResponse)).toBe(true);
+  expect(stopRecordingMock).toHaveBeenCalledOnce();
+
+  stop.resolve({ result: 'stopped' });
+  await flushRuntimeRouting();
+
+  expect(firstResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
+  expect(duplicateResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
+}
+
+async function verifiesTerminalStopFailuresUseAnAcceptedTerminalResponse() {
+  const listener = await captureSubscriptionListener();
+  const sendResponse = vi.fn();
+  parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
+  stopRecordingMock.mockResolvedValueOnce({
+    error: 'encoder failed',
+    result: 'terminal-failure',
+  });
+
+  expect(
+    emitTrustedRuntimeMessage(
+      listener,
+      {
+        type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
+        generation: 8,
+        recordingId: 'recording-terminal-stop',
+        streamInstanceId: 'stream-terminal-stop',
+      },
+      sendResponse
+    )
+  ).toBe(true);
+  await flushRuntimeRouting();
+
+  expect(sendResponse).toHaveBeenCalledWith({
+    success: true,
+    result: 'terminal-failure',
+    error: 'encoder failed',
+  });
 }
 
 describe('offscreen-runtime', () => {
@@ -287,5 +359,13 @@ describe('offscreen-runtime', () => {
   it(
     'acknowledges accepted start-recording commands before async media setup completes',
     verifiesStartRecordingAcknowledgesAcceptedCommandImmediately
+  );
+  it(
+    'shares one deferred result with duplicate identity-bound stop commands',
+    verifiesDuplicateBoundStopsShareOneDeferredOutcome
+  );
+  it(
+    'acknowledges terminal recorder failures as one terminal stop result',
+    verifiesTerminalStopFailuresUseAnAcceptedTerminalResponse
   );
 });

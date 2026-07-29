@@ -23,7 +23,10 @@ export function resolveQuickActionRuntimeContext(
     afterCapture: action.afterCapture ?? 'download_default',
     captureMode: action.screenshotMode || 'visible',
     delaySeconds: action.delay ?? 0,
-    emulation: action.emulation ?? settings.defaultViewportId ?? 'native',
+    viewportPresetId:
+      action.viewportPresetId === undefined
+        ? settings.defaultViewportPresetId
+        : action.viewportPresetId,
     imageFormat: action.imageFormat || settings.imageFormat || 'png',
     imageQuality: action.imageQuality || settings.imageQuality || 90,
     settings,

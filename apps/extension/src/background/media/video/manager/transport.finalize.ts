@@ -1,16 +1,19 @@
+import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   CaptureMode,
   normalizeVideoSourceCount,
-  type VideoRecordingSettings,
-  type VideoViewportPresetSelection,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { createLogger } from '@sniptale/platform/observability/logger';
-import { attemptDiagnosticsStart } from './diagnostics';
-import { sendOffscreenStartRecording } from './start-helpers';
+import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import { getCaptureSurfaceService, type AppliedCaptureSurface } from '../../../capture-surface';
+import { cancelVideoSourceReadyWait, waitForVideoSourceReady } from '../capture-surface';
 import { supportsSystemAudio } from '../capture-source';
-import { getVideoRecordingId, getVideoRecordingTabId } from '../session-state';
 import type { enableAnnotationsIfNeeded, resolveCaptureSource } from './preflight';
-import type { ViewportSetupDeps } from './transport.deps';
+import { attemptDiagnosticsStart } from './diagnostics';
+import { sendOffscreenBeginRecording, sendOffscreenStartRecording } from './start-helpers';
+import { markVideoRecordingOffscreenStartDispatched } from '../session-state';
+import { isVideoRecordingStartCancelled } from './flow-cancellation';
+
+const logger = createLogger({ namespace: 'BackgroundVideoFlowTransport:FinalizeStart' });
 
 function resolveOffscreenStartSettings(
   captureMode: CaptureMode,
@@ -23,68 +26,80 @@ function resolveOffscreenStartSettings(
     : { ...settings, systemAudioEnabled: false };
 }
 
-function logResolvedStartSettings(
-  logger: ReturnType<typeof createLogger>,
-  captureMode: CaptureMode,
-  offscreenSettings: VideoRecordingSettings,
-  viewportPreset?: VideoViewportPresetSelection
-): void {
-  if (!supportsSystemAudio(captureMode) || !offscreenSettings.systemAudioEnabled) {
-    logger.debug('Disabling system audio for capture mode', captureMode);
-  }
-
-  if (captureMode === CaptureMode.VIEWPORT_EMULATION && viewportPreset) {
-    logger.debug('Viewport emulation will resize in offscreen without cropRegion');
-  }
-}
-
 export async function finalizeRecordingStart(context: {
   tabId: number | null;
   captureMode: CaptureMode;
   captureSource: NonNullable<Awaited<ReturnType<typeof resolveCaptureSource>>>;
-  viewport?: Awaited<ReturnType<typeof enableAnnotationsIfNeeded>>;
-  shouldAbortBeforeOffscreenStart?: () => boolean;
-  onBeforeOffscreenStartDispatch?: () => void;
-  viewportEmulationResult?: Awaited<ReturnType<ViewportSetupDeps['configureViewportEmulation']>>;
-  viewportPreset?: VideoViewportPresetSelection;
+  generation: number;
+  recordingId: string;
   settings: VideoRecordingSettings;
-}) {
-  const logger = createLogger({ namespace: 'BackgroundVideoFlowTransport:FinalizeStart' });
-  const {
-    tabId,
-    captureMode,
-    captureSource,
-    viewport,
-    shouldAbortBeforeOffscreenStart,
-    onBeforeOffscreenStartDispatch,
-    viewportEmulationResult,
-    viewportPreset,
-    settings,
-  } = context;
-
+  surface: AppliedCaptureSurface | null;
+  streamInstanceId: string;
+  viewport?: Awaited<ReturnType<typeof enableAnnotationsIfNeeded>>;
+}): Promise<string | null> {
+  markVideoRecordingOffscreenStartDispatched();
   await attemptDiagnosticsStart({
-    captureMode,
-    settings,
-    ...(tabId === null ? {} : { tabId }),
-    ...(viewport === undefined ? {} : { viewport }),
+    captureMode: context.captureMode,
+    settings: context.settings,
+    ...(context.tabId === null ? {} : { tabId: context.tabId }),
+    ...(context.viewport === undefined ? {} : { viewport: context.viewport }),
   });
-
-  const offscreenSettings = resolveOffscreenStartSettings(captureMode, settings);
-  logResolvedStartSettings(logger, captureMode, offscreenSettings, viewportPreset);
-
-  if (shouldAbortBeforeOffscreenStart?.()) {
-    throw new Error('Recording start delivery was cancelled before offscreen handoff');
+  if (isVideoRecordingStartCancelled(context.tabId, context.captureMode)) {
+    throw new Error('Recording start was cancelled before source dispatch');
   }
 
-  onBeforeOffscreenStartDispatch?.();
-  await sendOffscreenStartRecording({
-    captureMode,
-    captureSource,
-    currentRecordingId: getVideoRecordingId(),
-    recordingTabId: captureMode === CaptureMode.CAMERA ? null : getVideoRecordingTabId(),
-    settings: offscreenSettings,
-    ...(viewport === undefined ? {} : { viewport }),
-    ...(viewportEmulationResult === undefined ? {} : { viewportEmulationResult }),
-    ...(viewportPreset === undefined ? {} : { viewportPreset }),
+  const multiSource =
+    context.captureMode === CaptureMode.SCREEN &&
+    normalizeVideoSourceCount(context.settings.sourceCount) > 1;
+  const ready = multiSource
+    ? null
+    : waitForVideoSourceReady({
+        recordingId: context.recordingId,
+        expectedStreamInstanceId: context.streamInstanceId,
+        expectedViewport:
+          context.captureMode === CaptureMode.TAB || context.captureMode === CaptureMode.TAB_CROP
+            ? (context.viewport ?? null)
+            : null,
+        tabId: context.tabId,
+      });
+  const observedReady = ready?.catch(() => null);
+  try {
+    await sendOffscreenStartRecording({
+      captureMode: context.captureMode,
+      captureSource: context.captureSource,
+      generation: context.generation,
+      recordingId: context.recordingId,
+      streamInstanceId: context.streamInstanceId,
+      recordingTabId: context.captureMode === CaptureMode.CAMERA ? null : context.tabId,
+      settings: resolveOffscreenStartSettings(context.captureMode, context.settings),
+      surface: context.surface,
+      ...(context.viewport === undefined ? {} : { viewport: context.viewport }),
+    });
+  } catch (error) {
+    cancelVideoSourceReadyWait(context.recordingId, error);
+    await observedReady;
+    throw error;
+  }
+  if (!ready) return context.streamInstanceId;
+  const streamInstanceId = await ready;
+  if (context.surface?.target === 'viewport') {
+    await getCaptureSurfaceService().reassert({
+      sessionId: context.surface.sessionId,
+      leaseId: context.surface.leaseId,
+      generation: context.surface.generation,
+    });
+  }
+  logger.debug('Raw recording source validated', {
+    recordingId: context.recordingId,
+    streamInstanceId,
   });
+  return streamInstanceId;
+}
+
+export function beginPreparedRecording(args: {
+  generation: number;
+  recordingId: string;
+  streamInstanceId: string;
+}): Promise<void> {
+  return sendOffscreenBeginRecording(args);
 }

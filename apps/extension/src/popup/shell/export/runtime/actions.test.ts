@@ -96,6 +96,7 @@ function createSessionState(): PopupExportSessionFixture {
     canExport: true,
     copiedFormat: null,
     copyingFormat: null,
+    cancelRetryRef: { current: null },
     copyRequestIdRef: { current: 0 },
     copyResetTimeoutRef: { current: null as number | null },
     exportDisabledReason: null as string | null,

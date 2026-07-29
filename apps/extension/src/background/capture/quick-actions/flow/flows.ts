@@ -11,29 +11,28 @@ import {
 import * as contentCaps from '../../../routing-contracts/capabilities/content-action/route';
 import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 import {
+  getScreenshotSurfaceBinding,
+  type ScreenshotSurfaceBinding,
+} from '../../../capture-surface/screenshot-session';
+import {
   buildQuickActionOverlay,
   type QuickActionFlowArgs,
   type QuickActionRuntimeContext,
 } from './shared';
-import { isDebuggerRequired, setupQuickActionDebugger } from './debugger';
+import { applyQuickActionSurface, releaseQuickActionSurfaceAfterFailure } from './surface';
 
 type QuickActionStartMessage =
   | { autoStartSelection: true }
   | { autoStartCaptureType: Exclude<QuickActionRuntimeContext['captureMode'], 'selection'> };
 
-type QuickActionViewport = { width: number; height: number } | null;
 type QuickActionFlowResult = { result: 'accepted' | 'blocked' };
 
-async function ensureQuickActionDebugger(args: QuickActionFlowArgs) {
-  if (!isDebuggerRequired(args.emulation)) {
-    return { cleanup: async () => undefined, ready: true };
-  }
-
-  return setupQuickActionDebugger(args.tabId, args.emulation, args.settings, args.viewportState);
-}
-
-async function sendQuickActionMessage(args: QuickActionFlowArgs, message: QuickActionStartMessage) {
-  const viewport = isDebuggerRequired(args.emulation) ? args.viewportState.get(args.tabId) : null;
+async function sendQuickActionMessage(
+  args: QuickActionFlowArgs,
+  message: QuickActionStartMessage,
+  surfaceBinding: ScreenshotSurfaceBinding
+) {
+  const viewport = args.viewportState.get(args.tabId) ?? null;
 
   await getBackgroundRuntimeMessaging().sendTabMessage(args.tabId, {
     type: MessageType.ENABLE_SCREENSHOT_MODE,
@@ -42,9 +41,21 @@ async function sendQuickActionMessage(args: QuickActionFlowArgs, message: QuickA
       tabId: args.tabId,
     }),
     quickActionOverlay: buildQuickActionOverlay(args),
+    ...surfaceBinding,
     ...message,
-    ...(viewport === undefined ? {} : { viewport }),
+    viewport,
   });
+}
+
+function requireQuickActionSurfaceBinding(
+  tabId: number,
+  surfaceCapabilityToken: string | null
+): ScreenshotSurfaceBinding {
+  const binding = getScreenshotSurfaceBinding(tabId);
+  if (!surfaceCapabilityToken || binding?.surfaceCapabilityToken !== surfaceCapabilityToken) {
+    throw new Error('Screenshot surface capability unavailable');
+  }
+  return binding;
 }
 
 async function ensureNativeVisibleCaptureAuthorityForFlow(
@@ -66,12 +77,16 @@ function requiresNativeVisibleCaptureAuthority(
   args: QuickActionFlowArgs,
   message: QuickActionStartMessage
 ): boolean {
-  if ('autoStartCaptureType' in message && message.autoStartCaptureType !== 'visible') {
-    return false;
+  if ('autoStartSelection' in message) {
+    return true;
+  }
+
+  if (message.autoStartCaptureType === 'full') {
+    return true;
   }
 
   const viewport = args.viewportState.get(args.tabId);
-  return viewport === null || viewport === undefined;
+  return viewport === null || viewport === undefined || viewport.target === 'window';
 }
 
 function resolveAutoStartCaptureActionType(
@@ -121,23 +136,6 @@ function resolveContentIntentGrantActionTypes(
     : [captureActionType, ...resolveBackgroundCaptureFollowupActionTypes(args)];
 }
 
-function resolveViewerQuickActionViewport(args: QuickActionFlowArgs): QuickActionViewport {
-  if (!isDebuggerRequired(args.emulation)) {
-    return null;
-  }
-
-  const preset = args.settings.viewportPresets?.find(
-    (candidate) => candidate.id === args.emulation
-  );
-  if (!preset) {
-    return args.viewportState.get(args.tabId) ?? null;
-  }
-
-  const viewport = { width: preset.width, height: preset.height };
-  args.viewportState.set(args.tabId, viewport);
-  return viewport;
-}
-
 async function sendViewerQuickActionMessage(
   args: QuickActionFlowArgs,
   message: QuickActionStartMessage
@@ -147,7 +145,7 @@ async function sendViewerQuickActionMessage(
     args.tabId,
     {
       type: MessageType.ENABLE_SCREENSHOT_MODE,
-      viewport: resolveViewerQuickActionViewport(args),
+      viewport: args.viewportState.get(args.tabId) ?? null,
       quickActionOverlay: buildQuickActionOverlay(args),
       ...message,
     }
@@ -159,26 +157,24 @@ function isOwnedViewerQuickAction(args: QuickActionFlowArgs): boolean {
 }
 
 export async function runSelectionFlow(args: QuickActionFlowArgs): Promise<QuickActionFlowResult> {
-  if (isOwnedViewerQuickAction(args)) {
-    await sendViewerQuickActionMessage(args, { autoStartSelection: true });
-    args.screenshotModeState.set(args.tabId, true);
-    return { result: 'accepted' };
-  }
-
-  const debuggerSetup = await ensureQuickActionDebugger(args);
-  if (!debuggerSetup.ready) {
-    return { result: 'blocked' };
-  }
-
   try {
+    const surface = await applyQuickActionSurface(args);
     const message = { autoStartSelection: true } as const;
+    if (isOwnedViewerQuickAction(args)) {
+      await sendViewerQuickActionMessage(args, message);
+      args.screenshotModeState.set(args.tabId, true);
+      return { result: 'accepted' };
+    }
     await ensureNativeVisibleCaptureAuthorityForFlow(args, message);
-    await sendQuickActionMessage(args, message);
+    await sendQuickActionMessage(
+      args,
+      message,
+      requireQuickActionSurfaceBinding(args.tabId, surface.surfaceCapabilityToken)
+    );
     args.screenshotModeState.set(args.tabId, true);
     return { result: 'accepted' };
   } catch (error) {
-    await debuggerSetup.cleanup();
-    throw error;
+    return releaseQuickActionSurfaceAfterFailure(args.tabId, args.viewportState, error);
   }
 }
 
@@ -187,25 +183,23 @@ export async function runCaptureFlow(
     captureMode: Exclude<QuickActionRuntimeContext['captureMode'], 'selection'>;
   }
 ): Promise<QuickActionFlowResult> {
-  if (isOwnedViewerQuickAction(args)) {
-    await sendViewerQuickActionMessage(args, { autoStartCaptureType: args.captureMode });
-    args.screenshotModeState.set(args.tabId, true);
-    return { result: 'accepted' };
-  }
-
-  const debuggerSetup = await ensureQuickActionDebugger(args);
-  if (!debuggerSetup.ready) {
-    return { result: 'blocked' };
-  }
-
   try {
+    const surface = await applyQuickActionSurface(args);
     const message = { autoStartCaptureType: args.captureMode };
+    if (isOwnedViewerQuickAction(args)) {
+      await sendViewerQuickActionMessage(args, message);
+      args.screenshotModeState.set(args.tabId, true);
+      return { result: 'accepted' };
+    }
     await ensureNativeVisibleCaptureAuthorityForFlow(args, message);
-    await sendQuickActionMessage(args, message);
+    await sendQuickActionMessage(
+      args,
+      message,
+      requireQuickActionSurfaceBinding(args.tabId, surface.surfaceCapabilityToken)
+    );
     args.screenshotModeState.set(args.tabId, true);
     return { result: 'accepted' };
   } catch (error) {
-    await debuggerSetup.cleanup();
-    throw error;
+    return releaseQuickActionSurfaceAfterFailure(args.tabId, args.viewportState, error);
   }
 }

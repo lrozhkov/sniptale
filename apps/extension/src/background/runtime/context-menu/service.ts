@@ -26,6 +26,8 @@ const logger = createLogger({ namespace: 'BackgroundContextMenu' });
 
 type ContextMenuDeps = BackgroundContextMenuActionDeps;
 let contextMenuRebuildQueue: Promise<void> = Promise.resolve();
+let contextMenuVisibilityApplyQueue: Promise<void> = Promise.resolve();
+let contextMenuVisibilityGeneration = 0;
 
 function getContextMenuUpdateEntries(
   updates: Record<string, BrowserContextMenuUpdateProperties>
@@ -86,29 +88,61 @@ function rebuildBackgroundContextMenus(): Promise<void> {
   return nextRebuild;
 }
 
+function applyContextMenuVisibility(
+  generation: number,
+  updates: Record<string, BrowserContextMenuUpdateProperties>
+): Promise<void> {
+  const nextApply = contextMenuVisibilityApplyQueue
+    .catch(() => undefined)
+    .then(async () => {
+      if (generation !== contextMenuVisibilityGeneration) {
+        return;
+      }
+
+      await Promise.all(
+        getContextMenuUpdateEntries(updates).map(({ id, update }) =>
+          browserContextMenus.update(id, update).catch((error: unknown) => {
+            logContextMenuUpdateFailure(id, update, error);
+          })
+        )
+      );
+
+      if (generation === contextMenuVisibilityGeneration) {
+        await browserContextMenus.refresh();
+      }
+    });
+
+  contextMenuVisibilityApplyQueue = nextApply;
+  return nextApply;
+}
+
 async function refreshContextMenuVisibility(tab?: chrome.tabs.Tab): Promise<void> {
+  const generation = ++contextMenuVisibilityGeneration;
   const settings = await loadSettings();
+
+  if (generation !== contextMenuVisibilityGeneration) {
+    return;
+  }
+
   const contextMenuSettings = settings.contextMenu;
 
   if (!contextMenuSettings.enabled) {
     return;
   }
 
+  const hasVideoPreset = await hasContextMenuVideoPreset(tab);
+
+  if (generation !== contextMenuVisibilityGeneration) {
+    return;
+  }
+
   const updates = resolveContextMenuDynamicState({
-    hasVideoPreset: await hasContextMenuVideoPreset(),
+    hasVideoPreset,
     settings: contextMenuSettings,
     ...(tab ? { tab } : {}),
   });
 
-  await Promise.all(
-    getContextMenuUpdateEntries(updates).map(({ id, update }) =>
-      browserContextMenus.update(id, update).catch((error: unknown) => {
-        logContextMenuUpdateFailure(id, update, error);
-      })
-    )
-  );
-
-  await browserContextMenus.refresh();
+  await applyContextMenuVisibility(generation, updates);
 }
 
 function shouldRebuildContextMenus(

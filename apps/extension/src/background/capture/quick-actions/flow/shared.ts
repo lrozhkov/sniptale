@@ -7,8 +7,9 @@ import type {
 import type { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { WebSnapshotViewerPorts } from '../../page-preparation/viewer-ports';
 import type { PageAccessPort } from '../../../routing-contracts/page-access-port';
+import type { ViewportState } from '../../../routing-contracts/tab-mode-state';
 
-export type ViewportState = Map<number, { width: number; height: number } | null>;
+export type { ViewportState } from '../../../routing-contracts/tab-mode-state';
 
 export type ProcessQuickActionArgs = {
   actionId: string;
@@ -25,7 +26,7 @@ export type QuickActionRuntimeContext = {
   afterCapture: CaptureActionType;
   captureMode: QuickActionScreenshotMode;
   delaySeconds: number;
-  emulation: string;
+  viewportPresetId: string | null;
   imageFormat: 'png' | 'jpeg' | 'webp';
   imageQuality: number;
   settings: UserSettings;
@@ -35,7 +36,7 @@ export type QuickActionFlowArgs = {
   action: QuickAction;
   afterCapture: CaptureActionType;
   delaySeconds: number;
-  emulation: string;
+  viewportPresetId: string | null;
   imageFormat: 'png' | 'jpeg' | 'webp';
   imageQuality: number;
   settings: UserSettings;

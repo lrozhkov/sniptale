@@ -21,6 +21,7 @@ import {
   DEFAULT_FOCUS_SETTINGS,
 } from '../../../../features/highlighter/style/defaults';
 import type { FrameManagerRefs } from '../contracts';
+import { createFrameHostLayoutService } from '../host-layout/service';
 
 /**
  * Creates mutable refs used by frame manager orchestration.
@@ -28,7 +29,7 @@ import type { FrameManagerRefs } from '../contracts';
 export function useFrameManagerRefs(): FrameManagerRefs {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rootsRef = useRef<Map<string, Root>>(new Map());
-  const linkedElementsRef = useRef<Map<string, HTMLElement>>(new Map());
+  const hostLayoutServiceRef = useRef(createFrameHostLayoutService());
   const isClearingRef = useRef(false);
   const framesRef = useRef<FrameData[]>([]);
   const frameStatesRef = useRef<Map<string, FrameState>>(new Map());
@@ -48,7 +49,7 @@ export function useFrameManagerRefs(): FrameManagerRefs {
   return {
     containerRef,
     rootsRef,
-    linkedElementsRef,
+    hostLayoutServiceRef,
     isClearingRef,
     framesRef,
     frameStatesRef,

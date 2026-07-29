@@ -83,7 +83,6 @@ function createPopoversProps(args: {
     frame: args.frame,
     currentFrame: args.currentFrame,
     frameZIndex: 100,
-    borderWidth: 3,
     effectMode: 'border' as const,
     isPopoverOpen: true,
     isSelected: true,

@@ -11,7 +11,12 @@ import type {
 
 export type RuntimeMessagingDeps = {
   runtimeSendMessage: (message: unknown) => Promise<unknown>;
-  tabSendMessage: (tabId: number, message: unknown) => Promise<unknown>;
+  tabSendMessage: (tabId: number, message: unknown, target?: TabMessageTarget) => Promise<unknown>;
+};
+
+export type TabMessageTarget = {
+  documentId?: string;
+  frameId?: number;
 };
 
 /**
@@ -23,6 +28,7 @@ export type RuntimeMessagingTransport = {
   ): Promise<RuntimeResponseByType[TMessage['type']]>;
   sendTabMessage<TMessage extends TabRequestByType[TabMessageType]>(
     tabId: number,
-    message: TMessage
+    message: TMessage,
+    target?: TabMessageTarget
   ): Promise<TabResponseByType[TMessage['type']]>;
 };

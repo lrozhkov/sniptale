@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Viewport compositor fixture</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 900px;
+        width: 100%;
+      }
+
+      .band {
+        height: 300px;
+        left: 0;
+        position: absolute;
+        width: 100%;
+      }
+
+      .band-one {
+        top: 0;
+      }
+
+      .band-two {
+        top: 300px;
+      }
+
+      .tile {
+        height: 50%;
+        position: absolute;
+        width: 50%;
+      }
+
+      .top-left {
+        left: 0;
+        top: 0;
+      }
+
+      .top-right {
+        right: 0;
+        top: 0;
+      }
+
+      .bottom-left {
+        bottom: 0;
+        left: 0;
+      }
+
+      .bottom-right {
+        bottom: 0;
+        right: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="band band-one">
+      <div class="tile top-left" style="background: rgb(255, 0, 0)"></div>
+      <div class="tile top-right" style="background: rgb(0, 255, 0)"></div>
+      <div class="tile bottom-left" style="background: rgb(0, 0, 255)"></div>
+      <div class="tile bottom-right" style="background: rgb(255, 255, 0)"></div>
+    </div>
+    <div class="band band-two">
+      <div class="tile top-left" style="background: rgb(0, 255, 255)"></div>
+      <div class="tile top-right" style="background: rgb(0, 0, 0)"></div>
+      <div class="tile bottom-left" style="background: rgb(255, 255, 255)"></div>
+      <div class="tile bottom-right" style="background: rgb(255, 128, 0)"></div>
+    </div>
+  </body>
+</html>

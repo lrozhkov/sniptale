@@ -20,18 +20,19 @@ import {
 function initializeBatchExport(
   state: PopupExportRuntimeContract,
   requestId: string,
-  selectedCount: number
+  selectedTabIds: number[]
 ) {
   logPopupExportBatchStart({
     requestId,
-    selectedCount,
+    selectedCount: selectedTabIds.length,
   });
   state.requestIdRef.current = requestId;
+  state.cancelRetryRef.current = { exportRunId: requestId, tabIds: [...selectedTabIds] };
   state.setResult(null);
   setBatchExportProgress(
     state,
     0,
-    selectedCount,
+    selectedTabIds.length,
     translate('popup.export.batchPrepareMessage'),
     'scanning'
   );
@@ -49,7 +50,11 @@ export async function startPopupExportBatch(
     selection: getPopupExportSelection(state),
   });
 
-  initializeBatchExport(state, requestId, selectedTabs.length);
+  initializeBatchExport(
+    state,
+    requestId,
+    selectedTabs.flatMap((tab) => (typeof tab.tabId === 'number' ? [tab.tabId] : []))
+  );
 
   const collectedBatch = await collectBatchPagePackages({
     deps,

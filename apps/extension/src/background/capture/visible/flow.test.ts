@@ -91,6 +91,7 @@ import {
   captureVisibleTabForCrop,
   captureVisibleTabTransaction,
 } from './flow';
+import { resetNativeVisibleCaptureCoordinatorForTests } from './coordinator';
 
 function resetVisibleFlowMocks() {
   vi.clearAllMocks();
@@ -102,9 +103,18 @@ function resetVisibleFlowMocks() {
   transitionCaptureJobMock.mockResolvedValue(undefined);
 }
 
+function mockExactBitmap(width: number, height: number): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({ blob: vi.fn().mockResolvedValue(new Blob(['image'])) })
+  );
+  vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ close: vi.fn(), height, width }));
+}
+
 function useVisibleFlowTestScope() {
   beforeEach(() => {
     resetVisibleFlowMocks();
+    resetNativeVisibleCaptureCoordinatorForTests();
   });
 
   afterEach(() => {
@@ -138,6 +148,29 @@ describe('capture-visible-flow native visible capture', () => {
       settings: { imageFormat: 'jpeg', imageQuality: 82 },
       convertPngToWebp: expect.any(Function),
     });
+  });
+
+  it('revalidates the active tab before a quota retry can capture new pixels', async () => {
+    vi.useFakeTimers();
+    loadSettingsMock.mockResolvedValue({ imageFormat: 'png', imageQuality: 90 });
+    resolveVisibleCaptureApiFormatMock.mockReturnValue('png');
+    browserTabsGetMock.mockResolvedValue({ id: 11, windowId: 5 });
+    browserTabsQueryMock
+      .mockResolvedValueOnce([{ id: 11, windowId: 5 }])
+      .mockResolvedValueOnce([{ id: 11, windowId: 5 }])
+      .mockResolvedValueOnce([{ id: 12, windowId: 5 }]);
+    browserTabsCaptureVisibleTabMock.mockRejectedValueOnce(
+      new Error('This request exceeds the MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND quota.')
+    );
+
+    const capture = expect(captureVisibleTab(11)).rejects.toThrow(
+      'Visible capture target is not the active tab'
+    );
+    await vi.advanceTimersByTimeAsync(1_100);
+
+    await capture;
+    expect(browserTabsCaptureVisibleTabMock).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 });
 
@@ -179,6 +212,7 @@ describe('capture-visible-flow viewport capture', () => {
   useVisibleFlowTestScope();
 
   it('captures a viewport through the debugger adapter and post-processes the result', async () => {
+    mockExactBitmap(1280, 720);
     loadSettingsMock.mockResolvedValue({ imageFormat: 'png', imageQuality: 90 });
     buildViewportCaptureScreenshotOptionsMock.mockReturnValue({ clip: { width: 1280 } });
     browserDebuggerSendCommandMock.mockResolvedValue({ data: 'raw-screenshot' });
@@ -226,6 +260,7 @@ describe('capture-visible-flow viewport transaction payloads', () => {
   useVisibleFlowTestScope();
 
   it('returns capture job identity for delivery-owned viewport captures', async () => {
+    mockExactBitmap(1440, 900);
     loadSettingsMock.mockResolvedValue({ imageFormat: 'png', imageQuality: 90 });
     buildViewportCaptureScreenshotOptionsMock.mockReturnValue({ clip: { width: 1440 } });
     browserDebuggerSendCommandMock.mockResolvedValue({ data: 'raw-screenshot' });

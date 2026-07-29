@@ -11,6 +11,7 @@ const {
   handleFetchWebSnapshotAssetMock,
   handleOpenEditorWithImageMock,
   handleRegisterWebSnapshotAssetsMock,
+  handleReleaseWebSnapshotStagedBlobsMock,
   handleRequestGalleryImageUpdateCapabilityMock,
   handleRequestExportHarStartCapabilityMock,
   handleReleaseRecordingDownloadMock,
@@ -34,6 +35,7 @@ const {
   handleFetchWebSnapshotAssetMock: vi.fn(),
   handleOpenEditorWithImageMock: vi.fn(),
   handleRegisterWebSnapshotAssetsMock: vi.fn(),
+  handleReleaseWebSnapshotStagedBlobsMock: vi.fn(),
   handleRequestGalleryImageUpdateCapabilityMock: vi.fn(),
   handleRequestExportHarStartCapabilityMock: vi.fn(),
   handleReleaseRecordingDownloadMock: vi.fn(),
@@ -91,6 +93,7 @@ vi.mock('../actions.quick-action', () => ({
 vi.mock('../actions.web-snapshot', () => ({
   handleFetchWebSnapshotAsset: handleFetchWebSnapshotAssetMock,
   handleRegisterWebSnapshotAssets: handleRegisterWebSnapshotAssetsMock,
+  handleReleaseWebSnapshotStagedBlobs: handleReleaseWebSnapshotStagedBlobsMock,
   handleSaveWebSnapshotToGallery: handleSaveWebSnapshotToGalleryMock,
   handleStageWebSnapshotBlobChunk: handleStageWebSnapshotBlobChunkMock,
 }));
@@ -101,14 +104,20 @@ import { createScenarioSessionServiceStub } from '../../../../../../../tooling/t
 import { routeCaptureMessage } from './dispatcher';
 import { createWebSnapshotManifest, flushRouteAsync } from './dispatcher.test-support';
 import type { RouteCaptureMessage } from '../types';
+import { markPreauthorizedContentActionRouteMessage } from '../authorization/content-action';
+import {
+  getScreenshotSurfaceSession,
+  resetScreenshotSurfaceSessionsForTests,
+} from '../../../capture-surface/screenshot-session';
 
 function createRouteArgs() {
   return {
     resolvedTabId: 42,
     sendResponse: vi.fn(),
-    viewportState: new Map<number, { width: number; height: number } | null>([
-      [42, { width: 1280, height: 720 }],
-    ]),
+    viewportState: new Map<
+      number,
+      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    >([[42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }]]),
     screenshotModeState: new Map([[42, true]]),
     captureGuardState: { isCapturing: false },
     pageAccessPort: {
@@ -122,6 +131,7 @@ function createRouteArgs() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetScreenshotSurfaceSessionsForTests();
   handleVisibleCaptureMock.mockReturnValue(true);
   handleVisibleCaptureForCropMock.mockReturnValue(true);
   handleFullCaptureMock.mockReturnValue(true);
@@ -132,6 +142,7 @@ beforeEach(() => {
   handleFetchWebSnapshotAssetMock.mockReturnValue(true);
   handleOpenEditorWithImageMock.mockReturnValue(true);
   handleRegisterWebSnapshotAssetsMock.mockReturnValue(true);
+  handleReleaseWebSnapshotStagedBlobsMock.mockReturnValue(true);
   handleRequestGalleryImageUpdateCapabilityMock.mockReturnValue(true);
   handleSaveScreenshotToGalleryMock.mockReturnValue(true);
   handleSaveWebSnapshotToGalleryMock.mockReturnValue(true);
@@ -140,6 +151,51 @@ beforeEach(() => {
   handleTriggerQuickActionMock.mockReturnValue(true);
   browserTabsGetMock.mockResolvedValue({ id: 42, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
+});
+
+it('renews a screenshot surface only for its preauthorized content document', async () => {
+  const args = createRouteArgs();
+  const message = {
+    contentIntent: { requestId: 'renew-request-1', token: 'renew-token-1' },
+    type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+  } as const;
+  markPreauthorizedContentActionRouteMessage(message, {
+    documentId: 'content-document-42',
+    frameId: 0,
+    senderUrl: 'https://example.test/page',
+    tabId: 42,
+  });
+
+  expect(routeCaptureMessage({ ...args, message })).toBe(true);
+  await flushRouteAsync();
+
+  expect(ensureActivePageAccessRuntimeMock).toHaveBeenCalledWith(42);
+  expect(getScreenshotSurfaceSession(42)).toMatchObject({
+    documentId: 'content-document-42',
+    lastOperationGeneration: 0,
+  });
+  expect(args.sendResponse).toHaveBeenCalledWith({
+    success: true,
+    surfaceCapabilityToken: expect.any(String),
+    surfaceOperationGeneration: 0,
+  });
+});
+
+it('rejects screenshot surface renewal without preauthorized sender ownership', async () => {
+  const args = createRouteArgs();
+  const message = {
+    contentIntent: { requestId: 'renew-request-1', token: 'renew-token-1' },
+    type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
+  } as const;
+
+  expect(routeCaptureMessage({ ...args, message })).toBe(true);
+  await flushRouteAsync();
+
+  expect(args.sendResponse).toHaveBeenCalledWith({
+    success: false,
+    error: 'Unauthorized screenshot surface renewal',
+  });
+  expect(getScreenshotSurfaceSession(42)).toBeNull();
 });
 
 it('routes capture requests through handler contexts', async () => {
@@ -191,7 +247,10 @@ const routeCases: Array<[RouteCaptureMessage, Mock]> = [
   [{ type: CaptureMessageType.CAPTURE_FULL }, handleFullCaptureMock],
   [{ type: MessageType.EXPORT_START_HAR }, handleExportStartHarMock],
   [{ type: MessageType.EXPORT_STOP_HAR }, handleExportStopHarMock],
-  [{ type: MessageType.EXPORT_CAPTURE_FULL_PAGE }, handleExportCaptureFullPageMock],
+  [
+    { exportRunId: 'export-run-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
+    handleExportCaptureFullPageMock,
+  ],
   [
     { type: MessageType.OPEN_EDITOR_WITH_IMAGE, dataUrl: 'data:image/png;base64,1' },
     handleOpenEditorWithImageMock,
@@ -235,6 +294,13 @@ const routeCases: Array<[RouteCaptureMessage, Mock]> = [
       requestId: 'req-web',
     },
     handleRegisterWebSnapshotAssetsMock,
+  ],
+  [
+    {
+      type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
+      snapshotSessionId: 'snapshot-session-1',
+    },
+    handleReleaseWebSnapshotStagedBlobsMock,
   ],
   [
     {

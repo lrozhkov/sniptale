@@ -3,7 +3,6 @@ import type {
   VideoRecordingLiveMediaState,
   VideoRecordingRuntimeState,
   VideoRecordingSettings,
-  VideoViewportPresetSelection,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type {
   VideoProject,
@@ -102,18 +101,6 @@ export function isVideoRecordingSettings(value: unknown): value is VideoRecordin
   );
 }
 
-export function isVideoViewportPresetSelection(
-  value: unknown
-): value is VideoViewportPresetSelection {
-  return (
-    isRecord(value) &&
-    isNumber(value['width']) &&
-    isNumber(value['height']) &&
-    hasOptionalField(value, 'id', isString) &&
-    hasOptionalField(value, 'label', isString)
-  );
-}
-
 export function isVideoRecordingLiveMediaState(
   value: unknown
 ): value is VideoRecordingLiveMediaState {
@@ -139,7 +126,10 @@ export function isVideoRecordingRuntimeState(value: unknown): value is VideoReco
     (value['countdownEndsAt'] === null || isNumber(value['countdownEndsAt'])) &&
     (value['captureMode'] === null || isCaptureMode(value['captureMode'])) &&
     (value['captureSource'] === null || isCaptureSource(value['captureSource'])) &&
-    (value['viewportPreset'] === null || isVideoViewportPresetSelection(value['viewportPreset'])) &&
+    (value['cropRegion'] === undefined ||
+      value['cropRegion'] === null ||
+      isViewportRegion(value['cropRegion'])) &&
+    (value['viewportPresetId'] === null || isString(value['viewportPresetId'])) &&
     (value['liveMedia'] === undefined ||
       value['liveMedia'] === null ||
       isVideoRecordingLiveMediaState(value['liveMedia'])) &&

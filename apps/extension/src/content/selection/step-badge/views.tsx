@@ -44,22 +44,21 @@ function getEffectiveAnchor(settings: StepBadgeSettings): StepBadgeAnchor {
   return 'top-left';
 }
 
-function getManualPosition(settings: StepBadgeSettings, borderWidth: number) {
+function getManualPosition(settings: StepBadgeSettings) {
   const placement = settings.manualPlacement;
   if (!placement) return null;
   const normalizedPosition = Math.max(0, Math.min(1, placement.position));
-  const position = `calc(${normalizedPosition * 100}% + ${borderWidth * (normalizedPosition - 0.5)}px)`;
-  const strokeCenterOffset = -borderWidth / 2;
+  const position = `${normalizedPosition * 100}%`;
   if (placement.side === 'top') {
-    return { top: strokeCenterOffset, left: position, translate: 'translate(-50%, -50%)' };
+    return { top: 0, left: position, translate: 'translate(-50%, -50%)' };
   }
   if (placement.side === 'right') {
-    return { top: position, right: strokeCenterOffset, translate: 'translate(50%, -50%)' };
+    return { top: position, right: 0, translate: 'translate(50%, -50%)' };
   }
   if (placement.side === 'bottom') {
-    return { bottom: strokeCenterOffset, left: position, translate: 'translate(-50%, 50%)' };
+    return { bottom: 0, left: position, translate: 'translate(-50%, 50%)' };
   }
-  return { top: position, left: strokeCenterOffset, translate: 'translate(-50%, -50%)' };
+  return { top: position, left: 0, translate: 'translate(-50%, -50%)' };
 }
 
 export function getStepBadgeStyle(props: {
@@ -76,7 +75,7 @@ export function getStepBadgeStyle(props: {
     props.settings,
     props.borderWidth
   );
-  const manualPosition = getManualPosition(props.settings, props.borderWidth);
+  const manualPosition = getManualPosition(props.settings);
   const position = manualPosition ?? ANCHOR_POSITIONS[anchor];
   const shadowVisual =
     props.shadow === undefined ? null : resolveBorderShadowVisual(props.shadow, props.borderColor);

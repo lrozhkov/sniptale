@@ -103,9 +103,9 @@ function routeParsedOffscreenMessage(
     handleOffscreenRuntimeMessage(parsedMessage, responseHandler)
   );
   void work
-    .then(() => {
+    .then((result) => {
       if (responseHandler && responseMode === 'deferred-ack') {
-        responseHandler({ success: true, result: 'accepted' });
+        responseHandler(buildOffscreenCommandSuccessResponse(result));
       }
     })
     .catch((error) => {
@@ -123,8 +123,8 @@ function routeParsedOffscreenMessage(
 
 function trackOffscreenRuntimeWork(
   idempotency: ReturnType<typeof markOffscreenSideEffectCommand>,
-  work: Promise<void>
-): Promise<void> {
+  work: Promise<unknown>
+): Promise<unknown> {
   if (idempotency.duplicate) {
     return work;
   }
@@ -132,7 +132,7 @@ function trackOffscreenRuntimeWork(
 }
 
 function routeDuplicateOffscreenCommand(
-  completion: Promise<void>,
+  completion: Promise<unknown>,
   responseHandler: ResponseSender | undefined,
   responseMode: ReturnType<typeof resolveOffscreenRuntimeResponseMode>
 ): boolean | undefined {
@@ -142,8 +142,8 @@ function routeDuplicateOffscreenCommand(
   }
 
   void completion.then(
-    () => {
-      responseHandler?.({ success: true, result: 'accepted' });
+    (result) => {
+      responseHandler?.(buildOffscreenCommandSuccessResponse(result));
     },
     (error) => {
       responseHandler?.({
@@ -153,6 +153,34 @@ function routeDuplicateOffscreenCommand(
     }
   );
   return responseHandler ? true : undefined;
+}
+
+function buildOffscreenCommandSuccessResponse(result: unknown) {
+  if (isTerminalStopFailure(result)) {
+    return {
+      success: true,
+      result: 'terminal-failure',
+      error: result.error,
+    };
+  }
+  if (result === 'applied' || result === 'stale') {
+    return { success: true, result };
+  }
+  return { success: true, result: 'accepted' };
+}
+
+function isTerminalStopFailure(value: unknown): value is {
+  error: string;
+  result: 'terminal-failure';
+} {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'result' in value &&
+    value.result === 'terminal-failure' &&
+    'error' in value &&
+    typeof value.error === 'string'
+  );
 }
 
 function reportOffscreenRuntimeError(message: ParsedOffscreenRuntimeMessage, error: unknown): void {
@@ -219,7 +247,7 @@ function reportOffscreenStartRuntimeError(
       type: VideoMessageType.OFFSCREEN_ERROR,
       error: normalizedError,
       phase: 'start',
-      ...(message.recordingId === undefined ? {} : { recordingId: message.recordingId }),
+      recordingId: message.recordingId,
     },
   });
 }

@@ -1,17 +1,6 @@
 export type RegionBounds = { x: number; y: number; width: number; height: number };
 export const MIN_REGION_SELECTOR_SIZE = 100;
 
-export function toDevicePixelRegion(region: RegionBounds): RegionBounds {
-  const dpr = window.devicePixelRatio || 1;
-
-  return {
-    x: Math.round(region.x * dpr),
-    y: Math.round(region.y * dpr),
-    width: Math.round(region.width * dpr),
-    height: Math.round(region.height * dpr),
-  };
-}
-
 export function resizeRegionDimension(
   region: RegionBounds,
   dimension: 'width' | 'height',

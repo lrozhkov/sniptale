@@ -93,8 +93,6 @@ function bootstrapRecorder() {
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
     settings: { quality: VideoQuality.HIGH } as never,
-    captureWidth: 1280,
-    captureHeight: 720,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker: {
       reset: vi.fn(),
@@ -107,8 +105,6 @@ function bootstrapRecorderWithCursorMode(cursorCaptureMode: 'separate' | 'embedd
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
     settings: { quality: VideoQuality.HIGH } as never,
-    captureWidth: 1280,
-    captureHeight: 720,
     cursorCaptureMode,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker: {
@@ -122,8 +118,6 @@ function bootstrapRecorderWithSurface(displaySurface: string | undefined) {
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
     settings: { quality: VideoQuality.HIGH } as never,
-    captureWidth: 1280,
-    captureHeight: 720,
     cursorCaptureMode: 'separate',
     trackSettings: {
       width: 1280,

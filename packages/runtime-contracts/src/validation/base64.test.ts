@@ -39,6 +39,7 @@ describe('base64 boundary validation', () => {
     expect(estimateUtf8Bytes('WEBVTT')).toBe(6);
     expect(estimateUtf8Bytes('\u041f\u0440\u0438\u0432\u0435\u0442')).toBe(12);
     expect(estimateUtf8Bytes('\ud83c\udfac')).toBe(4);
+    expect(estimateUtf8Bytes('ééé', 3)).toBe(4);
     expect(isBoundedUtf8Text('WEBVTT', 6)).toBe(true);
     expect(isBoundedUtf8Text('WEBVTT', 5)).toBe(false);
     expect(isBoundedUtf8Text('', 5)).toBe(false);

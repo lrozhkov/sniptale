@@ -5,12 +5,14 @@ const {
   mediaCleanupMock,
   nativeIngestionCleanupMock,
   runtimeCleanupMock,
+  screenshotCleanupPortMock,
   storageCleanupMock,
 } = vi.hoisted(() => ({
   diagnosticsCleanupMock: vi.fn(),
   mediaCleanupMock: vi.fn(),
   nativeIngestionCleanupMock: vi.fn(),
   runtimeCleanupMock: vi.fn(),
+  screenshotCleanupPortMock: vi.fn(),
   storageCleanupMock: vi.fn(),
 }));
 
@@ -38,14 +40,17 @@ vi.mock('../../media/privacy-erasure/cleanup', () => ({
     }),
   },
 }));
-vi.mock('./runtime-cleanup', () => ({
+vi.mock('./runtime-cleanup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./runtime-cleanup')>()),
   backgroundRuntimeCleanupAdapter: { cleanup: runtimeCleanupMock },
+  configureBackgroundRuntimeScreenshotCleanupPort: screenshotCleanupPortMock,
 }));
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createBackgroundRuntimeState } from '../runtime-state';
 import {
   configureNativeIngestionPrivacyErasureCleanupPort,
+  configureScreenshotPrivacyErasureCleanupPort,
   eraseLocalExtensionDataFromBackground,
 } from './composition';
 
@@ -97,4 +102,12 @@ it('maps the authorized message options into the serialized application use case
     preservePreferences: false,
   });
   expect(result).toEqual(expect.objectContaining({ indexedDbStoresCleared: 2, success: true }));
+});
+
+it('configures screenshot cleanup through the application port', () => {
+  const port = { disableScreenshotMode: vi.fn() };
+
+  configureScreenshotPrivacyErasureCleanupPort(port);
+
+  expect(screenshotCleanupPortMock).toHaveBeenCalledWith(port);
 });

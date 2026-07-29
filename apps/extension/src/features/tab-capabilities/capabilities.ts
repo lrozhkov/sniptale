@@ -16,8 +16,6 @@ function getVideoModeLabel(mode: CaptureMode): string {
       return translate('popup.labels.captureModeArea');
     case CaptureMode.CAMERA:
       return translate('popup.video.modeCameraLabel');
-    case CaptureMode.VIEWPORT_EMULATION:
-      return translate('popup.labels.captureModePreset');
     case CaptureMode.SCREEN:
       return translate('popup.labels.captureModeScreen');
   }
@@ -58,7 +56,6 @@ function createMissingTabCapabilities(): ActiveTabCapabilities {
       [CaptureMode.TAB]: unsupported,
       [CaptureMode.TAB_CROP]: unsupported,
       [CaptureMode.CAMERA]: createSupported(),
-      [CaptureMode.VIEWPORT_EMULATION]: unsupported,
       [CaptureMode.SCREEN]: unsupported,
     },
   };
@@ -176,10 +173,6 @@ export function getTabCapabilities(tab?: chrome.tabs.Tab | null): ActiveTabCapab
       [CaptureMode.TAB]: getVideoCaptureModeCapability(CaptureMode.TAB, tab),
       [CaptureMode.TAB_CROP]: getVideoCaptureModeCapability(CaptureMode.TAB_CROP, tab),
       [CaptureMode.CAMERA]: getVideoCaptureModeCapability(CaptureMode.CAMERA, tab),
-      [CaptureMode.VIEWPORT_EMULATION]: getVideoCaptureModeCapability(
-        CaptureMode.VIEWPORT_EMULATION,
-        tab
-      ),
       [CaptureMode.SCREEN]: getVideoCaptureModeCapability(CaptureMode.SCREEN, tab),
     },
   };

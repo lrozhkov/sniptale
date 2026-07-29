@@ -148,7 +148,10 @@ it('forwards cancel only while the controller instance owns an active export', (
     },
     vi.fn()
   );
-  controller.handleRequest({ type: MessageType.EXPORT_POPUP_CANCEL }, vi.fn());
+  controller.handleRequest(
+    { exportRunId: 'req-1', type: MessageType.EXPORT_POPUP_CANCEL },
+    vi.fn()
+  );
 
   expect(exportRunner.cancel).toHaveBeenCalledTimes(1);
 });

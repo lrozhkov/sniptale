@@ -101,16 +101,12 @@ export function isInsideExistingFrame(
   return false;
 }
 
-function hasHighlighterUiClass(target: HTMLElement): boolean {
-  return HIGHLIGHTER_EXTENSION_UI_CLASSES.some((className) => target.classList.contains(className));
-}
-
 export function isHighlighterExtensionUiElement(target: HTMLElement): boolean {
-  if (hasHighlighterUiClass(target)) return true;
   const popoverPortal =
     getContentUiElementById('sniptale-toolbar-portal') ??
     queryContentUiElement('.sniptale-toolbar-portal-wrapper');
   return isContentRuntimeUiElement(target, {
+    classNames: HIGHLIGHTER_EXTENSION_UI_CLASSES,
     closestSelectors: ['.sniptale-action-toolbar', HIGHLIGHTER_EXTENSION_UI_SELECTOR],
     portalElements: [popoverPortal],
   });

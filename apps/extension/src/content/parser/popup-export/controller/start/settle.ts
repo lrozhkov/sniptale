@@ -7,12 +7,14 @@ import type { ContentPrivilegedActionIntentSource } from '../../../../platform/p
 import { translate } from '../../../../../platform/i18n';
 import { resetPopupExportState } from '../state';
 import type { PopupExportRequestHandlerRuntime, PopupExportRunner } from '../types';
+import type { FullPageExportCaptureIdentity } from '../../../../../contracts/full-page-capture';
 
 type PopupExportStartSettlementProps = Pick<
   PopupExportRequestHandlerRuntime,
   'persistArchive' | 'state'
 > & {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+  fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
   exportRunner: Pick<PopupExportRunner, 'export'>;
   options: ExportOptions;
   requestId: string;
@@ -50,6 +52,7 @@ export async function settlePopupExportStartFlow(
   try {
     const result = await props.exportRunner.export(props.options, {
       contentIntentSource: props.contentIntentSource,
+      fullPageCaptureIdentity: props.fullPageCaptureIdentity,
     });
 
     if (props.state.activeExportRequestId !== props.requestId) {

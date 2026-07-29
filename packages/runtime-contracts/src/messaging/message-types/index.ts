@@ -1,3 +1,5 @@
+import type { ContentPrivilegedActionCapability } from '../../protocol/content-privileged-action';
+
 export const MessageType = {
   ENABLE_SCREENSHOT_MODE: 'ENABLE_SCREENSHOT_MODE',
   DISABLE_SCREENSHOT_MODE: 'DISABLE_SCREENSHOT_MODE',
@@ -26,7 +28,9 @@ export const MessageType = {
   OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE: 'OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE',
   LLM_RESPONSE: 'LLM_RESPONSE',
   LLM_ERROR: 'LLM_ERROR',
-  SET_VIEWPORT: 'SET_VIEWPORT',
+  APPLY_VIEWPORT_PRESET: 'APPLY_VIEWPORT_PRESET',
+  RELEASE_VIEWPORT_PRESET: 'RELEASE_VIEWPORT_PRESET',
+  GET_VIEWPORT_PRESET_AVAILABILITY: 'GET_VIEWPORT_PRESET_AVAILABILITY',
   VIEWPORT_CHANGED: 'VIEWPORT_CHANGED',
   GET_VIEWPORT_STATUS: 'GET_VIEWPORT_STATUS',
   OPEN_EXPORT_MODAL: 'OPEN_EXPORT_MODAL',
@@ -52,6 +56,12 @@ export const MessageType = {
   EXPORT_START_HAR: 'EXPORT_START_HAR',
   EXPORT_STOP_HAR: 'EXPORT_STOP_HAR',
   EXPORT_CAPTURE_FULL_PAGE: 'EXPORT_CAPTURE_FULL_PAGE',
+  EXPORT_CAPTURE_FULL_PAGE_UNATTENDED: 'EXPORT_CAPTURE_FULL_PAGE_UNATTENDED',
+  PREPARE_FULL_PAGE_CAPTURE: 'PREPARE_FULL_PAGE_CAPTURE',
+  HEARTBEAT_FULL_PAGE_CAPTURE: 'HEARTBEAT_FULL_PAGE_CAPTURE',
+  PREPARE_FULL_PAGE_TILE: 'PREPARE_FULL_PAGE_TILE',
+  VERIFY_FULL_PAGE_TILE: 'VERIFY_FULL_PAGE_TILE',
+  RESTORE_FULL_PAGE_CAPTURE: 'RESTORE_FULL_PAGE_CAPTURE',
   OPEN_EDITOR_WITH_IMAGE: 'OPEN_EDITOR_WITH_IMAGE',
   IMAGE_DATA_FOR_EDITOR: 'IMAGE_DATA_FOR_EDITOR',
   SAVE_SCREENSHOT_TO_GALLERY: 'SAVE_SCREENSHOT_TO_GALLERY',
@@ -59,6 +69,7 @@ export const MessageType = {
   REGISTER_WEB_SNAPSHOT_ASSETS: 'REGISTER_WEB_SNAPSHOT_ASSETS',
   FETCH_WEB_SNAPSHOT_ASSET: 'FETCH_WEB_SNAPSHOT_ASSET',
   STAGE_WEB_SNAPSHOT_BLOB_CHUNK: 'STAGE_WEB_SNAPSHOT_BLOB_CHUNK',
+  RELEASE_WEB_SNAPSHOT_STAGED_BLOBS: 'RELEASE_WEB_SNAPSHOT_STAGED_BLOBS',
   REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY: 'REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY',
   UPDATE_GALLERY_IMAGE_ASSET: 'UPDATE_GALLERY_IMAGE_ASSET',
   STAGE_RECORDING_DOWNLOAD_CHUNK: 'STAGE_RECORDING_DOWNLOAD_CHUNK',
@@ -95,10 +106,66 @@ export type MessageType = (typeof MessageType)[keyof typeof MessageType];
 export { CaptureMessageType, CaptureType } from '../capture-messages';
 export type { CaptureArea } from '../capture-messages';
 
-interface SetViewportMessage {
-  type: typeof MessageType.SET_VIEWPORT;
-  width?: number;
-  height?: number;
+export interface AppliedViewportPresetPayload {
+  presetId: string;
+  target: 'viewport' | 'window';
+  width: number;
+  height: number;
+}
+
+export type ViewportPresetAvailabilityPayload =
+  | {
+      status: 'available';
+      presetId: string;
+      target: 'viewport' | 'window';
+      required: { width: number; height: number };
+    }
+  | {
+      status: 'requires-start-validation';
+      presetId: string;
+      target: 'viewport';
+      required: { width: number; height: number };
+    }
+  | {
+      status: 'unavailable';
+      presetId: string;
+      target: 'viewport' | 'window' | null;
+      reason:
+        | 'disabled'
+        | 'missing'
+        | 'unsupported-context'
+        | 'viewport-too-large'
+        | 'window-too-large'
+        | 'window-not-normal'
+        | 'zoom-not-100'
+        | 'surface-busy'
+        | 'permission-denied'
+        | 'platform-rejected'
+        | 'verification-failed';
+      required?: { width: number; height: number };
+      available?: { width: number; height: number };
+    };
+
+interface ApplyViewportPresetMessage {
+  type: typeof MessageType.APPLY_VIEWPORT_PRESET;
+  operationGeneration: number;
+  presetId: string;
+  surfaceCapabilityToken: string;
+  tabId?: number;
+}
+
+interface ReleaseViewportPresetMessage {
+  type: typeof MessageType.RELEASE_VIEWPORT_PRESET;
+  leaseGeneration: number;
+  operationGeneration: number;
+  surfaceCapabilityToken: string;
+  tabId?: number;
+}
+
+interface GetViewportPresetAvailabilityMessage {
+  type: typeof MessageType.GET_VIEWPORT_PRESET_AVAILABILITY;
+  context?: 'screenshot' | 'video';
+  presetIds: string[];
   tabId?: number;
 }
 
@@ -109,7 +176,7 @@ interface GetViewportStatusMessage {
 
 export interface ViewportStatusResponse {
   success: boolean;
-  viewport: { width: number; height: number } | null;
+  viewport: AppliedViewportPresetPayload | null;
   error?: string;
 }
 
@@ -119,15 +186,29 @@ export type TabModeMessage =
   | {
       type: typeof MessageType.ENABLE_SCREENSHOT_MODE;
       tabId?: number;
-      viewport?: { width: number; height: number } | null;
+      viewport?: AppliedViewportPresetPayload | null;
+      contentIntent?: ContentPrivilegedActionCapability;
+      surfaceCapabilityToken?: string;
+      surfaceWarning?: string;
     }
-  | { type: typeof MessageType.DISABLE_SCREENSHOT_MODE; tabId?: number }
-  | { type: typeof MessageType.SCREENSHOT_MODE_STATUS; tabId?: number }
+  | {
+      type: typeof MessageType.DISABLE_SCREENSHOT_MODE;
+      leaseGeneration?: number;
+      operationGeneration?: number;
+      surfaceCapabilityToken?: string;
+      tabId?: number;
+    }
+  | {
+      type: typeof MessageType.SCREENSHOT_MODE_STATUS;
+      tabId?: number;
+    }
   | { type: typeof MessageType.ENABLE_HIGHLIGHTER_MODE; tabId?: number }
   | { type: typeof MessageType.DISABLE_HIGHLIGHTER_MODE; tabId?: number }
   | { type: typeof MessageType.HIGHLIGHTER_MODE_STATUS; tabId?: number }
   | { type: typeof MessageType.ENABLE_QUICK_EDIT_MODE; tabId?: number }
   | { type: typeof MessageType.DISABLE_QUICK_EDIT_MODE; tabId?: number }
   | { type: typeof MessageType.QUICK_EDIT_MODE_STATUS; tabId?: number }
-  | SetViewportMessage
+  | ApplyViewportPresetMessage
+  | ReleaseViewportPresetMessage
+  | GetViewportPresetAvailabilityMessage
   | GetViewportStatusMessage;

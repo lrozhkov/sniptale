@@ -40,7 +40,7 @@ function createRecordingStateResponse() {
       countdownEndsAt: null,
       captureMode: null,
       captureSource: null,
-      viewportPreset: null,
+      viewportPresetId: null,
       error: null,
     },
   };
@@ -207,6 +207,11 @@ async function routesRootFacadeHelpersThroughTheDefaultChromeTransport() {
   const tabResponse = await sendTabMessageViaFacade(11, {
     type: VideoMessageType.HIDE_COUNTDOWN,
   });
+  await sendTabMessageViaFacade(
+    12,
+    { type: VideoMessageType.HIDE_COUNTDOWN },
+    { documentId: 'document-12' }
+  );
 
   expect(runtimeSendMessage).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -220,6 +225,11 @@ async function routesRootFacadeHelpersThroughTheDefaultChromeTransport() {
   expect(tabSendMessage).toHaveBeenCalledWith(11, {
     type: VideoMessageType.HIDE_COUNTDOWN,
   });
+  expect(tabSendMessage).toHaveBeenCalledWith(
+    12,
+    { type: VideoMessageType.HIDE_COUNTDOWN },
+    { documentId: 'document-12' }
+  );
   expect(runtimeResponse.state?.duration).toBe(42);
   expect(tabResponse.success).toBe(true);
 }

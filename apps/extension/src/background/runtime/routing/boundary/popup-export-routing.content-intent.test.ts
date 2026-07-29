@@ -68,7 +68,7 @@ function createExportMessage(
   };
   return type === MessageType.EXPORT_POPUP_START
     ? { ...base, requestId: 'req-export', type }
-    : { ...base, type };
+    : { ...base, batchRequestId: 'req-export', type };
 }
 
 async function flushRouteWork(): Promise<void> {
@@ -79,7 +79,7 @@ async function flushRouteWork(): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  browserTabsGetMock.mockResolvedValue({ id: 62, url: 'https://example.test/page' });
+  browserTabsGetMock.mockResolvedValue({ active: true, id: 62, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
   isOwnedSnapshotViewerPageMock.mockReturnValue(false);
   sendTabMessageMock.mockResolvedValue({ pagePackage: {}, success: true });
@@ -109,6 +109,10 @@ it.each([
       expect(sentMessage).toEqual(
         expect.objectContaining({
           contentIntentGrant: { grantToken: expect.any(String) },
+          fullPageCaptureAction:
+            type === MessageType.EXPORT_POPUP_BUILD_PACKAGE
+              ? MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED
+              : MessageType.EXPORT_CAPTURE_FULL_PAGE,
         })
       );
       return;
