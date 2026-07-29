@@ -20,7 +20,6 @@ import { createStream, createTrackedStream } from '../multi-source/media-stream.
 type NavigationHarness = {
   canvas: HTMLCanvasElement;
   context: { drawImage: ReturnType<typeof vi.fn> };
-  presentVideoFrame: () => void;
   requestVideoFrameCallback: ReturnType<typeof vi.fn>;
   video: {
     cancelVideoFrameCallback: ReturnType<typeof vi.fn>;
@@ -34,8 +33,6 @@ function installNavigationHarness(): NavigationHarness {
   const output = createTrackedStream();
   const context = { drawImage: vi.fn() };
   const canvases: HTMLCanvasElement[] = [];
-  const callbacks = new Map<number, () => void>();
-  let nextCallbackId = 1;
   Object.defineProperty(HTMLCanvasElement.prototype, 'captureStream', {
     configurable: true,
     value: vi.fn(function (this: HTMLCanvasElement) {
@@ -47,14 +44,9 @@ function installNavigationHarness(): NavigationHarness {
     configurable: true,
     value: vi.fn(() => context),
   });
-  const requestVideoFrameCallback = vi.fn((callback: () => void) => {
-    const callbackId = nextCallbackId;
-    nextCallbackId += 1;
-    callbacks.set(callbackId, callback);
-    return callbackId;
-  });
+  const requestVideoFrameCallback = vi.fn(() => 1);
   const video = {
-    cancelVideoFrameCallback: vi.fn((callbackId: number) => callbacks.delete(callbackId)),
+    cancelVideoFrameCallback: vi.fn(),
     requestVideoFrameCallback,
     videoHeight: 720,
     videoWidth: 1280,
@@ -67,11 +59,6 @@ function installNavigationHarness(): NavigationHarness {
       return canvas;
     },
     context,
-    presentVideoFrame: () => {
-      const pending = [...callbacks.values()];
-      callbacks.clear();
-      pending.forEach((callback) => callback());
-    },
     requestVideoFrameCallback,
     video,
   };
@@ -150,11 +137,12 @@ describe('crop stream navigation output', () => {
       harness.context.drawImage.mock.calls.every(([source]) => source === harness.canvas)
     ).toBe(true);
 
-    const navigationTwoFrame = gated.controls.waitForFreshFrame('navigation-2');
-    harness.presentVideoFrame();
-    await navigationTwoFrame;
+    expect(gated.controls.readFrozenSourceSize('navigation-2')).toEqual({
+      height: 720,
+      width: 1280,
+    });
     expect(
-      gated.controls.applyFreshGeometry('navigation-2', {
+      gated.controls.applyFrozenSourceGeometry('navigation-2', {
         sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
         outputSize: { width: 1280, height: 720 },
       })
@@ -167,11 +155,12 @@ describe('crop stream navigation output', () => {
     expect(gated.controls.setFrozen('navigation-2', true)).toBe('stale');
 
     expect(gated.controls.setFrozen('navigation-3', true)).toBe('applied');
-    const navigationThreeFrame = gated.controls.waitForFreshFrame('navigation-3');
-    harness.presentVideoFrame();
-    await navigationThreeFrame;
+    expect(gated.controls.readFrozenSourceSize('navigation-3')).toEqual({
+      height: 720,
+      width: 1280,
+    });
     expect(
-      gated.controls.applyFreshGeometry('navigation-3', {
+      gated.controls.applyFrozenSourceGeometry('navigation-3', {
         sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
         outputSize: { width: 1280, height: 720 },
       })
@@ -210,17 +199,27 @@ describe('crop stream navigation output', () => {
       harness.context.drawImage.mock.calls.slice(1).every(([source]) => source === harness.canvas)
     ).toBe(true);
 
-    const navigationOneFrame = gated.controls.waitForFreshFrame('navigation-1');
-    harness.presentVideoFrame();
-    await navigationOneFrame;
+    expect(gated.controls.readFrozenSourceSize('navigation-1')).toEqual({
+      height: 720,
+      width: 1280,
+    });
     expect(
-      gated.controls.applyFreshGeometry('navigation-1', {
+      gated.controls.applyFrozenSourceGeometry('navigation-1', {
         sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
         outputSize: { width: 1280, height: 720 },
       })
     ).toBe('applied');
     expect(gated.controls.setFrozen('navigation-1', false)).toBe('applied');
     expect(harness.context.drawImage.mock.calls.at(-1)?.[0]).toBe(harness.video);
+    expect(harness.requestVideoFrameCallback).not.toHaveBeenCalled();
+    const callsAfterThaw = harness.context.drawImage.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(harness.context.drawImage.mock.calls.length).toBeGreaterThan(callsAfterThaw);
+    expect(
+      harness.context.drawImage.mock.calls
+        .slice(callsAfterThaw)
+        .every(([source]) => source === harness.video)
+    ).toBe(true);
 
     expect(gated.controls.setFrozen('navigation-2', true)).toBe('applied');
     const callsBeforeSecondFreeze = harness.context.drawImage.mock.calls.length;
@@ -235,7 +234,7 @@ describe('crop stream navigation output', () => {
     gated.stream.getVideoTracks()[0]?.stop();
   });
 
-  it('keeps a viewport crop frozen until fresh source geometry is applied', async () => {
+  it('keeps a viewport crop frozen until current source geometry is applied', async () => {
     const harness = installNavigationHarness();
     const gated = await createGatedCropStream(
       createStream(1280, 720),
@@ -248,8 +247,13 @@ describe('crop stream navigation output', () => {
     gated.controls.activate();
     expect(gated.controls.setFrozen('navigation-1', true)).toBe('applied');
 
-    const freshFrame = gated.controls.waitForFreshFrame('navigation-1');
-    expect(() => gated.controls.setFrozen('navigation-1', false)).toThrow('fresh source geometry');
+    expect(() =>
+      gated.controls.applyFrozenSourceGeometry('navigation-1', {
+        sourceRect: { x: 150, y: 120, width: 450, height: 450 },
+        outputSize: { width: 300, height: 300 },
+      })
+    ).toThrow('reading the frozen source');
+    expect(() => gated.controls.setFrozen('navigation-1', false)).toThrow('frozen source geometry');
     await vi.advanceTimersByTimeAsync(100);
     expect(
       harness.context.drawImage.mock.calls.slice(1).every(([source]) => source === harness.canvas)
@@ -257,10 +261,12 @@ describe('crop stream navigation output', () => {
 
     harness.video.videoWidth = 1920;
     harness.video.videoHeight = 1080;
-    harness.presentVideoFrame();
-    await expect(freshFrame).resolves.toEqual({ height: 1080, width: 1920 });
+    expect(gated.controls.readFrozenSourceSize('navigation-1')).toEqual({
+      height: 1080,
+      width: 1920,
+    });
     expect(
-      gated.controls.applyFreshGeometry('navigation-1', {
+      gated.controls.applyFrozenSourceGeometry('navigation-1', {
         sourceRect: { x: 150, y: 120, width: 450, height: 450 },
         outputSize: { width: 300, height: 300 },
       })

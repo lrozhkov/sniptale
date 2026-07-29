@@ -237,9 +237,9 @@ it('changes viewport drawing only for the active recording source binding', asyn
   const setFrozen = vi.fn(() => 'applied' as const);
   recordingContext.tabOutputControls = {
     activate,
-    applyFreshGeometry: vi.fn(() => 'applied' as const),
+    applyFrozenSourceGeometry: vi.fn(() => 'applied' as const),
+    readFrozenSourceSize: vi.fn(),
     setFrozen,
-    waitForFreshFrame: vi.fn(),
   };
   const start = startRecording(createStartParams());
 

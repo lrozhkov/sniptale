@@ -52,9 +52,9 @@ const {
     },
     tabOutputControls: null as null | {
       activate: ReturnType<typeof vi.fn>;
-      applyFreshGeometry: ReturnType<typeof vi.fn>;
+      applyFrozenSourceGeometry: ReturnType<typeof vi.fn>;
+      readFrozenSourceSize: ReturnType<typeof vi.fn>;
       setFrozen: ReturnType<typeof vi.fn>;
-      waitForFreshFrame: ReturnType<typeof vi.fn>;
     },
     matchesSourceBinding: vi.fn(() => true),
   },
@@ -555,20 +555,14 @@ it('revalidates source metadata and returns typed ALLOW or DENY responses', asyn
   expect(activateViewportOutputMock).not.toHaveBeenCalled();
 });
 
-it('remaps a frozen viewport crop from its fresh source frame before acknowledging recovery', async () => {
-  let resolveFreshFrame!: (size: { height: number; width: number }) => void;
-  const waitForFreshFrame = vi.fn(
-    () =>
-      new Promise<{ height: number; width: number }>((resolve) => {
-        resolveFreshFrame = resolve;
-      })
-  );
-  const applyFreshGeometry = vi.fn(() => 'applied');
+it('remaps a frozen viewport crop without waiting for starved media callbacks', async () => {
+  const readFrozenSourceSize = vi.fn(() => ({ height: 1080, width: 1920 }));
+  const applyFrozenSourceGeometry = vi.fn(() => 'applied');
   const controls = {
     activate: vi.fn(),
-    applyFreshGeometry,
+    applyFrozenSourceGeometry,
+    readFrozenSourceSize,
     setFrozen: vi.fn(),
-    waitForFreshFrame,
   };
   const geometry = {
     coordinateSpace: { devicePixelRatio: 1, width: 1280, height: 720 },
@@ -603,13 +597,10 @@ it('remaps a frozen viewport crop from its fresh source frame before acknowledgi
     },
     sendResponse
   );
-  await vi.waitFor(() => expect(waitForFreshFrame).toHaveBeenCalledWith('navigation-1'));
-  expect(sendResponse).not.toHaveBeenCalled();
-
-  resolveFreshFrame({ height: 1080, width: 1920 });
   await routed;
 
-  expect(applyFreshGeometry).toHaveBeenCalledWith('navigation-1', {
+  expect(readFrozenSourceSize).toHaveBeenCalledWith('navigation-1');
+  expect(applyFrozenSourceGeometry).toHaveBeenCalledWith('navigation-1', {
     coordinateSpace: { devicePixelRatio: 1, width: 1280, height: 720 },
     requestedCrop: { x: 100, y: 80, width: 300, height: 300 },
     sourceSize: { height: 1080, width: 1920 },

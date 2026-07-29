@@ -55,9 +55,9 @@ const geometry = {
 };
 const tabOutputControls = {
   activate: vi.fn(),
-  applyFreshGeometry: vi.fn(() => 'applied' as const),
+  applyFrozenSourceGeometry: vi.fn(() => 'applied' as const),
+  readFrozenSourceSize: vi.fn(),
   setFrozen: vi.fn(),
-  waitForFreshFrame: vi.fn(),
 };
 
 beforeEach(() => {

@@ -293,7 +293,7 @@ async function refreshFrozenTabOutput(
   if (!message.transitionId) {
     throw new Error('Viewport source revalidation transition ID is unavailable');
   }
-  const sourceSize = await controls.waitForFreshFrame(message.transitionId);
+  const sourceSize = controls.readFrozenSourceSize(message.transitionId);
   assertCurrentRecordingSource(message, stream);
   if (
     recordingContext.tabOutputControls !== controls ||
@@ -313,7 +313,7 @@ async function refreshFrozenTabOutput(
     sourceSize,
     coordinateSpace
   );
-  if (controls.applyFreshGeometry(message.transitionId, nextGeometry) !== 'applied') {
+  if (controls.applyFrozenSourceGeometry(message.transitionId, nextGeometry) !== 'applied') {
     throw new Error('Viewport source revalidation was superseded');
   }
   recordingContext.sourceVideoHeight = sourceSize.height;

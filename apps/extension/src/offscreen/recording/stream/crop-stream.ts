@@ -112,7 +112,7 @@ export async function createGatedCropStream(
         validated.outputSize.width !== canvas.width ||
         validated.outputSize.height !== canvas.height
       ) {
-        throw new Error('Fresh crop geometry cannot change the encoded output dimensions');
+        throw new Error('Updated crop geometry cannot change the encoded output dimensions');
       }
       activeGeometry = validated;
     };
