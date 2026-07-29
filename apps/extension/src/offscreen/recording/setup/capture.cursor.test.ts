@@ -162,9 +162,99 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
   }
 );
 
-it('fails closed and releases the source when native cursor exclusion is not honored', async () => {
+it('keeps viewport-projected tab capture when Chrome omits cursor track settings', async () => {
+  const stop = vi.fn();
+  const getUserMedia = vi.fn().mockResolvedValue({
+    getTracks: () => [{ stop }],
+    getVideoTracks: () => [{ getSettings: () => ({}), readyState: 'live' }],
+    id: 'tab-stream',
+  });
+  installMediaDevicesMocks({ getUserMedia });
+
+  await expect(
+    acquireRecordingSourceStream({
+      captureMode: CaptureMode.TAB,
+      excludeNativeCursor: true,
+      settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
+      streamId: 'tab-stream-unreported-cursor',
+    })
+  ).resolves.toEqual(expect.objectContaining({ cursorCaptureMode: null }));
+
+  expect(getUserMedia).toHaveBeenCalledWith({
+    audio: false,
+    video: {
+      cursor: 'never',
+      mandatory: {
+        chromeMediaSource: 'tab',
+        chromeMediaSourceId: 'tab-stream-unreported-cursor',
+      },
+    },
+  });
+  expect(stop).not.toHaveBeenCalled();
+  expect(loggerDebugMock).toHaveBeenCalledWith(
+    'Tab capture accepted cursor-free constraints without cursor track settings',
+    { displaySurface: null }
+  );
+});
+
+it.each(['always', 'motion'] as const)(
+  'fails closed and releases the source when native cursor exclusion reports %s',
+  async (cursor) => {
+    const videoTrack = {
+      getSettings: () => ({ cursor }),
+      readyState: 'live',
+      stop: vi.fn(),
+    };
+    const audioTrack = { stop: vi.fn() };
+    installMediaDevicesMocks({
+      getUserMedia: vi.fn().mockResolvedValue({
+        getTracks: () => [videoTrack, audioTrack],
+        getVideoTracks: () => [videoTrack],
+        id: 'tab-stream',
+      }),
+    });
+
+    await expect(
+      acquireRecordingSourceStream({
+        captureMode: CaptureMode.TAB,
+        excludeNativeCursor: true,
+        settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
+        streamId: 'tab-stream-cursor-leak',
+      })
+    ).rejects.toThrow('Native cursor exclusion could not be verified');
+
+    expect(videoTrack.stop).toHaveBeenCalledOnce();
+    expect(audioTrack.stop).toHaveBeenCalledOnce();
+  }
+);
+
+it('fails closed and releases an unverified source without a video track', async () => {
+  const audioTrack = { stop: vi.fn() };
+  installMediaDevicesMocks({
+    getUserMedia: vi.fn().mockResolvedValue({
+      getTracks: () => [audioTrack],
+      getVideoTracks: () => [],
+      id: 'tab-stream',
+    }),
+  });
+
+  await expect(
+    acquireRecordingSourceStream({
+      captureMode: CaptureMode.TAB,
+      excludeNativeCursor: true,
+      settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
+      streamId: 'tab-stream-without-video',
+    })
+  ).rejects.toThrow('Native cursor exclusion could not be verified');
+
+  expect(audioTrack.stop).toHaveBeenCalledOnce();
+});
+
+it('fails closed and releases every track when cursor settings cannot be read', async () => {
   const videoTrack = {
-    getSettings: () => ({ cursor: 'always' }),
+    getSettings: () => {
+      throw new Error('track settings unavailable');
+    },
     readyState: 'live',
     stop: vi.fn(),
   };
@@ -182,7 +272,7 @@ it('fails closed and releases the source when native cursor exclusion is not hon
       captureMode: CaptureMode.TAB,
       excludeNativeCursor: true,
       settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
-      streamId: 'tab-stream-cursor-leak',
+      streamId: 'tab-stream-settings-error',
     })
   ).rejects.toThrow('Native cursor exclusion could not be verified');
 
@@ -190,7 +280,7 @@ it('fails closed and releases the source when native cursor exclusion is not hon
   expect(audioTrack.stop).toHaveBeenCalledOnce();
 });
 
-it('keeps tab recordings alive when cursor exclusion cannot be verified', async () => {
+it('keeps controlled tab telemetry alive when native cursor exclusion was not requested', async () => {
   const stop = vi.fn();
   installMediaDevicesMocks({
     getUserMedia: vi.fn().mockResolvedValue({

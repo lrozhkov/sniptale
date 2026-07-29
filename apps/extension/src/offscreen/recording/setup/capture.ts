@@ -126,7 +126,7 @@ async function acquireTabStream({
     audio: audioConstraints,
     video: videoConstraints,
   });
-  if (excludeNativeCursor === true) assertNativeCursorExcluded(stream);
+  if (excludeNativeCursor === true) assertNativeCursorExclusionNotContradicted(stream);
   const cursorCaptureMode = resolveCursorCaptureMode(stream, settings, captureMode);
   logger.debug('Acquired tab capture stream', {
     hasAudio: Boolean(audioConstraints),
@@ -169,15 +169,28 @@ function stopAcquiredStream(stream: MediaStream): void {
   }
 }
 
-function assertNativeCursorExcluded(stream: MediaStream): void {
+function assertNativeCursorExclusionNotContradicted(stream: MediaStream): void {
+  if (!stream.getVideoTracks()[0]) {
+    stopAcquiredStream(stream);
+    throw new Error('Native cursor exclusion could not be verified');
+  }
   let cursorSetting: string | null;
+  let displaySurface: string | null;
   try {
-    cursorSetting = getTrackSettings(stream).cursor;
+    const trackSettings = getTrackSettings(stream);
+    cursorSetting = trackSettings.cursor;
+    displaySurface = trackSettings.displaySurface;
   } catch (error) {
     stopAcquiredStream(stream);
     throw new Error('Native cursor exclusion could not be verified', { cause: error });
   }
   if (cursorSetting === 'never') return;
+  if (cursorSetting === null) {
+    logger.debug('Tab capture accepted cursor-free constraints without cursor track settings', {
+      displaySurface,
+    });
+    return;
+  }
   stopAcquiredStream(stream);
   throw new Error('Native cursor exclusion could not be verified');
 }
