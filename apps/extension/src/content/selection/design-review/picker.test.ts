@@ -238,10 +238,12 @@ it('removes the picker frame node on teardown', () => {
   pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection: vi.fn() });
 
   expect(queryContentUiElement('.sniptale-design-review-frame')).not.toBeNull();
+  expect(document.getElementById('sniptale-design-review-cursor-style')).not.toBeNull();
 
   pickerRuntime.dispose();
   pickerRuntime = null;
   expect(queryContentUiElement('.sniptale-design-review-frame')).toBeNull();
+  expect(document.getElementById('sniptale-design-review-cursor-style')).toBeNull();
 });
 
 it('selects the exact element from an accessible same-origin iframe', () => {

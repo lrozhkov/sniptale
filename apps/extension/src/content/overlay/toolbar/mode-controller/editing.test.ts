@@ -148,6 +148,9 @@ describe('toolbar-mode-controller manual editing transitions', () => {
     expect(params.setNavigationLockEnabled).toHaveBeenCalledWith(true);
     expect(toolbarEditingMocks.enableDesignReviewModeMock).toHaveBeenCalledOnce();
     expect(params.setDesignReviewMode).toHaveBeenCalledWith(true);
+    expect(toolbarEditingMocks.enableDesignReviewModeMock.mock.invocationCallOrder[0]).toBeLessThan(
+      params.setNavigationLockEnabled.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
   });
 });
 

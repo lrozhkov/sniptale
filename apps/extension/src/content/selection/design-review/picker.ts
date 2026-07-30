@@ -7,6 +7,7 @@ import {
 } from '../../platform/frame';
 import { resolvePagePreparationElement } from '../../parser/page-preparation/target';
 import { isTrustedKeyboardEvent, isTrustedMouseEvent } from '../../platform/trusted-events';
+import { mountDesignReviewCursor } from './cursor';
 import { hideDesignReviewFrame, removeDesignReviewFrame, showDesignReviewFrame } from './frame';
 import { addInaccessibleIframeSelectionListener } from './inaccessible-iframe';
 import { readPageStyleSelectionSnapshot, type PageStyleSelectionSnapshot } from './snapshot';
@@ -116,6 +117,7 @@ export function startDesignReviewPicker(args: {
 }): DesignReviewPickerRuntime {
   let selectedElement: Element | null = null;
   let framedElement: Element | null = null;
+  const cleanupCursor = mountDesignReviewCursor();
 
   function refreshFrame(): void {
     if (framedElement?.isConnected) {
@@ -230,6 +232,7 @@ export function startDesignReviewPicker(args: {
       cleanupScroll();
       cleanupResize();
       cleanupInaccessibleIframes();
+      cleanupCursor();
       removeDesignReviewFrame();
     },
     selectElement,

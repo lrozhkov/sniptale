@@ -338,8 +338,8 @@ function createDesignReviewModeToggle({
       setQuickEditMode(false);
     }
 
-    setNavigationLockEnabled(true);
     enableDesignReviewMode();
+    setNavigationLockEnabled(true);
     setDesignReviewMode(true);
   };
 }
