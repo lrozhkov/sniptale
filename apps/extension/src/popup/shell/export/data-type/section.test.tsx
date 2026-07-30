@@ -99,6 +99,31 @@ it('renders selected summary items and opens the drawer', async () => {
   expect(props.onOpen).toHaveBeenCalledOnce();
 });
 
+it('allocates the full five-row collapsed summary instead of clipping the last item', async () => {
+  await renderSection({
+    includeAnnotations: true,
+    includeBasicLogs: true,
+    includeCssDiagnostics: true,
+    includeFiles: true,
+    includeFullPageScreenshot: true,
+    includeHarDomLogs: true,
+    includeImages: true,
+    includeJson: true,
+    includeMarkdown: true,
+    isOpen: false,
+  });
+
+  const editButton = findButton('t:popup.export.editButton');
+  const summaryBody = document.getElementById(editButton.getAttribute('aria-controls') ?? '');
+  const summary = summaryBody?.querySelector('[data-testid="export-data-type-summary"]');
+
+  expect(summary?.children).toHaveLength(9);
+  expect(summary?.className).toContain('grid-cols-2');
+  expect(Math.ceil((summary?.children.length ?? 0) / 2)).toBe(5);
+  expect(summaryBody?.className).toContain('max-h-[140px]');
+  expect(summaryBody?.className).not.toContain('max-h-[132px]');
+});
+
 it('selects only visible inactive options and renders the empty filter state', async () => {
   const setIncludeJson = vi.fn<SectionProps['setIncludeJson']>();
   const props = await renderSection({ setIncludeJson });

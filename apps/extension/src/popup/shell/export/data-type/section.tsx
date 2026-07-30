@@ -231,7 +231,7 @@ export function ExportDataTypeSection(props: DataTypeSectionProps) {
       onOpen={props.onOpen}
       onClose={props.onClose}
       bodyClassName={cx(
-        props.isOpen ? 'flex min-h-0 flex-1 flex-col pt-1' : 'max-h-[132px] overflow-hidden pt-1'
+        props.isOpen ? 'flex min-h-0 flex-1 flex-col pt-1' : 'max-h-[140px] overflow-hidden pt-1'
       )}
     >
       {props.isOpen
