@@ -25,6 +25,7 @@ function createState(
 
   return {
     activeTab: PAGE_STYLE_INSPECTOR_TABS.PROPERTIES,
+    comment: { commitFailed: false, draft: '', marker: null },
     defaultValues: resolvedValues,
     draftPatch: { assets: [], declarations: [] },
     includeComputedInTemplate: false,

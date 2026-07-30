@@ -11,7 +11,9 @@ const { contentDialogStackMock, contentToolbarShellMock, pageStyleInspectorSurfa
     contentDialogStackMock: vi.fn(() => <div data-ui="content.layout.dialogs" />),
     contentToolbarShellMock: vi.fn(() => <div data-ui="content.layout.toolbar" />),
     pageStyleInspectorSurfaceMock: vi.fn(() => (
-      <div data-ui="content.layout.page-style-inspector" />
+      <div data-ui="content.layout.page-style-inspector">
+        <div data-ui="content.annotation-markers" />
+      </div>
     )),
   }));
 
@@ -214,6 +216,7 @@ it('hides dialog and inspector app chrome while capture UI is completely hidden'
   expect(pageStyleInspectorSurfaceMock).not.toHaveBeenCalled();
   expect(container?.querySelector('[data-ui="content.layout.dialogs"]')).toBeNull();
   expect(container?.querySelector('[data-ui="content.layout.page-style-inspector"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).toBeNull();
 
   await renderLayout({
     ...props,
@@ -229,4 +232,5 @@ it('hides dialog and inspector app chrome while capture UI is completely hidden'
   expect(
     container?.querySelector('[data-ui="content.layout.page-style-inspector"]')
   ).not.toBeNull();
+  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).not.toBeNull();
 });

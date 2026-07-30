@@ -141,6 +141,31 @@ describe('browser annotation session live identity', () => {
     ]);
   });
 
+  it('removes only comment evidence while text and style keep the DOM annotation alive', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const target = createTarget();
+    session.recordTextChange({ after: 'New', before: 'Old', evidence, target });
+    session.recordPropertyChanges({
+      changes: [createPropertyChange({ after: '24px', before: '16px' })],
+      evidence,
+      target,
+    });
+    session.setComment({ comment: 'Temporary', evidence, target });
+
+    session.setComment({ comment: '', evidence, target });
+
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({
+        propertyChanges: [createPropertyChange({ after: '24px', before: '16px' })],
+        textChange: { after: 'New', before: 'Old' },
+      }),
+    ]);
+    expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('comment');
+    expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('commentMarker');
+    expect(session.getAnnotationId(target)).toBe(1);
+  });
+
   it('restores the original live target and identifiers through snapshot undo/redo', () => {
     const session = createBrowserAnnotationSession();
     const evidence = createEvidence();
@@ -165,6 +190,40 @@ describe('browser annotation session live identity', () => {
       annotationId: 2,
       commentMarker: 2,
     });
+  });
+
+  it('restores allocators only for the exact failed synchronous mutation', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const target = createTarget();
+    const rollbackPoint = session.captureFailedMutationRollbackPoint();
+
+    expect(session.setComment({ comment: 'Failed', evidence, target })).toBe(1);
+    expect(session.rollbackFailedMutation(rollbackPoint)).toBe(true);
+    expect(session.captureSnapshot()).toMatchObject({
+      domRecords: [],
+      nextAnnotationId: 1,
+      nextCommentMarker: 1,
+      nextCreationOrder: 1,
+    });
+    expect(session.setComment({ comment: 'Retry', evidence, target })).toBe(1);
+  });
+
+  it('refuses a failed-mutation rollback after an intervening session mutation', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const rollbackPoint = session.captureFailedMutationRollbackPoint();
+    const first = createTarget();
+    const second = createTarget();
+
+    session.setComment({ comment: 'First', evidence, target: first });
+    session.setComment({ comment: 'Second', evidence, target: second });
+
+    expect(session.rollbackFailedMutation(rollbackPoint)).toBe(false);
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({ comment: 'First', commentMarker: 1 }),
+      expect.objectContaining({ comment: 'Second', commentMarker: 2 }),
+    ]);
   });
 
   it('keeps detached evidence exportable without throwing', () => {

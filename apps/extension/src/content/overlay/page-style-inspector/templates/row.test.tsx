@@ -20,6 +20,12 @@ function createActions(): PageStyleInspectorActions {
     applyTemplate: vi.fn(async () => undefined),
     clearBackgroundAsset: vi.fn(),
     close: vi.fn(),
+    comment: {
+      commit: vi.fn(() => true),
+      endComposition: vi.fn(),
+      startComposition: vi.fn(),
+      updateDraft: vi.fn(),
+    },
     deleteRule: vi.fn(),
     deleteTemplate: vi.fn(async () => undefined),
     duplicateTemplate: vi.fn(async () => undefined),

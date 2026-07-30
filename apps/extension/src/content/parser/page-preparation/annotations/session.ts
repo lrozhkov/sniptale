@@ -2,6 +2,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   BROWSER_ANNOTATION_SCHEMA_VERSION,
   type BrowserAnnotationCommentInput,
+  type BrowserAnnotationFailedMutationRollbackPoint,
   type BrowserAnnotationPropertyChange,
   type BrowserAnnotationPropertyChangesInput,
   type BrowserAnnotationSessionSnapshot,
@@ -297,11 +298,14 @@ function syncFrameIds(state: BrowserAnnotationRuntimeState, frameIds: readonly s
 
 function applySnapshot(
   state: BrowserAnnotationRuntimeState,
-  snapshot: BrowserAnnotationSessionSnapshot
+  snapshot: BrowserAnnotationSessionSnapshot,
+  allocatorMode: 'exact' | 'monotonic' = 'monotonic'
 ): void {
-  const nextAnnotationId = Math.max(state.nextAnnotationId, snapshot.nextAnnotationId);
-  const nextCommentMarker = Math.max(state.nextCommentMarker, snapshot.nextCommentMarker);
-  const nextCreationOrder = Math.max(state.nextCreationOrder, snapshot.nextCreationOrder);
+  const resolveAllocator = (current: number, captured: number) =>
+    allocatorMode === 'exact' ? captured : Math.max(current, captured);
+  const nextAnnotationId = resolveAllocator(state.nextAnnotationId, snapshot.nextAnnotationId);
+  const nextCommentMarker = resolveAllocator(state.nextCommentMarker, snapshot.nextCommentMarker);
+  const nextCreationOrder = resolveAllocator(state.nextCreationOrder, snapshot.nextCreationOrder);
   const nextRecords = new Map(
     snapshot.domRecords.map((record) => [record.annotationId, cloneDomRecord(record)])
   );
@@ -326,11 +330,17 @@ function applySnapshot(
 /** Creates the sole mutable authority for annotations in one content-document session. */
 export function createBrowserAnnotationSession() {
   const state = createEmptyRuntimeState();
+  const rollbackAuthority = Symbol('BrowserAnnotationFailedMutationRollback');
 
   return {
     applySnapshot: (snapshot: BrowserAnnotationSessionSnapshot): void =>
       applySnapshot(state, snapshot),
     captureSnapshot: (): BrowserAnnotationSessionSnapshot => createSnapshot(state),
+    captureFailedMutationRollbackPoint: (): BrowserAnnotationFailedMutationRollbackPoint => ({
+      authority: rollbackAuthority,
+      revision: state.revision,
+      snapshot: createSnapshot(state),
+    }),
     getAnnotationId: (target: Element): number | null =>
       state.liveAnnotationIds.get(target) ?? null,
     getLiveTarget: (annotationId: number): Element | null =>
@@ -347,6 +357,19 @@ export function createBrowserAnnotationSession() {
       const listeners = state.listeners;
       Object.assign(state, createEmptyRuntimeState(), { listeners });
       publish(state);
+    },
+    rollbackFailedMutation: (point: BrowserAnnotationFailedMutationRollbackPoint): boolean => {
+      if (point.authority !== rollbackAuthority) {
+        return false;
+      }
+      if (state.revision === point.revision) {
+        return true;
+      }
+      if (state.revision !== point.revision + 1) {
+        return false;
+      }
+      applySnapshot(state, point.snapshot, 'exact');
+      return true;
     },
     setComment: (input: BrowserAnnotationCommentInput): number | null => setComment(state, input),
     subscribe: (listener: BrowserAnnotationListener): (() => void) => {

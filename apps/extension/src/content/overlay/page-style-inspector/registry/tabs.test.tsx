@@ -16,6 +16,7 @@ let root: Root | null = null;
 function createState(): PageStyleInspectorViewState {
   return {
     activeTab: PAGE_STYLE_INSPECTOR_TABS.RULES,
+    comment: { commitFailed: false, draft: '', marker: null },
     defaultValues: {},
     draftPatch: { assets: [], declarations: [] },
     includeComputedInTemplate: false,
@@ -56,6 +57,12 @@ function createActions(): PageStyleInspectorActions {
     applyTemplate: vi.fn(),
     clearBackgroundAsset: vi.fn(),
     close: vi.fn(),
+    comment: {
+      commit: vi.fn(() => true),
+      endComposition: vi.fn(),
+      startComposition: vi.fn(),
+      updateDraft: vi.fn(),
+    },
     deleteRule: vi.fn(async () => ({
       message: 'Действие выполнено, но часть файлов не удалось очистить',
       state: 'warning' as const,

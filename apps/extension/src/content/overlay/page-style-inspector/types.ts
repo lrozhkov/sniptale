@@ -13,6 +13,7 @@ import type {
 
 export interface PageStyleInspectorViewState {
   activeTab: PageStyleInspectorTab;
+  comment: PageStyleInspectorCommentViewState;
   defaultValues: PageStyleDeclarationValueMap;
   draftPatch: PageStylePatch;
   includeComputedInTemplate: boolean;
@@ -32,6 +33,12 @@ export interface PageStyleInspectorViewState {
   values: PageStyleDeclarationValueMap;
 }
 
+interface PageStyleInspectorCommentViewState {
+  commitFailed: boolean;
+  draft: string;
+  marker: number | null;
+}
+
 export type PageStyleInspectorActionOutcome = {
   message: string;
   state: 'success' | 'warning';
@@ -43,6 +50,7 @@ export interface PageStyleInspectorActions {
   applyTemplate: (template: PageStyleTemplate) => Promise<void>;
   clearBackgroundAsset: () => Promise<PageStyleInspectorActionOutcome>;
   close: () => void;
+  comment: PageStyleInspectorCommentActions;
   saveBackgroundAsset: (file: File) => Promise<PageStyleInspectorActionOutcome>;
   saveImageReplacement: (file: File) => Promise<PageStyleInspectorActionOutcome>;
   saveRule: () => Promise<void>;
@@ -66,4 +74,11 @@ export interface PageStyleInspectorActions {
   updateAssetPatch: (asset: PageStyleAssetReference) => Promise<PageStyleInspectorActionOutcome>;
   updateValue: (property: PageStyleProperty, value: string) => void;
   updateValues: (updates: Array<{ property: PageStyleProperty; value: string }>) => void;
+}
+
+interface PageStyleInspectorCommentActions {
+  commit: () => boolean;
+  endComposition: (value: string) => void;
+  startComposition: () => void;
+  updateDraft: (value: string) => void;
 }

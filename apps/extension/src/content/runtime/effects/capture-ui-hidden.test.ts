@@ -64,6 +64,7 @@ it('hides transient app UI during screenshot capture without hiding captured ann
     '.sniptale-step-badge-controls',
     '.sniptale-free-frame-draft-portal',
     '.sniptale-quick-edit-hover',
+    '.sniptale-annotation-marker-layer',
   ].forEach(expectCaptureHiddenSelector);
 
   expect(captureHiddenSelectors).not.toContain(

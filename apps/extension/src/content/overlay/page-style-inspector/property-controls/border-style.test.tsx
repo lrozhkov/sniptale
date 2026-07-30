@@ -17,6 +17,7 @@ function createState(value: string): PageStyleInspectorViewState {
 
   return {
     activeTab: PAGE_STYLE_INSPECTOR_TABS.PROPERTIES,
+    comment: { commitFailed: false, draft: '', marker: null },
     defaultValues: values,
     draftPatch: { assets: [], declarations: [] },
     includeComputedInTemplate: false,

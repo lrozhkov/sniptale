@@ -79,6 +79,13 @@ export interface BrowserAnnotationSessionState extends BrowserAnnotationSessionS
   revision: number;
 }
 
+/** Session-local rollback token for one synchronous producer mutation that never committed. */
+export interface BrowserAnnotationFailedMutationRollbackPoint {
+  readonly authority: symbol;
+  readonly revision: number;
+  readonly snapshot: BrowserAnnotationSessionSnapshot;
+}
+
 export interface BrowserAnnotationPropertyChangesInput {
   changes: BrowserAnnotationPropertyChange[];
   evidence: BrowserAnnotationTargetEvidence;

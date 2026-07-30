@@ -16,6 +16,12 @@ function createActions(): PageStyleInspectorActions {
     applyTemplate: vi.fn(),
     clearBackgroundAsset: vi.fn(),
     close: vi.fn(),
+    comment: {
+      commit: vi.fn(() => true),
+      endComposition: vi.fn(),
+      startComposition: vi.fn(),
+      updateDraft: vi.fn(),
+    },
     deleteRule: vi.fn(),
     deleteTemplate: vi.fn(),
     duplicateTemplate: vi.fn(),
@@ -48,6 +54,7 @@ function createState(
 
   return {
     activeTab: PAGE_STYLE_INSPECTOR_TABS.PROPERTIES,
+    comment: { commitFailed: false, draft: '', marker: null },
     defaultValues: {
       color: 'rgb(1, 2, 3)',
       'margin-bottom': '3px',

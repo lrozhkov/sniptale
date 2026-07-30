@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { useAppLocale } from '../../../platform/i18n';
+import { BrowserAnnotationMarkers } from '../annotation-markers/view';
 import {
   hideQuickEditPageStyleFrame,
   showQuickEditPageStyleFrame,
@@ -37,6 +39,7 @@ function useQuickEditPageStyleSelectionFrame(
 export function PageStyleInspectorSurface(props: {
   controller: ReturnType<typeof usePageStyleInspectorController>;
 }) {
+  useAppLocale();
   const { controller } = props;
   useQuickEditPageStyleSelectionFrame(
     controller.viewState.selection?.element ?? null,
@@ -44,11 +47,14 @@ export function PageStyleInspectorSurface(props: {
   );
 
   return (
-    <PageStyleInspectorPanel
-      actions={controller.actions}
-      open={controller.inspectorOpen}
-      state={controller.viewState}
-    />
+    <>
+      <BrowserAnnotationMarkers />
+      <PageStyleInspectorPanel
+        actions={controller.actions}
+        open={controller.inspectorOpen}
+        state={controller.viewState}
+      />
+    </>
   );
 }
 

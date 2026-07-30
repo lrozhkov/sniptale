@@ -5,6 +5,7 @@ import {
   usePageStyleSelectionRefresh,
 } from './actions';
 import { usePageStyleDraftState } from './draft';
+import { usePageStyleCommentDraft } from './comment-draft';
 import { usePageStyleRegistryActions } from '../registry/actions';
 import { useInspectorOpenState, useInspectorSelection, useRegistryData } from './hooks';
 import { usePageStyleValueActions } from '../value-editing/actions';
@@ -21,9 +22,11 @@ type ValueActions = ReturnType<typeof usePageStyleValueActions>;
 type AssetActions = ReturnType<typeof usePageStyleAssetActions>;
 type ApplyActions = ReturnType<typeof usePageStyleApplyActions>;
 type SaveActions = ReturnType<typeof usePageStyleSaveActions>;
+type CommentDraft = ReturnType<typeof usePageStyleCommentDraft>;
 
 export function usePageStyleInspectorController(params: UsePageStyleInspectorControllerParams) {
   const openState = useInspectorOpenState(params.quickEditDocumentMode);
+  const inspectorOpen = openState.open && params.quickEditMode && !params.quickEditDocumentMode;
   const { selection, setSelection } = useInspectorSelection({
     open: openState.open,
     quickEditDocumentMode: params.quickEditDocumentMode,
@@ -31,6 +34,7 @@ export function usePageStyleInspectorController(params: UsePageStyleInspectorCon
   });
   const registryData = useRegistryData(openState.open);
   const registryActions = usePageStyleRegistryActions(registryData.refresh);
+  const commentDraft = usePageStyleCommentDraft({ open: inspectorOpen, selection });
   const draftState = usePageStyleDraftState(selection);
   const valueActions = usePageStyleValueActions({
     defaultValues: draftState.defaultValues,
@@ -49,17 +53,26 @@ export function usePageStyleInspectorController(params: UsePageStyleInspectorCon
     actions: createControllerActions({
       applyActions: interactionActions.applyActions,
       assetActions: interactionActions.assetActions,
+      commentDraft,
       draftState,
       openState,
       registryActions,
       saveActions: interactionActions.saveActions,
       valueActions,
     }),
-    inspectorOpen: openState.open && params.quickEditMode && !params.quickEditDocumentMode,
-    toggleInspector: () =>
-      !params.quickEditDocumentMode && openState.setOpen((current) => !current),
+    inspectorOpen,
+    toggleInspector: () => {
+      if (params.quickEditDocumentMode) {
+        return;
+      }
+      if (openState.open && !commentDraft.closeComment()) {
+        return;
+      }
+      openState.setOpen((current) => !current);
+    },
     viewState: createViewState({
       activeTab: openState.activeTab,
+      commentDraft,
       draftState,
       registryData,
       selection,
@@ -96,6 +109,7 @@ function usePageStyleInteractionActions(args: {
 function createControllerActions(args: {
   applyActions: ApplyActions;
   assetActions: AssetActions;
+  commentDraft: CommentDraft;
   draftState: DraftState;
   openState: OpenState;
   registryActions: RegistryActions;
@@ -106,7 +120,17 @@ function createControllerActions(args: {
     applyRule: args.applyActions.applyRule,
     applyTemplate: args.applyActions.applyTemplate,
     clearBackgroundAsset: args.assetActions.clearBackgroundAsset,
-    close: () => args.openState.setOpen(false),
+    close: () => {
+      if (args.commentDraft.closeComment()) {
+        args.openState.setOpen(false);
+      }
+    },
+    comment: {
+      commit: args.commentDraft.commitComment,
+      endComposition: args.commentDraft.endCommentComposition,
+      startComposition: args.commentDraft.startCommentComposition,
+      updateDraft: args.commentDraft.updateCommentDraft,
+    },
     deleteRule: args.registryActions.deleteRule,
     deleteTemplate: args.registryActions.deleteTemplate,
     duplicateTemplate: args.registryActions.duplicateTemplate,
@@ -135,12 +159,18 @@ function createControllerActions(args: {
 
 function createViewState(args: {
   activeTab: OpenState['activeTab'];
+  commentDraft: CommentDraft;
   draftState: DraftState;
   registryData: ReturnType<typeof useRegistryData>;
   selection: ReturnType<typeof useInspectorSelection>['selection'];
 }) {
   return {
     activeTab: args.activeTab,
+    comment: {
+      commitFailed: args.commentDraft.commentCommitFailed,
+      draft: args.commentDraft.commentDraft,
+      marker: args.commentDraft.commentMarker,
+    },
     defaultValues: args.draftState.defaultValues,
     draftPatch: args.draftState.draftPatch,
     includeComputedInTemplate: args.draftState.includeComputedInTemplate,

@@ -65,6 +65,8 @@ export function getAbsolutePosition(element: Element): {
   const rect = element.getBoundingClientRect();
   let x = rect.left;
   let y = rect.top;
+  let width = rect.width;
+  let height = rect.height;
 
   let currentDoc = element.ownerDocument;
   let attempts = 0;
@@ -78,12 +80,16 @@ export function getAbsolutePosition(element: Element): {
     }
 
     const iframeRect = iframe.getBoundingClientRect();
-    x += iframeRect.left;
-    y += iframeRect.top;
+    const scaleX = iframe.offsetWidth > 0 ? iframeRect.width / iframe.offsetWidth : 1;
+    const scaleY = iframe.offsetHeight > 0 ? iframeRect.height / iframe.offsetHeight : 1;
+    x = iframeRect.left + (iframe.clientLeft + x) * scaleX;
+    y = iframeRect.top + (iframe.clientTop + y) * scaleY;
+    width *= scaleX;
+    height *= scaleY;
     currentDoc = iframe.ownerDocument;
   }
 
-  return { x, y, width: rect.width, height: rect.height };
+  return { x, y, width, height };
 }
 
 /**

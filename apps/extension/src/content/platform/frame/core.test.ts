@@ -39,6 +39,15 @@ function setRect(target: Element, rect: RectLike): void {
   });
 }
 
+function setIframeBoxMetrics(
+  iframe: HTMLIFrameElement,
+  metrics: { clientLeft: number; clientTop: number; offsetHeight: number; offsetWidth: number }
+): void {
+  Object.entries(metrics).forEach(([property, value]) => {
+    Object.defineProperty(iframe, property, { configurable: true, value });
+  });
+}
+
 function createAccessibleIframe(options?: { src?: string }) {
   const iframe = document.createElement('iframe');
   if (options?.src) {
@@ -162,6 +171,42 @@ describe('iframe-utils-core geometry helpers', () => {
     expect(getAbsolutePosition(detachedElement)).toEqual({ x: 9, y: 10, width: 11, height: 12 });
     expect(getContainingIframe(topElement)).toBeNull();
     expect(getContainingIframe(nestedElement)).toBe(iframe);
+  });
+
+  it('maps nested iframe borders and rendered scale into absolute position and size', () => {
+    const { iframe: outerIframe, iframeDoc: outerDocument } = createAccessibleIframe();
+    setRect(outerIframe, { height: 240, left: 100, top: 200, width: 320 });
+    setIframeBoxMetrics(outerIframe, {
+      clientLeft: 3,
+      clientTop: 4,
+      offsetHeight: 120,
+      offsetWidth: 160,
+    });
+
+    const innerIframe = outerDocument.createElement('iframe');
+    outerDocument.body.append(innerIframe);
+    const innerDocument = innerIframe.contentDocument;
+    const innerWindow = innerIframe.contentWindow;
+    if (!innerDocument || !innerWindow) {
+      throw new Error('Expected nested jsdom iframe document');
+    }
+    Object.defineProperty(innerWindow, 'frameElement', {
+      configurable: true,
+      value: innerIframe,
+    });
+    setRect(innerIframe, { height: 50, left: 10, top: 20, width: 100 });
+    setIframeBoxMetrics(innerIframe, {
+      clientLeft: 1,
+      clientTop: 2,
+      offsetHeight: 25,
+      offsetWidth: 50,
+    });
+
+    const target = innerDocument.createElement('button');
+    innerDocument.body.append(target);
+    setRect(target, { height: 6, left: 3, top: 4, width: 5 });
+
+    expect(getAbsolutePosition(target)).toEqual({ height: 24, width: 20, x: 142, y: 272 });
   });
 });
 

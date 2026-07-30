@@ -62,6 +62,26 @@ export const contentPageStyleInspectorMessages = defineMessageSource({
     ru: 'вычислено',
     en: 'computed',
   },
+  commentLabel: {
+    ru: 'Комментарий к элементу',
+    en: 'Element comment',
+  },
+  commentPlaceholder: {
+    ru: 'Добавьте скрытый комментарий',
+    en: 'Add a hidden comment',
+  },
+  commentHint: {
+    ru: 'Комментарий хранится в текущей сессии и не изменяет страницу.',
+    en: 'The comment stays in this session and does not modify the page.',
+  },
+  commentMarkerLabel: {
+    ru: 'Комментарий',
+    en: 'Comment',
+  },
+  commentCommitFailed: {
+    ru: 'Не удалось сохранить комментарий. Текст сохранён в поле — попробуйте ещё раз.',
+    en: 'The comment could not be saved. Your draft is still here; try again.',
+  },
   changedSummarySuffix: {
     ru: 'изменено',
     en: 'changed',

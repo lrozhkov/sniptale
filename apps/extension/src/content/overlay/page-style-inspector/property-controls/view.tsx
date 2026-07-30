@@ -3,6 +3,7 @@ import { ImageSection } from './image-section';
 import { AppearanceSection } from './sections/appearance';
 import { BoxSection } from './sections/frame';
 import { TextSection } from './sections/text';
+import { PageStyleCommentField } from './comment';
 
 export function PageStylePropertyControls(props: {
   actions: PageStyleInspectorActions;
@@ -17,6 +18,11 @@ export function PageStylePropertyControls(props: {
       data-ui="content.page-style-inspector.property-controls"
       className="grid w-full min-w-0 max-w-full gap-2.5"
     >
+      <PageStyleCommentField
+        actions={props.actions.comment}
+        disabled={props.disabled}
+        state={props.state.comment}
+      />
       {imageSelected ? <ImageSection {...props} /> : <TextSection {...props} />}
       <BoxSection {...props} />
       <AppearanceSection {...props} />

@@ -80,7 +80,7 @@ function clearPendingHistoryTimer(): void {
   pendingHistoryCommit.timer = null;
 }
 
-function commitPendingPageStyleHistory(): void {
+export function flushPendingPageStyleHistory(): void {
   if (!pendingHistoryCommit) {
     return;
   }
@@ -123,7 +123,7 @@ function ensurePendingPageStyleHistory(
   evidence: PageStyleAnnotationEvidence
 ): NonNullable<typeof pendingHistoryCommit> {
   if (pendingHistoryCommit && pendingHistoryCommit.element !== element) {
-    commitPendingPageStyleHistory();
+    flushPendingPageStyleHistory();
   }
 
   if (!pendingHistoryCommit) {
@@ -235,7 +235,7 @@ function schedulePendingPageStyleHistoryCommit(): void {
 
   clearPendingHistoryTimer();
   pendingHistoryCommit.timer = window.setTimeout(
-    commitPendingPageStyleHistory,
+    flushPendingPageStyleHistory,
     PAGE_STYLE_HISTORY_IDLE_COMMIT_MS
   );
 }

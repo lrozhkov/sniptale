@@ -11,6 +11,7 @@ import {
   type PageStyleTemplate,
 } from '@sniptale/runtime-contracts/page-style';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
+import { PageStyleCommentField } from '../property-controls/comment';
 import { usePageStyleInspectorController } from './controller';
 
 const mocks = vi.hoisted(() => ({
@@ -28,6 +29,11 @@ const mocks = vi.hoisted(() => ({
 
 const trustedEventMocks = vi.hoisted(() => ({
   isTrustedMouseEvent: vi.fn(() => true),
+}));
+
+const commentMocks = vi.hoisted(() => ({
+  commit: vi.fn(() => 1),
+  read: vi.fn(() => ({ comment: '', marker: null })),
 }));
 
 vi.mock('../../../../composition/persistence/page-style/storage', async (importOriginal) => ({
@@ -48,7 +54,8 @@ vi.mock('../../../../composition/persistence/page-style', async (importOriginal)
   deletePageStyleTemplate: mocks.deletePageStyleTemplate,
 }));
 
-vi.mock('../runtime/actions', () => ({
+vi.mock('../runtime/actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/actions')>()),
   appendPageStyleImageAsset: vi.fn(
     (args: { asset: PageStyleAssetReference; patch: PageStylePatch }) => ({
       assets: [...args.patch.assets.filter((item) => item.kind !== args.asset.kind), args.asset],
@@ -72,6 +79,12 @@ vi.mock('../runtime/actions', () => ({
 vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/trusted-events')>()),
   isTrustedMouseEvent: trustedEventMocks.isTrustedMouseEvent,
+}));
+
+vi.mock('../runtime/comment', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/comment')>()),
+  commitPropertiesComment: commentMocks.commit,
+  readPropertiesComment: commentMocks.read,
 }));
 
 let root: Root | null = null;
@@ -106,12 +119,32 @@ function createTemplate(): PageStyleTemplate {
   };
 }
 
-function Harness(props: { quickEditDocumentMode?: boolean; quickEditMode?: boolean }) {
-  latest = usePageStyleInspectorController({
+function Harness(props: {
+  quickEditDocumentMode?: boolean;
+  quickEditMode?: boolean;
+  renderCommentControls?: boolean;
+}) {
+  const controller = usePageStyleInspectorController({
     quickEditDocumentMode: props.quickEditDocumentMode ?? false,
     quickEditMode: props.quickEditMode ?? true,
   });
-  return null;
+  latest = controller;
+  return props.renderCommentControls && controller.inspectorOpen ? (
+    <>
+      <PageStyleCommentField
+        actions={controller.actions.comment}
+        disabled={!controller.viewState.selection}
+        state={controller.viewState.comment}
+      />
+      <button
+        data-testid="close-comment-inspector"
+        onClick={controller.actions.close}
+        type="button"
+      >
+        Close
+      </button>
+    </>
+  ) : null;
 }
 
 async function renderHarness(props: Parameters<typeof Harness>[0] = {}) {
@@ -119,6 +152,12 @@ async function renderHarness(props: Parameters<typeof Harness>[0] = {}) {
   document.body.append(host);
   root = createRoot(host);
 
+  await act(async () => {
+    root?.render(<Harness {...props} />);
+  });
+}
+
+async function rerenderHarness(props: Parameters<typeof Harness>[0]): Promise<void> {
   await act(async () => {
     root?.render(<Harness {...props} />);
   });
@@ -145,6 +184,15 @@ async function selectElement(element: HTMLElement) {
   await act(async () => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   });
+}
+
+function setTextareaValue(textarea: HTMLTextAreaElement, value: string): void {
+  const setter = Object.getOwnPropertyDescriptor(
+    window.HTMLTextAreaElement.prototype,
+    'value'
+  )?.set;
+  setter?.call(textarea, value);
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 beforeEach(() => {
@@ -301,4 +349,135 @@ it('adds text retention only after the user opts in for the selected rule', asyn
       contentRetention: { text: { enabled: true, text: 'Retained text' } },
     })
   );
+});
+
+it('commits a changed comment before closing the inspector', async () => {
+  await renderHarness();
+  const target = document.createElement('p');
+  target.id = 'comment-target';
+  document.body.append(target);
+  await openInspector();
+  await selectElement(target);
+
+  await act(async () => {
+    latest?.actions.comment.updateDraft('Controller comment');
+    latest?.actions.close();
+  });
+
+  expect(commentMocks.commit).toHaveBeenCalledTimes(1);
+  expect(commentMocks.commit).toHaveBeenCalledWith(
+    expect.objectContaining({ comment: 'Controller comment', target })
+  );
+  expect(latest?.inspectorOpen).toBe(false);
+});
+
+it('commits a changed comment once when the active Quick Edit mode closes the inspector', async () => {
+  await renderHarness({ quickEditMode: true });
+  const target = document.createElement('p');
+  target.id = 'mode-close-comment-target';
+  document.body.append(target);
+  await openInspector();
+  await selectElement(target);
+
+  act(() => latest?.actions.comment.updateDraft('Commit on mode close'));
+  await rerenderHarness({ quickEditMode: false });
+  await rerenderHarness({ quickEditMode: false });
+
+  expect(commentMocks.commit).toHaveBeenCalledTimes(1);
+  expect(commentMocks.commit).toHaveBeenCalledWith(
+    expect.objectContaining({ comment: 'Commit on mode close', target })
+  );
+  expect(latest?.inspectorOpen).toBe(false);
+});
+
+it('finalizes an active IME draft once when Quick Edit mode closes externally', async () => {
+  await renderHarness({ quickEditMode: true });
+  const target = document.createElement('p');
+  target.id = 'ime-mode-close-target';
+  document.body.append(target);
+  await openInspector();
+  await selectElement(target);
+
+  act(() => {
+    latest?.actions.comment.startComposition();
+    latest?.actions.comment.updateDraft('IME terminal draft');
+  });
+  expect(commentMocks.commit).not.toHaveBeenCalled();
+
+  await rerenderHarness({ quickEditMode: false });
+  await rerenderHarness({ quickEditMode: false });
+
+  expect(commentMocks.commit).toHaveBeenCalledTimes(1);
+  expect(commentMocks.commit).toHaveBeenCalledWith(
+    expect.objectContaining({ comment: 'IME terminal draft', target })
+  );
+});
+
+it('does not retry a failed textarea blur during the same pointer close gesture', async () => {
+  commentMocks.commit.mockImplementationOnce(() => {
+    throw new Error('blur failed');
+  });
+  await renderHarness({ quickEditMode: true, renderCommentControls: true });
+  const target = document.createElement('p');
+  target.id = 'blur-close-target';
+  document.body.append(target);
+  await openInspector();
+  await selectElement(target);
+  const textarea = document.querySelector<HTMLTextAreaElement>('textarea')!;
+  const closeButton = document.querySelector<HTMLButtonElement>(
+    '[data-testid="close-comment-inspector"]'
+  )!;
+
+  act(() => {
+    textarea.focus();
+    setTextareaValue(textarea, 'One failed gesture');
+  });
+  act(() => {
+    textarea.blur();
+    closeButton.click();
+  });
+
+  expect(commentMocks.commit).toHaveBeenCalledTimes(1);
+  expect(latest?.inspectorOpen).toBe(true);
+  expect(latest?.viewState.comment).toMatchObject({
+    commitFailed: true,
+    draft: 'One failed gesture',
+  });
+
+  const retryTextarea = document.querySelector<HTMLTextAreaElement>('textarea')!;
+  act(() => {
+    retryTextarea.focus();
+    retryTextarea.blur();
+  });
+  expect(commentMocks.commit).toHaveBeenCalledTimes(2);
+});
+
+it('uses one terminal producer call for active IME blur plus explicit pointer close', async () => {
+  await renderHarness({ quickEditMode: true, renderCommentControls: true });
+  const target = document.createElement('p');
+  target.id = 'ime-pointer-close-target';
+  document.body.append(target);
+  await openInspector();
+  await selectElement(target);
+  const textarea = document.querySelector<HTMLTextAreaElement>('textarea')!;
+  const closeButton = document.querySelector<HTMLButtonElement>(
+    '[data-testid="close-comment-inspector"]'
+  )!;
+
+  act(() => {
+    textarea.focus();
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    setTextareaValue(textarea, 'IME pointer close');
+  });
+  expect(commentMocks.commit).not.toHaveBeenCalled();
+  act(() => {
+    textarea.blur();
+    closeButton.click();
+  });
+
+  expect(commentMocks.commit).toHaveBeenCalledTimes(1);
+  expect(commentMocks.commit).toHaveBeenCalledWith(
+    expect.objectContaining({ comment: 'IME pointer close', target })
+  );
+  expect(latest?.inspectorOpen).toBe(false);
 });
