@@ -193,7 +193,7 @@ it('projects numbered accessible markers for HTML, SVG, iframe-inner, and iframe
   for (const [name, value] of Object.entries(PASSIVE_CONTENT_CHROME)) {
     expect(markerLayer?.getAttribute(name)).toBe(value);
     expect(firstMarkerGroup?.getAttribute(name)).toBe(value);
-    expect(markers[0]?.getAttribute(name)).toBeNull();
+    expect(markers[0]?.getAttribute(name)).toBe(value);
     expect(firstTooltip?.getAttribute(name)).toBeNull();
   }
   markers[0]?.focus();
@@ -203,7 +203,7 @@ it('projects numbered accessible markers for HTML, SVG, iframe-inner, and iframe
   expect(opaqueIframe.children).toHaveLength(0);
 });
 
-it('registers only marker wrappers as exact passive chrome in the live content root', async () => {
+it('registers marker projection and note as passive while keeping its tooltip interactive', async () => {
   act(() => root.unmount());
   const contentHost = document.createElement('div');
   document.body.append(contentHost);
@@ -223,8 +223,12 @@ it('registers only marker wrappers as exact passive chrome in the live content r
   const tooltip = shadowRoot.querySelector('[role="tooltip"]');
   expect(isContentOwnedPassiveChrome(markerLayer)).toBe(true);
   expect(isContentOwnedPassiveChrome(markerGroup)).toBe(true);
-  expect(isContentOwnedPassiveChrome(markerNote)).toBe(false);
+  expect(isContentOwnedPassiveChrome(markerNote)).toBe(true);
   expect(isContentOwnedPassiveChrome(tooltip)).toBe(false);
+  expect(markerNote?.querySelector('svg')?.getAttribute('class')).toContain('pointer-events-none');
+  expect(markerNote?.querySelector(':scope > span')?.getAttribute('class')).toContain(
+    'pointer-events-none'
+  );
 });
 
 it('keeps text and internal focus geometry above theme contrast on an accent host', async () => {

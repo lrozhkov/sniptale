@@ -227,6 +227,7 @@ function AnnotationMarker(
 ) {
   const tooltipScrollRef = useRef<HTMLSpanElement>(null);
   const markerGroupRef = usePassiveContentChromeRef<HTMLDivElement>();
+  const markerNoteRef = usePassiveContentChromeRef<HTMLSpanElement>();
   if (!props.position || !props.record.comment || props.record.commentMarker === undefined) {
     return null;
   }
@@ -258,12 +259,18 @@ function AnnotationMarker(
           'focus-visible:border-[color:var(--sniptale-color-accent)]',
         ].join(' ')}
         onKeyDown={(event) => handleTooltipScroll(event, tooltipScrollRef.current)}
+        ref={markerNoteRef}
         role="note"
         style={{ borderWidth: 3 }}
         tabIndex={0}
       >
-        <MessageSquare aria-hidden="true" size={12} strokeWidth={2.25} />
-        <span className="truncate">{props.record.commentMarker}</span>
+        <MessageSquare
+          aria-hidden="true"
+          className="pointer-events-none"
+          size={12}
+          strokeWidth={2.25}
+        />
+        <span className="pointer-events-none truncate">{props.record.commentMarker}</span>
       </span>
       <span
         className={[

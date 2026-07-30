@@ -51,8 +51,11 @@ vi.mock('../../../platform/frame', async (importOriginal) => ({
 
 import { usePageStyleInspectorController } from './controller';
 import { readPageStyleSelectionSnapshot } from '../runtime/properties';
+import { BrowserAnnotationMarkers } from '../../annotation-markers/view';
+import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import {
   initializeContentUiRoots,
+  isContentOwnedPassiveChrome,
   PASSIVE_CONTENT_CHROME,
   registerContentOwnedPassiveChrome,
 } from '../../../platform/dom-host';
@@ -66,12 +69,12 @@ function Harness() {
     quickEditDocumentMode: false,
     quickEditMode: true,
   });
-  return null;
+  return <BrowserAnnotationMarkers />;
 }
 
-async function renderHarness() {
+async function renderHarness(parent: HTMLElement | ShadowRoot = document.body) {
   host = document.createElement('div');
-  document.body.append(host);
+  parent.append(host);
   root = createRoot(host);
 
   await act(async () => {
@@ -87,6 +90,12 @@ async function openInspector() {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn(() => 1)
+  );
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  browserAnnotationSession.resetForDocument();
   vi.spyOn(Element.prototype, 'getClientRects').mockReturnValue({
     0: DOMRect.fromRect({ height: 40, width: 80 }),
     [Symbol.iterator]: () => [DOMRect.fromRect({ height: 40, width: 80 })][Symbol.iterator](),
@@ -114,6 +123,7 @@ afterEach(() => {
   host?.remove();
   host = null;
   latest = null;
+  browserAnnotationSession.resetForDocument();
   document.body.replaceChildren();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
@@ -146,9 +156,7 @@ it('ignores page-dispatched inspector open and synthetic selection clicks', asyn
   expect(latest?.viewState.selection).toBeNull();
 });
 
-it('selects through owned passive chrome without passing through an owned control', async () => {
-  await renderHarness();
-  await openInspector();
+it('selects through passive marker chrome without passing through an owned control', async () => {
   const contentHost = document.createElement('div');
   document.body.append(contentHost);
   const shadowRoot = contentHost.attachShadow({ mode: 'open' });
@@ -161,8 +169,32 @@ it('selects through owned passive chrome without passing through an owned contro
   shadowRoot.append(passiveChrome, inspectorControl);
   const unregisterPassiveChrome = registerContentOwnedPassiveChrome(passiveChrome);
   const pageTarget = document.createElement('section');
+  const annotatedPageTarget = document.createElement('aside');
   const pageBehindControl = document.createElement('article');
-  document.body.append(pageTarget, pageBehindControl);
+  document.body.append(pageTarget, annotatedPageTarget, pageBehindControl);
+  browserAnnotationSession.setComment({
+    comment: 'Installed annotation',
+    evidence: {
+      fileLabel: 'browser:annotated',
+      frame: { kind: 'top-document' },
+      locator: 'aside',
+      nodePosition: { x: 20, y: 30 },
+      pageUrl: 'https://example.test',
+      targetPath: 'body > aside',
+      targetSelector: 'aside',
+      targetText: 'Annotated target',
+      viewport: { height: 720, width: 1280 },
+    },
+    target: annotatedPageTarget,
+  });
+  await renderHarness(shadowRoot);
+  await openInspector();
+  const markerNote = shadowRoot.querySelector<HTMLElement>('[role="note"]');
+  const markerIcon = markerNote?.querySelector('svg');
+  const markerNumber = markerNote?.querySelector(':scope > span');
+  expect(isContentOwnedPassiveChrome(markerNote)).toBe(true);
+  expect(markerIcon?.getAttribute('class')).toContain('pointer-events-none');
+  expect(markerNumber?.getAttribute('class')).toContain('pointer-events-none');
   let pointStack: Element[] = [passiveChrome, pageTarget];
   Object.defineProperty(document, 'elementsFromPoint', {
     configurable: true,
@@ -183,6 +215,27 @@ it('selects through owned passive chrome without passing through an owned contro
   expect(latest?.viewState.selection?.element).toBe(pageTarget);
   expect(passiveClick.defaultPrevented).toBe(true);
 
+  for (const [visualChild, clientX] of [
+    [markerIcon, 20],
+    [markerNumber, 28],
+  ] as const) {
+    expect(visualChild).not.toBeNull();
+    pointStack = [markerNote!, annotatedPageTarget];
+    const markerClick = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      clientX,
+      clientY: 30,
+      composed: true,
+    });
+    await act(async () => {
+      markerNote?.dispatchEvent(markerClick);
+    });
+
+    expect(latest?.viewState.selection?.element).toBe(annotatedPageTarget);
+    expect(markerClick.defaultPrevented).toBe(true);
+  }
+
   pointStack = [inspectorControl, pageBehindControl];
   const controlClick = new MouseEvent('click', {
     bubbles: true,
@@ -195,7 +248,7 @@ it('selects through owned passive chrome without passing through an owned contro
     inspectorControl.dispatchEvent(controlClick);
   });
 
-  expect(latest?.viewState.selection?.element).toBe(pageTarget);
+  expect(latest?.viewState.selection?.element).toBe(annotatedPageTarget);
   expect(controlClick.defaultPrevented).toBe(false);
   unregisterPassiveChrome();
 });

@@ -154,7 +154,6 @@ function registerUniversalElementTests(): void {
     ['toolbar', 'sniptale-toolbar-control'],
     ['resize handle', 'sniptale-resize-handle'],
     ['interactive popover', 'sniptale-frame-popover'],
-    ['marker note', 'sniptale-annotation-marker-note'],
   ])('keeps owned %s controls interactive', (_kind, className) => {
     const inspectorButton = forgePassiveContentChromeProjection(document.createElement('button'));
     inspectorButton.className = className;
@@ -169,6 +168,34 @@ function registerUniversalElementTests(): void {
     expect(
       resolvePagePreparationElement(event, undefined, { passThroughPassiveChrome: true })
     ).toBe(inspectorButton);
+  });
+
+  it('passes through a registered marker note without trusting a page marker lookalike', () => {
+    const markerNote = registerPassiveContentChrome(document.createElement('span'));
+    markerNote.className = 'sniptale-annotation-marker-note';
+    markerNote.setAttribute('role', 'note');
+    mountOwnedElement(markerNote);
+    const pageTarget = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    document.body.append(pageTarget);
+    const markerEvent = createPointEvent(markerNote);
+    mockElementsFromPoint([markerNote, pageTarget]);
+    iframeUtils.resolveIframeEventElement.mockReturnValueOnce(markerNote);
+
+    expect(
+      resolvePagePreparationElement(markerEvent, undefined, { passThroughPassiveChrome: true })
+    ).toBe(pageTarget);
+
+    const pageLookalike = forgePassiveContentChromeProjection(document.createElement('span'));
+    pageLookalike.className = markerNote.className;
+    pageLookalike.setAttribute('role', 'note');
+    document.body.append(pageLookalike);
+    const lookalikeEvent = createPointEvent(pageLookalike);
+    mockElementsFromPoint([pageLookalike, pageTarget]);
+    iframeUtils.resolveIframeEventElement.mockReturnValueOnce(pageLookalike);
+
+    expect(
+      resolvePagePreparationElement(lookalikeEvent, undefined, { passThroughPassiveChrome: true })
+    ).toBe(pageLookalike);
   });
 
   it('does not inherit pass-through from a passive ancestor', () => {
