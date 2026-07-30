@@ -170,7 +170,7 @@ it('ignores extension-owned controls instead of annotating the review UI', () =>
   expect(onSelection).not.toHaveBeenCalled();
 });
 
-it('defers Escape to the open feedback panel before disabling Design Review', () => {
+it('defers Escape to the highest open Design Review layer before disabling the mode', () => {
   const contentHost = document.createElement('div');
   const contentRoot = contentHost.attachShadow({ mode: 'open' });
   initializeContentUiRoots(contentRoot);
@@ -185,6 +185,13 @@ it('defers Escape to the open feedback panel before disabling Design Review', ()
   expect(onDisableRequested).not.toHaveBeenCalled();
 
   panel.remove();
+  const actionMenu = document.createElement('div');
+  actionMenu.dataset['ui'] = 'content.design-review.action-menu';
+  contentRoot.append(actionMenu);
+  document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  expect(onDisableRequested).not.toHaveBeenCalled();
+
+  actionMenu.remove();
   document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
   expect(onDisableRequested).toHaveBeenCalledOnce();
 });

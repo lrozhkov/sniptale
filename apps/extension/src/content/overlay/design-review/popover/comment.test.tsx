@@ -116,6 +116,8 @@ it('binds the comment draft, marker number, blur commit, and IME lifecycle actio
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
 
   expect(textarea?.value).toBe('Review this');
+  expect(textarea?.rows).toBe(2);
+  expect(document.activeElement).toBe(textarea);
   expect(document.body.textContent).toContain('Замечание №3');
 
   act(() => {
@@ -149,6 +151,66 @@ it('binds the comment draft, marker number, blur commit, and IME lifecycle actio
   expect(actions.startComposition).toHaveBeenCalledOnce();
   expect(actions.endComposition).toHaveBeenCalledWith('Changed');
   expect(actions.commit).toHaveBeenCalledOnce();
+});
+
+it('grows from two lines with the draft and caps long comments inside the composer', () => {
+  const { actions } = renderField(createState({ draft: '' }));
+  const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
+  if (!textarea) throw new Error('Expected Design Review comment field');
+  let scrollHeight = 104;
+  Object.defineProperty(textarea, 'scrollHeight', {
+    configurable: true,
+    get: () => scrollHeight,
+  });
+
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      'value'
+    )?.set;
+    setter?.call(textarea, 'A comment that wraps onto several lines');
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(textarea.style.height).toBe('104px');
+  expect(textarea.style.overflowY).toBe('hidden');
+
+  scrollHeight = 240;
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      'value'
+    )?.set;
+    setter?.call(textarea, 'A much longer comment');
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(textarea.style.height).toBe('160px');
+  expect(textarea.style.overflowY).toBe('auto');
+  expect(actions.updateDraft).toHaveBeenCalledTimes(2);
+});
+
+it('closes on Enter while preserving Shift+Enter for a new line', () => {
+  const { actions } = renderField();
+  const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
+  if (!textarea) throw new Error('Expected Design Review comment field');
+
+  act(() => {
+    textarea.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'Enter',
+        shiftKey: true,
+      })
+    );
+  });
+  expect(actions.close).not.toHaveBeenCalled();
+
+  act(() => {
+    textarea.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' })
+    );
+  });
+  expect(actions.close).toHaveBeenCalledOnce();
 });
 
 it('keeps the recoverable localized error associated with the textarea', () => {

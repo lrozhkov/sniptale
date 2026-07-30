@@ -201,7 +201,14 @@ export function startDesignReviewPicker(args: {
       if (!isTrustedKeyboardEvent(event) || event.key !== 'Escape') {
         return;
       }
-      if (queryContentUiElement('[data-ui="content.design-review.feedback-panel"]')) {
+      if (
+        queryContentUiElement(
+          [
+            '[data-ui="content.design-review.feedback-panel"]',
+            '[data-ui="content.design-review.action-menu"]',
+          ].join(',')
+        )
+      ) {
         return;
       }
       event.preventDefault();

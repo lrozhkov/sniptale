@@ -14,6 +14,7 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 }));
 
 import { DesignReviewFeedbackPanel } from './view';
+import { DesignReviewActionMenu } from '../popover/action-menu';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -177,6 +178,35 @@ it('filters actions and dismisses the highest floating layer with focus restorat
   });
   expect(onClose).toHaveBeenCalledOnce();
   expect(document.activeElement).toBe(toolbarToggle);
+});
+
+it('defers Escape to an open popover action menu before closing the feedback panel', async () => {
+  const onClose = vi.fn();
+  act(() => {
+    root.render(
+      <>
+        <DesignReviewFeedbackPanel onClose={onClose} onOpenRecord={vi.fn(() => true)} open />
+        <DesignReviewActionMenu action="refine" onSelect={vi.fn()} />
+      </>
+    );
+  });
+  const actionTrigger = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent?.includes('content.designReview.actionRefine')
+  );
+  if (!actionTrigger) throw new Error('Expected Design Review action trigger');
+  act(() => actionTrigger.click());
+  expect(container.querySelector('[data-ui="content.design-review.action-menu"]')).not.toBeNull();
+
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' }));
+  });
+  expect(container.querySelector('[data-ui="content.design-review.action-menu"]')).toBeNull();
+  expect(onClose).not.toHaveBeenCalled();
+
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' }));
+  });
+  expect(onClose).toHaveBeenCalledOnce();
 });
 
 it('searches feedback and drags the panel by its header', () => {

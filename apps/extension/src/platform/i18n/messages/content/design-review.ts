@@ -269,10 +269,6 @@ export const contentDesignReviewMessages = defineMessageSource({
     ru: 'Объяснить',
     en: 'Explain',
   },
-  enterHint: {
-    ru: 'Enter — готово',
-    en: 'Enter — done',
-  },
   copyElement: {
     ru: 'Копировать данные элемента',
     en: 'Copy element data',
@@ -280,6 +276,78 @@ export const contentDesignReviewMessages = defineMessageSource({
   pathCopied: {
     ru: 'Путь элемента скопирован',
     en: 'Element path copied',
+  },
+  copyFullPath: {
+    ru: 'Копировать полный путь к элементу',
+    en: 'Copy the full element path',
+  },
+  movePopover: {
+    ru: 'Переместить окно замечания',
+    en: 'Move the feedback window',
+  },
+  elementHeading: {
+    ru: 'заголовок',
+    en: 'heading',
+  },
+  elementParagraph: {
+    ru: 'абзац текста',
+    en: 'text paragraph',
+  },
+  elementLink: {
+    ru: 'ссылка',
+    en: 'link',
+  },
+  elementButton: {
+    ru: 'кнопка',
+    en: 'button',
+  },
+  elementFormControl: {
+    ru: 'поле формы',
+    en: 'form control',
+  },
+  elementImage: {
+    ru: 'изображение',
+    en: 'image',
+  },
+  elementList: {
+    ru: 'список',
+    en: 'list',
+  },
+  elementListItem: {
+    ru: 'элемент списка',
+    en: 'list item',
+  },
+  elementSection: {
+    ru: 'раздел страницы',
+    en: 'page section',
+  },
+  elementArticle: {
+    ru: 'самостоятельный материал',
+    en: 'standalone article',
+  },
+  elementNavigation: {
+    ru: 'область навигации',
+    en: 'navigation region',
+  },
+  elementMain: {
+    ru: 'основное содержимое',
+    en: 'main content',
+  },
+  elementForm: {
+    ru: 'форма',
+    en: 'form',
+  },
+  elementTable: {
+    ru: 'таблица',
+    en: 'table',
+  },
+  elementContainer: {
+    ru: 'универсальный контейнер',
+    en: 'generic container',
+  },
+  elementGeneric: {
+    ru: 'HTML-элемент',
+    en: 'HTML element',
   },
   elementCopied: {
     ru: 'Данные элемента скопированы',

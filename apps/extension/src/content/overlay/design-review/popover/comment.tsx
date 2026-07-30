@@ -1,16 +1,22 @@
-import { useId } from 'react';
+import { useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 
 export function PageStyleCommentField(props: {
   actions: DesignReviewActions['comment'] & { close: () => void };
   disabled: boolean;
+  footer?: ReactNode;
   state: DesignReviewViewState['comment'];
 }) {
   const inputId = useId();
   const hintId = useId();
   const errorId = useId();
   const describedBy = props.state.commitFailed ? `${hintId} ${errorId}` : hintId;
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useLayoutEffect(() => {
+    resizeCommentTextarea(textareaRef.current);
+  }, [props.state.draft]);
 
   return (
     <section className="grid gap-1.5" data-ui="content.design-review.comment">
@@ -27,33 +33,55 @@ export function PageStyleCommentField(props: {
           </span>
         )}
       </div>
-      <textarea
-        aria-describedby={describedBy}
+      <div
         className={[
-          'min-h-28 w-full resize-none rounded-[8px] border border-[color:var(--sniptale-color-border-soft)]',
-          'bg-[var(--sniptale-color-surface-input)] px-2.5 py-2 text-xs',
-          'text-[var(--sniptale-color-text-primary)] outline-none',
-          'placeholder:text-[var(--sniptale-color-text-secondary)]',
-          'focus-visible:border-[var(--sniptale-color-accent)] focus-visible:ring-2',
-          'focus-visible:ring-[color:var(--sniptale-color-accent-soft)]',
-          'disabled:cursor-not-allowed disabled:opacity-50',
+          'overflow-visible rounded-[9px] border bg-[var(--sniptale-color-surface-input)]',
+          'border-[color:var(--sniptale-color-border-soft)]',
+          'focus-within:border-[var(--sniptale-color-accent)] focus-within:ring-2',
+          'focus-within:ring-[color:var(--sniptale-color-accent-soft)]',
         ].join(' ')}
-        disabled={props.disabled}
-        autoFocus
-        id={inputId}
-        onBlur={props.actions.commit}
-        onChange={(event) => props.actions.updateDraft(event.currentTarget.value)}
-        onCompositionEnd={(event) => props.actions.endComposition(event.currentTarget.value)}
-        onCompositionStart={props.actions.startComposition}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-            event.preventDefault();
-            props.actions.close();
-          }
-        }}
-        placeholder={translate('content.designReview.commentPlaceholder')}
-        value={props.state.draft}
-      />
+      >
+        <textarea
+          ref={textareaRef}
+          aria-describedby={describedBy}
+          className={[
+            'block min-h-14 max-h-40 w-full resize-none overflow-y-hidden rounded-t-[8px]',
+            'border-0 bg-transparent px-3 pb-2 pt-3 text-xs leading-5',
+            'text-[var(--sniptale-color-text-primary)] outline-none',
+            'placeholder:text-[var(--sniptale-color-text-secondary)]',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+          ].join(' ')}
+          disabled={props.disabled}
+          autoFocus
+          id={inputId}
+          onBlur={props.actions.commit}
+          onChange={(event) => {
+            resizeCommentTextarea(event.currentTarget);
+            props.actions.updateDraft(event.currentTarget.value);
+          }}
+          onCompositionEnd={(event) => props.actions.endComposition(event.currentTarget.value)}
+          onCompositionStart={props.actions.startComposition}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              props.actions.close();
+            }
+          }}
+          placeholder={translate('content.designReview.commentPlaceholder')}
+          rows={2}
+          value={props.state.draft}
+        />
+        {props.footer ? (
+          <div
+            className={[
+              'flex min-h-10 items-center border-t px-2 py-1',
+              'border-[color:var(--sniptale-color-border-soft)]',
+            ].join(' ')}
+          >
+            {props.footer}
+          </div>
+        ) : null}
+      </div>
       <p className="sr-only" id={hintId}>
         {translate('content.designReview.commentHint')}
       </p>
@@ -68,4 +96,12 @@ export function PageStyleCommentField(props: {
       ) : null}
     </section>
   );
+}
+
+function resizeCommentTextarea(textarea: HTMLTextAreaElement | null): void {
+  if (!textarea) return;
+  textarea.style.height = 'auto';
+  const height = Math.min(Math.max(textarea.scrollHeight, 56), 160);
+  textarea.style.height = `${height}px`;
+  textarea.style.overflowY = textarea.scrollHeight > 160 ? 'auto' : 'hidden';
 }
