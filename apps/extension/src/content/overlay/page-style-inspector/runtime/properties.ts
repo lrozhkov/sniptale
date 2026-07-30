@@ -9,13 +9,16 @@ import {
   createCompositeSelector,
   serializeCompositeSelector,
 } from '../../../platform/frame/selectors';
-import { isQuickEditStyleInspectableElement } from '../../../selection/quick-edit-runtime/elements';
+import {
+  isPageStyleMutationElement,
+  type PageStyleMutationElement,
+} from '../../../selection/quick-edit-runtime/page-style/element';
 
 type PageStyleElementKind = 'block' | 'image' | 'text';
 
 export interface PageStyleSelectionSnapshot {
   domPath: string;
-  element: HTMLElement;
+  element: PageStyleMutationElement;
   kind: PageStyleElementKind;
   patch: PageStylePatch;
   selector: PageStyleSelectorIdentity;
@@ -35,8 +38,11 @@ function normalizeComputedStyleValue(value: string): string {
   return value.trim();
 }
 
-function resolveElementKind(element: HTMLElement): PageStyleElementKind {
-  if (element instanceof HTMLImageElement) {
+function resolveElementKind(element: Element): PageStyleElementKind {
+  if (
+    element.namespaceURI === 'http://www.w3.org/1999/xhtml' &&
+    element.localName.toLowerCase() === 'img'
+  ) {
     return 'image';
   }
 
@@ -53,13 +59,13 @@ function createComputedDeclaration(
   };
 }
 
-function createElementCode(element: HTMLElement): string {
+function createElementCode(element: Element): string {
   const id = element.id ? `#${element.id}` : '';
   const className = [...element.classList]
     .slice(0, 2)
     .map((value) => `.${value}`)
     .join('');
-  const base = `${element.tagName.toLowerCase()}${className}${id}`;
+  const base = `${element.localName.toLowerCase()}${className}${id}`;
 
   if (id || className) {
     return base;
@@ -71,14 +77,15 @@ function createElementCode(element: HTMLElement): string {
   }
 
   const sameTagSiblings = Array.from(parent.children).filter(
-    (sibling) => sibling.tagName === element.tagName
+    (sibling) =>
+      sibling.localName === element.localName && sibling.namespaceURI === element.namespaceURI
   );
   return `${base}:nth-of-type(${sameTagSiblings.indexOf(element) + 1})`;
 }
 
-function createReadableDomPath(element: HTMLElement): string {
+function createReadableDomPath(element: Element): string {
   const parts: string[] = [];
-  let current: HTMLElement | null = element;
+  let current: Element | null = element;
 
   while (current && current !== current.ownerDocument.body && parts.length < 4) {
     parts.unshift(createElementCode(current));
@@ -103,9 +110,9 @@ export function createPageStyleValuesFromPatch(
 }
 
 export function readPageStyleSelectionSnapshot(
-  element: HTMLElement
+  element: Element
 ): PageStyleSelectionSnapshot | null {
-  if (!isQuickEditStyleInspectableElement(element)) {
+  if (!isPageStyleMutationElement(element)) {
     return null;
   }
 
@@ -127,29 +134,24 @@ export function readPageStyleSelectionSnapshot(
     },
     selector: {
       locator: serializeCompositeSelector(compositeSelector),
-      ...(element.dataset['sniptaleId'] ? { sniptaleId: element.dataset['sniptaleId'] } : {}),
+      ...(element.getAttribute('data-sniptale-id')
+        ? { sniptaleId: element.getAttribute('data-sniptale-id')! }
+        : {}),
     },
     selectorLabel: createElementCode(element),
-    tagName: element.tagName.toLowerCase(),
+    tagName: element.localName.toLowerCase(),
     textPreview: element.textContent?.trim().slice(0, 80) ?? '',
   };
 }
 
-export function findInspectablePageStyleElement(target: EventTarget | null): HTMLElement | null {
-  if (!(target instanceof Node)) {
+export function findInspectablePageStyleElement(
+  target: EventTarget | null
+): PageStyleMutationElement | null {
+  if (!target || typeof target !== 'object' || !('nodeType' in target)) {
     return null;
   }
 
-  let element =
-    target.nodeType === Node.ELEMENT_NODE ? (target as HTMLElement) : target.parentElement;
-
-  while (element && element !== element.ownerDocument.body) {
-    if (isQuickEditStyleInspectableElement(element)) {
-      return element;
-    }
-
-    element = element.parentElement;
-  }
-
-  return null;
+  const node = target as Node;
+  const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  return element && isPageStyleMutationElement(element) ? element : null;
 }

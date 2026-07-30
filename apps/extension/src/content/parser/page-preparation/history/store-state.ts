@@ -2,6 +2,7 @@ import { applyDomMutationBatch } from './dom';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
   PageDomMutationBatch,
+  PagePreparationHistoryDomEffect,
   PagePreparationHistoryBridge,
   PagePreparationHistoryEntry,
   PagePreparationSessionSnapshot,
@@ -53,8 +54,9 @@ function buildHistoryState(
   future: PagePreparationHistoryEntry[],
   revision: number
 ): PagePreparationHistoryState {
+  const recoveryPending = past[past.length - 1]?.domEffect?.recoveryOnly === true;
   return {
-    canRedo: future.length > 0,
+    canRedo: future.length > 0 && !recoveryPending,
     canUndo: past.length > 0,
     revision,
   };
@@ -136,6 +138,12 @@ function domBatchEqual(
   return historyValueEqual(left, right);
 }
 
+export function normalizeHistoryDomEffect(
+  effect: PagePreparationHistoryDomEffect | null | undefined
+): PagePreparationHistoryDomEffect | null {
+  return effect?.hasChanges ? effect : null;
+}
+
 export function normalizeHistoryDomBatch(
   batch: PageDomMutationBatch | null | undefined
 ): PageDomMutationBatch | null {
@@ -199,15 +207,78 @@ export function pushHistoryEntry(
   entry: PagePreparationHistoryEntry
 ): boolean {
   const domBatch = normalizeHistoryDomBatch(entry.domBatch);
-  if (snapshotsEqual(entry.before, entry.after) && domBatchEqual(domBatch, null)) {
+  const domEffect = normalizeHistoryDomEffect(entry.domEffect);
+  if (
+    snapshotsEqual(entry.before, entry.after) &&
+    domBatchEqual(domBatch, null) &&
+    domEffect === null
+  ) {
     return false;
   }
 
-  state.past = [...state.past, { ...entry, domBatch }];
+  state.past = [...state.past, { ...entry, domBatch, domEffect }];
   state.future = [];
   notifyHistoryReachabilityChanged(state);
   publishHistoryState(state);
   return true;
+}
+
+type HistoryApplyOutcome =
+  | { status: 'applied' }
+  | { entry: PagePreparationHistoryEntry; replaceCurrent: boolean; status: 'recovery' }
+  | { status: 'unchanged' };
+
+const snapshotOnlyRecoveryEffect: PagePreparationHistoryDomEffect = {
+  apply: () => ({ failures: [], success: true }),
+  hasChanges: true,
+  recoveryOnly: true,
+};
+
+function createHistoryRecoveryOutcome(args: {
+  dispatchEventName: string;
+  effect: PagePreparationHistoryDomEffect;
+  previousSnapshot: PagePreparationSessionSnapshot;
+  state: HistoryStoreRuntimeState;
+}): HistoryApplyOutcome {
+  const recoverySnapshot = captureHistorySnapshot(args.state);
+  if (!recoverySnapshot) {
+    return { status: 'unchanged' };
+  }
+
+  dispatchHistoryApplied(args.dispatchEventName);
+  return {
+    entry: {
+      after: recoverySnapshot,
+      before: args.previousSnapshot,
+      domBatch: null,
+      domEffect: args.effect,
+    },
+    replaceCurrent: false,
+    status: 'recovery',
+  };
+}
+
+function createSnapshotOnlyRecoveryOutcome(args: {
+  dispatchEventName: string;
+  targetSnapshot: PagePreparationSessionSnapshot;
+  state: HistoryStoreRuntimeState;
+}): HistoryApplyOutcome {
+  const factualSnapshot = captureHistorySnapshot(args.state);
+  if (!factualSnapshot) {
+    return { status: 'unchanged' };
+  }
+
+  dispatchHistoryApplied(args.dispatchEventName);
+  return {
+    entry: {
+      after: factualSnapshot,
+      before: args.targetSnapshot,
+      domBatch: null,
+      domEffect: snapshotOnlyRecoveryEffect,
+    },
+    replaceCurrent: true,
+    status: 'recovery',
+  };
 }
 
 export function applyHistoryEntry(
@@ -215,14 +286,14 @@ export function applyHistoryEntry(
   dispatchEventName: string,
   entry: PagePreparationHistoryEntry,
   state: HistoryStoreRuntimeState
-): boolean {
+): HistoryApplyOutcome {
   if (!state.bridge) {
-    return false;
+    return { status: 'unchanged' };
   }
 
   const previousSnapshot = captureHistorySnapshot(state);
   if (!previousSnapshot) {
-    return false;
+    return { status: 'unchanged' };
   }
 
   state.isApplying = true;
@@ -233,14 +304,47 @@ export function applyHistoryEntry(
         direction,
         missingLocators: domApplyResult.missingLocators,
       });
-      return false;
+      return { status: 'unchanged' };
+    }
+
+    const effectApplyResult = entry.domEffect?.apply(direction) ?? {
+      failures: [],
+      success: true,
+    };
+    if (!effectApplyResult.success) {
+      const domRollbackResult = applyDomMutationBatch(
+        entry.domBatch,
+        direction === 'undo' ? 'redo' : 'undo'
+      );
+      logger.warn('Skipped history apply because owner DOM effects failed', {
+        direction,
+        failures: effectApplyResult.failures,
+      });
+      if (effectApplyResult.recovery && domRollbackResult.success) {
+        return createHistoryRecoveryOutcome({
+          dispatchEventName,
+          effect: effectApplyResult.recovery.effect,
+          previousSnapshot,
+          state,
+        });
+      }
+      return { status: 'unchanged' };
     }
 
     state.bridge.applySnapshot(direction === 'undo' ? entry.before : entry.after);
     dispatchHistoryApplied(dispatchEventName);
-    return true;
+    return { status: 'applied' };
   } catch (error) {
     const rollbackDirection = direction === 'undo' ? 'redo' : 'undo';
+    const effectRollbackResult = entry.domEffect?.apply(rollbackDirection) ?? {
+      failures: [],
+      success: true,
+    };
+    if (effectRollbackResult && !effectRollbackResult.success) {
+      logger.error('Failed to rollback owner DOM effects after snapshot apply failure', {
+        failures: effectRollbackResult.failures,
+      });
+    }
     const rollbackResult = applyDomMutationBatch(entry.domBatch, rollbackDirection);
     if (!rollbackResult.success) {
       logger.error('Failed to rollback DOM history state after snapshot apply failure', {
@@ -248,16 +352,43 @@ export function applyHistoryEntry(
       });
     }
 
-    try {
-      state.bridge.applySnapshot(previousSnapshot);
-    } catch (rollbackError) {
-      logger.error('Failed to rollback page-preparation snapshot after history apply failure', {
-        error: rollbackError,
+    if (effectRollbackResult.recovery && rollbackResult.success) {
+      logger.error('Failed to apply page-preparation history entry', error);
+      return createHistoryRecoveryOutcome({
+        dispatchEventName,
+        effect: effectRollbackResult.recovery.effect,
+        previousSnapshot,
+        state,
       });
     }
 
+    if (
+      direction === 'undo' &&
+      entry.domBatch === null &&
+      entry.domEffect?.recoveryOnly === true &&
+      !effectRollbackResult.success &&
+      rollbackResult.success
+    ) {
+      logger.error('Retained snapshot-only recovery after safe owner recovery', error);
+      return createSnapshotOnlyRecoveryOutcome({
+        dispatchEventName,
+        state,
+        targetSnapshot: entry.before,
+      });
+    }
+
+    if (effectRollbackResult.success && rollbackResult.success) {
+      try {
+        state.bridge.applySnapshot(previousSnapshot);
+      } catch (rollbackError) {
+        logger.error('Failed to rollback page-preparation snapshot after history apply failure', {
+          error: rollbackError,
+        });
+      }
+    }
+
     logger.error('Failed to apply page-preparation history entry', error);
-    return false;
+    return { status: 'unchanged' };
   } finally {
     state.isApplying = false;
   }

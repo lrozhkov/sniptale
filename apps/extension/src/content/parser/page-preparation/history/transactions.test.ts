@@ -68,8 +68,8 @@ describe('page-preparation-history transaction lifecycle', () => {
     const listener = vi.fn();
     harness.state.listeners.add(listener);
 
-    harness.api.beginTransaction('frame-edit');
-    harness.api.beginTransaction('frame-edit');
+    expect(harness.api.beginTransaction('frame-edit')).toBe(true);
+    expect(harness.api.beginTransaction('frame-edit')).toBe(false);
 
     expect(harness.state.transactions.size).toBe(1);
     expect(listener).toHaveBeenCalledTimes(1);
@@ -78,6 +78,14 @@ describe('page-preparation-history transaction lifecycle', () => {
 
     expect(harness.state.transactions.size).toBe(0);
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses a transaction when no snapshot authority is registered', () => {
+    const harness = createTransactionHarness();
+    harness.state.bridge = null;
+
+    expect(harness.api.beginTransaction('frame-edit')).toBe(false);
+    expect(harness.state.transactions.size).toBe(0);
   });
 
   it('drops a deferred commit when history is already applying during finalize', () => {

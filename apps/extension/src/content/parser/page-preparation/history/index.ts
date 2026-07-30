@@ -21,6 +21,8 @@ export type {
   PageDomMutationPatch,
   PagePreparationHistoryBridge,
   PagePreparationHistoryEntry,
+  PagePreparationHistoryDomEffect,
+  PagePreparationHistoryDomEffectResult,
   PagePreparationSessionSnapshot,
   PagePreparationHistoryState,
   PagePreparationDomElement,

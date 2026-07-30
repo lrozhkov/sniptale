@@ -131,6 +131,17 @@ async function openInspector() {
 }
 
 async function selectElement(element: HTMLElement) {
+  const rect = DOMRect.fromRect({ height: 40, width: 80 });
+  Object.defineProperty(element, 'getClientRects', {
+    configurable: true,
+    value: () => ({
+      0: rect,
+      [Symbol.iterator]: () => [rect][Symbol.iterator](),
+      item: (index: number) => (index === 0 ? rect : null),
+      length: 1,
+    }),
+  });
+
   await act(async () => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   });

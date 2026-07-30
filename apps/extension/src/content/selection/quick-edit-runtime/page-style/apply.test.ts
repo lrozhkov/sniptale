@@ -9,6 +9,21 @@ import type { PageStyleAssetResolver } from './assets';
 import type { PageStyleRuntimeDiagnostic } from './diagnostics';
 import { applyPageStyleRule } from './apply';
 
+function appendVisible<T extends HTMLElement>(element: T): T {
+  const rect = DOMRect.fromRect({ height: 40, width: 80 });
+  Object.defineProperty(element, 'getClientRects', {
+    configurable: true,
+    value: () => ({
+      0: rect,
+      [Symbol.iterator]: () => [rect][Symbol.iterator](),
+      item: (index: number) => (index === 0 ? rect : null),
+      length: 1,
+    }),
+  });
+  document.body.append(element);
+  return element;
+}
+
 function createRule(overrides: Partial<PageStyleRestoreRule> = {}): PageStyleRestoreRule {
   return {
     createdAt: 1,
@@ -39,7 +54,7 @@ function createAssetResolver(url: string | null): PageStyleAssetResolver {
 }
 
 it('applies allowlisted declarations and rejects unsupported style properties', async () => {
-  const element = document.createElement('div');
+  const element = appendVisible(document.createElement('div'));
   const rule = createRule({
     patch: {
       assets: [],
@@ -69,7 +84,7 @@ it('applies allowlisted declarations and rejects unsupported style properties', 
 });
 
 it('rejects raw URL style payloads and only restores text when explicitly retained', async () => {
-  const element = document.createElement('div');
+  const element = appendVisible(document.createElement('div'));
   element.textContent = 'Current text';
 
   await applyPageStyleRule({
@@ -96,7 +111,7 @@ it('rejects raw URL style payloads and only restores text when explicitly retain
 });
 
 it('rejects obfuscated CSS fetch and protocol payloads', async () => {
-  const element = document.createElement('div');
+  const element = appendVisible(document.createElement('div'));
   const result = await applyPageStyleRule({
     assetResolver: createAssetResolver(null),
     element,
@@ -123,7 +138,7 @@ it('rejects obfuscated CSS fetch and protocol payloads', async () => {
 });
 
 it('applies safe gradient background-image declarations without asset references', async () => {
-  const element = document.createElement('div');
+  const element = appendVisible(document.createElement('div'));
 
   await applyPageStyleRule({
     assetResolver: createAssetResolver(null),
@@ -145,8 +160,8 @@ it('applies safe gradient background-image declarations without asset references
 });
 
 it('restores background and image assets through object URL references', async () => {
-  const element = document.createElement('div');
-  const image = document.createElement('img');
+  const element = appendVisible(document.createElement('div'));
+  const image = appendVisible(document.createElement('img'));
   const assetResolver = createAssetResolver('blob:https://example.test/asset-1');
 
   await applyPageStyleRule({
@@ -184,7 +199,7 @@ it('restores background and image assets through object URL references', async (
 });
 
 it('reports missing image assets without crashing or clearing existing src', async () => {
-  const image = document.createElement('img');
+  const image = appendVisible(document.createElement('img'));
   image.setAttribute('src', 'https://example.test/original.png');
 
   const result = await applyPageStyleRule({

@@ -1,8 +1,9 @@
+import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   BROWSER_ANNOTATION_SCHEMA_VERSION,
   type BrowserAnnotationCommentInput,
   type BrowserAnnotationPropertyChange,
-  type BrowserAnnotationPropertyChangeInput,
+  type BrowserAnnotationPropertyChangesInput,
   type BrowserAnnotationSessionSnapshot,
   type BrowserAnnotationSessionState,
   type BrowserAnnotationTargetEvidence,
@@ -10,16 +11,17 @@ import {
   type BrowserDomAnnotationRecord,
   type BrowserFrameAnnotationOrder,
 } from './types';
-import { createLogger } from '@sniptale/platform/observability/logger';
 
 const logger = createLogger({ namespace: 'ContentBrowserAnnotationSession' });
 
 type BrowserAnnotationListener = () => void;
 
 interface BrowserAnnotationRuntimeState {
-  domRecords: Map<string, BrowserDomAnnotationRecord>;
+  domRecords: Map<number, BrowserDomAnnotationRecord>;
   frameOrders: Map<string, BrowserFrameAnnotationOrder>;
+  knownTargets: Map<number, Element>;
   listeners: Set<BrowserAnnotationListener>;
+  liveAnnotationIds: WeakMap<Element, number>;
   nextAnnotationId: number;
   nextCommentMarker: number;
   nextCreationOrder: number;
@@ -30,25 +32,13 @@ function createEmptyRuntimeState(): BrowserAnnotationRuntimeState {
   return {
     domRecords: new Map(),
     frameOrders: new Map(),
+    knownTargets: new Map(),
     listeners: new Set(),
+    liveAnnotationIds: new WeakMap(),
     nextAnnotationId: 1,
     nextCommentMarker: 1,
     nextCreationOrder: 1,
     revision: 0,
-  };
-}
-
-function cloneDomRecord(record: BrowserDomAnnotationRecord): BrowserDomAnnotationRecord {
-  return {
-    ...record,
-    evidence: {
-      ...record.evidence,
-      frame: { ...record.evidence.frame },
-      nodePosition: { ...record.evidence.nodePosition },
-      viewport: { ...record.evidence.viewport },
-    },
-    propertyChanges: record.propertyChanges.map((change) => ({ ...change })),
-    ...(record.textChange ? { textChange: { ...record.textChange } } : {}),
   };
 }
 
@@ -58,6 +48,25 @@ function cloneEvidence(evidence: BrowserAnnotationTargetEvidence): BrowserAnnota
     frame: { ...evidence.frame },
     nodePosition: { ...evidence.nodePosition },
     viewport: { ...evidence.viewport },
+  };
+}
+
+function clonePropertyChange(
+  change: BrowserAnnotationPropertyChange
+): BrowserAnnotationPropertyChange {
+  return {
+    ...change,
+    after: { ...change.after },
+    before: { ...change.before },
+  };
+}
+
+function cloneDomRecord(record: BrowserDomAnnotationRecord): BrowserDomAnnotationRecord {
+  return {
+    ...record,
+    evidence: cloneEvidence(record.evidence),
+    propertyChanges: record.propertyChanges.map(clonePropertyChange),
+    ...(record.textChange ? { textChange: { ...record.textChange } } : {}),
   };
 }
 
@@ -87,71 +96,112 @@ function publish(state: BrowserAnnotationRuntimeState): void {
   });
 }
 
+function getRecordForTarget(
+  state: BrowserAnnotationRuntimeState,
+  target: Element
+): BrowserDomAnnotationRecord | undefined {
+  const annotationId = state.liveAnnotationIds.get(target);
+  return annotationId === undefined ? undefined : state.domRecords.get(annotationId);
+}
+
 function createRecord(
   state: BrowserAnnotationRuntimeState,
-  input: Pick<BrowserAnnotationPropertyChangeInput, 'evidence' | 'targetKey'>
+  input: { evidence: BrowserAnnotationTargetEvidence; target: Element }
 ): BrowserDomAnnotationRecord {
   const record: BrowserDomAnnotationRecord = {
     annotationId: state.nextAnnotationId,
     creationOrder: state.nextCreationOrder,
     evidence: cloneEvidence(input.evidence),
     propertyChanges: [],
-    targetKey: input.targetKey,
   };
   state.nextAnnotationId += 1;
   state.nextCreationOrder += 1;
-  state.domRecords.set(input.targetKey, record);
+  state.domRecords.set(record.annotationId, record);
+  state.knownTargets.set(record.annotationId, input.target);
+  state.liveAnnotationIds.set(input.target, record.annotationId);
   return record;
 }
 
-function removeEmptyRecord(state: BrowserAnnotationRuntimeState, targetKey: string): void {
-  const record = state.domRecords.get(targetKey);
-  if (record && !record.comment && !record.textChange && record.propertyChanges.length === 0) {
-    state.domRecords.delete(targetKey);
+function removeEmptyRecord(
+  state: BrowserAnnotationRuntimeState,
+  record: BrowserDomAnnotationRecord
+): void {
+  if (record.comment || record.textChange || record.propertyChanges.length > 0) {
+    return;
   }
+
+  state.domRecords.delete(record.annotationId);
+  const target = state.knownTargets.get(record.annotationId);
+  if (target && state.liveAnnotationIds.get(target) === record.annotationId) {
+    state.liveAnnotationIds.delete(target);
+  }
+}
+
+function declarationValuesEqual(
+  left: BrowserAnnotationPropertyChange['before'],
+  right: BrowserAnnotationPropertyChange['before']
+): boolean {
+  return left.priority === right.priority && left.value === right.value;
+}
+
+function propertyChangesEqual(
+  left: BrowserAnnotationPropertyChange[],
+  right: BrowserAnnotationPropertyChange[]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((change, index) => {
+      const other = right[index];
+      return Boolean(
+        other &&
+        change.order === other.order &&
+        change.property === other.property &&
+        declarationValuesEqual(change.before, other.before) &&
+        declarationValuesEqual(change.after, other.after)
+      );
+    })
+  );
 }
 
 function normalizePropertyChanges(
   changes: BrowserAnnotationPropertyChange[]
 ): BrowserAnnotationPropertyChange[] {
   return changes
-    .map((change) => ({ ...change }))
+    .map(clonePropertyChange)
     .sort((left, right) => left.order - right.order || left.property.localeCompare(right.property));
 }
 
-function recordPropertyChange(
+function recordPropertyChanges(
   state: BrowserAnnotationRuntimeState,
-  input: BrowserAnnotationPropertyChangeInput
+  input: BrowserAnnotationPropertyChangesInput
 ): void {
-  const existingRecord = state.domRecords.get(input.targetKey);
-  const existingChange = existingRecord?.propertyChanges.find(
-    (change) => change.property === input.property
-  );
-  const baseline = existingChange?.before ?? input.before;
+  const existingRecord = getRecordForTarget(state, input.target);
+  let nextChanges = existingRecord?.propertyChanges.map(clonePropertyChange) ?? [];
 
-  if (!existingRecord && baseline === input.after) {
+  input.changes.forEach((change) => {
+    const existingChange = nextChanges.find((entry) => entry.property === change.property);
+    const baseline = existingChange?.before ?? change.before;
+    nextChanges = nextChanges.filter((entry) => entry.property !== change.property);
+    if (!declarationValuesEqual(baseline, change.after)) {
+      nextChanges.push({
+        ...clonePropertyChange(change),
+        before: { ...baseline },
+      });
+    }
+  });
+  nextChanges = normalizePropertyChanges(nextChanges);
+
+  if (!existingRecord && nextChanges.length === 0) {
+    return;
+  }
+  if (existingRecord && propertyChangesEqual(existingRecord.propertyChanges, nextChanges)) {
     return;
   }
 
   const record = existingRecord ?? createRecord(state, input);
-  if (existingRecord) {
-    record.evidence = cloneEvidence(input.evidence);
-  }
-  record.propertyChanges = record.propertyChanges.filter(
-    (change) => change.property !== input.property
-  );
-
-  if (baseline !== input.after) {
-    record.propertyChanges.push({
-      after: input.after,
-      before: baseline,
-      order: input.order,
-      property: input.property,
-    });
-    record.propertyChanges = normalizePropertyChanges(record.propertyChanges);
-  }
-
-  removeEmptyRecord(state, input.targetKey);
+  record.evidence = cloneEvidence(input.evidence);
+  record.propertyChanges = nextChanges;
+  removeEmptyRecord(state, record);
   publish(state);
 }
 
@@ -159,23 +209,29 @@ function recordTextChange(
   state: BrowserAnnotationRuntimeState,
   input: BrowserAnnotationTextChangeInput
 ): void {
-  const existingRecord = state.domRecords.get(input.targetKey);
+  const existingRecord = getRecordForTarget(state, input.target);
   const baseline = existingRecord?.textChange?.before ?? input.before;
+  const nextChange =
+    baseline === input.after ? undefined : { after: input.after, before: baseline };
 
-  if (!existingRecord && baseline === input.after) {
+  if (!existingRecord && !nextChange) {
+    return;
+  }
+  if (
+    existingRecord?.textChange?.before === nextChange?.before &&
+    existingRecord?.textChange?.after === nextChange?.after
+  ) {
     return;
   }
 
   const record = existingRecord ?? createRecord(state, input);
-  if (existingRecord) {
-    record.evidence = cloneEvidence(input.evidence);
-  }
-  if (baseline === input.after) {
-    delete record.textChange;
+  record.evidence = cloneEvidence(input.evidence);
+  if (nextChange) {
+    record.textChange = nextChange;
   } else {
-    record.textChange = { after: input.after, before: baseline };
+    delete record.textChange;
   }
-  removeEmptyRecord(state, input.targetKey);
+  removeEmptyRecord(state, record);
   publish(state);
 }
 
@@ -184,20 +240,20 @@ function setComment(
   input: BrowserAnnotationCommentInput
 ): number | null {
   const comment = input.comment.trim() === '' ? '' : input.comment;
-  const existingRecord = state.domRecords.get(input.targetKey);
+  const existingRecord = getRecordForTarget(state, input.target);
   if (!existingRecord && comment === '') {
     return null;
   }
-
-  const record = existingRecord ?? createRecord(state, input);
-  if (existingRecord) {
-    record.evidence = cloneEvidence(input.evidence);
+  if (existingRecord?.comment === comment) {
+    return existingRecord.commentMarker ?? null;
   }
 
+  const record = existingRecord ?? createRecord(state, input);
+  record.evidence = cloneEvidence(input.evidence);
   if (comment === '') {
     delete record.comment;
     delete record.commentMarker;
-    removeEmptyRecord(state, input.targetKey);
+    removeEmptyRecord(state, record);
     publish(state);
     return null;
   }
@@ -246,11 +302,21 @@ function applySnapshot(
   const nextAnnotationId = Math.max(state.nextAnnotationId, snapshot.nextAnnotationId);
   const nextCommentMarker = Math.max(state.nextCommentMarker, snapshot.nextCommentMarker);
   const nextCreationOrder = Math.max(state.nextCreationOrder, snapshot.nextCreationOrder);
-
-  state.domRecords = new Map(
-    snapshot.domRecords.map((record) => [record.targetKey, cloneDomRecord(record)])
+  const nextRecords = new Map(
+    snapshot.domRecords.map((record) => [record.annotationId, cloneDomRecord(record)])
   );
+  const nextLiveAnnotationIds = new WeakMap<Element, number>();
+
+  nextRecords.forEach((record) => {
+    const target = state.knownTargets.get(record.annotationId);
+    if (target) {
+      nextLiveAnnotationIds.set(target, record.annotationId);
+    }
+  });
+
+  state.domRecords = nextRecords;
   state.frameOrders = new Map(snapshot.frameOrders.map((entry) => [entry.frameId, { ...entry }]));
+  state.liveAnnotationIds = nextLiveAnnotationIds;
   state.nextAnnotationId = nextAnnotationId;
   state.nextCommentMarker = nextCommentMarker;
   state.nextCreationOrder = nextCreationOrder;
@@ -265,12 +331,16 @@ export function createBrowserAnnotationSession() {
     applySnapshot: (snapshot: BrowserAnnotationSessionSnapshot): void =>
       applySnapshot(state, snapshot),
     captureSnapshot: (): BrowserAnnotationSessionSnapshot => createSnapshot(state),
+    getAnnotationId: (target: Element): number | null =>
+      state.liveAnnotationIds.get(target) ?? null,
+    getLiveTarget: (annotationId: number): Element | null =>
+      state.domRecords.has(annotationId) ? (state.knownTargets.get(annotationId) ?? null) : null,
     getState: (): BrowserAnnotationSessionState => ({
       ...createSnapshot(state),
       revision: state.revision,
     }),
-    recordPropertyChange: (input: BrowserAnnotationPropertyChangeInput): void =>
-      recordPropertyChange(state, input),
+    recordPropertyChanges: (input: BrowserAnnotationPropertyChangesInput): void =>
+      recordPropertyChanges(state, input),
     recordTextChange: (input: BrowserAnnotationTextChangeInput): void =>
       recordTextChange(state, input),
     resetForDocument: (): void => {

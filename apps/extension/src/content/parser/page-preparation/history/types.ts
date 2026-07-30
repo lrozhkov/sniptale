@@ -54,10 +54,24 @@ export interface PageDomMutationBatch {
   patches: PageDomMutationPatch[];
 }
 
+export interface PagePreparationHistoryDomEffectResult {
+  failures: string[];
+  recovery?: { effect: PagePreparationHistoryDomEffect };
+  success: boolean;
+}
+
+/** Reversible owner effect retained by in-memory page-preparation history. */
+export interface PagePreparationHistoryDomEffect {
+  apply: (direction: 'undo' | 'redo') => PagePreparationHistoryDomEffectResult;
+  hasChanges: boolean;
+  recoveryOnly?: boolean;
+}
+
 export interface PagePreparationHistoryEntry {
   after: PagePreparationSessionSnapshot;
   before: PagePreparationSessionSnapshot;
   domBatch: PageDomMutationBatch | null;
+  domEffect: PagePreparationHistoryDomEffect | null;
 }
 
 export interface PagePreparationHistoryBridge {

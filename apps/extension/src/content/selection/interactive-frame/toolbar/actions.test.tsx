@@ -53,7 +53,7 @@ describe('interactive frame toolbar callout actions', () => {
     const cleanup = addFrameCalloutChangedListener(listener);
     const beginTransactionSpy = vi
       .spyOn(pagePreparationHistory, 'beginTransaction')
-      .mockImplementation(() => undefined);
+      .mockImplementation(() => true);
 
     createInteractiveFrameToolbarActions(props).handleCalloutClick(createToolbarEvent());
 

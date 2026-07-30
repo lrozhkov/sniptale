@@ -85,7 +85,7 @@ function renderHarness(props: {
 function mockHistoryTransactions() {
   const beginTransactionSpy = vi
     .spyOn(pagePreparationHistory, 'beginTransaction')
-    .mockImplementation(() => undefined);
+    .mockImplementation(() => true);
   const commitTransactionSpy = vi
     .spyOn(pagePreparationHistory, 'commitTransaction')
     .mockImplementation(() => undefined);

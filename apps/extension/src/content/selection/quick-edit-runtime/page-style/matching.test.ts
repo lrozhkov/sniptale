@@ -1,11 +1,25 @@
 // @vitest-environment jsdom
 
-import { expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   PAGE_STYLE_SCOPE_TYPES,
   type PageStyleRestoreRule,
 } from '@sniptale/runtime-contracts/page-style';
 import { matchPageStyleRestoreRules } from './matching';
+
+beforeEach(() => {
+  vi.spyOn(Element.prototype, 'getClientRects').mockReturnValue({
+    0: DOMRect.fromRect({ height: 40, width: 80 }),
+    [Symbol.iterator]: () => [DOMRect.fromRect({ height: 40, width: 80 })][Symbol.iterator](),
+    item: (index: number) => (index === 0 ? DOMRect.fromRect({ height: 40, width: 80 }) : null),
+    length: 1,
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  document.body.replaceChildren();
+});
 
 function createRule(
   id: string,

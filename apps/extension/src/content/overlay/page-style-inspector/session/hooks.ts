@@ -20,7 +20,12 @@ import {
   type PageStyleSelectionSnapshot,
 } from '../runtime/properties';
 import { isTrustedMouseEvent } from '../../../platform/trusted-events';
+import {
+  addEventListenerToAllWindowsDynamic,
+  resolveIframeEventElement,
+} from '../../../platform/frame';
 import type { PageStyleInspectorViewState } from '../types';
+import { addInaccessibleIframeSelectionListener } from './iframe-selection';
 
 function resolvePageStyleInspectorTab(tab: PageStyleInspectorTab | undefined) {
   if (tab === PAGE_STYLE_INSPECTOR_TABS.RULES && !isPageStyleRulesUiEnabled()) {
@@ -64,25 +69,41 @@ export function useInspectorSelection(args: {
       return;
     }
 
-    function handleClick(event: MouseEvent) {
+    function selectElement(eventElement: Element | null): boolean {
+      const element = findInspectablePageStyleElement(eventElement);
+      const snapshot = element ? readPageStyleSelectionSnapshot(element) : null;
+      if (!snapshot) {
+        return false;
+      }
+
+      setSelection(snapshot);
+      return true;
+    }
+
+    function handleClick(event: MouseEvent, iframe?: HTMLIFrameElement) {
       if (!isTrustedMouseEvent(event)) {
         return;
       }
 
-      const element = findInspectablePageStyleElement(event.target);
-      const snapshot = element ? readPageStyleSelectionSnapshot(element) : null;
-      if (!snapshot) {
+      if (!selectElement(resolveIframeEventElement(event, iframe))) {
         return;
       }
 
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      setSelection(snapshot);
     }
 
-    document.addEventListener('click', handleClick, true);
-    return () => document.removeEventListener('click', handleClick, true);
+    const cleanupClicks = addEventListenerToAllWindowsDynamic<MouseEvent>('click', handleClick, {
+      capture: true,
+    });
+    const cleanupInaccessibleIframes = addInaccessibleIframeSelectionListener((iframe) => {
+      selectElement(iframe);
+    });
+    return () => {
+      cleanupClicks();
+      cleanupInaccessibleIframes();
+    };
   }, [args.open, args.quickEditDocumentMode, args.quickEditMode]);
 
   useEffect(() => {

@@ -9,14 +9,28 @@ import {
   type PageStyleSelectorIdentity,
 } from '@sniptale/runtime-contracts/page-style';
 import { savePageStyleAsset } from '../../../../composition/persistence/page-style/assets';
+import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import {
-  captureDomStateMap,
-  createDomMutationBatch,
-  pagePreparationHistory,
-} from '../../../parser/page-preparation/history';
-import { applyPageStyleRule } from '../../../selection/quick-edit-runtime/page-style/apply';
+  applyPreparedPageStyleRuleMutation,
+  preparePageStyleRuleMutation,
+  type PageStyleRuleApplyResult,
+} from '../../../selection/quick-edit-runtime/page-style/apply';
 import { createPageStyleAssetResolver } from '../../../selection/quick-edit-runtime/page-style/assets';
+import {
+  createPageStyleAnnotationEvidence,
+  publishPageStyleAnnotation,
+} from '../../../selection/quick-edit-runtime/page-style/annotation';
 import { resolvePageStyleRuleElement } from '../../../selection/quick-edit-runtime/page-style/element';
+import {
+  applyPageStyleMutationBatch,
+  capturePageStyleMutationResidual,
+  createPageStyleHistoryEffect,
+  mergePageStyleMutationBatches,
+} from '../../../selection/quick-edit-runtime/page-style/mutation';
+import type {
+  PageStyleMutationBatch,
+  PageStyleMutationElement,
+} from '../../../selection/quick-edit-runtime/page-style/types';
 
 interface PageStylePageIdentity {
   pageDomain: string | null;
@@ -28,13 +42,19 @@ interface SavePageStyleImageAssetInput {
   kind: PageStyleAssetKind;
 }
 
-let inspectorMutationSequence = 0;
-let pendingHistoryCommit: {
-  beforeStates: ReturnType<typeof captureDomStateMap>;
-  element: HTMLElement;
+type PageStyleAnnotationEvidence = ReturnType<typeof createPageStyleAnnotationEvidence>;
+
+interface PendingPageStyleHistory {
+  element: PageStyleMutationElement;
+  evidence: PageStyleAnnotationEvidence;
+  mutation: PageStyleMutationBatch | null;
+  recoveryOnly: boolean;
   timer: number | null;
   transactionId: string;
-} | null = null;
+}
+
+let inspectorMutationSequence = 0;
+let pendingHistoryCommit: PendingPageStyleHistory | null = null;
 
 const PAGE_STYLE_HISTORY_IDLE_COMMIT_MS = 500;
 
@@ -70,7 +90,15 @@ function commitPendingPageStyleHistory(): void {
   try {
     pagePreparationHistory.commitTransaction(
       pending.transactionId,
-      createDomMutationBatch([pending.element], pending.beforeStates)
+      null,
+      pending.mutation
+        ? createPageStyleHistoryEffect(pending.mutation, {
+            onRecovery: (recoveryBatch) => {
+              tryPublishPageStyleRecovery(recoveryBatch, pending.evidence, pending.element);
+            },
+            recoveryOnly: pending.recoveryOnly,
+          })
+        : null
     );
     pendingHistoryCommit = null;
   } catch (error) {
@@ -91,7 +119,8 @@ function cancelPendingPageStyleHistory(): void {
 }
 
 function ensurePendingPageStyleHistory(
-  element: HTMLElement
+  element: PageStyleMutationElement,
+  evidence: PageStyleAnnotationEvidence
 ): NonNullable<typeof pendingHistoryCommit> {
   if (pendingHistoryCommit && pendingHistoryCommit.element !== element) {
     commitPendingPageStyleHistory();
@@ -99,15 +128,104 @@ function ensurePendingPageStyleHistory(
 
   if (!pendingHistoryCommit) {
     pendingHistoryCommit = {
-      beforeStates: captureDomStateMap([element]),
       element,
+      evidence,
+      mutation: null,
+      recoveryOnly: false,
       timer: null,
       transactionId: createInspectorMutationId('page-style-inspector'),
     };
-    pagePreparationHistory.beginTransaction(pendingHistoryCommit.transactionId);
+    if (!pagePreparationHistory.beginTransaction(pendingHistoryCommit.transactionId)) {
+      pendingHistoryCommit = null;
+      throw new Error('Page style history transaction is unavailable');
+    }
   }
 
   return pendingHistoryCommit;
+}
+
+function tryPublishPageStyleRecovery(
+  mutation: PageStyleMutationBatch,
+  evidence: PageStyleAnnotationEvidence,
+  target: PageStyleMutationElement
+): void {
+  try {
+    publishPageStyleAnnotation({ changes: mutation.declarations, evidence, target });
+  } catch {
+    // Invalid hostile residuals remain recovery-only and are never annotation evidence.
+  }
+}
+
+function pageStyleMutationHasChanges(mutation: PageStyleMutationBatch): boolean {
+  return (
+    mutation.attributes.length > 0 || mutation.declarations.length > 0 || mutation.text !== null
+  );
+}
+
+function retainPageStyleRecovery(args: {
+  element: PageStyleMutationElement;
+  evidence: PageStyleAnnotationEvidence;
+  mutation: PageStyleMutationBatch;
+  pending: PendingPageStyleHistory;
+}): void {
+  if (!pageStyleMutationHasChanges(args.mutation)) {
+    return;
+  }
+  args.pending.mutation = mergePageStyleMutationBatches(args.pending.mutation, args.mutation);
+  args.pending.recoveryOnly = true;
+  tryPublishPageStyleRecovery(args.mutation, args.evidence, args.element);
+}
+
+function throwFailedPageStyleMutation(args: {
+  element: PageStyleMutationElement;
+  evidence: PageStyleAnnotationEvidence;
+  pending: PendingPageStyleHistory;
+  result: PageStyleRuleApplyResult;
+}): never {
+  if (args.result.recoveryMutation) {
+    retainPageStyleRecovery({
+      element: args.element,
+      evidence: args.evidence,
+      mutation: args.result.recoveryMutation,
+      pending: args.pending,
+    });
+  }
+  throw new Error(
+    args.result.diagnostics.map((diagnostic) => diagnostic.message).join('; ') ||
+      'Page style mutation failed'
+  );
+}
+
+function publishAppliedPageStyleMutation(args: {
+  element: PageStyleMutationElement;
+  evidence: PageStyleAnnotationEvidence;
+  mutation: PageStyleMutationBatch;
+  pending: PendingPageStyleHistory;
+}): void {
+  const nextMutation = mergePageStyleMutationBatches(args.pending.mutation, args.mutation);
+  try {
+    publishPageStyleAnnotation({
+      changes: args.mutation.declarations,
+      evidence: args.evidence,
+      target: args.element,
+    });
+  } catch (error) {
+    const rollback = applyPageStyleMutationBatch(args.mutation, 'undo');
+    if (!rollback.success) {
+      retainPageStyleRecovery({
+        element: args.element,
+        evidence: args.evidence,
+        mutation: capturePageStyleMutationResidual(args.mutation, 'before'),
+        pending: args.pending,
+      });
+      throw new Error(
+        `Page style evidence failed and rollback failed: ${rollback.failures.join(', ')}`,
+        { cause: error }
+      );
+    }
+    throw error;
+  }
+  args.pending.mutation = nextMutation;
 }
 
 function schedulePendingPageStyleHistoryCommit(): void {
@@ -162,11 +280,11 @@ function createTransientRule(args: {
 }
 
 export async function applyPageStylePatchWithHistory(args: {
-  element: HTMLElement;
+  element: PageStyleMutationElement;
   patch: PageStylePatch;
   selector?: PageStyleSelectorIdentity;
-}): Promise<void> {
-  await applyPageStyleRuleWithHistory({
+}): Promise<PageStyleRuleApplyResult> {
+  return await applyPageStyleRuleWithHistory({
     element: args.element,
     rule: createTransientRule({
       patch: args.patch,
@@ -176,21 +294,42 @@ export async function applyPageStylePatchWithHistory(args: {
 }
 
 async function applyPageStyleRuleWithHistory(args: {
-  element: HTMLElement;
+  element: PageStyleMutationElement;
   rule: PageStyleRestoreRule;
-}): Promise<void> {
+}): Promise<PageStyleRuleApplyResult> {
+  const evidence = createPageStyleAnnotationEvidence(args.element);
   const assetResolver = createPageStyleAssetResolver();
-  ensurePendingPageStyleHistory(args.element);
 
   try {
-    await applyPageStyleRule({
+    const prepared = await preparePageStyleRuleMutation({
       assetResolver,
       element: args.element,
       rule: args.rule,
     });
+    const pending = ensurePendingPageStyleHistory(args.element, evidence);
+    const result = applyPreparedPageStyleRuleMutation(prepared);
+    if (!result.applied) {
+      throwFailedPageStyleMutation({ element: args.element, evidence, pending, result });
+    }
+    if (!result.mutation) {
+      throw new Error('Page style mutation returned no applied delta');
+    }
+
+    publishAppliedPageStyleMutation({
+      element: args.element,
+      evidence,
+      mutation: result.mutation,
+      pending,
+    });
+
     schedulePendingPageStyleHistoryCommit();
+    return result;
   } catch (error) {
-    cancelPendingPageStyleHistory();
+    if (!pendingHistoryCommit?.mutation) {
+      cancelPendingPageStyleHistory();
+    } else {
+      schedulePendingPageStyleHistoryCommit();
+    }
     throw error;
   } finally {
     assetResolver.dispose();

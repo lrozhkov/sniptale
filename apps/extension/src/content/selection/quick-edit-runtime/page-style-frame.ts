@@ -30,7 +30,7 @@ function ensureQuickEditPageStyleFrame(): HTMLElement {
   return frame;
 }
 
-export function showQuickEditPageStyleFrame(element: HTMLElement): void {
+export function showQuickEditPageStyleFrame(element: Element): void {
   const frame = ensureQuickEditPageStyleFrame();
   applyQuickEditFrameRect(frame, element);
   frame.style.display = 'block';

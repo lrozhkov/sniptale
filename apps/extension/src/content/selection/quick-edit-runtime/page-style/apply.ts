@@ -1,183 +1,234 @@
 import {
-  isPageStyleProperty,
   PAGE_STYLE_ASSET_KINDS,
   type PageStyleDeclaration,
   type PageStylePatch,
   type PageStyleRestoreRule,
 } from '@sniptale/runtime-contracts/page-style';
-import { containsUnsafeCssSyntax } from '../../../../features/web-snapshot/public';
 import type { PageStyleAssetResolver } from './assets';
 import { findPatchAsset } from './assets';
 import type { PageStyleRuntimeDiagnostic } from './diagnostics';
 import { createPageStyleRuntimeDiagnostic } from './diagnostics';
+import { applyPageStyleMutation } from './mutation';
+import type {
+  CssDeclarationRequest,
+  PageStyleMutationBatch,
+  PageStyleMutationElement,
+  PageStyleMutationInput,
+} from './types';
+import { validateCssDeclaration } from './validation';
 
-interface PageStyleRuleApplyResult {
-  diagnostics: PageStyleRuntimeDiagnostic[];
+export interface PageStyleRuleApplyResult {
   applied: boolean;
+  diagnostics: PageStyleRuntimeDiagnostic[];
+  mutation: PageStyleMutationBatch | null;
+  recoveryMutation: PageStyleMutationBatch | null;
 }
 
-type StyleApplyContext = {
-  assetResolver: PageStyleAssetResolver;
+function appendValidatedDeclaration(args: {
+  declarations: CssDeclarationRequest[];
   diagnostics: PageStyleRuntimeDiagnostic[];
-  element: HTMLElement;
+  element: PageStyleMutationElement;
+  request: CssDeclarationRequest;
+  ruleId: string;
+}): void {
+  const validated = validateCssDeclaration(args.element, args.request);
+  if (validated.status === 'invalid') {
+    args.diagnostics.push(
+      createPageStyleRuntimeDiagnostic('warning', validated.message, args.ruleId)
+    );
+    return;
+  }
+
+  args.declarations.push({
+    ...(validated.assetUrl ? { assetUrl: validated.assetUrl } : {}),
+    priority: validated.priority,
+    property: validated.property,
+    source: validated.source,
+    value: validated.value,
+  });
+}
+
+function appendPatchDeclaration(args: {
+  declaration: PageStyleDeclaration;
+  declarations: CssDeclarationRequest[];
+  diagnostics: PageStyleRuntimeDiagnostic[];
+  element: PageStyleMutationElement;
+  ruleId: string;
+}): void {
+  appendValidatedDeclaration({
+    declarations: args.declarations,
+    diagnostics: args.diagnostics,
+    element: args.element,
+    request: args.declaration,
+    ruleId: args.ruleId,
+  });
+}
+
+async function appendBackgroundDeclaration(args: {
+  assetResolver: PageStyleAssetResolver;
+  declarations: CssDeclarationRequest[];
+  diagnostics: PageStyleRuntimeDiagnostic[];
+  element: PageStyleMutationElement;
   patch: PageStylePatch;
   ruleId: string;
-};
-
-function isBlockedStyleValue(property: string, value: string): boolean {
-  return containsUnsafeCssSyntax(`${property}: ${value};`);
-}
-
-function applyStyleDeclaration(
-  element: HTMLElement,
-  declaration: PageStyleDeclaration,
-  diagnostics: PageStyleRuntimeDiagnostic[],
-  ruleId: string
-): void {
-  if (!isPageStyleProperty(declaration.property)) {
-    diagnostics.push(
-      createPageStyleRuntimeDiagnostic(
-        'warning',
-        'Rejected unsupported page style property',
-        ruleId
-      )
-    );
-    return;
-  }
-
-  if (declaration.value === null) {
-    element.style.removeProperty(declaration.property);
-    return;
-  }
-
-  if (isBlockedStyleValue(declaration.property, declaration.value)) {
-    diagnostics.push(
-      createPageStyleRuntimeDiagnostic('warning', 'Rejected unsafe page style value', ruleId)
-    );
-    return;
-  }
-
-  element.style.setProperty(declaration.property, declaration.value);
-}
-
-async function applyBackgroundImageAsset(context: StyleApplyContext): Promise<void> {
+}): Promise<void> {
   const backgroundAsset = findPatchAsset(
-    context.patch.assets,
+    args.patch.assets,
     PAGE_STYLE_ASSET_KINDS.BACKGROUND_IMAGE
   );
-  if (!backgroundAsset) {
+  if (backgroundAsset) {
+    const resolved = await args.assetResolver.resolveAssetUrl(backgroundAsset, args.ruleId);
+    args.diagnostics.push(...resolved.diagnostics);
+    if (resolved.url) {
+      appendValidatedDeclaration({
+        declarations: args.declarations,
+        diagnostics: args.diagnostics,
+        element: args.element,
+        request: {
+          assetUrl: resolved.url,
+          property: 'background-image',
+          source: 'resolved-asset',
+          value: `url("${resolved.url}")`,
+        },
+        ruleId: args.ruleId,
+      });
+    }
     return;
   }
 
-  const resolved = await context.assetResolver.resolveAssetUrl(backgroundAsset, context.ruleId);
-  context.diagnostics.push(...resolved.diagnostics);
-  if (resolved.url) {
-    context.element.style.setProperty('background-image', `url("${resolved.url}")`);
+  const declaration = args.patch.declarations.find(
+    (entry) => entry.property === 'background-image'
+  );
+  if (declaration) {
+    appendPatchDeclaration({
+      declaration,
+      declarations: args.declarations,
+      diagnostics: args.diagnostics,
+      element: args.element,
+      ruleId: args.ruleId,
+    });
   }
 }
 
-function applyImageSafeAttributes(
-  element: HTMLImageElement,
-  asset: { height?: number | null; width?: number | null }
-): void {
-  if (typeof asset.width === 'number' && Number.isFinite(asset.width) && asset.width > 0) {
-    element.setAttribute('width', String(asset.width));
-  }
-
-  if (typeof asset.height === 'number' && Number.isFinite(asset.height) && asset.height > 0) {
-    element.setAttribute('height', String(asset.height));
-  }
-}
-
-async function applyImageReplacement(context: {
+async function createImageAttributeMutation(args: {
   assetResolver: PageStyleAssetResolver;
   diagnostics: PageStyleRuntimeDiagnostic[];
-  element: HTMLElement;
+  element: PageStyleMutationElement;
   rule: PageStyleRestoreRule;
-}): Promise<void> {
-  if (!(context.element instanceof HTMLImageElement)) {
-    return;
+}): Promise<Partial<Record<'height' | 'src' | 'width', string | null>> | undefined> {
+  if (
+    args.element.namespaceURI !== 'http://www.w3.org/1999/xhtml' ||
+    args.element.localName.toLowerCase() !== 'img'
+  ) {
+    return undefined;
   }
 
-  const retainedImage = context.rule.contentRetention?.image;
+  const retainedImage = args.rule.contentRetention?.image;
   const imageAsset =
     retainedImage?.enabled === true
       ? retainedImage.asset
-      : findPatchAsset(context.rule.patch.assets, PAGE_STYLE_ASSET_KINDS.IMAGE_REPLACEMENT);
+      : findPatchAsset(args.rule.patch.assets, PAGE_STYLE_ASSET_KINDS.IMAGE_REPLACEMENT);
   if (!imageAsset) {
-    return;
+    return undefined;
   }
 
-  const resolved = await context.assetResolver.resolveAssetUrl(imageAsset, context.rule.id);
-  context.diagnostics.push(...resolved.diagnostics);
+  const resolved = await args.assetResolver.resolveAssetUrl(imageAsset, args.rule.id);
+  args.diagnostics.push(...resolved.diagnostics);
   if (!resolved.url) {
-    return;
+    return undefined;
   }
 
-  if (context.element.getAttribute('src') !== resolved.url) {
-    context.element.setAttribute('src', resolved.url);
-  }
-  applyImageSafeAttributes(context.element, imageAsset);
+  return {
+    src: resolved.url,
+    ...(typeof imageAsset.width === 'number' &&
+    Number.isFinite(imageAsset.width) &&
+    imageAsset.width > 0
+      ? { width: String(imageAsset.width) }
+      : {}),
+    ...(typeof imageAsset.height === 'number' &&
+    Number.isFinite(imageAsset.height) &&
+    imageAsset.height > 0
+      ? { height: String(imageAsset.height) }
+      : {}),
+  };
 }
 
-function applyTextRetention(rule: PageStyleRestoreRule, element: HTMLElement): void {
-  const retainedText = rule.contentRetention?.text;
-  if (retainedText?.enabled === true && element.textContent !== retainedText.text) {
-    element.textContent = retainedText.text;
-  }
+interface PreparedPageStyleRuleMutation {
+  diagnostics: PageStyleRuntimeDiagnostic[];
+  input: PageStyleMutationInput;
+  ruleId: string;
 }
 
-async function applyPatchStyles(context: StyleApplyContext): Promise<void> {
-  for (const declaration of context.patch.declarations) {
-    if (declaration.property === 'background-image') {
-      continue;
-    }
-
-    applyStyleDeclaration(context.element, declaration, context.diagnostics, context.ruleId);
-  }
-
-  await applyBackgroundImageAsset(context);
-
-  const backgroundDeclaration = context.patch.declarations.find(
-    (declaration) => declaration.property === 'background-image'
-  );
-  if (
-    !findPatchAsset(context.patch.assets, PAGE_STYLE_ASSET_KINDS.BACKGROUND_IMAGE) &&
-    backgroundDeclaration
-  ) {
-    applyStyleDeclaration(
-      context.element,
-      backgroundDeclaration,
-      context.diagnostics,
-      context.ruleId
-    );
-  }
-}
-
-export async function applyPageStyleRule(args: {
+export async function preparePageStyleRuleMutation(args: {
   assetResolver: PageStyleAssetResolver;
-  element: HTMLElement;
+  element: PageStyleMutationElement;
   rule: PageStyleRestoreRule;
-}): Promise<PageStyleRuleApplyResult> {
+}): Promise<PreparedPageStyleRuleMutation> {
   const diagnostics: PageStyleRuntimeDiagnostic[] = [];
-
-  await applyPatchStyles({
+  const declarations: CssDeclarationRequest[] = [];
+  args.rule.patch.declarations.forEach((declaration) => {
+    if (declaration.property !== 'background-image') {
+      appendPatchDeclaration({
+        declaration,
+        declarations,
+        diagnostics,
+        element: args.element,
+        ruleId: args.rule.id,
+      });
+    }
+  });
+  await appendBackgroundDeclaration({
     assetResolver: args.assetResolver,
+    declarations,
     diagnostics,
     element: args.element,
     patch: args.rule.patch,
     ruleId: args.rule.id,
   });
-  applyTextRetention(args.rule, args.element);
-  await applyImageReplacement({
-    assetResolver: args.assetResolver,
+
+  const attributes = await createImageAttributeMutation({ ...args, diagnostics });
+  return {
     diagnostics,
-    element: args.element,
-    rule: args.rule,
-  });
+    input: {
+      ...(attributes ? { attributes } : {}),
+      declarations,
+      target: args.element,
+      ...(args.rule.contentRetention?.text?.enabled === true
+        ? { text: args.rule.contentRetention.text.text }
+        : {}),
+    },
+    ruleId: args.rule.id,
+  };
+}
+
+export function applyPreparedPageStyleRuleMutation(
+  prepared: PreparedPageStyleRuleMutation
+): PageStyleRuleApplyResult {
+  const diagnostics = [...prepared.diagnostics];
+  const result = applyPageStyleMutation(prepared.input);
+  if (result.status === 'failed') {
+    diagnostics.push(createPageStyleRuntimeDiagnostic('error', result.message, prepared.ruleId));
+    return {
+      applied: false,
+      diagnostics,
+      mutation: null,
+      recoveryMutation: result.recoveryBatch ?? null,
+    };
+  }
 
   return {
     applied: diagnostics.every((diagnostic) => diagnostic.level !== 'error'),
     diagnostics,
+    mutation: result.batch,
+    recoveryMutation: null,
   };
+}
+
+export async function applyPageStyleRule(args: {
+  assetResolver: PageStyleAssetResolver;
+  element: PageStyleMutationElement;
+  rule: PageStyleRestoreRule;
+}): Promise<PageStyleRuleApplyResult> {
+  const prepared = await preparePageStyleRuleMutation(args);
+  return applyPreparedPageStyleRuleMutation(prepared);
 }

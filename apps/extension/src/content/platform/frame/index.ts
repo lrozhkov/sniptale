@@ -12,7 +12,10 @@ export {
   walkAllDocuments,
 } from './core';
 export { mountStyleInAccessibleDocuments } from './documents';
-export { addEventListenerToAllWindowsDynamic } from './listeners';
+export {
+  addEventListenerToAllWindowsDynamic,
+  addWindowEventListenerToAllWindowsDynamic,
+} from './listeners';
 export {
   createDocumentPagePlacement,
   getDocumentViewportBounds,

@@ -7,6 +7,20 @@ import {
 } from '@sniptale/runtime-contracts/page-style';
 import { createPageStyleRuntimeController } from './controller';
 
+function markVisible<T extends Element>(element: T): T {
+  const rect = DOMRect.fromRect({ height: 40, width: 80 });
+  Object.defineProperty(element, 'getClientRects', {
+    configurable: true,
+    value: () => ({
+      0: rect,
+      [Symbol.iterator]: () => [rect][Symbol.iterator](),
+      item: (index: number) => (index === 0 ? rect : null),
+      length: 1,
+    }),
+  });
+  return element;
+}
+
 function createRule(id: string, selector: string): PageStyleRestoreRule {
   return {
     createdAt: 1,
@@ -34,6 +48,7 @@ function deferred<T>() {
 
 it('applies matching rules idempotently on the current page', async () => {
   const element = document.createElement('div');
+  markVisible(element);
   element.id = 'target';
   document.body.append(element);
   const controller = createPageStyleRuntimeController({
@@ -56,6 +71,7 @@ it('applies matching rules idempotently on the current page', async () => {
 
 it('returns only selector-resolved active rules in the current page summary', async () => {
   const element = document.createElement('div');
+  markVisible(element);
   element.id = 'target';
   document.body.append(element);
   const controller = createPageStyleRuntimeController({
@@ -77,8 +93,10 @@ it('returns only selector-resolved active rules in the current page summary', as
 
 it('does not let stale async summaries overwrite newer current-page status', async () => {
   const first = document.createElement('div');
+  markVisible(first);
   first.id = 'first';
   const second = document.createElement('div');
+  markVisible(second);
   second.id = 'second';
   document.body.append(first, second);
   const firstRules = deferred<PageStyleRestoreRule[]>();

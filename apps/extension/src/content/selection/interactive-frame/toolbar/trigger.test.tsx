@@ -104,7 +104,7 @@ describe('InteractiveFrameToolbarTrigger', () => {
     const handlers = createTriggerProps();
     const beginTransaction = vi
       .spyOn(pagePreparationHistory, 'beginTransaction')
-      .mockImplementation(() => undefined);
+      .mockImplementation(() => true);
     const stepBadgeListener = vi.fn();
     const cleanupStepBadgeListener = addFrameStepBadgeChangedListener(stepBadgeListener);
     act(() => {

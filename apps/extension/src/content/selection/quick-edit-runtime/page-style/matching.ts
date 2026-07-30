@@ -7,9 +7,10 @@ import type { PageStyleRuntimeDiagnostic } from './diagnostics';
 import { createPageStyleRuntimeDiagnostic } from './diagnostics';
 import { resolvePageStyleRuleElement } from './element';
 import type { PageStyleRuntimePageIdentity } from './identity';
+import type { PageStyleMutationElement } from './types';
 
 export interface PageStyleMatchedRule {
-  element: HTMLElement;
+  element: PageStyleMutationElement;
   rule: PageStyleRestoreRule;
 }
 

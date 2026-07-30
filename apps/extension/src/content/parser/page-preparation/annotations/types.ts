@@ -35,10 +35,15 @@ export interface BrowserAnnotationTargetEvidence {
 }
 
 export interface BrowserAnnotationPropertyChange {
-  after: string;
-  before: string;
+  after: BrowserAnnotationDeclarationValue;
+  before: BrowserAnnotationDeclarationValue;
   order: number;
   property: string;
+}
+
+export interface BrowserAnnotationDeclarationValue {
+  priority: string;
+  value: string;
 }
 
 export interface BrowserAnnotationTextChange {
@@ -53,7 +58,6 @@ export interface BrowserDomAnnotationRecord {
   creationOrder: number;
   evidence: BrowserAnnotationTargetEvidence;
   propertyChanges: BrowserAnnotationPropertyChange[];
-  targetKey: string;
   textChange?: BrowserAnnotationTextChange;
 }
 
@@ -75,24 +79,21 @@ export interface BrowserAnnotationSessionState extends BrowserAnnotationSessionS
   revision: number;
 }
 
-export interface BrowserAnnotationPropertyChangeInput {
-  after: string;
-  before: string;
+export interface BrowserAnnotationPropertyChangesInput {
+  changes: BrowserAnnotationPropertyChange[];
   evidence: BrowserAnnotationTargetEvidence;
-  order: number;
-  property: string;
-  targetKey: string;
+  target: Element;
 }
 
 export interface BrowserAnnotationTextChangeInput {
   after: string;
   before: string;
   evidence: BrowserAnnotationTargetEvidence;
-  targetKey: string;
+  target: Element;
 }
 
 export interface BrowserAnnotationCommentInput {
   comment: string;
   evidence: BrowserAnnotationTargetEvidence;
-  targetKey: string;
+  target: Element;
 }

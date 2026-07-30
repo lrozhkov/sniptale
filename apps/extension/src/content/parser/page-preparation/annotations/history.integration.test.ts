@@ -50,24 +50,25 @@ describe('browser annotation history integration', () => {
       }),
     });
     const first = createEvidence('#first');
+    const firstTarget = document.createElement('div');
 
     store.beginTransaction('comment-edit');
-    session.setComment({ comment: 'Temporary', evidence: first, targetKey: first.locator });
-    session.setComment({ comment: '', evidence: first, targetKey: first.locator });
+    session.setComment({ comment: 'Temporary', evidence: first, target: firstTarget });
+    session.setComment({ comment: '', evidence: first, target: firstTarget });
     store.commitTransaction('comment-edit');
 
     expect(store.getState()).toMatchObject({ canRedo: false, canUndo: false });
 
     const second = createEvidence('#second');
+    const secondTarget = document.createElement('div');
     expect(
-      session.setComment({ comment: 'Persistent', evidence: second, targetKey: second.locator })
+      session.setComment({ comment: 'Persistent', evidence: second, target: secondTarget })
     ).toBe(2);
     expect(session.captureSnapshot().domRecords).toEqual([
       expect.objectContaining({
         annotationId: 2,
         commentMarker: 2,
         creationOrder: 2,
-        targetKey: second.locator,
       }),
     ]);
   });

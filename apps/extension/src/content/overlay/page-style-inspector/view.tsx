@@ -5,8 +5,12 @@ import {
 } from '../../selection/quick-edit-runtime/page-style-frame';
 import { PageStyleInspectorPanel } from './panel/view';
 import { usePageStyleInspectorController } from './session/controller';
+import type { PageStyleMutationElement } from '../../selection/quick-edit-runtime/page-style/types';
 
-function useQuickEditPageStyleSelectionFrame(element: HTMLElement | null, visible: boolean) {
+function useQuickEditPageStyleSelectionFrame(
+  element: PageStyleMutationElement | null,
+  visible: boolean
+) {
   useEffect(() => {
     if (!visible || !element) {
       hideQuickEditPageStyleFrame();

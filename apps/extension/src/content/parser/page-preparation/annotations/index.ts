@@ -3,10 +3,11 @@ export { subscribeToBrowserAnnotationDocumentNavigation } from './document-navig
 export {
   BROWSER_ANNOTATION_SCHEMA_VERSION,
   type BrowserAnnotationCommentInput,
+  type BrowserAnnotationDeclarationValue,
   type BrowserAnnotationFrameContext,
   type BrowserAnnotationNodePosition,
   type BrowserAnnotationPropertyChange,
-  type BrowserAnnotationPropertyChangeInput,
+  type BrowserAnnotationPropertyChangesInput,
   type BrowserAnnotationSessionSnapshot,
   type BrowserAnnotationSessionState,
   type BrowserAnnotationTargetEvidence,
