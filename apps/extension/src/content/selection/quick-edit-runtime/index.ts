@@ -51,6 +51,7 @@ function createQuickEditRuntimeParts(props: {
     updateBlockingOverlayShape: props.updateBlockingOverlayShape,
   });
   const documentMode = createQuickEditDocumentMode({
+    disableRequested: props.onDisableRequested,
     editingElements: props.editingElements,
     finishEditing: editingActions.finishEditing,
     getIsQuickEditMode: props.getIsQuickEditMode,

@@ -65,6 +65,35 @@ describe('browser annotation session live identity', () => {
     expect(session.getLiveTarget(1)).toBe(target);
   });
 
+  it('publishes multiple text inputs as one rollback-capable session mutation', () => {
+    const session = createBrowserAnnotationSession();
+    const listener = vi.fn();
+    const first = createTarget();
+    const second = createTarget();
+    const rollbackPoint = session.captureFailedMutationRollbackPoint();
+    session.subscribe(listener);
+
+    session.recordTextChanges([
+      {
+        after: 'First after',
+        before: 'First before',
+        evidence: createEvidence('#first'),
+        target: first,
+      },
+      {
+        after: 'Second after',
+        before: 'Second before',
+        evidence: createEvidence('#second'),
+        target: second,
+      },
+    ]);
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(session.captureSnapshot().domRecords).toHaveLength(2);
+    expect(session.rollbackFailedMutation(rollbackPoint)).toBe(true);
+    expect(session.captureSnapshot().domRecords).toEqual([]);
+  });
+
   it('does not rebind a detached annotation to an SPA replacement with the same selector', () => {
     const session = createBrowserAnnotationSession();
     const evidence = createEvidence('#same');

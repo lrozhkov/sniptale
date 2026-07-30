@@ -1,4 +1,5 @@
 export { browserAnnotationSession, createBrowserAnnotationSession } from './session';
+export { createBrowserAnnotationTargetEvidence } from './evidence';
 export { subscribeToBrowserAnnotationDocumentNavigation } from './document-navigation';
 export {
   BROWSER_ANNOTATION_SCHEMA_VERSION,
@@ -13,6 +14,7 @@ export {
   type BrowserAnnotationTargetEvidence,
   type BrowserAnnotationTextChange,
   type BrowserAnnotationTextChangeInput,
+  type BrowserAnnotationTextChangesInput,
   type BrowserAnnotationViewport,
   type BrowserDomAnnotationRecord,
   type BrowserFrameAnnotationOrder,

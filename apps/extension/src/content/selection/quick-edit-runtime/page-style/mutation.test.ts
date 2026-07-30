@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
-import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
-import { createPageStyleAnnotationEvidence, publishPageStyleAnnotation } from './annotation';
+import {
+  browserAnnotationSession,
+  createBrowserAnnotationTargetEvidence,
+} from '../../../parser/page-preparation/annotations';
+import { publishPageStyleAnnotation } from './annotation';
 import { applyPageStyleMutation, createPageStyleHistoryEffect } from './mutation';
 import type { CssDeclarationRequest, PageStyleMutationBatch } from './types';
 
@@ -368,7 +371,7 @@ it('does not reconstruct resolver policy for an exact reentrant rollback residua
   expect(() =>
     publishPageStyleAnnotation({
       changes: result.recoveryBatch!.declarations,
-      evidence: createPageStyleAnnotationEvidence(target),
+      evidence: createBrowserAnnotationTargetEvidence(target),
       target,
     })
   ).toThrow('Cannot publish invalid page-style annotation evidence');

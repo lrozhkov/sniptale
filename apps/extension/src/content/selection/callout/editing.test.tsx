@@ -88,7 +88,7 @@ function mockHistoryTransactions() {
     .mockImplementation(() => true);
   const commitTransactionSpy = vi
     .spyOn(pagePreparationHistory, 'commitTransaction')
-    .mockImplementation(() => undefined);
+    .mockImplementation(() => true);
 
   return { beginTransactionSpy, commitTransactionSpy };
 }

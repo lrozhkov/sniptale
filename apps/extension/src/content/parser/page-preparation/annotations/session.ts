@@ -9,6 +9,7 @@ import {
   type BrowserAnnotationSessionState,
   type BrowserAnnotationTargetEvidence,
   type BrowserAnnotationTextChangeInput,
+  type BrowserAnnotationTextChangesInput,
   type BrowserDomAnnotationRecord,
   type BrowserFrameAnnotationOrder,
 } from './types';
@@ -206,23 +207,23 @@ function recordPropertyChanges(
   publish(state);
 }
 
-function recordTextChange(
+function applyTextChange(
   state: BrowserAnnotationRuntimeState,
   input: BrowserAnnotationTextChangeInput
-): void {
+): boolean {
   const existingRecord = getRecordForTarget(state, input.target);
   const baseline = existingRecord?.textChange?.before ?? input.before;
   const nextChange =
     baseline === input.after ? undefined : { after: input.after, before: baseline };
 
   if (!existingRecord && !nextChange) {
-    return;
+    return false;
   }
   if (
     existingRecord?.textChange?.before === nextChange?.before &&
     existingRecord?.textChange?.after === nextChange?.after
   ) {
-    return;
+    return false;
   }
 
   const record = existingRecord ?? createRecord(state, input);
@@ -233,6 +234,20 @@ function recordTextChange(
     delete record.textChange;
   }
   removeEmptyRecord(state, record);
+  return true;
+}
+
+function recordTextChanges(
+  state: BrowserAnnotationRuntimeState,
+  inputs: BrowserAnnotationTextChangesInput
+): void {
+  const changed = inputs.reduce(
+    (didChange, input) => applyTextChange(state, input) || didChange,
+    false
+  );
+  if (!changed) {
+    return;
+  }
   publish(state);
 }
 
@@ -352,7 +367,9 @@ export function createBrowserAnnotationSession() {
     recordPropertyChanges: (input: BrowserAnnotationPropertyChangesInput): void =>
       recordPropertyChanges(state, input),
     recordTextChange: (input: BrowserAnnotationTextChangeInput): void =>
-      recordTextChange(state, input),
+      recordTextChanges(state, [input]),
+    recordTextChanges: (inputs: BrowserAnnotationTextChangesInput): void =>
+      recordTextChanges(state, inputs),
     resetForDocument: (): void => {
       const listeners = state.listeners;
       Object.assign(state, createEmptyRuntimeState(), { listeners });

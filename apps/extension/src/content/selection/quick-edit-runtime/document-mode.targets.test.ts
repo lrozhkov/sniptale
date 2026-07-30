@@ -71,3 +71,16 @@ it('does not fall back to an ignored body root', () => {
 
   expect(resolveDocumentModeEditRoot(target)).toBeNull();
 });
+
+it('resolves an inner same-origin iframe element in its own DOM realm', () => {
+  const iframe = document.createElement('iframe');
+  document.body.append(iframe);
+  const innerDocument = iframe.contentDocument!;
+  const paragraph = innerDocument.createElement('p');
+  paragraph.textContent = 'Inner text';
+  innerDocument.body.append(paragraph);
+
+  expect(paragraph instanceof HTMLElement).toBe(false);
+  expect(resolveDocumentModeEditRoot(paragraph.firstChild)).toBe(paragraph);
+  expect(resolveDocumentModeEditRoot(paragraph)).toBe(paragraph);
+});

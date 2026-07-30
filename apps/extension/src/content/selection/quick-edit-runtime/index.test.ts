@@ -1,6 +1,26 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const historyMocks = vi.hoisted(() => ({
+  beginTransaction: vi.fn(() => true),
+  cancelTransaction: vi.fn(),
+  commitTransaction: vi.fn(() => true),
+}));
+
+vi.mock('../../parser/page-preparation/history', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../parser/page-preparation/history')>();
+  return {
+    ...original,
+    pagePreparationHistory: {
+      ...original.pagePreparationHistory,
+      beginTransaction: historyMocks.beginTransaction,
+      cancelTransaction: historyMocks.cancelTransaction,
+      commitTransaction: historyMocks.commitTransaction,
+    },
+  };
+});
+
 import { createQuickEditRuntimeController } from '.';
 
 class ResizeObserverMock {
@@ -52,6 +72,9 @@ function dispatchEscapeKey(): void {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  historyMocks.beginTransaction.mockReturnValue(true);
+  historyMocks.commitTransaction.mockReturnValue(true);
   vi.stubGlobal('ResizeObserver', ResizeObserverMock);
   vi.spyOn(console, 'log').mockImplementation(() => {});
   document.designMode = 'off';

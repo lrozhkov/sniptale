@@ -99,6 +99,8 @@ export interface BrowserAnnotationTextChangeInput {
   target: Element;
 }
 
+export type BrowserAnnotationTextChangesInput = readonly BrowserAnnotationTextChangeInput[];
+
 export interface BrowserAnnotationCommentInput {
   comment: string;
   evidence: BrowserAnnotationTargetEvidence;

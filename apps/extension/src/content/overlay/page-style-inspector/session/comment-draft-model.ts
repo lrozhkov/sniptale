@@ -1,5 +1,7 @@
-import type { BrowserAnnotationTargetEvidence } from '../../../parser/page-preparation/annotations';
-import { createPageStyleAnnotationEvidence } from '../../../selection/quick-edit-runtime/page-style/annotation';
+import {
+  createBrowserAnnotationTargetEvidence,
+  type BrowserAnnotationTargetEvidence,
+} from '../../../parser/page-preparation/annotations';
 import type { PageStyleSelectionSnapshot } from '../runtime/properties';
 import { commitPropertiesComment, readPropertiesComment } from '../runtime/comment';
 
@@ -166,7 +168,7 @@ class PageStyleCommentDraftModel {
       const committed = readPropertiesComment(selection.element);
       this.currentTarget = {
         element: selection.element,
-        evidence: createPageStyleAnnotationEvidence(selection.element),
+        evidence: createBrowserAnnotationTargetEvidence(selection.element),
       };
       this.committedComment = committed.comment;
       this.draft = committed.comment;

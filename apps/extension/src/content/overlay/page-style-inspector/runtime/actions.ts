@@ -9,6 +9,10 @@ import {
   type PageStyleSelectorIdentity,
 } from '@sniptale/runtime-contracts/page-style';
 import { savePageStyleAsset } from '../../../../composition/persistence/page-style/assets';
+import {
+  createBrowserAnnotationTargetEvidence,
+  type BrowserAnnotationTargetEvidence,
+} from '../../../parser/page-preparation/annotations';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import {
   applyPreparedPageStyleRuleMutation,
@@ -16,10 +20,7 @@ import {
   type PageStyleRuleApplyResult,
 } from '../../../selection/quick-edit-runtime/page-style/apply';
 import { createPageStyleAssetResolver } from '../../../selection/quick-edit-runtime/page-style/assets';
-import {
-  createPageStyleAnnotationEvidence,
-  publishPageStyleAnnotation,
-} from '../../../selection/quick-edit-runtime/page-style/annotation';
+import { publishPageStyleAnnotation } from '../../../selection/quick-edit-runtime/page-style/annotation';
 import { resolvePageStyleRuleElement } from '../../../selection/quick-edit-runtime/page-style/element';
 import {
   applyPageStyleMutationBatch,
@@ -42,11 +43,9 @@ interface SavePageStyleImageAssetInput {
   kind: PageStyleAssetKind;
 }
 
-type PageStyleAnnotationEvidence = ReturnType<typeof createPageStyleAnnotationEvidence>;
-
 interface PendingPageStyleHistory {
   element: PageStyleMutationElement;
-  evidence: PageStyleAnnotationEvidence;
+  evidence: BrowserAnnotationTargetEvidence;
   mutation: PageStyleMutationBatch | null;
   recoveryOnly: boolean;
   timer: number | null;
@@ -120,7 +119,7 @@ function cancelPendingPageStyleHistory(): void {
 
 function ensurePendingPageStyleHistory(
   element: PageStyleMutationElement,
-  evidence: PageStyleAnnotationEvidence
+  evidence: BrowserAnnotationTargetEvidence
 ): NonNullable<typeof pendingHistoryCommit> {
   if (pendingHistoryCommit && pendingHistoryCommit.element !== element) {
     flushPendingPageStyleHistory();
@@ -146,7 +145,7 @@ function ensurePendingPageStyleHistory(
 
 function tryPublishPageStyleRecovery(
   mutation: PageStyleMutationBatch,
-  evidence: PageStyleAnnotationEvidence,
+  evidence: BrowserAnnotationTargetEvidence,
   target: PageStyleMutationElement
 ): void {
   try {
@@ -164,7 +163,7 @@ function pageStyleMutationHasChanges(mutation: PageStyleMutationBatch): boolean 
 
 function retainPageStyleRecovery(args: {
   element: PageStyleMutationElement;
-  evidence: PageStyleAnnotationEvidence;
+  evidence: BrowserAnnotationTargetEvidence;
   mutation: PageStyleMutationBatch;
   pending: PendingPageStyleHistory;
 }): void {
@@ -178,7 +177,7 @@ function retainPageStyleRecovery(args: {
 
 function throwFailedPageStyleMutation(args: {
   element: PageStyleMutationElement;
-  evidence: PageStyleAnnotationEvidence;
+  evidence: BrowserAnnotationTargetEvidence;
   pending: PendingPageStyleHistory;
   result: PageStyleRuleApplyResult;
 }): never {
@@ -198,7 +197,7 @@ function throwFailedPageStyleMutation(args: {
 
 function publishAppliedPageStyleMutation(args: {
   element: PageStyleMutationElement;
-  evidence: PageStyleAnnotationEvidence;
+  evidence: BrowserAnnotationTargetEvidence;
   mutation: PageStyleMutationBatch;
   pending: PendingPageStyleHistory;
 }): void {
@@ -297,7 +296,7 @@ async function applyPageStyleRuleWithHistory(args: {
   element: PageStyleMutationElement;
   rule: PageStyleRestoreRule;
 }): Promise<PageStyleRuleApplyResult> {
-  const evidence = createPageStyleAnnotationEvidence(args.element);
+  const evidence = createBrowserAnnotationTargetEvidence(args.element);
   const assetResolver = createPageStyleAssetResolver();
 
   try {

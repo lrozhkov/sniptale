@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
-import { createPageStyleAnnotationEvidence, publishPageStyleAnnotation } from './annotation';
+import {
+  browserAnnotationSession,
+  createBrowserAnnotationTargetEvidence,
+} from '../../../parser/page-preparation/annotations';
+import { publishPageStyleAnnotation } from './annotation';
 
 beforeEach(() => {
   browserAnnotationSession.resetForDocument();
@@ -14,57 +17,11 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-describe('page-style annotation evidence', () => {
-  it('captures stable top-document evidence without transient Sniptale identity', () => {
-    const parent = document.createElement('main');
-    parent.className = 'layout sniptale-transient';
-    const target = document.createElement('p');
-    target.id = 'target';
-    target.className = 'copy sniptale-overlay emphasized';
-    target.setAttribute('role', 'note');
-    target.textContent = '  Visible   annotation text  ';
-    parent.append(target);
-    document.body.append(parent);
-
-    const evidence = createPageStyleAnnotationEvidence(target);
-
-    expect(evidence).toMatchObject({
-      fileLabel: 'browser:Visible annotation text',
-      frame: { kind: 'top-document' },
-      targetRole: 'note',
-      targetText: 'Visible   annotation text',
-    });
-    expect(evidence.targetSelector).toContain('#target');
-    expect(evidence.targetSelector).not.toContain('data-sniptale-id');
-    expect(evidence.targetPath).toContain('p#target.copy.emphasized');
-    expect(evidence.targetPath).not.toContain('sniptale-');
-  });
-
-  it('captures iframe context and falls back to the element name for empty text', () => {
-    const iframe = document.createElement('iframe');
-    iframe.id = 'same-origin-frame';
-    iframe.name = 'Editor frame';
-    document.body.append(iframe);
-    const target = iframe.contentDocument!.createElement('div');
-    iframe.contentDocument!.body.append(target);
-
-    const evidence = createPageStyleAnnotationEvidence(target);
-
-    expect(evidence.fileLabel).toBe('browser:div');
-    expect(evidence.frame).toMatchObject({
-      kind: 'iframe',
-      name: 'Editor frame',
-      selector: 'iframe#same-origin-frame',
-    });
-    expect(evidence).not.toHaveProperty('targetRole');
-  });
-});
-
 describe('page-style annotation publication', () => {
   it('ignores empty batches and publishes exact validated declaration evidence', () => {
     const target = document.createElement('div');
     document.body.append(target);
-    const evidence = createPageStyleAnnotationEvidence(target);
+    const evidence = createBrowserAnnotationTargetEvidence(target);
 
     publishPageStyleAnnotation({ changes: [], evidence, target });
     expect(browserAnnotationSession.captureSnapshot().domRecords).toEqual([]);
@@ -97,7 +54,7 @@ describe('page-style annotation publication', () => {
   it('rejects evidence that the canonical declaration policy cannot replay', () => {
     const target = document.createElement('div');
     document.body.append(target);
-    const evidence = createPageStyleAnnotationEvidence(target);
+    const evidence = createBrowserAnnotationTargetEvidence(target);
 
     expect(() =>
       publishPageStyleAnnotation({

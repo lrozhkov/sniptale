@@ -17,11 +17,9 @@ vi.mock('../runtime/comment', async (importOriginal) => ({
   readPropertiesComment: commentMocks.read,
 }));
 
-vi.mock('../../../selection/quick-edit-runtime/page-style/annotation', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../../selection/quick-edit-runtime/page-style/annotation')
-  >()),
-  createPageStyleAnnotationEvidence: vi.fn((element: Element) => ({
+vi.mock('../../../parser/page-preparation/annotations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../parser/page-preparation/annotations')>()),
+  createBrowserAnnotationTargetEvidence: vi.fn((element: Element) => ({
     fileLabel: element.id,
     frame: { kind: 'top-document' },
     locator: `#${element.id}`,

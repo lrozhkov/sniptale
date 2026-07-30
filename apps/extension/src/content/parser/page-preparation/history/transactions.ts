@@ -143,9 +143,9 @@ function commitHistoryTransaction(
   key: string,
   domBatch: PageDomMutationBatch | null = null,
   domEffect: PagePreparationHistoryDomEffect | null = null
-): void {
+): boolean {
   if (state.isApplying) {
-    return;
+    return false;
   }
 
   const hadTransaction = state.transactions.has(key);
@@ -155,13 +155,14 @@ function commitHistoryTransaction(
       notifyHistoryReachabilityChanged(state);
       publishHistoryState(state);
     }
-    return;
+    return true;
   }
 
   if (hadTransaction) {
     notifyHistoryReachabilityChanged(state);
     publishHistoryState(state);
   }
+  return false;
 }
 
 function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
@@ -218,8 +219,8 @@ function createTransactionCommitApi(state: HistoryStoreRuntimeState) {
       key: string,
       domBatch: PageDomMutationBatch | null = null,
       domEffect: PagePreparationHistoryDomEffect | null = null
-    ): void {
-      commitHistoryTransaction(state, key, domBatch, domEffect);
+    ): boolean {
+      return commitHistoryTransaction(state, key, domBatch, domEffect);
     },
   };
 }
