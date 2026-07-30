@@ -1,8 +1,7 @@
 import { translate } from '../../../../../platform/i18n';
-import { Section } from '../section';
 import { NumericField } from '../numeric-field';
 import { LinkedSideFields, SIDE_ORDER, createSideProperty } from '../side-fields';
-import { changedSummary, countModified, fieldState } from '../helpers';
+import { fieldState } from '../helpers';
 import type { DesignReviewActions, DesignReviewViewState } from '../../types';
 
 type SectionProps = {
@@ -11,25 +10,9 @@ type SectionProps = {
   state: DesignReviewViewState;
 };
 
-const FRAME_PROPERTIES = [
-  'width',
-  'height',
-  'margin-top',
-  'margin-right',
-  'margin-bottom',
-  'margin-left',
-  'padding-top',
-  'padding-right',
-  'padding-bottom',
-  'padding-left',
-] as const;
-
 export function BoxSection({ actions, disabled, state }: SectionProps) {
   return (
-    <Section
-      title={translate('content.designReview.sectionFrame')}
-      summary={changedSummary(countModified(state, FRAME_PROPERTIES))}
-    >
+    <div className="grid gap-2" data-ui="content.design-review.settings-layout">
       <FrameSizeFields actions={actions} disabled={disabled} state={state} />
       <LinkedSideFields
         disabled={disabled}
@@ -49,7 +32,7 @@ export function BoxSection({ actions, disabled, state }: SectionProps) {
         onChangeMany={actions.updateValues}
         onLinkedChange={actions.setSideFieldLinked}
       />
-    </Section>
+    </div>
   );
 }
 

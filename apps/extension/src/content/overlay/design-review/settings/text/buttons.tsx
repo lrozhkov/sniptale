@@ -22,7 +22,7 @@ function ToggleButton(props: {
       disabled={props.disabled}
       data-active={props.active}
       className={[
-        'inline-flex h-8 w-8 items-center justify-center rounded-[8px] border transition',
+        'inline-flex h-7 w-7 items-center justify-center rounded-[7px] border transition',
         'border-[color:var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
         'hover:bg-[var(--sniptale-color-surface-hover)] disabled:opacity-45',
         'data-[active=true]:border-[color:var(--sniptale-color-accent)]',
@@ -43,7 +43,7 @@ function IconButtonRow(props: {
   onReset: () => void;
 }) {
   return (
-    <div className="group/section-row grid gap-1">
+    <div className="group/section-row grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-2">
       <div className="flex min-h-5 items-center justify-between gap-2">
         <span
           className={[

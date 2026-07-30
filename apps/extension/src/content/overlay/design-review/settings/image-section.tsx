@@ -1,7 +1,6 @@
 import { translate } from '../../../../platform/i18n';
 import { SelectField } from './choice-fields';
-import { changedSummary, countModified, fieldState } from './helpers';
-import { Section } from './section';
+import { fieldState } from './helpers';
 import { CssTextField } from './text-fields';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 
@@ -21,42 +20,15 @@ function getObjectFitOptions() {
   ];
 }
 
-function ImageSelectionPreview(props: { state: DesignReviewViewState }) {
-  const element = props.state.selection?.element;
-  if (!(element instanceof HTMLImageElement) || (!element.currentSrc && !element.src)) {
-    return null;
-  }
-
-  return (
-    <div
-      className={[
-        'relative aspect-[16/9] overflow-hidden rounded-[10px] border',
-        'border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)]',
-      ].join(' ')}
-    >
-      <img
-        alt=""
-        className="h-full w-full object-contain"
-        draggable={false}
-        src={element.currentSrc || element.src}
-      />
-    </div>
-  );
-}
-
 export function ImageSection({ actions, disabled, state }: ImageSectionProps) {
   if (state.selection?.kind !== 'image') {
     return null;
   }
 
   return (
-    <Section
-      title={translate('content.designReview.sectionImage')}
-      summary={changedSummary(countModified(state, ['object-fit', 'object-position']))}
-    >
-      <ImageSelectionPreview state={state} />
+    <div className="grid gap-2" data-ui="content.design-review.settings-image">
       <ImageFitFields actions={actions} disabled={disabled} state={state} />
-    </Section>
+    </div>
   );
 }
 

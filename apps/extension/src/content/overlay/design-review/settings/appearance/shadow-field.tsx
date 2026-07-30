@@ -1,7 +1,7 @@
 import { CompactColorSelector } from '../../../../../ui/color-selector';
 import { CompactInput, CompactSelect } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
-import { Field, PAGE_STYLE_SELECT_CLASS_NAME } from '../field-shell';
+import { Field, PAGE_STYLE_CONTROL_CLASS_NAME, PAGE_STYLE_SELECT_CLASS_NAME } from '../field-shell';
 import {
   createDefaultBoxShadow,
   resolveCssBoxShadow,
@@ -123,7 +123,7 @@ function ShadowPreview(props: { model: ShadowFieldModel }) {
     <div
       aria-hidden="true"
       className={[
-        'h-10 rounded-[10px] border bg-[var(--sniptale-color-surface-panel)]',
+        'h-8 rounded-[7px] border bg-[var(--sniptale-color-surface-panel)]',
         'border-[color:var(--sniptale-color-border-soft)]',
       ].join(' ')}
       style={{
@@ -187,6 +187,7 @@ function ShadowLengthInput(props: {
   return (
     <CompactInput
       aria-label={props.label}
+      className={PAGE_STYLE_CONTROL_CLASS_NAME}
       disabled={props.disabled}
       inputMode="decimal"
       value={props.value.replace(/px$/, '')}

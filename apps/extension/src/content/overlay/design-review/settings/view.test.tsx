@@ -62,9 +62,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('keeps compact localized section navigation and renders only the active settings group', () => {
+it('uses compact non-collapsible navigation and renders only the active logical group', () => {
   act(() => root.render(<DesignReviewSettings actions={actions} disabled={false} state={state} />));
 
+  const navigation = container.querySelector('nav');
+  expect(navigation?.querySelectorAll('button')).toHaveLength(4);
+  expect(container.querySelector('details')).toBeNull();
+  expect(container.querySelector('summary')).toBeNull();
   expect(container.textContent).toContain('Цвет');
   expect(container.textContent).not.toContain('Ширина');
 
@@ -76,5 +80,58 @@ it('keeps compact localized section navigation and renders only the active setti
   expect(container.textContent).toContain('Ширина');
   expect(container.textContent).toContain('Высота');
   expect(container.textContent).not.toContain('Цвет');
+  expect(container.querySelectorAll('[data-ui="content.design-review.side-field"]')).toHaveLength(
+    2
+  );
+  expect(container.querySelector('[data-ui="content.design-review.side-values"]')).toBeNull();
+  expect(container.querySelector('[data-ui="content.design-review.field"]')?.className).toContain(
+    'grid-cols-[7rem_minmax(0,1fr)]'
+  );
   expect(container.querySelector('input[type="file"]')).toBeNull();
+});
+
+it('separates fill effects from borders so each section stays focused', () => {
+  act(() => root.render(<DesignReviewSettings actions={actions} disabled={false} state={state} />));
+
+  const appearanceButton = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="Фон и эффекты"]'
+  );
+  act(() => appearanceButton?.click());
+  expect(container.textContent).toContain('Цвет фона');
+  expect(container.textContent).toContain('Тень');
+  expect(container.textContent).not.toContain('Толщина');
+
+  const borderButton = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="Границы и скругление"]'
+  );
+  act(() => borderButton?.click());
+  expect(container.textContent).toContain('Толщина');
+  expect(container.textContent).toContain('Цвет рамки');
+  expect(container.textContent).toContain('Скругление');
+  expect(container.textContent).not.toContain('Цвет фона');
+});
+
+it('shows image layout properties without preview or asset-upload controls', () => {
+  const imageState: DesignReviewViewState = {
+    ...state,
+    selection: {
+      ...state.selection!,
+      element: document.createElement('img'),
+      kind: 'image',
+      tagName: 'img',
+    },
+  };
+  act(() =>
+    root.render(<DesignReviewSettings actions={actions} disabled={false} state={imageState} />)
+  );
+
+  expect(container.querySelector('nav')?.querySelectorAll('button')).toHaveLength(5);
+  expect(container.textContent).toContain('Вписывание');
+  expect(container.textContent).toContain('Позиция');
+  expect(container.querySelector('img')).toBeNull();
+  expect(container.querySelector('input[type="file"]')).toBeNull();
+
+  act(() => root.render(<DesignReviewSettings actions={actions} disabled={false} state={state} />));
+  expect(container.textContent).toContain('Цвет');
+  expect(container.textContent).not.toContain('Вписывание');
 });

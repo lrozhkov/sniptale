@@ -1,5 +1,5 @@
 import { CompactInput } from '../../../../ui/compact-inspector-controls';
-import { Field } from './field-shell';
+import { Field, PAGE_STYLE_CONTROL_CLASS_NAME } from './field-shell';
 
 function displayCssTextValue(value: string, emptyValues: readonly string[]): string {
   const normalized = value.trim().toLowerCase();
@@ -39,6 +39,7 @@ export function CssTextField(props: {
     >
       <CompactInput
         aria-label={props.label}
+        className={PAGE_STYLE_CONTROL_CLASS_NAME}
         disabled={props.disabled}
         placeholder={props.placeholder}
         value={displayedValue}

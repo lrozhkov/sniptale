@@ -1,8 +1,7 @@
 import { translate } from '../../../../../platform/i18n';
 import { ColorField } from '../choice-fields';
-import { Section } from '../section';
 import { NumericField } from '../numeric-field';
-import { changedSummary, countModified, fieldState } from '../helpers';
+import { fieldState } from '../helpers';
 import { TextAlignButtons, TextModeButtons } from '../text/buttons';
 import {
   getFontFamilyOptions,
@@ -18,27 +17,12 @@ type SectionProps = {
   state: DesignReviewViewState;
 };
 
-const TEXT_PROPERTIES = [
-  'color',
-  'font-style',
-  'font-family',
-  'font-weight',
-  'text-decoration',
-  'font-size',
-  'line-height',
-  'letter-spacing',
-  'text-align',
-] as const;
-
 export function TextSection({ actions, disabled, state }: SectionProps) {
   const change = actions.updateValue;
 
   return (
-    <Section
-      title={translate('content.designReview.sectionText')}
-      summary={changedSummary(countModified(state, TEXT_PROPERTIES))}
-    >
-      <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-3 gap-y-2">
+    <div className="grid gap-2" data-ui="content.design-review.settings-text">
+      <div className="grid gap-2">
         <TextModeButtons actions={actions} disabled={disabled} state={state} />
         <TextAlignButtons actions={actions} disabled={disabled} state={state} />
       </div>
@@ -64,7 +48,7 @@ export function TextSection({ actions, disabled, state }: SectionProps) {
         />
         <TextNumericFields actions={actions} disabled={disabled} state={state} />
       </div>
-    </Section>
+    </div>
   );
 }
 

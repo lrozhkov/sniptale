@@ -7,10 +7,10 @@ import {
   splitCssLength,
   stepCssLength,
 } from './css-length';
-import { Field } from './field-shell';
+import { Field, PAGE_STYLE_CONTROL_CLASS_NAME } from './field-shell';
 
 const NUMERIC_STEPPER_CLASS_NAME = [
-  'absolute right-1 top-1/2 grid h-8 w-6 -translate-y-1/2 overflow-hidden rounded-[7px]',
+  'absolute right-1 top-1/2 grid h-6 w-5 -translate-y-1/2 overflow-hidden rounded-[6px]',
   'border border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
   'opacity-0 transition-opacity group-hover/number:opacity-100 group-focus-within/number:opacity-100',
 ].join(' ');
@@ -91,7 +91,7 @@ function NumericFieldInput(props: NumericFieldProps) {
     <div className="group/number relative min-w-0">
       <CompactInput
         aria-label={props.label}
-        className={showUnit ? 'pr-16' : 'pr-8'}
+        className={`${PAGE_STYLE_CONTROL_CLASS_NAME} ${showUnit ? '!pr-14' : '!pr-7'}`}
         disabled={props.disabled}
         inputMode="decimal"
         value={inputValue}
@@ -121,7 +121,7 @@ function NumericUnitLabel(props: { unit: string }) {
     <span
       aria-hidden="true"
       className={[
-        'pointer-events-none absolute right-10 top-1/2 -translate-y-1/2',
+        'pointer-events-none absolute right-8 top-1/2 -translate-y-1/2',
         'text-[11px] font-semibold text-[var(--sniptale-color-text-dim)]',
       ].join(' ')}
     >

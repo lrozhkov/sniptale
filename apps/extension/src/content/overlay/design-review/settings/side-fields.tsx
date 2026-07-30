@@ -59,8 +59,8 @@ function SideToggleButton(props: {
       title={props.title}
       aria-label={props.title}
       className={[
-        props.linked ? '' : 'mt-5',
-        'inline-flex h-8 w-8 items-center justify-center rounded-[8px] border transition',
+        props.linked ? '' : 'mt-4',
+        'inline-flex h-8 w-8 items-center justify-center rounded-[7px] border transition',
         'border-[color:var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
         'hover:border-[color:var(--sniptale-color-accent)] hover:text-[var(--sniptale-color-accent)]',
       ].join(' ')}
@@ -220,11 +220,13 @@ export function LinkedSideFields(props: {
 
   return (
     <div
-      className="grid gap-2"
+      className="grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-2"
       data-ui="content.design-review.side-field"
       data-side-field-label={props.label}
     >
-      <SideFieldLabel label={props.label} modifiedCount={model.modifiedCount} />
+      <div className="pt-2">
+        <SideFieldLabel label={props.label} modifiedCount={model.modifiedCount} />
+      </div>
       <SideFieldInputs model={model} props={props} toggleTitle={toggleTitle} />
     </div>
   );
@@ -276,11 +278,15 @@ function createSideFieldModel(props: {
   state: DesignReviewViewState;
 }) {
   const fieldKey = createSideFieldKey(props.properties);
+  const explicitLinkState = props.linked ?? props.state.sideFieldLinks?.[fieldKey];
+  const sideValues = props.properties.map(
+    (property) => propertyValue(props.state, property) || props.state.defaultValues[property] || ''
+  );
   return {
     fieldKey,
     firstDefault: props.state.defaultValues[props.properties[0] as PageStyleProperty],
     firstValue: propertyValue(props.state, props.properties[0] as PageStyleProperty),
-    linked: props.linked ?? props.state.sideFieldLinks?.[fieldKey] ?? false,
+    linked: explicitLinkState ?? new Set(sideValues.map((value) => value.trim())).size <= 1,
     modifiedCount: props.properties.filter((property) => propertyModified(props.state, property))
       .length,
   };

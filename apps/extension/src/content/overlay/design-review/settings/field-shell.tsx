@@ -2,7 +2,8 @@ import { RotateCcw } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
 
-export const PAGE_STYLE_SELECT_CLASS_NAME = '!h-10 !rounded-[10px]';
+export const PAGE_STYLE_CONTROL_CLASS_NAME = '!h-8 !rounded-[7px] !px-2 !text-xs';
+export const PAGE_STYLE_SELECT_CLASS_NAME = PAGE_STYLE_CONTROL_CLASS_NAME;
 
 function fieldLabelClassName(modified: boolean): string {
   return [
@@ -23,11 +24,12 @@ export function Field(props: {
 }) {
   const modified = props.modified ?? false;
   return (
-    <label
+    <div
       data-ui="content.design-review.field"
       data-field-label={props.label}
       className={[
-        'group/field relative grid w-full min-w-0 max-w-full gap-1',
+        'group/field relative grid w-full min-w-0 max-w-full',
+        'grid-cols-[7rem_minmax(0,1fr)] items-center gap-2',
         props.className ?? '',
       ]
         .filter(Boolean)
@@ -57,8 +59,8 @@ export function Field(props: {
           ) : null}
         </span>
       </span>
-      {props.children}
-    </label>
+      <div className="min-w-0">{props.children}</div>
+    </div>
   );
 }
 

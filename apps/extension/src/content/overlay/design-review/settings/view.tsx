@@ -1,13 +1,14 @@
-import { Droplets, Image, Maximize2, Type } from 'lucide-react';
-import { useState, type ComponentType } from 'react';
+import { Droplets, Image, Maximize2, Square, Type } from 'lucide-react';
+import { useLayoutEffect, useState, type ComponentType } from 'react';
 import { translate, type TranslationKey } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { ImageSection } from './image-section';
 import { AppearanceSection } from './sections/appearance';
+import { BorderSection } from './sections/border';
 import { BoxSection } from './sections/frame';
 import { TextSection } from './sections/text';
 
-type SettingsSection = 'text' | 'layout' | 'appearance' | 'image';
+type SettingsSection = 'text' | 'layout' | 'appearance' | 'border' | 'image';
 
 type SectionOption = {
   icon: ComponentType<{ size?: number }>;
@@ -19,6 +20,7 @@ const BASE_SECTIONS: SectionOption[] = [
   { icon: Type, key: 'text', labelKey: 'content.designReview.sectionText' },
   { icon: Maximize2, key: 'layout', labelKey: 'content.designReview.sectionFrame' },
   { icon: Droplets, key: 'appearance', labelKey: 'content.designReview.sectionAppearance' },
+  { icon: Square, key: 'border', labelKey: 'content.designReview.sectionBorder' },
 ];
 
 function SettingsContent(props: {
@@ -34,6 +36,8 @@ function SettingsContent(props: {
       return <BoxSection {...props} />;
     case 'appearance':
       return <AppearanceSection {...props} />;
+    case 'border':
+      return <BorderSection {...props} />;
     case 'image':
       return <ImageSection {...props} />;
   }
@@ -53,8 +57,12 @@ export function DesignReviewSettings(props: {
     : BASE_SECTIONS;
   const [section, setSection] = useState<SettingsSection>(imageSelected ? 'image' : 'text');
 
+  useLayoutEffect(() => {
+    setSection(imageSelected ? 'image' : 'text');
+  }, [imageSelected, props.state.selection?.element]);
+
   return (
-    <div className="grid min-h-52 grid-cols-[3rem_minmax(0,1fr)]">
+    <div className="grid min-h-40 grid-cols-[3rem_minmax(0,1fr)]">
       <nav
         className="grid content-start gap-1 border-r border-[color:var(--sniptale-color-border-soft)] p-1.5"
         aria-label={translate('content.designReview.settingsNavigation')}
@@ -81,7 +89,7 @@ export function DesignReviewSettings(props: {
           );
         })}
       </nav>
-      <div className="min-w-0 p-3">
+      <div className="min-w-0 p-2.5">
         <SettingsContent {...props} section={section} />
       </div>
     </div>

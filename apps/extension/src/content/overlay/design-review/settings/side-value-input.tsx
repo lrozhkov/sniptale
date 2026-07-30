@@ -10,7 +10,7 @@ import {
   splitCssLength,
   stepCssLength,
 } from './css-length';
-import { PAGE_STYLE_SELECT_CLASS_NAME } from './field-shell';
+import { PAGE_STYLE_CONTROL_CLASS_NAME, PAGE_STYLE_SELECT_CLASS_NAME } from './field-shell';
 
 type SideValueKind = 'color' | 'length' | 'select' | 'text';
 
@@ -117,6 +117,7 @@ function SideTextInput(props: {
   return (
     <CompactInput
       aria-label={props.ariaLabel}
+      className={PAGE_STYLE_CONTROL_CLASS_NAME}
       disabled={props.disabled}
       value={props.value}
       onChange={(event) => props.onChange(event.currentTarget.value)}
@@ -144,7 +145,7 @@ function SideLengthInput(props: {
     <div className="group/side-number relative min-w-0">
       <CompactInput
         aria-label={props.ariaLabel}
-        className={showUnit ? 'pr-14' : 'pr-7'}
+        className={`${PAGE_STYLE_CONTROL_CLASS_NAME} ${showUnit ? '!pr-12' : '!pr-6'}`}
         disabled={props.disabled}
         inputMode="decimal"
         value={inputValue}
@@ -167,7 +168,7 @@ function SideLengthUnit({ unit }: { unit: string }) {
     <span
       aria-hidden="true"
       className={[
-        'pointer-events-none absolute right-9 top-1/2 -translate-y-1/2',
+        'pointer-events-none absolute right-7 top-1/2 -translate-y-1/2',
         'text-[10px] font-semibold text-[var(--sniptale-color-text-dim)]',
       ].join(' ')}
     >
@@ -186,7 +187,7 @@ function SideLengthStepper(props: {
   return (
     <div
       className={[
-        'absolute right-1 top-1/2 grid h-8 w-5 -translate-y-1/2 overflow-hidden rounded-[7px]',
+        'absolute right-1 top-1/2 grid h-6 w-4 -translate-y-1/2 overflow-hidden rounded-[6px]',
         'border border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
         'opacity-0 transition-opacity',
         'group-hover/side-number:opacity-100 group-focus-within/side-number:opacity-100',

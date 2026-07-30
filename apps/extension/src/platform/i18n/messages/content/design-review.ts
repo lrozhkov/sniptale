@@ -45,10 +45,6 @@ export const contentDesignReviewMessages = defineMessageSource({
     ru: 'Путь появится после выбора блока',
     en: 'Path appears after selecting a block',
   },
-  computedSummary: {
-    ru: 'вычислено',
-    en: 'computed',
-  },
   commentLabel: {
     ru: 'Комментарий к элементу',
     en: 'Element comment',
@@ -69,14 +65,6 @@ export const contentDesignReviewMessages = defineMessageSource({
     ru: 'Не удалось сохранить комментарий. Текст сохранён в поле — попробуйте ещё раз.',
     en: 'The comment could not be saved. Your draft is still here; try again.',
   },
-  changedSummarySuffix: {
-    ru: 'изменено',
-    en: 'changed',
-  },
-  unsupportedSummary: {
-    ru: 'не применимо',
-    en: 'not applicable',
-  },
   resetProperty: {
     ru: 'сбросить',
     en: 'reset',
@@ -85,33 +73,17 @@ export const contentDesignReviewMessages = defineMessageSource({
     ru: 'Текст',
     en: 'Text',
   },
-  sectionBox: {
-    ru: 'Размер и отступы',
-    en: 'Size and spacing',
-  },
   sectionFrame: {
     ru: 'Размер и отступы',
     en: 'Size and spacing',
   },
   sectionBorder: {
-    ru: 'Рамка',
-    en: 'Border',
-  },
-  sectionBackground: {
-    ru: 'Фон',
-    en: 'Background',
+    ru: 'Границы и скругление',
+    en: 'Borders and corners',
   },
   sectionAppearance: {
-    ru: 'Оформление',
-    en: 'Appearance',
-  },
-  appearanceFillGroup: {
-    ru: 'Заливка',
-    en: 'Fill',
-  },
-  appearanceBorderGroup: {
-    ru: 'Рамка',
-    en: 'Border',
+    ru: 'Фон и эффекты',
+    en: 'Fill and effects',
   },
   sectionImage: {
     ru: 'Изображение',
@@ -150,7 +122,7 @@ export const contentDesignReviewMessages = defineMessageSource({
     en: 'Line height',
   },
   letterSpacing: {
-    ru: 'Межбуквенный',
+    ru: 'Интервал букв',
     en: 'Letter spacing',
   },
   textAlign: {
@@ -166,11 +138,11 @@ export const contentDesignReviewMessages = defineMessageSource({
     en: 'Height',
   },
   margin: {
-    ru: 'Внешние',
+    ru: 'Внешние отступы',
     en: 'Margin',
   },
   padding: {
-    ru: 'Внутренние',
+    ru: 'Внутренние отступы',
     en: 'Padding',
   },
   borderWidth: {
