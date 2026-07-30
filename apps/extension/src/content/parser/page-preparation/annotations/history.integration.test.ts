@@ -6,7 +6,7 @@ import { createFrameDataFixture } from '../../../selection/frame-runtime/test-su
 import { createPagePreparationHistoryStore } from '../history/store';
 import type { FrameSessionSnapshot, PagePreparationSessionSnapshot } from '../history/types';
 import { createBrowserAnnotationSession } from './session';
-import type { BrowserAnnotationTargetEvidence } from './types';
+import type { BrowserAnnotationTargetEvidence, BrowserFrameAnnotationInput } from './types';
 
 function createEvidence(locator: string): BrowserAnnotationTargetEvidence {
   return {
@@ -34,6 +34,21 @@ function createFrameSnapshot(frameIds: readonly string[] = []): FrameSessionSnap
     sessionFocusSettings: { opacity: 0.5, showBorder: false },
     sessionStepBadgeTemplate: null,
     stepBadgeOrder: [],
+  };
+}
+
+function createFrameInput(
+  frameId: string,
+  overrides: Partial<BrowserFrameAnnotationInput> = {}
+): BrowserFrameAnnotationInput {
+  return {
+    borderPresetName: 'Review',
+    frameId,
+    kind: 'free',
+    pageUrl: 'https://example.test/page',
+    rect: { height: 80, width: 120, x: 10, y: 20 },
+    viewport: { height: 720, width: 1280 },
+    ...overrides,
   };
 }
 
@@ -90,36 +105,46 @@ describe('browser annotation history integration', () => {
 
     store.beginTransaction('add-frame');
     frameSession = createFrameSnapshot(['frame-1']);
-    session.syncFrameIds(['frame-1']);
+    session.syncFrames([createFrameInput('frame-1', { comment: 'First' })]);
     store.commitTransaction('add-frame');
     expect(session.captureSnapshot().frameOrders).toEqual([
-      { creationOrder: 1, frameId: 'frame-1' },
+      expect.objectContaining({
+        comment: 'First',
+        creationOrder: 1,
+        frameId: 'frame-1',
+        frameName: 'Frame 1',
+      }),
     ]);
 
     store.beginTransaction('remove-frame');
     frameSession = createFrameSnapshot();
-    session.syncFrameIds([]);
+    session.syncFrames([]);
     store.commitTransaction('remove-frame');
 
     store.beginTransaction('re-add-frame');
     frameSession = createFrameSnapshot(['frame-1']);
-    session.syncFrameIds(['frame-1']);
+    session.syncFrames([createFrameInput('frame-1', { comment: 'Again' })]);
     store.commitTransaction('re-add-frame');
     expect(session.captureSnapshot().frameOrders).toEqual([
-      { creationOrder: 2, frameId: 'frame-1' },
+      expect.objectContaining({
+        comment: 'Again',
+        creationOrder: 2,
+        frameId: 'frame-1',
+        frameName: 'Frame 2',
+      }),
     ]);
 
     store.undo();
     expect(session.captureSnapshot().frameOrders).toEqual([]);
     store.undo();
     expect(session.captureSnapshot().frameOrders).toEqual([
-      { creationOrder: 1, frameId: 'frame-1' },
+      expect.objectContaining({ comment: 'First', creationOrder: 1, frameName: 'Frame 1' }),
     ]);
     store.redo();
     expect(session.captureSnapshot().frameOrders).toEqual([]);
     store.redo();
     expect(session.captureSnapshot().frameOrders).toEqual([
-      { creationOrder: 2, frameId: 'frame-1' },
+      expect.objectContaining({ comment: 'Again', creationOrder: 2, frameName: 'Frame 2' }),
     ]);
   });
 });

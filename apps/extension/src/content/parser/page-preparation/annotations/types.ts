@@ -61,14 +61,34 @@ export interface BrowserDomAnnotationRecord {
   textChange?: BrowserAnnotationTextChange;
 }
 
-export interface BrowserFrameAnnotationOrder {
-  creationOrder: number;
+export interface BrowserFrameAnnotationRect {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+}
+
+export interface BrowserFrameAnnotationInput {
+  borderPresetName?: string;
+  comment?: string;
   frameId: string;
+  kind: 'free' | 'linked';
+  linkedElementSelector?: string;
+  pageUrl: string;
+  /** Visible box captured after the last evidence-relevant user frame command committed. */
+  rect: BrowserFrameAnnotationRect;
+  /** Viewport observed with `rect`; automatic host-layout reflow does not rewrite either field. */
+  viewport: BrowserAnnotationViewport;
+}
+
+export interface BrowserFrameAnnotationRecord extends BrowserFrameAnnotationInput {
+  creationOrder: number;
+  frameName: string;
 }
 
 export interface BrowserAnnotationSessionSnapshot {
   domRecords: BrowserDomAnnotationRecord[];
-  frameOrders: BrowserFrameAnnotationOrder[];
+  frameOrders: BrowserFrameAnnotationRecord[];
   nextAnnotationId: number;
   nextCommentMarker: number;
   nextCreationOrder: number;

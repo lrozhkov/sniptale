@@ -11,7 +11,8 @@ import {
   type BrowserAnnotationTextChangeInput,
   type BrowserAnnotationTextChangesInput,
   type BrowserDomAnnotationRecord,
-  type BrowserFrameAnnotationOrder,
+  type BrowserFrameAnnotationInput,
+  type BrowserFrameAnnotationRecord,
 } from './types';
 
 const logger = createLogger({ namespace: 'ContentBrowserAnnotationSession' });
@@ -20,7 +21,7 @@ type BrowserAnnotationListener = () => void;
 
 interface BrowserAnnotationRuntimeState {
   domRecords: Map<number, BrowserDomAnnotationRecord>;
-  frameOrders: Map<string, BrowserFrameAnnotationOrder>;
+  frameOrders: Map<string, BrowserFrameAnnotationRecord>;
   knownTargets: Map<number, Element>;
   listeners: Set<BrowserAnnotationListener>;
   liveAnnotationIds: WeakMap<Element, number>;
@@ -72,12 +73,20 @@ function cloneDomRecord(record: BrowserDomAnnotationRecord): BrowserDomAnnotatio
   };
 }
 
+function cloneFrameRecord(record: BrowserFrameAnnotationRecord): BrowserFrameAnnotationRecord {
+  return {
+    ...record,
+    rect: { ...record.rect },
+    viewport: { ...record.viewport },
+  };
+}
+
 function createSnapshot(state: BrowserAnnotationRuntimeState): BrowserAnnotationSessionSnapshot {
   return {
     domRecords: Array.from(state.domRecords.values(), cloneDomRecord).sort(
       (left, right) => left.creationOrder - right.creationOrder
     ),
-    frameOrders: Array.from(state.frameOrders.values(), (entry) => ({ ...entry })).sort(
+    frameOrders: Array.from(state.frameOrders.values(), cloneFrameRecord).sort(
       (left, right) => left.creationOrder - right.creationOrder
     ),
     nextAnnotationId: state.nextAnnotationId,
@@ -283,8 +292,33 @@ function setComment(
   return record.commentMarker;
 }
 
-function syncFrameIds(state: BrowserAnnotationRuntimeState, frameIds: readonly string[]): void {
-  const nextIds = new Set(frameIds);
+function frameRecordsEqual(
+  left: BrowserFrameAnnotationRecord,
+  right: BrowserFrameAnnotationRecord
+): boolean {
+  return (
+    left.borderPresetName === right.borderPresetName &&
+    left.comment === right.comment &&
+    left.frameId === right.frameId &&
+    left.kind === right.kind &&
+    left.linkedElementSelector === right.linkedElementSelector &&
+    left.pageUrl === right.pageUrl &&
+    left.rect.height === right.rect.height &&
+    left.rect.width === right.rect.width &&
+    left.rect.x === right.rect.x &&
+    left.rect.y === right.rect.y &&
+    left.viewport.height === right.viewport.height &&
+    left.viewport.width === right.viewport.width
+  );
+}
+
+function syncFrames(
+  state: BrowserAnnotationRuntimeState,
+  inputs: readonly BrowserFrameAnnotationInput[],
+  updatedFrameIds: readonly string[] = inputs.map((input) => input.frameId)
+): void {
+  const nextIds = new Set(inputs.map((input) => input.frameId));
+  const updatedIds = new Set(updatedFrameIds);
   let changed = false;
 
   state.frameOrders.forEach((_entry, frameId) => {
@@ -294,13 +328,32 @@ function syncFrameIds(state: BrowserAnnotationRuntimeState, frameIds: readonly s
     }
   });
 
-  frameIds.forEach((frameId) => {
-    if (state.frameOrders.has(frameId)) {
+  inputs.forEach((input) => {
+    const existing = state.frameOrders.get(input.frameId);
+    if (!updatedIds.has(input.frameId)) {
       return;
     }
-    state.frameOrders.set(frameId, {
-      creationOrder: state.nextCreationOrder,
-      frameId,
+    if (existing) {
+      const next = {
+        ...input,
+        creationOrder: existing.creationOrder,
+        frameName: existing.frameName,
+        rect: { ...input.rect },
+        viewport: { ...input.viewport },
+      };
+      if (!frameRecordsEqual(existing, next)) {
+        state.frameOrders.set(input.frameId, next);
+        changed = true;
+      }
+      return;
+    }
+    const creationOrder = state.nextCreationOrder;
+    state.frameOrders.set(input.frameId, {
+      ...input,
+      creationOrder,
+      frameName: `Frame ${creationOrder}`,
+      rect: { ...input.rect },
+      viewport: { ...input.viewport },
     });
     state.nextCreationOrder += 1;
     changed = true;
@@ -309,6 +362,12 @@ function syncFrameIds(state: BrowserAnnotationRuntimeState, frameIds: readonly s
   if (changed) {
     publish(state);
   }
+}
+
+function cloneFrameRecords(
+  records: BrowserFrameAnnotationRecord[]
+): Map<string, BrowserFrameAnnotationRecord> {
+  return new Map(records.map((entry) => [entry.frameId, cloneFrameRecord(entry)]));
 }
 
 function applySnapshot(
@@ -334,7 +393,7 @@ function applySnapshot(
   });
 
   state.domRecords = nextRecords;
-  state.frameOrders = new Map(snapshot.frameOrders.map((entry) => [entry.frameId, { ...entry }]));
+  state.frameOrders = cloneFrameRecords(snapshot.frameOrders);
   state.liveAnnotationIds = nextLiveAnnotationIds;
   state.nextAnnotationId = nextAnnotationId;
   state.nextCommentMarker = nextCommentMarker;
@@ -393,7 +452,10 @@ export function createBrowserAnnotationSession() {
       state.listeners.add(listener);
       return () => state.listeners.delete(listener);
     },
-    syncFrameIds: (frameIds: readonly string[]): void => syncFrameIds(state, frameIds),
+    syncFrames: (
+      inputs: readonly BrowserFrameAnnotationInput[],
+      updatedFrameIds?: readonly string[]
+    ): void => syncFrames(state, inputs, updatedFrameIds),
   };
 }
 

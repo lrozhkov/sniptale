@@ -17,5 +17,7 @@ export {
   type BrowserAnnotationTextChangesInput,
   type BrowserAnnotationViewport,
   type BrowserDomAnnotationRecord,
-  type BrowserFrameAnnotationOrder,
+  type BrowserFrameAnnotationInput,
+  type BrowserFrameAnnotationRecord,
+  type BrowserFrameAnnotationRect,
 } from './types';

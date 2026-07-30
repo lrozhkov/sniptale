@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { createBrowserAnnotationSession } from './session';
-import type { BrowserAnnotationTargetEvidence } from './types';
+import type { BrowserAnnotationTargetEvidence, BrowserFrameAnnotationInput } from './types';
 
 function createEvidence(selector = '#target'): BrowserAnnotationTargetEvidence {
   return {
@@ -21,6 +21,21 @@ function createEvidence(selector = '#target'): BrowserAnnotationTargetEvidence {
 
 function createTarget(): Element {
   return document.createElement('button');
+}
+
+function createFrameInput(
+  frameId: string,
+  overrides: Partial<BrowserFrameAnnotationInput> = {}
+): BrowserFrameAnnotationInput {
+  return {
+    borderPresetName: 'Review',
+    frameId,
+    kind: 'free',
+    pageUrl: 'https://example.test/page',
+    rect: { height: 80, width: 120, x: 10, y: 20 },
+    viewport: { height: 720, width: 1280 },
+    ...overrides,
+  };
 }
 
 function createPropertyChange(args: {
@@ -266,15 +281,56 @@ describe('browser annotation session live identity', () => {
 });
 
 describe('browser annotation session lifecycle', () => {
-  it('tracks frame creation order and removes missing frames', () => {
+  it('keeps historical frame evidence when the current command did not change that frame', () => {
     const session = createBrowserAnnotationSession();
-    session.syncFrameIds(['frame-1', 'frame-2']);
-    session.syncFrameIds(['frame-2', 'frame-3']);
+    const captured = createFrameInput('frame-1');
+    const liveDrift = createFrameInput('frame-1', {
+      rect: { height: 80, width: 120, x: 50, y: 20 },
+    });
+
+    session.syncFrames([captured]);
+    session.syncFrames([liveDrift], []);
 
     expect(session.captureSnapshot().frameOrders).toEqual([
-      { creationOrder: 2, frameId: 'frame-2' },
-      { creationOrder: 3, frameId: 'frame-3' },
+      expect.objectContaining({ frameId: 'frame-1', rect: captured.rect }),
     ]);
+
+    session.syncFrames([], []);
+    expect(session.captureSnapshot().frameOrders).toEqual([]);
+  });
+
+  it('tracks frame order and replaces only factual comment, preset, locator, and geometry evidence', () => {
+    const session = createBrowserAnnotationSession();
+    const listener = vi.fn();
+    const first = createFrameInput('frame-1');
+    const second = createFrameInput('frame-2', { comment: 'Original' });
+    session.subscribe(listener);
+
+    session.syncFrames([first, second]);
+    session.syncFrames([first, second]);
+    const updatedSecond = createFrameInput('frame-2', {
+      kind: 'linked',
+      linkedElementSelector: '#replacement',
+      rect: { height: 140, width: 220, x: 30, y: 40 },
+    });
+    delete updatedSecond.borderPresetName;
+    session.syncFrames([updatedSecond, createFrameInput('frame-3')]);
+
+    expect(session.captureSnapshot().frameOrders).toEqual([
+      {
+        ...updatedSecond,
+        creationOrder: 2,
+        frameName: 'Frame 2',
+      },
+      {
+        ...createFrameInput('frame-3'),
+        creationOrder: 3,
+        frameName: 'Frame 3',
+      },
+    ]);
+    expect(session.captureSnapshot().frameOrders[0]).not.toHaveProperty('comment');
+    expect(session.captureSnapshot().frameOrders[0]).not.toHaveProperty('borderPresetName');
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 
   it('publishes real mutations, isolates evidence, and resets the document session', () => {

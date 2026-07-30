@@ -20,7 +20,7 @@ import {
   DEFAULT_BLUR_SETTINGS,
   DEFAULT_FOCUS_SETTINGS,
 } from '../../../../features/highlighter/style/defaults';
-import type { FrameManagerRefs } from '../contracts';
+import type { FrameManagerRefs, FrameSetter } from '../contracts';
 import { createFrameHostLayoutService } from '../host-layout/service';
 
 /**
@@ -97,6 +97,18 @@ export function syncFrameManagerStateRefs(
   }
 
   refs.globalStepBadgeAutoModeRef.current = refs.globalStepBadgeSettingsRef.current.autoMode;
+}
+
+/** Keeps the imperative frame authority factual before React projects the same immutable array. */
+export function createSynchronizedFrameSetter(
+  setFrames: FrameSetter,
+  framesRef: FrameManagerRefs['framesRef']
+): FrameSetter {
+  return (update) => {
+    const nextFrames = typeof update === 'function' ? update(framesRef.current) : update;
+    framesRef.current = nextFrames;
+    setFrames(nextFrames);
+  };
 }
 
 /**

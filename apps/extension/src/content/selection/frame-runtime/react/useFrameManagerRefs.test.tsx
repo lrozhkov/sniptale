@@ -5,7 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { FrameManagerRefs } from '../contracts';
 import { DEFAULT_BLUR_SETTINGS } from '../../../../features/highlighter/style/defaults';
-import { useFrameManagerRefs } from './useFrameManagerRefs';
+import { createFrameDataFixture } from '../test-support';
+import { createSynchronizedFrameSetter, useFrameManagerRefs } from './useFrameManagerRefs';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -53,4 +54,21 @@ it('creates independent tab-session settings refs from built-in fallbacks', asyn
     DEFAULT_BLUR_SETTINGS.amount
   );
   expect(secondRefs.sessionSettingsRefs.defaultsInitialized.current).toBe(false);
+});
+
+it('updates the imperative frame authority before projecting React state', () => {
+  const before = [createFrameDataFixture('before')];
+  const after = [createFrameDataFixture('after')];
+  const framesRef = { current: before };
+  const setFrameState = vi.fn(() => {
+    expect(framesRef.current).toBe(after);
+  });
+  const setFrames = createSynchronizedFrameSetter(setFrameState, framesRef);
+  const updater = vi.fn(() => after);
+
+  setFrames(updater);
+
+  expect(updater).toHaveBeenCalledWith(before);
+  expect(framesRef.current).toBe(after);
+  expect(setFrameState).toHaveBeenCalledWith(after);
 });
