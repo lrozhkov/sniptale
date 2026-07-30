@@ -155,23 +155,6 @@ async function expectStableShowToolbarCallback() {
   expect(props.visibilityState.setPinnedToolbarVisible).toHaveBeenCalledWith(true);
 }
 
-async function expectPagePreparationHistoryReset() {
-  const props = createBindingsProps();
-
-  await renderBindings(props);
-  expect(clearHistoryMock).not.toHaveBeenCalled();
-
-  await renderBindings({
-    ...props,
-    modeFlags: {
-      ...props.modeFlags,
-      screenshotMode: false,
-    },
-  });
-
-  expect(clearHistoryMock).toHaveBeenCalledTimes(1);
-}
-
 async function expectLatestFrameManagerCallbackRouting() {
   const frameMocks = createFrameManagerCallbackMocks();
   const element = document.createElement('div');
@@ -297,10 +280,6 @@ function runUseContentAppBindingsSuite() {
   it(
     'passes a stable show-toolbar callback across parent rerenders',
     expectStableShowToolbarCallback
-  );
-  it(
-    'clears page-preparation history when screenshot mode exits',
-    expectPagePreparationHistoryReset
   );
   it(
     'registers frame callbacks once and routes them through the latest frame-manager actions',

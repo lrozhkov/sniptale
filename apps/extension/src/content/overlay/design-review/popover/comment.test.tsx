@@ -116,7 +116,7 @@ it('binds the comment draft, marker number, blur commit, and IME lifecycle actio
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
 
   expect(textarea?.value).toBe('Review this');
-  expect(document.body.textContent).toContain('Комментарий №3');
+  expect(document.body.textContent).toContain('Замечание №3');
 
   act(() => {
     if (!textarea) return;

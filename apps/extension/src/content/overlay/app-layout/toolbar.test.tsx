@@ -142,10 +142,12 @@ function createToolbarProps(): ContentAppLayoutToolbarProps {
 }
 
 function createProps(): {
+  designReview: { panel: { open: boolean; toggle: () => void } };
   scenario: ContentAppLayoutScenarioProps;
   toolbar: ContentAppLayoutToolbarProps;
 } {
   return {
+    designReview: { panel: { open: false, toggle: vi.fn() } },
     scenario: createScenarioProps(),
     toolbar: createToolbarProps(),
   };

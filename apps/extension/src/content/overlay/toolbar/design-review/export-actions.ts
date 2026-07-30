@@ -1,3 +1,4 @@
+/** User-activated aggregate export commands owned by Design Review. */
 import { writeBrowserClipboardText } from '@sniptale/platform/browser/clipboard';
 import { isBrowserAnnotationsExportText } from '@sniptale/runtime-contracts/export';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';

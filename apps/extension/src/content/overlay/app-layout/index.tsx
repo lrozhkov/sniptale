@@ -41,8 +41,14 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
 
   return (
     <>
-      <ContentToolbarShell scenario={props.scenario} toolbar={props.toolbar} />
-      {isCaptureUiHidden ? null : <DesignReviewSurface controller={designReview} />}
+      <ContentToolbarShell
+        designReview={designReview}
+        scenario={props.scenario}
+        toolbar={props.toolbar}
+      />
+      {props.toolbar.modes.screenshotMode ? (
+        <DesignReviewSurface controller={designReview} showChrome={!isCaptureUiHidden} />
+      ) : null}
       <ContentScenarioRecorderSidebarSlot
         isCompletelyHidden={props.toolbar.isCompletelyHidden}
         modeController={props.toolbar.modeController}

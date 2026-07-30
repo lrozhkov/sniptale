@@ -52,6 +52,7 @@ function createComputedDeclaration(
 function createElementCode(element: Element): string {
   const id = element.id ? `#${element.id}` : '';
   const className = [...element.classList]
+    .filter((value) => !value.startsWith('sniptale-'))
     .slice(0, 2)
     .map((value) => `.${value}`)
     .join('');

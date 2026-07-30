@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import type { PageStyleSelectionSnapshot } from '../../../selection/design-review/snapshot';
+import { registerDesignReviewCommentDraftFinalizer } from './comment-draft-finalization';
 import { createPageStyleCommentDraftModel } from './comment-draft-model';
 
 type CommentDraftModel = ReturnType<typeof createPageStyleCommentDraftModel>;
@@ -71,6 +72,14 @@ export function usePageStyleCommentDraft(args: {
     }
   }, [args.open, model]);
 
+  useLayoutEffect(
+    () =>
+      registerDesignReviewCommentDraftFinalizer(() =>
+        applyCommentDraftResult(model.close(), setView)
+      ),
+    [model]
+  );
+
   useEffect(() => {
     const nextView = model.syncCommittedComment();
     if (nextView) {
@@ -88,7 +97,7 @@ export function usePageStyleCommentDraft(args: {
   return {
     commentCommitFailed: view.commitFailed,
     commentDraft: view.draft,
-    commentMarker: view.marker,
+    markerNumber: view.marker,
     closeComment,
     commitComment,
     endCommentComposition,

@@ -179,6 +179,10 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Выйти из режима снимка',
     en: 'Exit screenshot mode',
   },
+  screenshotDisableError: {
+    ru: 'Не удалось выйти из режима снимка. Повторите попытку.',
+    en: 'Could not exit screenshot mode. Try again.',
+  },
   screenshotEnable: {
     ru: 'Перейти в режим снимка',
     en: 'Enter screenshot mode',

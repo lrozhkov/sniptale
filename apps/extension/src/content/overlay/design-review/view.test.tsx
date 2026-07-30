@@ -4,11 +4,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 
 vi.mock('../annotation-markers/view', () => ({
-  BrowserAnnotationMarkers: () => <div data-ui="review-markers" />,
+  BrowserAnnotationMarkers: (props: { showChrome: boolean }) => (
+    <div data-show-chrome={String(props.showChrome)} data-ui="review-markers" />
+  ),
 }));
 
 vi.mock('./popover/view', () => ({
   DesignReviewPopover: () => <div data-ui="review-popover" />,
+}));
+
+vi.mock('./feedback-panel/view', () => ({
+  DesignReviewFeedbackPanel: () => <div data-ui="review-panel" />,
 }));
 
 vi.mock('./session/controller', () => ({
@@ -38,7 +44,14 @@ function createController(): ReturnType<typeof useDesignReviewController> {
       updateValue: vi.fn(),
       updateValues: vi.fn(),
     },
+    enabled: true,
     inspectorOpen: true,
+    panel: {
+      close: vi.fn(),
+      open: true,
+      openRecord: vi.fn(() => true),
+      toggle: vi.fn(),
+    },
     sessionRevision: 0,
     viewState: {
       action: 'refine',
@@ -64,8 +77,23 @@ function createController(): ReturnType<typeof useDesignReviewController> {
 }
 
 it('composes the review marker projection and popover on the extension-owned surface', () => {
-  const markup = renderToStaticMarkup(<DesignReviewSurface controller={createController()} />);
+  const markup = renderToStaticMarkup(
+    <DesignReviewSurface controller={createController()} showChrome />
+  );
 
   expect(markup).toContain('data-ui="review-markers"');
+  expect(markup).toContain('data-show-chrome="true"');
+  expect(markup).toContain('data-ui="review-panel"');
   expect(markup).toContain('data-ui="review-popover"');
+});
+
+it('keeps markers while screenshot chrome hides the panel and popover', () => {
+  const markup = renderToStaticMarkup(
+    <DesignReviewSurface controller={createController()} showChrome={false} />
+  );
+
+  expect(markup).toContain('data-ui="review-markers"');
+  expect(markup).toContain('data-show-chrome="false"');
+  expect(markup).not.toContain('data-ui="review-panel"');
+  expect(markup).not.toContain('data-ui="review-popover"');
 });

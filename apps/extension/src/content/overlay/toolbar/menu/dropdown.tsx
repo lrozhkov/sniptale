@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-  resolveToolbarFloatingMenuStyle,
-  resolveToolbarMenuPlacement,
-} from '../menu/floating.helpers';
+import { resolveToolbarFloatingMenuStyle, resolveToolbarMenuPlacement } from './floating.helpers';
 
 type ToolbarDropdownPlacementArgs = {
   anchorRef: React.RefObject<HTMLButtonElement | null>;
@@ -50,15 +47,17 @@ export function ToolbarMenuDropdown(props: {
   );
 }
 
+type ToolbarMenuClickEvent = Pick<React.MouseEvent, 'preventDefault' | 'stopPropagation'>;
+
 export function createToolbarMenuItemClickHandler(onSelect: () => void) {
-  return (event: React.MouseEvent) => {
+  return (event: ToolbarMenuClickEvent) => {
     event.stopPropagation();
     event.preventDefault();
     onSelect();
   };
 }
 
-export function preventToolbarMenuClick(event: React.MouseEvent) {
+export function preventToolbarMenuClick(event: ToolbarMenuClickEvent) {
   event.stopPropagation();
   event.preventDefault();
 }

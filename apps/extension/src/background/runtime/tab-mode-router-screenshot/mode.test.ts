@@ -401,6 +401,8 @@ describe('screenshot mode rollback and disable', () => {
     const current = state();
     await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner);
     const session = getScreenshotSurfaceSession(5)!;
+    mocks.releaseTabOwners.mockClear();
+    mocks.sendTabMessage.mockClear();
 
     await disableScreenshotModeForContent({
       leaseGeneration: session.activeLeaseGeneration,
@@ -415,8 +417,69 @@ describe('screenshot mode rollback and disable', () => {
     });
 
     expect(mocks.releaseTabOwners).toHaveBeenCalledWith(5, ['screenshot']);
+    expect(mocks.releaseTabOwners.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.sendTabMessage.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
     expect(getScreenshotSurfaceSession(5)).toBeNull();
     expect(current.screenshot.has(5)).toBe(false);
+  });
+
+  it('preserves content mode and session state when surface release fails before teardown', async () => {
+    const current = state();
+    await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner);
+    const session = getScreenshotSurfaceSession(5)!;
+    mocks.sendTabMessage.mockClear();
+    mocks.releaseTabOwners.mockRejectedValueOnce(new Error('surface release failed'));
+
+    await expect(
+      disableScreenshotModeForContent({
+        leaseGeneration: session.activeLeaseGeneration,
+        operationGeneration: session.lastOperationGeneration + 1,
+        screenshotModeState: current.screenshot,
+        senderDocumentId: 'document-a',
+        surfaceCapabilityToken: session.capabilityToken,
+        tabId: 5,
+        viewportOwnerState: current.owner,
+        viewportState: current.viewport,
+        webSnapshotViewerPorts: new Map(),
+      })
+    ).rejects.toThrow('surface release failed');
+
+    expect(mocks.sendTabMessage).not.toHaveBeenCalled();
+    expect(getScreenshotSurfaceSession(5)).not.toBeNull();
+    expect(current.screenshot.get(5)).toBe(true);
+    expect(current.owner.get(5)).toBe('capture-surface');
+    expect(mocks.apply).toHaveBeenCalledOnce();
+  });
+
+  it('preserves background session state when content rejects final teardown', async () => {
+    const current = state();
+    await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner);
+    const session = getScreenshotSurfaceSession(5)!;
+    mocks.sendTabMessage.mockClear();
+    mocks.sendTabMessage.mockResolvedValueOnce({
+      error: 'stale-target-state',
+      success: false,
+    });
+
+    await expect(
+      disableScreenshotModeForContent({
+        leaseGeneration: session.activeLeaseGeneration,
+        operationGeneration: session.lastOperationGeneration + 1,
+        screenshotModeState: current.screenshot,
+        senderDocumentId: 'document-a',
+        surfaceCapabilityToken: session.capabilityToken,
+        tabId: 5,
+        viewportOwnerState: current.owner,
+        viewportState: current.viewport,
+        webSnapshotViewerPorts: new Map(),
+      })
+    ).rejects.toThrow('stale-target-state');
+
+    expect(getScreenshotSurfaceSession(5)).not.toBeNull();
+    expect(current.screenshot.get(5)).toBe(true);
+    expect(current.owner.get(5)).toBe('capture-surface');
+    expect(mocks.apply).toHaveBeenCalledTimes(2);
   });
 
   it('rejects a stale document A disable without tearing down replacement session B', async () => {

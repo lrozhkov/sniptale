@@ -8,7 +8,11 @@ import {
   dispatchContentModeDisabled,
   dispatchContentModeEnabled,
 } from '../../platform/page-context/mode-events';
-import { startDesignReviewPicker, type DesignReviewSelection } from './picker';
+import {
+  startDesignReviewPicker,
+  type DesignReviewPickerRuntime,
+  type DesignReviewSelection,
+} from './picker';
 
 export interface DesignReviewModeState {
   enabled: boolean;
@@ -17,7 +21,7 @@ export interface DesignReviewModeState {
 
 type DesignReviewModeListener = () => void;
 
-let cleanupPicker: (() => void) | null = null;
+let pickerRuntime: DesignReviewPickerRuntime | null = null;
 let state: DesignReviewModeState = { enabled: false, selection: null };
 const listeners = new Set<DesignReviewModeListener>();
 
@@ -34,8 +38,8 @@ function disableDesignReviewModeInternal(dispatchDisabled: boolean): void {
   if (!state.enabled) {
     return;
   }
-  cleanupPicker?.();
-  cleanupPicker = null;
+  pickerRuntime?.dispose();
+  pickerRuntime = null;
   state = { enabled: false, selection: null };
   setContentModeEnabled('design-review', false);
   publish();
@@ -49,7 +53,7 @@ export function enableDesignReviewMode(): void {
     return;
   }
   deactivateOtherContentModes('design-review');
-  cleanupPicker = startDesignReviewPicker({
+  pickerRuntime = startDesignReviewPicker({
     onDisableRequested: () => disableDesignReviewModeInternal(true),
     onSelection: setSelection,
   });
@@ -57,6 +61,20 @@ export function enableDesignReviewMode(): void {
   setContentModeEnabled('design-review', true);
   publish();
   dispatchContentModeEnabled({ mode: 'design-review' });
+}
+
+export function openDesignReviewTarget(target: Element): boolean {
+  if (!state.enabled || !target.isConnected || !pickerRuntime) {
+    return false;
+  }
+  let current: Element | null = target;
+  let attempts = 0;
+  while (current && attempts < 10) {
+    attempts += 1;
+    current.scrollIntoView({ block: 'center', inline: 'center' });
+    current = current.ownerDocument.defaultView?.frameElement ?? null;
+  }
+  return pickerRuntime.selectElement(target);
 }
 
 export function disableDesignReviewMode(): void {

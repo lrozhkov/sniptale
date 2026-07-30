@@ -91,7 +91,9 @@ function hasInlineStyleOwner(element: Element): element is PageStyleMutationElem
   );
 }
 
-export function isPageStyleMutationElement(element: Element): element is PageStyleMutationElement {
+export function isPageStyleRestorationElement(
+  element: Element
+): element is PageStyleMutationElement {
   const namespace = element.namespaceURI;
   if (namespace !== HTML_NAMESPACE && namespace !== SVG_NAMESPACE) {
     return false;
@@ -108,5 +110,9 @@ export function isPageStyleMutationElement(element: Element): element is PageSty
     return false;
   }
 
-  return isRenderedElement(element);
+  return true;
+}
+
+export function isPageStyleMutationElement(element: Element): element is PageStyleMutationElement {
+  return isPageStyleRestorationElement(element) && isRenderedElement(element);
 }

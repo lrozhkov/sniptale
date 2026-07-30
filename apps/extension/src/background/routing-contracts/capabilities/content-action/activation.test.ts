@@ -4,6 +4,7 @@ import {
   CaptureMessageType,
   MessageType,
 } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { ContentPrivilegedActionType } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import {
   resetContentPrivilegedActionCapabilitiesForTests,
   routeContentPrivilegedActionActivationKeyRequest,
@@ -47,12 +48,13 @@ function requestActivationKey(sender: chrome.runtime.MessageSender) {
 function requestRuntimeToken(
   sender: chrome.runtime.MessageSender,
   activationKey: unknown,
+  actionType: ContentPrivilegedActionType = CaptureMessageType.CAPTURE_VISIBLE,
   response = vi.fn()
 ) {
   routeContentPrivilegedActionRuntimeTokenRequest(
     {
       activationProof: activationKey,
-      actionType: CaptureMessageType.CAPTURE_VISIBLE,
+      actionType,
       requestId: 'request-1',
       type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_RUNTIME_TOKEN,
     },
@@ -121,6 +123,19 @@ it('allows a sender to claim a new activation key after runtime token exchange c
     success: true,
   });
 });
+
+it.each([MessageType.DOWNLOAD_BROWSER_ANNOTATIONS, MessageType.OPEN_EXPORT_MODAL])(
+  'authorizes trusted-event activation for design review export action %s',
+  (actionType) => {
+    const sender = contentSender();
+    const activationKey = readActivationKey(requestActivationKey(sender));
+
+    expect(requestRuntimeToken(sender, activationKey, actionType).mock.calls[0]?.[0]).toEqual({
+      runtimeToken: { runtimeToken: 'content-token-1' },
+      success: true,
+    });
+  }
+);
 
 it('rejects forged activation proofs', () => {
   const sender = contentSender();

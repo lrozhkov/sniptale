@@ -27,8 +27,8 @@ interface BrowserAnnotationRuntimeState {
   listeners: Set<BrowserAnnotationListener>;
   liveAnnotationIds: WeakMap<Element, number>;
   nextAnnotationId: number;
-  nextCommentMarker: number;
   nextCreationOrder: number;
+  nextMarkerNumber: number;
   revision: number;
 }
 
@@ -40,8 +40,8 @@ function createEmptyRuntimeState(): BrowserAnnotationRuntimeState {
     listeners: new Set(),
     liveAnnotationIds: new WeakMap(),
     nextAnnotationId: 1,
-    nextCommentMarker: 1,
     nextCreationOrder: 1,
+    nextMarkerNumber: 1,
     revision: 0,
   };
 }
@@ -92,8 +92,8 @@ function createSnapshot(state: BrowserAnnotationRuntimeState): BrowserAnnotation
       (left, right) => left.creationOrder - right.creationOrder
     ),
     nextAnnotationId: state.nextAnnotationId,
-    nextCommentMarker: state.nextCommentMarker,
     nextCreationOrder: state.nextCreationOrder,
+    nextMarkerNumber: state.nextMarkerNumber,
     schemaVersion: BROWSER_ANNOTATION_SCHEMA_VERSION,
   };
 }
@@ -155,6 +155,27 @@ function removeEmptyRecord(
   }
 }
 
+function hasDesignReviewEvidence(record: BrowserDomAnnotationRecord): boolean {
+  return Boolean(
+    record.comment || record.designReview?.action || record.propertyChanges.length > 0
+  );
+}
+
+function syncDesignReviewMarker(
+  state: BrowserAnnotationRuntimeState,
+  record: BrowserDomAnnotationRecord
+): void {
+  if (hasDesignReviewEvidence(record)) {
+    if (record.markerNumber === undefined) {
+      record.markerNumber = state.nextMarkerNumber;
+      state.nextMarkerNumber += 1;
+    }
+    return;
+  }
+
+  delete record.markerNumber;
+}
+
 function setDesignReviewAction(
   state: BrowserAnnotationRuntimeState,
   input: BrowserDesignReviewActionInput
@@ -171,10 +192,11 @@ function setDesignReviewAction(
   record.evidence = cloneEvidence(input.evidence);
   if (input.action === null) {
     delete record.designReview;
-    removeEmptyRecord(state, record);
   } else {
     record.designReview = { action: input.action };
   }
+  syncDesignReviewMarker(state, record);
+  removeEmptyRecord(state, record);
   publish(state);
 }
 
@@ -192,8 +214,8 @@ function clearDesignReview(state: BrowserAnnotationRuntimeState, target: Element
   }
 
   delete record.comment;
-  delete record.commentMarker;
   delete record.designReview;
+  delete record.markerNumber;
   record.propertyChanges = [];
   removeEmptyRecord(state, record);
   publish(state);
@@ -263,6 +285,7 @@ function recordPropertyChanges(
   const record = existingRecord ?? createRecord(state, input);
   record.evidence = cloneEvidence(input.evidence);
   record.propertyChanges = nextChanges;
+  syncDesignReviewMarker(state, record);
   removeEmptyRecord(state, record);
   publish(state);
 }
@@ -321,26 +344,23 @@ function setComment(
     return null;
   }
   if (existingRecord?.comment === comment) {
-    return existingRecord.commentMarker ?? null;
+    return existingRecord.markerNumber ?? null;
   }
 
   const record = existingRecord ?? createRecord(state, input);
   record.evidence = cloneEvidence(input.evidence);
   if (comment === '') {
     delete record.comment;
-    delete record.commentMarker;
+    syncDesignReviewMarker(state, record);
     removeEmptyRecord(state, record);
     publish(state);
     return null;
   }
 
-  if (record.commentMarker === undefined) {
-    record.commentMarker = state.nextCommentMarker;
-    state.nextCommentMarker += 1;
-  }
   record.comment = comment;
+  syncDesignReviewMarker(state, record);
   publish(state);
-  return record.commentMarker;
+  return record.markerNumber ?? null;
 }
 
 function frameRecordsEqual(
@@ -429,8 +449,8 @@ function applySnapshot(
   const resolveAllocator = (current: number, captured: number) =>
     allocatorMode === 'exact' ? captured : Math.max(current, captured);
   const nextAnnotationId = resolveAllocator(state.nextAnnotationId, snapshot.nextAnnotationId);
-  const nextCommentMarker = resolveAllocator(state.nextCommentMarker, snapshot.nextCommentMarker);
   const nextCreationOrder = resolveAllocator(state.nextCreationOrder, snapshot.nextCreationOrder);
+  const nextMarkerNumber = resolveAllocator(state.nextMarkerNumber, snapshot.nextMarkerNumber);
   const nextRecords = new Map(
     snapshot.domRecords.map((record) => [record.annotationId, cloneDomRecord(record)])
   );
@@ -447,8 +467,8 @@ function applySnapshot(
   state.frameOrders = cloneFrameRecords(snapshot.frameOrders);
   state.liveAnnotationIds = nextLiveAnnotationIds;
   state.nextAnnotationId = nextAnnotationId;
-  state.nextCommentMarker = nextCommentMarker;
   state.nextCreationOrder = nextCreationOrder;
+  state.nextMarkerNumber = nextMarkerNumber;
   publish(state);
 }
 

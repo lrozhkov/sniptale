@@ -13,7 +13,7 @@ vi.mock('../../platform/trusted-events', async (importOriginal) => ({
   isTrustedMouseEvent: vi.fn(() => true),
 }));
 
-import { startDesignReviewPicker } from './picker';
+import { startDesignReviewPicker, type DesignReviewPickerRuntime } from './picker';
 import { showDesignReviewFrame } from './frame';
 
 const inaccessibleIframeMocks = vi.hoisted(() => ({
@@ -47,7 +47,7 @@ function makeVisible<T extends Element>(element: T): T {
   return element;
 }
 
-let cleanup: (() => void) | null = null;
+let pickerRuntime: DesignReviewPickerRuntime | null = null;
 
 beforeEach(() => {
   document.body.replaceChildren();
@@ -55,8 +55,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  cleanup?.();
-  cleanup = null;
+  pickerRuntime?.dispose();
+  pickerRuntime = null;
   document.body.replaceChildren();
   vi.restoreAllMocks();
 });
@@ -68,7 +68,7 @@ it('selects the exact rendered open-shadow DOM element and claims its click', ()
   root.append(target);
   document.body.append(host);
   const onSelection = vi.fn();
-  cleanup = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
 
   const event = new MouseEvent('click', {
     bubbles: true,
@@ -84,6 +84,48 @@ it('selects the exact rendered open-shadow DOM element and claims its click', ()
   expect(event.defaultPrevented).toBe(true);
 });
 
+it('selects the visible label proxy for an opacity-hidden checkbox menu trigger', () => {
+  const input = makeVisible(document.createElement('input'));
+  input.type = 'checkbox';
+  input.id = 'p-lang-btn-checkbox';
+  input.setAttribute('role', 'button');
+  input.style.opacity = '0';
+  const label = makeVisible(document.createElement('label'));
+  label.htmlFor = input.id;
+  label.textContent = '152 languages';
+  document.body.append(input, label);
+  const onSelection = vi.fn();
+  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+
+  input.dispatchEvent(
+    new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 24,
+      clientY: 36,
+      composed: true,
+    })
+  );
+
+  expect(onSelection).toHaveBeenCalledOnce();
+  expect(onSelection.mock.calls[0]?.[0].snapshot.element).toBe(label);
+});
+
+it('opens the exact live DOM element through the picker programmatic path', () => {
+  const target = makeVisible(document.createElement('button'));
+  document.body.append(target);
+  const onSelection = vi.fn();
+  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+
+  expect(pickerRuntime.selectElement(target)).toBe(true);
+  expect(onSelection).toHaveBeenCalledWith(
+    expect.objectContaining({
+      anchor: { x: 44, y: 54 },
+      snapshot: expect.objectContaining({ element: target }),
+    })
+  );
+});
+
 it('selects a closed shadow host instead of its inaccessible descendant', () => {
   const host = makeVisible(document.createElement('article'));
   const root = host.attachShadow({ mode: 'closed' });
@@ -91,7 +133,7 @@ it('selects a closed shadow host instead of its inaccessible descendant', () => 
   root.append(target);
   document.body.append(host);
   const onSelection = vi.fn();
-  cleanup = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
 
   target.dispatchEvent(
     new MouseEvent('click', {
@@ -115,7 +157,7 @@ it('ignores extension-owned controls instead of annotating the review UI', () =>
   contentRoot.append(control);
   document.body.append(contentHost);
   const onSelection = vi.fn();
-  cleanup = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
 
   control.dispatchEvent(
     new MouseEvent('click', {
@@ -126,6 +168,25 @@ it('ignores extension-owned controls instead of annotating the review UI', () =>
   );
 
   expect(onSelection).not.toHaveBeenCalled();
+});
+
+it('defers Escape to the open feedback panel before disabling Design Review', () => {
+  const contentHost = document.createElement('div');
+  const contentRoot = contentHost.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(contentRoot);
+  const panel = document.createElement('aside');
+  panel.dataset['ui'] = 'content.design-review.feedback-panel';
+  contentRoot.append(panel);
+  document.body.append(contentHost);
+  const onDisableRequested = vi.fn();
+  pickerRuntime = startDesignReviewPicker({ onDisableRequested, onSelection: vi.fn() });
+
+  document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  expect(onDisableRequested).not.toHaveBeenCalled();
+
+  panel.remove();
+  document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  expect(onDisableRequested).toHaveBeenCalledOnce();
 });
 
 it('fails closed on a registered annotation marker instead of selecting the page below it', () => {
@@ -144,7 +205,7 @@ it('fails closed on a registered annotation marker instead of selecting the page
     value: vi.fn(() => [marker, pageTarget]),
   });
   const onSelection = vi.fn();
-  cleanup = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
 
   marker.dispatchEvent(
     new MouseEvent('click', {
@@ -167,12 +228,12 @@ it('removes the picker frame node on teardown', () => {
   const target = makeVisible(document.createElement('button'));
   document.body.append(target);
   showDesignReviewFrame(target);
-  cleanup = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection: vi.fn() });
+  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection: vi.fn() });
 
   expect(queryContentUiElement('.sniptale-design-review-frame')).not.toBeNull();
 
-  cleanup();
-  cleanup = null;
+  pickerRuntime.dispose();
+  pickerRuntime = null;
   expect(queryContentUiElement('.sniptale-design-review-frame')).toBeNull();
 });
 
@@ -184,7 +245,7 @@ it('selects the exact element from an accessible same-origin iframe', () => {
   );
   iframe.contentDocument!.body.append(target);
   const onSelection = vi.fn();
-  cleanup = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
 
   target.dispatchEvent(
     new MouseEvent('click', {
@@ -232,7 +293,7 @@ it('anchors an inaccessible iframe through nested rendered scale in the top view
     }),
   });
   const onSelection = vi.fn();
-  cleanup = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
 
   inaccessibleIframeMocks.onSelect?.(innerIframe);
 

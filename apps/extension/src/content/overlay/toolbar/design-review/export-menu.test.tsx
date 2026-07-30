@@ -27,12 +27,12 @@ vi.mock('../../../application/privileged-action-intent', async (importOriginal) 
   createTrustedContentActionIntentSource: mocks.createIntentSource,
 }));
 
-vi.mock('./annotation-export-actions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./annotation-export-actions')>()),
+vi.mock('./export-actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./export-actions')>()),
   executeToolbarAnnotationExportAction: mocks.executeAction,
 }));
 
-import { AnnotationExportMenu } from './annotation-export-menu';
+import { AnnotationExportMenu } from './export-menu';
 import { useToolbarMenuState } from '../state/menu';
 
 let container: HTMLDivElement | null = null;

@@ -29,7 +29,7 @@ export function readPropertiesComment(target: Element): PropertiesCommentState {
     .domRecords.find((candidate) => candidate.annotationId === annotationId);
   return {
     comment: record?.comment ?? '',
-    marker: record?.commentMarker ?? null,
+    marker: record?.markerNumber ?? null,
   };
 }
 

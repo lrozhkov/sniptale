@@ -61,9 +61,9 @@ export const contentDesignReviewMessages = defineMessageSource({
     ru: 'Enter — сохранить и закрыть, Shift+Enter — новая строка.',
     en: 'Enter saves and closes; Shift+Enter starts a new line.',
   },
-  commentMarkerLabel: {
-    ru: 'Комментарий',
-    en: 'Comment',
+  markerNumberLabel: {
+    ru: 'Замечание',
+    en: 'Feedback',
   },
   commentCommitFailed: {
     ru: 'Не удалось сохранить комментарий. Текст сохранён в поле — попробуйте ещё раз.',
@@ -312,6 +312,62 @@ export const contentDesignReviewMessages = defineMessageSource({
   delete: {
     ru: 'Удалить',
     en: 'Delete',
+  },
+  showFeedbackPanel: {
+    ru: 'Показать список замечаний',
+    en: 'Show feedback list',
+  },
+  hideFeedbackPanel: {
+    ru: 'Скрыть список замечаний',
+    en: 'Hide feedback list',
+  },
+  panelTitle: {
+    ru: 'Обратная связь',
+    en: 'Feedback',
+  },
+  panelClose: {
+    ru: 'Закрыть список замечаний',
+    en: 'Close feedback list',
+  },
+  panelSearch: {
+    ru: 'Найти замечание',
+    en: 'Find feedback',
+  },
+  panelFilter: {
+    ru: 'Фильтр по действию',
+    en: 'Filter by action',
+  },
+  panelFilterAll: {
+    ru: 'Все действия',
+    en: 'All actions',
+  },
+  panelEmpty: {
+    ru: 'Выберите элемент на странице и добавьте первое замечание.',
+    en: 'Select a page element and add the first feedback item.',
+  },
+  panelNoResults: {
+    ru: 'По этому запросу ничего не найдено.',
+    en: 'No feedback matches this search.',
+  },
+  panelNoComment: {
+    ru: 'Комментарий не добавлен',
+    en: 'No comment added',
+  },
+  panelPropertiesChanged: {
+    ru: 'Изменено свойств',
+    en: 'Changed properties',
+  },
+  panelPage: {
+    ru: 'Страница:',
+    en: 'Page:',
+  },
+  panelClickHint: {
+    ru: 'Нажмите, чтобы перейти к элементу',
+    en: 'Click to go to the element',
+  },
+  moveMarker: {
+    ru: 'Сместить маркер рядом с элементом',
+    en: 'Move marker near the element',
   },
   settingsNavigation: {
     ru: 'Разделы свойств',

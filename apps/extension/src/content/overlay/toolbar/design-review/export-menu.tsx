@@ -14,11 +14,11 @@ import {
   preventToolbarMenuClick,
   resolveToolbarDropdownState,
   ToolbarMenuDropdown,
-} from './dropdown.shared';
+} from '../menu/dropdown';
 import {
   executeToolbarAnnotationExportAction,
   type ToolbarAnnotationExportAction,
-} from './annotation-export-actions';
+} from './export-actions';
 
 type AnnotationExportMenuProps = {
   compactMenus: boolean;

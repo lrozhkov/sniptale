@@ -51,6 +51,15 @@ vi.mock('./utilities', () => ({
   ),
 }));
 
+vi.mock('./design-review', () => ({
+  ToolbarDesignReviewControls: (props: { panelOpen: boolean }) => (
+    <div
+      data-panel-open={props.panelOpen ? 'true' : 'false'}
+      data-ui="test.design-review-controls"
+    />
+  ),
+}));
+
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
@@ -68,11 +77,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function createToolbarProps(params?: { isCursorMode?: boolean }) {
+function createToolbarProps(params?: { designReviewPanelOpen?: boolean; isCursorMode?: boolean }) {
   return {
     aiPickMode: false,
     currentViewport: null,
     framesCount: 0,
+    designReviewPanelOpen: params?.designReviewPanelOpen ?? false,
     ...(params?.isCursorMode === undefined ? {} : { isCursorMode: params.isCursorMode }),
     onPinToTabChange: vi.fn(),
     onAiPickContentStart: vi.fn(),
@@ -84,6 +94,7 @@ function createToolbarProps(params?: { isCursorMode?: boolean }) {
     onTakeScreenshot: vi.fn(),
     onTimerDelayChange: vi.fn(),
     onToggleHighlighterMode: vi.fn(),
+    onToggleDesignReviewPanel: vi.fn(),
     onToggleNavigationLock: vi.fn(),
     onToggleQuickEditDocumentMode: vi.fn(),
     onToggleQuickEditMode: vi.fn(),
@@ -116,6 +127,7 @@ function createToolbarProps(params?: { isCursorMode?: boolean }) {
 
 function createViewModel(params: {
   captureAction: 'download_default' | 'scenario';
+  designReviewMode?: boolean;
   highlighterMode?: boolean;
   pendingInteractionMode?: 'quick-edit' | 'highlighter' | null;
 }) {
@@ -124,6 +136,7 @@ function createViewModel(params: {
       action: params.captureAction,
       setAction: vi.fn(),
     },
+    designReviewMode: params.designReviewMode ?? false,
     derivedState: {
       currentViewport: null,
       displayMode: 'vertical' as const,
@@ -148,6 +161,8 @@ function createViewModel(params: {
 
 async function renderSecondaryControls(params: {
   captureAction: 'download_default' | 'scenario';
+  designReviewMode?: boolean;
+  designReviewPanelOpen?: boolean;
   highlighterMode?: boolean;
   isCursorMode?: boolean;
   pendingInteractionMode?: 'quick-edit' | 'highlighter' | null;
@@ -164,13 +179,19 @@ async function renderSecondaryControls(params: {
     root?.render(
       <ToolbarSecondaryControls
         toolbarProps={
-          createToolbarProps(
-            params.isCursorMode === undefined ? undefined : { isCursorMode: params.isCursorMode }
-          ) as never
+          createToolbarProps({
+            ...(params.designReviewPanelOpen === undefined
+              ? {}
+              : { designReviewPanelOpen: params.designReviewPanelOpen }),
+            ...(params.isCursorMode === undefined ? {} : { isCursorMode: params.isCursorMode }),
+          }) as never
         }
         viewModel={
           createViewModel({
             captureAction: params.captureAction,
+            ...(params.designReviewMode === undefined
+              ? {}
+              : { designReviewMode: params.designReviewMode }),
             ...(params.highlighterMode === undefined
               ? {}
               : { highlighterMode: params.highlighterMode }),
@@ -258,6 +279,22 @@ async function verifiesPendingQuickEditSuppressesCursorUtilities() {
   ).toBe('false');
 }
 
+async function verifiesDesignReviewControls() {
+  await renderSecondaryControls({
+    captureAction: 'download_default',
+    designReviewMode: true,
+    designReviewPanelOpen: true,
+  });
+  expect(
+    document
+      .querySelector('[data-ui="test.design-review-controls"]')
+      ?.getAttribute('data-panel-open')
+  ).toBe('true');
+
+  await renderSecondaryControls({ captureAction: 'download_default', designReviewMode: false });
+  expect(document.querySelector('[data-ui="test.design-review-controls"]')).toBeNull();
+}
+
 describe('ToolbarSecondaryControls', () => {
   it(
     'passes scenario props to capture actions only when after-capture action is scenario',
@@ -274,5 +311,9 @@ describe('ToolbarSecondaryControls', () => {
   it(
     'suppresses cursor-only utility controls while a quick-edit transition is pending',
     verifiesPendingQuickEditSuppressesCursorUtilities
+  );
+  it(
+    'shows the panel and export controls only in Design Review mode',
+    verifiesDesignReviewControls
   );
 });

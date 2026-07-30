@@ -71,7 +71,7 @@ describe('browser annotation session live identity', () => {
       expect.objectContaining({
         annotationId: 1,
         comment: 'Prominent',
-        commentMarker: 1,
+        markerNumber: 1,
         propertyChanges: [createPropertyChange({ after: '24px', before: '16px' })],
         textChange: { after: 'New', before: 'Old' },
       }),
@@ -181,7 +181,7 @@ describe('browser annotation session live identity', () => {
     expect(session.setComment({ comment: 'Again', evidence, target })).toBe(2);
 
     expect(session.captureSnapshot().domRecords).toEqual([
-      expect.objectContaining({ annotationId: 2, commentMarker: 2 }),
+      expect.objectContaining({ annotationId: 2, markerNumber: 2 }),
     ]);
   });
 
@@ -206,7 +206,7 @@ describe('browser annotation session live identity', () => {
       }),
     ]);
     expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('comment');
-    expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('commentMarker');
+    expect(session.captureSnapshot().domRecords[0]).toHaveProperty('markerNumber', 1);
     expect(session.getAnnotationId(target)).toBe(1);
   });
 
@@ -224,7 +224,7 @@ describe('browser annotation session live identity', () => {
     expect(session.getAnnotationId(target)).toBe(1);
     expect(session.captureSnapshot().domRecords[0]).toMatchObject({
       annotationId: 1,
-      commentMarker: 1,
+      markerNumber: 1,
     });
 
     session.applySnapshot(withoutComment);
@@ -232,7 +232,7 @@ describe('browser annotation session live identity', () => {
     session.setComment({ comment: 'New', evidence, target });
     expect(session.captureSnapshot().domRecords[0]).toMatchObject({
       annotationId: 2,
-      commentMarker: 2,
+      markerNumber: 2,
     });
   });
 
@@ -247,7 +247,7 @@ describe('browser annotation session live identity', () => {
     expect(session.captureSnapshot()).toMatchObject({
       domRecords: [],
       nextAnnotationId: 1,
-      nextCommentMarker: 1,
+      nextMarkerNumber: 1,
       nextCreationOrder: 1,
     });
     expect(session.setComment({ comment: 'Retry', evidence, target })).toBe(1);
@@ -265,8 +265,8 @@ describe('browser annotation session live identity', () => {
 
     expect(session.rollbackFailedMutation(rollbackPoint)).toBe(false);
     expect(session.captureSnapshot().domRecords).toEqual([
-      expect.objectContaining({ comment: 'First', commentMarker: 1 }),
-      expect.objectContaining({ comment: 'Second', commentMarker: 2 }),
+      expect.objectContaining({ comment: 'First', markerNumber: 1 }),
+      expect.objectContaining({ comment: 'Second', markerNumber: 2 }),
     ]);
   });
 
@@ -298,6 +298,7 @@ describe('Design Review annotation state', () => {
     expect(session.captureSnapshot().domRecords[0]).toMatchObject({
       comment: 'Fix this',
       designReview: { action: 'fix' },
+      markerNumber: 1,
       propertyChanges: [createPropertyChange({ after: '24px', before: '16px' })],
       textChange: { after: 'New', before: 'Old' },
     });
@@ -312,6 +313,26 @@ describe('Design Review annotation state', () => {
     ]);
     expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('comment');
     expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('designReview');
+    expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('markerNumber');
+  });
+
+  it('allocates one marker for action-only and property-only feedback', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const actionTarget = createTarget();
+    const propertyTarget = createTarget();
+
+    session.setDesignReviewAction({ action: 'verify', evidence, target: actionTarget });
+    session.recordPropertyChanges({
+      changes: [createPropertyChange({ after: '24px', before: '16px' })],
+      evidence,
+      target: propertyTarget,
+    });
+
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({ designReview: { action: 'verify' }, markerNumber: 1 }),
+      expect.objectContaining({ markerNumber: 2, propertyChanges: [expect.any(Object)] }),
+    ]);
   });
 });
 
@@ -387,7 +408,7 @@ describe('browser annotation session lifecycle', () => {
       domRecords: [],
       frameOrders: [],
       nextAnnotationId: 1,
-      nextCommentMarker: 1,
+      nextMarkerNumber: 1,
       nextCreationOrder: 1,
     });
   });

@@ -60,18 +60,6 @@ function useNavigationLockCleanup(modeFlags: ContentAppModeFlags) {
   ]);
 }
 
-function usePagePreparationHistoryReset(screenshotMode: boolean) {
-  const prevScreenshotModeRef = useRef(screenshotMode);
-
-  useEffect(() => {
-    if (prevScreenshotModeRef.current && !screenshotMode) {
-      pagePreparationHistory.clear();
-    }
-
-    prevScreenshotModeRef.current = screenshotMode;
-  }, [screenshotMode]);
-}
-
 function useBrowserAnnotationDocumentReset(clearFrames: () => void) {
   useEffect(
     () =>
@@ -138,7 +126,6 @@ export function useContentAppBindings(params: ContentAppBindingsParams) {
   useBrowserAnnotationDocumentReset(frameManager.clearFrames);
   useQuickActionHotkeys();
   useNavigationLockCleanup(params.modeFlags);
-  usePagePreparationHistoryReset(params.modeFlags.screenshotMode);
   useFrameCallbackRegistration({
     addFrame: frameManager.addFrame,
     addFreeFrame: frameManager.addFreeFrame,

@@ -176,16 +176,16 @@ it('projects numbered accessible markers for HTML, SVG, iframe-inner, and iframe
   await renderMarkers();
 
   const markers = Array.from(
-    document.querySelectorAll<HTMLElement>('[data-ui="content.annotation-marker"] [role="note"]')
+    document.querySelectorAll<HTMLElement>('[data-ui="content.annotation-marker-button"]')
   );
   expect(markers.map((marker) => marker.textContent)).toEqual(['1', '2', '3', '4']);
   const firstTooltip = document.getElementById(markers[0]!.getAttribute('aria-describedby')!);
-  expect(markers[0]?.getAttribute('aria-label')).toBe('Комментарий 1');
+  expect(markers[0]?.getAttribute('aria-label')).toBe('Замечание 1: Доработать');
   const iframeInnerMarker = document.querySelector<HTMLElement>('[data-annotation-id="3"]');
   expect(iframeInnerMarker?.style.left).toBe('308px');
   expect(iframeInnerMarker?.style.top).toBe('59px');
   expect(firstTooltip?.getAttribute('role')).toBe('tooltip');
-  expect(firstTooltip?.textContent).toBe('HTML comment');
+  expect(firstTooltip?.textContent).toContain('HTML comment');
   expect(firstTooltip?.className).toContain('group-hover:visible');
   expect(firstTooltip?.className).toContain('group-focus-within:visible');
   const markerLayer = document.querySelector('[data-ui="content.annotation-markers"]');
@@ -219,7 +219,7 @@ it('registers marker projection and note as passive while keeping its tooltip in
 
   const markerLayer = shadowRoot.querySelector('[data-ui="content.annotation-markers"]');
   const markerGroup = shadowRoot.querySelector('[data-ui="content.annotation-marker"]');
-  const markerNote = shadowRoot.querySelector('[role="note"]');
+  const markerNote = shadowRoot.querySelector('[data-ui="content.annotation-marker-button"]');
   const tooltip = shadowRoot.querySelector('[role="tooltip"]');
   expect(isContentOwnedPassiveChrome(markerLayer)).toBe(true);
   expect(isContentOwnedPassiveChrome(markerGroup)).toBe(true);
@@ -238,7 +238,7 @@ it('keeps text and internal focus geometry above theme contrast on an accent hos
   await renderMarkers();
 
   const marker = document.querySelector<HTMLElement>(
-    '[data-ui="content.annotation-marker"] [role="note"]'
+    '[data-ui="content.annotation-marker-button"]'
   );
   expect(marker?.className).toContain('bg-[var(--sniptale-color-surface-canvas)]');
   expect(marker?.className).toContain('text-[var(--sniptale-color-text-primary)]');
@@ -286,7 +286,9 @@ it('recomputes tooltip side and bounds after viewport-only size changes', async 
   await renderMarkers();
 
   const marker = document.querySelector<HTMLElement>('[data-ui="content.annotation-marker"]');
-  const tooltipId = marker?.querySelector('[role="note"]')?.getAttribute('aria-describedby');
+  const tooltipId = marker
+    ?.querySelector('[data-ui="content.annotation-marker-button"]')
+    ?.getAttribute('aria-describedby');
   let tooltip = tooltipId ? document.getElementById(tooltipId) : null;
   expect(marker?.style.left).toBe('150px');
   expect(marker?.style.right).toBe('');
@@ -320,7 +322,9 @@ it('uses a chrome-aware full-viewport fallback for a height-80 viewport', async 
   addComment(target, 'Small viewport', '#small');
   await renderMarkers();
   const marker = document.querySelector<HTMLElement>('[data-ui="content.annotation-marker"]');
-  const tooltipId = marker?.querySelector('[role="note"]')?.getAttribute('aria-describedby');
+  const tooltipId = marker
+    ?.querySelector('[data-ui="content.annotation-marker-button"]')
+    ?.getAttribute('aria-describedby');
 
   vi.stubGlobal('innerHeight', 80);
   runAnimationFrame();
@@ -333,7 +337,7 @@ it('uses a chrome-aware full-viewport fallback for a height-80 viewport', async 
   expect(tooltip?.style.top).toBe('4px');
   expect(tooltip?.style.bottom).toBe('');
   expect(tooltipScroll?.style.maxHeight).toBe('72px');
-  expect(tooltipScroll?.className).toContain('p-0.5');
+  expect(tooltipScroll?.className).toContain('p-1');
   expect(tooltip?.className).not.toContain('before:-top-2');
   expect(tooltip?.className).not.toContain('before:-bottom-2');
   expect(
@@ -343,14 +347,14 @@ it('uses a chrome-aware full-viewport fallback for a height-80 viewport', async 
 
 it('anchors a variable-width focused marker inside the right viewport edge', async () => {
   const snapshot = browserAnnotationSession.captureSnapshot();
-  browserAnnotationSession.applySnapshot({ ...snapshot, nextCommentMarker: 12_345 });
+  browserAnnotationSession.applySnapshot({ ...snapshot, nextMarkerNumber: 12_345 });
   document.body.style.backgroundColor = '#f97316';
   const target = appendVisible(document.createElement('div'), { left: 1200, width: 80 });
   addComment(target, 'Right edge', '#right-edge');
   await renderMarkers();
 
   const group = document.querySelector<HTMLElement>('[data-ui="content.annotation-marker"]');
-  const marker = group?.querySelector<HTMLElement>('[role="note"]');
+  const marker = group?.querySelector<HTMLElement>('[data-ui="content.annotation-marker-button"]');
   expect(marker?.textContent).toBe('12345');
   expect(group?.style.left).toBe('');
   expect(group?.style.right).toBe('12px');
@@ -365,7 +369,9 @@ it('keeps long tooltip content pointer- and keyboard-scrollable from the focused
   const target = appendVisible(document.createElement('div'));
   addComment(target, 'Long '.repeat(200), '#long');
   await renderMarkers();
-  const marker = document.querySelector<HTMLElement>('[role="note"]');
+  const marker = document.querySelector<HTMLElement>(
+    '[data-ui="content.annotation-marker-button"]'
+  );
   const tooltip = document.getElementById(marker!.getAttribute('aria-describedby')!);
   const tooltipScroll = tooltip?.querySelector<HTMLElement>(
     '[data-ui="content.annotation-marker-tooltip-scroll"]'
@@ -399,7 +405,9 @@ it('scrolls through a component-local tooltip ref when mounted inside a ShadowRo
   addComment(target, 'Shadow '.repeat(200), '#shadow-scroll');
   await renderMarkers();
 
-  const marker = shadowRoot.querySelector<HTMLElement>('[role="note"]');
+  const marker = shadowRoot.querySelector<HTMLElement>(
+    '[data-ui="content.annotation-marker-button"]'
+  );
   const tooltip = shadowRoot.getElementById(marker!.getAttribute('aria-describedby')!);
   const tooltipScroll = tooltip?.querySelector<HTMLElement>(
     '[data-ui="content.annotation-marker-tooltip-scroll"]'
@@ -478,7 +486,7 @@ it('omits a disconnected target and never rebinds its marker to an SPA replaceme
   expect(browserAnnotationSession.captureSnapshot().domRecords[0]?.comment).toBe('Original only');
 });
 
-it('removes only the comment marker while preserving other evidence for the live target', async () => {
+it('removes the marker when only Quick Edit text evidence remains', async () => {
   const target = appendVisible(document.createElement('div'));
   const evidence = createEvidence('#mixed');
   browserAnnotationSession.recordTextChange({
@@ -500,4 +508,58 @@ it('removes only the comment marker while preserving other evidence for the live
     after: 'After',
     before: 'Before',
   });
+});
+
+it('keeps an action icon and marker after its comment is removed but style feedback remains', async () => {
+  const target = appendVisible(document.createElement('button'));
+  const evidence = createEvidence('#styled');
+  browserAnnotationSession.recordPropertyChanges({
+    changes: [
+      {
+        after: { priority: '', value: 'red' },
+        before: { priority: '', value: 'blue' },
+        order: 1,
+        property: 'color',
+      },
+    ],
+    evidence,
+    target,
+  });
+  browserAnnotationSession.setDesignReviewAction({ action: 'fix', evidence, target });
+  browserAnnotationSession.setComment({ comment: 'Fix color', evidence, target });
+  await act(async () => {
+    root.render(<BrowserAnnotationMarkers interactive onOpenRecord={vi.fn(() => true)} />);
+  });
+
+  act(() => browserAnnotationSession.setComment({ comment: '', evidence, target }));
+
+  const marker = document.querySelector<HTMLElement>(
+    '[data-ui="content.annotation-marker-button"]'
+  );
+  expect(marker?.textContent).toContain('1');
+  expect(marker?.querySelector('svg')?.getAttribute('class')).toContain(
+    'text-[var(--sniptale-color-danger)]'
+  );
+  expect(
+    document.querySelector('[data-ui="content.annotation-marker-drag-handle"]')
+  ).not.toBeNull();
+});
+
+it('retains only the numbered marker chrome during screenshot capture', async () => {
+  const target = appendVisible(document.createElement('button'));
+  addComment(target, 'Visible in screenshot', '#capture-marker');
+  await act(async () => {
+    root.render(<BrowserAnnotationMarkers interactive showChrome={false} />);
+  });
+
+  const marker = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.annotation-marker-button"]'
+  );
+  expect(marker).not.toBeNull();
+  expect(marker?.textContent).toBe('1');
+  expect(marker?.tabIndex).toBe(-1);
+  expect(marker?.className).toContain('pointer-events-none');
+  expect(marker?.hasAttribute('aria-describedby')).toBe(false);
+  expect(document.querySelector('[role="tooltip"]')).toBeNull();
+  expect(document.querySelector('[data-ui="content.annotation-marker-drag-handle"]')).toBeNull();
 });

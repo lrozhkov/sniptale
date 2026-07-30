@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initializeContentUiRoots } from '../../../platform/dom-host';
-import { isPageStyleMutationElement } from './element';
+import { isPageStyleMutationElement, isPageStyleRestorationElement } from './element';
 
 function appendVisible<T extends Element>(element: T, root: ParentNode = document.body): T {
   const rect = DOMRect.fromRect({ height: 40, width: 80 });
@@ -84,5 +84,6 @@ describe('page-style Element target eligibility', () => {
     expect(
       [script, template, defs, gradient, animate, hidden].some(isPageStyleMutationElement)
     ).toBe(false);
+    expect(isPageStyleRestorationElement(hidden)).toBe(true);
   });
 });

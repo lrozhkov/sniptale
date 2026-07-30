@@ -11,7 +11,7 @@ function createSnapshot(frameId: string): PagePreparationSessionSnapshot {
       domRecords: [],
       frameOrders: [],
       nextAnnotationId: 1,
-      nextCommentMarker: 1,
+      nextMarkerNumber: 1,
       nextCreationOrder: 1,
       schemaVersion: 1,
     },

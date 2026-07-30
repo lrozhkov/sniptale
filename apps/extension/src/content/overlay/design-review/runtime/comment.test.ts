@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 import {
   browserAnnotationSession,
+  formatBrowserAnnotationSnapshot,
   type BrowserAnnotationTargetEvidence,
 } from '../../../parser/page-preparation/annotations';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
@@ -99,7 +100,7 @@ describe('Properties comment producer', () => {
     expect(pagePreparationHistory.hasOpenTransactions()).toBe(false);
 
     pagePreparationHistory.undo();
-    expect(readPropertiesComment(target)).toEqual({ comment: '', marker: null });
+    expect(readPropertiesComment(target)).toEqual({ comment: '', marker: 1 });
     expect(target.style.color).toBe('red');
     expect(browserAnnotationSession.captureSnapshot().domRecords[0]?.propertyChanges).toHaveLength(
       1
@@ -161,7 +162,7 @@ describe('Properties comment producer', () => {
 });
 
 describe('Design Review record deletion', () => {
-  it('copies only the current element review payload with action, comment, path, and properties', () => {
+  it('copies only the current element through the canonical Markdown v2 formatter', () => {
     const target = document.createElement('button');
     target.id = 'target';
     const rect = DOMRect.fromRect({ height: 40, width: 80 });
@@ -179,16 +180,18 @@ describe('Design Review record deletion', () => {
     commitPropertiesComment({ comment: 'Check the label', evidence: createEvidence(), target });
     commitDesignReviewAction({ action: 'verify', target });
 
-    expect(JSON.parse(serializeDesignReviewRecord(target))).toEqual({
-      action: 'verify',
-      comment: 'Check the label',
-      element: {
-        path: 'html > body > button#target',
-        selector: '#target',
-        tag: 'BUTTON',
-      },
-      properties: [],
-    });
+    const snapshot = browserAnnotationSession.captureSnapshot();
+    expect(serializeDesignReviewRecord(target)).toBe(
+      formatBrowserAnnotationSnapshot({
+        ...snapshot,
+        domRecords: snapshot.domRecords.filter(
+          (record) => record.annotationId === browserAnnotationSession.getAnnotationId(target)
+        ),
+        frameOrders: [],
+      })
+    );
+    expect(serializeDesignReviewRecord(target)).toContain('Design review action: verify');
+    expect(serializeDesignReviewRecord(target)).toContain('Comment:\nCheck the label');
   });
 
   it('atomically clears review evidence and CSS while preserving Quick Edit text history', async () => {

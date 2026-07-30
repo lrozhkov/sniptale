@@ -7,7 +7,7 @@ import {
   preventToolbarMenuClick,
   resolveToolbarDropdownState,
   ToolbarMenuDropdown,
-} from './dropdown.shared';
+} from './dropdown';
 
 function createButtonRef(rectOverrides?: Partial<DOMRect>) {
   const button = document.createElement('button');
@@ -30,7 +30,7 @@ function createButtonRef(rectOverrides?: Partial<DOMRect>) {
   } as React.RefObject<HTMLButtonElement | null>;
 }
 
-describe('toolbar capture dropdown shared helpers', () => {
+describe('toolbar dropdown helpers', () => {
   it('resolves vertical dropdown placement beside the toolbar anchor', () => {
     vi.stubGlobal('innerWidth', 1280);
 
@@ -53,14 +53,12 @@ describe('toolbar capture dropdown shared helpers', () => {
     const preventDefault = vi.fn();
     const onSelect = vi.fn();
 
-    createToolbarMenuItemClickHandler(onSelect)({
+    const event = {
       stopPropagation,
       preventDefault,
-    } as unknown as React.MouseEvent);
-    preventToolbarMenuClick({
-      stopPropagation,
-      preventDefault,
-    } as unknown as React.MouseEvent);
+    };
+    createToolbarMenuItemClickHandler(onSelect)(event);
+    preventToolbarMenuClick(event);
 
     const markup = renderToStaticMarkup(
       <ToolbarMenuDropdown

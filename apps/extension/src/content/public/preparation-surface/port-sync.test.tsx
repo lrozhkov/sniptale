@@ -11,7 +11,7 @@ import { createModeState } from './mode-state.test-support';
 import { usePreparationSurfacePortSync } from './port-sync';
 
 type PortCommand = { type: string; viewport?: { width: number; height: number } };
-type PortListener = (command: PortCommand) => void;
+type PortListener = (command: PortCommand) => void | Promise<void>;
 
 const mocks = vi.hoisted(() => ({
   connectPort: vi.fn(),
@@ -33,7 +33,12 @@ let portListener: PortListener | null = null;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.clearAllMocks();
-  mocks.handleScreenshotModeMessage.mockReturnValue(true);
+  mocks.handleScreenshotModeMessage.mockImplementation(
+    (_command, _params, sendResponse: (response: { success: boolean }) => void) => {
+      sendResponse({ success: true });
+      return true;
+    }
+  );
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -52,7 +57,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('forwards viewer preparation port commands through the screenshot mode handler', () => {
+it('forwards viewer preparation port commands through the screenshot mode handler', async () => {
   const modeState = createModeState();
   const handleTakeScreenshot = vi.fn().mockResolvedValue(undefined);
   renderHarness(modeState, handleTakeScreenshot);
@@ -61,8 +66,8 @@ it('forwards viewer preparation port commands through the screenshot mode handle
     viewport: { width: 1024, height: 768 },
   };
 
-  act(() => {
-    portListener?.(command);
+  await act(async () => {
+    await portListener?.(command);
   });
 
   expect(mocks.handleScreenshotModeMessage).toHaveBeenCalledWith(
@@ -78,6 +83,46 @@ it('forwards viewer preparation port commands through the screenshot mode handle
       }),
     }),
     expect.any(Function)
+  );
+});
+
+it('waits for the asynchronous content teardown acknowledgement before resolving', async () => {
+  const modeState = createModeState();
+  const responseRef: { current: ((response: { success: boolean }) => void) | null } = {
+    current: null,
+  };
+  mocks.handleScreenshotModeMessage.mockImplementation(
+    (_command, _params, sendResponse: (response: { success: boolean }) => void) => {
+      responseRef.current = sendResponse;
+      return true;
+    }
+  );
+  renderHarness(modeState, vi.fn().mockResolvedValue(undefined));
+
+  const commandPromise = portListener?.({ type: MessageType.DISABLE_SCREENSHOT_MODE });
+  let settled = false;
+  void commandPromise?.then(() => {
+    settled = true;
+  });
+  await Promise.resolve();
+  expect(settled).toBe(false);
+
+  responseRef.current?.({ success: true });
+  await expect(commandPromise).resolves.toBeUndefined();
+});
+
+it('rejects an asynchronous negative teardown acknowledgement', async () => {
+  const modeState = createModeState();
+  mocks.handleScreenshotModeMessage.mockImplementation(
+    (_command, _params, sendResponse: (response: { error: string; success: boolean }) => void) => {
+      queueMicrotask(() => sendResponse({ error: 'Restoration failed', success: false }));
+      return true;
+    }
+  );
+  renderHarness(modeState, vi.fn().mockResolvedValue(undefined));
+
+  await expect(portListener?.({ type: MessageType.DISABLE_SCREENSHOT_MODE })).rejects.toThrow(
+    'Restoration failed'
   );
 });
 

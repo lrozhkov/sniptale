@@ -10,7 +10,7 @@ import {
   preventToolbarMenuClick,
   resolveToolbarDropdownState,
   ToolbarMenuDropdown,
-} from './dropdown.shared';
+} from '../menu/dropdown';
 import { renderMenuCheck } from './options';
 
 type CaptureActionDropdownProps = {

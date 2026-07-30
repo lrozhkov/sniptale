@@ -27,7 +27,7 @@ export interface ToolbarCaptureActionsProps {
   onCaptureActionChange: (action: CaptureActionType) => void;
   onCaptureActionCommitted?: (action: CaptureActionType) => Promise<void> | void;
   onClose: () => void;
-  onDisableScreenshotMode: () => void;
+  onDisableScreenshotMode: (activationEvent?: Event) => void;
   timerDelay: number;
   onTimerDelayChange: (delay: number) => void;
   currentViewport: { width: number; height: number } | null;
@@ -60,6 +60,7 @@ export interface ToolbarProps {
   onAiPickContentStart: () => void;
   aiPickMode?: boolean;
   designReviewMode?: boolean;
+  designReviewPanelOpen?: boolean;
   highlighterMode?: boolean;
   quickEditDocumentMode?: boolean;
   quickEditMode?: boolean;
@@ -70,6 +71,7 @@ export interface ToolbarProps {
   pinToTabLocked?: boolean;
   onDisableAiPickMode?: () => void;
   onEnableCursorMode?: () => void;
+  onToggleDesignReviewPanel?: () => void;
   onPinToTabChange?: (
     value: boolean,
     contentIntentSource?: ContentPrivilegedActionIntentSource

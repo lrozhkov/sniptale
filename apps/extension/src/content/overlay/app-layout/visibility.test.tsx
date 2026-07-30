@@ -10,8 +10,11 @@ const { contentDialogStackMock, contentToolbarShellMock, designReviewSurfaceMock
   () => ({
     contentDialogStackMock: vi.fn(() => <div data-ui="content.layout.dialogs" />),
     contentToolbarShellMock: vi.fn(() => <div data-ui="content.layout.toolbar" />),
-    designReviewSurfaceMock: vi.fn(() => (
-      <div data-ui="content.layout.design-review">
+    designReviewSurfaceMock: vi.fn((props: { showChrome: boolean }) => (
+      <div
+        data-show-chrome={props.showChrome ? 'true' : 'false'}
+        data-ui="content.layout.design-review"
+      >
         <div data-ui="content.annotation-markers" />
       </div>
     )),
@@ -32,7 +35,7 @@ vi.mock('./toolbar', () => ({
 }));
 
 vi.mock('../design-review/view', () => ({
-  DesignReviewSurface: () => designReviewSurfaceMock(),
+  DesignReviewSurface: (props: { showChrome: boolean }) => designReviewSurfaceMock(props),
   useDesignReviewController: () => ({
     actions: {},
     inspectorOpen: false,
@@ -216,10 +219,12 @@ it('hides dialog and inspector app chrome while capture UI is completely hidden'
   await renderLayout(props);
 
   expect(contentDialogStackMock).not.toHaveBeenCalled();
-  expect(designReviewSurfaceMock).not.toHaveBeenCalled();
+  expect(designReviewSurfaceMock).toHaveBeenCalledWith(
+    expect.objectContaining({ showChrome: false })
+  );
   expect(container?.querySelector('[data-ui="content.layout.dialogs"]')).toBeNull();
-  expect(container?.querySelector('[data-ui="content.layout.design-review"]')).toBeNull();
-  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="content.layout.design-review"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).not.toBeNull();
 
   await renderLayout({
     ...props,
@@ -230,8 +235,31 @@ it('hides dialog and inspector app chrome while capture UI is completely hidden'
   });
 
   expect(contentDialogStackMock).toHaveBeenCalledTimes(1);
-  expect(designReviewSurfaceMock).toHaveBeenCalledTimes(1);
+  expect(designReviewSurfaceMock).toHaveBeenCalledTimes(2);
+  expect(designReviewSurfaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ showChrome: true })
+  );
   expect(container?.querySelector('[data-ui="content.layout.dialogs"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="content.layout.design-review"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="content.annotation-markers"]')).not.toBeNull();
+});
+
+it('removes the marker surface when the screenshot session exits', async () => {
+  const props = createControllerProps();
+
+  await renderLayout(props);
+  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).not.toBeNull();
+
+  await renderLayout({
+    ...props,
+    toolbar: {
+      ...props.toolbar,
+      modes: {
+        ...props.toolbar.modes,
+        screenshotMode: false,
+      },
+    },
+  });
+
+  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).toBeNull();
 });

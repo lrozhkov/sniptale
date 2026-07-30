@@ -1,26 +1,12 @@
-import {
-  Check,
-  ChevronDown,
-  ClipboardCopy,
-  FileSearch,
-  ListMinus,
-  MessageCircleQuestion,
-  Pencil,
-  Trash2,
-  WandSparkles,
-  Wrench,
-  X,
-} from 'lucide-react';
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ComponentType,
-  type RefObject,
-} from 'react';
+import { Check, ChevronDown, ClipboardCopy, Pencil, Trash2, X } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { BrowserDesignReviewAction } from '../../../parser/page-preparation/annotations';
-import { translate, type TranslationKey } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n';
+import {
+  DESIGN_REVIEW_ACTIONS,
+  getDesignReviewActionOption,
+  getDesignReviewActionTone,
+} from '../action-catalog';
 import { DesignReviewSettings } from '../settings/view';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { PageStyleCommentField } from './comment';
@@ -33,24 +19,6 @@ interface PopoverMetrics {
   viewportHeight: number;
   viewportWidth: number;
 }
-
-type ReviewActionOption = {
-  action: BrowserDesignReviewAction;
-  icon: ComponentType<{ className?: string; size?: number }>;
-  labelKey: TranslationKey;
-};
-
-const REVIEW_ACTIONS: ReviewActionOption[] = [
-  { action: 'refine', icon: WandSparkles, labelKey: 'content.designReview.actionRefine' },
-  { action: 'fix', icon: Wrench, labelKey: 'content.designReview.actionFix' },
-  { action: 'simplify', icon: ListMinus, labelKey: 'content.designReview.actionSimplify' },
-  { action: 'verify', icon: FileSearch, labelKey: 'content.designReview.actionVerify' },
-  {
-    action: 'explain',
-    icon: MessageCircleQuestion,
-    labelKey: 'content.designReview.actionExplain',
-  },
-];
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
@@ -133,7 +101,7 @@ function ActionMenu(props: {
   onSelect: (action: BrowserDesignReviewAction) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = REVIEW_ACTIONS.find((option) => option.action === props.action)!;
+  const selected = getDesignReviewActionOption(props.action);
   const SelectedIcon = selected.icon;
 
   return (
@@ -143,9 +111,7 @@ function ActionMenu(props: {
         aria-expanded={open}
         className={[
           'inline-flex h-8 items-center gap-2 rounded-[8px] px-2 text-xs font-semibold',
-          props.action === 'fix'
-            ? 'text-[var(--sniptale-color-danger)]'
-            : 'text-[var(--sniptale-color-text-primary)]',
+          getDesignReviewActionTone(props.action),
         ].join(' ')}
         onClick={() => setOpen((current) => !current)}
       >
@@ -163,7 +129,7 @@ function ActionMenu(props: {
           data-ui="content.design-review.action-menu"
           role="menu"
         >
-          {REVIEW_ACTIONS.map((option) => {
+          {DESIGN_REVIEW_ACTIONS.map((option) => {
             const Icon = option.icon;
             return (
               <button
@@ -172,9 +138,7 @@ function ActionMenu(props: {
                 className={[
                   'flex w-full items-center gap-2 rounded-[7px] px-2 py-2 text-left text-xs',
                   'hover:bg-[var(--sniptale-color-surface-input)]',
-                  option.action === 'fix'
-                    ? 'text-[var(--sniptale-color-danger)]'
-                    : 'text-[var(--sniptale-color-text-primary)]',
+                  getDesignReviewActionTone(option.action),
                 ].join(' ')}
                 role="menuitem"
                 onClick={() => {

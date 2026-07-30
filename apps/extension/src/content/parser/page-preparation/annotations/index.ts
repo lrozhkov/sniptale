@@ -1,7 +1,11 @@
 export { browserAnnotationSession, createBrowserAnnotationSession } from './session';
 export { createBrowserAnnotationTargetEvidence } from './evidence';
 export { subscribeToBrowserAnnotationDocumentNavigation } from './document-navigation';
-export { formatBrowserAnnotationSnapshot, prepareBrowserAnnotationsExportText } from './format';
+export {
+  formatBrowserAnnotationSnapshot,
+  formatBrowserDomAnnotationRecord,
+  prepareBrowserAnnotationsExportText,
+} from './format';
 export {
   BROWSER_ANNOTATION_SCHEMA_VERSION,
   type BrowserAnnotationCommentInput,

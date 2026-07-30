@@ -33,6 +33,7 @@ vi.mock('../../../parser/page-preparation/annotations', async (importOriginal) =
 }));
 
 import { usePageStyleCommentDraft } from './comment-draft';
+import { finalizeDesignReviewCommentDraft } from './comment-draft-finalization';
 
 let host: HTMLDivElement;
 let root: Root | null;
@@ -131,7 +132,7 @@ it('commits the previous target once before hydrating the next target', async ()
     expect.objectContaining({ comment: 'First comment', target: first.element })
   );
   expect(latest?.commentDraft).toBe('Second comment');
-  expect(latest?.commentMarker).toBe(7);
+  expect(latest?.markerNumber).toBe(7);
 });
 
 it('defers an IME blur commit until composition ends', async () => {
@@ -210,7 +211,7 @@ it('normalizes an all-whitespace draft to an empty comment removal', async () =>
     expect.objectContaining({ comment: '', target: selection.element })
   );
   expect(latest?.commentDraft).toBe('');
-  expect(latest?.commentMarker).toBeNull();
+  expect(latest?.markerNumber).toBeNull();
 });
 
 it('does not commit an unchanged hydrated draft', async () => {
@@ -248,7 +249,7 @@ it('rehydrates a clean draft after an external history/session revision', async 
   });
 
   expect(latest?.commentDraft).toBe('Restored');
-  expect(latest?.commentMarker).toBe(1);
+  expect(latest?.markerNumber).toBe(1);
 });
 
 it('keeps a failed draft recoverable and blocks explicit close', async () => {
@@ -265,4 +266,26 @@ it('keeps a failed draft recoverable and blocks explicit close', async () => {
 
   expect(latest?.commentCommitFailed).toBe(true);
   expect(latest?.commentDraft).toBe('Retry me');
+});
+
+it('exposes a failed automatic draft save to the session teardown owner', async () => {
+  const selection = createSelection('teardown-failure');
+  commentMocks.commit.mockImplementation(() => {
+    throw new Error('failed');
+  });
+  await renderHarness({ open: true, selection });
+  act(() => latest?.updateCommentDraft('Do not discard me'));
+
+  let finalizationError: unknown;
+  act(() => {
+    try {
+      finalizeDesignReviewCommentDraft();
+    } catch (error) {
+      finalizationError = error;
+    }
+  });
+
+  expect(finalizationError).toEqual(new Error('Design Review comment draft could not be saved'));
+  expect(latest?.commentCommitFailed).toBe(true);
+  expect(latest?.commentDraft).toBe('Do not discard me');
 });

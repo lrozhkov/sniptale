@@ -19,7 +19,7 @@ type ToolbarSettingsMenuProps = {
   toolbarMenuState: ToolbarMenuState;
   onClose: () => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
-  onDisableScreenshotMode: () => void;
+  onDisableScreenshotMode: (activationEvent?: Event) => void;
   onDisplayModeChange: (displayMode: ContentToolbarDisplayMode) => void;
   onPinToTabChange: (
     value: boolean,

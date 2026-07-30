@@ -285,6 +285,9 @@ function formatPropertyChanges(changes: readonly BrowserAnnotationPropertyChange
 }
 
 function formatDomHeading(record: BrowserDomAnnotationRecord): string {
+  if (record.comment || record.designReview?.action || record.propertyChanges.length > 0) {
+    return `## Design review feedback ${record.creationOrder}`;
+  }
   return record.propertyChanges.length > 0 || record.textChange
     ? `## Requested annotation ${record.creationOrder}`
     : `## Comment ${record.creationOrder}`;
@@ -311,8 +314,11 @@ function formatDomRecord(record: BrowserDomAnnotationRecord): string {
     `Target selector: ${escapeInline(sanitizeExportSelector(evidence.targetSelector))}`,
     `Target path: ${escapeInline(evidence.targetPath)}`
   );
-  if (record.commentMarker !== undefined) {
-    lines.push(`Comment marker: ${record.commentMarker}`);
+  if (record.markerNumber !== undefined) {
+    lines.push(`Feedback marker: ${record.markerNumber}`);
+  }
+  if (record.comment || record.designReview?.action || record.propertyChanges.length > 0) {
+    lines.push(`Design review action: ${record.designReview?.action ?? 'refine'}`);
   }
 
   if (record.propertyChanges.length > 0 || record.textChange) {
@@ -392,17 +398,15 @@ function compareRecords(left: OrderedAnnotationRecord, right: OrderedAnnotationR
 function collectOrderedRecords(
   snapshot: BrowserAnnotationSessionSnapshot
 ): OrderedAnnotationRecord[] {
-  const exportableDomRecords = snapshot.domRecords.filter(
-    (record) =>
-      !record.designReview ||
-      record.comment !== undefined ||
-      record.propertyChanges.length > 0 ||
-      record.textChange !== undefined
-  );
   return [
-    ...exportableDomRecords.map((record): OrderedAnnotationRecord => ({ kind: 'dom', record })),
+    ...snapshot.domRecords.map((record): OrderedAnnotationRecord => ({ kind: 'dom', record })),
     ...snapshot.frameOrders.map((record): OrderedAnnotationRecord => ({ kind: 'frame', record })),
   ].sort(compareRecords);
+}
+
+/** Pure UTF-8/GFM-compatible projection of one immutable DOM annotation record. */
+export function formatBrowserDomAnnotationRecord(record: BrowserDomAnnotationRecord): string {
+  return `# Browser comments:\n\n${formatDomRecord(record)}\n`;
 }
 
 /** Pure UTF-8/GFM-compatible projection of one immutable annotation-session snapshot. */

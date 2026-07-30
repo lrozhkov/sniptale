@@ -82,7 +82,7 @@ describe('browser annotation history integration', () => {
     expect(session.captureSnapshot().domRecords).toEqual([
       expect.objectContaining({
         annotationId: 2,
-        commentMarker: 2,
+        markerNumber: 2,
         creationOrder: 2,
       }),
     ]);

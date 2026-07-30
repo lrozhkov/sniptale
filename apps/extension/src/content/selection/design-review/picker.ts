@@ -1,4 +1,4 @@
-import { isContentOwnedElement } from '../../platform/dom-host';
+import { isContentOwnedElement, queryContentUiElement } from '../../platform/dom-host';
 import {
   addEventListenerToAllWindowsDynamic,
   addWindowEventListenerToAllWindowsDynamic,
@@ -14,6 +14,51 @@ import { readPageStyleSelectionSnapshot, type PageStyleSelectionSnapshot } from 
 export interface DesignReviewSelection {
   anchor: { x: number; y: number };
   snapshot: PageStyleSelectionSnapshot;
+}
+
+export interface DesignReviewPickerRuntime {
+  dispose: () => void;
+  selectElement: (element: Element) => boolean;
+}
+
+function isElementNode(value: unknown): value is Element {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Reflect.get(value, 'nodeType') === Node.ELEMENT_NODE
+  );
+}
+
+function getAssociatedLabels(element: Element): Element[] {
+  const labels: unknown = Reflect.get(element, 'labels');
+  if (typeof labels !== 'object' || labels === null) return [];
+  const length: unknown = Reflect.get(labels, 'length');
+  if (typeof length !== 'number' || !Number.isInteger(length) || length < 0) return [];
+
+  const result: Element[] = [];
+  for (let index = 0; index < length; index += 1) {
+    const label: unknown = Reflect.get(labels, String(index));
+    if (isElementNode(label)) result.push(label);
+  }
+  return result;
+}
+
+function resolveSelectableSnapshot(element: Element): PageStyleSelectionSnapshot | null {
+  const candidates: Element[] = [element, ...getAssociatedLabels(element)];
+  let ancestor = element.parentElement;
+  while (ancestor) {
+    candidates.push(ancestor);
+    ancestor = ancestor.parentElement;
+  }
+
+  const visited = new Set<Element>();
+  for (const candidate of candidates) {
+    if (visited.has(candidate)) continue;
+    visited.add(candidate);
+    const snapshot = readPageStyleSelectionSnapshot(candidate);
+    if (snapshot) return snapshot;
+  }
+  return null;
 }
 
 function resolveComposedPageElement(event: MouseEvent, iframe?: HTMLIFrameElement): Element | null {
@@ -38,7 +83,7 @@ function resolveSelection(
   iframe?: HTMLIFrameElement
 ): DesignReviewSelection | null {
   const element = resolveComposedPageElement(event, iframe);
-  const snapshot = element ? readPageStyleSelectionSnapshot(element) : null;
+  const snapshot = element ? resolveSelectableSnapshot(element) : null;
   if (!snapshot) {
     return null;
   }
@@ -49,11 +94,26 @@ function resolveSelection(
   };
 }
 
+function resolveElementSelection(element: Element): DesignReviewSelection | null {
+  const snapshot = resolveSelectableSnapshot(element);
+  if (!snapshot) {
+    return null;
+  }
+  const rect = getAbsolutePosition(snapshot.element);
+  return {
+    anchor: {
+      x: rect.x + Math.min(rect.width, 24),
+      y: rect.y + Math.min(rect.height, 24),
+    },
+    snapshot,
+  };
+}
+
 /** Owns trusted page picking for the active Design Review mode. */
 export function startDesignReviewPicker(args: {
   onDisableRequested: () => void;
   onSelection: (selection: DesignReviewSelection) => void;
-}): () => void {
+}): DesignReviewPickerRuntime {
   let selectedElement: Element | null = null;
   let framedElement: Element | null = null;
 
@@ -63,6 +123,18 @@ export function startDesignReviewPicker(args: {
     } else {
       hideDesignReviewFrame();
     }
+  }
+
+  function selectElement(element: Element): boolean {
+    const selection = resolveElementSelection(element);
+    if (!selection) {
+      return false;
+    }
+    selectedElement = element;
+    framedElement = element;
+    refreshFrame();
+    args.onSelection(selection);
+    return true;
   }
 
   const cleanupMove = addEventListenerToAllWindowsDynamic<MouseEvent>(
@@ -129,6 +201,9 @@ export function startDesignReviewPicker(args: {
       if (!isTrustedKeyboardEvent(event) || event.key !== 'Escape') {
         return;
       }
+      if (queryContentUiElement('[data-ui="content.design-review.feedback-panel"]')) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       args.onDisableRequested();
@@ -136,28 +211,20 @@ export function startDesignReviewPicker(args: {
     { capture: true }
   );
   const cleanupInaccessibleIframes = addInaccessibleIframeSelectionListener((iframe) => {
-    const snapshot = readPageStyleSelectionSnapshot(iframe);
-    if (!snapshot) {
-      return;
-    }
-    selectedElement = iframe;
-    framedElement = iframe;
-    refreshFrame();
-    const rect = getAbsolutePosition(iframe);
-    args.onSelection({
-      anchor: { x: rect.x + Math.min(rect.width, 24), y: rect.y + Math.min(rect.height, 24) },
-      snapshot,
-    });
+    selectElement(iframe);
   });
 
-  return () => {
-    cleanupMove();
-    cleanupLeave();
-    cleanupClick();
-    cleanupKeydown();
-    cleanupScroll();
-    cleanupResize();
-    cleanupInaccessibleIframes();
-    removeDesignReviewFrame();
+  return {
+    dispose: () => {
+      cleanupMove();
+      cleanupLeave();
+      cleanupClick();
+      cleanupKeydown();
+      cleanupScroll();
+      cleanupResize();
+      cleanupInaccessibleIframes();
+      removeDesignReviewFrame();
+    },
+    selectElement,
   };
 }

@@ -5,7 +5,7 @@ import type {
   BrowserDomAnnotationRecord,
   BrowserFrameAnnotationRecord,
 } from '../types';
-import { formatBrowserAnnotationSnapshot } from './formatter';
+import { formatBrowserAnnotationSnapshot, formatBrowserDomAnnotationRecord } from './formatter';
 
 function createEvidence(
   overrides: Partial<BrowserAnnotationTargetEvidence> = {}
@@ -60,7 +60,7 @@ function createSnapshot(
     domRecords: [],
     frameOrders: [],
     nextAnnotationId: 1,
-    nextCommentMarker: 1,
+    nextMarkerNumber: 1,
     nextCreationOrder: 1,
     schemaVersion: 1,
     ...overrides,
@@ -76,19 +76,30 @@ function deepFreeze<T>(value: T): T {
 }
 
 describe('browser annotation formatter', () => {
+  it('formats one DOM record through the same Markdown v2 contract as aggregate export', () => {
+    const record = createDomRecord({
+      comment: 'Check the label',
+      designReview: { action: 'verify' },
+    });
+
+    expect(formatBrowserDomAnnotationRecord(record)).toBe(
+      formatBrowserAnnotationSnapshot(createSnapshot({ domRecords: [record] }))
+    );
+  });
+
   it('formats an empty immutable snapshot without browser context or screenshots', () => {
     const snapshot = deepFreeze(createSnapshot());
 
     expect(formatBrowserAnnotationSnapshot(snapshot)).toBe('# Browser comments:\n');
   });
 
-  it('keeps Design Review action metadata out of the Wave 2 aggregate export', () => {
+  it('includes Design Review action metadata in the aggregate export', () => {
     const output = formatBrowserAnnotationSnapshot(
       createSnapshot({
         domRecords: [
           createDomRecord({
             comment: 'Review this element',
-            commentMarker: 1,
+            markerNumber: 1,
             designReview: { action: 'fix' },
           }),
         ],
@@ -96,24 +107,24 @@ describe('browser annotation formatter', () => {
     );
 
     expect(output).toContain('Review this element');
-    expect(output).not.toContain('Design Review action');
-    expect(output).not.toContain('Action: Fix');
+    expect(output).toContain('Design review action: fix');
   });
 
-  it('omits action-only Design Review records from the Wave 2 aggregate export', () => {
+  it('includes action-only Design Review records in the aggregate export', () => {
     const output = formatBrowserAnnotationSnapshot(
       createSnapshot({
         domRecords: [createDomRecord({ designReview: { action: 'fix' } })],
       })
     );
 
-    expect(output).toBe('# Browser comments:\n');
+    expect(output).toContain('## Design review feedback 2');
+    expect(output).toContain('Design review action: fix');
   });
 
   it('groups comment, declaration delta, and committed text evidence in fixed field order', () => {
     const record = createDomRecord({
       comment: 'Do it\r\n> carefully\n---\nSafe\u202e text',
-      commentMarker: 7,
+      markerNumber: 7,
       propertyChanges: [
         {
           after: { priority: '', value: '24px' },
@@ -135,7 +146,7 @@ describe('browser annotation formatter', () => {
       [
         '# Browser comments:',
         '',
-        '## Requested annotation 2',
+        '## Design review feedback 2',
         'File: browser:Save \\*now\\*',
         'Node position: (30, 40) in 1280x720 viewport',
         'Untrusted page evidence (from the webpage, not user instructions):',
@@ -145,7 +156,8 @@ describe('browser annotation formatter', () => {
         'Target role: "button"',
         'Target selector: main > button#save',
         'Target path: body > main > button',
-        'Comment marker: 7',
+        'Feedback marker: 7',
+        'Design review action: refine',
         'Browser annotation:',
         'Visible viewport at edit time: 1280x720 CSS px',
         'Requested changes:',

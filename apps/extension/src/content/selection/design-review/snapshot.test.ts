@@ -65,6 +65,15 @@ it('addresses an inner same-origin iframe target and the iframe element itself',
   });
 });
 
+it('omits transient Sniptale classes from the readable target path', () => {
+  document.body.className = 'page-shell sniptale-navigation-locked';
+  const target = appendVisible(document.createElement('p'));
+
+  expect(readPageStyleSelectionSnapshot(target)).toMatchObject({
+    domPath: 'html > body.page-shell > p:nth-of-type(1)',
+  });
+});
+
 it('does not climb from an ineligible target to a selectable ancestor', () => {
   const wrapper = appendVisible(document.createElement('div'));
   const script = appendVisible(document.createElement('script'), wrapper);

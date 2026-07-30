@@ -8,7 +8,6 @@ import type { ToolbarCaptureActionsProps } from '../types';
 import { getCaptureActionDescriptors } from '../../../../features/quick-actions-presets/catalog';
 import { FullPageCaptureSplitButton } from './full-page-menu';
 import { useFullPageCapturePreferences } from './full-page-preferences';
-import { AnnotationExportMenu } from './annotation-export-menu';
 
 export function renderMenuCheck() {
   return <PopoverCheckIcon />;
@@ -140,12 +139,6 @@ export function ToolbarCaptureButtons(props: {
         onUpdate={fullPage.updatePreferences}
         preferences={fullPage.preferences}
         saving={fullPage.saving}
-        toolbarMenuState={props.toolbarMenuState}
-      />
-      <AnnotationExportMenu
-        compactMenus={props.compactMenus}
-        disabled={props.isLoading}
-        displayMode={props.displayMode}
         toolbarMenuState={props.toolbarMenuState}
       />
     </>

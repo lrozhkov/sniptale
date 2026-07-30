@@ -2,6 +2,7 @@ import { ToolbarCaptureActions } from '../capture';
 import type { useToolbarViewModel } from '../state/view-model';
 import type { ToolbarProps } from '../types';
 import { ToolbarUtilityButtons } from './utilities';
+import { ToolbarDesignReviewControls } from './design-review';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
@@ -84,8 +85,8 @@ function createCaptureActionProps(args: {
     onPinToTabChange: args.toolbarProps.onPinToTabChange ?? (() => undefined),
     onCaptureActionChange: args.viewModel.capture.setAction,
     onClose: args.toolbarProps.onHide,
-    onDisableScreenshotMode: () => {
-      void args.viewModel.toggleMode('screenshot');
+    onDisableScreenshotMode: (activationEvent?: Event) => {
+      void args.viewModel.toggleMode('screenshot', activationEvent);
     },
     timerDelay: args.toolbarProps.timerDelay,
     onTimerDelayChange: args.toolbarProps.onTimerDelayChange,
@@ -129,6 +130,15 @@ export function ToolbarSecondaryControls(props: {
 
   return (
     <>
+      {viewModel.designReviewMode ? (
+        <ToolbarDesignReviewControls
+          compactMenus={viewModel.derivedState.compactMenus}
+          displayMode={viewModel.derivedState.displayMode}
+          panelOpen={toolbarProps.designReviewPanelOpen ?? false}
+          toolbarMenuState={viewModel.toolbarMenuState}
+          onTogglePanel={toolbarProps.onToggleDesignReviewPanel ?? (() => undefined)}
+        />
+      ) : null}
       <ToolbarUtilityButtons
         {...createUtilityButtonsProps({
           interactionMode,

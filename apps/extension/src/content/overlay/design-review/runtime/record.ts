@@ -2,6 +2,7 @@ import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import {
   browserAnnotationSession,
   createBrowserAnnotationTargetEvidence,
+  formatBrowserDomAnnotationRecord,
   type BrowserDesignReviewAction,
   type BrowserDomAnnotationRecord,
 } from '../../../parser/page-preparation/annotations';
@@ -68,7 +69,7 @@ function normalizeDeclarationPriority(priority: string): CssDeclarationPriority 
   return priority === 'important' ? 'important' : '';
 }
 
-function createDesignReviewResetBatch(
+export function createDesignReviewResetBatch(
   record: BrowserDomAnnotationRecord,
   target: PageStyleMutationElement
 ): PageStyleMutationBatch {
@@ -135,7 +136,7 @@ function commitDesignReviewRecovery(args: {
   return failures;
 }
 
-function retainDesignReviewRecovery(args: {
+export function retainDesignReviewRecovery(args: {
   evidence: BrowserDomAnnotationRecord['evidence'];
   mutation: PageStyleMutationBatch;
   target: PageStyleMutationElement;
@@ -143,9 +144,12 @@ function retainDesignReviewRecovery(args: {
   if (args.mutation.declarations.length === 0) {
     return [];
   }
-  const transactionId = createTransactionId('delete-recovery');
+  const transactionId = createTransactionId('recovery');
   if (!pagePreparationHistory.beginTransaction(transactionId)) {
-    return ['Design Review recovery history transaction is unavailable'];
+    return [
+      ...publishDesignReviewRecovery(args),
+      'Design Review recovery history transaction is unavailable',
+    ];
   }
   const failures = commitDesignReviewRecovery({ ...args, transactionId });
   if (failures.length > 0) {
@@ -224,18 +228,13 @@ export function deleteDesignReviewRecord(target: PageStyleMutationElement): void
 export function serializeDesignReviewRecord(target: Element): string {
   const record = readDesignReviewRecord(target);
   const evidence = record?.evidence ?? createBrowserAnnotationTargetEvidence(target);
-  return JSON.stringify(
-    {
-      action: record?.designReview?.action ?? 'refine',
-      comment: record?.comment ?? '',
-      element: {
-        path: evidence.targetPath,
-        selector: evidence.targetSelector,
-        tag: target.localName.toUpperCase(),
-      },
-      properties: record?.propertyChanges ?? [],
-    },
-    null,
-    2
+  return formatBrowserDomAnnotationRecord(
+    record ?? {
+      annotationId: 0,
+      creationOrder: 1,
+      designReview: { action: 'refine' },
+      evidence,
+      propertyChanges: [],
+    }
   );
 }

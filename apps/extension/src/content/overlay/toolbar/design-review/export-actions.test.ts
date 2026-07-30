@@ -34,7 +34,7 @@ vi.mock('../../../application/privileged-action-intent', async (importOriginal) 
   attachContentActionIntent: mocks.attachContentActionIntent,
 }));
 
-import { executeToolbarAnnotationExportAction } from './annotation-export-actions';
+import { executeToolbarAnnotationExportAction } from './export-actions';
 
 beforeEach(() => {
   mocks.attachContentActionIntent.mockClear();

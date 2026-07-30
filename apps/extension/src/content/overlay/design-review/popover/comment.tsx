@@ -23,7 +23,7 @@ export function PageStyleCommentField(props: {
         </label>
         {props.state.marker === null ? null : (
           <span className="text-[10px] font-semibold text-[var(--sniptale-color-text-secondary)]">
-            {translate('content.designReview.commentMarkerLabel')} №{props.state.marker}
+            {translate('content.designReview.markerNumberLabel')} №{props.state.marker}
           </span>
         )}
       </div>

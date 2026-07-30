@@ -60,10 +60,10 @@ export interface BrowserDesignReviewMetadata {
 export interface BrowserDomAnnotationRecord {
   annotationId: number;
   comment?: string;
-  commentMarker?: number;
   creationOrder: number;
   designReview?: BrowserDesignReviewMetadata;
   evidence: BrowserAnnotationTargetEvidence;
+  markerNumber?: number;
   propertyChanges: BrowserAnnotationPropertyChange[];
   textChange?: BrowserAnnotationTextChange;
 }
@@ -97,8 +97,8 @@ export interface BrowserAnnotationSessionSnapshot {
   domRecords: BrowserDomAnnotationRecord[];
   frameOrders: BrowserFrameAnnotationRecord[];
   nextAnnotationId: number;
-  nextCommentMarker: number;
   nextCreationOrder: number;
+  nextMarkerNumber: number;
   schemaVersion: typeof BROWSER_ANNOTATION_SCHEMA_VERSION;
 }
 

@@ -3,6 +3,7 @@ import type { BrowserDesignReviewAction } from '../../../parser/page-preparation
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import {
   getDesignReviewModeState,
+  openDesignReviewTarget,
   subscribeToDesignReviewMode,
 } from '../../../selection/design-review';
 import { usePageStyleDraftState } from './draft';
@@ -29,6 +30,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
   const activeSelection = params.enabled && modeState.enabled ? modeState.selection : null;
   const selection = activeSelection?.snapshot ?? null;
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const sessionRevision = useSyncExternalStore(
     browserAnnotationSession.subscribe,
@@ -43,6 +45,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
 
   useEffect(() => {
     if (!params.enabled) {
+      setPanelOpen(false);
       setPopoverOpen(false);
       setSettingsOpen(false);
     }
@@ -62,6 +65,11 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
     if (commentDraft.closeComment()) {
       setPopoverOpen(false);
     }
+  }
+
+  function openRecord(annotationId: number): boolean {
+    const target = browserAnnotationSession.getLiveTarget(annotationId);
+    return target ? openDesignReviewTarget(target) : false;
   }
 
   return {
@@ -106,13 +114,20 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
       updateValues: valueActions.updateValues,
     },
     inspectorOpen: popoverOpen,
+    enabled: params.enabled && modeState.enabled,
+    panel: {
+      close: () => setPanelOpen(false),
+      openRecord,
+      open: panelOpen,
+      toggle: () => setPanelOpen((current) => !current),
+    },
     viewState: {
       action,
       anchor: activeSelection?.anchor ?? null,
       comment: {
         commitFailed: commentDraft.commentCommitFailed,
         draft: commentDraft.commentDraft,
-        marker: commentDraft.commentMarker,
+        marker: commentDraft.markerNumber,
       },
       defaultValues: draftState.defaultValues,
       draftPatch: draftState.draftPatch,

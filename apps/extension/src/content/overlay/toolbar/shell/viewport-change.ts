@@ -2,71 +2,25 @@ import { translate } from '../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
-import {
-  CaptureMessageType,
-  MessageType,
-} from '@sniptale/runtime-contracts/messaging/message-types';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   getScreenshotSurfaceCapabilityToken,
   getScreenshotSurfaceLeaseGeneration,
   nextScreenshotSurfaceOperationGeneration,
-  setScreenshotSurfaceBinding,
 } from '../../viewport-selector/capability';
 import type { ToolbarViewportSelection } from '../types';
 import { getViewportPresetErrorMessage } from '../../../../features/viewport-presets/error-message';
-import {
-  attachContentActionIntent,
-  type ContentPrivilegedActionIntentSource,
-} from '../../../application/privileged-action-intent';
-import type { ContentPrivilegedActionCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
+import { refreshToolbarSurfaceSession, renewToolbarSurfaceSession } from './surface-session';
 
 const logger = createLogger({ namespace: 'ContentToolbarShell' });
 
 async function refreshToolbarViewportStatus(
   setCurrentViewport: (viewport: { width: number; height: number } | null) => void
 ) {
-  const status = await getContentRuntimeServices().messaging.sendRuntimeMessage({
-    type: MessageType.SCREENSHOT_MODE_STATUS,
-  });
+  const status = await refreshToolbarSurfaceSession();
   setCurrentViewport(status?.success ? (status.viewport ?? null) : null);
-  if (status?.success) {
-    setScreenshotSurfaceBinding({
-      token: status.enabled ? (status.surfaceCapabilityToken ?? null) : null,
-      ...(status.surfaceLeaseGeneration === undefined
-        ? {}
-        : { leaseGeneration: status.surfaceLeaseGeneration }),
-      ...(status.surfaceOperationGeneration === undefined
-        ? {}
-        : { operationGeneration: status.surfaceOperationGeneration }),
-    });
-  }
   return status;
-}
-
-async function renewToolbarSurfaceSession(
-  contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined
-): Promise<void> {
-  if (!contentIntentSource) throw new Error('authorization-expired');
-  const renewalRequest: {
-    contentIntent?: ContentPrivilegedActionCapability;
-    type: typeof CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION;
-  } = { type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION };
-  const message = await attachContentActionIntent(renewalRequest, contentIntentSource);
-  if (!message.contentIntent) throw new Error('authorization-expired');
-  const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
-    contentIntent: message.contentIntent,
-    type: CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
-  });
-  if (!response?.success || !response.surfaceCapabilityToken) {
-    throw new Error(response?.error ?? 'authorization-expired');
-  }
-  setScreenshotSurfaceBinding({
-    token: response.surfaceCapabilityToken,
-    ...(response.surfaceLeaseGeneration === undefined
-      ? {}
-      : { leaseGeneration: response.surfaceLeaseGeneration }),
-    operationGeneration: response.surfaceOperationGeneration,
-  });
 }
 
 async function sendToolbarSurfaceMutation(viewport: ToolbarViewportSelection) {
