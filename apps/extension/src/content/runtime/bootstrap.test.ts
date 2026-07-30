@@ -37,9 +37,7 @@ const runtimeCleanupMocks = vi.hoisted(() => ({
   disableSelectionMode: vi.fn(),
   disableVideoAnnotations: vi.fn(),
   disableVideoTelemetry: vi.fn(),
-  disposePageStyleRuntime: vi.fn(),
   hideVideoCountdown: vi.fn(),
-  initializePageStyleRuntime: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
@@ -80,13 +78,6 @@ vi.mock('../selection/quick-edit', () => ({
   enableQuickEditDocumentMode: vi.fn(),
   enableQuickEditMode: vi.fn(),
   isQuickEditDocumentModeEnabled: vi.fn(),
-}));
-
-vi.mock('../selection/quick-edit/page-style', () => ({
-  disposePageStyleRuntime: runtimeCleanupMocks.disposePageStyleRuntime,
-  getPageStyleCurrentRuleSummary: vi.fn(),
-  initializePageStyleRuntime: runtimeCleanupMocks.initializePageStyleRuntime,
-  openPageStyleInspector: vi.fn(),
 }));
 
 vi.mock('../selection/selection-mode', () => ({

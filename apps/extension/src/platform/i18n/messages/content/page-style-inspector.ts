@@ -1,6 +1,5 @@
 import { defineMessageSource } from '../source';
 import { contentPageStyleInspectorAppearanceMessages } from './page-style-inspector-appearance';
-import { contentPageStyleInspectorManagementMessages } from './page-style-inspector-management';
 import { contentPageStyleInspectorOptionMessages } from './page-style-inspector-options';
 
 export const contentPageStyleInspectorMessages = defineMessageSource({
@@ -21,18 +20,6 @@ export const contentPageStyleInspectorMessages = defineMessageSource({
   unavailableDuringDocumentEdit: {
     ru: 'Недоступно при свободном редактировании текста',
     en: 'Unavailable during free text editing',
-  },
-  tabProperties: {
-    ru: 'Блок',
-    en: 'Block',
-  },
-  tabTemplates: {
-    ru: 'Шаблоны',
-    en: 'Templates',
-  },
-  tabRules: {
-    ru: 'Правила',
-    en: 'Rules',
   },
   emptySelectionTitle: {
     ru: 'Блок не выбран',
@@ -230,14 +217,6 @@ export const contentPageStyleInspectorMessages = defineMessageSource({
     ru: 'Цвет фона',
     en: 'Background color',
   },
-  backgroundImage: {
-    ru: 'Градиент',
-    en: 'Gradient',
-  },
-  backgroundImagePlaceholder: {
-    ru: 'linear-gradient(...)',
-    en: 'linear-gradient(...)',
-  },
   cssAutoPlaceholder: {
     ru: 'авто',
     en: 'auto',
@@ -246,25 +225,9 @@ export const contentPageStyleInspectorMessages = defineMessageSource({
     ru: 'нет',
     en: 'none',
   },
-  backgroundAsset: {
-    ru: 'Файл фона',
-    en: 'Background file',
-  },
-  chooseFile: {
-    ru: 'Выбрать',
-    en: 'Choose',
-  },
-  replaceFile: {
-    ru: 'Заменить',
-    en: 'Replace',
-  },
   boxShadow: {
     ru: 'Тень',
     en: 'Shadow',
-  },
-  replaceImage: {
-    ru: 'Заменить файл',
-    en: 'Replace file',
   },
   objectFit: {
     ru: 'Вписывание',
@@ -278,11 +241,6 @@ export const contentPageStyleInspectorMessages = defineMessageSource({
     ru: '50% 50%',
     en: '50% 50%',
   },
-  save: {
-    ru: 'Сохранить',
-    en: 'Save',
-  },
-  ...contentPageStyleInspectorManagementMessages,
   disabledWithoutSelection: {
     ru: 'Выберите блок на странице',
     en: 'Select a block on the page',

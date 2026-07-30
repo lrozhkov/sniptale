@@ -25,10 +25,7 @@ function declarationValuesEqual(left: CssDeclarationValue, right: CssDeclaration
 }
 
 export function cloneDeclarationPolicy(policy: CssDeclarationPolicy): CssDeclarationPolicy {
-  return {
-    ...(policy.assetUrl ? { assetUrl: policy.assetUrl } : {}),
-    source: policy.source,
-  };
+  return { source: policy.source };
 }
 
 function markPageStylePolicyRecords(
@@ -112,16 +109,6 @@ export function readDeclarationPolicy(
   return retained && declarationValuesEqual(retained.value, value)
     ? cloneDeclarationPolicy(retained.policy)
     : { source: 'inspector' };
-}
-
-export function isCurrentDeclarationPolicy(args: {
-  expected: CssDeclarationPolicy;
-  property: CssDeclarationDelta['property'];
-  target: PageStyleMutationElement;
-  value: CssDeclarationValue;
-}): boolean {
-  const current = readDeclarationPolicy(args.target, args.property, args.value);
-  return current.source === args.expected.source && current.assetUrl === args.expected.assetUrl;
 }
 
 export function rememberDeclarationPolicies(

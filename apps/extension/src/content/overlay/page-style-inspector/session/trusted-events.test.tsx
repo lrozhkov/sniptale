@@ -4,12 +4,6 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const storageMocks = vi.hoisted(() => ({
-  listPageStyleRestoreRules: vi.fn(),
-  listPageStyleTemplates: vi.fn(),
-  summarizePageStyleRulesForPage: vi.fn(),
-}));
-
 const frameMocks = vi.hoisted(() => ({
   isIframeAccessible: vi.fn(() => true),
 }));
@@ -18,23 +12,6 @@ const trustedEventMocks = vi.hoisted(() => ({
   hasActiveUserActivation: vi.fn(() => true),
   isTrustedDomEvent: vi.fn(() => true),
   isTrustedMouseEvent: vi.fn(() => true),
-}));
-
-vi.mock('../../../../composition/persistence/page-style/storage', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../../../composition/persistence/page-style/storage')
-  >()),
-  listPageStyleRestoreRules: storageMocks.listPageStyleRestoreRules,
-  listPageStyleTemplates: storageMocks.listPageStyleTemplates,
-  summarizePageStyleRulesForPage: storageMocks.summarizePageStyleRulesForPage,
-}));
-
-vi.mock('../runtime/actions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../runtime/actions')>()),
-  readCurrentPageStyleIdentity: vi.fn(() => ({
-    pageDomain: window.location.hostname || null,
-    pageUrl: window.location.href,
-  })),
 }));
 
 vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
@@ -106,13 +83,6 @@ beforeEach(() => {
   trustedEventMocks.isTrustedDomEvent.mockReturnValue(true);
   trustedEventMocks.isTrustedMouseEvent.mockReturnValue(true);
   frameMocks.isIframeAccessible.mockReturnValue(true);
-  storageMocks.listPageStyleTemplates.mockResolvedValue([]);
-  storageMocks.listPageStyleRestoreRules.mockResolvedValue([]);
-  storageMocks.summarizePageStyleRulesForPage.mockResolvedValue({
-    activeAppliedCount: 0,
-    matchedRules: [],
-    pageUrl: window.location.href,
-  });
 });
 
 afterEach(() => {

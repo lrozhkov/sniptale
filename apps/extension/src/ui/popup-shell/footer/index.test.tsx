@@ -169,25 +169,21 @@ it('renders only the extension version in the footer label', async () => {
 });
 
 it('wires footer actions and shows the restriction indicator when requested', async () => {
-  const onOpenAppliedStyles = vi.fn();
   const onOpenDesignSystem = vi.fn();
   const onOpenGithub = vi.fn();
   const onOpenSettings = vi.fn();
   const restrictionIndicatorTitle = 'Недоступно на этой странице';
 
   await renderFooterWithProps({
-    onOpenAppliedStyles,
     onOpenDesignSystem,
     onOpenGithub,
     onOpenSettings,
-    showAppliedStylesAction: true,
     showRestrictionIndicator: true,
     restrictionIndicatorTitle,
   });
 
   act(() => {
     clickFooterAction('popup.footer.github-button');
-    clickFooterAction('popup.footer.applied-styles-button');
     clickFooterAction('popup.footer.design-system-button');
     clickFooterAction('popup.footer.settings-button');
   });
@@ -196,13 +192,7 @@ it('wires footer actions and shows the restriction indicator when requested', as
   expect(onOpenGithub).toHaveBeenCalledTimes(1);
   expect(githubButton?.getAttribute('title')).toBe('GitHub');
   expect(githubButton?.querySelector('svg')?.classList.contains('lucide-github')).toBe(true);
-  expect(onOpenAppliedStyles).toHaveBeenCalledTimes(1);
   expect(onOpenDesignSystem).toHaveBeenCalledTimes(1);
-  expect(
-    container
-      ?.querySelector('[data-ui="popup.footer.applied-styles-button"]')
-      ?.getAttribute('title')
-  ).toBe('Показать примененные стили');
   expect(onOpenSettings).toHaveBeenCalledTimes(1);
   expect(
     container
@@ -212,15 +202,6 @@ it('wires footer actions and shows the restriction indicator when requested', as
   expect(
     container?.querySelector('[data-ui="popup.footer.restriction-indicator"]')?.className
   ).toContain('var(--sniptale-color-danger)');
-});
-
-it('hides the applied styles action when no current-page rules are reported', async () => {
-  await renderFooterWithProps({
-    onOpenAppliedStyles: vi.fn(),
-    showAppliedStylesAction: false,
-  });
-
-  expect(container?.querySelector('[data-ui="popup.footer.applied-styles-button"]')).toBeNull();
 });
 
 it('hides the design system action when the build flag disables it', async () => {

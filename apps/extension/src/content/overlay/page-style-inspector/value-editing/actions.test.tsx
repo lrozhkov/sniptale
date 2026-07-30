@@ -25,8 +25,7 @@ function createSelection(element: HTMLElement) {
     domPath: 'p#target',
     element,
     kind: 'text' as const,
-    patch: { assets: [], declarations: [] },
-    selector: { locator: '#target' },
+    patch: { declarations: [] },
     selectorLabel: 'p#target',
     tagName: 'p',
     textPreview: 'Target',
@@ -89,7 +88,7 @@ it('tracks manual dirty values and removes them when reset to computed default',
   expect(latestValues.color).toBe('rgb(17, 17, 17)');
   expect(mocks.applyPageStylePatchWithHistory).toHaveBeenLastCalledWith(
     expect.objectContaining({
-      patch: { assets: [], declarations: [{ property: 'color', value: null }] },
+      patch: { declarations: [{ property: 'color', value: null }] },
     })
   );
 });
@@ -114,7 +113,6 @@ it('applies linked side field updates as one atomic patch', async () => {
   expect(mocks.applyPageStylePatchWithHistory).toHaveBeenLastCalledWith(
     expect.objectContaining({
       patch: {
-        assets: [],
         declarations: [
           { property: 'border-top-width', value: '4px' },
           { property: 'border-right-width', value: '4px' },
@@ -141,7 +139,6 @@ it('adds visible border styles when border width changes from computed none', as
   expect(mocks.applyPageStylePatchWithHistory).toHaveBeenLastCalledWith(
     expect.objectContaining({
       patch: {
-        assets: [],
         declarations: [
           { property: 'border-top-width', value: '2px' },
           { property: 'border-top-style', value: 'solid' },

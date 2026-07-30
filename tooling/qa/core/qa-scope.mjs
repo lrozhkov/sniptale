@@ -42,7 +42,6 @@ const FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES = new Set([
   'media-hub-backup-restore.mjs',
   'media-hub.mjs',
   'messaging.mjs',
-  'page-style.mjs',
   'popup-page-access.mjs',
   'popup-recording.mjs',
   'privacy-erasure-runtime.mjs',

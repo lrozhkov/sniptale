@@ -9,9 +9,6 @@ declare module './' {
     type ENABLE_QUICK_EDIT_MODE = typeof import('./').MessageType.ENABLE_QUICK_EDIT_MODE;
     type DISABLE_QUICK_EDIT_MODE = typeof import('./').MessageType.DISABLE_QUICK_EDIT_MODE;
     type QUICK_EDIT_MODE_STATUS = typeof import('./').MessageType.QUICK_EDIT_MODE_STATUS;
-    type GET_PAGE_STYLE_CURRENT_RULE_SUMMARY =
-      typeof import('./').MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY;
-    type OPEN_PAGE_STYLE_INSPECTOR = typeof import('./').MessageType.OPEN_PAGE_STYLE_INSPECTOR;
     type SHOW_TOOLBAR = typeof import('./').MessageType.SHOW_TOOLBAR;
     type HIDE_TOOLBAR = typeof import('./').MessageType.HIDE_TOOLBAR;
     type TOOLBAR_STATUS = typeof import('./').MessageType.TOOLBAR_STATUS;

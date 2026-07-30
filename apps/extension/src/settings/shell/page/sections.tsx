@@ -28,7 +28,6 @@ const deferredSettingsSectionLoaders: Record<DeferredSettingsTab, SettingsSectio
   highlighter: () => import('../../sections/highlighter/section'),
   editor: () => import('../../sections/editor'),
   image: () => import('../../sections/image'),
-  pageStyles: () => import('../../sections/page-styles'),
   templates: () => import('../../sections/templates'),
   quickactions: () => import('../../sections/quick-actions'),
   nativeApp: () => import('../../sections/native-app'),
@@ -49,10 +48,6 @@ const deferredSettingsSections: Record<
   ),
   editor: createLazySettingsSection(deferredSettingsSectionLoaders.editor, 'EditorSection'),
   image: createLazySettingsSection(deferredSettingsSectionLoaders.image, 'ImageSettingsSection'),
-  pageStyles: createLazySettingsSection(
-    deferredSettingsSectionLoaders.pageStyles,
-    'PageStylesSection'
-  ),
   templates: createLazySettingsSection(
     deferredSettingsSectionLoaders.templates,
     'TemplatesSection'

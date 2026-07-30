@@ -37,12 +37,10 @@ it('creates Properties snapshots for visible HTML and SVG targets', () => {
 
   expect(readPageStyleSelectionSnapshot(html)).toMatchObject({
     element: html,
-    selector: { locator: '#html-target' },
     tagName: 'section',
   });
   expect(readPageStyleSelectionSnapshot(text)).toMatchObject({
     element: text,
-    selector: { locator: '#svg-target' },
     tagName: 'text',
   });
   expect(findInspectablePageStyleElement(text)).toBe(text);
@@ -57,7 +55,10 @@ it('addresses an inner same-origin iframe target and the iframe element itself',
   inner.id = 'inner';
   inner.textContent = 'Inner';
 
-  expect(readPageStyleSelectionSnapshot(inner)?.selector.locator).toBe('iframe#frame => #inner');
+  expect(readPageStyleSelectionSnapshot(inner)).toMatchObject({
+    element: inner,
+    tagName: 'button',
+  });
   expect(readPageStyleSelectionSnapshot(iframe)).toMatchObject({
     element: iframe,
     tagName: 'iframe',

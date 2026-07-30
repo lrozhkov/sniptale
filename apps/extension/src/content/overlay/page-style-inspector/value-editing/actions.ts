@@ -101,10 +101,8 @@ function applyValueUpdates(args: {
   void applyPageStylePatchWithHistory({
     element: args.selection.element,
     patch: {
-      assets: [],
       declarations: args.declarations,
     },
-    selector: args.selection.selector,
   });
 }
 

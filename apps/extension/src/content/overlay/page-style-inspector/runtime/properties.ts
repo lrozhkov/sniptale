@@ -3,12 +3,7 @@ import {
   type PageStyleDeclaration,
   type PageStylePatch,
   type PageStyleProperty,
-  type PageStyleSelectorIdentity,
 } from '@sniptale/runtime-contracts/page-style';
-import {
-  createCompositeSelector,
-  serializeCompositeSelector,
-} from '../../../platform/frame/selectors';
 import {
   isPageStyleMutationElement,
   type PageStyleMutationElement,
@@ -21,7 +16,6 @@ export interface PageStyleSelectionSnapshot {
   element: PageStyleMutationElement;
   kind: PageStyleElementKind;
   patch: PageStylePatch;
-  selector: PageStyleSelectorIdentity;
   selectorLabel: string;
   tagName: string;
   textPreview: string;
@@ -30,7 +24,6 @@ export interface PageStyleSelectionSnapshot {
 export type PageStyleDeclarationValueMap = Partial<Record<PageStyleProperty, string>>;
 
 const EMPTY_STYLE_PATCH: PageStylePatch = {
-  assets: [],
   declarations: [],
 };
 
@@ -116,7 +109,6 @@ export function readPageStyleSelectionSnapshot(
     return null;
   }
 
-  const compositeSelector = createCompositeSelector(element);
   const styles = element.ownerDocument.defaultView?.getComputedStyle(element);
   if (!styles) {
     return null;
@@ -131,12 +123,6 @@ export function readPageStyleSelectionSnapshot(
       declarations: PAGE_STYLE_ALLOWED_PROPERTIES.map((property) =>
         createComputedDeclaration(styles, property)
       ),
-    },
-    selector: {
-      locator: serializeCompositeSelector(compositeSelector),
-      ...(element.getAttribute('data-sniptale-id')
-        ? { sniptaleId: element.getAttribute('data-sniptale-id')! }
-        : {}),
     },
     selectorLabel: createElementCode(element),
     tagName: element.localName.toLowerCase(),

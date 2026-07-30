@@ -13,7 +13,6 @@ export type RuntimeStateAuthorityFlowId =
   | 'editor-bootstrap'
   | 'offscreen-command'
   | 'page-access-activation'
-  | 'page-style-runtime'
   | 'popup-export'
   | 'privacy-erasure'
   | 'project-export'

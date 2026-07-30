@@ -1,5 +1,4 @@
 import { translate } from '../../../../../platform/i18n';
-import { PAGE_STYLE_ASSET_KINDS } from '@sniptale/runtime-contracts/page-style';
 import { ColorField } from '../choice-fields';
 import { Section } from '../section';
 import {
@@ -10,8 +9,6 @@ import {
 } from '../side-fields';
 import { changedSummary, countModified, fieldState } from '../helpers';
 import type { PageStyleInspectorActions, PageStyleInspectorViewState } from '../../types';
-import { BackgroundFileField } from '../appearance/background-file-field';
-import { GradientField } from '../appearance/gradient-field';
 import { ShadowField } from '../appearance/shadow-field';
 
 type SectionProps = {
@@ -22,7 +19,6 @@ type SectionProps = {
 
 const APPEARANCE_PROPERTIES = [
   'background-color',
-  'background-image',
   'box-shadow',
   'border-top-width',
   'border-right-width',
@@ -59,18 +55,6 @@ export function AppearanceSection({ actions, disabled, state }: SectionProps) {
         onChange={(value) => actions.updateValue('background-color', value)}
       />
       <BackgroundAppearanceFields actions={actions} disabled={disabled} state={state} />
-      <BackgroundFileField
-        asset={
-          state.draftPatch.assets.find(
-            (asset) => asset.kind === PAGE_STYLE_ASSET_KINDS.BACKGROUND_IMAGE
-          ) ?? null
-        }
-        disabled={disabled}
-        buttonLabel={translate('content.pageStyleInspector.chooseFile')}
-        label={translate('content.pageStyleInspector.backgroundAsset')}
-        onClear={actions.clearBackgroundAsset}
-        onSelect={actions.saveBackgroundAsset}
-      />
       <SectionGroupLabel label={translate('content.pageStyleInspector.appearanceBorderGroup')} />
       <BorderSideFields actions={actions} disabled={disabled} state={state} />
     </Section>
@@ -88,12 +72,6 @@ function SectionGroupLabel(props: { label: string }) {
 function BackgroundAppearanceFields({ actions, disabled, state }: SectionProps) {
   return (
     <>
-      <GradientField
-        disabled={disabled}
-        label={translate('content.pageStyleInspector.backgroundImage')}
-        {...fieldState(state, actions, 'background-image')}
-        onChange={(value) => actions.updateValue('background-image', value)}
-      />
       <ShadowField
         disabled={disabled}
         label={translate('content.pageStyleInspector.boxShadow')}

@@ -1,7 +1,6 @@
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 import { handleCoreModeMessage } from './core';
-import { handlePageStyleMessage } from './page-style';
 import { handleRegionCaptureMessage } from './region-capture';
 import { createRegionOverlayBridgeDeps, handleRegionOverlayMessage } from './region-overlay';
 import { handleViewportMessage } from './viewport';
@@ -24,7 +23,6 @@ export function createContentRuntimeMessageHandlers(
 
   return [
     () => handleCoreModeMessage(message),
-    () => handlePageStyleMessage(message, sendResponse),
     () => handleViewportMessage(message, sendResponse, getViewportInfo, regionSelectorController),
     () => handleRegionCaptureMessage(message, sendResponse),
     () => handleRegionOverlayMessage(message, sendResponse, regionOverlayDeps),

@@ -41,7 +41,7 @@ export function createRadiusProperty(side: Side): PageStyleProperty {
   return 'border-bottom-left-radius';
 }
 
-export function createSideFieldKey(properties: readonly PageStyleProperty[]): string {
+function createSideFieldKey(properties: readonly PageStyleProperty[]): string {
   return properties.join('|');
 }
 

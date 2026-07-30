@@ -10,12 +10,7 @@ type CaptureRouteSenderPolicyArgs = {
   sender: chrome.runtime.MessageSender | undefined;
 };
 
-export type PrivilegedTabRouteFamily =
-  | 'capture'
-  | 'page-style'
-  | 'scenario'
-  | 'tab-mode'
-  | 'video-control';
+export type PrivilegedTabRouteFamily = 'capture' | 'scenario' | 'tab-mode' | 'video-control';
 
 type PrivilegedTabRouteSenderPolicyArgs = {
   family: PrivilegedTabRouteFamily;
@@ -32,7 +27,6 @@ type TabRouteAuthorizationPolicy = {
 
 const privilegedTabRouteAuthorizationMatrix = {
   capture: { popup: false, senderOwnedTab: true, viewer: false },
-  'page-style': { popup: true, senderOwnedTab: true, viewer: false },
   scenario: { popup: false, senderOwnedTab: true, viewer: true },
   'tab-mode': { popup: true, senderOwnedTab: true, viewer: false },
   'video-control': { popup: true, senderOwnedTab: false, viewer: false },
@@ -40,7 +34,6 @@ const privilegedTabRouteAuthorizationMatrix = {
 
 const unauthorizedRouteErrors = {
   capture: 'Unauthorized capture route sender',
-  'page-style': 'Unauthorized page-style route sender',
   scenario: 'Unauthorized scenario route sender',
   'tab-mode': 'Unauthorized tab-mode route sender',
   'video-control': 'Unauthorized video-control route sender',

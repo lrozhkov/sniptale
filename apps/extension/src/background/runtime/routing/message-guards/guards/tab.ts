@@ -14,10 +14,6 @@ import type {
   RuntimeMessageEnvelope,
   ScenarioMessage,
 } from './shared';
-import {
-  isPageStyleRuntimeMessage,
-  pageStyleRuntimeMessageTypes,
-} from '../../../../capture/routes';
 
 const backgroundInternalSignalTypes = [
   VideoMessageType.COUNTDOWN_COMPLETE,
@@ -103,7 +99,6 @@ const videoControlMessageTypes = [
 
 export const backgroundTabMessageTypes = [
   ...tabModeMessageTypes,
-  ...pageStyleRuntimeMessageTypes,
   ...scenarioMessageTypes,
   ...popupExportViewerMessageTypes,
   ...captureMessageTypes,
@@ -151,7 +146,6 @@ export function isBackgroundTabMessage(
 ): message is BackgroundTabMessage {
   return (
     isTabModeMessage(message) ||
-    isPageStyleRuntimeMessage(message) ||
     isScenarioMessage(message) ||
     isPopupExportViewerMessage(message) ||
     isRouteCaptureMessage(message) ||

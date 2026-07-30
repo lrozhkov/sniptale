@@ -29,15 +29,6 @@ export const TAB_ACTION_ROUTE_CONTRACTS = {
     sideEffects: 'issues a scoped gallery update lease',
     transitiveStateOwner: 'gallery update capability owner',
   },
-  'page-style-privileged-tab-route': {
-    acceptedSenderClass: 'owned content tab or extension page routed to an authorized tab',
-    errorShape: 'page-style tab route error response',
-    freshnessReplayPolicy: 'resolved tab/page state must match before applying or inspecting rules',
-    requiredAuthority: 'privileged tab page-style authorization policy',
-    responseShape: 'page-style route response',
-    sideEffects: 'page-style inspection, rule summary, and storage-backed runtime effects',
-    transitiveStateOwner: 'page-style runtime and shared page-style storage owners',
-  },
   'popup-export-tab-route-capability': {
     acceptedSenderClass: 'popup or viewer route presenting one-shot tab-route capability',
     errorShape: 'popup export tab route error response',

@@ -30,16 +30,6 @@ beforeEach(() => {
   browserTabsQueryMock.mockResolvedValue([{ id: 17 }]);
 });
 
-it('resolves popup page-style messages to the active tab instead of the caller tab id', async () => {
-  await expect(
-    resolveTabIdPromise(
-      { tabId: 61, type: MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY },
-      createSender({ url: POPUP_URL })
-    )
-  ).resolves.toBe(17);
-  expect(browserTabsQueryMock).toHaveBeenCalledWith({ active: true, currentWindow: true });
-});
-
 it('uses the popup sender tab instead of a caller-provided tab id', async () => {
   await expect(
     resolveTabIdPromise(

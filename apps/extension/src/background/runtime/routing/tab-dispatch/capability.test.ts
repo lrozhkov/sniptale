@@ -2,7 +2,6 @@ import { beforeEach, expect, it } from 'vitest';
 
 import {
   browserTabsGetMock,
-  browserTabsQueryMock,
   createSender,
   createSendResponse,
   ensureActivePageAccessRuntimeMock,
@@ -123,30 +122,6 @@ it('prefers popup export capabilities over extension page sender tabs', async ()
     'Page access is required for export.'
   );
   expect(sendTabMessageMock).not.toHaveBeenCalledWith(999, expect.anything());
-});
-
-it('routes popup page-style messages to the active tab instead of caller tab ids', async () => {
-  const { listener, sendResponse } = registerListener();
-  const message = { tabId: 61, type: MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY };
-  browserTabsQueryMock.mockResolvedValue([{ id: 17 }]);
-  browserTabsGetMock.mockResolvedValue({ id: 17, url: 'https://example.test/page' });
-  parseBackgroundRuntimeMessageMock.mockReturnValue(message);
-  isBackgroundTabMessageMock.mockReturnValue(true);
-  sendTabMessageMock.mockResolvedValue({
-    success: true,
-    summary: { activeAppliedCount: 2 },
-  });
-
-  expectListenerResult(true, listener, message, createSender(undefined, POPUP_URL), sendResponse);
-  await flushPromises();
-
-  expect(ensureActivePageAccessRuntimeMock).toHaveBeenCalledWith(17);
-  expect(sendTabMessageMock).toHaveBeenCalledWith(17, {
-    tabId: 17,
-    type: MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY,
-  });
-  expect(sendTabMessageMock).not.toHaveBeenCalledWith(61, expect.anything());
-  expect(sendResponse).toHaveBeenCalledWith({ success: true, summary: { activeAppliedCount: 2 } });
 });
 
 it('rejects non-popup extension pages that submit popup export tab ids', async () => {

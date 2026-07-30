@@ -1,4 +1,4 @@
-import { AlertTriangle, Blocks, Github, Paintbrush, Settings2 } from 'lucide-react';
+import { AlertTriangle, Blocks, Github, Settings2 } from 'lucide-react';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { isDesignSystemEnabled } from '../../../platform/config/design-system-access';
 import { translate } from '../../../platform/i18n';
@@ -14,11 +14,9 @@ function getPopupFooterVersion(): string {
 }
 
 export interface PopupFooterProps {
-  onOpenAppliedStyles?: () => void;
   onOpenDesignSystem: () => void;
   onOpenGithub: () => void;
   onOpenSettings: () => void;
-  showAppliedStylesAction?: boolean;
   restrictionIndicatorTitle?: string | null;
   showRestrictionIndicator?: boolean;
 }
@@ -62,15 +60,6 @@ function PopupFooterActions(props: PopupFooterProps) {
           restrictionIndicatorTitle={props.restrictionIndicatorTitle}
         />
       ) : null}
-      {props.showAppliedStylesAction && props.onOpenAppliedStyles ? (
-        <PopupFooterAction
-          onClick={props.onOpenAppliedStyles}
-          icon={Paintbrush}
-          label={translate('popup.common.footerAppliedStyles')}
-          iconOnly
-          dataUi="popup.footer.applied-styles-button"
-        />
-      ) : null}
       <PopupFooterAction
         onClick={props.onOpenGithub}
         icon={Github}
@@ -89,12 +78,10 @@ function PopupFooterActions(props: PopupFooterProps) {
 }
 
 export function PopupFooter({
-  onOpenAppliedStyles,
   onOpenDesignSystem,
   onOpenGithub,
   onOpenSettings,
   restrictionIndicatorTitle,
-  showAppliedStylesAction = false,
   showRestrictionIndicator = false,
 }: PopupFooterProps) {
   const version = getPopupFooterVersion();
@@ -102,9 +89,7 @@ export function PopupFooter({
     onOpenDesignSystem,
     onOpenGithub,
     onOpenSettings,
-    showAppliedStylesAction,
     showRestrictionIndicator,
-    ...(onOpenAppliedStyles === undefined ? {} : { onOpenAppliedStyles }),
     ...(restrictionIndicatorTitle === undefined ? {} : { restrictionIndicatorTitle }),
   };
 

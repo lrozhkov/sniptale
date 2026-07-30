@@ -19,7 +19,6 @@ export function publishPageStyleAnnotation(args: {
     (['before', 'after'] as const).every((side) => {
       const policy = side === 'before' ? change.beforePolicy : change.afterPolicy;
       return isCssDeclarationValueAllowed({
-        ...(policy.assetUrl ? { assetUrl: policy.assetUrl } : {}),
         element: args.target,
         property: change.property,
         source: policy.source,

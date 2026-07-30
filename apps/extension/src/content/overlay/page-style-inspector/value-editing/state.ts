@@ -30,26 +30,11 @@ export function listModifiedPageStyleProperties(args: {
 }
 
 export function createManualPageStylePatch(args: {
-  assets: PageStylePatch['assets'];
   defaultValues: PageStyleDeclarationValueMap;
   values: PageStyleDeclarationValueMap;
 }): PageStylePatch {
   return {
-    assets: args.assets,
     declarations: listModifiedPageStyleProperties(args).map((property) => ({
-      property,
-      value: normalizeInspectorValue(args.values[property]) || null,
-    })),
-  };
-}
-
-export function createComputedPageStylePatch(args: {
-  assets: PageStylePatch['assets'];
-  values: PageStyleDeclarationValueMap;
-}): PageStylePatch {
-  return {
-    assets: args.assets,
-    declarations: PAGE_STYLE_ALLOWED_PROPERTIES.map((property) => ({
       property,
       value: normalizeInspectorValue(args.values[property]) || null,
     })),

@@ -13,7 +13,6 @@ import {
   resetRuntimeMessagingMocks,
   routeScenarioMessageMock,
   routeTabModeMessageMock,
-  sendTabMessageMock,
 } from '../../../../../../../tooling/test/support/background-runtime-messaging.test-support';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { routeAuthorizedTabAction as handleTabMessage } from './adapters/dispatcher';
@@ -44,27 +43,6 @@ it('keeps the viewer port registry when tab-mode deps provide it', async () => {
       webSnapshotViewerPorts: deps.webSnapshotViewerPorts,
     })
   );
-});
-
-it('routes page-style messages after page access is authorized', async () => {
-  const { deps } = registerListener();
-  const sendResponse = createSendResponse();
-  sendTabMessageMock.mockResolvedValue({ success: true });
-
-  handleTabMessage({
-    deps,
-    logger: { error: loggerErrorMock, warn: loggerWarnMock },
-    message: { type: MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY },
-    resolvedTabId: 17,
-    sendResponse,
-    sender: createTopLevelContentSender(17, 'https://example.test/page'),
-  });
-  await flushPromises();
-
-  expect(ensureActivePageAccessRuntimeMock).toHaveBeenCalledWith(17);
-  expect(sendTabMessageMock).toHaveBeenCalledWith(17, {
-    type: MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY,
-  });
 });
 
 it('routes scenario messages after page access is authorized', async () => {

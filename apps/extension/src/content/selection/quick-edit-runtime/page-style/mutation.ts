@@ -7,12 +7,10 @@ import type {
   CssDeclarationPolicy,
   CssDeclarationRequest,
   CssDeclarationValue,
-  PageStyleAttributeDelta,
   PageStyleMutationBatch,
   PageStyleMutationElement,
   PageStyleMutationInput,
   PageStyleMutationResult,
-  PageStyleTextDelta,
 } from './types';
 import { isPageStyleMutationElement } from './element';
 import {
@@ -20,13 +18,10 @@ import {
   cloneDeclarationPolicy,
   completeOwnerDeclarationMutation,
   invalidatePageOwnedDeclarationPolicies,
-  isCurrentDeclarationPolicy,
   readDeclarationPolicy,
   rememberDeclarationPolicies,
 } from './provenance';
 import { isCssDeclarationValueAllowed, validateCssDeclaration } from './validation';
-
-const PAGE_STYLE_ATTRIBUTE_NAMES = ['src', 'width', 'height'] as const;
 
 type PageStyleMutationBatchApplyResult = PagePreparationHistoryDomEffectResult & {
   recoveryBatch?: PageStyleMutationBatch;
@@ -47,13 +42,9 @@ function readDeclarationValue(
 }
 
 function createValidatedPolicy(args: {
-  assetUrl?: string;
   source: CssDeclarationPolicy['source'];
 }): CssDeclarationPolicy {
-  return {
-    ...(args.assetUrl ? { assetUrl: args.assetUrl } : {}),
-    source: args.source,
-  };
+  return { source: args.source };
 }
 
 function createDeclarationDeltas(
@@ -98,38 +89,8 @@ function createDeclarationDeltas(
   );
 }
 
-function createAttributeDeltas(
-  target: PageStyleMutationElement,
-  attributes: PageStyleMutationInput['attributes']
-): PageStyleAttributeDelta[] {
-  if (!attributes) {
-    return [];
-  }
-
-  return PAGE_STYLE_ATTRIBUTE_NAMES.flatMap((name) => {
-    if (!Object.prototype.hasOwnProperty.call(attributes, name)) {
-      return [];
-    }
-    const before = target.getAttribute(name);
-    const after = attributes[name] ?? null;
-    return before === after ? [] : [{ after, before, name }];
-  });
-}
-
-function createTextDelta(
-  target: PageStyleMutationElement,
-  text: string | undefined
-): PageStyleTextDelta | null {
-  if (text === undefined) {
-    return null;
-  }
-
-  const before = target.textContent ?? '';
-  return before === text ? null : { after: text, before };
-}
-
 function batchHasChanges(batch: PageStyleMutationBatch): boolean {
-  return batch.attributes.length > 0 || batch.declarations.length > 0 || batch.text !== null;
+  return batch.declarations.length > 0;
 }
 
 function readBatchMatches(
@@ -139,19 +100,11 @@ function readBatchMatches(
 ): boolean {
   const readSide = endpoint === 'source' ? (direction === 'undo' ? 'after' : 'before') : direction;
   const declarationSide = readSide === 'undo' ? 'before' : readSide === 'redo' ? 'after' : readSide;
-  const attributeSide = declarationSide;
-
-  return (
-    batch.declarations.every((delta) =>
-      declarationValuesEqual(
-        readDeclarationValue(batch.target, delta.property),
-        delta[declarationSide]
-      )
-    ) &&
-    batch.attributes.every(
-      (delta) => batch.target.getAttribute(delta.name) === delta[attributeSide]
-    ) &&
-    (!batch.text || (batch.target.textContent ?? '') === batch.text[attributeSide])
+  return batch.declarations.every((delta) =>
+    declarationValuesEqual(
+      readDeclarationValue(batch.target, delta.property),
+      delta[declarationSide]
+    )
   );
 }
 
@@ -177,17 +130,6 @@ function applyBatchUnchecked(batch: PageStyleMutationBatch, direction: 'undo' | 
       throw new Error('Page style target performed a reentrant declaration mutation');
     }
   });
-  batch.attributes.forEach((delta) => {
-    const value = delta[side];
-    if (value === null) {
-      batch.target.removeAttribute(delta.name);
-    } else {
-      batch.target.setAttribute(delta.name, value);
-    }
-  });
-  if (batch.text) {
-    batch.target.textContent = batch.text[side];
-  }
 }
 
 function resolveCurrentPolicy(
@@ -200,12 +142,9 @@ function resolveCurrentPolicy(
     : declarationValuesEqual(delta.after, value)
       ? delta.afterPolicy
       : null;
-  if (endpointPolicy?.source !== 'resolved-asset') {
-    return endpointPolicy
-      ? cloneDeclarationPolicy(endpointPolicy)
-      : readDeclarationPolicy(batch.target, delta.property, value);
-  }
-  return readDeclarationPolicy(batch.target, delta.property, value);
+  return endpointPolicy
+    ? cloneDeclarationPolicy(endpointPolicy)
+    : readDeclarationPolicy(batch.target, delta.property, value);
 }
 
 function captureRecoveryBatch(
@@ -230,22 +169,9 @@ function captureRecoveryBatch(
           },
         ];
   });
-  const attributes = batch.attributes.flatMap((delta) => {
-    const after = batch.target.getAttribute(delta.name);
-    const before = delta[sourceSide];
-    return before === after ? [] : [{ ...delta, after, before }];
-  });
-  const currentText = batch.target.textContent ?? '';
-  const sourceText = batch.text?.[sourceSide];
-
   return {
-    attributes,
     declarations,
     target: batch.target,
-    text:
-      sourceText === undefined || sourceText === currentText
-        ? null
-        : { after: currentText, before: sourceText },
   };
 }
 
@@ -263,7 +189,6 @@ function validateDeclarationEndpoint(
 ): boolean {
   const policy = side === 'before' ? delta.beforePolicy : delta.afterPolicy;
   return isCssDeclarationValueAllowed({
-    ...(policy.assetUrl ? { assetUrl: policy.assetUrl } : {}),
     element: batch.target,
     property: delta.property,
     source: policy.source,
@@ -277,25 +202,6 @@ function validateBatchDeclarations(batch: PageStyleMutationBatch): boolean {
   );
 }
 
-function validateBatchSourceProvenance(
-  batch: PageStyleMutationBatch,
-  direction: 'undo' | 'redo'
-): boolean {
-  const sourceSide = direction === 'undo' ? 'after' : 'before';
-  return batch.declarations.every((delta) => {
-    const expectedPolicy = sourceSide === 'before' ? delta.beforePolicy : delta.afterPolicy;
-    if (expectedPolicy.source !== 'resolved-asset') {
-      return true;
-    }
-    return isCurrentDeclarationPolicy({
-      expected: expectedPolicy,
-      property: delta.property,
-      target: batch.target,
-      value: delta[sourceSide],
-    });
-  });
-}
-
 /** Applies an exact owner delta and restores the source endpoint if any write fails. */
 export function applyPageStyleMutationBatch(
   batch: PageStyleMutationBatch,
@@ -305,7 +211,7 @@ export function applyPageStyleMutationBatch(
     return { failures: ['detached-target'], success: false };
   }
   invalidatePageOwnedDeclarationPolicies(batch.target);
-  if (!validateBatchDeclarations(batch) || !validateBatchSourceProvenance(batch, direction)) {
+  if (!validateBatchDeclarations(batch)) {
     return { failures: ['invalid-declaration'], success: false };
   }
   if (!readBatchMatches(batch, direction, 'source')) {
@@ -356,10 +262,8 @@ export function applyPageStyleMutation(input: PageStyleMutationInput): PageStyle
     return declarations;
   }
   const batch: PageStyleMutationBatch = {
-    attributes: createAttributeDeltas(input.target, input.attributes),
     declarations,
     target: input.target,
-    text: createTextDelta(input.target, input.text),
   };
   if (!batchHasChanges(batch)) {
     return { batch, status: 'applied' };
@@ -409,22 +313,6 @@ function mergeDeclarationDeltas(
   );
 }
 
-function mergeAttributeDeltas(
-  current: PageStyleAttributeDelta[],
-  next: PageStyleAttributeDelta[]
-): PageStyleAttributeDelta[] {
-  const merged = new Map(current.map((delta) => [delta.name, delta]));
-  next.forEach((delta) => {
-    const existing = merged.get(delta.name);
-    const before = existing?.before ?? delta.before;
-    merged.delete(delta.name);
-    if (before !== delta.after) {
-      merged.set(delta.name, { ...delta, before });
-    }
-  });
-  return Array.from(merged.values());
-}
-
 export function mergePageStyleMutationBatches(
   current: PageStyleMutationBatch | null,
   next: PageStyleMutationBatch
@@ -436,16 +324,9 @@ export function mergePageStyleMutationBatches(
     throw new Error('Cannot merge page-style mutations for different targets');
   }
 
-  const textBefore = current.text?.before ?? next.text?.before;
-  const textAfter = next.text?.after ?? current.text?.after;
   return {
-    attributes: mergeAttributeDeltas(current.attributes, next.attributes),
     declarations: mergeDeclarationDeltas(current.declarations, next.declarations),
     target: current.target,
-    text:
-      textBefore === undefined || textAfter === undefined || textBefore === textAfter
-        ? null
-        : { after: textAfter, before: textBefore },
   };
 }
 

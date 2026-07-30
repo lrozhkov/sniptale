@@ -1,40 +1,11 @@
 import { GripHorizontal, Image, Square, Type, X } from 'lucide-react';
 import { useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import {
-  PAGE_STYLE_INSPECTOR_TABS,
-  type PageStyleInspectorTab,
-} from '@sniptale/runtime-contracts/page-style';
 import { translate } from '../../../../platform/i18n';
-import { isPageStyleRulesUiEnabled } from '../../../../platform/config/page-style-rules-access';
-import { ActiveTab } from './tabs';
+import { InspectorProperties } from './tabs';
 import type { PageStyleInspectorActions, PageStyleInspectorViewState } from '../types';
 
 const PANEL_WIDTH = 372;
-const TAB_ORDER: PageStyleInspectorTab[] = [
-  PAGE_STYLE_INSPECTOR_TABS.PROPERTIES,
-  PAGE_STYLE_INSPECTOR_TABS.TEMPLATES,
-  PAGE_STYLE_INSPECTOR_TABS.RULES,
-];
-
-function getVisibleTabOrder(): PageStyleInspectorTab[] {
-  return isPageStyleRulesUiEnabled()
-    ? TAB_ORDER
-    : TAB_ORDER.filter((tab) => tab !== PAGE_STYLE_INSPECTOR_TABS.RULES);
-}
-
-function tabLabel(tab: PageStyleInspectorTab): string {
-  switch (tab) {
-    case PAGE_STYLE_INSPECTOR_TABS.TEMPLATES:
-      return translate('content.pageStyleInspector.tabTemplates');
-    case PAGE_STYLE_INSPECTOR_TABS.RULES:
-      return translate('content.pageStyleInspector.tabRules');
-    case PAGE_STYLE_INSPECTOR_TABS.PROPERTIES:
-    default:
-      return translate('content.pageStyleInspector.tabProperties');
-  }
-}
-
 function selectionLabel(state: PageStyleInspectorViewState): string {
   if (!state.selection) {
     return translate('content.pageStyleInspector.emptySelectionTitle');
@@ -107,36 +78,6 @@ function usePanelPosition() {
   }
 
   return { handlePointerDown, position };
-}
-
-function TabList(props: {
-  activeTab: PageStyleInspectorTab;
-  onChange: (tab: PageStyleInspectorTab) => void;
-}) {
-  const tabs = getVisibleTabOrder();
-
-  return (
-    <div
-      className="grid gap-1 rounded-[10px] bg-[color:var(--sniptale-color-surface-input)] p-1"
-      style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
-    >
-      {tabs.map((tab) => (
-        <button
-          key={tab}
-          type="button"
-          className={[
-            'h-8 rounded-[8px] px-2 text-xs font-semibold transition',
-            'data-[active=true]:bg-[var(--sniptale-color-surface-panel)]',
-            'data-[active=true]:text-[var(--sniptale-color-text-primary)]',
-          ].join(' ')}
-          data-active={props.activeTab === tab}
-          onClick={() => props.onChange(tab)}
-        >
-          {tabLabel(tab)}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 function InspectorHeader(props: {
@@ -242,7 +183,7 @@ export function PageStyleInspectorPanel(props: {
       className={[
         'fixed z-[2147483646] grid max-h-[min(80vh,calc(100vh-24px))]',
         'w-[min(23.25rem,calc(100vw-24px))]',
-        'grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_1fr] overflow-hidden overscroll-contain rounded-[12px] border',
+        'grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr] overflow-hidden overscroll-contain rounded-[12px] border',
         'border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
         'pointer-events-auto text-[var(--sniptale-color-text-primary)] shadow-xl',
       ].join(' ')}
@@ -255,11 +196,8 @@ export function PageStyleInspectorPanel(props: {
         onPointerDown={handlePointerDown}
         state={props.state}
       />
-      <div className="min-w-0 p-3">
-        <TabList activeTab={props.state.activeTab} onChange={props.actions.setActiveTab} />
-      </div>
-      <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain px-3 pb-3">
-        <ActiveTab actions={props.actions} state={props.state} />
+      <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain p-3">
+        <InspectorProperties actions={props.actions} state={props.state} />
       </div>
     </aside>
   );

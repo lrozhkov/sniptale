@@ -109,52 +109,33 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'content-page-style-text-fields',
-    productionFile:
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/text-fields.tsx',
+    owner: 'content-page-style-direct-panel',
+    productionPrefix: 'apps/extension/src/content/overlay/page-style-inspector/panel/',
     exclusive: true,
-    reason: 'Property-control matrix and composed-view suites cover the text-field owner.',
-    testFiles: [
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/field-matrix.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
-    ],
+    reason: 'Direct proof covers session property controls and the absent closed panel.',
+    testFiles: ['apps/extension/src/content/overlay/page-style-inspector/panel/view.test.tsx'],
   },
   {
-    owner: 'content-page-style-property-fields-predecessor',
+    owner: 'content-page-style-direct-appearance',
     productionFile:
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/fields.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/sections/appearance.tsx',
     exclusive: true,
-    allowMissingProductionTarget: true,
     reason:
-      'The removed property-field re-export ladder is covered by the owner surfaces that now import its contracts directly.',
+      'The direct appearance suite proves color and shadow remain while asset and gradient inputs are retired.',
     testFiles: [
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/field-matrix.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/file-field.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/text-controls.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/save/panel.test.tsx',
+      'apps/extension/src/content/overlay/page-style-inspector/property-controls/appearance-fields.test.tsx',
     ],
   },
   {
-    owner: 'content-page-style-image-preview-predecessor',
-    productionFile:
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/image-preview.tsx',
+    owner: 'content-runtime-bridge-types',
+    productionFile: 'apps/extension/src/content/runtime/bridge/types.ts',
     exclusive: true,
-    allowMissingProductionTarget: true,
     reason:
-      'The removed single-consumer image preview is covered through the property-control composition that now owns it.',
+      'Core and router suites prove surviving message families and no page-style handler slot.',
     testFiles: [
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
+      'apps/extension/src/content/runtime/bridge/core.test.ts',
+      'apps/extension/src/content/runtime/bridge/router.test.ts',
     ],
-  },
-  {
-    owner: 'content-page-style-retention-toggle-predecessor',
-    productionFile:
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/retention-toggle.tsx',
-    exclusive: true,
-    allowMissingProductionTarget: true,
-    reason: 'The removed single-consumer retention toggle is covered through its save-panel owner.',
-    testFiles: ['apps/extension/src/content/overlay/page-style-inspector/save/panel.test.tsx'],
   },
   {
     owner: 'content-overlay-app-layout-projection',

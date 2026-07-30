@@ -41,10 +41,6 @@ export const settingsNavigationMessages = defineMessageSource({
     ru: 'Приложение Sniptale',
     en: 'Sniptale app',
   },
-  pageStyles: {
-    ru: 'Стили страницы',
-    en: 'Page styles',
-  },
   templates: {
     ru: 'Шаблоны промптов',
     en: 'Prompt templates',

@@ -21,7 +21,6 @@ import {
   BACKGROUND_OWNED_POLICY_STATE_IDS,
   CAPTURE_PRIVILEGED_TAB_POLICY_STATE_IDS,
   OFFSCREEN_RUNTIME_POLICY_STATE_IDS,
-  PAGE_STYLE_PRIVILEGED_TAB_POLICY_STATE_IDS,
   POPUP_EXPORT_TAB_ROUTE_POLICY_STATE_IDS,
   PROJECT_EXPORT_RUNTIME_POLICY_STATE_IDS,
   SCENARIO_PRIVILEGED_TAB_POLICY_STATE_IDS,
@@ -66,7 +65,6 @@ export const authorizationPolicyRegistryEntries = [
       'apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-capabilities.ts',
   },
   createPrivilegedTabPolicyEntry('capture', CAPTURE_PRIVILEGED_TAB_POLICY_STATE_IDS),
-  createPrivilegedTabPolicyEntry('page-style', PAGE_STYLE_PRIVILEGED_TAB_POLICY_STATE_IDS),
   createPrivilegedTabPolicyEntry('scenario', SCENARIO_PRIVILEGED_TAB_POLICY_STATE_IDS),
   createPrivilegedTabPolicyEntry('tab-mode', TAB_MODE_PRIVILEGED_TAB_POLICY_STATE_IDS),
   createPrivilegedTabPolicyEntry('video-control', VIDEO_CONTROL_PRIVILEGED_TAB_POLICY_STATE_IDS),
@@ -107,7 +105,7 @@ export const authorizationPolicyRegistryEntries = [
 ] as const satisfies readonly AuthorizationPolicyRegistryEntry[];
 
 function createPrivilegedTabPolicyEntry(
-  family: 'capture' | 'page-style' | 'scenario' | 'tab-mode' | 'video-control',
+  family: 'capture' | 'scenario' | 'tab-mode' | 'video-control',
   policyStateIds: readonly PolicyStateId[]
 ): AuthorizationPolicyRegistryEntry {
   return {

@@ -1,6 +1,5 @@
 import { translate } from '../../../../platform/i18n';
 import { SelectField } from './choice-fields';
-import { FileField } from './file-field';
 import { changedSummary, countModified, fieldState } from './helpers';
 import { Section } from './section';
 import { CssTextField } from './text-fields';
@@ -56,12 +55,6 @@ export function ImageSection({ actions, disabled, state }: ImageSectionProps) {
       summary={changedSummary(countModified(state, ['object-fit', 'object-position']))}
     >
       <ImageSelectionPreview state={state} />
-      <FileField
-        disabled={disabled}
-        buttonLabel={translate('content.pageStyleInspector.replaceFile')}
-        label={translate('content.pageStyleInspector.replaceImage')}
-        onSelect={actions.saveImageReplacement}
-      />
       <ImageFitFields actions={actions} disabled={disabled} state={state} />
     </Section>
   );

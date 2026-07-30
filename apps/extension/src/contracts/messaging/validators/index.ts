@@ -21,7 +21,6 @@ export {
   isString,
 } from './primitives';
 export { isCaptureActionType, isQuickActionOverlay, isShowToastPayload } from './ui';
-export { isPageStyleCurrentPageRuleSummary, isPageStyleInspectorTab } from './page-style';
 export {
   isCaptureMode,
   isProjectExportInputReference,

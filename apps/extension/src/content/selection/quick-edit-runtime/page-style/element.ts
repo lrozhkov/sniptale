@@ -1,6 +1,4 @@
-import type { PageStyleRestoreRule } from '@sniptale/runtime-contracts/page-style';
 import { isContentOwnedElement } from '../../../platform/dom-host';
-import { findElementBySelector, findElementBySniptaleId } from '../../../platform/frame';
 import type { PageStyleMutationElement } from './types';
 
 export type { PageStyleMutationElement } from './types';
@@ -120,32 +118,4 @@ export function isPageStyleMutationElement(element: Element): element is PageSty
   }
 
   return isRenderedElement(element);
-}
-
-function resolveByLocator(locator: string): Element | null {
-  try {
-    return findElementBySelector(locator);
-  } catch {
-    return null;
-  }
-}
-
-function resolveBySniptaleId(sniptaleId?: string): Element | null {
-  if (!sniptaleId) {
-    return null;
-  }
-
-  try {
-    return findElementBySniptaleId(sniptaleId)?.element ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export function resolvePageStyleRuleElement(
-  rule: PageStyleRestoreRule
-): PageStyleMutationElement | null {
-  const element =
-    resolveByLocator(rule.selector.locator) ?? resolveBySniptaleId(rule.selector.sniptaleId);
-  return element && isPageStyleMutationElement(element) ? element : null;
 }

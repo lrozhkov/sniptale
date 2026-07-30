@@ -187,29 +187,6 @@ it('routes popup export adapter messages to the viewer owner', async () => {
   expect(sendTabMessageMock).not.toHaveBeenCalled();
 });
 
-it('rejects page-style routes without page access before content side effects', async () => {
-  const { deps } = registerListener();
-  const sendResponse = createSendResponse();
-  ensureActivePageAccessRuntimeMock.mockRejectedValue(new Error('Page access is required.'));
-
-  handleTabMessage({
-    deps,
-    logger: { error: loggerErrorMock, warn: loggerWarnMock },
-    message: { type: MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY },
-    resolvedTabId: 17,
-    sendResponse,
-    sender: createTopLevelContentSender(17, 'https://example.test/page'),
-  });
-  await flushPromises();
-
-  expect(ensureActivePageAccessRuntimeMock).toHaveBeenCalledWith(17);
-  expect(sendTabMessageMock).not.toHaveBeenCalled();
-  expect(sendResponse).toHaveBeenCalledWith({
-    error: 'Page access is required.',
-    success: false,
-  });
-});
-
 it('rejects scenario routes without page access before scenario side effects', async () => {
   const { deps } = registerListener();
   const sendResponse = createSendResponse();

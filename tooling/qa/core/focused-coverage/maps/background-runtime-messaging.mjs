@@ -35,13 +35,6 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/background/capture/page-preparation/route.test.ts'],
   },
   {
-    owner: 'background-capture-page-style-messaging',
-    productionFile: 'apps/extension/src/background/capture/page-style-runtime/route.ts',
-    exclusive: true,
-    reason: 'Page style tab dispatch is covered by the page-style route suite.',
-    testFiles: ['apps/extension/src/background/capture/page-style-runtime/route.test.ts'],
-  },
-  {
     owner: 'background-quick-actions-messaging',
     productionPrefix: 'apps/extension/src/background/capture/quick-actions/',
     exclusive: true,

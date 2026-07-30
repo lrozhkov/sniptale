@@ -18,7 +18,6 @@ import type {
 
 type CssDeclarationValidationResult =
   | {
-      assetUrl?: string;
       order: number;
       priority: CssDeclarationPriority;
       property: PageStyleProperty;
@@ -28,43 +27,20 @@ type CssDeclarationValidationResult =
     }
   | { message: string; status: 'invalid' };
 
-const STRING_URL_IMAGE_FUNCTIONS = ['image-set', '-webkit-image-set', 'image'] as const;
-
 function normalizePriority(priority: string | undefined): CssDeclarationPriority | null {
   const normalized = priority?.trim().toLowerCase() ?? '';
   return normalized === '' || normalized === 'important' ? normalized : null;
 }
 
-function isResolvedAssetValue(value: string, assetUrl: string | undefined): boolean {
-  if (!assetUrl || !assetUrl.startsWith('blob:') || /["'\\\u0000-\u001f]/u.test(assetUrl)) {
-    return false;
-  }
-
-  return value === `url("${assetUrl}")`;
-}
-
-function isValueAllowedByPolicy(args: {
-  assetUrl?: string;
-  property: PageStyleProperty;
-  source: CssDeclarationPolicySource;
-  value: string;
-}): boolean {
+function isValueAllowedByPolicy(args: { property: PageStyleProperty; value: string }): boolean {
   if (args.value === '') {
     return true;
-  }
-
-  if (args.source === 'resolved-asset') {
-    if (args.property === 'background-image' && isResolvedAssetValue(args.value, args.assetUrl)) {
-      return true;
-    }
   }
 
   return (
     !containsUnsafeCssSyntax(`${args.property}: ${args.value};`) &&
     !containsCssFunction(args.value, 'var') &&
-    !STRING_URL_IMAGE_FUNCTIONS.some((functionName) =>
-      containsCssFunction(args.value, functionName)
-    )
+    !containsCssFunction(args.value, 'url')
   );
 }
 
@@ -110,9 +86,7 @@ export function validateCssDeclaration(
   if (
     value.length > PAGE_STYLE_LIMITS.maxCssValueLength ||
     !isValueAllowedByPolicy({
-      ...(request.assetUrl ? { assetUrl: request.assetUrl } : {}),
       property: request.property,
-      source,
       value,
     })
   ) {
@@ -125,7 +99,6 @@ export function validateCssDeclaration(
   }
 
   return {
-    ...(request.assetUrl ? { assetUrl: request.assetUrl } : {}),
     order: PAGE_STYLE_ALLOWED_PROPERTIES.indexOf(request.property) + 1,
     priority: normalized.priority,
     property: request.property,
@@ -136,14 +109,12 @@ export function validateCssDeclaration(
 }
 
 export function isCssDeclarationValueAllowed(args: {
-  assetUrl?: string;
   element: PageStyleMutationElement;
   property: PageStyleProperty;
   source: CssDeclarationPolicySource;
   value: CssDeclarationValue;
 }): boolean {
   const result = validateCssDeclaration(args.element, {
-    ...(args.assetUrl ? { assetUrl: args.assetUrl } : {}),
     priority: args.value.priority,
     property: args.property,
     source: args.source,

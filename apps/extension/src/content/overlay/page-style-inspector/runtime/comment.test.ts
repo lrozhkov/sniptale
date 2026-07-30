@@ -85,7 +85,7 @@ describe('Properties comment producer', () => {
 
     await applyPageStylePatchWithHistory({
       element: target,
-      patch: { assets: [], declarations: [{ property: 'color', value: 'red' }] },
+      patch: { declarations: [{ property: 'color', value: 'red' }] },
     });
     expect(pagePreparationHistory.hasOpenTransactions()).toBe(true);
 

@@ -21,7 +21,6 @@
     "./messaging/capture-messages": "./src/messaging/capture-messages.ts",
     "./messaging/contracts/response": "./src/messaging/contracts/response.ts",
     "./messaging/contracts/runtime-message/content-action": "./src/messaging/contracts/runtime-message/content-action.ts",
-    "./messaging/contracts/runtime-message/page-style": "./src/messaging/contracts/runtime-message/page-style.ts",
     "./messaging/contracts/runtime-message/popup-export": "./src/messaging/contracts/runtime-message/popup-export.ts",
     "./messaging/message-types": "./src/messaging/message-types/index.ts",
     "./messaging/page-access": "./src/messaging/page-access.ts",

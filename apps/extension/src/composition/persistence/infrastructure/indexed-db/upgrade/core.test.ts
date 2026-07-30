@@ -20,7 +20,6 @@ const COMPLETE_STORES = [
   'web_snapshots',
   'video_effect_bundles',
   'project_export_inputs',
-  'page_style_assets',
   'editor_custom_shapes',
   'state_manager',
   'native_transfer_sessions',
@@ -45,9 +44,6 @@ it('creates stores for the expected schema versions', () => {
   });
   expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('project_export_inputs', {
     keyPath: 'jobId',
-  });
-  expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('page_style_assets', {
-    keyPath: 'id',
   });
   expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('editor_custom_shapes', {
     keyPath: 'id',
@@ -130,6 +126,15 @@ it('removes the legacy annotation pack store during the v16 upgrade', () => {
 
   expect(legacyDb.deleteObjectStore).toHaveBeenCalledWith('annotation_packs');
   expect(legacyDb.objectStoreNames).not.toContain('annotation_packs');
+});
+
+it('destructively removes the retired page style asset store during the v22 upgrade', () => {
+  const legacyDb = createMockDb([...COMPLETE_STORES, 'page_style_assets']);
+
+  handleDatabaseUpgrade(legacyDb, 21);
+
+  expect(legacyDb.deleteObjectStore).toHaveBeenCalledWith('page_style_assets');
+  expect(legacyDb.objectStoreNames).not.toContain('page_style_assets');
 });
 
 function createMockDb(initialStores: readonly string[] = []) {
