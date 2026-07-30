@@ -57,7 +57,6 @@ it('uses the inner iframe text node for quick edit hover resolution', () => {
       hideHoverOverlay,
       isDocumentModeEnabled: () => false,
       isEnabled: () => true,
-      isStyleInspectorModeEnabled: () => false,
       makeElementEditable: vi.fn(),
       showHoverOverlay,
     },
@@ -102,7 +101,6 @@ it('lets native contenteditable insertion handle spaces when text remains to the
     hideHoverOverlay: vi.fn(),
     isDocumentModeEnabled: () => false,
     isEnabled: () => true,
-    isStyleInspectorModeEnabled: () => false,
     makeElementEditable: vi.fn(),
     showHoverOverlay: vi.fn(),
   });
@@ -144,7 +142,6 @@ it('preserves a trailing space when the caret is already at the end of the edita
     hideHoverOverlay: vi.fn(),
     isDocumentModeEnabled: () => false,
     isEnabled: () => true,
-    isStyleInspectorModeEnabled: () => false,
     makeElementEditable: vi.fn(),
     showHoverOverlay: vi.fn(),
   });
@@ -176,7 +173,6 @@ it('cancels the active edit on Escape even when the event target is a text node'
     hideHoverOverlay: vi.fn(),
     isDocumentModeEnabled: () => false,
     isEnabled: () => true,
-    isStyleInspectorModeEnabled: () => false,
     makeElementEditable: vi.fn(),
     showHoverOverlay: vi.fn(),
   });
@@ -214,7 +210,6 @@ it('keeps quick edit mode active on the first Escape when the editable is only d
     hideHoverOverlay: vi.fn(),
     isDocumentModeEnabled: () => false,
     isEnabled: () => true,
-    isStyleInspectorModeEnabled: () => false,
     makeElementEditable: vi.fn(),
     showHoverOverlay: vi.fn(),
   });

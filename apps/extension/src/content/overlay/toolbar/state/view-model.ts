@@ -33,6 +33,7 @@ function useCaptureActionState(
 function createToolbarDerivedStateArgs(
   props: ToolbarProps,
   args: {
+    designReviewMode: boolean;
     highlighterMode: boolean;
     quickEditMode: boolean;
     screenshotMode: boolean;
@@ -40,6 +41,7 @@ function createToolbarDerivedStateArgs(
 ) {
   return {
     aiPickMode: props.aiPickMode ?? false,
+    designReviewMode: args.designReviewMode,
     highlighterMode: args.highlighterMode,
     isCursorMode: props.isCursorMode ?? true,
     quickEditMode: args.quickEditMode,
@@ -87,6 +89,7 @@ function createToolbarModeToggleArgs(
 
 function resolveToolbarModeFlags(props: ToolbarProps) {
   return {
+    designReviewMode: props.designReviewMode ?? false,
     highlighterMode: props.highlighterMode ?? false,
     quickEditDocumentMode: props.quickEditDocumentMode ?? false,
     quickEditMode: props.quickEditMode ?? false,
@@ -98,13 +101,18 @@ function resolveToolbarModeFlags(props: ToolbarProps) {
  * Builds the Toolbar view-model while keeping the render shell thin.
  */
 export function useToolbarViewModel(props: ToolbarProps) {
-  const { highlighterMode, quickEditDocumentMode, quickEditMode, screenshotMode } =
-    resolveToolbarModeFlags(props);
+  const {
+    designReviewMode,
+    highlighterMode,
+    quickEditDocumentMode,
+    quickEditMode,
+    screenshotMode,
+  } = resolveToolbarModeFlags(props);
   const { captureAction, handleCaptureActionChange } = useCaptureActionState(
     props.captureAction,
     props.onCaptureActionChange
   );
-  const modeFlags = { highlighterMode, quickEditMode, screenshotMode };
+  const modeFlags = { designReviewMode, highlighterMode, quickEditMode, screenshotMode };
   const toolbarMenuState = useToolbarMenuState();
 
   const derivedState = useToolbarDerivedState(createToolbarDerivedStateArgs(props, modeFlags));
@@ -114,13 +122,16 @@ export function useToolbarViewModel(props: ToolbarProps) {
   );
 
   return {
+    designReviewMode,
     highlighterMode,
     quickEditDocumentMode,
     quickEditMode,
     pendingInteractionMode,
     screenshotMode,
-    captureAction,
-    setCaptureAction: handleCaptureActionChange,
+    capture: {
+      action: captureAction,
+      setAction: handleCaptureActionChange,
+    },
     derivedState,
     toolbarMenuState,
     toggleMode,

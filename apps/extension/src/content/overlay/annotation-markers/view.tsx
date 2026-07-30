@@ -233,7 +233,7 @@ function AnnotationMarker(
   }
 
   const tooltipId = `sniptale-annotation-comment-${props.record.annotationId}`;
-  const markerLabel = `${translate('content.pageStyleInspector.commentMarkerLabel')} ${props.record.commentMarker}`;
+  const markerLabel = `${translate('content.designReview.commentMarkerLabel')} ${props.record.commentMarker}`;
 
   return (
     <div

@@ -33,9 +33,11 @@ function createBridgeParams(): RuntimeMessageBridgeParams {
     },
     modeControls: {
       disableAiPickMode: vi.fn(),
+      disableDesignReviewMode: vi.fn(),
       disableHighlighterMode: vi.fn(),
       disableQuickEditMode: vi.fn(),
       setAiPickMode: vi.fn(),
+      setDesignReviewMode: vi.fn(),
       setHighlighterMode: vi.fn(),
       setIsToolbarVisible: vi.fn(),
       setNavigationLockEnabled: vi.fn(),
@@ -45,6 +47,7 @@ function createBridgeParams(): RuntimeMessageBridgeParams {
     },
     modeState: {
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       isToolbarVisible: false,
       quickEditMode: false,

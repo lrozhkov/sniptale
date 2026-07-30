@@ -5,6 +5,7 @@ describe('resolveToolbarNavigationLockMode', () => {
   it('keeps full lock while ai-pick is active inside screenshot mode', () => {
     expect(
       resolveToolbarNavigationLockMode({
+        designReviewMode: false,
         highlighterMode: false,
         isCursorMode: false,
         quickEditMode: false,
@@ -17,6 +18,7 @@ describe('resolveToolbarNavigationLockMode', () => {
   it('uses links-only lock for plain screenshot mode', () => {
     expect(
       resolveToolbarNavigationLockMode({
+        designReviewMode: false,
         highlighterMode: false,
         isCursorMode: false,
         quickEditMode: false,
@@ -29,6 +31,7 @@ describe('resolveToolbarNavigationLockMode', () => {
   it('returns no override when screenshot mode is off', () => {
     expect(
       resolveToolbarNavigationLockMode({
+        designReviewMode: false,
         highlighterMode: false,
         isCursorMode: true,
         quickEditMode: false,
@@ -36,5 +39,18 @@ describe('resolveToolbarNavigationLockMode', () => {
         aiPickMode: false,
       })
     ).toBeNull();
+  });
+
+  it('uses links-only lock while Design Review owns page picking', () => {
+    expect(
+      resolveToolbarNavigationLockMode({
+        aiPickMode: false,
+        designReviewMode: true,
+        highlighterMode: false,
+        isCursorMode: false,
+        quickEditMode: false,
+        screenshotMode: true,
+      })
+    ).toBe(false);
   });
 });

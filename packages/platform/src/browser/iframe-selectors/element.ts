@@ -1,8 +1,14 @@
 import { escapeCssIdentifier, escapeCssString } from './css';
 
+function isSelectorRoot(node: Node): node is Node & ParentNode {
+  return typeof (node as Partial<ParentNode>).querySelectorAll === 'function';
+}
+
 function isUniqueSelectorForElement(element: Element, selector: string): boolean {
   try {
-    const matches = element.ownerDocument.querySelectorAll(selector);
+    const root = element.getRootNode();
+    const queryRoot: ParentNode = isSelectorRoot(root) ? root : element.ownerDocument;
+    const matches = queryRoot.querySelectorAll(selector);
     return matches.length === 1 && matches.item(0) === element;
   } catch {
     return false;
@@ -26,11 +32,14 @@ function getPathSelector(element: Element): string | null {
     const currentElement: Element = current;
     const tagName = escapeCssIdentifier(currentElement.localName);
     const parentEl: Element | null = currentElement.parentElement;
+    const parentNode = currentElement.parentNode;
+    const selectorParent: ParentNode | null =
+      parentEl ?? (parentNode && isSelectorRoot(parentNode) ? parentNode : null);
 
-    if (!parentEl) {
+    if (!selectorParent) {
       path.unshift(tagName);
     } else {
-      const siblings = Array.from(parentEl.children).filter(
+      const siblings = Array.from(selectorParent.children).filter(
         (child: Element) => child.localName === currentElement.localName
       );
       const index = siblings.indexOf(currentElement);

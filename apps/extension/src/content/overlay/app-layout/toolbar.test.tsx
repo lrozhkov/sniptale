@@ -115,6 +115,7 @@ function createToolbarProps(): ContentAppLayoutToolbarProps {
       handleClearHighlights: vi.fn(),
       handleEnableCursorMode: vi.fn(),
       handleHideToolbar: vi.fn(),
+      handleToggleDesignReviewMode: vi.fn(),
       handleToggleHighlighterMode: vi.fn(),
       handleToggleNavigationLock: vi.fn(),
       handleToggleQuickEditDocumentMode: vi.fn(),
@@ -123,6 +124,7 @@ function createToolbarProps(): ContentAppLayoutToolbarProps {
     },
     modes: {
       aiPickMode: true,
+      designReviewMode: false,
       highlighterMode: false,
       quickEditDocumentMode: false,
       quickEditMode: false,

@@ -26,6 +26,7 @@ vi.mock('./helpers', () => helpers);
 
 import {
   blockEvent,
+  blockNavigationEvent,
   getLockRoutingTarget,
   handleClosestLink,
   handleResolvedNavigationTarget,
@@ -100,6 +101,9 @@ function shouldReportDelegatedSelectionModes(): void {
   modeSession.isContentModeEnabled.mockImplementation((mode: string) => mode === 'highlighter');
   expect(isSelectionDelegatedMode()).toBe(true);
 
+  modeSession.isContentModeEnabled.mockImplementation((mode: string) => mode === 'design-review');
+  expect(isSelectionDelegatedMode()).toBe(true);
+
   modeSession.isContentModeEnabled.mockReturnValue(false);
   expect(isSelectionDelegatedMode()).toBe(false);
 }
@@ -166,5 +170,15 @@ describe('locker routing guards', () => {
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(event.stopPropagation).toHaveBeenCalledOnce();
     expect(event.stopImmediatePropagation).toHaveBeenCalledOnce();
+  });
+  it('keeps Design Review navigation events available to the picker listener', () => {
+    const event = createCancelableEvent();
+    modeSession.isContentModeEnabled.mockImplementation((mode: string) => mode === 'design-review');
+
+    blockNavigationEvent(event);
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(event.stopPropagation).toHaveBeenCalledOnce();
+    expect(event.stopImmediatePropagation).not.toHaveBeenCalled();
   });
 });

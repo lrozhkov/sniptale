@@ -392,8 +392,15 @@ function compareRecords(left: OrderedAnnotationRecord, right: OrderedAnnotationR
 function collectOrderedRecords(
   snapshot: BrowserAnnotationSessionSnapshot
 ): OrderedAnnotationRecord[] {
+  const exportableDomRecords = snapshot.domRecords.filter(
+    (record) =>
+      !record.designReview ||
+      record.comment !== undefined ||
+      record.propertyChanges.length > 0 ||
+      record.textChange !== undefined
+  );
   return [
-    ...snapshot.domRecords.map((record): OrderedAnnotationRecord => ({ kind: 'dom', record })),
+    ...exportableDomRecords.map((record): OrderedAnnotationRecord => ({ kind: 'dom', record })),
     ...snapshot.frameOrders.map((record): OrderedAnnotationRecord => ({ kind: 'frame', record })),
   ].sort(compareRecords);
 }

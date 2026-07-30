@@ -1,4 +1,5 @@
 import type { Logger } from '@sniptale/platform/observability/logger/types';
+import { isContentModeEnabled } from '../../application/mode-session';
 import type { addEventListenerToAllWindowsDynamic, walkAllDocuments } from '../../platform/frame';
 import type { removeNavigationLockOverlay, syncNavigationLockOverlay } from './overlay';
 
@@ -22,6 +23,7 @@ export type NavigationLockerDeps = {
 
 export type NavigationLockerState = {
   beforeUnloadHandler: BeforeUnloadHandler | null;
+  cleanupAuxClickHandler: (() => void) | null;
   cleanupClickHandler: (() => void) | null;
   cleanupKeyDownHandler: (() => void) | null;
   cleanupMouseDownHandler: (() => void) | null;
@@ -42,6 +44,7 @@ export type NavigationLockerHandlers = {
 export function createNavigationLockerState(): NavigationLockerState {
   return {
     beforeUnloadHandler: null,
+    cleanupAuxClickHandler: null,
     cleanupClickHandler: null,
     cleanupKeyDownHandler: null,
     cleanupMouseDownHandler: null,
@@ -65,7 +68,9 @@ export function syncNavigationLockSurfaces(
   state: NavigationLockerState
 ): void {
   toggleNavigationLockClass(deps, state.isNavigationLocked);
-  deps.syncNavigationLockOverlay(state.isNavigationLocked && !state.isFullLockMode);
+  deps.syncNavigationLockOverlay(
+    state.isNavigationLocked && !state.isFullLockMode && !isContentModeEnabled('design-review')
+  );
 }
 
 export function registerNavigationListeners(
@@ -88,6 +93,15 @@ export function registerNavigationListeners(
     handlers.handleInteractionEvent,
     { capture: true }
   );
+  state.cleanupAuxClickHandler = deps.addEventListenerToAllWindowsDynamic(
+    'auxclick',
+    (event) => {
+      if (isContentModeEnabled('design-review')) {
+        handlers.handleInteractionEvent(event);
+      }
+    },
+    { capture: true }
+  );
   state.cleanupKeyDownHandler = deps.addEventListenerToAllWindowsDynamic(
     'keydown',
     handlers.handleKeyDown,
@@ -104,6 +118,9 @@ export function cleanupNavigationListeners(state: NavigationLockerState): void {
 
   state.cleanupClickHandler?.();
   state.cleanupClickHandler = null;
+
+  state.cleanupAuxClickHandler?.();
+  state.cleanupAuxClickHandler = null;
 
   state.cleanupKeyDownHandler?.();
   state.cleanupKeyDownHandler = null;

@@ -16,8 +16,8 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 function ModeButtonsHarness(params: {
-  inspectorOpen?: boolean;
-  onToggleInspector?: () => void;
+  designReviewMode?: boolean;
+  onToggleDesignReview?: () => void;
   onToggleQuickEdit?: () => void;
   quickEditDocumentMode?: boolean;
   quickEditMode?: boolean;
@@ -26,6 +26,7 @@ function ModeButtonsHarness(params: {
   const props: ToolbarModeButtonsProps = {
     isCursorMode: true,
     aiPickMode: false,
+    designReviewMode: params.designReviewMode ?? false,
     compactMenus: true,
     displayMode: 'vertical',
     sidebarVisible: true,
@@ -33,17 +34,14 @@ function ModeButtonsHarness(params: {
     quickEditMode: params.quickEditMode ?? false,
     highlighterMode: false,
     pendingMode: null,
-    pageStyleInspectorOpen: params.inspectorOpen ?? false,
     toolbarMenuState,
     onEnableCursorMode: vi.fn(),
     onDisableAiPickMode: vi.fn(),
     onAiPickContentStart: vi.fn(),
+    onToggleDesignReview: params.onToggleDesignReview ?? vi.fn(),
     onToggleQuickEditDocumentMode: vi.fn(),
     onToggleQuickEdit: params.onToggleQuickEdit ?? vi.fn(),
     onToggleHighlighter: vi.fn(),
-    ...(params.onToggleInspector === undefined
-      ? {}
-      : { onTogglePageStyleInspector: params.onToggleInspector }),
   };
 
   return <ToolbarModeButtons {...props} />;
@@ -51,8 +49,8 @@ function ModeButtonsHarness(params: {
 
 function renderModeButtons(
   params: {
-    inspectorOpen?: boolean;
-    onToggleInspector?: () => void;
+    designReviewMode?: boolean;
+    onToggleDesignReview?: () => void;
     onToggleQuickEdit?: () => void;
     quickEditDocumentMode?: boolean;
     quickEditMode?: boolean;
@@ -75,10 +73,6 @@ function queryModeSelectorButton(): HTMLButtonElement | null {
 
 function queryQuickEditModeOption(): HTMLButtonElement | null {
   return document.querySelector('[data-ui="content.toolbar.mode-option.quick-edit"]');
-}
-
-function queryInspectorButton(): HTMLButtonElement | null {
-  return document.querySelector('[data-ui="content.toolbar.page-style-inspector-button"]');
 }
 
 beforeEach(() => {
@@ -147,55 +141,18 @@ it('selects a mode option from the menu mousedown action', () => {
   expect(document.querySelector('[data-ui="content.toolbar.mode-option.quick-edit"]')).toBeNull();
 });
 
-it('shows the properties control only in quick-edit mode', () => {
-  renderModeButtons({ onToggleInspector: vi.fn() });
+it('offers Design Review as a standalone mode and no longer adds a Quick Edit inspector button', () => {
+  const onToggleDesignReview = vi.fn();
+  renderModeButtons({ onToggleDesignReview, quickEditMode: true });
 
-  expect(queryInspectorButton()).toBeNull();
-
-  renderModeButtons({ onToggleInspector: vi.fn(), quickEditMode: true });
-
-  expect(queryInspectorButton()?.getAttribute('title')).toBe(
-    'content.pageStyleInspector.showProperties'
+  expect(document.querySelector('[data-ui="content.toolbar.design-review-button"]')).toBeNull();
+  act(() => queryModeSelectorButton()?.click());
+  const option = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.mode-option.design-review"]'
   );
-});
-
-it('disables the properties control while document text editing is active', () => {
-  const onToggleInspector = vi.fn();
-  renderModeButtons({
-    inspectorOpen: true,
-    onToggleInspector,
-    quickEditDocumentMode: true,
-    quickEditMode: true,
-  });
-
-  const button = queryInspectorButton();
   act(() => {
-    button?.click();
+    option?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
   });
 
-  expect(button?.disabled).toBe(true);
-  expect(button?.getAttribute('data-active')).not.toBe('true');
-  expect(button?.getAttribute('title')).toBe(
-    'content.pageStyleInspector.unavailableDuringDocumentEdit'
-  );
-  expect(onToggleInspector).not.toHaveBeenCalled();
-});
-
-it('reflects open properties panel state and toggles from the toolbar', () => {
-  const onToggleInspector = vi.fn();
-  renderModeButtons({
-    inspectorOpen: true,
-    onToggleInspector,
-    quickEditMode: true,
-  });
-
-  const button = queryInspectorButton();
-  act(() => {
-    button?.click();
-  });
-
-  expect(button?.getAttribute('aria-pressed')).toBe('true');
-  expect(button?.getAttribute('data-active')).toBe('true');
-  expect(button?.getAttribute('title')).toBe('content.pageStyleInspector.hideProperties');
-  expect(onToggleInspector).toHaveBeenCalledTimes(1);
+  expect(onToggleDesignReview).toHaveBeenCalledOnce();
 });

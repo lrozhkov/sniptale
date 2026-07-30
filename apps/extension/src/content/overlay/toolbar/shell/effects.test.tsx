@@ -155,6 +155,7 @@ async function renderNavigationHarness(
   await renderElement(
     <NavigationHarness
       aiPickMode={false}
+      designReviewMode={false}
       highlighterMode={false}
       isCursorMode={false}
       quickEditMode={false}
@@ -186,6 +187,19 @@ function registerManagedNavigationLockTests() {
     await renderNavigationHarness({ aiPickMode: true });
 
     expect(shellMocks.enableNavigationLock).toHaveBeenLastCalledWith(true);
+    expect(getNavigationState().lockDisabled).toBe(true);
+    expect(getNavigationState().lockTitle).toBe('content.toolbar.navigationLockManaged');
+  });
+
+  it('blocks links in Design Review without exposing the manual lock toggle', async () => {
+    await renderNavigationHarness({
+      designReviewMode: true,
+      isCursorMode: false,
+      screenshotMode: true,
+    });
+
+    expect(shellMocks.enableNavigationLock).toHaveBeenLastCalledWith(false);
+    expect(getNavigationState().navigationLockEnabled).toBe(true);
     expect(getNavigationState().lockDisabled).toBe(true);
     expect(getNavigationState().lockTitle).toBe('content.toolbar.navigationLockManaged');
   });

@@ -2,6 +2,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import { disableAiPickModeIfLoaded } from '../../../content/overlay/ai/pick/runtime/lazy';
 import { disableHighlighterMode } from '../../../content/selection/highlighter';
 import { disableQuickEditMode } from '../../../content/selection/quick-edit';
+import { disableDesignReviewMode } from '../../../content/selection/design-review';
 import {
   buildContentModeControls,
   buildContentModeFlags,
@@ -65,6 +66,7 @@ function createPreparationBridgeParams(
     modeControls: {
       ...buildContentModeControls(modeState),
       disableAiPickMode: disableAiPickModeIfLoaded,
+      disableDesignReviewMode,
       disableHighlighterMode,
       disableQuickEditMode,
     },

@@ -2,6 +2,7 @@ import type { ContentAppRuntimeModeControls } from '../../app/content-mode';
 
 export interface UseToolbarModeControllerParams extends ContentAppRuntimeModeControls {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   disableAiPickMode: () => void;
   highlighterMode: boolean;
   quickEditMode: boolean;
@@ -12,6 +13,7 @@ export interface UseToolbarModeControllerResult {
   handleEnableCursorMode: () => void;
   handleHideToolbar: () => void;
   handleToggleHighlighterMode: (enabled: boolean) => void;
+  handleToggleDesignReviewMode: (enabled: boolean) => void;
   handleToggleNavigationLock: (enabled: boolean) => void;
   handleToggleQuickEditDocumentMode: (enabled: boolean) => void;
   handleToggleQuickEditMode: (enabled: boolean) => void;

@@ -24,7 +24,11 @@ interface ContentAppBindingsParams {
   InteractiveFrameComponent: InteractiveFrameComponent;
   modeControls: Pick<
     ContentAppModeControls,
-    'setAiPickMode' | 'setHighlighterMode' | 'setQuickEditDocumentMode' | 'setQuickEditMode'
+    | 'setAiPickMode'
+    | 'setDesignReviewMode'
+    | 'setHighlighterMode'
+    | 'setQuickEditDocumentMode'
+    | 'setQuickEditMode'
   > &
     Pick<ContentAppVisibilityState, 'setIsToolbarVisible'>;
   modeFlags: ContentAppModeFlags;
@@ -40,7 +44,8 @@ function useNavigationLockCleanup(modeFlags: ContentAppModeFlags) {
       modeFlags.screenshotMode ||
       modeFlags.highlighterMode ||
       modeFlags.quickEditMode ||
-      modeFlags.aiPickMode
+      modeFlags.aiPickMode ||
+      modeFlags.designReviewMode
     ) {
       return;
     }
@@ -48,6 +53,7 @@ function useNavigationLockCleanup(modeFlags: ContentAppModeFlags) {
     disableNavigationLock();
   }, [
     modeFlags.aiPickMode,
+    modeFlags.designReviewMode,
     modeFlags.highlighterMode,
     modeFlags.quickEditMode,
     modeFlags.screenshotMode,
@@ -114,8 +120,13 @@ function useFrameCallbackRegistration(args: {
 export function useContentAppBindings(params: ContentAppBindingsParams) {
   const { modeControls } = params;
   const { setPinnedToolbarVisible } = params.visibilityState;
-  const { setAiPickMode, setHighlighterMode, setQuickEditDocumentMode, setQuickEditMode } =
-    modeControls;
+  const {
+    setAiPickMode,
+    setDesignReviewMode,
+    setHighlighterMode,
+    setQuickEditDocumentMode,
+    setQuickEditMode,
+  } = modeControls;
   const frameManager = useFrameManager({
     InteractiveFrameComponent: params.InteractiveFrameComponent,
   });
@@ -144,9 +155,11 @@ export function useContentAppBindings(params: ContentAppBindingsParams) {
   });
   useModeDisabledListener({
     aiPickMode: params.modeFlags.aiPickMode,
+    designReviewMode: params.modeFlags.designReviewMode,
     highlighterMode: params.modeFlags.highlighterMode,
     quickEditMode: params.modeFlags.quickEditMode,
     setAiPickMode,
+    setDesignReviewMode,
     setHighlighterMode,
     setQuickEditDocumentMode,
     setQuickEditMode,

@@ -26,6 +26,7 @@ type ToolbarPrimaryControlsProps = React.ComponentProps<typeof ToolbarPrimaryCon
 type ToolbarPrimaryFixtureParams = {
   aiPickMode?: boolean;
   captureAction?: 'download_default' | 'scenario';
+  designReviewMode?: boolean;
   highlighterMode?: boolean;
   isCursorMode?: boolean;
   pendingInteractionMode?: 'quick-edit' | 'highlighter' | null;
@@ -78,6 +79,7 @@ function createScenarioState() {
 function createToolbarPrimaryToolbarProps(params: ToolbarPrimaryFixtureParams) {
   return {
     aiPickMode: params.aiPickMode ?? false,
+    designReviewMode: params.designReviewMode ?? false,
     isCursorMode: params.isCursorMode ?? true,
     onAiPickContentStart: vi.fn(),
     onClearHighlights: vi.fn(),
@@ -87,6 +89,7 @@ function createToolbarPrimaryToolbarProps(params: ToolbarPrimaryFixtureParams) {
     onTakeScreenshot: vi.fn(),
     onTimerDelayChange: vi.fn(),
     onToggleHighlighterMode: vi.fn(),
+    onToggleDesignReviewMode: vi.fn(),
     onToggleQuickEditDocumentMode: vi.fn(),
     onToggleQuickEditMode: vi.fn(),
     onToggleScreenshotMode: vi.fn(),
@@ -101,13 +104,16 @@ function createToolbarPrimaryViewModel(
   toolbarMenuState: ToolbarPrimaryControlsProps['viewModel']['toolbarMenuState']
 ): ToolbarPrimaryControlsProps['viewModel'] {
   return {
+    designReviewMode: params.designReviewMode ?? false,
     quickEditMode: params.quickEditMode ?? false,
     quickEditDocumentMode: params.quickEditDocumentMode ?? false,
     highlighterMode: params.highlighterMode ?? false,
     pendingInteractionMode: params.pendingInteractionMode ?? null,
     screenshotMode: params.screenshotMode ?? true,
-    captureAction: params.captureAction ?? 'download_default',
-    setCaptureAction: vi.fn(),
+    capture: {
+      action: params.captureAction ?? 'download_default',
+      setAction: vi.fn(),
+    },
     derivedState: {
       compactMenus: false,
       currentViewport: null,

@@ -35,6 +35,7 @@ function createBridgeParams() {
     modeControls: createModeControls(),
     modeState: {
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       isToolbarVisible: false,
       quickEditMode: false,
@@ -56,9 +57,11 @@ function createBridgeParams() {
 function createModeControls() {
   return {
     disableAiPickMode: vi.fn(),
+    disableDesignReviewMode: vi.fn(),
     disableHighlighterMode: vi.fn(),
     disableQuickEditMode: vi.fn(),
     setAiPickMode: vi.fn(),
+    setDesignReviewMode: vi.fn(),
     setHighlighterMode: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),

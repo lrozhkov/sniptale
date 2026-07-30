@@ -1,5 +1,6 @@
 import { disableHighlighterMode } from '../../../selection/highlighter';
 import { disableQuickEditMode } from '../../../selection/quick-edit';
+import { disableDesignReviewMode } from '../../../selection/design-review';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 import type { DiagnosticLoggerController } from '../../../application/diagnostics/runtime';
 import type { ScreenshotStartContext } from '../../screenshot/types';
@@ -32,6 +33,7 @@ export type ContentRuntimeBridgeParams = {
 export function buildContentModeFlags(modeState: ContentAppModeStateValue): ContentAppModeFlags {
   return {
     aiPickMode: modeState.aiPickMode,
+    designReviewMode: modeState.designReviewMode,
     highlighterMode: modeState.highlighterMode,
     quickEditDocumentMode: modeState.quickEditDocumentMode,
     quickEditMode: modeState.quickEditMode,
@@ -44,6 +46,7 @@ export function buildContentModeControls(
 ): ContentAppRuntimeModeControls {
   return {
     setAiPickMode: modeState.setAiPickMode,
+    setDesignReviewMode: modeState.setDesignReviewMode,
     setHighlighterMode: modeState.setHighlighterMode,
     setQuickEditDocumentMode: modeState.setQuickEditDocumentMode,
     setIsToolbarVisible: modeState.setIsToolbarVisible,
@@ -127,9 +130,11 @@ export function buildRuntimeMessageBridgeParams(
     },
     modeControls: {
       disableAiPickMode,
+      disableDesignReviewMode,
       disableHighlighterMode,
       disableQuickEditMode,
       setAiPickMode: params.modeControls.setAiPickMode,
+      setDesignReviewMode: params.modeControls.setDesignReviewMode,
       setHighlighterMode: params.modeControls.setHighlighterMode,
       setIsToolbarVisible: params.modeControls.setIsToolbarVisible,
       setNavigationLockEnabled: params.modeControls.setNavigationLockEnabled,
@@ -139,6 +144,7 @@ export function buildRuntimeMessageBridgeParams(
     },
     modeState: {
       aiPickMode: params.modeFlags.aiPickMode,
+      designReviewMode: params.modeFlags.designReviewMode,
       highlighterMode: params.modeFlags.highlighterMode,
       isToolbarVisible: params.visibilityState.isToolbarVisible,
       quickEditMode: params.modeFlags.quickEditMode,

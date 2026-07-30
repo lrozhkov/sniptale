@@ -65,11 +65,13 @@ function createToolbarLayoutSection(
     isCursorMode:
       !viewModel.modeState.highlighterMode &&
       !viewModel.modeState.quickEditMode &&
-      !viewModel.modeState.aiPickMode,
+      !viewModel.modeState.aiPickMode &&
+      !viewModel.modeState.designReviewMode,
     isToolbarVisible: viewModel.modeState.isToolbarVisible,
     modeController: viewModel.modeController,
     modes: {
       aiPickMode: viewModel.modeState.aiPickMode,
+      designReviewMode: viewModel.modeState.designReviewMode,
       highlighterMode: viewModel.modeState.highlighterMode,
       quickEditDocumentMode: viewModel.modeState.quickEditDocumentMode,
       quickEditMode: viewModel.modeState.quickEditMode,

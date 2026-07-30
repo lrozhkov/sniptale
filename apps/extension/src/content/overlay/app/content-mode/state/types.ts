@@ -7,6 +7,7 @@ import type { ScreenshotStartContext } from '../../../screenshot/types';
 
 export type ContentAppModeFlags = {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   highlighterMode: boolean;
   quickEditDocumentMode: boolean;
   quickEditMode: boolean;
@@ -58,6 +59,7 @@ export type ContentAppVisibilityState = {
 
 export type ContentAppModeControls = {
   setAiPickMode: (enabled: boolean) => void;
+  setDesignReviewMode: (enabled: boolean) => void;
   setHighlighterMode: (enabled: boolean) => void;
   setQuickEditDocumentMode: (enabled: boolean) => void;
   setQuickEditMode: (enabled: boolean) => void;

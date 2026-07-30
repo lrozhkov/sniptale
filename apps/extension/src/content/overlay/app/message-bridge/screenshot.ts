@@ -18,6 +18,11 @@ function disableEditingModes(params: RuntimeMessageBridgeParams): void {
     params.modeControls.setAiPickMode(false);
   }
 
+  if (params.modeState.designReviewMode) {
+    params.modeControls.disableDesignReviewMode();
+    params.modeControls.setDesignReviewMode(false);
+  }
+
   if (params.modeState.highlighterMode) {
     params.modeControls.disableHighlighterMode();
     params.modeControls.setHighlighterMode(false);
@@ -55,6 +60,7 @@ function isPlainPopupPreparationOpenFlow(request: RuntimeMessageRequest): boolea
 function hasModeOwnedNavigationLock(params: RuntimeMessageBridgeParams): boolean {
   return (
     params.modeState.aiPickMode ||
+    params.modeState.designReviewMode ||
     params.modeState.highlighterMode ||
     params.modeState.quickEditMode
   );

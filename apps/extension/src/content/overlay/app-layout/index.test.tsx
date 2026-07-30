@@ -85,6 +85,7 @@ function createModeController() {
     handleClearHighlights: vi.fn(),
     handleEnableCursorMode: vi.fn(),
     handleHideToolbar: vi.fn(),
+    handleToggleDesignReviewMode: vi.fn(),
     handleToggleHighlighterMode: vi.fn(),
     handleToggleNavigationLock: vi.fn(),
     handleToggleQuickEditDocumentMode: vi.fn(),
@@ -182,6 +183,7 @@ function createProps() {
       modeController: createModeController(),
       modes: {
         aiPickMode: false,
+        designReviewMode: false,
         highlighterMode: false,
         quickEditDocumentMode: false,
         quickEditMode: false,

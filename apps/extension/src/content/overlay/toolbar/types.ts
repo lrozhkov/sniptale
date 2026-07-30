@@ -54,14 +54,12 @@ export interface ToolbarProps {
   onCaptureActionChange?: (action: CaptureActionType) => void;
   onToggleScreenshotMode: (enabled: boolean) => void;
   onToggleHighlighterMode: (enabled: boolean) => void;
+  onToggleDesignReviewMode: (enabled: boolean) => void;
   onToggleQuickEditDocumentMode: (enabled: boolean) => void;
   onToggleQuickEditMode: (enabled: boolean) => void;
-  pageStyleInspector?: {
-    open: boolean;
-    onToggle: () => void;
-  };
   onAiPickContentStart: () => void;
   aiPickMode?: boolean;
+  designReviewMode?: boolean;
   highlighterMode?: boolean;
   quickEditDocumentMode?: boolean;
   quickEditMode?: boolean;

@@ -280,6 +280,41 @@ describe('browser annotation session live identity', () => {
   });
 });
 
+describe('Design Review annotation state', () => {
+  it('stores action metadata and clears only review-owned evidence', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const target = createTarget();
+
+    session.recordTextChange({ after: 'New', before: 'Old', evidence, target });
+    session.recordPropertyChanges({
+      changes: [createPropertyChange({ after: '24px', before: '16px' })],
+      evidence,
+      target,
+    });
+    session.setComment({ comment: 'Fix this', evidence, target });
+    session.setDesignReviewAction({ action: 'fix', evidence, target });
+
+    expect(session.captureSnapshot().domRecords[0]).toMatchObject({
+      comment: 'Fix this',
+      designReview: { action: 'fix' },
+      propertyChanges: [createPropertyChange({ after: '24px', before: '16px' })],
+      textChange: { after: 'New', before: 'Old' },
+    });
+
+    session.clearDesignReview(target);
+
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({
+        propertyChanges: [],
+        textChange: { after: 'New', before: 'Old' },
+      }),
+    ]);
+    expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('comment');
+    expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('designReview');
+  });
+});
+
 describe('browser annotation session lifecycle', () => {
   it('keeps historical frame evidence when the current command did not change that frame', () => {
     const session = createBrowserAnnotationSession();

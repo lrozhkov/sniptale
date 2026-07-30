@@ -6,16 +6,17 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AutoBlurController } from '../auto-blur/controller';
 import type { ContentAppLayoutProps } from './types';
 
-const { contentDialogStackMock, contentToolbarShellMock, pageStyleInspectorSurfaceMock } =
-  vi.hoisted(() => ({
+const { contentDialogStackMock, contentToolbarShellMock, designReviewSurfaceMock } = vi.hoisted(
+  () => ({
     contentDialogStackMock: vi.fn(() => <div data-ui="content.layout.dialogs" />),
     contentToolbarShellMock: vi.fn(() => <div data-ui="content.layout.toolbar" />),
-    pageStyleInspectorSurfaceMock: vi.fn(() => (
-      <div data-ui="content.layout.page-style-inspector">
+    designReviewSurfaceMock: vi.fn(() => (
+      <div data-ui="content.layout.design-review">
         <div data-ui="content.annotation-markers" />
       </div>
     )),
-  }));
+  })
+);
 
 vi.mock('./dialogs', () => ({
   ContentDialogStack: () => contentDialogStackMock(),
@@ -30,9 +31,9 @@ vi.mock('./toolbar', () => ({
   ContentToolbarShell: () => contentToolbarShellMock(),
 }));
 
-vi.mock('../page-style-inspector/view', () => ({
-  PageStyleInspectorSurface: () => pageStyleInspectorSurfaceMock(),
-  usePageStyleInspectorController: () => ({
+vi.mock('../design-review/view', () => ({
+  DesignReviewSurface: () => designReviewSurfaceMock(),
+  useDesignReviewController: () => ({
     actions: {},
     inspectorOpen: false,
     toggleInspector: vi.fn(),
@@ -145,6 +146,7 @@ function createToolbarProps(
       handleClearHighlights: vi.fn(),
       handleEnableCursorMode: vi.fn(),
       handleHideToolbar: vi.fn(),
+      handleToggleDesignReviewMode: vi.fn(),
       handleToggleHighlighterMode: vi.fn(),
       handleToggleNavigationLock: vi.fn(),
       handleToggleQuickEditDocumentMode: vi.fn(),
@@ -153,6 +155,7 @@ function createToolbarProps(
     },
     modes: {
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       quickEditDocumentMode: true,
       quickEditMode: true,
@@ -213,9 +216,9 @@ it('hides dialog and inspector app chrome while capture UI is completely hidden'
   await renderLayout(props);
 
   expect(contentDialogStackMock).not.toHaveBeenCalled();
-  expect(pageStyleInspectorSurfaceMock).not.toHaveBeenCalled();
+  expect(designReviewSurfaceMock).not.toHaveBeenCalled();
   expect(container?.querySelector('[data-ui="content.layout.dialogs"]')).toBeNull();
-  expect(container?.querySelector('[data-ui="content.layout.page-style-inspector"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="content.layout.design-review"]')).toBeNull();
   expect(container?.querySelector('[data-ui="content.annotation-markers"]')).toBeNull();
 
   await renderLayout({
@@ -227,10 +230,8 @@ it('hides dialog and inspector app chrome while capture UI is completely hidden'
   });
 
   expect(contentDialogStackMock).toHaveBeenCalledTimes(1);
-  expect(pageStyleInspectorSurfaceMock).toHaveBeenCalledTimes(1);
+  expect(designReviewSurfaceMock).toHaveBeenCalledTimes(1);
   expect(container?.querySelector('[data-ui="content.layout.dialogs"]')).not.toBeNull();
-  expect(
-    container?.querySelector('[data-ui="content.layout.page-style-inspector"]')
-  ).not.toBeNull();
+  expect(container?.querySelector('[data-ui="content.layout.design-review"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="content.annotation-markers"]')).not.toBeNull();
 });

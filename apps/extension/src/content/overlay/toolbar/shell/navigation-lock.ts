@@ -6,6 +6,7 @@ import {
 import { createToolbarNavigationLockToggle } from './navigation-lock.toggle';
 
 export function useToolbarNavigationLock(params: {
+  designReviewMode: boolean;
   scenarioCaptureMode?: 'manual' | 'by-click';
   scenarioEnabled?: boolean;
   highlighterMode: boolean;
@@ -47,6 +48,7 @@ export function useToolbarNavigationLock(params: {
 
 function useToolbarNavigationLockEffectState(params: {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   highlighterMode: boolean;
   isCursorMode: boolean;
   quickEditMode: boolean;
@@ -58,6 +60,7 @@ function useToolbarNavigationLockEffectState(params: {
 }) {
   const {
     aiPickMode,
+    designReviewMode,
     highlighterMode,
     isCursorMode,
     quickEditMode,
@@ -69,6 +72,7 @@ function useToolbarNavigationLockEffectState(params: {
 
   useToolbarManagedNavigationEffect({
     aiPickMode,
+    designReviewMode,
     highlighterMode,
     isCursorMode,
     quickEditMode,
@@ -82,6 +86,7 @@ function useToolbarNavigationLockEffectState(params: {
 
 function resolveToolbarNavigationLockPresentation(params: {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   highlighterMode: boolean;
   isCursorMode: boolean;
   navigationLockEnabled: boolean;
@@ -91,6 +96,7 @@ function resolveToolbarNavigationLockPresentation(params: {
 }) {
   return resolveToolbarLockPresentation({
     aiPickMode: params.aiPickMode,
+    designReviewMode: params.designReviewMode,
     highlighterMode: params.highlighterMode,
     isCursorMode: params.isCursorMode,
     navigationLockEnabled: params.navigationLockEnabled,

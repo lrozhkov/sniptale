@@ -90,6 +90,7 @@ function createModeState(): ContentAppControllersModeState {
     captureActionRef: { current: 'download_default' as const },
     clearPendingAutoStartCapture: vi.fn(),
     currentViewport: null,
+    designReviewMode: false,
     highlighterMode: false,
     isCompletelyHidden: false,
     isToolbarVisible: true,
@@ -108,6 +109,7 @@ function createModeState(): ContentAppControllersModeState {
     setAiPickMode: vi.fn(),
     setCaptureAction: vi.fn(),
     setCurrentViewport: vi.fn(),
+    setDesignReviewMode: vi.fn(),
     setHighlighterMode: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
@@ -174,10 +176,12 @@ function expectAiAndToolbarControllerArgs(modeState: ReturnType<typeof createMod
   });
   expect(mocks.useToolbarModeController).toHaveBeenCalledWith({
     aiPickMode: true,
+    designReviewMode: false,
     disableAiPickMode: expect.any(Function),
     highlighterMode: false,
     quickEditMode: true,
     setAiPickMode: modeState.setAiPickMode,
+    setDesignReviewMode: modeState.setDesignReviewMode,
     setHighlighterMode: modeState.setHighlighterMode,
     setIsToolbarVisible: modeState.setIsToolbarVisible,
     setNavigationLockEnabled: modeState.setNavigationLockEnabled,

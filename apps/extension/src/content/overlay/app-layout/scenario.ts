@@ -1,5 +1,6 @@
 type ScenarioBlockedModes = {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   highlighterMode: boolean;
   quickEditMode: boolean;
 };
@@ -24,7 +25,7 @@ type UserScreenshotModeExitArgs = {
 };
 
 export function isScenarioByClickBlocked(modes: ScenarioBlockedModes) {
-  return modes.aiPickMode || modes.highlighterMode || modes.quickEditMode;
+  return modes.aiPickMode || modes.designReviewMode || modes.highlighterMode || modes.quickEditMode;
 }
 
 export function resolveScenarioByClickTransition(args: {

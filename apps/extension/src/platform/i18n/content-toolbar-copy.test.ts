@@ -82,8 +82,8 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Select a page element and describe the change',
   },
   'content.toolbar.quickEditEnable': {
-    ru: 'Редактируйте текст и стили прямо на странице',
-    en: 'Edit text and styles directly on the page',
+    ru: 'Редактируйте текст прямо на странице',
+    en: 'Edit text directly on the page',
   },
   'content.toolbar.highlighterEnable': {
     ru: 'Добавляйте рамки, маски, размытие и комментарии',

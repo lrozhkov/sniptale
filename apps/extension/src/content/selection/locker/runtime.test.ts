@@ -1,4 +1,12 @@
+// @vitest-environment jsdom
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const modeSession = vi.hoisted(() => ({
+  isContentModeEnabled: vi.fn((_mode: string) => false),
+}));
+
+vi.mock('../../application/mode-session', () => modeSession);
 
 import { createNavigationLocker, type NavigationLockerDeps } from './runtime';
 
@@ -24,6 +32,7 @@ function createClassListHarness() {
 function createListenerHarness() {
   return {
     addSelectStartListener: vi.fn(),
+    auxClickCleanup: vi.fn(),
     clickCleanup: vi.fn(),
     keydownCleanup: vi.fn(),
     logger: { log: vi.fn() },
@@ -40,6 +49,8 @@ function createListenerHarness() {
 function createWindowListenerFactory(listeners: ReturnType<typeof createListenerHarness>) {
   return vi.fn().mockImplementation((eventName: string) => {
     switch (eventName) {
+      case 'auxclick':
+        return listeners.auxClickCleanup;
       case 'pointerdown':
         return listeners.pointerCleanup;
       case 'mousedown':
@@ -97,8 +108,23 @@ function createLockerHarness() {
   };
 }
 
+function getRegisteredEventListener(
+  harness: ReturnType<typeof createLockerHarness>,
+  eventName: string
+): EventListener {
+  const registration = harness.addEventListenerToAllWindowsDynamic.mock.calls.find(
+    ([registeredEventName]) => registeredEventName === eventName
+  );
+  if (!registration) {
+    throw new Error(`Expected ${eventName} listener registration`);
+  }
+
+  return registration[1] as EventListener;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  modeSession.isContentModeEnabled.mockReturnValue(false);
 });
 
 function shouldSubscribeListenersWhileLockIsActive(): void {
@@ -108,12 +134,30 @@ function shouldSubscribeListenersWhileLockIsActive(): void {
 
   expect(harness.doc.body.classList.contains('sniptale-navigation-locked')).toBe(true);
   expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenCalledWith(true);
-  expect(harness.deps.addEventListenerToAllWindowsDynamic).toHaveBeenCalledTimes(4);
+  expect(harness.deps.addEventListenerToAllWindowsDynamic).toHaveBeenCalledTimes(5);
   expect(harness.listeners.subscribeBeforeUnload).toHaveBeenCalledOnce();
+  expect(() =>
+    getRegisteredEventListener(harness, 'auxclick')(new Event('auxclick'))
+  ).not.toThrow();
 
   harness.locker.setFullLockMode(true);
 
   expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenLastCalledWith(false);
+}
+
+function shouldKeepDesignReviewListenersWithoutThePointerBlockingOverlay(): void {
+  const harness = createLockerHarness();
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'design-review');
+
+  harness.locker.enableNavigationLock(false);
+
+  expect(harness.doc.body.classList.contains('sniptale-navigation-locked')).toBe(true);
+  expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenCalledWith(false);
+  expect(harness.deps.addEventListenerToAllWindowsDynamic).toHaveBeenCalledTimes(5);
+  expect(harness.listeners.subscribeBeforeUnload).toHaveBeenCalledOnce();
+  expect(() =>
+    getRegisteredEventListener(harness, 'auxclick')(new Event('auxclick'))
+  ).not.toThrow();
 }
 
 function shouldCleanUpRuntimeListenersWhenDisabled(): void {
@@ -126,6 +170,7 @@ function shouldCleanUpRuntimeListenersWhenDisabled(): void {
   expect(harness.listeners.pointerCleanup).toHaveBeenCalledOnce();
   expect(harness.listeners.mouseCleanup).toHaveBeenCalledOnce();
   expect(harness.listeners.clickCleanup).toHaveBeenCalledOnce();
+  expect(harness.listeners.auxClickCleanup).toHaveBeenCalledOnce();
   expect(harness.listeners.keydownCleanup).toHaveBeenCalledOnce();
   expect(harness.listeners.unsubscribeBeforeUnload).toHaveBeenCalledOnce();
   expect(harness.listeners.removeNavigationLockOverlay).toHaveBeenCalledOnce();
@@ -254,6 +299,10 @@ describe('createNavigationLocker', () => {
   it(
     'subscribes window listeners and syncs overlay state while the lock is active',
     shouldSubscribeListenersWhileLockIsActive
+  );
+  it(
+    'keeps Design Review listeners without the pointer-blocking overlay',
+    shouldKeepDesignReviewListenersWithoutThePointerBlockingOverlay
   );
   it(
     'cleans up all runtime listeners and removes the overlay when disabled',

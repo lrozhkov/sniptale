@@ -58,7 +58,6 @@ function createRuntimeOptions() {
       hideHoverOverlay: vi.fn(),
       isDocumentModeEnabled: vi.fn(() => false),
       isEnabled: vi.fn(() => true),
-      isStyleInspectorModeEnabled: vi.fn(() => false),
       makeElementEditable: vi.fn(),
       showHoverOverlay: vi.fn(),
     }),

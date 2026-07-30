@@ -10,6 +10,7 @@ import {
   type BrowserAnnotationTargetEvidence,
   type BrowserAnnotationTextChangeInput,
   type BrowserAnnotationTextChangesInput,
+  type BrowserDesignReviewActionInput,
   type BrowserDomAnnotationRecord,
   type BrowserFrameAnnotationInput,
   type BrowserFrameAnnotationRecord,
@@ -69,6 +70,7 @@ function cloneDomRecord(record: BrowserDomAnnotationRecord): BrowserDomAnnotatio
     ...record,
     evidence: cloneEvidence(record.evidence),
     propertyChanges: record.propertyChanges.map(clonePropertyChange),
+    ...(record.designReview ? { designReview: { ...record.designReview } } : {}),
     ...(record.textChange ? { textChange: { ...record.textChange } } : {}),
   };
 }
@@ -137,7 +139,12 @@ function removeEmptyRecord(
   state: BrowserAnnotationRuntimeState,
   record: BrowserDomAnnotationRecord
 ): void {
-  if (record.comment || record.textChange || record.propertyChanges.length > 0) {
+  if (
+    record.comment ||
+    record.designReview?.action ||
+    record.textChange ||
+    record.propertyChanges.length > 0
+  ) {
     return;
   }
 
@@ -146,6 +153,50 @@ function removeEmptyRecord(
   if (target && state.liveAnnotationIds.get(target) === record.annotationId) {
     state.liveAnnotationIds.delete(target);
   }
+}
+
+function setDesignReviewAction(
+  state: BrowserAnnotationRuntimeState,
+  input: BrowserDesignReviewActionInput
+): void {
+  const existingRecord = getRecordForTarget(state, input.target);
+  if (!existingRecord && input.action === null) {
+    return;
+  }
+  if (existingRecord?.designReview?.action === input.action) {
+    return;
+  }
+
+  const record = existingRecord ?? createRecord(state, input);
+  record.evidence = cloneEvidence(input.evidence);
+  if (input.action === null) {
+    delete record.designReview;
+    removeEmptyRecord(state, record);
+  } else {
+    record.designReview = { action: input.action };
+  }
+  publish(state);
+}
+
+function clearDesignReview(state: BrowserAnnotationRuntimeState, target: Element): void {
+  const record = getRecordForTarget(state, target);
+  if (!record) {
+    return;
+  }
+
+  const hasDesignReviewEvidence = Boolean(
+    record.comment || record.designReview || record.propertyChanges.length > 0
+  );
+  if (!hasDesignReviewEvidence) {
+    return;
+  }
+
+  delete record.comment;
+  delete record.commentMarker;
+  delete record.designReview;
+  record.propertyChanges = [];
+  removeEmptyRecord(state, record);
+  publish(state);
 }
 
 function declarationValuesEqual(
@@ -410,6 +461,7 @@ export function createBrowserAnnotationSession() {
     applySnapshot: (snapshot: BrowserAnnotationSessionSnapshot): void =>
       applySnapshot(state, snapshot),
     captureSnapshot: (): BrowserAnnotationSessionSnapshot => createSnapshot(state),
+    clearDesignReview: (target: Element): void => clearDesignReview(state, target),
     captureFailedMutationRollbackPoint: (): BrowserAnnotationFailedMutationRollbackPoint => ({
       authority: rollbackAuthority,
       revision: state.revision,
@@ -448,6 +500,8 @@ export function createBrowserAnnotationSession() {
       return true;
     },
     setComment: (input: BrowserAnnotationCommentInput): number | null => setComment(state, input),
+    setDesignReviewAction: (input: BrowserDesignReviewActionInput): void =>
+      setDesignReviewAction(state, input),
     subscribe: (listener: BrowserAnnotationListener): (() => void) => {
       state.listeners.add(listener);
       return () => state.listeners.delete(listener);

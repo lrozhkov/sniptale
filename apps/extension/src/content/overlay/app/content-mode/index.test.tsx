@@ -257,6 +257,14 @@ async function verifyDelayedPreferenceDoesNotOverwriteScenarioRestore() {
 }
 
 describe('useContentAppModeState', () => {
+  it('projects the Design Review flag and control through the grouped mode owner', async () => {
+    await renderHarness();
+
+    expect(getLatestState().designReviewMode).toBe(false);
+    act(() => getLatestState().setDesignReviewMode(true));
+    expect(getLatestState().designReviewMode).toBe(true);
+  });
+
   registerStableOverlayStateTests();
   registerPinnedToolbarWindowStorageRestoreTest();
   registerPinnedToolbarBackgroundRestoreTest();

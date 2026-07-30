@@ -3,11 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { initializeContentUiRoots } from '../../platform/dom-host';
-import {
-  buildEditableElementRecord,
-  isQuickEditStyleInspectableElement,
-  isQuickEditTextElement,
-} from './elements';
+import { buildEditableElementRecord, isQuickEditTextElement } from './elements';
 
 function shouldAcceptPlainTextElementsAndRejectExtensionOwnedSurfaces() {
   const editable = document.createElement('div');
@@ -51,16 +47,6 @@ function shouldCaptureTheOriginalEditableElementRecord() {
   expect(record.originalChildNodes?.[0]?.textContent).toBe('Original text');
 }
 
-function shouldRecognizeImageAndBlockStyleTargetsWithoutWideningDirectTextEditing() {
-  const image = document.createElement('img');
-  const section = document.createElement('section');
-  section.append(document.createElement('p'));
-
-  expect(isQuickEditTextElement(image)).toBe(false);
-  expect(isQuickEditStyleInspectableElement(image)).toBe(true);
-  expect(isQuickEditStyleInspectableElement(section)).toBe(true);
-}
-
 describe('quick-edit runtime elements', () => {
   it(
     'accepts plain text elements and rejects extension-owned surfaces',
@@ -70,10 +56,5 @@ describe('quick-edit runtime elements', () => {
   it(
     'captures the original editable element record',
     shouldCaptureTheOriginalEditableElementRecord
-  );
-
-  it(
-    'recognizes image and block style targets without widening direct text editing',
-    shouldRecognizeImageAndBlockStyleTargetsWithoutWideningDirectTextEditing
   );
 });

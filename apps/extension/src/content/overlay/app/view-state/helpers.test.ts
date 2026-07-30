@@ -14,6 +14,7 @@ function createModeState(): ContentAppModeState {
     captureActionRef: { current: 'download_default' },
     clearPendingAutoStartCapture: vi.fn(),
     currentViewport: { height: 720, width: 1280 },
+    designReviewMode: false,
     highlighterMode: false,
     isCompletelyHidden: false,
     isToolbarVisible: true,
@@ -32,6 +33,7 @@ function createModeState(): ContentAppModeState {
     setAiPickMode: vi.fn(),
     setCaptureAction: vi.fn(),
     setCurrentViewport: vi.fn(),
+    setDesignReviewMode: vi.fn(),
     setHighlighterMode: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
@@ -64,6 +66,7 @@ function buildRuntimeBridgeResult(modeState: ContentAppModeState) {
       modeControls: buildContentModeControls(modeState),
       modeFlags: {
         aiPickMode: modeState.aiPickMode,
+        designReviewMode: modeState.designReviewMode,
         highlighterMode: modeState.highlighterMode,
         quickEditDocumentMode: modeState.quickEditDocumentMode,
         quickEditMode: modeState.quickEditMode,

@@ -151,6 +151,34 @@ describe('iframe-utils-core geometry helpers', () => {
     expect(getViewportClientPoint(5, 6, iframe)).toEqual({ x: 108, y: 210 });
   });
 
+  it('translates points through nested iframe borders and rendered scale', () => {
+    const { iframe: outerIframe, iframeDoc: outerDocument } = createAccessibleIframe();
+    setRect(outerIframe, { height: 240, left: 100, top: 200, width: 320 });
+    setIframeBoxMetrics(outerIframe, {
+      clientLeft: 3,
+      clientTop: 4,
+      offsetHeight: 120,
+      offsetWidth: 160,
+    });
+    const innerIframe = outerDocument.createElement('iframe');
+    outerDocument.body.append(innerIframe);
+    const innerWindow = innerIframe.contentWindow;
+    if (!innerWindow) throw new Error('Expected nested iframe window');
+    Object.defineProperty(innerWindow, 'frameElement', {
+      configurable: true,
+      value: innerIframe,
+    });
+    setRect(innerIframe, { height: 50, left: 10, top: 20, width: 100 });
+    setIframeBoxMetrics(innerIframe, {
+      clientLeft: 1,
+      clientTop: 2,
+      offsetHeight: 25,
+      offsetWidth: 50,
+    });
+
+    expect(getViewportClientPoint(3, 4, innerIframe)).toEqual({ x: 142, y: 272 });
+  });
+
   it('computes absolute positions and containing iframes for nested and detached documents', () => {
     const { iframe, iframeDoc } = createAccessibleIframe();
     setRect(iframe, { left: 100, top: 200, width: 160, height: 120 });

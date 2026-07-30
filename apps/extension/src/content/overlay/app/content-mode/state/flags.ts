@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ContentAppModeControls, ContentAppModeFlags } from './types';
 
 export function useContentModeFlags() {
   const [screenshotMode, setScreenshotMode] = useState(false);
@@ -6,17 +7,24 @@ export function useContentModeFlags() {
   const [quickEditMode, setQuickEditMode] = useState(false);
   const [quickEditDocumentMode, setQuickEditDocumentMode] = useState(false);
   const [aiPickMode, setAiPickMode] = useState(false);
+  const [designReviewMode, setDesignReviewMode] = useState(false);
 
-  return {
+  const flags: ContentAppModeFlags = {
     aiPickMode,
+    designReviewMode,
     highlighterMode,
     quickEditDocumentMode,
     quickEditMode,
     screenshotMode,
+  };
+  const controls: ContentAppModeControls = {
     setAiPickMode,
+    setDesignReviewMode,
     setHighlighterMode,
     setQuickEditDocumentMode,
     setQuickEditMode,
     setScreenshotMode,
   };
+
+  return { controls, flags };
 }

@@ -119,3 +119,17 @@ it('rejects duplicate preferred identities and falls back to the exact element p
   expect(document.querySelectorAll(selector)).toHaveLength(1);
   expect(document.querySelector(selector)).toBe(second);
 });
+
+it('allocates uniqueness inside the target open shadow root', () => {
+  const host = document.createElement('section');
+  const root = host.attachShadow({ mode: 'open' });
+  const first = document.createElement('button');
+  const second = document.createElement('button');
+  root.append(first, second);
+  document.body.append(host);
+
+  const selector = getElementSelector(second, { includeSniptaleId: false });
+
+  expect(selector).toBe('button:nth-of-type(2)');
+  expect(root.querySelector(selector)).toBe(second);
+});

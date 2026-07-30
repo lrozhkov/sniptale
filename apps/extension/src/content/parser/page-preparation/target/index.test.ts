@@ -150,7 +150,7 @@ function registerUniversalElementTests(): void {
   });
 
   it.each([
-    ['inspector', 'sniptale-page-style-inspector-control'],
+    ['inspector', 'sniptale-design-review-control'],
     ['toolbar', 'sniptale-toolbar-control'],
     ['resize handle', 'sniptale-resize-handle'],
     ['interactive popover', 'sniptale-frame-popover'],

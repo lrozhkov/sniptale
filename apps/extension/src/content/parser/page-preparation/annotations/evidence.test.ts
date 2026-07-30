@@ -50,3 +50,20 @@ it('captures the inner target and iframe context only for an accessible iframe d
   });
   expect(evidence).not.toHaveProperty('targetRole');
 });
+
+it('captures full root-scoped selector and ancestor evidence for an open shadow target', () => {
+  const host = document.createElement('article');
+  host.id = 'card-host';
+  const root = host.attachShadow({ mode: 'open' });
+  const wrapper = document.createElement('section');
+  const target = document.createElement('button');
+  target.className = 'primary';
+  wrapper.append(target);
+  root.append(wrapper);
+  document.body.append(host);
+
+  const evidence = createBrowserAnnotationTargetEvidence(target);
+
+  expect(evidence.targetSelector).toBe('#card-host >>> button.primary');
+  expect(evidence.targetPath).toContain('article#card-host >>> section > button.primary');
+});

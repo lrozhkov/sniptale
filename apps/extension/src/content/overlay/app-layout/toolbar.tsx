@@ -152,16 +152,15 @@ function renderToolbarShell(args: {
         captureAction={args.toolbar.captureAction}
         onToggleScreenshotMode={args.handleToggleScreenshotMode}
         onToggleHighlighterMode={modeController.handleToggleHighlighterMode}
+        onToggleDesignReviewMode={modeController.handleToggleDesignReviewMode}
         onToggleQuickEditDocumentMode={modeController.handleToggleQuickEditDocumentMode}
         onToggleQuickEditMode={modeController.handleToggleQuickEditMode}
         onAiPickContentStart={args.toolbar.aiController.handleAiPickContentStart}
         aiPickMode={modes.aiPickMode}
+        designReviewMode={modes.designReviewMode}
         highlighterMode={modes.highlighterMode}
         quickEditDocumentMode={modes.quickEditDocumentMode}
         quickEditMode={modes.quickEditMode}
-        {...(args.toolbar.pageStyleInspector === undefined
-          ? {}
-          : { pageStyleInspector: args.toolbar.pageStyleInspector })}
         screenshotMode={modes.screenshotMode}
         pinToTab={args.toolbar.pinToTab}
         pinToTabAvailable={args.toolbar.pinToTabAvailable}

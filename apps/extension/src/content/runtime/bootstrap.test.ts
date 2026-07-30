@@ -32,6 +32,7 @@ const fullPageCaptureAgentMocks = vi.hoisted(() => ({
 
 const runtimeCleanupMocks = vi.hoisted(() => ({
   disableAiPickModeIfLoaded: vi.fn(),
+  disableDesignReviewMode: vi.fn(),
   disableHighlighterMode: vi.fn(),
   disableQuickEditMode: vi.fn(),
   disableSelectionMode: vi.fn(),
@@ -78,6 +79,14 @@ vi.mock('../selection/quick-edit', () => ({
   enableQuickEditDocumentMode: vi.fn(),
   enableQuickEditMode: vi.fn(),
   isQuickEditDocumentModeEnabled: vi.fn(),
+}));
+
+vi.mock('../selection/design-review', () => ({
+  DesignReviewModeState: undefined,
+  disableDesignReviewMode: runtimeCleanupMocks.disableDesignReviewMode,
+  enableDesignReviewMode: vi.fn(),
+  getDesignReviewModeState: vi.fn(),
+  subscribeToDesignReviewMode: vi.fn(),
 }));
 
 vi.mock('../selection/selection-mode', () => ({

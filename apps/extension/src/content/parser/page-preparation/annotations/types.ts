@@ -51,11 +51,18 @@ export interface BrowserAnnotationTextChange {
   before: string;
 }
 
+export type BrowserDesignReviewAction = 'refine' | 'fix' | 'simplify' | 'verify' | 'explain';
+
+export interface BrowserDesignReviewMetadata {
+  action: BrowserDesignReviewAction | null;
+}
+
 export interface BrowserDomAnnotationRecord {
   annotationId: number;
   comment?: string;
   commentMarker?: number;
   creationOrder: number;
+  designReview?: BrowserDesignReviewMetadata;
   evidence: BrowserAnnotationTargetEvidence;
   propertyChanges: BrowserAnnotationPropertyChange[];
   textChange?: BrowserAnnotationTextChange;
@@ -123,6 +130,12 @@ export type BrowserAnnotationTextChangesInput = readonly BrowserAnnotationTextCh
 
 export interface BrowserAnnotationCommentInput {
   comment: string;
+  evidence: BrowserAnnotationTargetEvidence;
+  target: Element;
+}
+
+export interface BrowserDesignReviewActionInput {
+  action: BrowserDesignReviewAction | null;
   evidence: BrowserAnnotationTargetEvidence;
   target: Element;
 }

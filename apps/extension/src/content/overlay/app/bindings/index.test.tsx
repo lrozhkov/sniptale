@@ -97,6 +97,7 @@ function createBindingsProps() {
     InteractiveFrameComponent,
     modeControls: {
       setAiPickMode: vi.fn(),
+      setDesignReviewMode: vi.fn(),
       setHighlighterMode: vi.fn(),
       setIsToolbarVisible: vi.fn(),
       setQuickEditDocumentMode: vi.fn(),
@@ -104,6 +105,7 @@ function createBindingsProps() {
     },
     modeFlags: {
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       quickEditDocumentMode: false,
       quickEditMode: false,

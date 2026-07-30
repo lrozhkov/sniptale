@@ -29,8 +29,10 @@ export type {
 };
 
 function useContentAppCoreState(): ContentAppModeState {
+  const { controls, flags } = useContentModeFlags();
   return {
-    ...useContentModeFlags(),
+    ...flags,
+    ...controls,
     ...useContentSurfaceState(),
   };
 }

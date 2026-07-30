@@ -8,7 +8,7 @@ function createTargetPath(element: Element): string {
   const segments: string[] = [];
   let current: Element | null = element;
 
-  while (current && segments.length < 5) {
+  while (current) {
     const id = current.id ? `#${current.id}` : '';
     const classes = Array.from(current.classList)
       .filter((className) => !className.startsWith('sniptale-'))
@@ -16,10 +16,43 @@ function createTargetPath(element: Element): string {
       .map((className) => `.${className}`)
       .join('');
     segments.unshift(`${current.localName}${id}${classes}`);
-    current = current.parentElement;
+    if (current.parentElement) {
+      current = current.parentElement;
+      continue;
+    }
+
+    const root: Node = current.getRootNode();
+    if (root.nodeType === Node.DOCUMENT_FRAGMENT_NODE && 'host' in root) {
+      segments.unshift('>>>');
+      current = (root as ShadowRoot).host;
+      continue;
+    }
+    current = null;
   }
 
-  return segments.join(' > ');
+  return segments.reduce(
+    (path, segment) =>
+      segment === '>>>'
+        ? `${path.trimEnd()} >>> `
+        : `${path}${path && !path.endsWith(' >>> ') ? ' > ' : ''}${segment}`,
+    ''
+  );
+}
+
+function createShadowAwareSelector(element: Element): string {
+  const selectors: string[] = [];
+  let current = element;
+
+  while (true) {
+    selectors.unshift(getElementSelector(current, { includeSniptaleId: false }));
+    const root = current.getRootNode();
+    if (root.nodeType !== Node.DOCUMENT_FRAGMENT_NODE || !('host' in root)) {
+      break;
+    }
+    current = (root as ShadowRoot).host;
+  }
+
+  return selectors.join(' >>> ');
 }
 
 function createFrameContext(element: Element): BrowserAnnotationFrameContext {
@@ -47,7 +80,7 @@ function createFileLabel(element: Element): string {
 export function createBrowserAnnotationTargetEvidence(
   element: Element
 ): BrowserAnnotationTargetEvidence {
-  const elementSelector = getElementSelector(element, { includeSniptaleId: false });
+  const elementSelector = createShadowAwareSelector(element);
   const iframe = getContainingIframe(element);
   const locator = serializeCompositeSelector({
     elementSelector,

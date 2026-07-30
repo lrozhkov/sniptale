@@ -76,8 +76,16 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Disable editing',
   },
   quickEditEnable: {
-    ru: 'Редактируйте текст и стили прямо на странице',
-    en: 'Edit text and styles directly on the page',
+    ru: 'Редактируйте текст прямо на странице',
+    en: 'Edit text directly on the page',
+  },
+  designReviewLabel: {
+    ru: 'Дизайн-ревью',
+    en: 'Design review',
+  },
+  designReviewEnable: {
+    ru: 'Выбирайте любые элементы, оставляйте замечания и проверяйте стили',
+    en: 'Select any element, leave feedback, and inspect its styles',
   },
   quickEditDocumentModeLabel: {
     ru: 'Свободное редактирование',

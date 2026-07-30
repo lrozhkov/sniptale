@@ -42,15 +42,24 @@ export function getViewportClientPoint(
   y: number,
   iframe?: HTMLIFrameElement
 ): { x: number; y: number } {
-  if (!iframe) {
-    return { x, y };
+  let viewportX = x;
+  let viewportY = y;
+  let currentIframe: HTMLIFrameElement | null | undefined = iframe;
+  let attempts = 0;
+
+  while (currentIframe && attempts < 10) {
+    attempts += 1;
+    const iframeRect = currentIframe.getBoundingClientRect();
+    const scaleX = currentIframe.offsetWidth > 0 ? iframeRect.width / currentIframe.offsetWidth : 1;
+    const scaleY =
+      currentIframe.offsetHeight > 0 ? iframeRect.height / currentIframe.offsetHeight : 1;
+    viewportX = iframeRect.left + (currentIframe.clientLeft + viewportX) * scaleX;
+    viewportY = iframeRect.top + (currentIframe.clientTop + viewportY) * scaleY;
+    currentIframe = currentIframe.ownerDocument.defaultView
+      ?.frameElement as HTMLIFrameElement | null;
   }
 
-  const iframeRect = iframe.getBoundingClientRect();
-  return {
-    x: x + iframeRect.left + iframe.clientLeft,
-    y: y + iframeRect.top + iframe.clientTop,
-  };
+  return { x: viewportX, y: viewportY };
 }
 
 /**

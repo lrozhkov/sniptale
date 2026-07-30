@@ -120,7 +120,10 @@ function createViewModel(params: {
   pendingInteractionMode?: 'quick-edit' | 'highlighter' | null;
 }) {
   return {
-    captureAction: params.captureAction,
+    capture: {
+      action: params.captureAction,
+      setAction: vi.fn(),
+    },
     derivedState: {
       currentViewport: null,
       displayMode: 'vertical' as const,
@@ -139,7 +142,6 @@ function createViewModel(params: {
     quickEditMode: false,
     quickEditDocumentMode: false,
     screenshotMode: true,
-    setCaptureAction: vi.fn(),
     toggleMode: vi.fn(),
   };
 }

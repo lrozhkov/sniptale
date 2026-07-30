@@ -2,7 +2,7 @@ import { contentAutoBlurMessages } from './auto-blur';
 import { contentCalloutMessages } from './callout';
 import { contentInteractiveFrameMessages } from './interactive-frame';
 import { contentOverlayControlsMessages } from './overlay-controls';
-import { contentPageStyleInspectorMessages } from './page-style-inspector';
+import { contentDesignReviewMessages } from './design-review';
 import { contentRuntimeMessages } from './runtime';
 import { contentSaveDialogMessages } from './save-dialog';
 import { contentStepBadgeMessages } from './step-badge';
@@ -18,5 +18,5 @@ export const contentMessages = defineMessageSource({
   stepBadge: contentStepBadgeMessages,
   interactiveFrame: contentInteractiveFrameMessages,
   overlayControls: contentOverlayControlsMessages,
-  pageStyleInspector: contentPageStyleInspectorMessages,
+  designReview: contentDesignReviewMessages,
 });

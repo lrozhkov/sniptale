@@ -15,7 +15,6 @@ type QuickEditRuntimeEventsProps = {
   hideHoverOverlay: () => void;
   isDocumentModeEnabled: () => boolean;
   isEnabled: () => boolean;
-  isStyleInspectorModeEnabled: () => boolean;
   makeElementEditable: (element: HTMLElement) => void;
   showHoverOverlay: (element: HTMLElement) => void;
   disableDocumentMode: () => void;
@@ -27,7 +26,6 @@ function createQuickEditRuntimeEventState(props: QuickEditRuntimeEventsProps) {
     isDocumentModeEnabled: props.isDocumentModeEnabled,
     editingElementsSize: () => props.editingElements.size,
     hideHoverOverlay: props.hideHoverOverlay,
-    isStyleInspectorModeEnabled: props.isStyleInspectorModeEnabled,
     showHoverOverlay: props.showHoverOverlay,
     makeElementEditable: props.makeElementEditable,
     finishEditing: props.finishEditing,

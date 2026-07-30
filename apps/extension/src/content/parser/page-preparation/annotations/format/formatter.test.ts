@@ -82,6 +82,34 @@ describe('browser annotation formatter', () => {
     expect(formatBrowserAnnotationSnapshot(snapshot)).toBe('# Browser comments:\n');
   });
 
+  it('keeps Design Review action metadata out of the Wave 2 aggregate export', () => {
+    const output = formatBrowserAnnotationSnapshot(
+      createSnapshot({
+        domRecords: [
+          createDomRecord({
+            comment: 'Review this element',
+            commentMarker: 1,
+            designReview: { action: 'fix' },
+          }),
+        ],
+      })
+    );
+
+    expect(output).toContain('Review this element');
+    expect(output).not.toContain('Design Review action');
+    expect(output).not.toContain('Action: Fix');
+  });
+
+  it('omits action-only Design Review records from the Wave 2 aggregate export', () => {
+    const output = formatBrowserAnnotationSnapshot(
+      createSnapshot({
+        domRecords: [createDomRecord({ designReview: { action: 'fix' } })],
+      })
+    );
+
+    expect(output).toBe('# Browser comments:\n');
+  });
+
   it('groups comment, declaration delta, and committed text evidence in fixed field order', () => {
     const record = createDomRecord({
       comment: 'Do it\r\n> carefully\n---\nSafe\u202e text',

@@ -6,13 +6,11 @@ const mocks = vi.hoisted(() => ({
   ownedElementMock: vi.fn(() => false),
   quickEditTargetMock: vi.fn(),
   resolveActiveElementMock: vi.fn(),
-  styleInspectableTargetMock: vi.fn(() => false),
   textTargetMock: vi.fn(() => false),
 }));
 
 vi.mock('./events.shared', () => ({
   isQuickEditOwnedElement: mocks.ownedElementMock,
-  isQuickEditStyleInspectableTarget: mocks.styleInspectableTargetMock,
   isQuickEditTextTarget: mocks.textTargetMock,
   resolveActiveQuickEditElement: mocks.resolveActiveElementMock,
   resolveQuickEditTarget: mocks.quickEditTargetMock,
@@ -53,7 +51,6 @@ function createPointerOptions() {
     hideHoverOverlay: vi.fn(),
     isDocumentModeEnabled: vi.fn(() => false),
     isEnabled: vi.fn(() => true),
-    isStyleInspectorModeEnabled: vi.fn(() => false),
     makeElementEditable: vi.fn(),
     showHoverOverlay: vi.fn(),
   } as any;
