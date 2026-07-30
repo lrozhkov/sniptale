@@ -7,8 +7,10 @@ import type {
 } from '@sniptale/runtime-contracts/export';
 import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
 import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
-import type { PageSnapshotSource } from '../../page-snapshot/source';
+import { resolvePageSnapshotSource, type PageSnapshotSource } from '../../page-snapshot/source';
 import { getExportErrorMessage } from './runtime';
+import { prepareBrowserAnnotationsExportText } from '../../page-preparation/annotations';
+import { buildExportArchiveBaseNameFromTitle } from '../files/naming';
 import { runExportManagerPackagePipeline, runExportManagerPipeline } from './pipeline';
 import {
   beginExportManagerRun,
@@ -17,6 +19,11 @@ import {
   setExportManagerProgressCallback,
   updateExportManagerProgress,
 } from './state';
+import {
+  createBrowserAnnotationsExportResult,
+  createBrowserAnnotationsPagePackage,
+  hasOnlyBrowserAnnotations,
+} from './annotations';
 
 type ExportManagerRunContext = {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
@@ -34,14 +41,24 @@ interface ExportManagerService {
 }
 
 interface ExportManagerServiceDeps {
+  prepareAnnotationsText?: () => Promise<string>;
   resolveSnapshotSource?: () => PageSnapshotSource;
   snapshotSource?: PageSnapshotSource | undefined;
+}
+
+function resolvePrepareAnnotationsText(deps: ExportManagerServiceDeps): () => Promise<string> {
+  return deps.prepareAnnotationsText ?? prepareBrowserAnnotationsExportText;
 }
 
 function resolveServiceSnapshotSource(
   deps: ExportManagerServiceDeps
 ): PageSnapshotSource | undefined {
   return deps.resolveSnapshotSource?.() ?? deps.snapshotSource;
+}
+
+function resolveAnnotationsArchiveBaseName(deps: ExportManagerServiceDeps): string {
+  const pageSource = resolvePageSnapshotSource(resolveServiceSnapshotSource(deps));
+  return buildExportArchiveBaseNameFromTitle(pageSource.pageTitle);
 }
 
 function reportServiceFailure(
@@ -75,9 +92,31 @@ function createExportContentRunner(
     const warnings: string[] = [];
 
     try {
+      if (hasOnlyBrowserAnnotations(options)) {
+        updateExportManagerProgress(state, {
+          activeStepKey: 'annotations',
+          phase: 'scanning',
+          message: translate('content.runtime.prepareAnnotations'),
+          current: 0,
+          total: 0,
+          errors: [],
+        });
+        const text = await resolvePrepareAnnotationsText(deps)();
+        if (state.isCancelled) {
+          throw new Error(translate('content.runtime.exportCancelled'));
+        }
+        const pagePackage = createBrowserAnnotationsPagePackage(
+          text,
+          resolveAnnotationsArchiveBaseName(deps)
+        );
+        const result = createBrowserAnnotationsExportResult(pagePackage);
+        finishAnnotationsOnlyExport(state);
+        return { success: true, ...result, errors: warnings };
+      }
       const result = await runExportManagerPipeline(state, options, warnings, {
         contentIntentSource: context.contentIntentSource,
         fullPageCaptureIdentity: context.fullPageCaptureIdentity,
+        prepareAnnotationsText: resolvePrepareAnnotationsText(deps),
         snapshotSource: resolveServiceSnapshotSource(deps),
       });
       return { success: true, ...result, errors: warnings };
@@ -93,6 +132,17 @@ function createExportContentRunner(
   };
 }
 
+function finishAnnotationsOnlyExport(state: ReturnType<typeof createExportManagerState>): void {
+  updateExportManagerProgress(state, {
+    activeStepKey: 'annotations',
+    phase: 'done',
+    message: translate('content.runtime.exportCompleted'),
+    current: 1,
+    total: 1,
+    errors: [],
+  });
+}
+
 function createBuildPackageRunner(
   state: ReturnType<typeof createExportManagerState>,
   deps: ExportManagerServiceDeps
@@ -105,9 +155,30 @@ function createBuildPackageRunner(
     const warnings: string[] = [];
 
     try {
+      if (hasOnlyBrowserAnnotations(options)) {
+        updateExportManagerProgress(state, {
+          activeStepKey: 'annotations',
+          phase: 'scanning',
+          message: translate('content.runtime.prepareAnnotations'),
+          current: 0,
+          total: 0,
+          errors: [],
+        });
+        const text = await resolvePrepareAnnotationsText(deps)();
+        if (state.isCancelled) {
+          throw new Error(translate('content.runtime.exportCancelled'));
+        }
+        const pagePackage = createBrowserAnnotationsPagePackage(
+          text,
+          resolveAnnotationsArchiveBaseName(deps)
+        );
+        finishAnnotationsOnlyExport(state);
+        return pagePackage;
+      }
       const result = await runExportManagerPackagePipeline(state, options, warnings, {
         contentIntentSource: context.contentIntentSource,
         fullPageCaptureIdentity: context.fullPageCaptureIdentity,
+        prepareAnnotationsText: resolvePrepareAnnotationsText(deps),
         snapshotSource: resolveServiceSnapshotSource(deps),
       });
       return result.pagePackage;

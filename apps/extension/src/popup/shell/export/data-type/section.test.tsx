@@ -19,6 +19,7 @@ let root: Root | null = null;
 function createProps(overrides: Partial<SectionProps> = {}): SectionProps {
   return {
     disabled: false,
+    includeAnnotations: false,
     includeBasicLogs: false,
     includeCssDiagnostics: false,
     includeFiles: false,
@@ -32,6 +33,7 @@ function createProps(overrides: Partial<SectionProps> = {}): SectionProps {
     onClose: vi.fn(),
     onOpen: vi.fn(),
     setIncludeBasicLogs: vi.fn(),
+    setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),
@@ -126,6 +128,7 @@ it('clears selected options and forwards row toggles in disabled presentation', 
   const setIncludeJson = vi.fn<SectionProps['setIncludeJson']>();
   const props = await renderSection({
     disabled: true,
+    includeAnnotations: true,
     includeBasicLogs: true,
     includeCssDiagnostics: true,
     includeFiles: true,

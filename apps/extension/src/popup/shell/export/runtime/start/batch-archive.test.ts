@@ -173,6 +173,33 @@ it('writes markdown files into the archive root for flat layout', async () => {
   ]);
 });
 
+it('uses stable page-scoped annotation paths for flat and grouped layouts', async () => {
+  const packages = [
+    createBatchPackage({
+      archiveBaseName: 'first_page_2026-04-23_12-00-00',
+      entries: [{ path: 'browser-annotations.md', textContent: 'First evidence' }],
+    }),
+    createBatchPackage({
+      archiveBaseName: 'second_page_2026-04-23_12-00-01',
+      entries: [{ path: 'browser-annotations.md', textContent: 'Second evidence' }],
+    }),
+  ];
+
+  const flatZip = await openBatchArchive(packages, 'flat');
+  expect(Object.keys(flatZip.files).sort()).toEqual([
+    'first_page_2026-04-23_12-00-00_annotations.md',
+    'second_page_2026-04-23_12-00-01_annotations.md',
+  ]);
+
+  const groupedZip = await openBatchArchive(packages, 'grouped');
+  expect(Object.keys(groupedZip.files).sort()).toEqual([
+    'first_page_2026-04-23_12-00-00/',
+    'first_page_2026-04-23_12-00-00/browser-annotations.md',
+    'second_page_2026-04-23_12-00-01/',
+    'second_page_2026-04-23_12-00-01/browser-annotations.md',
+  ]);
+});
+
 it('renames screenshot and warning log files into unique archive-root names for flat layout', async () => {
   const zip = await openBatchArchive(
     [

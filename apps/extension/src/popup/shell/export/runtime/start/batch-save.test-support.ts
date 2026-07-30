@@ -36,6 +36,7 @@ export function createDeps(
 function createToggleState() {
   return {
     hasLoadedPreferences: true,
+    includeAnnotations: false,
     includeBasicLogs: false,
     includeCssDiagnostics: false,
     includeFiles: false,
@@ -45,6 +46,7 @@ function createToggleState() {
     includeJson: true,
     includeMarkdown: true,
     setIncludeBasicLogs: vi.fn(),
+    setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),

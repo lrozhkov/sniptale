@@ -20,7 +20,17 @@ export function buildExportArchiveBaseName(
   data: ExportData | null,
   timestamp = getMoscowTimestamp()
 ): string {
-  const sanitizedTitle = sanitizeFilename(data?.meta?.title || treeData.title || 'export', 50);
+  return buildExportArchiveBaseNameFromTitle(
+    data?.meta?.title || treeData.title || 'export',
+    timestamp
+  );
+}
+
+export function buildExportArchiveBaseNameFromTitle(
+  title: string,
+  timestamp = getMoscowTimestamp()
+): string {
+  const sanitizedTitle = sanitizeFilename(title || 'export', 50);
   return `${sanitizedTitle}_${timestamp}`;
 }
 

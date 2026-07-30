@@ -7,9 +7,15 @@ import type {
   PopupExportSelection,
 } from '../../session/types';
 import { persistPopupExportPreferences } from './persistence';
+import {
+  applyPopupExportSelection,
+  arePopupExportSelectionsEqual,
+  toPopupExportSelection,
+} from './selection';
 
 function createPreferences(): PopupExportPreferenceValues {
   return {
+    includeAnnotations: true,
     includeBasicLogs: true,
     includeCssDiagnostics: false,
     includeFiles: true,
@@ -23,6 +29,7 @@ function createPreferences(): PopupExportPreferenceValues {
 
 function createPreferenceActions(): PopupExportPreferenceActions {
   return {
+    setIncludeAnnotations: vi.fn(),
     setIncludeBasicLogs: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
@@ -36,6 +43,7 @@ function createPreferenceActions(): PopupExportPreferenceActions {
 
 function createSelection(overrides: Partial<PopupExportSelection> = {}): PopupExportSelection {
   return {
+    includeAnnotations: false,
     includeBasicLogs: false,
     includeCssDiagnostics: false,
     includeFiles: true,
@@ -82,7 +90,7 @@ async function verifyInitialCommittedSnapshot() {
 
   expect(savePreferences).not.toHaveBeenCalled();
   expect(committedPreferencesRef.current).toEqual(
-    createSelection({ includeBasicLogs: true, includeJson: true })
+    createSelection({ includeAnnotations: true, includeBasicLogs: true, includeJson: true })
   );
 }
 
@@ -104,6 +112,7 @@ async function verifyChangedPreferencesPersist() {
   });
 
   expect(savePreferences).toHaveBeenCalledWith({
+    includeAnnotations: true,
     includeBasicLogs: true,
     includeCssDiagnostics: false,
     includeFiles: true,
@@ -140,9 +149,24 @@ async function verifyRestoreAfterFailure() {
   expect(debug).toHaveBeenCalledWith('Failed to persist export preferences', expect.any(Error));
   expect(onPersistError).toHaveBeenCalledTimes(1);
   expect(preferenceActions.setIncludeBasicLogs).toHaveBeenCalledWith(false);
+  expect(preferenceActions.setIncludeAnnotations).toHaveBeenCalledWith(false);
 }
 
 describe('usePopupExportToggles persistence', () => {
+  it('maps, applies, and compares the annotations preference with the selection', () => {
+    const preferences = createPreferences();
+    const selection = toPopupExportSelection(preferences);
+    const actions = createPreferenceActions();
+
+    expect(selection.includeAnnotations).toBe(true);
+    applyPopupExportSelection(selection, actions);
+    expect(actions.setIncludeAnnotations).toHaveBeenCalledWith(true);
+    expect(arePopupExportSelectionsEqual(selection, { ...selection })).toBe(true);
+    expect(
+      arePopupExportSelectionsEqual(selection, { ...selection, includeAnnotations: false })
+    ).toBe(false);
+  });
+
   it('skips persistence before preferences are hydrated', async () => {
     await verifySkipBeforeHydration();
   });

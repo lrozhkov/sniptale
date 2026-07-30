@@ -8,6 +8,7 @@ import type { PopupExportTabSelectionState } from '../selection/tabs/types';
 export type PopupExportPreferenceValues = PopupExportPreferences;
 
 export type PopupExportPreferenceActions = {
+  setIncludeAnnotations: Dispatch<SetStateAction<boolean>>;
   setIncludeBasicLogs: Dispatch<SetStateAction<boolean>>;
   setIncludeCssDiagnostics: Dispatch<SetStateAction<boolean>>;
   setIncludeFiles: Dispatch<SetStateAction<boolean>>;
@@ -64,6 +65,7 @@ export type PopupExportSessionState = {
 };
 
 export type PopupExportSelection = {
+  includeAnnotations: boolean;
   includeBasicLogs: boolean;
   includeCssDiagnostics: boolean;
   includeFiles: boolean;

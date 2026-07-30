@@ -12,6 +12,7 @@ type ExportReadySectionProps = {
   filterQuery: string;
   filteredTabs: PopupExportTabItem[];
   hasLoadedPreferences: boolean;
+  includeAnnotations: boolean;
   includeBasicLogs: boolean;
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
@@ -23,6 +24,7 @@ type ExportReadySectionProps = {
   isFilterActive: boolean;
   selectedCount: number;
   selectedTabIds: number[];
+  setIncludeAnnotations: Dispatch<SetStateAction<boolean>>;
   setIncludeBasicLogs: Dispatch<SetStateAction<boolean>>;
   setIncludeCssDiagnostics: Dispatch<SetStateAction<boolean>>;
   setFilterQuery: (value: string) => void;
@@ -59,6 +61,7 @@ function renderDataTypeSection(
   return (
     <ExportDataTypeSection
       disabled={props.disabled}
+      includeAnnotations={props.includeAnnotations}
       includeBasicLogs={props.includeBasicLogs}
       includeCssDiagnostics={props.includeCssDiagnostics}
       includeFiles={props.includeFiles}
@@ -71,6 +74,7 @@ function renderDataTypeSection(
       isOpen={isEditingDataTypes}
       onClose={onClose}
       onOpen={onOpen}
+      setIncludeAnnotations={props.setIncludeAnnotations}
       setIncludeBasicLogs={props.setIncludeBasicLogs}
       setIncludeCssDiagnostics={props.setIncludeCssDiagnostics}
       setIncludeFiles={props.setIncludeFiles}

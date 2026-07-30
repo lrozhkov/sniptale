@@ -8,6 +8,7 @@ import type { FieldContentRole } from '../dom-tree';
  * Состояние прогресса экспорта
  */
 export type ExportProgressStepKey =
+  | 'annotations'
   | 'json'
   | 'markdown'
   | 'files'
@@ -35,6 +36,7 @@ export interface ExportProgress {
  * Опции экспорта
  */
 export interface ExportOptions {
+  includeAnnotations?: boolean; // включить browser-annotations.md
   includeJson: boolean; // включить JSON (data.json)
   includeMarkdown: boolean; // включить Markdown (data.md)
   includeFiles: boolean; // включить файлы

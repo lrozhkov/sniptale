@@ -39,6 +39,7 @@ function createDefaultDerivedState(): PopupExportController['state']['derived'] 
 function createDefaultPreferencesState(): PopupExportController['state']['preferences'] {
   return {
     actions: {
+      setIncludeAnnotations: vi.fn(),
       setIncludeBasicLogs: vi.fn(),
       setIncludeCssDiagnostics: vi.fn(),
       setIncludeFiles: vi.fn(),
@@ -50,6 +51,7 @@ function createDefaultPreferencesState(): PopupExportController['state']['prefer
     },
     hasLoadedPreferences: true,
     values: {
+      includeAnnotations: false,
       includeBasicLogs: false,
       includeCssDiagnostics: false,
       includeFiles: true,
@@ -113,6 +115,9 @@ function applyPreferenceValueOverrides(
   state: PopupExportController['state']['preferences'],
   overrides: NonNullable<ControllerFixtureOverrides['preferences']>
 ) {
+  if (overrides.includeAnnotations !== undefined) {
+    state.values.includeAnnotations = overrides.includeAnnotations;
+  }
   if (overrides.includeBasicLogs !== undefined) {
     state.values.includeBasicLogs = overrides.includeBasicLogs;
   }
@@ -143,6 +148,9 @@ function applyPreferenceActionOverrides(
   state: PopupExportController['state']['preferences'],
   overrides: NonNullable<ControllerFixtureOverrides['preferences']>
 ) {
+  if (overrides.setIncludeAnnotations !== undefined) {
+    state.actions.setIncludeAnnotations = overrides.setIncludeAnnotations;
+  }
   if (overrides.setIncludeBasicLogs !== undefined) {
     state.actions.setIncludeBasicLogs = overrides.setIncludeBasicLogs;
   }

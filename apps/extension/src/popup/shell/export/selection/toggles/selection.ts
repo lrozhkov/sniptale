@@ -8,6 +8,7 @@ export function toPopupExportSelection(
   preferences: PopupExportPreferenceValues | PopupExportSelection
 ): PopupExportSelection {
   return {
+    includeAnnotations: preferences.includeAnnotations,
     includeBasicLogs: preferences.includeBasicLogs,
     includeCssDiagnostics: preferences.includeCssDiagnostics,
     includeFiles: preferences.includeFiles,
@@ -23,6 +24,7 @@ export function applyPopupExportSelection(
   selection: PopupExportSelection,
   preferences: PopupExportPreferenceSetters
 ) {
+  preferences.setIncludeAnnotations(selection.includeAnnotations);
   preferences.setIncludeBasicLogs(selection.includeBasicLogs);
   preferences.setIncludeCssDiagnostics(selection.includeCssDiagnostics);
   preferences.setIncludeFiles(selection.includeFiles);
@@ -38,6 +40,7 @@ export function arePopupExportSelectionsEqual(
   right: PopupExportSelection
 ) {
   return (
+    left.includeAnnotations === right.includeAnnotations &&
     left.includeBasicLogs === right.includeBasicLogs &&
     left.includeCssDiagnostics === right.includeCssDiagnostics &&
     left.includeFiles === right.includeFiles &&

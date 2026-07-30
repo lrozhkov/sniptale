@@ -4,12 +4,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isOptionalBoolean(value: unknown): boolean {
+  return value === undefined || typeof value === 'boolean';
+}
+
 export function isPopupExportOptions(value: unknown): value is ExportOptions {
   if (!isRecord(value)) {
     return false;
   }
 
   return (
+    isOptionalBoolean(value['includeAnnotations']) &&
     typeof value['includeJson'] === 'boolean' &&
     typeof value['includeMarkdown'] === 'boolean' &&
     typeof value['includeFiles'] === 'boolean' &&

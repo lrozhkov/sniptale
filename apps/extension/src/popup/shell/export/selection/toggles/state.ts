@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import type { PopupExportPreferenceActions, PopupExportPreferenceState } from '../../session/types';
 
 export function usePopupExportPreferenceState(): PopupExportPreferenceState {
+  const [includeAnnotations, setIncludeAnnotations] = useState(false);
   const [includeJson, setIncludeJson] = useState(true);
   const [includeMarkdown, setIncludeMarkdown] = useState(true);
   const [includeFiles, setIncludeFiles] = useState(true);
@@ -14,6 +15,7 @@ export function usePopupExportPreferenceState(): PopupExportPreferenceState {
 
   return {
     actions: {
+      setIncludeAnnotations,
       setIncludeBasicLogs,
       setIncludeCssDiagnostics,
       setIncludeFiles,
@@ -24,6 +26,7 @@ export function usePopupExportPreferenceState(): PopupExportPreferenceState {
       setIncludeMarkdown,
     },
     values: {
+      includeAnnotations,
       includeBasicLogs,
       includeCssDiagnostics,
       includeFiles,
@@ -40,6 +43,7 @@ export function usePopupExportPreferenceSetters(
   preferences: PopupExportPreferenceState
 ): PopupExportPreferenceActions {
   const {
+    setIncludeAnnotations,
     setIncludeBasicLogs,
     setIncludeCssDiagnostics,
     setIncludeFiles,
@@ -52,6 +56,7 @@ export function usePopupExportPreferenceSetters(
 
   return useMemo(
     () => ({
+      setIncludeAnnotations,
       setIncludeBasicLogs,
       setIncludeCssDiagnostics,
       setIncludeFiles,
@@ -62,6 +67,7 @@ export function usePopupExportPreferenceSetters(
       setIncludeMarkdown,
     }),
     [
+      setIncludeAnnotations,
       setIncludeBasicLogs,
       setIncludeCssDiagnostics,
       setIncludeFiles,

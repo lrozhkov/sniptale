@@ -3,6 +3,7 @@ import type { PopupExportSelection } from './state';
 
 export function buildPopupExportOptions(selection: PopupExportSelection): ExportOptions {
   return {
+    ...(selection.includeAnnotations ? { includeAnnotations: true } : {}),
     includeBasicLogs: selection.includeBasicLogs,
     includeCssDiagnostics: selection.includeCssDiagnostics,
     includeFiles: selection.includeFiles,

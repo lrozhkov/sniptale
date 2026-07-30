@@ -57,6 +57,10 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Парсинг структуры страницы...',
     en: 'Scanning page structure...',
   },
+  prepareAnnotations: {
+    ru: 'Подготовка аннотаций...',
+    en: 'Preparing annotations...',
+  },
   scanDirectLinks: {
     ru: 'Поиск прямых ссылок на файлы...',
     en: 'Searching for direct file links...',

@@ -131,6 +131,14 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Остановить сбор',
     en: 'Cancel export',
   },
+  includeAnnotationsLabel: {
+    ru: 'Аннотации',
+    en: 'Annotations',
+  },
+  includeAnnotationsDescription: {
+    ru: 'Комментарии и изменения элементов',
+    en: 'Element comments and changes',
+  },
   includeJsonLabel: {
     ru: 'JSON',
     en: 'JSON',

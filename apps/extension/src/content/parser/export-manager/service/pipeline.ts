@@ -1,5 +1,10 @@
-import type { ExportData, ExportOptions } from '@sniptale/runtime-contracts/export';
+import type {
+  ExportData,
+  ExportOptions,
+  ExportProgressStepKey,
+} from '@sniptale/runtime-contracts/export';
 import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
+import { translate } from '../../../../platform/i18n';
 import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
 import {
   buildExportPagePackage,
@@ -29,6 +34,7 @@ import {
   runWithConsoleDiagnosticsSession,
   shouldCaptureConsoleDiagnostics,
 } from './diagnostics-session';
+import { createBrowserAnnotationsArchiveAsset } from './annotations';
 
 function throwIfExportCancelled(state: ExportManagerState): void {
   if (state.isCancelled) {
@@ -78,7 +84,7 @@ export async function runExportManagerPipeline(
   warnings: string[],
   pipelineOptions: Pick<
     PackagePipelineOptions,
-    'contentIntentSource' | 'fullPageCaptureIdentity' | 'snapshotSource'
+    'contentIntentSource' | 'fullPageCaptureIdentity' | 'prepareAnnotationsText' | 'snapshotSource'
   > = {}
 ) {
   const shouldCaptureConsole = shouldCaptureConsoleDiagnostics(options);
@@ -89,6 +95,7 @@ export async function runExportManagerPipeline(
       consoleDiagnosticsManaged: shouldCaptureConsole,
       contentIntentSource: pipelineOptions.contentIntentSource,
       fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
+      prepareAnnotationsText: pipelineOptions.prepareAnnotationsText,
       finishOnPackage: false,
       snapshotSource: pipelineOptions.snapshotSource,
     });
@@ -112,8 +119,46 @@ interface PackagePipelineOptions {
   consoleDiagnosticsManaged?: boolean;
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
   fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
+  prepareAnnotationsText?: (() => Promise<string>) | undefined;
   finishOnPackage?: boolean;
   snapshotSource?: PageSnapshotSource | undefined;
+}
+
+async function prepareAnnotationsAsset(args: {
+  options: ExportOptions;
+  prepareAnnotationsText?: (() => Promise<string>) | undefined;
+  state: ExportManagerState;
+}): Promise<ArchiveAsset | null> {
+  if (!args.options.includeAnnotations) {
+    return null;
+  }
+  if (!args.prepareAnnotationsText) {
+    throw new Error('Browser annotations formatter is unavailable');
+  }
+
+  updateExportManagerProgress(args.state, {
+    activeStepKey: 'annotations',
+    phase: 'scanning',
+    message: translate('content.runtime.prepareAnnotations'),
+    current: 0,
+    total: 0,
+  });
+  throwIfExportCancelled(args.state);
+  const text = await args.prepareAnnotationsText();
+  throwIfExportCancelled(args.state);
+  return createBrowserAnnotationsArchiveAsset(text);
+}
+
+function getPostAnnotationsActiveStep(options: ExportOptions): ExportProgressStepKey | undefined {
+  if (options.includeJson) return 'json';
+  if (options.includeMarkdown) return 'markdown';
+  if (options.includeFiles) return 'files';
+  if (options.includeImages) return 'images';
+  if (options.includeBasicLogs) return 'basicLogs';
+  if (options.includeHarDomLogs) return 'harDomLogs';
+  if (options.includeCssDiagnostics) return 'cssDiagnostics';
+  if (options.includeFullPageScreenshot) return 'fullPageScreenshot';
+  return undefined;
 }
 
 async function buildPipelinePagePackage(args: {
@@ -150,10 +195,19 @@ async function collectPackagePipelineInputs(
   warnings: string[],
   pipelineOptions: Pick<
     PackagePipelineOptions,
-    'contentIntentSource' | 'fullPageCaptureIdentity' | 'snapshotSource'
+    'contentIntentSource' | 'fullPageCaptureIdentity' | 'prepareAnnotationsText' | 'snapshotSource'
   > = {}
 ) {
-  const snapshot = await prepareExportManagerTreeData(state, pipelineOptions.snapshotSource);
+  const annotationsAsset = await prepareAnnotationsAsset({
+    options,
+    prepareAnnotationsText: pipelineOptions.prepareAnnotationsText,
+    state,
+  });
+  const snapshot = await prepareExportManagerTreeData(
+    state,
+    pipelineOptions.snapshotSource,
+    annotationsAsset ? getPostAnnotationsActiveStep(options) : undefined
+  );
   const captureArtifact = createCaptureArtifact(snapshot);
   const diagnosticsSource = createExportDiagnosticsSource(pipelineOptions.snapshotSource);
   throwIfExportCancelled(state);
@@ -181,6 +235,9 @@ async function collectPackagePipelineInputs(
     diagnosticsSource,
     throwIfCancelled: () => throwIfExportCancelled(state),
   });
+  if (annotationsAsset) {
+    extraAssets.unshift(annotationsAsset);
+  }
 
   return {
     captureArtifact,
@@ -210,6 +267,7 @@ export async function runExportManagerPackagePipeline(
     const collected = await collectPackagePipelineInputs(state, options, warnings, {
       contentIntentSource: pipelineOptions.contentIntentSource,
       fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
+      prepareAnnotationsText: pipelineOptions.prepareAnnotationsText,
       snapshotSource: pipelineOptions.snapshotSource,
     });
     throwIfExportCancelled(state);

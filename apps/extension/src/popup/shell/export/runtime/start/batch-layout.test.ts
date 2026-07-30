@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { resolvePopupBatchArchiveLayout } from './batch-layout';
 
 const baseSelection = {
+  includeAnnotations: false,
   includeBasicLogs: false,
   includeCssDiagnostics: false,
   includeFiles: false,
@@ -56,6 +57,7 @@ function expectGroupedSelection(
 describe('resolvePopupBatchArchiveLayout', () => {
   it('returns flat for each single eligible export option with 2+ pages', () => {
     expectFlatSelection({ includeJson: true });
+    expectFlatSelection({ includeAnnotations: true });
     expectFlatSelection({ includeMarkdown: true });
     expectFlatSelection({ includeFullPageScreenshot: true });
   });

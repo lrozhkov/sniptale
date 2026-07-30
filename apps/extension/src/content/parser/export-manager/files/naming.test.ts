@@ -6,6 +6,7 @@ import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import { getMoscowFilenameTimestamp } from '@sniptale/foundation/utils/export-timestamp';
 import {
   buildExportArchiveBaseName,
+  buildExportArchiveBaseNameFromTitle,
   createEmptyExportPagePackage,
   getMoscowTimestamp,
   sanitizeFilename,
@@ -74,4 +75,7 @@ it('builds export archive names and empty page packages from canonical metadata'
     archiveBaseName: 'canonical-export',
     entries: [],
   });
+  expect(buildExportArchiveBaseNameFromTitle('Annotation Page', '2026-03-22_13-11-12')).toBe(
+    'Annotation_Page_2026-03-22_13-11-12'
+  );
 });

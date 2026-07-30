@@ -5,6 +5,7 @@ import {
   FileText,
   Globe,
   Images,
+  MessageSquareText,
   NotebookText,
   Paperclip,
   SwatchBook,
@@ -16,6 +17,7 @@ import type {
 } from '../../session/types';
 
 export type ExportOptionKey =
+  | 'annotations'
   | 'json'
   | 'markdown'
   | 'files'
@@ -44,6 +46,13 @@ export function getExportOptionConfigs(): ExportOptionConfig[] {
 
 export function getContentOptionConfigs(): ExportOptionConfig[] {
   return [
+    {
+      accentClassName: 'text-[var(--sniptale-color-accent)]',
+      description: translate('popup.export.includeAnnotationsDescription'),
+      icon: MessageSquareText,
+      key: 'annotations',
+      label: translate('popup.export.includeAnnotationsLabel'),
+    },
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
       description: translate('popup.export.includeJsonDescription'),
@@ -110,6 +119,8 @@ export function getDiagnosticsOptionConfigs(): ExportOptionConfig[] {
 
 export function getExportOptionActive(key: ExportOptionKey, props: ExportOptionToggleProps) {
   switch (key) {
+    case 'annotations':
+      return props.includeAnnotations;
     case 'json':
       return props.includeJson;
     case 'markdown':
@@ -131,6 +142,9 @@ export function getExportOptionActive(key: ExportOptionKey, props: ExportOptionT
 
 export function toggleExportOption(key: ExportOptionKey, props: ExportOptionToggleProps) {
   switch (key) {
+    case 'annotations':
+      props.setIncludeAnnotations((value) => !value);
+      return;
     case 'json':
       props.setIncludeJson((value) => !value);
       return;
@@ -163,6 +177,9 @@ export function setExportOptionActive(
   props: ExportOptionToggleProps
 ) {
   switch (key) {
+    case 'annotations':
+      props.setIncludeAnnotations(nextValue);
+      return;
     case 'json':
       props.setIncludeJson(nextValue);
       return;

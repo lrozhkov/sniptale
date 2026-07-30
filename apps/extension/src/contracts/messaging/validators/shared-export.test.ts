@@ -24,6 +24,34 @@ it('accepts only complete export options payloads', () => {
 
   expect(
     isExportOptions({
+      includeAnnotations: true,
+      includeJson: true,
+      includeMarkdown: true,
+      includeFiles: true,
+      includeImages: true,
+      includeBasicLogs: false,
+      includeHarDomLogs: false,
+      includeCssDiagnostics: false,
+      includeFullPageScreenshot: true,
+    })
+  ).toBe(true);
+
+  expect(
+    isExportOptions({
+      includeAnnotations: 'yes',
+      includeJson: true,
+      includeMarkdown: true,
+      includeFiles: true,
+      includeImages: true,
+      includeBasicLogs: false,
+      includeHarDomLogs: false,
+      includeCssDiagnostics: false,
+      includeFullPageScreenshot: true,
+    })
+  ).toBe(false);
+
+  expect(
+    isExportOptions({
       includeJson: true,
     })
   ).toBe(false);

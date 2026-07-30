@@ -10,6 +10,7 @@ import type {
 import { hasOptionalField, isBoolean, isNumber, isRecord, isString } from './index';
 
 const exportProgressStepKeys = new Set<ExportProgressStepKey>([
+  'annotations',
   'basicLogs',
   'cssDiagnostics',
   'files',
@@ -43,6 +44,7 @@ function isExportPagePackageEntry(value: unknown): value is ExportPagePackageEnt
 export function isExportOptions(value: unknown): value is ExportOptions {
   return (
     isRecord(value) &&
+    hasOptionalField(value, 'includeAnnotations', isBoolean) &&
     isBoolean(value['includeJson']) &&
     isBoolean(value['includeMarkdown']) &&
     isBoolean(value['includeFiles']) &&

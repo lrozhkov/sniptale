@@ -88,6 +88,7 @@ function createSelectionProps(props: DataTypeSectionProps): ExportOptionTogglePr
 
   return {
     disabled: props.disabled,
+    includeAnnotations: props.includeAnnotations,
     includeBasicLogs: props.includeBasicLogs,
     includeCssDiagnostics: props.includeCssDiagnostics,
     includeFiles: props.includeFiles,
@@ -96,6 +97,7 @@ function createSelectionProps(props: DataTypeSectionProps): ExportOptionTogglePr
     includeImages: props.includeImages,
     includeJson: props.includeJson,
     includeMarkdown: props.includeMarkdown,
+    setIncludeAnnotations: bindSetter(props.setIncludeAnnotations),
     setIncludeBasicLogs: bindSetter(props.setIncludeBasicLogs),
     setIncludeCssDiagnostics: bindSetter(props.setIncludeCssDiagnostics),
     setIncludeFiles: bindSetter(props.setIncludeFiles),

@@ -89,6 +89,20 @@ function createExportOptions() {
   };
 }
 
+function createAnnotationsOnlyOptions() {
+  return {
+    includeAnnotations: true,
+    includeBasicLogs: false,
+    includeCssDiagnostics: false,
+    includeFiles: false,
+    includeFullPageScreenshot: false,
+    includeHarDomLogs: false,
+    includeImages: false,
+    includeJson: false,
+    includeMarkdown: false,
+  };
+}
+
 function createDeferred<T>(): DeferredValue<T> {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -98,6 +112,15 @@ function createDeferred<T>(): DeferredValue<T> {
   });
 
   return { promise, reject, resolve };
+}
+
+function readBlobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsText(blob);
+  });
 }
 
 function createTransferResult(previewId: string, fileId: string, filename: string) {
@@ -289,5 +312,137 @@ describe('export-manager service ownership cancellation', () => {
         message: 'content.runtime.exportCancelled',
       })
     );
+  });
+});
+
+describe('export-manager browser annotations delivery', () => {
+  it('downloads annotations-only as one markdown file without page capture or ZIP work', async () => {
+    const prepareAnnotationsText = vi.fn().mockResolvedValue('# Browser annotations\n');
+    const progressSpy = vi.fn();
+    const service = createExportManagerService({ prepareAnnotationsText });
+    service.onProgress(progressSpy);
+
+    const result = await service.export(createAnnotationsOnlyOptions());
+
+    expect(result).toMatchObject({
+      errors: [],
+      filename: 'browser-annotations.md',
+      success: true,
+    });
+    expect(result.blob?.type).toBe('text/markdown;charset=utf-8');
+    await expect(readBlobText(result.blob as Blob)).resolves.toBe('# Browser annotations\n');
+    expect(prepareAnnotationsText).toHaveBeenCalledOnce();
+    expect(prepareDOMTreeSnapshotMock).not.toHaveBeenCalled();
+    expect(buildExportPagePackageMock).not.toHaveBeenCalled();
+    expect(createExportArchiveBlobMock).not.toHaveBeenCalled();
+    expect(captureOptionalArchiveAssetsMock).not.toHaveBeenCalled();
+    expect(progressSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ activeStepKey: 'annotations', phase: 'done' })
+    );
+  });
+
+  it('builds an annotations-only page package without page capture', async () => {
+    const prepareAnnotationsText = vi.fn().mockResolvedValue('annotation evidence');
+    const { snapshotSource } = createSnapshotSource();
+    snapshotSource.document.title = 'Annotated page';
+    const service = createExportManagerService({ prepareAnnotationsText, snapshotSource });
+
+    const pagePackage = await service.buildPackage(createAnnotationsOnlyOptions());
+
+    expect(pagePackage.archiveBaseName).toMatch(/^Annotated_page_\d{4}-\d{2}-\d{2}_/u);
+    expect(pagePackage.entries).toEqual([
+      expect.objectContaining({
+        mimeType: 'text/markdown;charset=utf-8',
+        path: 'browser-annotations.md',
+        textContent: 'annotation evidence',
+      }),
+    ]);
+    expect(prepareAnnotationsText).toHaveBeenCalledOnce();
+    expect(prepareDOMTreeSnapshotMock).not.toHaveBeenCalled();
+    expect(buildExportPagePackageMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps annotations-only package bases page-scoped independently of batch order', async () => {
+    const firstSource = createSnapshotSource().snapshotSource;
+    const secondSource = createSnapshotSource().snapshotSource;
+    firstSource.document.title = 'First annotated page';
+    secondSource.document.title = 'Second annotated page';
+
+    const firstPackage = await createExportManagerService({
+      prepareAnnotationsText: vi.fn().mockResolvedValue('first evidence'),
+      snapshotSource: firstSource,
+    }).buildPackage(createAnnotationsOnlyOptions());
+    const secondPackage = await createExportManagerService({
+      prepareAnnotationsText: vi.fn().mockResolvedValue('second evidence'),
+      snapshotSource: secondSource,
+    }).buildPackage(createAnnotationsOnlyOptions());
+
+    expect(firstPackage.archiveBaseName).toMatch(/^First_annotated_page_/u);
+    expect(secondPackage.archiveBaseName).toMatch(/^Second_annotated_page_/u);
+    expect(firstPackage.archiveBaseName).not.toBe(secondPackage.archiveBaseName);
+    expect(prepareDOMTreeSnapshotMock).not.toHaveBeenCalled();
+  });
+
+  it('adds one annotations asset to a mixed package through the same command', async () => {
+    const prepareAnnotationsText = vi.fn().mockResolvedValue('mixed annotation evidence');
+    const service = createExportManagerService({ prepareAnnotationsText });
+    const progressSpy = vi.fn();
+    service.onProgress(progressSpy);
+    collectFilesWithHarForExportManagerMock.mockResolvedValue(
+      createTransferResult('preview-a', 'uuid-a', 'file-a.txt')
+    );
+
+    await service.buildPackage({ ...createExportOptions(), includeAnnotations: true });
+
+    expect(prepareAnnotationsText).toHaveBeenCalledOnce();
+    expect(prepareDOMTreeSnapshotMock).toHaveBeenCalledOnce();
+    expect(buildExportPagePackageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extraAssets: [
+          {
+            content: 'mixed annotation evidence',
+            path: 'browser-annotations.md',
+          },
+        ],
+      })
+    );
+    const progressEvents = progressSpy.mock.calls.map(([progress]) => progress);
+    const annotationsIndex = progressEvents.findIndex(
+      (progress) => progress.activeStepKey === 'annotations'
+    );
+    expect(annotationsIndex).toBeGreaterThanOrEqual(0);
+    expect(progressEvents[annotationsIndex + 1]).toMatchObject({
+      activeStepKey: 'json',
+      message: 'content.runtime.scanPageStructure',
+      phase: 'scanning',
+    });
+  });
+
+  it('fails annotations-only export without starting page capture when formatting fails', async () => {
+    const prepareAnnotationsText = vi.fn().mockRejectedValue(new Error('format failed'));
+    const service = createExportManagerService({ prepareAnnotationsText });
+
+    await expect(service.export(createAnnotationsOnlyOptions())).resolves.toMatchObject({
+      errors: ['format failed'],
+      success: false,
+    });
+    expect(prepareDOMTreeSnapshotMock).not.toHaveBeenCalled();
+    expect(createExportArchiveBlobMock).not.toHaveBeenCalled();
+  });
+
+  it('cancels annotations-only preparation before publishing a file', async () => {
+    const deferred = createDeferred<string>();
+    const service = createExportManagerService({ prepareAnnotationsText: () => deferred.promise });
+
+    const resultPromise = service.export(createAnnotationsOnlyOptions());
+    service.cancel();
+    deferred.resolve('stale evidence');
+
+    await expect(resultPromise).resolves.toMatchObject({
+      errors: ['content.runtime.exportCancelled'],
+      success: false,
+    });
+    expect(prepareDOMTreeSnapshotMock).not.toHaveBeenCalled();
+    expect(createExportArchiveBlobMock).not.toHaveBeenCalled();
   });
 });

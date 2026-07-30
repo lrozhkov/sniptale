@@ -40,6 +40,7 @@ function renderComponent(
 ) {
   const props: React.ComponentProps<typeof ExportOptionToggles> = {
     disabled: false,
+    includeAnnotations: false,
     includeBasicLogs: false,
     includeCssDiagnostics: false,
     includeFiles: true,
@@ -48,6 +49,7 @@ function renderComponent(
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
+    setIncludeAnnotations: createToggleSetter(),
     setIncludeBasicLogs: createToggleSetter(),
     setIncludeCssDiagnostics: createToggleSetter(),
     setIncludeFiles: createToggleSetter(),
@@ -94,12 +96,12 @@ describe('ExportOptionToggles', () => {
 
     expect(container?.textContent).toContain('t:popup.export.contentGroupLabel');
     expect(container?.textContent).toContain('t:popup.export.diagnosticsGroupLabel');
-    expect(buttons).toHaveLength(8);
+    expect(buttons).toHaveLength(9);
 
     act(() => {
-      buttons[0]?.click();
-      buttons[5]?.click();
-      buttons[7]?.click();
+      buttons[1]?.click();
+      buttons[6]?.click();
+      buttons[8]?.click();
     });
 
     expect(props.setIncludeJson).toHaveBeenCalledTimes(1);

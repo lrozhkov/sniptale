@@ -23,6 +23,7 @@ export function parseStoredPopupExportPreferences(value: unknown): {
 }
 
 const POPUP_EXPORT_PREFERENCE_KEYS = [
+  'includeAnnotations',
   'includeBasicLogs',
   'includeCssDiagnostics',
   'includeFiles',
