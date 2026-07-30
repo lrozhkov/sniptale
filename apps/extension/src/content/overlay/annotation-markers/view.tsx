@@ -1,6 +1,7 @@
 import { MessageSquare } from 'lucide-react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -8,6 +9,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { translate } from '../../../platform/i18n';
+import { registerContentOwnedPassiveChrome } from '../../platform/dom-host';
 import {
   browserAnnotationSession,
   type BrowserDomAnnotationRecord,
@@ -31,6 +33,17 @@ interface AnnotationMarkerPosition {
   tooltipRight: number | null;
   tooltipCorridor: 'above' | 'below' | 'none';
   tooltipTop: number | null;
+}
+
+function usePassiveContentChromeRef<T extends Element>() {
+  const cleanupRef = useRef<() => void>(() => undefined);
+  const ref = useCallback((element: T | null) => {
+    cleanupRef.current();
+    cleanupRef.current = registerContentOwnedPassiveChrome(element);
+  }, []);
+
+  useLayoutEffect(() => () => cleanupRef.current(), []);
+  return ref;
 }
 
 function markerPositionsMatch(
@@ -213,6 +226,7 @@ function AnnotationMarker(
   props: AnnotationMarkerProjection & { position: AnnotationMarkerPosition | undefined }
 ) {
   const tooltipScrollRef = useRef<HTMLSpanElement>(null);
+  const markerGroupRef = usePassiveContentChromeRef<HTMLDivElement>();
   if (!props.position || !props.record.comment || props.record.commentMarker === undefined) {
     return null;
   }
@@ -225,6 +239,7 @@ function AnnotationMarker(
       className="group pointer-events-none fixed"
       data-annotation-id={props.record.annotationId}
       data-ui="content.annotation-marker"
+      ref={markerGroupRef}
       style={{
         left: props.position.markerLeft ?? undefined,
         right: props.position.markerRight ?? undefined,
@@ -307,6 +322,7 @@ function createMarkerProjections(_revision: number): AnnotationMarkerProjection[
 }
 
 export function BrowserAnnotationMarkers() {
+  const markerLayerRef = usePassiveContentChromeRef<HTMLDivElement>();
   const revision = useSyncExternalStore(
     browserAnnotationSession.subscribe,
     () => browserAnnotationSession.getState().revision,
@@ -319,6 +335,7 @@ export function BrowserAnnotationMarkers() {
     <div
       className="sniptale-annotation-marker-layer pointer-events-none fixed inset-0 z-[2147483646]"
       data-ui="content.annotation-markers"
+      ref={markerLayerRef}
     >
       {projections.map((projection) => (
         <AnnotationMarker

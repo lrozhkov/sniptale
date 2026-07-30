@@ -16,8 +16,11 @@ import {
   isContentEventWithinElement,
   isContentOwnedEvent,
   isContentOwnedElement,
+  isContentOwnedPassiveChrome,
+  PASSIVE_CONTENT_CHROME,
   queryAllContentUiElements,
   queryContentUiElement,
+  registerContentOwnedPassiveChrome,
   resolveContentAppContainer,
   resolveContentOverlayRoot,
   resolveContentShadowRoot,
@@ -182,6 +185,46 @@ describe('content-root ui ownership and events', () => {
     expect(resolveContentShadowRoot()).toBe(replacementShadowRoot);
     expect(isContentOwnedElement(replacementHost)).toBe(true);
     expect(isContentOwnedElement(host)).toBe(false);
+  });
+
+  it('recognizes only exact passive hits in the live content root', () => {
+    const { host, shadowRoot } = mountContentHost();
+    initializeContentUiRoots(shadowRoot);
+    const passiveSurface = document.createElement('div');
+    const nestedControl = document.createElement('button');
+    const forgedOwnedControl = document.createElement('button');
+    const pageCreatedMarkedNode = document.createElement('div');
+    const classOnlySurface = document.createElement('div');
+    const pageLookalike = document.createElement('div');
+    Object.entries(PASSIVE_CONTENT_CHROME).forEach(([name, value]) => {
+      forgedOwnedControl.setAttribute(name, value);
+      pageCreatedMarkedNode.setAttribute(name, value);
+      pageLookalike.setAttribute(name, value);
+    });
+    classOnlySurface.className = 'sniptale-interactive-frame';
+    passiveSurface.append(nestedControl);
+    shadowRoot.append(passiveSurface, forgedOwnedControl, pageCreatedMarkedNode, classOnlySurface);
+    document.body.append(pageLookalike);
+    const unregisterPassiveSurface = registerContentOwnedPassiveChrome(passiveSurface);
+
+    expect(isContentOwnedPassiveChrome(passiveSurface)).toBe(true);
+    expect(isContentOwnedPassiveChrome(nestedControl)).toBe(false);
+    expect(isContentOwnedPassiveChrome(forgedOwnedControl)).toBe(false);
+    expect(isContentOwnedPassiveChrome(pageCreatedMarkedNode)).toBe(false);
+    expect(isContentOwnedPassiveChrome(classOnlySurface)).toBe(false);
+    expect(isContentOwnedPassiveChrome(pageLookalike)).toBe(false);
+    expect(isContentOwnedPassiveChrome(null)).toBe(false);
+
+    unregisterPassiveSurface();
+    expect(isContentOwnedPassiveChrome(passiveSurface)).toBe(false);
+    expect(passiveSurface.hasAttribute('data-sniptale-content-chrome')).toBe(false);
+
+    const cleanupRetiredSurface = registerContentOwnedPassiveChrome(passiveSurface);
+
+    host.remove();
+    document.body.append(host);
+    expect(isContentOwnedPassiveChrome(passiveSurface)).toBe(false);
+    cleanupRetiredSurface();
   });
 
   it('checks whether events flow through one or more candidate elements', () => {

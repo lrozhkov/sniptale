@@ -1,4 +1,4 @@
-import { isContentOwnedElement } from '../../../platform/dom-host';
+import { isContentOwnedElement, isContentOwnedPassiveChrome } from '../../../platform/dom-host';
 import { resolveIframeEventElement, resolveIframePointTarget } from '../../../platform/frame';
 
 const HOST_MODAL_BACKDROP_SELECTOR = [
@@ -10,12 +10,6 @@ const HOST_MODAL_BACKDROP_SELECTOR = [
 const HOST_MODAL_DIALOG_SELECTOR = ['.gwt-DialogBox', '.b-lightbox-form', '[role="dialog"]'].join(
   ','
 );
-const PASS_THROUGH_FRAME_CHROME_CLASSES = new Set([
-  'sniptale-frame-container',
-  'sniptale-interactive-frame',
-  'sniptale-interactive-frame-fill',
-  'sniptale-interactive-frame-stroke',
-]);
 
 type PointerLikeEvent = Event & {
   clientX?: number;
@@ -35,12 +29,6 @@ function isHostBackdrop(element: Element): boolean {
 
 function isHostDialogElement(element: Element): boolean {
   return Boolean(element.closest(HOST_MODAL_DIALOG_SELECTOR));
-}
-
-function isPassThroughFrameChrome(element: Element): boolean {
-  return Array.from(element.classList).some((className) =>
-    PASS_THROUGH_FRAME_CHROME_CLASSES.has(className)
-  );
 }
 
 function resolveUnderlyingElement(
@@ -79,7 +67,7 @@ function resolveUnderlyingPageElement(
 export function resolvePagePreparationElement(
   event: Event,
   iframe?: HTMLIFrameElement,
-  options: { passThroughFrameChrome?: boolean } = {}
+  options: { passThroughPassiveChrome?: boolean } = {}
 ): Element | null {
   const target = resolveIframeEventElement(event, iframe);
   if (!target) {
@@ -87,7 +75,7 @@ export function resolvePagePreparationElement(
   }
 
   if (isContentOwnedElement(target)) {
-    return options.passThroughFrameChrome && isPassThroughFrameChrome(target)
+    return options.passThroughPassiveChrome && isContentOwnedPassiveChrome(target)
       ? resolveUnderlyingPageElement(event, target, { skipHostDialogs: false })
       : target;
   }

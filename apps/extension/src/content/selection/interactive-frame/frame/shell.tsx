@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import type { FrameData, ResizeDirection } from '../../../../features/highlighter/contracts';
 import { dispatchFrameStepBadgeChanged } from '../../../platform/page-context/frame-events';
+import { registerContentOwnedPassiveChrome } from '../../../platform/dom-host';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 import { StepBadge } from '../../step-badge';
 import { InteractiveFrameResizeHandles } from './handles';
@@ -31,6 +32,19 @@ interface InteractiveFrameFrameShellProps {
 export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProps) {
   const isAnyFrameSelected = useFrameUIStore((state) => state.selectedFrameId !== null);
   const toggleQuickPopover = useFrameUIStore((state) => state.toggleQuickPopover);
+  const fillRef = useRef<HTMLDivElement>(null);
+  const strokeRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const cleanups = [
+      registerContentOwnedPassiveChrome(props.containerRef.current),
+      registerContentOwnedPassiveChrome(props.frameRef.current),
+      registerContentOwnedPassiveChrome(fillRef.current),
+      registerContentOwnedPassiveChrome(strokeRef.current),
+    ];
+    return () => cleanups.forEach((cleanup) => cleanup());
+  }, [props.containerRef, props.frameRef]);
+
   return (
     <div
       ref={props.containerRef as React.RefObject<HTMLDivElement>}
@@ -55,12 +69,14 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
           aria-hidden="true"
           className="sniptale-interactive-frame-fill"
           data-frame-id={props.frame.id}
+          ref={fillRef}
           style={props.fillStyle}
         />
         <div
           aria-hidden="true"
           className="sniptale-interactive-frame-stroke"
           data-frame-id={props.frame.id}
+          ref={strokeRef}
           style={props.strokeStyle}
         />
         <InteractiveFrameResizeHandles

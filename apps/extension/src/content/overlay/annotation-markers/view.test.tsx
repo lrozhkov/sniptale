@@ -9,6 +9,11 @@ import {
   browserAnnotationSession,
   type BrowserAnnotationTargetEvidence,
 } from '../../parser/page-preparation/annotations';
+import {
+  initializeContentUiRoots,
+  isContentOwnedPassiveChrome,
+  PASSIVE_CONTENT_CHROME,
+} from '../../platform/dom-host';
 import { BrowserAnnotationMarkers } from './view';
 
 let host: HTMLDivElement;
@@ -183,11 +188,43 @@ it('projects numbered accessible markers for HTML, SVG, iframe-inner, and iframe
   expect(firstTooltip?.textContent).toBe('HTML comment');
   expect(firstTooltip?.className).toContain('group-hover:visible');
   expect(firstTooltip?.className).toContain('group-focus-within:visible');
+  const markerLayer = document.querySelector('[data-ui="content.annotation-markers"]');
+  const firstMarkerGroup = document.querySelector('[data-ui="content.annotation-marker"]');
+  for (const [name, value] of Object.entries(PASSIVE_CONTENT_CHROME)) {
+    expect(markerLayer?.getAttribute(name)).toBe(value);
+    expect(firstMarkerGroup?.getAttribute(name)).toBe(value);
+    expect(markers[0]?.getAttribute(name)).toBeNull();
+    expect(firstTooltip?.getAttribute(name)).toBeNull();
+  }
   markers[0]?.focus();
   expect(document.activeElement).toBe(markers[0]);
   expect(html.children).toHaveLength(0);
   expect(svgText.children).toHaveLength(0);
   expect(opaqueIframe.children).toHaveLength(0);
+});
+
+it('registers only marker wrappers as exact passive chrome in the live content root', async () => {
+  act(() => root.unmount());
+  const contentHost = document.createElement('div');
+  document.body.append(contentHost);
+  const shadowRoot = contentHost.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(shadowRoot);
+  host = document.createElement('div');
+  shadowRoot.append(host);
+  root = createRoot(host);
+  const target = appendVisible(document.createElement('div'));
+  addComment(target, 'Registered marker', '#registered');
+
+  await renderMarkers();
+
+  const markerLayer = shadowRoot.querySelector('[data-ui="content.annotation-markers"]');
+  const markerGroup = shadowRoot.querySelector('[data-ui="content.annotation-marker"]');
+  const markerNote = shadowRoot.querySelector('[role="note"]');
+  const tooltip = shadowRoot.querySelector('[role="tooltip"]');
+  expect(isContentOwnedPassiveChrome(markerLayer)).toBe(true);
+  expect(isContentOwnedPassiveChrome(markerGroup)).toBe(true);
+  expect(isContentOwnedPassiveChrome(markerNote)).toBe(false);
+  expect(isContentOwnedPassiveChrome(tooltip)).toBe(false);
 });
 
 it('keeps text and internal focus geometry above theme contrast on an accent host', async () => {

@@ -20,10 +20,8 @@ import {
   type PageStyleSelectionSnapshot,
 } from '../runtime/properties';
 import { isTrustedMouseEvent } from '../../../platform/trusted-events';
-import {
-  addEventListenerToAllWindowsDynamic,
-  resolveIframeEventElement,
-} from '../../../platform/frame';
+import { addEventListenerToAllWindowsDynamic } from '../../../platform/frame';
+import { resolvePagePreparationElement } from '../../../parser/page-preparation/target';
 import type { PageStyleInspectorViewState } from '../types';
 import { addInaccessibleIframeSelectionListener } from './iframe-selection';
 
@@ -85,7 +83,11 @@ export function useInspectorSelection(args: {
         return;
       }
 
-      if (!selectElement(resolveIframeEventElement(event, iframe))) {
+      if (
+        !selectElement(
+          resolvePagePreparationElement(event, iframe, { passThroughPassiveChrome: true })
+        )
+      ) {
         return;
       }
 

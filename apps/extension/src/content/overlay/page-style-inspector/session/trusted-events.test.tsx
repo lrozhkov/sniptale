@@ -51,6 +51,11 @@ vi.mock('../../../platform/frame', async (importOriginal) => ({
 
 import { usePageStyleInspectorController } from './controller';
 import { readPageStyleSelectionSnapshot } from '../runtime/properties';
+import {
+  initializeContentUiRoots,
+  PASSIVE_CONTENT_CHROME,
+  registerContentOwnedPassiveChrome,
+} from '../../../platform/dom-host';
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -139,6 +144,60 @@ it('ignores page-dispatched inspector open and synthetic selection clicks', asyn
   });
 
   expect(latest?.viewState.selection).toBeNull();
+});
+
+it('selects through owned passive chrome without passing through an owned control', async () => {
+  await renderHarness();
+  await openInspector();
+  const contentHost = document.createElement('div');
+  document.body.append(contentHost);
+  const shadowRoot = contentHost.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(shadowRoot);
+  const passiveChrome = document.createElement('div');
+  const inspectorControl = document.createElement('button');
+  Object.entries(PASSIVE_CONTENT_CHROME).forEach(([name, value]) => {
+    inspectorControl.setAttribute(name, value);
+  });
+  shadowRoot.append(passiveChrome, inspectorControl);
+  const unregisterPassiveChrome = registerContentOwnedPassiveChrome(passiveChrome);
+  const pageTarget = document.createElement('section');
+  const pageBehindControl = document.createElement('article');
+  document.body.append(pageTarget, pageBehindControl);
+  let pointStack: Element[] = [passiveChrome, pageTarget];
+  Object.defineProperty(document, 'elementsFromPoint', {
+    configurable: true,
+    value: vi.fn(() => pointStack),
+  });
+
+  const passiveClick = new MouseEvent('click', {
+    bubbles: true,
+    cancelable: true,
+    clientX: 20,
+    clientY: 30,
+    composed: true,
+  });
+  await act(async () => {
+    passiveChrome.dispatchEvent(passiveClick);
+  });
+
+  expect(latest?.viewState.selection?.element).toBe(pageTarget);
+  expect(passiveClick.defaultPrevented).toBe(true);
+
+  pointStack = [inspectorControl, pageBehindControl];
+  const controlClick = new MouseEvent('click', {
+    bubbles: true,
+    cancelable: true,
+    clientX: 20,
+    clientY: 30,
+    composed: true,
+  });
+  await act(async () => {
+    inspectorControl.dispatchEvent(controlClick);
+  });
+
+  expect(latest?.viewState.selection?.element).toBe(pageTarget);
+  expect(controlClick.defaultPrevented).toBe(false);
+  unregisterPassiveChrome();
 });
 
 it('selects the inner element for a trusted click inside a same-origin iframe', async () => {

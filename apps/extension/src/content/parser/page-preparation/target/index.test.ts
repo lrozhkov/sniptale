@@ -10,7 +10,11 @@ const iframeUtils = vi.hoisted(() => ({
 vi.mock('../../../platform/frame', () => iframeUtils);
 
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
-import { initializeContentUiRoots } from '../../../platform/dom-host';
+import {
+  initializeContentUiRoots,
+  PASSIVE_CONTENT_CHROME,
+  registerContentOwnedPassiveChrome,
+} from '../../../platform/dom-host';
 import { resolvePagePreparationElement, resolvePagePreparationTarget } from '.';
 
 afterEach(() => {
@@ -36,6 +40,28 @@ function mockElementsFromPoint(elements: Element[]): void {
     configurable: true,
     value: vi.fn(() => elements),
   });
+}
+
+function forgePassiveContentChromeProjection<T extends Element>(element: T): T {
+  Object.entries(PASSIVE_CONTENT_CHROME).forEach(([name, value]) => {
+    element.setAttribute(name, value);
+  });
+  return element;
+}
+
+function registerPassiveContentChrome<T extends Element>(element: T): T {
+  registerContentOwnedPassiveChrome(element);
+  return element;
+}
+
+function mountOwnedElement<T extends Element>(element: T): { element: T; host: HTMLDivElement } {
+  const host = document.createElement('div');
+  host.id = CONTENT_ROOT_ID;
+  document.body.append(host);
+  const shadowRoot = host.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(shadowRoot);
+  shadowRoot.append(element);
+  return { element, host };
 }
 
 function registerStableTargetTests(): void {
@@ -104,36 +130,35 @@ function registerUniversalElementTests(): void {
     expect(resolvePagePreparationTarget(event)).toBeNull();
   });
 
-  it('passes through owned frame chrome to the underlying page element', () => {
-    const host = document.createElement('div');
-    host.id = CONTENT_ROOT_ID;
-    document.body.append(host);
-    const shadowRoot = host.attachShadow({ mode: 'open' });
-    initializeContentUiRoots(shadowRoot);
-    const frameChrome = document.createElement('div');
-    frameChrome.className = 'sniptale-interactive-frame';
-    shadowRoot.append(frameChrome);
-    const pageTarget = document.createElement('button');
+  it.each(['frame', 'annotation'])('passes through owned passive %s chrome', (kind) => {
+    const frameChrome = registerPassiveContentChrome(document.createElement('div'));
+    frameChrome.className = `sniptale-${kind}-chrome`;
+    mountOwnedElement(frameChrome);
+    const pageTarget =
+      kind === 'annotation'
+        ? document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+        : document.createElement('button');
     document.body.append(pageTarget);
     const event = createPointEvent(frameChrome);
 
     mockElementsFromPoint([frameChrome, pageTarget]);
     iframeUtils.resolveIframeEventElement.mockReturnValue(frameChrome);
 
-    expect(resolvePagePreparationElement(event, undefined, { passThroughFrameChrome: true })).toBe(
-      pageTarget
-    );
+    expect(
+      resolvePagePreparationElement(event, undefined, { passThroughPassiveChrome: true })
+    ).toBe(pageTarget);
   });
 
-  it('keeps owned inspector controls selected when frame pass-through is enabled', () => {
-    const host = document.createElement('div');
-    host.id = CONTENT_ROOT_ID;
-    document.body.append(host);
-    const shadowRoot = host.attachShadow({ mode: 'open' });
-    initializeContentUiRoots(shadowRoot);
-    const inspectorButton = document.createElement('button');
-    inspectorButton.className = 'sniptale-page-style-inspector-control';
-    shadowRoot.append(inspectorButton);
+  it.each([
+    ['inspector', 'sniptale-page-style-inspector-control'],
+    ['toolbar', 'sniptale-toolbar-control'],
+    ['resize handle', 'sniptale-resize-handle'],
+    ['interactive popover', 'sniptale-frame-popover'],
+    ['marker note', 'sniptale-annotation-marker-note'],
+  ])('keeps owned %s controls interactive', (_kind, className) => {
+    const inspectorButton = forgePassiveContentChromeProjection(document.createElement('button'));
+    inspectorButton.className = className;
+    mountOwnedElement(inspectorButton);
     const pageTarget = document.createElement('div');
     document.body.append(pageTarget);
     const event = createPointEvent(inspectorButton);
@@ -141,9 +166,84 @@ function registerUniversalElementTests(): void {
     mockElementsFromPoint([inspectorButton, pageTarget]);
     iframeUtils.resolveIframeEventElement.mockReturnValue(inspectorButton);
 
-    expect(resolvePagePreparationElement(event, undefined, { passThroughFrameChrome: true })).toBe(
-      inspectorButton
+    expect(
+      resolvePagePreparationElement(event, undefined, { passThroughPassiveChrome: true })
+    ).toBe(inspectorButton);
+  });
+
+  it('does not inherit pass-through from a passive ancestor', () => {
+    const passiveChrome = registerPassiveContentChrome(document.createElement('div'));
+    const nestedControl = forgePassiveContentChromeProjection(document.createElement('button'));
+    passiveChrome.append(nestedControl);
+    mountOwnedElement(passiveChrome);
+    const pageTarget = document.createElement('div');
+    document.body.append(pageTarget);
+    const event = createPointEvent(nestedControl);
+    mockElementsFromPoint([nestedControl, passiveChrome, pageTarget]);
+    iframeUtils.resolveIframeEventElement.mockReturnValue(nestedControl);
+
+    expect(
+      resolvePagePreparationElement(event, undefined, { passThroughPassiveChrome: true })
+    ).toBe(nestedControl);
+  });
+
+  it('never trusts passive classes or attributes on page-owned lookalikes', () => {
+    const classLookalike = document.createElement('div');
+    classLookalike.className = 'sniptale-interactive-frame';
+    const attributeLookalike = forgePassiveContentChromeProjection(document.createElement('div'));
+    document.body.append(classLookalike, attributeLookalike);
+    const pageBehind = document.createElement('button');
+    document.body.append(pageBehind);
+
+    for (const lookalike of [classLookalike, attributeLookalike]) {
+      const event = createPointEvent(lookalike);
+      mockElementsFromPoint([lookalike, pageBehind]);
+      iframeUtils.resolveIframeEventElement.mockReturnValueOnce(lookalike);
+      expect(
+        resolvePagePreparationElement(event, undefined, { passThroughPassiveChrome: true })
+      ).toBe(lookalike);
+    }
+  });
+
+  it('fails closed for passive chrome in a retired former content host', () => {
+    const passiveChrome = registerPassiveContentChrome(document.createElement('div'));
+    const { host } = mountOwnedElement(passiveChrome);
+    const pageTarget = document.createElement('button');
+    document.body.append(pageTarget);
+    host.remove();
+    document.body.append(host);
+    const event = createPointEvent(passiveChrome);
+    mockElementsFromPoint([passiveChrome, pageTarget]);
+    iframeUtils.resolveIframeEventElement.mockReturnValue(passiveChrome);
+
+    expect(
+      resolvePagePreparationElement(event, undefined, { passThroughPassiveChrome: true })
+    ).toBe(passiveChrome);
+  });
+
+  it('resolves passive chrome through same-origin iframe internals and stops at cross-origin iframe', () => {
+    const passiveChrome = registerPassiveContentChrome(document.createElement('div'));
+    mountOwnedElement(passiveChrome);
+    const iframe = document.createElement('iframe');
+    document.body.append(iframe);
+    const innerTarget = iframe.contentDocument!.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'text'
     );
+    const event = createPointEvent(passiveChrome);
+    mockElementsFromPoint([passiveChrome, iframe]);
+    iframeUtils.resolveIframeEventElement.mockReturnValue(passiveChrome);
+    iframeUtils.resolveIframePointTarget
+      .mockReturnValueOnce(innerTarget)
+      .mockReturnValueOnce(iframe);
+
+    expect(
+      resolvePagePreparationElement(event, undefined, { passThroughPassiveChrome: true })
+    ).toBe(innerTarget);
+    expect(
+      resolvePagePreparationElement(event, undefined, { passThroughPassiveChrome: true })
+    ).toBe(iframe);
+    expect(iframeUtils.resolveIframePointTarget).toHaveBeenCalledTimes(2);
   });
 }
 

@@ -19,6 +19,36 @@ type ContentEventLike = Pick<Event, 'target'> & {
 };
 
 const failClosedMountTargets = new Map<ContentUiSurface, HTMLElement>();
+const CONTENT_CHROME_ATTRIBUTE = 'data-sniptale-content-chrome';
+const registeredPassiveContentChrome = new WeakSet<Element>();
+
+/** Declarative producer contract for extension-owned chrome that may expose the page below it. */
+export const PASSIVE_CONTENT_CHROME = Object.freeze({
+  [CONTENT_CHROME_ATTRIBUTE]: 'passive',
+});
+
+/**
+ * Registers exact passive projection provenance inside the isolated content-script world.
+ * The returned cleanup revokes provenance before a producer-owned node can be reused.
+ */
+export function registerContentOwnedPassiveChrome(element: Element | null): () => void {
+  if (!element) {
+    return () => undefined;
+  }
+
+  registeredPassiveContentChrome.add(element);
+  element.setAttribute(CONTENT_CHROME_ATTRIBUTE, PASSIVE_CONTENT_CHROME[CONTENT_CHROME_ATTRIBUTE]);
+
+  return () => {
+    registeredPassiveContentChrome.delete(element);
+    if (
+      element.getAttribute(CONTENT_CHROME_ATTRIBUTE) ===
+      PASSIVE_CONTENT_CHROME[CONTENT_CHROME_ATTRIBUTE]
+    ) {
+      element.removeAttribute(CONTENT_CHROME_ATTRIBUTE);
+    }
+  };
+}
 
 function resolveContentHost(): Element | null {
   return resolveInitializedContentShadowRoot()?.host ?? null;
@@ -49,6 +79,20 @@ export function isContentOwnedElement(node: Node | null): boolean {
 
   const shadowRoot = resolveContentShadowRoot();
   return Boolean(shadowRoot && (node === shadowRoot.host || node.getRootNode() === shadowRoot));
+}
+
+/**
+ * Returns true only for an exact passive-chrome hit inside the live registered content root.
+ * Descendants do not inherit this contract, so nested controls remain interactive.
+ */
+export function isContentOwnedPassiveChrome(element: Element | null): boolean {
+  return Boolean(
+    element &&
+    isContentOwnedElement(element) &&
+    registeredPassiveContentChrome.has(element) &&
+    element.getAttribute(CONTENT_CHROME_ATTRIBUTE) ===
+      PASSIVE_CONTENT_CHROME[CONTENT_CHROME_ATTRIBUTE]
+  );
 }
 
 function getContentEventPathTargets(event: ContentEventLike): EventTarget[] {

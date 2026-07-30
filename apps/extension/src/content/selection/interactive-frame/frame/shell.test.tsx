@@ -8,6 +8,11 @@ import {
   createStepBadgeSettingsFixture,
 } from '../../frame-runtime/test-support';
 import { addFrameStepBadgeChangedListener } from '../../../platform/page-context/frame-events';
+import {
+  initializeContentUiRoots,
+  isContentOwnedPassiveChrome,
+  PASSIVE_CONTENT_CHROME,
+} from '../../../platform/dom-host';
 
 vi.mock('../../step-badge', () => ({
   StepBadge: (props: {
@@ -35,8 +40,12 @@ let root: Root;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const contentHost = document.createElement('div');
+  document.body.append(contentHost);
+  const shadowRoot = contentHost.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(shadowRoot);
   host = document.createElement('div');
-  document.body.append(host);
+  shadowRoot.append(host);
   root = createRoot(host);
   useFrameUIStore.getState().reset();
 });
@@ -94,6 +103,21 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
     expect(fill?.style.borderRadius).toBe('8px');
     expect(stroke?.style.border).toBe('3px solid rgb(17, 17, 17)');
     expect(stroke?.style.borderRadius).toBe('8px');
+    for (const [name, value] of Object.entries(PASSIVE_CONTENT_CHROME)) {
+      expect(container?.getAttribute(name)).toBe(value);
+      expect(surface?.getAttribute(name)).toBe(value);
+      expect(fill?.getAttribute(name)).toBe(value);
+      expect(stroke?.getAttribute(name)).toBe(value);
+      expect(host.querySelector('[data-ui="move-step"]')?.getAttribute(name)).toBeNull();
+      expect(host.querySelector('[data-ui="step-settings"]')?.getAttribute(name)).toBeNull();
+    }
+    expect([container, surface, fill, stroke].every(isContentOwnedPassiveChrome)).toBe(true);
+    expect(
+      [
+        host.querySelector('[data-ui="move-step"]'),
+        host.querySelector('[data-ui="step-settings"]'),
+      ].some(isContentOwnedPassiveChrome)
+    ).toBe(false);
 
     act(() => host.querySelector<HTMLButtonElement>('[data-ui="move-step"]')?.click());
     expect(stepBadgeListener).toHaveBeenCalledOnce();
