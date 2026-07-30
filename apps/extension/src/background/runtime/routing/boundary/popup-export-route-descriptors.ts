@@ -11,6 +11,7 @@ export const popupExportTabRouteDescriptor = {
     MessageType.EXPORT_POPUP_BUILD_PACKAGE,
     MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
     MessageType.EXPORT_POPUP_CANCEL,
+    MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
   ],
   ownerModule: 'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.ts',
 } as const;

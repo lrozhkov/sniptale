@@ -6,8 +6,18 @@ import type {
   PopupLifecycleBootstrapParams,
   PopupLifecycleBootstrapParamsGetter,
 } from './contracts';
+import { consumePopupExportLaunchIntentForActiveTab } from '../export/runtime/tab-message-routing';
 
 const logger = createLogger({ namespace: 'PopupLifecycle' });
+
+async function consumePopupExportLaunchIntent(): Promise<'export' | null> {
+  try {
+    return await consumePopupExportLaunchIntentForActiveTab();
+  } catch (error) {
+    logger.error('Failed to consume popup export launch intent', error);
+    return null;
+  }
+}
 
 function applyBootstrapSuccess(params: PopupLifecycleBootstrapParams, state: PopupBootstrapResult) {
   params.setHomeError(state.homeError ?? null);
@@ -67,13 +77,19 @@ export async function bootstrapPopupLifecycle({
     getParams();
 
   try {
-    const bootstrapState = await bootstrapPopupState();
+    const [bootstrapState, launchPage] = await Promise.all([
+      bootstrapPopupState(),
+      consumePopupExportLaunchIntent(),
+    ]);
 
     if (cancelledRef()) {
       return;
     }
 
     applyBootstrapSuccess(getParams(), bootstrapState);
+    if (launchPage) {
+      getParams().setPage(launchPage);
+    }
     await refreshPopupSecondaryState({
       cancelledRef,
       refreshActiveTabCapabilities,

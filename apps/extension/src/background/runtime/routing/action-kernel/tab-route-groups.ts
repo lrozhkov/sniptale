@@ -1,5 +1,6 @@
 import { pageStyleRouteDescriptor } from '../../../capture/page-style-runtime/route-descriptors';
 import {
+  annotationExportRouteDescriptor,
   captureActionsRouteDescriptor,
   captureDownloadRouteDescriptor,
   captureExportRouteDescriptor,
@@ -21,6 +22,7 @@ export const tabRouteGroups = [
   scenarioRouteDescriptor,
   popupExportTabRouteDescriptor,
   captureActionsRouteDescriptor,
+  annotationExportRouteDescriptor,
   quickActionRouteDescriptor,
   captureDownloadRouteDescriptor,
   captureExportRouteDescriptor,

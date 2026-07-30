@@ -169,6 +169,50 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     ru: 'Не удалось сохранить параметры снимка всей страницы',
     en: 'Could not save full-page capture settings',
   },
+  annotationExportMenuTitle: {
+    ru: 'Экспорт страницы и аннотаций',
+    en: 'Export page and annotations',
+  },
+  annotationExportDownloadLabel: {
+    ru: 'Скачать аннотации',
+    en: 'Download annotations',
+  },
+  annotationExportDownloadHint: {
+    ru: 'Скачать browser-annotations.md без снимка страницы',
+    en: 'Download browser-annotations.md without capturing the page',
+  },
+  annotationExportCopyLabel: {
+    ru: 'Копировать аннотации',
+    en: 'Copy annotations',
+  },
+  annotationExportCopyHint: {
+    ru: 'Скопировать текст аннотаций в буфер обмена',
+    en: 'Copy annotation text to the clipboard',
+  },
+  annotationExportOpenLabel: {
+    ru: 'Экспорт страницы',
+    en: 'Export page',
+  },
+  annotationExportOpenHint: {
+    ru: 'Открыть полный экспорт страницы со всеми параметрами',
+    en: 'Open full page export with all options',
+  },
+  annotationExportDownloadSuccess: {
+    ru: 'Аннотации отправлены в загрузки',
+    en: 'Annotations sent to Downloads',
+  },
+  annotationExportCopySuccess: {
+    ru: 'Аннотации скопированы',
+    en: 'Annotations copied',
+  },
+  annotationExportOpenSuccess: {
+    ru: 'Открыт экспорт страницы',
+    en: 'Page export opened',
+  },
+  annotationExportActionError: {
+    ru: 'Не удалось выполнить экспорт аннотаций',
+    en: 'Could not complete annotation export',
+  },
   selectionArea: {
     ru: 'Выбрать область для снимка',
     en: 'Select an area to capture',

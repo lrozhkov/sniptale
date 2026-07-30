@@ -17,6 +17,15 @@ export const captureActionsRouteDescriptor = {
   ownerModule: 'apps/extension/src/background/capture/routing/route/screenshot-adapter.ts',
 } as const;
 
+export const annotationExportRouteDescriptor = {
+  actionKind: 'tab',
+  authorityFamily: 'capture-privileged-tab-route',
+  handlerAdapter: 'routeTabAction',
+  keepChannelBehaviorSource: 'tab-routing-adapter',
+  messageTypes: [MessageType.DOWNLOAD_BROWSER_ANNOTATIONS, MessageType.OPEN_EXPORT_MODAL],
+  ownerModule: 'apps/extension/src/background/capture/annotation-export/route.ts',
+} as const;
+
 export const quickActionRouteDescriptor = {
   actionKind: 'tab',
   authorityFamily: 'quick-action-privileged-tab-route',

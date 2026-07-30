@@ -154,3 +154,34 @@ it('accepts both authorized full-page export actions at popup export boundaries'
     ).toEqual(expect.objectContaining({ fullPageCaptureAction }));
   }
 });
+
+it('parses the direct popup launch-intent consume contract narrowly', () => {
+  expect(
+    tabUiExportMessageContracts[MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT].parseRequest({
+      type: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
+    })
+  ).toEqual({ type: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT });
+  expect(
+    tabUiExportMessageContracts[MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT].parseResponse({
+      page: 'export',
+      success: true,
+    })
+  ).toEqual({ page: 'export', success: true });
+  expect(
+    tabUiExportMessageContracts[MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT].parseResponse({
+      page: null,
+      success: true,
+    })
+  ).toEqual({ page: null, success: true });
+  expect(() =>
+    tabUiExportMessageContracts[MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT].parseResponse({
+      page: 'home',
+      success: true,
+    })
+  ).toThrow();
+  expect(() =>
+    tabUiExportMessageContracts[MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT].parseResponse({
+      success: true,
+    })
+  ).toThrow();
+});

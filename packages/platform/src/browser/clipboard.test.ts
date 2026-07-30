@@ -4,6 +4,7 @@ import {
   isBrowserClipboardImageFormatSupported,
   readBrowserClipboardImage,
   writeBrowserClipboardItems,
+  writeBrowserClipboardText,
 } from './clipboard';
 
 afterEach(() => {
@@ -36,6 +37,19 @@ describe('browser clipboard adapters', () => {
     await writeBrowserClipboardItems(items);
 
     expect(write).toHaveBeenCalledWith(items);
+  });
+
+  it('delegates text writes and rejects an unavailable text clipboard', async () => {
+    const writeText = vi.fn();
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+    await writeBrowserClipboardText('annotations');
+    expect(writeText).toHaveBeenCalledWith('annotations');
+
+    vi.stubGlobal('navigator', { clipboard: {} });
+    await expect(writeBrowserClipboardText('annotations')).rejects.toThrow(
+      'Clipboard text write is unavailable.'
+    );
   });
 
   it('reads the first image item from navigator.clipboard.read', async () => {

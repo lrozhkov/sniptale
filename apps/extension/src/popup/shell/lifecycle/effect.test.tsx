@@ -20,6 +20,7 @@ function createLifecycleParams() {
       refreshActiveTabCapabilities: vi.fn(async () => undefined),
       refreshGalleryStatus: vi.fn(async () => undefined),
       setHomeError: vi.fn(),
+      setPage: vi.fn(),
       setViewportPresets: vi.fn(),
       setQuickActions: vi.fn(),
       setQuickActionsReady: vi.fn(),

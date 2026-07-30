@@ -11,7 +11,8 @@ export type PopupTabRouteOperation =
   | typeof MessageType.EXPORT_POPUP_START
   | typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE
   | typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT
-  | typeof MessageType.EXPORT_POPUP_CANCEL;
+  | typeof MessageType.EXPORT_POPUP_CANCEL
+  | typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT;
 
 export type PopupTabRouteCapabilityPayload = {
   tabRouteCapabilityToken: string;
@@ -45,6 +46,10 @@ export type RuntimePopupExportRequestByType = {
     type: typeof MessageType.EXPORT_POPUP_CANCEL;
     tabId: number;
   } & PopupTabRouteCapabilityPayload;
+  [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: {
+    type: typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT;
+    tabId: number;
+  } & PopupTabRouteCapabilityPayload;
 };
 
 export type RuntimePopupExportResponseByType = {
@@ -53,4 +58,7 @@ export type RuntimePopupExportResponseByType = {
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: PopupExportPackageResponse;
   [MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]: WebSnapshotSaveResult;
   [MessageType.EXPORT_POPUP_CANCEL]: import('../response').RuntimeAckResponse;
+  [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: import('../response').RuntimeMessageResponse<{
+    page: 'export' | null;
+  }>;
 };

@@ -28,6 +28,8 @@ const backgroundInternalSignalTypes = [
 
 const captureMessageTypes = [
   'TRIGGER_QUICK_ACTION',
+  MessageType.DOWNLOAD_BROWSER_ANNOTATIONS,
+  MessageType.OPEN_EXPORT_MODAL,
   CaptureMessageType.CAPTURE_VISIBLE,
   CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
   CaptureMessageType.CAPTURE_FULL,
@@ -78,6 +80,7 @@ const popupExportViewerMessageTypes = [
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,
+  MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
 ] as const satisfies ReadonlyArray<PopupExportViewerMessage['type']>;
 
 type SupportedPopupExportViewerType = (typeof popupExportViewerMessageTypes)[number];

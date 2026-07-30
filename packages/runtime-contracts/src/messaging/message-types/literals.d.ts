@@ -33,6 +33,10 @@ declare module './' {
     type VIEWPORT_CHANGED = typeof import('./').MessageType.VIEWPORT_CHANGED;
     type GET_VIEWPORT_STATUS = typeof import('./').MessageType.GET_VIEWPORT_STATUS;
     type OPEN_EXPORT_MODAL = typeof import('./').MessageType.OPEN_EXPORT_MODAL;
+    type DOWNLOAD_BROWSER_ANNOTATIONS =
+      typeof import('./').MessageType.DOWNLOAD_BROWSER_ANNOTATIONS;
+    type CONSUME_POPUP_EXPORT_LAUNCH_INTENT =
+      typeof import('./').MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT;
     type EXPORT_POPUP_PREVIEW = typeof import('./').MessageType.EXPORT_POPUP_PREVIEW;
     type EXPORT_POPUP_START = typeof import('./').MessageType.EXPORT_POPUP_START;
     type EXPORT_POPUP_BUILD_PACKAGE = typeof import('./').MessageType.EXPORT_POPUP_BUILD_PACKAGE;

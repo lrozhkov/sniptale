@@ -78,6 +78,9 @@ export type TabUiRequestByType = {
     exportRunId: string;
     type: typeof MessageType.EXPORT_POPUP_CANCEL;
   };
+  [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: {
+    type: typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT;
+  };
 };
 
 export type TabUiResponseByType = {
@@ -102,4 +105,7 @@ export type TabUiResponseByType = {
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: PopupExportPackageResponse;
   [MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]: WebSnapshotSaveResult;
   [MessageType.EXPORT_POPUP_CANCEL]: PopupExportStartResponse;
+  [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: RuntimeMessageResponse<{
+    page: 'export' | null;
+  }>;
 };

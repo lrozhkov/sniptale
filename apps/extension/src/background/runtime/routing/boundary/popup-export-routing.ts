@@ -21,14 +21,23 @@ import type { TabRouteArgs } from './shared';
 import { executeInjectedWebSnapshotContentExport } from './popup-export-injected-runner';
 import type { FullPageExportCaptureAction } from '../../../../contracts/full-page-capture';
 import { cancelFullPageCaptureByExportRunId } from '../../../capture/full-page/cancellation';
+import { consumePopupExportLaunchIntent } from '../../../capture/annotation-export/popup-launch-intent';
 
 type PopupExportRouteArgs = Omit<TabRouteArgs, 'message'> & {
   message: PopupExportViewerMessage;
 };
 type ViewerPortPopupExportMessage = ViewerContracts.ViewerPopupExportMessage;
+type ForwardedPopupExportMessage = Exclude<
+  PopupExportViewerMessage,
+  { type: typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT }
+>;
+type ForwardedPopupExportRouteArgs = Omit<TabRouteArgs, 'message'> & {
+  message: ForwardedPopupExportMessage;
+};
 type NonSavePopupExportMessage = Exclude<
   PopupExportViewerMessage,
-  { type: typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT }
+  | { type: typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT }
+  | { type: typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT }
 >;
 type NonSavePopupExportRouteArgs = Omit<TabRouteArgs, 'message'> & {
   message: NonSavePopupExportMessage;
@@ -62,7 +71,7 @@ async function runWebSnapshotRouteStage<T>(stage: string, work: () => Promise<T>
 }
 
 function createViewerPopupExportMessage(
-  message: PopupExportViewerMessage
+  message: ForwardedPopupExportMessage
 ): ViewerPortPopupExportMessage {
   const {
     tabId: _tabId,
@@ -146,7 +155,7 @@ function toWebSnapshotRouteResponse(response: unknown): WebSnapshotRouteResponse
   return typeof response === 'object' && response !== null ? response : {};
 }
 
-function sendPopupExportToViewer(args: PopupExportRouteArgs): Promise<unknown> {
+function sendPopupExportToViewer(args: ForwardedPopupExportRouteArgs): Promise<unknown> {
   return sendViewerPopupExportMessage(
     args.deps.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts(),
     args.resolvedTabId,
@@ -226,6 +235,12 @@ async function routeWebSnapshotSave(
 }
 
 async function routePopupExportMessageWork(args: PopupExportRouteArgs): Promise<unknown> {
+  if (args.message.type === MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT) {
+    return {
+      page: consumePopupExportLaunchIntent(args.resolvedTabId) ? ('export' as const) : null,
+      success: true,
+    };
+  }
   if (args.message.type === MessageType.EXPORT_POPUP_CANCEL) {
     cancelFullPageCaptureByExportRunId(args.message.exportRunId);
     const committedAssetIds = cancelWebSnapshotCaptureRequest(

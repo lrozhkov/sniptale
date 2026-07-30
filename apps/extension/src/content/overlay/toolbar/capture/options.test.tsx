@@ -126,6 +126,7 @@ function registerCaptureActionOptionTests() {
       'content.toolbar.capture-selection-button',
       'content.toolbar.capture-full-button',
       'content.toolbar.capture-full-settings-button',
+      'content.toolbar.annotation-export-button',
     ]);
   });
 }

@@ -41,6 +41,15 @@ export type RuntimeContentActionRequestByType = {
     dataUrl: string;
     contentIntent?: ContentPrivilegedActionCapability;
   };
+  [MessageType.DOWNLOAD_BROWSER_ANNOTATIONS]: {
+    type: typeof MessageType.DOWNLOAD_BROWSER_ANNOTATIONS;
+    text: string;
+    contentIntent?: ContentPrivilegedActionCapability;
+  };
+  [MessageType.OPEN_EXPORT_MODAL]: {
+    type: typeof MessageType.OPEN_EXPORT_MODAL;
+    contentIntent?: ContentPrivilegedActionCapability;
+  };
   [MessageType.TRIGGER_QUICK_ACTION]: {
     type: typeof MessageType.TRIGGER_QUICK_ACTION;
     actionId: string;
@@ -63,5 +72,9 @@ export type RuntimeContentActionResponseByType = {
     contentIntent?: ContentPrivilegedActionCapability;
   }>;
   [MessageType.OPEN_EDITOR_WITH_IMAGE]: RuntimeEmptyResponse;
+  [MessageType.DOWNLOAD_BROWSER_ANNOTATIONS]: RuntimeMessageResponse<{
+    downloadId?: number;
+  }>;
+  [MessageType.OPEN_EXPORT_MODAL]: RuntimeEmptyResponse;
   [MessageType.TRIGGER_QUICK_ACTION]: RuntimeMessageResponse<{ result?: string }>;
 };

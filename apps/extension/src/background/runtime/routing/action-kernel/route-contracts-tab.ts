@@ -7,7 +7,8 @@ export const TAB_ACTION_ROUTE_CONTRACTS = {
     freshnessReplayPolicy: 'resolved tab, frame, document, capability, or HAR session must match',
     requiredAuthority: 'privileged tab capture authorization policy',
     responseShape: 'capture/tab route response contract',
-    sideEffects: 'screenshot capture, editor open, staged download, HAR, gallery, or web snapshot',
+    sideEffects:
+      'screenshot capture, editor open, annotation or staged download, popup launch, HAR, gallery, or web snapshot',
     transitiveStateOwner: 'capture routing and media-hub storage owners',
   },
   'gallery-update-capability': {

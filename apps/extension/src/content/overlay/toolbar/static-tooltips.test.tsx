@@ -183,6 +183,7 @@ describe('toolbar static tooltips', () => {
       'Выбрать область для снимка',
       'Снимок всей страницы',
       'Параметры снимка всей страницы',
+      'Экспорт страницы и аннотаций',
     ]);
     expect(buttons.every((button) => button.getAttribute('data-tooltip') === null)).toBe(true);
   });

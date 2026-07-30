@@ -4,6 +4,7 @@ import {
   createMessageGuard,
   createRuntimeResponseGuard,
   isBoolean,
+  isNullable,
   isNumber,
   isString,
 } from '../../../validators/index';
@@ -23,6 +24,7 @@ const popupTabRouteOperations = new Set<string>([
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,
+  MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
 ]);
 
 function isStringArray(value: unknown): value is string[] {
@@ -31,6 +33,10 @@ function isStringArray(value: unknown): value is string[] {
 
 function isPopupTabRouteOperation(value: unknown): value is string {
   return typeof value === 'string' && popupTabRouteOperations.has(value);
+}
+
+function isPopupExportLaunchPage(value: unknown): value is 'export' {
+  return value === 'export';
 }
 
 function isHarCapturePayload(value: unknown): value is Record<string, unknown> {
@@ -43,6 +49,19 @@ const popupTabRouteCapabilityFields = {
 };
 
 export const runtimeActionExportMessageContracts = {
+  [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: {
+    parseRequest: createGuardParser(
+      'runtime CONSUME_POPUP_EXPORT_LAUNCH_INTENT message',
+      createMessageGuard({
+        type: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
+        required: { tabId: isNumber, ...popupTabRouteCapabilityFields },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime CONSUME_POPUP_EXPORT_LAUNCH_INTENT response',
+      createRuntimeResponseGuard({ required: { page: isNullable(isPopupExportLaunchPage) } })
+    ),
+  },
   [MessageType.REQUEST_EXPORT_HAR_START_CAPABILITY]: {
     parseRequest: createGuardParser(
       'runtime REQUEST_EXPORT_HAR_START_CAPABILITY message',

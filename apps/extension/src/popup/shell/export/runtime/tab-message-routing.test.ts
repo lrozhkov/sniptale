@@ -1,13 +1,21 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { sendPopupExportTabMessage } from './tab-message-routing';
+import {
+  consumePopupExportLaunchIntentForActiveTab,
+  sendPopupExportTabMessage,
+} from './tab-message-routing';
 import { installPopupRuntimeMessagingMock } from '../../runtime/services.test-support';
 
 const mocks = vi.hoisted(() => ({
   runtimeGetURL: vi.fn((path: string) => `chrome-extension://test/${path}`),
   sendRuntimeMessage: vi.fn(),
   sendTabMessage: vi.fn(),
+  tabsQuery: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { query: mocks.tabsQuery },
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', () => ({
@@ -57,6 +65,7 @@ function createViewerExportMessages() {
     { batchRequestId: 'batch-1', type: MessageType.EXPORT_POPUP_BUILD_PACKAGE, options },
     { type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT, requestId: 'req-web' },
     { exportRunId: 'export-run-1', type: MessageType.EXPORT_POPUP_CANCEL },
+    { type: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT },
   ] as const;
 }
 
@@ -163,4 +172,30 @@ it('routes normal web tab snapshot saves through background runtime authorizatio
     tabRouteRequestId: 'req-web',
   });
   expect(mocks.sendTabMessage).not.toHaveBeenCalled();
+});
+
+it('consumes launch intent for the active current-window tab only', async () => {
+  mocks.tabsQuery.mockResolvedValueOnce([{ id: 9 }]);
+  mockRuntimeCapabilityResponses({ page: 'export', success: true });
+
+  await expect(consumePopupExportLaunchIntentForActiveTab()).resolves.toBe('export');
+  expect(mocks.tabsQuery).toHaveBeenCalledWith({ active: true, currentWindow: true });
+  expect(mocks.sendRuntimeMessage).toHaveBeenNthCalledWith(1, {
+    operation: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
+    requestId: expect.any(String),
+    tabId: 9,
+    type: MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY,
+  });
+
+  mocks.tabsQuery.mockResolvedValueOnce([]);
+  mocks.sendRuntimeMessage.mockClear();
+  await expect(consumePopupExportLaunchIntentForActiveTab()).resolves.toBeNull();
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+});
+
+it('surfaces failed launch-intent consumption', async () => {
+  mocks.tabsQuery.mockResolvedValueOnce([{ id: 9 }]);
+  mockRuntimeCapabilityResponses({ error: 'expired', success: false });
+
+  await expect(consumePopupExportLaunchIntentForActiveTab()).rejects.toThrow('expired');
 });
