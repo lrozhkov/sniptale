@@ -2,6 +2,7 @@ import {
   isContentEventWithinAnyElement,
   isContentOwnedElement,
   isContentOwnedEvent,
+  queryAllContentUiElements,
   queryContentUiElement,
   resolveContentShadowRoot,
 } from '../../platform/dom-host';
@@ -41,7 +42,11 @@ interface DesignReviewPickerInteractionState {
   selectedElement: Element | null;
 }
 
-const DESIGN_REVIEW_POPOVER_SELECTOR = '[data-ui="content.design-review.popover"]';
+const DESIGN_REVIEW_INTERACTION_ROOT_SELECTOR = [
+  '[data-ui="content.design-review.popover"]',
+  '[data-ui="content.design-review.feedback-panel"]',
+  '[data-ui="content.annotation-marker"]',
+].join(',');
 
 function isElementNode(value: unknown): value is Element {
   return (
@@ -133,11 +138,12 @@ function resolveElementSelection(element: Element): DesignReviewSelection | null
 }
 
 function isInspectorInteractionEvent(event: MouseEvent): boolean {
-  const popover = queryContentUiElement(DESIGN_REVIEW_POPOVER_SELECTOR);
+  const interactionRoots = queryAllContentUiElements(DESIGN_REVIEW_INTERACTION_ROOT_SELECTOR);
   const contentRoot = resolveContentShadowRoot();
-  const ownedLayers =
-    popover && contentRoot ? getOwnedFloatingInteractionLayers(popover, contentRoot) : [];
-  return isContentEventWithinAnyElement(event, [popover, ...ownedLayers]);
+  const ownedLayers = contentRoot
+    ? interactionRoots.flatMap((root) => getOwnedFloatingInteractionLayers(root, contentRoot))
+    : [];
+  return isContentEventWithinAnyElement(event, [...interactionRoots, ...ownedLayers]);
 }
 
 function claimPageClick(event: MouseEvent): void {

@@ -215,6 +215,35 @@ it('keeps inspector interactions inside the popover without requesting dismissal
   expect(outsideClick.defaultPrevented).toBe(false);
 });
 
+it('keeps feedback and marker clicks inside the Design Review dismissal boundary', () => {
+  const contentHost = document.createElement('div');
+  const contentRoot = contentHost.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(contentRoot);
+  document.body.append(contentHost);
+  const feedbackPanel = document.createElement('aside');
+  feedbackPanel.dataset['ui'] = 'content.design-review.feedback-panel';
+  const feedbackItem = document.createElement('button');
+  feedbackPanel.append(feedbackItem);
+  const marker = document.createElement('div');
+  marker.dataset['ui'] = 'content.annotation-marker';
+  const markerButton = document.createElement('button');
+  marker.append(markerButton);
+  contentRoot.append(feedbackPanel, marker);
+  const selected = makeVisible(document.createElement('button'));
+  document.body.append(selected);
+  const onInspectorDismissRequested = vi.fn(() => true);
+  const runtime = startPicker({ onInspectorDismissRequested });
+
+  for (const trigger of [feedbackItem, markerButton]) {
+    expect(runtime.selectElement(selected)).toBe(true);
+    trigger.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, composed: true })
+    );
+  }
+
+  expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+});
+
 it('keeps portaled settings controls owned by the inspector inside its dismissal boundary', () => {
   const contentHost = document.createElement('div');
   const contentRoot = contentHost.attachShadow({ mode: 'open' });
