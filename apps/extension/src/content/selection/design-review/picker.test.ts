@@ -111,7 +111,7 @@ it('selects the visible label proxy for an opacity-hidden checkbox menu trigger'
   expect(onSelection.mock.calls[0]?.[0].snapshot.element).toBe(label);
 });
 
-it('opens the exact live DOM element through the picker programmatic path', () => {
+it('opens the exact live DOM element near its trailing-edge marker', () => {
   const target = makeVisible(document.createElement('button'));
   document.body.append(target);
   const onSelection = vi.fn();
@@ -120,7 +120,7 @@ it('opens the exact live DOM element through the picker programmatic path', () =
   expect(pickerRuntime.selectElement(target)).toBe(true);
   expect(onSelection).toHaveBeenCalledWith(
     expect.objectContaining({
-      anchor: { x: 44, y: 54 },
+      anchor: { x: 92, y: 54 },
       snapshot: expect.objectContaining({ element: target }),
     })
   );
@@ -308,7 +308,7 @@ it('anchors an inaccessible iframe through nested rendered scale in the top view
 
   expect(onSelection).toHaveBeenCalledOnce();
   expect(onSelection.mock.calls[0]?.[0]).toMatchObject({
-    anchor: { x: 150, y: 272 },
+    anchor: { x: 302, y: 272 },
     snapshot: { element: innerIframe },
   });
 });

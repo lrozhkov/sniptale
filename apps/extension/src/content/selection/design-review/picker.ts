@@ -101,9 +101,10 @@ function resolveElementSelection(element: Element): DesignReviewSelection | null
     return null;
   }
   const rect = getAbsolutePosition(snapshot.element);
+  const trailingAnchorOffset = Math.max(Math.min(rect.width, 24), rect.width - 24);
   return {
     anchor: {
-      x: rect.x + Math.min(rect.width, 24),
+      x: rect.x + trailingAnchorOffset,
       y: rect.y + Math.min(rect.height, 24),
     },
     snapshot,
