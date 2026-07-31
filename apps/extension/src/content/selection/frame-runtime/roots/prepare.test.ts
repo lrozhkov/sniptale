@@ -203,7 +203,8 @@ function expectMissingFrameRootsRenderState() {
   expect(renderState?.currentFrames).toHaveLength(1);
 }
 
-function expectUnavailableFrameRootsStayUnmounted() {
+function expectUnavailableFrameRootUnmountsAfterRenderTick() {
+  vi.useFakeTimers();
   const container = document.createElement('div');
   document.body.appendChild(container);
   appendFrameContainer(container, 'frame-1');
@@ -224,10 +225,14 @@ function expectUnavailableFrameRootsStayUnmounted() {
     rootsRef,
   });
 
-  expect(root.unmount).toHaveBeenCalledTimes(1);
+  expect(root.unmount).not.toHaveBeenCalled();
   expect(rootsRef.current.has('frame-1')).toBe(false);
   expect(document.getElementById('frame-container-frame-1')).toBeNull();
   expect(prepareMocks.createRoot).not.toHaveBeenCalled();
+
+  vi.runOnlyPendingTimers();
+
+  expect(root.unmount).toHaveBeenCalledTimes(1);
 }
 
 function registerPrepareFrameRootsRenderTests() {
@@ -243,7 +248,10 @@ function registerPrepareFrameRootsRenderTests() {
     'defers unmounting removed frame roots until after the current render tick',
     expectRemovedFrameRootUnmountsAfterRenderTick
   );
-  it('keeps unavailable frame roots fully unmounted', expectUnavailableFrameRootsStayUnmounted);
+  it(
+    'defers unavailable frame root unmount until after the current render tick',
+    expectUnavailableFrameRootUnmountsAfterRenderTick
+  );
   it('logs deferred removed root unmount failures', expectDeferredUnmountErrorsAreLogged);
 }
 

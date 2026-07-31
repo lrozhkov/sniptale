@@ -72,8 +72,7 @@ function syncFrameRoots(
 
     rootsToRemove.push(frameId);
     getContentUiElementById(`frame-container-${frameId}`)?.remove();
-    if (currentFrame) unmountUnavailableFrameRoot(root);
-    else scheduleRemovedFrameRootUnmount(root);
+    scheduleFrameRootUnmount(root);
   });
   rootsToRemove.forEach((frameId) => rootsRef.current.delete(frameId));
 
@@ -90,15 +89,7 @@ function syncFrameRoots(
   });
 }
 
-function unmountUnavailableFrameRoot(root: Root) {
-  try {
-    root.unmount();
-  } catch (error) {
-    logger.error('Error unmounting unavailable frame root', error);
-  }
-}
-
-function scheduleRemovedFrameRootUnmount(root: Root) {
+function scheduleFrameRootUnmount(root: Root) {
   setTimeout(() => {
     try {
       root.unmount();
