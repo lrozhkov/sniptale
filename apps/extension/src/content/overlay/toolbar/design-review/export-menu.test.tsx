@@ -38,7 +38,7 @@ import { useToolbarMenuState } from '../state/menu';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function Harness() {
+function Harness(props: { displayMode: 'horizontal' | 'vertical' }) {
   const toolbarMenuState = useToolbarMenuState();
   return (
     <>
@@ -46,29 +46,48 @@ function Harness() {
       <AnnotationExportMenu
         compactMenus={false}
         disabled={false}
-        displayMode="horizontal"
+        displayMode={props.displayMode}
         toolbarMenuState={toolbarMenuState}
       />
     </>
   );
 }
 
-function renderMenu() {
+function renderMenu(options?: {
+  displayMode?: 'horizontal' | 'vertical';
+  rect?: Partial<DOMRect>;
+}) {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
   act(() => {
-    root?.render(<Harness />);
+    root?.render(<Harness displayMode={options?.displayMode ?? 'horizontal'} />);
+  });
+  const trigger = container.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.annotation-export-button"]'
+  );
+  if (!trigger) throw new Error('Expected annotation export trigger');
+  vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
+    bottom: 236,
+    height: 36,
+    left: 400,
+    right: 436,
+    top: 200,
+    width: 36,
+    x: 400,
+    y: 200,
+    toJSON: () => ({}),
+    ...options?.rect,
   });
   act(() => {
-    container
-      ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.annotation-export-button"]')
-      ?.click();
+    trigger.click();
   });
   return container!;
 }
 
 beforeEach(() => {
+  vi.stubGlobal('innerHeight', 900);
+  vi.stubGlobal('innerWidth', 1280);
   mocks.createIntentSource.mockReset();
   mocks.createIntentSource.mockReturnValue({ kind: 'trusted-content-event' });
   mocks.executeAction.mockReset();
@@ -80,9 +99,11 @@ afterEach(() => {
   container?.remove();
   container = null;
   root = null;
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
-it('renders three interactive commands without the passive-chrome contract', () => {
+it('uses the canonical toolbar trigger and horizontally aligns the menu with its anchor', () => {
   const view = renderMenu();
   const commands = Array.from(
     view.querySelectorAll<HTMLElement>('[data-ui^="content.toolbar.annotation-export."]')
@@ -103,11 +124,37 @@ it('renders three interactive commands without the passive-chrome contract', () 
     '[data-ui="content.toolbar.annotation-export-button"]'
   );
   expect(rootElement?.className).toContain('relative');
-  expect(trigger?.dataset['menuIndicator']).toBe('true');
-  expect(trigger?.querySelector('.lucide-file-check-corner')).not.toBeNull();
+  expect(view.querySelector<HTMLElement>('.sniptale-popover-menu')?.style.left).toBe('0px');
   expect(view.querySelector<HTMLElement>('.sniptale-popover-menu')?.style.top).toBe(
     'calc(100% + 10px)'
   );
+  expect(trigger?.className).toContain('sniptale-glass-toolbar-button');
+  expect(trigger?.className).toContain('sniptale-toggle');
+  expect(trigger?.dataset['active']).toBe('true');
+  expect(trigger?.dataset['menuIndicator']).toBe('true');
+  expect(trigger?.querySelector('.lucide-file-check-corner')).not.toBeNull();
+});
+
+it('places the menu beside a vertical toolbar and clears the trigger highlight when closed', () => {
+  const view = renderMenu({
+    displayMode: 'vertical',
+    rect: { bottom: 136, left: 100, right: 136, top: 100, x: 100, y: 100 },
+  });
+  const trigger = view.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.annotation-export-button"]'
+  );
+  const menu = view.querySelector<HTMLElement>('.sniptale-popover-menu');
+
+  expect(menu?.className).toContain('sniptale-popover-side');
+  expect(menu?.style.left).toBe('calc(100% + 10px)');
+  expect(menu?.style.top).toBe('0px');
+  expect(trigger?.dataset['active']).toBe('true');
+
+  act(() => trigger?.click());
+
+  expect(view.querySelector('.sniptale-popover-menu')).toBeNull();
+  expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+  expect(trigger?.dataset['active']).toBeUndefined();
 });
 
 it('runs one trusted action, disables duplicates, reports success, and restores focus', async () => {

@@ -5,6 +5,7 @@ import {
   ProductToolbarMenuItem,
   ProductToolbarMenuItemCopy,
 } from '@sniptale/ui/product-menus/toolbar';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../../platform/i18n';
 import { createTrustedContentActionIntentSource } from '../../../application/privileged-action-intent';
@@ -15,6 +16,7 @@ import {
   resolveToolbarDropdownState,
   ToolbarMenuDropdown,
 } from '../menu/dropdown';
+import { getToolbarMenuPosition } from '../menu/position';
 import {
   executeToolbarAnnotationExportAction,
   type ToolbarAnnotationExportAction,
@@ -70,17 +72,9 @@ function AnnotationExportDropdown(
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: props.triggerRef,
     displayMode: props.displayMode,
-    getMenuPosition: (ref, height = 230) => {
-      const rect = ref.current?.getBoundingClientRect();
-      return rect &&
-        window.innerHeight - rect.bottom < height &&
-        rect.top > window.innerHeight - rect.bottom
-        ? 'up'
-        : 'down';
-    },
+    getMenuPosition: (ref, height = 230) => getToolbarMenuPosition(ref.current, height),
     menuHeight: 230,
-    menuWidth: 300,
-    preferredAlign: 'end',
+    menuWidth: 280,
   });
   if (!style) return null;
 
@@ -179,15 +173,16 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
 
   return (
     <div className="relative" data-ui="content.toolbar.annotation-export">
-      <button
+      <ContentToolbarButton
         ref={triggerRef}
+        type="button"
+        active={open}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="sniptale-btn"
         data-menu-open={open ? 'true' : 'false'}
-        data-menu-indicator="true"
-        data-ui="content.toolbar.annotation-export-button"
+        dataUi="content.toolbar.annotation-export-button"
         disabled={props.disabled}
+        menuIndicator
         onClick={(event) => {
           event.stopPropagation();
           props.toolbarMenuState.toggleMenu('annotations-export');
@@ -195,7 +190,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
         title={translate('content.toolbar.annotationExportMenuTitle')}
       >
         <FileCheck2 size={20} strokeWidth={2} />
-      </button>
+      </ContentToolbarButton>
       {open ? (
         <AnnotationExportDropdown
           {...props}
