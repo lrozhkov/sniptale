@@ -2,6 +2,7 @@ import { getIframeDocument, isIframeAccessible, walkAllDocuments } from '../../.
 import { parseCompositeSelector } from '../../../platform/frame/selectors';
 
 const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
+const TRANSIENT_CONNECTED_ANCHOR_ATTRIBUTE = 'data-sniptale-id';
 
 const ANCHOR_FINGERPRINT_ATTRIBUTE_NAMES = [
   'data-sniptale-id',
@@ -19,8 +20,14 @@ type AnchorFingerprintPart = {
   tagName: string;
 };
 
+type ConnectedAnchorFingerprint = {
+  ancestor: AnchorFingerprintPart | null;
+  target: AnchorFingerprintPart;
+};
+
 export type AnchorFingerprint = AnchorFingerprintPart & {
   ancestor: AnchorFingerprintPart | null;
+  connected: ConnectedAnchorFingerprint;
   hasStableDiscriminator: boolean;
 };
 
@@ -45,19 +52,28 @@ function readStableAttribute(
   return element.getAttribute(name);
 }
 
-function createFingerprintPart(element: HTMLElement): AnchorFingerprintPart {
+function createFingerprintPart(
+  element: HTMLElement,
+  includeTransientConnectedAttribute = true
+): AnchorFingerprintPart {
   const attributes = ANCHOR_FINGERPRINT_ATTRIBUTE_NAMES.flatMap((name) => {
+    if (!includeTransientConnectedAttribute && name === TRANSIENT_CONNECTED_ANCHOR_ATTRIBUTE) {
+      return [];
+    }
     const value = readStableAttribute(element, name)?.trim();
     return value ? ([[name, value]] as const) : [];
   });
   return { attributes, tagName: element.tagName.toLowerCase() };
 }
 
-function findStableAncestor(element: HTMLElement): AnchorFingerprintPart | null {
+function findStableAncestor(
+  element: HTMLElement,
+  includeTransientConnectedAttribute = true
+): AnchorFingerprintPart | null {
   let current = element.parentElement;
   let depth = 0;
   while (current && depth < 5) {
-    const part = createFingerprintPart(current);
+    const part = createFingerprintPart(current, includeTransientConnectedAttribute);
     if (part.attributes.length > 0) {
       return part;
     }
@@ -73,6 +89,10 @@ export function createAnchorFingerprint(element: HTMLElement): AnchorFingerprint
   return {
     ...part,
     ancestor,
+    connected: {
+      ancestor: findStableAncestor(element, false),
+      target: createFingerprintPart(element, false),
+    },
     hasStableDiscriminator: part.attributes.length > 0 || Boolean(ancestor?.attributes.length),
   };
 }
@@ -88,11 +108,22 @@ function arePartsEqual(left: AnchorFingerprintPart | null, right: AnchorFingerpr
   });
 }
 
-export function areAnchorFingerprintsEqual(
+function areAnchorFingerprintsEqual(left: AnchorFingerprint, right: AnchorFingerprint): boolean {
+  return arePartsEqual(left, right) && arePartsEqual(left.ancestor, right.ancestor);
+}
+
+/**
+ * Keeps the already accepted DOM node stable while parser-owned locator ids come and go.
+ * Replacement candidates still use the strict fingerprint comparison above.
+ */
+export function areConnectedAnchorFingerprintsEqual(
   left: AnchorFingerprint,
   right: AnchorFingerprint
 ): boolean {
-  return arePartsEqual(left, right) && arePartsEqual(left.ancestor, right.ancestor);
+  return (
+    arePartsEqual(left.connected.target, right.connected.target) &&
+    arePartsEqual(left.connected.ancestor, right.connected.ancestor)
+  );
 }
 
 function queryDocument(doc: Document, selector: string): HTMLElement[] {

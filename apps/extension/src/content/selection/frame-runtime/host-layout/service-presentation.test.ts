@@ -106,6 +106,52 @@ describe('frame host-layout presentation lifecycle', () => {
     service.dispose();
   });
 
+  it('keeps a linked frame visible while AI parsing adds and removes its transient locator', async () => {
+    vi.useFakeTimers();
+    const stableAncestor = document.createElement('section');
+    stableAncestor.id = 'stable-ancestor';
+    const transientWrapper = document.createElement('div');
+    const target = document.createElement('button');
+    target.id = 'target';
+    transientWrapper.appendChild(target);
+    stableAncestor.appendChild(transientWrapper);
+    document.body.appendChild(stableAncestor);
+    installDynamicRect(target, () => ({ x: 120, y: 60, width: 140, height: 44 }));
+    const frame: FrameData = {
+      id: 'frame-1',
+      x: 120,
+      y: 60,
+      width: 140,
+      height: 44,
+      linkedElementSelector: '#target',
+      pagePlacement: { iframePath: [], pageX: 120, pageY: 60 },
+    };
+    const scenario = createRuntime([frame]);
+    const service = createFrameHostLayoutService();
+    service.link(frame.id, target, frame.linkedElementSelector!, {
+      pagePlacement: frame.pagePlacement!,
+      rect: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+    });
+    service.start(scenario.runtime);
+    vi.advanceTimersByTime(64);
+
+    target.dataset['sniptaleId'] = 'ai-field-1';
+    transientWrapper.dataset['sniptaleId'] = 'ai-section-1';
+    await Promise.resolve();
+    vi.advanceTimersByTime(600);
+
+    expect(service.getSnapshot().presentations.get(frame.id)).toBe('visible');
+    expect(service.getSnapshot().recoveries).toEqual([]);
+
+    delete target.dataset['sniptaleId'];
+    delete transientWrapper.dataset['sniptaleId'];
+    await Promise.resolve();
+    vi.advanceTimersByTime(64);
+
+    expect(service.getSnapshot().presentations.get(frame.id)).toBe('visible');
+    service.dispose();
+  });
+
   it('publishes restored motion geometry only after the second stable animation frame', () => {
     vi.useFakeTimers();
     const target = document.createElement('button');
