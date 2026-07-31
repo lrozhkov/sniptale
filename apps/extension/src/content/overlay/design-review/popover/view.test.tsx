@@ -90,6 +90,15 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   expect(
     root.querySelector('button[aria-label="Изменить свойства элемента"]')?.className
   ).toContain('bg-[var(--sniptale-color-accent-soft)]');
+  for (const label of [
+    'Копировать данные элемента',
+    'Изменить свойства элемента',
+    'Удалить замечание',
+  ]) {
+    expect(root.querySelector(`button[aria-label="${label}"]`)?.className).toContain(
+      'cursor-pointer'
+    );
+  }
   expect(root.querySelector('[data-ui="content.design-review.popover"]')?.className).toContain(
     'cursor-default'
   );

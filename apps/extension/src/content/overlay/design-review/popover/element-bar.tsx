@@ -87,7 +87,7 @@ function ElementActionButton(props: {
     <button
       type="button"
       className={[
-        'inline-flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded-[7px] border',
+        'inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-[7px] border',
         'border-[color:var(--sniptale-color-border-soft)]',
         activeClassName,
         props.danger ? 'text-[var(--sniptale-color-danger)]' : '',
