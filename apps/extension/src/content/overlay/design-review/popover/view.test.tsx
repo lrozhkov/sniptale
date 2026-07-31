@@ -71,6 +71,8 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   const markup = renderToStaticMarkup(
     <DesignReviewPopover actions={actions} open={true} state={state} />
   );
+  const root = document.createElement('div');
+  root.innerHTML = markup;
 
   expect(markup).toContain('content.design-review.popover');
   expect(markup).toContain('Что нужно изменить или проверить?');
@@ -79,6 +81,21 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   expect(markup).toContain('compact-settings');
   expect(markup).not.toContain('input type="file"');
   expect(markup).not.toContain('Enter — готово');
+  expect(
+    root.querySelector('[data-ui="content.design-review.comment-footer"]')?.className
+  ).not.toContain('border-t');
+  expect(
+    root.querySelector('[data-ui="content.design-review.comment-submit-hint"]')
+  ).not.toBeNull();
+  expect(
+    root.querySelector('button[aria-label="Изменить свойства элемента"]')?.className
+  ).toContain('bg-[var(--sniptale-color-accent-soft)]');
+  expect(root.querySelector('[data-ui="content.design-review.popover"]')?.className).toContain(
+    'cursor-default'
+  );
+  const closeButton = root.querySelector('button[aria-label="Закрыть"]');
+  expect(closeButton?.className).toContain('pointer-events-auto');
+  expect(closeButton?.className).toContain('z-50');
 });
 
 it('shows the current selector while exposing localized tag help and the full path on hover', () => {
@@ -95,7 +112,10 @@ it('shows the current selector while exposing localized tag help and the full pa
   ).toBe('html > body > main > h1:nth-of-type(1)');
   expect(
     root.querySelector('[data-ui="content.design-review.full-path-tooltip"]')?.className
-  ).toContain('group-hover:visible');
+  ).toContain('top-full');
+  expect(
+    root.querySelector('[data-ui="content.design-review.full-path-tooltip"]')?.className
+  ).not.toContain('bottom-full');
   expect(
     root.querySelector('[data-ui="content.design-review.element-tag-tooltip"]')?.textContent
   ).toBe('<h1> — заголовок');
@@ -107,19 +127,35 @@ it('does not render without an active click selection', () => {
   ).toBe('');
 });
 
-it('uses the danger color for Fix but not for the other selected actions', () => {
+it('uses the mock icon palette without recoloring selected action labels', () => {
   const renderActionButton = (action: DesignReviewViewState['action']) => {
     const root = document.createElement('div');
     root.innerHTML = renderToStaticMarkup(
       <DesignReviewPopover actions={actions} open={true} state={{ ...state, action }} />
     );
-    return [...root.querySelectorAll('button')].find((button) =>
-      button.textContent?.includes(action === 'fix' ? 'Исправить' : 'Доработать')
+    const button = [...root.querySelectorAll('button')].find((button) =>
+      button.hasAttribute('aria-expanded')
     );
+    return { button, icon: button?.querySelector('svg') };
   };
 
-  expect(renderActionButton('fix')?.className).toContain('text-[var(--sniptale-color-danger)]');
-  expect(renderActionButton('refine')?.className).not.toContain(
+  expect(renderActionButton('refine').icon?.getAttribute('class')).toContain('text-[#8b5cf6]');
+  expect(renderActionButton('fix').icon?.getAttribute('class')).toContain(
+    'text-[var(--sniptale-color-danger)]'
+  );
+  expect(renderActionButton('simplify').icon?.getAttribute('class')).toContain(
+    'text-[var(--sniptale-color-success)]'
+  );
+  expect(renderActionButton('verify').icon?.getAttribute('class')).toContain(
+    'text-[var(--sniptale-color-info)]'
+  );
+  expect(renderActionButton('explain').icon?.getAttribute('class')).toContain(
+    'text-[var(--sniptale-color-warning)]'
+  );
+  expect(renderActionButton('fix').button?.className).toContain(
+    'text-[var(--sniptale-color-text-primary)]'
+  );
+  expect(renderActionButton('fix').button?.className).not.toContain(
     'text-[var(--sniptale-color-danger)]'
   );
 });
@@ -158,6 +194,23 @@ it('keeps the action menu interactive across the content shadow boundary', () =>
     expect(
       shadowRoot.querySelector('[data-ui="content.design-review.action-menu"]')
     ).not.toBeNull();
+    expect(
+      shadowRoot.querySelector('[data-ui="content.design-review.action-menu"]')?.className
+    ).toContain('cursor-default');
+    const actionOptions = [
+      ...shadowRoot.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
+    ];
+    const findActionIcon = (label: string) =>
+      actionOptions
+        .find((button) => button.textContent?.includes(label))
+        ?.querySelector('svg')
+        ?.getAttribute('class');
+    expect(findActionIcon('Доработать')).toContain('text-[#8b5cf6]');
+    expect(findActionIcon('Упростить')).toContain('text-[var(--sniptale-color-success)]');
+    expect(findActionIcon('Проверить')).toContain('text-[var(--sniptale-color-info)]');
+    expect(findActionIcon('Объяснить')).toContain('text-[var(--sniptale-color-warning)]');
+    expect(fixOption.className).toContain('text-[var(--sniptale-color-text-primary)]');
+    expect(fixOption.className).not.toContain('text-[var(--sniptale-color-danger)]');
 
     act(() => fixOption.click());
     expect(selectAction).toHaveBeenCalledWith('fix');
@@ -429,7 +482,7 @@ it('positions outside a nested iframe target in top-viewport coordinates', () =>
   }
 });
 
-it('moves from the divider drag zone and stays clamped to the viewport', () => {
+it('moves from the popover header and stays clamped to the viewport', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1000);
   vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(800);
@@ -466,6 +519,7 @@ it('moves from the divider drag zone and stays clamped to the viewport', () => {
       '[data-ui="content.design-review.popover-drag-handle"]'
     );
     if (!popover || !handle) throw new Error('Expected draggable Design Review popover');
+    expect(handle.closest('[data-ui="content.design-review.comment-layer"]')).not.toBeNull();
     vi.spyOn(popover, 'getBoundingClientRect').mockImplementation(() => ({
       bottom: 52 + popoverHeight,
       height: popoverHeight,
@@ -504,5 +558,41 @@ it('moves from the divider drag zone and stays clamped to the viewport', () => {
     container.remove();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  }
+});
+
+it('collapses delete confirmation when the same selection is reopened', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  try {
+    act(() => {
+      root.render(<DesignReviewPopover actions={actions} open={true} state={state} />);
+    });
+    const deleteButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Удалить замечание"]'
+    );
+    if (!deleteButton) throw new Error('Expected delete action');
+    act(() => deleteButton.click());
+    expect(
+      container.querySelector('[data-ui="content.design-review.delete-confirmation"]')
+    ).not.toBeNull();
+
+    act(() => {
+      root.render(<DesignReviewPopover actions={actions} open={false} state={state} />);
+    });
+    act(() => {
+      root.render(<DesignReviewPopover actions={actions} open={true} state={state} />);
+    });
+
+    expect(
+      container.querySelector('[data-ui="content.design-review.delete-confirmation"]')
+    ).toBeNull();
+  } finally {
+    act(() => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
   }
 });

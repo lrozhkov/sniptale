@@ -83,11 +83,15 @@ export function DesignReviewPopover(props: {
   });
 
   useEffect(() => {
+    if (!props.open) {
+      setDeleteRequested(false);
+      return;
+    }
     if (previousSelectionRef.current !== selectionElement) {
       previousSelectionRef.current = selectionElement;
       setDeleteRequested(false);
     }
-  }, [selectionElement]);
+  }, [props.open, selectionElement]);
 
   if (!props.open || !props.state.anchor || !props.state.selection) {
     return null;
@@ -98,7 +102,7 @@ export function DesignReviewPopover(props: {
       ref={popoverRef}
       data-ui="content.design-review.popover"
       className={[
-        'pointer-events-auto fixed z-[2147483646] max-h-[calc(100vh-24px)] overflow-visible',
+        'pointer-events-auto fixed z-[2147483646] max-h-[calc(100vh-24px)] cursor-default overflow-visible',
         'rounded-[12px] border shadow-2xl',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
@@ -111,7 +115,8 @@ export function DesignReviewPopover(props: {
       <button
         type="button"
         className={[
-          'absolute -right-3 -top-3 inline-flex h-8 w-8 items-center justify-center',
+          'pointer-events-auto absolute -right-3 -top-3 z-50 inline-flex h-8 w-8',
+          'cursor-default items-center justify-center',
           'rounded-full border shadow-md',
           'border-[color:var(--sniptale-color-border-soft)]',
           'bg-[var(--sniptale-color-surface-panel)]',
@@ -127,7 +132,16 @@ export function DesignReviewPopover(props: {
         data-ui="content.design-review.popover-layout"
         style={{ maxHeight: basePosition.maxHeight }}
       >
-        <div className="relative z-20 p-3 pb-2" data-ui="content.design-review.comment-layer">
+        <div className="relative z-20 p-3 pb-2 pt-4" data-ui="content.design-review.comment-layer">
+          <div
+            className="absolute inset-x-0 top-0 z-10 h-4 touch-none cursor-grab active:cursor-grabbing"
+            data-ui="content.design-review.popover-drag-handle"
+            title={translate('content.designReview.movePopover')}
+            onPointerDown={drag.onPointerDown}
+            onPointerMove={drag.onPointerMove}
+            onPointerUp={drag.onPointerUp}
+            onPointerCancel={drag.onPointerUp}
+          />
           <PageStyleCommentField
             actions={{ ...props.actions.comment, close: props.actions.close }}
             disabled={false}
@@ -141,18 +155,6 @@ export function DesignReviewPopover(props: {
           />
         </div>
         <div className="min-h-0 overflow-y-auto overscroll-contain">
-          <div
-            className={[
-              'flex h-2 touch-none cursor-grab items-center border-t active:cursor-grabbing',
-              'border-[color:var(--sniptale-color-border-soft)]',
-            ].join(' ')}
-            data-ui="content.design-review.popover-drag-handle"
-            title={translate('content.designReview.movePopover')}
-            onPointerDown={drag.onPointerDown}
-            onPointerMove={drag.onPointerMove}
-            onPointerUp={drag.onPointerUp}
-            onPointerCancel={drag.onPointerUp}
-          />
           <DesignReviewElementBar
             onCopyElement={() => void props.actions.copyElement()}
             onCopyPath={() => void props.actions.copyPath()}

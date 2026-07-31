@@ -1,3 +1,4 @@
+import { CornerDownLeft } from 'lucide-react';
 import { useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
@@ -19,7 +20,7 @@ export function PageStyleCommentField(props: {
   }, [props.state.draft]);
 
   return (
-    <section className="grid gap-1.5" data-ui="content.design-review.comment">
+    <section className="grid cursor-default gap-1.5" data-ui="content.design-review.comment">
       <div className="sr-only">
         <label
           className="text-[11px] font-bold text-[var(--sniptale-color-text-primary)]"
@@ -73,12 +74,19 @@ export function PageStyleCommentField(props: {
         />
         {props.footer ? (
           <div
-            className={[
-              'flex min-h-10 items-center border-t px-2 py-1',
-              'border-[color:var(--sniptale-color-border-soft)]',
-            ].join(' ')}
+            className="flex min-h-10 items-center gap-2 px-2 py-1"
+            data-ui="content.design-review.comment-footer"
           >
-            {props.footer}
+            <div className="min-w-0 flex-1">{props.footer}</div>
+            <span
+              aria-label={translate('content.designReview.commentHint')}
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center text-[var(--sniptale-color-text-dim)]"
+              data-ui="content.design-review.comment-submit-hint"
+              role="img"
+              title={translate('content.designReview.commentHint')}
+            >
+              <CornerDownLeft size={14} strokeWidth={1.8} />
+            </span>
           </div>
         ) : null}
       </div>

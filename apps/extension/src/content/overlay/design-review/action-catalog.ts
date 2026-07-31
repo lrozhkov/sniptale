@@ -27,6 +27,14 @@ export const DESIGN_REVIEW_ACTIONS: readonly DesignReviewActionOption[] = [
   },
 ];
 
+const DESIGN_REVIEW_ACTION_TONES: Record<BrowserDesignReviewAction, string> = {
+  refine: 'text-[#8b5cf6]',
+  fix: 'text-[var(--sniptale-color-danger)]',
+  simplify: 'text-[var(--sniptale-color-success)]',
+  verify: 'text-[var(--sniptale-color-info)]',
+  explain: 'text-[var(--sniptale-color-warning)]',
+};
+
 export function getDesignReviewActionOption(
   action: BrowserDesignReviewAction | null | undefined
 ): DesignReviewActionOption {
@@ -36,7 +44,5 @@ export function getDesignReviewActionOption(
 }
 
 export function getDesignReviewActionTone(action: BrowserDesignReviewAction): string {
-  return action === 'fix'
-    ? 'text-[var(--sniptale-color-danger)]'
-    : 'text-[var(--sniptale-color-text-primary)]';
+  return DESIGN_REVIEW_ACTION_TONES[action];
 }

@@ -5,7 +5,7 @@ import type { PageStyleSelectionSnapshot } from '../../../selection/design-revie
 import { describeDesignReviewElement } from './element-label';
 
 const TOOLTIP_CLASS_NAME = [
-  'pointer-events-none invisible absolute bottom-full z-40 mb-2 w-max rounded-[7px] border',
+  'pointer-events-none invisible absolute z-40 w-max rounded-[7px] border',
   'border-[color:var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
   'px-2 py-1.5 text-[10px] font-normal shadow-lg',
@@ -27,7 +27,7 @@ export function DesignReviewElementBar(props: {
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-2 px-3 pb-2 pt-1">
+    <div className="relative flex min-w-0 items-center gap-2 px-3 pb-2 pt-1">
       <span
         className="group relative shrink-0 text-xs text-[var(--sniptale-color-text-dim)] outline-none"
         aria-describedby={tagTooltipId}
@@ -35,7 +35,7 @@ export function DesignReviewElementBar(props: {
       >
         {selection.tagName.toUpperCase()}
         <span
-          className={`${TOOLTIP_CLASS_NAME} left-0 max-w-72 group-hover:visible group-focus:visible`}
+          className={`${TOOLTIP_CLASS_NAME} bottom-full left-0 mb-2 max-w-72 group-hover:visible group-focus:visible`}
           data-ui="content.design-review.element-tag-tooltip"
           id={tagTooltipId}
           role="tooltip"
@@ -63,7 +63,7 @@ export function DesignReviewElementBar(props: {
         <span
           className={[
             TOOLTIP_CLASS_NAME,
-            'left-1/2 max-w-96 -translate-x-1/2 whitespace-normal break-all text-left font-mono',
+            'left-1/2 top-full mt-2 max-w-96 -translate-x-1/2 whitespace-normal break-all text-left font-mono',
             'group-hover:visible group-focus-visible:visible',
           ].join(' ')}
           data-ui="content.design-review.full-path-tooltip"
@@ -104,12 +104,20 @@ function ElementActionButton(props: {
   label: string;
   onClick: () => void;
 }) {
+  const activeClassName = props.active
+    ? [
+        'border-[color:var(--sniptale-color-accent)]',
+        'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent)]',
+      ].join(' ')
+    : '';
+
   return (
     <button
       type="button"
       className={[
-        'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[7px] border',
+        'inline-flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded-[7px] border',
         'border-[color:var(--sniptale-color-border-soft)]',
+        activeClassName,
         props.danger ? 'text-[var(--sniptale-color-danger)]' : '',
       ].join(' ')}
       aria-label={props.label}
