@@ -213,6 +213,9 @@ export function deriveLegacySectionsFromBlocks(
   sectionShells: SectionNode[],
   blocks: DocumentBlock[]
 ): SectionNode[] {
+  const emptySectionIds = new Set(
+    sectionShells.filter((section) => section.children.length === 0).map((section) => section.id)
+  );
   const sections = sectionShells.map((section) => ({
     ...section,
     kind: inferKindFromChildren(section),
@@ -223,7 +226,7 @@ export function deriveLegacySectionsFromBlocks(
 
   blocks.forEach((block) => {
     const section = byId.get(block.sectionId);
-    if (!section) {
+    if (!section || !emptySectionIds.has(block.sectionId)) {
       return;
     }
 
