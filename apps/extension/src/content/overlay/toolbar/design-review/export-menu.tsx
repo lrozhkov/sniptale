@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Copy, Download, ExternalLink, FileOutput } from 'lucide-react';
+import { Copy, Download, ExternalLink, FileCheck2 } from 'lucide-react';
 import {
   ProductToolbarMenu,
   ProductToolbarMenuItem,
@@ -122,6 +122,12 @@ function getSuccessMessage(action: ToolbarAnnotationExportAction): string {
   return translate('content.toolbar.annotationExportOpenSuccess');
 }
 
+function getErrorMessage(action: ToolbarAnnotationExportAction): string {
+  if (action === 'copy') return translate('content.toolbar.annotationExportCopyError');
+  if (action === 'download') return translate('content.toolbar.annotationExportDownloadError');
+  return translate('content.toolbar.annotationExportOpenError');
+}
+
 export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -151,7 +157,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
 
       const contentIntentSource = createTrustedContentActionIntentSource(event.nativeEvent);
       if (!contentIntentSource) {
-        showToast(translate('content.toolbar.annotationExportActionError'), 'error');
+        showToast(getErrorMessage(action), 'error');
         return;
       }
 
@@ -162,7 +168,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
           closeMenu();
         })
         .catch(() => {
-          showToast(translate('content.toolbar.annotationExportActionError'), 'error');
+          showToast(getErrorMessage(action), 'error');
         })
         .finally(() => {
           setBusyAction(null);
@@ -172,13 +178,14 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
   );
 
   return (
-    <div>
+    <div className="relative" data-ui="content.toolbar.annotation-export">
       <button
         ref={triggerRef}
         aria-expanded={open}
         aria-haspopup="menu"
         className="sniptale-btn"
         data-menu-open={open ? 'true' : 'false'}
+        data-menu-indicator="true"
         data-ui="content.toolbar.annotation-export-button"
         disabled={props.disabled}
         onClick={(event) => {
@@ -187,7 +194,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
         }}
         title={translate('content.toolbar.annotationExportMenuTitle')}
       >
-        <FileOutput size={20} strokeWidth={2} />
+        <FileCheck2 size={20} strokeWidth={2} />
       </button>
       {open ? (
         <AnnotationExportDropdown

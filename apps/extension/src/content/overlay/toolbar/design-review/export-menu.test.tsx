@@ -96,6 +96,18 @@ it('renders three interactive commands without the passive-chrome contract', () 
   expect(commands.every((command) => !command.hasAttribute('data-sniptale-content-chrome'))).toBe(
     true
   );
+  const rootElement = view.querySelector<HTMLElement>(
+    '[data-ui="content.toolbar.annotation-export"]'
+  );
+  const trigger = view.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.annotation-export-button"]'
+  );
+  expect(rootElement?.className).toContain('relative');
+  expect(trigger?.dataset['menuIndicator']).toBe('true');
+  expect(trigger?.querySelector('.lucide-file-check-corner')).not.toBeNull();
+  expect(view.querySelector<HTMLElement>('.sniptale-popover-menu')?.style.top).toBe(
+    'calc(100% + 10px)'
+  );
 });
 
 it('runs one trusted action, disables duplicates, reports success, and restores focus', async () => {
@@ -151,7 +163,7 @@ it('keeps a failed action retryable and rejects untrusted privileged clicks', as
   );
   expect(download.disabled).toBe(false);
   expect(mocks.showToast).toHaveBeenCalledWith(
-    'content.toolbar.annotationExportActionError',
+    'content.toolbar.annotationExportDownloadError',
     'error'
   );
 

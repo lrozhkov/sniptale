@@ -81,6 +81,10 @@ it('lists only Design Review feedback and opens the live element from the row or
   expect(items[0]?.textContent).toContain('Check the narrow layout');
   expect(items[0]?.textContent).toContain('BUTTON · Save changes');
   expect(items[0]?.textContent).not.toContain('Changed live page copy');
+  expect(
+    items[0]?.querySelector<HTMLElement>('[data-ui="content.design-review.feedback-summary"]')
+      ?.style.webkitLineClamp
+  ).toBe('3');
 
   act(() => items[0]?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
   expect(
@@ -89,6 +93,7 @@ it('lists only Design Review feedback and opens the live element from the row or
 
   act(() => (items[0] as HTMLButtonElement).click());
   expect(onOpenRecord).toHaveBeenCalledWith(1);
+  expect(container.querySelector('[data-ui="content.design-review.feedback-preview"]')).toBeNull();
 
   const close = container.querySelector<HTMLButtonElement>(
     '[aria-label="content.designReview.panelClose"]'

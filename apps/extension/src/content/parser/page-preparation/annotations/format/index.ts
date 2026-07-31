@@ -1,2 +1,5 @@
-export { prepareBrowserAnnotationsExportText } from './application';
+export {
+  captureBrowserAnnotationsExportText,
+  prepareBrowserAnnotationsExportText,
+} from './application';
 export { formatBrowserAnnotationSnapshot, formatBrowserDomAnnotationRecord } from './formatter';

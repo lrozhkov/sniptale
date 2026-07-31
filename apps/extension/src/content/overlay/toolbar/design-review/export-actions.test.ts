@@ -19,7 +19,7 @@ vi.mock('@sniptale/platform/browser/clipboard', () => ({
 
 vi.mock('../../../parser/page-preparation/annotations/format', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../parser/page-preparation/annotations/format')>()),
-  prepareBrowserAnnotationsExportText: mocks.prepareText,
+  captureBrowserAnnotationsExportText: mocks.prepareText,
 }));
 
 vi.mock('../../../application/runtime-services/services', async (importOriginal) => ({
@@ -43,17 +43,14 @@ beforeEach(() => {
   mocks.writeText.mockReset();
 });
 
-it('copies exactly one immutable application-command artifact', async () => {
+it('starts clipboard writing in the initiating action turn with one immutable artifact', async () => {
   let currentArtifact = 'initial annotations';
-  mocks.prepareText.mockImplementation(async () => {
-    const capturedArtifact = currentArtifact;
-    await Promise.resolve();
-    return capturedArtifact;
-  });
+  mocks.prepareText.mockImplementation(() => currentArtifact);
 
   const copyPromise = executeToolbarAnnotationExportAction('copy', {
     kind: 'trusted-content-event',
   });
+  expect(mocks.writeText).toHaveBeenCalledWith('initial annotations');
   currentArtifact = 'later annotations';
   await copyPromise;
 
@@ -63,17 +60,18 @@ it('copies exactly one immutable application-command artifact', async () => {
 });
 
 it('downloads exactly one prepared artifact through a protected runtime action', async () => {
-  mocks.prepareText.mockResolvedValue('# Browser comments:\n');
+  mocks.prepareText.mockReturnValue('# Browser comments:\n');
   mocks.sendRuntimeMessage.mockResolvedValue({ success: true });
   const source = { kind: 'trusted-content-event' } as const;
 
-  await executeToolbarAnnotationExportAction('download', source);
+  const downloadPromise = executeToolbarAnnotationExportAction('download', source);
 
   expect(mocks.prepareText).toHaveBeenCalledTimes(1);
   expect(mocks.attachContentActionIntent).toHaveBeenCalledWith(
     { type: MessageType.DOWNLOAD_BROWSER_ANNOTATIONS, text: '# Browser comments:\n' },
     source
   );
+  await downloadPromise;
   expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith({
     type: MessageType.DOWNLOAD_BROWSER_ANNOTATIONS,
     text: '# Browser comments:\n',
@@ -84,7 +82,7 @@ it('downloads exactly one prepared artifact through a protected runtime action',
 
 it('delivers empty formatter artifacts unchanged for copy and download', async () => {
   const source = { kind: 'trusted-content-event' } as const;
-  mocks.prepareText.mockResolvedValue('');
+  mocks.prepareText.mockReturnValue('');
   mocks.sendRuntimeMessage.mockResolvedValue({ success: true });
 
   await executeToolbarAnnotationExportAction('copy', source);
@@ -111,15 +109,13 @@ it('rejects untrusted copy before formatter and clipboard effects', async () => 
 });
 
 it('rejects clipboard and download oversize before their effects', async () => {
-  mocks.prepareText.mockResolvedValueOnce('x'.repeat(MAX_CLIPBOARD_TEXT_LENGTH + 1));
+  mocks.prepareText.mockReturnValueOnce('x'.repeat(MAX_CLIPBOARD_TEXT_LENGTH + 1));
   await expect(
     executeToolbarAnnotationExportAction('copy', { kind: 'trusted-content-event' })
   ).rejects.toThrow('clipboard text limit');
   expect(mocks.writeText).not.toHaveBeenCalled();
 
-  mocks.prepareText.mockResolvedValueOnce(
-    'x'.repeat(MAX_BROWSER_ANNOTATIONS_EXPORT_TEXT_BYTES + 1)
-  );
+  mocks.prepareText.mockReturnValueOnce('x'.repeat(MAX_BROWSER_ANNOTATIONS_EXPORT_TEXT_BYTES + 1));
   await expect(
     executeToolbarAnnotationExportAction('download', { kind: 'trusted-content-event' })
   ).rejects.toThrow('direct-download limit');
@@ -128,7 +124,7 @@ it('rejects clipboard and download oversize before their effects', async () => {
 });
 
 it('surfaces runtime rejection and opens full export without formatting annotations', async () => {
-  mocks.prepareText.mockResolvedValue('annotations');
+  mocks.prepareText.mockReturnValue('annotations');
   mocks.sendRuntimeMessage.mockResolvedValueOnce({ error: 'denied', success: false });
 
   await expect(
@@ -137,7 +133,7 @@ it('surfaces runtime rejection and opens full export without formatting annotati
 
   mocks.prepareText.mockClear();
   mocks.sendRuntimeMessage.mockResolvedValueOnce({ success: true });
-  await executeToolbarAnnotationExportAction('open-export', {
+  const openPromise = executeToolbarAnnotationExportAction('open-export', {
     kind: 'trusted-content-event',
   });
 
@@ -146,4 +142,5 @@ it('surfaces runtime rejection and opens full export without formatting annotati
     { type: MessageType.OPEN_EXPORT_MODAL },
     { kind: 'trusted-content-event' }
   );
+  await openPromise;
 });

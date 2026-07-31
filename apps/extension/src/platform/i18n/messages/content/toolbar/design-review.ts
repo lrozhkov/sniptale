@@ -41,8 +41,16 @@ export const contentToolbarDesignReviewMessages = defineMessageSource({
     ru: 'Открыт экспорт страницы',
     en: 'Page export opened',
   },
-  annotationExportActionError: {
-    ru: 'Не удалось экспортировать дизайн-ревью',
-    en: 'Could not export the design review',
+  annotationExportCopyError: {
+    ru: 'Не удалось скопировать дизайн-ревью. Проверьте доступ к буферу обмена.',
+    en: 'Could not copy the design review. Check clipboard access.',
+  },
+  annotationExportDownloadError: {
+    ru: 'Не удалось скачать дизайн-ревью. Попробуйте ещё раз.',
+    en: 'Could not download the design review. Try again.',
+  },
+  annotationExportOpenError: {
+    ru: 'Не удалось открыть экспорт страницы. Попробуйте ещё раз.',
+    en: 'Could not open page export. Try again.',
   },
 });

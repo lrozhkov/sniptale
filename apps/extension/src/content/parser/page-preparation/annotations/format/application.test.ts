@@ -4,7 +4,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { browserAnnotationSession } from '../session';
 import type { BrowserFrameAnnotationInput } from '../types';
 import * as formatter from './formatter';
-import { prepareBrowserAnnotationsExportText } from './application';
+import {
+  captureBrowserAnnotationsExportText,
+  prepareBrowserAnnotationsExportText,
+} from './application';
 
 function createFrameInput(comment: string): BrowserFrameAnnotationInput {
   return {
@@ -34,6 +37,16 @@ it('formats exactly one snapshot captured before asynchronous preparation yields
 
   expect(captureSpy).toHaveBeenCalledTimes(1);
   expect(formatSpy).toHaveBeenCalledTimes(1);
+  expect(text).toContain('Comment:\nInitial');
+  expect(text).not.toContain('Changed later');
+});
+
+it('captures toolbar export text synchronously in the initiating action turn', () => {
+  browserAnnotationSession.syncFrames([createFrameInput('Initial')]);
+
+  const text = captureBrowserAnnotationsExportText();
+  browserAnnotationSession.syncFrames([createFrameInput('Changed later')]);
+
   expect(text).toContain('Comment:\nInitial');
   expect(text).not.toContain('Changed later');
 });

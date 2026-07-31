@@ -4,6 +4,7 @@ export { subscribeToBrowserAnnotationDocumentNavigation } from './document-navig
 export {
   formatBrowserAnnotationSnapshot,
   formatBrowserDomAnnotationRecord,
+  captureBrowserAnnotationsExportText,
   prepareBrowserAnnotationsExportText,
 } from './format';
 export {

@@ -3,7 +3,7 @@ import { writeBrowserClipboardText } from '@sniptale/platform/browser/clipboard'
 import { isBrowserAnnotationsExportText } from '@sniptale/runtime-contracts/export';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { isClipboardTextWithinLimit } from '@sniptale/runtime-contracts/validation/text';
-import { prepareBrowserAnnotationsExportText } from '../../../parser/page-preparation/annotations/format';
+import { captureBrowserAnnotationsExportText } from '../../../parser/page-preparation/annotations/format';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import {
   attachContentActionIntent,
@@ -18,7 +18,7 @@ async function copyBrowserAnnotations(
   if (contentIntentSource?.kind !== 'trusted-content-event') {
     throw new Error('A trusted user event is required to copy browser annotations.');
   }
-  const text = await prepareBrowserAnnotationsExportText();
+  const text = captureBrowserAnnotationsExportText();
   if (!isClipboardTextWithinLimit(text)) {
     throw new Error('Browser annotations exceed the clipboard text limit.');
   }
@@ -28,7 +28,7 @@ async function copyBrowserAnnotations(
 async function downloadBrowserAnnotations(
   contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined
 ): Promise<void> {
-  const text = await prepareBrowserAnnotationsExportText();
+  const text = captureBrowserAnnotationsExportText();
   if (!isBrowserAnnotationsExportText(text)) {
     throw new Error('Browser annotations exceed the direct-download limit.');
   }

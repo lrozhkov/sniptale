@@ -130,7 +130,10 @@ export function FeedbackList(props: {
               ].join(' ')}
               data-annotation-id={record.annotationId}
               data-ui="content.design-review.feedback-item"
-              onClick={() => props.onOpenRecord(record.annotationId)}
+              onClick={() => {
+                setHovered(null);
+                props.onOpenRecord(record.annotationId);
+              }}
               onMouseEnter={(event) =>
                 setHovered({ record, rect: event.currentTarget.getBoundingClientRect() })
               }
@@ -149,7 +152,15 @@ export function FeedbackList(props: {
                   {getElementLabel(record)}
                 </span>
               </span>
-              <span className="mt-2 line-clamp-2 block pl-6 text-xs leading-5">
+              <span
+                className="mt-2 block overflow-hidden pl-6 text-xs leading-5"
+                data-ui="content.design-review.feedback-summary"
+                style={{
+                  WebkitBoxOrient: 'vertical',
+                  WebkitLineClamp: 3,
+                  display: '-webkit-box',
+                }}
+              >
                 {getRecordSummary(record)}
               </span>
               <span className="mt-1 block pl-6 text-[10px] text-[var(--sniptale-color-text-dim)]">
