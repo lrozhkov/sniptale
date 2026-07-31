@@ -1,15 +1,8 @@
 import { ClipboardCopy, Pencil, Trash2 } from 'lucide-react';
-import { useId, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
 import type { PageStyleSelectionSnapshot } from '../../../selection/design-review/snapshot';
 import { describeDesignReviewElement } from './element-label';
-
-const TOOLTIP_CLASS_NAME = [
-  'pointer-events-none invisible absolute z-40 w-max rounded-[7px] border',
-  'border-[color:var(--sniptale-color-border-soft)]',
-  'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
-  'px-2 py-1.5 text-[10px] font-normal shadow-lg',
-].join(' ');
 
 export function DesignReviewElementBar(props: {
   onCopyElement: () => void;
@@ -19,29 +12,20 @@ export function DesignReviewElementBar(props: {
   selection: PageStyleSelectionSnapshot | null;
   settingsOpen: boolean;
 }) {
-  const tagTooltipId = useId();
-  const pathTooltipId = useId();
   const selection = props.selection;
   if (!selection) {
     return null;
   }
 
   return (
-    <div className="relative flex min-w-0 items-center gap-2 px-3 pb-2 pt-1">
+    <div className="flex min-w-0 items-center gap-2 px-3 pb-2 pt-1">
       <span
-        className="group relative shrink-0 text-xs text-[var(--sniptale-color-text-dim)] outline-none"
-        aria-describedby={tagTooltipId}
+        className="shrink-0 text-xs text-[var(--sniptale-color-text-dim)] outline-none"
+        data-ui="content.design-review.element-tag"
         tabIndex={0}
+        title={describeDesignReviewElement(selection.tagName)}
       >
         {selection.tagName.toUpperCase()}
-        <span
-          className={`${TOOLTIP_CLASS_NAME} bottom-full left-0 mb-2 max-w-72 group-hover:visible group-focus:visible`}
-          data-ui="content.design-review.element-tag-tooltip"
-          id={tagTooltipId}
-          role="tooltip"
-        >
-          {describeDesignReviewElement(selection.tagName)}
-        </span>
       </span>
       <strong className="max-w-32 truncate text-xs">
         {selection.textPreview || selection.tagName}
@@ -49,28 +33,16 @@ export function DesignReviewElementBar(props: {
       <button
         type="button"
         className={[
-          'group relative min-w-0 flex-1 overflow-visible text-left font-mono text-[10px]',
+          'min-w-0 flex-1 text-left font-mono text-[10px]',
           'text-[var(--sniptale-color-text-dim)]',
           'hover:text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
-        aria-describedby={pathTooltipId}
         aria-label={translate('content.designReview.copyFullPath')}
+        title={selection.domPath}
         onClick={props.onCopyPath}
       >
         <span className="block truncate" data-ui="content.design-review.element-selector">
           {selection.selectorLabel}
-        </span>
-        <span
-          className={[
-            TOOLTIP_CLASS_NAME,
-            'left-1/2 top-full mt-2 max-w-96 -translate-x-1/2 whitespace-normal break-all text-left font-mono',
-            'group-hover:visible group-focus-visible:visible',
-          ].join(' ')}
-          data-ui="content.design-review.full-path-tooltip"
-          id={pathTooltipId}
-          role="tooltip"
-        >
-          {selection.domPath}
         </span>
       </button>
       <ElementActionButton

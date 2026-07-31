@@ -116,7 +116,7 @@ export function DesignReviewPopover(props: {
         type="button"
         className={[
           'pointer-events-auto absolute -right-3 -top-3 z-50 inline-flex h-8 w-8',
-          'cursor-default items-center justify-center',
+          'cursor-pointer items-center justify-center',
           'rounded-full border shadow-md',
           'border-[color:var(--sniptale-color-border-soft)]',
           'bg-[var(--sniptale-color-surface-panel)]',

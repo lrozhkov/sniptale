@@ -95,10 +95,11 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   );
   const closeButton = root.querySelector('button[aria-label="Закрыть"]');
   expect(closeButton?.className).toContain('pointer-events-auto');
+  expect(closeButton?.className).toContain('cursor-pointer');
   expect(closeButton?.className).toContain('z-50');
 });
 
-it('shows the current selector while exposing localized tag help and the full path on hover', () => {
+it('uses native non-layout hints for the element tag and full path', () => {
   const root = document.createElement('div');
   root.innerHTML = renderToStaticMarkup(
     <DesignReviewPopover actions={actions} open={true} state={state} />
@@ -108,17 +109,15 @@ it('shows the current selector while exposing localized tag help and the full pa
     root.querySelector('[data-ui="content.design-review.element-selector"]')?.textContent
   ).toBe('h1:nth-of-type(1)');
   expect(
-    root.querySelector('[data-ui="content.design-review.full-path-tooltip"]')?.textContent
+    root
+      .querySelector('[data-ui="content.design-review.element-selector"]')
+      ?.closest('button')
+      ?.getAttribute('title')
   ).toBe('html > body > main > h1:nth-of-type(1)');
   expect(
-    root.querySelector('[data-ui="content.design-review.full-path-tooltip"]')?.className
-  ).toContain('top-full');
-  expect(
-    root.querySelector('[data-ui="content.design-review.full-path-tooltip"]')?.className
-  ).not.toContain('bottom-full');
-  expect(
-    root.querySelector('[data-ui="content.design-review.element-tag-tooltip"]')?.textContent
+    root.querySelector('[data-ui="content.design-review.element-tag"]')?.getAttribute('title')
   ).toBe('<h1> — заголовок');
+  expect(root.querySelector('[role="tooltip"]')).toBeNull();
 });
 
 it('does not render without an active click selection', () => {
@@ -180,6 +179,7 @@ it('keeps the action menu interactive across the content shadow boundary', () =>
     });
     const trigger = shadowRoot.querySelector<HTMLButtonElement>('button[aria-expanded]');
     if (!trigger) throw new Error('Expected action menu trigger');
+    expect(trigger.className).toContain('cursor-pointer');
     act(() => trigger.click());
     const fixOption = [
       ...shadowRoot.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
@@ -196,7 +196,7 @@ it('keeps the action menu interactive across the content shadow boundary', () =>
     ).not.toBeNull();
     expect(
       shadowRoot.querySelector('[data-ui="content.design-review.action-menu"]')?.className
-    ).toContain('cursor-default');
+    ).toContain('cursor-pointer');
     const actionOptions = [
       ...shadowRoot.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
     ];
@@ -210,6 +210,7 @@ it('keeps the action menu interactive across the content shadow boundary', () =>
     expect(findActionIcon('Проверить')).toContain('text-[var(--sniptale-color-info)]');
     expect(findActionIcon('Объяснить')).toContain('text-[var(--sniptale-color-warning)]');
     expect(fixOption.className).toContain('text-[var(--sniptale-color-text-primary)]');
+    expect(fixOption.className).toContain('cursor-pointer');
     expect(fixOption.className).not.toContain('text-[var(--sniptale-color-danger)]');
 
     act(() => fixOption.click());

@@ -48,7 +48,7 @@ export function DesignReviewActionMenu(props: {
         type="button"
         aria-expanded={open}
         className={[
-          'inline-flex h-8 cursor-default items-center gap-2 rounded-[8px] px-2 text-xs font-semibold',
+          'inline-flex h-8 cursor-pointer items-center gap-2 rounded-[8px] px-2 text-xs font-semibold',
           'text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
         onClick={() => setOpen((current) => !current)}
@@ -60,7 +60,7 @@ export function DesignReviewActionMenu(props: {
       {open ? (
         <div
           className={[
-            'absolute left-0 top-full z-30 mt-1 w-48 cursor-default rounded-[10px] border p-1 shadow-xl',
+            'absolute left-0 top-full z-30 mt-1 w-48 cursor-pointer rounded-[10px] border p-1 shadow-xl',
             'border-[color:var(--sniptale-color-border-soft)]',
             'bg-[var(--sniptale-color-surface-panel)]',
           ].join(' ')}
@@ -74,7 +74,7 @@ export function DesignReviewActionMenu(props: {
                 key={option.action}
                 type="button"
                 className={[
-                  'flex w-full cursor-default items-center gap-2 rounded-[7px] px-2 py-2 text-left text-xs',
+                  'flex w-full cursor-pointer items-center gap-2 rounded-[7px] px-2 py-2 text-left text-xs',
                   'hover:bg-[var(--sniptale-color-surface-input)]',
                   'text-[var(--sniptale-color-text-primary)]',
                 ].join(' ')}
