@@ -152,6 +152,7 @@ it('filters actions and dismisses the highest floating layer with focus restorat
     '[data-ui="content.design-review.feedback-filter-menu"]'
   );
   expect(filterMenu?.getAttribute('role')).toBe('menu');
+  expect(filterMenu?.closest('.overflow-hidden')).toBeNull();
   const menuItems = Array.from(filterMenu?.querySelectorAll<HTMLButtonElement>('button') ?? []);
   expect(menuItems.every((item) => item.getAttribute('role') === 'menuitemradio')).toBe(true);
   const fixItem = menuItems.find((item) => item.textContent === 'content.designReview.actionFix');

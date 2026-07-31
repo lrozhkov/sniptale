@@ -45,7 +45,7 @@ export function DesignReviewFeedbackPanel(props: {
       ref={panelRef}
       className={[
         'pointer-events-auto fixed z-[2147483646] flex w-[min(408px,calc(100vw-24px))]',
-        'max-h-[calc(100vh-24px)] flex-col overflow-hidden rounded-[14px] border shadow-2xl',
+        'max-h-[calc(100vh-24px)] flex-col overflow-visible rounded-[14px] border shadow-2xl',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
