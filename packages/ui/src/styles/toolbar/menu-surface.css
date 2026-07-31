@@ -2,6 +2,10 @@
  * Toolbar Menu Surface
  * ======================================== */
 
+.sniptale-app:has(.sniptale-toolbar .sniptale-popover-menu) {
+  z-index: 2147483647;
+}
+
 .sniptale-popover-menu {
   position: absolute;
   top: calc(100% + 10px);

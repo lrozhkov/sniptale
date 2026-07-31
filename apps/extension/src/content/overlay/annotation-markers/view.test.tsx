@@ -203,6 +203,34 @@ it('projects numbered accessible markers for HTML, SVG, iframe-inner, and iframe
   expect(opaqueIframe.children).toHaveLength(0);
 });
 
+it('closes an active marker editor and suppresses its duplicate comment tooltip', async () => {
+  const target = appendVisible(document.createElement('p'));
+  addComment(target, 'Already open', '#active-comment');
+  const onCloseRecord = vi.fn();
+  const onOpenRecord = vi.fn(() => true);
+  await act(async () => {
+    root.render(
+      <BrowserAnnotationMarkers
+        activeTarget={target}
+        interactive
+        onCloseRecord={onCloseRecord}
+        onOpenRecord={onOpenRecord}
+      />
+    );
+  });
+
+  const marker = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.annotation-marker-button"]'
+  );
+  expect(marker?.hasAttribute('aria-describedby')).toBe(false);
+  expect(document.querySelector('[role="tooltip"]')).toBeNull();
+
+  act(() => marker?.click());
+
+  expect(onCloseRecord).toHaveBeenCalledOnce();
+  expect(onOpenRecord).not.toHaveBeenCalled();
+});
+
 it('registers marker projection and note as passive while keeping its tooltip interactive', async () => {
   act(() => root.unmount());
   const contentHost = document.createElement('div');

@@ -14,7 +14,11 @@ export function DesignReviewSurface(props: {
   return (
     <>
       <BrowserAnnotationMarkers
+        activeTarget={
+          controller.inspectorOpen ? (controller.viewState.selection?.element ?? null) : null
+        }
         interactive={showChrome && controller.enabled}
+        onCloseRecord={controller.actions.close}
         onOpenRecord={controller.panel.openRecord}
         showChrome={showChrome}
       />

@@ -42,7 +42,9 @@ function usePassiveContentChromeRef<T extends Element>() {
 
 function AnnotationMarker(
   props: AnnotationMarkerProjection & {
+    active: boolean;
     interactive: boolean;
+    onCloseRecord?: () => void;
     showChrome: boolean;
     offset: AnnotationMarkerOffset;
     onOffsetChange: (offset: AnnotationMarkerOffset) => void;
@@ -69,6 +71,7 @@ function AnnotationMarker(
     `${props.record.markerNumber}:`,
     translate(option.labelKey),
   ].join(' ');
+  const showTooltip = props.showChrome && !props.active;
 
   return (
     <div
@@ -84,7 +87,7 @@ function AnnotationMarker(
     >
       <button
         type="button"
-        aria-describedby={props.showChrome ? tooltipId : undefined}
+        aria-describedby={showTooltip ? tooltipId : undefined}
         aria-label={markerLabel}
         className={[
           'inline-flex min-w-8 items-center justify-center gap-0.5',
@@ -100,7 +103,12 @@ function AnnotationMarker(
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (props.interactive) props.onOpenRecord?.(props.record.annotationId);
+          if (!props.interactive) return;
+          if (props.active) {
+            props.onCloseRecord?.();
+          } else {
+            props.onOpenRecord?.(props.record.annotationId);
+          }
         }}
         onKeyDown={(event) => handleTooltipScroll(event, tooltipScrollRef.current)}
         ref={markerButtonRef}
@@ -140,7 +148,7 @@ function AnnotationMarker(
           <Grip size={11} />
         </button>
       ) : null}
-      {props.showChrome ? (
+      {showTooltip ? (
         <AnnotationMarkerTooltip
           id={tooltipId}
           position={props.position}
@@ -161,7 +169,9 @@ function createMarkerProjections(_revision: number): AnnotationMarkerProjection[
 }
 
 export function BrowserAnnotationMarkers(props: {
+  activeTarget?: Element | null;
   interactive?: boolean;
+  onCloseRecord?: () => void;
   onOpenRecord?: (annotationId: number) => boolean;
   showChrome?: boolean;
 }) {
@@ -195,7 +205,9 @@ export function BrowserAnnotationMarkers(props: {
         <AnnotationMarker
           key={projection.record.annotationId}
           {...projection}
+          active={props.activeTarget === projection.target}
           interactive={props.interactive ?? false}
+          {...(props.onCloseRecord ? { onCloseRecord: props.onCloseRecord } : {})}
           showChrome={props.showChrome ?? true}
           offset={offsets.get(projection.record.annotationId) ?? ZERO_OFFSET}
           onOffsetChange={(offset) =>

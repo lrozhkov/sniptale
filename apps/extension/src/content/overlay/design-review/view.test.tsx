@@ -4,8 +4,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 
 vi.mock('../annotation-markers/view', () => ({
-  BrowserAnnotationMarkers: (props: { showChrome: boolean }) => (
-    <div data-show-chrome={String(props.showChrome)} data-ui="review-markers" />
+  BrowserAnnotationMarkers: (props: {
+    activeTarget?: Element | null;
+    onCloseRecord?: () => void;
+    showChrome: boolean;
+  }) => (
+    <div
+      data-active-target={props.activeTarget?.tagName ?? ''}
+      data-has-close-record={String(typeof props.onCloseRecord === 'function')}
+      data-show-chrome={String(props.showChrome)}
+      data-ui="review-markers"
+    />
   ),
 }));
 
@@ -82,6 +91,8 @@ it('composes the review marker projection and popover on the extension-owned sur
   );
 
   expect(markup).toContain('data-ui="review-markers"');
+  expect(markup).toContain('data-active-target="BUTTON"');
+  expect(markup).toContain('data-has-close-record="true"');
   expect(markup).toContain('data-show-chrome="true"');
   expect(markup).toContain('data-ui="review-panel"');
   expect(markup).toContain('data-ui="review-popover"');
