@@ -180,6 +180,43 @@ describe('useToolbarModeToggles', () => {
     expect(onToggleScreenshotMode).toHaveBeenCalledWith(false);
   });
 
+  it('uses the recovered capability snapshot when a late status result clears local binding', async () => {
+    const onToggleScreenshotMode = vi.fn();
+    const renewedSurface = {
+      success: true,
+      surfaceOperationGeneration: 7,
+      get surfaceCapabilityToken() {
+        queueMicrotask(() => {
+          setScreenshotSurfaceBinding({ token: null });
+        });
+        return 'renewed-surface-token';
+      },
+    };
+    modeToggleMocks.sendRuntimeMessage
+      .mockResolvedValueOnce({ enabled: true, success: true })
+      .mockResolvedValueOnce(renewedSurface)
+      .mockResolvedValueOnce({ success: true });
+    await act(async () => {
+      root?.render(
+        <ModeToggleHarness aiPickMode={false} onToggleScreenshotMode={onToggleScreenshotMode} />
+      );
+    });
+
+    const toggleButton = document.querySelector('[data-ui="test.screenshot-toggle"]');
+    await act(async () => {
+      toggleButton?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(modeToggleMocks.sendRuntimeMessage).toHaveBeenNthCalledWith(3, {
+      operationGeneration: 8,
+      surfaceCapabilityToken: 'renewed-surface-token',
+      type: 'DISABLE_SCREENSHOT_MODE',
+    });
+    expect(onToggleScreenshotMode).toHaveBeenCalledWith(false);
+    expect(modeToggleMocks.showToast).not.toHaveBeenCalled();
+  });
+
   it('refreshes an expired surface binding and retries screenshot exit once', async () => {
     const onToggleScreenshotMode = vi.fn();
     setScreenshotSurfaceBinding({ operationGeneration: 1, token: 'expired-surface-token' });

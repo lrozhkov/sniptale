@@ -5,6 +5,12 @@ let surfaceCapabilityToken: string | null = null;
 let surfaceLeaseGeneration: number | null = null;
 let surfaceOperationGeneration = 0;
 
+export type ScreenshotSurfaceBindingSnapshot = {
+  surfaceCapabilityToken: string;
+  surfaceLeaseGeneration?: number;
+  surfaceOperationGeneration: number;
+};
+
 export function setScreenshotSurfaceCapabilityToken(token: string | null): void {
   if (surfaceCapabilityToken !== token) {
     surfaceLeaseGeneration = null;
@@ -41,7 +47,16 @@ export function getScreenshotSurfaceLeaseGeneration(): number | null {
   return surfaceLeaseGeneration;
 }
 
-export function createDisableScreenshotModeRequest() {
+export function createDisableScreenshotModeRequest(binding?: ScreenshotSurfaceBindingSnapshot) {
+  if (binding) {
+    setScreenshotSurfaceBinding({
+      token: binding.surfaceCapabilityToken,
+      operationGeneration: binding.surfaceOperationGeneration,
+      ...(binding.surfaceLeaseGeneration === undefined
+        ? {}
+        : { leaseGeneration: binding.surfaceLeaseGeneration }),
+    });
+  }
   const surfaceCapabilityToken = requireScreenshotSurfaceCapabilityToken();
   const operationGeneration = nextScreenshotSurfaceOperationGeneration();
   return {

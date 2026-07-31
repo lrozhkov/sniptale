@@ -9,6 +9,7 @@ import {
   type ContentPrivilegedActionIntentSource,
 } from '../../../application/privileged-action-intent';
 import { setScreenshotSurfaceBinding } from '../../viewport-selector/capability';
+import type { ScreenshotSurfaceBindingSnapshot } from '../../viewport-selector/capability';
 
 export async function refreshToolbarSurfaceSession() {
   const status = await getContentRuntimeServices().messaging.sendRuntimeMessage({
@@ -30,7 +31,7 @@ export async function refreshToolbarSurfaceSession() {
 
 export async function renewToolbarSurfaceSession(
   contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined
-): Promise<void> {
+): Promise<ScreenshotSurfaceBindingSnapshot> {
   if (!contentIntentSource) throw new Error('authorization-expired');
   const renewalRequest: {
     contentIntent?: ContentPrivilegedActionCapability;
@@ -45,11 +46,19 @@ export async function renewToolbarSurfaceSession(
   if (!response?.success || !response.surfaceCapabilityToken) {
     throw new Error(response?.error ?? 'authorization-expired');
   }
-  setScreenshotSurfaceBinding({
-    token: response.surfaceCapabilityToken,
+  const binding: ScreenshotSurfaceBindingSnapshot = {
+    surfaceCapabilityToken: response.surfaceCapabilityToken,
+    surfaceOperationGeneration: response.surfaceOperationGeneration ?? 0,
     ...(response.surfaceLeaseGeneration === undefined
       ? {}
-      : { leaseGeneration: response.surfaceLeaseGeneration }),
-    operationGeneration: response.surfaceOperationGeneration,
+      : { surfaceLeaseGeneration: response.surfaceLeaseGeneration }),
+  };
+  setScreenshotSurfaceBinding({
+    token: binding.surfaceCapabilityToken,
+    ...(binding.surfaceLeaseGeneration === undefined
+      ? {}
+      : { leaseGeneration: binding.surfaceLeaseGeneration }),
+    operationGeneration: binding.surfaceOperationGeneration,
   });
+  return binding;
 }

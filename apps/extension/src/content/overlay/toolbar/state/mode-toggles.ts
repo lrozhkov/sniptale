@@ -9,6 +9,7 @@ import type { ToolbarProps } from '../types';
 import {
   createDisableScreenshotModeRequest,
   getScreenshotSurfaceCapabilityToken,
+  type ScreenshotSurfaceBindingSnapshot,
 } from '../../viewport-selector/capability';
 import { refreshToolbarSurfaceSession, renewToolbarSurfaceSession } from '../shell/surface-session';
 import {
@@ -38,44 +39,63 @@ type ToolbarToggleMode = 'screenshot' | 'highlighter' | 'quickedit';
 
 async function recoverScreenshotSurfaceForExit(
   contentIntentSource: ReturnType<typeof createTrustedContentActionIntentSource> | undefined
-): Promise<'already-disabled' | 'ready'> {
+): Promise<
+  | { kind: 'already-disabled' }
+  | { kind: 'request'; request: ReturnType<typeof createDisableScreenshotModeRequest> }
+> {
   const status = await refreshToolbarSurfaceSession();
   if (status?.success && status.enabled === false) {
-    return 'already-disabled';
+    return { kind: 'already-disabled' };
+  }
+  const statusCapabilityToken = status?.success ? status.surfaceCapabilityToken : undefined;
+  if (status?.success && status.enabled && statusCapabilityToken) {
+    const statusBinding: ScreenshotSurfaceBindingSnapshot = {
+      surfaceCapabilityToken: statusCapabilityToken,
+      surfaceOperationGeneration: status.surfaceOperationGeneration ?? 0,
+      ...(status.surfaceLeaseGeneration === undefined
+        ? {}
+        : { surfaceLeaseGeneration: status.surfaceLeaseGeneration }),
+    };
+    return { kind: 'request', request: createDisableScreenshotModeRequest(statusBinding) };
   }
   if (getScreenshotSurfaceCapabilityToken()) {
-    return 'ready';
+    return { kind: 'request', request: createDisableScreenshotModeRequest() };
   }
-  await renewToolbarSurfaceSession(contentIntentSource);
-  return 'ready';
+  const renewedBinding = await renewToolbarSurfaceSession(contentIntentSource);
+  return {
+    kind: 'request',
+    request: createDisableScreenshotModeRequest(renewedBinding),
+  };
 }
 
 async function sendScreenshotModeDisable(
   contentIntentSource: ReturnType<typeof createTrustedContentActionIntentSource> | undefined
 ) {
   let recoveryAttempted = false;
+  let request: ReturnType<typeof createDisableScreenshotModeRequest>;
   if (!getScreenshotSurfaceCapabilityToken()) {
     recoveryAttempted = true;
-    if ((await recoverScreenshotSurfaceForExit(contentIntentSource)) === 'already-disabled') {
+    const recovery = await recoverScreenshotSurfaceForExit(contentIntentSource);
+    if (recovery.kind === 'already-disabled') {
       return { success: true as const };
     }
+    request = recovery.request;
+  } else {
+    request = createDisableScreenshotModeRequest();
   }
 
-  let response = await getContentRuntimeServices().messaging.sendRuntimeMessage(
-    createDisableScreenshotModeRequest()
-  );
+  let response = await getContentRuntimeServices().messaging.sendRuntimeMessage(request);
   if (
     !response?.success &&
     (response?.error === 'authorization-expired' || response?.error === 'stale-generation') &&
     !recoveryAttempted
   ) {
     recoveryAttempted = true;
-    if ((await recoverScreenshotSurfaceForExit(contentIntentSource)) === 'already-disabled') {
+    const recovery = await recoverScreenshotSurfaceForExit(contentIntentSource);
+    if (recovery.kind === 'already-disabled') {
       return { success: true as const };
     }
-    response = await getContentRuntimeServices().messaging.sendRuntimeMessage(
-      createDisableScreenshotModeRequest()
-    );
+    response = await getContentRuntimeServices().messaging.sendRuntimeMessage(recovery.request);
   }
   return response;
 }

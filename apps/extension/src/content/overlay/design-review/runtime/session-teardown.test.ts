@@ -173,6 +173,24 @@ it('restores Design Review styles before clearing session state after the UI tra
   expect(browserAnnotationSession.captureSnapshot().domRecords).toEqual([]);
 });
 
+it('clears comment-only Design Review feedback after the UI transition', async () => {
+  const target = document.createElement('button');
+  document.body.append(target);
+  browserAnnotationSession.setComment({
+    comment: 'Make the action clearer',
+    evidence: createEvidence(),
+    target,
+  });
+  const transitionUi = vi.fn();
+  const teardown = teardownDesignReviewSessionAfterUiTransition(transitionUi);
+
+  await vi.runAllTimersAsync();
+  await teardown;
+
+  expect(transitionUi).toHaveBeenCalledOnce();
+  expect(browserAnnotationSession.captureSnapshot().domRecords).toEqual([]);
+});
+
 it('preserves the session and mode when the active comment draft cannot be saved', async () => {
   const target = createChangedTarget();
   const transitionUi = vi.fn();
