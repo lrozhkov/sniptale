@@ -8,6 +8,7 @@ function createToggleState(
 ): PopupExportToggleState {
   const defaults: PopupExportToggleState = {
     actions: {
+      setIncludeAnnotations: vi.fn(),
       setIncludeBasicLogs: vi.fn(),
       setIncludeCssDiagnostics: vi.fn(),
       setIncludeFiles: vi.fn(),
@@ -19,6 +20,7 @@ function createToggleState(
     },
     hasLoadedPreferences: true,
     values: {
+      includeAnnotations: false,
       includeBasicLogs: false,
       includeCssDiagnostics: false,
       includeFiles: true,

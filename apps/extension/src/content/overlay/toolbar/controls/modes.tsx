@@ -1,5 +1,12 @@
 import React, { useRef } from 'react';
-import { Check, FilePenLine, MousePointer2, Square, TextCursorInput } from 'lucide-react';
+import {
+  Check,
+  FilePenLine,
+  MessageSquareText,
+  MousePointer2,
+  Square,
+  TextCursorInput,
+} from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import {
@@ -16,12 +23,11 @@ import {
 import { getToolbarMenuPosition } from '../menu/position';
 import { AiSparkIcon } from '../../icons/icons';
 import { ModeSelectorButton } from './mode-selector-button';
-import { PageStyleInspectorToolbarButton } from './page-style-inspector';
 
 const MODE_ICON_CLASS_NAME = 'sniptale-toolbar-mode-icon h-[18px] w-[18px] shrink-0';
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
 
-type ToolbarInteractionMode = 'ai' | 'cursor' | 'highlighter' | 'quick-edit';
+type ToolbarInteractionMode = 'ai' | 'cursor' | 'design-review' | 'highlighter' | 'quick-edit';
 
 function ToolbarAiIcon() {
   return <AiSparkIcon className={`${MODE_ICON_CLASS_NAME} sniptale-ai-icon`} />;
@@ -44,6 +50,10 @@ function getSelectedMode(props: ToolbarModeButtonsProps): ToolbarInteractionMode
     return 'ai';
   }
 
+  if (props.designReviewMode) {
+    return 'design-review';
+  }
+
   if (props.quickEditMode) {
     return 'quick-edit';
   }
@@ -61,6 +71,8 @@ function getModeIcon(mode: ToolbarInteractionMode) {
       return <ToolbarAiIcon />;
     case 'quick-edit':
       return <TextCursorInput size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+    case 'design-review':
+      return <MessageSquareText size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'highlighter':
       return <Square size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'cursor':
@@ -80,6 +92,11 @@ function getModeCopy(mode: ToolbarInteractionMode) {
       return {
         hint: translate('content.toolbar.quickEditEnable'),
         label: translate('content.toolbar.quickEditLabel'),
+      };
+    case 'design-review':
+      return {
+        hint: translate('content.toolbar.designReviewEnable'),
+        label: translate('content.toolbar.designReviewLabel'),
       };
     case 'highlighter':
       return {
@@ -114,6 +131,9 @@ function createModeSelectionHandler(
         break;
       case 'quick-edit':
         props.onToggleQuickEdit();
+        break;
+      case 'design-review':
+        props.onToggleDesignReview();
         break;
       case 'highlighter':
         props.onToggleHighlighter();
@@ -187,7 +207,9 @@ function ToolbarModeMenu(props: {
         placement={menuPlacement}
         style={menuStyle}
       >
-        {(['cursor', 'ai', 'quick-edit', 'highlighter'] as ToolbarInteractionMode[]).map((mode) => (
+        {(
+          ['cursor', 'ai', 'quick-edit', 'design-review', 'highlighter'] as ToolbarInteractionMode[]
+        ).map((mode) => (
           <ModeMenuItem
             key={mode}
             mode={mode}
@@ -233,13 +255,6 @@ function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
         enabled={props.quickEditDocumentMode}
         onToggle={props.onToggleQuickEditDocumentMode}
       />
-      {props.onTogglePageStyleInspector ? (
-        <PageStyleInspectorToolbarButton
-          disabled={props.quickEditDocumentMode}
-          open={props.pageStyleInspectorOpen ?? false}
-          onToggle={props.onTogglePageStyleInspector}
-        />
-      ) : null}
     </>
   );
 }

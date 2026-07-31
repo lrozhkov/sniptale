@@ -55,9 +55,11 @@ function createBridgeParams(overrides: BridgeOverrides = {}) {
     },
     modeControls: {
       disableAiPickMode: vi.fn(),
+      disableDesignReviewMode: vi.fn(),
       disableHighlighterMode: vi.fn(),
       disableQuickEditMode: vi.fn(),
       setAiPickMode: vi.fn(),
+      setDesignReviewMode: vi.fn(),
       setHighlighterMode: vi.fn(),
       setIsToolbarVisible: overrides.setIsToolbarVisible ?? vi.fn(),
       setNavigationLockEnabled: overrides.setNavigationLockEnabled ?? vi.fn(),
@@ -67,6 +69,7 @@ function createBridgeParams(overrides: BridgeOverrides = {}) {
     },
     modeState: {
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       isToolbarVisible: false,
       quickEditMode: false,

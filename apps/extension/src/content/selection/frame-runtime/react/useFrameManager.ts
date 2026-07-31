@@ -7,7 +7,11 @@ import {
   useHistoryCommitCoordinator,
 } from './useFrameHistoryCommit';
 import { createPagePreparationHistoryBridge } from '../history/bridge';
-import { syncFrameManagerStateRefs, useFrameManagerRefs } from './useFrameManagerRefs';
+import {
+  createSynchronizedFrameSetter,
+  syncFrameManagerStateRefs,
+  useFrameManagerRefs,
+} from './useFrameManagerRefs';
 import { useFrameManagerControllers } from './useFrameManagerControllers';
 
 /**
@@ -16,12 +20,19 @@ import { useFrameManagerControllers } from './useFrameManagerControllers';
 export const useFrameManager = (params: {
   InteractiveFrameComponent: InteractiveFrameComponent;
 }) => {
-  const [frames, setFrames] = useState<FrameData[]>([]);
+  const [frames, setFrameState] = useState<FrameData[]>([]);
   const [frameStates, setFrameStates] = useState<Map<string, FrameState>>(new Map());
   const refs = useFrameManagerRefs();
 
   syncFrameManagerStateRefs(frames, frameStates, refs);
-  const withHistoryCommit = useHistoryCommitCoordinator(frames);
+  const setFrames = useMemo(
+    () => createSynchronizedFrameSetter(setFrameState, refs.framesRef),
+    [refs.framesRef]
+  );
+  const withHistoryCommit = useHistoryCommitCoordinator({
+    framesRef: refs.framesRef,
+    setFrames,
+  });
   const frameManager = useFrameManagerControllers({
     frames,
     InteractiveFrameComponent: params.InteractiveFrameComponent,

@@ -27,12 +27,15 @@ export class StaleScreenshotRunError extends Error {
 
 type ScreenshotEditingModeControls = {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   disableAiPickMode: () => void;
+  disableDesignReviewMode: () => void;
   disableHighlighterMode: () => void;
   disableQuickEditMode: () => void;
   highlighterMode: boolean;
   quickEditMode: boolean;
   setAiPickMode: (enabled: boolean) => void;
+  setDesignReviewMode: (enabled: boolean) => void;
   setHighlighterMode: (enabled: boolean) => void;
   setQuickEditMode: (enabled: boolean) => void;
 };
@@ -60,6 +63,11 @@ function disableEditingModes(params: ScreenshotControllerParams): void {
   editingModes.disableQuickEditMode();
   editingModes.setQuickEditMode(false);
 
+  if (editingModes.designReviewMode) {
+    editingModes.disableDesignReviewMode();
+    editingModes.setDesignReviewMode(false);
+  }
+
   if (editingModes.highlighterMode) {
     editingModes.disableHighlighterMode();
     editingModes.setHighlighterMode(false);
@@ -73,7 +81,12 @@ function disableEditingModes(params: ScreenshotControllerParams): void {
 
 function hasModeOwnedNavigationLock(params: ScreenshotControllerParams): boolean {
   const { editingModes } = params;
-  return editingModes.aiPickMode || editingModes.highlighterMode || editingModes.quickEditMode;
+  return (
+    editingModes.aiPickMode ||
+    editingModes.designReviewMode ||
+    editingModes.highlighterMode ||
+    editingModes.quickEditMode
+  );
 }
 
 function resolveNavigationLockBaseline(

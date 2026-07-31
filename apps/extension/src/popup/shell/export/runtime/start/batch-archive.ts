@@ -84,6 +84,10 @@ function resolveFlatBatchEntryPath(args: {
     return `${args.uniqueBaseName}.md`;
   }
 
+  if (args.entryPath === 'browser-annotations.md') {
+    return `${args.uniqueBaseName}_annotations.md`;
+  }
+
   if (args.entryPath === 'page-screenshot.png') {
     return `${args.uniqueBaseName}_screenshot.png`;
   }

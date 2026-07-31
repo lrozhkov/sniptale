@@ -1,9 +1,6 @@
 import { Suspense } from 'react';
 import { ContentDialogStack } from './dialogs';
-import {
-  PageStyleInspectorSurface,
-  usePageStyleInspectorController,
-} from '../page-style-inspector/view';
+import { DesignReviewSurface, useDesignReviewController } from '../design-review/view';
 import { LazyContentScenarioRecorderSidebar } from './sidebar-lazy';
 import { shouldRenderContentScenarioRecorderSidebar } from './sidebar-visibility';
 import { ContentToolbarShell } from './toolbar';
@@ -38,24 +35,20 @@ function ContentScenarioRecorderSidebarSlot(props: {
 
 export function ContentAppLayout(props: ContentAppLayoutProps) {
   const isCaptureUiHidden = props.toolbar.isCompletelyHidden;
-  const pageStyleInspector = usePageStyleInspectorController({
-    quickEditDocumentMode: props.toolbar.modes.quickEditDocumentMode,
-    quickEditMode: props.toolbar.modes.quickEditMode,
+  const designReview = useDesignReviewController({
+    enabled: props.toolbar.modes.designReviewMode,
   });
-  const toolbar = props.toolbar.modes.quickEditMode
-    ? {
-        ...props.toolbar,
-        pageStyleInspector: {
-          open: pageStyleInspector.inspectorOpen,
-          onToggle: pageStyleInspector.toggleInspector,
-        },
-      }
-    : props.toolbar;
 
   return (
     <>
-      <ContentToolbarShell scenario={props.scenario} toolbar={toolbar} />
-      {isCaptureUiHidden ? null : <PageStyleInspectorSurface controller={pageStyleInspector} />}
+      <ContentToolbarShell
+        designReview={designReview}
+        scenario={props.scenario}
+        toolbar={props.toolbar}
+      />
+      {props.toolbar.modes.screenshotMode ? (
+        <DesignReviewSurface controller={designReview} showChrome={!isCaptureUiHidden} />
+      ) : null}
       <ContentScenarioRecorderSidebarSlot
         isCompletelyHidden={props.toolbar.isCompletelyHidden}
         modeController={props.toolbar.modeController}

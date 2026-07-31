@@ -41,10 +41,6 @@ export const popupCommonMessages = defineMessageSource({
     ru: 'Дизайн-система',
     en: 'Design system',
   },
-  footerAppliedStyles: {
-    ru: 'Показать примененные стили',
-    en: 'Show applied styles',
-  },
   footerSettings: {
     ru: 'Настройки',
     en: 'Settings',

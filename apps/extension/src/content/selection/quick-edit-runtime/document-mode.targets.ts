@@ -27,6 +27,25 @@ const STABLE_TEXT_CONTAINER_SELECTOR = [
   'section',
   'div',
 ].join(', ');
+const DOCUMENT_NODE_TYPE = 9;
+const ELEMENT_NODE_TYPE = 1;
+
+function isDomNode(target: QuickEditDocumentModeEditTarget): target is Node {
+  return Boolean(
+    target &&
+    typeof target === 'object' &&
+    'nodeType' in target &&
+    typeof target.nodeType === 'number'
+  );
+}
+
+function isHtmlElement(node: Node): node is HTMLElement {
+  if (node.nodeType !== ELEMENT_NODE_TYPE) {
+    return false;
+  }
+  const constructor = node.ownerDocument?.defaultView?.HTMLElement;
+  return constructor ? node instanceof constructor : node instanceof HTMLElement;
+}
 
 export function isIgnoredDocumentModeTarget(node: QuickEditDocumentModeEditTarget): boolean {
   const element = toElement(node);
@@ -49,7 +68,7 @@ export function resolveDocumentModeEditRoot(
   const ownerDocument = resolveOwnerDocument(target);
   const selection = ownerDocument.getSelection();
   const candidateNodes = [
-    target instanceof Node ? target : null,
+    isDomNode(target) ? target : null,
     selection?.anchorNode ?? null,
     ownerDocument.activeElement,
   ];
@@ -65,11 +84,14 @@ export function resolveDocumentModeEditRoot(
 }
 
 function toElement(node: QuickEditDocumentModeEditTarget): HTMLElement | null {
-  if (node instanceof HTMLElement) {
+  if (!isDomNode(node)) {
+    return null;
+  }
+  if (isHtmlElement(node)) {
     return node;
   }
 
-  return node instanceof Node ? node.parentElement : null;
+  return node.parentElement;
 }
 
 function resolveStableTextRoot(node: QuickEditDocumentModeEditTarget): HTMLElement | null {
@@ -91,11 +113,10 @@ function resolveBodyFallback(ownerDocument: Document): HTMLElement | null {
 }
 
 function resolveOwnerDocument(target: QuickEditDocumentModeEditTarget): Document {
-  if (target instanceof Document) {
-    return target;
-  }
-
-  if (target instanceof Node) {
+  if (isDomNode(target)) {
+    if (target.nodeType === DOCUMENT_NODE_TYPE) {
+      return target as Document;
+    }
     return target.ownerDocument ?? document;
   }
 

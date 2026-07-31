@@ -24,6 +24,7 @@ export type ContentAppModeController = UseToolbarModeControllerResult;
 
 type ContentAppModes = {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   highlighterMode: boolean;
   quickEditDocumentMode: boolean;
   quickEditMode: boolean;
@@ -89,10 +90,6 @@ export type ContentAppLayoutToolbarProps = {
   isToolbarVisible: boolean;
   modeController: ContentAppModeController;
   modes: ContentAppModes;
-  pageStyleInspector?: {
-    open: boolean;
-    onToggle: () => void;
-  };
   pinToTab: boolean;
   pinToTabAvailable: boolean;
   setCaptureAction: (action: CaptureActionType) => void;

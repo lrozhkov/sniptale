@@ -1,22 +1,25 @@
 import {
   captureHistorySnapshot,
   normalizeHistoryDomBatch,
+  normalizeHistoryDomEffect,
   notifyHistoryReachabilityChanged,
   publishHistoryState,
   pushHistoryEntry,
   type HistoryStoreRuntimeState,
 } from './store-state';
 import type {
-  FrameSessionSnapshot,
   PageDomMutationBatch,
+  PagePreparationHistoryDomEffect,
   PagePreparationHistoryEntry,
+  PagePreparationSessionSnapshot,
 } from './types';
-import { clearHistoryDomLocators } from './dom';
+import { clearHistoryDomLocators } from './dom-locators';
 
 type HistoryEntryArgs = {
-  after?: FrameSessionSnapshot | null;
-  before?: FrameSessionSnapshot | null;
+  after?: PagePreparationSessionSnapshot | null;
+  before?: PagePreparationSessionSnapshot | null;
   domBatch?: PageDomMutationBatch | null;
+  domEffect?: PagePreparationHistoryDomEffect | null;
 };
 
 function createEntryFromArgs(
@@ -33,6 +36,7 @@ function createEntryFromArgs(
     after,
     before,
     domBatch: normalizeHistoryDomBatch(args.domBatch),
+    domEffect: normalizeHistoryDomEffect(args.domEffect),
   };
 }
 
@@ -57,6 +61,7 @@ function beginDeferredCommitBoundary(state: HistoryStoreRuntimeState): number | 
 
 function commitTransactionEntry(args: {
   domBatch?: PageDomMutationBatch | null;
+  domEffect?: PagePreparationHistoryDomEffect | null;
   key: string;
   state: HistoryStoreRuntimeState;
 }): PagePreparationHistoryEntry | null {
@@ -72,11 +77,13 @@ function commitTransactionEntry(args: {
     after,
     before: transaction.before,
     domBatch: normalizeHistoryDomBatch(args.domBatch ?? transaction.domBatch),
+    domEffect: normalizeHistoryDomEffect(args.domEffect),
   };
 }
 
 function finalizeDeferredEntry(args: {
   domBatch?: PageDomMutationBatch | null;
+  domEffect?: PagePreparationHistoryDomEffect | null;
   id: number;
   state: HistoryStoreRuntimeState;
 }): PagePreparationHistoryEntry | null {
@@ -97,6 +104,7 @@ function finalizeDeferredEntry(args: {
     after,
     before: deferred.before,
     domBatch: normalizeHistoryDomBatch(args.domBatch),
+    domEffect: normalizeHistoryDomEffect(args.domEffect),
   };
 }
 
@@ -104,19 +112,20 @@ function beginHistoryTransaction(
   state: HistoryStoreRuntimeState,
   key: string,
   domBatch: PageDomMutationBatch | null = null
-): void {
+): boolean {
   if (state.isApplying || state.transactions.has(key)) {
-    return;
+    return false;
   }
 
   const before = captureHistorySnapshot(state);
   if (!before) {
-    return;
+    return false;
   }
 
   state.transactions.set(key, { before, domBatch });
   notifyHistoryReachabilityChanged(state);
   publishHistoryState(state);
+  return true;
 }
 
 function cancelHistoryTransaction(state: HistoryStoreRuntimeState, key: string): void {
@@ -132,26 +141,28 @@ function cancelHistoryTransaction(state: HistoryStoreRuntimeState, key: string):
 function commitHistoryTransaction(
   state: HistoryStoreRuntimeState,
   key: string,
-  domBatch: PageDomMutationBatch | null = null
-): void {
+  domBatch: PageDomMutationBatch | null = null,
+  domEffect: PagePreparationHistoryDomEffect | null = null
+): boolean {
   if (state.isApplying) {
-    return;
+    return false;
   }
 
   const hadTransaction = state.transactions.has(key);
-  const entry = commitTransactionEntry({ domBatch, key, state });
+  const entry = commitTransactionEntry({ domBatch, domEffect, key, state });
   if (entry) {
     if (!pushHistoryEntry(state, entry)) {
       notifyHistoryReachabilityChanged(state);
       publishHistoryState(state);
     }
-    return;
+    return true;
   }
 
   if (hadTransaction) {
     notifyHistoryReachabilityChanged(state);
     publishHistoryState(state);
   }
+  return false;
 }
 
 function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
@@ -162,8 +173,12 @@ function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
     cancelDeferredCommit(id: number): void {
       if (state.deferredCommits.delete(id)) notifyHistoryReachabilityChanged(state);
     },
-    finalizeDeferredCommit(id: number, domBatch: PageDomMutationBatch | null = null): void {
-      const entry = finalizeDeferredEntry({ domBatch, id, state });
+    finalizeDeferredCommit(
+      id: number,
+      domBatch: PageDomMutationBatch | null = null,
+      domEffect: PagePreparationHistoryDomEffect | null = null
+    ): void {
+      const entry = finalizeDeferredEntry({ domBatch, domEffect, id, state });
       if (entry) {
         if (!pushHistoryEntry(state, entry)) notifyHistoryReachabilityChanged(state);
       } else {
@@ -175,8 +190,8 @@ function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
 
 function createTransactionCommitApi(state: HistoryStoreRuntimeState) {
   return {
-    beginTransaction(key: string, domBatch: PageDomMutationBatch | null = null): void {
-      beginHistoryTransaction(state, key, domBatch);
+    beginTransaction(key: string, domBatch: PageDomMutationBatch | null = null): boolean {
+      return beginHistoryTransaction(state, key, domBatch);
     },
     cancelTransaction(key: string): void {
       cancelHistoryTransaction(state, key);
@@ -200,8 +215,12 @@ function createTransactionCommitApi(state: HistoryStoreRuntimeState) {
         if (!pushHistoryEntry(state, entry)) notifyHistoryReachabilityChanged(state);
       }
     },
-    commitTransaction(key: string, domBatch: PageDomMutationBatch | null = null): void {
-      commitHistoryTransaction(state, key, domBatch);
+    commitTransaction(
+      key: string,
+      domBatch: PageDomMutationBatch | null = null,
+      domEffect: PagePreparationHistoryDomEffect | null = null
+    ): boolean {
+      return commitHistoryTransaction(state, key, domBatch, domEffect);
     },
   };
 }

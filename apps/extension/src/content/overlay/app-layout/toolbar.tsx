@@ -19,6 +19,9 @@ import type { CaptureActionType } from '../../../contracts/settings';
 const logger = createLogger({ namespace: 'ContentToolbarShell' });
 
 type ContentToolbarShellProps = {
+  designReview: {
+    panel: { open: boolean; toggle: () => void };
+  };
   scenario: ContentAppLayoutScenarioProps;
   toolbar: ContentAppLayoutToolbarProps;
 };
@@ -136,6 +139,7 @@ function createToolbarAutoBlurProps(
 }
 
 function renderToolbarShell(args: {
+  designReview: ContentToolbarShellProps['designReview'];
   handleToggleScreenshotMode: (enabled: boolean) => void;
   scenarioToolbarProps: ReturnType<typeof buildScenarioToolbarProps>;
   toolbar: ContentAppLayoutToolbarProps;
@@ -152,22 +156,23 @@ function renderToolbarShell(args: {
         captureAction={args.toolbar.captureAction}
         onToggleScreenshotMode={args.handleToggleScreenshotMode}
         onToggleHighlighterMode={modeController.handleToggleHighlighterMode}
+        onToggleDesignReviewMode={modeController.handleToggleDesignReviewMode}
         onToggleQuickEditDocumentMode={modeController.handleToggleQuickEditDocumentMode}
         onToggleQuickEditMode={modeController.handleToggleQuickEditMode}
         onAiPickContentStart={args.toolbar.aiController.handleAiPickContentStart}
         aiPickMode={modes.aiPickMode}
+        designReviewMode={modes.designReviewMode}
+        designReviewPanelOpen={args.designReview.panel.open}
         highlighterMode={modes.highlighterMode}
         quickEditDocumentMode={modes.quickEditDocumentMode}
         quickEditMode={modes.quickEditMode}
-        {...(args.toolbar.pageStyleInspector === undefined
-          ? {}
-          : { pageStyleInspector: args.toolbar.pageStyleInspector })}
         screenshotMode={modes.screenshotMode}
         pinToTab={args.toolbar.pinToTab}
         pinToTabAvailable={args.toolbar.pinToTabAvailable}
         pinToTabLocked={args.toolbar.captureAction === 'scenario' && modes.screenshotMode}
         onCaptureActionChange={args.toolbar.setCaptureAction}
         onDisableAiPickMode={args.toolbar.aiController.handleDisableAiPickMode}
+        onToggleDesignReviewPanel={args.designReview.panel.toggle}
         onPinToTabChange={args.toolbar.setPinToTab}
         onTakeScreenshot={args.toolbar.handleTakeScreenshot}
         onHide={handleHideToolbar}
@@ -190,7 +195,7 @@ function renderToolbarShell(args: {
   );
 }
 
-export function ContentToolbarShell({ scenario, toolbar }: ContentToolbarShellProps) {
+export function ContentToolbarShell({ designReview, scenario, toolbar }: ContentToolbarShellProps) {
   const byClickBlocked = isScenarioByClickBlocked(toolbar.modes);
   const handleDisableScreenshotMode = () =>
     exitScreenshotModeFromUserAction({
@@ -225,6 +230,7 @@ export function ContentToolbarShell({ scenario, toolbar }: ContentToolbarShellPr
   });
 
   return renderToolbarShell({
+    designReview,
     handleToggleScreenshotMode,
     scenarioToolbarProps,
     toolbar,

@@ -55,6 +55,7 @@ type ScreenshotHandlerRef = {
 
 export interface RuntimeMessageBridgeModeState {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   highlighterMode: boolean;
   isToolbarVisible: boolean;
   quickEditMode: boolean;
@@ -63,6 +64,7 @@ export interface RuntimeMessageBridgeModeState {
 
 export type RuntimeMessageBridgeModeControls = ContentAppRuntimeModeControls & {
   disableAiPickMode: () => void;
+  disableDesignReviewMode: () => void;
   disableHighlighterMode: () => void;
   disableQuickEditMode: () => void;
 };

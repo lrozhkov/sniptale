@@ -85,10 +85,6 @@ vi.mock('../../sections/templates', () => {
   settingsPageDelayMocks.loadedSectionModules.push('templates');
   return { TemplatesSection: markerComponent('templates-section') };
 });
-vi.mock('../../sections/page-styles', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('pagestyles');
-  return { PageStylesSection: markerComponent('pagestyles-section') };
-});
 vi.mock('../../sections/quick-actions', () => {
   settingsPageDelayMocks.loadedSectionModules.push('quickactions');
   return { QuickActionsSection: markerComponent('quickactions-section') };
@@ -198,7 +194,6 @@ describe('SettingsPage delayed loading', () => {
         'editor',
         'image',
         'templates',
-        'pagestyles',
         'quickactions',
         'permissions',
         'privacy',

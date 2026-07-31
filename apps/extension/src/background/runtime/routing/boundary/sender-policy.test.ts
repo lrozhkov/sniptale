@@ -127,13 +127,6 @@ it('applies top-level content proof to non-capture privileged route families', (
 
   expect(
     getUnauthorizedPrivilegedTabRouteSenderReason({
-      family: 'page-style',
-      resolvedTabId: 7,
-      sender: createTopLevelContentSender(),
-    })
-  ).toBeNull();
-  expect(
-    getUnauthorizedPrivilegedTabRouteSenderReason({
       family: 'scenario',
       resolvedTabId: 7,
       sender: createSender({

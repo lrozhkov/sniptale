@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHistoryStoreState } from './store-state';
 import { createHistoryStoreCommitApi } from './transactions';
-import type { FrameSessionSnapshot } from './types';
+import type { FrameSessionSnapshot, PagePreparationSessionSnapshot } from './types';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
-function createSnapshot(label: string): FrameSessionSnapshot {
+function createFrameSnapshot(label: string): FrameSessionSnapshot {
   return {
     frames: [
       {
@@ -27,8 +27,22 @@ function createSnapshot(label: string): FrameSessionSnapshot {
   };
 }
 
-function cloneSnapshot(snapshot: FrameSessionSnapshot): FrameSessionSnapshot {
-  return JSON.parse(JSON.stringify(snapshot)) as FrameSessionSnapshot;
+function createSnapshot(label: string): PagePreparationSessionSnapshot {
+  return {
+    annotations: {
+      domRecords: [],
+      frameOrders: [],
+      nextAnnotationId: 1,
+      nextMarkerNumber: 1,
+      nextCreationOrder: 1,
+      schemaVersion: 1,
+    },
+    frameSession: createFrameSnapshot(label),
+  };
+}
+
+function cloneSnapshot(snapshot: PagePreparationSessionSnapshot): PagePreparationSessionSnapshot {
+  return JSON.parse(JSON.stringify(snapshot)) as PagePreparationSessionSnapshot;
 }
 
 function createTransactionHarness(initialSnapshot = createSnapshot('a')) {
@@ -41,7 +55,7 @@ function createTransactionHarness(initialSnapshot = createSnapshot('a')) {
 
   return {
     api: createHistoryStoreCommitApi(state),
-    setCurrentSnapshot(snapshot: FrameSessionSnapshot) {
+    setCurrentSnapshot(snapshot: PagePreparationSessionSnapshot) {
       currentSnapshot = cloneSnapshot(snapshot);
     },
     state,
@@ -54,8 +68,8 @@ describe('page-preparation-history transaction lifecycle', () => {
     const listener = vi.fn();
     harness.state.listeners.add(listener);
 
-    harness.api.beginTransaction('frame-edit');
-    harness.api.beginTransaction('frame-edit');
+    expect(harness.api.beginTransaction('frame-edit')).toBe(true);
+    expect(harness.api.beginTransaction('frame-edit')).toBe(false);
 
     expect(harness.state.transactions.size).toBe(1);
     expect(listener).toHaveBeenCalledTimes(1);
@@ -64,6 +78,14 @@ describe('page-preparation-history transaction lifecycle', () => {
 
     expect(harness.state.transactions.size).toBe(0);
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses a transaction when no snapshot authority is registered', () => {
+    const harness = createTransactionHarness();
+    harness.state.bridge = null;
+
+    expect(harness.api.beginTransaction('frame-edit')).toBe(false);
+    expect(harness.state.transactions.size).toBe(0);
   });
 
   it('drops a deferred commit when history is already applying during finalize', () => {
@@ -87,12 +109,76 @@ describe('page-preparation-history transaction commits', () => {
 
     harness.api.beginTransaction('frame-edit');
     harness.setCurrentSnapshot(createSnapshot('b'));
-    harness.api.commitTransaction('frame-edit');
+    expect(harness.api.commitTransaction('frame-edit')).toBe(true);
 
     expect(harness.state.transactions.size).toBe(0);
     expect(harness.state.past).toHaveLength(1);
-    expect(harness.state.past[0]?.before.frames[0]?.id).toBe('frame-a');
-    expect(harness.state.past[0]?.after.frames[0]?.id).toBe('frame-b');
+    expect(harness.state.past[0]?.before.frameSession.frames[0]?.id).toBe('frame-a');
+    expect(harness.state.past[0]?.after.frameSession.frames[0]?.id).toBe('frame-b');
+  });
+
+  it('keeps an installed transaction committed when passive observers throw', () => {
+    const harness = createTransactionHarness();
+    const listener = vi.fn(() => {
+      throw new Error('subscriber failed');
+    });
+    const reachabilityObserver = vi.fn(() => {
+      throw new Error('reachability observer failed');
+    });
+
+    harness.api.beginTransaction('frame-edit');
+    harness.state.listeners.add(listener);
+    harness.state.bridge!.onHistoryReachabilityChanged = reachabilityObserver;
+    harness.setCurrentSnapshot(createSnapshot('b'));
+
+    expect(harness.api.commitTransaction('frame-edit')).toBe(true);
+    expect(harness.state.transactions.size).toBe(0);
+    expect(harness.state.past).toHaveLength(1);
+    expect(harness.state.past[0]?.after.frameSession.frames[0]?.id).toBe('frame-b');
+    expect(reachabilityObserver).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('keeps an installed transaction committed when reachability snapshot capture throws', () => {
+    const harness = createTransactionHarness();
+    const captureSnapshot = harness.state.bridge!.captureSnapshot;
+    const reachabilityObserver = vi.fn();
+    let readsAfterBegin = 0;
+
+    harness.api.beginTransaction('frame-edit');
+    harness.state.bridge!.onHistoryReachabilityChanged = reachabilityObserver;
+    harness.state.bridge!.captureSnapshot = () => {
+      readsAfterBegin += 1;
+      if (readsAfterBegin === 2) {
+        throw new Error('reachability snapshot failed');
+      }
+      return captureSnapshot();
+    };
+    harness.setCurrentSnapshot(createSnapshot('b'));
+
+    expect(harness.api.commitTransaction('frame-edit')).toBe(true);
+    expect(harness.state.transactions.size).toBe(0);
+    expect(harness.state.past).toHaveLength(1);
+    expect(harness.state.past[0]?.after.frameSession.frames[0]?.id).toBe('frame-b');
+    expect(reachabilityObserver).not.toHaveBeenCalled();
+  });
+
+  it('keeps an installed transaction committed when reachability callback resolution throws', () => {
+    const harness = createTransactionHarness();
+
+    harness.api.beginTransaction('frame-edit');
+    Object.defineProperty(harness.state.bridge!, 'onHistoryReachabilityChanged', {
+      configurable: true,
+      get: () => {
+        throw new Error('reachability callback resolution failed');
+      },
+    });
+    harness.setCurrentSnapshot(createSnapshot('b'));
+
+    expect(harness.api.commitTransaction('frame-edit')).toBe(true);
+    expect(harness.state.transactions.size).toBe(0);
+    expect(harness.state.past).toHaveLength(1);
+    expect(harness.state.past[0]?.after.frameSession.frames[0]?.id).toBe('frame-b');
   });
 
   it('publishes when an open transaction closes without a history entry', () => {
@@ -103,7 +189,7 @@ describe('page-preparation-history transaction commits', () => {
     harness.api.beginTransaction('frame-edit');
     listener.mockClear();
     harness.state.bridge = null;
-    harness.api.commitTransaction('frame-edit');
+    expect(harness.api.commitTransaction('frame-edit')).toBe(false);
 
     expect(harness.state.transactions.size).toBe(0);
     expect(harness.state.past).toHaveLength(0);
@@ -117,10 +203,20 @@ describe('page-preparation-history transaction commits', () => {
 
     harness.api.beginTransaction('frame-edit');
     listener.mockClear();
-    harness.api.commitTransaction('frame-edit');
+    expect(harness.api.commitTransaction('frame-edit')).toBe(true);
 
     expect(harness.state.transactions.size).toBe(0);
     expect(harness.state.past).toHaveLength(0);
     expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('refuses a cleared or unknown keyed transaction without creating an entry', () => {
+    const harness = createTransactionHarness();
+
+    harness.api.beginTransaction('frame-edit');
+    harness.api.clear();
+
+    expect(harness.api.commitTransaction('frame-edit')).toBe(false);
+    expect(harness.state.past).toHaveLength(0);
   });
 });

@@ -18,6 +18,15 @@ function createCancelableClick(): MouseEvent {
   });
 }
 
+function createCancelableAuxClick(): MouseEvent {
+  return new MouseEvent('auxclick', {
+    bubbles: true,
+    button: 1,
+    cancelable: true,
+    composed: true,
+  });
+}
+
 function shouldBlockDelegatedNavigationTargets(): void {
   const navigationRoot = document.createElement('div');
   navigationRoot.setAttribute('data-href', '/poll/result');
@@ -166,6 +175,77 @@ function shouldAllowEditingTargets(): void {
   expect(event.defaultPrevented).toBe(false);
 }
 
+function shouldBlockDesignReviewLinksWithoutHidingThemFromThePicker(): void {
+  const link = document.createElement('a');
+  link.href = '/next';
+  link.textContent = 'Next';
+  document.body.appendChild(link);
+  const event = createCancelableClick();
+  const stopImmediatePropagation = vi.spyOn(event, 'stopImmediatePropagation');
+  const pickerListener = vi.fn();
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'design-review');
+  const lockerListener = (capturedEvent: Event) => {
+    routeLockInteractionEvent(capturedEvent, {
+      isFullLockMode: false,
+      isNavigationLocked: true,
+      isUIHidden: false,
+    });
+  };
+  window.addEventListener('click', lockerListener, { capture: true });
+  window.addEventListener('click', pickerListener, { capture: true });
+
+  try {
+    link.dispatchEvent(event);
+  } finally {
+    window.removeEventListener('click', lockerListener, { capture: true });
+    window.removeEventListener('click', pickerListener, { capture: true });
+  }
+
+  expect(event.defaultPrevented).toBe(true);
+  expect(stopImmediatePropagation).not.toHaveBeenCalled();
+  expect(pickerListener).toHaveBeenCalledOnce();
+}
+
+function shouldAllowDesignReviewToPickNonLinkControlsDuringAStaleFullLock(): void {
+  const button = document.createElement('button');
+  document.body.appendChild(button);
+  const event = createCancelableClick();
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'design-review');
+
+  button.dispatchEvent(event);
+  routeLockInteractionEvent(event, {
+    isFullLockMode: true,
+    isNavigationLocked: true,
+    isUIHidden: false,
+  });
+
+  expect(event.defaultPrevented).toBe(false);
+}
+
+function shouldBlockDesignReviewMiddleClickNavigation(): void {
+  const link = document.createElement('a');
+  link.href = '/next';
+  document.body.appendChild(link);
+  const event = createCancelableAuxClick();
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'design-review');
+  const lockerListener = (capturedEvent: Event) => {
+    routeLockInteractionEvent(capturedEvent, {
+      isFullLockMode: false,
+      isNavigationLocked: true,
+      isUIHidden: false,
+    });
+  };
+  window.addEventListener('auxclick', lockerListener, { capture: true });
+
+  try {
+    link.dispatchEvent(event);
+  } finally {
+    window.removeEventListener('auxclick', lockerListener, { capture: true });
+  }
+
+  expect(event.defaultPrevented).toBe(true);
+}
+
 describe('locker routing', () => {
   beforeEach(() => {
     document.body.replaceChildren();
@@ -189,4 +269,13 @@ describe('locker routing', () => {
   it('allows quick-edit text targets', shouldAllowQuickEditTextTargets);
   it('blocks quick-edit interactive targets', shouldBlockQuickEditInteractiveTargets);
   it('allows editing targets', shouldAllowEditingTargets);
+  it(
+    'blocks Design Review links without hiding them from the picker',
+    shouldBlockDesignReviewLinksWithoutHidingThemFromThePicker
+  );
+  it(
+    'allows Design Review to pick non-link controls during a stale full lock',
+    shouldAllowDesignReviewToPickNonLinkControlsDuringAStaleFullLock
+  );
+  it('blocks Design Review middle-click navigation', shouldBlockDesignReviewMiddleClickNavigation);
 });

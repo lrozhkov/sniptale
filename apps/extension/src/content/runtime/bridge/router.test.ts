@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const handleCoreModeMessage = vi.fn();
-const handlePageStyleMessage = vi.fn();
 const handleViewportMessage = vi.fn();
 const handleRegionCaptureMessage = vi.fn();
 const handleRegionOverlayMessage = vi.fn();
@@ -10,10 +9,6 @@ const handleFullPageCaptureMessage = vi.fn();
 
 vi.mock('./core', () => ({
   handleCoreModeMessage,
-}));
-
-vi.mock('./page-style', () => ({
-  handlePageStyleMessage,
 }));
 
 vi.mock('./viewport', () => ({
@@ -78,11 +73,10 @@ describe('createContentRuntimeMessageHandlers', () => {
       fullPageCaptureAgent
     );
 
-    expect(handlers).toHaveLength(6);
+    expect(handlers).toHaveLength(5);
     handlers.forEach((handler) => handler());
 
     expect(handleCoreModeMessage).toHaveBeenCalledWith(message);
-    expect(handlePageStyleMessage).toHaveBeenCalledWith(message, sendResponse);
     expect(handleViewportMessage).toHaveBeenCalledWith(
       message,
       sendResponse,

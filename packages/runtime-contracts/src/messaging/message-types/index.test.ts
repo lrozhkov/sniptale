@@ -12,10 +12,6 @@ describe('shared message contracts', () => {
     expect(MessageType.PROCESS_WITH_LLM).toBe('PROCESS_WITH_LLM');
     expect(MessageType.SCENARIO_GET_SESSION).toBe('SCENARIO_GET_SESSION');
     expect(MessageType.EXPORT_POPUP_RESULT).toBe('EXPORT_POPUP_RESULT');
-    expect(MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY).toBe(
-      'GET_PAGE_STYLE_CURRENT_RULE_SUMMARY'
-    );
-    expect(MessageType.OPEN_PAGE_STYLE_INSPECTOR).toBe('OPEN_PAGE_STYLE_INSPECTOR');
     expect(MessageType.ERASE_LOCAL_EXTENSION_DATA).toBe('ERASE_LOCAL_EXTENSION_DATA');
     expect(MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE).toBe(
       'OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE'

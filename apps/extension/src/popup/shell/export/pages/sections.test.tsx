@@ -43,6 +43,7 @@ const defaultTabs = [
   },
 ];
 const defaultToggleSetters = {
+  setIncludeAnnotations: vi.fn(),
   setIncludeBasicLogs: vi.fn(),
   setIncludeCssDiagnostics: vi.fn(),
   setIncludeFiles: vi.fn(),
@@ -74,6 +75,7 @@ function createReadyProps(
     filterQuery: '',
     filteredTabs: defaultTabs.slice(0, 1),
     hasLoadedPreferences: true,
+    includeAnnotations: false,
     includeBasicLogs: false,
     includeCssDiagnostics: false,
     includeFiles: true,

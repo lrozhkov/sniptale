@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { type QuickActionOverlay } from '../../../../contracts/settings';
@@ -9,13 +9,18 @@ import {
 } from '../../viewport-selector/capability';
 import { handleScreenshotModeMessage } from './screenshot';
 
-const { isLockEnabledMock } = vi.hoisted(() => ({
+const { isLockEnabledMock, teardownSessionMock } = vi.hoisted(() => ({
   isLockEnabledMock: vi.fn(() => false),
+  teardownSessionMock: vi.fn(),
 }));
 
 vi.mock('../../../selection/locker', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../selection/locker')>()),
   isLockEnabled: isLockEnabledMock,
+}));
+
+vi.mock('../../design-review/runtime/session-teardown', () => ({
+  teardownDesignReviewSessionAfterUiTransition: teardownSessionMock,
 }));
 
 function createBridgeParams() {
@@ -35,6 +40,7 @@ function createBridgeParams() {
     modeControls: createModeControls(),
     modeState: {
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       isToolbarVisible: false,
       quickEditMode: false,
@@ -56,9 +62,11 @@ function createBridgeParams() {
 function createModeControls() {
   return {
     disableAiPickMode: vi.fn(),
+    disableDesignReviewMode: vi.fn(),
     disableHighlighterMode: vi.fn(),
     disableQuickEditMode: vi.fn(),
     setAiPickMode: vi.fn(),
+    setDesignReviewMode: vi.fn(),
     setHighlighterMode: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
@@ -195,7 +203,7 @@ function expectPinnedRestorePreservesCollapsedToolbar() {
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
 }
 
-function expectDestroyToolbarInvalidatesInFlightCapture() {
+async function expectDestroyToolbarInvalidatesInFlightCapture() {
   const params = createBridgeParams();
   const sendResponse = vi.fn();
 
@@ -214,7 +222,53 @@ function expectDestroyToolbarInvalidatesInFlightCapture() {
   expect(params.modeControls.setScreenshotMode).toHaveBeenCalledWith(false);
   expect(params.modeControls.setNavigationLockEnabled).toHaveBeenCalledWith(false);
   expect(params.modeControls.setIsToolbarVisible).toHaveBeenCalledWith(false);
+  await vi.runAllTimersAsync();
+  expect(teardownSessionMock).toHaveBeenCalledOnce();
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
+}
+
+async function expectConfirmedDisableClearsPagePreparationSession() {
+  const params = createBridgeParams();
+  params.modeState.designReviewMode = true;
+  params.modeState.screenshotMode = true;
+  const sendResponse = vi.fn();
+
+  expect(
+    handleScreenshotModeMessage(
+      {
+        type: MessageType.DISABLE_SCREENSHOT_MODE,
+      },
+      params,
+      sendResponse
+    )
+  ).toBe(true);
+
+  expect(params.modeControls.disableDesignReviewMode).toHaveBeenCalledOnce();
+  await vi.runAllTimersAsync();
+  expect(teardownSessionMock).toHaveBeenCalledOnce();
+  expect(sendResponse).toHaveBeenCalledWith({ success: true });
+}
+
+async function expectFailedTeardownPreservesLocalModeState() {
+  const params = createBridgeParams();
+  params.modeState.designReviewMode = true;
+  params.modeState.screenshotMode = true;
+  const sendResponse = vi.fn();
+  teardownSessionMock.mockRejectedValueOnce(new Error('stale-target-state'));
+
+  expect(
+    handleScreenshotModeMessage({ type: MessageType.DISABLE_SCREENSHOT_MODE }, params, sendResponse)
+  ).toBe(true);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(params.modeControls.disableDesignReviewMode).not.toHaveBeenCalled();
+  expect(params.modeControls.setScreenshotMode).not.toHaveBeenCalled();
+  expect(params.modeControls.setIsToolbarVisible).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: 'stale-target-state',
+    success: false,
+  });
 }
 
 function runHandleScreenshotModeMessageSuite() {
@@ -237,11 +291,28 @@ function runHandleScreenshotModeMessageSuite() {
     'invalidates in-flight captures when destroying the toolbar',
     expectDestroyToolbarInvalidatesInFlightCapture
   );
+  it(
+    'clears session-only feedback only after authoritative screenshot disable',
+    expectConfirmedDisableClearsPagePreparationSession
+  );
+  it(
+    'preserves local mode state when Design Review teardown cannot restore the page',
+    expectFailedTeardownPreservesLocalModeState
+  );
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.clearAllMocks();
   isLockEnabledMock.mockReturnValue(false);
+  teardownSessionMock.mockImplementation(async (transitionUi: () => void) => {
+    transitionUi();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('handleScreenshotModeMessage', runHandleScreenshotModeMessageSuite);

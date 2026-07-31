@@ -50,11 +50,19 @@ vi.mock('./preauthorization', async (importOriginal) => ({
     hasPreauthorizedPopupTabRouteCapabilityRequestMessageMock,
 }));
 
-async function issueCapability(overrides: Partial<{ requestId: string; tabId: number }> = {}) {
+async function issueCapability(
+  overrides: Partial<{
+    operation:
+      | typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT
+      | typeof MessageType.EXPORT_POPUP_PREVIEW;
+    requestId: string;
+    tabId: number;
+  }> = {}
+) {
   const sendResponse = vi.fn();
   routePopupTabRouteCapabilityRequest(
     {
-      operation: MessageType.EXPORT_POPUP_PREVIEW,
+      operation: overrides.operation ?? MessageType.EXPORT_POPUP_PREVIEW,
       requestId: overrides.requestId ?? 'route-req-1',
       tabId: overrides.tabId ?? 7,
       type: MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY,
@@ -151,6 +159,23 @@ it('consumes matching capabilities once and rejects replay', async () => {
       senderUrl: POPUP_URL,
     })
   ).toThrow('Invalid tab route capability');
+});
+
+it('binds popup launch-intent consumption to its exact operation and rejects replay', async () => {
+  const issued = await issueCapability({
+    operation: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
+  });
+  const message = {
+    tabId: 7,
+    tabRouteCapabilityToken: issued.capabilityToken as string,
+    tabRouteRequestId: 'route-req-1',
+    type: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
+  } as const;
+
+  expect(() => assertPopupTabRouteCapability({ message, senderUrl: POPUP_URL })).not.toThrow();
+  expect(() => assertPopupTabRouteCapability({ message, senderUrl: POPUP_URL })).toThrow(
+    'Invalid tab route capability'
+  );
 });
 
 it('accepts popup senders with document hash when issuing and consuming capabilities', async () => {

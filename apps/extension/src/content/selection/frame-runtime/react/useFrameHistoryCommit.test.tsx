@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
+import type { FrameMutableRef, FrameSetter } from '../contracts';
 import { createFrameDataFixture } from './test-support';
 
 const historyMocks = vi.hoisted(() => ({
@@ -13,7 +14,19 @@ const historyMocks = vi.hoisted(() => ({
   hasOpenTransactions: vi.fn(),
 }));
 
-vi.mock('../../../parser/page-preparation/history', () => ({
+const annotationMocks = vi.hoisted(() => ({
+  captureFailedMutationRollbackPoint: vi.fn(),
+  rollbackFailedMutation: vi.fn(),
+  syncFrames: vi.fn(),
+}));
+
+vi.mock('../../../parser/page-preparation/annotations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../parser/page-preparation/annotations')>()),
+  browserAnnotationSession: annotationMocks,
+}));
+
+vi.mock('../../../parser/page-preparation/history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../parser/page-preparation/history')>()),
   pagePreparationHistory: historyMocks,
 }));
 
@@ -25,17 +38,20 @@ import {
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let latestWithHistoryCommit: ReturnType<typeof useHistoryCommitCoordinator> | null = null;
+let framesRef: FrameMutableRef<FrameData[]>;
+let setFrames: FrameSetter;
 
 function createFrame(id: string): FrameData {
   return createFrameDataFixture(id);
 }
 
-function Harness({ frames }: { frames: FrameData[] }) {
-  latestWithHistoryCommit = useHistoryCommitCoordinator(frames);
+function Harness() {
+  latestWithHistoryCommit = useHistoryCommitCoordinator({ framesRef, setFrames });
   return null;
 }
 
 async function renderHarness(frames: FrameData[]) {
+  framesRef.current = frames;
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -43,7 +59,7 @@ async function renderHarness(frames: FrameData[]) {
   }
 
   await act(async () => {
-    root?.render(<Harness frames={frames} />);
+    root?.render(<Harness />);
   });
 }
 
@@ -72,12 +88,16 @@ describe('frame-manager-history-commit', () => {
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     vi.useFakeTimers();
-    historyMocks.beginDeferredCommit.mockReset();
-    historyMocks.cancelDeferredCommit.mockReset();
-    historyMocks.finalizeDeferredCommit.mockReset();
-    historyMocks.hasOpenTransactions.mockReset();
+    Object.values(historyMocks).forEach((mock) => mock.mockReset());
+    Object.values(annotationMocks).forEach((mock) => mock.mockReset());
     historyMocks.beginDeferredCommit.mockReturnValue(11);
     historyMocks.hasOpenTransactions.mockReturnValue(false);
+    annotationMocks.captureFailedMutationRollbackPoint.mockReturnValue({ point: true });
+    annotationMocks.rollbackFailedMutation.mockReturnValue(true);
+    framesRef = { current: [] };
+    setFrames = vi.fn((update) => {
+      framesRef.current = typeof update === 'function' ? update(framesRef.current) : update;
+    });
   });
 
   afterEach(() => {
@@ -93,54 +113,73 @@ describe('frame-manager-history-commit', () => {
   });
 
   it(
-    'finalizes deferred commits for wrapped actions after the micro-lifecycle tick',
+    'publishes factual frame evidence before finalizing a deferred history commit',
     expectDeferredCommitFinalization
   );
-
   it(
-    'skips deferred commit creation when page-preparation transactions are already open',
+    'publishes evidence inside an already-open explicit transaction without owning it',
     expectOpenTransactionBypass
   );
-
   it('wraps only history-sensitive frame-manager actions', expectHistoryWrappedActions);
+  it('synchronizes frame add, remove, and re-add actions', expectFrameLifecycleSynchronization);
   it(
-    'cancels deferred commits when the wrapped action throws before queueing',
-    expectThrownActionRollback
+    'restores frame and annotation authorities when a mutating action throws',
+    expectActionFailure
+  );
+  it('restores both authorities when the frame producer throws', expectProducerFailure);
+  it('refuses to mutate when no history boundary can be acquired', expectUnavailableHistory);
+  it(
+    'surfaces every compensation failure without hiding the original error',
+    expectRollbackFailures
   );
 });
 
 async function expectDeferredCommitFinalization() {
-  const action = vi.fn();
+  const frame = createFrame('frame-1');
+  const action = vi.fn(() => {
+    framesRef.current = [frame];
+  });
 
-  await renderHarness([createFrame('frame-1')]);
+  await renderHarness([]);
   const wrappedAction = latestWithHistoryCommit?.(action);
   await act(async () => {
-    wrappedAction?.('value' as never);
+    wrappedAction?.();
   });
 
   expect(historyMocks.beginDeferredCommit).toHaveBeenCalledTimes(1);
-  expect(action).toHaveBeenCalledWith('value');
+  expect(annotationMocks.syncFrames).toHaveBeenCalledWith(
+    [expect.objectContaining({ frameId: 'frame-1', kind: 'free' })],
+    ['frame-1']
+  );
   expect(historyMocks.finalizeDeferredCommit).not.toHaveBeenCalled();
 
   await act(async () => {
     await vi.runAllTimersAsync();
   });
 
+  expect(annotationMocks.syncFrames.mock.invocationCallOrder[0]).toBeLessThan(
+    historyMocks.finalizeDeferredCommit.mock.invocationCallOrder[0]!
+  );
   expect(historyMocks.finalizeDeferredCommit).toHaveBeenCalledWith(11);
 }
 
 async function expectOpenTransactionBypass() {
-  const action = vi.fn();
+  const frame = createFrame('frame-1');
+  const action = vi.fn(() => {
+    framesRef.current = [frame];
+  });
   historyMocks.hasOpenTransactions.mockReturnValue(true);
 
-  await renderHarness([createFrame('frame-1')]);
+  await renderHarness([]);
   const wrappedAction = latestWithHistoryCommit?.(action);
-  await act(async () => {
-    wrappedAction?.('value' as never);
-  });
+  wrappedAction?.();
 
   expect(historyMocks.beginDeferredCommit).not.toHaveBeenCalled();
-  expect(action).toHaveBeenCalledWith('value');
+  expect(annotationMocks.syncFrames).toHaveBeenCalledWith(
+    [expect.objectContaining({ frameId: 'frame-1' })],
+    ['frame-1']
+  );
+  expect(historyMocks.cancelDeferredCommit).not.toHaveBeenCalled();
   expect(historyMocks.finalizeDeferredCommit).not.toHaveBeenCalled();
 }
 
@@ -165,15 +204,101 @@ function expectHistoryWrappedActions() {
   expect(wrapped.updateGlobalStepBadgeSettings).toBe(frameManager.updateGlobalStepBadgeSettings);
 }
 
-async function expectThrownActionRollback() {
+async function expectFrameLifecycleSynchronization() {
+  const frame = createFrame('frame-1');
+  historyMocks.beginDeferredCommit
+    .mockReturnValueOnce(11)
+    .mockReturnValueOnce(12)
+    .mockReturnValue(13);
+  await renderHarness([]);
+
+  const setCurrentFrames = latestWithHistoryCommit?.((next: FrameData[]) => {
+    framesRef.current = next;
+  });
+  setCurrentFrames?.([frame]);
+  setCurrentFrames?.([]);
+  setCurrentFrames?.([frame]);
+
+  expect(annotationMocks.syncFrames.mock.calls).toEqual([
+    [[expect.objectContaining({ frameId: 'frame-1' })], ['frame-1']],
+    [[], []],
+    [[expect.objectContaining({ frameId: 'frame-1' })], ['frame-1']],
+  ]);
+}
+
+async function expectActionFailure() {
+  const before = [createFrame('before')];
+  const changed = [createFrame('changed')];
   const action = vi.fn(() => {
+    framesRef.current = changed;
     throw new Error('frame failed');
   });
 
-  await renderHarness([createFrame('frame-1')]);
+  await renderHarness(before);
   const wrappedAction = latestWithHistoryCommit?.(action);
 
   expect(() => wrappedAction?.()).toThrow('frame failed');
+  expect(framesRef.current).toBe(before);
+  expect(setFrames).toHaveBeenCalledWith(before);
   expect(historyMocks.cancelDeferredCommit).toHaveBeenCalledWith(11);
-  expect(historyMocks.finalizeDeferredCommit).not.toHaveBeenCalled();
+  expect(annotationMocks.rollbackFailedMutation).toHaveBeenCalledWith({ point: true });
+  expect(annotationMocks.syncFrames).not.toHaveBeenCalled();
+}
+
+async function expectProducerFailure() {
+  const before = [createFrame('before')];
+  const changed = [createFrame('changed')];
+  annotationMocks.syncFrames.mockImplementationOnce(() => {
+    throw new Error('producer failed');
+  });
+
+  await renderHarness(before);
+  const wrappedAction = latestWithHistoryCommit?.(() => {
+    framesRef.current = changed;
+  });
+
+  expect(() => wrappedAction?.()).toThrow('producer failed');
+  expect(framesRef.current).toBe(before);
+  expect(historyMocks.cancelDeferredCommit).toHaveBeenCalledWith(11);
+  expect(annotationMocks.rollbackFailedMutation).toHaveBeenCalledWith({ point: true });
+}
+
+async function expectUnavailableHistory() {
+  const action = vi.fn();
+  historyMocks.beginDeferredCommit.mockReturnValue(null);
+  await renderHarness([]);
+
+  const wrappedAction = latestWithHistoryCommit?.(action);
+
+  expect(() => wrappedAction?.()).toThrow('Frame history transaction is unavailable');
+  expect(action).not.toHaveBeenCalled();
+  expect(annotationMocks.captureFailedMutationRollbackPoint).not.toHaveBeenCalled();
+  expect(annotationMocks.syncFrames).not.toHaveBeenCalled();
+}
+
+async function expectRollbackFailures() {
+  historyMocks.cancelDeferredCommit.mockImplementationOnce(() => {
+    throw new Error('cancel failed');
+  });
+  setFrames = vi.fn(() => {
+    throw new Error('frame rollback failed');
+  });
+  annotationMocks.rollbackFailedMutation.mockImplementationOnce(() => {
+    throw new Error('annotation rollback failed');
+  });
+  await renderHarness([]);
+  const wrappedAction = latestWithHistoryCommit?.(() => {
+    throw new Error('original failure');
+  });
+
+  let failure: unknown;
+  try {
+    wrappedAction?.();
+  } catch (error) {
+    failure = error;
+  }
+
+  expect(failure).toBeInstanceOf(AggregateError);
+  expect((failure as AggregateError).errors).toHaveLength(4);
+  expect((failure as AggregateError).errors[0]).toMatchObject({ message: 'original failure' });
 }

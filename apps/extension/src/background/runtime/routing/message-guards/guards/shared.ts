@@ -53,7 +53,6 @@ export type ScenarioMessage =
 
 export type BackgroundTabMessage =
   | RouteCaptureMessage
-  | BackgroundPageStyleMessage
   | ScenarioMessage
   | PopupExportViewerMessage
   | TabModeMessage
@@ -64,11 +63,8 @@ export type PopupExportViewerMessage =
   | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_START]
   | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
   | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]
-  | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_CANCEL];
-
-type BackgroundPageStyleMessage =
-  | RuntimeRequestByType[typeof MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY]
-  | RuntimeRequestByType[typeof MessageType.OPEN_PAGE_STYLE_INSPECTOR];
+  | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_CANCEL]
+  | RuntimeRequestByType[typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT];
 
 export type RuntimeMessageEnvelope = {
   type: string;

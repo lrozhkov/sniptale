@@ -28,11 +28,13 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let currentProps: {
   aiPickMode: boolean;
+  designReviewMode?: boolean;
   highlighterMode: boolean;
   quickEditMode: boolean;
 } | null = null;
 let latestSetters: {
   setAiPickModeSpy: Mock<(enabled: boolean) => void>;
+  setDesignReviewModeSpy: Mock<(enabled: boolean) => void>;
   setHighlighterModeSpy: Mock<(enabled: boolean) => void>;
   setQuickEditDocumentModeSpy: Mock<(enabled: boolean) => void>;
   setQuickEditModeSpy: Mock<(enabled: boolean) => void>;
@@ -41,9 +43,11 @@ let latestSetters: {
 function Harness() {
   useModeDisabledListener({
     aiPickMode: currentProps?.aiPickMode ?? false,
+    designReviewMode: currentProps?.designReviewMode ?? false,
     highlighterMode: currentProps?.highlighterMode ?? false,
     quickEditMode: currentProps?.quickEditMode ?? false,
     setAiPickMode: (enabled) => latestSetters?.setAiPickModeSpy(enabled),
+    setDesignReviewMode: (enabled) => latestSetters?.setDesignReviewModeSpy(enabled),
     setHighlighterMode: (enabled) => latestSetters?.setHighlighterModeSpy(enabled),
     setQuickEditDocumentMode: (enabled) => latestSetters?.setQuickEditDocumentModeSpy(enabled),
     setQuickEditMode: (enabled) => latestSetters?.setQuickEditModeSpy(enabled),
@@ -53,12 +57,14 @@ function Harness() {
 
 function renderHarness(props: {
   aiPickMode: boolean;
+  designReviewMode?: boolean;
   highlighterMode: boolean;
   quickEditMode: boolean;
 }) {
   currentProps = props;
   latestSetters = {
     setAiPickModeSpy: vi.fn<(enabled: boolean) => void>(),
+    setDesignReviewModeSpy: vi.fn<(enabled: boolean) => void>(),
     setHighlighterModeSpy: vi.fn<(enabled: boolean) => void>(),
     setQuickEditDocumentModeSpy: vi.fn<(enabled: boolean) => void>(),
     setQuickEditModeSpy: vi.fn<(enabled: boolean) => void>(),

@@ -7,6 +7,7 @@ import type { PopupExportPreferenceSetters, PopupExportSelection } from '../../s
 
 function createSetters(): PopupExportPreferenceSetters {
   return {
+    setIncludeAnnotations: vi.fn(),
     setIncludeBasicLogs: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
@@ -20,6 +21,7 @@ function createSetters(): PopupExportPreferenceSetters {
 
 async function verifyLoadedPreferences() {
   const loadPreferences = vi.fn().mockResolvedValue({
+    includeAnnotations: true,
     includeBasicLogs: true,
     includeCssDiagnostics: false,
     includeFiles: true,
@@ -44,10 +46,12 @@ async function verifyLoadedPreferences() {
   await Promise.resolve();
 
   expect(setters.setIncludeBasicLogs).toHaveBeenCalledWith(true);
+  expect(setters.setIncludeAnnotations).toHaveBeenCalledWith(true);
   expect(setters.setIncludeJson).toHaveBeenCalledWith(false);
   expect(loadPreferences).toHaveBeenCalledTimes(1);
   expect(loadedRef.current).toBe(true);
   expect(committedPreferencesRef.current).toEqual({
+    includeAnnotations: true,
     includeBasicLogs: true,
     includeCssDiagnostics: false,
     includeFiles: true,

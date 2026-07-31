@@ -41,10 +41,6 @@ vi.mock('../../sections/quick-actions', () => ({
   QuickActionsSection: () => 'quickactions',
 }));
 
-vi.mock('../../sections/page-styles', () => ({
-  PageStylesSection: () => 'pageStyles',
-}));
-
 vi.mock('../../sections/permissions', () => ({
   PermissionsSection: () => 'permissions',
 }));
@@ -61,18 +57,6 @@ import {
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
-
-function setRulesUiFlag(value: boolean | undefined) {
-  if (value === undefined) {
-    Reflect.deleteProperty(globalThis, '__ENABLE_PAGE_STYLE_RULES__');
-    return;
-  }
-
-  Object.defineProperty(globalThis, '__ENABLE_PAGE_STYLE_RULES__', {
-    configurable: true,
-    value,
-  });
-}
 
 async function render(node: React.ReactNode) {
   if (!container) {
@@ -91,7 +75,6 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
-  setRulesUiFlag(undefined);
 });
 
 describe('settings page section registry', () => {
@@ -109,9 +92,9 @@ describe('settings page section registry', () => {
   it('preloads deferred settings tabs and resolves the editor lazy section', async () => {
     await preloadDeferredSettingsSections();
 
-    await render(<Suspense fallback="loading">{renderSettingsTabContent('pageStyles')}</Suspense>);
+    await render(<Suspense fallback="loading">{renderSettingsTabContent('editor')}</Suspense>);
 
-    expect(container?.textContent).toBe('pageStyles');
+    expect(container?.textContent).toBe('editor');
   });
 
   it('preloads and resolves the privacy lazy section', async () => {
@@ -120,21 +103,5 @@ describe('settings page section registry', () => {
     await render(<Suspense fallback="loading">{renderSettingsTabContent('privacy')}</Suspense>);
 
     expect(container?.textContent).toBe('privacy');
-  });
-
-  it('falls back from the hidden page style rules section in release-gated mode', async () => {
-    vi.resetModules();
-    setRulesUiFlag(false);
-    const releaseSections = await import('./sections');
-
-    expect(releaseSections.shouldDeferSettingsTab('pageStyles')).toBe(false);
-    await releaseSections.preloadDeferredSettingsSections();
-    await render(
-      <Suspense fallback="loading">
-        {releaseSections.renderSettingsTabContent('pageStyles')}
-      </Suspense>
-    );
-
-    expect(container?.textContent).toBe('appearance');
   });
 });

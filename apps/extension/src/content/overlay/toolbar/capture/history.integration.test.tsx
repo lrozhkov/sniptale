@@ -9,6 +9,7 @@ import {
   pagePreparationHistory,
   type FrameSessionSnapshot,
   type PagePreparationHistoryBridge,
+  type PagePreparationSessionSnapshot,
 } from '../../../parser/page-preparation/history';
 import { clearAllSniptaleIds } from '../../../platform/frame';
 import { createQuickEditHistoryTracker } from '../../../selection/quick-edit-runtime/history';
@@ -24,7 +25,7 @@ vi.mock('./local-save', () => ({
   ToolbarLocalSaveControl: () => null,
 }));
 
-function createSnapshot(): FrameSessionSnapshot {
+function createFrameSnapshot(): FrameSessionSnapshot {
   return {
     frames: [],
     globalEffectMode: 'border',
@@ -35,6 +36,20 @@ function createSnapshot(): FrameSessionSnapshot {
     sessionFocusSettings: { opacity: 0.5, showBorder: false },
     sessionStepBadgeTemplate: null,
     stepBadgeOrder: [],
+  };
+}
+
+function createSnapshot(): PagePreparationSessionSnapshot {
+  return {
+    annotations: {
+      domRecords: [],
+      frameOrders: [],
+      nextAnnotationId: 1,
+      nextMarkerNumber: 1,
+      nextCreationOrder: 1,
+      schemaVersion: 1,
+    },
+    frameSession: createFrameSnapshot(),
   };
 }
 

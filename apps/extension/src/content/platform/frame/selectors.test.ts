@@ -13,8 +13,6 @@ vi.mock('./core', () => coreMocks);
 
 import {
   createCompositeSelector,
-  findElementByCompositeSelector,
-  findElementBySelector,
   getElementSelector,
   getIframeSelector,
   parseCompositeSelector,
@@ -52,9 +50,33 @@ describe('iframe selector generation', () => {
     document.body.append(byDataAttribute);
     expect(getIframeSelector(byDataAttribute)).toBe('iframe[data-application-code="case-view"]');
 
+    const byHostileDataAttribute = document.createElement('iframe');
+    byHostileDataAttribute.setAttribute('data-application-code', 'case => view"\\\n');
+    document.body.append(byHostileDataAttribute);
+    const hostileSelector = getIframeSelector(byHostileDataAttribute);
+    expect(hostileSelector).not.toContain('case => view');
+    expect(document.querySelectorAll(hostileSelector)).toHaveLength(1);
+    expect(document.querySelector(hostileSelector)).toBe(byHostileDataAttribute);
+
     const byIndex = document.createElement('iframe');
     document.body.append(byIndex);
-    expect(getIframeSelector(byIndex)).toBe('iframe:nth-of-type(4)');
+    expect(getIframeSelector(byIndex)).toBe('iframe:nth-of-type(5)');
+  });
+
+  it('escapes CSS-special custom-element ancestors in structural iframe selectors', () => {
+    const firstHost = document.createElement('x-frame.host');
+    const secondHost = document.createElement('x-frame.host');
+    const first = document.createElement('iframe');
+    const second = document.createElement('iframe');
+    firstHost.append(first);
+    secondHost.append(second);
+    document.body.append(firstHost, secondHost);
+
+    const selector = getIframeSelector(second);
+
+    expect(selector).toContain('x-frame\\.host');
+    expect(document.querySelectorAll(selector)).toHaveLength(1);
+    expect(document.querySelector(selector)).toBe(second);
   });
 });
 
@@ -62,10 +84,12 @@ describe('element selector generation', () => {
   it('builds element selectors from smart ids, unique classes, and path fallback', () => {
     const sniptaleElement = document.createElement('div');
     sniptaleElement.dataset['sniptaleId'] = 'smart-1';
+    document.body.append(sniptaleElement);
     expect(getElementSelector(sniptaleElement)).toBe('[data-sniptale-id="smart-1"]');
 
     const byId = document.createElement('button');
     byId.id = 'save:button';
+    document.body.append(byId);
     expect(getElementSelector(byId)).toBe('#save\\:button');
 
     const uniqueClass = document.createElement('button');
@@ -81,7 +105,7 @@ describe('element selector generation', () => {
     section.append(row);
     document.body.append(section);
 
-    expect(getElementSelector(text)).toBe('section > div > span');
+    expect(getElementSelector(text)).toBe('span.bad\\:selector');
   });
 });
 
@@ -93,6 +117,7 @@ describe('composite selector serialization', () => {
 
     const element = document.createElement('button');
     element.id = 'primary-action';
+    document.body.append(element);
     coreMocks.getContainingIframe.mockReturnValue(iframe);
 
     expect(createCompositeSelector(element)).toEqual({
@@ -110,78 +135,20 @@ describe('composite selector serialization', () => {
       })
     ).toBe('iframe#content-frame => #primary-action');
   });
-});
 
-describe('iframe selector composite lookup', () => {
-  it('finds composite selectors and warns on missing or inaccessible iframes', () => {
-    expect(
-      findElementByCompositeSelector({
-        iframeSelector: 'iframe#missing',
-        elementSelector: '.target',
-      })
-    ).toBeNull();
+  it('round-trips composite selectors when iframe metadata contains the grammar delimiter', () => {
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('data-application-code', 'case => view"\\\n');
+    document.body.append(iframe);
+    const element = document.createElement('button');
+    element.id = 'primary-action';
+    document.body.append(element);
+    coreMocks.getContainingIframe.mockReturnValue(iframe);
 
-    const blockedIframe = document.createElement('iframe');
-    blockedIframe.id = 'blocked';
-    document.body.append(blockedIframe);
-    coreMocks.isIframeAccessible.mockReturnValueOnce(false);
+    const composite = createCompositeSelector(element);
+    const serialized = serializeCompositeSelector(composite);
 
-    expect(
-      findElementByCompositeSelector({
-        iframeSelector: 'iframe#blocked',
-        elementSelector: '.target',
-      })
-    ).toBeNull();
-
-    const accessibleIframe = document.createElement('iframe');
-    accessibleIframe.id = 'ok';
-    const iframeDocument = document.implementation.createHTMLDocument('iframe');
-    const target = iframeDocument.createElement('button');
-    target.className = 'target';
-    iframeDocument.body.append(target);
-    Object.defineProperty(accessibleIframe, 'contentDocument', {
-      configurable: true,
-      value: iframeDocument,
-    });
-    document.body.append(accessibleIframe);
-
-    expect(
-      findElementByCompositeSelector({
-        iframeSelector: 'iframe#ok',
-        elementSelector: '.target',
-      })
-    ).toBe(target);
-    expect(console.warn).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe('iframe selector nested lookup', () => {
-  it('finds selectors in the top document and nested iframe documents', () => {
-    const topLevel = document.createElement('div');
-    topLevel.className = 'top-level-target';
-    document.body.append(topLevel);
-
-    expect(findElementBySelector('.top-level-target')).toBe(topLevel);
-
-    const outerIframe = document.createElement('iframe');
-    const nestedIframe = document.createElement('iframe');
-    const outerDocument = document.implementation.createHTMLDocument('outer');
-    const nestedDocument = document.implementation.createHTMLDocument('nested');
-    const nestedTarget = nestedDocument.createElement('button');
-    nestedTarget.className = 'nested-target';
-    nestedDocument.body.append(nestedTarget);
-    outerDocument.body.append(nestedIframe);
-
-    coreMocks.getAccessibleIframes.mockImplementation((rootDoc: Document = document) =>
-      rootDoc === document ? [outerIframe] : [nestedIframe]
-    );
-    coreMocks.getIframeDocument.mockImplementation((iframe) => {
-      if (iframe === outerIframe) return outerDocument;
-      if (iframe === nestedIframe) return nestedDocument;
-      return null;
-    });
-    coreMocks.isIframeAccessible.mockReturnValue(true);
-
-    expect(findElementBySelector('.nested-target')).toBe(nestedTarget);
+    expect(serialized.split(' => ')).toHaveLength(2);
+    expect(parseCompositeSelector(serialized)).toEqual(composite);
   });
 });

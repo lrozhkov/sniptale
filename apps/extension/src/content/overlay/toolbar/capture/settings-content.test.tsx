@@ -57,12 +57,16 @@ function createMenuRef() {
 }
 
 function renderSettingsDropdown(params?: {
+  onDisableScreenshotMode?: (activationEvent?: Event) => void;
   pinToTab?: boolean;
   pinToTabAvailable?: boolean;
   pinToTabLocked?: boolean;
 }) {
   ensureContainer();
   const onPinToTabChange = vi.fn();
+  const onDisableScreenshotMode = vi.fn((activationEvent?: Event) =>
+    params?.onDisableScreenshotMode?.(activationEvent)
+  );
 
   act(() => {
     root?.render(
@@ -73,7 +77,7 @@ function renderSettingsDropdown(params?: {
         onClose={() => undefined}
         onCompactMenusChange={() => undefined}
         onDisplayModeChange={() => undefined}
-        onDisableScreenshotMode={() => undefined}
+        onDisableScreenshotMode={onDisableScreenshotMode}
         onHide={() => undefined}
         onPinToTabChange={onPinToTabChange}
         pinToTab={params?.pinToTab ?? false}
@@ -86,7 +90,7 @@ function renderSettingsDropdown(params?: {
     );
   });
 
-  return { onPinToTabChange };
+  return { onDisableScreenshotMode, onPinToTabChange };
 }
 
 function renderSettingsDropdownNearSidebar() {
@@ -175,6 +179,18 @@ describe('ToolbarSettingsDropdown', () => {
 
     expect(onPinToTabChange).toHaveBeenCalledWith(true, { kind: 'trusted-content-event' });
     expect(createTrustedContentActionIntentSource).toHaveBeenCalledOnce();
+  });
+
+  it('preserves the native exit gesture for screenshot capability recovery', () => {
+    const { onDisableScreenshotMode } = renderSettingsDropdown();
+    const exitButton = findButton('content.toolbar.screenshotDisable');
+
+    act(() => {
+      exitButton?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    });
+
+    expect(onDisableScreenshotMode).toHaveBeenCalledOnce();
+    expect(onDisableScreenshotMode.mock.calls[0]?.[0]).toBeInstanceOf(MouseEvent);
   });
 
   it('disables the pin-to-tab toggle when scenario mode locks it', () => {

@@ -53,7 +53,6 @@ it('keeps privileged runtime authorization policies discoverable from one regist
     'offscreen-runtime',
     'popup-export-tab-route',
     'privileged-tab-route:capture',
-    'privileged-tab-route:page-style',
     'privileged-tab-route:scenario',
     'privileged-tab-route:tab-mode',
     'privileged-tab-route:video-control',

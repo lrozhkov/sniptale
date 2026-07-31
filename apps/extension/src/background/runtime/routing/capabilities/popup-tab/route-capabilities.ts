@@ -46,6 +46,7 @@ const popupTabRouteOperations = new Set<string>([
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,
+  MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {

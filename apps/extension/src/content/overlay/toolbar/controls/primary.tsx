@@ -12,6 +12,7 @@ export function ToolbarPrimaryControls(props: {
   const modeButtonProps = {
     isCursorMode: toolbarProps.isCursorMode ?? true,
     aiPickMode: toolbarProps.aiPickMode ?? false,
+    designReviewMode: toolbarProps.designReviewMode ?? false,
     compactMenus: viewModel.derivedState.compactMenus,
     displayMode: viewModel.derivedState.displayMode,
     sidebarVisible: toolbarProps.scenario?.sidebarVisible ?? false,
@@ -22,12 +23,6 @@ export function ToolbarPrimaryControls(props: {
     ...(typeof viewModel.pendingInteractionMode === 'undefined'
       ? {}
       : { pendingMode: viewModel.pendingInteractionMode }),
-    ...(typeof toolbarProps.pageStyleInspector === 'undefined'
-      ? {}
-      : {
-          pageStyleInspectorOpen: toolbarProps.pageStyleInspector.open,
-          onTogglePageStyleInspector: toolbarProps.pageStyleInspector.onToggle,
-        }),
     ...(typeof toolbarProps.onEnableCursorMode === 'undefined'
       ? {}
       : { onEnableCursorMode: toolbarProps.onEnableCursorMode }),
@@ -35,6 +30,7 @@ export function ToolbarPrimaryControls(props: {
       ? {}
       : { onDisableAiPickMode: toolbarProps.onDisableAiPickMode }),
     onAiPickContentStart: toolbarProps.onAiPickContentStart,
+    onToggleDesignReview: () => toolbarProps.onToggleDesignReviewMode(!viewModel.designReviewMode),
     onToggleQuickEditDocumentMode: toolbarProps.onToggleQuickEditDocumentMode,
     onToggleQuickEdit: () => void viewModel.toggleMode('quickedit'),
     onToggleHighlighter: () => {

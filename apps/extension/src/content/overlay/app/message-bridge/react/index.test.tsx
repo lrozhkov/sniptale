@@ -49,6 +49,7 @@ function createRuntimeBridgeParams(): ContentRuntimeBridgeParams {
     invalidateScreenshotRuns: vi.fn(),
     modeControls: {
       setAiPickMode: vi.fn(),
+      setDesignReviewMode: vi.fn(),
       setHighlighterMode: vi.fn(),
       setIsToolbarVisible: vi.fn(),
       setNavigationLockEnabled: vi.fn(),
@@ -58,6 +59,7 @@ function createRuntimeBridgeParams(): ContentRuntimeBridgeParams {
     },
     modeFlags: {
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       quickEditDocumentMode: false,
       quickEditMode: false,

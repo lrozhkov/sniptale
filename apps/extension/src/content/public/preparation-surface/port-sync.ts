@@ -2,6 +2,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import { disableAiPickModeIfLoaded } from '../../../content/overlay/ai/pick/runtime/lazy';
 import { disableHighlighterMode } from '../../../content/selection/highlighter';
 import { disableQuickEditMode } from '../../../content/selection/quick-edit';
+import { disableDesignReviewMode } from '../../../content/selection/design-review';
 import {
   buildContentModeControls,
   buildContentModeFlags,
@@ -11,10 +12,7 @@ import {
 } from '../../../content/overlay/app/view-state/helpers';
 import { handleScreenshotModeMessage } from '../../../content/overlay/app/message-bridge/message-helpers';
 import type { ContentPrivilegedActionIntentSource } from '../../../content/application/privileged-action-intent';
-import type {
-  RuntimeMessageBridgeParams,
-  RuntimeMessageResponse,
-} from '../../../content/overlay/app/message-bridge/types';
+import type { RuntimeMessageBridgeParams } from '../../../content/overlay/app/message-bridge/types';
 import type { ScreenshotStartContext } from '../../../content/overlay/screenshot/types';
 import type { ContentAppModeState } from '../../../content/overlay/app/mode';
 import {
@@ -26,23 +24,27 @@ import type { PreparationPortConnector } from './types';
 function handlePreparationPortCommand(
   command: ViewerPreparationCommand,
   bridgeParamsRef: MutableRefObject<RuntimeMessageBridgeParams>
-): void {
+): Promise<void> {
   if (command.type === PREPARATION_SURFACE_RESIZE) {
     bridgeParamsRef.current.viewport.setCurrentViewport(command.viewport ?? null);
-    return;
+    return Promise.resolve();
   }
 
-  let response: RuntimeMessageResponse | undefined;
-  const handled = handleScreenshotModeMessage(command, bridgeParamsRef.current, (nextResponse) => {
-    response = nextResponse;
+  return new Promise((resolve, reject) => {
+    const handled = handleScreenshotModeMessage(command, bridgeParamsRef.current, (response) => {
+      if (response?.['success'] === false) {
+        const error = response['error'];
+        reject(
+          new Error(typeof error === 'string' ? error : 'Web snapshot viewer preparation failed.')
+        );
+        return;
+      }
+      resolve();
+    });
+    if (!handled) {
+      reject(new Error('Unsupported web snapshot viewer preparation command.'));
+    }
   });
-  if (!handled) {
-    throw new Error('Unsupported web snapshot viewer preparation command.');
-  }
-  if (response?.['success'] === false) {
-    const error = response['error'];
-    throw new Error(typeof error === 'string' ? error : 'Web snapshot viewer preparation failed.');
-  }
 }
 
 function createPreparationBridgeParams(
@@ -65,6 +67,7 @@ function createPreparationBridgeParams(
     modeControls: {
       ...buildContentModeControls(modeState),
       disableAiPickMode: disableAiPickModeIfLoaded,
+      disableDesignReviewMode,
       disableHighlighterMode,
       disableQuickEditMode,
     },
@@ -104,8 +107,9 @@ export function usePreparationSurfacePortSync(
   );
 
   useEffect(() => {
-    return connectPort(async (command: ViewerPreparationCommand) => {
-      handlePreparationPortCommand(command, bridgeParamsRef);
-    }, onPopupExportRequest);
+    return connectPort(
+      (command: ViewerPreparationCommand) => handlePreparationPortCommand(command, bridgeParamsRef),
+      onPopupExportRequest
+    );
   }, [connectPort, onPopupExportRequest]);
 }

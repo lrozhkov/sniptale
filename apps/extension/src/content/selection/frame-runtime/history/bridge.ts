@@ -5,6 +5,7 @@ import {
   hydrateFrameSessionSnapshot,
   type PagePreparationHistoryBridge,
 } from '../../../parser/page-preparation/history';
+import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import { getFrameSessionBorderPreset, setFrameSessionBorderPreset } from '../session/border-preset';
 
@@ -14,7 +15,8 @@ export function applyHistorySnapshotToFrameManager(args: {
   setFrameStates: FrameStateSetter;
   snapshot: ReturnType<PagePreparationHistoryBridge['captureSnapshot']>;
 }) {
-  const { frames, stepBadgeOrder } = hydrateFrameSessionSnapshot(args.snapshot);
+  const frameSnapshot = args.snapshot.frameSession;
+  const { frames, stepBadgeOrder } = hydrateFrameSessionSnapshot(frameSnapshot);
   const nextFrameStates = new Map<string, FrameState>(frames.map((frame) => [frame.id, 'idle']));
 
   args.refs.framesRef.current = frames;
@@ -23,24 +25,24 @@ export function applyHistorySnapshotToFrameManager(args: {
   args.refs.prevFrameStatesRef.current = nextFrameStates;
   args.refs.hostLayoutServiceRef.current.restoreFrames(frames);
   args.refs.stepBadgeOrderRef.current = stepBadgeOrder;
-  args.refs.globalEffectModeRef.current = args.snapshot.globalEffectMode;
-  args.refs.globalStepBadgeSettingsRef.current = { ...args.snapshot.globalStepBadgeSettings };
-  args.refs.globalStepBadgeAutoModeRef.current = args.snapshot.globalStepBadgeSettings.autoMode;
-  setFrameSessionBorderPreset(args.snapshot.sessionBorderPreset);
-  args.refs.sessionSettingsRefs.blurSettings.current = { ...args.snapshot.sessionBlurSettings };
+  args.refs.globalEffectModeRef.current = frameSnapshot.globalEffectMode;
+  args.refs.globalStepBadgeSettingsRef.current = { ...frameSnapshot.globalStepBadgeSettings };
+  args.refs.globalStepBadgeAutoModeRef.current = frameSnapshot.globalStepBadgeSettings.autoMode;
+  setFrameSessionBorderPreset(frameSnapshot.sessionBorderPreset);
+  args.refs.sessionSettingsRefs.blurSettings.current = { ...frameSnapshot.sessionBlurSettings };
   args.refs.sessionSettingsRefs.defaultsInitialized.current = true;
-  args.refs.sessionSettingsRefs.focusSettings.current = { ...args.snapshot.sessionFocusSettings };
-  args.refs.sessionStepBadgeTemplateRef.current = args.snapshot.sessionStepBadgeTemplate
+  args.refs.sessionSettingsRefs.focusSettings.current = { ...frameSnapshot.sessionFocusSettings };
+  args.refs.sessionStepBadgeTemplateRef.current = frameSnapshot.sessionStepBadgeTemplate
     ? {
-        ...args.snapshot.sessionStepBadgeTemplate,
-        offsetDirections: [...(args.snapshot.sessionStepBadgeTemplate.offsetDirections ?? [])],
-        ...(args.snapshot.sessionStepBadgeTemplate.manualPlacement
-          ? { manualPlacement: { ...args.snapshot.sessionStepBadgeTemplate.manualPlacement } }
+        ...frameSnapshot.sessionStepBadgeTemplate,
+        offsetDirections: [...(frameSnapshot.sessionStepBadgeTemplate.offsetDirections ?? [])],
+        ...(frameSnapshot.sessionStepBadgeTemplate.manualPlacement
+          ? { manualPlacement: { ...frameSnapshot.sessionStepBadgeTemplate.manualPlacement } }
           : {}),
       }
     : null;
-  args.refs.sessionCalloutStyleRef.current = args.snapshot.sessionCalloutStyle
-    ? { ...args.snapshot.sessionCalloutStyle }
+  args.refs.sessionCalloutStyleRef.current = frameSnapshot.sessionCalloutStyle
+    ? { ...frameSnapshot.sessionCalloutStyle }
     : null;
 
   useFrameUIStore.getState().reset();
@@ -61,9 +63,11 @@ export function createPagePreparationHistoryBridge(args: {
         setFrameStates: args.setFrameStates,
         snapshot,
       });
+      browserAnnotationSession.applySnapshot(snapshot.annotations);
     },
-    captureSnapshot: () =>
-      captureFrameSessionSnapshot({
+    captureSnapshot: () => ({
+      annotations: browserAnnotationSession.captureSnapshot(),
+      frameSession: captureFrameSessionSnapshot({
         frames: args.refs.framesRef.current,
         globalEffectMode: args.refs.globalEffectModeRef.current,
         globalStepBadgeSettings: args.refs.globalStepBadgeSettingsRef.current,
@@ -74,6 +78,7 @@ export function createPagePreparationHistoryBridge(args: {
         sessionStepBadgeTemplate: args.refs.sessionStepBadgeTemplateRef.current,
         stepBadgeOrder: args.refs.stepBadgeOrderRef.current,
       }),
+    }),
     onHistoryCleared: () => args.refs.hostLayoutServiceRef.current.retireHistoryBindings(),
     onHistoryReachabilityChanged: (frameIds) =>
       args.refs.hostLayoutServiceRef.current.retireHistoryBindings(frameIds),

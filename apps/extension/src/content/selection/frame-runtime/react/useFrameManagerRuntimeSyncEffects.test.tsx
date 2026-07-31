@@ -29,7 +29,8 @@ vi.mock('../manager/runtime-mutations', () => ({
   createRuntimeHistoryWrappedMutations: mocks.createRuntimeHistoryWrappedMutations,
 }));
 
-vi.mock('./useFrameManagerRefs', () => ({
+vi.mock('./useFrameManagerRefs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./useFrameManagerRefs')>()),
   syncFrameManagerStateRefs: mocks.syncFrameManagerStateRefs,
   useFrameContainer: mocks.useFrameContainer,
   useFrameManagerRefs: mocks.useFrameManagerRefs,

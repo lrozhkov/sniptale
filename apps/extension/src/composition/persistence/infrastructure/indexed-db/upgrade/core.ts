@@ -17,7 +17,6 @@ import {
   WEB_SNAPSHOTS_STORE,
 } from '../core.stores.ts';
 import { applyStateManagerStoreUpgrade } from './core.state-manager.ts';
-import { applyPageStyleAssetsStoreUpgrade } from './core.page-style.ts';
 import { applyEditorCustomShapesStoreUpgrade } from './core.editor-custom-shapes.ts';
 import { applyVideoEffectBundlesStoreUpgrade } from './core.video-effect-bundles.ts';
 import { applyNativeTransferStoresUpgrade } from './core.native-transfer.ts';
@@ -35,13 +34,13 @@ export function handleDatabaseUpgrade(db: UpgradeDatabase, oldVersion: number) {
   applyVersion10Changes(db, oldVersion);
   applyVersion11Changes(db, oldVersion);
   applyVersion12Changes(db, oldVersion);
-  applyPageStyleAssetsStoreUpgrade(db, oldVersion);
   applyEditorCustomShapesStoreUpgrade(db, oldVersion);
   applyVideoEffectBundlesStoreUpgrade(db, oldVersion);
   applyStateManagerStoreUpgrade(db, oldVersion);
   applyNativeTransferStoresUpgrade(db, oldVersion);
   applyProjectExportInputsStoreUpgrade(db, oldVersion);
   removeLegacyAnnotationPacksStore(db, oldVersion);
+  removeRetiredPageStyleAssetsStore(db, oldVersion);
 }
 
 function applyVersion1Changes(db: UpgradeDatabase, oldVersion: number) {
@@ -208,4 +207,12 @@ function removeLegacyAnnotationPacksStore(db: UpgradeDatabase, oldVersion: numbe
   }
 
   db.deleteObjectStore('annotation_packs');
+}
+
+function removeRetiredPageStyleAssetsStore(db: UpgradeDatabase, oldVersion: number) {
+  if (oldVersion >= 22 || !db.objectStoreNames.contains('page_style_assets')) {
+    return;
+  }
+
+  db.deleteObjectStore('page_style_assets');
 }

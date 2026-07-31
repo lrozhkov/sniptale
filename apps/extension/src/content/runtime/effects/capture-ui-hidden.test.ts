@@ -64,6 +64,8 @@ it('hides transient app UI during screenshot capture without hiding captured ann
     '.sniptale-step-badge-controls',
     '.sniptale-free-frame-draft-portal',
     '.sniptale-quick-edit-hover',
+    '.sniptale-annotation-marker-tooltip',
+    '.sniptale-annotation-marker-drag-handle',
   ].forEach(expectCaptureHiddenSelector);
 
   expect(captureHiddenSelectors).not.toContain(
@@ -83,5 +85,8 @@ it('hides transient app UI during screenshot capture without hiding captured ann
   );
   expect(captureHiddenSelectors).not.toContain(
     ':host(.sniptale-capture-ui-hidden) .sniptale-focus-overlay'
+  );
+  expect(captureHiddenSelectors).not.toContain(
+    ':host(.sniptale-capture-ui-hidden) .sniptale-annotation-marker-layer'
   );
 });

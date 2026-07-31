@@ -23,6 +23,40 @@ function createLegacyTree(): ParsedDOMTree {
   };
 }
 
+function createMixedSectionTree(): ParsedDOMTree {
+  return {
+    context: 'generic-host',
+    title: 'Mixed sections',
+    structure: [
+      createSection('section-populated', 'Populated', [
+        {
+          type: 'field',
+          id: 'block-populated-field-1',
+          label: 'Text 1',
+          value: 'Existing content',
+          valueType: 'string',
+          contentRole: 'paragraph',
+        },
+      ]),
+      createSection('section-empty', 'Empty', []),
+    ],
+    blocks: [
+      {
+        id: 'block-populated',
+        sectionId: 'section-populated',
+        kind: 'paragraph',
+        text: 'Existing content',
+      },
+      {
+        id: 'block-empty',
+        sectionId: 'section-empty',
+        kind: 'paragraph',
+        text: 'Recovered content',
+      },
+    ],
+  };
+}
+
 function createDuplicateGwtTree(): ParsedDOMTree {
   return {
     context: 'naumen',
@@ -195,6 +229,15 @@ describe('normalizeLegacyTree', () => {
     );
 
     expect(documentData.meta?.url).toBe('https://legacy.example/path');
+  });
+
+  it('hydrates only empty section shells without duplicating populated field ids', () => {
+    const documentData = normalizeLegacyTree(createMixedSectionTree(), PROFILE);
+    const populated = documentData.structure.find(({ id }) => id === 'section-populated');
+    const recovered = documentData.structure.find(({ id }) => id === 'section-empty');
+
+    expect(populated?.children.map(({ id }) => id)).toEqual(['block-populated-field-1']);
+    expect(recovered?.children.map(({ id }) => id)).toEqual(['block-empty-field-1']);
   });
 
   it(

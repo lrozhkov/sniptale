@@ -97,6 +97,7 @@ function createBindingsProps() {
     InteractiveFrameComponent,
     modeControls: {
       setAiPickMode: vi.fn(),
+      setDesignReviewMode: vi.fn(),
       setHighlighterMode: vi.fn(),
       setIsToolbarVisible: vi.fn(),
       setQuickEditDocumentMode: vi.fn(),
@@ -104,6 +105,7 @@ function createBindingsProps() {
     },
     modeFlags: {
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       quickEditDocumentMode: false,
       quickEditMode: false,
@@ -151,23 +153,6 @@ async function expectStableShowToolbarCallback() {
 
   expect(props.modeControls.setIsToolbarVisible).not.toHaveBeenCalled();
   expect(props.visibilityState.setPinnedToolbarVisible).toHaveBeenCalledWith(true);
-}
-
-async function expectPagePreparationHistoryReset() {
-  const props = createBindingsProps();
-
-  await renderBindings(props);
-  expect(clearHistoryMock).not.toHaveBeenCalled();
-
-  await renderBindings({
-    ...props,
-    modeFlags: {
-      ...props.modeFlags,
-      screenshotMode: false,
-    },
-  });
-
-  expect(clearHistoryMock).toHaveBeenCalledTimes(1);
 }
 
 async function expectLatestFrameManagerCallbackRouting() {
@@ -295,10 +280,6 @@ function runUseContentAppBindingsSuite() {
   it(
     'passes a stable show-toolbar callback across parent rerenders',
     expectStableShowToolbarCallback
-  );
-  it(
-    'clears page-preparation history when screenshot mode exits',
-    expectPagePreparationHistoryReset
   );
   it(
     'registers frame callbacks once and routes them through the latest frame-manager actions',

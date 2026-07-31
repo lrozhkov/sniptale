@@ -1,6 +1,7 @@
 import { disableAiPickModeIfLoaded } from '../../ai/pick/runtime/lazy';
 import { disableHighlighterMode } from '../../../selection/highlighter';
 import { disableQuickEditDocumentMode, disableQuickEditMode } from '../../../selection/quick-edit';
+import { disableDesignReviewMode } from '../../../selection/design-review';
 import type { ContentAppModeState } from '../mode';
 import { useAiPickController } from '../../ai/pick/controller';
 import type { ContentCoreControllers } from '../view-state/types';
@@ -22,7 +23,11 @@ interface ContentAppControllerDependencies {
 
 function useContentScenarioController(modeState: ContentAppModeStateValue) {
   return useScenarioController({
-    autoClickBlocked: modeState.aiPickMode || modeState.highlighterMode || modeState.quickEditMode,
+    autoClickBlocked:
+      modeState.aiPickMode ||
+      modeState.designReviewMode ||
+      modeState.highlighterMode ||
+      modeState.quickEditMode,
     captureActionRef: modeState.captureActionRef,
     navigationLockEnabled: modeState.navigationLockEnabled,
     screenshotMode: modeState.screenshotMode,
@@ -51,10 +56,12 @@ function useContentAiController(
 function useContentToolbarModeController(modeState: ContentAppModeStateValue) {
   return useToolbarModeController({
     aiPickMode: modeState.aiPickMode,
+    designReviewMode: modeState.designReviewMode,
     disableAiPickMode: disableAiPickModeDeferred,
     highlighterMode: modeState.highlighterMode,
     quickEditMode: modeState.quickEditMode,
     setAiPickMode: modeState.setAiPickMode,
+    setDesignReviewMode: modeState.setDesignReviewMode,
     setHighlighterMode: modeState.setHighlighterMode,
     setIsToolbarVisible: modeState.setIsToolbarVisible,
     setNavigationLockEnabled: modeState.setNavigationLockEnabled,
@@ -77,7 +84,9 @@ function useContentScreenshotController(
     captureActionRef,
     editingModes: {
       aiPickMode: modeState.aiPickMode,
+      designReviewMode: modeState.designReviewMode,
       disableAiPickMode: disableAiPickModeDeferred,
+      disableDesignReviewMode,
       disableHighlighterMode,
       disableQuickEditMode: () => {
         disableQuickEditDocumentMode();
@@ -87,6 +96,7 @@ function useContentScreenshotController(
       highlighterMode: modeState.highlighterMode,
       quickEditMode: modeState.quickEditMode,
       setAiPickMode: modeState.setAiPickMode,
+      setDesignReviewMode: modeState.setDesignReviewMode,
       setHighlighterMode: modeState.setHighlighterMode,
       setQuickEditMode: modeState.setQuickEditMode,
     },

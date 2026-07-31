@@ -30,10 +30,6 @@ export const CAPTURE_PRIVILEGED_TAB_POLICY_STATE_IDS = [
   'content-action-trusted-event-proofs',
 ] as const satisfies readonly PolicyStateId[];
 
-export const PAGE_STYLE_PRIVILEGED_TAB_POLICY_STATE_IDS = [
-  'page-access-tab-activation',
-] as const satisfies readonly PolicyStateId[];
-
 export const SCENARIO_PRIVILEGED_TAB_POLICY_STATE_IDS = [
   'tab-mode-runtime-state',
 ] as const satisfies readonly PolicyStateId[];

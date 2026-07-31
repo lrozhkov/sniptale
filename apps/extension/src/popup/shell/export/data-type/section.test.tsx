@@ -19,6 +19,7 @@ let root: Root | null = null;
 function createProps(overrides: Partial<SectionProps> = {}): SectionProps {
   return {
     disabled: false,
+    includeAnnotations: false,
     includeBasicLogs: false,
     includeCssDiagnostics: false,
     includeFiles: false,
@@ -32,6 +33,7 @@ function createProps(overrides: Partial<SectionProps> = {}): SectionProps {
     onClose: vi.fn(),
     onOpen: vi.fn(),
     setIncludeBasicLogs: vi.fn(),
+    setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),
@@ -97,6 +99,31 @@ it('renders selected summary items and opens the drawer', async () => {
   expect(props.onOpen).toHaveBeenCalledOnce();
 });
 
+it('allocates the full five-row collapsed summary instead of clipping the last item', async () => {
+  await renderSection({
+    includeAnnotations: true,
+    includeBasicLogs: true,
+    includeCssDiagnostics: true,
+    includeFiles: true,
+    includeFullPageScreenshot: true,
+    includeHarDomLogs: true,
+    includeImages: true,
+    includeJson: true,
+    includeMarkdown: true,
+    isOpen: false,
+  });
+
+  const editButton = findButton('t:popup.export.editButton');
+  const summaryBody = document.getElementById(editButton.getAttribute('aria-controls') ?? '');
+  const summary = summaryBody?.querySelector('[data-testid="export-data-type-summary"]');
+
+  expect(summary?.children).toHaveLength(9);
+  expect(summary?.className).toContain('grid-cols-2');
+  expect(Math.ceil((summary?.children.length ?? 0) / 2)).toBe(5);
+  expect(summaryBody?.className).toContain('max-h-[140px]');
+  expect(summaryBody?.className).not.toContain('max-h-[132px]');
+});
+
 it('selects only visible inactive options and renders the empty filter state', async () => {
   const setIncludeJson = vi.fn<SectionProps['setIncludeJson']>();
   const props = await renderSection({ setIncludeJson });
@@ -126,6 +153,7 @@ it('clears selected options and forwards row toggles in disabled presentation', 
   const setIncludeJson = vi.fn<SectionProps['setIncludeJson']>();
   const props = await renderSection({
     disabled: true,
+    includeAnnotations: true,
     includeBasicLogs: true,
     includeCssDiagnostics: true,
     includeFiles: true,

@@ -30,6 +30,15 @@ export type CaptureRouteContext = {
 
 export type RouteCaptureMessage =
   | {
+      type: 'DOWNLOAD_BROWSER_ANNOTATIONS';
+      text: string;
+      contentIntent?: ContentPrivilegedActionCapability;
+    }
+  | {
+      type: 'OPEN_EXPORT_MODAL';
+      contentIntent?: ContentPrivilegedActionCapability;
+    }
+  | {
       type: 'CAPTURE_VISIBLE';
       actionType?: CaptureActionType;
       contentIntent?: ContentPrivilegedActionCapability;

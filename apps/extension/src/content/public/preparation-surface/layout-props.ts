@@ -93,11 +93,16 @@ function projectPreparationToolbar(
     frameCount: frameManager.frames.length,
     handleTakeScreenshot: controllers.screenshotController.handleTakeScreenshot,
     isCompletelyHidden: modeState.isCompletelyHidden,
-    isCursorMode: !modeState.highlighterMode && !modeState.quickEditMode && !modeState.aiPickMode,
+    isCursorMode:
+      !modeState.highlighterMode &&
+      !modeState.quickEditMode &&
+      !modeState.aiPickMode &&
+      !modeState.designReviewMode,
     isToolbarVisible: modeState.isToolbarVisible,
     modeController: controllers.modeController,
     modes: {
       aiPickMode: modeState.aiPickMode,
+      designReviewMode: modeState.designReviewMode,
       highlighterMode: modeState.highlighterMode,
       quickEditDocumentMode: modeState.quickEditDocumentMode,
       quickEditMode: modeState.quickEditMode,

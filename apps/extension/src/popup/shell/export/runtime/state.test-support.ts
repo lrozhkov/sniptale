@@ -35,6 +35,7 @@ function createRuntimeSessionState(): Pick<
 function createRuntimeToggleState(): Pick<
   PopupExportRuntimeContract,
   | 'hasLoadedPreferences'
+  | 'includeAnnotations'
   | 'includeBasicLogs'
   | 'includeCssDiagnostics'
   | 'includeFiles'
@@ -44,6 +45,7 @@ function createRuntimeToggleState(): Pick<
   | 'includeJson'
   | 'includeMarkdown'
   | 'setIncludeBasicLogs'
+  | 'setIncludeAnnotations'
   | 'setIncludeCssDiagnostics'
   | 'setIncludeFiles'
   | 'setIncludeFullPageScreenshot'
@@ -54,6 +56,7 @@ function createRuntimeToggleState(): Pick<
 > {
   return {
     hasLoadedPreferences: true,
+    includeAnnotations: false,
     includeBasicLogs: false,
     includeCssDiagnostics: false,
     includeFiles: true,
@@ -63,6 +66,7 @@ function createRuntimeToggleState(): Pick<
     includeJson: true,
     includeMarkdown: true,
     setIncludeBasicLogs: vi.fn(),
+    setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),

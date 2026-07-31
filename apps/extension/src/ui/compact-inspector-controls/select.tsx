@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
 import { CompactSelectMenu } from './select-menu';
 import { CompactSelectTrigger } from './select-trigger';
 import { useCompactSelectController } from '@sniptale/ui/compact-inspector-controls/select-controller';
+import { FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
 import { cx } from './shared';
 import type { CompactSelectOption } from '@sniptale/ui/compact-inspector-controls/select-types';
 export type { CompactSelectOption } from '@sniptale/ui/compact-inspector-controls/select-types';
@@ -55,6 +56,7 @@ function CompactSelectBody<T extends string>({
     <div
       ref={select.refs.containerRef}
       data-ui={props.dataUi ?? 'shared.ui.compact-select'}
+      {...{ [FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE]: menuId }}
       className={cx('relative w-full min-w-0 max-w-full', props.containerClassName)}
     >
       <CompactSelectTriggerView menuId={menuId} props={props} select={select} />
@@ -128,6 +130,7 @@ function CompactSelectMenuView<T extends string>({
   return (
     <CompactSelectMenu
       menuId={menuId}
+      ownerId={menuId}
       menuRef={select.refs.menuRef}
       options={props.options}
       optionRefs={select.refs.optionRefs}

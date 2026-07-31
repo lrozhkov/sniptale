@@ -6,14 +6,20 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AutoBlurController } from '../auto-blur/controller';
 import type { ContentAppLayoutProps } from './types';
 
-const { contentDialogStackMock, contentToolbarShellMock, pageStyleInspectorSurfaceMock } =
-  vi.hoisted(() => ({
+const { contentDialogStackMock, contentToolbarShellMock, designReviewSurfaceMock } = vi.hoisted(
+  () => ({
     contentDialogStackMock: vi.fn(() => <div data-ui="content.layout.dialogs" />),
     contentToolbarShellMock: vi.fn(() => <div data-ui="content.layout.toolbar" />),
-    pageStyleInspectorSurfaceMock: vi.fn(() => (
-      <div data-ui="content.layout.page-style-inspector" />
+    designReviewSurfaceMock: vi.fn((props: { showChrome: boolean }) => (
+      <div
+        data-show-chrome={props.showChrome ? 'true' : 'false'}
+        data-ui="content.layout.design-review"
+      >
+        <div data-ui="content.annotation-markers" />
+      </div>
     )),
-  }));
+  })
+);
 
 vi.mock('./dialogs', () => ({
   ContentDialogStack: () => contentDialogStackMock(),
@@ -28,9 +34,9 @@ vi.mock('./toolbar', () => ({
   ContentToolbarShell: () => contentToolbarShellMock(),
 }));
 
-vi.mock('../page-style-inspector/view', () => ({
-  PageStyleInspectorSurface: () => pageStyleInspectorSurfaceMock(),
-  usePageStyleInspectorController: () => ({
+vi.mock('../design-review/view', () => ({
+  DesignReviewSurface: (props: { showChrome: boolean }) => designReviewSurfaceMock(props),
+  useDesignReviewController: () => ({
     actions: {},
     inspectorOpen: false,
     toggleInspector: vi.fn(),
@@ -143,6 +149,7 @@ function createToolbarProps(
       handleClearHighlights: vi.fn(),
       handleEnableCursorMode: vi.fn(),
       handleHideToolbar: vi.fn(),
+      handleToggleDesignReviewMode: vi.fn(),
       handleToggleHighlighterMode: vi.fn(),
       handleToggleNavigationLock: vi.fn(),
       handleToggleQuickEditDocumentMode: vi.fn(),
@@ -151,6 +158,7 @@ function createToolbarProps(
     },
     modes: {
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       quickEditDocumentMode: true,
       quickEditMode: true,
@@ -211,9 +219,12 @@ it('hides dialog and inspector app chrome while capture UI is completely hidden'
   await renderLayout(props);
 
   expect(contentDialogStackMock).not.toHaveBeenCalled();
-  expect(pageStyleInspectorSurfaceMock).not.toHaveBeenCalled();
+  expect(designReviewSurfaceMock).toHaveBeenCalledWith(
+    expect.objectContaining({ showChrome: false })
+  );
   expect(container?.querySelector('[data-ui="content.layout.dialogs"]')).toBeNull();
-  expect(container?.querySelector('[data-ui="content.layout.page-style-inspector"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="content.layout.design-review"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).not.toBeNull();
 
   await renderLayout({
     ...props,
@@ -224,9 +235,31 @@ it('hides dialog and inspector app chrome while capture UI is completely hidden'
   });
 
   expect(contentDialogStackMock).toHaveBeenCalledTimes(1);
-  expect(pageStyleInspectorSurfaceMock).toHaveBeenCalledTimes(1);
+  expect(designReviewSurfaceMock).toHaveBeenCalledTimes(2);
+  expect(designReviewSurfaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ showChrome: true })
+  );
   expect(container?.querySelector('[data-ui="content.layout.dialogs"]')).not.toBeNull();
-  expect(
-    container?.querySelector('[data-ui="content.layout.page-style-inspector"]')
-  ).not.toBeNull();
+  expect(container?.querySelector('[data-ui="content.layout.design-review"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).not.toBeNull();
+});
+
+it('removes the marker surface when the screenshot session exits', async () => {
+  const props = createControllerProps();
+
+  await renderLayout(props);
+  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).not.toBeNull();
+
+  await renderLayout({
+    ...props,
+    toolbar: {
+      ...props.toolbar,
+      modes: {
+        ...props.toolbar.modes,
+        screenshotMode: false,
+      },
+    },
+  });
+
+  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).toBeNull();
 });

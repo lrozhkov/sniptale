@@ -11,7 +11,6 @@ const EXPECTED_STAGE_3_FLOW_IDS = [
   'editor-bootstrap',
   'offscreen-command',
   'page-access-activation',
-  'page-style-runtime',
   'popup-export',
   'privacy-erasure',
   'project-export',

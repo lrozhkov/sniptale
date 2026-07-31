@@ -9,9 +9,11 @@ const logger = createLogger({ namespace: 'ContentModeDisabledListener' });
 
 interface UseModeDisabledListenerParams {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   highlighterMode: boolean;
   quickEditMode: boolean;
   setAiPickMode: (enabled: boolean) => void;
+  setDesignReviewMode: (enabled: boolean) => void;
   setHighlighterMode: (enabled: boolean) => void;
   setQuickEditDocumentMode: (enabled: boolean) => void;
   setQuickEditMode: (enabled: boolean) => void;
@@ -32,6 +34,11 @@ function handleContentModeDisabled(snapshot: ContentModeDisabledSnapshot, mode: 
     return;
   }
 
+  if (mode === 'design-review' && snapshot.designReviewMode) {
+    snapshot.setDesignReviewMode(false);
+    return;
+  }
+
   if (mode === 'quick-edit') {
     snapshot.setQuickEditDocumentMode(false);
     if (snapshot.quickEditMode) {
@@ -41,6 +48,10 @@ function handleContentModeDisabled(snapshot: ContentModeDisabledSnapshot, mode: 
 }
 
 function handleContentModeEnabled(snapshot: ContentModeDisabledSnapshot, mode: string) {
+  if (mode === 'design-review' && !snapshot.designReviewMode) {
+    snapshot.setDesignReviewMode(true);
+    return;
+  }
   if (mode === 'quick-edit' && !snapshot.quickEditMode) {
     snapshot.setQuickEditMode(true);
   }
@@ -48,18 +59,22 @@ function handleContentModeEnabled(snapshot: ContentModeDisabledSnapshot, mode: s
 
 export function useModeDisabledListener({
   aiPickMode,
+  designReviewMode,
   highlighterMode,
   quickEditMode,
   setAiPickMode,
+  setDesignReviewMode,
   setHighlighterMode,
   setQuickEditDocumentMode,
   setQuickEditMode,
 }: UseModeDisabledListenerParams): void {
   const snapshotRef = useRef<ContentModeDisabledSnapshot>({
     aiPickMode,
+    designReviewMode,
     highlighterMode,
     quickEditMode,
     setAiPickMode,
+    setDesignReviewMode,
     setHighlighterMode,
     setQuickEditDocumentMode,
     setQuickEditMode,
@@ -67,9 +82,11 @@ export function useModeDisabledListener({
 
   snapshotRef.current = {
     aiPickMode,
+    designReviewMode,
     highlighterMode,
     quickEditMode,
     setAiPickMode,
+    setDesignReviewMode,
     setHighlighterMode,
     setQuickEditDocumentMode,
     setQuickEditMode,

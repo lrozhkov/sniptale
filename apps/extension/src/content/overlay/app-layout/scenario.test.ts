@@ -24,6 +24,7 @@ it('treats highlighter, quick edit, and ai-pick as by-click blockers', () => {
   expect(
     isScenarioByClickBlocked({
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       quickEditMode: false,
     })
@@ -32,6 +33,7 @@ it('treats highlighter, quick edit, and ai-pick as by-click blockers', () => {
   expect(
     isScenarioByClickBlocked({
       aiPickMode: true,
+      designReviewMode: false,
       highlighterMode: false,
       quickEditMode: false,
     })
@@ -40,6 +42,7 @@ it('treats highlighter, quick edit, and ai-pick as by-click blockers', () => {
   expect(
     isScenarioByClickBlocked({
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: true,
       quickEditMode: false,
     })
@@ -48,6 +51,7 @@ it('treats highlighter, quick edit, and ai-pick as by-click blockers', () => {
   expect(
     isScenarioByClickBlocked({
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       quickEditMode: true,
     })

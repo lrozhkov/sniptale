@@ -24,6 +24,7 @@ import {
 import type { useFrameManager } from '../../../content/selection/frame-runtime/react/useFrameManager';
 import { InteractiveFrame } from '../../../content/selection/interactive-frame';
 import { disableQuickEditMode } from '../../../content/selection/quick-edit';
+import { disableDesignReviewMode } from '../../../content/selection/design-review';
 import {
   createPreparationLayoutProjection,
   type PreparationSurfaceControllers,
@@ -125,7 +126,9 @@ function usePreparationScreenshotController(
     captureActionRef: modeState.captureActionRef,
     editingModes: {
       aiPickMode: modeState.aiPickMode,
+      designReviewMode: modeState.designReviewMode,
       disableAiPickMode: aiController.handleDisableAiPickMode,
+      disableDesignReviewMode,
       disableHighlighterMode: () => {
         disableHighlighterMode();
         modeState.setHighlighterMode(false);
@@ -137,6 +140,7 @@ function usePreparationScreenshotController(
       highlighterMode: modeState.highlighterMode,
       quickEditMode: modeState.quickEditMode,
       setAiPickMode: modeState.setAiPickMode,
+      setDesignReviewMode: modeState.setDesignReviewMode,
       setHighlighterMode: modeState.setHighlighterMode,
       setQuickEditMode: modeState.setQuickEditMode,
     },
@@ -198,7 +202,11 @@ function usePreparationScenarioController(args: {
 }): PreparationSurfaceControllers['scenarioController'] {
   const { captureAdapter, modeState, ports } = args;
   return useScenarioController({
-    autoClickBlocked: modeState.aiPickMode || modeState.highlighterMode || modeState.quickEditMode,
+    autoClickBlocked:
+      modeState.aiPickMode ||
+      modeState.designReviewMode ||
+      modeState.highlighterMode ||
+      modeState.quickEditMode,
     captureActionRef: modeState.captureActionRef,
     navigationLockEnabled: modeState.navigationLockEnabled,
     screenshotMode: modeState.screenshotMode,
@@ -239,6 +247,7 @@ function usePreparationControllers(
   const modeController = useToolbarModeController({
     ...buildContentModeControls(modeState),
     aiPickMode: modeState.aiPickMode,
+    designReviewMode: modeState.designReviewMode,
     disableAiPickMode: disableAiPickModeIfLoaded,
     highlighterMode: modeState.highlighterMode,
     quickEditMode: modeState.quickEditMode,
@@ -274,8 +283,10 @@ function usePreparationCaptureSync(
 }
 
 function usePreparationModeState(): ContentAppModeState {
+  const { controls, flags } = useContentModeFlags();
   return {
-    ...useContentModeFlags(),
+    ...flags,
+    ...controls,
     ...useContentSurfaceState(),
   };
 }

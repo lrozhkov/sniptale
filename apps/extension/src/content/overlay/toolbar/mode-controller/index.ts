@@ -4,10 +4,12 @@ import { createToolbarStaticHandlers } from './static';
 
 export function useToolbarModeController({
   aiPickMode,
+  designReviewMode,
   disableAiPickMode,
   highlighterMode,
   quickEditMode,
   setAiPickMode,
+  setDesignReviewMode,
   setHighlighterMode,
   setIsToolbarVisible,
   setNavigationLockEnabled,
@@ -17,10 +19,12 @@ export function useToolbarModeController({
 }: UseToolbarModeControllerParams): UseToolbarModeControllerResult {
   const editingHandlers = createToolbarEditingHandlers({
     aiPickMode,
+    designReviewMode,
     disableAiPickMode,
     highlighterMode,
     quickEditMode,
     setAiPickMode,
+    setDesignReviewMode,
     setHighlighterMode,
     setIsToolbarVisible,
     setNavigationLockEnabled,
@@ -35,6 +39,7 @@ export function useToolbarModeController({
     handleEnableCursorMode: editingHandlers.handleEnableCursorMode,
     handleHideToolbar: staticHandlers.handleHideToolbar,
     handleToggleHighlighterMode: editingHandlers.handleToggleHighlighterMode,
+    handleToggleDesignReviewMode: editingHandlers.handleToggleDesignReviewMode,
     handleToggleNavigationLock: staticHandlers.handleToggleNavigationLock,
     handleToggleQuickEditDocumentMode: editingHandlers.handleToggleQuickEditDocumentMode,
     handleToggleQuickEditMode: editingHandlers.handleToggleQuickEditMode,

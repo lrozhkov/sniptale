@@ -19,7 +19,7 @@
     {
       "category": "bundled-font",
       "path": "apps/extension/vite.config.ts",
-      "sha256": "74cd4ef56937fba031f8dd7b443338e804db7759533b953b16491a1c29ea0eef"
+      "sha256": "fa463a3b5599a876008ecac770ff24e947bd43da5e5185cb18ee844438fc9e51"
     },
     {
       "category": "archive-integration",

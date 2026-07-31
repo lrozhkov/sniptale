@@ -24,7 +24,7 @@ import type {
 import type { ToolbarMenuState } from '../state/menu';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
 import { PopoverCheckIcon } from '../../icons/icons';
-import { resolveToolbarDropdownState, ToolbarMenuDropdown } from './dropdown.shared';
+import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
 
 type FullPageMenuProps = {
   compactMenus: boolean;

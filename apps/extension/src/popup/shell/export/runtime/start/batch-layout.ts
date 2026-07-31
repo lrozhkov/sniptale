@@ -4,7 +4,10 @@ export type PopupBatchArchiveLayout = 'grouped' | 'flat';
 
 function hasOnlyFlatEligibleOptions(selection: PopupExportSelection): boolean {
   const hasFlatEligibleSelection =
-    selection.includeJson || selection.includeMarkdown || selection.includeFullPageScreenshot;
+    selection.includeAnnotations ||
+    selection.includeJson ||
+    selection.includeMarkdown ||
+    selection.includeFullPageScreenshot;
   const hasNonEligibleSelection =
     selection.includeFiles ||
     selection.includeImages ||

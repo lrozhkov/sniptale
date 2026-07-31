@@ -5,7 +5,7 @@ import {
 } from '../event-bus';
 
 type ModeDisabledDetail = {
-  mode: 'ai-pick' | 'highlighter' | 'quick-edit';
+  mode: 'ai-pick' | 'design-review' | 'highlighter' | 'quick-edit';
 };
 
 const MODE_DISABLED_EVENT = 'sniptale-mode-disabled';

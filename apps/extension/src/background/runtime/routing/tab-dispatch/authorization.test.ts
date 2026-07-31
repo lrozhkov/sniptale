@@ -13,7 +13,6 @@ import {
   resetRuntimeMessagingMocks,
   routeScenarioMessageMock,
   routeTabModeMessageMock,
-  sendTabMessageMock,
 } from '../../../../../../../tooling/test/support/background-runtime-messaging.test-support';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 
@@ -64,21 +63,5 @@ it('rejects unknown extension-page senders before privileged tab route handlers'
   expect(scenarioResponse).toHaveBeenCalledWith({
     success: false,
     error: 'Unauthorized scenario route sender',
-  });
-});
-
-it('rejects non-popup extension pages before page-style content dispatch', async () => {
-  const { listener, sendResponse } = registerListener();
-  const message = { tabId: 71, type: MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY };
-  parseBackgroundRuntimeMessageMock.mockReturnValue(message);
-  isBackgroundTabMessageMock.mockReturnValue(true);
-
-  expectListenerResult(true, listener, message, createSender(71, SETTINGS_URL), sendResponse);
-  await flushPromises();
-
-  expect(sendTabMessageMock).not.toHaveBeenCalled();
-  expect(sendResponse).toHaveBeenCalledWith({
-    success: false,
-    error: 'Unauthorized page-style route sender',
   });
 });

@@ -12,7 +12,10 @@ export {
   walkAllDocuments,
 } from './core';
 export { mountStyleInAccessibleDocuments } from './documents';
-export { addEventListenerToAllWindowsDynamic } from './listeners';
+export {
+  addEventListenerToAllWindowsDynamic,
+  addWindowEventListenerToAllWindowsDynamic,
+} from './listeners';
 export {
   createDocumentPagePlacement,
   getDocumentViewportBounds,
@@ -23,11 +26,17 @@ export {
 } from './page-placement';
 export { waitForAccessibleIframeReady, type AccessibleIframeReadyResult } from './ready';
 export { addScrollListenersToAllWindows } from './scroll-listeners';
-export { findElementBySelector } from './selectors';
+export { findElementBySelector, findHtmlElementBySelector } from './selectors';
 export {
   clearAllSniptaleIds,
   clearRetainedSniptaleIds,
   findElementBySniptaleId,
+  getSniptaleIdCleanupGeneration,
+  releaseSniptaleId,
   retainSniptaleId,
 } from './sniptale';
-export { resolveIframeEventTarget } from './target';
+export {
+  resolveIframeEventElement,
+  resolveIframeEventTarget,
+  resolveIframePointTarget,
+} from './target';

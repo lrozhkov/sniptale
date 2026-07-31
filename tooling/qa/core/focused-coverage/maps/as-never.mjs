@@ -37,16 +37,6 @@ export const AS_NEVER_REMOVAL_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'content-page-style-inspector-controls',
-    productionFile:
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/helpers.tsx',
-    reason: 'Page-style inspector control summaries are covered by focused inspector UI suites.',
-    testFiles: [
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/sections/sections.test.tsx',
-    ],
-  },
-  {
     owner: 'editor-raster-metadata',
     productionFile: 'apps/extension/src/editor/controller/raster/object/metadata.ts',
     reason: 'Raster replacement metadata copy behavior is covered by raster object owner tests.',

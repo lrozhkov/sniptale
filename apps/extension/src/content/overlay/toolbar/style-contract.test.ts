@@ -77,6 +77,10 @@ const interactiveFrameToolbarSectionsSource = readFileSync(
   new URL('../../selection/interactive-frame/toolbar/sections.tsx', import.meta.url),
   'utf8'
 );
+const designReviewPopoverSource = readFileSync(
+  new URL('../design-review/popover/view.tsx', import.meta.url),
+  'utf8'
+);
 
 function expectActiveAccentContract(): void {
   expect(toolbarStylesheet).toContain('color: var(--sniptale-color-accent);');
@@ -229,6 +233,21 @@ it('keeps the main screenshot toolbar size contract aligned with the frame toolt
 
 it('keeps toolbar menu surfaces, items, and status badges on canonical owners', () => {
   expectToolbarMenuContract();
+});
+
+it('keeps toolbar menus above the Design Review comment popover', () => {
+  const menuLayer = Number(
+    toolbarMenuSurfaceStylesheet.match(/\.sniptale-popover-menu\s*\{[^}]*z-index:\s*(\d+);/su)?.[1]
+  );
+  const openToolbarRootLayer = Number(
+    toolbarMenuSurfaceStylesheet.match(
+      /\.sniptale-app:has\(\.sniptale-toolbar \.sniptale-popover-menu\)\s*\{[^}]*z-index:\s*(\d+);/su
+    )?.[1]
+  );
+  const commentPopoverLayer = Number(designReviewPopoverSource.match(/z-\[(\d+)\]/u)?.[1]);
+
+  expect(menuLayer).toBeGreaterThan(commentPopoverLayer);
+  expect(openToolbarRootLayer).toBeGreaterThan(commentPopoverLayer);
 });
 
 it('disables the legacy quick-edit outline once the active frame owns the border', () => {

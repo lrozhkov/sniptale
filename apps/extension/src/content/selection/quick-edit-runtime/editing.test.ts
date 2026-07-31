@@ -8,10 +8,18 @@ const mocks = vi.hoisted(() => ({
   cancelEditableElement: vi.fn(),
   captureDomStateMap: vi.fn(() => new Map([['before', new Map()]])),
   clearEditableElementState: vi.fn(),
-  commitTransaction: vi.fn(),
-  createDomMutationBatch: vi.fn(() => ({ changed: true })),
+  commitTransaction: vi.fn(() => true),
+  createDomMutationBatch: vi.fn((elements: Iterable<HTMLElement>) => ({
+    patches: Array.from(elements, (target) => ({
+      after: { attributes: {}, html: target.innerHTML },
+      before: { attributes: {}, html: target.innerHTML },
+      changed: true,
+      locator: '#target',
+      target,
+    })),
+  })),
   finishEditableElement: vi.fn(),
-  beginTransaction: vi.fn(),
+  beginTransaction: vi.fn(() => true),
   cancelTransaction: vi.fn(),
   loggerLog: vi.fn(),
 }));
@@ -51,9 +59,11 @@ import { createQuickEditEditingActions } from './editing';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  document.body.replaceChildren();
+  mocks.beginTransaction.mockReturnValue(true);
+  mocks.commitTransaction.mockReturnValue(true);
   mocks.buildEditableElementRecord.mockReturnValue({ editable: true });
   mocks.captureDomStateMap.mockReturnValue(new Map([['before', new Map()]]));
-  mocks.createDomMutationBatch.mockReturnValue({ changed: true });
   mocks.activateEditableElement.mockImplementation((element: HTMLElement, id: string) => {
     element.dataset['sniptaleEditableId'] = id;
   });
@@ -89,6 +99,7 @@ function createOverlayActions() {
 
 it('makes an element editable and starts a quick-edit history transaction', () => {
   const element = document.createElement('div');
+  document.body.append(element);
   const editingElements = new Map();
   const overlayActions = createOverlayActions();
   const actions = createQuickEditEditingActions({
@@ -122,6 +133,7 @@ it('makes an element editable and starts a quick-edit history transaction', () =
 
 it('wires overlay callbacks and link-click suppression into editable activation', () => {
   const element = document.createElement('div');
+  document.body.append(element);
   const overlayActions = createOverlayActions();
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
@@ -154,6 +166,7 @@ it('wires overlay callbacks and link-click suppression into editable activation'
 
 it('finishes editing and commits the captured DOM mutation batch', () => {
   const element = document.createElement('div');
+  document.body.append(element);
   const overlayActions = createOverlayActions();
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
@@ -183,12 +196,13 @@ it('finishes editing and commits the captured DOM mutation batch', () => {
   );
   expect(mocks.createDomMutationBatch).toHaveBeenCalledWith([element], expect.any(Map));
   expect(mocks.commitTransaction).toHaveBeenCalledWith(`quick-edit:${editableId}`, {
-    changed: true,
+    patches: [expect.objectContaining({ changed: true })],
   });
 });
 
 it('passes clear-state callbacks that reuse owner-local overlay wiring', () => {
   const element = document.createElement('div');
+  document.body.append(element);
   const overlayActions = createOverlayActions();
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
@@ -262,6 +276,7 @@ it('cancels editing and skips history cancellation when no editable id is presen
 
 it('cancels and commits quick-edit history only when an editable id exists', () => {
   const element = document.createElement('div');
+  document.body.append(element);
   const overlayActions = createOverlayActions();
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
@@ -281,6 +296,7 @@ it('cancels and commits quick-edit history only when an editable id exists', () 
 
 it('reuses the same child-link suppressor for activation and clear-state callbacks', () => {
   const element = document.createElement('div');
+  document.body.append(element);
   const overlayActions = createOverlayActions();
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),

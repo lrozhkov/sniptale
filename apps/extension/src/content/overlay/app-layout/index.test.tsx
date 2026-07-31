@@ -85,6 +85,7 @@ function createModeController() {
     handleClearHighlights: vi.fn(),
     handleEnableCursorMode: vi.fn(),
     handleHideToolbar: vi.fn(),
+    handleToggleDesignReviewMode: vi.fn(),
     handleToggleHighlighterMode: vi.fn(),
     handleToggleNavigationLock: vi.fn(),
     handleToggleQuickEditDocumentMode: vi.fn(),
@@ -182,6 +183,7 @@ function createProps() {
       modeController: createModeController(),
       modes: {
         aiPickMode: false,
+        designReviewMode: false,
         highlighterMode: false,
         quickEditDocumentMode: false,
         quickEditMode: false,
@@ -241,10 +243,13 @@ async function verifiesLayoutComposition() {
   expect(container?.querySelector('[data-ui="content.layout.toolbar"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="content.layout.sidebar"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="content.layout.dialogs"]')).not.toBeNull();
-  expect(toolbarCall?.[0]).toEqual({
-    scenario: props.scenario,
-    toolbar: props.toolbar,
-  });
+  expect(toolbarCall?.[0]).toEqual(
+    expect.objectContaining({
+      scenario: props.scenario,
+      toolbar: props.toolbar,
+    })
+  );
+  expect(toolbarCall?.[0]).toHaveProperty('designReview.panel.open', false);
   expect(sidebarCall?.[0]).toEqual({
     isCompletelyHidden: props.toolbar.isCompletelyHidden,
     modeController: props.toolbar.modeController,

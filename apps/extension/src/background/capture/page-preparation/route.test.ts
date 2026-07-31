@@ -14,6 +14,7 @@ vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
 
 beforeEach(() => {
   sendTabMessageMock.mockReset();
+  sendTabMessageMock.mockResolvedValue({ success: true });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
 });
 
@@ -55,6 +56,21 @@ it('routes regular page preparation through the content-script message', async (
   expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
     type: MessageType.DISABLE_SCREENSHOT_MODE,
   });
+});
+
+it('rejects a negative content teardown acknowledgement', async () => {
+  sendTabMessageMock.mockResolvedValueOnce({
+    error: 'Design Review session restoration failed',
+    success: false,
+  });
+
+  await expect(
+    disablePreparationByCapability({
+      capability: TabRuntimeCapability.Regular,
+      ports: new Map(),
+      tabId: 7,
+    })
+  ).rejects.toThrow('Design Review session restoration failed');
 });
 
 it('forwards pinned-toolbar visibility through regular page preparation', async () => {

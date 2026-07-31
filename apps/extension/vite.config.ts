@@ -69,7 +69,6 @@ function buildDefines(mode: string) {
     __SNIPTALE_TRACE_WS_URL__: JSON.stringify(getTraceWsUrlForMode(mode)),
     'globalThis.__SNIPTALE_RELEASE_BUILD__': JSON.stringify(mode === 'release'),
     __ENABLE_DESIGN_SYSTEM__: JSON.stringify(mode !== 'release'),
-    __ENABLE_PAGE_STYLE_RULES__: JSON.stringify(mode !== 'release'),
   };
 }
 

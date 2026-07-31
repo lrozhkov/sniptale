@@ -11,11 +11,17 @@ import {
   setScreenshotSurfaceCapabilityToken,
 } from '../../viewport-selector/capability';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { teardownDesignReviewSessionAfterUiTransition } from '../../design-review/runtime/session-teardown';
 
 function disableEditingModes(params: RuntimeMessageBridgeParams): void {
   if (params.modeState.aiPickMode) {
     params.modeControls.disableAiPickMode();
     params.modeControls.setAiPickMode(false);
+  }
+
+  if (params.modeState.designReviewMode) {
+    params.modeControls.disableDesignReviewMode();
+    params.modeControls.setDesignReviewMode(false);
   }
 
   if (params.modeState.highlighterMode) {
@@ -55,6 +61,7 @@ function isPlainPopupPreparationOpenFlow(request: RuntimeMessageRequest): boolea
 function hasModeOwnedNavigationLock(params: RuntimeMessageBridgeParams): boolean {
   return (
     params.modeState.aiPickMode ||
+    params.modeState.designReviewMode ||
     params.modeState.highlighterMode ||
     params.modeState.quickEditMode
   );
@@ -169,6 +176,25 @@ function hideScreenshotToolbar(params: RuntimeMessageBridgeParams): void {
   params.modeControls.setIsToolbarVisible(false);
 }
 
+function completeScreenshotToolbarTeardown(
+  params: RuntimeMessageBridgeParams,
+  sendResponse: (response?: RuntimeMessageResponse) => void
+): void {
+  void teardownDesignReviewSessionAfterUiTransition(() => {
+    disableEditingModes(params);
+    hideScreenshotToolbar(params);
+  })
+    .then(() => {
+      sendResponse({ success: true });
+    })
+    .catch((error) => {
+      sendResponse({
+        error: error instanceof Error ? error.message : 'Design Review session teardown failed',
+        success: false,
+      });
+    });
+}
+
 export function handleScreenshotModeMessage(
   request: RuntimeMessageRequest,
   params: RuntimeMessageBridgeParams,
@@ -179,15 +205,12 @@ export function handleScreenshotModeMessage(
   }
 
   if (request.type === MessageType.DISABLE_SCREENSHOT_MODE) {
-    disableEditingModes(params);
-    hideScreenshotToolbar(params);
-    sendResponse({ success: true });
+    completeScreenshotToolbarTeardown(params, sendResponse);
     return true;
   }
 
   if (request.type === MessageType.DESTROY_UI_TOOLBAR) {
-    hideScreenshotToolbar(params);
-    sendResponse({ success: true });
+    completeScreenshotToolbarTeardown(params, sendResponse);
     return true;
   }
 

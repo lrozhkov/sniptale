@@ -2,9 +2,10 @@ import { expect, it } from 'vitest';
 
 import { buildPopupExportOptions } from './options';
 
-it('builds export options from the selected artifacts', () => {
+it('preserves the legacy options payload when annotations are disabled', () => {
   expect(
     buildPopupExportOptions({
+      includeAnnotations: false,
       includeBasicLogs: true,
       includeCssDiagnostics: false,
       includeFiles: true,
@@ -22,6 +23,32 @@ it('builds export options from the selected artifacts', () => {
     includeHarDomLogs: true,
     includeImages: false,
     includeJson: true,
+    includeMarkdown: false,
+  });
+});
+
+it('adds annotations to the options payload only when selected', () => {
+  expect(
+    buildPopupExportOptions({
+      includeAnnotations: true,
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: false,
+      includeFullPageScreenshot: false,
+      includeHarDomLogs: false,
+      includeImages: false,
+      includeJson: false,
+      includeMarkdown: false,
+    })
+  ).toEqual({
+    includeAnnotations: true,
+    includeBasicLogs: false,
+    includeCssDiagnostics: false,
+    includeFiles: false,
+    includeFullPageScreenshot: false,
+    includeHarDomLogs: false,
+    includeImages: false,
+    includeJson: false,
     includeMarkdown: false,
   });
 });

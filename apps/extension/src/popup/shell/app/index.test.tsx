@@ -105,6 +105,8 @@ function expectPopupRootShell(): void {
 
   expect(pageRoot?.className).toContain('sniptale-extension-surface');
   expect(pageRoot?.className).toContain('sc-popup-shell');
+  expect(pageRoot?.className).toContain('h-[568px]');
+  expect(pageRoot?.className).not.toContain('h-[560px]');
   expect(container?.querySelector('[data-testid="popup-app-shell"]')).not.toBeNull();
 }
 

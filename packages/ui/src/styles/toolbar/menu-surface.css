@@ -2,6 +2,10 @@
  * Toolbar Menu Surface
  * ======================================== */
 
+.sniptale-app:has(.sniptale-toolbar .sniptale-popover-menu) {
+  z-index: 2147483647;
+}
+
 .sniptale-popover-menu {
   position: absolute;
   top: calc(100% + 10px);
@@ -11,7 +15,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  z-index: 9999;
+  z-index: 2147483647;
   animation: popoverFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

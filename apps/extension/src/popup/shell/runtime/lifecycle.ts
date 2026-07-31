@@ -7,6 +7,7 @@ export function usePopupLifecycleSync(state: PopupRuntimeStateSlice) {
       refreshActiveTabCapabilities: state.actions.refreshActiveTabCapabilities,
       refreshGalleryStatus: state.actions.refreshGalleryStatus,
       setHomeError: state.session.setHomeError,
+      setPage: state.session.setPage,
       setViewportPresets: state.presets.setViewportPresets,
       setQuickActions: state.presets.setQuickActions,
       setQuickActionsReady: state.presets.setQuickActionsReady,

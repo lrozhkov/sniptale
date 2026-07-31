@@ -13,3 +13,7 @@ export function isTrustedMouseEvent(event: Event): boolean {
 export function isTrustedPointerEvent(event: Event): boolean {
   return isTrustedDomEvent(event);
 }
+
+export function hasActiveUserActivation(currentWindow: Window): boolean {
+  return currentWindow.navigator.userActivation?.isActive === true;
+}

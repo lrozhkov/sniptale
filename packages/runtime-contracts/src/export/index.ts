@@ -1,4 +1,15 @@
 import type { FieldContentRole } from '../dom-tree';
+import { estimateUtf8Bytes } from '../validation/base64';
+
+export const MAX_BROWSER_ANNOTATIONS_EXPORT_TEXT_BYTES = 5 * 1024 * 1024;
+
+export function isBrowserAnnotationsExportText(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    estimateUtf8Bytes(value, MAX_BROWSER_ANNOTATIONS_EXPORT_TEXT_BYTES) <=
+      MAX_BROWSER_ANNOTATIONS_EXPORT_TEXT_BYTES
+  );
+}
 
 // ========================================
 // Export Types
@@ -8,6 +19,7 @@ import type { FieldContentRole } from '../dom-tree';
  * Состояние прогресса экспорта
  */
 export type ExportProgressStepKey =
+  | 'annotations'
   | 'json'
   | 'markdown'
   | 'files'
@@ -35,6 +47,7 @@ export interface ExportProgress {
  * Опции экспорта
  */
 export interface ExportOptions {
+  includeAnnotations?: boolean; // включить browser-annotations.md
   includeJson: boolean; // включить JSON (data.json)
   includeMarkdown: boolean; // включить Markdown (data.md)
   includeFiles: boolean; // включить файлы

@@ -50,13 +50,22 @@ function createHistoryStoreNavigationApi(state: HistoryStoreRuntimeState) {
         return;
       }
 
-      state.future = previousFuture.slice(1);
-      state.past = [...previousPast, next];
-      if (!applyHistoryEntry('redo', HISTORY_APPLIED_EVENT, next, state)) {
-        state.future = previousFuture;
-        state.past = previousPast;
+      const outcome = applyHistoryEntry('redo', HISTORY_APPLIED_EVENT, next, state);
+      if (outcome.status === 'unchanged') {
         return;
       }
+      state.past =
+        outcome.status === 'recovery'
+          ? outcome.replaceCurrent
+            ? previousPast
+            : [...previousPast, outcome.entry]
+          : [...previousPast, next];
+      state.future =
+        outcome.status === 'recovery'
+          ? outcome.replaceCurrent
+            ? [outcome.entry, ...previousFuture.slice(1)]
+            : previousFuture
+          : previousFuture.slice(1);
 
       notifyHistoryReachabilityChanged(state);
       publishHistoryState(state);
@@ -69,13 +78,20 @@ function createHistoryStoreNavigationApi(state: HistoryStoreRuntimeState) {
         return;
       }
 
-      state.past = previousPast.slice(0, -1);
-      state.future = [next, ...previousFuture];
-      if (!applyHistoryEntry('undo', HISTORY_APPLIED_EVENT, next, state)) {
-        state.past = previousPast;
-        state.future = previousFuture;
+      const outcome = applyHistoryEntry('undo', HISTORY_APPLIED_EVENT, next, state);
+      if (outcome.status === 'unchanged') {
         return;
       }
+      state.past =
+        outcome.status === 'recovery'
+          ? outcome.replaceCurrent
+            ? [...previousPast.slice(0, -1), outcome.entry]
+            : [...previousPast, outcome.entry]
+          : previousPast.slice(0, -1);
+      state.future =
+        outcome.status === 'recovery' || next.domEffect?.recoveryOnly
+          ? previousFuture
+          : [next, ...previousFuture];
 
       notifyHistoryReachabilityChanged(state);
       publishHistoryState(state);

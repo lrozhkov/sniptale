@@ -3,11 +3,19 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const historyMocks = vi.hoisted(() => ({
-  beginTransaction: vi.fn(),
+  beginTransaction: vi.fn(() => true),
   cancelTransaction: vi.fn(),
   captureDomStateMap: vi.fn(() => new Map([['locator', { attributes: {}, html: 'Before' }]])),
-  commitTransaction: vi.fn(),
-  createDomMutationBatch: vi.fn(() => ({ patches: [{ changed: true }] })),
+  commitTransaction: vi.fn(() => true),
+  createDomMutationBatch: vi.fn((elements: Iterable<HTMLElement>) => ({
+    patches: Array.from(elements, (target) => ({
+      after: { attributes: {}, html: target.innerHTML },
+      before: { attributes: {}, html: target.innerHTML },
+      changed: true,
+      locator: '#target',
+      target,
+    })),
+  })),
 }));
 
 vi.mock('../../parser/page-preparation/history', async (importOriginal) => ({
@@ -44,6 +52,8 @@ function dispatchDocumentModeInput(target: HTMLElement, mutate: () => void): voi
 
 beforeEach(() => {
   vi.clearAllMocks();
+  historyMocks.beginTransaction.mockReturnValue(true);
+  historyMocks.commitTransaction.mockReturnValue(true);
   vi.stubGlobal('ResizeObserver', ResizeObserverMock);
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -74,7 +84,7 @@ it('commits open document-mode history during full quick-edit disable', () => {
   expect(controller.documentMode.isEnabled()).toBe(false);
   expect(document.designMode).toBe('off');
   expect(historyMocks.commitTransaction).toHaveBeenCalledWith('quick-edit-document-mode', {
-    patches: [{ changed: true }],
+    patches: [expect.objectContaining({ changed: true })],
   });
   expect(historyMocks.cancelTransaction).not.toHaveBeenCalled();
 });

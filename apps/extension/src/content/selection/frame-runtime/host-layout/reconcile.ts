@@ -6,7 +6,7 @@ import {
 } from '../../../platform/frame';
 import { applyFrameOffsetToElement, calculateFrameViewportCoords } from '../manager/coords';
 import {
-  areAnchorFingerprintsEqual,
+  areConnectedAnchorFingerprintsEqual,
   createAnchorFingerprint,
   resolveAnchorCandidate,
 } from './anchor-identity';
@@ -170,7 +170,7 @@ export function resolveFrameAnchorBinding(
     acceptedNode?.isConnected &&
     current?.fingerprint &&
     isAnchorNodeCurrentDocument(acceptedNode) &&
-    areAnchorFingerprintsEqual(createAnchorFingerprint(acceptedNode), current.fingerprint)
+    areConnectedAnchorFingerprintsEqual(createAnchorFingerprint(acceptedNode), current.fingerprint)
   ) {
     return current.node === acceptedNode
       ? current
@@ -182,7 +182,7 @@ export function resolveFrameAnchorBinding(
   }
   if (preservesIntent && current?.node?.isConnected && isAnchorNodeCurrentDocument(current.node)) {
     const currentFingerprint = createAnchorFingerprint(current.node);
-    if (areAnchorFingerprintsEqual(currentFingerprint, fingerprint)) {
+    if (areConnectedAnchorFingerprintsEqual(currentFingerprint, fingerprint)) {
       if (current.bindingStatus !== 'reacquired') return current;
       const resolution = resolveAnchorCandidate(selector, fingerprint);
       if (resolution.kind === 'resolved' && resolution.element === current.node) return current;

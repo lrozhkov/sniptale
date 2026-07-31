@@ -21,6 +21,7 @@ type PopupExportTabSelectionFixture = Pick<
 type PopupExportPreferenceFixture = Pick<
   PopupExportRuntimeContract,
   | 'hasLoadedPreferences'
+  | 'includeAnnotations'
   | 'includeBasicLogs'
   | 'includeCssDiagnostics'
   | 'includeFiles'
@@ -30,6 +31,7 @@ type PopupExportPreferenceFixture = Pick<
   | 'includeJson'
   | 'includeMarkdown'
   | 'setIncludeBasicLogs'
+  | 'setIncludeAnnotations'
   | 'setIncludeCssDiagnostics'
   | 'setIncludeFiles'
   | 'setIncludeFullPageScreenshot'
@@ -70,6 +72,7 @@ function createTabSelectionState(): PopupExportTabSelectionFixture {
 function createPreferenceState(): PopupExportPreferenceFixture {
   return {
     hasLoadedPreferences: true,
+    includeAnnotations: false,
     includeBasicLogs: false,
     includeCssDiagnostics: true,
     includeFiles: false,
@@ -79,6 +82,7 @@ function createPreferenceState(): PopupExportPreferenceFixture {
     includeJson: true,
     includeMarkdown: false,
     setIncludeBasicLogs: vi.fn(),
+    setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),

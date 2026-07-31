@@ -9,6 +9,7 @@ const STORAGE_KEY = 'sniptale_popup_export_preferences';
 const logger = createLogger({ namespace: 'PopupExportPreferences' });
 
 export const DEFAULT_POPUP_EXPORT_PREFERENCES: PopupExportPreferences = {
+  includeAnnotations: false,
   includeBasicLogs: false,
   includeCssDiagnostics: false,
   includeFiles: true,

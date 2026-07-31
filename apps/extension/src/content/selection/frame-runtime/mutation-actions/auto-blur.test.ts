@@ -328,7 +328,7 @@ describe('createAddAutoBlurFramesHandler', () => {
     expect(scenario.args.hostLayoutServiceRef.current.getSnapshot().presentations.size).toBe(0);
   });
 
-  it('cleans transient UI before a deferred React frame updater is flushed', () => {
+  it('cleans transient UI before a deferred React frame projection is flushed', () => {
     const element = document.createElement('span');
     const autoBlur = createFrameDataFixture('auto-blur', {
       createdBy: 'auto-blur',
@@ -363,7 +363,7 @@ describe('createAddAutoBlurFramesHandler', () => {
     });
 
     const pendingUpdate = pendingUpdates[0];
-    expect(pendingUpdate).toBeTypeOf('function');
+    expect(pendingUpdate).toEqual([]);
     committedFrames =
       typeof pendingUpdate === 'function' ? pendingUpdate(committedFrames) : pendingUpdate!;
     expect(committedFrames).toEqual([]);

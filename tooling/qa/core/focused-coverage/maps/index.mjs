@@ -16,7 +16,6 @@ import { EXTENSION_UI_ENTRYPOINT_OWNER_MAPPINGS } from './extension-ui-entrypoin
 import { LOCAL_OWNER_MAPPINGS } from './local.mjs';
 import { MESSAGING_OWNER_MAPPINGS } from './messaging.mjs';
 import { PAGE_ACCESS_OWNER_MAPPINGS } from './page-access.mjs';
-import { PAGE_STYLE_OWNER_MAPPINGS } from './page-style.mjs';
 import { PLATFORM_BACKUP_OWNER_MAPPINGS } from './platform-backup.mjs';
 import { SCENARIO_OWNER_MAPPINGS } from './scenario.mjs';
 import { SCENARIO_STAGE_OWNER_MAPPINGS } from './scenario-stage.mjs';
@@ -38,7 +37,6 @@ export const FOCUSED_COVERAGE_OWNER_MAPPINGS = [
   ...AI_OWNER_MAPPINGS,
   ...EDITOR_OWNER_MAPPINGS,
   ...VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS,
-  ...PAGE_STYLE_OWNER_MAPPINGS,
   ...PAGE_ACCESS_OWNER_MAPPINGS,
   ...BACKGROUND_STORAGE_OWNER_MAPPINGS,
   ...BG_RUNTIME_MESSAGING_OWNER_MAPPINGS,

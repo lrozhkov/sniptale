@@ -42,21 +42,30 @@ export function getViewportClientPoint(
   y: number,
   iframe?: HTMLIFrameElement
 ): { x: number; y: number } {
-  if (!iframe) {
-    return { x, y };
+  let viewportX = x;
+  let viewportY = y;
+  let currentIframe: HTMLIFrameElement | null | undefined = iframe;
+  let attempts = 0;
+
+  while (currentIframe && attempts < 10) {
+    attempts += 1;
+    const iframeRect = currentIframe.getBoundingClientRect();
+    const scaleX = currentIframe.offsetWidth > 0 ? iframeRect.width / currentIframe.offsetWidth : 1;
+    const scaleY =
+      currentIframe.offsetHeight > 0 ? iframeRect.height / currentIframe.offsetHeight : 1;
+    viewportX = iframeRect.left + (currentIframe.clientLeft + viewportX) * scaleX;
+    viewportY = iframeRect.top + (currentIframe.clientTop + viewportY) * scaleY;
+    currentIframe = currentIframe.ownerDocument.defaultView
+      ?.frameElement as HTMLIFrameElement | null;
   }
 
-  const iframeRect = iframe.getBoundingClientRect();
-  return {
-    x: x + iframeRect.left + iframe.clientLeft,
-    y: y + iframeRect.top + iframe.clientTop,
-  };
+  return { x: viewportX, y: viewportY };
 }
 
 /**
  * Get absolute position of an element, accounting for iframe offsets.
  */
-export function getAbsolutePosition(element: HTMLElement): {
+export function getAbsolutePosition(element: Element): {
   x: number;
   y: number;
   width: number;
@@ -65,6 +74,8 @@ export function getAbsolutePosition(element: HTMLElement): {
   const rect = element.getBoundingClientRect();
   let x = rect.left;
   let y = rect.top;
+  let width = rect.width;
+  let height = rect.height;
 
   let currentDoc = element.ownerDocument;
   let attempts = 0;
@@ -78,18 +89,22 @@ export function getAbsolutePosition(element: HTMLElement): {
     }
 
     const iframeRect = iframe.getBoundingClientRect();
-    x += iframeRect.left;
-    y += iframeRect.top;
+    const scaleX = iframe.offsetWidth > 0 ? iframeRect.width / iframe.offsetWidth : 1;
+    const scaleY = iframe.offsetHeight > 0 ? iframeRect.height / iframe.offsetHeight : 1;
+    x = iframeRect.left + (iframe.clientLeft + x) * scaleX;
+    y = iframeRect.top + (iframe.clientTop + y) * scaleY;
+    width *= scaleX;
+    height *= scaleY;
     currentDoc = iframe.ownerDocument;
   }
 
-  return { x, y, width: rect.width, height: rect.height };
+  return { x, y, width, height };
 }
 
 /**
  * Get the iframe that contains an element, if any.
  */
-export function getContainingIframe(element: HTMLElement): HTMLIFrameElement | null {
+export function getContainingIframe(element: Element): HTMLIFrameElement | null {
   const doc = element.ownerDocument;
   if (doc === document) {
     return null;

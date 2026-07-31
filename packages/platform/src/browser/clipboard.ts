@@ -6,6 +6,10 @@ function canWriteBrowserClipboard(): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.clipboard?.write === 'function';
 }
 
+function canWriteBrowserClipboardText(): boolean {
+  return typeof navigator !== 'undefined' && typeof navigator.clipboard?.writeText === 'function';
+}
+
 function canReadBrowserClipboard(): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.clipboard?.read === 'function';
 }
@@ -48,6 +52,14 @@ export async function writeBrowserClipboardItems(items: ClipboardItem[]): Promis
   }
 
   await navigator.clipboard.write(items);
+}
+
+export async function writeBrowserClipboardText(text: string): Promise<void> {
+  if (!canWriteBrowserClipboardText()) {
+    throw new Error('Clipboard text write is unavailable.');
+  }
+
+  await navigator.clipboard.writeText(text);
 }
 
 export async function readBrowserClipboardImage(): Promise<{

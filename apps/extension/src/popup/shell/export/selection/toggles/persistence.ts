@@ -68,6 +68,7 @@ export function usePopupExportPersistence(
   restoringPreferencesRef: MutableRefObject<boolean>
 ) {
   const {
+    includeAnnotations,
     includeBasicLogs,
     includeCssDiagnostics,
     includeFiles,
@@ -93,6 +94,7 @@ export function usePopupExportPersistence(
     [
       committedPreferencesRef,
       hasLoadedPreferencesRef,
+      includeAnnotations,
       includeBasicLogs,
       includeCssDiagnostics,
       includeFiles,

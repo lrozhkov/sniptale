@@ -19,14 +19,19 @@ export function applyAiChangesWithHistory(treeData: ParsedDOMTree, changes: AIEd
   const beforeStates = captureDomStateMap(targets);
 
   pagePreparationHistory.beginTransaction(historyTransactionKey);
-  const result = applyAIChanges(treeData, changes);
-  pagePreparationHistory.commitTransaction(
-    historyTransactionKey,
-    createDomMutationBatch(targets, beforeStates)
-  );
+  try {
+    const result = applyAIChanges(treeData, changes);
+    pagePreparationHistory.commitTransaction(
+      historyTransactionKey,
+      createDomMutationBatch(targets, beforeStates)
+    );
 
-  return {
-    ...result,
-    targets,
-  } satisfies AiHistoryApplyResult;
+    return {
+      ...result,
+      targets,
+    } satisfies AiHistoryApplyResult;
+  } catch (error) {
+    pagePreparationHistory.cancelTransaction(historyTransactionKey);
+    throw error;
+  }
 }

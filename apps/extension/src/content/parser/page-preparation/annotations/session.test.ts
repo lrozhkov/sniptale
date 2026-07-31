@@ -1,0 +1,433 @@
+// @vitest-environment jsdom
+
+import { describe, expect, it, vi } from 'vitest';
+import { createBrowserAnnotationSession } from './session';
+import type { BrowserAnnotationTargetEvidence, BrowserFrameAnnotationInput } from './types';
+
+function createEvidence(selector = '#target'): BrowserAnnotationTargetEvidence {
+  return {
+    fileLabel: 'Target',
+    frame: { kind: 'top-document' },
+    locator: selector,
+    nodePosition: { x: 20, y: 30 },
+    pageUrl: 'https://example.test/page',
+    targetPath: 'main > button',
+    targetRole: 'button',
+    targetSelector: selector,
+    targetText: 'Target',
+    viewport: { height: 720, width: 1280 },
+  };
+}
+
+function createTarget(): Element {
+  return document.createElement('button');
+}
+
+function createFrameInput(
+  frameId: string,
+  overrides: Partial<BrowserFrameAnnotationInput> = {}
+): BrowserFrameAnnotationInput {
+  return {
+    borderPresetName: 'Review',
+    frameId,
+    kind: 'free',
+    pageUrl: 'https://example.test/page',
+    rect: { height: 80, width: 120, x: 10, y: 20 },
+    viewport: { height: 720, width: 1280 },
+    ...overrides,
+  };
+}
+
+function createPropertyChange(args: {
+  after: string;
+  afterPriority?: string;
+  before: string;
+  beforePriority?: string;
+  property?: string;
+}) {
+  return {
+    after: { priority: args.afterPriority ?? '', value: args.after },
+    before: { priority: args.beforePriority ?? '', value: args.before },
+    order: 1,
+    property: args.property ?? 'font-size',
+  };
+}
+
+describe('browser annotation session live identity', () => {
+  it('groups text, property, and comment evidence by the same Element identity', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const target = createTarget();
+
+    session.recordTextChange({ after: 'New', before: 'Old', evidence, target });
+    session.recordPropertyChanges({
+      changes: [createPropertyChange({ after: '24px', before: '16px' })],
+      evidence,
+      target,
+    });
+    expect(session.setComment({ comment: 'Prominent', evidence, target })).toBe(1);
+
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({
+        annotationId: 1,
+        comment: 'Prominent',
+        markerNumber: 1,
+        propertyChanges: [createPropertyChange({ after: '24px', before: '16px' })],
+        textChange: { after: 'New', before: 'Old' },
+      }),
+    ]);
+    expect(session.getAnnotationId(target)).toBe(1);
+    expect(session.getLiveTarget(1)).toBe(target);
+  });
+
+  it('publishes multiple text inputs as one rollback-capable session mutation', () => {
+    const session = createBrowserAnnotationSession();
+    const listener = vi.fn();
+    const first = createTarget();
+    const second = createTarget();
+    const rollbackPoint = session.captureFailedMutationRollbackPoint();
+    session.subscribe(listener);
+
+    session.recordTextChanges([
+      {
+        after: 'First after',
+        before: 'First before',
+        evidence: createEvidence('#first'),
+        target: first,
+      },
+      {
+        after: 'Second after',
+        before: 'Second before',
+        evidence: createEvidence('#second'),
+        target: second,
+      },
+    ]);
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(session.captureSnapshot().domRecords).toHaveLength(2);
+    expect(session.rollbackFailedMutation(rollbackPoint)).toBe(true);
+    expect(session.captureSnapshot().domRecords).toEqual([]);
+  });
+
+  it('does not rebind a detached annotation to an SPA replacement with the same selector', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence('#same');
+    const original = createTarget();
+    const replacement = createTarget();
+
+    session.setComment({ comment: 'Original', evidence, target: original });
+    session.setComment({ comment: 'Replacement', evidence, target: replacement });
+
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({ annotationId: 1, comment: 'Original' }),
+      expect.objectContaining({ annotationId: 2, comment: 'Replacement' }),
+    ]);
+    expect(session.getLiveTarget(1)).toBe(original);
+    expect(session.getLiveTarget(2)).toBe(replacement);
+  });
+
+  it('keeps the original value and priority baseline and removes returned evidence', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const target = createTarget();
+
+    session.recordPropertyChanges({
+      changes: [
+        createPropertyChange({
+          after: '18px',
+          before: '16px',
+          beforePriority: 'important',
+        }),
+      ],
+      evidence,
+      target,
+    });
+    session.recordPropertyChanges({
+      changes: [createPropertyChange({ after: '20px', before: '18px' })],
+      evidence,
+      target,
+    });
+
+    expect(session.captureSnapshot().domRecords[0]?.propertyChanges[0]).toEqual(
+      createPropertyChange({
+        after: '20px',
+        before: '16px',
+        beforePriority: 'important',
+      })
+    );
+
+    session.recordPropertyChanges({
+      changes: [
+        createPropertyChange({
+          after: '16px',
+          afterPriority: 'important',
+          before: '20px',
+        }),
+      ],
+      evidence,
+      target,
+    });
+    expect(session.captureSnapshot().domRecords).toEqual([]);
+    expect(session.getAnnotationId(target)).toBeNull();
+  });
+
+  it('uses monotonic comment numbers when an empty record is removed and re-added', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const target = createTarget();
+
+    expect(session.setComment({ comment: 'First', evidence, target })).toBe(1);
+    expect(session.setComment({ comment: '', evidence, target })).toBeNull();
+    expect(session.setComment({ comment: 'Again', evidence, target })).toBe(2);
+
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({ annotationId: 2, markerNumber: 2 }),
+    ]);
+  });
+
+  it('removes only comment evidence while text and style keep the DOM annotation alive', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const target = createTarget();
+    session.recordTextChange({ after: 'New', before: 'Old', evidence, target });
+    session.recordPropertyChanges({
+      changes: [createPropertyChange({ after: '24px', before: '16px' })],
+      evidence,
+      target,
+    });
+    session.setComment({ comment: 'Temporary', evidence, target });
+
+    session.setComment({ comment: '', evidence, target });
+
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({
+        propertyChanges: [createPropertyChange({ after: '24px', before: '16px' })],
+        textChange: { after: 'New', before: 'Old' },
+      }),
+    ]);
+    expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('comment');
+    expect(session.captureSnapshot().domRecords[0]).toHaveProperty('markerNumber', 1);
+    expect(session.getAnnotationId(target)).toBe(1);
+  });
+
+  it('restores the original live target and identifiers through snapshot undo/redo', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const target = createTarget();
+
+    session.setComment({ comment: 'First', evidence, target });
+    const withComment = session.captureSnapshot();
+    session.setComment({ comment: '', evidence, target });
+    const withoutComment = session.captureSnapshot();
+
+    session.applySnapshot(withComment);
+    expect(session.getAnnotationId(target)).toBe(1);
+    expect(session.captureSnapshot().domRecords[0]).toMatchObject({
+      annotationId: 1,
+      markerNumber: 1,
+    });
+
+    session.applySnapshot(withoutComment);
+    expect(session.getAnnotationId(target)).toBeNull();
+    session.setComment({ comment: 'New', evidence, target });
+    expect(session.captureSnapshot().domRecords[0]).toMatchObject({
+      annotationId: 2,
+      markerNumber: 2,
+    });
+  });
+
+  it('restores allocators only for the exact failed synchronous mutation', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const target = createTarget();
+    const rollbackPoint = session.captureFailedMutationRollbackPoint();
+
+    expect(session.setComment({ comment: 'Failed', evidence, target })).toBe(1);
+    expect(session.rollbackFailedMutation(rollbackPoint)).toBe(true);
+    expect(session.captureSnapshot()).toMatchObject({
+      domRecords: [],
+      nextAnnotationId: 1,
+      nextMarkerNumber: 1,
+      nextCreationOrder: 1,
+    });
+    expect(session.setComment({ comment: 'Retry', evidence, target })).toBe(1);
+  });
+
+  it('refuses a failed-mutation rollback after an intervening session mutation', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const rollbackPoint = session.captureFailedMutationRollbackPoint();
+    const first = createTarget();
+    const second = createTarget();
+
+    session.setComment({ comment: 'First', evidence, target: first });
+    session.setComment({ comment: 'Second', evidence, target: second });
+
+    expect(session.rollbackFailedMutation(rollbackPoint)).toBe(false);
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({ comment: 'First', markerNumber: 1 }),
+      expect.objectContaining({ comment: 'Second', markerNumber: 2 }),
+    ]);
+  });
+
+  it('keeps detached evidence exportable without throwing', () => {
+    const session = createBrowserAnnotationSession();
+    const target = createTarget();
+    session.setComment({ comment: 'Detached', evidence: createEvidence(), target });
+
+    expect(() => session.captureSnapshot()).not.toThrow();
+    expect(session.captureSnapshot().domRecords[0]?.comment).toBe('Detached');
+  });
+});
+
+describe('Design Review annotation state', () => {
+  it('stores action metadata and clears only review-owned evidence', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const target = createTarget();
+
+    session.recordTextChange({ after: 'New', before: 'Old', evidence, target });
+    session.recordPropertyChanges({
+      changes: [createPropertyChange({ after: '24px', before: '16px' })],
+      evidence,
+      target,
+    });
+    session.setComment({ comment: 'Fix this', evidence, target });
+    session.setDesignReviewAction({ action: 'fix', evidence, target });
+
+    expect(session.captureSnapshot().domRecords[0]).toMatchObject({
+      comment: 'Fix this',
+      designReview: { action: 'fix' },
+      markerNumber: 1,
+      propertyChanges: [createPropertyChange({ after: '24px', before: '16px' })],
+      textChange: { after: 'New', before: 'Old' },
+    });
+
+    session.clearDesignReview(target);
+
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({
+        propertyChanges: [],
+        textChange: { after: 'New', before: 'Old' },
+      }),
+    ]);
+    expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('comment');
+    expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('designReview');
+    expect(session.captureSnapshot().domRecords[0]).not.toHaveProperty('markerNumber');
+  });
+
+  it('allocates one marker for action-only and property-only feedback', () => {
+    const session = createBrowserAnnotationSession();
+    const evidence = createEvidence();
+    const actionTarget = createTarget();
+    const propertyTarget = createTarget();
+
+    session.setDesignReviewAction({ action: 'verify', evidence, target: actionTarget });
+    session.recordPropertyChanges({
+      changes: [createPropertyChange({ after: '24px', before: '16px' })],
+      evidence,
+      target: propertyTarget,
+    });
+
+    expect(session.captureSnapshot().domRecords).toEqual([
+      expect.objectContaining({ designReview: { action: 'verify' }, markerNumber: 1 }),
+      expect.objectContaining({ markerNumber: 2, propertyChanges: [expect.any(Object)] }),
+    ]);
+  });
+});
+
+describe('browser annotation session lifecycle', () => {
+  it('keeps historical frame evidence when the current command did not change that frame', () => {
+    const session = createBrowserAnnotationSession();
+    const captured = createFrameInput('frame-1');
+    const liveDrift = createFrameInput('frame-1', {
+      rect: { height: 80, width: 120, x: 50, y: 20 },
+    });
+
+    session.syncFrames([captured]);
+    session.syncFrames([liveDrift], []);
+
+    expect(session.captureSnapshot().frameOrders).toEqual([
+      expect.objectContaining({ frameId: 'frame-1', rect: captured.rect }),
+    ]);
+
+    session.syncFrames([], []);
+    expect(session.captureSnapshot().frameOrders).toEqual([]);
+  });
+
+  it('tracks frame order and replaces only factual comment, preset, locator, and geometry evidence', () => {
+    const session = createBrowserAnnotationSession();
+    const listener = vi.fn();
+    const first = createFrameInput('frame-1');
+    const second = createFrameInput('frame-2', { comment: 'Original' });
+    session.subscribe(listener);
+
+    session.syncFrames([first, second]);
+    session.syncFrames([first, second]);
+    const updatedSecond = createFrameInput('frame-2', {
+      kind: 'linked',
+      linkedElementSelector: '#replacement',
+      rect: { height: 140, width: 220, x: 30, y: 40 },
+    });
+    delete updatedSecond.borderPresetName;
+    session.syncFrames([updatedSecond, createFrameInput('frame-3')]);
+
+    expect(session.captureSnapshot().frameOrders).toEqual([
+      {
+        ...updatedSecond,
+        creationOrder: 2,
+        frameName: 'Frame 2',
+      },
+      {
+        ...createFrameInput('frame-3'),
+        creationOrder: 3,
+        frameName: 'Frame 3',
+      },
+    ]);
+    expect(session.captureSnapshot().frameOrders[0]).not.toHaveProperty('comment');
+    expect(session.captureSnapshot().frameOrders[0]).not.toHaveProperty('borderPresetName');
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('publishes real mutations, isolates evidence, and resets the document session', () => {
+    const session = createBrowserAnnotationSession();
+    const listener = vi.fn();
+    const evidence = createEvidence();
+    const target = createTarget();
+    session.subscribe(listener);
+
+    session.recordTextChange({ after: 'Same', before: 'Same', evidence, target });
+    expect(listener).not.toHaveBeenCalled();
+    session.setComment({ comment: 'Comment', evidence, target });
+    evidence.nodePosition.x = 900;
+    expect(session.captureSnapshot().domRecords[0]?.evidence.nodePosition.x).toBe(20);
+
+    session.resetForDocument();
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(session.captureSnapshot()).toMatchObject({
+      domRecords: [],
+      frameOrders: [],
+      nextAnnotationId: 1,
+      nextMarkerNumber: 1,
+      nextCreationOrder: 1,
+    });
+  });
+
+  it('commits mutations even when one subscriber fails', () => {
+    const session = createBrowserAnnotationSession();
+    const followingListener = vi.fn();
+    session.subscribe(() => {
+      throw new Error('listener failed');
+    });
+    session.subscribe(followingListener);
+
+    expect(() =>
+      session.setComment({
+        comment: 'Committed',
+        evidence: createEvidence(),
+        target: createTarget(),
+      })
+    ).not.toThrow();
+    expect(followingListener).toHaveBeenCalledOnce();
+  });
+});

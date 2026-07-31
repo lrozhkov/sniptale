@@ -65,6 +65,30 @@ async function releaseRegularScreenshotSurface(tabId: number): Promise<void> {
   await getCaptureSurfaceService().releaseTabOwners(tabId, ['screenshot']);
 }
 
+async function restoreRegularScreenshotSurfaceAfterFailedTeardown(
+  args: DisableScreenshotModeArgs
+): Promise<void> {
+  const viewport = args.viewportState.get(args.tabId);
+  if (!viewport) return;
+  const generation = nextScreenshotSurfaceGeneration(args.tabId);
+  const applied = await getCaptureSurfaceService().apply({
+    context: 'screenshot',
+    generation: generation.generation,
+    owner: 'screenshot',
+    presetId: viewport.presetId,
+    sessionId: generation.sessionId,
+    tabId: args.tabId,
+  });
+  markScreenshotSurfaceApplied(args.tabId, generation.generation);
+  args.viewportState.set(args.tabId, {
+    height: applied.height,
+    presetId: applied.presetId,
+    target: applied.target,
+    width: applied.width,
+  });
+  args.viewportOwnerState.set(args.tabId, 'capture-surface');
+}
+
 async function resolveDefaultSurface(args: {
   capability: TabRuntimeCapability;
   tabId: number;
@@ -356,14 +380,28 @@ export async function disableScreenshotMode(
 async function disableScreenshotModeOperation(args: DisableScreenshotModeArgs): Promise<void> {
   const tab = await browserTabs.get(args.tabId);
   const capability = classifyTabRuntimeCapability(tab);
-  await disablePreparationByCapability({
-    capability,
-    ports: args.webSnapshotViewerPorts,
-    tabId: args.tabId,
-  });
   if (capability === TabRuntimeCapability.Regular) {
     await releaseQuickActionSurface(args.tabId, args.viewportState);
     await releaseRegularScreenshotSurface(args.tabId);
+  }
+  try {
+    await disablePreparationByCapability({
+      capability,
+      ports: args.webSnapshotViewerPorts,
+      tabId: args.tabId,
+    });
+  } catch (error) {
+    if (capability === TabRuntimeCapability.Regular) {
+      try {
+        await restoreRegularScreenshotSurfaceAfterFailedTeardown(args);
+      } catch (compensationError) {
+        throw new AggregateError(
+          [error, compensationError],
+          'Content teardown and screenshot surface compensation both failed'
+        );
+      }
+    }
+    throw error;
   }
   endScreenshotSurfaceSession(args.tabId);
   args.viewportOwnerState.delete(args.tabId);

@@ -6,6 +6,7 @@ import { routeQuickActionMessage } from './quick-action-adapter';
 import { routeScreenshotCaptureMessage } from './screenshot-adapter';
 import type { CaptureRouteAdapterContext, RouteCaptureMessageArgs } from './types';
 import { routeWebSnapshotMessage } from './web-snapshot-adapter';
+import { routeAnnotationExportMessage } from './annotation-export-adapter';
 
 export function routeCaptureMessage(routeArgs: RouteCaptureMessageArgs): boolean {
   const adapterContext: CaptureRouteAdapterContext = {
@@ -17,6 +18,7 @@ export function routeCaptureMessage(routeArgs: RouteCaptureMessageArgs): boolean
     routeExportMessage(routeArgs) ||
     routeScreenshotCaptureMessage(adapterContext) ||
     routeQuickActionMessage(adapterContext) ||
+    routeAnnotationExportMessage(routeArgs) ||
     routeDownloadMessage(routeArgs) ||
     routeGalleryMessage(routeArgs) ||
     routeWebSnapshotMessage(routeArgs)

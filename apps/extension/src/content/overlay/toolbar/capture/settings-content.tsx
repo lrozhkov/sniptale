@@ -83,7 +83,7 @@ function renderDisplayModeItem(params: {
 function renderActionItem(params: {
   icon: React.ReactNode;
   label: string;
-  onAction: () => void;
+  onAction: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onClose: () => void;
 }) {
   return (
@@ -92,7 +92,7 @@ function renderActionItem(params: {
       label={params.label}
       onSelect={(event) => {
         stopMenuEvent(event);
-        params.onAction();
+        params.onAction(event);
         params.onClose();
       }}
     />
@@ -132,7 +132,7 @@ function renderToolbarSettingsUtilityItems(props: {
   compactMenus: boolean;
   onClose: () => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
-  onDisableScreenshotMode: () => void;
+  onDisableScreenshotMode: (activationEvent?: Event) => void;
   onHide: () => void;
   onPinToTabChange: (
     value: boolean,
@@ -161,7 +161,7 @@ function renderToolbarSettingsUtilityItems(props: {
       {renderActionItem({
         icon: <EyeOff className="sniptale-popover-icon" />,
         label: translate('content.toolbar.hideToolbar'),
-        onAction: props.onHide,
+        onAction: () => props.onHide(),
         onClose: props.onClose,
       })}
       {renderDisableScreenshotModeItem(props)}
@@ -214,7 +214,7 @@ function renderPinToTabItem(props: {
 
 function renderDisableScreenshotModeItem(props: {
   onClose: () => void;
-  onDisableScreenshotMode: () => void;
+  onDisableScreenshotMode: (activationEvent?: Event) => void;
   screenshotMode: boolean;
 }) {
   if (!props.screenshotMode) {
@@ -224,7 +224,7 @@ function renderDisableScreenshotModeItem(props: {
   return renderActionItem({
     icon: <X className="sniptale-popover-icon" />,
     label: translate('content.toolbar.screenshotDisable'),
-    onAction: props.onDisableScreenshotMode,
+    onAction: (event) => props.onDisableScreenshotMode(event.nativeEvent),
     onClose: props.onClose,
   });
 }
@@ -260,7 +260,7 @@ type ToolbarSettingsDropdownProps = {
   onClose: () => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
   onDisplayModeChange: (displayMode: ContentToolbarDisplayMode) => void;
-  onDisableScreenshotMode: () => void;
+  onDisableScreenshotMode: (activationEvent?: Event) => void;
   onHide: () => void;
   onPinToTabChange: (
     value: boolean,

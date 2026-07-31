@@ -17,12 +17,17 @@ beforeEach(() => vi.clearAllMocks());
 it('parses partial preferences and falls back on read failure', async () => {
   getMock
     .mockResolvedValueOnce({
-      sniptale_popup_export_preferences: { includeFiles: false, includeMarkdown: false },
+      sniptale_popup_export_preferences: {
+        includeAnnotations: true,
+        includeFiles: false,
+        includeMarkdown: false,
+      },
     })
     .mockRejectedValueOnce(new Error('unavailable'));
 
   await expect(loadPopupExportPreferences()).resolves.toEqual({
     ...DEFAULT_POPUP_EXPORT_PREFERENCES,
+    includeAnnotations: true,
     includeFiles: false,
     includeMarkdown: false,
   });

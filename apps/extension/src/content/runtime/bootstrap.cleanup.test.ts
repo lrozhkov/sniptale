@@ -4,10 +4,6 @@ const browserRuntimeMocks = vi.hoisted(() => ({
   subscribeToMessages: vi.fn(),
 }));
 
-const runtimeMessagingMocks = vi.hoisted(() => ({
-  sendRuntimeMessage: vi.fn(),
-}));
-
 const regionSelectorControllerMocks = vi.hoisted(() => ({
   controller: {
     dispose: vi.fn(),
@@ -21,15 +17,14 @@ const regionSelectorControllerMocks = vi.hoisted(() => ({
 
 const runtimeCleanupMocks = vi.hoisted(() => ({
   disableAiPickModeIfLoaded: vi.fn(),
+  disableDesignReviewMode: vi.fn(),
   disableHighlighterMode: vi.fn(),
   disableQuickEditMode: vi.fn(),
   disableSelectionMode: vi.fn(),
   disableVideoAnnotations: vi.fn(),
   disableVideoTelemetry: vi.fn(),
   disposeViewportCursorProjection: vi.fn(),
-  disposePageStyleRuntime: vi.fn(),
   hideVideoCountdown: vi.fn(),
-  initializePageStyleRuntime: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
@@ -37,11 +32,6 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   browserRuntime: {
     subscribeToMessages: browserRuntimeMocks.subscribeToMessages,
   },
-}));
-
-vi.mock('../../platform/runtime-messaging', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../platform/runtime-messaging')>()),
-  sendRuntimeMessage: runtimeMessagingMocks.sendRuntimeMessage,
 }));
 
 vi.mock('../selection/region-selector', () => ({
@@ -76,11 +66,12 @@ vi.mock('../selection/quick-edit', () => ({
   isQuickEditDocumentModeEnabled: vi.fn(),
 }));
 
-vi.mock('../selection/quick-edit/page-style', () => ({
-  disposePageStyleRuntime: runtimeCleanupMocks.disposePageStyleRuntime,
-  getPageStyleCurrentRuleSummary: vi.fn(),
-  initializePageStyleRuntime: runtimeCleanupMocks.initializePageStyleRuntime,
-  openPageStyleInspector: vi.fn(),
+vi.mock('../selection/design-review', () => ({
+  DesignReviewModeState: undefined,
+  disableDesignReviewMode: runtimeCleanupMocks.disableDesignReviewMode,
+  enableDesignReviewMode: vi.fn(),
+  getDesignReviewModeState: vi.fn(),
+  subscribeToDesignReviewMode: vi.fn(),
 }));
 
 vi.mock('../selection/selection-mode', () => ({
@@ -123,15 +114,28 @@ beforeEach(() => {
   regionSelectorControllerMocks.createRegionSelectorController.mockReturnValue(
     regionSelectorControllerMocks.controller
   );
-  runtimeMessagingMocks.sendRuntimeMessage.mockResolvedValue({ success: false });
 });
+
+function createRuntimeServices() {
+  return {
+    contentActionIntent: {
+      attachContentActionIntent: async <TMessage>(message: TMessage) => message,
+      createBackgroundAutoStartContentActionIntentSource: vi.fn(),
+      createTrustedContentActionIntentSource: vi.fn(),
+    },
+    messaging: {
+      sendRuntimeMessage: vi.fn().mockResolvedValue({ success: false }),
+      sendTabMessage: vi.fn(),
+    },
+  };
+}
 
 function expectRuntimeDisposersRan(): void {
   expect(runtimeCleanupMocks.disableHighlighterMode).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.disableQuickEditMode).toHaveBeenCalledTimes(1);
+  expect(runtimeCleanupMocks.disableDesignReviewMode).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.disableAiPickModeIfLoaded).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.disableSelectionMode).toHaveBeenCalledTimes(1);
-  expect(runtimeCleanupMocks.disposePageStyleRuntime).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.hideVideoCountdown).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.disableVideoAnnotations).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.disableVideoTelemetry).toHaveBeenCalledTimes(1);
@@ -144,7 +148,7 @@ it('cleans up the runtime listener and singleton content resources', async () =>
   browserRuntimeMocks.subscribeToMessages.mockReturnValue(unsubscribe);
 
   const { initializeTopLevelContentRuntime } = await import('./bootstrap');
-  const cleanup = initializeTopLevelContentRuntime(vi.fn());
+  const cleanup = initializeTopLevelContentRuntime(vi.fn(), createRuntimeServices());
   cleanup();
 
   expect(unsubscribe).toHaveBeenCalledTimes(1);
@@ -161,7 +165,7 @@ it('continues cleanup when a runtime disposer throws', async () => {
 
   try {
     const { initializeTopLevelContentRuntime } = await import('./bootstrap');
-    const cleanup = initializeTopLevelContentRuntime(vi.fn());
+    const cleanup = initializeTopLevelContentRuntime(vi.fn(), createRuntimeServices());
 
     expect(() => cleanup()).not.toThrow();
   } finally {

@@ -23,7 +23,6 @@ const routeAggregatorFiles = [
 const ownerRouteDescriptorFiles = [
   'apps/extension/src/background/ai/llm/route-descriptors.ts',
   'apps/extension/src/background/ai/settings/route-descriptors.ts',
-  'apps/extension/src/background/capture/page-style-runtime/route-descriptors.ts',
   'apps/extension/src/background/capture/popup-export/route-descriptors.ts',
   'apps/extension/src/background/capture/routing/route-descriptors.ts',
   'apps/extension/src/background/application/privacy-erasure/route-descriptors.ts',
@@ -50,7 +49,6 @@ const policyBackedAuthorityFamilies: Partial<Record<ActionRouteAuthorityFamily, 
   'gallery-update-capability-issuance': 'privileged-tab-route:capture',
   'offscreen-runtime-capability': 'offscreen-runtime',
   'page-access-owner': 'background-owned',
-  'page-style-privileged-tab-route': 'privileged-tab-route:page-style',
   'popup-export-archive-download': 'background-owned',
   'popup-export-tab-route-capability': 'popup-export-tab-route',
   'popup-tab-route-capability-issuance': 'background-owned',
@@ -193,6 +191,13 @@ it('keeps policy-backed authority families anchored to the authorization registr
       expect(registeredPolicyKeys.has(alternatePolicyKey as string), entry.routeName).toBe(true);
     }
   }
+});
+
+it('does not retain authorization policies without a live action-route authority family', () => {
+  const referencedPolicyKeys = new Set(Object.values(policyBackedAuthorityFamilies));
+  expect(authorizationPolicyRegistry.map((entry) => entry.key).sort()).toEqual(
+    [...referencedPolicyKeys].sort()
+  );
 });
 
 it('derives contract metadata for internal and parser-supported route families', () => {

@@ -34,8 +34,6 @@ const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
   MessageType.DISABLE_HIGHLIGHTER_MODE,
   MessageType.ENABLE_QUICK_EDIT_MODE,
   MessageType.DISABLE_QUICK_EDIT_MODE,
-  MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY,
-  MessageType.OPEN_PAGE_STYLE_INSPECTOR,
   MessageType.PREPARE_FULL_PAGE_CAPTURE,
   MessageType.HEARTBEAT_FULL_PAGE_CAPTURE,
   MessageType.PREPARE_FULL_PAGE_TILE,

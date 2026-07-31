@@ -19,7 +19,6 @@ import {
   routeScenarioMessageMock,
   routeTabModeMessageMock,
   routeVideoControlMessageMock,
-  sendTabMessageMock,
 } from '../../../../../../../tooling/test/support/background-runtime-messaging.test-support';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -140,28 +139,6 @@ async function verifiesOwnedViewerSenderUrlRouting() {
   });
 }
 
-async function verifiesPageStyleRuntimeRouting() {
-  const { listener, sendResponse } = registerListener();
-  const message = { tabId: 71, type: MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY };
-  browserTabsQueryMock.mockResolvedValue([{ id: 17 }]);
-  parseBackgroundRuntimeMessageMock.mockReturnValue(message);
-  isBackgroundTabMessageMock.mockReturnValue(true);
-  sendTabMessageMock.mockResolvedValue({
-    summary: { activeAppliedCount: 0, matchedRules: [], pageUrl: 'https://example.test/page' },
-    success: true,
-  });
-
-  expectListenerResult(true, listener, message, createSender(undefined, POPUP_URL), sendResponse);
-  await flushPromises();
-
-  expect(sendTabMessageMock).toHaveBeenCalledWith(17, {
-    tabId: 17,
-    type: MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY,
-  });
-  expect(sendTabMessageMock).not.toHaveBeenCalledWith(71, expect.anything());
-  expect(sendResponse).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
-}
-
 async function verifiesVideoControlAndMissingTabFallbacks() {
   const { listener, sendResponse } = registerListener();
   parseBackgroundRuntimeMessageMock.mockReturnValue({ type: VideoMessageType.START_RECORDING });
@@ -256,7 +233,6 @@ describe('index.runtime-messaging routing', () => {
   it('routes capture messages with explicit tab', verifiesCaptureRoutingWithExplicitTargetTab);
   it('routes scenario messages', verifiesScenarioRoutingWithResolvedTabId);
   it('resolves owned viewer senders', verifiesOwnedViewerSenderUrlRouting);
-  it('routes page style runtime messages to the content tab', verifiesPageStyleRuntimeRouting);
   it(
     'rejects content video control messages and reports missing tab ids',
     verifiesVideoControlAndMissingTabFallbacks

@@ -5,13 +5,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   ownedElementMock: vi.fn(() => false),
   quickEditTargetMock: vi.fn(),
-  styleInspectableTargetMock: vi.fn(() => false),
   textTargetMock: vi.fn(() => false),
 }));
 
 vi.mock('./events.shared', () => ({
   isQuickEditOwnedElement: mocks.ownedElementMock,
-  isQuickEditStyleInspectableTarget: mocks.styleInspectableTargetMock,
   isQuickEditTextTarget: mocks.textTargetMock,
   resolveQuickEditTarget: mocks.quickEditTargetMock,
 }));
@@ -31,7 +29,6 @@ function createOptions() {
     hideHoverOverlay: vi.fn(),
     isDocumentModeEnabled: vi.fn(() => false),
     isEnabled: vi.fn(() => true),
-    isStyleInspectorModeEnabled: vi.fn(() => false),
     makeElementEditable: vi.fn(),
     showHoverOverlay: vi.fn(),
   } as any;
@@ -110,19 +107,6 @@ it('keeps hover hidden while document mode owns text editing', () => {
   expect(mocks.quickEditTargetMock).not.toHaveBeenCalled();
 });
 
-it('routes image-style targets to the hover frame only while the style inspector is open', () => {
-  const options = createOptions();
-  const target = document.createElement('img');
-  options.isStyleInspectorModeEnabled.mockReturnValue(true);
-  mocks.quickEditTargetMock.mockReturnValue(target);
-  mocks.styleInspectableTargetMock.mockReturnValue(true);
-
-  handleQuickEditMouseMove(new MouseEvent('mousemove'), options);
-
-  expect(options.showHoverOverlay).toHaveBeenCalledWith(target);
-  expect(options.hideHoverOverlay).not.toHaveBeenCalled();
-});
-
 it('does not start targeted editing while document mode owns text editing', () => {
   const options = createOptions();
   options.isDocumentModeEnabled.mockReturnValue(true);
@@ -131,20 +115,6 @@ it('does not start targeted editing while document mode owns text editing', () =
 
   expect(options.makeElementEditable).not.toHaveBeenCalled();
   expect(mocks.quickEditTargetMock).not.toHaveBeenCalled();
-});
-
-it('claims style-inspector image clicks without starting text editing', () => {
-  const options = createOptions();
-  const target = document.createElement('img');
-  const event = new MouseEvent('click', { bubbles: true, cancelable: true });
-  options.isStyleInspectorModeEnabled.mockReturnValue(true);
-  mocks.quickEditTargetMock.mockReturnValue(target);
-  mocks.styleInspectableTargetMock.mockReturnValue(true);
-
-  handleQuickEditClick(event, options);
-
-  expect(event.defaultPrevented).toBe(true);
-  expect(options.makeElementEditable).not.toHaveBeenCalled();
 });
 
 it('starts editing only for text targets and finishes blur after focus leaves', () => {

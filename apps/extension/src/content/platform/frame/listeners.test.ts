@@ -233,3 +233,41 @@ describe('iframe-utils listeners scoped root flow', () => {
     cleanup();
   });
 });
+
+describe('iframe-utils window listeners', () => {
+  it('attaches to each accessible parent window and removes every listener', async () => {
+    const iframe = document.createElement('iframe');
+    document.body.append(iframe);
+    const iframeDoc = iframe.contentDocument;
+    const iframeWindow = iframe.contentWindow;
+    expect(iframeDoc).not.toBeNull();
+    expect(iframeWindow).not.toBeNull();
+    Object.defineProperty(iframeDoc, 'readyState', {
+      configurable: true,
+      get: () => 'complete',
+    });
+    iframeCoreMocks.getAccessibleIframesMock.mockImplementation((doc?: Document) =>
+      doc === document ? [iframe] : []
+    );
+    iframeCoreMocks.getIframeDocumentMock.mockImplementation((candidate: HTMLIFrameElement) =>
+      candidate === iframe ? iframeDoc : null
+    );
+    iframeCoreMocks.isIframeAccessibleMock.mockReturnValue(true);
+    const handler = vi.fn();
+
+    const { addWindowEventListenerToAllWindowsDynamic } = await import('./listeners');
+    const cleanup = addWindowEventListenerToAllWindowsDynamic('blur', handler, {
+      capture: true,
+    });
+    window.dispatchEvent(new Event('blur'));
+    iframeWindow!.dispatchEvent(new Event('blur'));
+
+    expect(handler).toHaveBeenNthCalledWith(1, expect.any(Event), window, undefined);
+    expect(handler).toHaveBeenNthCalledWith(2, expect.any(Event), iframeWindow, iframe);
+
+    cleanup();
+    window.dispatchEvent(new Event('blur'));
+    iframeWindow!.dispatchEvent(new Event('blur'));
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+});

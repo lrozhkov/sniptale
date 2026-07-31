@@ -5,7 +5,7 @@ import {
 } from '../event-bus';
 
 type ModeEnabledDetail = {
-  mode: 'quick-edit';
+  mode: 'design-review' | 'quick-edit';
 };
 
 const MODE_ENABLED_EVENT = 'sniptale-mode-enabled';

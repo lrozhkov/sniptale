@@ -1,4 +1,5 @@
 import { translate } from '../../../../platform/i18n';
+import type { ExportProgressStepKey } from '@sniptale/runtime-contracts/export';
 import type { PageSnapshotSource } from '../../page-snapshot/source';
 import {
   prepareParsedPageSnapshot,
@@ -17,9 +18,11 @@ export function getExportCompletedMessage(): string {
 
 export async function prepareExportManagerTreeData(
   state: ExportManagerState,
-  snapshotSource?: PageSnapshotSource
+  snapshotSource?: PageSnapshotSource,
+  activeStepKey?: ExportProgressStepKey
 ): Promise<PreparedParsedPageSnapshot> {
   updateExportManagerProgress(state, {
+    ...(activeStepKey ? { activeStepKey } : {}),
     phase: 'scanning',
     message: translate('content.runtime.scanPageStructure'),
     current: 0,

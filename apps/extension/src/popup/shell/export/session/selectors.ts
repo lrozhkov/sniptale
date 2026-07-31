@@ -14,6 +14,7 @@ export function getPopupExportSelection(
   const values = 'values' in toggles ? toggles.values : toggles;
 
   return {
+    includeAnnotations: values.includeAnnotations,
     includeBasicLogs: values.includeBasicLogs,
     includeCssDiagnostics: values.includeCssDiagnostics,
     includeFiles: values.includeFiles,
@@ -64,6 +65,7 @@ export function getPopupExportDerivedState(args: {
 export function getCanExport({
   exportDisabledReason,
   includeBasicLogs,
+  includeAnnotations,
   includeCssDiagnostics,
   includeFiles,
   includeFullPageScreenshot,
@@ -74,6 +76,7 @@ export function getCanExport({
   isExporting,
   selectedCount,
 }: {
+  includeAnnotations: boolean;
   exportDisabledReason: string | null;
   includeBasicLogs: boolean;
   includeCssDiagnostics: boolean;
@@ -87,6 +90,7 @@ export function getCanExport({
   selectedCount: number;
 }): boolean {
   const hasSelectedArtifacts =
+    includeAnnotations ||
     includeJson ||
     includeMarkdown ||
     includeFiles ||

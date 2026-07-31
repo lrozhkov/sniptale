@@ -2,8 +2,13 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   bootstrapPopupStateMock: vi.fn(),
+  consumePopupExportLaunchIntentMock: vi.fn<() => Promise<'export' | null>>(async () => null),
   errorMock: vi.fn(),
   translateMock: vi.fn((key: string) => `translated:${key}`),
+}));
+
+vi.mock('../export/runtime/tab-message-routing', (_importOriginal) => ({
+  consumePopupExportLaunchIntentForActiveTab: mocks.consumePopupExportLaunchIntentMock,
 }));
 
 vi.mock('../../../platform/i18n', (_importOriginal) => ({
@@ -28,6 +33,7 @@ function createParams() {
     refreshGalleryStatus: vi.fn(async () => undefined),
     setDisplayMode: vi.fn(),
     setHomeError: vi.fn(),
+    setPage: vi.fn(),
     setIsReady: vi.fn(),
     setMicrophoneDevices: vi.fn(),
     setWebcamDevices: vi.fn(),
@@ -113,6 +119,8 @@ function expectBootstrappedStateApplied(
 
 beforeEach(() => {
   mocks.bootstrapPopupStateMock.mockReset();
+  mocks.consumePopupExportLaunchIntentMock.mockReset();
+  mocks.consumePopupExportLaunchIntentMock.mockResolvedValue(null);
   mocks.errorMock.mockReset();
   mocks.translateMock.mockClear();
 });
@@ -219,4 +227,38 @@ it('waits for secondary refresh before marking the popup ready', async () => {
   await bootstrapPromise;
 
   expect(params.setIsReady).toHaveBeenCalledWith(true);
+});
+
+it('applies a consumed export launch intent before popup readiness', async () => {
+  const params = createParams();
+  mocks.bootstrapPopupStateMock.mockResolvedValue(createBootstrapState());
+  mocks.consumePopupExportLaunchIntentMock.mockResolvedValueOnce('export');
+
+  await bootstrapPopupLifecycle({
+    cancelledRef: () => false,
+    getParams: () => params,
+  });
+
+  expect(params.setPage).toHaveBeenCalledWith('export');
+  expect(params.setPage.mock.invocationCallOrder[0]).toBeLessThan(
+    params.setIsReady.mock.invocationCallOrder[0]!
+  );
+});
+
+it('keeps ordinary popup navigation when launch-intent delivery fails', async () => {
+  const params = createParams();
+  mocks.bootstrapPopupStateMock.mockResolvedValue(createBootstrapState());
+  mocks.consumePopupExportLaunchIntentMock.mockRejectedValueOnce(new Error('route unavailable'));
+
+  await bootstrapPopupLifecycle({
+    cancelledRef: () => false,
+    getParams: () => params,
+  });
+
+  expect(params.setPage).not.toHaveBeenCalled();
+  expect(params.setIsReady).toHaveBeenCalledWith(true);
+  expect(mocks.errorMock).toHaveBeenCalledWith(
+    'Failed to consume popup export launch intent',
+    expect.any(Error)
+  );
 });

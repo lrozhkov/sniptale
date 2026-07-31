@@ -14,9 +14,4 @@ export {
   disablePreparationByCapability,
   enablePreparationByCapability,
 } from './page-preparation/route';
-export {
-  isPageStyleRuntimeMessage,
-  pageStyleRuntimeMessageTypes,
-  routePageStyleRuntimeMessage,
-} from './page-style-runtime/route';
 export { handleQuickAction } from './quick-actions';

@@ -2,6 +2,24 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
+
+const highlighterState = vi.hoisted(() => ({ enabled: true, paused: false }));
+
+vi.mock('../../highlighter', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../highlighter')>();
+  return {
+    ...actual,
+    isHighlighterEnabled: () => highlighterState.enabled,
+    isHighlighterPausedState: () => highlighterState.paused,
+    pauseHighlighter: () => {
+      highlighterState.paused = true;
+    },
+    resumeHighlighter: () => {
+      highlighterState.paused = false;
+    },
+  };
+});
+
 import { createFrameSelectionEventHandlers } from './activation';
 import { pauseHighlighter, resumeHighlighter } from '../../highlighter';
 
@@ -37,6 +55,7 @@ function createHandlers(
 }
 
 afterEach(() => {
+  highlighterState.enabled = true;
   resumeHighlighter();
   document.body.replaceChildren();
   vi.unstubAllGlobals();
@@ -70,6 +89,25 @@ describe('frame selection events', () => {
 
     expect(actions.selectFrame).toHaveBeenCalledWith('frame-1', { x: 90, y: 50 });
     expect(event.defaultPrevented).toBe(true);
+  });
+
+  it.each([
+    { area: 'border', clientX: 101, clientY: 150 },
+    { area: 'interior', clientX: 190, clientY: 150 },
+  ])('lets a primary click in the frame $area pass outside highlighter mode', (point) => {
+    const { actions, handlers } = createHandlers();
+    const event = new MouseEvent('click', {
+      button: 0,
+      cancelable: true,
+      clientX: point.clientX,
+      clientY: point.clientY,
+    });
+    highlighterState.enabled = false;
+
+    handlers.click(event);
+
+    expect(actions.selectFrame).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it('leaves a secondary click in the frame interior untouched', () => {

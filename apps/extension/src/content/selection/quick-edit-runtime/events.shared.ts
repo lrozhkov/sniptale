@@ -1,13 +1,12 @@
 import { isContentOwnedElement } from '../../platform/dom-host';
 import { resolvePagePreparationTarget } from '../../parser/page-preparation/target';
-import { isQuickEditStyleInspectableElement, isQuickEditTextElement } from './elements';
+import { isQuickEditTextElement } from './elements';
 
 export interface QuickEditRuntimeEventOptions {
   isEnabled: () => boolean;
   isDocumentModeEnabled: () => boolean;
   editingElementsSize: () => number;
   hideHoverOverlay: () => void;
-  isStyleInspectorModeEnabled: () => boolean;
   showHoverOverlay: (element: HTMLElement) => void;
   makeElementEditable: (element: HTMLElement) => void;
   finishEditing: (element: HTMLElement) => void;
@@ -46,8 +45,4 @@ export function resolveActiveQuickEditElement(target: EventTarget | null): HTMLE
 
 export function isQuickEditTextTarget(target: HTMLElement): boolean {
   return target.nodeType === Node.ELEMENT_NODE && isQuickEditTextElement(target);
-}
-
-export function isQuickEditStyleInspectableTarget(target: HTMLElement): boolean {
-  return target.nodeType === Node.ELEMENT_NODE && isQuickEditStyleInspectableElement(target);
 }

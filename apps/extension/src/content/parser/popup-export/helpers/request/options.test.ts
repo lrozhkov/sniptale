@@ -17,6 +17,32 @@ it('accepts only complete popup export option records with boolean flags', () =>
   ).toBe(true);
   expect(
     isPopupExportOptions({
+      includeAnnotations: true,
+      includeJson: true,
+      includeMarkdown: true,
+      includeFiles: false,
+      includeImages: true,
+      includeBasicLogs: false,
+      includeHarDomLogs: true,
+      includeCssDiagnostics: false,
+      includeFullPageScreenshot: true,
+    })
+  ).toBe(true);
+  expect(
+    isPopupExportOptions({
+      includeAnnotations: 'yes',
+      includeJson: true,
+      includeMarkdown: true,
+      includeFiles: false,
+      includeImages: true,
+      includeBasicLogs: false,
+      includeHarDomLogs: true,
+      includeCssDiagnostics: false,
+      includeFullPageScreenshot: true,
+    })
+  ).toBe(false);
+  expect(
+    isPopupExportOptions({
       includeJson: true,
       includeMarkdown: true,
       includeFiles: false,

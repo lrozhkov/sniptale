@@ -92,20 +92,6 @@ it('classifies viewer-routed popup export messages as background tab messages', 
   expect(isBackgroundTabMessage(message)).toBe(true);
 });
 
-it('classifies page style runtime messages as background tab messages', () => {
-  const summaryMessage = {
-    tabId: 7,
-    type: MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY,
-  };
-  const openMessage = {
-    targetTab: 'rules',
-    type: MessageType.OPEN_PAGE_STYLE_INSPECTOR,
-  };
-
-  expect(isBackgroundTabMessage(summaryMessage)).toBe(true);
-  expect(isBackgroundTabMessage(openMessage)).toBe(true);
-});
-
 it('classifies recording start cancellation as a video control tab message', () => {
   const message = { type: VideoMessageType.CANCEL_RECORDING_START };
 

@@ -37,10 +37,6 @@ import type {
   PopupTabRouteOperation,
 } from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/popup-export';
 import type {
-  RuntimePageStyleRequestByType,
-  RuntimePageStyleResponseByType,
-} from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/page-style';
-import type {
   RuntimeActionSaveRequestByType,
   RuntimeActionSaveResponseByType,
 } from '../runtime/actions/save.types.ts';
@@ -213,11 +209,9 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
 export type RuntimeCoreRequestByType = RuntimeCoreBaseRequestByType &
   RuntimeContentActionRequestByType &
   RuntimePopupExportRequestByType &
-  RuntimeScenarioRequestByType &
-  RuntimePageStyleRequestByType;
+  RuntimeScenarioRequestByType;
 
 export type RuntimeCoreResponseByType = RuntimeCoreBaseResponseByType &
   RuntimeContentActionResponseByType &
   RuntimePopupExportResponseByType &
-  RuntimeScenarioResponseByType &
-  RuntimePageStyleResponseByType;
+  RuntimeScenarioResponseByType;

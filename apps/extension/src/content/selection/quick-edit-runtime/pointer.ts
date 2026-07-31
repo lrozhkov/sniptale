@@ -1,7 +1,6 @@
 import type { QuickEditRuntimeEventOptions } from './events.shared';
 import {
   isQuickEditOwnedElement,
-  isQuickEditStyleInspectableTarget,
   isQuickEditTextTarget,
   resolveQuickEditTarget,
 } from './events.shared';
@@ -64,11 +63,7 @@ export function handleQuickEditMouseMove(
     return;
   }
 
-  const isInspectableTarget = options.isStyleInspectorModeEnabled()
-    ? isQuickEditStyleInspectableTarget(target)
-    : isQuickEditTextTarget(target);
-
-  if (isInspectableTarget) {
+  if (isQuickEditTextTarget(target)) {
     options.showHoverOverlay(target);
   } else {
     options.hideHoverOverlay();
@@ -90,13 +85,6 @@ export function handleQuickEditClick(
 
   const target = resolveQuickEditTarget(event, iframe);
   if (!target || isQuickEditOwnedElement(target)) {
-    return;
-  }
-
-  if (options.isStyleInspectorModeEnabled() && isQuickEditStyleInspectableTarget(target)) {
-    event.preventDefault();
-    event.stopPropagation();
-    options.hideHoverOverlay();
     return;
   }
 

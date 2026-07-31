@@ -3,6 +3,7 @@ import { translate } from '../../../../platform/i18n';
 import { disableNavigationLock, enableNavigationLock } from '../../../selection/locker';
 
 export function resolveToolbarNavigationLockMode(params: {
+  designReviewMode: boolean;
   highlighterMode: boolean;
   quickEditMode: boolean;
   screenshotMode: boolean;
@@ -11,6 +12,10 @@ export function resolveToolbarNavigationLockMode(params: {
 }): boolean | null {
   if (params.highlighterMode || params.quickEditMode || params.aiPickMode) {
     return true;
+  }
+
+  if (params.designReviewMode) {
+    return false;
   }
 
   if (params.isCursorMode) {
@@ -26,6 +31,7 @@ export function resolveToolbarNavigationLockMode(params: {
 
 export function useToolbarManagedNavigationEffect(params: {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   highlighterMode: boolean;
   isCursorMode: boolean;
   quickEditMode: boolean;
@@ -37,6 +43,7 @@ export function useToolbarManagedNavigationEffect(params: {
 }) {
   const {
     aiPickMode,
+    designReviewMode,
     highlighterMode,
     isCursorMode,
     quickEditMode,
@@ -47,6 +54,7 @@ export function useToolbarManagedNavigationEffect(params: {
     setNavigationLockEnabled,
   } = params;
   const nextLockMode = resolveToolbarNavigationLockMode({
+    designReviewMode,
     highlighterMode,
     isCursorMode,
     quickEditMode,
@@ -62,6 +70,7 @@ export function useToolbarManagedNavigationEffect(params: {
     });
   }, [
     aiPickMode,
+    designReviewMode,
     highlighterMode,
     isCursorMode,
     quickEditMode,
@@ -98,6 +107,7 @@ function syncToolbarManagedNavigation(params: {
 
 export function resolveToolbarLockPresentation(params: {
   aiPickMode: boolean;
+  designReviewMode: boolean;
   highlighterMode: boolean;
   isCursorMode: boolean;
   navigationLockEnabled: boolean;
@@ -108,6 +118,7 @@ export function resolveToolbarLockPresentation(params: {
   const lockDisabled =
     !params.screenshotMode ||
     params.isCursorMode ||
+    params.designReviewMode ||
     params.highlighterMode ||
     params.quickEditMode ||
     params.aiPickMode ||

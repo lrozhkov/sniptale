@@ -38,8 +38,13 @@ export function isSelectionDelegatedMode(): boolean {
   return (
     isContentModeEnabled('ai-pick') ||
     isContentModeEnabled('selection-mode') ||
-    isContentModeEnabled('highlighter')
+    isContentModeEnabled('highlighter') ||
+    isContentModeEnabled('design-review')
   );
+}
+
+function isDesignReviewPickerActive(): boolean {
+  return isContentModeEnabled('design-review');
 }
 
 export function handleResolvedNavigationTarget(
@@ -58,7 +63,7 @@ export function handleResolvedNavigationTarget(
     return false;
   }
 
-  blockEvent(event);
+  blockNavigationEvent(event);
   return true;
 }
 
@@ -79,6 +84,18 @@ export function blockEvent(event: Event): void {
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
+}
+
+/**
+ * Blocks host-page navigation while allowing the Design Review picker listener on
+ * the same capture target to observe the event and select the underlying element.
+ */
+export function blockNavigationEvent(event: Event): void {
+  event.preventDefault();
+  event.stopPropagation();
+  if (!isDesignReviewPickerActive()) {
+    event.stopImmediatePropagation();
+  }
 }
 
 export function getLockRoutingTarget(event: Event): HTMLElement | null {
@@ -106,10 +123,13 @@ function handleNavigationLink(event: Event, link: HTMLAnchorElement): boolean {
     (fullHref && isGwtInternalTabLink(fullHref)) ||
     (hrefAttr && isGwtInternalTabLink(hrefAttr))
   ) {
+    if (isDesignReviewPickerActive()) {
+      blockNavigationEvent(event);
+    }
     return true;
   }
 
-  blockEvent(event);
+  blockNavigationEvent(event);
   return true;
 }
 
@@ -125,6 +145,10 @@ function handleFullLockInteractiveTarget(
   isFullLockMode: boolean
 ): void {
   if (!interactiveTarget) {
+    return;
+  }
+
+  if (isDesignReviewPickerActive()) {
     return;
   }
 

@@ -7,7 +7,8 @@ export const TAB_ACTION_ROUTE_CONTRACTS = {
     freshnessReplayPolicy: 'resolved tab, frame, document, capability, or HAR session must match',
     requiredAuthority: 'privileged tab capture authorization policy',
     responseShape: 'capture/tab route response contract',
-    sideEffects: 'screenshot capture, editor open, staged download, HAR, gallery, or web snapshot',
+    sideEffects:
+      'screenshot capture, editor open, annotation or staged download, popup launch, HAR, gallery, or web snapshot',
     transitiveStateOwner: 'capture routing and media-hub storage owners',
   },
   'gallery-update-capability': {
@@ -27,15 +28,6 @@ export const TAB_ACTION_ROUTE_CONTRACTS = {
     responseShape: 'gallery update capability grant response',
     sideEffects: 'issues a scoped gallery update lease',
     transitiveStateOwner: 'gallery update capability owner',
-  },
-  'page-style-privileged-tab-route': {
-    acceptedSenderClass: 'owned content tab or extension page routed to an authorized tab',
-    errorShape: 'page-style tab route error response',
-    freshnessReplayPolicy: 'resolved tab/page state must match before applying or inspecting rules',
-    requiredAuthority: 'privileged tab page-style authorization policy',
-    responseShape: 'page-style route response',
-    sideEffects: 'page-style inspection, rule summary, and storage-backed runtime effects',
-    transitiveStateOwner: 'page-style runtime and shared page-style storage owners',
   },
   'popup-export-tab-route-capability': {
     acceptedSenderClass: 'popup or viewer route presenting one-shot tab-route capability',

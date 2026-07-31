@@ -76,6 +76,8 @@ function createStepBadgeTemplate(auto = true): StepBadgeSettings {
 
 function createBuildArgs() {
   setFrameSessionBorderPreset(createHighlighterSettings().borderPresets[0]!);
+  const element = document.createElement('button');
+  document.body.append(element);
   const borderSettings: BorderPreset = {
     id: 'coords-border',
     name: 'Coords',
@@ -105,7 +107,7 @@ function createBuildArgs() {
         borderSettings: nextBorder ?? borderSettings,
         width: 100,
       }),
-    element: document.createElement('button'),
+    element,
     globalEffectModeRef: { current: 'border' as const },
     globalStepBadgeAutoModeRef: { current: true },
     sessionBlurSettingsRef: { current: createBlurSettings() },

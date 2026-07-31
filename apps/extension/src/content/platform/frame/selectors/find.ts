@@ -5,12 +5,14 @@ import type { CompositeSelector } from './types';
 
 const logger = createLogger({ namespace: 'iframe-utils' });
 
-export function findElementByCompositeSelector(composite: CompositeSelector): HTMLElement | null {
+const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
+
+export function findElementByCompositeSelector(composite: CompositeSelector): Element | null {
   let doc: Document = document;
 
   if (composite.iframeSelector) {
-    const iframe = document.querySelector(composite.iframeSelector) as HTMLIFrameElement | null;
-    if (!iframe) {
+    const iframe = document.querySelector(composite.iframeSelector);
+    if (!(iframe instanceof HTMLIFrameElement)) {
       logger.warn(`Iframe not found: ${composite.iframeSelector}`);
       return null;
     }
@@ -23,12 +25,12 @@ export function findElementByCompositeSelector(composite: CompositeSelector): HT
     doc = iframe.contentDocument!;
   }
 
-  return doc.querySelector(composite.elementSelector) as HTMLElement | null;
+  return doc.querySelector(composite.elementSelector);
 }
 
-function findElementBySelectorInDocument(doc: Document, selector: string): HTMLElement | null {
+function findElementBySelectorInDocument(doc: Document, selector: string): Element | null {
   try {
-    return doc.querySelector(selector) as HTMLElement | null;
+    return doc.querySelector(selector);
   } catch {
     return null;
   }
@@ -37,7 +39,7 @@ function findElementBySelectorInDocument(doc: Document, selector: string): HTMLE
 function findElementBySelectorInNestedIframes(
   iframes: Iterable<HTMLIFrameElement>,
   selector: string
-): HTMLElement | null {
+): Element | null {
   for (const iframe of iframes) {
     try {
       const iframeDoc = getIframeDocument(iframe);
@@ -67,7 +69,7 @@ function findElementBySelectorInNestedIframes(
   return null;
 }
 
-export function findElementBySelector(selector: string): HTMLElement | null {
+export function findElementBySelector(selector: string): Element | null {
   const composite = parseCompositeSelector(selector);
   if (composite.iframeSelector) {
     return findElementByCompositeSelector(composite);
@@ -79,4 +81,9 @@ export function findElementBySelector(selector: string): HTMLElement | null {
   }
 
   return findElementBySelectorInNestedIframes(getAccessibleIframes(), selector);
+}
+
+export function findHtmlElementBySelector(selector: string): HTMLElement | null {
+  const element = findElementBySelector(selector);
+  return element?.namespaceURI === HTML_NAMESPACE ? (element as HTMLElement) : null;
 }

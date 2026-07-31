@@ -37,7 +37,6 @@ export type ActionRouteAuthorityFamily =
   | 'internal-signal'
   | 'offscreen-runtime-capability'
   | 'page-access-owner'
-  | 'page-style-privileged-tab-route'
   | 'popup-export-archive-download'
   | 'popup-export-tab-route-capability'
   | 'popup-tab-route-capability-issuance'

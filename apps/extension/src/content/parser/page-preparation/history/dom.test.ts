@@ -8,10 +8,21 @@ import {
   captureDomStateMap,
   createDomMutationBatch,
 } from './dom';
+import { clearHistoryDomLocators } from './dom-locators';
+import type { PageDomElementState } from './types';
 
 afterEach(() => {
+  clearHistoryDomLocators();
   document.body.replaceChildren();
 });
+
+function readAttributeValue(state: PageDomElementState, name: string): string | undefined {
+  return state.attributes[name];
+}
+
+function readAttributeRecord(state: PageDomElementState): Record<string, string> {
+  return state.attributes;
+}
 
 function verifyDropsUnsafeCapturedUrlSchemes() {
   const link = document.createElement('a');
@@ -25,9 +36,9 @@ function verifyDropsUnsafeCapturedUrlSchemes() {
   const vbscriptLink = document.createElement('a');
   vbscriptLink.setAttribute('href', 'vbscript:msgbox("x")');
 
-  expect(captureDomElementState(link).attributes).toEqual({ title: 'safe' });
-  expect(captureDomElementState(image).attributes).toEqual({ alt: 'preview' });
-  expect(captureDomElementState(vbscriptLink).attributes).toEqual({});
+  expect(readAttributeRecord(captureDomElementState(link))).toEqual({ title: 'safe' });
+  expect(readAttributeRecord(captureDomElementState(image))).toEqual({ alt: 'preview' });
+  expect(readAttributeRecord(captureDomElementState(vbscriptLink))).toEqual({});
 }
 
 function verifyPreservesSafeUrlSchemes() {
@@ -41,15 +52,15 @@ function verifyPreservesSafeUrlSchemes() {
   const mailLink = document.createElement('a');
   mailLink.setAttribute('href', 'mailto:test@example.com');
 
-  expect(captureDomElementState(link).attributes).toEqual({
+  expect(readAttributeRecord(captureDomElementState(link))).toEqual({
     href: '/docs/help',
     rel: 'noopener noreferrer',
     target: '_blank',
   });
-  expect(captureDomElementState(image).attributes).toEqual({
+  expect(readAttributeRecord(captureDomElementState(image))).toEqual({
     src: 'https://example.com/image.png',
   });
-  expect(captureDomElementState(mailLink).attributes).toEqual({
+  expect(readAttributeRecord(captureDomElementState(mailLink))).toEqual({
     href: 'mailto:test@example.com',
   });
 }
@@ -66,7 +77,8 @@ function verifyDoesNotRestoreUnsafeUrls() {
   link.setAttribute('href', 'javascript:alert(1)');
   const batch = createDomMutationBatch([link], beforeStates);
 
-  expect(batch.patches[0]?.after.attributes['href']).toBeUndefined();
+  const afterState = batch.patches[0]?.after;
+  expect(afterState && readAttributeValue(afterState, 'href')).toBeUndefined();
 
   link.setAttribute('href', '/safe');
   const result = applyDomMutationBatch(batch, 'redo');
@@ -142,6 +154,30 @@ function verifyRejectsObfuscatedStyleFetchVectors() {
   expect(link.getAttribute('style')).toBeNull();
 }
 
+function verifyRejectsVariableStyleIndirection() {
+  const link = document.createElement('a');
+  link.id = 'history-variable-style-target';
+  link.textContent = 'Open';
+  document.body.append(link);
+
+  const batch = createDomMutationBatch([link]);
+  const nextAttributes = batch.patches[0]?.after.attributes;
+  if (!nextAttributes) {
+    throw new Error('Expected mutation patch attributes');
+  }
+  nextAttributes['style'] = [
+    'background-image: var(--remote-image);',
+    'list-style-image: v\\61r(--remote-list-image);',
+    'font-family: "safe\\\"", var(--remote-font);',
+    'background-image: v\\61\r\nr(--remote-crlf-image);',
+  ].join(' ');
+
+  const result = applyDomMutationBatch(batch, 'redo');
+
+  expect(result).toEqual({ missingLocators: [], success: true });
+  expect(link.getAttribute('style')).toBeNull();
+}
+
 describe('page-preparation-history dom URL capture filtering', () => {
   it(
     'drops unsafe href and src schemes from captured element state',
@@ -162,4 +198,6 @@ describe('page-preparation-history dom replay filtering', () => {
   );
   it('rejects obfuscated CSS fetch vectors during DOM history replay', () =>
     verifyRejectsObfuscatedStyleFetchVectors());
+  it('rejects direct and escaped CSS variable indirection during replay', () =>
+    verifyRejectsVariableStyleIndirection());
 });

@@ -1,13 +1,15 @@
-const CSS_HEX_ESCAPE_PATTERN = /^[0-9a-fA-F]{1,6}\s?/u;
+const CSS_HEX_ESCAPE_PATTERN = /^[0-9a-fA-F]{1,6}[ \n\t]?/u;
 const MAX_CSS_CODE_POINT = 0x10ffff;
 
-interface CssScanState {
-  inBlockComment: boolean;
-  quote: '"' | "'" | null;
+function preprocessCssInput(value: string): string {
+  return value.replace(/\r\n?/g, '\n').replace(/\f/g, '\n').replace(/\0/g, '\uFFFD');
 }
 
 function readCssEscape(value: string, index: number): { nextIndex: number; value: string } {
   const afterSlash = value.slice(index + 1);
+  if (afterSlash.startsWith('\n')) {
+    return { nextIndex: Math.min(index + 2, value.length), value: '' };
+  }
   const hexMatch = CSS_HEX_ESCAPE_PATTERN.exec(afterSlash);
   if (hexMatch) {
     const hexValue = hexMatch[0].trim();
@@ -28,30 +30,49 @@ function readCssEscape(value: string, index: number): { nextIndex: number; value
 }
 
 function normalizeCssForFetchDetection(value: string): string {
+  const source = preprocessCssInput(value);
   let normalized = '';
-  const state: CssScanState = { inBlockComment: false, quote: null };
+  let quote: '"' | "'" | null = null;
 
-  for (let index = 0; index < value.length; ) {
-    const char = value[index] ?? '';
-    const nextChar = value[index + 1] ?? '';
-    if (state.inBlockComment) {
-      if (char === '*' && nextChar === '/') {
-        state.inBlockComment = false;
-        index += 2;
-      } else {
-        index += 1;
+  for (let index = 0; index < source.length; ) {
+    const char = source[index] ?? '';
+    const nextChar = source[index + 1] ?? '';
+    if (quote) {
+      if (char === '\\') {
+        index = readCssEscape(source, index).nextIndex;
+        continue;
       }
+      if (char === '\n') {
+        quote = null;
+        normalized += ' ';
+        index += 1;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      index += 1;
       continue;
     }
 
-    if (!state.quote && char === '/' && nextChar === '*') {
-      state.inBlockComment = true;
+    if (char === '/' && nextChar === '*') {
       index += 2;
+      while (index < source.length && source.slice(index, index + 2) !== '*/') {
+        index += 1;
+      }
+      index = Math.min(index + 2, source.length);
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      normalized += ' ';
+      index += 1;
       continue;
     }
 
     if (char === '\\') {
-      const escaped = readCssEscape(value, index);
+      const escaped = readCssEscape(source, index);
       normalized += escaped.value;
       index = escaped.nextIndex;
       continue;
@@ -114,24 +135,22 @@ function startsCssFunction(value: string, index: number, functionName: string): 
   return value[cursor] === '(';
 }
 
-export function containsUnsafeCssSyntax(value: string): boolean {
+export function containsCssFunction(value: string, functionName: string): boolean {
   const normalized = normalizeCssForFetchDetection(value);
-  let quote: '"' | "'" | null = null;
 
   for (let index = 0; index < normalized.length; index += 1) {
-    const char = normalized[index] ?? '';
-    if (quote) {
-      if (char === quote) {
-        quote = null;
-      }
-      continue;
+    if (startsCssFunction(normalized, index, functionName.toLowerCase())) {
+      return true;
     }
+  }
 
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
+  return false;
+}
 
+export function containsUnsafeCssSyntax(value: string): boolean {
+  const normalized = normalizeCssForFetchDetection(value);
+
+  for (let index = 0; index < normalized.length; index += 1) {
     if (
       normalized.startsWith('@import', index) ||
       startsCssUrlFunction(normalized, index) ||

@@ -19,21 +19,6 @@ const QUICK_EDIT_TEXT_TAGS = [
   'button',
 ];
 
-const QUICK_EDIT_STYLE_TARGET_TAGS = [
-  ...QUICK_EDIT_TEXT_TAGS,
-  'article',
-  'aside',
-  'blockquote',
-  'figure',
-  'figcaption',
-  'footer',
-  'header',
-  'img',
-  'main',
-  'nav',
-  'section',
-];
-
 export function isQuickEditTextElement(element: HTMLElement): boolean {
   const tagName = element.tagName.toLowerCase();
 
@@ -53,19 +38,6 @@ export function isQuickEditTextElement(element: HTMLElement): boolean {
   }
 
   return true;
-}
-
-export function isQuickEditStyleInspectableElement(element: HTMLElement): boolean {
-  const tagName = element.tagName.toLowerCase();
-  if (!QUICK_EDIT_STYLE_TARGET_TAGS.includes(tagName) || isContentOwnedElement(element)) {
-    return false;
-  }
-
-  if (element instanceof HTMLImageElement) {
-    return true;
-  }
-
-  return isQuickEditTextElement(element) || element.children.length > 0;
 }
 
 export function buildEditableElementRecord(element: HTMLElement): EditableElement {

@@ -1,4 +1,5 @@
 import { isUiRuntimeBridgeMessage } from '../../../application/message-listener/ownership';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { parseRuntimeMessageRequest } from './guards';
 import {
   createPassiveRuntimeMessageHandler,
@@ -49,7 +50,10 @@ export function createRuntimeMessageHandler(
     }
 
     if (handleScreenshotModeMessage(typedRequest, params, sendResponse)) {
-      return false;
+      return (
+        typedRequest.type === MessageType.DISABLE_SCREENSHOT_MODE ||
+        typedRequest.type === MessageType.DESTROY_UI_TOOLBAR
+      );
     }
 
     return handlePassiveRuntimeMessage(typedRequest, sendResponse);

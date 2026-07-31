@@ -2,6 +2,7 @@ import { ToolbarCaptureActions } from '../capture';
 import type { useToolbarViewModel } from '../state/view-model';
 import type { ToolbarProps } from '../types';
 import { ToolbarUtilityButtons } from './utilities';
+import { ToolbarDesignReviewControls } from './design-review';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
@@ -36,7 +37,7 @@ function resolveScenarioCaptureProps(
   toolbarProps: ToolbarProps,
   viewModel: ToolbarViewModel
 ): ToolbarProps['scenario'] | undefined {
-  return viewModel.screenshotMode && viewModel.captureAction === 'scenario'
+  return viewModel.screenshotMode && viewModel.capture.action === 'scenario'
     ? toolbarProps.scenario
     : undefined;
 }
@@ -73,7 +74,7 @@ function createCaptureActionProps(args: {
   return {
     screenshotMode: args.viewModel.screenshotMode,
     isLoading: args.viewModel.derivedState.isLoading,
-    captureAction: args.viewModel.captureAction,
+    captureAction: args.viewModel.capture.action,
     compactMenus: args.viewModel.derivedState.compactMenus,
     displayMode: args.viewModel.derivedState.displayMode,
     pinToTab: args.toolbarProps.pinToTab ?? false,
@@ -82,10 +83,10 @@ function createCaptureActionProps(args: {
     onCompactMenusChange: args.viewModel.derivedState.setCompactMenus,
     onDisplayModeChange: args.viewModel.derivedState.setDisplayMode,
     onPinToTabChange: args.toolbarProps.onPinToTabChange ?? (() => undefined),
-    onCaptureActionChange: args.viewModel.setCaptureAction,
+    onCaptureActionChange: args.viewModel.capture.setAction,
     onClose: args.toolbarProps.onHide,
-    onDisableScreenshotMode: () => {
-      void args.viewModel.toggleMode('screenshot');
+    onDisableScreenshotMode: (activationEvent?: Event) => {
+      void args.viewModel.toggleMode('screenshot', activationEvent);
     },
     timerDelay: args.toolbarProps.timerDelay,
     onTimerDelayChange: args.toolbarProps.onTimerDelayChange,
@@ -129,6 +130,15 @@ export function ToolbarSecondaryControls(props: {
 
   return (
     <>
+      {viewModel.designReviewMode ? (
+        <ToolbarDesignReviewControls
+          compactMenus={viewModel.derivedState.compactMenus}
+          displayMode={viewModel.derivedState.displayMode}
+          panelOpen={toolbarProps.designReviewPanelOpen ?? false}
+          toolbarMenuState={viewModel.toolbarMenuState}
+          onTogglePanel={toolbarProps.onToggleDesignReviewPanel ?? (() => undefined)}
+        />
+      ) : null}
       <ToolbarUtilityButtons
         {...createUtilityButtonsProps({
           interactionMode,

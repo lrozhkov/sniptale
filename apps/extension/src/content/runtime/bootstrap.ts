@@ -8,10 +8,7 @@ import { createRegionSelectorController } from '../selection/region-selector';
 import { disableHighlighterMode } from '../selection/highlighter';
 import { disableAiPickModeIfLoaded } from '../overlay/ai/pick/runtime/lazy';
 import { disableQuickEditMode } from '../selection/quick-edit';
-import {
-  disposePageStyleRuntime,
-  initializePageStyleRuntime,
-} from '../selection/quick-edit/page-style';
+import { disableDesignReviewMode } from '../selection/design-review';
 import { disableSelectionMode } from '../selection/selection-mode';
 import { hideVideoCountdown } from '../overlay/video-countdown';
 import { disableVideoAnnotations } from '../overlay/video-annotations';
@@ -131,7 +128,6 @@ export function initializeTopLevelContentRuntime(
   const lifecycle: ContentRuntimeLifecycle = { disposed: false };
   const fullPageCaptureAgent = createFullPageCaptureAgent();
 
-  initializePageStyleRuntime();
   const unsubscribe = browserRuntime.subscribeToMessages(
     createContentRuntimeMessageListener(getViewportInfo, {
       fullPageCaptureAgent,
@@ -147,9 +143,9 @@ export function initializeTopLevelContentRuntime(
       { resource: 'full-page capture agent', run: () => fullPageCaptureAgent.dispose() },
       { resource: 'highlighter mode', run: disableHighlighterMode },
       { resource: 'quick edit mode', run: disableQuickEditMode },
+      { resource: 'design review mode', run: disableDesignReviewMode },
       { resource: 'AI pick mode', run: disableAiPickModeIfLoaded },
       { resource: 'selection mode', run: disableSelectionMode },
-      { resource: 'page style runtime', run: disposePageStyleRuntime },
       { resource: 'video countdown', run: hideVideoCountdown },
       { resource: 'video annotations', run: disableVideoAnnotations },
       { resource: 'video telemetry', run: disableVideoTelemetry },

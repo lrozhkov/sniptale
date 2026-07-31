@@ -1,6 +1,5 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { isOwnedSnapshotViewerPage } from '../../../../../features/tab-capabilities/url';
-import { isPageStyleRuntimeMessage } from '../../../../capture/routes';
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
 import { isPopupExportViewerMessage, isTabModeMessage } from '../../message-guards/guards/tab';
 import { authorizeIPCMessage } from '../../authorization/index';
@@ -86,7 +85,7 @@ function isPopupCurrentTabMessage(message: unknown): boolean {
   }
 
   const runtimeMessage = message as { type: string };
-  return isTabModeMessage(runtimeMessage) || isPageStyleRuntimeMessage(runtimeMessage);
+  return isTabModeMessage(runtimeMessage);
 }
 
 function readMessageType(message: object): unknown {

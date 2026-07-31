@@ -13,11 +13,13 @@ import type {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { MicrophoneOption } from '../../recording/microphone';
 import type { WebcamOption } from '../../recording/webcam';
+import type { PopupPage } from '../navigation/actions';
 
 export type PopupLifecycleBootstrapParams = {
   refreshActiveTabCapabilities: () => Promise<void>;
   refreshGalleryStatus: () => Promise<void>;
   setHomeError: Dispatch<SetStateAction<string | null>>;
+  setPage: Dispatch<SetStateAction<PopupPage>>;
   setViewportPresets: Dispatch<SetStateAction<ViewportPreset[]>>;
   setQuickActions: Dispatch<SetStateAction<QuickAction[]>>;
   setQuickActionsReady: Dispatch<SetStateAction<boolean>>;

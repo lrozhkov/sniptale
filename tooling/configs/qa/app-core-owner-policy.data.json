@@ -267,11 +267,6 @@
       "ownerClass": "persistence"
     },
     {
-      "sourcePrefix": "apps/extension/src/composition/persistence/page-style",
-      "ownerId": "persistence.page-style",
-      "ownerClass": "persistence"
-    },
-    {
       "sourcePrefix": "apps/extension/src/composition/persistence/popup-export-preferences",
       "ownerId": "persistence.popup-export-preferences",
       "ownerClass": "persistence"
@@ -411,11 +406,6 @@
     {
       "id": "media-library",
       "path": "apps/extension/src/composition/persistence/media-library",
-      "stateKind": "authoritative-durable"
-    },
-    {
-      "id": "page-style",
-      "path": "apps/extension/src/composition/persistence/page-style",
       "stateKind": "authoritative-durable"
     },
     {

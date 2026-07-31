@@ -49,6 +49,7 @@ function createFrameManager() {
 
 const mocks = vi.hoisted(() => {
   const refs = createRefs();
+  const synchronizedSetFrames = vi.fn();
   const bridge = {
     applySnapshot: vi.fn(),
     captureSnapshot: vi.fn(),
@@ -64,10 +65,12 @@ const mocks = vi.hoisted(() => {
     bridge,
     createHistoryWrappedFrameManager: vi.fn(() => wrappedFrameManager),
     createPagePreparationHistoryBridge: vi.fn(() => bridge),
+    createSynchronizedFrameSetter: vi.fn(() => synchronizedSetFrames),
     frameManager,
     refs,
     registerBridge: vi.fn(),
     syncFrameManagerStateRefs: vi.fn(),
+    synchronizedSetFrames,
     unregisterBridge: vi.fn(),
     useFrameContainer: vi.fn(),
     useFrameManagerControllers: vi.fn(() => frameManager),
@@ -87,6 +90,7 @@ vi.mock('../../../parser/page-preparation/history', async (importOriginal) => ({
 }));
 
 vi.mock('./useFrameManagerRefs', () => ({
+  createSynchronizedFrameSetter: mocks.createSynchronizedFrameSetter,
   syncFrameManagerStateRefs: mocks.syncFrameManagerStateRefs,
   useFrameContainer: mocks.useFrameContainer,
   useFrameManagerRefs: mocks.useFrameManagerRefs,
@@ -134,6 +138,7 @@ describe('useFrameManager', () => {
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     mocks.createHistoryWrappedFrameManager.mockClear();
+    mocks.createSynchronizedFrameSetter.mockClear();
     mocks.createPagePreparationHistoryBridge.mockClear();
     mocks.registerBridge.mockClear();
     mocks.syncFrameManagerStateRefs.mockClear();
@@ -164,18 +169,25 @@ async function expectFrameManagerOrchestration() {
   await renderHarness();
 
   expect(mocks.syncFrameManagerStateRefs).toHaveBeenCalledWith([], new Map(), mocks.refs);
-  expect(mocks.useHistoryCommitCoordinator).toHaveBeenCalledWith([]);
+  expect(mocks.createSynchronizedFrameSetter).toHaveBeenCalledWith(
+    expect.any(Function),
+    mocks.refs.framesRef
+  );
+  expect(mocks.useHistoryCommitCoordinator).toHaveBeenCalledWith({
+    framesRef: mocks.refs.framesRef,
+    setFrames: mocks.synchronizedSetFrames,
+  });
   expect(mocks.useFrameManagerControllers).toHaveBeenCalledWith({
     frames: [],
     InteractiveFrameComponent,
     refs: mocks.refs,
-    setFrames: expect.any(Function),
+    setFrames: mocks.synchronizedSetFrames,
     setFrameStates: expect.any(Function),
     withHistoryCommit: mocks.withHistoryCommit,
   });
   expect(mocks.createPagePreparationHistoryBridge).toHaveBeenCalledWith({
     refs: mocks.refs,
-    setFrames: expect.any(Function),
+    setFrames: mocks.synchronizedSetFrames,
     setFrameStates: expect.any(Function),
   });
   expect(mocks.createHistoryWrappedFrameManager).toHaveBeenCalledWith(

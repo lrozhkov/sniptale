@@ -3,6 +3,7 @@ import { getCanExport } from './';
 
 const baseArgs = {
   exportDisabledReason: null,
+  includeAnnotations: false,
   includeBasicLogs: false,
   includeCssDiagnostics: false,
   includeFiles: false,
@@ -14,6 +15,10 @@ const baseArgs = {
   isExporting: false,
   selectedCount: 1,
 };
+
+it('allows export with only annotations enabled', () => {
+  expect(getCanExport({ ...baseArgs, includeAnnotations: true })).toBe(true);
+});
 
 it('allows export with only basic logs enabled', () => {
   expect(

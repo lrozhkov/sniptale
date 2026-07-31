@@ -3,6 +3,10 @@ import { useCallback, useEffect, useRef } from 'react';
 import { registerFrameCallbacks } from '../../../selection/highlighter';
 import { disableNavigationLock } from '../../../selection/locker';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
+import {
+  browserAnnotationSession,
+  subscribeToBrowserAnnotationDocumentNavigation,
+} from '../../../parser/page-preparation/annotations';
 import type { InteractiveFrameComponent } from '../../../selection/frame-runtime/roots/component';
 import type {
   ContentAppModeControls,
@@ -20,7 +24,11 @@ interface ContentAppBindingsParams {
   InteractiveFrameComponent: InteractiveFrameComponent;
   modeControls: Pick<
     ContentAppModeControls,
-    'setAiPickMode' | 'setHighlighterMode' | 'setQuickEditDocumentMode' | 'setQuickEditMode'
+    | 'setAiPickMode'
+    | 'setDesignReviewMode'
+    | 'setHighlighterMode'
+    | 'setQuickEditDocumentMode'
+    | 'setQuickEditMode'
   > &
     Pick<ContentAppVisibilityState, 'setIsToolbarVisible'>;
   modeFlags: ContentAppModeFlags;
@@ -36,7 +44,8 @@ function useNavigationLockCleanup(modeFlags: ContentAppModeFlags) {
       modeFlags.screenshotMode ||
       modeFlags.highlighterMode ||
       modeFlags.quickEditMode ||
-      modeFlags.aiPickMode
+      modeFlags.aiPickMode ||
+      modeFlags.designReviewMode
     ) {
       return;
     }
@@ -44,22 +53,25 @@ function useNavigationLockCleanup(modeFlags: ContentAppModeFlags) {
     disableNavigationLock();
   }, [
     modeFlags.aiPickMode,
+    modeFlags.designReviewMode,
     modeFlags.highlighterMode,
     modeFlags.quickEditMode,
     modeFlags.screenshotMode,
   ]);
 }
 
-function usePagePreparationHistoryReset(screenshotMode: boolean) {
-  const prevScreenshotModeRef = useRef(screenshotMode);
-
-  useEffect(() => {
-    if (prevScreenshotModeRef.current && !screenshotMode) {
-      pagePreparationHistory.clear();
-    }
-
-    prevScreenshotModeRef.current = screenshotMode;
-  }, [screenshotMode]);
+function useBrowserAnnotationDocumentReset(clearFrames: () => void) {
+  useEffect(
+    () =>
+      subscribeToBrowserAnnotationDocumentNavigation({
+        onNavigation: () => {
+          clearFrames();
+          browserAnnotationSession.resetForDocument();
+          pagePreparationHistory.clear();
+        },
+      }),
+    [clearFrames]
+  );
 }
 
 function useFrameCallbackRegistration(args: {
@@ -96,8 +108,13 @@ function useFrameCallbackRegistration(args: {
 export function useContentAppBindings(params: ContentAppBindingsParams) {
   const { modeControls } = params;
   const { setPinnedToolbarVisible } = params.visibilityState;
-  const { setAiPickMode, setHighlighterMode, setQuickEditDocumentMode, setQuickEditMode } =
-    modeControls;
+  const {
+    setAiPickMode,
+    setDesignReviewMode,
+    setHighlighterMode,
+    setQuickEditDocumentMode,
+    setQuickEditMode,
+  } = modeControls;
   const frameManager = useFrameManager({
     InteractiveFrameComponent: params.InteractiveFrameComponent,
   });
@@ -106,9 +123,9 @@ export function useContentAppBindings(params: ContentAppBindingsParams) {
   }, [setPinnedToolbarVisible]);
 
   useFrameUIController({ frames: frameManager.frames });
+  useBrowserAnnotationDocumentReset(frameManager.clearFrames);
   useQuickActionHotkeys();
   useNavigationLockCleanup(params.modeFlags);
-  usePagePreparationHistoryReset(params.modeFlags.screenshotMode);
   useFrameCallbackRegistration({
     addFrame: frameManager.addFrame,
     addFreeFrame: frameManager.addFreeFrame,
@@ -125,9 +142,11 @@ export function useContentAppBindings(params: ContentAppBindingsParams) {
   });
   useModeDisabledListener({
     aiPickMode: params.modeFlags.aiPickMode,
+    designReviewMode: params.modeFlags.designReviewMode,
     highlighterMode: params.modeFlags.highlighterMode,
     quickEditMode: params.modeFlags.quickEditMode,
     setAiPickMode,
+    setDesignReviewMode,
     setHighlighterMode,
     setQuickEditDocumentMode,
     setQuickEditMode,

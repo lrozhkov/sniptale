@@ -1,13 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { classifyRuntimeMessageRoute } from './preflight';
-
-vi.mock('../../../capture/page-style-runtime/route', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../capture/page-style-runtime/route')>()),
-  isPageStyleRuntimeMessage: () => false,
-}));
 
 describe('background runtime message preflight classifier', () => {
   it('classifies routes without executing runtime handlers or authorization gates', () => {

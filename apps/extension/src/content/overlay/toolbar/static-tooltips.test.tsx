@@ -174,7 +174,7 @@ describe('toolbar static tooltips', () => {
     expectClearHighlightsTooltip();
   });
 
-  it('uses native titles for the main screenshot-type buttons', async () => {
+  it('uses native titles for screenshot buttons without exposing Design Review export', async () => {
     await renderCaptureButtons();
     const buttons = Array.from(document.querySelectorAll('button'));
 
@@ -184,6 +184,9 @@ describe('toolbar static tooltips', () => {
       'Снимок всей страницы',
       'Параметры снимка всей страницы',
     ]);
+    expect(
+      document.querySelector('[data-ui="content.toolbar.annotation-export-button"]')
+    ).toBeNull();
     expect(buttons.every((button) => button.getAttribute('data-tooltip') === null)).toBe(true);
   });
 });

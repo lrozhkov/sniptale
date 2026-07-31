@@ -14,9 +14,11 @@ function createBridgeParams() {
     },
     modeControls: {
       disableAiPickMode: vi.fn(),
+      disableDesignReviewMode: vi.fn(),
       disableHighlighterMode: vi.fn(),
       disableQuickEditMode: vi.fn(),
       setAiPickMode: vi.fn(),
+      setDesignReviewMode: vi.fn(),
       setHighlighterMode: vi.fn(),
       setIsToolbarVisible: vi.fn(),
       setNavigationLockEnabled: vi.fn(),
@@ -26,6 +28,7 @@ function createBridgeParams() {
     },
     modeState: {
       aiPickMode: false,
+      designReviewMode: false,
       highlighterMode: false,
       isToolbarVisible: false,
       quickEditMode: false,
@@ -142,6 +145,31 @@ function expectTopLevelOnlyMessagesAreIgnoredBeforeParsing() {
   expect(params.modeControls.setScreenshotMode).not.toHaveBeenCalled();
 }
 
+async function expectScreenshotTeardownKeepsResponseChannelOpen() {
+  vi.useFakeTimers();
+  try {
+    const params = createBridgeParams();
+    params.modeState.screenshotMode = true;
+    const sendResponse = vi.fn();
+    const handleMessage = createRuntimeMessageHandler(params);
+
+    expect(
+      handleMessage(
+        { type: MessageType.DISABLE_SCREENSHOT_MODE },
+        {} as chrome.runtime.MessageSender,
+        sendResponse
+      )
+    ).toBe(true);
+    expect(sendResponse).not.toHaveBeenCalled();
+
+    await vi.runAllTimersAsync();
+
+    expect(sendResponse).toHaveBeenCalledWith({ success: true });
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 async function expectWebSnapshotExportRoutesThroughPopupExportController() {
   const handleRequest = vi.fn(() => true);
 
@@ -190,6 +218,10 @@ describe('createRuntimeMessageHandler', () => {
   it(
     'ignores top-level-only runtime messages before UI bridge parsing',
     expectTopLevelOnlyMessagesAreIgnoredBeforeParsing
+  );
+  it(
+    'keeps the runtime response channel open until screenshot teardown completes',
+    expectScreenshotTeardownKeepsResponseChannelOpen
   );
   it(
     'routes web snapshot export requests through the popup export controller',

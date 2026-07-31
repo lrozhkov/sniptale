@@ -51,6 +51,10 @@ vi.mock('../message-sync', (_importOriginal) => ({
   subscribeToRecordingMessages: mocks.subscribeToRecordingMessagesMock,
 }));
 
+vi.mock('../export/runtime/tab-message-routing', (_importOriginal) => ({
+  consumePopupExportLaunchIntentForActiveTab: vi.fn(async () => null),
+}));
+
 import { setupPopupLifecycle } from './setup';
 import type { PopupLifecycleParams } from './contracts';
 
@@ -66,6 +70,7 @@ function createParams(): PopupLifecycleParams {
       refreshGalleryStatus,
       setDisplayMode: vi.fn(),
       setHomeError: vi.fn(),
+      setPage: vi.fn(),
       setIsReady: vi.fn(),
       setMicrophoneDevices: vi.fn(),
       setQuickActions: vi.fn(),

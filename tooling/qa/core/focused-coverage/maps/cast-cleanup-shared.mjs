@@ -12,12 +12,6 @@ export const CAST_CLEANUP_SHARED_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/background/ai/llm/edit-response.test.ts'],
   },
   {
-    owner: 'shared-page-style-assets-boundary',
-    productionFile: 'apps/extension/src/composition/persistence/page-style/assets.ts',
-    reason: 'Page style asset budget parsing is covered by page style asset tests.',
-    testFiles: ['apps/extension/src/composition/persistence/page-style/assets.test.ts'],
-  },
-  {
     owner: 'shared-web-snapshot-record-guards',
     productionFile: 'apps/extension/src/composition/persistence/web-snapshots/guards.ts',
     reason: 'Web snapshot record guard parsing is covered by web snapshot guard tests.',

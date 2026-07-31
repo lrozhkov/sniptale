@@ -12,6 +12,7 @@ type ExportStepStatus = 'pending' | 'active' | 'done' | 'error';
 type ExportStepDefinition = {
   key: ExportStepKey;
   labelKey:
+    | 'popup.export.includeAnnotationsLabel'
     | 'popup.export.includeJsonLabel'
     | 'popup.export.includeMarkdownLabel'
     | 'popup.export.includeFilesLabel'
@@ -28,6 +29,7 @@ type ExportStepDefinition = {
 };
 
 type ExportStepSelection = {
+  includeAnnotations: boolean;
   includeBasicLogs: boolean;
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
@@ -46,6 +48,7 @@ export type PopupExportProgressStep = {
 };
 
 const EXPORT_STEP_DEFINITIONS: ExportStepDefinition[] = [
+  { key: 'annotations', labelKey: 'popup.export.includeAnnotationsLabel' },
   { key: 'json', labelKey: 'popup.export.includeJsonLabel' },
   { key: 'markdown', labelKey: 'popup.export.includeMarkdownLabel' },
   { key: 'files', labelKey: 'popup.export.includeFilesLabel' },
@@ -68,7 +71,7 @@ const WEB_SNAPSHOT_WARNING_STEP_DEFINITION: ExportStepDefinition = {
   labelKey: 'popup.export.webSnapshotWarningsStep',
 };
 
-const SCANNING_KEYS: ExportStepKey[] = ['json', 'markdown'];
+const SCANNING_KEYS: ExportStepKey[] = ['annotations', 'json', 'markdown'];
 const DOWNLOADING_KEYS: ExportStepKey[] = ['files', 'images'];
 const ZIPPING_KEYS: ExportStepKey[] = [
   'basicLogs',
@@ -79,6 +82,8 @@ const ZIPPING_KEYS: ExportStepKey[] = [
 
 function isStepSelected(key: ExportStepKey, selection: ExportStepSelection) {
   switch (key) {
+    case 'annotations':
+      return selection.includeAnnotations;
     case 'json':
       return selection.includeJson;
     case 'markdown':
@@ -166,8 +171,11 @@ function getCompletedStepKeys(progress: ExportProgress): ExportStepKey[] {
       return SCANNING_KEYS;
     case 'zipping':
       return [...SCANNING_KEYS, ...DOWNLOADING_KEYS];
-    case 'idle':
     case 'scanning':
+      return progress.activeStepKey && progress.activeStepKey !== 'annotations'
+        ? ['annotations']
+        : [];
+    case 'idle':
     case 'done':
     case 'error':
       return [];

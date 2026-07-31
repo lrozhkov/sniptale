@@ -37,6 +37,7 @@ function renderReadyContent(controller: ExportController) {
       filterQuery={tabs.filterQuery}
       filteredTabs={tabs.filteredTabs}
       hasLoadedPreferences={preferences.hasLoadedPreferences}
+      includeAnnotations={preferences.values.includeAnnotations}
       includeBasicLogs={preferences.values.includeBasicLogs}
       includeCssDiagnostics={preferences.values.includeCssDiagnostics}
       includeFiles={preferences.values.includeFiles}
@@ -47,6 +48,7 @@ function renderReadyContent(controller: ExportController) {
       includeMarkdown={preferences.values.includeMarkdown}
       isFilterActive={tabs.isFilterActive}
       selectedCount={tabs.selectedCount}
+      setIncludeAnnotations={preferences.actions.setIncludeAnnotations}
       setIncludeBasicLogs={preferences.actions.setIncludeBasicLogs}
       setIncludeCssDiagnostics={preferences.actions.setIncludeCssDiagnostics}
       setFilterQuery={tabs.setFilterQuery}

@@ -5,7 +5,6 @@ import { createQuickEditDocumentMode } from './document-mode';
 import { createQuickEditEditingActions } from './editing';
 import { createQuickEditRuntimeEvents } from './runtime.events';
 import { createQuickEditOverlayActions } from './overlays';
-import { isQuickEditStyleInspectorModeEnabled } from './page-style-inspection';
 import type {
   QuickEditRuntimeController,
   QuickEditRuntimeEditingSurface,
@@ -51,6 +50,7 @@ function createQuickEditRuntimeParts(props: {
     updateBlockingOverlayShape: props.updateBlockingOverlayShape,
   });
   const documentMode = createQuickEditDocumentMode({
+    disableRequested: props.onDisableRequested,
     editingElements: props.editingElements,
     finishEditing: editingActions.finishEditing,
     getIsQuickEditMode: props.getIsQuickEditMode,
@@ -82,7 +82,6 @@ function createRuntimeEventHandlers(
     hideHoverOverlay: props.overlayActions.hideHoverOverlay,
     isDocumentModeEnabled: documentMode.isEnabled,
     isEnabled: props.getIsQuickEditMode,
-    isStyleInspectorModeEnabled: isQuickEditStyleInspectorModeEnabled,
     makeElementEditable: editingActions.makeElementEditable,
     showHoverOverlay: props.overlayActions.showHoverOverlay,
   });

@@ -8,7 +8,7 @@ import {
   resolveFrameInteriorHitTarget,
 } from './hit-test';
 import { queryAllContentUiElements, queryContentUiElement } from '../../../platform/dom-host';
-import { isHighlighterPausedState } from '../../highlighter';
+import { isHighlighterEnabled, isHighlighterPausedState } from '../../highlighter';
 import { FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
 
 const OWNED_FLOATING_SELECTORS = [
@@ -120,7 +120,9 @@ export function createFrameSelectionEventHandlers(params: {
       if (!borderHit && !interiorHit) params.clearSelection();
     },
     click: (event: MouseEvent, iframe?: HTMLIFrameElement) => {
-      if (event.button !== 0 || isFrameUiOwnedFloatingEvent(event)) return;
+      if (!isHighlighterEnabled() || event.button !== 0 || isFrameUiOwnedFloatingEvent(event)) {
+        return;
+      }
       if (params.consumeSuppressedClick(event)) {
         stopFrameActivationClick(event);
         return;

@@ -1,10 +1,17 @@
 import { useRef, useState } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { translate } from '../../../../platform/i18n';
 import { logToolbarReactActionReached } from '../shell/event-diagnostics';
 import type { ToolbarProps } from '../types';
-import { createDisableScreenshotModeRequest } from '../../viewport-selector/capability';
+import {
+  createDisableScreenshotModeRequest,
+  getScreenshotSurfaceCapabilityToken,
+  type ScreenshotSurfaceBindingSnapshot,
+} from '../../viewport-selector/capability';
+import { refreshToolbarSurfaceSession, renewToolbarSurfaceSession } from '../shell/surface-session';
 import {
   attachContentActionIntent,
   createTrustedContentActionIntentSource,
@@ -29,6 +36,69 @@ interface UseToolbarModeTogglesParams {
 
 type PendingToolbarInteractionMode = 'highlighter' | 'quick-edit' | null;
 type ToolbarToggleMode = 'screenshot' | 'highlighter' | 'quickedit';
+
+async function recoverScreenshotSurfaceForExit(
+  contentIntentSource: ReturnType<typeof createTrustedContentActionIntentSource> | undefined
+): Promise<
+  | { kind: 'already-disabled' }
+  | { kind: 'request'; request: ReturnType<typeof createDisableScreenshotModeRequest> }
+> {
+  const status = await refreshToolbarSurfaceSession();
+  if (status?.success && status.enabled === false) {
+    return { kind: 'already-disabled' };
+  }
+  const statusCapabilityToken = status?.success ? status.surfaceCapabilityToken : undefined;
+  if (status?.success && status.enabled && statusCapabilityToken) {
+    const statusBinding: ScreenshotSurfaceBindingSnapshot = {
+      surfaceCapabilityToken: statusCapabilityToken,
+      surfaceOperationGeneration: status.surfaceOperationGeneration ?? 0,
+      ...(status.surfaceLeaseGeneration === undefined
+        ? {}
+        : { surfaceLeaseGeneration: status.surfaceLeaseGeneration }),
+    };
+    return { kind: 'request', request: createDisableScreenshotModeRequest(statusBinding) };
+  }
+  if (getScreenshotSurfaceCapabilityToken()) {
+    return { kind: 'request', request: createDisableScreenshotModeRequest() };
+  }
+  const renewedBinding = await renewToolbarSurfaceSession(contentIntentSource);
+  return {
+    kind: 'request',
+    request: createDisableScreenshotModeRequest(renewedBinding),
+  };
+}
+
+async function sendScreenshotModeDisable(
+  contentIntentSource: ReturnType<typeof createTrustedContentActionIntentSource> | undefined
+) {
+  let recoveryAttempted = false;
+  let request: ReturnType<typeof createDisableScreenshotModeRequest>;
+  if (!getScreenshotSurfaceCapabilityToken()) {
+    recoveryAttempted = true;
+    const recovery = await recoverScreenshotSurfaceForExit(contentIntentSource);
+    if (recovery.kind === 'already-disabled') {
+      return { success: true as const };
+    }
+    request = recovery.request;
+  } else {
+    request = createDisableScreenshotModeRequest();
+  }
+
+  let response = await getContentRuntimeServices().messaging.sendRuntimeMessage(request);
+  if (
+    !response?.success &&
+    (response?.error === 'authorization-expired' || response?.error === 'stale-generation') &&
+    !recoveryAttempted
+  ) {
+    recoveryAttempted = true;
+    const recovery = await recoverScreenshotSurfaceForExit(contentIntentSource);
+    if (recovery.kind === 'already-disabled') {
+      return { success: true as const };
+    }
+    response = await getContentRuntimeServices().messaging.sendRuntimeMessage(recovery.request);
+  }
+  return response;
+}
 
 function createModeToggles(params: UseToolbarModeTogglesParams) {
   const {
@@ -92,7 +162,7 @@ export function useToolbarModeToggles(params: UseToolbarModeTogglesParams) {
 
     const next = toggles[mode];
     const contentIntentSource =
-      mode === 'screenshot' && next.enabled && activationEvent
+      mode === 'screenshot' && activationEvent
         ? createTrustedContentActionIntentSource(activationEvent)
         : undefined;
     setPendingInteractionMode(resolvePendingInteractionMode(mode, next.enabled));
@@ -108,14 +178,17 @@ export function useToolbarModeToggles(params: UseToolbarModeTogglesParams) {
                 contentIntentSource
               )
             )
-          : await getContentRuntimeServices().messaging.sendRuntimeMessage(
-              mode === 'screenshot' && !next.enabled
-                ? createDisableScreenshotModeRequest()
-                : { type: next.enabled ? next.enable : next.disable }
-            );
+          : mode === 'screenshot' && !next.enabled
+            ? await sendScreenshotModeDisable(contentIntentSource)
+            : await getContentRuntimeServices().messaging.sendRuntimeMessage({
+                type: next.enabled ? next.enable : next.disable,
+              });
 
       if (!response?.success) {
         logger.error('Failed to toggle mode', response?.error);
+        if (mode === 'screenshot' && !next.enabled) {
+          showToast(translate('content.toolbar.screenshotDisableError'), 'error');
+        }
         return;
       }
 
@@ -126,6 +199,9 @@ export function useToolbarModeToggles(params: UseToolbarModeTogglesParams) {
       next.apply(next.enabled);
     } catch (error) {
       logger.error('Failed to toggle mode', error);
+      if (mode === 'screenshot' && !next.enabled) {
+        showToast(translate('content.toolbar.screenshotDisableError'), 'error');
+      }
     } finally {
       inFlightRef.current = false;
       setPendingInteractionMode(null);

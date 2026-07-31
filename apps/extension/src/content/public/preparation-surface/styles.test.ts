@@ -13,7 +13,11 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   },
 }));
 
-import { createContentEntrypointStyles, resolveContentEntrypointStyleUrls } from './styles';
+import {
+  createContentEntrypointStyles,
+  normalizeContentEntrypointRemUnits,
+  resolveContentEntrypointStyleUrls,
+} from './styles';
 
 const STYLES_SOURCE_PATH = fileURLToPath(new URL('./styles.ts', import.meta.url));
 const HOST_STYLES_PATH = fileURLToPath(new URL('./host.css', import.meta.url));
@@ -40,6 +44,26 @@ describe('content entrypoint styles', () => {
     expect(source).toContain('@sniptale/ui/styles?inline');
     expect(source).not.toContain('@sniptale/ui/styles/tailwind?inline');
     expect(source).not.toContain('../../../shared/design-tokens.css?inline');
+  });
+
+  it('keeps shadow UI dimensions independent from the host page root font size', () => {
+    expect(
+      normalizeContentEntrypointRemUnits(
+        [
+          '.h-8 { height: 2rem; } .p-3 { padding: .75rem; }',
+          '.w-\\[15rem\\] { width: 15rem; }',
+          '@media (min-width: 48rem) { .offset { left: -.5rem; } }',
+          '.literal::after { content: "1rem"; } /* keep 2rem */',
+        ].join(' ')
+      )
+    ).toBe(
+      [
+        '.h-8 { height: 32px; } .p-3 { padding: 12px; }',
+        '.w-\\[15rem\\] { width: 240px; }',
+        '@media (min-width: 768px) { .offset { left: -8px; } }',
+        '.literal::after { content: "1rem"; } /* keep 2rem */',
+      ].join(' ')
+    );
   });
 
   it('resolves dev and build font urls through extension runtime URLs', () => {

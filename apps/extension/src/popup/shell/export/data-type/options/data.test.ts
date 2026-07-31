@@ -12,6 +12,7 @@ import {
 function createProps(overrides: Partial<ExportOptionToggleProps> = {}): ExportOptionToggleProps {
   return {
     disabled: false,
+    includeAnnotations: false,
     includeBasicLogs: false,
     includeCssDiagnostics: false,
     includeFiles: true,
@@ -20,6 +21,7 @@ function createProps(overrides: Partial<ExportOptionToggleProps> = {}): ExportOp
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
+    setIncludeAnnotations: vi.fn(),
     setIncludeBasicLogs: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
@@ -63,6 +65,7 @@ describe('popup export option metadata', () => {
 
   it('returns the full canonical option list for the unified data-type section', () => {
     expect(getExportOptionConfigs().map((option) => option.key)).toEqual([
+      'annotations',
       'json',
       'markdown',
       'files',
@@ -87,6 +90,7 @@ describe('popup export option toggles', () => {
     const props = createProps();
 
     toggleExportOption('basicLogs', props);
+    toggleExportOption('annotations', props);
     toggleExportOption('cssDiagnostics', props);
     toggleExportOption('files', props);
     toggleExportOption('markdown', props);
@@ -96,6 +100,7 @@ describe('popup export option toggles', () => {
     toggleExportOption('fullPageScreenshot', props);
 
     expect(props.setIncludeBasicLogs).toHaveBeenCalledTimes(1);
+    expect(props.setIncludeAnnotations).toHaveBeenCalledTimes(1);
     expect(props.setIncludeCssDiagnostics).toHaveBeenCalledTimes(1);
     expect(props.setIncludeFiles).toHaveBeenCalledTimes(1);
     expect(props.setIncludeMarkdown).toHaveBeenCalledTimes(1);
@@ -109,11 +114,13 @@ describe('popup export option toggles', () => {
     const props = createProps();
 
     setExportOptionActive('basicLogs', true, props);
+    setExportOptionActive('annotations', true, props);
     setExportOptionActive('json', false, props);
     setExportOptionActive('images', true, props);
     setExportOptionActive('fullPageScreenshot', true, props);
 
     expect(props.setIncludeBasicLogs).toHaveBeenCalledWith(true);
+    expect(props.setIncludeAnnotations).toHaveBeenCalledWith(true);
     expect(props.setIncludeJson).toHaveBeenCalledWith(false);
     expect(props.setIncludeImages).toHaveBeenCalledWith(true);
     expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledWith(true);

@@ -17,6 +17,7 @@ let root: Root | null = null;
 function createToggleProps(): ExportOptionToggleProps {
   return {
     disabled: false,
+    includeAnnotations: true,
     includeBasicLogs: true,
     includeCssDiagnostics: true,
     includeFiles: true,
@@ -26,6 +27,7 @@ function createToggleProps(): ExportOptionToggleProps {
     includeJson: true,
     includeMarkdown: true,
     setIncludeBasicLogs: vi.fn(),
+    setIncludeAnnotations: vi.fn(),
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),

@@ -30,7 +30,7 @@ This policy covers AI credentials and request history, secret-bearing network tr
 
 - Browser storage must not retain page-derived prompts, Markdown/JSON payloads, raw responses, HTML, cookies, or authorization values unless an explicit registry owner and policy exception exist.
 - User-requested web snapshots may retain sanitized HTML/CSS only in IndexedDB `web_snapshots` with a linked media entry. Scripts, handlers, unsafe URLs, credentials, browser storage, page IndexedDB, API bodies, and live JavaScript state remain excluded.
-- Page-style templates and restore rules may retain allowlisted style patches, selector identity, explicit address/domain scope, state, timestamps, and lightweight asset references. Page text or image restoration requires per-rule user opt-in; image binaries belong in IndexedDB `page_style_assets`, referenced by id rather than inline base64.
+- Design-review style edits are session-only and must not retain templates, restore rules, selector scopes, page text, images, or style assets. Database schema v22 destructively removes the retired IndexedDB `page_style_assets` store; `sniptale_page_style_registry` remains listed only so local-data erasure also removes any stale alpha record.
 - LLM history is metadata-only: timestamp, model, request kind, counts, and status. Legacy prompt-bearing records are normalized away on read.
 - Model egress uses the shared payload-bound lease, proof, normalization, redaction, and transport pipeline. Point-of-action UI discloses provider, model, prompt inclusion, page-data classes, and metadata-only retention before submit.
 - Scenario pending-capture session state may hold metadata and a temporary asset reference; screenshot blobs stay in the scenario temp-asset store.

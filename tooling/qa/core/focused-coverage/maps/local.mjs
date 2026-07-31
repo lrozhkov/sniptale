@@ -109,52 +109,104 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'content-page-style-text-fields',
-    productionFile:
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/text-fields.tsx',
+    owner: 'content-design-review-popover',
+    productionPrefix: 'apps/extension/src/content/overlay/design-review/popover/',
     exclusive: true,
-    reason: 'Property-control matrix and composed-view suites cover the text-field owner.',
-    testFiles: [
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/field-matrix.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
-    ],
-  },
-  {
-    owner: 'content-page-style-property-fields-predecessor',
-    productionFile:
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/fields.tsx',
-    exclusive: true,
-    allowMissingProductionTarget: true,
     reason:
-      'The removed property-field re-export ladder is covered by the owner surfaces that now import its contracts directly.',
+      'Direct proof covers the mock-aligned comment, action, element controls, settings disclosure, autosave, and the absent closed popover.',
     testFiles: [
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/field-matrix.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/file-field.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/text-controls.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
-      'apps/extension/src/content/overlay/page-style-inspector/save/panel.test.tsx',
+      'apps/extension/src/content/overlay/design-review/popover/comment.test.tsx',
+      'apps/extension/src/content/overlay/design-review/popover/view.test.tsx',
     ],
   },
   {
-    owner: 'content-page-style-image-preview-predecessor',
+    owner: 'content-design-review-appearance',
     productionFile:
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/image-preview.tsx',
+      'apps/extension/src/content/overlay/design-review/settings/sections/appearance.tsx',
     exclusive: true,
-    allowMissingProductionTarget: true,
     reason:
-      'The removed single-consumer image preview is covered through the property-control composition that now owns it.',
+      'The direct appearance suite proves color and shadow remain while asset and gradient inputs are retired.',
     testFiles: [
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/view.test.tsx',
+      'apps/extension/src/content/overlay/design-review/settings/appearance-fields.test.tsx',
     ],
   },
   {
-    owner: 'content-page-style-retention-toggle-predecessor',
+    owner: 'content-design-review-layout-settings',
     productionFile:
-      'apps/extension/src/content/overlay/page-style-inspector/property-controls/retention-toggle.tsx',
+      'apps/extension/src/content/overlay/design-review/settings/sections/frame.tsx',
     exclusive: true,
-    allowMissingProductionTarget: true,
-    reason: 'The removed single-consumer retention toggle is covered through its save-panel owner.',
-    testFiles: ['apps/extension/src/content/overlay/page-style-inspector/save/panel.test.tsx'],
+    reason:
+      'The compact settings navigation suite selects the localized size-and-spacing owner and proves its width and height controls.',
+    testFiles: ['apps/extension/src/content/overlay/design-review/settings/view.test.tsx'],
+  },
+  {
+    owner: 'content-design-review-text-settings',
+    productionFile: 'apps/extension/src/content/overlay/design-review/settings/sections/text.tsx',
+    exclusive: true,
+    reason:
+      'The compact settings navigation suite proves localized text controls are the default active owner and are replaced by the selected section.',
+    testFiles: ['apps/extension/src/content/overlay/design-review/settings/view.test.tsx'],
+  },
+  {
+    owner: 'content-design-review-view-contract',
+    productionFile: 'apps/extension/src/content/overlay/design-review/types.ts',
+    exclusive: true,
+    reason:
+      'Popover and compact settings suites exercise the shared review action and view-state contract through both UI consumers.',
+    testFiles: [
+      'apps/extension/src/content/overlay/design-review/popover/view.test.tsx',
+      'apps/extension/src/content/overlay/design-review/settings/view.test.tsx',
+    ],
+  },
+  {
+    owner: 'content-design-review-surface',
+    productionFile: 'apps/extension/src/content/overlay/design-review/view.tsx',
+    exclusive: true,
+    reason:
+      'The surface suite proves the extension-owned composition retains both review markers and the active popover.',
+    testFiles: ['apps/extension/src/content/overlay/design-review/view.test.tsx'],
+  },
+  {
+    owner: 'content-design-review-record',
+    productionFile: 'apps/extension/src/content/overlay/design-review/runtime/record.ts',
+    exclusive: true,
+    reason:
+      'The record suite proves action metadata, current-element serialization, atomic deletion, CSS rollback, and history restoration.',
+    testFiles: ['apps/extension/src/content/overlay/design-review/runtime/comment.test.ts'],
+  },
+  {
+    owner: 'content-design-review-picker',
+    productionFile: 'apps/extension/src/content/selection/design-review/picker.ts',
+    exclusive: true,
+    reason:
+      'The picker suite proves exact open-shadow and same-origin iframe selection, inaccessible boundary fallback, and extension-UI exclusion.',
+    testFiles: ['apps/extension/src/content/selection/design-review/picker.test.ts'],
+  },
+  {
+    owner: 'content-design-review-mode',
+    productionFile: 'apps/extension/src/content/selection/design-review/mode.ts',
+    exclusive: true,
+    reason:
+      'The mode suite proves standalone activation, sibling-mode exclusion, selection publication, and deterministic deactivation.',
+    testFiles: ['apps/extension/src/content/selection/design-review/mode.test.ts'],
+  },
+  {
+    owner: 'content-design-review-frame',
+    productionFile: 'apps/extension/src/content/selection/design-review/frame.ts',
+    exclusive: true,
+    reason: 'The frame suite proves exact absolute geometry and the frozen two-pixel black outline.',
+    testFiles: ['apps/extension/src/content/selection/design-review/frame.test.ts'],
+  },
+  {
+    owner: 'content-runtime-bridge-types',
+    productionFile: 'apps/extension/src/content/runtime/bridge/types.ts',
+    exclusive: true,
+    reason:
+      'Core and router suites prove surviving message families and no page-style handler slot.',
+    testFiles: [
+      'apps/extension/src/content/runtime/bridge/core.test.ts',
+      'apps/extension/src/content/runtime/bridge/router.test.ts',
+    ],
   },
   {
     owner: 'content-overlay-app-layout-projection',
@@ -163,6 +215,22 @@ export const LOCAL_OWNER_MAPPINGS = [
     reason:
       'The app layout projection is exercised through the app composition that builds and renders its scenario, toolbar, and dialog sections.',
     testFiles: ['apps/extension/src/content/overlay/app/view/index.test.tsx'],
+  },
+  {
+    owner: 'content-app-mode-flags',
+    productionFile: 'apps/extension/src/content/overlay/app/content-mode/state/flags.ts',
+    exclusive: true,
+    reason:
+      'The content mode hook suite proves grouped mode flags and controls still project the standalone Design Review state.',
+    testFiles: ['apps/extension/src/content/overlay/app/content-mode/index.test.tsx'],
+  },
+  {
+    owner: 'content-toolbar-view-model',
+    productionFile: 'apps/extension/src/content/overlay/toolbar/state/view-model.ts',
+    exclusive: true,
+    reason:
+      'The direct hook suite proves Design Review mode and capture actions retain their narrowed role contracts.',
+    testFiles: ['apps/extension/src/content/overlay/toolbar/state/view-model.test.tsx'],
   },
   {
     owner: 'content-overlay-scenario-controller',

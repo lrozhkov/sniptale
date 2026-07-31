@@ -8,8 +8,9 @@ export type {
   QueueAutoStartCapture,
 } from './types';
 
-import type { useContentModeFlags } from './flags';
 import type { useContentSurfaceState } from './surface';
+import type { ContentAppModeControls, ContentAppModeFlags } from './types';
 
-export type ContentAppModeState = ReturnType<typeof useContentModeFlags> &
+export type ContentAppModeState = ContentAppModeFlags &
+  ContentAppModeControls &
   ReturnType<typeof useContentSurfaceState>;

@@ -4,6 +4,7 @@ import type { ExportProgress } from '@sniptale/runtime-contracts/export';
 import { buildPopupExportProgressSteps } from './steps';
 
 const selection = {
+  includeAnnotations: false,
   includeBasicLogs: true,
   includeCssDiagnostics: false,
   includeFiles: true,
@@ -197,6 +198,27 @@ function verifyWebSnapshotSteps() {
 }
 
 describe('buildPopupExportProgressSteps', () => {
+  it('shows annotation preparation as the active selected step', () => {
+    const steps = buildPopupExportProgressSteps({
+      progress: createProgress({ activeStepKey: 'annotations', phase: 'scanning' }),
+      result: null,
+      selection: { ...selection, includeAnnotations: true },
+    });
+
+    expect(steps.find((step) => step.key === 'annotations')?.status).toBe('active');
+  });
+
+  it('marks annotations done when mixed export hands page scanning to the next step', () => {
+    const steps = buildPopupExportProgressSteps({
+      progress: createProgress({ activeStepKey: 'json', phase: 'scanning' }),
+      result: null,
+      selection: { ...selection, includeAnnotations: true },
+    });
+
+    expect(steps.find((step) => step.key === 'annotations')?.status).toBe('done');
+    expect(steps.find((step) => step.key === 'json')?.status).toBe('active');
+  });
+
   it('marks text steps as done and files as active during downloading', verifyDownloadingSteps);
 
   it(

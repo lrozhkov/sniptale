@@ -60,15 +60,6 @@ export type ViewportMessage = Extract<
   }
 >;
 
-type PageStyleMessage = Extract<
-  ContentRuntimeMessage,
-  {
-    type:
-      | typeof MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY
-      | typeof MessageType.OPEN_PAGE_STYLE_INSPECTOR;
-  }
->;
-
 export type ContentRuntimeHandlerResult = boolean | null;
 
 export function isCoreModeMessage(message: ContentRuntimeMessage): message is CoreModeMessage {
@@ -117,12 +108,5 @@ export function isViewportMessage(message: ContentRuntimeMessage): message is Vi
     message.type === VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE ||
     message.type === VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE ||
     message.type === VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE
-  );
-}
-
-export function isPageStyleMessage(message: ContentRuntimeMessage): message is PageStyleMessage {
-  return (
-    message.type === MessageType.GET_PAGE_STYLE_CURRENT_RULE_SUMMARY ||
-    message.type === MessageType.OPEN_PAGE_STYLE_INSPECTOR
   );
 }

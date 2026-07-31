@@ -3,10 +3,12 @@ import { createToolbarEditingHandlers } from './editing';
 
 const toolbarEditingMocks = vi.hoisted(() => ({
   disableAiPickModeMock: vi.fn(),
+  disableDesignReviewModeMock: vi.fn(),
   disableHighlighterModeMock: vi.fn(),
   disableQuickEditDocumentModeMock: vi.fn(),
   disableQuickEditModeMock: vi.fn(),
   enableQuickEditDocumentModeMock: vi.fn(),
+  enableDesignReviewModeMock: vi.fn(),
   isQuickEditDocumentModeEnabledMock: vi.fn(() => false),
   loggerErrorMock: vi.fn(),
   loggerWarnMock: vi.fn(),
@@ -47,6 +49,14 @@ vi.mock('../../../selection/quick-edit', () => ({
   isQuickEditDocumentModeEnabled: toolbarEditingMocks.isQuickEditDocumentModeEnabledMock,
 }));
 
+vi.mock('../../../selection/design-review', () => ({
+  DesignReviewModeState: undefined,
+  disableDesignReviewMode: toolbarEditingMocks.disableDesignReviewModeMock,
+  enableDesignReviewMode: toolbarEditingMocks.enableDesignReviewModeMock,
+  getDesignReviewModeState: vi.fn(),
+  subscribeToDesignReviewMode: vi.fn(),
+}));
+
 vi.mock('../../../selection/selection-mode/lazy', async (importOriginal) => ({
   ...(await importOriginal()),
   preloadSelectionMode: toolbarEditingMocks.preloadSelectionModeMock,
@@ -55,10 +65,12 @@ vi.mock('../../../selection/selection-mode/lazy', async (importOriginal) => ({
 function createParams() {
   return {
     aiPickMode: false,
+    designReviewMode: false,
     disableAiPickMode: toolbarEditingMocks.disableAiPickModeMock,
     highlighterMode: false,
     quickEditMode: false,
     setAiPickMode: vi.fn(),
+    setDesignReviewMode: vi.fn(),
     setHighlighterMode: vi.fn(),
     setIsToolbarVisible: vi.fn(),
     setNavigationLockEnabled: vi.fn(),
@@ -124,6 +136,21 @@ describe('toolbar-mode-controller manual editing transitions', () => {
     handlers.handleToggleQuickEditMode(false);
 
     expect(toolbarEditingMocks.showToastMock).not.toHaveBeenCalled();
+  });
+
+  it('starts Design Review picking with managed navigation blocking', () => {
+    const params = createParams();
+    const handlers = createToolbarEditingHandlers(params);
+
+    handlers.handleToggleDesignReviewMode(true);
+
+    expect(params.setNavigationLockEnabled).toHaveBeenCalledOnce();
+    expect(params.setNavigationLockEnabled).toHaveBeenCalledWith(true);
+    expect(toolbarEditingMocks.enableDesignReviewModeMock).toHaveBeenCalledOnce();
+    expect(params.setDesignReviewMode).toHaveBeenCalledWith(true);
+    expect(toolbarEditingMocks.enableDesignReviewModeMock.mock.invocationCallOrder[0]).toBeLessThan(
+      params.setNavigationLockEnabled.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
   });
 });
 

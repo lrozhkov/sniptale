@@ -127,9 +127,9 @@ function removeAutoBlurFrames(
   const removedIds = args.framesRef.current.filter(shouldRemoveFrame).map((frame) => frame.id);
   if (removedIds.length === 0) return [];
   const removedIdSet = new Set(removedIds);
-  args.framesRef.current = args.framesRef.current.filter((frame) => !removedIdSet.has(frame.id));
-
-  args.setFrames((prev) => prev.filter((frame) => !removedIdSet.has(frame.id)));
+  const frames = args.framesRef.current.filter((frame) => !removedIdSet.has(frame.id));
+  args.framesRef.current = frames;
+  args.setFrames(frames);
 
   removedIds.forEach((frameId) => {
     args.hostLayoutServiceRef.current.unlink(frameId);
@@ -183,8 +183,9 @@ export function createAddAutoBlurFramesHandler(args: CreateAddAutoBlurFramesHand
     });
 
     if (addedFrames.length > 0) {
-      args.framesRef.current = [...args.framesRef.current, ...addedFrames];
-      args.setFrames((prev) => [...prev, ...addedFrames]);
+      const frames = [...args.framesRef.current, ...addedFrames];
+      args.framesRef.current = frames;
+      args.setFrames(frames);
     }
 
     if (addedFrames.length > 0) {

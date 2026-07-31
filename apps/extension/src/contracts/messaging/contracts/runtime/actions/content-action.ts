@@ -2,8 +2,10 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import {
   createMessageGuard,
   createRuntimeResponseGuard,
+  isNumber,
   isString,
 } from '../../../validators/index';
+import { isBrowserAnnotationsExportText } from '@sniptale/runtime-contracts/export';
 import { createGuardParser } from '@sniptale/runtime-contracts/messaging/parsers/utils';
 import {
   isContentPrivilegedActionActivationKey,
@@ -18,6 +20,35 @@ import {
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
 
 export const contentActionRuntimeContracts = {
+  [MessageType.DOWNLOAD_BROWSER_ANNOTATIONS]: {
+    parseRequest: createGuardParser(
+      'runtime DOWNLOAD_BROWSER_ANNOTATIONS message',
+      createMessageGuard({
+        type: MessageType.DOWNLOAD_BROWSER_ANNOTATIONS,
+        required: {
+          text: isBrowserAnnotationsExportText,
+        },
+        optional: { contentIntent: isContentPrivilegedActionCapability },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime DOWNLOAD_BROWSER_ANNOTATIONS response',
+      createRuntimeResponseGuard({ optional: { downloadId: isNumber } })
+    ),
+  },
+  [MessageType.OPEN_EXPORT_MODAL]: {
+    parseRequest: createGuardParser(
+      'runtime OPEN_EXPORT_MODAL message',
+      createMessageGuard({
+        type: MessageType.OPEN_EXPORT_MODAL,
+        optional: { contentIntent: isContentPrivilegedActionCapability },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OPEN_EXPORT_MODAL response',
+      createRuntimeResponseGuard()
+    ),
+  },
   [MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY]: {
     parseRequest: createGuardParser(
       'runtime REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY message',

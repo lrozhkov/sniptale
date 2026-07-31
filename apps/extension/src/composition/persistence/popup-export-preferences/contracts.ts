@@ -1,4 +1,5 @@
 export interface PopupExportPreferences {
+  includeAnnotations: boolean;
   includeBasicLogs: boolean;
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
