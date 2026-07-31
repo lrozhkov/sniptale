@@ -10,6 +10,7 @@ import type {
 } from 'react';
 import type { AppTheme } from '@sniptale/ui/theme/types';
 import { mergeFloatingInteractionLayerStyle } from '@sniptale/ui/floating-interactions/placement';
+import { FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
 import { cx } from './shared';
 import type { CompactSelectOption } from '@sniptale/ui/compact-inspector-controls/select-types';
 
@@ -18,6 +19,7 @@ interface CompactSelectMenuProps<T extends string> {
   menuId: string;
   onOptionKeyDown: (event: KeyboardEvent<HTMLButtonElement>, index: number) => void;
   onSelect: (option: CompactSelectOption<T>) => void;
+  ownerId: string;
   optionRefs: MutableRefObject<Array<HTMLButtonElement | null>>;
   options: readonly CompactSelectOption<T>[];
   portalTarget: DocumentFragment | HTMLElement | ShadowRoot;
@@ -42,6 +44,7 @@ export function CompactSelectMenu<T extends string>({
   onSelect,
   optionRefs,
   options,
+  ownerId,
   portalTarget,
   style,
   theme,
@@ -54,6 +57,7 @@ export function CompactSelectMenu<T extends string>({
       role="listbox"
       data-theme={theme ?? undefined}
       data-floating-ui-root="true"
+      {...{ [FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE]: ownerId }}
       style={mergeFloatingInteractionLayerStyle(style)}
       onPointerDown={stopCompactSelectMenuEventPropagation}
       onMouseDown={stopCompactSelectMenuEventPropagation}

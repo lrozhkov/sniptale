@@ -1,9 +1,11 @@
-import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import type { BrowserDesignReviewAction } from '../../../parser/page-preparation/annotations';
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import {
+  dismissDesignReviewSelection,
   getDesignReviewModeState,
   openDesignReviewTarget,
+  registerDesignReviewInspectorDismissRequestHandler,
   subscribeToDesignReviewMode,
 } from '../../../selection/design-review';
 import { usePageStyleDraftState } from './draft';
@@ -52,6 +54,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
   }, [params.enabled]);
 
   const commentDraft = usePageStyleCommentDraft({ open: popoverOpen, selection });
+  const closeComment = commentDraft.closeComment;
   const draftState = usePageStyleDraftState(selection);
   const valueActions = usePageStyleValueActions({
     defaultValues: draftState.defaultValues,
@@ -61,11 +64,16 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
   const record = selection ? readDesignReviewRecord(selection.element) : null;
   const action = record?.designReview?.action ?? 'refine';
 
-  function closePopover() {
-    if (commentDraft.closeComment()) {
+  const closePopover = useCallback(() => {
+    if (closeComment()) {
+      dismissDesignReviewSelection();
       setPopoverOpen(false);
+      return true;
     }
-  }
+    return false;
+  }, [closeComment]);
+
+  useEffect(() => registerDesignReviewInspectorDismissRequestHandler(closePopover), [closePopover]);
 
   function openRecord(annotationId: number): boolean {
     const target = browserAnnotationSession.getLiveTarget(annotationId);
@@ -99,6 +107,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
           return;
         }
         deleteDesignReviewRecord(selection.element);
+        dismissDesignReviewSelection();
         setSettingsOpen(false);
         setPopoverOpen(false);
       },

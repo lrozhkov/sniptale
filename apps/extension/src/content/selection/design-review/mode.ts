@@ -20,10 +20,12 @@ export interface DesignReviewModeState {
 }
 
 type DesignReviewModeListener = () => void;
+type DesignReviewInspectorDismissRequestHandler = () => boolean;
 
 let pickerRuntime: DesignReviewPickerRuntime | null = null;
 let state: DesignReviewModeState = { enabled: false, selection: null };
 const listeners = new Set<DesignReviewModeListener>();
+let inspectorDismissRequestHandler: DesignReviewInspectorDismissRequestHandler | null = null;
 
 function publish(): void {
   listeners.forEach((listener) => listener());
@@ -32,6 +34,30 @@ function publish(): void {
 function setSelection(selection: DesignReviewSelection): void {
   state = { ...state, selection };
   publish();
+}
+
+function requestInspectorDismiss(): boolean {
+  return inspectorDismissRequestHandler?.() ?? false;
+}
+
+export function dismissDesignReviewSelection(): void {
+  pickerRuntime?.dismissSelection();
+  if (!state.selection) {
+    return;
+  }
+  state = { ...state, selection: null };
+  publish();
+}
+
+export function registerDesignReviewInspectorDismissRequestHandler(
+  handler: DesignReviewInspectorDismissRequestHandler
+): () => void {
+  inspectorDismissRequestHandler = handler;
+  return () => {
+    if (inspectorDismissRequestHandler === handler) {
+      inspectorDismissRequestHandler = null;
+    }
+  };
 }
 
 function disableDesignReviewModeInternal(dispatchDisabled: boolean): void {
@@ -55,6 +81,7 @@ export function enableDesignReviewMode(): void {
   deactivateOtherContentModes('design-review');
   pickerRuntime = startDesignReviewPicker({
     onDisableRequested: () => disableDesignReviewModeInternal(true),
+    onInspectorDismissRequested: requestInspectorDismiss,
     onSelection: setSelection,
   });
   state = { enabled: true, selection: null };

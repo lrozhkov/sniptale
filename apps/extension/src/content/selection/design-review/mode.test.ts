@@ -3,6 +3,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  dismissSelection: vi.fn(),
   disposePicker: vi.fn(),
   deactivateOtherContentModes: vi.fn(),
   dispatchContentModeDisabled: vi.fn(),
@@ -37,12 +38,15 @@ vi.mock('./picker', () => ({
 }));
 
 import {
+  dismissDesignReviewSelection,
   disableDesignReviewMode,
   enableDesignReviewMode,
   getDesignReviewModeState,
   openDesignReviewTarget,
+  registerDesignReviewInspectorDismissRequestHandler,
   subscribeToDesignReviewMode,
 } from './mode';
+import type { PageStyleSelectionSnapshot } from './snapshot';
 
 afterEach(() => {
   disableDesignReviewMode();
@@ -51,6 +55,7 @@ afterEach(() => {
 
 it('registers and owns the standalone Design Review mode lifecycle', () => {
   mocks.startDesignReviewPicker.mockReturnValue({
+    dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
     selectElement: mocks.selectElement,
   });
@@ -77,6 +82,7 @@ it('registers and owns the standalone Design Review mode lifecycle', () => {
 
 it('scrolls a live target into view and delegates programmatic selection to the active picker', () => {
   mocks.startDesignReviewPicker.mockReturnValue({
+    dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
     selectElement: mocks.selectElement,
   });
@@ -93,6 +99,7 @@ it('scrolls a live target into view and delegates programmatic selection to the 
 
 it('scrolls nested iframe containers before selecting an inner feedback target', () => {
   mocks.startDesignReviewPicker.mockReturnValue({
+    dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
     selectElement: mocks.selectElement,
   });
@@ -110,4 +117,51 @@ it('scrolls nested iframe containers before selecting an inner feedback target',
   expect(targetScroll).toHaveBeenCalledOnce();
   expect(iframeScroll).toHaveBeenCalledOnce();
   expect(mocks.selectElement).toHaveBeenCalledWith(target);
+});
+
+it('routes picker outside-dismiss through the registered inspector owner', () => {
+  mocks.startDesignReviewPicker.mockReturnValue({
+    dismissSelection: mocks.dismissSelection,
+    dispose: mocks.disposePicker,
+    selectElement: mocks.selectElement,
+  });
+  const dismissHandler = vi.fn(() => true);
+  const unregister = registerDesignReviewInspectorDismissRequestHandler(dismissHandler);
+  enableDesignReviewMode();
+
+  const pickerArgs = mocks.startDesignReviewPicker.mock.calls[0]?.[0];
+
+  expect(pickerArgs?.onInspectorDismissRequested()).toBe(true);
+  expect(dismissHandler).toHaveBeenCalledOnce();
+  unregister();
+});
+
+it('releases the active picker selection and publishes the cleared inspector state', () => {
+  mocks.startDesignReviewPicker.mockReturnValue({
+    dismissSelection: mocks.dismissSelection,
+    dispose: mocks.disposePicker,
+    selectElement: mocks.selectElement,
+  });
+  const listener = vi.fn();
+  const unsubscribe = subscribeToDesignReviewMode(listener);
+  enableDesignReviewMode();
+  const pickerArgs = mocks.startDesignReviewPicker.mock.calls[0]?.[0];
+  const element = document.createElement('button');
+  const snapshot: PageStyleSelectionSnapshot = {
+    domPath: 'html > body > button',
+    element,
+    kind: 'text',
+    patch: { declarations: [] },
+    selectorLabel: 'button',
+    tagName: 'button',
+    textPreview: 'Save',
+  };
+  pickerArgs?.onSelection({ anchor: { x: 20, y: 30 }, snapshot });
+
+  dismissDesignReviewSelection();
+
+  expect(mocks.dismissSelection).toHaveBeenCalledOnce();
+  expect(getDesignReviewModeState().selection).toBeNull();
+  expect(listener).toHaveBeenCalledTimes(3);
+  unsubscribe();
 });

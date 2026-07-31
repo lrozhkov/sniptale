@@ -6,6 +6,10 @@ import {
   queryContentUiElement,
   registerContentOwnedPassiveChrome,
 } from '../../platform/dom-host';
+import {
+  FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE,
+  FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE,
+} from '@sniptale/ui/floating-interactions/ownership';
 
 vi.mock('../../platform/trusted-events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/trusted-events')>()),
@@ -47,7 +51,25 @@ function makeVisible<T extends Element>(element: T): T {
   return element;
 }
 
+function expectFrameSummary(tagName: string): void {
+  expect(queryContentUiElement('.sniptale-design-review-frame-summary')?.textContent).toMatch(
+    new RegExp(`^${tagName}`)
+  );
+}
+
 let pickerRuntime: DesignReviewPickerRuntime | null = null;
+
+function startPicker(
+  overrides: Partial<Parameters<typeof startDesignReviewPicker>[0]> = {}
+): DesignReviewPickerRuntime {
+  pickerRuntime = startDesignReviewPicker({
+    onDisableRequested: vi.fn(),
+    onInspectorDismissRequested: vi.fn(() => true),
+    onSelection: vi.fn(),
+    ...overrides,
+  });
+  return pickerRuntime;
+}
 
 beforeEach(() => {
   document.body.replaceChildren();
@@ -68,7 +90,7 @@ it('selects the exact rendered open-shadow DOM element and claims its click', ()
   root.append(target);
   document.body.append(host);
   const onSelection = vi.fn();
-  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  startPicker({ onSelection });
 
   const event = new MouseEvent('click', {
     bubbles: true,
@@ -84,6 +106,141 @@ it('selects the exact rendered open-shadow DOM element and claims its click', ()
   expect(event.defaultPrevented).toBe(true);
 });
 
+it('keeps the preview frame pinned to the selected element while its inspector is open', () => {
+  const contentHost = document.createElement('div');
+  document.body.append(contentHost);
+  initializeContentUiRoots(contentHost.attachShadow({ mode: 'open' }));
+  const selected = makeVisible(document.createElement('button'));
+  const hovered = makeVisible(document.createElement('article'));
+  document.body.append(selected, hovered);
+  startPicker();
+
+  selected.dispatchEvent(
+    new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 24,
+      clientY: 36,
+      composed: true,
+    })
+  );
+  hovered.dispatchEvent(
+    new MouseEvent('mousemove', {
+      bubbles: true,
+      clientX: 24,
+      clientY: 36,
+      composed: true,
+    })
+  );
+
+  expectFrameSummary('button');
+});
+
+it('dismisses the inspector on a page click, consumes that click, and resumes hover preview', () => {
+  const contentHost = document.createElement('div');
+  document.body.append(contentHost);
+  initializeContentUiRoots(contentHost.attachShadow({ mode: 'open' }));
+  const selected = makeVisible(document.createElement('button'));
+  const outside = makeVisible(document.createElement('article'));
+  const nextHover = makeVisible(document.createElement('section'));
+  document.body.append(selected, outside, nextHover);
+  const onInspectorDismissRequested = vi.fn(() => true);
+  const onSelection = vi.fn();
+  startPicker({ onInspectorDismissRequested, onSelection });
+  selected.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  const outsideClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+  outside.dispatchEvent(outsideClick);
+
+  expect(onInspectorDismissRequested).toHaveBeenCalledOnce();
+  expect(onSelection).toHaveBeenCalledOnce();
+  expect(outsideClick.defaultPrevented).toBe(true);
+  expectFrameSummary('article');
+
+  nextHover.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+  expectFrameSummary('section');
+});
+
+it('keeps the inspector and pinned frame when automatic comment save rejects dismissal', () => {
+  const contentHost = document.createElement('div');
+  document.body.append(contentHost);
+  initializeContentUiRoots(contentHost.attachShadow({ mode: 'open' }));
+  const selected = makeVisible(document.createElement('button'));
+  const outside = makeVisible(document.createElement('article'));
+  document.body.append(selected, outside);
+  const onInspectorDismissRequested = vi.fn(() => false);
+  startPicker({ onInspectorDismissRequested });
+  selected.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  const outsideClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+  outside.dispatchEvent(outsideClick);
+  outside.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+
+  expect(onInspectorDismissRequested).toHaveBeenCalledOnce();
+  expect(outsideClick.defaultPrevented).toBe(true);
+  expectFrameSummary('button');
+});
+
+it('keeps inspector interactions inside the popover without requesting dismissal', () => {
+  const contentHost = document.createElement('div');
+  const contentRoot = contentHost.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(contentRoot);
+  document.body.append(contentHost);
+  const popover = document.createElement('aside');
+  popover.dataset['ui'] = 'content.design-review.popover';
+  const control = document.createElement('button');
+  popover.append(control);
+  const outsideControl = document.createElement('button');
+  contentRoot.append(popover, outsideControl);
+  const selected = makeVisible(document.createElement('button'));
+  document.body.append(selected);
+  const onInspectorDismissRequested = vi.fn(() => true);
+  startPicker({ onInspectorDismissRequested });
+  selected.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  control.dispatchEvent(
+    new MouseEvent('click', { bubbles: true, cancelable: true, composed: true })
+  );
+
+  expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+
+  const outsideClick = new MouseEvent('click', {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  });
+  outsideControl.dispatchEvent(outsideClick);
+
+  expect(onInspectorDismissRequested).toHaveBeenCalledOnce();
+  expect(outsideClick.defaultPrevented).toBe(false);
+});
+
+it('keeps portaled settings controls owned by the inspector inside its dismissal boundary', () => {
+  const contentHost = document.createElement('div');
+  const contentRoot = contentHost.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(contentRoot);
+  document.body.append(contentHost);
+  const popover = document.createElement('aside');
+  popover.dataset['ui'] = 'content.design-review.popover';
+  const owner = document.createElement('div');
+  owner.setAttribute(FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE, 'review-color');
+  popover.append(owner);
+  const portaledControl = document.createElement('button');
+  portaledControl.setAttribute(FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE, 'review-color');
+  contentRoot.append(popover, portaledControl);
+  const selected = makeVisible(document.createElement('button'));
+  document.body.append(selected);
+  const onInspectorDismissRequested = vi.fn(() => true);
+  startPicker({ onInspectorDismissRequested });
+  selected.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  portaledControl.dispatchEvent(
+    new MouseEvent('click', { bubbles: true, cancelable: true, composed: true })
+  );
+
+  expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+});
+
 it('selects the visible label proxy for an opacity-hidden checkbox menu trigger', () => {
   const input = makeVisible(document.createElement('input'));
   input.type = 'checkbox';
@@ -95,7 +252,7 @@ it('selects the visible label proxy for an opacity-hidden checkbox menu trigger'
   label.textContent = '152 languages';
   document.body.append(input, label);
   const onSelection = vi.fn();
-  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  startPicker({ onSelection });
 
   input.dispatchEvent(
     new MouseEvent('click', {
@@ -115,9 +272,9 @@ it('opens the exact live DOM element near its trailing-edge marker', () => {
   const target = makeVisible(document.createElement('button'));
   document.body.append(target);
   const onSelection = vi.fn();
-  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  const runtime = startPicker({ onSelection });
 
-  expect(pickerRuntime.selectElement(target)).toBe(true);
+  expect(runtime.selectElement(target)).toBe(true);
   expect(onSelection).toHaveBeenCalledWith(
     expect.objectContaining({
       anchor: { x: 92, y: 54 },
@@ -133,7 +290,7 @@ it('selects a closed shadow host instead of its inaccessible descendant', () => 
   root.append(target);
   document.body.append(host);
   const onSelection = vi.fn();
-  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  startPicker({ onSelection });
 
   target.dispatchEvent(
     new MouseEvent('click', {
@@ -157,7 +314,7 @@ it('ignores extension-owned controls instead of annotating the review UI', () =>
   contentRoot.append(control);
   document.body.append(contentHost);
   const onSelection = vi.fn();
-  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  startPicker({ onSelection });
 
   control.dispatchEvent(
     new MouseEvent('click', {
@@ -179,7 +336,7 @@ it('defers Escape to the highest open Design Review layer before disabling the m
   contentRoot.append(panel);
   document.body.append(contentHost);
   const onDisableRequested = vi.fn();
-  pickerRuntime = startDesignReviewPicker({ onDisableRequested, onSelection: vi.fn() });
+  startPicker({ onDisableRequested });
 
   document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
   expect(onDisableRequested).not.toHaveBeenCalled();
@@ -212,7 +369,7 @@ it('fails closed on a registered annotation marker instead of selecting the page
     value: vi.fn(() => [marker, pageTarget]),
   });
   const onSelection = vi.fn();
-  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  startPicker({ onSelection });
 
   marker.dispatchEvent(
     new MouseEvent('click', {
@@ -235,12 +392,12 @@ it('removes the picker frame node on teardown', () => {
   const target = makeVisible(document.createElement('button'));
   document.body.append(target);
   showDesignReviewFrame(target);
-  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection: vi.fn() });
+  const runtime = startPicker();
 
   expect(queryContentUiElement('.sniptale-design-review-frame')).not.toBeNull();
   expect(document.getElementById('sniptale-design-review-cursor-style')).not.toBeNull();
 
-  pickerRuntime.dispose();
+  runtime.dispose();
   pickerRuntime = null;
   expect(queryContentUiElement('.sniptale-design-review-frame')).toBeNull();
   expect(document.getElementById('sniptale-design-review-cursor-style')).toBeNull();
@@ -254,7 +411,7 @@ it('selects the exact element from an accessible same-origin iframe', () => {
   );
   iframe.contentDocument!.body.append(target);
   const onSelection = vi.fn();
-  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  startPicker({ onSelection });
 
   target.dispatchEvent(
     new MouseEvent('click', {
@@ -302,7 +459,7 @@ it('anchors an inaccessible iframe through nested rendered scale in the top view
     }),
   });
   const onSelection = vi.fn();
-  pickerRuntime = startDesignReviewPicker({ onDisableRequested: vi.fn(), onSelection });
+  startPicker({ onSelection });
 
   inaccessibleIframeMocks.onSelect?.(innerIframe);
 
@@ -311,4 +468,30 @@ it('anchors an inaccessible iframe through nested rendered scale in the top view
     anchor: { x: 302, y: 272 },
     snapshot: { element: innerIframe },
   });
+});
+
+it('restores inaccessible iframe preview after dismissal and keeps the pin when dismissal fails', () => {
+  const contentHost = document.createElement('div');
+  document.body.append(contentHost);
+  initializeContentUiRoots(contentHost.attachShadow({ mode: 'open' }));
+  const selected = makeVisible(document.createElement('button'));
+  const iframe = makeVisible(document.createElement('iframe'));
+  document.body.append(selected, iframe);
+  const onInspectorDismissRequested = vi.fn(() => false);
+  const onSelection = vi.fn();
+  startPicker({ onInspectorDismissRequested, onSelection });
+  selected.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  inaccessibleIframeMocks.onSelect?.(iframe);
+
+  expect(onInspectorDismissRequested).toHaveBeenCalledOnce();
+  expect(onSelection).toHaveBeenCalledOnce();
+  expectFrameSummary('button');
+
+  onInspectorDismissRequested.mockReturnValue(true);
+  inaccessibleIframeMocks.onSelect?.(iframe);
+
+  expect(onInspectorDismissRequested).toHaveBeenCalledTimes(2);
+  expect(onSelection).toHaveBeenCalledOnce();
+  expectFrameSummary('iframe');
 });
