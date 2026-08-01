@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isSameTabOutputGeometry,
+  remapTabOutputGeometry,
   resolveTabOutputGeometry,
   revalidateTabOutputGeometry,
 } from './tab-output';
@@ -59,14 +60,52 @@ describe('tab output geometry', () => {
     });
   });
 
-  it('rejects a raw source whose aspect ratio does not match the viewport', () => {
-    expect(() =>
+  it('maps a centered logical viewport inside a differently shaped raw proxy', () => {
+    expect(
       resolveTabOutputGeometry(
-        { x: 0, y: 0, width: 1024, height: 768 },
+        { x: 0, y: 0, width: 1904, height: 985 },
         { width: 2560, height: 1440 },
-        { width: 1024, height: 768, devicePixelRatio: 2 }
+        { width: 1904, height: 985, devicePixelRatio: 1 }
       )
-    ).toThrow('does not match');
+    ).toMatchObject({
+      logicalContentRect: {
+        height: expect.closeTo((2560 * 985) / 1904),
+        width: 2560,
+        x: 0,
+        y: expect.closeTo((1440 - (2560 * 985) / 1904) / 2),
+      },
+      sourceRect: { height: 1324, width: 2560, x: 0, y: 58 },
+    });
+  });
+
+  it('tracks a resized full viewport inside a stable proxy and locks the encoder size', () => {
+    const initial = {
+      ...resolveTabOutputGeometry(
+        { x: 0, y: 0, width: 1904, height: 985 },
+        { width: 2560, height: 1440 },
+        { width: 1904, height: 985, devicePixelRatio: 1 },
+        { tracksFullViewport: true }
+      ),
+      outputSize: { width: 1904, height: 984 },
+    };
+
+    expect(
+      remapTabOutputGeometry(
+        initial,
+        { width: 2560, height: 1440 },
+        {
+          width: 1600,
+          height: 900,
+          devicePixelRatio: 1,
+        }
+      )
+    ).toMatchObject({
+      fit: 'contain',
+      outputSize: { width: 1904, height: 984 },
+      requestedCrop: { x: 0, y: 0, width: 1600, height: 900 },
+      sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
+      tracksFullViewport: true,
+    });
   });
 
   it('preserves odd TAB_CROP geometry instead of silently changing the selected area', () => {

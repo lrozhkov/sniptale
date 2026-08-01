@@ -74,17 +74,16 @@ function createTabVideoConstraints(params: {
   const mandatory: Record<string, unknown> = {
     chromeMediaSource: 'tab',
     chromeMediaSourceId: params.streamId,
-    ...(params.viewport
-      ? {
-          maxHeight: params.viewport.height,
-          maxWidth: params.viewport.width,
-          minHeight: params.viewport.height,
-          minWidth: params.viewport.width,
-        }
-      : {}),
   };
   return {
     mandatory,
+    ...(params.viewport
+      ? {
+          aspectRatio: { ideal: params.viewport.width / params.viewport.height },
+          height: { ideal: params.viewport.height },
+          width: { ideal: params.viewport.width },
+        }
+      : {}),
     ...(params.controlledCursorCaptureEnabled === true || params.excludeNativeCursor === true
       ? { cursor: 'never' as const }
       : {}),

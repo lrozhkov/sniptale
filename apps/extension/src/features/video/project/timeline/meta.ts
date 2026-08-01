@@ -13,12 +13,12 @@ import {
   VideoProjectShapeType,
 } from '../types';
 import {
-  getVideoResolutionTier,
   resolveVideoOutputDimensions,
+  VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 
 export function getDefaultExportSettings(project: VideoProject): VideoProjectExportSettings {
-  const resolution = getVideoResolutionTier(project.width, project.height);
+  const resolution = VideoResolutionPreset.SOURCE;
   const dimensions = resolveVideoOutputDimensions(project.width, project.height, resolution);
   return {
     width: dimensions.width,

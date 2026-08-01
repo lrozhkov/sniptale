@@ -6,7 +6,11 @@ import {
   type CropStreamGeometry,
   type OutputSize,
 } from './crop-frame-gate';
-import { isOnePixelEncoderCrop, resolveContainedFrame } from './contain-frame';
+import {
+  isOnePixelEncoderCrop,
+  resolveContainedFrame,
+  resolveCoverSourceRect,
+} from './contain-frame';
 import { createCanvasVideoOutput } from './canvas-video-output';
 
 export type {
@@ -27,7 +31,6 @@ type CropStreamOptions = {
   dynamicSourceFit?: boolean;
   frameRate?: number;
   initiallySuspended?: boolean;
-  logicalSourceSize?: OutputSize;
 };
 
 function requirePositiveInteger(value: number, label: string): number {
@@ -64,34 +67,20 @@ function fillFrameBackground(context: CanvasRenderingContext2D, outputSize: Outp
 function drawDynamicSourceFrame(params: {
   context: CanvasRenderingContext2D;
   cropOddSourceEdges: boolean;
-  initialRawSize: OutputSize;
-  initialSurfaceSize: OutputSize;
   outputSize: OutputSize;
   video: HTMLVideoElement;
 }): void {
   const rawSize = { height: params.video.videoHeight, width: params.video.videoWidth };
   if (rawSize.width <= 0 || rawSize.height <= 0) return;
-  const surfaceSize = {
-    height: (rawSize.height * params.initialSurfaceSize.height) / params.initialRawSize.height,
-    width: (rawSize.width * params.initialSurfaceSize.width) / params.initialRawSize.width,
-  };
 
-  if (params.cropOddSourceEdges && isOnePixelEncoderCrop(surfaceSize, params.outputSize)) {
-    const sourceCrop = {
-      height: (rawSize.height * params.outputSize.height) / surfaceSize.height,
-      width: (rawSize.width * params.outputSize.width) / surfaceSize.width,
-    };
-    const scaled =
-      sourceCrop.width !== params.outputSize.width ||
-      sourceCrop.height !== params.outputSize.height;
-    params.context.imageSmoothingEnabled = scaled;
-    if (scaled) params.context.imageSmoothingQuality = 'high';
+  if (params.cropOddSourceEdges && isOnePixelEncoderCrop(rawSize, params.outputSize)) {
+    params.context.imageSmoothingEnabled = false;
     params.context.drawImage(
       params.video,
       0,
       0,
-      sourceCrop.width,
-      sourceCrop.height,
+      params.outputSize.width,
+      params.outputSize.height,
       0,
       0,
       params.outputSize.width,
@@ -101,7 +90,7 @@ function drawDynamicSourceFrame(params: {
   }
 
   fillFrameBackground(params.context, params.outputSize);
-  const destination = resolveContainedFrame(surfaceSize, params.outputSize);
+  const destination = resolveContainedFrame(rawSize, params.outputSize);
   const scaled = rawSize.width !== destination.width || rawSize.height !== destination.height;
   params.context.imageSmoothingEnabled = scaled;
   if (scaled) params.context.imageSmoothingQuality = 'high';
@@ -124,19 +113,48 @@ function drawFixedSourceFrame(params: {
   video: HTMLVideoElement;
 }): void {
   const { sourceRect, outputSize } = params.geometry;
-  const scaled = sourceRect.width !== outputSize.width || sourceRect.height !== outputSize.height;
+  let source = sourceRect;
+  let destination = { x: 0, y: 0, ...outputSize };
+  if (params.geometry.fit === 'source' && isOnePixelEncoderCrop(sourceRect, outputSize)) {
+    params.context.imageSmoothingEnabled = false;
+    params.context.drawImage(
+      params.video,
+      sourceRect.x,
+      sourceRect.y,
+      outputSize.width,
+      outputSize.height,
+      0,
+      0,
+      outputSize.width,
+      outputSize.height
+    );
+    return;
+  }
+  if (params.geometry.fit === 'cover' || params.geometry.fit === 'source') {
+    const crop = resolveCoverSourceRect(sourceRect, outputSize);
+    source = {
+      height: crop.height,
+      width: crop.width,
+      x: sourceRect.x + crop.x,
+      y: sourceRect.y + crop.y,
+    };
+  } else if (params.geometry.fit === 'contain') {
+    fillFrameBackground(params.context, outputSize);
+    destination = resolveContainedFrame(sourceRect, outputSize);
+  }
+  const scaled = source.width !== destination.width || source.height !== destination.height;
   params.context.imageSmoothingEnabled = scaled;
   if (scaled) params.context.imageSmoothingQuality = 'high';
   params.context.drawImage(
     params.video,
-    sourceRect.x,
-    sourceRect.y,
-    sourceRect.width,
-    sourceRect.height,
-    0,
-    0,
-    outputSize.width,
-    outputSize.height
+    source.x,
+    source.y,
+    source.width,
+    source.height,
+    destination.x,
+    destination.y,
+    destination.width,
+    destination.height
   );
 }
 
@@ -159,8 +177,6 @@ export async function createGatedCropStream(
       width: video.videoWidth,
       height: video.videoHeight,
     });
-    const initialRawSize = { height: video.videoHeight, width: video.videoWidth };
-    const initialSurfaceSize = options.logicalSourceSize ?? initialRawSize;
     const sourceFrameRate =
       options.frameRate ?? sourceStream.getVideoTracks()[0]?.getSettings().frameRate;
     const frameRate =
@@ -179,8 +195,6 @@ export async function createGatedCropStream(
             drawDynamicSourceFrame({
               context,
               cropOddSourceEdges: options.cropOddSourceEdges === true,
-              initialRawSize,
-              initialSurfaceSize,
               outputSize: activeGeometry.outputSize,
               video,
             });

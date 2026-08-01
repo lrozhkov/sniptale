@@ -71,7 +71,7 @@ it('records the webcam through the fixed output stream', async () => {
     frameRate: 30,
   });
   expect(recorder?.recorder).toMatchObject({
-    options: { videoBitsPerSecond: 6_000_000 },
+    options: { videoBitsPerSecond: 8_000_000 },
     stream: recorder?.stream,
   });
   expect(recorder?.trackSettings).toEqual({ frameRate: 30, height: 1080, width: 1920 });

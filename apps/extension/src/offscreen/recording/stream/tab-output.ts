@@ -5,11 +5,15 @@ import {
   type CropStreamGeometry,
   type OutputSize,
 } from './crop-stream';
+import { resolveContainedFrame } from './contain-frame';
 
 export type TabOutputGeometry = CropStreamGeometry & {
   coordinateSpace: TabOutputCoordinateSpace;
+  fit: 'contain' | 'cover' | 'source';
+  logicalContentRect: CropRect;
   requestedCrop: CropRect;
   sourceSize: OutputSize;
+  tracksFullViewport: boolean;
 };
 
 type TabOutputCoordinateSpace = OutputSize & {
@@ -57,27 +61,19 @@ function requireRequestedCrop(crop: CropRect, coordinateSpace: TabOutputCoordina
 export function resolveTabOutputGeometry(
   requestedCrop: CropRect,
   sourceSize: OutputSize,
-  coordinateSpace: TabOutputCoordinateSpace
+  coordinateSpace: TabOutputCoordinateSpace,
+  options: { tracksFullViewport?: boolean } = {}
 ): TabOutputGeometry {
   const source = requirePositiveSize(sourceSize, 'Tab source');
   const cssViewport = requireCoordinateSpace(coordinateSpace);
   const requested = requireRequestedCrop(requestedCrop, cssViewport);
-  const aspectError = Math.abs(
-    source.width * cssViewport.height - source.height * cssViewport.width
-  );
-  if (aspectError > Math.max(source.width, source.height)) {
-    throw new Error(
-      'source-dimensions-mismatch: raw tab source does not match the measured viewport aspect ratio'
-    );
-  }
-
-  const scaleX = source.width / cssViewport.width;
-  const scaleY = source.height / cssViewport.height;
+  const logicalContentRect = resolveContainedFrame(cssViewport, source);
+  const scale = logicalContentRect.width / cssViewport.width;
   const mappedBounds = [
-    Math.round(requested.x * scaleX),
-    Math.round(requested.y * scaleY),
-    Math.round((requested.x + requested.width) * scaleX),
-    Math.round((requested.y + requested.height) * scaleY),
+    Math.round(logicalContentRect.x + requested.x * scale),
+    Math.round(logicalContentRect.y + requested.y * scale),
+    Math.round(logicalContentRect.x + (requested.x + requested.width) * scale),
+    Math.round(logicalContentRect.y + (requested.y + requested.height) * scale),
   ];
   const [left, top, right, bottom] = mappedBounds as [number, number, number, number];
   const sourceRect = {
@@ -99,10 +95,34 @@ export function resolveTabOutputGeometry(
 
   return {
     coordinateSpace: { ...cssViewport },
+    fit: 'cover',
+    logicalContentRect,
     outputSize: { width: sourceRect.width, height: sourceRect.height },
     requestedCrop: { ...requested },
     sourceRect,
     sourceSize: { ...source },
+    tracksFullViewport: options.tracksFullViewport === true,
+  };
+}
+
+export function remapTabOutputGeometry(
+  geometry: TabOutputGeometry,
+  sourceSize: OutputSize,
+  coordinateSpace: TabOutputCoordinateSpace
+): TabOutputGeometry {
+  const requestedCrop = geometry.tracksFullViewport
+    ? { x: 0, y: 0, width: coordinateSpace.width, height: coordinateSpace.height }
+    : geometry.requestedCrop;
+  const remapped = resolveTabOutputGeometry(requestedCrop, sourceSize, coordinateSpace, {
+    tracksFullViewport: geometry.tracksFullViewport,
+  });
+  const viewportAspectChanged =
+    geometry.coordinateSpace.width * coordinateSpace.height !==
+    coordinateSpace.width * geometry.coordinateSpace.height;
+  return {
+    ...remapped,
+    fit: geometry.tracksFullViewport && viewportAspectChanged ? 'contain' : geometry.fit,
+    outputSize: geometry.outputSize,
   };
 }
 
@@ -111,22 +131,24 @@ export function isSameTabOutputGeometry(
   right: TabOutputGeometry
 ): boolean {
   return (
-    left.coordinateSpace.width === right.coordinateSpace.width &&
-    left.coordinateSpace.height === right.coordinateSpace.height &&
+    areSizesEqual(left.coordinateSpace, right.coordinateSpace) &&
     left.coordinateSpace.devicePixelRatio === right.coordinateSpace.devicePixelRatio &&
-    left.requestedCrop.x === right.requestedCrop.x &&
-    left.requestedCrop.y === right.requestedCrop.y &&
-    left.requestedCrop.width === right.requestedCrop.width &&
-    left.requestedCrop.height === right.requestedCrop.height &&
-    left.sourceSize.width === right.sourceSize.width &&
-    left.sourceSize.height === right.sourceSize.height &&
-    left.sourceRect.x === right.sourceRect.x &&
-    left.sourceRect.y === right.sourceRect.y &&
-    left.sourceRect.width === right.sourceRect.width &&
-    left.sourceRect.height === right.sourceRect.height &&
-    left.outputSize.width === right.outputSize.width &&
-    left.outputSize.height === right.outputSize.height
+    left.fit === right.fit &&
+    areRectsEqual(left.logicalContentRect, right.logicalContentRect) &&
+    areRectsEqual(left.requestedCrop, right.requestedCrop) &&
+    areSizesEqual(left.sourceSize, right.sourceSize) &&
+    areRectsEqual(left.sourceRect, right.sourceRect) &&
+    areSizesEqual(left.outputSize, right.outputSize) &&
+    left.tracksFullViewport === right.tracksFullViewport
   );
+}
+
+function areSizesEqual(left: OutputSize, right: OutputSize): boolean {
+  return left.width === right.width && left.height === right.height;
+}
+
+function areRectsEqual(left: CropRect, right: CropRect): boolean {
+  return left.x === right.x && left.y === right.y && areSizesEqual(left, right);
 }
 
 export function revalidateTabOutputGeometry(
@@ -137,7 +159,7 @@ export function revalidateTabOutputGeometry(
   try {
     return isSameTabOutputGeometry(
       geometry,
-      resolveTabOutputGeometry(geometry.requestedCrop, sourceSize, coordinateSpace)
+      remapTabOutputGeometry(geometry, sourceSize, coordinateSpace)
     );
   } catch {
     return false;

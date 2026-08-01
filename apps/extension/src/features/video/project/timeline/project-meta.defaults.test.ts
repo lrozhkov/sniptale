@@ -37,7 +37,7 @@ describe('video project meta defaults', () => {
       fps: 30,
       height: 720,
       quality: VideoExportQualityPreset.MEDIUM,
-      resolution: '720P',
+      resolution: 'SOURCE',
       scope: 'project',
       subtitleSidecarFormats: [],
       width: 1280,
@@ -49,6 +49,16 @@ describe('video project meta defaults', () => {
         expect.objectContaining({ id: 'track-b', order: 1 }),
       ],
       updatedAt: 77,
+    });
+  });
+
+  it('defaults to Source and only removes odd encoder edges', () => {
+    const project = { ...createProject([createVideoClip()]), height: 985, width: 1904 };
+
+    expect(getDefaultExportSettings(project)).toMatchObject({
+      height: 984,
+      resolution: 'SOURCE',
+      width: 1904,
     });
   });
 });

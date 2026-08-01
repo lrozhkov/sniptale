@@ -17,7 +17,7 @@ type VideoRecordingArtifact = {
 
 export function applyVideoTrackContentHint(
   track: MediaStreamTrack,
-  hint: 'detail' | 'motion'
+  hint: 'detail' | 'motion' | 'text'
 ): void {
   if (!('contentHint' in track)) return;
   try {
@@ -116,7 +116,6 @@ export function buildVideoMediaRecorderOptions(
       output,
     }),
     videoBitsPerSecond: resolveVideoTargetBitrate({
-      codec: output.codec,
       fps,
       height,
       quality: settings.quality,

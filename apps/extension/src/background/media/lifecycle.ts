@@ -11,6 +11,7 @@ export {
   handleTabRecordingNavigationCompleted,
   handleTabRecordingNavigationError,
   handleTabRecordingNavigationStart,
+  handleTabRecordingWindowBoundsChanged,
   handleTabClose,
 } from './video/runtime/manager';
 export { resetVideoRecordingRuntimeState } from './video/runtime/session-state';

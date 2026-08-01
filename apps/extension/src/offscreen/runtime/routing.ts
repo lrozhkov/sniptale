@@ -27,7 +27,7 @@ import {
   waitForSourceMetadata,
 } from '../recording/stream/video-source';
 import {
-  resolveTabOutputGeometry,
+  remapTabOutputGeometry,
   revalidateTabOutputGeometry,
 } from '../recording/stream/tab-output';
 import type { OutputSize } from '../recording/stream/crop-stream';
@@ -308,12 +308,7 @@ async function refreshFrozenTabOutput(
         devicePixelRatio: message.viewport.devicePixelRatio,
       }
     : geometry.coordinateSpace;
-  const remappedGeometry = resolveTabOutputGeometry(
-    geometry.requestedCrop,
-    sourceSize,
-    coordinateSpace
-  );
-  const nextGeometry = { ...remappedGeometry, outputSize: geometry.outputSize };
+  const nextGeometry = remapTabOutputGeometry(geometry, sourceSize, coordinateSpace);
   if (controls.applyFrozenSourceGeometry(message.transitionId, nextGeometry) !== 'applied') {
     throw new Error('Viewport source revalidation was superseded');
   }

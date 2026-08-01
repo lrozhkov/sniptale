@@ -39,7 +39,6 @@ export interface VideoOutputDimensions {
 }
 
 type CanonicalVideoQuality = 'LOW' | 'MEDIUM' | 'HIGH' | 'ULTRA';
-type VideoBitrateCodec = 'VP8' | 'VP9' | 'AVC' | 'HEVC';
 
 export const DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS: VideoRecordingOutputSettings = {
   codec: VideoOutputCodec.VP9,
@@ -247,7 +246,6 @@ export function getVideoResolutionTier(
 }
 
 export function resolveVideoTargetBitrate(params: {
-  codec: VideoBitrateCodec;
   fps: number;
   height: number;
   quality: CanonicalVideoQuality;
@@ -260,6 +258,5 @@ export function resolveVideoTargetBitrate(params: {
       : getVideoResolutionTier(params.width, params.height);
   const base = VIDEO_BITRATE_LADDER[resolution][params.quality];
   const frameRateAdjusted = params.fps > 30 ? base * HIGH_FRAME_RATE_BITRATE_MULTIPLIER : base;
-  const codecMultiplier = params.codec === 'VP9' || params.codec === 'HEVC' ? 0.75 : 1;
-  return Math.round(frameRateAdjusted * codecMultiplier);
+  return Math.round(frameRateAdjusted);
 }

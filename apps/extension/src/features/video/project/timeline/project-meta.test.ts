@@ -29,7 +29,7 @@ function expectDefaultExportSettings(project: ReturnType<typeof createProject>) 
     fps: 30,
     height: 720,
     quality: VideoExportQualityPreset.MEDIUM,
-    resolution: '720P',
+    resolution: 'SOURCE',
     scope: 'project',
     subtitleSidecarFormats: [],
     width: 1280,

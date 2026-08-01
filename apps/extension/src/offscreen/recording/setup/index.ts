@@ -74,22 +74,7 @@ async function createOutputVideoStream(
   stream: MediaStream;
   tabOutputGeometry: TabOutputGeometry | null;
 }> {
-  const requiresTabCanvas =
-    params.captureMode === CaptureMode.TAB_CROP || params.surface?.target === 'viewport';
   const frameRate = resolveVideoRecordingFrameRate(params.settings);
-  if (params.captureMode === CaptureMode.TAB && !requiresTabCanvas) {
-    if (!params.viewport) throw new Error('Tab recording viewport geometry is unavailable');
-    const fixedOutput = await createFixedOutputStream(source, raw, params.settings, {
-      height: params.viewport.height,
-      width: params.viewport.width,
-    });
-    return {
-      controls: null,
-      outputSize: fixedOutput.outputSize,
-      stream: fixedOutput.stream,
-      tabOutputGeometry: null,
-    };
-  }
   if (params.captureMode === CaptureMode.TAB || params.captureMode === CaptureMode.TAB_CROP) {
     if (!params.viewport) throw new Error('Tab recording viewport geometry is unavailable');
     if (!params.viewport.devicePixelRatio) {
@@ -107,14 +92,19 @@ async function createOutputVideoStream(
     const baseGeometry = resolveTabOutputGeometry(
       requestedCrop,
       { width: raw.width, height: raw.height },
-      coordinateSpace
+      coordinateSpace,
+      { tracksFullViewport: params.captureMode === CaptureMode.TAB }
     );
     const outputProfile = resolveVideoRecordingOutputSettings(params.settings);
     const tabOutputGeometry = {
       ...baseGeometry,
+      fit:
+        outputProfile.resolution === VideoResolutionPreset.SOURCE
+          ? ('source' as const)
+          : baseGeometry.fit,
       outputSize: resolveVideoOutputDimensions(
-        baseGeometry.sourceRect.width,
-        baseGeometry.sourceRect.height,
+        requestedCrop.width,
+        requestedCrop.height,
         outputProfile.resolution
       ),
     };
@@ -123,10 +113,7 @@ async function createOutputVideoStream(
       initiallySuspended: params.surface?.target === 'viewport',
     });
     return {
-      controls:
-        params.captureMode === CaptureMode.TAB_CROP || params.surface?.target === 'viewport'
-          ? tabOutput.controls
-          : null,
+      controls: tabOutput.controls,
       outputSize: tabOutputGeometry.outputSize,
       stream: tabOutput.stream,
       tabOutputGeometry,
@@ -152,15 +139,10 @@ async function createOutputVideoStream(
 
 function resolveFixedOutputGeometry(
   raw: { width: number; height: number },
-  settings: VideoRecordingSettings,
-  outputReference: { width: number; height: number } = raw
+  settings: VideoRecordingSettings
 ): CropStreamGeometry {
   const output = resolveVideoRecordingOutputSettings(settings);
-  const outputSize = resolveVideoOutputDimensions(
-    outputReference.width,
-    outputReference.height,
-    output.resolution
-  );
+  const outputSize = resolveVideoOutputDimensions(raw.width, raw.height, output.resolution);
   return {
     outputSize,
     sourceRect: { x: 0, y: 0, width: raw.width, height: raw.height },
@@ -170,10 +152,9 @@ function resolveFixedOutputGeometry(
 async function createFixedOutputStream(
   source: MediaStream,
   raw: { width: number; height: number },
-  settings: VideoRecordingSettings,
-  logicalSourceSize?: { width: number; height: number }
+  settings: VideoRecordingSettings
 ): Promise<{ outputSize: VideoOutputDimensions; stream: MediaStream }> {
-  const geometry = resolveFixedOutputGeometry(raw, settings, logicalSourceSize ?? raw);
+  const geometry = resolveFixedOutputGeometry(raw, settings);
   const output = resolveVideoRecordingOutputSettings(settings);
   return {
     outputSize: geometry.outputSize,
@@ -181,7 +162,6 @@ async function createFixedOutputStream(
       ...(output.resolution === VideoResolutionPreset.SOURCE ? { cropOddSourceEdges: true } : {}),
       dynamicSourceFit: true,
       frameRate: resolveVideoRecordingFrameRate(settings),
-      ...(logicalSourceSize === undefined ? {} : { logicalSourceSize }),
     }),
   };
 }
@@ -272,7 +252,11 @@ export async function prepareRecordingStream(
   await attachMicrophoneAudioIfEnabled(params.settings);
   applyVideoTrackContentHint(
     outputTrack,
-    params.captureMode === CaptureMode.CAMERA ? 'motion' : 'detail'
+    params.captureMode === CaptureMode.CAMERA
+      ? 'motion'
+      : params.captureMode === CaptureMode.TAB || params.captureMode === CaptureMode.TAB_CROP
+        ? 'text'
+        : 'detail'
   );
   return {
     cursorCaptureMode,

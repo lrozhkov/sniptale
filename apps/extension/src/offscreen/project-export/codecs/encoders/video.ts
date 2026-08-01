@@ -12,11 +12,8 @@ type VideoEncoderSupportResult = Awaited<ReturnType<typeof VideoEncoder.isConfig
 type VideoEncoderCandidate =
   (typeof MP4_VIDEO_ENCODER_CANDIDATES_BY_CODEC)[VideoMp4CodecType][number];
 
-function getVideoEncoderBitrate(
-  settings: VideoProjectExportSettings,
-  codec: VideoMp4CodecType
-): number {
-  return resolveExportTargetBitrate(settings, codec);
+function getVideoEncoderBitrate(settings: VideoProjectExportSettings): number {
+  return resolveExportTargetBitrate(settings);
 }
 
 function createVideoEncoderConfig(params: {
@@ -79,7 +76,7 @@ async function probeSupportedMp4VideoEncoder(
 ): Promise<SupportedMp4VideoEncoder | null> {
   const candidates = MP4_VIDEO_ENCODER_CANDIDATES_BY_CODEC[codec];
   const attempts: string[] = [];
-  const bitrate = getVideoEncoderBitrate(settings, codec);
+  const bitrate = getVideoEncoderBitrate(settings);
 
   for (const candidate of candidates) {
     const label = translate(candidate.labelKey);

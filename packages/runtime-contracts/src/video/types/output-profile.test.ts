@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  getDefaultVideoOutputCodec,
   getVideoResolutionTier,
+  getVideoRecordingMimeTypeCandidates,
   isVideoRecordingOutputSettings,
   resolveVideoOutputDimensions,
   resolveVideoTargetBitrate,
@@ -48,6 +50,36 @@ describe('canonical video output geometry', () => {
 });
 
 describe('canonical video output profile', () => {
+  it('maps each container to its canonical default codec and MIME candidates', () => {
+    expect(getDefaultVideoOutputCodec(VideoOutputContainer.WEBM)).toBe(VideoOutputCodec.VP9);
+    expect(getDefaultVideoOutputCodec(VideoOutputContainer.MP4)).toBe(VideoOutputCodec.AVC);
+
+    expect(
+      getVideoRecordingMimeTypeCandidates(
+        {
+          codec: VideoOutputCodec.VP9,
+          container: VideoOutputContainer.WEBM,
+          resolution: VideoResolutionPreset.P1080,
+        },
+        true
+      )
+    ).toEqual(['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp9']);
+    expect(
+      getVideoRecordingMimeTypeCandidates(
+        {
+          codec: VideoOutputCodec.AVC,
+          container: VideoOutputContainer.MP4,
+          resolution: VideoResolutionPreset.P1080,
+        },
+        false
+      )
+    ).toEqual([
+      'video/mp4;codecs=avc1.640028',
+      'video/mp4;codecs=avc1.4d0028',
+      'video/mp4;codecs=avc1.42E01E',
+    ]);
+  });
+
   it('accepts only compatible container and codec combinations', () => {
     expect(isVideoRecordingOutputSettings(DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS)).toBe(true);
     expect(
@@ -75,7 +107,6 @@ describe('canonical video output profile', () => {
 
   it('uses a fixed resolution ladder and an explicit high-frame-rate step', () => {
     const base = resolveVideoTargetBitrate({
-      codec: VideoOutputCodec.AVC,
       fps: 30,
       height: 1080,
       quality: 'HIGH',
@@ -83,7 +114,6 @@ describe('canonical video output profile', () => {
       width: 1920,
     });
     const highFrameRate = resolveVideoTargetBitrate({
-      codec: VideoOutputCodec.AVC,
       fps: 60,
       height: 1080,
       quality: 'HIGH',
@@ -93,5 +123,37 @@ describe('canonical video output profile', () => {
 
     expect(base).toBe(8_000_000);
     expect(highFrameRate).toBe(12_000_000);
+  });
+
+  it('keeps codec efficiency outside the explicit quality ladder', () => {
+    expect(
+      resolveVideoTargetBitrate({
+        fps: 30,
+        height: 1080,
+        quality: 'HIGH',
+        resolution: VideoResolutionPreset.P1080,
+        width: 1920,
+      })
+    ).toBe(8_000_000);
+  });
+
+  it('derives the Source bitrate tier from the materialized encoder size', () => {
+    expect(
+      resolveVideoTargetBitrate({
+        fps: 30,
+        height: 720,
+        quality: 'HIGH',
+        resolution: VideoResolutionPreset.SOURCE,
+        width: 1280,
+      })
+    ).toBe(5_000_000);
+    expect(
+      resolveVideoTargetBitrate({
+        fps: 30,
+        height: 720,
+        quality: 'HIGH',
+        width: 1280,
+      })
+    ).toBe(5_000_000);
   });
 });

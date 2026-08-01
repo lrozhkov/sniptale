@@ -2,6 +2,7 @@ export type CropRect = { x: number; y: number; width: number; height: number };
 export type OutputSize = { width: number; height: number };
 
 export type CropStreamGeometry = {
+  fit?: 'contain' | 'cover' | 'source';
   outputSize: OutputSize;
   sourceRect: CropRect;
 };

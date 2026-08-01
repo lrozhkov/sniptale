@@ -109,7 +109,18 @@ describe('crop stream', () => {
     video.videoHeight = 900;
     vi.advanceTimersToNextTimer();
 
-    expect(context.drawImage).toHaveBeenLastCalledWith(video, 0, 0, 1600, 900, 76, 0, 1750, 984);
+    const resizedDraw = context.drawImage.mock.calls.at(-1);
+    expect(resizedDraw?.[0]).toBe(video);
+    expect(resizedDraw?.slice(1)).toEqual([
+      0,
+      0,
+      1600,
+      900,
+      expect.closeTo((1902 - (1600 * 984) / 900) / 2),
+      expect.closeTo(0),
+      expect.closeTo((1600 * 984) / 900),
+      expect.closeTo(984),
+    ]);
     expect(context.fillRect).toHaveBeenLastCalledWith(0, 0, 1902, 984);
     expect(context.imageSmoothingEnabled).toBe(true);
     expect(context.imageSmoothingQuality).toBe('high');
@@ -148,62 +159,6 @@ describe('crop stream', () => {
 
     expect(context.imageSmoothingEnabled).toBe(false);
     expect(context.drawImage).toHaveBeenCalledWith(video, 0, 0, 1278, 720, 0, 0, 1278, 720);
-    output.getVideoTracks()[0]?.stop();
-  });
-
-  it('normalizes a screen-sized raw TAB proxy to the initial logical viewport without bars', async () => {
-    const output = createStream(1904, 984);
-    const context = {
-      drawImage: vi.fn(),
-      fillRect: vi.fn(),
-      fillStyle: '',
-      imageSmoothingEnabled: false,
-      imageSmoothingQuality: 'low',
-    };
-    Object.defineProperty(HTMLCanvasElement.prototype, 'captureStream', {
-      configurable: true,
-      value: vi.fn(() => output),
-    });
-    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
-      configurable: true,
-      value: vi.fn(() => context),
-    });
-    const video = { videoHeight: 1440, videoWidth: 2560 };
-    mocks.createSourceVideo.mockReturnValue(video);
-
-    await createCropStream(
-      createStream(2560, 1440),
-      {
-        sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
-        outputSize: { width: 1904, height: 984 },
-      },
-      {
-        cropOddSourceEdges: true,
-        dynamicSourceFit: true,
-        frameRate: 30,
-        logicalSourceSize: { width: 1904, height: 985 },
-      }
-    );
-
-    expect(context.fillRect).not.toHaveBeenCalled();
-    expect(context.drawImage).toHaveBeenLastCalledWith(
-      video,
-      0,
-      0,
-      2560,
-      (1440 * 984) / 985,
-      0,
-      0,
-      1904,
-      984
-    );
-    expect(context.imageSmoothingEnabled).toBe(true);
-    expect(context.imageSmoothingQuality).toBe('high');
-
-    video.videoWidth = 2400;
-    vi.advanceTimersToNextTimer();
-    expect(context.fillRect).toHaveBeenLastCalledWith(0, 0, 1904, 984);
-    expect(context.drawImage).toHaveBeenLastCalledWith(video, 0, 0, 2400, 1440, 60, 0, 1784, 984);
     output.getVideoTracks()[0]?.stop();
   });
 

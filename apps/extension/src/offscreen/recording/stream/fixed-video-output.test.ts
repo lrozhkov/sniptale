@@ -172,6 +172,15 @@ it('normalizes an arbitrary source to the selected short edge without distortion
 
   expect(result.dimensions).toEqual({ height: 1080, width: 2346 });
   expect(canvas).toEqual(expect.objectContaining({ height: 1080, width: 2346 }));
-  expect(ctx.drawImage).toHaveBeenCalledWith(video, 0, 0, 1086, 500, 0, 0, 2346, 1080);
+  expect(ctx.drawImage.mock.calls[0]?.slice(1)).toEqual([
+    0,
+    0,
+    1086,
+    500,
+    expect.closeTo((2346 - (1086 * 1080) / 500) / 2),
+    0,
+    expect.closeTo((1086 * 1080) / 500),
+    1080,
+  ]);
   canvasTrack.stop();
 });

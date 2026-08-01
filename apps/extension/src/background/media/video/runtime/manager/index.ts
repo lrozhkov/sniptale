@@ -20,4 +20,5 @@ export {
   handleTabRecordingNavigationCompleted,
   handleTabRecordingNavigationError,
   handleTabRecordingNavigationStart,
+  handleTabRecordingWindowBoundsChanged,
 } from './tab-navigation';

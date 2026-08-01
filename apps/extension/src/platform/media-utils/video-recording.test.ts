@@ -71,7 +71,7 @@ describe('video recording options', () => {
       )
     ).toEqual({
       mimeType: 'video/webm;codecs=vp9,opus',
-      videoBitsPerSecond: 6_000_000,
+      videoBitsPerSecond: 8_000_000,
     });
   });
 

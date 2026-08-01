@@ -99,7 +99,7 @@ it('requests tab capture without the native cursor when controlled cursor captur
   expect(loggerWarnMock).not.toHaveBeenCalled();
 });
 
-it('requests the measured viewport instead of inheriting the screen-sized tab track default', async () => {
+it('requests the measured viewport as a non-blocking ideal over the tab source binding', async () => {
   const getUserMedia = vi.fn().mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
     getVideoTracks: () => [{ getSettings: () => ({ width: 1024, height: 768 }) }],
@@ -116,14 +116,13 @@ it('requests the measured viewport instead of inheriting the screen-sized tab tr
   expect(getUserMedia).toHaveBeenCalledWith({
     audio: false,
     video: {
+      aspectRatio: { ideal: 1904 / 985 },
+      height: { ideal: 985 },
       mandatory: {
         chromeMediaSource: 'tab',
         chromeMediaSourceId: 'tab-stream-viewport',
-        maxHeight: 985,
-        maxWidth: 1904,
-        minHeight: 985,
-        minWidth: 1904,
       },
+      width: { ideal: 1904 },
     },
   });
 });

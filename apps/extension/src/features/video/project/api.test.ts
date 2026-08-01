@@ -203,7 +203,7 @@ it('covers subtitle clip defaults and export settings from the public facade', (
     fps: 30,
     height: 1080,
     quality: 'MEDIUM',
-    resolution: '1080P',
+    resolution: 'SOURCE',
     scope: 'project',
     subtitleSidecarFormats: [],
     width: 1920,

@@ -225,7 +225,7 @@ describe('tab-capture-fallback recorder mime types', () => {
 
     expect(resolveRecorderOptions(createSettings(), stream)).toEqual({
       mimeType: 'video/webm;codecs=vp9',
-      videoBitsPerSecond: 3_750_000,
+      videoBitsPerSecond: 5_000_000,
     });
 
     expect(isTypeSupported).toHaveBeenCalled();

@@ -13,6 +13,7 @@ import {
   resetTabNavigationTransactionForTests,
 } from './transaction';
 import type { TabNavigationPageAccessVerifier } from './page-effects';
+import { queueTabRecordingWindowBoundsChanged, resetTabRecordingResizeForTests } from './resize';
 
 const logger = createLogger({ namespace: 'BackgroundVideoTabNavigation' });
 
@@ -79,6 +80,11 @@ export function handleTabRecordingDebuggerDetach(
   return recoverDetachedViewport(tabId, pageAccessVerifier);
 }
 
+export function handleTabRecordingWindowBoundsChanged(windowId: number): boolean {
+  if (deferUntilRecovery(() => handleTabRecordingWindowBoundsChanged(windowId))) return true;
+  return queueTabRecordingWindowBoundsChanged(windowId);
+}
+
 export function isTabRecordingNavigationPending(): boolean {
   return isTabNavigationTransactionPending();
 }
@@ -89,4 +95,5 @@ export function markTabRecordingManuallyPaused(): void {
 
 export function resetTabRecordingNavigationForTests(): void {
   resetTabNavigationTransactionForTests();
+  resetTabRecordingResizeForTests();
 }

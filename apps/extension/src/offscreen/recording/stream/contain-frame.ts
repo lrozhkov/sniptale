@@ -1,11 +1,5 @@
 import type { OutputSize } from './crop-frame-gate';
 
-function roundToEven(value: number, maximum: number): number {
-  const rounded = Math.round(value / 2) * 2;
-  const evenMaximum = maximum - (maximum % 2);
-  return Math.max(2, Math.min(rounded, evenMaximum));
-}
-
 export function isOnePixelEncoderCrop(source: OutputSize, output: OutputSize): boolean {
   return (
     source.width >= output.width &&
@@ -16,13 +10,27 @@ export function isOnePixelEncoderCrop(source: OutputSize, output: OutputSize): b
 }
 
 export function resolveContainedFrame(source: OutputSize, output: OutputSize) {
-  const scale = Math.min(output.width / source.width, output.height / source.height);
-  const width = roundToEven(source.width * scale, output.width);
-  const height = roundToEven(source.height * scale, output.height);
+  const sourceAspect = source.width / source.height;
+  const outputAspect = output.width / output.height;
+  const width = sourceAspect > outputAspect ? output.width : output.height * sourceAspect;
+  const height = sourceAspect > outputAspect ? output.width / sourceAspect : output.height;
   return {
     height,
     width,
-    x: Math.floor((output.width - width) / 2),
-    y: Math.floor((output.height - height) / 2),
+    x: (output.width - width) / 2,
+    y: (output.height - height) / 2,
+  };
+}
+
+export function resolveCoverSourceRect(source: OutputSize, output: OutputSize) {
+  const sourceAspect = source.width / source.height;
+  const outputAspect = output.width / output.height;
+  const width = sourceAspect > outputAspect ? source.height * outputAspect : source.width;
+  const height = sourceAspect > outputAspect ? source.height : source.width / outputAspect;
+  return {
+    height,
+    width,
+    x: (source.width - width) / 2,
+    y: (source.height - height) / 2,
   };
 }

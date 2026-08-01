@@ -57,10 +57,13 @@ const settings = {
 
 const geometry = {
   coordinateSpace: { width: 1280, height: 720, devicePixelRatio: 2 },
+  fit: 'cover' as const,
+  logicalContentRect: { x: 0, y: 0, width: 2560, height: 1440 },
   requestedCrop: { x: 0, y: 0, width: 1280, height: 720 },
   sourceSize: { width: 2560, height: 1440 },
   sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
   outputSize: { width: 1280, height: 720 },
+  tracksFullViewport: false,
 };
 const tabOutputControls = {
   activate: vi.fn(),
@@ -101,7 +104,20 @@ beforeEach(() => {
   mocks.acquire.mockResolvedValue({ cursorCaptureMode: null, stream: source });
   mocks.createSourceVideo.mockReturnValue({ videoHeight: 1440, videoWidth: 2560 });
   mocks.waitForSourceMetadata.mockResolvedValue(undefined);
-  mocks.resolveTabGeometry.mockReturnValue(geometry);
+  mocks.resolveTabGeometry.mockImplementation(
+    (
+      requestedCrop,
+      sourceSize,
+      coordinateSpace,
+      options: { tracksFullViewport?: boolean } = {}
+    ) => ({
+      ...geometry,
+      coordinateSpace,
+      requestedCrop,
+      sourceSize,
+      tracksFullViewport: options.tracksFullViewport === true,
+    })
+  );
   mocks.createCrop.mockImplementation(
     async (_source: MediaStream, cropGeometry: { outputSize: { width: number; height: number } }) =>
       createRecordingStream(cropGeometry.outputSize.width, cropGeometry.outputSize.height)
@@ -126,13 +142,16 @@ it('materializes the selected output geometry for a normal full-tab source', asy
       streamId: 'stream-1',
       viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
     })
-  ).resolves.toEqual({
+  ).resolves.toMatchObject({
     cursorCaptureMode: null,
     rawTrackSettings: { frameRate: 30, height: 1440, width: 2560 },
     rawVideoHeight: 1440,
     rawVideoWidth: 2560,
-    tabOutputControls: null,
-    tabOutputGeometry: null,
+    tabOutputControls,
+    tabOutputGeometry: {
+      outputSize: { height: 1080, width: 1920 },
+      tracksFullViewport: true,
+    },
     trackSettings: { frameRate: 30, height: 1080, width: 1920 },
   });
 
@@ -142,20 +161,18 @@ it('materializes the selected output geometry for a normal full-tab source', asy
     streamId: 'stream-1',
     viewport: { height: 720, width: 1280 },
   });
-  expect(mocks.resolveTabGeometry).not.toHaveBeenCalled();
-  expect(mocks.createTabOutput).not.toHaveBeenCalled();
-  expect(mocks.createCrop).toHaveBeenCalledWith(
-    expect.anything(),
-    {
-      sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
-      outputSize: { width: 1920, height: 1080 },
-    },
-    {
-      dynamicSourceFit: true,
-      frameRate: 30,
-      logicalSourceSize: { height: 720, width: 1280 },
-    }
+  expect(mocks.resolveTabGeometry).toHaveBeenCalledWith(
+    { x: 0, y: 0, width: 1280, height: 720 },
+    { width: 2560, height: 1440 },
+    { width: 1280, height: 720, devicePixelRatio: 2 },
+    { tracksFullViewport: true }
   );
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
+    { frameRate: 30, initiallySuspended: false }
+  );
+  expect(mocks.createCrop).not.toHaveBeenCalled();
   expect(mocks.releaseSourceVideo).toHaveBeenCalledOnce();
 });
 
@@ -184,7 +201,7 @@ it('starts viewport-preset output behind a closed frame gate', async () => {
   expect(prepared.tabOutputControls).toBe(tabOutputControls);
 });
 
-it('keeps a window-preset TAB output on the fixed canvas path', async () => {
+it('keeps a window-preset TAB output on the controlled tab canvas path', async () => {
   const prepared = await prepareRecordingStream({
     captureMode: CaptureMode.TAB,
     settings,
@@ -198,17 +215,13 @@ it('keeps a window-preset TAB output on the fixed canvas path', async () => {
     viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
   });
 
-  expect(prepared.tabOutputControls).toBeNull();
-  expect(mocks.createTabOutput).not.toHaveBeenCalled();
-  expect(mocks.createCrop).toHaveBeenCalledWith(
+  expect(prepared.tabOutputControls).toBe(tabOutputControls);
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
-    {
-      dynamicSourceFit: true,
-      frameRate: 30,
-      logicalSourceSize: { height: 720, width: 1280 },
-    }
+    { frameRate: 30, initiallySuspended: false }
   );
+  expect(mocks.createCrop).not.toHaveBeenCalled();
 });
 
 it('snapshots verified encoder metadata before audio stream composition', async () => {
@@ -260,12 +273,13 @@ it('uses the selected CSS region for TAB_CROP output mapping', async () => {
   expect(mocks.resolveTabGeometry).toHaveBeenCalledWith(
     crop,
     { width: 2560, height: 1440 },
-    { width: 1280, height: 720, devicePixelRatio: 2 }
+    { width: 1280, height: 720, devicePixelRatio: 2 },
+    { tracksFullViewport: false }
   );
   expect(prepared.tabOutputControls).toBe(tabOutputControls);
   expect(mocks.createTabOutput).toHaveBeenCalledWith(
     expect.anything(),
-    expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
+    expect.objectContaining({ outputSize: { width: 1080, height: 1080 } }),
     { frameRate: 30, initiallySuspended: false }
   );
 });
@@ -288,7 +302,7 @@ it('retains exact-output controls for TAB_CROP with a window preset', async () =
   expect(prepared.tabOutputControls).toBe(tabOutputControls);
   expect(mocks.createTabOutput).toHaveBeenCalledWith(
     expect.anything(),
-    expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
+    expect.objectContaining({ outputSize: { width: 1080, height: 1080 } }),
     { frameRate: 30, initiallySuspended: false }
   );
 });
@@ -380,19 +394,13 @@ it('encodes a 2560x1440 full-tab source as an exact 854x480 output', async () =>
     viewport: { width: 1920, height: 1080, devicePixelRatio: 4 / 3 },
   });
 
-  expect(mocks.createCrop).toHaveBeenCalledWith(
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(
     source,
-    {
-      sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
-      outputSize: { width: 854, height: 480 },
-    },
-    {
-      dynamicSourceFit: true,
-      frameRate: 30,
-      logicalSourceSize: { height: 1080, width: 1920 },
-    }
+    expect.objectContaining({ outputSize: { width: 854, height: 480 } }),
+    { frameRate: 30, initiallySuspended: false }
   );
   expect(prepared.trackSettings).toEqual({ frameRate: 30, height: 480, width: 854 });
+  expect(recordingContext.videoStream?.getVideoTracks()[0]?.contentHint).toBe('text');
 });
 
 it('uses the measured TAB viewport as Source output authority instead of the screen-sized raw track', async () => {
@@ -412,18 +420,41 @@ it('uses the measured TAB viewport as Source output authority instead of the scr
     viewport: { width: 1904, height: 985, devicePixelRatio: 1 },
   });
 
-  expect(mocks.createCrop).toHaveBeenCalledWith(
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(
     source,
-    {
-      sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
-      outputSize: { width: 1904, height: 984 },
+    expect.objectContaining({ outputSize: { width: 1904, height: 984 } }),
+    { frameRate: 30, initiallySuspended: false }
+  );
+  expect(prepared.trackSettings).toEqual({ frameRate: 30, height: 984, width: 1904 });
+});
+
+it('keeps the measured TAB viewport authoritative for Source with a viewport preset', async () => {
+  const source = createRecordingStream(2560, 1440);
+  mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
+
+  const prepared = await prepareRecordingStream({
+    captureMode: CaptureMode.TAB,
+    settings: {
+      ...settings,
+      output: {
+        ...settings.output,
+        resolution: VideoResolutionPreset.SOURCE,
+      },
     },
-    {
-      cropOddSourceEdges: true,
-      dynamicSourceFit: true,
-      frameRate: 30,
-      logicalSourceSize: { height: 985, width: 1904 },
-    }
+    streamId: 'stream-viewport-preset-source',
+    surface: {
+      presetId: 'viewport-1',
+      target: 'viewport',
+      width: 1904,
+      height: 985,
+    },
+    viewport: { width: 1904, height: 985, devicePixelRatio: 1 },
+  });
+
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(
+    source,
+    expect.objectContaining({ outputSize: { width: 1904, height: 984 } }),
+    { frameRate: 30, initiallySuspended: true }
   );
   expect(prepared.trackSettings).toEqual({ frameRate: 30, height: 984, width: 1904 });
 });
@@ -445,17 +476,10 @@ it('preserves the measured TAB aspect ratio for a 1440p output profile', async (
     viewport: { width: 1904, height: 985, devicePixelRatio: 1 },
   });
 
-  expect(mocks.createCrop).toHaveBeenCalledWith(
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(
     source,
-    {
-      sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
-      outputSize: { width: 2784, height: 1440 },
-    },
-    {
-      dynamicSourceFit: true,
-      frameRate: 30,
-      logicalSourceSize: { height: 985, width: 1904 },
-    }
+    expect.objectContaining({ outputSize: { width: 2784, height: 1440 } }),
+    { frameRate: 30, initiallySuspended: false }
   );
   expect(prepared.trackSettings).toEqual({ frameRate: 30, height: 1440, width: 2784 });
 });

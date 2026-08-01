@@ -20,6 +20,7 @@ import { runStartupMaintenance } from './startup';
 import type { BackgroundModeState } from './shared';
 import { registerTabLifecycleListeners } from './tab-lifecycle';
 import { disableScreenshotMode } from '../../tab-mode-router-screenshot';
+import { registerWindowBoundsListener } from './window-bounds';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeWiring' });
 
@@ -32,6 +33,7 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   registerTabLifecycleListeners(state, logger);
   registerDebuggerListeners(logger, state);
   registerNavigationListeners(state);
+  registerWindowBoundsListener();
   initializePageAccessLifecycle(logger);
   configureScreenshotPrivacyErasureCleanupPort({
     disableScreenshotMode: (tabId, runtimeState) =>
