@@ -120,6 +120,7 @@ function createSurfaceSession(applied: TestAppliedSurface | null = viewportSurfa
     applied,
     generation: 1,
     recordingId: 'recording-1',
+    sourceReady: true,
     sourceVideoHeight: 1440,
     sourceVideoWidth: 2560,
     streamInstanceId: 'stream-1',

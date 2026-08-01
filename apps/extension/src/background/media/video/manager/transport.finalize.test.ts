@@ -176,7 +176,7 @@ it('does not bind ordinary full-tab startup to a second viewport measurement', a
   });
 });
 
-it('keeps strict viewport validation for crop geometry', async () => {
+it('requests an atomic remap when crop geometry changes during source opening', async () => {
   const viewport = {
     devicePixelRatio: 2,
     height: 720,
@@ -202,6 +202,50 @@ it('keeps strict viewport validation for crop geometry', async () => {
     expectedViewport: viewport,
     recordingId: 'recording-42',
     tabId: 12,
+    viewportMismatchPolicy: 'remap',
+  });
+});
+
+it('allows startup crop remapping for a window-target preset', async () => {
+  const viewport = {
+    devicePixelRatio: 2,
+    height: 985,
+    scrollX: 0,
+    scrollY: 0,
+    width: 1904,
+  };
+
+  await finalizeRecordingStart({
+    captureMode: CaptureMode.TAB_CROP,
+    captureSource: {
+      captureViewport: viewport,
+      cropRegion: { height: 400, width: 800, x: 20, y: 30 },
+      mode: CaptureMode.TAB_CROP,
+      streamId: 'tab-crop-1',
+    },
+    generation: 1,
+    recordingId: 'recording-window-crop',
+    streamInstanceId: 'stream-window-crop',
+    settings,
+    surface: {
+      generation: 1,
+      height: 1080,
+      leaseId: 'lease-window-crop',
+      presetId: 'system:window-full-hd',
+      sessionId: 'recording-window-crop',
+      target: 'window',
+      width: 1920,
+    },
+    tabId: 12,
+    viewport,
+  });
+
+  expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
+    expectedStreamInstanceId: 'stream-window-crop',
+    expectedViewport: viewport,
+    recordingId: 'recording-window-crop',
+    tabId: 12,
+    viewportMismatchPolicy: 'remap',
   });
 });
 
