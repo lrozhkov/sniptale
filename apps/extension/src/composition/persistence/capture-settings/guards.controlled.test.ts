@@ -62,7 +62,6 @@ it('keeps valid string and numeric settings while counting invalid field variant
       controlledCursorCaptureEnabled: false,
       diagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',
-      openEditorAfterRecording: true,
     })
   ).toEqual({
     hasInvalidRoot: false,
@@ -73,7 +72,6 @@ it('keeps valid string and numeric settings while counting invalid field variant
       controlledCursorCaptureEnabled: false,
       diagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',
-      openEditorAfterRecording: true,
     },
   });
 });

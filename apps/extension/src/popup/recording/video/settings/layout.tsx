@@ -38,17 +38,6 @@ function formatCountdownOption(value: number): string {
   return replaceCount(translate('popup.video.countdownManyOption'), value);
 }
 
-function formatCountdownSelectedValue(value: number): string {
-  if (value === 0) {
-    return translate('popup.video.countdownImmediateValue');
-  }
-
-  return translate('popup.video.countdownDelayedValue').replace(
-    '{duration}',
-    formatCountdownOption(value)
-  );
-}
-
 export function VideoSettingsGrid({
   captureMode,
   knownOutputBasisDimensions,
@@ -63,7 +52,7 @@ export function VideoSettingsGrid({
   const showSourceCount = captureMode === CaptureMode.SCREEN;
 
   return (
-    <div className="mt-0.5 flex flex-col">
+    <div className="flex flex-col">
       <QualityCard
         knownOutputBasisDimensions={knownOutputBasisDimensions ?? null}
         settings={settings}
@@ -88,7 +77,7 @@ export function VideoSettingsGrid({
         max={10}
         suffix={translate('popup.video.secondsSuffix')}
         formatValue={formatCountdownOption}
-        formatSelectedValue={formatCountdownSelectedValue}
+        formatSelectedValue={formatCountdownOption}
         onChange={(value) => onSettingsChange({ countdownSeconds: value })}
       />
     </div>

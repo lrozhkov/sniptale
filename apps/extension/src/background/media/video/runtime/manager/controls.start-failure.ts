@@ -7,7 +7,6 @@ import {
   isCurrentVideoRecordingId,
   isControlledCursorCaptureEnabled,
   resetVideoRecordingStartSession,
-  setOpenEditorAfterRecording,
   setVideoRecordingId,
 } from '../../session-state';
 import { resetVideoRecordingRuntimeState } from '../session-state';
@@ -69,7 +68,6 @@ export async function notifyRecordingStartFailed(
 
   if (options.retainAuthority !== true) {
     setVideoRecordingId(null);
-    setOpenEditorAfterRecording(false);
     resetVideoRecordingStartSession();
     resetVideoRecordingRuntimeState();
   }

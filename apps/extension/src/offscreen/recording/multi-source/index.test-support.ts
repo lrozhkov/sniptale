@@ -71,7 +71,6 @@ export function createSettings(): VideoRecordingSettings {
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: true,
-    openEditorAfterRecording: true,
     outputProfile: DEFAULT_VIDEO_OUTPUT_PROFILE,
     sourceCount: 2,
     systemAudioEnabled: false,

@@ -50,7 +50,6 @@ const defaultSettings = {
   diagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: true,
-  openEditorAfterRecording: false,
   quality: VideoQuality.HIGH,
   systemAudioEnabled: true,
 };

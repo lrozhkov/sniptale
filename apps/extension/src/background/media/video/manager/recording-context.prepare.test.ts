@@ -74,7 +74,6 @@ function createSettings() {
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
-    openEditorAfterRecording: false,
     quality: VideoQuality.HIGH,
     systemAudioEnabled: true,
   };

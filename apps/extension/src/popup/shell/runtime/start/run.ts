@@ -15,11 +15,13 @@ export function useStartRecordingHandler(state: PopupRuntimeStateSlice) {
     state.recording.clearStartError();
     await startRecordingHandler({
       captureMode: state.presets.videoCaptureMode,
+      microphoneDevices: state.devices.microphoneDevices,
       setIsStartPending: state.recording.setIsStartPending,
       setRecordingControlCapability: state.recording.setRecordingControlCapability,
       setStartError: state.recording.setStartError,
       videoSettings: state.recording.videoSettings,
       viewportPresetId: state.presets.selectedPresetId,
+      webcamDevices: state.devices.webcamDevices,
     });
   }, [state]);
 }

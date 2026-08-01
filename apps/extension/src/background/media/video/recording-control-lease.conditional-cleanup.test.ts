@@ -7,7 +7,6 @@ const {
   browserStorageSessionSetMock,
   getVideoRecordingIdMock,
   getVideoRecordingTabIdMock,
-  setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
   setVideoRecordingRuntimeStateMock,
   setVideoRecordingTabIdMock,
@@ -18,7 +17,6 @@ const {
   browserStorageSessionSetMock: vi.fn(),
   getVideoRecordingIdMock: vi.fn(),
   getVideoRecordingTabIdMock: vi.fn(),
-  setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
   setVideoRecordingRuntimeStateMock: vi.fn(),
   setVideoRecordingTabIdMock: vi.fn(),
@@ -47,7 +45,6 @@ vi.mock('./session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./session-state')>()),
   getVideoRecordingId: getVideoRecordingIdMock,
   getVideoRecordingTabId: getVideoRecordingTabIdMock,
-  setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
   setVideoRecordingTabId: setVideoRecordingTabIdMock,
 }));
@@ -103,7 +100,6 @@ it('restores the lease when conditional cleanup loses a late-activation race', a
   await issuePreparedVideoRecordingLease({
     captureMode: CaptureMode.TAB,
     ownerSenderUrl,
-    openEditorAfterRecording: true,
   });
   await activateVideoRecordingLease({
     generation: 1,
@@ -144,7 +140,6 @@ it('preserves a newer lease when stale conditional cleanup resumes after retry',
   await issuePreparedVideoRecordingLease({
     captureMode: CaptureMode.TAB,
     ownerSenderUrl,
-    openEditorAfterRecording: true,
   });
   await activateVideoRecordingLease({
     generation: 1,
@@ -161,7 +156,6 @@ it('preserves a newer lease when stale conditional cleanup resumes after retry',
   await issuePreparedVideoRecordingLease({
     captureMode: CaptureMode.SCREEN,
     ownerSenderUrl,
-    openEditorAfterRecording: false,
   });
   await activateVideoRecordingLease({
     generation: 1,

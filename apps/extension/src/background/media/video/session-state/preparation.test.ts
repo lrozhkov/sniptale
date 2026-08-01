@@ -43,7 +43,6 @@ it('resets controlled cursor state when a new recording preparation begins', () 
       diagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',
       microphoneEnabled: true,
-      openEditorAfterRecording: false,
       outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
       systemAudioEnabled: true,
       webcamDeviceId: 'cam-1',

@@ -46,11 +46,8 @@ export function usePopupRuntimeEffects(state: {
   refreshWebcams: (options?: RefreshWebcamDevicesOptions) => Promise<WebcamOption[]>;
 }) {
   usePopupMediaDeviceEffects({
-    microphoneDevices: state.microphoneDevices,
     refreshMicrophones: state.refreshMicrophones,
     refreshWebcams: state.refreshWebcams,
-    setVideoSettings: state.setVideoSettings,
-    webcamDevices: state.webcamDevices,
   });
   usePopupPersistenceEffects(state);
   usePopupRecordingNavigationEffect(state);

@@ -61,7 +61,6 @@ it('offers fast advanced choices and marks manual combinations as custom', () =>
           diagnosticsEnabled: false,
           microphoneDeviceId: null,
           microphoneEnabled: false,
-          openEditorAfterRecording: false,
           outputProfile: {
             ...DEFAULT_VIDEO_OUTPUT_PROFILE,
             quality: VideoQuality.HIGH,

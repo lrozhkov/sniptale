@@ -12,11 +12,13 @@ const { openCameraRecorderPage, requestMicrophonePermission, requestWebcamPermis
   })
 );
 
-vi.mock('../../recording/microphone', (_importOriginal) => ({
+vi.mock('../../recording/microphone', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording/microphone')>()),
   requestMicrophonePermission,
 }));
 
-vi.mock('../../recording/webcam', (_importOriginal) => ({
+vi.mock('../../recording/webcam', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording/webcam')>()),
   requestWebcamPermission,
 }));
 
@@ -34,7 +36,6 @@ const defaultSettings = {
   systemAudioEnabled: true,
   countdownSeconds: 3,
   autoFadeDelay: 3,
-  openEditorAfterRecording: false,
   diagnosticsEnabled: false,
   controlledCursorCaptureEnabled: false,
 };
@@ -93,7 +94,9 @@ function createStartArgs(
   return {
     videoSettings: defaultSettings,
     captureMode: CaptureMode.TAB,
+    microphoneDevices: [],
     viewportPresetId: 'hd',
+    webcamDevices: [],
     setIsStartPending,
     setRecordingControlCapability,
     setStartError,
@@ -138,6 +141,7 @@ async function verifiesMissingPresetEarlyReturn() {
 async function verifiesMicrophonePermissionRequest() {
   await startRecordingHandler(
     createStartArgs({
+      microphoneDevices: [{ deviceId: 'mic-1', label: 'Microphone 1' }],
       videoSettings: {
         ...defaultSettings,
         microphoneEnabled: true,

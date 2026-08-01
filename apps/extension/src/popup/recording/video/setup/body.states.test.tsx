@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   postRecordPanelMock: vi.fn(),
   recordingPanelMock: vi.fn(),
   savingPanelMock: vi.fn(),
+  webcamSelectorMock: vi.fn(),
 }));
 
 vi.mock('./toggles/grid', () => ({
@@ -31,7 +32,10 @@ vi.mock('./options', () => ({
   },
   VideoMicrophoneSelector: () => <div />,
   VideoPresetSelector: () => <div />,
-  VideoWebcamSelector: () => <div />,
+  VideoWebcamSelector: (props: unknown) => {
+    mocks.webcamSelectorMock(props);
+    return <div />;
+  },
 }));
 
 vi.mock('./panel', () => ({
@@ -117,6 +121,7 @@ beforeEach(() => {
   mocks.postRecordPanelMock.mockReset();
   mocks.recordingPanelMock.mockReset();
   mocks.savingPanelMock.mockReset();
+  mocks.webcamSelectorMock.mockReset();
 });
 
 afterEach(() => {
@@ -193,5 +198,13 @@ it('passes actual webcam settings into the active recording panel', async () => 
         webcamSettings: { frameRate: 30, height: 720, width: 1280 },
       }),
     })
+  );
+});
+
+it('marks the webcam selector as required only for camera capture', async () => {
+  await renderBody({ ...createProps(), captureMode: CaptureMode.CAMERA });
+
+  expect(mocks.webcamSelectorMock).toHaveBeenCalledWith(
+    expect.objectContaining({ required: true })
   );
 });

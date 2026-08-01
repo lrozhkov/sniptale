@@ -24,7 +24,6 @@ function createSettings(quality: VideoOutputProfile['quality']): VideoRecordingS
     outputProfile: { ...DEFAULT_VIDEO_OUTPUT_PROFILE, quality },
     countdownSeconds: 3,
     autoFadeDelay: 2,
-    openEditorAfterRecording: false,
     diagnosticsEnabled: false,
     qualityProfileId: VideoRecordingBuiltInProfileId.OPTIMAL,
   };

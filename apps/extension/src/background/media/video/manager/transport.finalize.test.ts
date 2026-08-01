@@ -61,7 +61,6 @@ const settings = {
   diagnosticsEnabled: true,
   microphoneDeviceId: null,
   microphoneEnabled: true,
-  openEditorAfterRecording: false,
   quality: VideoQuality.HIGH,
   systemAudioEnabled: true,
 };

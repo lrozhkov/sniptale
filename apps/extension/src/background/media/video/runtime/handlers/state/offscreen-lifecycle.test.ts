@@ -22,7 +22,6 @@ const {
   resetRecordingTabIdMock,
   resetVideoRecordingRuntimeStateMock,
   sendRuntimeMessageMock,
-  shouldOpenVideoEditorAfterRecordingMock,
   waitForStopSideEffectsMock,
   clearActiveVideoRecordingLeaseMock,
   restoreCurrentRecordingFromLeaseMock,
@@ -43,7 +42,6 @@ const {
   resetRecordingTabIdMock: vi.fn(),
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
-  shouldOpenVideoEditorAfterRecordingMock: vi.fn(),
   waitForStopSideEffectsMock: vi.fn(),
   clearActiveVideoRecordingLeaseMock: vi.fn(),
   restoreCurrentRecordingFromLeaseMock: vi.fn(),
@@ -107,7 +105,6 @@ vi.mock('../../../session-state', async () => {
     isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
       recordingId != null && getVideoRecordingIdMock() === recordingId,
     resetCompletedVideoRecordingSession: resetCompletedVideoRecordingSessionMock,
-    shouldOpenVideoEditorAfterRecording: shouldOpenVideoEditorAfterRecordingMock,
   };
 });
 vi.mock('../../../manager/start-activation-watchdog', async (importOriginal) => ({
@@ -166,7 +163,6 @@ beforeEach(() => {
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   getVideoRecordingIdMock.mockReturnValue('rec-1');
   openVideoEditorPageMock.mockResolvedValue(undefined);
-  shouldOpenVideoEditorAfterRecordingMock.mockReturnValue(false);
   waitForStopSideEffectsMock.mockResolvedValue(undefined);
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
   releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
@@ -487,14 +483,12 @@ it('restores the recording lease before accepting saved notifications after rest
   expectAcceptedLifecycleResponse(sendResponse);
 });
 
-it('hydrates the auto-editor decision before staging a cold-worker completion', async () => {
+it('stages a cold-worker completion without automatic editor navigation', async () => {
   const sendResponse = createSendResponse();
   let currentRecordingId: string | null = null;
   getVideoRecordingIdMock.mockImplementation(() => currentRecordingId);
-  shouldOpenVideoEditorAfterRecordingMock.mockReturnValue(false);
   restoreCurrentRecordingFromLeaseMock.mockImplementationOnce(async () => {
     currentRecordingId = 'rec-cold-editor';
-    shouldOpenVideoEditorAfterRecordingMock.mockReturnValue(true);
     return true;
   });
 
@@ -510,7 +504,7 @@ it('hydrates the auto-editor decision before staging a cold-worker completion', 
     recordingId: 'rec-cold-editor',
   });
   expect(commitPendingVideoPostRecordResultMock).toHaveBeenCalledWith('rec-cold-editor');
-  expect(openVideoEditorPageMock).toHaveBeenCalledWith(null, 'rec-cold-editor');
+  expect(openVideoEditorPageMock).not.toHaveBeenCalled();
   expectAcceptedLifecycleResponse(sendResponse);
 });
 
@@ -535,9 +529,8 @@ it('ignores stale offscreen recording errors and saved notifications', async () 
   expectSupersededLifecycleResponse(sendResponse);
 });
 
-it('opens the video editor only after a saved recording arrives with the open-editor flag', async () => {
+it('never opens the video editor automatically after a recording is saved', async () => {
   const sendResponse = createSendResponse();
-  shouldOpenVideoEditorAfterRecordingMock.mockReturnValue(true);
 
   getVideoRecordingIdMock.mockReturnValue('rec-2');
   expect(
@@ -547,7 +540,7 @@ it('opens the video editor only after a saved recording arrives with the open-ed
     keepChannelOpen: true,
   });
   await flushAsyncRoute();
-  expect(openVideoEditorPageMock).toHaveBeenCalledWith(null, 'rec-2');
+  expect(openVideoEditorPageMock).not.toHaveBeenCalled();
   expect(persistPendingVideoPostRecordResultMock).toHaveBeenCalledWith({
     primaryRecordingId: 'rec-2',
     projectId: null,
@@ -563,12 +556,12 @@ it('opens the video editor only after a saved recording arrives with the open-ed
     sendResponse
   );
   await flushAsyncRoute();
-  expect(openVideoEditorPageMock).toHaveBeenCalledWith('project-1', null);
+  expect(openVideoEditorPageMock).not.toHaveBeenCalled();
   expectAcceptedLifecycleResponse(sendResponse);
 
   getVideoRecordingIdMock.mockReturnValue(null);
   handleVideoSavedToIdb({ primaryRecordingId: 'rec-4', recordingId: 'rec-4' }, sendResponse);
   await flushAsyncRoute();
-  expect(openVideoEditorPageMock).toHaveBeenCalledTimes(2);
+  expect(openVideoEditorPageMock).not.toHaveBeenCalled();
   expectSupersededLifecycleResponse(sendResponse);
 });

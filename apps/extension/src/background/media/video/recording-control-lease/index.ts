@@ -8,7 +8,6 @@ import { setVideoRecordingRuntimeState } from '../runtime/session-state';
 import {
   getVideoRecordingId,
   getVideoRecordingTabId,
-  setOpenEditorAfterRecording,
   setVideoRecordingId,
   setVideoRecordingTabId,
 } from '../session-state';
@@ -38,7 +37,6 @@ function getUnexpiredActiveLease(): VideoRecordingControlLease | null {
 function hydrateSessionFromLease(lease: VideoRecordingControlLease): void {
   setVideoRecordingId(lease.recordingId);
   setVideoRecordingTabId(lease.recordingTabId);
-  setOpenEditorAfterRecording(lease.openEditorAfterRecording);
   setVideoRecordingRuntimeState({
     captureMode: lease.captureMode,
     cropRegion: lease.cropRegion,
@@ -53,7 +51,6 @@ export async function issuePreparedVideoRecordingLease(args: {
   captureMode: CaptureMode;
   cropRegion?: { x: number; y: number; width: number; height: number } | null;
   ownerSenderUrl: string;
-  openEditorAfterRecording: boolean;
   surfaceBinding?: { generation: number; streamInstanceId: string } | null;
   viewportPresetId?: string | null;
 }): Promise<VideoRecordingControlLease | null> {
@@ -71,7 +68,6 @@ export async function issuePreparedVideoRecordingLease(args: {
     captureMode: args.captureMode,
     cropRegion: args.cropRegion ?? null,
     ownerSenderUrl: args.ownerSenderUrl,
-    openEditorAfterRecording: args.openEditorAfterRecording,
     recordingId,
     recordingTabId,
     surfaceBinding: args.surfaceBinding ?? null,

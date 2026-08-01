@@ -12,7 +12,6 @@ function createVideoSettings() {
     controlledCursorCaptureEnabled: false,
     countdownSeconds: 3,
     microphoneEnabled: true,
-    openEditorAfterRecording: true,
   };
 }
 

@@ -67,7 +67,6 @@ async function verifyVideoSettingsContracts() {
         qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
         countdownSeconds: 'bad',
         autoFadeDelay: 8,
-        openEditorAfterRecording: true,
         diagnosticsEnabled: true,
       },
     })
@@ -86,7 +85,6 @@ async function verifyVideoSettingsContracts() {
       quality: VideoQuality.MEDIUM,
     },
     autoFadeDelay: 8,
-    openEditorAfterRecording: true,
     diagnosticsEnabled: true,
   });
 
@@ -169,6 +167,46 @@ describe('video', () => {
       qualityProfiles,
     });
     expect(browserStorageLocalSetMock).not.toHaveBeenCalled();
+  });
+
+  it('round-trips the last selected recording controls through canonical storage', async () => {
+    let stored = DEFAULT_VIDEO_SETTINGS;
+    browserStorageLocalGetMock.mockImplementation(async () => ({
+      sniptale_video_settings: stored,
+    }));
+    browserStorageLocalSetMock.mockImplementation(async (items) => {
+      stored = items.sniptale_video_settings as typeof DEFAULT_VIDEO_SETTINGS;
+    });
+    const outputProfile = {
+      codec: VideoOutputCodec.AVC,
+      container: VideoOutputContainer.MP4,
+      frameRate: VideoFrameRate.FPS30,
+      quality: VideoQuality.HIGH,
+      resolution: VideoResolutionPreset.P1080,
+    };
+
+    await patchVideoSettings({
+      countdownSeconds: 8,
+      microphoneDeviceId: 'mic-last',
+      microphoneEnabled: true,
+      outputProfile,
+      qualityProfileId: null,
+      systemAudioEnabled: false,
+      webcamDeviceId: 'cam-last',
+      webcamEnabled: true,
+    });
+
+    await expect(loadVideoSettings()).resolves.toEqual({
+      ...DEFAULT_VIDEO_SETTINGS,
+      countdownSeconds: 8,
+      microphoneDeviceId: 'mic-last',
+      microphoneEnabled: true,
+      outputProfile,
+      qualityProfileId: null,
+      systemAudioEnabled: false,
+      webcamDeviceId: 'cam-last',
+      webcamEnabled: true,
+    });
   });
 
   it('resets the previous quality schema without migrating or repairing storage', async () => {

@@ -133,7 +133,6 @@ export interface VideoRecordingSettings {
   qualityProfiles: VideoRecordingProfile[];
   countdownSeconds: number;
   autoFadeDelay: number;
-  openEditorAfterRecording: boolean;
   diagnosticsEnabled: boolean;
   controlledCursorCaptureEnabled?: boolean;
   native?: NativeCaptureSettings;

@@ -115,7 +115,6 @@ function createEffectsState(overrides: Partial<Parameters<typeof usePopupRuntime
       diagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: true,
-      openEditorAfterRecording: true,
       outputProfile: {
         ...DEFAULT_VIDEO_SETTINGS.outputProfile,
         quality: VideoQuality.MEDIUM,

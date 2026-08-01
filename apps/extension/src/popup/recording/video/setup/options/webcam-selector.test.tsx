@@ -61,7 +61,6 @@ function createSettings(
     microphoneEnabled: false,
     webcamDeviceId: 'cam-1',
     webcamEnabled: true,
-    openEditorAfterRecording: false,
     quality: VideoQuality.MEDIUM,
     systemAudioEnabled: true,
     webcamQuality: {
@@ -110,6 +109,21 @@ it('hides the webcam selector until webcam capture is enabled', () => {
   );
 
   expect(container?.textContent ?? '').not.toContain('t:popup.video.webcamRowLabel');
+});
+
+it('shows the required camera selector without changing a disabled saved preference', () => {
+  renderNode(
+    <VideoWebcamSelector
+      required
+      settings={createSettings({ webcamDeviceId: null, webcamEnabled: false })}
+      webcamDevices={[]}
+      isLoadingWebcams={false}
+      onWebcamDeviceChange={() => undefined}
+      onSettingsChange={() => undefined}
+    />
+  );
+
+  expect(container?.textContent).toContain('t:popup.video.webcamRowLabel');
 });
 
 it('shows the webcam select control and emits selected device changes', async () => {

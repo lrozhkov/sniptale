@@ -53,7 +53,6 @@ const settings = {
   diagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
-  openEditorAfterRecording: false,
   systemAudioEnabled: false,
 };
 

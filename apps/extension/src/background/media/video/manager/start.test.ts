@@ -17,7 +17,6 @@ const {
   resetVideoRecordingRuntimeStateMock,
   resetVideoRecordingStartSessionMock,
   readStoredVideoPostRecordResultMock,
-  setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
 } = vi.hoisted(() => ({
   beginVideoRecordingPreparationMock: vi.fn(),
@@ -36,7 +35,6 @@ const {
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   resetVideoRecordingStartSessionMock: vi.fn(),
   readStoredVideoPostRecordResultMock: vi.fn(),
-  setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
 }));
 
@@ -57,7 +55,6 @@ vi.mock('../session-state', async (importOriginal) => ({
   hasActiveVideoRecordingSession: hasActiveVideoRecordingSessionMock,
   isVideoRecordingPreparationInProgress: isVideoRecordingPreparationInProgressMock,
   resetVideoRecordingStartSession: resetVideoRecordingStartSessionMock,
-  setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
 vi.mock('../runtime/session-state', async (importOriginal) => ({
@@ -131,7 +128,6 @@ function startRecordingFromPopup(
 
 function expectFullStartRollback() {
   expect(setVideoRecordingIdMock).toHaveBeenLastCalledWith(null);
-  expect(setOpenEditorAfterRecordingMock).toHaveBeenLastCalledWith(false);
   expect(resetVideoRecordingStartSessionMock).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
 }
@@ -240,7 +236,6 @@ function verifiesViewportPresetHappyPath() {
     });
     expect(runCountdownMock).toHaveBeenCalledWith(17, CaptureMode.TAB, sanitizedSettings);
     expect(initializeRecordingContextMock.mock.calls[0]?.[0].settings).not.toBe(defaultSettings);
-    expect(setOpenEditorAfterRecordingMock).toHaveBeenCalledWith(false);
     expect(isStartCancelledMock).toHaveBeenCalledWith(17, CaptureMode.TAB);
     expect(scheduleRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('recording-1');
     expect(finalizeRecordingStartMock).toHaveBeenCalledWith({
@@ -251,7 +246,6 @@ function verifiesViewportPresetHappyPath() {
     expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
       captureMode: CaptureMode.TAB,
       cropRegion: null,
-      openEditorAfterRecording: false,
       ownerSenderUrl,
       surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
       viewportPresetId: viewportPreset.id,

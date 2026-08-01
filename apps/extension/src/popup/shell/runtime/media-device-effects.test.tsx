@@ -4,14 +4,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import {
-  VideoQuality,
-  type VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
 import type { MicrophoneOption } from '../../recording/microphone';
 import type { WebcamOption } from '../../recording/webcam';
 import { usePopupMediaDeviceEffects } from './media-device-effects';
-import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { resolveMicrophoneDeviceIdMock, resolveWebcamDeviceIdMock } = vi.hoisted(() => ({
   resolveMicrophoneDeviceIdMock: vi.fn((deviceId: string | null) => deviceId),
@@ -29,37 +24,16 @@ vi.mock('../../recording/webcam', (_importOriginal) => ({
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function createSettings(): VideoRecordingSettings {
-  return {
-    ...DEFAULT_VIDEO_SETTINGS,
-    autoFadeDelay: 0,
-    countdownSeconds: 3,
-    diagnosticsEnabled: false,
-    microphoneDeviceId: 'mic-1',
-    microphoneEnabled: true,
-    openEditorAfterRecording: true,
-    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
-    systemAudioEnabled: true,
-    webcamDeviceId: 'cam-1',
-    webcamEnabled: true,
-  };
-}
-
 function EffectsHarness({
   refreshMicrophones,
   refreshWebcams,
-  setVideoSettings,
 }: {
   refreshMicrophones: () => Promise<MicrophoneOption[]>;
   refreshWebcams: () => Promise<WebcamOption[]>;
-  setVideoSettings: React.Dispatch<React.SetStateAction<VideoRecordingSettings>>;
 }) {
   usePopupMediaDeviceEffects({
-    microphoneDevices: [{ deviceId: 'mic-2', label: 'Mic 2' }],
     refreshMicrophones,
     refreshWebcams,
-    setVideoSettings,
-    webcamDevices: [{ deviceId: 'cam-2', label: 'Camera 2' }],
   });
   return null;
 }
@@ -102,7 +76,6 @@ it('skips devicechange listeners when media device events are unavailable', asyn
   await renderHarness({
     refreshMicrophones,
     refreshWebcams,
-    setVideoSettings: vi.fn(),
   });
 
   expect(refreshMicrophones).not.toHaveBeenCalled();
@@ -122,7 +95,6 @@ it('refreshes microphones and webcams on mount and device changes', async () => 
   await renderHarness({
     refreshMicrophones,
     refreshWebcams,
-    setVideoSettings: vi.fn(),
   });
 
   expect(refreshMicrophones).toHaveBeenCalledTimes(1);
@@ -138,41 +110,15 @@ it('refreshes microphones and webcams on mount and device changes', async () => 
   expect(removeEventListener).toHaveBeenCalledWith('devicechange', deviceChangeHandler);
 });
 
-it('corrects stale microphone and webcam device ids from available devices', async () => {
-  const setVideoSettings = vi.fn();
+it('does not resolve or rewrite saved device preferences from transient availability', async () => {
   resolveMicrophoneDeviceIdMock.mockReturnValue('mic-2');
   resolveWebcamDeviceIdMock.mockReturnValue('cam-2');
 
   await renderHarness({
     refreshMicrophones: vi.fn(async () => []),
     refreshWebcams: vi.fn(async () => []),
-    setVideoSettings,
   });
 
-  const microphoneUpdater = setVideoSettings.mock.calls[0]?.[0] as (
-    settings: VideoRecordingSettings
-  ) => VideoRecordingSettings;
-  const webcamUpdater = setVideoSettings.mock.calls[1]?.[0] as (
-    settings: VideoRecordingSettings
-  ) => VideoRecordingSettings;
-
-  expect(microphoneUpdater(createSettings()).microphoneDeviceId).toBe('mic-2');
-  expect(webcamUpdater(createSettings()).webcamDeviceId).toBe('cam-2');
-});
-
-it('keeps settings object identity when resolved device ids are unchanged', async () => {
-  const setVideoSettings = vi.fn();
-
-  await renderHarness({
-    refreshMicrophones: vi.fn(async () => []),
-    refreshWebcams: vi.fn(async () => []),
-    setVideoSettings,
-  });
-
-  const microphoneUpdater = setVideoSettings.mock.calls[0]?.[0] as (
-    settings: VideoRecordingSettings
-  ) => VideoRecordingSettings;
-  const settings = createSettings();
-
-  expect(microphoneUpdater(settings)).toBe(settings);
+  expect(resolveMicrophoneDeviceIdMock).not.toHaveBeenCalled();
+  expect(resolveWebcamDeviceIdMock).not.toHaveBeenCalled();
 });

@@ -27,7 +27,6 @@ const recordingSettings = {
   ...DEFAULT_VIDEO_SETTINGS,
   countdownSeconds: 0,
   autoFadeDelay: 1,
-  openEditorAfterRecording: true,
 };
 
 it('accepts valid cursor capture modes on offscreen recording started messages', () => {

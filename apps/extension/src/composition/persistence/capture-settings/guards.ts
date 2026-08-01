@@ -148,7 +148,6 @@ const VIDEO_SETTINGS_FIELD_PARSERS = [
   ['qualityProfiles', parseOptionalVideoQualityProfiles],
   ['countdownSeconds', parseOptionalNumber],
   ['autoFadeDelay', parseOptionalNumber],
-  ['openEditorAfterRecording', parseOptionalBoolean],
   ['diagnosticsEnabled', parseOptionalBoolean],
   ['controlledCursorCaptureEnabled', parseOptionalBoolean],
   ['native', parseOptionalNativeSettings],

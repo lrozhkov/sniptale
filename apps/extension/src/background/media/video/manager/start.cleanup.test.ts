@@ -16,7 +16,6 @@ const {
   resetVideoRecordingRuntimeStateMock,
   resetVideoRecordingStartSessionMock,
   readStoredVideoPostRecordResultMock,
-  setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
 } = vi.hoisted(() => ({
   beginVideoRecordingPreparationMock: vi.fn(),
@@ -33,7 +32,6 @@ const {
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   resetVideoRecordingStartSessionMock: vi.fn(),
   readStoredVideoPostRecordResultMock: vi.fn(),
-  setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
 }));
 
@@ -54,7 +52,6 @@ vi.mock('../session-state', async (importOriginal) => ({
   hasActiveVideoRecordingSession: hasActiveVideoRecordingSessionMock,
   isVideoRecordingPreparationInProgress: isVideoRecordingPreparationInProgressMock,
   resetVideoRecordingStartSession: resetVideoRecordingStartSessionMock,
-  setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
 vi.mock('../runtime/session-state', async (importOriginal) => ({
@@ -102,7 +99,6 @@ const multiSourceSettings: VideoRecordingSettings = {
   diagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
-  openEditorAfterRecording: false,
   outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
   sourceCount: 3,
   systemAudioEnabled: true,
@@ -190,7 +186,6 @@ it('disposes prepared multi-source streams and resets state when start is cancel
   );
   expect(finalizeRecordingStartMock).toHaveBeenCalledOnce();
   expect(setVideoRecordingIdMock).toHaveBeenLastCalledWith(null);
-  expect(setOpenEditorAfterRecordingMock).toHaveBeenLastCalledWith(false);
   expect(resetVideoRecordingStartSessionMock).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
   expect(notifyRecordingStartFailedMock).not.toHaveBeenCalled();

@@ -81,7 +81,6 @@ function createSettings(): VideoRecordingSettings {
     microphoneEnabled: true,
     microphoneGain: 1,
     noiseSuppression: true,
-    openEditorAfterRecording: false,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: false,
     webcamDeviceId: null,

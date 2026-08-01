@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   getCurrentLocale: () => 'en',
-  translate: (key: string) => key,
+  translate: (key: string) => (key === 'popup.video.countdownManyOption' ? `${key}:{count}` : key),
 }));
 
 vi.mock('./quality-card/view', () => ({
@@ -61,6 +61,12 @@ function clickButtonContaining(text: string) {
 }
 
 describe('video settings layout', () => {
+  it('does not add a redundant top margin to the settings block', () => {
+    renderGrid();
+
+    expect(container.firstElementChild?.className).toBe('flex flex-col');
+  });
+
   it('threads known and unknown output bases to the quality owner', () => {
     renderGrid({ knownOutputBasisDimensions: { height: 900, width: 1440 } });
     expect(mocks.qualityCard).toHaveBeenLastCalledWith(
@@ -82,9 +88,9 @@ describe('video settings layout', () => {
       settings: { ...DEFAULT_VIDEO_SETTINGS, countdownSeconds: 3 },
     });
 
-    expect(container.textContent).toContain('popup.video.countdownDelayedValue');
+    expect(container.textContent).toContain('popup.video.countdownManyOption:3');
     clickButtonContaining('popup.video.countdownLabel');
-    clickButtonContaining('popup.video.countdownManyOption');
+    clickButtonContaining('popup.video.countdownManyOption:2');
 
     expect(onSettingsChange).toHaveBeenCalledWith({ countdownSeconds: 2 });
   });
@@ -97,7 +103,7 @@ describe('video settings layout', () => {
       settings: { ...DEFAULT_VIDEO_SETTINGS, countdownSeconds: 0, sourceCount: 2 },
     });
 
-    expect(container.textContent).toContain('popup.video.countdownImmediateValue');
+    expect(container.textContent).toContain('popup.video.countdownZeroOption');
     clickButtonContaining('popup.video.sourceCountLabel');
     clickButtonContaining('popup.video.sourceCountOne');
 

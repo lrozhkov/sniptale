@@ -77,7 +77,6 @@ function registerFullVideoSettingsTests() {
         microphoneGain: 1.5,
         microphoneDeviceId: null,
         microphoneEnabled: true,
-        openEditorAfterRecording: false,
         outputProfile: {
           ...DEFAULT_VIDEO_SETTINGS.outputProfile,
           quality: VideoQuality.HIGH,
@@ -101,7 +100,6 @@ function registerFullVideoSettingsTests() {
         microphoneGain: 1.5,
         microphoneDeviceId: null,
         microphoneEnabled: true,
-        openEditorAfterRecording: false,
         outputProfile: {
           ...DEFAULT_VIDEO_SETTINGS.outputProfile,
           quality: VideoQuality.HIGH,
@@ -302,7 +300,6 @@ describe('video guards invalid settings', () => {
         diagnosticsEnabled: 'true',
         microphoneDeviceId: 7,
         microphoneEnabled: true,
-        openEditorAfterRecording: false,
         outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: 'BROKEN' },
         systemAudioEnabled: null,
         webcamDeviceId: false,
@@ -314,7 +311,6 @@ describe('video guards invalid settings', () => {
       value: {
         countdownSeconds: 3,
         microphoneEnabled: true,
-        openEditorAfterRecording: false,
         qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
         qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
       },

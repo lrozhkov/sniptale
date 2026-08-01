@@ -16,10 +16,6 @@ export function isCurrentVideoRecordingId(
   return getVideoRecordingId() === recordingId;
 }
 
-export function shouldOpenVideoEditorAfterRecording(): boolean {
-  return videoManagerSession.openEditorAfterRecording;
-}
-
 export function getVideoRecordingCaptureMode(): CaptureMode | null {
   return videoManagerSession.currentCaptureMode;
 }

@@ -8,7 +8,6 @@ import type { RecordingTelemetrySnapshot } from '../../../../contracts/messaging
 interface VideoManagerSessionState {
   recordingTabId: number | null;
   currentRecordingId: string | null;
-  openEditorAfterRecording: boolean;
   isStarting: boolean;
   offscreenStartDispatched: boolean;
   isStopping: boolean;
@@ -29,7 +28,6 @@ export type VideoManagerSessionFacade = VideoManagerSessionState;
 const VIDEO_MANAGER_SESSION_FIELDS = [
   'recordingTabId',
   'currentRecordingId',
-  'openEditorAfterRecording',
   'isStarting',
   'offscreenStartDispatched',
   'isStopping',
@@ -51,7 +49,6 @@ function createVideoManagerSessionState(): VideoManagerSessionState {
   return {
     recordingTabId: null,
     currentRecordingId: null,
-    openEditorAfterRecording: false,
     isStarting: false,
     offscreenStartDispatched: false,
     isStopping: false,

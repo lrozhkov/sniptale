@@ -9,11 +9,13 @@ const { requestWebcamPermission } = vi.hoisted(() => ({
   requestWebcamPermission: vi.fn(),
 }));
 
-vi.mock('../../recording/microphone', (_importOriginal) => ({
+vi.mock('../../recording/microphone', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording/microphone')>()),
   requestMicrophonePermission: vi.fn(),
 }));
 
-vi.mock('../../recording/webcam', (_importOriginal) => ({
+vi.mock('../../recording/webcam', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording/webcam')>()),
   requestWebcamPermission,
 }));
 
@@ -33,7 +35,6 @@ const defaultSettings = {
   microphoneEnabled: false,
   webcamDeviceId: 'cam-1',
   webcamEnabled: true,
-  openEditorAfterRecording: false,
   systemAudioEnabled: true,
 };
 
@@ -52,11 +53,13 @@ beforeEach(() => {
 it('requests webcam permission and carries webcam settings into START_RECORDING', async () => {
   await startRecordingHandler({
     captureMode: CaptureMode.TAB,
+    microphoneDevices: [],
     setIsStartPending,
     setRecordingControlCapability,
     setStartError,
     videoSettings: defaultSettings,
     viewportPresetId: null,
+    webcamDevices: [{ deviceId: 'cam-1', label: 'Camera 1' }],
   });
 
   expect(requestWebcamPermission).toHaveBeenCalledWith('cam-1');
@@ -71,16 +74,39 @@ it('requests webcam permission and carries webcam settings into START_RECORDING'
   );
 });
 
+it('uses an available webcam for this start without rewriting the saved preference', async () => {
+  await startRecordingHandler({
+    captureMode: CaptureMode.TAB,
+    microphoneDevices: [],
+    setIsStartPending,
+    setRecordingControlCapability,
+    setStartError,
+    videoSettings: { ...defaultSettings, webcamDeviceId: 'camera-currently-missing' },
+    viewportPresetId: null,
+    webcamDevices: [{ deviceId: 'cam-available', label: 'Available camera' }],
+  });
+
+  expect(requestWebcamPermission).toHaveBeenCalledWith('cam-available');
+  expect(runtimeSendMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      settings: expect.objectContaining({ webcamDeviceId: 'cam-available' }),
+    })
+  );
+  expect(defaultSettings.webcamDeviceId).toBe('cam-1');
+});
+
 it('does not send START_RECORDING when webcam permission fails', async () => {
   requestWebcamPermission.mockRejectedValueOnce(new Error('camera blocked'));
 
   await startRecordingHandler({
     captureMode: CaptureMode.TAB,
+    microphoneDevices: [],
     setIsStartPending,
     setRecordingControlCapability,
     setStartError,
     videoSettings: defaultSettings,
     viewportPresetId: null,
+    webcamDevices: [{ deviceId: 'cam-1', label: 'Camera 1' }],
   });
 
   expect(requestWebcamPermission).toHaveBeenCalledWith('cam-1');

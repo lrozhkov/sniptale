@@ -47,7 +47,6 @@ export function createPopupBootstrapVideoSettings(overrides: Record<string, unkn
     diagnosticsEnabled: false,
     microphoneDeviceId: 'missing-device',
     microphoneEnabled: true,
-    openEditorAfterRecording: true,
     quality: VideoQuality.HIGH,
     systemAudioEnabled: true,
     ...overrides,

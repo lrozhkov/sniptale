@@ -173,6 +173,7 @@ async function openPaletteFromHotkey() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.useFakeTimers();
+  window.history.replaceState(null, '', '/');
   settingsPageMocks.loadSettingsMock.mockReset();
   settingsPageMocks.settingsCommandPaletteMock.mockReset();
   settingsPageMocks.settingsSidebarMock.mockReset();
@@ -216,6 +217,15 @@ describe('SettingsPage', () => {
 });
 
 describe('SettingsPage navigation', () => {
+  it('opens the presets section from the section query parameter', async () => {
+    window.history.replaceState(null, '', '?section=presets');
+
+    await renderPage();
+    await flushLazySettingsSection();
+
+    expect(container?.textContent).toContain('presets-section');
+  });
+
   it('renders each settings tab surface through the owner sidebar and command palette', async () => {
     const settingsTabs: Array<[string, string]> = [
       ['ai', 'ai-section'],

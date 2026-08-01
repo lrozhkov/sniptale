@@ -9,7 +9,6 @@ const {
   resetVideoRecordingStartSessionMock,
   sendRuntimeMessageMock,
   sendTabMessageMock,
-  setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
   loggerErrorMock,
   loggerWarnMock,
@@ -24,7 +23,6 @@ const {
   resetVideoRecordingStartSessionMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
-  setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerWarnMock: vi.fn(),
@@ -71,7 +69,6 @@ vi.mock('../../session-state', async (importOriginal) => ({
     recordingId != null && getVideoRecordingIdMock() === recordingId,
   isControlledCursorCaptureEnabled: isControlledCursorCaptureEnabledMock,
   resetVideoRecordingStartSession: resetVideoRecordingStartSessionMock,
-  setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
 vi.mock('../../capture-surface', async (importOriginal) => ({
@@ -143,7 +140,6 @@ function expectStartFailureBroadcast(): void {
 
 function expectRuntimeStateReset(): void {
   expect(setVideoRecordingIdMock).toHaveBeenCalledWith(null);
-  expect(setOpenEditorAfterRecordingMock).toHaveBeenCalledWith(false);
   expect(resetVideoRecordingStartSessionMock).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
 }

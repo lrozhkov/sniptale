@@ -13,7 +13,6 @@ const recordingSettings = {
   ...DEFAULT_VIDEO_SETTINGS,
   countdownSeconds: 0,
   autoFadeDelay: 1,
-  openEditorAfterRecording: true,
 };
 
 it('rejects unknown capture modes on start recording requests', () => {

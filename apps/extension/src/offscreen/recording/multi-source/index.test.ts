@@ -378,7 +378,6 @@ it('can discard a mic-free multi-source session without saving outputs', async (
     settings: {
       ...createSettings(),
       microphoneEnabled: false,
-      openEditorAfterRecording: false,
     },
   });
   await stopMultiSourceRecording(true);
@@ -420,7 +419,6 @@ it('creates a grouped project for later post-record editing when auto-open is di
     settings: {
       ...createSettings(),
       microphoneEnabled: false,
-      openEditorAfterRecording: false,
     },
   });
   await stopMultiSourceRecording();

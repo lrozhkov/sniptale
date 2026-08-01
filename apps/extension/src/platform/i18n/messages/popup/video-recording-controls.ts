@@ -18,8 +18,8 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
     en: 'Enable',
   },
   countdownZeroOption: {
-    ru: '0 секунд',
-    en: '0 seconds',
+    ru: 'Выкл.',
+    en: 'Off',
   },
   countdownOneOption: {
     ru: '1 секунда',
@@ -32,14 +32,6 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
   countdownManyOption: {
     ru: '{count} секунд',
     en: '{count} seconds',
-  },
-  countdownImmediateValue: {
-    ru: 'Запись начнется сразу',
-    en: 'Recording starts immediately',
-  },
-  countdownDelayedValue: {
-    ru: 'Пауза перед началом записи {duration}',
-    en: 'Pause before recording starts: {duration}',
   },
   sourceCountOne: {
     ru: '1 окно',

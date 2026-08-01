@@ -1,5 +1,5 @@
 import { ChevronRight, X } from 'lucide-react';
-import { type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { type MouseEvent, type ReactNode } from 'react';
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
@@ -62,7 +62,6 @@ export function InlineCurtainTrigger({
   ariaLabel,
   label,
   onClick,
-  onPointerDown,
   onSecondaryClick,
   secondaryAction,
   valueLabel,
@@ -72,7 +71,6 @@ export function InlineCurtainTrigger({
   ariaLabel: string;
   label: string;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
-  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onSecondaryClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   secondaryAction?: InlineCurtainSecondaryAction;
   valueLabel: string;
@@ -85,7 +83,6 @@ export function InlineCurtainTrigger({
         ariaLabel={ariaLabel}
         label={label}
         onClick={onClick}
-        onPointerDown={onPointerDown}
         valueLabel={valueLabel}
       />
       {secondaryAction ? (
@@ -106,7 +103,6 @@ function InlineCurtainPrimaryButton({
   ariaLabel,
   label,
   onClick,
-  onPointerDown,
   valueLabel,
 }: {
   ariaControls: string;
@@ -114,7 +110,6 @@ function InlineCurtainPrimaryButton({
   ariaLabel: string;
   label: string;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
-  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   valueLabel: string;
 }) {
   return (
@@ -125,7 +120,6 @@ function InlineCurtainPrimaryButton({
       aria-label={ariaLabel}
       className="flex min-w-0 flex-1 items-center gap-2 text-left"
       onClick={onClick}
-      onPointerDown={onPointerDown}
     >
       <span className="min-w-[60px] shrink-0 text-[11px] font-medium text-[var(--sniptale-color-text-secondary)]">
         {label}

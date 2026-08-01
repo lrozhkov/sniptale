@@ -10,20 +10,17 @@ describe('video-manager-session-facade', () => {
     expect(facade.recordingTabId).toBeNull();
     expect(facade.isStarting).toBe(false);
     expect(facade.offscreenStartDispatched).toBe(false);
-    expect(facade.openEditorAfterRecording).toBe(false);
     expect(facade.controlledCursorDisplaySurface).toBeNull();
 
     facade.recordingTabId = 17;
     facade.isStarting = true;
     facade.offscreenStartDispatched = true;
-    facade.openEditorAfterRecording = true;
     facade.controlledCursorNavigationEpoch = 5;
     facade.controlledCursorDisplaySurface = 'browser';
 
     expect(session.recordingTabId).toBe(17);
     expect(session.isStarting).toBe(true);
     expect(session.offscreenStartDispatched).toBe(true);
-    expect(session.openEditorAfterRecording).toBe(true);
     expect(session.controlledCursorNavigationEpoch).toBe(5);
     expect(session.controlledCursorDisplaySurface).toBe('browser');
     expect(facade.controlledCursorNavigationEpoch).toBe(5);

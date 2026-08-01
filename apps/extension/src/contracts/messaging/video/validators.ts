@@ -105,7 +105,6 @@ export function isVideoRecordingSettings(value: unknown): value is VideoRecordin
     parseVideoRecordingProfiles(value['qualityProfiles']) !== null &&
     isNumber(value['countdownSeconds']) &&
     isNumber(value['autoFadeDelay']) &&
-    isBoolean(value['openEditorAfterRecording']) &&
     isBoolean(value['diagnosticsEnabled']) &&
     hasOptionalField(value, 'controlledCursorCaptureEnabled', isBoolean)
   );

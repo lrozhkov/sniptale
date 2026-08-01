@@ -21,7 +21,6 @@ export const DEFAULT_VIDEO_SETTINGS: VideoRecordingSettings = {
   qualityProfiles: [],
   countdownSeconds: 3,
   autoFadeDelay: 3,
-  openEditorAfterRecording: false,
   diagnosticsEnabled: false,
   controlledCursorCaptureEnabled: false,
   native: {

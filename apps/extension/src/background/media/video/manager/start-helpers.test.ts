@@ -23,7 +23,6 @@ const settings = {
   systemAudioEnabled: true,
   countdownSeconds: 3,
   autoFadeDelay: 3,
-  openEditorAfterRecording: false,
   diagnosticsEnabled: false,
 };
 

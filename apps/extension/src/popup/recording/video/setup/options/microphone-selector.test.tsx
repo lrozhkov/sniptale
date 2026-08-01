@@ -39,7 +39,6 @@ function createSettings(enabled = true) {
     diagnosticsEnabled: false,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: enabled,
-    openEditorAfterRecording: false,
     quality: VideoQuality.MEDIUM,
     systemAudioEnabled: true,
     webcamDeviceId: null,

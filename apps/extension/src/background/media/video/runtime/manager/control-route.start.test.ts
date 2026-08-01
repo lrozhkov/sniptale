@@ -43,7 +43,6 @@ it('rejects start recording when no target tab is resolved', () => {
           diagnosticsEnabled: false,
           microphoneDeviceId: null,
           microphoneEnabled: true,
-          openEditorAfterRecording: true,
           outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
           systemAudioEnabled: true,
         },

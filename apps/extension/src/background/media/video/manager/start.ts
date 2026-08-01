@@ -16,7 +16,6 @@ import {
   isVideoRecordingPreparationInProgress,
   resetVideoRecordingStartSession,
   clearVideoRecordingOffscreenStartDispatched,
-  setOpenEditorAfterRecording,
   setVideoRecordingId,
 } from '../session-state';
 import { resetVideoRecordingRuntimeState } from '../runtime/session-state';
@@ -42,7 +41,6 @@ const logger = createLogger({ namespace: 'BackgroundVideoManager' });
 
 function rollbackRecordingStartState(): void {
   setVideoRecordingId(null);
-  setOpenEditorAfterRecording(false);
   resetVideoRecordingStartSession();
   resetVideoRecordingRuntimeState();
 }
@@ -179,7 +177,6 @@ async function executeRecordingStart(props: {
   let preparedBindingPersisted = false;
   let sourceBinding: RecordingSourceBinding | null = null;
   setVideoRecordingId(recordingId);
-  setOpenEditorAfterRecording(settings.openEditorAfterRecording);
   logger.log('Starting recording', { captureMode, recordingId, tabId: tabId ?? null });
 
   try {
@@ -204,7 +201,6 @@ async function executeRecordingStart(props: {
       captureMode,
       cropRegion: context.captureSource.cropRegion ?? null,
       ownerSenderUrl,
-      openEditorAfterRecording: settings.openEditorAfterRecording,
       surfaceBinding: {
         generation: sourceBinding.generation,
         streamInstanceId: sourceBinding.streamInstanceId,

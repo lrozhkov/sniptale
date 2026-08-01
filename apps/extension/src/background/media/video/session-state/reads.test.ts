@@ -11,13 +11,11 @@ import {
   isCurrentVideoRecordingId,
   isVideoRecordingPreparationInProgress,
   isVideoRecordingStopInProgress,
-  shouldOpenVideoEditorAfterRecording,
 } from './reads';
 
 beforeEach(() => {
   videoManagerSession.recordingTabId = 42;
   videoManagerSession.currentRecordingId = 'recording-42';
-  videoManagerSession.openEditorAfterRecording = true;
   videoManagerSession.isStarting = true;
   videoManagerSession.isStopping = false;
   videoManagerSession.currentCaptureMode = CaptureMode.TAB;
@@ -27,7 +25,6 @@ beforeEach(() => {
 it('reads recording session fields through the read facade', () => {
   expect(getVideoRecordingTabId()).toBe(42);
   expect(getVideoRecordingId()).toBe('recording-42');
-  expect(shouldOpenVideoEditorAfterRecording()).toBe(true);
   expect(getVideoRecordingCaptureMode()).toBe(CaptureMode.TAB);
   expect(getVideoRecordingCountdownSessionId()).toBe('countdown-42');
   expect(isVideoRecordingPreparationInProgress()).toBe(true);

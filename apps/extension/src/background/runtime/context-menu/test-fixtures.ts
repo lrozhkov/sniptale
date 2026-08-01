@@ -53,7 +53,6 @@ export const contextMenuVideoSettingsFixture = {
   diagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
-  openEditorAfterRecording: false,
   quality: 'HIGH',
   systemAudioEnabled: true,
 };

@@ -29,7 +29,6 @@ const settings = {
   microphoneEnabled: false,
   webcamDeviceId: null,
   webcamEnabled: false,
-  openEditorAfterRecording: false,
   systemAudioEnabled: true,
 };
 
@@ -53,11 +52,13 @@ beforeEach(() => {
 it('stores the background-issued recording control capability after accepted start', async () => {
   await startRecordingHandler({
     captureMode: CaptureMode.TAB,
+    microphoneDevices: [],
     setIsStartPending,
     setRecordingControlCapability,
     setStartError,
     videoSettings: settings,
     viewportPresetId: null,
+    webcamDevices: [],
   });
 
   expect(setRecordingControlCapability).toHaveBeenCalledWith({
@@ -71,11 +72,13 @@ it('clears stale recording control capability after non-accepted start', async (
 
   await startRecordingHandler({
     captureMode: CaptureMode.TAB,
+    microphoneDevices: [],
     setIsStartPending,
     setRecordingControlCapability,
     setStartError,
     videoSettings: settings,
     viewportPresetId: null,
+    webcamDevices: [],
   });
 
   expect(setRecordingControlCapability).toHaveBeenCalledWith(null);

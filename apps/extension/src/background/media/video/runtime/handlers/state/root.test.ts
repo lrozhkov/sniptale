@@ -24,7 +24,6 @@ const {
   resetVideoRecordingRuntimeStateMock,
   sendRuntimeMessageMock,
   setVideoRecordingRuntimeStateMock,
-  shouldOpenVideoEditorAfterRecordingMock,
   ensureActiveVideoRecordingLeaseHydratedMock,
   restoreCurrentRecordingFromLeaseMock,
   releaseVideoCaptureSurfaceMock,
@@ -42,7 +41,6 @@ const {
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   setVideoRecordingRuntimeStateMock: vi.fn(),
-  shouldOpenVideoEditorAfterRecordingMock: vi.fn(() => false),
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
   restoreCurrentRecordingFromLeaseMock: vi.fn(),
   releaseVideoCaptureSurfaceMock: vi.fn(),
@@ -100,7 +98,6 @@ vi.mock('../../../session-state', async (importOriginal) => ({
     recordingId != null && getVideoRecordingIdMock() === recordingId,
   getVideoRecordingTabId: getVideoRecordingTabIdMock,
   markVideoRecordingPreparationSettled: markVideoRecordingPreparationSettledMock,
-  shouldOpenVideoEditorAfterRecording: shouldOpenVideoEditorAfterRecordingMock,
 }));
 
 vi.mock('../../offscreen-manager', async (importOriginal) => ({

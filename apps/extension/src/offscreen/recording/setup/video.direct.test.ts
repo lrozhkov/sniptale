@@ -51,7 +51,6 @@ function createSettings(overrides: Partial<VideoRecordingSettings> = {}): VideoR
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
-    openEditorAfterRecording: false,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile },
     systemAudioEnabled: false,
     ...overrides,

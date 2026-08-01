@@ -24,7 +24,6 @@ function createSettings() {
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
-    openEditorAfterRecording: false,
     quality: VideoQuality.HIGH,
     systemAudioEnabled: false,
     webcamDeviceId: 'cam-1',

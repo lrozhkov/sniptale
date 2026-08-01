@@ -6,10 +6,9 @@ import { VideoDiagnosticsToggle } from '../diagnostics-toggle';
 import { VideoSystemAudioToggle } from '../system-audio-toggle';
 import { VideoControlledCursorToggle } from './controlled-cursor';
 import { VideoMicrophoneToggle } from './microphone';
-import { VideoOpenEditorToggle } from './open-editor';
 import { VideoWebcamToggle } from './webcam';
 
-const VIDEO_TOGGLE_GRID_CLASS_NAME = 'mt-2.5 mr-1 grid grid-cols-6 gap-1.5';
+const VIDEO_TOGGLE_GRID_CLASS_NAME = 'mt-2.5 mr-1 grid grid-cols-5 gap-1.5';
 
 type VideoToggleGridProps = {
   captureMode: CaptureMode;
@@ -50,10 +49,6 @@ export function VideoToggleGrid({
       <VideoSystemAudioToggle
         settings={settings}
         systemAudioDisabled={systemAudioDisabled}
-        onSettingsChange={onSettingsChange}
-      />
-      <VideoOpenEditorToggle
-        openEditorAfterRecording={settings.openEditorAfterRecording}
         onSettingsChange={onSettingsChange}
       />
       <VideoControlledCursorToggle

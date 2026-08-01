@@ -30,7 +30,6 @@ export function beginVideoRecordingStop(): VideoManagerStopContext {
 
 export function finishVideoRecordingStop(): void {
   videoManagerSession.isStopping = false;
-  videoManagerSession.openEditorAfterRecording = false;
   resetControlledCursorCaptureState();
 }
 

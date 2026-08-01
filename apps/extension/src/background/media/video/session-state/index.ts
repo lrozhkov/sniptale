@@ -30,7 +30,6 @@ export {
   getVideoRecordingCaptureMode,
   getVideoRecordingCountdownSessionId,
   getVideoRecordingId,
-  shouldOpenVideoEditorAfterRecording,
   getVideoRecordingTabId,
   hasActiveVideoRecordingSession,
   hasActiveVideoRecordingTab,
@@ -44,7 +43,6 @@ export {
   resetCompletedVideoRecordingSession,
 } from './stop';
 export {
-  setOpenEditorAfterRecording,
   setVideoRecordingCountdownSessionId,
   setVideoRecordingId,
   setVideoRecordingTabId,

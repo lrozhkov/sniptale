@@ -4,11 +4,13 @@ import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { startRecordingHandler } from './start-recording';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
-vi.mock('../../recording/microphone', (_importOriginal) => ({
+vi.mock('../../recording/microphone', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording/microphone')>()),
   requestMicrophonePermission: vi.fn(),
 }));
 
-vi.mock('../../recording/webcam', (_importOriginal) => ({
+vi.mock('../../recording/webcam', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording/webcam')>()),
   requestWebcamPermission: vi.fn(),
 }));
 
@@ -28,7 +30,6 @@ const defaultSettings = {
   microphoneEnabled: false,
   webcamDeviceId: null,
   webcamEnabled: false,
-  openEditorAfterRecording: false,
   systemAudioEnabled: true,
 };
 
@@ -47,11 +48,13 @@ beforeEach(() => {
 it('disables system audio for multi-source screen recording', async () => {
   await startRecordingHandler({
     captureMode: CaptureMode.SCREEN,
+    microphoneDevices: [],
     setIsStartPending,
     setRecordingControlCapability,
     setStartError,
     videoSettings: { ...defaultSettings, sourceCount: 2 },
     viewportPresetId: null,
+    webcamDevices: [],
   });
 
   expect(runtimeSendMessage).toHaveBeenCalledWith(
@@ -64,6 +67,7 @@ it('disables system audio for multi-source screen recording', async () => {
 it('does not disable webcam for multi-source screen recording', async () => {
   await startRecordingHandler({
     captureMode: CaptureMode.SCREEN,
+    microphoneDevices: [],
     setIsStartPending,
     setRecordingControlCapability,
     setStartError,
@@ -74,6 +78,7 @@ it('does not disable webcam for multi-source screen recording', async () => {
       webcamDeviceId: 'cam-1',
     },
     viewportPresetId: null,
+    webcamDevices: [{ deviceId: 'cam-1', label: 'Camera 1' }],
   });
 
   expect(runtimeSendMessage).toHaveBeenCalledWith(
@@ -91,11 +96,13 @@ it('does not disable webcam for multi-source screen recording', async () => {
 it('resets source count outside screen capture mode', async () => {
   await startRecordingHandler({
     captureMode: CaptureMode.TAB,
+    microphoneDevices: [],
     setIsStartPending,
     setRecordingControlCapability,
     setStartError,
     videoSettings: { ...defaultSettings, sourceCount: 3 },
     viewportPresetId: null,
+    webcamDevices: [],
   });
 
   expect(runtimeSendMessage).toHaveBeenCalledWith(

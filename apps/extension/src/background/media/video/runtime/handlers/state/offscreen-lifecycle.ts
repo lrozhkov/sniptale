@@ -1,7 +1,5 @@
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRuntimeMessage } from '../../../../../../contracts/video/types/messages';
-import { runBestEffort } from '@sniptale/foundation/best-effort';
-import { openVideoEditorPage } from '../../../../../../platform/navigation/extension-pages';
 import { translate } from '../../../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { sendRuntimeMessage } from '../../../../../../platform/runtime-messaging';
@@ -11,7 +9,6 @@ import {
   getVideoRecordingId,
   isCurrentVideoRecordingId,
   resetCompletedVideoRecordingSession,
-  shouldOpenVideoEditorAfterRecording,
 } from '../../../session-state';
 import { loadActiveProjectExportJobLedgerEntry } from '../../../../../../composition/persistence/export-ledger';
 import {
@@ -24,7 +21,6 @@ import {
   resetRecordingTabId,
   finalizeRecordingDiagnostics,
 } from '../../manager';
-import { waitForStopSideEffects } from '../../manager/controls.stop/effects';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
 import { markOffscreenDocumentReady } from '../../offscreen-manager';
 import { releaseVideoCaptureSurface } from '../../../capture-surface';
@@ -279,33 +275,11 @@ function finalizeSavedRecordingCompletion(message: SavedRecordingMessage): void 
     return;
   }
 
-  const shouldOpenEditor = shouldOpenVideoEditorAfterRecording();
   finishVideoRecordingStop();
   resetCompletedVideoRecordingSession(message.recordingId);
   resetRecordingTabId();
   resetVideoRecordingRuntimeState();
   void finalizeRecordingDiagnostics(message.recordingId);
-  scheduleSavedRecordingEditorOpen(message, shouldOpenEditor);
-}
-
-function scheduleSavedRecordingEditorOpen(
-  message: SavedRecordingMessage,
-  shouldOpenEditor: boolean
-): void {
-  if (!shouldOpenEditor) {
-    return;
-  }
-  runBestEffort(
-    waitForStopSideEffects().then(() =>
-      openVideoEditorPage(
-        message.projectId ?? null,
-        message.projectId ? null : message.primaryRecordingId
-      )
-    ),
-    logger,
-    'Failed to open video editor after recording save',
-    { projectId: message.projectId ?? null, recordingId: message.recordingId }
-  );
 }
 
 function isExactPostRecordState(

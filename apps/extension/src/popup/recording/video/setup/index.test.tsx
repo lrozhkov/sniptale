@@ -128,7 +128,6 @@ function createVideoSettings(): VideoRecordingSettings {
     diagnosticsEnabled: true,
     microphoneDeviceId: null,
     microphoneEnabled: true,
-    openEditorAfterRecording: true,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
     systemAudioEnabled: true,
   };

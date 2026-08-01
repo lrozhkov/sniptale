@@ -17,7 +17,6 @@ const {
   readStoredVideoPostRecordResultMock,
   scheduleRecordingStartActivationWatchdogMock,
   sendRuntimeMessageMock,
-  setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
   waitForVideoCaptureSurfaceRecoveryMock,
 } = vi.hoisted(() => ({
@@ -36,7 +35,6 @@ const {
   readStoredVideoPostRecordResultMock: vi.fn(),
   scheduleRecordingStartActivationWatchdogMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
-  setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
   waitForVideoCaptureSurfaceRecoveryMock: vi.fn(),
 }));
@@ -57,7 +55,6 @@ vi.mock('../session-state', async (importOriginal) => ({
   beginVideoRecordingPreparation: beginVideoRecordingPreparationMock,
   hasActiveVideoRecordingSession: hasActiveVideoRecordingSessionMock,
   isVideoRecordingPreparationInProgress: isVideoRecordingPreparationInProgressMock,
-  setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
 vi.mock('../recording-control-lease', async (importOriginal) => ({
@@ -104,7 +101,6 @@ const settings = {
   quality: VideoQuality.HIGH,
   countdownSeconds: 3,
   autoFadeDelay: 1500,
-  openEditorAfterRecording: false,
   diagnosticsEnabled: false,
 };
 
@@ -184,7 +180,6 @@ it('issues an owner-bound control lease before accepting a recording start', asy
   expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
     cropRegion: null,
-    openEditorAfterRecording: false,
     ownerSenderUrl,
     surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
     viewportPresetId: undefined,
@@ -347,7 +342,6 @@ it('persists source authority before delivery and waits to arm the activation wa
   expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
     cropRegion: null,
-    openEditorAfterRecording: false,
     ownerSenderUrl,
     surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
     viewportPresetId: undefined,
@@ -362,7 +356,6 @@ it('persists source authority before delivery and waits to arm the activation wa
   expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
     cropRegion: null,
-    openEditorAfterRecording: false,
     ownerSenderUrl,
     surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
     viewportPresetId: undefined,
@@ -457,7 +450,6 @@ it('rolls back and cleans up when raw source validation times out', async () => 
   expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
     cropRegion: null,
-    openEditorAfterRecording: false,
     ownerSenderUrl,
     surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
     viewportPresetId: undefined,

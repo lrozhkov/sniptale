@@ -75,6 +75,10 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Пресет размера записи',
     en: 'Recording size preset',
   },
+  manageSizePresets: {
+    ru: 'Управление пресетами размеров…',
+    en: 'Manage presets…',
+  },
   choosePresetError: {
     ru: 'Сначала выберите пресет',
     en: 'Select a preset first',
@@ -96,14 +100,6 @@ export const popupVideoMessages = defineMessageSource({
   systemAudioDisabledDescription: {
     ru: 'Недоступно для режима Экран',
     en: 'Unavailable in Screen mode',
-  },
-  openEditorLabel: {
-    ru: 'Открыть редактор',
-    en: 'Open editor',
-  },
-  openEditorDescription: {
-    ru: 'Открывать после записи',
-    en: 'Open after recording',
   },
   controlledCursorLabel: {
     ru: 'История действий',
@@ -218,8 +214,8 @@ export const popupVideoMessages = defineMessageSource({
     en: 'This resolution and frame-rate combination is too demanding for the selected recording size.',
   },
   countdownLabel: {
-    ru: 'Старт',
-    en: 'Start',
+    ru: 'Отсчёт',
+    en: 'Countdown',
   },
   autoHideLabel: {
     ru: 'Скрыть',

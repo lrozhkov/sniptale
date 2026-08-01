@@ -18,7 +18,7 @@ export async function finalizeAcceptedRecordingStart(
   context: {
     captureMode: CaptureMode;
     generation: number;
-    settings: { openEditorAfterRecording: boolean; sourceCount?: number };
+    settings: { sourceCount?: number };
     viewportPresetId: string | null;
   },
   streamInstanceId: string

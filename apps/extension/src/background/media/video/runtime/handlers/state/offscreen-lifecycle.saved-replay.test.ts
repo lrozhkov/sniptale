@@ -12,7 +12,6 @@ const {
   resetRecordingTabIdMock,
   resetVideoRecordingRuntimeStateMock,
   sendRuntimeMessageMock,
-  shouldOpenVideoEditorAfterRecordingMock,
   restoreCurrentRecordingFromLeaseMock,
   releaseVideoCaptureSurfaceMock,
   commitPendingVideoPostRecordResultMock,
@@ -31,7 +30,6 @@ const {
   resetRecordingTabIdMock: vi.fn(),
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
-  shouldOpenVideoEditorAfterRecordingMock: vi.fn(),
   restoreCurrentRecordingFromLeaseMock: vi.fn(),
   releaseVideoCaptureSurfaceMock: vi.fn(),
   commitPendingVideoPostRecordResultMock: vi.fn(),
@@ -89,7 +87,6 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
     recordingId != null && getVideoRecordingIdMock() === recordingId,
   resetCompletedVideoRecordingSession: resetCompletedVideoRecordingSessionMock,
-  shouldOpenVideoEditorAfterRecording: shouldOpenVideoEditorAfterRecordingMock,
 }));
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
@@ -169,7 +166,6 @@ beforeEach(() => {
   });
   markOffscreenDocumentReadyMock.mockReturnValue(true);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
-  shouldOpenVideoEditorAfterRecordingMock.mockReturnValue(false);
 });
 
 it('deduplicates replayed saved-recording notifications while cleanup is pending', async () => {
@@ -343,7 +339,6 @@ it('uses an exact staged record as restart-safe cleanup retry authority', async 
 it('commits staged recording A without reading or resetting newer recording B state', async () => {
   const response = createSendResponse();
   getVideoRecordingIdMock.mockReturnValue('rec-b');
-  shouldOpenVideoEditorAfterRecordingMock.mockReturnValue(true);
   readStoredVideoPostRecordResultMock.mockResolvedValue({
     acknowledgedBy: null,
     createdAt: 1,
@@ -361,7 +356,6 @@ it('commits staged recording A without reading or resetting newer recording B st
 
   expect(commitPendingVideoPostRecordResultMock).toHaveBeenCalledWith('rec-a');
   expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-a');
-  expect(shouldOpenVideoEditorAfterRecordingMock).not.toHaveBeenCalled();
   expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
   expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
   expect(resetRecordingTabIdMock).not.toHaveBeenCalled();
@@ -376,7 +370,6 @@ it('does not reset recording B when it becomes current during delayed A cleanup'
   const releaseSurface = createDeferred();
   let currentRecordingId = 'rec-a';
   getVideoRecordingIdMock.mockImplementation(() => currentRecordingId);
-  shouldOpenVideoEditorAfterRecordingMock.mockReturnValue(true);
   releaseVideoCaptureSurfaceMock.mockReturnValueOnce(releaseSurface.promise);
 
   handleVideoSavedToIdb({ primaryRecordingId: 'rec-a', recordingId: 'rec-a' }, response);
@@ -388,7 +381,6 @@ it('does not reset recording B when it becomes current during delayed A cleanup'
   );
 
   expect(commitPendingVideoPostRecordResultMock).toHaveBeenCalledWith('rec-a');
-  expect(shouldOpenVideoEditorAfterRecordingMock).not.toHaveBeenCalled();
   expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
   expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
   expect(resetRecordingTabIdMock).not.toHaveBeenCalled();

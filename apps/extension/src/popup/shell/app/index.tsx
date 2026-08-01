@@ -12,7 +12,7 @@ import { initializePopupTracer } from '../../diagnostics/tracing';
 import { PopupAppShell } from '../app-shell';
 
 const POPUP_ROOT_CLASS_NAME =
-  'sc-popup-shell sniptale-extension-surface relative h-[568px] w-[392px] overflow-hidden';
+  'sc-popup-shell sniptale-extension-surface relative h-[560px] w-[392px] overflow-hidden';
 const POPUP_ROOT_SURFACE_CLASS_NAME =
   'bg-[var(--sniptale-color-surface-canvas)] text-[var(--sniptale-color-text-primary)]';
 const POPUP_BACKGROUND_ORBS_CLASS_NAME = 'pointer-events-none absolute inset-0';

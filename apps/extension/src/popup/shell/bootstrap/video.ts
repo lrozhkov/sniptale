@@ -10,16 +10,8 @@ import {
   type VideoRecordingUiState,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import {
-  loadMicrophoneDevices,
-  resolveMicrophoneDeviceId,
-  type MicrophoneOption,
-} from '../../recording/microphone';
-import {
-  loadWebcamDevices,
-  resolveWebcamDeviceId,
-  type WebcamOption,
-} from '../../recording/webcam';
+import { loadMicrophoneDevices, type MicrophoneOption } from '../../recording/microphone';
+import { loadWebcamDevices, type WebcamOption } from '../../recording/webcam';
 import { trackPopupPerfAsync } from '../../diagnostics/performance';
 import { resolveVideoViewportPresetId } from '../../../features/viewport-presets/video-recording-policy';
 
@@ -158,14 +150,7 @@ function buildPopupBootstrapVideoData(
     microphones,
     webcams,
     selectedPresetId,
-    videoSettings: {
-      ...storedVideoSettings,
-      microphoneDeviceId: resolveMicrophoneDeviceId(
-        storedVideoSettings.microphoneDeviceId,
-        microphones
-      ),
-      webcamDeviceId: resolveWebcamDeviceId(storedVideoSettings.webcamDeviceId ?? null, webcams),
-    },
+    videoSettings: storedVideoSettings,
     viewportPresets,
   };
 }

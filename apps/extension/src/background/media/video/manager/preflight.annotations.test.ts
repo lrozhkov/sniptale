@@ -24,7 +24,6 @@ function createVideoSettings(): VideoRecordingSettings {
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: true,
-    openEditorAfterRecording: false,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: true,
     controlledCursorCaptureEnabled: false,

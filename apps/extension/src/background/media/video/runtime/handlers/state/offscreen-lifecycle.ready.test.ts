@@ -37,7 +37,6 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   getVideoRecordingId: getVideoRecordingIdMock,
   isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
     recordingId != null && getVideoRecordingIdMock() === recordingId,
-  shouldOpenVideoEditorAfterRecording: vi.fn(() => false),
 }));
 
 vi.mock('../../manager', async (importOriginal) => ({

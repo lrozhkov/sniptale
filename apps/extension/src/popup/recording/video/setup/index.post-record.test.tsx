@@ -121,7 +121,6 @@ function createProps(overrides: Partial<React.ComponentProps<typeof VideoSetupPa
       diagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: false,
-      openEditorAfterRecording: false,
       quality: VideoQuality.MEDIUM,
       systemAudioEnabled: true,
     },

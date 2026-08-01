@@ -46,7 +46,6 @@ export function createBodySettings(): VideoRecordingSettings {
     diagnosticsEnabled: true,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,
-    openEditorAfterRecording: true,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
     systemAudioEnabled: true,
   };

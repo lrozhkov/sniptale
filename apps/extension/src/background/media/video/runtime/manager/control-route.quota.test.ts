@@ -76,7 +76,6 @@ function createStartRecordingMessage() {
       diagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: true,
-      openEditorAfterRecording: true,
       quality: VideoQuality.HIGH,
       systemAudioEnabled: true,
     },

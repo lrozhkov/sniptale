@@ -17,7 +17,6 @@ it('accepts both viewport and window preset surfaces on recording start', () => 
       ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 1,
       countdownSeconds: 0,
-      openEditorAfterRecording: true,
     },
   };
 

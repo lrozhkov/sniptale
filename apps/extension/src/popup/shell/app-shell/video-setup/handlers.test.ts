@@ -113,7 +113,7 @@ it('preserves controlled cursor settings while changing capture modes', () => {
   );
 });
 
-it('forces camera-compatible recording settings', () => {
+it('keeps saved recording preferences unchanged when camera mode is selected', () => {
   const runtime = createRuntime({
     videoSettings: {
       ...DEFAULT_VIDEO_SETTINGS,
@@ -129,17 +129,5 @@ it('forces camera-compatible recording settings', () => {
   createPopupVideoSetupHandlers(runtime).onCaptureModeChange(CaptureMode.CAMERA);
 
   expect(runtime.recording.setVideoCaptureMode).toHaveBeenCalledWith(CaptureMode.CAMERA);
-  const applyPatch = vi.mocked(runtime.recording.setVideoSettings).mock.calls[0]?.[0] as (
-    settings: VideoRecordingSettings
-  ) => VideoRecordingSettings;
-  expect(applyPatch(runtime.recording.videoSettings)).toEqual(
-    expect.objectContaining({
-      controlledCursorCaptureEnabled: false,
-      diagnosticsEnabled: false,
-      sourceCount: 1,
-      systemAudioEnabled: false,
-      webcamDeviceId: 'cam-2',
-      webcamEnabled: true,
-    })
-  );
+  expect(runtime.recording.setVideoSettings).not.toHaveBeenCalled();
 });

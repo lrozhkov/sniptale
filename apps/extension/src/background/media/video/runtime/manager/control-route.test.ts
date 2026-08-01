@@ -117,7 +117,6 @@ function createStartMessage(): StartRecordingMessage {
       outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
       countdownSeconds: 3,
       autoFadeDelay: 1500,
-      openEditorAfterRecording: true,
       diagnosticsEnabled: false,
     },
     tabId: 17,

@@ -33,7 +33,6 @@ const defaultSettings = {
   diagnosticsEnabled: true,
   microphoneDeviceId: null,
   microphoneEnabled: false,
-  openEditorAfterRecording: false,
   sourceCount: 3,
   systemAudioEnabled: true,
   webcamDeviceId: 'cam-1',
@@ -68,11 +67,13 @@ describe('startRecordingHandler camera mode', () => {
   it('starts camera recording without active tab resolution', async () => {
     await startRecordingHandler({
       captureMode: CaptureMode.CAMERA,
+      microphoneDevices: [],
       setIsStartPending,
       setRecordingControlCapability,
       setStartError,
       videoSettings: defaultSettings,
       viewportPresetId: 'retained-tab-preset',
+      webcamDevices: [{ deviceId: 'cam-1', label: 'Camera 1' }],
     });
 
     expect(tabsQuery).not.toHaveBeenCalled();

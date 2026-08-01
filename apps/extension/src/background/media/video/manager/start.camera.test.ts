@@ -12,7 +12,6 @@ const {
   runCountdownMock,
   scheduleRecordingStartActivationWatchdogMock,
   sendRuntimeMessageMock,
-  setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
 } = vi.hoisted(() => ({
   beginVideoRecordingPreparationMock: vi.fn(),
@@ -25,7 +24,6 @@ const {
   runCountdownMock: vi.fn(),
   scheduleRecordingStartActivationWatchdogMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
-  setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
 }));
 
@@ -37,7 +35,6 @@ vi.mock('../session-state', async (importOriginal) => ({
   beginVideoRecordingPreparation: beginVideoRecordingPreparationMock,
   hasActiveVideoRecordingSession: vi.fn(() => false),
   isVideoRecordingPreparationInProgress: vi.fn(() => false),
-  setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
 vi.mock('./flow', async (importOriginal) => ({
@@ -86,7 +83,6 @@ const defaultSettings: VideoRecordingSettings = {
   diagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
-  openEditorAfterRecording: false,
   outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
   systemAudioEnabled: true,
 };
@@ -144,7 +140,6 @@ it('finalizes a camera recording with a launch token and control capability', as
     captureMode: CaptureMode.CAMERA,
     cropRegion: null,
     ownerSenderUrl,
-    openEditorAfterRecording: false,
     surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
     viewportPresetId: null,
   });

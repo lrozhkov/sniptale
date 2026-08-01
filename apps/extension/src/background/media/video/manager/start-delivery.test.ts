@@ -35,7 +35,7 @@ it('publishes the active lease only after the bound recorder begin succeeds', as
       {
         captureMode: CaptureMode.TAB,
         generation: 3,
-        settings: { openEditorAfterRecording: false },
+        settings: {},
         viewportPresetId: 'preset-1',
       },
       'stream-1'
@@ -61,7 +61,7 @@ it('leaves identity-bound cleanup to the start owner when activation persistence
       {
         captureMode: CaptureMode.TAB,
         generation: 3,
-        settings: { openEditorAfterRecording: false },
+        settings: {},
         viewportPresetId: 'preset-1',
       },
       'stream-1'
@@ -78,7 +78,7 @@ it('activates a prepared multi-source recording without a redundant begin comman
       {
         captureMode: CaptureMode.SCREEN,
         generation: 3,
-        settings: { openEditorAfterRecording: false, sourceCount: 2 },
+        settings: { sourceCount: 2 },
         viewportPresetId: null,
       },
       'stream-1'

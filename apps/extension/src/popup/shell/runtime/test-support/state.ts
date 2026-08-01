@@ -170,7 +170,6 @@ function createVideoSettings() {
     diagnosticsEnabled: false,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,
-    openEditorAfterRecording: false,
     quality: VideoQuality.HIGH,
     systemAudioEnabled: true,
   };

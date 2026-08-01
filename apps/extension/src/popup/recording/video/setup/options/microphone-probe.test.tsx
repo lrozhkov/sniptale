@@ -46,7 +46,6 @@ function createSettings(
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,
     microphoneGain: 1,
-    openEditorAfterRecording: false,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: false,
     webcamDeviceId: null,

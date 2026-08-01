@@ -10,6 +10,10 @@ import {
 } from './types';
 import { DEFAULT_VIDEO_SETTINGS } from './defaults';
 
+it('keeps webcam recording disabled for a fresh user', () => {
+  expect(DEFAULT_VIDEO_SETTINGS.webcamEnabled).toBe(false);
+});
+
 it('clamps video source counts and derives the recording audio policy', () => {
   expect(normalizeVideoSourceCount(undefined)).toBe(1);
   expect(normalizeVideoSourceCount(0)).toBe(1);
@@ -29,7 +33,6 @@ it('creates and updates live media state from recording settings', () => {
     diagnosticsEnabled: false,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,
-    openEditorAfterRecording: false,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: false,
     webcamDeviceId: 'cam-1',

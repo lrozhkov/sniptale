@@ -14,7 +14,6 @@ function createRecordingSettings() {
     autoFadeDelay: 300,
     countdownSeconds: 0,
     diagnosticsEnabled: true,
-    openEditorAfterRecording: false,
   };
 }
 

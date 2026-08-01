@@ -161,5 +161,8 @@ function getInitialSettingsTab(): SettingsTab {
   if (section === 'video') {
     return 'video';
   }
+  if (section === 'presets') {
+    return 'presets';
+  }
   return 'appearance';
 }

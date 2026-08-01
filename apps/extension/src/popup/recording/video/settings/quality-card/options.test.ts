@@ -47,7 +47,6 @@ describe('quality card options', () => {
       diagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: false,
-      openEditorAfterRecording: false,
       systemAudioEnabled: true,
     };
 
