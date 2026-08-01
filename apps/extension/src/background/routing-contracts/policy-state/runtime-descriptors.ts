@@ -1,5 +1,7 @@
 import type { PolicyStateDescriptor } from './types';
 import { MINUTE_MS } from './constants';
+import { VIDEO_POST_RECORD_RESULT_TTL_MS } from '../../storage/video/post-record-result';
+import { CAMERA_RECORDER_DOCUMENT_TTL_MS } from '../../storage/video/camera-recorder-grant';
 
 export const runtimePolicyStateDescriptors = [
   {
@@ -145,6 +147,58 @@ export const runtimePolicyStateDescriptors = [
     restartClass: 'durable-lease',
     stateClass: 'runtime-state',
     storageClass: 'browser-session-storage',
+  },
+  {
+    authorityFamily: 'video-camera-recorder-grant',
+    failClosedOnRestart: false,
+    id: 'video-camera-recorder-grant',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/background/storage/video/camera-recorder-grant.ts',
+    proofModules: [
+      'apps/extension/src/background/storage/video/camera-recorder-grant.test.ts',
+      'apps/extension/src/background/media/video/runtime/camera-recorder-control.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.test.ts',
+    ],
+    requiresTtl: true,
+    restartBehavior: [
+      'Session storage retains the document-bound camera capability across service-worker',
+      'restarts; the launch token is consumed on first binding and records the exact sender tab.',
+      'A reload may rebind only that tab to its new document without retaining recording identity',
+      'or a registration token in page storage and without extending expiry. Result acknowledgement',
+      'atomically revokes the matching grant; error/discard cleanup and TTL remain terminal guards. The',
+      'worker cache is generation-bound and invalidated when privacy erasure is reserved.',
+    ].join(' '),
+    restartClass: 'durable-lease',
+    stateClass: 'capability',
+    storageClass: 'browser-session-storage',
+    ttlMs: CAMERA_RECORDER_DOCUMENT_TTL_MS,
+  },
+  {
+    authorityFamily: 'video-post-record-result',
+    failClosedOnRestart: false,
+    id: 'video-post-record-results',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/background/storage/video/post-record-result.ts',
+    proofModules: [
+      'apps/extension/src/background/storage/video/post-record-result.test.ts',
+      'apps/extension/src/background/storage/video/post-record-acknowledgement.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.saved-replay.test.ts',
+      'apps/extension/src/popup/recording/video/setup/index.post-record.test.tsx',
+    ],
+    requiresTtl: true,
+    restartBehavior: [
+      'Session storage retains one monotonic staged, ready, or acknowledged result across popup',
+      'and service-worker restarts. The complete saved-result lifecycle is admitted through the',
+      'media-erasure exclusion, and staged results remain undisclosed until terminal cleanup.',
+      'Acknowledgement logically clears only the exact ready result and leaves a bounded tombstone',
+      'with an inert exact camera receipt so response-loss retries cannot restore authority or',
+      'resurrect a completed user decision.',
+    ].join(' '),
+    restartClass: 'durable-lease',
+    stateClass: 'runtime-state',
+    storageClass: 'browser-session-storage',
+    ttlMs: VIDEO_POST_RECORD_RESULT_TTL_MS,
   },
   {
     authorityFamily: 'video-recording-control',

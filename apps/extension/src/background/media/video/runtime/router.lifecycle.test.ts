@@ -12,8 +12,8 @@ const {
   handleOffscreenRecordingStoppedMock: vi.fn(),
 }));
 
-vi.mock('./handlers', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./handlers')>();
+vi.mock('./handlers/state/recording-state', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./handlers/state/recording-state')>();
   return {
     ...actual,
     handleOffscreenRecordingPaused: handleOffscreenRecordingPausedMock,

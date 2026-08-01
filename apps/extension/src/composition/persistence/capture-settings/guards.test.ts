@@ -4,13 +4,14 @@ import {
   CaptureMode,
   VideoOutputCodec,
   VideoOutputContainer,
+  VideoFrameRate,
   VideoQuality,
   VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { parseStoredVideoSettings, parseStoredVideoUiState } from './guards';
 
 const CURRENT_VIDEO_SETTINGS_CONTRACT = {
-  output: DEFAULT_VIDEO_SETTINGS.output,
+  outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
   qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
   qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
 };
@@ -77,7 +78,10 @@ function registerFullVideoSettingsTests() {
         microphoneDeviceId: null,
         microphoneEnabled: true,
         openEditorAfterRecording: false,
-        quality: VideoQuality.HIGH,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          quality: VideoQuality.HIGH,
+        },
         sourceCount: 2,
         systemAudioEnabled: true,
         webcamDeviceId: 'cam-1',
@@ -98,7 +102,10 @@ function registerFullVideoSettingsTests() {
         microphoneDeviceId: null,
         microphoneEnabled: true,
         openEditorAfterRecording: false,
-        quality: VideoQuality.HIGH,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          quality: VideoQuality.HIGH,
+        },
         sourceCount: 2,
         systemAudioEnabled: true,
         webcamDeviceId: 'cam-1',
@@ -137,7 +144,10 @@ function registerPartialVideoSettingsTests() {
         microphoneEnabled: false,
         webcamDeviceId: null,
         webcamEnabled: false,
-        quality: VideoQuality.LOW,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          quality: VideoQuality.LOW,
+        },
       })
     ).toEqual({
       hasInvalidRoot: false,
@@ -147,29 +157,33 @@ function registerPartialVideoSettingsTests() {
         microphoneEnabled: false,
         webcamDeviceId: null,
         webcamEnabled: false,
-        quality: VideoQuality.LOW,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          quality: VideoQuality.LOW,
+        },
       },
     });
   });
 
   it('parses explicit output settings and compatible custom quality profiles', () => {
-    const output = {
+    const outputProfile = {
       codec: VideoOutputCodec.AVC,
       container: VideoOutputContainer.MP4,
+      frameRate: VideoFrameRate.FPS30,
+      quality: VideoQuality.MEDIUM,
       resolution: VideoResolutionPreset.P720,
     };
     const qualityProfiles = [
       {
         id: 'custom:review',
         name: 'Review',
-        output,
-        quality: VideoQuality.MEDIUM,
+        configuration: outputProfile,
       },
     ];
 
     expect(
       parseCurrentVideoSettings({
-        output,
+        outputProfile,
         qualityProfileId: 'custom:review',
         qualityProfiles,
       })
@@ -177,7 +191,7 @@ function registerPartialVideoSettingsTests() {
       hasInvalidRoot: false,
       invalidFieldCount: 0,
       value: {
-        output,
+        outputProfile,
         qualityProfileId: 'custom:review',
         qualityProfiles,
       },
@@ -289,7 +303,7 @@ describe('video guards invalid settings', () => {
         microphoneDeviceId: 7,
         microphoneEnabled: true,
         openEditorAfterRecording: false,
-        quality: 'BROKEN',
+        outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: 'BROKEN' },
         systemAudioEnabled: null,
         webcamDeviceId: false,
         webcamEnabled: 'yes',
@@ -298,10 +312,11 @@ describe('video guards invalid settings', () => {
       hasInvalidRoot: false,
       invalidFieldCount: 7,
       value: {
-        ...CURRENT_VIDEO_SETTINGS_CONTRACT,
         countdownSeconds: 3,
         microphoneEnabled: true,
         openEditorAfterRecording: false,
+        qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
+        qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
       },
     });
   });
@@ -309,17 +324,18 @@ describe('video guards invalid settings', () => {
   it('drops incompatible output settings and malformed profile collections independently', () => {
     expect(
       parseCurrentVideoSettings({
-        output: {
+        outputProfile: {
           codec: VideoOutputCodec.AVC,
           container: VideoOutputContainer.WEBM,
+          frameRate: VideoFrameRate.FPS30,
+          quality: VideoQuality.HIGH,
           resolution: VideoResolutionPreset.P1080,
         },
         qualityProfiles: [
           {
             id: 'custom:broken',
             name: '',
-            output: DEFAULT_VIDEO_SETTINGS.output,
-            quality: VideoQuality.HIGH,
+            configuration: { ...DEFAULT_VIDEO_SETTINGS.outputProfile },
           },
         ],
         systemAudioEnabled: false,

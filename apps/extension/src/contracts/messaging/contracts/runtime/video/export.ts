@@ -117,20 +117,6 @@ export const runtimeVideoExportMessageContracts = {
       createRuntimeResponseGuard({ allowUndefined: true, optional: { downloadId: isNumber } })
     ),
   },
-  [V.VIDEO_SAVED_TO_IDB]: {
-    parseRequest: createGuardParser(
-      'runtime VIDEO_SAVED_TO_IDB message',
-      createMessageGuard({
-        type: V.VIDEO_SAVED_TO_IDB,
-        required: { recordingId: isString },
-        optional: { filename: isString, projectId: isString },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime VIDEO_SAVED_TO_IDB response',
-      createRuntimeResponseGuard({ allowUndefined: true, optional: { result: isString } })
-    ),
-  },
   KEEP_ALIVE: {
     parseRequest: createGuardParser(
       'runtime KEEP_ALIVE message',
@@ -151,39 +137,6 @@ export const runtimeVideoExportMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime AREA_SELECTED response',
-      createRuntimeResponseGuard({ allowUndefined: true })
-    ),
-  },
-  REGION_CAPTURE_STARTED: {
-    parseRequest: createGuardParser(
-      'runtime REGION_CAPTURE_STARTED message',
-      createMessageGuard({ type: 'REGION_CAPTURE_STARTED' })
-    ),
-    parseResponse: createGuardParser(
-      'runtime REGION_CAPTURE_STARTED response',
-      createRuntimeResponseGuard({ allowUndefined: true })
-    ),
-  },
-  REGION_CAPTURE_ERROR: {
-    parseRequest: createGuardParser(
-      'runtime REGION_CAPTURE_ERROR message',
-      createMessageGuard({
-        type: 'REGION_CAPTURE_ERROR',
-        required: { error: isString },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime REGION_CAPTURE_ERROR response',
-      createRuntimeResponseGuard({ allowUndefined: true })
-    ),
-  },
-  REGION_CAPTURE_STOPPED: {
-    parseRequest: createGuardParser(
-      'runtime REGION_CAPTURE_STOPPED message',
-      createMessageGuard({ type: 'REGION_CAPTURE_STOPPED' })
-    ),
-    parseResponse: createGuardParser(
-      'runtime REGION_CAPTURE_STOPPED response',
       createRuntimeResponseGuard({ allowUndefined: true })
     ),
   },

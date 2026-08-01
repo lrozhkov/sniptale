@@ -1,7 +1,4 @@
-import {
-  RegionCaptureControlMessageType,
-  VideoMessageType,
-} from '@sniptale/runtime-contracts/video/messages';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   createGuardParser,
   type MessageContractRegistry,
@@ -11,7 +8,6 @@ import { tabVideoControlledCursorContracts } from './controlled';
 import {
   createMessageGuard,
   createRuntimeResponseGuard,
-  isBoolean,
   isNumber,
   isRecordingTelemetrySnapshot,
   isString,
@@ -209,45 +205,6 @@ export const tabVideoMessageContracts = {
     parseResponse: createGuardParser(
       'tab DISABLE_DIAGNOSTIC_LOGGER response',
       createRuntimeResponseGuard()
-    ),
-  },
-  [RegionCaptureControlMessageType.START]: {
-    parseRequest: createGuardParser(
-      'tab START_REGION_CAPTURE message',
-      createMessageGuard({
-        type: RegionCaptureControlMessageType.START,
-        required: { settings: isVideoRecordingSettings },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'tab START_REGION_CAPTURE response',
-      createRuntimeResponseGuard()
-    ),
-  },
-  [RegionCaptureControlMessageType.STOP]: {
-    parseRequest: createGuardParser(
-      'tab STOP_REGION_CAPTURE message',
-      createMessageGuard({ type: RegionCaptureControlMessageType.STOP })
-    ),
-    parseResponse: createGuardParser(
-      'tab STOP_REGION_CAPTURE response',
-      createRuntimeResponseGuard()
-    ),
-  },
-  [RegionCaptureControlMessageType.CHECK_SUPPORT]: {
-    parseRequest: createGuardParser(
-      'tab CHECK_REGION_CAPTURE_SUPPORT message',
-      createMessageGuard({ type: RegionCaptureControlMessageType.CHECK_SUPPORT })
-    ),
-    parseResponse: createGuardParser(
-      'tab CHECK_REGION_CAPTURE_SUPPORT response',
-      createRuntimeResponseGuard({
-        required: {
-          supported: isBoolean,
-          produceCropTarget: isBoolean,
-          cropTo: isBoolean,
-        },
-      })
     ),
   },
 } satisfies PartialTabRegistry;

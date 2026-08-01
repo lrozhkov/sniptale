@@ -6,7 +6,7 @@ import {
   VideoOutputCodec,
   VideoOutputContainer,
   VideoResolutionPreset,
-  type VideoRecordingOutputSettings,
+  type VideoOutputProfile,
 } from '@sniptale/runtime-contracts/video/types/types';
 
 const OUTPUT_CODECS = [VideoOutputCodec.VP9, VideoOutputCodec.VP8, VideoOutputCodec.AVC] as const;
@@ -55,37 +55,37 @@ export function getOutputResolutionLabel(resolution: VideoResolutionPreset): str
 }
 
 function isRecordingOutputSupported(
-  output: VideoRecordingOutputSettings,
+  outputProfile: VideoOutputProfile,
   hasAudioTracks: boolean
 ): boolean {
   if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
     return true;
   }
-  return getVideoRecordingMimeTypeCandidates(output, hasAudioTracks).some((mimeType) =>
+  return getVideoRecordingMimeTypeCandidates(outputProfile, hasAudioTracks).some((mimeType) =>
     MediaRecorder.isTypeSupported(mimeType)
   );
 }
 
 export function getAvailableOutputCodecs(
   container: VideoOutputContainer,
-  resolution: VideoResolutionPreset,
+  current: VideoOutputProfile,
   hasAudioTracks: boolean
 ): VideoOutputCodec[] {
   return OUTPUT_CODECS.filter(
     (codec) =>
       isVideoOutputCodecCompatible(container, codec) &&
-      isRecordingOutputSupported({ codec, container, resolution }, hasAudioTracks)
+      isRecordingOutputSupported({ ...current, codec, container }, hasAudioTracks)
   );
 }
 
 export function resolveOutputForContainer(params: {
   container: VideoOutputContainer;
-  current: VideoRecordingOutputSettings;
+  current: VideoOutputProfile;
   hasAudioTracks: boolean;
-}): VideoRecordingOutputSettings {
+}): VideoOutputProfile {
   const available = getAvailableOutputCodecs(
     params.container,
-    params.current.resolution,
+    params.current,
     params.hasAudioTracks
   );
   const codec = available.includes(params.current.codec)

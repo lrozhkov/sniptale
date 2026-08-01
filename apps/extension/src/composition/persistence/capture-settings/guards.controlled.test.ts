@@ -4,7 +4,7 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import { parseStoredVideoSettings, parseStoredVideoUiState } from './guards';
 
 const CURRENT_VIDEO_SETTINGS_CONTRACT = {
-  output: DEFAULT_VIDEO_SETTINGS.output,
+  outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
   qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
   qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
 };
@@ -63,7 +63,6 @@ it('keeps valid string and numeric settings while counting invalid field variant
       diagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',
       openEditorAfterRecording: true,
-      quality: 'HIGH',
     })
   ).toEqual({
     hasInvalidRoot: false,
@@ -75,7 +74,6 @@ it('keeps valid string and numeric settings while counting invalid field variant
       diagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',
       openEditorAfterRecording: true,
-      quality: 'HIGH',
     },
   });
 });

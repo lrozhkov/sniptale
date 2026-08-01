@@ -7,7 +7,13 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   bodyMock: vi.fn(),
   footerMock: vi.fn(),
+  loadPostRecordResult: vi.fn(),
   subscribeToMessages: vi.fn(),
+}));
+
+vi.mock('../post-record/result-runtime', () => ({
+  acknowledgeVideoPostRecordResult: vi.fn(),
+  loadPendingVideoPostRecordResult: mocks.loadPostRecordResult,
 }));
 
 vi.mock('../../../../platform/i18n', (_importOriginal) => ({
@@ -123,7 +129,7 @@ function createVideoSettings(): VideoRecordingSettings {
     microphoneDeviceId: null,
     microphoneEnabled: true,
     openEditorAfterRecording: true,
-    quality: VideoQuality.MEDIUM,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
     systemAudioEnabled: true,
   };
 }
@@ -156,6 +162,8 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.bodyMock.mockReset();
   mocks.footerMock.mockReset();
+  mocks.loadPostRecordResult.mockReset();
+  mocks.loadPostRecordResult.mockResolvedValue(null);
   mocks.subscribeToMessages.mockReset();
   mocks.subscribeToMessages.mockReturnValue(() => undefined);
 });
@@ -175,6 +183,7 @@ async function verifiesStartableViewModel() {
   const props = createProps();
 
   await renderNode(<VideoSetupPage {...props} />);
+  await act(async () => Promise.resolve());
 
   expect(mocks.bodyMock).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -216,6 +225,7 @@ async function verifiesDisabledStartState() {
       })}
     />
   );
+  await act(async () => Promise.resolve());
 
   expect(mocks.footerMock).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -274,6 +284,7 @@ it('returns to setup immediately when cancelling before recorder activation', as
   await renderNode(
     <VideoSetupPage
       {...createProps({
+        activeRecordingId: 'recording-countdown',
         isStartPending: true,
         onCancel,
         recordingState: {

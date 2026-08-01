@@ -32,16 +32,19 @@ const {
   handleVideoSavedToIdbMock: vi.fn(),
 }));
 
-vi.mock('./handlers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./handlers')>()),
-  createUnhandledRouteResult: createUnhandledRouteResultMock,
+vi.mock('./handlers/export/download', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./handlers/export/download')>()),
   handleDownloadRecording: handleDownloadRecordingMock,
   handleDownloadRecordingSidecar: handleDownloadRecordingSidecarMock,
-  handleOffscreenError: handleOffscreenErrorMock,
+}));
+vi.mock('./handlers/state/recording-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./handlers/state/recording-state')>()),
   handleRecordingDurationUpdated: handleRecordingDurationUpdatedMock,
-  handleRecordingState: handleRecordingStateMock,
   handleRecordingTabId: handleRecordingTabIdMock,
-  handleVideoSavedToIdb: handleVideoSavedToIdbMock,
+}));
+vi.mock('./handlers/state/recording-state-response', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./handlers/state/recording-state-response')>()),
+  handleRecordingState: handleRecordingStateMock,
 }));
 vi.mock('./handlers/export/project-export', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./handlers/export/project-export')>()),
@@ -51,9 +54,12 @@ vi.mock('./handlers/export/project-export', async (importOriginal) => ({
 }));
 vi.mock('./handlers/state/offscreen-lifecycle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./handlers/state/offscreen-lifecycle')>()),
+  createUnhandledRouteResult: createUnhandledRouteResultMock,
   handleInternalVideoSignal: handleInternalVideoSignalMock,
+  handleOffscreenError: handleOffscreenErrorMock,
   handleOffscreenReady: handleOffscreenReadyMock,
   handleProjectExportLifecycleMessage: handleProjectExportLifecycleMessageMock,
+  handleVideoSavedToIdb: handleVideoSavedToIdbMock,
 }));
 import type { VideoRuntimeMessage } from '../../../../contracts/video/types/messages';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -142,13 +148,18 @@ function verifiesOffscreenErrorRoute(sendResponse: ReturnType<typeof createSendR
 function verifiesSavedAndDownloadRoutes(sendResponse: ReturnType<typeof createSendResponse>) {
   expect(
     routeVideoRuntimeMessage(
-      asRuntimeMessage({ type: VideoMessageType.VIDEO_SAVED_TO_IDB, recordingId: 'rec-1' }),
+      asRuntimeMessage({
+        type: VideoMessageType.VIDEO_SAVED_TO_IDB,
+        primaryRecordingId: 'rec-1',
+        recordingId: 'rec-1',
+      }),
       sendResponse
     )
   ).toEqual(createRouteResult('saved'));
   expect(handleVideoSavedToIdbMock).toHaveBeenCalledWith(
     {
       type: VideoMessageType.VIDEO_SAVED_TO_IDB,
+      primaryRecordingId: 'rec-1',
       recordingId: 'rec-1',
     },
     sendResponse

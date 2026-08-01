@@ -17,6 +17,8 @@ const mediaHubStoreMocks = vi.hoisted(() => ({
   publishMediaHubLibraryChangedMock: vi.fn(),
   saveProjectAssetMock: vi.fn(),
   saveRecordingMock: vi.fn(),
+  saveRecordingsBatchMock: vi.fn(),
+  saveRecordingsBatchWithCompletionMock: vi.fn(),
   saveRecordingTelemetryMock: vi.fn(),
   saveScreenshotMediaAssetMock: vi.fn(),
   saveWebSnapshotMediaAssetMock: vi.fn(),
@@ -38,6 +40,8 @@ vi.mock('../../composition/persistence/recordings/index', async (importOriginal)
   ...(await importOriginal<typeof import('../../composition/persistence/recordings/index')>()),
   deleteRecording: mediaHubStoreMocks.deleteRecordingMock,
   saveRecording: mediaHubStoreMocks.saveRecordingMock,
+  saveRecordingsBatch: mediaHubStoreMocks.saveRecordingsBatchMock,
+  saveRecordingsBatchWithCompletion: mediaHubStoreMocks.saveRecordingsBatchWithCompletionMock,
 }));
 
 vi.mock('../../composition/persistence/recordings/telemetry', async (importOriginal) => ({
@@ -91,6 +95,8 @@ function resetMediaHubStoreMocks() {
     groups: [],
     potentialBytes: 0,
   });
+  mediaHubStoreMocks.saveRecordingsBatchMock.mockResolvedValue([]);
+  mediaHubStoreMocks.saveRecordingsBatchWithCompletionMock.mockResolvedValue([]);
 }
 
 async function importMediaHubStoreModule() {
@@ -188,6 +194,59 @@ describe('media-hub-store recording and asset save flows', () => {
       'create',
       ['recording:recording-1']
     );
+  });
+
+  it('commits recording batches through one guarded repository call and publishes after success', async () => {
+    const { saveRecordingsBatchSafely } = await importMediaHubStoreModule();
+    const inputs = [
+      { id: 'recording-1', blob: new Blob(['one']), filename: 'one.webm' },
+      { id: 'recording-2', blob: new Blob(['two']), filename: 'two.webm' },
+    ];
+    mediaHubStoreMocks.saveRecordingsBatchMock.mockResolvedValue(
+      inputs.map((input) => ({ ...input, createdAt: 1_700, size: input.blob.size }))
+    );
+
+    await saveRecordingsBatchSafely(inputs);
+
+    expect(mediaHubStoreMocks.saveRecordingsBatchMock).toHaveBeenCalledWith(inputs);
+    expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('create', [
+      'recording:recording-1',
+      'recording:recording-2',
+    ]);
+  });
+
+  it('does not publish a recording batch when its atomic repository commit fails', async () => {
+    const { saveRecordingsBatchSafely } = await importMediaHubStoreModule();
+    const error = new Error('batch failed');
+    const inputs = [{ id: 'recording-1', blob: new Blob(['one']), filename: 'one.webm' }];
+    mediaHubStoreMocks.saveRecordingsBatchMock.mockRejectedValue(error);
+
+    await expect(saveRecordingsBatchSafely(inputs)).rejects.toBe(error);
+
+    expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+  });
+
+  it('commits recording media and its completion outbox through one guarded repository call', async () => {
+    const { saveRecordingsBatchWithCompletionSafely } = await importMediaHubStoreModule();
+    const inputs = [{ id: 'recording-1', blob: new Blob(['one']), filename: 'one.webm' }];
+    const completion = {
+      primaryRecordingId: 'recording-1',
+      projectId: null,
+      recordingId: 'session-1',
+    };
+    mediaHubStoreMocks.saveRecordingsBatchWithCompletionMock.mockResolvedValue(
+      inputs.map((input) => ({ ...input, createdAt: 1_700, size: input.blob.size }))
+    );
+
+    await saveRecordingsBatchWithCompletionSafely(inputs, completion);
+
+    expect(mediaHubStoreMocks.saveRecordingsBatchWithCompletionMock).toHaveBeenCalledWith(
+      inputs,
+      completion
+    );
+    expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('create', [
+      'recording:recording-1',
+    ]);
   });
 
   it('saves project assets and exports through the guarded db seams', async () => {

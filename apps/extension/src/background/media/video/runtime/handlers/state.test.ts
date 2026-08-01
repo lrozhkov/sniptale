@@ -1,5 +1,15 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
+vi.mock(
+  '../../../../../composition/persistence/recordings/completion-outbox',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../../composition/persistence/recordings/completion-outbox')
+    >()),
+    removeVideoRecordingCompletionOutbox: vi.fn().mockResolvedValue(true),
+  })
+);
+
 const {
   finalizeRecordingDiagnosticsMock,
   finishVideoRecordingStopMock,
@@ -16,6 +26,7 @@ const {
   setVideoRecordingRuntimeStateMock,
   shouldOpenVideoEditorAfterRecordingMock,
   ensureActiveVideoRecordingLeaseHydratedMock,
+  clearCameraRecorderControlGrantMock,
   restoreCurrentRecordingFromLeaseMock,
   translateMock,
 } = vi.hoisted(() => ({
@@ -34,6 +45,7 @@ const {
   setVideoRecordingRuntimeStateMock: vi.fn(),
   shouldOpenVideoEditorAfterRecordingMock: vi.fn(() => false),
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
+  clearCameraRecorderControlGrantMock: vi.fn(),
   restoreCurrentRecordingFromLeaseMock: vi.fn(),
   translateMock: vi.fn((key: string) => `t:${key}`),
 }));
@@ -76,6 +88,8 @@ vi.mock('../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../session-state')>()),
   finishVideoRecordingStop: finishVideoRecordingStopMock,
   getVideoRecordingId: getVideoRecordingIdMock,
+  isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
+    recordingId != null && getVideoRecordingIdMock() === recordingId,
   getVideoRecordingTabId: getVideoRecordingTabIdMock,
   markVideoRecordingPreparationSettled: markVideoRecordingPreparationSettledMock,
   shouldOpenVideoEditorAfterRecording: shouldOpenVideoEditorAfterRecordingMock,
@@ -96,16 +110,27 @@ vi.mock('../../recording-control-lease', async (importOriginal) => ({
   ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
   restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
 }));
+vi.mock('../../../../storage/video/post-record-result', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../storage/video/post-record-result')>()),
+  clearPendingVideoPostRecordResult: vi.fn().mockResolvedValue(true),
+  commitPendingVideoPostRecordResult: vi.fn().mockResolvedValue('ready'),
+  persistPendingVideoPostRecordResult: vi.fn().mockResolvedValue('staged'),
+  readPendingVideoPostRecordResult: vi.fn().mockResolvedValue(null),
+  readStoredVideoPostRecordResult: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('../camera-recorder-control', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../camera-recorder-control')>()),
+  clearCameraRecorderControlGrant: clearCameraRecorderControlGrantMock,
+}));
 
+import { handleRecordingDurationUpdated, handleRecordingTabId } from './state/recording-state';
+import { handleRecordingState } from './state/recording-state-response';
 import {
   createUnhandledRouteResult,
   handleOffscreenError,
   handleOffscreenReady,
-  handleRecordingDurationUpdated,
-  handleRecordingState,
-  handleRecordingTabId,
   handleVideoSavedToIdb,
-} from './state';
+} from './state/offscreen-lifecycle';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import {
@@ -142,6 +167,7 @@ beforeEach(() => {
   getVideoRecordingIdMock.mockReturnValue('rec-1');
   getVideoRecordingTabIdMock.mockReturnValue(17);
   ensureActiveVideoRecordingLeaseHydratedMock.mockResolvedValue(null);
+  clearCameraRecorderControlGrantMock.mockResolvedValue(true);
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
 });
@@ -150,10 +176,14 @@ it('declares every state and offscreen lifecycle route under its canonical autho
   expect(videoRuntimeStateRouteDescriptor).toMatchObject({
     authorityFamily: 'video-runtime-owner-policy',
     messageTypes: expect.arrayContaining([VideoMessageType.GET_RECORDING_STATE]),
+    ownerModule: 'apps/extension/src/background/media/video/runtime/router.ts',
   });
   expect(offscreenLifecycleRouteDescriptor).toMatchObject({
     authorityFamily: 'offscreen-runtime-capability',
-    messageTypes: expect.arrayContaining([VideoMessageType.OFFSCREEN_SOURCE_READY]),
+    messageTypes: expect.arrayContaining([
+      VideoMessageType.OFFSCREEN_SOURCE_READY,
+      VideoMessageType.VIDEO_SAVED_TO_IDB,
+    ]),
   });
   expect(captureSourceObtainedRouteDescriptor.messageTypes).toEqual([
     VideoMessageType.CAPTURE_SOURCE_OBTAINED,
@@ -203,7 +233,9 @@ it('handles offscreen lifecycle routes through the state owner', async () => {
     )
   ).toEqual({ handled: true, keepChannelOpen: false });
   expect(markOffscreenDocumentReadyMock).toHaveBeenCalledWith('startup-1');
-  expect(handleVideoSavedToIdb({ recordingId: 'rec-1' }, sendResponse)).toEqual({
+  expect(
+    handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse)
+  ).toEqual({
     handled: true,
     keepChannelOpen: true,
   });
@@ -221,7 +253,9 @@ it('handles offscreen lifecycle routes through the state owner', async () => {
   });
   await flushAsyncRoute();
   expect(clearRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('rec-1');
-  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('boom');
+  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('boom', {
+    recordingId: 'rec-1',
+  });
   expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
   expect(resetRecordingTabIdMock).not.toHaveBeenCalled();
   expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();

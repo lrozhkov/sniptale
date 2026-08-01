@@ -1,6 +1,8 @@
 import { VideoCursorCaptureMode } from '../../../../../../features/video/project/types';
 import { VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
+import type { VideoSavedToIdbOutcome } from '../../../../video/export';
 import { createGuardParser } from '@sniptale/runtime-contracts/messaging/parsers/utils';
 import {
   createMessageGuard,
@@ -45,6 +47,21 @@ const desktopMediaRequestBindingGuard = {
 };
 const desktopMediaSourcePositionGuard = { sourceCount: isNumber, sourceIndex: isNumber };
 const V = VideoMessageType;
+const isNonEmptyString = (value: unknown): value is string => isString(value) && value.length > 0;
+type VideoSavedToIdbResponse = RuntimeMessageResponse<{ result: VideoSavedToIdbOutcome }>;
+function isVideoSavedToIdbOutcome(value: unknown): value is VideoSavedToIdbOutcome {
+  return value === 'accepted' || value === 'discarded' || value === 'superseded';
+}
+const videoSavedToIdbResponseEnvelopeGuard = createRuntimeResponseGuard<VideoSavedToIdbResponse>({
+  optional: { result: isVideoSavedToIdbOutcome },
+});
+
+function isVideoSavedToIdbResponse(input: unknown): input is VideoSavedToIdbResponse {
+  return (
+    videoSavedToIdbResponseEnvelopeGuard(input) &&
+    (input.success !== true || isVideoSavedToIdbOutcome(input.result))
+  );
+}
 
 export const runtimeVideoOffscreenEventMessageContracts = {
   [V.OFFSCREEN_SOURCE_READY]: {
@@ -102,6 +119,20 @@ export const runtimeVideoOffscreenEventMessageContracts = {
     parseResponse: createGuardParser(
       'runtime OFFSCREEN_RECORDING_STOPPED response',
       createRuntimeResponseGuard({ allowUndefined: true, optional: { result: isString } })
+    ),
+  },
+  [V.VIDEO_SAVED_TO_IDB]: {
+    parseRequest: createGuardParser(
+      'runtime VIDEO_SAVED_TO_IDB message',
+      createMessageGuard({
+        type: V.VIDEO_SAVED_TO_IDB,
+        required: { primaryRecordingId: isNonEmptyString, recordingId: isNonEmptyString },
+        optional: { projectId: isNonEmptyString },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime VIDEO_SAVED_TO_IDB response',
+      isVideoSavedToIdbResponse
     ),
   },
   [V.OFFSCREEN_RECORDING_PAUSED]: {

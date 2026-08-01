@@ -12,7 +12,7 @@ import {
   settingsSectionClassName,
   settingsSuccessBadgeClassName,
 } from '../../section-surface';
-import type { VideoRecordingQualityProfile } from '@sniptale/runtime-contracts/video/types/types';
+import type { VideoRecordingProfile } from '@sniptale/runtime-contracts/video/types/types';
 import { getProfileName, getProfileSummary } from './profile-copy';
 import type { ReturnTypeUseProfiles } from './types';
 import { VideoQualityProfileEditor } from './profile-editor';
@@ -24,7 +24,7 @@ function ProfileRow(props: {
   onDelete?: () => void;
   onEdit?: () => void;
   onSelect: () => void;
-  profile: VideoRecordingQualityProfile;
+  profile: VideoRecordingProfile;
 }) {
   return (
     <div className={settingsListRowClassName}>
@@ -83,10 +83,10 @@ function ProfileGroup(props: {
   busy: boolean;
   editable: boolean;
   emptyText?: string;
-  onDelete: (profile: VideoRecordingQualityProfile) => void;
-  onEdit: (profile: VideoRecordingQualityProfile) => void;
-  onSelect: (profile: VideoRecordingQualityProfile) => void;
-  profiles: readonly VideoRecordingQualityProfile[];
+  onDelete: (profile: VideoRecordingProfile) => void;
+  onEdit: (profile: VideoRecordingProfile) => void;
+  onSelect: (profile: VideoRecordingProfile) => void;
+  profiles: readonly VideoRecordingProfile[];
   title: string;
 }) {
   return (

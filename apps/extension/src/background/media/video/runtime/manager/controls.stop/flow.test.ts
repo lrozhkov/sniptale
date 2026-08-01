@@ -24,6 +24,7 @@ const {
   getVideoSurfaceSessionMock,
   clearActiveVideoRecordingLeaseMock,
   ensureActiveVideoRecordingLeaseHydratedMock,
+  readStoredVideoPostRecordResultMock,
 } = vi.hoisted(() => ({
   beginVideoRecordingStopMock: vi.fn(),
   finishVideoRecordingStopMock: vi.fn(),
@@ -49,6 +50,7 @@ const {
   getVideoSurfaceSessionMock: vi.fn(),
   clearActiveVideoRecordingLeaseMock: vi.fn(),
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
+  readStoredVideoPostRecordResultMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -75,6 +77,8 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   hasActiveVideoRecordingSession: hasActiveVideoRecordingSessionMock,
   isVideoRecordingPreparationInProgress: isVideoRecordingPreparationInProgressMock,
   isVideoRecordingStopInProgress: isVideoRecordingStopInProgressMock,
+  isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
+    recordingId != null && getVideoRecordingIdMock() === recordingId,
   resetCompletedVideoRecordingSession: resetCompletedVideoRecordingSessionMock,
   restoreVideoRecordingOffscreenStartPending: restoreVideoRecordingOffscreenStartPendingMock,
   getVideoRecordingId: getVideoRecordingIdMock,
@@ -88,6 +92,10 @@ vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
   ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
+}));
+vi.mock('../../../../../storage/video/post-record-result', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../storage/video/post-record-result')>()),
+  readStoredVideoPostRecordResult: readStoredVideoPostRecordResultMock,
 }));
 
 vi.mock('./effects', () => ({
@@ -124,6 +132,7 @@ beforeEach(() => {
   });
   clearActiveVideoRecordingLeaseMock.mockResolvedValue(undefined);
   ensureActiveVideoRecordingLeaseHydratedMock.mockResolvedValue(null);
+  readStoredVideoPostRecordResultMock.mockResolvedValue(null);
   releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
 });
 
@@ -295,6 +304,7 @@ it('fails closed when neither the live session nor durable lease has a source bi
 
   expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
   expect(releaseVideoCaptureSurfaceMock).not.toHaveBeenCalled();
+  expect(finishVideoRecordingStopMock).toHaveBeenCalledOnce();
 });
 
 it('hydrates the exact source binding from the durable lease', async () => {
@@ -320,6 +330,39 @@ it('hydrates the exact source binding from the durable lease', async () => {
   );
 });
 
+it('does not let delayed source-binding hydration for A start stopping current recording B', async () => {
+  beginVideoRecordingStopMock.mockReturnValue({
+    mode: CaptureMode.TAB,
+    shouldResetImmediately: false,
+    tabId: 9,
+  });
+  getVideoSurfaceSessionMock.mockReturnValue(null);
+  let resolveLease!: (value: {
+    recordingId: string;
+    surfaceBinding: { generation: number; streamInstanceId: string };
+  }) => void;
+  ensureActiveVideoRecordingLeaseHydratedMock.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveLease = resolve;
+    })
+  );
+
+  const stopA = stopRecording();
+  await vi.waitFor(() =>
+    expect(ensureActiveVideoRecordingLeaseHydratedMock).toHaveBeenCalledOnce()
+  );
+  getVideoRecordingIdMock.mockReturnValue('recording-2');
+  resolveLease({
+    recordingId: 'recording-1',
+    surfaceBinding: { generation: 4, streamInstanceId: 'durable-stream' },
+  });
+
+  await expect(stopA).resolves.toEqual({ result: 'accepted' });
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+  expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+});
+
 it('retains recording state when surface restoration fails after a bound stop', async () => {
   beginVideoRecordingStopMock.mockReturnValue({
     mode: CaptureMode.TAB,
@@ -334,7 +377,10 @@ it('retains recording state when surface restoration fails after a bound stop', 
   });
 
   expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
+  expect(finishVideoRecordingStopMock).toHaveBeenCalledOnce();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenLastCalledWith({
+    status: VideoRecordingStatus.RECORDING,
+    countdownEndsAt: null,
     error: 'restore-conflict',
   });
 });
@@ -407,6 +453,188 @@ it('restores the previous runtime state when offscreen stop delivery fails', asy
     'Failed to deliver offscreen stop command',
     expect.any(Error)
   );
+});
+
+it('does not let a delayed STOP delivery failure for A roll back current recording B', async () => {
+  beginVideoRecordingStopMock.mockReturnValue({
+    mode: CaptureMode.TAB,
+    shouldResetImmediately: false,
+    tabId: 11,
+  });
+  let rejectStop!: (error: Error) => void;
+  sendRuntimeMessageMock.mockReturnValueOnce(
+    new Promise((_, reject) => {
+      rejectStop = reject;
+    })
+  );
+
+  const stopA = stopRecording();
+  await vi.waitFor(() => expect(sendRuntimeMessageMock).toHaveBeenCalledOnce());
+  getVideoRecordingIdMock.mockReturnValue('recording-2');
+  rejectStop(new Error('transport failed'));
+
+  await expect(stopA).resolves.toEqual({ result: 'accepted' });
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledTimes(1);
+  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+  expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+});
+
+it('does not let delayed surface cleanup failure for A mutate current recording B', async () => {
+  beginVideoRecordingStopMock.mockReturnValue({
+    mode: CaptureMode.TAB,
+    shouldResetImmediately: false,
+    tabId: 11,
+  });
+  let rejectRelease!: (error: Error) => void;
+  releaseVideoCaptureSurfaceMock.mockReturnValueOnce(
+    new Promise((_, reject) => {
+      rejectRelease = reject;
+    })
+  );
+
+  const stopA = stopRecording();
+  await vi.waitFor(() =>
+    expect(releaseVideoCaptureSurfaceMock).toHaveBeenCalledWith('recording-1')
+  );
+  getVideoRecordingIdMock.mockReturnValue('recording-2');
+  rejectRelease(new Error('surface cleanup failed'));
+
+  await expect(stopA).resolves.toEqual({
+    error: 'surface cleanup failed',
+    result: 'failed',
+  });
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledTimes(1);
+  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+  expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+});
+
+it('cleans only A authority when its delayed terminal STOP completes after B starts', async () => {
+  beginVideoRecordingStopMock.mockReturnValue({
+    mode: CaptureMode.TAB,
+    shouldResetImmediately: false,
+    tabId: 11,
+  });
+  sendRuntimeMessageMock.mockResolvedValueOnce({
+    success: true,
+    result: 'terminal-failure',
+    error: 'encoder failed',
+  });
+  let resolveRelease!: () => void;
+  releaseVideoCaptureSurfaceMock.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      resolveRelease = resolve;
+    })
+  );
+
+  const stopA = stopRecording();
+  await vi.waitFor(() =>
+    expect(releaseVideoCaptureSurfaceMock).toHaveBeenCalledWith('recording-1')
+  );
+  getVideoRecordingIdMock.mockReturnValue('recording-2');
+  resolveRelease();
+
+  await expect(stopA).resolves.toEqual({ error: 'encoder failed', result: 'failed' });
+  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('recording-1');
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledTimes(1);
+  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+  expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+});
+
+it('keeps committed post-record completion idle when only the stop response is lost', async () => {
+  beginVideoRecordingStopMock.mockReturnValue({
+    mode: CaptureMode.TAB,
+    shouldResetImmediately: false,
+    tabId: 11,
+  });
+  sendRuntimeMessageMock.mockRejectedValueOnce(new Error('response channel closed'));
+  readStoredVideoPostRecordResultMock.mockResolvedValueOnce({
+    createdAt: 1,
+    expiresAt: Date.now() + 1_000,
+    result: {
+      primaryRecordingId: 'recording-1',
+      projectId: null,
+      recordingId: 'recording-1',
+    },
+    status: 'ready',
+  });
+
+  await expect(stopRecording()).resolves.toEqual({ result: 'accepted' });
+
+  expect(resetCompletedVideoRecordingSessionMock).toHaveBeenCalledWith('recording-1');
+  expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledTimes(1);
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
+    status: VideoRecordingStatus.STOPPING,
+    countdownEndsAt: null,
+    error: null,
+  });
+});
+
+it('does not let stale committed STOP recovery for A reset current recording B', async () => {
+  beginVideoRecordingStopMock.mockReturnValue({
+    mode: CaptureMode.TAB,
+    shouldResetImmediately: false,
+    tabId: 11,
+  });
+  sendRuntimeMessageMock.mockRejectedValueOnce(new Error('response channel closed'));
+  let resolveStoredResult!: (value: unknown) => void;
+  readStoredVideoPostRecordResultMock.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveStoredResult = resolve;
+    })
+  );
+
+  const stopA = stopRecording();
+  await vi.waitFor(() => expect(readStoredVideoPostRecordResultMock).toHaveBeenCalledOnce());
+  getVideoRecordingIdMock.mockReturnValue('recording-2');
+  resolveStoredResult({
+    createdAt: 1,
+    expiresAt: Date.now() + 1_000,
+    result: {
+      primaryRecordingId: 'recording-1',
+      projectId: null,
+      recordingId: 'recording-1',
+    },
+    status: 'ready',
+  });
+
+  await expect(stopA).resolves.toEqual({ result: 'accepted' });
+
+  expect(finishVideoRecordingStopMock).not.toHaveBeenCalled();
+  expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledTimes(1);
+});
+
+it('retains the lease and session when saved-result publication is not acknowledged', async () => {
+  beginVideoRecordingStopMock.mockReturnValue({
+    mode: CaptureMode.TAB,
+    shouldResetImmediately: false,
+    tabId: 11,
+  });
+  sendRuntimeMessageMock.mockResolvedValueOnce({
+    success: false,
+    error: 'session storage failed',
+  });
+
+  await expect(stopRecording()).resolves.toEqual({
+    error: 'session storage failed',
+    result: 'failed',
+  });
+
+  expect(finishVideoRecordingStopMock).toHaveBeenCalledOnce();
+  expect(resetCompletedVideoRecordingSessionMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
+  expect(releaseVideoCaptureSurfaceMock).not.toHaveBeenCalled();
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenLastCalledWith({
+    status: VideoRecordingStatus.RECORDING,
+    countdownEndsAt: null,
+    error: 'session storage failed',
+  });
 });
 
 it('restores accepted-start lifecycle state when its offscreen stop is rejected', async () => {

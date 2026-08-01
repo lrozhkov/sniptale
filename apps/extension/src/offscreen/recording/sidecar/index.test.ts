@@ -1,391 +1,289 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import type { RecordingSidecarRecorder } from './types';
+import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
+import { createTrackedStream } from '../multi-source/media-stream.test-support';
+import { TestMediaRecorder } from '../multi-source/media-recorder.test-support';
 
-const { createFixedVideoOutputStreamMock, finalizeSidecarRecordingMock } = vi.hoisted(() => ({
-  createFixedVideoOutputStreamMock: vi.fn(),
-  finalizeSidecarRecordingMock: vi.fn(),
+const { createWebcamSidecarRecorderMock, loggerDebugMock } = vi.hoisted(() => ({
+  createWebcamSidecarRecorderMock: vi.fn(),
+  loggerDebugMock: vi.fn(),
 }));
 
-vi.mock('../stream/fixed-video-output', () => ({
-  createFixedVideoOutputStream: createFixedVideoOutputStreamMock,
+vi.mock('./webcam', () => ({
+  createWebcamSidecarRecorder: createWebcamSidecarRecorderMock,
+}));
+vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sniptale/platform/observability/logger')>()),
+  createLogger: () => ({ debug: loggerDebugMock }),
 }));
 
-vi.mock('../finalizer', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../finalizer')>()),
-  finalizeSidecarRecording: finalizeSidecarRecordingMock,
-}));
-
-import {
-  resolveVideoOutputDimensions,
-  WebcamFrameRatePreset,
-  WebcamResolutionPreset,
-} from '@sniptale/runtime-contracts/video/types/types';
 import {
   cleanupActiveSidecarRecorders,
-  finalizeActiveSidecarRecordings,
+  getActiveSidecarVideoDimensions,
   getActiveSidecarWebcamSettings,
   hasActiveSidecarSession,
-  pauseActiveSidecarRecorders,
   initializeSidecarRecorders,
+  pauseActiveSidecarRecorders,
   resumeActiveSidecarRecorders,
+  setActiveSidecarWebcamEnabled,
   startActiveSidecarRecorders,
   stopActiveSidecarRecordersWithFlush,
 } from '.';
-import {
-  createSettings,
-  createStream,
-  FakeMediaRecorder,
-  installSidecarNavigator,
-} from './index.test-support';
+
+function createSidecar(): RecordingSidecarRecorder {
+  const file = new File(['webcam'], 'webcam.webm', { type: 'video/webm' });
+  const stream = createTrackedStream();
+  const recorder = new TestMediaRecorder({ stream });
+  return {
+    artifact: null,
+    artifactSession: {
+      abort: vi.fn().mockResolvedValue(undefined),
+      recorder,
+      setLifecycleCallbacks: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn().mockResolvedValue({
+        artifactId: 'rec-webcam',
+        file,
+        filename: file.name,
+        mimeType: file.type,
+        size: file.size,
+      }),
+    },
+    filenameSuffix: 'webcam',
+    kind: 'webcam',
+    recorder,
+    recordingId: 'rec-webcam',
+    stream,
+    trackSettings: { frameRate: 30, height: 720, width: 1280 },
+  };
+}
 
 beforeEach(() => {
-  cleanupActiveSidecarRecorders();
   vi.clearAllMocks();
-  FakeMediaRecorder.instances = [];
-  vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
-  createFixedVideoOutputStreamMock.mockImplementation(
-    (
-      source: MediaStream,
-      settings: ReturnType<typeof createSettings>,
-      options: { frameRate: number }
-    ) => {
-      const sourceSettings = source.getVideoTracks()[0]?.getSettings() ?? {};
-      const dimensions = resolveVideoOutputDimensions(
-        sourceSettings.width ?? 1280,
-        sourceSettings.height ?? 720,
-        settings.output.resolution
-      );
-      const derived = createStream({
-        stop: () => source.getTracks().forEach((track) => track.stop()),
-        trackSettings: { ...dimensions, frameRate: options.frameRate },
-      });
-      return Promise.resolve({ dimensions, frameRate: options.frameRate, stream: derived });
-    }
-  );
-});
-
-afterEach(() => {
   cleanupActiveSidecarRecorders();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
 });
 
-function registerSidecarInitializationTests() {
-  it('requests a selected webcam as video-only media and creates a stable sidecar recorder', async () => {
-    const getUserMedia = vi.fn().mockResolvedValue(createStream());
-    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
-
+describe('recording sidecar lifecycle', () => {
+  it('keeps camera mode free of sidecar ownership', async () => {
     await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
+      baseRecordingId: 'rec',
+      captureMode: CaptureMode.CAMERA,
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
     });
 
-    expect(getUserMedia).toHaveBeenCalledWith({
-      audio: false,
-      video: { deviceId: { exact: 'cam-1' } },
-    });
-    expect(FakeMediaRecorder.instances).toHaveLength(1);
-    expect(FakeMediaRecorder.instances[0]?.stream.getAudioTracks()).toEqual([]);
-    expect(hasActiveSidecarSession()).toBe(true);
-  });
-
-  it('does not acquire webcam media when webcam capture is disabled', async () => {
-    const getUserMedia = vi.fn();
-    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
-
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings({ webcamEnabled: false }),
-    });
-
-    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(createWebcamSidecarRecorderMock).not.toHaveBeenCalled();
     expect(hasActiveSidecarSession()).toBe(false);
   });
 
-  it('uses default webcam constraints and rejects an unsupported selected codec', async () => {
-    vi.spyOn(FakeMediaRecorder, 'isTypeSupported').mockReturnValue(false);
-    const getUserMedia = vi.fn().mockResolvedValue(createStream());
-    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+  it('propagates sidecar creation failure without retaining a session', async () => {
+    createWebcamSidecarRecorderMock.mockRejectedValueOnce(new Error('webcam setup failed'));
 
     await expect(
       initializeSidecarRecorders({
-        baseRecordingId: 'rec-1',
-        settings: createSettings({ webcamDeviceId: null }),
+        baseRecordingId: 'rec',
+        coordinator: createRecordingStagingCoordinatorTestDouble(),
+        settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
       })
-    ).rejects.toThrow('selected recording container and codec are not supported');
-
-    expect(getUserMedia).toHaveBeenCalledWith({ audio: false, video: {} });
-    expect(FakeMediaRecorder.instances).toHaveLength(0);
-  });
-}
-
-function registerSidecarConstraintTests() {
-  it('returns null webcam settings when no sidecar session is active', () => {
-    expect(getActiveSidecarWebcamSettings()).toBeNull();
+    ).rejects.toThrow('webcam setup failed');
+    expect(hasActiveSidecarSession()).toBe(false);
   });
 
-  it('reads numeric settings from the active webcam sidecar', async () => {
-    installSidecarNavigator(
-      createStream({ trackSettings: { frameRate: 30, height: 720, width: 1280 } })
-    );
+  it('does not retain a session when no sidecar recorder is requested', async () => {
+    createWebcamSidecarRecorderMock.mockResolvedValueOnce(null);
 
     await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: false },
     });
 
+    expect(hasActiveSidecarSession()).toBe(false);
+  });
+
+  it('starts and terminally drains the webcam artifact session', async () => {
+    const sidecar = createSidecar();
+    createWebcamSidecarRecorderMock.mockResolvedValue(sidecar);
+    await initializeSidecarRecorders({
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
+    });
+
+    startActiveSidecarRecorders(vi.fn());
+    const artifacts = await stopActiveSidecarRecordersWithFlush();
+
+    expect(sidecar.artifactSession.start).toHaveBeenCalledWith();
+    expect(sidecar.artifactSession.stop).toHaveBeenCalledOnce();
+    expect(artifacts[0]?.artifactId).toBe('rec-webcam');
+  });
+
+  it('returns one stop promise and exposes actual encoder dimensions', async () => {
+    const sidecar = createSidecar();
+    createWebcamSidecarRecorderMock.mockResolvedValue(sidecar);
+    await initializeSidecarRecorders({
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
+    });
+
+    expect(getActiveSidecarVideoDimensions()).toEqual([{ height: 720, width: 1280 }]);
+    expect(stopActiveSidecarRecordersWithFlush()).toBe(stopActiveSidecarRecordersWithFlush());
+  });
+
+  it('surfaces unexpected artifact failure through the semantic callback', async () => {
+    const sidecar = createSidecar();
+    const onFailure = vi.fn();
+    createWebcamSidecarRecorderMock.mockResolvedValue(sidecar);
+    await initializeSidecarRecorders({
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
+    });
+    startActiveSidecarRecorders(onFailure);
+
+    const callbacks = vi.mocked(sidecar.artifactSession.setLifecycleCallbacks).mock.calls[0]?.[0];
+    callbacks?.onFailure?.(new Error('writer failed'));
+    expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ message: 'writer failed' }));
+  });
+
+  it('normalizes a non-Error sidecar start failure', async () => {
+    const sidecar = createSidecar();
+    vi.mocked(sidecar.artifactSession.start).mockImplementationOnce(() => {
+      throw 'encoder unavailable';
+    });
+    createWebcamSidecarRecorderMock.mockResolvedValue(sidecar);
+    await initializeSidecarRecorders({
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
+    });
+
+    expect(() => startActiveSidecarRecorders(vi.fn())).toThrow('encoder unavailable');
+  });
+
+  it('applies state-aware pause, resume, and webcam enable controls', async () => {
+    const sidecar = createSidecar();
+    createWebcamSidecarRecorderMock.mockResolvedValue(sidecar);
+    await initializeSidecarRecorders({
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
+    });
+
+    sidecar.recorder.start();
+    pauseActiveSidecarRecorders();
+    expect(sidecar.recorder.state).toBe('paused');
+    pauseActiveSidecarRecorders();
+    expect(sidecar.recorder.state).toBe('paused');
+
+    resumeActiveSidecarRecorders();
+    expect(sidecar.recorder.state).toBe('recording');
+    resumeActiveSidecarRecorders();
+    expect(sidecar.recorder.state).toBe('recording');
+
+    setActiveSidecarWebcamEnabled(false);
+    expect(sidecar.stream.getVideoTracks()[0]?.enabled).toBe(false);
+    setActiveSidecarWebcamEnabled(true);
+    expect(sidecar.stream.getVideoTracks()[0]?.enabled).toBe(true);
     expect(getActiveSidecarWebcamSettings()).toEqual({
       frameRate: 30,
-      height: 1080,
-      width: 1920,
+      height: 720,
+      width: 1280,
     });
   });
 
-  it('applies webcam quality presets as ideal constraints', async () => {
-    const getUserMedia = vi.fn().mockResolvedValue(createStream());
-    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
-
+  it('records a terminal artifact and reports only an unrequested sidecar stop', async () => {
+    const sidecar = createSidecar();
+    const onFailure = vi.fn();
+    createWebcamSidecarRecorderMock.mockResolvedValue(sidecar);
     await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings({
-        webcamQuality: {
-          frameRate: WebcamFrameRatePreset.FPS60,
-          resolution: WebcamResolutionPreset.P1080,
-        },
-      }),
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
     });
+    startActiveSidecarRecorders(onFailure);
+    const callbacks = vi.mocked(sidecar.artifactSession.setLifecycleCallbacks).mock.calls[0]?.[0];
+    const artifact = await sidecar.artifactSession.stop();
 
-    expect(getUserMedia).toHaveBeenCalledWith({
-      audio: false,
-      video: {
-        deviceId: { exact: 'cam-1' },
-        frameRate: { ideal: 60 },
-        height: { ideal: 1080 },
-        width: { ideal: 1920 },
-      },
-    });
-  });
-}
-
-function registerSidecarFinalizationTests() {
-  it('does nothing when no sidecar session is active', async () => {
-    await finalizeActiveSidecarRecordings(false);
-
-    expect(finalizeSidecarRecordingMock).not.toHaveBeenCalled();
-  });
-
-  it('finalizes active webcam sidecars with stable save metadata', async () => {
-    installSidecarNavigator();
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
-    });
-    FakeMediaRecorder.instances[0]?.requestData();
-
-    await finalizeActiveSidecarRecordings(true);
-
-    expect(finalizeSidecarRecordingMock).toHaveBeenCalledWith({
-      chunks: expect.any(Array),
-      discard: true,
-      filenameSuffix: 'webcam',
-      mimeType: 'video/webm;codecs=vp9',
-      recordingId: 'rec-1-webcam',
-    });
-    expect(finalizeSidecarRecordingMock.mock.calls[0]?.[0].chunks).toHaveLength(1);
-  });
-
-  it('surfaces sidecar finalization failures to the recording owner', async () => {
-    installSidecarNavigator();
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
-    });
-    FakeMediaRecorder.instances[0]?.requestData();
-    finalizeSidecarRecordingMock.mockRejectedValueOnce(new Error('sidecar finalize failed'));
-
-    await expect(finalizeActiveSidecarRecordings(false)).rejects.toThrow('sidecar finalize failed');
-  });
-}
-
-function registerSidecarControlTests() {
-  it('starts, pauses, resumes, flushes, and stops active webcam sidecars', async () => {
-    installSidecarNavigator();
-
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
-    });
-    startActiveSidecarRecorders(1000, vi.fn());
-    pauseActiveSidecarRecorders();
-    expect(FakeMediaRecorder.instances[0]?.state).toBe('paused');
-
-    resumeActiveSidecarRecorders();
-    expect(FakeMediaRecorder.instances[0]?.state).toBe('recording');
-
-    await expect(stopActiveSidecarRecordersWithFlush()).resolves.toBeUndefined();
-    expect(FakeMediaRecorder.instances[0]?.state).toBe('inactive');
-  });
-
-  it('ignores pause and resume for sidecar recorders in other states', async () => {
-    installSidecarNavigator();
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
-    });
-
-    pauseActiveSidecarRecorders();
-    expect(FakeMediaRecorder.instances[0]?.state).toBe('inactive');
-
-    startActiveSidecarRecorders(1000, vi.fn());
-    resumeActiveSidecarRecorders();
-    expect(FakeMediaRecorder.instances[0]?.state).toBe('recording');
-  });
-
-  it('keeps sidecar controls idle-safe when no sidecar session is active', async () => {
-    startActiveSidecarRecorders(1000, vi.fn());
-    pauseActiveSidecarRecorders();
-    resumeActiveSidecarRecorders();
-
-    await expect(stopActiveSidecarRecordersWithFlush()).resolves.toBeUndefined();
-    expect(FakeMediaRecorder.instances).toHaveLength(0);
-  });
-
-  it('propagates an unexpected sidecar encoder failure to the recording owner', async () => {
-    installSidecarNavigator();
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
-    });
-    const onUnexpectedFailure = vi.fn();
-
-    startActiveSidecarRecorders(1000, onUnexpectedFailure);
-    FakeMediaRecorder.instances[0]?.onerror?.(
-      Object.assign(new Event('error'), { error: new Error('webcam encoder failed') }) as ErrorEvent
+    callbacks?.onStop?.(artifact);
+    expect(sidecar.artifact).toBe(artifact);
+    expect(onFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'A sidecar recorder stopped unexpectedly.' })
     );
 
-    expect(onUnexpectedFailure).toHaveBeenCalledWith(new Error('webcam encoder failed'));
-  });
-}
-
-function registerSidecarStopTests() {
-  it('returns the same stop promise when webcam sidecar stop is already pending', async () => {
-    installSidecarNavigator();
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
-    });
-    startActiveSidecarRecorders(1000, vi.fn());
-
-    const firstStop = stopActiveSidecarRecordersWithFlush();
-    const secondStop = stopActiveSidecarRecordersWithFlush();
-
-    expect(secondStop).toBe(firstStop);
-    await firstStop;
+    void stopActiveSidecarRecordersWithFlush();
+    callbacks?.onStop?.(artifact);
+    expect(onFailure).toHaveBeenCalledOnce();
   });
 
-  it('resolves sidecar stop immediately for inactive recorders', async () => {
-    installSidecarNavigator();
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
-    });
+  it.each([
+    { height: 720 },
+    { width: 1280 },
+    { height: 720, width: 1.5 },
+    { height: 1.5, width: 1280 },
+    { height: 720, width: 0 },
+    { height: 0, width: 1280 },
+  ] satisfies MediaTrackSettings[])(
+    'rejects unavailable encoder dimensions %#',
+    async (trackSettings) => {
+      const sidecar = createSidecar();
+      sidecar.trackSettings = trackSettings;
+      createWebcamSidecarRecorderMock.mockResolvedValue(sidecar);
+      await initializeSidecarRecorders({
+        baseRecordingId: 'rec',
+        coordinator: createRecordingStagingCoordinatorTestDouble(),
+        settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
+      });
 
-    await expect(stopActiveSidecarRecordersWithFlush()).resolves.toBeUndefined();
-  });
-
-  it('rejects sidecar stop when a recorder emits an error without a native error', async () => {
-    installSidecarNavigator();
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
-    });
-    startActiveSidecarRecorders(1000, vi.fn());
-    const recorder = FakeMediaRecorder.instances[0];
-    if (!recorder) {
-      throw new Error('Expected webcam recorder');
+      expect(() => getActiveSidecarVideoDimensions()).toThrow(
+        'Webcam recording dimensions are unavailable for rec-webcam.'
+      );
     }
-    recorder.stop = vi.fn();
-    const stopPromise = stopActiveSidecarRecordersWithFlush();
+  );
 
-    recorder.onerror?.({} as ErrorEvent);
-
-    await expect(stopPromise).rejects.toThrow('A sidecar recorder failed.');
-    recorder.onstop?.();
+  it('keeps stop and dimension reads idle-safe without an active session', async () => {
+    expect(getActiveSidecarVideoDimensions()).toEqual([]);
+    expect(getActiveSidecarWebcamSettings()).toBeNull();
+    await expect(stopActiveSidecarRecordersWithFlush()).resolves.toEqual([]);
   });
-}
 
-function registerSidecarCleanupStateTests() {
-  it('stops webcam tracks during cleanup and clears active sidecar state', async () => {
-    const stop = vi.fn();
-    vi.stubGlobal('navigator', {
-      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(createStream({ stop })) },
+  it('aborts staging bindings and stops owned tracks during cleanup', async () => {
+    const sidecar = createSidecar();
+    const [track] = sidecar.stream.getTracks();
+    createWebcamSidecarRecorderMock.mockResolvedValue(sidecar);
+    await initializeSidecarRecorders({
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
     });
 
+    cleanupActiveSidecarRecorders();
+    expect(sidecar.artifactSession.abort).toHaveBeenCalledOnce();
+    expect(track?.stop).toHaveBeenCalledOnce();
+  });
+
+  it('finishes stream cleanup when aborting the staging binding fails', async () => {
+    const sidecar = createSidecar();
+    const [track] = sidecar.stream.getTracks();
+    vi.mocked(sidecar.artifactSession.abort).mockRejectedValueOnce(new Error('abort failed'));
+    createWebcamSidecarRecorderMock.mockResolvedValue(sidecar);
     await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true },
     });
 
     cleanupActiveSidecarRecorders();
 
-    expect(stop).toHaveBeenCalledOnce();
-    expect(hasActiveSidecarSession()).toBe(false);
+    expect(track?.stop).toHaveBeenCalledOnce();
+    await vi.waitFor(() =>
+      expect(loggerDebugMock).toHaveBeenCalledWith(
+        'Failed to abort sidecar artifact during cleanup',
+        expect.objectContaining({ message: 'abort failed' })
+      )
+    );
   });
-}
-
-function registerSidecarCleanupFailureTests() {
-  it('continues cleanup when a sidecar recorder stop throws', async () => {
-    const stop = vi.fn();
-    vi.stubGlobal('navigator', {
-      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(createStream({ stop })) },
-    });
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings(),
-    });
-    const recorder = FakeMediaRecorder.instances[0];
-    if (!recorder) {
-      throw new Error('Expected webcam recorder');
-    }
-    recorder.state = 'recording';
-    recorder.stop = () => {
-      throw new Error('stop failed');
-    };
-
-    cleanupActiveSidecarRecorders();
-
-    expect(stop).toHaveBeenCalledOnce();
-    expect(hasActiveSidecarSession()).toBe(false);
-  });
-}
-
-function registerSidecarCreationFailureTests() {
-  it('stops acquired webcam tracks when sidecar creation fails', async () => {
-    const stop = vi.fn();
-    vi.stubGlobal('navigator', {
-      mediaDevices: {
-        getUserMedia: vi.fn().mockResolvedValue(createStream({ hasVideo: false, stop })),
-      },
-    });
-
-    await expect(
-      initializeSidecarRecorders({
-        baseRecordingId: 'rec-1',
-        settings: createSettings(),
-      })
-    ).rejects.toThrow('Webcam sidecar stream is missing a video track.');
-
-    expect(stop).toHaveBeenCalledOnce();
-    expect(hasActiveSidecarSession()).toBe(false);
-  });
-}
-
-describe('offscreen recording sidecar', () => {
-  registerSidecarInitializationTests();
-  registerSidecarConstraintTests();
-  registerSidecarFinalizationTests();
-  registerSidecarControlTests();
-  registerSidecarStopTests();
-  registerSidecarCleanupStateTests();
-  registerSidecarCleanupFailureTests();
-  registerSidecarCreationFailureTests();
 });

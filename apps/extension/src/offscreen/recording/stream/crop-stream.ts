@@ -6,12 +6,9 @@ import {
   type CropStreamGeometry,
   type OutputSize,
 } from './crop-frame-gate';
-import {
-  isOnePixelEncoderCrop,
-  resolveContainedFrame,
-  resolveCoverSourceRect,
-} from './contain-frame';
+import { resolveContainedFrame } from '../geometry/contain-frame';
 import { createCanvasVideoOutput } from './canvas-video-output';
+import { resolveFixedVideoFrameRate } from './frame-pump';
 
 export type {
   CropRect,
@@ -23,12 +20,11 @@ export type {
 
 export type GatedCropStream = {
   controls: CropStreamControls;
+  frameRate: number;
   stream: MediaStream;
 };
 
 type CropStreamOptions = {
-  cropOddSourceEdges?: boolean;
-  dynamicSourceFit?: boolean;
   frameRate?: number;
   initiallySuspended?: boolean;
 };
@@ -54,9 +50,12 @@ function requireCropGeometry(geometry: CropStreamGeometry, source: OutputSize): 
   ) {
     throw new Error('Crop sourceRect must use integer bounds inside the source');
   }
+  if (geometry.fit !== undefined && geometry.fit !== 'contain') {
+    throw new Error('Recording crop geometry supports contain fit only');
+  }
   requirePositiveInteger(outputSize.width, 'Crop output width');
   requirePositiveInteger(outputSize.height, 'Crop output height');
-  return geometry;
+  return { ...geometry, fit: 'contain' };
 }
 
 function fillFrameBackground(context: CanvasRenderingContext2D, outputSize: OutputSize): void {
@@ -64,93 +63,23 @@ function fillFrameBackground(context: CanvasRenderingContext2D, outputSize: Outp
   context.fillRect(0, 0, outputSize.width, outputSize.height);
 }
 
-function drawDynamicSourceFrame(params: {
-  context: CanvasRenderingContext2D;
-  cropOddSourceEdges: boolean;
-  outputSize: OutputSize;
-  video: HTMLVideoElement;
-}): void {
-  const rawSize = { height: params.video.videoHeight, width: params.video.videoWidth };
-  if (rawSize.width <= 0 || rawSize.height <= 0) return;
-
-  if (params.cropOddSourceEdges && isOnePixelEncoderCrop(rawSize, params.outputSize)) {
-    params.context.imageSmoothingEnabled = false;
-    params.context.drawImage(
-      params.video,
-      0,
-      0,
-      params.outputSize.width,
-      params.outputSize.height,
-      0,
-      0,
-      params.outputSize.width,
-      params.outputSize.height
-    );
-    return;
-  }
-
-  fillFrameBackground(params.context, params.outputSize);
-  const destination = resolveContainedFrame(rawSize, params.outputSize);
-  const scaled = rawSize.width !== destination.width || rawSize.height !== destination.height;
-  params.context.imageSmoothingEnabled = scaled;
-  if (scaled) params.context.imageSmoothingQuality = 'high';
-  params.context.drawImage(
-    params.video,
-    0,
-    0,
-    rawSize.width,
-    rawSize.height,
-    destination.x,
-    destination.y,
-    destination.width,
-    destination.height
-  );
-}
-
-function drawFixedSourceFrame(params: {
+function drawContainedSourceFrame(params: {
   context: CanvasRenderingContext2D;
   geometry: CropStreamGeometry;
   video: HTMLVideoElement;
 }): void {
   const { sourceRect, outputSize } = params.geometry;
-  let source = sourceRect;
-  let destination = { x: 0, y: 0, ...outputSize };
-  if (params.geometry.fit === 'source' && isOnePixelEncoderCrop(sourceRect, outputSize)) {
-    params.context.imageSmoothingEnabled = false;
-    params.context.drawImage(
-      params.video,
-      sourceRect.x,
-      sourceRect.y,
-      outputSize.width,
-      outputSize.height,
-      0,
-      0,
-      outputSize.width,
-      outputSize.height
-    );
-    return;
-  }
-  if (params.geometry.fit === 'cover' || params.geometry.fit === 'source') {
-    const crop = resolveCoverSourceRect(sourceRect, outputSize);
-    source = {
-      height: crop.height,
-      width: crop.width,
-      x: sourceRect.x + crop.x,
-      y: sourceRect.y + crop.y,
-    };
-  } else if (params.geometry.fit === 'contain') {
-    fillFrameBackground(params.context, outputSize);
-    destination = resolveContainedFrame(sourceRect, outputSize);
-  }
-  const scaled = source.width !== destination.width || source.height !== destination.height;
+  fillFrameBackground(params.context, outputSize);
+  const destination = resolveContainedFrame(sourceRect, outputSize);
+  const scaled = sourceRect.width !== destination.width || sourceRect.height !== destination.height;
   params.context.imageSmoothingEnabled = scaled;
   if (scaled) params.context.imageSmoothingQuality = 'high';
   params.context.drawImage(
     params.video,
-    source.x,
-    source.y,
-    source.width,
-    source.height,
+    sourceRect.x,
+    sourceRect.y,
+    sourceRect.width,
+    sourceRect.height,
     destination.x,
     destination.y,
     destination.width,
@@ -177,12 +106,11 @@ export async function createGatedCropStream(
       width: video.videoWidth,
       height: video.videoHeight,
     });
-    const sourceFrameRate =
-      options.frameRate ?? sourceStream.getVideoTracks()[0]?.getSettings().frameRate;
-    const frameRate =
-      typeof sourceFrameRate === 'number' && Number.isFinite(sourceFrameRate) && sourceFrameRate > 0
-        ? sourceFrameRate
-        : 30;
+    const sourceFrameRate = sourceStream.getVideoTracks()[0]?.getSettings().frameRate;
+    const frameRate = resolveFixedVideoFrameRate(
+      options.frameRate ?? sourceFrameRate ?? 30,
+      sourceFrameRate
+    );
     let frameGate: CropFrameGate | null = null;
     const cropped = createCanvasVideoOutput({
       audioTracks: sourceStream.getAudioTracks(),
@@ -190,21 +118,14 @@ export async function createGatedCropStream(
       frameRate,
       initializeDrawing: ({ canvas, context }) => {
         const drawSourceFrame = () => {
-          if (!frameGate?.canDraw()) return;
-          if (options.dynamicSourceFit) {
-            drawDynamicSourceFrame({
-              context,
-              cropOddSourceEdges: options.cropOddSourceEdges === true,
-              outputSize: activeGeometry.outputSize,
-              video,
-            });
-            return;
-          }
-          drawFixedSourceFrame({ context, geometry: activeGeometry, video });
+          if (!frameGate?.canDraw()) return false;
+          drawContainedSourceFrame({ context, geometry: activeGeometry, video });
+          return true;
         };
         const drawHeldFrame = () => {
-          if (!frameGate?.canEmitHeldFrame()) return;
+          if (!frameGate?.canEmitHeldFrame()) return false;
           context.drawImage(canvas, 0, 0);
+          return true;
         };
         frameGate = createCropFrameGate({
           applyGeometry: (nextGeometry) => {
@@ -235,6 +156,7 @@ export async function createGatedCropStream(
     ownershipTransferred = true;
     return {
       controls: frameGate,
+      frameRate,
       stream: cropped,
     };
   } finally {

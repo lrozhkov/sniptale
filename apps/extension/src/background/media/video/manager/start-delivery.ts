@@ -39,10 +39,12 @@ export async function finalizeAcceptedRecordingStart(
     streamInstanceId,
   });
   scheduleRecordingStartActivationWatchdog(recordingId);
+  const cameraLaunchToken =
+    context.captureMode === CaptureMode.CAMERA
+      ? await issueCameraRecorderLaunchToken(recordingId)
+      : null;
   return {
-    ...(context.captureMode === CaptureMode.CAMERA
-      ? { cameraLaunchToken: issueCameraRecorderLaunchToken(recordingId) }
-      : {}),
+    ...(cameraLaunchToken === null ? {} : { cameraLaunchToken }),
     controlToken: activeLease.controlToken,
     recordingId,
     result: 'accepted',

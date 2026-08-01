@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { startRecordingHandler } from './start-recording';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
@@ -30,7 +30,6 @@ const settings = {
   webcamDeviceId: null,
   webcamEnabled: false,
   openEditorAfterRecording: false,
-  quality: VideoQuality.HIGH,
   systemAudioEnabled: true,
 };
 

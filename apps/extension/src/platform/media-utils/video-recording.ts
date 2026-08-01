@@ -1,14 +1,12 @@
-import { VIDEO_QUALITY_CONFIGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   getVideoRecordingMimeTypeCandidates,
-  resolveVideoOutputDimensions,
-  resolveVideoRecordingOutputSettings,
+  resolveVideoOutputProfile,
   resolveVideoTargetBitrate,
-  type VideoRecordingOutputSettings,
+  type VideoOutputProfile,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 
-type VideoRecordingEncodingSettings = Pick<VideoRecordingSettings, 'output' | 'quality'>;
+type VideoRecordingEncodingSettings = Pick<VideoRecordingSettings, 'outputProfile'>;
 
 type VideoRecordingArtifact = {
   extension: 'mp4' | 'webm';
@@ -28,11 +26,9 @@ export function applyVideoTrackContentHint(
 }
 
 export function resolveVideoRecordingFrameRate(
-  settings: Pick<VideoRecordingSettings, 'quality'>
+  settings: Pick<VideoRecordingSettings, 'outputProfile'>
 ): number {
-  const config = VIDEO_QUALITY_CONFIGS[settings.quality];
-  if (!config) throw new Error(`Unsupported video quality: ${String(settings.quality)}`);
-  return config.frameRate;
+  return resolveVideoOutputProfile(settings).frameRate;
 }
 
 export function resolveVideoRecordingArtifact(mimeType: string): VideoRecordingArtifact {
@@ -44,20 +40,6 @@ export function resolveVideoRecordingArtifact(mimeType: string): VideoRecordingA
     return { extension: 'webm', mimeType: 'video/webm' };
   }
   throw new Error(`Unsupported recorded video MIME type: ${mimeType || '(empty)'}`);
-}
-
-function readResizeModes(track: MediaStreamTrack): string[] {
-  try {
-    const capabilities = track.getCapabilities?.() as
-      | (MediaTrackCapabilities & { resizeMode?: unknown })
-      | undefined;
-    const resizeMode: unknown = capabilities?.resizeMode;
-    return Array.isArray(resizeMode)
-      ? resizeMode.filter((value): value is string => typeof value === 'string')
-      : [];
-  } catch {
-    return [];
-  }
 }
 
 function readVideoTrackSettings(stream: MediaStream): MediaTrackSettings {
@@ -85,9 +67,12 @@ function requirePositiveTrackSetting(
 
 function resolveSupportedVideoRecordingMimeType(params: {
   hasAudioTracks: boolean;
-  output: VideoRecordingOutputSettings;
+  outputProfile: VideoOutputProfile;
 }): string {
-  const candidates = getVideoRecordingMimeTypeCandidates(params.output, params.hasAudioTracks);
+  const candidates = getVideoRecordingMimeTypeCandidates(
+    params.outputProfile,
+    params.hasAudioTracks
+  );
   const supported = candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate));
   if (!supported) {
     throw new Error('The selected recording container and codec are not supported');
@@ -101,10 +86,7 @@ export function buildVideoMediaRecorderOptions(
   stream: MediaStream,
   authoritativeInputSettings?: MediaTrackSettings
 ): MediaRecorderOptions {
-  if (!VIDEO_QUALITY_CONFIGS[settings.quality]) {
-    throw new Error(`Unsupported video quality: ${String(settings.quality)}`);
-  }
-  const output = resolveVideoRecordingOutputSettings(settings);
+  const outputProfile = resolveVideoOutputProfile(settings);
   const trackSettings = authoritativeInputSettings ?? readVideoTrackSettings(stream);
   const width = requirePositiveTrackSetting(trackSettings, 'width');
   const height = requirePositiveTrackSetting(trackSettings, 'height');
@@ -113,56 +95,14 @@ export function buildVideoMediaRecorderOptions(
   return {
     mimeType: resolveSupportedVideoRecordingMimeType({
       hasAudioTracks: hasAudioTracks(stream),
-      output,
+      outputProfile,
     }),
     videoBitsPerSecond: resolveVideoTargetBitrate({
       fps,
       height,
-      quality: settings.quality,
+      quality: outputProfile.quality,
+      resolution: outputProfile.resolution,
       width,
     }),
   };
-}
-
-export async function applyVideoRecordingOutputConstraints(
-  stream: MediaStream,
-  settings: VideoRecordingEncodingSettings
-): Promise<void> {
-  const track = stream.getVideoTracks()[0];
-  if (!track || typeof track.applyConstraints !== 'function') {
-    throw new Error('Recording output is missing a configurable video track');
-  }
-
-  const frameRate = resolveVideoRecordingFrameRate(settings);
-  const output = resolveVideoRecordingOutputSettings(settings);
-  const trackSettings = track.getSettings();
-  const width = requirePositiveTrackSetting(trackSettings, 'width');
-  const height = requirePositiveTrackSetting(trackSettings, 'height');
-  const target = resolveVideoOutputDimensions(width, height, output.resolution);
-  const constraints: MediaTrackConstraints & { resizeMode?: string } = {
-    frameRate: { ideal: frameRate, max: frameRate },
-    width: { ideal: target.width, max: target.width },
-    height: { ideal: target.height, max: target.height },
-  };
-
-  if (readResizeModes(track).includes('crop-and-scale')) {
-    constraints.resizeMode = 'crop-and-scale';
-  }
-
-  await track.applyConstraints(constraints);
-  const applied = track.getSettings();
-  if (applied.width !== target.width || applied.height !== target.height) {
-    const receivedDimensions = `${applied.width ?? 'unknown'}x${applied.height ?? 'unknown'}`;
-    throw new Error(
-      `The selected recording resolution was not applied: ` +
-        `expected ${target.width}x${target.height}, received ${receivedDimensions}`
-    );
-  }
-  const appliedFrameRate = requirePositiveTrackSetting(applied, 'frameRate');
-  if (appliedFrameRate > frameRate) {
-    throw new Error(
-      `The selected recording frame-rate ceiling was not applied: ` +
-        `expected at most ${frameRate}, received ${appliedFrameRate}`
-    );
-  }
 }

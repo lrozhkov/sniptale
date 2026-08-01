@@ -21,6 +21,39 @@ import {
   clearCameraRecorderControlGrant,
   issueCameraRecorderLaunchToken,
 } from '../../../media/video/runtime/camera-recorder-control';
+import { vi } from 'vitest';
+
+const { readCameraRecorderGrantMock } = vi.hoisted(() => ({
+  readCameraRecorderGrantMock: vi.fn(),
+}));
+
+vi.mock('../../../storage/video/camera-recorder-grant', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../storage/video/camera-recorder-grant')>()),
+  clearCameraRecorderGrant: vi.fn().mockResolvedValue(true),
+  createCameraRecorderLaunchGrant: vi.fn(
+    async (recordingId: string, registrationToken: string) => ({
+      documentId: '',
+      expiresAt: Date.now() + 60_000,
+      previousRegistrationToken: null,
+      registrationToken,
+      recordingId,
+      senderUrl: '',
+      stage: 'launch' as const,
+      tabId: null,
+    })
+  ),
+  bindCameraRecorderDocumentGrant: vi.fn(async (args) => ({
+    documentId: args.documentId,
+    expiresAt: Date.now() + 86_400_000,
+    previousRegistrationToken: args.registrationToken,
+    registrationToken: args.nextRegistrationToken,
+    recordingId: args.recordingId,
+    senderUrl: args.senderUrl,
+    stage: 'document' as const,
+    tabId: args.tabId,
+  })),
+  readCameraRecorderGrant: readCameraRecorderGrantMock,
+}));
 
 const POPUP_ACTIVE_RECORDING_CONTROLS = [
   {
@@ -154,14 +187,16 @@ async function verifiesContentRecordingControlsAreRejected() {
   });
 }
 
-function resetVideoControlRoutingSuite(): void {
+async function resetVideoControlRoutingSuite(): Promise<void> {
   resetRuntimeMessagingMocks();
-  clearCameraRecorderControlGrant();
+  readCameraRecorderGrantMock.mockReset();
+  readCameraRecorderGrantMock.mockResolvedValue(null);
+  await clearCameraRecorderControlGrant();
 }
 
 function registerPopupVideoControlRoutingSuite() {
-  beforeEach(() => {
-    resetVideoControlRoutingSuite();
+  beforeEach(async () => {
+    await resetVideoControlRoutingSuite();
   });
 
   it(
@@ -206,24 +241,28 @@ function registerPopupVideoControlRoutingSuite() {
 }
 
 function registerCameraRecorderRoutingSuite() {
-  beforeEach(() => {
-    resetVideoControlRoutingSuite();
+  beforeEach(async () => {
+    await resetVideoControlRoutingSuite();
   });
 
   it(
-    'routes registered camera-recorder document controls without a sender tab id',
+    'rejects registered camera-recorder document controls without a sender tab id',
     verifiesCameraRecorderControlsWithoutSenderTab
   );
   it(
-    'routes registered camera-recorder document controls even when Chrome reports a sender tab',
+    'routes registered camera-recorder document controls only from the bound sender tab',
     verifiesCameraRecorderControlsWithSenderTab
+  );
+  it(
+    'hydrates the exact persisted camera document before the first control after worker restart',
+    verifiesPersistedCameraRecorderControlAfterWorkerRestart
   );
 }
 
 async function verifiesCameraRecorderControlsWithoutSenderTab() {
   const { listener, sendResponse } = registerListener();
   const cameraSender = createCameraRecorderSender();
-  authorizeCameraRecorderSender();
+  await authorizeCameraRecorderSender();
   isBackgroundTabMessageMock.mockReturnValue(true);
   isVideoControlMessageMock.mockReturnValue(true);
 
@@ -233,18 +272,22 @@ async function verifiesCameraRecorderControlsWithoutSenderTab() {
     await flushPromises();
   }
 
-  expect(routeVideoControlMessageMock).toHaveBeenCalledTimes(CAMERA_RECORDER_CONTROLS.length);
+  expect(routeVideoControlMessageMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: 'Unauthorized camera recorder control sender',
+    success: false,
+  });
 }
 
 async function verifiesCameraRecorderControlsWithSenderTab() {
   const { listener, sendResponse } = registerListener();
-  const cameraSender = createCameraRecorderSender(91);
+  const cameraSender = createCameraRecorderSender(7);
   const message = {
     type: VideoMessageType.STOP_RECORDING,
     controlToken: 'token-1',
     recordingId: 'rec-1',
   };
-  authorizeCameraRecorderSender();
+  await authorizeCameraRecorderSender();
   isBackgroundTabMessageMock.mockReturnValue(true);
   isVideoControlMessageMock.mockReturnValue(true);
   parseBackgroundRuntimeMessageMock.mockReturnValue(message);
@@ -262,6 +305,50 @@ async function verifiesCameraRecorderControlsWithSenderTab() {
     error: 'Unauthorized video-control route sender',
     success: false,
   });
+
+  routeVideoControlMessageMock.mockClear();
+  const wrongTabSender = createCameraRecorderSender(91);
+  expectListenerResult(true, listener, message, wrongTabSender, sendResponse);
+  await flushPromises();
+  expect(routeVideoControlMessageMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenLastCalledWith({
+    error: 'Unauthorized camera recorder control sender',
+    success: false,
+  });
+}
+
+async function verifiesPersistedCameraRecorderControlAfterWorkerRestart() {
+  const { listener, sendResponse } = registerListener();
+  const exactSender = createCameraRecorderSender(7);
+  const message = CAMERA_RECORDER_CONTROLS[2];
+  await clearCameraRecorderControlGrant();
+  readCameraRecorderGrantMock.mockResolvedValue({
+    documentId: 'camera-document-1',
+    expiresAt: Date.now() + 86_400_000,
+    previousRegistrationToken: 'launch-token-1',
+    registrationToken: 'reload-token-1',
+    recordingId: 'rec-1',
+    senderUrl: 'chrome-extension://test/apps/extension/src/camera-recorder/index.html',
+    stage: 'document',
+    tabId: 7,
+  });
+  isBackgroundTabMessageMock.mockReturnValue(true);
+  isVideoControlMessageMock.mockReturnValue(true);
+  parseBackgroundRuntimeMessageMock.mockReturnValue(message);
+
+  expectListenerResult(true, listener, message, exactSender, sendResponse);
+  await flushPromises();
+  expect(routeVideoControlMessageMock).toHaveBeenCalledOnce();
+
+  routeVideoControlMessageMock.mockClear();
+  const mismatchedSender = { ...exactSender, documentId: 'other-document' };
+  expectListenerResult(true, listener, message, mismatchedSender, sendResponse);
+  await flushPromises();
+  expect(routeVideoControlMessageMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenLastCalledWith({
+    error: 'Unauthorized camera recorder control sender',
+    success: false,
+  });
 }
 
 function createCameraRecorderSender(tabId?: number): chrome.runtime.MessageSender {
@@ -271,12 +358,13 @@ function createCameraRecorderSender(tabId?: number): chrome.runtime.MessageSende
   };
 }
 
-function authorizeCameraRecorderSender(): void {
-  authorizeCameraRecorderDocument({
+async function authorizeCameraRecorderSender(): Promise<void> {
+  await authorizeCameraRecorderDocument({
     documentId: 'camera-document-1',
-    launchToken: issueCameraRecorderLaunchToken('rec-1'),
+    registrationToken: await issueCameraRecorderLaunchToken('rec-1'),
     recordingId: 'rec-1',
     senderUrl: 'chrome-extension://test/apps/extension/src/camera-recorder/index.html',
+    tabId: 7,
   });
 }
 

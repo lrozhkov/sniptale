@@ -1,11 +1,12 @@
 // policyStateIds: [] - built-in profile ids are an immutable validation catalog, not authority.
 import type { VideoQuality } from './quality';
 import {
-  isVideoRecordingOutputSettings,
+  isVideoOutputProfile,
+  VideoFrameRate,
   VideoOutputCodec,
   VideoOutputContainer,
   VideoResolutionPreset,
-  type VideoRecordingOutputSettings,
+  type VideoOutputProfile,
 } from './output-profile';
 
 export const VideoRecordingBuiltInProfileId = {
@@ -18,31 +19,31 @@ export const VideoRecordingBuiltInProfileId = {
 export type VideoRecordingBuiltInProfileId =
   (typeof VideoRecordingBuiltInProfileId)[keyof typeof VideoRecordingBuiltInProfileId];
 
-export interface VideoRecordingQualityProfile {
+export interface VideoRecordingProfile {
+  configuration: VideoOutputProfile;
   id: string;
   name: string;
-  output: VideoRecordingOutputSettings;
-  quality: VideoQuality;
 }
 
 function createBuiltInProfile(
   id: VideoRecordingBuiltInProfileId,
   quality: VideoQuality,
   resolution: VideoResolutionPreset
-): VideoRecordingQualityProfile {
+): VideoRecordingProfile {
   return {
-    id,
-    name: id,
-    quality,
-    output: {
+    configuration: {
       codec: VideoOutputCodec.VP9,
       container: VideoOutputContainer.WEBM,
+      frameRate: VideoFrameRate.FPS30,
+      quality,
       resolution,
     },
+    id,
+    name: id,
   };
 }
 
-export const BUILT_IN_VIDEO_RECORDING_QUALITY_PROFILES: readonly VideoRecordingQualityProfile[] = [
+export const BUILT_IN_VIDEO_RECORDING_QUALITY_PROFILES: readonly VideoRecordingProfile[] = [
   createBuiltInProfile(
     VideoRecordingBuiltInProfileId.COMPACT,
     'MEDIUM',
@@ -61,35 +62,29 @@ export const DEFAULT_VIDEO_RECORDING_QUALITY_PROFILE_ID = VideoRecordingBuiltInP
 export const VIDEO_RECORDING_CUSTOM_PROFILE_LIMIT = 32;
 const BUILT_IN_PROFILE_IDS = new Set<string>(Object.values(VideoRecordingBuiltInProfileId));
 
-export function isVideoRecordingQualityProfile(
-  value: unknown
-): value is VideoRecordingQualityProfile {
+export function isVideoRecordingProfile(value: unknown): value is VideoRecordingProfile {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
   }
   const candidate = value as Record<string, unknown>;
   return (
+    !Object.hasOwn(candidate, 'quality') &&
+    !Object.hasOwn(candidate, 'output') &&
     typeof candidate['id'] === 'string' &&
     candidate['id'].length > 0 &&
     candidate['id'].length <= 128 &&
     typeof candidate['name'] === 'string' &&
     candidate['name'].trim().length > 0 &&
     candidate['name'].length <= 80 &&
-    (candidate['quality'] === 'LOW' ||
-      candidate['quality'] === 'MEDIUM' ||
-      candidate['quality'] === 'HIGH' ||
-      candidate['quality'] === 'ULTRA') &&
-    isVideoRecordingOutputSettings(candidate['output'])
+    isVideoOutputProfile(candidate['configuration'])
   );
 }
 
-export function parseVideoRecordingQualityProfiles(
-  value: unknown
-): VideoRecordingQualityProfile[] | null {
+export function parseVideoRecordingProfiles(value: unknown): VideoRecordingProfile[] | null {
   if (!Array.isArray(value) || value.length > VIDEO_RECORDING_CUSTOM_PROFILE_LIMIT) {
     return null;
   }
-  if (!value.every(isVideoRecordingQualityProfile)) {
+  if (!value.every(isVideoRecordingProfile)) {
     return null;
   }
   if (value.some((profile) => BUILT_IN_PROFILE_IDS.has(profile.id))) {
@@ -99,36 +94,37 @@ export function parseVideoRecordingQualityProfiles(
   if (ids.size !== value.length) {
     return null;
   }
-  return value.map((profile) => ({ ...profile, output: { ...profile.output } }));
+  return value.map((profile) => ({
+    ...profile,
+    configuration: { ...profile.configuration },
+  }));
 }
 
-export function getVideoRecordingQualityProfiles(settings: {
-  qualityProfiles?: VideoRecordingQualityProfile[];
-}): VideoRecordingQualityProfile[] {
+export function getVideoRecordingProfiles(settings: {
+  qualityProfiles?: VideoRecordingProfile[];
+}): VideoRecordingProfile[] {
   return [...BUILT_IN_VIDEO_RECORDING_QUALITY_PROFILES, ...(settings.qualityProfiles ?? [])];
 }
 
-export function getVideoRecordingQualityProfile(
+export function getVideoRecordingProfile(
   settings: {
     qualityProfileId?: string | null;
-    qualityProfiles?: VideoRecordingQualityProfile[];
+    qualityProfiles?: VideoRecordingProfile[];
   },
   profileId: string
-): VideoRecordingQualityProfile | null {
-  return (
-    getVideoRecordingQualityProfiles(settings).find((profile) => profile.id === profileId) ?? null
-  );
+): VideoRecordingProfile | null {
+  return getVideoRecordingProfiles(settings).find((profile) => profile.id === profileId) ?? null;
 }
 
 export function isVideoRecordingProfileConfigurationMatch(
-  profile: VideoRecordingQualityProfile,
-  settings: { output?: VideoRecordingOutputSettings; quality: VideoQuality }
+  profile: VideoRecordingProfile,
+  configuration: VideoOutputProfile
 ): boolean {
-  const output = settings.output;
   return (
-    profile.quality === settings.quality &&
-    output?.codec === profile.output.codec &&
-    output.container === profile.output.container &&
-    output.resolution === profile.output.resolution
+    configuration.codec === profile.configuration.codec &&
+    configuration.container === profile.configuration.container &&
+    configuration.frameRate === profile.configuration.frameRate &&
+    configuration.quality === profile.configuration.quality &&
+    configuration.resolution === profile.configuration.resolution
   );
 }

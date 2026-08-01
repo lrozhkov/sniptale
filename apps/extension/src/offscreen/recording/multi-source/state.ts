@@ -1,8 +1,14 @@
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import type { RecordingSidecarRecorder } from '../sidecar/types';
+import type {
+  FinalizedRecordingStagingArtifact,
+  RecordingStagingCoordinator,
+} from '../../../composition/persistence/recordings/staging';
+import type { RecordingArtifactSession } from '../encoding/artifact-session';
 
 export type MultiSourceRecorder = {
-  chunks: Blob[];
+  artifact: FinalizedRecordingStagingArtifact | null;
+  artifactSession: RecordingArtifactSession;
   label: string | null;
   recorder: MediaRecorder;
   recordingId: string;
@@ -66,6 +72,7 @@ export type MultiSourceSession = {
   recorders: MultiSourceRecorder[];
   recordingId: string;
   settings: VideoRecordingSettings;
+  staging: RecordingStagingCoordinator;
   startedAt: number;
   stopReject: ((reason?: unknown) => void) | null;
   stopPromise: Promise<void> | null;

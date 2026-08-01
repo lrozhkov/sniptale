@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 
+vi.mock(
+  '../../../../../../composition/persistence/recordings/completion-outbox',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../../../composition/persistence/recordings/completion-outbox')
+    >()),
+    removeVideoRecordingCompletionOutbox: vi.fn().mockResolvedValue(true),
+  })
+);
+
 const {
   finalizeRecordingDiagnosticsMock,
   finishVideoRecordingStopMock,
@@ -86,6 +96,8 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../session-state')>()),
   finishVideoRecordingStop: finishVideoRecordingStopMock,
   getVideoRecordingId: getVideoRecordingIdMock,
+  isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
+    recordingId != null && getVideoRecordingIdMock() === recordingId,
   getVideoRecordingTabId: getVideoRecordingTabIdMock,
   markVideoRecordingPreparationSettled: markVideoRecordingPreparationSettledMock,
   shouldOpenVideoEditorAfterRecording: shouldOpenVideoEditorAfterRecordingMock,
@@ -111,19 +123,35 @@ vi.mock('../../../capture-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../capture-surface')>()),
   releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
 }));
+vi.mock('../../camera-recorder-control', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../camera-recorder-control')>()),
+  clearCameraRecorderControlGrant: vi.fn().mockResolvedValue(true),
+  isAuthorizedCameraRecorderDocument: vi.fn(() => false),
+  restoreAuthorizedCameraRecorderDocument: vi.fn().mockResolvedValue(false),
+}));
+vi.mock('../../../../../storage/video/post-record-result', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../storage/video/post-record-result')>()),
+  clearPendingVideoPostRecordResult: vi.fn().mockResolvedValue(true),
+  commitPendingVideoPostRecordResult: vi.fn().mockResolvedValue('ready'),
+  persistPendingVideoPostRecordResult: vi.fn().mockResolvedValue('staged'),
+  readPendingVideoPostRecordResult: vi.fn().mockResolvedValue(null),
+  readStoredVideoPostRecordResult: vi.fn().mockResolvedValue(null),
+}));
 
 import {
-  handleInternalVideoSignal,
   handleOffscreenRecordingPaused,
   handleOffscreenRecordingResumed,
   handleOffscreenRecordingStarted,
   handleOffscreenRecordingStopped,
-  handleProjectExportLifecycleMessage,
   handleRecordingDurationUpdated,
-  handleRecordingState,
   handleRecordingTabId,
+} from './recording-state';
+import { handleRecordingState } from './recording-state-response';
+import {
+  handleInternalVideoSignal,
+  handleProjectExportLifecycleMessage,
   handleVideoSavedToIdb,
-} from './index';
+} from './offscreen-lifecycle';
 
 function createSendResponse() {
   return vi.fn<(response?: unknown) => void>();
@@ -260,7 +288,9 @@ async function verifyRecordingStateLifecycle(sendResponse: ReturnType<typeof cre
 }
 
 async function verifyRuntimeSignalAcks(sendResponse: ReturnType<typeof createSendResponse>) {
-  expect(handleVideoSavedToIdb({ recordingId: 'rec-1' }, sendResponse)).toEqual({
+  expect(
+    handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse)
+  ).toEqual({
     handled: true,
     keepChannelOpen: true,
   });

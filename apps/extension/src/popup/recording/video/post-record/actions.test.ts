@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  deletePersistedVideoProject: vi.fn(),
   deleteRecording: vi.fn(),
   getRecording: vi.fn(),
   listRecordings: vi.fn(),
@@ -10,12 +11,18 @@ const mocks = vi.hoisted(() => ({
   openVideoEditorPage: vi.fn(),
 }));
 
-vi.mock('../../../../composition/persistence/recordings/index', () => ({
-  cleanupOldRecordings: vi.fn(),
+vi.mock('../../../../workflows/media-hub/video-projects', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../workflows/media-hub/video-projects')>()),
+  deletePersistedVideoProject: mocks.deletePersistedVideoProject,
+}));
+
+vi.mock('../../../../composition/persistence/recordings/index', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../composition/persistence/recordings/index')
+  >()),
   deleteRecording: mocks.deleteRecording,
   getRecording: mocks.getRecording,
   listRecordings: mocks.listRecordings,
-  saveRecording: vi.fn(),
 }));
 
 vi.mock('../../../../platform/navigation/extension-pages', async (importOriginal) => ({
@@ -25,11 +32,11 @@ vi.mock('../../../../platform/navigation/extension-pages', async (importOriginal
 }));
 
 import {
-  deleteSavedRecordingTracks,
+  deleteVideoPostRecordResult,
   downloadSavedRecordingTracks,
   openLatestRecordingInGallery,
   openSavedRecordingInVideoEditor,
-} from './actions';
+} from '../../../../workflows/media-hub/post-record-actions';
 
 const urlMocks = {
   createObjectURL: vi.fn(),
@@ -69,6 +76,7 @@ beforeEach(() => {
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(vi.fn());
   vi.useFakeTimers();
   mocks.deleteRecording.mockReset();
+  mocks.deletePersistedVideoProject.mockReset();
   mocks.getRecording.mockReset();
   mocks.listRecordings.mockReset();
   mocks.openGalleryPage.mockReset();
@@ -112,25 +120,35 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('opens the internal gallery and closes the popup', async () => {
+it('opens the primary recording in the internal gallery', async () => {
   const close = vi.fn();
   vi.stubGlobal('close', close);
 
   await openLatestRecordingInGallery('rec-1');
 
   expect(mocks.openGalleryPage).toHaveBeenCalledWith({ recordingId: 'rec-1' });
-  expect(close).toHaveBeenCalledOnce();
+  expect(close).not.toHaveBeenCalled();
   vi.unstubAllGlobals();
 });
 
-it('opens the completed recording in the internal video editor and closes the popup', async () => {
+it('opens a single recording or grouped project in the internal video editor', async () => {
   const close = vi.fn();
   vi.stubGlobal('close', close);
 
-  await openSavedRecordingInVideoEditor('rec-1');
+  await openSavedRecordingInVideoEditor({
+    primaryRecordingId: 'rec-1',
+    projectId: null,
+    recordingId: 'rec-1',
+  });
 
   expect(mocks.openVideoEditorPage).toHaveBeenCalledWith(null, 'rec-1');
-  expect(close).toHaveBeenCalledOnce();
+  await openSavedRecordingInVideoEditor({
+    primaryRecordingId: 'rec-2-window-1',
+    projectId: 'project-2',
+    recordingId: 'rec-2',
+  });
+  expect(mocks.openVideoEditorPage).toHaveBeenLastCalledWith('project-2', null);
+  expect(close).not.toHaveBeenCalled();
   vi.unstubAllGlobals();
 });
 
@@ -155,12 +173,31 @@ it('reports missing saved tracks instead of invoking a privileged runtime downlo
   );
 });
 
-it('deletes every saved track for the completed recording id', async () => {
-  await deleteSavedRecordingTracks('rec-1');
+it('deletes a grouped project before removing every saved raw track', async () => {
+  await deleteVideoPostRecordResult({
+    primaryRecordingId: 'rec-1',
+    projectId: 'project-1',
+    recordingId: 'rec-1',
+  });
 
+  expect(mocks.deletePersistedVideoProject).toHaveBeenCalledWith('project-1');
   expect(mocks.deleteRecording).toHaveBeenCalledTimes(3);
   expect(mocks.deleteRecording).toHaveBeenCalledWith('rec-1');
   expect(mocks.deleteRecording).toHaveBeenCalledWith('rec-1-webcam');
   expect(mocks.deleteRecording).toHaveBeenCalledWith('rec-1-window-1');
   expect(mocks.deleteRecording).not.toHaveBeenCalledWith('other');
+  expect(mocks.deletePersistedVideoProject.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.deleteRecording.mock.invocationCallOrder[0] ?? 0
+  );
+});
+
+it('deletes single-source raw tracks without invoking project deletion', async () => {
+  await deleteVideoPostRecordResult({
+    primaryRecordingId: 'rec-1',
+    projectId: null,
+    recordingId: 'rec-1',
+  });
+
+  expect(mocks.deletePersistedVideoProject).not.toHaveBeenCalled();
+  expect(mocks.deleteRecording).toHaveBeenCalledTimes(3);
 });

@@ -28,8 +28,8 @@ vi.mock('./profile-editor', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./profile-editor')>()),
   VideoQualityProfileEditor: (props: {
     onClose: () => void;
-    onSave: (profile: VideoRecordingQualityProfile) => Promise<void>;
-    profile?: VideoRecordingQualityProfile;
+    onSave: (profile: VideoRecordingProfile) => Promise<void>;
+    profile?: VideoRecordingProfile;
   }) => {
     const profile = props.profile;
     return (
@@ -48,20 +48,21 @@ import {
   VideoOutputContainer,
   VideoQuality,
   VideoResolutionPreset,
-  type VideoRecordingQualityProfile,
+  type VideoRecordingProfile,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoQualityProfilesContent } from './content';
 import type { ReturnTypeUseProfiles } from './types';
 
-const customProfile: VideoRecordingQualityProfile = {
+const customProfile: VideoRecordingProfile = {
   id: 'custom:review',
   name: 'Review',
-  output: {
+  configuration: {
+    ...DEFAULT_VIDEO_SETTINGS.outputProfile,
     codec: VideoOutputCodec.AVC,
     container: VideoOutputContainer.MP4,
     resolution: VideoResolutionPreset.P720,
+    quality: VideoQuality.MEDIUM,
   },
-  quality: VideoQuality.MEDIUM,
 };
 
 let container: HTMLDivElement | null = null;
@@ -124,7 +125,7 @@ afterEach(() => {
 it('renders profile groups and forwards profile, editor, and delete actions', () => {
   const props = renderContent();
   expect(container?.textContent).toContain('Review');
-  expect(container?.textContent).toContain('720p · MP4 · H.264 (AVC)');
+  expect(container?.textContent).toContain('720p · MP4 · H.264 (AVC) · 30 fps');
   expect(container?.textContent).toContain('save error');
   expect(container?.textContent).toContain('settings.videoQuality.activeBadge');
 

@@ -1,8 +1,5 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import {
-  RegionCaptureControlMessageType,
-  VideoMessageType,
-} from '@sniptale/runtime-contracts/video/messages';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { TabMessageType, TabRequestByType } from '../../../contracts/messaging/tab';
 
 export type ContentRuntimeMessage = TabRequestByType[TabMessageType];
@@ -17,16 +14,6 @@ export type CoreModeMessage = Extract<
       | MessageType.DISABLE_HIGHLIGHTER_MODE
       | MessageType.ENABLE_QUICK_EDIT_MODE
       | MessageType.DISABLE_QUICK_EDIT_MODE;
-  }
->;
-
-export type RegionCaptureMessage = Extract<
-  ContentRuntimeMessage,
-  {
-    type:
-      | typeof RegionCaptureControlMessageType.START
-      | typeof RegionCaptureControlMessageType.STOP
-      | typeof RegionCaptureControlMessageType.CHECK_SUPPORT;
   }
 >;
 
@@ -70,16 +57,6 @@ export function isCoreModeMessage(message: ContentRuntimeMessage): message is Co
     message.type === MessageType.DISABLE_HIGHLIGHTER_MODE ||
     message.type === MessageType.ENABLE_QUICK_EDIT_MODE ||
     message.type === MessageType.DISABLE_QUICK_EDIT_MODE
-  );
-}
-
-export function isRegionCaptureMessage(
-  message: ContentRuntimeMessage
-): message is RegionCaptureMessage {
-  return (
-    message.type === RegionCaptureControlMessageType.START ||
-    message.type === RegionCaptureControlMessageType.STOP ||
-    message.type === RegionCaptureControlMessageType.CHECK_SUPPORT
   );
 }
 

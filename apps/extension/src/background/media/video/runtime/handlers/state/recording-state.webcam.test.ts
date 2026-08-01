@@ -26,6 +26,8 @@ vi.mock('../../session-state/service/runtime-state-service', async (importOrigin
 vi.mock('../../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../session-state')>()),
   getVideoRecordingId: getVideoRecordingIdMock,
+  isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
+    recordingId != null && getVideoRecordingIdMock() === recordingId,
   markVideoRecordingPreparationSettled: markVideoRecordingPreparationSettledMock,
   setControlledCursorDisplaySurface: setControlledCursorDisplaySurfaceMock,
 }));

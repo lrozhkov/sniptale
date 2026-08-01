@@ -51,16 +51,8 @@ function createActivationSecret(): string {
 }
 
 function getPurposeActionTypes(
-  purpose: ContentPrivilegedActionActivationPurpose
+  _purpose: ContentPrivilegedActionActivationPurpose
 ): readonly ContentPrivilegedActionType[] {
-  if (purpose === 'recording-download') {
-    return [
-      MessageType.STAGE_RECORDING_DOWNLOAD_CHUNK,
-      MessageType.SAVE_RECORDING_FOR_DOWNLOAD,
-      MessageType.RELEASE_RECORDING_DOWNLOAD,
-    ];
-  }
-
   return [
     MessageType.ENABLE_SCREENSHOT_MODE,
     CaptureMessageType.CAPTURE_VISIBLE,

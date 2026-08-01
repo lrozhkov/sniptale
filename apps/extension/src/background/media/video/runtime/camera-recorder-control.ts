@@ -1,93 +1,224 @@
-type CameraRecorderControlGrant = {
-  documentId: string;
-  expiresAt: number;
-  launchToken: string;
-  recordingId: string;
-  senderUrl: string;
-};
+import {
+  bindCameraRecorderDocumentGrant,
+  clearCameraRecorderGrant as clearStoredCameraRecorderGrant,
+  createCameraRecorderLaunchGrant,
+  readCameraRecorderGrant,
+  rebindCameraRecorderDocumentGrant,
+  type CameraRecorderGrant,
+} from '../../../storage/video/camera-recorder-grant';
+import { acquireMediaMutationPermit, getMediaAuthorityGeneration } from '../../lifecycle-gate';
 
-const CAMERA_RECORDER_LAUNCH_TTL_MS = 60_000;
-const CAMERA_RECORDER_DOCUMENT_TTL_MS = 24 * 60 * 60 * 1000;
+let activeGrant: CameraRecorderGrant | null = null;
+let activeGrantAuthorityGeneration = -1;
+let cacheOperationGeneration = 0;
 
-let activeGrant: CameraRecorderControlGrant | null = null;
-
-export function issueCameraRecorderLaunchToken(recordingId: string): string {
-  const launchToken = crypto.randomUUID();
-  activeGrant = {
-    documentId: '',
-    expiresAt: Date.now() + CAMERA_RECORDER_LAUNCH_TTL_MS,
-    launchToken,
-    recordingId,
-    senderUrl: '',
-  };
-  return launchToken;
+function beginCacheOperation(): number {
+  cacheOperationGeneration += 1;
+  return cacheOperationGeneration;
 }
 
-export function authorizeCameraRecorderDocument(args: {
+function publishGrantToCache(
+  grant: CameraRecorderGrant,
+  operationGeneration: number,
+  authorityGeneration: number
+): boolean {
+  if (
+    operationGeneration !== cacheOperationGeneration ||
+    authorityGeneration !== getMediaAuthorityGeneration()
+  ) {
+    return false;
+  }
+  activeGrant = grant;
+  activeGrantAuthorityGeneration = authorityGeneration;
+  return true;
+}
+
+function clearGrantCache(): void {
+  activeGrant = null;
+  activeGrantAuthorityGeneration = -1;
+}
+
+export async function issueCameraRecorderLaunchToken(recordingId: string): Promise<string> {
+  const releaseMutationPermit = acquireMediaMutationPermit();
+  if (!releaseMutationPermit) {
+    throw new Error('Camera recorder launch is unavailable during privacy erasure.');
+  }
+  const authorityGeneration = getMediaAuthorityGeneration();
+  const operationGeneration = beginCacheOperation();
+  const registrationToken = crypto.randomUUID();
+  try {
+    const grant = await createCameraRecorderLaunchGrant(recordingId, registrationToken);
+    if (!publishGrantToCache(grant, operationGeneration, authorityGeneration)) {
+      throw new Error('Camera recorder launch authority changed before activation.');
+    }
+    return registrationToken;
+  } finally {
+    releaseMutationPermit();
+  }
+}
+
+export async function authorizeCameraRecorderDocument(args: {
   documentId?: string | undefined;
-  launchToken?: string | undefined;
+  registrationToken?: string | undefined;
   recordingId: string;
   senderUrl: string | null;
-}): boolean {
-  if (!activeGrant || activeGrant.recordingId !== args.recordingId) {
-    return false;
+  tabId?: number | undefined;
+}): Promise<{ recordingId: string } | null> {
+  if (!args.senderUrl || !args.documentId || !args.registrationToken || args.tabId === undefined) {
+    return null;
   }
-  if (!args.senderUrl || !args.documentId) {
-    return false;
+  const releaseMutationPermit = acquireMediaMutationPermit();
+  if (!releaseMutationPermit) {
+    return null;
   }
+  const authorityGeneration = getMediaAuthorityGeneration();
+  const operationGeneration = beginCacheOperation();
 
-  const now = Date.now();
-  if (activeGrant.expiresAt <= now) {
-    activeGrant = null;
-    return false;
+  const nextRegistrationToken = crypto.randomUUID();
+  try {
+    const grant = await bindCameraRecorderDocumentGrant({
+      documentId: args.documentId,
+      nextRegistrationToken,
+      registrationToken: args.registrationToken,
+      recordingId: args.recordingId,
+      senderUrl: args.senderUrl,
+      tabId: args.tabId,
+    });
+    if (!grant || !publishGrantToCache(grant, operationGeneration, authorityGeneration)) {
+      return null;
+    }
+    return { recordingId: grant.recordingId };
+  } finally {
+    releaseMutationPermit();
   }
+}
 
-  if (activeGrant.documentId) {
-    return activeGrant.documentId === args.documentId && activeGrant.senderUrl === args.senderUrl;
+export async function reconnectCameraRecorderDocument(args: {
+  documentId?: string | undefined;
+  senderUrl: string | null;
+  tabId?: number | undefined;
+}): Promise<{ recordingId: string } | null> {
+  if (!args.senderUrl || !args.documentId || args.tabId === undefined) {
+    return null;
   }
-
-  if (!args.launchToken || activeGrant.launchToken !== args.launchToken) {
-    return false;
+  const releaseMutationPermit = acquireMediaMutationPermit();
+  if (!releaseMutationPermit) {
+    return null;
   }
-
-  activeGrant = {
-    ...activeGrant,
-    documentId: args.documentId,
-    expiresAt: now + CAMERA_RECORDER_DOCUMENT_TTL_MS,
-    senderUrl: args.senderUrl,
-  };
-  return true;
+  const authorityGeneration = getMediaAuthorityGeneration();
+  const operationGeneration = beginCacheOperation();
+  try {
+    const grant = await rebindCameraRecorderDocumentGrant({
+      documentId: args.documentId,
+      senderUrl: args.senderUrl,
+      tabId: args.tabId,
+    });
+    if (!grant || !publishGrantToCache(grant, operationGeneration, authorityGeneration)) {
+      return null;
+    }
+    return { recordingId: grant.recordingId };
+  } finally {
+    releaseMutationPermit();
+  }
 }
 
 export function isAuthorizedCameraRecorderDocument(args: {
   documentId?: string | undefined;
   recordingId?: string | undefined;
   senderUrl: string | null;
+  tabId?: number | undefined;
 }): boolean {
   if (
     !activeGrant ||
-    !activeGrant.documentId ||
+    activeGrantAuthorityGeneration !== getMediaAuthorityGeneration() ||
+    activeGrant.stage !== 'document' ||
     !args.documentId ||
     !args.recordingId ||
-    !args.senderUrl
+    !args.senderUrl ||
+    args.tabId === undefined
   ) {
     return false;
   }
   if (activeGrant.expiresAt <= Date.now()) {
-    activeGrant = null;
+    forgetCameraRecorderControlGrant();
     return false;
   }
 
+  return matchesCameraRecorderDocument(activeGrant, {
+    documentId: args.documentId,
+    recordingId: args.recordingId,
+    senderUrl: args.senderUrl,
+    tabId: args.tabId,
+  });
+}
+
+export async function restoreAuthorizedCameraRecorderDocument(args: {
+  documentId?: string | undefined;
+  recordingId?: string | undefined;
+  senderUrl: string | null;
+  tabId?: number | undefined;
+}): Promise<boolean> {
+  if (!args.documentId || !args.recordingId || !args.senderUrl || args.tabId === undefined) {
+    return false;
+  }
+  const releaseMutationPermit = acquireMediaMutationPermit();
+  if (!releaseMutationPermit) {
+    return false;
+  }
+  const authorityGeneration = getMediaAuthorityGeneration();
+  try {
+    if (isAuthorizedCameraRecorderDocument(args)) {
+      return true;
+    }
+    const operationGeneration = beginCacheOperation();
+
+    const stored = await readCameraRecorderGrant();
+    if (
+      !stored ||
+      stored.stage !== 'document' ||
+      !matchesCameraRecorderDocument(stored, {
+        documentId: args.documentId,
+        recordingId: args.recordingId,
+        senderUrl: args.senderUrl,
+        tabId: args.tabId,
+      })
+    ) {
+      return false;
+    }
+    return publishGrantToCache(stored, operationGeneration, authorityGeneration);
+  } finally {
+    releaseMutationPermit();
+  }
+}
+
+function matchesCameraRecorderDocument(
+  grant: CameraRecorderGrant,
+  args: { documentId: string; recordingId: string; senderUrl: string; tabId: number }
+): boolean {
   return (
-    activeGrant.documentId === args.documentId &&
-    activeGrant.recordingId === args.recordingId &&
-    activeGrant.senderUrl === args.senderUrl
+    grant.documentId === args.documentId &&
+    grant.recordingId === args.recordingId &&
+    grant.senderUrl === args.senderUrl &&
+    grant.tabId === args.tabId
   );
 }
 
-export function clearCameraRecorderControlGrant(recordingId?: string): void {
-  if (!activeGrant || (recordingId !== undefined && activeGrant.recordingId !== recordingId)) {
-    return;
+export async function clearCameraRecorderControlGrant(recordingId?: string): Promise<boolean> {
+  const operationGeneration = beginCacheOperation();
+  const cleared = await clearStoredCameraRecorderGrant(recordingId);
+  if (
+    cleared &&
+    operationGeneration === cacheOperationGeneration &&
+    (!recordingId || activeGrant?.recordingId === recordingId)
+  ) {
+    clearGrantCache();
   }
-  activeGrant = null;
+  return cleared;
+}
+
+export function forgetCameraRecorderControlGrant(recordingId?: string): void {
+  beginCacheOperation();
+  if (!recordingId || activeGrant?.recordingId === recordingId) {
+    clearGrantCache();
+  }
 }

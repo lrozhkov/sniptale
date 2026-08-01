@@ -30,9 +30,8 @@ vi.mock('../../../diagnostics/public/event-sink', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../diagnostics/public/event-sink')>()),
   appendContentDiagnosticEvent: appendContentDiagnosticEventMock,
 }));
-vi.mock('./handlers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./handlers')>()),
-  createUnhandledRouteResult: createUnhandledRouteResultMock,
+vi.mock('./handlers/state/recording-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./handlers/state/recording-state')>()),
   handleOffscreenRecordingPaused: handleOffscreenRecordingPausedMock,
   handleOffscreenRecordingResumed: handleOffscreenRecordingResumedMock,
   handleOffscreenRecordingStarted: handleOffscreenRecordingStartedMock,
@@ -46,6 +45,7 @@ vi.mock('./handlers/export/project-export', async (importOriginal) => ({
 }));
 vi.mock('./handlers/state/offscreen-lifecycle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./handlers/state/offscreen-lifecycle')>()),
+  createUnhandledRouteResult: createUnhandledRouteResultMock,
   handleInternalVideoSignal: handleInternalVideoSignalMock,
 }));
 vi.mock('./sender-policy', async (importOriginal) => ({

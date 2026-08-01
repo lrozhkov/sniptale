@@ -76,6 +76,7 @@ export type CaptureSurfaceOwnerReleaseOptions = {
 };
 
 export interface CaptureSurfaceService {
+  abandonConflicted(request: CaptureSurfaceReleaseRequest): Promise<void>;
   apply(request: CaptureSurfaceLeaseRequest): Promise<AppliedCaptureSurface>;
   replace(request: CaptureSurfaceLeaseRequest): Promise<AppliedCaptureSurface>;
   getApplied(tabId: number): AppliedCaptureSurface | null;

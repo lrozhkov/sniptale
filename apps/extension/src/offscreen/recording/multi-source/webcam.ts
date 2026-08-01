@@ -1,31 +1,21 @@
-import { saveRecordingSafely } from '../../../workflows/media-hub/store';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
-import { buildSidecarFilename } from '../finalizer';
+import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
 import { createWebcamSidecarRecorder } from '../sidecar';
 import type { RecordingSidecarRecorder } from '../sidecar/types';
-import { triggerMultiSourceDownload } from './messages';
-import { resolveVideoRecordingArtifact } from '../../../platform/media-utils/video-recording';
-
-type SavedWebcamRecording = {
-  blob: Blob;
-  duration: number;
-  filename: string;
-  mimeType: string;
-  source: RecordingSidecarRecorder;
-};
 
 type WebcamProjectInput = {
-  recordingId: string;
-  filename: string;
-  width: number;
-  height: number;
   duration: number;
+  filename: string;
+  height: number;
   mimeType: string;
+  recordingId: string;
   size: number;
+  width: number;
 };
 
 export function createMultiSourceWebcamRecorder(params: {
   baseRecordingId: string;
+  coordinator: RecordingStagingCoordinator;
   settings: VideoRecordingSettings;
 }): Promise<RecordingSidecarRecorder | null> {
   return createWebcamSidecarRecorder(params);
@@ -35,27 +25,16 @@ export function stopWebcamRecorderStream(source: RecordingSidecarRecorder | null
   source?.stream.getTracks().forEach((track) => track.stop());
 }
 
-export async function saveWebcamRecording(
-  source: RecordingSidecarRecorder,
-  duration: number
-): Promise<SavedWebcamRecording> {
-  const artifact = resolveVideoRecordingArtifact(
-    source.recorder.mimeType || source.chunks[0]?.type || ''
-  );
-  const blob = new Blob(source.chunks, { type: artifact.mimeType });
-  const filename = buildSidecarFilename(source.filenameSuffix, artifact.mimeType);
-  await saveRecordingSafely(source.recordingId, blob, filename);
-  await triggerMultiSourceDownload(source.recordingId, filename);
-  return { blob, filename, mimeType: artifact.mimeType, source, duration };
-}
-
 export function createWebcamProjectInput(
-  result: SavedWebcamRecording | null
+  source: RecordingSidecarRecorder | null,
+  duration: number
 ): WebcamProjectInput | null {
-  if (!result) {
-    return null;
+  if (!source) return null;
+  const { artifact } = source;
+  if (!artifact || artifact.size <= 0) {
+    throw new Error(`Webcam recording ${source.recordingId} has no finalized media.`);
   }
-  const { height, width } = result.source.trackSettings;
+  const { height, width } = source.trackSettings;
   if (
     typeof width !== 'number' ||
     typeof height !== 'number' ||
@@ -67,12 +46,12 @@ export function createWebcamProjectInput(
     throw new Error('Webcam recording dimensions are unavailable.');
   }
   return {
-    recordingId: result.source.recordingId,
-    filename: result.filename,
-    width,
+    duration,
+    filename: artifact.filename,
     height,
-    duration: result.duration,
-    mimeType: result.mimeType,
-    size: result.blob.size,
+    mimeType: artifact.mimeType,
+    recordingId: source.recordingId,
+    size: artifact.size,
+    width,
   };
 }

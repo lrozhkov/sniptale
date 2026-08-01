@@ -1,8 +1,12 @@
 import { translate } from '../../../../../platform/i18n';
 import { openSettingsPage } from '../../../../../platform/navigation/extension-pages';
 import {
-  resolveVideoRecordingOutputSettings,
+  resolveVideoOutputProfile,
+  isVideoResolutionFrameRateSupported,
+  VideoFrameRate,
   VideoOutputContainer,
+  type VideoOutputDimensions,
+  type VideoOutputProfile,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { getQualityOption, QUALITY_OPTIONS } from '../quality-card/options';
@@ -14,28 +18,45 @@ import {
   OUTPUT_RESOLUTION_PRESETS,
   resolveOutputForContainer,
 } from './options';
+import { isKnownVideoOutputProfileSupported } from '../../output-resource-policy';
 
-type OutputOption<TValue extends string> = { label: string; value: TValue };
+type OutputOption<TValue extends string | number> = {
+  disabled?: boolean;
+  label: string;
+  value: TValue;
+};
 
 export function OutputSettingsPanel(props: {
+  knownOutputBasisDimensions?: VideoOutputDimensions | null;
   onChange: (patch: Partial<VideoRecordingSettings>) => void;
   settings: VideoRecordingSettings;
 }) {
-  const output = resolveVideoRecordingOutputSettings(props.settings);
+  const outputProfile = resolveVideoOutputProfile(props.settings);
   const hasAudioTracks = props.settings.microphoneEnabled || props.settings.systemAudioEnabled;
   const codecOptions = getAvailableOutputCodecs(
-    output.container,
-    output.resolution,
+    outputProfile.container,
+    outputProfile,
     hasAudioTracks
   ).map((codec) => ({ label: getOutputCodecLabel(codec), value: codec }));
   const containerOptions = [VideoOutputContainer.WEBM, VideoOutputContainer.MP4]
     .filter(
-      (container) =>
-        getAvailableOutputCodecs(container, output.resolution, hasAudioTracks).length > 0
+      (container) => getAvailableOutputCodecs(container, outputProfile, hasAudioTracks).length > 0
     )
     .map((container) => ({ label: getOutputContainerLabel(container), value: container }));
   const update = (patch: Partial<VideoRecordingSettings>) =>
     props.onChange({ ...patch, qualityProfileId: null });
+  const isSupported = (profile: VideoOutputProfile) =>
+    isKnownVideoOutputProfileSupported(props.knownOutputBasisDimensions ?? null, profile);
+  const resolveResolutionSelection = (
+    resolution: VideoOutputProfile['resolution']
+  ): VideoOutputProfile => ({
+    ...outputProfile,
+    frameRate: isVideoResolutionFrameRateSupported(resolution, outputProfile.frameRate)
+      ? outputProfile.frameRate
+      : VideoFrameRate.FPS24,
+    resolution,
+  });
+  const unsupportedReason = translate('popup.video.outputResourceUnsupported');
 
   return (
     <div className="grid gap-3">
@@ -43,22 +64,22 @@ export function OutputSettingsPanel(props: {
         {translate('popup.video.outputSettingsTitle')}
       </div>
       <OutputOptionGroup
-        activeValue={props.settings.quality}
+        activeValue={outputProfile.quality}
         label={translate('popup.video.qualityLabel')}
-        onChange={(quality) => update({ quality })}
+        onChange={(quality) => update({ outputProfile: { ...outputProfile, quality } })}
         options={QUALITY_OPTIONS.map((option) => ({
           label: getQualityOption(option.value).label,
           value: option.value,
         }))}
       />
       <OutputOptionGroup
-        activeValue={output.container}
+        activeValue={outputProfile.container}
         label={translate('popup.video.outputLabel')}
         onChange={(container) =>
           update({
-            output: resolveOutputForContainer({
+            outputProfile: resolveOutputForContainer({
               container,
-              current: output,
+              current: outputProfile,
               hasAudioTracks,
             }),
           })
@@ -66,20 +87,39 @@ export function OutputSettingsPanel(props: {
         options={containerOptions}
       />
       <OutputOptionGroup
-        activeValue={output.codec}
+        activeValue={outputProfile.codec}
         label={translate('popup.video.outputCodecLabel')}
-        onChange={(codec) => update({ output: { ...output, codec } })}
+        onChange={(codec) => update({ outputProfile: { ...outputProfile, codec } })}
         options={codecOptions}
       />
       <OutputOptionGroup
-        activeValue={output.resolution}
+        activeValue={outputProfile.resolution}
         label={translate('popup.video.outputResolutionLabel')}
-        onChange={(resolution) => update({ output: { ...output, resolution } })}
+        onChange={(resolution) => update({ outputProfile: resolveResolutionSelection(resolution) })}
         options={OUTPUT_RESOLUTION_PRESETS.map((resolution) => ({
+          disabled: !isSupported(resolveResolutionSelection(resolution)),
           label: getOutputResolutionLabel(resolution),
           value: resolution,
         }))}
       />
+      <OutputOptionGroup
+        activeValue={outputProfile.frameRate}
+        label={translate('popup.video.outputFrameRateLabel')}
+        onChange={(frameRate) => update({ outputProfile: { ...outputProfile, frameRate } })}
+        options={Object.values(VideoFrameRate).map((frameRate) => ({
+          disabled: !isSupported({ ...outputProfile, frameRate }),
+          label: `${frameRate} fps`,
+          value: frameRate,
+        }))}
+      />
+      {isSupported(outputProfile) ? null : (
+        <p
+          className="px-0.5 text-[10px] leading-4 text-[var(--sniptale-color-danger)]"
+          role="alert"
+        >
+          {unsupportedReason}
+        </p>
+      )}
       <p className="px-0.5 text-[10px] leading-4 text-[var(--sniptale-color-text-muted-strong)]">
         {translate('popup.video.outputAspectNotice')}
       </p>
@@ -99,7 +139,7 @@ export function OutputSettingsPanel(props: {
   );
 }
 
-function OutputOptionGroup<TValue extends string>(props: {
+function OutputOptionGroup<TValue extends string | number>(props: {
   activeValue: TValue;
   label: string;
   onChange: (value: TValue) => void;
@@ -127,7 +167,10 @@ function OutputOptionGroup<TValue extends string>(props: {
                     'hover:bg-[var(--sniptale-color-surface-hover)]',
                     'hover:text-[var(--sniptale-color-text-primary)]',
                   ].join(' '),
+              option.disabled ? 'cursor-not-allowed opacity-50' : '',
             ].join(' ')}
+            disabled={option.disabled}
+            title={option.disabled ? translate('popup.video.outputResourceUnsupported') : undefined}
             onClick={() => props.onChange(option.value)}
           >
             {option.label}

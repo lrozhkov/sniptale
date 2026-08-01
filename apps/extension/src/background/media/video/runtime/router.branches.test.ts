@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const {
   createUnhandledRouteResultMock,
   handleCancelProjectExportMock,
+  handleAcknowledgePostRecordResultMock,
   handleDownloadRecordingMock,
   handleDownloadRecordingSidecarMock,
   handleGetProjectExportCapabilitiesMock,
@@ -22,6 +23,7 @@ const {
 } = vi.hoisted(() => ({
   createUnhandledRouteResultMock: vi.fn(),
   handleCancelProjectExportMock: vi.fn(),
+  handleAcknowledgePostRecordResultMock: vi.fn(),
   handleDownloadRecordingMock: vi.fn(),
   handleDownloadRecordingSidecarMock: vi.fn(),
   handleGetProjectExportCapabilitiesMock: vi.fn(),
@@ -40,20 +42,21 @@ const {
   handleVideoSavedToIdbMock: vi.fn(),
 }));
 
-vi.mock('./handlers', () => ({
-  RouteResult: undefined,
-  createUnhandledRouteResult: createUnhandledRouteResultMock,
+vi.mock('./handlers/export/download', () => ({
   handleDownloadRecording: handleDownloadRecordingMock,
   handleDownloadRecordingSidecar: handleDownloadRecordingSidecarMock,
-  handleOffscreenError: handleOffscreenErrorMock,
+}));
+vi.mock('./handlers/state/recording-state', () => ({
   handleOffscreenRecordingPaused: handleOffscreenRecordingPausedMock,
   handleOffscreenRecordingResumed: handleOffscreenRecordingResumedMock,
   handleOffscreenRecordingStarted: handleOffscreenRecordingStartedMock,
   handleOffscreenRecordingStopped: handleOffscreenRecordingStoppedMock,
   handleRecordingDurationUpdated: handleRecordingDurationUpdatedMock,
-  handleRecordingState: handleRecordingStateMock,
   handleRecordingTabId: handleRecordingTabIdMock,
-  handleVideoSavedToIdb: handleVideoSavedToIdbMock,
+}));
+vi.mock('./handlers/state/recording-state-response', () => ({
+  handleAcknowledgePostRecordResult: handleAcknowledgePostRecordResultMock,
+  handleRecordingState: handleRecordingStateMock,
 }));
 vi.mock('./handlers/export/project-export', () => ({
   handleCancelProjectExport: handleCancelProjectExportMock,
@@ -197,7 +200,11 @@ function createRecordingRouteMessages(): RoutedVideoRuntimeMessage[] {
     { recordingId: 'recording-1', type: VideoMessageType.OFFSCREEN_RECORDING_PAUSED },
     { recordingId: 'recording-1', type: VideoMessageType.OFFSCREEN_RECORDING_RESUMED },
     { error: 'boom', phase: 'runtime', type: VideoMessageType.OFFSCREEN_ERROR },
-    { recordingId: 'recording-1', type: VideoMessageType.VIDEO_SAVED_TO_IDB },
+    {
+      primaryRecordingId: 'recording-1',
+      recordingId: 'recording-1',
+      type: VideoMessageType.VIDEO_SAVED_TO_IDB,
+    },
     {
       filename: 'recording.webm',
       recordingId: 'recording-1',

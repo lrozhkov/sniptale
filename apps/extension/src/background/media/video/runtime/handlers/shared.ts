@@ -28,6 +28,21 @@ export function createAsyncLifecycleRoute(
   return HANDLED_ASYNC_RESULT;
 }
 
+export function createAsyncLifecycleOutcomeRoute<Result extends string>(
+  work: Promise<Result>,
+  sendResponse: (response: unknown) => void,
+  logger: LifecycleRouteLogger,
+  failureLogMessage: string
+): RouteResult {
+  work
+    .then((result) => sendResponse({ success: true, result }))
+    .catch((error) => {
+      logger.warn(failureLogMessage, error);
+      sendResponse({ success: false, error: 'Internal error' });
+    });
+  return HANDLED_ASYNC_RESULT;
+}
+
 export function shouldNotifyRecordingFailure(
   phase?: 'start' | 'stop' | 'runtime' | 'export'
 ): boolean {

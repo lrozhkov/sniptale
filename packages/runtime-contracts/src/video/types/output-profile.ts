@@ -1,3 +1,5 @@
+import type { VideoQuality } from './quality';
+
 export const VideoOutputContainer = {
   WEBM: 'WEBM',
   MP4: 'MP4',
@@ -27,9 +29,19 @@ export const VideoResolutionPreset = {
 export type VideoResolutionPreset =
   (typeof VideoResolutionPreset)[keyof typeof VideoResolutionPreset];
 
-export interface VideoRecordingOutputSettings {
+export const VideoFrameRate = {
+  FPS24: 24,
+  FPS30: 30,
+  FPS60: 60,
+} as const;
+
+export type VideoFrameRate = (typeof VideoFrameRate)[keyof typeof VideoFrameRate];
+
+export interface VideoOutputProfile {
   codec: VideoOutputCodec;
   container: VideoOutputContainer;
+  frameRate: VideoFrameRate;
+  quality: VideoQuality;
   resolution: VideoResolutionPreset;
 }
 
@@ -38,13 +50,17 @@ export interface VideoOutputDimensions {
   width: number;
 }
 
-type CanonicalVideoQuality = 'LOW' | 'MEDIUM' | 'HIGH' | 'ULTRA';
+type CanonicalVideoQuality = VideoQuality;
 
-export const DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS: VideoRecordingOutputSettings = {
+export const DEFAULT_VIDEO_OUTPUT_PROFILE: VideoOutputProfile = {
   codec: VideoOutputCodec.VP9,
   container: VideoOutputContainer.WEBM,
+  frameRate: VideoFrameRate.FPS30,
+  quality: 'HIGH',
   resolution: VideoResolutionPreset.P1080,
 };
+
+export const MAX_LIVE_VIDEO_PIXEL_RATE = 3840 * 2160 * 30;
 
 const VIDEO_RESOLUTION_LINES: Readonly<Record<Exclude<VideoResolutionPreset, 'SOURCE'>, number>> = {
   [VideoResolutionPreset.P240]: 240,
@@ -145,7 +161,7 @@ const MP4_VIDEO_CODEC_CANDIDATES = {
 } as const;
 
 export function getVideoRecordingMimeTypeCandidates(
-  output: VideoRecordingOutputSettings,
+  output: Pick<VideoOutputProfile, 'codec' | 'container'>,
   hasAudioTracks: boolean
 ): string[] {
   if (output.container === VideoOutputContainer.WEBM) {
@@ -168,9 +184,7 @@ export function getVideoRecordingMimeTypeCandidates(
   );
 }
 
-export function isVideoRecordingOutputSettings(
-  value: unknown
-): value is VideoRecordingOutputSettings {
+export function isVideoOutputProfile(value: unknown): value is VideoOutputProfile {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
   }
@@ -178,12 +192,18 @@ export function isVideoRecordingOutputSettings(
   const candidate = value as Record<string, unknown>;
   const containers = new Set<string>(Object.values(VideoOutputContainer));
   const codecs = new Set<string>(Object.values(VideoOutputCodec));
+  const frameRates = new Set<number>(Object.values(VideoFrameRate));
+  const qualities = new Set<string>(['LOW', 'MEDIUM', 'HIGH', 'ULTRA']);
   const resolutions = new Set<string>(Object.values(VideoResolutionPreset));
   if (
     typeof candidate['container'] !== 'string' ||
     !containers.has(candidate['container']) ||
     typeof candidate['codec'] !== 'string' ||
     !codecs.has(candidate['codec']) ||
+    typeof candidate['frameRate'] !== 'number' ||
+    !frameRates.has(candidate['frameRate']) ||
+    typeof candidate['quality'] !== 'string' ||
+    !qualities.has(candidate['quality']) ||
     typeof candidate['resolution'] !== 'string' ||
     !resolutions.has(candidate['resolution'])
   ) {
@@ -196,13 +216,43 @@ export function isVideoRecordingOutputSettings(
   );
 }
 
-export function resolveVideoRecordingOutputSettings(settings: {
-  output?: VideoRecordingOutputSettings;
-}): VideoRecordingOutputSettings {
-  if (!isVideoRecordingOutputSettings(settings.output)) {
-    throw new Error('Video recording output settings are required');
+export function resolveVideoOutputProfile(settings: {
+  outputProfile?: VideoOutputProfile;
+}): VideoOutputProfile {
+  if (!isVideoOutputProfile(settings.outputProfile)) {
+    throw new Error('Video output profile is required');
   }
-  return settings.output;
+  return settings.outputProfile;
+}
+
+export function resolveVideoPixelRate(
+  dimensions: VideoOutputDimensions,
+  frameRate: VideoFrameRate
+): number {
+  if (
+    !isFinitePositive(dimensions.width) ||
+    !isFinitePositive(dimensions.height) ||
+    !Number.isInteger(dimensions.width) ||
+    !Number.isInteger(dimensions.height)
+  ) {
+    throw new Error('Video output dimensions must be positive integers');
+  }
+  return dimensions.width * dimensions.height * frameRate;
+}
+
+export function isVideoPixelRateSupported(totalPixelRate: number): boolean {
+  return (
+    Number.isFinite(totalPixelRate) &&
+    totalPixelRate > 0 &&
+    totalPixelRate <= MAX_LIVE_VIDEO_PIXEL_RATE
+  );
+}
+
+export function isVideoResolutionFrameRateSupported(
+  resolution: VideoResolutionPreset,
+  frameRate: VideoFrameRate
+): boolean {
+  return resolution !== VideoResolutionPreset.P2160 || frameRate === VideoFrameRate.FPS24;
 }
 
 export function resolveVideoOutputDimensions(
@@ -219,11 +269,11 @@ export function resolveVideoOutputDimensions(
     return { width: floorEven(source.width), height: floorEven(source.height) };
   }
 
-  const shortEdge = Math.min(source.width, source.height);
-  const scale = VIDEO_RESOLUTION_LINES[preset] / shortEdge;
+  const targetHeight = VIDEO_RESOLUTION_LINES[preset];
+  const scale = targetHeight / source.height;
   return {
     width: roundEven(source.width * scale),
-    height: roundEven(source.height * scale),
+    height: targetHeight,
   };
 }
 
@@ -237,7 +287,7 @@ export function getVideoResolutionTier(
 
   const source = { width, height };
   for (const preset of RESOLUTION_PRESET_ORDER) {
-    if (Math.min(source.width, source.height) <= VIDEO_RESOLUTION_LINES[preset]) {
+    if (source.height <= VIDEO_RESOLUTION_LINES[preset]) {
       return preset;
     }
   }

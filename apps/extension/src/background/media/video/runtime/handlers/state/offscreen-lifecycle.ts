@@ -9,6 +9,7 @@ import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/messa
 import {
   finishVideoRecordingStop,
   getVideoRecordingId,
+  isCurrentVideoRecordingId,
   resetCompletedVideoRecordingSession,
   shouldOpenVideoEditorAfterRecording,
 } from '../../../session-state';
@@ -28,7 +29,18 @@ import { clearRecordingStartActivationWatchdog } from '../../../manager/start-ac
 import { markOffscreenDocumentReady } from '../../offscreen-manager';
 import { releaseVideoCaptureSurface } from '../../../capture-surface';
 import {
+  commitPendingVideoPostRecordResult,
+  persistPendingVideoPostRecordResult,
+  readStoredVideoPostRecordResult,
+  type StoredVideoPostRecordResult,
+  type VideoPostRecordResultStatus,
+} from '../../../../../storage/video/post-record-result';
+import { clearCameraRecorderControlGrant } from '../../camera-recorder-control';
+import { acquireMediaMutationPermit } from '../../../../lifecycle-gate';
+import { removeVideoRecordingCompletionOutbox } from '../../../../../../composition/persistence/recordings/completion-outbox';
+import {
   createAsyncLifecycleRoute,
+  createAsyncLifecycleOutcomeRoute,
   HANDLED_SYNC_RESULT,
   UNHANDLED_RESULT,
   shouldNotifyRecordingFailure,
@@ -36,7 +48,20 @@ import {
 } from '../shared';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeRouterHandlers' });
-const processingSavedRecordingIds = new Set<string>();
+type SavedRecordingOutcome = 'accepted' | 'discarded' | 'superseded';
+
+type SavedRecordingMessage = {
+  projectId?: string;
+  primaryRecordingId: string;
+  recordingId: string;
+};
+
+type SavedRecordingOperation = {
+  message: SavedRecordingMessage;
+  promise: Promise<SavedRecordingOutcome>;
+};
+
+const savedRecordingOperations = new Map<string, SavedRecordingOperation>();
 
 export function handleOffscreenError(
   message: {
@@ -73,16 +98,34 @@ async function handleOffscreenErrorAsync(message: {
       return;
     }
 
+    if (message.recordingId) {
+      await clearCameraRecorderControlGrant(message.recordingId);
+      if (!isCurrentVideoRecordingId(message.recordingId)) {
+        logger.warn('Ignoring stale offscreen recording error after camera grant cleanup', {
+          eventRecordingId: message.recordingId,
+        });
+        await clearActiveVideoRecordingLease(message.recordingId);
+        return;
+      }
+    }
     if (shouldNotifyRecordingFailure(message.phase)) {
       clearRecordingStartActivationWatchdog(message.recordingId);
       await notifyRecordingStartFailed(
-        message.error || translate('background.runtime.recordingError')
+        message.error || translate('background.runtime.recordingError'),
+        message.recordingId ? { recordingId: message.recordingId } : undefined
       );
       await clearActiveVideoRecordingLease(message.recordingId);
       return;
     }
 
     await releaseVideoCaptureSurface(message.recordingId);
+    if (message.recordingId && !isCurrentVideoRecordingId(message.recordingId)) {
+      logger.warn('Ignoring stale offscreen stop error after surface cleanup', {
+        eventRecordingId: message.recordingId,
+      });
+      await clearActiveVideoRecordingLease(message.recordingId);
+      return;
+    }
     finishVideoRecordingStop();
     resetCompletedVideoRecordingSession(message.recordingId);
     resetRecordingTabId();
@@ -94,11 +137,12 @@ async function handleOffscreenErrorAsync(message: {
 export function handleVideoSavedToIdb(
   message: {
     projectId?: string;
+    primaryRecordingId: string;
     recordingId: string;
   },
   sendResponse: ResponseSender
 ): RouteResult {
-  return createAsyncLifecycleRoute(
+  return createAsyncLifecycleOutcomeRoute(
     handleVideoSavedToIdbAsync(message),
     sendResponse,
     logger,
@@ -108,65 +152,182 @@ export function handleVideoSavedToIdb(
 
 async function handleVideoSavedToIdbAsync(message: {
   projectId?: string;
+  primaryRecordingId: string;
   recordingId: string;
-}): Promise<void> {
-  if (!beginSavedRecordingNotification(message.recordingId)) {
-    logger.warn('Ignoring duplicate saved recording notification', {
+}): Promise<SavedRecordingOutcome> {
+  const existingOperation = savedRecordingOperations.get(message.recordingId);
+  if (existingOperation) {
+    return isSameSavedRecordingMessage(existingOperation.message, message)
+      ? await existingOperation.promise
+      : 'superseded';
+  }
+
+  const releaseMutationPermit = acquireMediaMutationPermit();
+  if (!releaseMutationPermit) {
+    logger.warn('Ignoring saved recording notification during privacy erasure', {
+      recordingId: message.recordingId,
+    });
+    return 'discarded';
+  }
+  const operation = processVideoSavedToIdb(message).finally(releaseMutationPermit);
+  const trackedOperation = { message, promise: operation };
+  savedRecordingOperations.set(message.recordingId, trackedOperation);
+  try {
+    return await operation;
+  } finally {
+    if (savedRecordingOperations.get(message.recordingId) === trackedOperation) {
+      savedRecordingOperations.delete(message.recordingId);
+    }
+  }
+}
+
+function isSameSavedRecordingMessage(
+  left: SavedRecordingMessage,
+  right: SavedRecordingMessage
+): boolean {
+  return (
+    left.primaryRecordingId === right.primaryRecordingId &&
+    (left.projectId ?? null) === (right.projectId ?? null) &&
+    left.recordingId === right.recordingId
+  );
+}
+
+async function processVideoSavedToIdb(
+  message: SavedRecordingMessage
+): Promise<SavedRecordingOutcome> {
+  const existingState = await readStoredVideoPostRecordResult();
+  if (isCompletedPostRecordReplay(existingState, message)) {
+    await consumeRecordingCompletionOutbox(message, false);
+    finalizeSavedRecordingCompletion(message);
+    return 'accepted';
+  }
+
+  if (!(await authorizeSavedRecordingCompletion(message, existingState))) {
+    return 'superseded';
+  }
+
+  const synchronized = await synchronizePostRecordResult(message);
+  if (synchronized === 'ready' || synchronized === 'acknowledged') {
+    await consumeRecordingCompletionOutbox(message, false);
+    finalizeSavedRecordingCompletion(message);
+    return 'accepted';
+  }
+  await completeSavedRecordingPersistence(message.recordingId);
+  await consumeRecordingCompletionOutbox(message, true);
+  finalizeSavedRecordingCompletion(message);
+  return 'accepted';
+}
+
+function toPostRecordResult(message: SavedRecordingMessage) {
+  return {
+    primaryRecordingId: message.primaryRecordingId,
+    projectId: message.projectId ?? null,
+    recordingId: message.recordingId,
+  };
+}
+
+async function consumeRecordingCompletionOutbox(
+  message: SavedRecordingMessage,
+  required: boolean
+): Promise<void> {
+  const expected = toPostRecordResult(message);
+  if (!(await removeVideoRecordingCompletionOutbox(expected)) && required) {
+    throw new Error('The durable recording completion outbox could not be consumed.');
+  }
+}
+
+function isCompletedPostRecordReplay(
+  state: StoredVideoPostRecordResult | null,
+  message: SavedRecordingMessage
+): boolean {
+  return (
+    isExactPostRecordState(state, message) &&
+    (state.status === 'ready' || state.status === 'acknowledged')
+  );
+}
+
+async function authorizeSavedRecordingCompletion(
+  message: SavedRecordingMessage,
+  existingState: StoredVideoPostRecordResult | null
+): Promise<boolean> {
+  const currentRecordingId = getVideoRecordingId();
+  const authorized =
+    (currentRecordingId !== null && message.recordingId === currentRecordingId) ||
+    (isExactPostRecordState(existingState, message) && existingState.status === 'staged') ||
+    (await restoreCurrentRecordingFromLease(message.recordingId));
+  if (!authorized) {
+    logger.warn('Ignoring stale saved recording notification', {
+      currentRecordingId,
       eventRecordingId: message.recordingId,
     });
+  }
+  return authorized;
+}
+
+async function completeSavedRecordingPersistence(recordingId: string): Promise<void> {
+  await releaseVideoCaptureSurface(recordingId);
+  await clearActiveVideoRecordingLease(recordingId);
+  const committed = await commitPendingVideoPostRecordResult(recordingId);
+  if (committed !== 'ready' && committed !== 'acknowledged') {
+    throw new Error('The post-record result could not be committed after terminal cleanup.');
+  }
+}
+
+function finalizeSavedRecordingCompletion(message: SavedRecordingMessage): void {
+  if (getVideoRecordingId() !== message.recordingId) {
+    void finalizeRecordingDiagnostics(message.recordingId);
     return;
   }
 
-  try {
-    const currentRecordingId = getVideoRecordingId();
-    if (
-      (!currentRecordingId || message.recordingId !== currentRecordingId) &&
-      !(await restoreCurrentRecordingFromLease(message.recordingId))
-    ) {
-      logger.warn('Ignoring stale saved recording notification', {
-        currentRecordingId,
-        eventRecordingId: message.recordingId,
-      });
-      return;
-    }
-
-    const shouldOpenEditor = shouldOpenVideoEditorAfterRecording();
-    await releaseVideoCaptureSurface(message.recordingId);
-    finishVideoRecordingStop();
-    resetCompletedVideoRecordingSession(message.recordingId);
-    resetRecordingTabId();
-    resetVideoRecordingRuntimeState();
-    await clearActiveVideoRecordingLease(message.recordingId);
-    void finalizeRecordingDiagnostics(message.recordingId);
-    if (message.recordingId && shouldOpenEditor) {
-      runBestEffort(
-        waitForStopSideEffects().then(() =>
-          openVideoEditorPage(
-            message.projectId ?? null,
-            message.projectId ? null : message.recordingId
-          )
-        ),
-        logger,
-        'Failed to open video editor after recording save',
-        { projectId: message.projectId ?? null, recordingId: message.recordingId }
-      );
-    }
-  } finally {
-    finishSavedRecordingNotification(message.recordingId);
-  }
+  const shouldOpenEditor = shouldOpenVideoEditorAfterRecording();
+  finishVideoRecordingStop();
+  resetCompletedVideoRecordingSession(message.recordingId);
+  resetRecordingTabId();
+  resetVideoRecordingRuntimeState();
+  void finalizeRecordingDiagnostics(message.recordingId);
+  scheduleSavedRecordingEditorOpen(message, shouldOpenEditor);
 }
 
-function beginSavedRecordingNotification(recordingId: string): boolean {
-  if (processingSavedRecordingIds.has(recordingId)) {
-    return false;
+function scheduleSavedRecordingEditorOpen(
+  message: SavedRecordingMessage,
+  shouldOpenEditor: boolean
+): void {
+  if (!shouldOpenEditor) {
+    return;
   }
-
-  processingSavedRecordingIds.add(recordingId);
-  return true;
+  runBestEffort(
+    waitForStopSideEffects().then(() =>
+      openVideoEditorPage(
+        message.projectId ?? null,
+        message.projectId ? null : message.primaryRecordingId
+      )
+    ),
+    logger,
+    'Failed to open video editor after recording save',
+    { projectId: message.projectId ?? null, recordingId: message.recordingId }
+  );
 }
 
-function finishSavedRecordingNotification(recordingId: string): void {
-  processingSavedRecordingIds.delete(recordingId);
+function isExactPostRecordState(
+  state: StoredVideoPostRecordResult | null,
+  message: SavedRecordingMessage
+): state is StoredVideoPostRecordResult {
+  return (
+    state !== null &&
+    state.result.primaryRecordingId === message.primaryRecordingId &&
+    state.result.projectId === (message.projectId ?? null) &&
+    state.result.recordingId === message.recordingId
+  );
+}
+
+async function synchronizePostRecordResult(
+  message: SavedRecordingMessage
+): Promise<VideoPostRecordResultStatus> {
+  return persistPendingVideoPostRecordResult({
+    primaryRecordingId: message.primaryRecordingId,
+    projectId: message.projectId ?? null,
+    recordingId: message.recordingId,
+  });
 }
 
 export function handleOffscreenReady(

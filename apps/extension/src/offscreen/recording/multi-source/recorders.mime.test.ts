@@ -1,80 +1,38 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-
-const { normalizeMultiSourceVideoStreamMock } = vi.hoisted(() => ({
-  normalizeMultiSourceVideoStreamMock: vi.fn(),
-}));
-
-vi.mock('../stream/fixed-video-output', () => ({
-  createFixedVideoOutputStream: normalizeMultiSourceVideoStreamMock,
-}));
-
-import {
-  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-  VideoQuality,
-  type VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
-import { createMicrophoneRecorder, createSourceRecorders } from './recorders';
-import { createAudioStream, createStream } from './media-stream.test-support';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
+import { createMicrophoneRecorder } from './recorders';
+import { createAudioStream } from './media-stream.test-support';
 
-class FakeMediaRecorder {
-  static isTypeSupported() {
-    return false;
-  }
-
+class MediaRecorderMock {
+  static isTypeSupported = vi.fn((mimeType: string) => mimeType === 'video/webm');
   mimeType: string;
+  ondataavailable = null;
+  onerror = null;
+  onstart = null;
+  onstop = null;
+  state: RecordingState = 'inactive';
 
   constructor(_stream: MediaStream, options: MediaRecorderOptions) {
-    this.mimeType = options.mimeType ?? 'video/webm';
+    this.mimeType = options.mimeType ?? '';
   }
-}
-
-function createSettings(microphoneEnabled: boolean): VideoRecordingSettings {
-  return {
-    ...DEFAULT_VIDEO_SETTINGS,
-    autoFadeDelay: 0,
-    countdownSeconds: 0,
-    diagnosticsEnabled: false,
-    microphoneDeviceId: 'mic-1',
-    microphoneEnabled,
-    openEditorAfterRecording: false,
-    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-    quality: VideoQuality.HIGH,
-    sourceCount: 2,
-    systemAudioEnabled: false,
-    webcamDeviceId: null,
-    webcamEnabled: false,
-  };
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
-  vi.stubGlobal('navigator', {
-    mediaDevices: {
-      getUserMedia: vi.fn().mockResolvedValue(createAudioStream()),
-    },
+  vi.stubGlobal('MediaRecorder', MediaRecorderMock);
+});
+
+it('uses the supported WebM MIME for a separately staged microphone artifact', async () => {
+  const audio = createAudioStream();
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: vi.fn().mockResolvedValue(audio) },
   });
-});
-
-it('falls back to video/webm when audio/webm is unavailable for microphone recorders', async () => {
-  const recorder = await createMicrophoneRecorder('rec', createSettings(true));
-
+  const recorder = await createMicrophoneRecorder(
+    'rec',
+    { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true },
+    createRecordingStagingCoordinatorTestDouble()
+  );
   expect(recorder?.recorder.mimeType).toBe('video/webm');
-});
-
-it('rejects an unavailable selected video codec instead of falling back to plain webm', async () => {
-  normalizeMultiSourceVideoStreamMock.mockImplementation(async (stream: MediaStream) => ({
-    dimensions: { height: 720, width: 1280 },
-    frameRate: 30,
-    stream,
-  }));
-
-  await expect(
-    createSourceRecorders({
-      baseRecordingId: 'rec',
-      settings: createSettings(false),
-      sources: [{ label: 'Window 1', stream: createStream(1280, 720) }],
-    })
-  ).rejects.toThrow('selected recording container and codec are not supported');
+  expect(recorder?.artifactSession).toBeDefined();
 });

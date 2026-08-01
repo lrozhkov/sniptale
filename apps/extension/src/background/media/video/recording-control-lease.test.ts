@@ -60,6 +60,7 @@ import {
   activateVideoRecordingLease,
   clearActiveVideoRecordingLease,
   ensureActiveVideoRecordingLeaseHydrated,
+  getActiveVideoRecordingLeaseSnapshot,
   hydrateActiveVideoRecordingLease,
   issuePreparedVideoRecordingLease,
   resetActiveVideoRecordingLeaseForTests,
@@ -220,6 +221,7 @@ it('hydrates active recording state from a persisted lease after restart', async
     status: VideoRecordingStatus.RECORDING,
     viewportPresetId: null,
   });
+  getVideoRecordingIdMock.mockReturnValue('recording-2');
   await expect(restoreCurrentRecordingFromLease('recording-2')).resolves.toBe(true);
 });
 
@@ -328,6 +330,7 @@ it('clears a matching persisted lease when no in-memory lease has hydrated yet',
 });
 
 it('hydrates a persisted lease before restoring a post-restart lifecycle event', async () => {
+  getVideoRecordingIdMock.mockReturnValue(null);
   browserStorageSessionGetMock.mockResolvedValue({
     [storageKey]: {
       captureMode: CaptureMode.TAB,
@@ -348,4 +351,72 @@ it('hydrates a persisted lease before restoring a post-restart lifecycle event',
   expect(setVideoRecordingIdMock).toHaveBeenCalledWith('recording-5');
   expect(setVideoRecordingTabIdMock).toHaveBeenCalledWith(17);
   expect(setOpenEditorAfterRecordingMock).toHaveBeenCalledWith(true);
+});
+
+it('does not hydrate stale recording A over current recording B', async () => {
+  getVideoRecordingIdMock.mockReturnValue('recording-B');
+
+  await expect(restoreCurrentRecordingFromLease('recording-A')).resolves.toBe(false);
+
+  expect(browserStorageSessionGetMock).not.toHaveBeenCalled();
+  expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
+  expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+});
+
+it('retires an expired cached active lease instead of restoring stale runtime authority', async () => {
+  const prepared = await issuePreparedVideoRecordingLease({
+    captureMode: CaptureMode.TAB,
+    ownerSenderUrl,
+    openEditorAfterRecording: true,
+    surfaceBinding: { generation: 2, streamInstanceId: 'stream-instance-1' },
+  });
+  if (!prepared) throw new Error('Expected a prepared recording lease');
+  await activateVideoRecordingLease({
+    generation: 2,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-instance-1',
+  });
+  vi.clearAllMocks();
+  getVideoRecordingIdMock.mockReturnValue(null);
+  browserStorageSessionGetMock.mockResolvedValue({});
+  vi.setSystemTime(prepared.expiresAt + 1);
+
+  await expect(restoreCurrentRecordingFromLease('recording-1')).resolves.toBe(false);
+
+  expect(getActiveVideoRecordingLeaseSnapshot()).toBeNull();
+  expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
+  expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(browserStorageSessionGetMock).toHaveBeenCalledOnce();
+});
+
+it('does not hydrate A when B becomes current while its durable lease is loading', async () => {
+  getVideoRecordingIdMock.mockReturnValue(null);
+  let resolveLease!: (value: object) => void;
+  browserStorageSessionGetMock.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveLease = resolve;
+    })
+  );
+
+  const restoreA = restoreCurrentRecordingFromLease('recording-A');
+  await vi.waitFor(() => expect(browserStorageSessionGetMock).toHaveBeenCalledOnce());
+  getVideoRecordingIdMock.mockReturnValue('recording-B');
+  resolveLease({
+    [storageKey]: {
+      captureMode: CaptureMode.TAB,
+      controlToken: 'control-token-A',
+      expiresAt: Date.now() + 60_000,
+      openEditorAfterRecording: false,
+      ownerSenderUrl,
+      phase: 'active',
+      recordingId: 'recording-A',
+      recordingTabId: 17,
+      surfaceBinding: null,
+      version: 1,
+    },
+  });
+
+  await expect(restoreA).resolves.toBe(false);
+  expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
+  expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
 });

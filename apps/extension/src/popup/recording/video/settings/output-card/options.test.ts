@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import {
+  DEFAULT_VIDEO_OUTPUT_PROFILE,
   VideoOutputCodec,
   VideoOutputContainer,
   VideoResolutionPreset,
@@ -14,10 +15,18 @@ it('exposes only the stable live-recording codec matrix', () => {
   vi.stubGlobal('MediaRecorder', { isTypeSupported: vi.fn(() => true) });
 
   expect(
-    getAvailableOutputCodecs(VideoOutputContainer.WEBM, VideoResolutionPreset.P480, false)
+    getAvailableOutputCodecs(
+      VideoOutputContainer.WEBM,
+      { ...DEFAULT_VIDEO_OUTPUT_PROFILE, resolution: VideoResolutionPreset.P480 },
+      false
+    )
   ).toEqual([VideoOutputCodec.VP9, VideoOutputCodec.VP8]);
   expect(
-    getAvailableOutputCodecs(VideoOutputContainer.MP4, VideoResolutionPreset.P480, false)
+    getAvailableOutputCodecs(
+      VideoOutputContainer.MP4,
+      { ...DEFAULT_VIDEO_OUTPUT_PROFILE, resolution: VideoResolutionPreset.P480 },
+      false
+    )
   ).toEqual([VideoOutputCodec.AVC]);
 });
 
@@ -28,6 +37,7 @@ it('switches WebM VP9 to the canonical MP4 AVC codec without a hidden runtime fa
     resolveOutputForContainer({
       container: VideoOutputContainer.MP4,
       current: {
+        ...DEFAULT_VIDEO_OUTPUT_PROFILE,
         codec: VideoOutputCodec.VP9,
         container: VideoOutputContainer.WEBM,
         resolution: VideoResolutionPreset.P480,
@@ -35,6 +45,7 @@ it('switches WebM VP9 to the canonical MP4 AVC codec without a hidden runtime fa
       hasAudioTracks: false,
     })
   ).toEqual({
+    ...DEFAULT_VIDEO_OUTPUT_PROFILE,
     codec: VideoOutputCodec.AVC,
     container: VideoOutputContainer.MP4,
     resolution: VideoResolutionPreset.P480,

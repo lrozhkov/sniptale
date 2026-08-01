@@ -1,8 +1,22 @@
 type VideoFramePumpOptions = {
-  drawHeldFrame?: () => void;
-  drawLiveFrame: () => void;
+  drawHeldFrame?: () => boolean;
+  drawLiveFrame: () => boolean;
   frameRate: number;
 };
+
+export function resolveFixedVideoFrameRate(
+  requestedFrameRate: number,
+  sourceFrameRate: number | undefined
+): number {
+  if (!Number.isFinite(requestedFrameRate) || requestedFrameRate <= 0) {
+    throw new Error('Requested video frame rate must be positive and finite');
+  }
+  return typeof sourceFrameRate === 'number' &&
+    Number.isFinite(sourceFrameRate) &&
+    sourceFrameRate > 0
+    ? Math.min(requestedFrameRate, sourceFrameRate)
+    : requestedFrameRate;
+}
 
 function startCompensatedTimer(frameRate: number, callback: () => void): () => void {
   const periodMs = 1000 / frameRate;
@@ -27,7 +41,6 @@ function startCompensatedTimer(frameRate: number, callback: () => void): () => v
 
 export function startVideoFramePump(options: VideoFramePumpOptions): () => void {
   return startCompensatedTimer(options.frameRate, () => {
-    options.drawLiveFrame();
-    options.drawHeldFrame?.();
+    if (!options.drawLiveFrame()) options.drawHeldFrame?.();
   });
 }

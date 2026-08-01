@@ -3,6 +3,7 @@ import {
   CaptureMode,
   VideoOutputCodec,
   VideoOutputContainer,
+  VideoFrameRate,
   VideoQuality,
   VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -58,8 +59,10 @@ async function verifyVideoSettingsContracts() {
         webcamEnabled: true,
         webcamDeviceId: 'cam-2',
         systemAudioEnabled: false,
-        quality: VideoQuality.MEDIUM,
-        output: DEFAULT_VIDEO_SETTINGS.output,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          quality: VideoQuality.MEDIUM,
+        },
         qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
         qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
         countdownSeconds: 'bad',
@@ -78,7 +81,10 @@ async function verifyVideoSettingsContracts() {
     webcamEnabled: true,
     webcamDeviceId: 'cam-2',
     systemAudioEnabled: false,
-    quality: VideoQuality.MEDIUM,
+    outputProfile: {
+      ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+      quality: VideoQuality.MEDIUM,
+    },
     autoFadeDelay: 8,
     openEditorAfterRecording: true,
     diagnosticsEnabled: true,
@@ -134,23 +140,23 @@ describe('video', () => {
   );
 
   it('loads output and custom-profile choices without repairing storage on read', async () => {
-    const output = {
+    const outputProfile = {
       codec: VideoOutputCodec.AVC,
       container: VideoOutputContainer.MP4,
+      frameRate: VideoFrameRate.FPS30,
+      quality: VideoQuality.MEDIUM,
       resolution: VideoResolutionPreset.P720,
     };
     const qualityProfiles = [
       {
         id: 'custom:review',
         name: 'Review',
-        output,
-        quality: VideoQuality.MEDIUM,
+        configuration: outputProfile,
       },
     ];
     browserStorageLocalGetMock.mockResolvedValue({
       sniptale_video_settings: {
-        output,
-        quality: VideoQuality.MEDIUM,
+        outputProfile,
         qualityProfileId: 'custom:review',
         qualityProfiles,
       },
@@ -158,8 +164,7 @@ describe('video', () => {
 
     await expect(loadVideoSettings()).resolves.toEqual({
       ...DEFAULT_VIDEO_SETTINGS,
-      output,
-      quality: VideoQuality.MEDIUM,
+      outputProfile,
       qualityProfileId: 'custom:review',
       qualityProfiles,
     });
@@ -190,8 +195,10 @@ describe('video', () => {
     const profile = {
       id: 'custom:concurrent',
       name: 'Concurrent',
-      output: DEFAULT_VIDEO_SETTINGS.output,
-      quality: VideoQuality.MEDIUM,
+      configuration: {
+        ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+        quality: VideoQuality.MEDIUM,
+      },
     };
 
     await Promise.all([

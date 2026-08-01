@@ -7,14 +7,12 @@ const {
   detachCachedPreviewMock,
   loggerErrorMock,
   loggerWarnMock,
-  logOffscreenDebugErrorMock,
   sendRuntimeMessageMock,
 } = vi.hoisted(() => ({
   cleanupActiveSidecarRecordersMock: vi.fn(),
   detachCachedPreviewMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerWarnMock: vi.fn(),
-  logOffscreenDebugErrorMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
 }));
 
@@ -30,7 +28,6 @@ vi.mock('../setup/desktop-media', async (importOriginal) => ({
 
 vi.mock('../../runtime-messaging/best-effort', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime-messaging/best-effort')>()),
-  logOffscreenDebugError: logOffscreenDebugErrorMock,
   sendRuntimeMessageBestEffort: sendRuntimeMessageMock,
 }));
 
@@ -57,7 +54,6 @@ beforeEach(() => {
   recordingContext.videoStream = null;
   recordingContext.sourceStream = null;
   recordingContext.audioMixer = null;
-  recordingContext.recordedChunks = [];
   recordingContext.currentRecordingId = null;
   recordingContext.stopRecordingResolve = null;
   recordingContext.stopRecordingReject = null;
@@ -83,13 +79,12 @@ it('binds the background-minted recording and stream identities before source se
   ).toBe(true);
 });
 
-it('cleans up mixers, streams, sidecars, and recorder stop failures without throwing', async () => {
+it('delegates recorder shutdown to the artifact owner while cleaning up other resources', async () => {
   const cleanupError = new Error('cleanup failed');
   const sourceTrackStop = vi.fn();
   const videoTrackStop = vi.fn();
-  const recorderStop = vi.fn(() => {
-    throw new Error('stop failed');
-  });
+  const recorderStop = vi.fn();
+  const artifactAbort = vi.fn().mockResolvedValue(undefined);
 
   recordingContext.audioMixer = {
     cleanup: vi.fn().mockRejectedValue(cleanupError),
@@ -104,6 +99,13 @@ it('cleans up mixers, streams, sidecars, and recorder stop failures without thro
     state: 'recording',
     stop: recorderStop,
   } as never;
+  recordingContext.artifactSession = {
+    abort: artifactAbort,
+    recorder: recordingContext.mediaRecorder,
+    setLifecycleCallbacks: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+  };
 
   cleanupResources();
   await Promise.resolve();
@@ -112,13 +114,9 @@ it('cleans up mixers, streams, sidecars, and recorder stop failures without thro
   expect(cleanupActiveSidecarRecordersMock).toHaveBeenCalledOnce();
   expect(sourceTrackStop).toHaveBeenCalledOnce();
   expect(videoTrackStop).toHaveBeenCalledOnce();
-  expect(recorderStop).toHaveBeenCalledOnce();
+  expect(artifactAbort).toHaveBeenCalledOnce();
+  expect(recorderStop).not.toHaveBeenCalled();
   expect(loggerWarnMock).toHaveBeenCalledWith('Audio mixer cleanup failed', cleanupError);
-  expect(logOffscreenDebugErrorMock).toHaveBeenCalledWith(
-    expect.any(Object),
-    'Failed to stop MediaRecorder during cleanup',
-    expect.any(Error)
-  );
   expect(recordingContext.sourceStream).toBeNull();
   expect(recordingContext.videoStream).toBeNull();
   expect(recordingContext.mediaRecorder).toBeNull();

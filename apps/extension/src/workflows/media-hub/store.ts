@@ -5,7 +5,13 @@ import {
   updateMediaLibraryEntry,
   updateScreenshotMediaAsset,
 } from '../../composition/persistence/media-library/index';
-import { deleteRecording, saveRecording } from '../../composition/persistence/recordings/index';
+import {
+  deleteRecording,
+  saveRecording,
+  saveRecordingsBatch,
+  saveRecordingsBatchWithCompletion,
+  type SaveRecordingBatchInput,
+} from '../../composition/persistence/recordings/index';
 import {
   deleteProjectExport,
   commitProjectExport,
@@ -21,6 +27,7 @@ import type {
 } from '../../composition/persistence/media-library/contracts';
 import type { ProjectExportEntry } from '../../composition/persistence/projects/contracts';
 import type { RecordingTelemetryEntry } from '../../composition/persistence/recordings/contracts';
+import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { isSafeArchiveEntryLeafFilename } from '@sniptale/platform/data/zip-profile/entry-filenames';
 import { translate } from '../../platform/i18n';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
@@ -85,6 +92,36 @@ export async function saveRecordingSafely(id: string, blob: Blob, filename: stri
     saveRecording(id, blob, filename)
   );
   publishMediaHubLibraryChanged('create', [`recording:${id}`]);
+}
+
+async function saveRecordingBatchThroughGuard(
+  inputs: readonly SaveRecordingBatchInput[],
+  commit: () => ReturnType<typeof saveRecordingsBatch>
+): Promise<void> {
+  inputs.forEach((input) => assertSafeMediaFilename(input.filename));
+  const entries = await withMediaHubWriteGuard(
+    translate('shared.mediaHub.saveRecordingAction'),
+    commit
+  );
+  publishMediaHubLibraryChanged(
+    'create',
+    entries.map((entry) => `recording:${entry.id}`)
+  );
+}
+
+export function saveRecordingsBatchSafely(
+  inputs: readonly SaveRecordingBatchInput[]
+): Promise<void> {
+  return saveRecordingBatchThroughGuard(inputs, () => saveRecordingsBatch(inputs));
+}
+
+export async function saveRecordingsBatchWithCompletionSafely(
+  inputs: readonly SaveRecordingBatchInput[],
+  completion: VideoPostRecordResult
+): Promise<void> {
+  return saveRecordingBatchThroughGuard(inputs, () =>
+    saveRecordingsBatchWithCompletion(inputs, completion)
+  );
 }
 
 export async function saveRecordingTelemetrySafely(entry: RecordingTelemetryEntry): Promise<void> {

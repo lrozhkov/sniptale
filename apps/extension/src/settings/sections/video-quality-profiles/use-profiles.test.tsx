@@ -10,7 +10,7 @@ import {
   VideoOutputContainer,
   VideoQuality,
   VideoResolutionPreset,
-  type VideoRecordingQualityProfile,
+  type VideoRecordingProfile,
 } from '@sniptale/runtime-contracts/video/types/types';
 
 const { loadVideoSettingsMock, mutateVideoSettingsMock } = vi.hoisted(() => ({
@@ -35,15 +35,16 @@ let container: HTMLDivElement | null = null;
 let latest: ReturnType<typeof useVideoQualityProfiles> | null = null;
 let root: Root | null = null;
 
-const existingProfile: VideoRecordingQualityProfile = {
+const existingProfile: VideoRecordingProfile = {
   id: 'custom:review',
   name: 'Review',
-  output: {
+  configuration: {
+    ...DEFAULT_VIDEO_SETTINGS.outputProfile,
     codec: VideoOutputCodec.VP9,
     container: VideoOutputContainer.WEBM,
     resolution: VideoResolutionPreset.P720,
+    quality: VideoQuality.MEDIUM,
   },
-  quality: VideoQuality.MEDIUM,
 };
 
 function Harness() {
@@ -67,16 +68,14 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   loadVideoSettingsMock.mockResolvedValue({
     ...DEFAULT_VIDEO_SETTINGS,
-    output: existingProfile.output,
-    quality: existingProfile.quality,
+    outputProfile: existingProfile.configuration,
     qualityProfileId: existingProfile.id,
     qualityProfiles: [existingProfile],
   });
   mutateVideoSettingsMock.mockImplementation(async (mutation) =>
     mutation({
       ...DEFAULT_VIDEO_SETTINGS,
-      output: existingProfile.output,
-      quality: existingProfile.quality,
+      outputProfile: existingProfile.configuration,
       qualityProfileId: existingProfile.id,
       qualityProfiles: [existingProfile],
     })
@@ -106,8 +105,7 @@ it('loads built-in and custom profiles and materializes a selected profile', asy
   const mutation = mutateVideoSettingsMock.mock.calls[0]?.[0];
   expect(mutation?.(DEFAULT_VIDEO_SETTINGS)).toEqual(
     expect.objectContaining({
-      output: maximum.output,
-      quality: maximum.quality,
+      outputProfile: maximum.configuration,
       qualityProfileId: maximum.id,
     })
   );
@@ -118,12 +116,13 @@ it('updates the active profile and its materialized recording settings atomicall
   const edited = {
     ...existingProfile,
     name: 'Review MP4',
-    output: {
+    configuration: {
+      ...existingProfile.configuration,
       codec: VideoOutputCodec.AVC,
       container: VideoOutputContainer.MP4,
       resolution: VideoResolutionPreset.P1080,
+      quality: VideoQuality.HIGH,
     },
-    quality: VideoQuality.HIGH,
   } as const;
 
   await act(async () => requireState().actions.saveProfile(edited));
@@ -132,15 +131,13 @@ it('updates the active profile and its materialized recording settings atomicall
   expect(
     mutation?.({
       ...DEFAULT_VIDEO_SETTINGS,
-      output: existingProfile.output,
-      quality: existingProfile.quality,
+      outputProfile: existingProfile.configuration,
       qualityProfileId: existingProfile.id,
       qualityProfiles: [existingProfile],
     })
   ).toEqual(
     expect.objectContaining({
-      output: edited.output,
-      quality: edited.quality,
+      outputProfile: edited.configuration,
       qualityProfileId: edited.id,
       qualityProfiles: [edited],
     })
@@ -193,7 +190,7 @@ it('surfaces load and save failures without replacing the current settings', asy
 it('rejects a concurrent add at the locked profile limit and keeps the editor open', async () => {
   const profilesAtLimit = Array.from(
     { length: VIDEO_RECORDING_CUSTOM_PROFILE_LIMIT },
-    (_, index): VideoRecordingQualityProfile => ({
+    (_, index): VideoRecordingProfile => ({
       ...existingProfile,
       id: `custom:${index}`,
       name: `Profile ${index}`,

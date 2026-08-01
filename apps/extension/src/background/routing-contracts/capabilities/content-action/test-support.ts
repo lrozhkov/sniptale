@@ -32,13 +32,9 @@ function getSenderBindingKey(
 }
 
 function getActivationPurposeForAction(
-  actionType: ContentPrivilegedActionType
+  _actionType: ContentPrivilegedActionType
 ): ContentPrivilegedActionActivationPurpose {
-  return actionType === MessageType.STAGE_RECORDING_DOWNLOAD_CHUNK ||
-    actionType === MessageType.SAVE_RECORDING_FOR_DOWNLOAD ||
-    actionType === MessageType.RELEASE_RECORDING_DOWNLOAD
-    ? 'recording-download'
-    : 'trusted-content-event';
+  return 'trusted-content-event';
 }
 
 export function resolveContentSenderBindingForTest(

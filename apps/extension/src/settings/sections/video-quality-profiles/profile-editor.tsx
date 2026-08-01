@@ -2,11 +2,14 @@ import { useState, type FormEvent } from 'react';
 import {
   getDefaultVideoOutputCodec,
   isVideoOutputCodecCompatible,
+  isVideoResolutionFrameRateSupported,
+  VideoFrameRate,
   VideoOutputCodec,
   VideoOutputContainer,
   VideoQuality,
   VideoResolutionPreset,
-  type VideoRecordingQualityProfile,
+  type VideoOutputProfile,
+  type VideoRecordingProfile,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { ProductField, ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import {
@@ -28,6 +31,11 @@ const QUALITY_OPTIONS = Object.values(VideoQuality).map((value) => ({
   value,
   label: getQualityLabel(value),
 }));
+const FRAME_RATE_OPTIONS = Object.values(VideoFrameRate).map((value) => ({
+  frameRate: value,
+  value: String(value),
+  label: `${value} fps`,
+}));
 const CONTAINER_OPTIONS = Object.values(VideoOutputContainer).map((value) => ({
   value,
   label: getContainerLabel(value),
@@ -37,31 +45,137 @@ const RESOLUTION_OPTIONS = Object.values(VideoResolutionPreset).map((value) => (
   label: getResolutionLabel(value),
 }));
 
-function createDraft(profile?: VideoRecordingQualityProfile): VideoRecordingQualityProfile {
+function createDraft(profile?: VideoRecordingProfile): VideoRecordingProfile {
   return (
     profile ?? {
       id: '',
       name: '',
-      quality: VideoQuality.HIGH,
-      output: {
+      configuration: {
         codec: VideoOutputCodec.VP9,
         container: VideoOutputContainer.WEBM,
+        frameRate: VideoFrameRate.FPS30,
+        quality: VideoQuality.HIGH,
         resolution: VideoResolutionPreset.P1080,
       },
     }
   );
 }
 
+function VideoProfileFormatFields(props: {
+  configuration: VideoOutputProfile;
+  onChange: (configuration: VideoOutputProfile) => void;
+}) {
+  const codecOptions = Object.values(VideoOutputCodec)
+    .filter((codec) => isVideoOutputCodecCompatible(props.configuration.container, codec))
+    .map((value) => ({ value, label: getCodecLabel(value) }));
+  return (
+    <>
+      <ProductField label={translate('settings.videoQuality.qualityLabel')}>
+        <ProductSelect
+          aria-label={translate('settings.videoQuality.qualityLabel')}
+          menuPlacement="auto"
+          menuScrollable={false}
+          value={props.configuration.quality}
+          options={QUALITY_OPTIONS}
+          onChange={(quality) => props.onChange({ ...props.configuration, quality })}
+        />
+      </ProductField>
+      <ProductField label={translate('settings.videoQuality.containerLabel')}>
+        <ProductSelect
+          aria-label={translate('settings.videoQuality.containerLabel')}
+          menuPlacement="auto"
+          menuScrollable={false}
+          value={props.configuration.container}
+          options={CONTAINER_OPTIONS}
+          onChange={(container) =>
+            props.onChange({
+              ...props.configuration,
+              container,
+              codec: isVideoOutputCodecCompatible(container, props.configuration.codec)
+                ? props.configuration.codec
+                : getDefaultVideoOutputCodec(container),
+            })
+          }
+        />
+      </ProductField>
+      <ProductField label={translate('settings.videoQuality.codecLabel')}>
+        <ProductSelect
+          aria-label={translate('settings.videoQuality.codecLabel')}
+          menuPlacement="auto"
+          menuScrollable={false}
+          value={props.configuration.codec}
+          options={codecOptions}
+          onChange={(codec) => props.onChange({ ...props.configuration, codec })}
+        />
+      </ProductField>
+    </>
+  );
+}
+
+function resolveSelectedFrameRate(value: string): VideoFrameRate {
+  if (value === String(VideoFrameRate.FPS24)) return VideoFrameRate.FPS24;
+  if (value === String(VideoFrameRate.FPS60)) return VideoFrameRate.FPS60;
+  return VideoFrameRate.FPS30;
+}
+
+function VideoProfileGeometryFields(props: {
+  configuration: VideoOutputProfile;
+  onChange: (configuration: VideoOutputProfile) => void;
+}) {
+  const frameRateOptions = FRAME_RATE_OPTIONS.map(({ frameRate, label, value }) => ({
+    disabled: !isVideoResolutionFrameRateSupported(props.configuration.resolution, frameRate),
+    label,
+    value,
+  }));
+  return (
+    <>
+      <ProductField label={translate('settings.videoQuality.resolutionLabel')}>
+        <ProductSelect
+          aria-label={translate('settings.videoQuality.resolutionLabel')}
+          menuPlacement="auto"
+          menuScrollable={false}
+          value={props.configuration.resolution}
+          options={RESOLUTION_OPTIONS}
+          onChange={(resolution) =>
+            props.onChange({
+              ...props.configuration,
+              frameRate: isVideoResolutionFrameRateSupported(
+                resolution,
+                props.configuration.frameRate
+              )
+                ? props.configuration.frameRate
+                : VideoFrameRate.FPS24,
+              resolution,
+            })
+          }
+        />
+      </ProductField>
+      <ProductField label={translate('settings.videoQuality.frameRateLabel')}>
+        <ProductSelect
+          aria-label={translate('settings.videoQuality.frameRateLabel')}
+          menuPlacement="auto"
+          menuScrollable={false}
+          value={String(props.configuration.frameRate)}
+          options={frameRateOptions}
+          onChange={(frameRate) =>
+            props.onChange({
+              ...props.configuration,
+              frameRate: resolveSelectedFrameRate(frameRate),
+            })
+          }
+        />
+      </ProductField>
+    </>
+  );
+}
+
 export function VideoQualityProfileEditor(props: {
   busy: boolean;
   onClose: () => void;
-  onSave: (profile: VideoRecordingQualityProfile) => Promise<void>;
-  profile?: VideoRecordingQualityProfile;
+  onSave: (profile: VideoRecordingProfile) => Promise<void>;
+  profile?: VideoRecordingProfile;
 }) {
   const [draft, setDraft] = useState(() => createDraft(props.profile));
-  const codecOptions = Object.values(VideoOutputCodec)
-    .filter((codec) => isVideoOutputCodecCompatible(draft.output.container, codec))
-    .map((value) => ({ value, label: getCodecLabel(value) }));
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     void props.onSave(draft);
@@ -87,59 +201,14 @@ export function VideoQualityProfileEditor(props: {
             />
           </ProductField>
           <div className="grid grid-cols-2 gap-3">
-            <ProductField label={translate('settings.videoQuality.qualityLabel')}>
-              <ProductSelect
-                aria-label={translate('settings.videoQuality.qualityLabel')}
-                menuPlacement="auto"
-                menuScrollable={false}
-                value={draft.quality}
-                options={QUALITY_OPTIONS}
-                onChange={(quality) => setDraft({ ...draft, quality })}
-              />
-            </ProductField>
-            <ProductField label={translate('settings.videoQuality.containerLabel')}>
-              <ProductSelect
-                aria-label={translate('settings.videoQuality.containerLabel')}
-                menuPlacement="auto"
-                menuScrollable={false}
-                value={draft.output.container}
-                options={CONTAINER_OPTIONS}
-                onChange={(container) =>
-                  setDraft({
-                    ...draft,
-                    output: {
-                      ...draft.output,
-                      container,
-                      codec: isVideoOutputCodecCompatible(container, draft.output.codec)
-                        ? draft.output.codec
-                        : getDefaultVideoOutputCodec(container),
-                    },
-                  })
-                }
-              />
-            </ProductField>
-            <ProductField label={translate('settings.videoQuality.codecLabel')}>
-              <ProductSelect
-                aria-label={translate('settings.videoQuality.codecLabel')}
-                menuPlacement="auto"
-                menuScrollable={false}
-                value={draft.output.codec}
-                options={codecOptions}
-                onChange={(codec) => setDraft({ ...draft, output: { ...draft.output, codec } })}
-              />
-            </ProductField>
-            <ProductField label={translate('settings.videoQuality.resolutionLabel')}>
-              <ProductSelect
-                aria-label={translate('settings.videoQuality.resolutionLabel')}
-                menuPlacement="auto"
-                menuScrollable={false}
-                value={draft.output.resolution}
-                options={RESOLUTION_OPTIONS}
-                onChange={(resolution) =>
-                  setDraft({ ...draft, output: { ...draft.output, resolution } })
-                }
-              />
-            </ProductField>
+            <VideoProfileFormatFields
+              configuration={draft.configuration}
+              onChange={(configuration) => setDraft({ ...draft, configuration })}
+            />
+            <VideoProfileGeometryFields
+              configuration={draft.configuration}
+              onChange={(configuration) => setDraft({ ...draft, configuration })}
+            />
           </div>
         </div>
         <ProductModalFooter compact>

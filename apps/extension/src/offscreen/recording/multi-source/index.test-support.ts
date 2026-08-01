@@ -1,6 +1,5 @@
 import {
-  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-  VideoQuality,
+  DEFAULT_VIDEO_OUTPUT_PROFILE,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
@@ -25,6 +24,7 @@ export class FakeMediaRecorder {
   onerror: ((event: Event) => void) | null = null;
   onstart: (() => void) | null = null;
   onstop: (() => void) | null = null;
+  readonly startTimeslices: Array<number | undefined> = [];
   state: RecordingState = 'inactive';
 
   constructor(
@@ -48,7 +48,8 @@ export class FakeMediaRecorder {
     this.onstop?.();
   }
 
-  start() {
+  start(timeslice?: number) {
+    this.startTimeslices.push(timeslice);
     this.state = 'recording';
     if (FakeMediaRecorder.autoEmitStart) {
       this.emitStart();
@@ -71,8 +72,7 @@ export function createSettings(): VideoRecordingSettings {
     microphoneDeviceId: null,
     microphoneEnabled: true,
     openEditorAfterRecording: true,
-    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-    quality: VideoQuality.HIGH,
+    outputProfile: DEFAULT_VIDEO_OUTPUT_PROFILE,
     sourceCount: 2,
     systemAudioEnabled: false,
     webcamDeviceId: 'cam-1',

@@ -14,6 +14,8 @@ declare module './index' {
     type RECORDING_ERROR = typeof import('./index').VideoMessageType.RECORDING_ERROR;
     type READY_TO_COUNTDOWN = typeof import('./index').VideoMessageType.READY_TO_COUNTDOWN;
     type GET_RECORDING_STATE = typeof import('./index').VideoMessageType.GET_RECORDING_STATE;
+    type ACKNOWLEDGE_POST_RECORD_RESULT =
+      typeof import('./index').VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT;
     type REGISTER_CAMERA_RECORDER_CONTROL =
       typeof import('./index').VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL;
     type RECORDING_STATE_SYNC = typeof import('./index').VideoMessageType.RECORDING_STATE_SYNC;

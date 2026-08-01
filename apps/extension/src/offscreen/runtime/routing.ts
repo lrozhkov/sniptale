@@ -32,6 +32,7 @@ import {
 } from '../recording/stream/tab-output';
 import type { OutputSize } from '../recording/stream/crop-stream';
 import type { RecordingStopOutcome } from '../recording/context';
+import { createLogger } from '@sniptale/platform/observability/logger';
 import { buildDesktopMediaRequestOptions } from './desktop-media-options';
 import {
   handledOffscreenRuntimeMessageTypes,
@@ -41,6 +42,8 @@ import { handlePageStoragePrivacyErasure } from './privacy-erasure';
 import { handleProjectExportRuntimeMessage } from './routing.project-export';
 
 type OffscreenRuntimeMessage = ReturnType<typeof parseOffscreenRuntimeMessage>;
+
+const logger = createLogger({ namespace: 'OffscreenRuntimeRouting' });
 
 export type { HandledOffscreenRuntimeMessageType } from './message-types';
 type HandledMessage = Extract<
@@ -308,13 +311,18 @@ async function refreshFrozenTabOutput(
         devicePixelRatio: message.viewport.devicePixelRatio,
       }
     : geometry.coordinateSpace;
-  const nextGeometry = remapTabOutputGeometry(geometry, sourceSize, coordinateSpace);
-  if (controls.applyFrozenSourceGeometry(message.transitionId, nextGeometry) !== 'applied') {
+  const remapOutcome = remapTabOutputGeometry(geometry, sourceSize, coordinateSpace);
+  if (
+    controls.applyFrozenSourceGeometry(message.transitionId, remapOutcome.geometry) !== 'applied'
+  ) {
     throw new Error('Viewport source revalidation was superseded');
+  }
+  if (remapOutcome.kind === 'recoverable-contain') {
+    logger.warn(remapOutcome.warning);
   }
   recordingContext.sourceVideoHeight = sourceSize.height;
   recordingContext.sourceVideoWidth = sourceSize.width;
-  recordingContext.tabOutputGeometry = nextGeometry;
+  recordingContext.tabOutputGeometry = remapOutcome.geometry;
   return sourceSize;
 }
 

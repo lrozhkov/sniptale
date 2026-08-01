@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest';
 
-import { acquireMediaMutationPermit, reserveMediaErasureExclusion } from './lifecycle-gate';
+import {
+  acquireMediaMutationPermit,
+  getMediaAuthorityGeneration,
+  reserveMediaErasureExclusion,
+} from './lifecycle-gate';
 
 it('blocks new starts immediately and waits for already admitted starts to finish', async () => {
   const releaseExistingStart = acquireMediaMutationPermit();
@@ -57,9 +61,12 @@ it('drains every concurrent start and makes permit release idempotent', async ()
 });
 
 it('makes exclusion release idempotent', () => {
+  const generationBefore = getMediaAuthorityGeneration();
   const exclusion = reserveMediaErasureExclusion();
+  expect(getMediaAuthorityGeneration()).toBe(generationBefore + 1);
   exclusion.release();
   exclusion.release();
+  expect(getMediaAuthorityGeneration()).toBe(generationBefore + 2);
 
   const nextStart = acquireMediaMutationPermit();
   expect(nextStart).not.toBeNull();

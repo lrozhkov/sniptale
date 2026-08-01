@@ -1,79 +1,55 @@
-import { beforeEach, expect, it, vi } from 'vitest';
-import {
-  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-  VideoQuality,
-  type VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
-import {
-  createMultiSourceLifecycle,
-  setActiveMultiSourceSession,
-  type MultiSourceRecorder,
-  type MultiSourceSession,
-} from './state';
-import type { RecordingSidecarRecorder } from '../sidecar/types';
-import { stopMultiSourceSession } from './stop';
+import { expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
+import { createMultiSourceLifecycle, type MultiSourceSession } from './state';
+import { setActiveMultiSourceSession } from './state';
+import { stopMultiSourceSession } from './stop';
 
-type FakeRecorder = {
-  onstop: (() => void) | null;
-  requestData: ReturnType<typeof vi.fn>;
-  state: RecordingState;
-  stop: ReturnType<typeof vi.fn>;
-};
-
-function createSettings(): VideoRecordingSettings {
+function createArtifact(id: string): FinalizedRecordingStagingArtifact {
+  const file = new File(['media'], `${id}.webm`, { type: 'video/webm' });
   return {
-    ...DEFAULT_VIDEO_SETTINGS,
-    autoFadeDelay: 3,
-    controlledCursorCaptureEnabled: false,
-    countdownSeconds: 0,
-    diagnosticsEnabled: false,
-    microphoneDeviceId: null,
-    microphoneEnabled: false,
-    openEditorAfterRecording: false,
-    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-    quality: VideoQuality.HIGH,
-    sourceCount: 2,
-    systemAudioEnabled: false,
+    artifactId: id,
+    file,
+    filename: file.name,
+    mimeType: file.type,
+    size: file.size,
   };
 }
 
-function createRecorder(sourceIndex: number): MultiSourceRecorder & { fakeRecorder: FakeRecorder } {
-  const track = { stop: vi.fn() };
-  const stream = {
-    getTracks: () => [track],
-    getVideoTracks: () => [track],
-  } as unknown as MediaStream;
-  const fakeRecorder: FakeRecorder = {
-    onstop: null,
-    requestData: vi.fn(),
-    state: 'recording',
-    stop: vi.fn(() => {
-      fakeRecorder.state = 'inactive';
-    }),
-  };
-  return {
-    chunks: [],
-    fakeRecorder,
-    label: null,
-    recorder: fakeRecorder as unknown as MediaRecorder,
-    recordingId: `rec-window-${sourceIndex + 1}`,
-    sourceIndex,
-    stream,
-    trackSettings: { height: 720, width: 1280 },
-  };
-}
-
-function createSession(recorders: MultiSourceRecorder[]): MultiSourceSession {
+function createSession(): MultiSourceSession {
   const lifecycle = createMultiSourceLifecycle();
   lifecycle.activate();
+  const artifact = createArtifact('rec-window-1');
   return {
     audioRecorder: null,
     durationTimer: null,
     lifecycle,
-    recorders,
+    recorders: [
+      {
+        artifact: null,
+        artifactSession: {
+          abort: vi.fn(),
+          recorder: {} as MediaRecorder,
+          setLifecycleCallbacks: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn().mockResolvedValue(artifact),
+        },
+        label: 'Window 1',
+        recorder: {} as MediaRecorder,
+        recordingId: artifact.artifactId,
+        sourceIndex: 0,
+        stream: { getTracks: () => [] } as unknown as MediaStream,
+        trackSettings: { height: 720, width: 1280 },
+      },
+    ],
     recordingId: 'rec',
-    settings: createSettings(),
+    settings: DEFAULT_VIDEO_SETTINGS,
+    staging: {
+      abort: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+      getPendingBytes: vi.fn(() => 0),
+      openArtifact: vi.fn(),
+    },
     startedAt: Date.now(),
     stopPromise: null,
     stopReject: null,
@@ -82,77 +58,27 @@ function createSession(recorders: MultiSourceRecorder[]): MultiSourceSession {
   };
 }
 
-function createWebcamRecorder(): RecordingSidecarRecorder & { fakeRecorder: FakeRecorder } {
-  const track = { stop: vi.fn() };
-  const stream = {
-    getTracks: () => [track],
-    getVideoTracks: () => [track],
-  } as unknown as MediaStream;
-  const fakeRecorder: FakeRecorder = {
-    onstop: null,
-    requestData: vi.fn(),
-    state: 'recording',
-    stop: vi.fn(() => {
-      fakeRecorder.state = 'inactive';
-    }),
-  };
-  return {
-    chunks: [],
-    fakeRecorder,
-    filenameSuffix: 'webcam',
-    kind: 'webcam',
-    recorder: fakeRecorder as unknown as MediaRecorder,
-    recordingId: 'rec-webcam',
-    stream,
-    trackSettings: { height: 360, width: 640 },
-  };
-}
-
-beforeEach(() => {
-  setActiveMultiSourceSession(null);
-});
-
-it('deduplicates overlapping stop requests and finalizes a source batch once', async () => {
-  const recorders = [createRecorder(0), createRecorder(1)];
-  const session = createSession(recorders);
+it('deduplicates stop and finalizes only after every artifact session drains', async () => {
+  const session = createSession();
   const finalizeSession = vi.fn().mockResolvedValue(undefined);
-
   setActiveMultiSourceSession(session);
-  const firstStop = stopMultiSourceSession({ discard: false, finalizeSession, session });
-  const secondStop = stopMultiSourceSession({ discard: false, finalizeSession, session });
 
-  expect(firstStop).toBe(secondStop);
-  recorders.forEach((source) => {
-    expect(source.fakeRecorder.requestData).toHaveBeenCalledOnce();
-    expect(source.fakeRecorder.stop).toHaveBeenCalledOnce();
-  });
-  expect(finalizeSession).not.toHaveBeenCalled();
+  const first = stopMultiSourceSession({ discard: false, finalizeSession, session });
+  const second = stopMultiSourceSession({ discard: false, finalizeSession, session });
+  expect(first).toBe(second);
+  await first;
 
-  recorders[0]?.fakeRecorder.onstop?.();
-  recorders[1]?.fakeRecorder.onstop?.();
-  recorders[1]?.fakeRecorder.onstop?.();
-  await Promise.all([firstStop, secondStop]);
-
-  expect(finalizeSession).toHaveBeenCalledOnce();
+  expect(session.recorders[0]?.artifactSession.stop).toHaveBeenCalledOnce();
   expect(finalizeSession).toHaveBeenCalledWith(session);
 });
 
-it('waits for webcam recorder stop before finalizing the session', async () => {
-  const recorders = [createRecorder(0), createRecorder(1)];
-  const webcamRecorder = createWebcamRecorder();
-  const session = { ...createSession(recorders), webcamRecorder };
-  const finalizeSession = vi.fn().mockResolvedValue(undefined);
-
+it('aborts staging instead of finalizing a discarded artifact set', async () => {
+  const session = createSession();
+  const finalizeSession = vi.fn();
   setActiveMultiSourceSession(session);
-  const stopPromise = stopMultiSourceSession({ discard: false, finalizeSession, session });
 
-  recorders.forEach((source) => source.fakeRecorder.onstop?.());
-  await Promise.resolve();
+  await stopMultiSourceSession({ discard: true, finalizeSession, session });
+
+  expect(session.staging.abort).toHaveBeenCalledOnce();
   expect(finalizeSession).not.toHaveBeenCalled();
-
-  webcamRecorder.fakeRecorder.onstop?.();
-  await stopPromise;
-
-  expect(webcamRecorder.fakeRecorder.requestData).toHaveBeenCalledOnce();
-  expect(finalizeSession).toHaveBeenCalledWith(session);
 });

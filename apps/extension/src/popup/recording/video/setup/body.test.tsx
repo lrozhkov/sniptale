@@ -229,6 +229,7 @@ function expectSetupControlProps(props: React.ComponentProps<typeof VideoSetupBo
   expect(videoSetupBodyMocks.settingsGridMock).toHaveBeenCalledWith(
     expect.objectContaining({
       captureMode: CaptureMode.TAB,
+      knownOutputBasisDimensions: props.viewModel.knownOutputBasisDimensions,
       onSettingsChange: props.onSettingsChange,
       settings: props.settings,
     })

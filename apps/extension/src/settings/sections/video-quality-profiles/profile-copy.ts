@@ -2,13 +2,13 @@ import { translate } from '../../../platform/i18n';
 import {
   VideoOutputCodec,
   VideoOutputContainer,
+  type VideoRecordingProfile,
   VideoQuality,
   VideoRecordingBuiltInProfileId,
   VideoResolutionPreset,
-  type VideoRecordingQualityProfile,
 } from '@sniptale/runtime-contracts/video/types/types';
 
-export function getProfileName(profile: VideoRecordingQualityProfile): string {
+export function getProfileName(profile: VideoRecordingProfile): string {
   switch (profile.id) {
     case VideoRecordingBuiltInProfileId.COMPACT:
       return translate('settings.videoQuality.compactName');
@@ -61,11 +61,12 @@ export function getResolutionLabel(resolution: VideoResolutionPreset): string {
   return resolution.toLowerCase();
 }
 
-export function getProfileSummary(profile: VideoRecordingQualityProfile): string {
+export function getProfileSummary(profile: VideoRecordingProfile): string {
   return [
-    getResolutionLabel(profile.output.resolution),
-    getContainerLabel(profile.output.container),
-    getCodecLabel(profile.output.codec),
-    getQualityLabel(profile.quality),
+    getResolutionLabel(profile.configuration.resolution),
+    getContainerLabel(profile.configuration.container),
+    getCodecLabel(profile.configuration.codec),
+    `${profile.configuration.frameRate} fps`,
+    getQualityLabel(profile.configuration.quality),
   ].join(' · ');
 }

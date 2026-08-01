@@ -17,17 +17,25 @@ import {
 export class CaptureSurfaceLeaseRelease {
   constructor(private readonly registry: CaptureSurfaceLeaseRegistry) {}
 
-  async release(request: CaptureSurfaceReleaseRequest): Promise<void> {
-    const state = this.registry.getLease(request.leaseId);
-    if (
-      !state ||
-      state.applied.sessionId !== request.sessionId ||
-      state.applied.generation !== request.generation
-    ) {
+  async abandonConflicted(request: CaptureSurfaceReleaseRequest): Promise<void> {
+    const state = this.requireExactTopLease(request);
+    if (state.entry.phase !== 'conflict') {
       throw new CaptureSurfaceError('stale-generation');
     }
+    await this.releaseOwnedViewportAcquisition(state);
     const stack = this.registry.getStack(state.entry.tabId);
-    if (stack?.at(-1) !== state) throw new CaptureSurfaceError('stale-generation');
+    const parent = stack?.at(-2);
+    this.registry.remove(state);
+    if (parent) {
+      parent.entry.phase = 'conflict';
+      parent.entry.updatedAt = this.registry.nextTimestamp();
+    }
+    await this.registry.persist();
+  }
+
+  async release(request: CaptureSurfaceReleaseRequest): Promise<void> {
+    const state = this.requireExactTopLease(request);
+    const stack = this.registry.getStack(state.entry.tabId);
 
     state.entry.phase = 'releasing';
     state.entry.updatedAt = this.registry.nextTimestamp();
@@ -57,6 +65,19 @@ export class CaptureSurfaceLeaseRelease {
     } finally {
       if (!acquisitionSettled) await observation.releaseAcquisition();
     }
+  }
+
+  private requireExactTopLease(request: CaptureSurfaceReleaseRequest): CaptureSurfaceLeaseState {
+    const state = this.registry.getLease(request.leaseId);
+    if (
+      !state ||
+      state.applied.sessionId !== request.sessionId ||
+      state.applied.generation !== request.generation ||
+      this.registry.getStack(state.entry.tabId)?.at(-1) !== state
+    ) {
+      throw new CaptureSurfaceError('stale-generation');
+    }
+    return state;
   }
 
   async releaseOwners(

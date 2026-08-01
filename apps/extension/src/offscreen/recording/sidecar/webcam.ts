@@ -14,6 +14,10 @@ import {
   resolveVideoRecordingFrameRate,
 } from '../../../platform/media-utils/video-recording';
 import { createFixedVideoOutputStream } from '../stream/fixed-video-output';
+import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
+import { createRecordingArtifactSession } from '../encoding/artifact-session';
+import { buildSidecarFilename } from '../finalizer';
+import { resolveVideoRecordingArtifact } from '../../../platform/media-utils/video-recording';
 
 function buildWebcamVideoConstraints(settings: VideoRecordingSettings): MediaTrackConstraints {
   return {
@@ -35,6 +39,7 @@ function resolveWebcamEncoderFrameRate(params: {
 
 async function createWebcamMediaRecorder(params: {
   baseRecordingId: string;
+  coordinator: RecordingStagingCoordinator;
   settings: VideoRecordingSettings;
   stream: MediaStream;
 }): Promise<RecordingSidecarRecorder> {
@@ -62,26 +67,31 @@ async function createWebcamMediaRecorder(params: {
       ...normalized.dimensions,
       frameRate: normalized.frameRate,
     };
+    const recorderOptions = buildVideoMediaRecorderOptions(
+      params.settings,
+      normalized.stream,
+      trackSettings
+    );
+    const artifact = resolveVideoRecordingArtifact(recorderOptions.mimeType ?? '');
+    const recordingId = buildWebcamRecordingId(params.baseRecordingId);
+    const artifactSession = await createRecordingArtifactSession({
+      artifactId: recordingId,
+      coordinator: params.coordinator,
+      filename: buildSidecarFilename(WEBCAM_RECORDING_FILENAME_SUFFIX, artifact.mimeType),
+      mimeType: artifact.mimeType,
+      recorderOptions,
+      stream: normalized.stream,
+    });
+    const recorder = artifactSession.recorder;
     const sidecar: RecordingSidecarRecorder = {
-      chunks: [],
+      artifact: null,
+      artifactSession,
       filenameSuffix: WEBCAM_RECORDING_FILENAME_SUFFIX,
       kind: 'webcam',
-      recorder: new MediaRecorder(
-        normalized.stream,
-        buildVideoMediaRecorderOptions(params.settings, normalized.stream, trackSettings)
-      ),
-      recordingId: buildWebcamRecordingId(params.baseRecordingId),
+      recorder,
+      recordingId,
       stream: normalized.stream,
       trackSettings,
-    };
-
-    sidecar.recorder.ondataavailable = (event) => {
-      if (event.data && event.data.size > 0) {
-        sidecar.chunks.push(event.data);
-      }
-    };
-    sidecar.recorder.onerror = () => {
-      sidecar.stream.getTracks().forEach((track) => track.stop());
     };
 
     return sidecar;
@@ -93,6 +103,7 @@ async function createWebcamMediaRecorder(params: {
 
 export async function createWebcamSidecarRecorder(params: {
   baseRecordingId: string;
+  coordinator: RecordingStagingCoordinator;
   settings: VideoRecordingSettings;
 }): Promise<RecordingSidecarRecorder | null> {
   if (!params.settings.webcamEnabled) {
@@ -106,6 +117,7 @@ export async function createWebcamSidecarRecorder(params: {
 
   return createWebcamMediaRecorder({
     baseRecordingId: params.baseRecordingId,
+    coordinator: params.coordinator,
     settings: params.settings,
     stream,
   });

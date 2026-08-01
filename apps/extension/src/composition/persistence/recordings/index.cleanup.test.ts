@@ -1,14 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { dbGetAllMock, dbDeleteMock, initDBMock, mediaDeleteMock, openCursorMock, transactionMock } =
-  vi.hoisted(() => ({
-    dbDeleteMock: vi.fn(),
-    dbGetAllMock: vi.fn(),
-    initDBMock: vi.fn(),
-    mediaDeleteMock: vi.fn(),
-    openCursorMock: vi.fn(),
-    transactionMock: vi.fn(),
-  }));
+const {
+  dbGetAllMock,
+  dbDeleteMock,
+  initDBMock,
+  mediaDeleteMock,
+  openCursorMock,
+  telemetryDeleteMock,
+  transactionMock,
+} = vi.hoisted(() => ({
+  dbDeleteMock: vi.fn(),
+  dbGetAllMock: vi.fn(),
+  initDBMock: vi.fn(),
+  mediaDeleteMock: vi.fn(),
+  openCursorMock: vi.fn(),
+  telemetryDeleteMock: vi.fn(),
+  transactionMock: vi.fn(),
+}));
 
 vi.mock('../infrastructure/indexed-db/core', () => ({
   MEDIA_LIBRARY_STORE: 'media_library',
@@ -25,7 +33,12 @@ function resetRecordingsDbMocks() {
   transactionMock.mockReturnValue({
     done: Promise.resolve(),
     objectStore: vi.fn((storeName: string) => ({
-      delete: storeName === 'media_library' ? mediaDeleteMock : dbDeleteMock,
+      delete:
+        storeName === 'media_library'
+          ? mediaDeleteMock
+          : storeName === 'recording_telemetry'
+            ? telemetryDeleteMock
+            : dbDeleteMock,
       index: vi.fn().mockReturnValue({
         openCursor: openCursorMock,
       }),
@@ -76,6 +89,8 @@ async function verifyCleanupOldRecordingsDeletesCursorMatches() {
   expect(IDBKeyRange.upperBound).toHaveBeenCalledWith(2 * 24 * 60 * 60 * 1000);
   expect(mediaDeleteMock).toHaveBeenNthCalledWith(1, 'recording:old-1');
   expect(mediaDeleteMock).toHaveBeenNthCalledWith(2, 'recording:old-2');
+  expect(telemetryDeleteMock).toHaveBeenNthCalledWith(1, 'old-1');
+  expect(telemetryDeleteMock).toHaveBeenNthCalledWith(2, 'old-2');
   expect(firstCursor.delete).toHaveBeenCalledTimes(1);
 }
 

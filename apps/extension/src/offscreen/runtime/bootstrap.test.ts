@@ -10,6 +10,8 @@ const offscreenMocks = vi.hoisted(() => ({
   sendRuntimeMessage: vi.fn(),
   subscribeToDbTermination: vi.fn(),
   reconcileProjectExportJobs: vi.fn(),
+  cleanupOrphanedRecordingStaging: vi.fn(),
+  reconcileRecordingCompletionOutbox: vi.fn(),
 }));
 
 vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -41,6 +43,14 @@ vi.mock('../project-export', () => ({
   reconcileProjectExportJobs: offscreenMocks.reconcileProjectExportJobs,
   startProjectExport: vi.fn(),
 }));
+vi.mock('../../composition/persistence/recordings/staging', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../composition/persistence/recordings/staging')>()),
+  cleanupOrphanedRecordingStaging: offscreenMocks.cleanupOrphanedRecordingStaging,
+}));
+vi.mock('../recording/post-record-publication', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../recording/post-record-publication')>()),
+  reconcileRecordingCompletionOutbox: offscreenMocks.reconcileRecordingCompletionOutbox,
+}));
 
 function resetOffscreenMocks() {
   offscreenMocks.initDB.mockReset();
@@ -50,8 +60,12 @@ function resetOffscreenMocks() {
   offscreenMocks.sendRuntimeMessage.mockReset();
   offscreenMocks.subscribeToDbTermination.mockReset();
   offscreenMocks.reconcileProjectExportJobs.mockReset();
+  offscreenMocks.cleanupOrphanedRecordingStaging.mockReset();
+  offscreenMocks.reconcileRecordingCompletionOutbox.mockReset();
   offscreenMocks.initDB.mockResolvedValue(undefined);
   offscreenMocks.reconcileProjectExportJobs.mockResolvedValue(undefined);
+  offscreenMocks.cleanupOrphanedRecordingStaging.mockResolvedValue(0);
+  offscreenMocks.reconcileRecordingCompletionOutbox.mockResolvedValue(false);
 }
 
 async function flushBootstrapTasks() {
@@ -71,6 +85,7 @@ async function verifyTerminationReinitFlow() {
 
   expect(offscreenMocks.initDB).toHaveBeenCalledTimes(1);
   expect(offscreenMocks.subscribeToDbTermination).toHaveBeenCalledTimes(1);
+  expect(offscreenMocks.cleanupOrphanedRecordingStaging).toHaveBeenCalledOnce();
 
   const handleTermination = offscreenMocks.subscribeToDbTermination.mock.calls[0]?.[0] as
     | (() => void)
@@ -90,12 +105,35 @@ async function verifyTerminationReinitFlow() {
 async function verifyReadyMessageIncludesStartupId() {
   const { bootstrapOffscreenDocument } = await import('./bootstrap');
   bootstrapOffscreenDocument();
-  await flushBootstrapTasks();
+  await vi.waitFor(() =>
+    expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+      type: 'OFFSCREEN_READY',
+      offscreenStartupId: 'startup-1',
+    })
+  );
 
   expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
     type: 'OFFSCREEN_READY',
     offscreenStartupId: 'startup-1',
   });
+}
+
+async function verifyCompletionOutboxReplaysBeforeReady() {
+  offscreenMocks.reconcileRecordingCompletionOutbox.mockResolvedValueOnce(true);
+
+  const { bootstrapOffscreenDocument } = await import('./bootstrap');
+  bootstrapOffscreenDocument();
+  await vi.waitFor(() => {
+    expect(offscreenMocks.reconcileRecordingCompletionOutbox).toHaveBeenCalledOnce();
+    expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+      type: 'OFFSCREEN_READY',
+      offscreenStartupId: 'startup-1',
+    });
+  });
+
+  expect(
+    offscreenMocks.reconcileRecordingCompletionOutbox.mock.invocationCallOrder[0]
+  ).toBeLessThan(offscreenMocks.sendRuntimeMessage.mock.invocationCallOrder[0]!);
 }
 
 async function verifyPrivacyErasureBootstrapSkipsPersistenceInitialization() {
@@ -110,6 +148,7 @@ async function verifyPrivacyErasureBootstrapSkipsPersistenceInitialization() {
 
   expect(offscreenMocks.initDB).not.toHaveBeenCalled();
   expect(offscreenMocks.reconcileProjectExportJobs).not.toHaveBeenCalled();
+  expect(offscreenMocks.cleanupOrphanedRecordingStaging).not.toHaveBeenCalled();
   expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
     type: 'OFFSCREEN_READY',
     offscreenStartupId: 'privacy-1',
@@ -129,6 +168,44 @@ async function verifyBootstrapFailureReporting() {
     offscreenStartupId: 'startup-1',
     phase: 'runtime',
   });
+}
+
+async function verifyOrphanCleanupFailureBlocksReady() {
+  offscreenMocks.cleanupOrphanedRecordingStaging.mockRejectedValueOnce(
+    new Error('staging cleanup unavailable')
+  );
+
+  const { bootstrapOffscreenDocument } = await import('./bootstrap');
+  bootstrapOffscreenDocument();
+  await flushBootstrapTasks();
+
+  expect(offscreenMocks.reconcileProjectExportJobs).not.toHaveBeenCalled();
+  expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+    type: 'OFFSCREEN_ERROR',
+    error: 'staging cleanup unavailable',
+    offscreenStartupId: 'startup-1',
+    phase: 'runtime',
+  });
+}
+
+async function verifyCompletionReplayFailureBlocksReady() {
+  offscreenMocks.reconcileRecordingCompletionOutbox.mockRejectedValueOnce(
+    new Error('completion replay unavailable')
+  );
+
+  const { bootstrapOffscreenDocument } = await import('./bootstrap');
+  bootstrapOffscreenDocument();
+  await vi.waitFor(() =>
+    expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+      type: 'OFFSCREEN_ERROR',
+      error: 'completion replay unavailable',
+      offscreenStartupId: 'startup-1',
+      phase: 'runtime',
+    })
+  );
+  expect(offscreenMocks.sendRuntimeMessage).not.toHaveBeenCalledWith(
+    expect.objectContaining({ type: 'OFFSCREEN_READY' })
+  );
 }
 
 async function verifyBootstrapFailureNotificationFallback() {
@@ -187,12 +264,24 @@ describe('offscreen bootstrap', () => {
   );
   it('sends OFFSCREEN_READY with the current startup id', verifyReadyMessageIncludesStartupId);
   it(
+    'replays a durable recording completion before OFFSCREEN_READY',
+    verifyCompletionOutboxReplaysBeforeReady
+  );
+  it(
     'keeps the privacy-erasure offscreen document free of persistence bootstrap writes',
     verifyPrivacyErasureBootstrapSkipsPersistenceInitialization
   );
   it(
     'reports bootstrap failures instead of sending OFFSCREEN_READY',
     verifyBootstrapFailureReporting
+  );
+  it(
+    'blocks readiness when orphan staging cannot be reconciled',
+    verifyOrphanCleanupFailureBlocksReady
+  );
+  it(
+    'blocks readiness when a durable recording completion cannot be replayed',
+    verifyCompletionReplayFailureBlocksReady
   );
   it(
     'logs when bootstrap failure notifications cannot be delivered',

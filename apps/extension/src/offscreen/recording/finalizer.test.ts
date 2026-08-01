@@ -1,317 +1,156 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  FinalizedRecordingStagingArtifact,
+  RecordingStagingCoordinator,
+} from '../../composition/persistence/recordings/staging';
 
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-
-// State-machine proof: failure/cancel/discard paths are terminal and notify stopped once.
-const {
-  loggerDebugMock,
-  loggerErrorMock,
-  loggerInfoMock,
-  loggerWarnMock,
-  persistStaticFrameSignalsMock,
-  saveRecordingSafelyMock,
-  sendRuntimeMessageMock,
-} = vi.hoisted(() => ({
-  loggerDebugMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
-  loggerInfoMock: vi.fn(),
-  loggerWarnMock: vi.fn(),
+const { persistStaticFrameSignalsMock, saveBatchMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
   persistStaticFrameSignalsMock: vi.fn(),
-  saveRecordingSafelyMock: vi.fn(),
+  saveBatchMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
 }));
 
-vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@sniptale/platform/observability/logger')>();
-  return {
-    ...actual,
-    createLogger: () => ({
-      debug: loggerDebugMock,
-      error: loggerErrorMock,
-      info: loggerInfoMock,
-      warn: loggerWarnMock,
-    }),
-  };
-});
+vi.mock('../../workflows/media-hub/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../workflows/media-hub/store')>()),
+  saveRecordingsBatchWithCompletionSafely: saveBatchMock,
+}));
 
-vi.mock('../../workflows/media-hub/store', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../workflows/media-hub/store')>();
-  return {
-    ...actual,
-    saveRecordingSafely: saveRecordingSafelyMock,
-  };
-});
+vi.mock('../../platform/runtime-messaging/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/runtime-messaging/index')>()),
+  sendRuntimeMessage: sendRuntimeMessageMock,
+}));
 
-vi.mock('../../platform/runtime-messaging/index', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../platform/runtime-messaging/index')>();
-  return {
-    ...actual,
-    sendRuntimeMessage: sendRuntimeMessageMock,
-  };
-});
+vi.mock('../../composition/persistence/recordings/completion-outbox', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../composition/persistence/recordings/completion-outbox')
+  >()),
+  readVideoRecordingCompletionOutbox: vi.fn(async () => saveBatchMock.mock.lastCall?.[1]),
+  removeVideoRecordingCompletionOutbox: vi.fn().mockResolvedValue(true),
+}));
 
 vi.mock('./signals/static-frame', () => ({
   persistStaticFrameSignals: persistStaticFrameSignalsMock,
 }));
 
-import { finalizeRecording, finalizeSidecarRecording } from './finalizer';
+import { finalizeRecording } from './finalizer';
+
+function createArtifact(id: string, contents = id): FinalizedRecordingStagingArtifact {
+  const file = new File([contents], `${id}.webm`, { type: 'video/webm' });
+  return {
+    artifactId: id,
+    file,
+    filename: file.name,
+    mimeType: file.type,
+    size: file.size,
+  };
+}
+
+function createStaging(): RecordingStagingCoordinator {
+  return {
+    abort: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
+    getPendingBytes: vi.fn(() => 0),
+    openArtifact: vi.fn(),
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.spyOn(Date, 'now').mockReturnValue(12345);
+  saveBatchMock.mockResolvedValue(undefined);
+  sendRuntimeMessageMock.mockResolvedValue({ success: true, result: 'accepted' });
 });
 
-async function verifyEmptyFinalizePath() {
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
+describe('recording finalizer', () => {
+  it('commits primary and sidecar artifacts atomically before deleting staging', async () => {
+    const staging = createStaging();
+    const primary = createArtifact('finalizer-batch-primary');
+    const webcam = createArtifact('finalizer-batch-webcam');
 
-  await expect(finalizeRecording([], 'rec-empty')).resolves.toBeNull();
+    await expect(
+      finalizeRecording({
+        artifacts: [primary, webcam],
+        discard: false,
+        primaryRecordingId: primary.artifactId,
+        staging,
+      })
+    ).resolves.toEqual({ filename: primary.filename, recordingId: primary.artifactId });
 
-  expect(loggerWarnMock).toHaveBeenCalledWith('No recorded chunks to process');
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: 'OFFSCREEN_RECORDING_STOPPED',
-    recordingId: 'rec-empty',
-  });
-}
-
-async function verifyStoppedNotificationFailuresStayLowNoise() {
-  sendRuntimeMessageMock.mockRejectedValue(new Error('runtime unavailable'));
-
-  await expect(finalizeRecording([], 'rec-1')).resolves.toBeNull();
-
-  expect(loggerDebugMock).toHaveBeenCalledWith(
-    'Failed to notify runtime that recording stopped',
-    expect.objectContaining({
-      errorMessage: 'runtime unavailable',
-      recordingId: 'rec-1',
-      reason: 'no-recorded-chunks',
-    })
-  );
-}
-
-async function verifySuccessfulFinalizePath() {
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
-  saveRecordingSafelyMock.mockResolvedValue(undefined);
-
-  const result = await finalizeRecording(
-    [new Blob(['video'], { type: 'video/webm' })],
-    'rec-1',
-    'video/webm;codecs=vp8,opus'
-  );
-
-  expect(result).toEqual({
-    recordingId: 'rec-1',
-    filename: expect.stringMatching(/^Sniptale-.*\.webm$/),
-  });
-  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
-    'rec-1',
-    expect.any(Blob),
-    expect.stringMatching(/^Sniptale-.*\.webm$/)
-  );
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: VideoMessageType.DOWNLOAD_RECORDING,
-    recordingId: 'rec-1',
-    filename: expect.stringMatching(/^Sniptale-.*\.webm$/),
-  });
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: VideoMessageType.VIDEO_SAVED_TO_IDB,
-    recordingId: 'rec-1',
-    filename: expect.stringMatching(/^Sniptale-.*\.webm$/),
-  });
-  expect(persistStaticFrameSignalsMock).toHaveBeenCalledWith(
-    'rec-1',
-    expect.objectContaining({ type: 'video/webm' })
-  );
-  expect(
-    sendRuntimeMessageMock.mock.calls.findIndex(
-      ([message]) => message.type === VideoMessageType.VIDEO_SAVED_TO_IDB
-    )
-  ).toBeLessThan(
-    sendRuntimeMessageMock.mock.calls.findIndex(
-      ([message]) => message.type === 'OFFSCREEN_RECORDING_STOPPED'
-    )
-  );
-  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
-    'rec-1',
-    expect.objectContaining({ type: 'video/webm' }),
-    expect.stringMatching(/^Sniptale-.*\.webm$/)
-  );
-}
-
-async function verifyMp4FinalizePath() {
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
-  saveRecordingSafelyMock.mockResolvedValue(undefined);
-
-  const result = await finalizeRecording(
-    [new Blob(['video'], { type: 'video/mp4' })],
-    'rec-mp4',
-    'video/mp4'
-  );
-
-  expect(result).toEqual({
-    recordingId: 'rec-mp4',
-    filename: expect.stringMatching(/^Sniptale-.*\.mp4$/),
-  });
-  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
-    'rec-mp4',
-    expect.objectContaining({ type: 'video/mp4' }),
-    expect.stringMatching(/^Sniptale-.*\.mp4$/)
-  );
-}
-
-async function verifyFailedSavePath() {
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
-  saveRecordingSafelyMock.mockRejectedValue(new Error('save failed'));
-
-  await expect(
-    finalizeRecording([new Blob(['video'], { type: 'video/webm' })], null)
-  ).resolves.toBeNull();
-
-  expect(loggerErrorMock).toHaveBeenCalledWith(
-    'Failed to save recording to media hub',
-    expect.any(Error)
-  );
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: 'OFFSCREEN_RECORDING_STOPPED',
-    recordingId: 'rec-12345',
-  });
-}
-
-async function verifyDiscardedFinalizePath() {
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
-
-  await expect(
-    finalizeRecording([new Blob(['video'], { type: 'video/webm' })], 'rec-2', undefined, true)
-  ).resolves.toBeNull();
-
-  expect(persistStaticFrameSignalsMock).not.toHaveBeenCalled();
-  expect(saveRecordingSafelyMock).not.toHaveBeenCalled();
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: 'OFFSCREEN_RECORDING_STOPPED',
-    recordingId: 'rec-2',
-  });
-}
-
-async function verifySuppressedSavedNotificationPath() {
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
-  saveRecordingSafelyMock.mockResolvedValue(undefined);
-
-  const result = await finalizeRecording([new Blob(['video'])], 'rec-3', 'video/webm', false, {
-    notifySaved: false,
-    notifyStopped: false,
+    expect(saveBatchMock).toHaveBeenCalledWith(
+      [
+        { blob: primary.file, filename: primary.filename, id: primary.artifactId },
+        { blob: webcam.file, filename: webcam.filename, id: webcam.artifactId },
+      ],
+      {
+        primaryRecordingId: primary.artifactId,
+        projectId: null,
+        recordingId: primary.artifactId,
+      }
+    );
+    expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(staging.delete).mock.invocationCallOrder[0]!
+    );
+    expect(persistStaticFrameSignalsMock).toHaveBeenCalledWith(primary.artifactId);
   });
 
-  expect(result).toEqual({
-    recordingId: 'rec-3',
-    filename: expect.stringMatching(/^Sniptale-.*\.webm$/),
-  });
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: VideoMessageType.DOWNLOAD_RECORDING,
-    recordingId: 'rec-3',
-    filename: expect.stringMatching(/^Sniptale-.*\.webm$/),
-  });
-  expect(sendRuntimeMessageMock).not.toHaveBeenCalledWith(
-    expect.objectContaining({ type: VideoMessageType.VIDEO_SAVED_TO_IDB })
-  );
-  expect(sendRuntimeMessageMock).not.toHaveBeenCalledWith({
-    type: 'OFFSCREEN_RECORDING_STOPPED',
-  });
-}
+  it('aborts staging without publishing media when discarded', async () => {
+    const staging = createStaging();
+    await expect(
+      finalizeRecording({
+        artifacts: [createArtifact('finalizer-discard')],
+        discard: true,
+        primaryRecordingId: 'finalizer-discard',
+        staging,
+      })
+    ).resolves.toBeNull();
 
-async function verifySidecarFinalizePath() {
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
-  saveRecordingSafelyMock.mockResolvedValue(undefined);
-
-  const result = await finalizeSidecarRecording({
-    chunks: [new Blob(['webcam'], { type: 'video/webm' })],
-    discard: false,
-    filenameSuffix: 'webcam',
-    mimeType: 'video/webm',
-    recordingId: 'rec-1-webcam',
+    expect(staging.abort).toHaveBeenCalledOnce();
+    expect(saveBatchMock).not.toHaveBeenCalled();
   });
 
-  expect(result).toEqual({
-    recordingId: 'rec-1-webcam',
-    filename: expect.stringMatching(/^Sniptale-.*-webcam\.webm$/),
-  });
-  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
-    'rec-1-webcam',
-    expect.objectContaining({ type: 'video/webm' }),
-    expect.stringMatching(/^Sniptale-.*-webcam\.webm$/)
-  );
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: VideoMessageType.DOWNLOAD_RECORDING,
-    recordingId: 'rec-1-webcam',
-    filename: expect.stringMatching(/^Sniptale-.*-webcam\.webm$/),
-  });
-  expect(sendRuntimeMessageMock).not.toHaveBeenCalledWith(
-    expect.objectContaining({
-      type: VideoMessageType.VIDEO_SAVED_TO_IDB,
-      recordingId: 'rec-1-webcam',
-    })
-  );
-  expect(sendRuntimeMessageMock).not.toHaveBeenCalledWith({
-    type: 'OFFSCREEN_RECORDING_STOPPED',
-  });
-  expect(persistStaticFrameSignalsMock).not.toHaveBeenCalled();
-}
+  it('aborts staging and surfaces an atomic batch failure', async () => {
+    const saveError = new Error('batch failed');
+    const staging = createStaging();
+    saveBatchMock.mockRejectedValueOnce(saveError);
 
-async function verifySidecarDiscardPath() {
-  await expect(
-    finalizeSidecarRecording({
-      chunks: [new Blob(['webcam'])],
-      discard: true,
-      filenameSuffix: 'webcam',
-      recordingId: 'rec-1-webcam',
-    })
-  ).resolves.toBeNull();
-
-  expect(saveRecordingSafelyMock).not.toHaveBeenCalled();
-  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
-}
-
-async function verifyMp4SidecarFinalizePath() {
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
-  saveRecordingSafelyMock.mockResolvedValue(undefined);
-
-  const result = await finalizeSidecarRecording({
-    chunks: [new Blob(['webcam'], { type: 'video/mp4' })],
-    discard: false,
-    filenameSuffix: 'webcam',
-    mimeType: 'video/mp4;codecs=avc1.640028',
-    recordingId: 'rec-1-webcam-mp4',
+    await expect(
+      finalizeRecording({
+        artifacts: [createArtifact('finalizer-failure')],
+        discard: false,
+        primaryRecordingId: 'finalizer-failure',
+        staging,
+      })
+    ).rejects.toBe(saveError);
+    expect(staging.abort).toHaveBeenCalledOnce();
+    expect(staging.delete).not.toHaveBeenCalled();
   });
 
-  expect(result?.filename).toMatch(/-webcam\.mp4$/);
-  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
-    'rec-1-webcam-mp4',
-    expect.objectContaining({ type: 'video/mp4' }),
-    expect.stringMatching(/-webcam\.mp4$/)
-  );
-}
+  it('continues publication when cleanup fails after the durable batch commit', async () => {
+    const staging = createStaging();
+    vi.mocked(staging.delete).mockRejectedValueOnce(new Error('cleanup failed'));
+    const artifact = createArtifact('finalizer-cleanup-failure');
 
-function runOffscreenFinalizerSuite() {
-  it(
-    'returns null and notifies the runtime when there are no recorded chunks',
-    verifyEmptyFinalizePath
-  );
-  it(
-    'keeps stop-notification failures as low-noise debug traces',
-    verifyStoppedNotificationFailuresStayLowNoise
-  );
-  it('backs up, saves, and reports a finalized recording', verifySuccessfulFinalizePath);
-  it('uses an mp4 filename for mp4 recorder output', verifyMp4FinalizePath);
-  it('returns null when saving to the media hub fails', verifyFailedSavePath);
-  it('skips persistence entirely when the recording is cancelled', verifyDiscardedFinalizePath);
-  it(
-    'can defer the saved notification for sidecar-aware finalization',
-    verifySuppressedSavedNotificationPath
-  );
-  it(
-    'backs up and saves webcam sidecar recordings without main-recording events',
-    verifySidecarFinalizePath
-  );
-  it('uses an mp4 artifact for an mp4 webcam sidecar recorder', verifyMp4SidecarFinalizePath);
-  it('skips webcam sidecar persistence on discard', verifySidecarDiscardPath);
-}
+    await expect(
+      finalizeRecording({
+        artifacts: [artifact],
+        discard: false,
+        primaryRecordingId: artifact.artifactId,
+        staging,
+      })
+    ).resolves.toEqual({ filename: artifact.filename, recordingId: artifact.artifactId });
+    expect(staging.abort).not.toHaveBeenCalled();
+    expect(sendRuntimeMessageMock).toHaveBeenCalled();
+  });
 
-describe('offscreen-finalizer', runOffscreenFinalizerSuite);
+  it('rejects a partial artifact set before any publication', async () => {
+    const staging = createStaging();
+    await expect(
+      finalizeRecording({
+        artifacts: [createArtifact('another-artifact')],
+        discard: false,
+        primaryRecordingId: 'missing-primary',
+        staging,
+      })
+    ).rejects.toThrow('Primary recording artifact is unavailable');
+    expect(saveBatchMock).not.toHaveBeenCalled();
+  });
+});

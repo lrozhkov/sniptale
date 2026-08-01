@@ -14,7 +14,7 @@ export const defaultSettings: VideoRecordingSettings = {
   microphoneDeviceId: null,
   microphoneEnabled: false,
   openEditorAfterRecording: false,
-  quality: VideoQuality.HIGH,
+  outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
   systemAudioEnabled: true,
 };
 

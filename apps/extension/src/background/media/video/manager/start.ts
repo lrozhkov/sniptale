@@ -36,6 +36,7 @@ import {
   requiresRecordingAuthorityRetention,
   type RecordingSourceBinding,
 } from '../offscreen-recording-stop';
+import { readStoredVideoPostRecordResult } from '../../../storage/video/post-record-result';
 
 const logger = createLogger({ namespace: 'BackgroundVideoManager' });
 
@@ -101,6 +102,21 @@ async function startRecordingWithPermit(
 ): Promise<RecordingStartResult> {
   try {
     await waitForVideoCaptureSurfaceRecovery();
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+      result: 'failed',
+    };
+  }
+
+  try {
+    const postRecordState = await readStoredVideoPostRecordResult();
+    if (postRecordState?.status === 'staged' || postRecordState?.status === 'ready') {
+      return {
+        error: 'Resolve the previous recording before starting another.',
+        result: 'failed',
+      };
+    }
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : String(error),

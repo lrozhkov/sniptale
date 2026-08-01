@@ -6,14 +6,12 @@ const {
   executeDownloadBlobMock,
   getRecordingMock,
   loadSettingsMock,
-  saveRecordingSafelyMock,
 } = vi.hoisted(() => ({
   blobToDataUrlMock: vi.fn(),
   browserDownloadsDownloadMock: vi.fn(),
   executeDownloadBlobMock: vi.fn(),
   getRecordingMock: vi.fn(),
   loadSettingsMock: vi.fn(),
-  saveRecordingSafelyMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/downloads', () => ({
@@ -63,7 +61,7 @@ vi.mock('../../workflows/media-hub/store', async (importOriginal) => ({
   getStorageCleanupReport: vi.fn(),
   saveProjectAssetSafely: vi.fn(),
   saveProjectExportSafely: vi.fn(),
-  saveRecordingSafely: saveRecordingSafelyMock,
+  saveRecordingSafely: vi.fn(),
   saveRecordingTelemetrySafely: vi.fn(),
   saveScreenshotMediaAssetSafely: vi.fn(),
   saveWebSnapshotMediaAssetSafely: vi.fn(),
@@ -81,18 +79,10 @@ vi.mock('../routing-contracts/download-port', async (importOriginal) => ({
   executeDownloadBlob: executeDownloadBlobMock,
 }));
 
-import {
-  downloadRecordingSidecar,
-  downloadStoredRecording,
-  saveRecordingBlobForDownload,
-} from './recording-download';
+import { downloadRecordingSidecar, downloadStoredRecording } from './recording-download';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('atob', (value: string) => Buffer.from(value, 'base64').toString('binary'));
-  vi.stubGlobal('crypto', {
-    randomUUID: vi.fn(() => 'recording-1'),
-  });
   browserDownloadsDownloadMock.mockResolvedValue(17);
   executeDownloadBlobMock.mockResolvedValue(17);
   blobToDataUrlMock.mockResolvedValue('data:video/webm;base64,dmlkZW8=');
@@ -101,7 +91,6 @@ beforeEach(() => {
     defaultVideoPresetId: 'preset-1',
     presets: [{ id: 'preset-1', path: '../../Recordings\\Today' }],
   });
-  saveRecordingSafelyMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -118,21 +107,6 @@ it('downloads stored recordings through the blob download owner', async () => {
   expect(executeDownloadBlobMock).toHaveBeenCalledWith(blob, '../clip?.webm', 'preset-1');
   expect(blobToDataUrlMock).not.toHaveBeenCalled();
   expect(browserDownloadsDownloadMock).not.toHaveBeenCalled();
-});
-
-it('stores staged content recording blobs before downloading them by recording id', async () => {
-  const blob = new Blob(['video'], { type: 'video/webm' });
-
-  await expect(
-    saveRecordingBlobForDownload({
-      blob,
-      filename: 'clip.webm',
-      mimeType: 'video/webm',
-    })
-  ).resolves.toEqual({ downloadId: 17, recordingId: 'recording-1' });
-
-  expect(saveRecordingSafelyMock).toHaveBeenCalledWith('recording-1', blob, 'clip.webm');
-  expect(getRecordingMock).toHaveBeenCalledWith('recording-1');
 });
 
 it('downloads sidecar payloads without accepting arbitrary URL input', async () => {
@@ -169,18 +143,5 @@ it('rejects oversized sidecar payloads before starting a download', async () => 
     })
   ).rejects.toThrow('Recording sidecar payload is too large');
 
-  expect(browserDownloadsDownloadMock).not.toHaveBeenCalled();
-});
-
-it('rejects malformed staged recording payloads before storage', async () => {
-  await expect(
-    saveRecordingBlobForDownload({
-      blob: new Blob(['video'], { type: 'video/webm' }),
-      filename: 'clip.webm',
-      mimeType: 'text/html',
-    })
-  ).rejects.toThrow('Invalid recording payload');
-
-  expect(saveRecordingSafelyMock).not.toHaveBeenCalled();
   expect(browserDownloadsDownloadMock).not.toHaveBeenCalled();
 });

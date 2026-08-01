@@ -5,6 +5,7 @@ import {
   createVideoRecordingLiveMediaState,
   VideoRecordingStatus,
   type VideoRecordingLiveMediaState,
+  type VideoPostRecordResult,
   type VideoRecordingRuntimeState,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -62,22 +63,26 @@ interface VideoSetupBodyProps {
   onActiveRecordingSettingsChange: (patch: Partial<VideoRecordingSettings>) => Promise<void>;
   onSettingsChange: (patch: Partial<VideoRecordingSettings>) => void;
   showSavingState?: boolean;
-  postRecordRecordingId?: string | null;
-  onClosePostRecord?: () => void;
+  postRecordResult?: VideoPostRecordResult | null;
+  onAcknowledgePostRecord?: () => Promise<void>;
   viewModel: VideoSetupViewModel;
 }
 
 export function VideoSetupBody(props: VideoSetupBodyProps) {
-  if (props.showSavingState || props.recordingState.status === VideoRecordingStatus.STOPPING) {
+  if (props.showSavingState) {
+    return <VideoSavingSection />;
+  }
+
+  if (props.postRecordResult && props.onAcknowledgePostRecord) {
+    return <VideoPostRecordSection {...props} />;
+  }
+
+  if (props.recordingState.status === VideoRecordingStatus.STOPPING) {
     return <VideoSavingSection />;
   }
 
   if (props.recordingState.status !== VideoRecordingStatus.IDLE) {
     return <VideoActiveRecordingSection {...props} />;
-  }
-
-  if (props.postRecordRecordingId && props.onClosePostRecord) {
-    return <VideoPostRecordSection {...props} />;
   }
 
   return <VideoIdleSetupSection {...props} />;
@@ -118,12 +123,15 @@ function VideoActiveRecordingSection(props: VideoSetupBodyProps) {
 }
 
 function VideoPostRecordSection(props: VideoSetupBodyProps) {
+  const result = props.postRecordResult;
+  const onAcknowledge = props.onAcknowledgePostRecord;
+  if (!result || !onAcknowledge) {
+    return null;
+  }
+
   return (
     <section className={VIDEO_SETUP_SECTION_CLASS_NAME}>
-      <VideoPostRecordPanel
-        recordingId={props.postRecordRecordingId ?? ''}
-        onClose={props.onClosePostRecord ?? (() => undefined)}
-      />
+      <VideoPostRecordPanel result={result} onAcknowledge={onAcknowledge} />
     </section>
   );
 }
@@ -164,6 +172,7 @@ function VideoIdleSetupSection(props: VideoSetupBodyProps) {
       )}
       <VideoSettingsGrid
         captureMode={props.captureMode}
+        knownOutputBasisDimensions={props.viewModel.knownOutputBasisDimensions}
         settings={props.settings}
         onSettingsChange={props.onSettingsChange}
       />

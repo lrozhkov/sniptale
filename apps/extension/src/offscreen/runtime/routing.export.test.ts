@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import type { TabOutputGeometry } from '../recording/geometry/tab-source';
 
 const {
   activateViewportOutputMock,
@@ -43,16 +44,7 @@ const {
     sourceStream: null,
     sourceVideoHeight: 720,
     sourceVideoWidth: 1280,
-    tabOutputGeometry: null as null | {
-      coordinateSpace: { devicePixelRatio: number; width: number; height: number };
-      fit: 'contain' | 'cover' | 'source';
-      logicalContentRect: { x: number; y: number; width: number; height: number };
-      requestedCrop: { x: number; y: number; width: number; height: number };
-      sourceSize: { width: number; height: number };
-      sourceRect: { x: number; y: number; width: number; height: number };
-      outputSize: { width: number; height: number };
-      tracksFullViewport: boolean;
-    },
+    tabOutputGeometry: null as TabOutputGeometry | null,
     tabOutputControls: null as null | {
       activate: ReturnType<typeof vi.fn>;
       applyFrozenSourceGeometry: ReturnType<typeof vi.fn>;
@@ -494,8 +486,10 @@ it('revalidates source metadata and returns typed ALLOW or DENY responses', asyn
 
   recordingContextMock.tabOutputGeometry = {
     coordinateSpace: { devicePixelRatio: 1, width: 1280, height: 720 },
-    fit: 'cover',
+    fit: 'contain',
+    frameRateCap: 30,
     logicalContentRect: { x: 0, y: 0, width: 1280, height: 720 },
+    outputBasis: { width: 300, height: 300 },
     requestedCrop: { x: 100, y: 80, width: 300, height: 300 },
     sourceSize: { width: 1280, height: 720 },
     sourceRect: { x: 100, y: 80, width: 300, height: 300 },
@@ -574,8 +568,10 @@ it('remaps a frozen viewport crop without waiting for starved media callbacks', 
   };
   const geometry = {
     coordinateSpace: { devicePixelRatio: 1, width: 1280, height: 720 },
-    fit: 'cover' as const,
+    fit: 'contain' as const,
+    frameRateCap: 30 as const,
     logicalContentRect: { x: 0, y: 0, width: 1280, height: 720 },
+    outputBasis: { width: 300, height: 300 },
     requestedCrop: { x: 100, y: 80, width: 300, height: 300 },
     sourceSize: { width: 1280, height: 720 },
     sourceRect: { x: 100, y: 80, width: 300, height: 300 },
@@ -613,8 +609,10 @@ it('remaps a frozen viewport crop without waiting for starved media callbacks', 
   expect(readFrozenSourceSize).toHaveBeenCalledWith('navigation-1');
   expect(applyFrozenSourceGeometry).toHaveBeenCalledWith('navigation-1', {
     coordinateSpace: { devicePixelRatio: 1, width: 1280, height: 720 },
-    fit: 'cover',
+    fit: 'contain',
+    frameRateCap: 30,
     logicalContentRect: { x: 0, y: 0, width: 1920, height: 1080 },
+    outputBasis: { width: 300, height: 300 },
     requestedCrop: { x: 100, y: 80, width: 300, height: 300 },
     sourceSize: { height: 1080, width: 1920 },
     sourceRect: { x: 150, y: 120, width: 450, height: 450 },

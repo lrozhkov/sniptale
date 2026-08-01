@@ -63,10 +63,14 @@ export type RuntimeVideoSessionRequestByType = {
     settings: Partial<VideoRecordingSettings>;
   };
   [VideoMessageType.GET_RECORDING_STATE]: { type: typeof VideoMessageType.GET_RECORDING_STATE };
+  [VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT]: {
+    type: typeof VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT;
+    recordingId: string;
+  };
   [VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL]: {
     type: typeof VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL;
-    cameraLaunchToken: string;
-    recordingId: string;
+    cameraRegistrationToken?: string;
+    recordingId?: string;
   };
   [VideoMessageType.GET_RECORDING_TAB_ID]: {
     type: typeof VideoMessageType.GET_RECORDING_TAB_ID;

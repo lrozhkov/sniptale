@@ -8,11 +8,6 @@ import {
   PageAccessOperation,
 } from './page-access';
 import type { PageAccessMessage, PageAccessResponse } from './page-access';
-import {
-  isRecordingDownloadStageId,
-  MAX_RECORDING_DOWNLOAD_STAGE_CHUNK_BYTES,
-  MAX_RECORDING_DOWNLOAD_STAGE_CHUNKS,
-} from './recording-download';
 
 it('keeps capture and page-access message vocabularies stable', () => {
   expect(Object.values(CaptureType)).toEqual(['visible', 'full', 'selection']);
@@ -28,15 +23,4 @@ it('keeps capture and page-access message vocabularies stable', () => {
   expectTypeOf<Exclude<PageAccessResponse, { success: true }>['error']>().toEqualTypeOf<
     string | undefined
   >();
-});
-
-it('accepts only bounded recording stage identifiers', () => {
-  expect(MAX_RECORDING_DOWNLOAD_STAGE_CHUNK_BYTES).toBe(512 * 1024);
-  expect(MAX_RECORDING_DOWNLOAD_STAGE_CHUNKS).toBe(1024);
-  expect(isRecordingDownloadStageId('session_1-part-A')).toBe(true);
-  expect(isRecordingDownloadStageId('a'.repeat(128))).toBe(true);
-
-  for (const value of ['', 'contains space', 'contains.dot', 'a'.repeat(129), null, 1]) {
-    expect(isRecordingDownloadStageId(value)).toBe(false);
-  }
 });

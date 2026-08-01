@@ -201,13 +201,21 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Разрешение',
     en: 'Resolution',
   },
+  outputFrameRateLabel: {
+    ru: 'Частота кадров',
+    en: 'Frame rate',
+  },
   outputResolutionSource: {
     ru: 'Исходное',
     en: 'Source',
   },
   outputAspectNotice: {
-    ru: 'Видео вписывается в выбранный стандарт без обрезки, растяжения и чёрных полей.',
-    en: 'Video fits the selected standard without cropping, stretching, or black bars.',
+    ru: 'Пропорции сохраняются без растяжения и обрезки; при изменении формы окна возможны поля.',
+    en: 'Aspect ratio is preserved without stretching or cropping; window shape changes may add padding.',
+  },
+  outputResourceUnsupported: {
+    ru: 'Эта комбинация разрешения и частоты кадров слишком тяжёлая для записи выбранного размера.',
+    en: 'This resolution and frame-rate combination is too demanding for the selected recording size.',
   },
   countdownLabel: {
     ru: 'Старт',

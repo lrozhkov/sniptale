@@ -7,25 +7,25 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 
 import { QualityCard } from './view';
 import {
-  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  DEFAULT_VIDEO_OUTPUT_PROFILE,
   VideoRecordingBuiltInProfileId,
   VideoQuality,
+  type VideoOutputProfile,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
-function createSettings(quality: VideoRecordingSettings['quality']): VideoRecordingSettings {
+function createSettings(quality: VideoOutputProfile['quality']): VideoRecordingSettings {
   return {
     ...DEFAULT_VIDEO_SETTINGS,
     microphoneEnabled: true,
     microphoneDeviceId: null,
     systemAudioEnabled: true,
-    quality,
+    outputProfile: { ...DEFAULT_VIDEO_OUTPUT_PROFILE, quality },
     countdownSeconds: 3,
     autoFadeDelay: 2,
     openEditorAfterRecording: false,
     diagnosticsEnabled: false,
-    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     qualityProfileId: VideoRecordingBuiltInProfileId.OPTIMAL,
   };
 }
@@ -45,8 +45,7 @@ describe('quality card view', () => {
     card.props.onChange(VideoRecordingBuiltInProfileId.COMPACT);
 
     expect(onSettingsChange).toHaveBeenCalledWith({
-      output: expect.objectContaining({ resolution: '720P' }),
-      quality: VideoQuality.MEDIUM,
+      outputProfile: expect.objectContaining({ quality: VideoQuality.MEDIUM, resolution: '720P' }),
       qualityProfileId: VideoRecordingBuiltInProfileId.COMPACT,
     });
     expect(card.props.secondaryAction.panel).toBeTruthy();

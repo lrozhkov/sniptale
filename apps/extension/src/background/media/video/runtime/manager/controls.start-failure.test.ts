@@ -67,6 +67,8 @@ vi.mock('../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../session-state')>()),
   getVideoRecordingTabId: getVideoRecordingTabIdMock,
   getVideoRecordingId: getVideoRecordingIdMock,
+  isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
+    recordingId != null && getVideoRecordingIdMock() === recordingId,
   isControlledCursorCaptureEnabled: isControlledCursorCaptureEnabledMock,
   resetVideoRecordingStartSession: resetVideoRecordingStartSessionMock,
   setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
@@ -227,4 +229,29 @@ it('reports a cleanup failure without releasing durable session authority', asyn
     type: VideoMessageType.RECORDING_START_FAILED,
     error: 'offscreen unavailable',
   });
+});
+
+it('does not let delayed start-failure cleanup for A reset current recording B', async () => {
+  let resolveRelease!: () => void;
+  releaseVideoCaptureSurfaceMock.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      resolveRelease = resolve;
+    })
+  );
+
+  const cleanupA = notifyRecordingStartFailed('permission denied', {
+    recordingId: 'recording-1',
+  });
+  await vi.waitFor(() =>
+    expect(releaseVideoCaptureSurfaceMock).toHaveBeenCalledWith('recording-1')
+  );
+  getVideoRecordingIdMock.mockReturnValue('recording-2');
+  resolveRelease();
+  await cleanupA;
+
+  expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingStartSessionMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(sendTabMessageMock).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
 });

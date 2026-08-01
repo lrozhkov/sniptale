@@ -61,7 +61,8 @@ vi.mock('../offscreen-manager', async (importOriginal) => ({
 }));
 
 import { installBackgroundRuntimeMessagingMock } from '../../../../routing-contracts/runtime-messaging/mock';
-import { handleDownloadRecording, handleStartProjectExport } from './export';
+import { handleDownloadRecording } from './export/download';
+import { handleStartProjectExport } from './export/project-export';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
@@ -70,6 +71,7 @@ import {
   type VideoProjectExportSettings,
 } from '../../../../../features/video/project/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { recordingDownloadRouteDescriptor } from './export/route-descriptors';
 
 const VIDEO_EDITOR_URL = 'chrome-extension://test/apps/extension/src/video-editor/index.html';
 const VIDEO_EDITOR_OWNER = { documentId: 'editor-doc-1', senderUrl: VIDEO_EDITOR_URL };
@@ -134,6 +136,14 @@ beforeEach(() => {
   sendRuntimeMessageMock.mockResolvedValue({ result: 'accepted', success: true });
   installBackgroundRuntimeMessagingMock({ sendRuntimeMessage: sendRuntimeMessageMock });
   waitForOffscreenReadyMock.mockResolvedValue(undefined);
+});
+
+it('keeps only explicit download commands under the recording-download owner', () => {
+  expect(recordingDownloadRouteDescriptor.messageTypes).toEqual([
+    VideoMessageType.DOWNLOAD_RECORDING_SIDECAR,
+    VideoMessageType.DOWNLOAD_RECORDING,
+  ]);
+  expect(recordingDownloadRouteDescriptor.ownerModule).toContain('/export/download.ts');
 });
 
 it('downloads recordings and starts project export through the export owner', async () => {

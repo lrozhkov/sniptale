@@ -15,9 +15,6 @@ const nonActionBackgroundRuntimeMessageTypes = new Map<
 >([
   ['AREA_SELECTED', 'content-runtime-event'],
   ['KEEP_ALIVE', 'internal-signal'],
-  ['REGION_CAPTURE_ERROR', 'content-runtime-event'],
-  ['REGION_CAPTURE_STARTED', 'content-runtime-event'],
-  ['REGION_CAPTURE_STOPPED', 'content-runtime-event'],
   [MessageType.EXPORT_POPUP_PROGRESS, 'internal-signal'],
   [MessageType.EXPORT_POPUP_RESULT, 'internal-signal'],
   [VideoMessageType.COUNTDOWN_COMPLETE, 'internal-signal'],

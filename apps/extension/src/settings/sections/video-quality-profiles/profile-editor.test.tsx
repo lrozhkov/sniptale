@@ -23,7 +23,7 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
     menuPlacement?: 'auto' | 'bottom';
     menuScrollable?: boolean;
     onChange: (value: string) => void;
-    options: Array<{ label: string; value: string }>;
+    options: Array<{ disabled?: boolean; label: string; value: string }>;
     value: string;
   }) => (
     <select
@@ -34,7 +34,7 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
       onChange={(event) => props.onChange(event.currentTarget.value)}
     >
       {props.options.map((option) => (
-        <option key={option.value} value={option.value}>
+        <option disabled={option.disabled} key={option.value} value={option.value}>
           {option.label}
         </option>
       ))}
@@ -69,6 +69,8 @@ vi.mock('@sniptale/ui/product-modal/actions', async (importOriginal) => ({
 }));
 
 import {
+  DEFAULT_VIDEO_OUTPUT_PROFILE,
+  VideoFrameRate,
   VideoOutputCodec,
   VideoOutputContainer,
   VideoQuality,
@@ -157,10 +159,10 @@ it('creates a named profile and submits the selected output combination', () => 
   expect(props.onSave).toHaveBeenCalledWith(
     expect.objectContaining({
       name: 'Review',
-      quality: VideoQuality.LOW,
-      output: expect.objectContaining({
+      configuration: expect.objectContaining({
         codec: VideoOutputCodec.AVC,
         container: VideoOutputContainer.MP4,
+        quality: VideoQuality.LOW,
         resolution: VideoResolutionPreset.P720,
       }),
     })
@@ -175,12 +177,13 @@ it('edits a profile, normalizes an incompatible codec, and closes from either ac
     profile: {
       id: 'custom:mp4',
       name: 'MP4',
-      output: {
+      configuration: {
+        ...DEFAULT_VIDEO_OUTPUT_PROFILE,
         codec: VideoOutputCodec.AVC,
         container: VideoOutputContainer.MP4,
         resolution: VideoResolutionPreset.P1080,
+        quality: VideoQuality.HIGH,
       },
-      quality: VideoQuality.HIGH,
     },
   });
   expect(container?.textContent).toContain('settings.videoQuality.editTitle');
@@ -193,7 +196,7 @@ it('edits a profile, normalizes an incompatible codec, and closes from either ac
   act(() => container?.querySelector('form')?.requestSubmit());
   expect(props.onSave).toHaveBeenCalledWith(
     expect.objectContaining({
-      output: expect.objectContaining({
+      configuration: expect.objectContaining({
         codec: VideoOutputCodec.VP9,
         container: VideoOutputContainer.WEBM,
       }),
@@ -206,4 +209,92 @@ it('edits a profile, normalizes an incompatible codec, and closes from either ac
     buttons.find((button) => button.textContent === 'settings.videoQuality.cancel')?.click()
   );
   expect(onClose).toHaveBeenCalledTimes(2);
+});
+
+it('preserves compatible codecs and maps every frame-rate option into the profile', () => {
+  const props = renderEditor({
+    profile: {
+      id: 'custom:webm',
+      name: 'WebM',
+      configuration: DEFAULT_VIDEO_OUTPUT_PROFILE,
+    },
+  });
+  const containerSelect = container?.querySelector(
+    '[aria-label="settings.videoQuality.containerLabel"]'
+  );
+  const frameRateSelect = container?.querySelector(
+    '[aria-label="settings.videoQuality.frameRateLabel"]'
+  );
+
+  change(containerSelect, VideoOutputContainer.WEBM);
+  change(frameRateSelect, String(VideoFrameRate.FPS24));
+  act(() => container?.querySelector('form')?.requestSubmit());
+  change(frameRateSelect, String(VideoFrameRate.FPS60));
+  act(() => container?.querySelector('form')?.requestSubmit());
+  change(frameRateSelect, String(VideoFrameRate.FPS30));
+  act(() => container?.querySelector('form')?.requestSubmit());
+
+  expect(props.onSave).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({
+      configuration: expect.objectContaining({
+        codec: DEFAULT_VIDEO_OUTPUT_PROFILE.codec,
+        frameRate: VideoFrameRate.FPS24,
+      }),
+    })
+  );
+  expect(props.onSave).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({
+      configuration: expect.objectContaining({ frameRate: VideoFrameRate.FPS60 }),
+    })
+  );
+  expect(props.onSave).toHaveBeenNthCalledWith(
+    3,
+    expect.objectContaining({
+      configuration: expect.objectContaining({ frameRate: VideoFrameRate.FPS30 }),
+    })
+  );
+});
+
+it('disables incompatible 2160p frame rates and normalizes the draft to 24 fps', () => {
+  const props = renderEditor({
+    profile: {
+      id: 'custom:4k',
+      name: '4K',
+      configuration: {
+        ...DEFAULT_VIDEO_OUTPUT_PROFILE,
+        frameRate: VideoFrameRate.FPS60,
+        resolution: VideoResolutionPreset.P1440,
+      },
+    },
+  });
+  const resolutionSelect = container?.querySelector(
+    '[aria-label="settings.videoQuality.resolutionLabel"]'
+  );
+  const frameRateSelect = container?.querySelector<HTMLSelectElement>(
+    '[aria-label="settings.videoQuality.frameRateLabel"]'
+  );
+
+  change(resolutionSelect, VideoResolutionPreset.P2160);
+
+  expect(frameRateSelect?.value).toBe(String(VideoFrameRate.FPS24));
+  expect(
+    frameRateSelect?.querySelector<HTMLOptionElement>(`option[value="${VideoFrameRate.FPS30}"]`)
+      ?.disabled
+  ).toBe(true);
+  expect(
+    frameRateSelect?.querySelector<HTMLOptionElement>(`option[value="${VideoFrameRate.FPS60}"]`)
+      ?.disabled
+  ).toBe(true);
+
+  act(() => container?.querySelector('form')?.requestSubmit());
+  expect(props.onSave).toHaveBeenCalledWith(
+    expect.objectContaining({
+      configuration: expect.objectContaining({
+        frameRate: VideoFrameRate.FPS24,
+        resolution: VideoResolutionPreset.P2160,
+      }),
+    })
+  );
 });

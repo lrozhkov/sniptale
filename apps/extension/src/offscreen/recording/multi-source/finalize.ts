@@ -1,59 +1,37 @@
 import { RECORDING_EXPORT_FILENAME_PREFIX } from '@sniptale/ui/branding';
+import { createLogger } from '@sniptale/platform/observability/logger';
 import { commitVideoProjectMutation } from '../../../composition/persistence/projects/index-mutations';
-import { saveRecordingSafely } from '../../../workflows/media-hub/store';
+import { saveRecordingsBatchWithCompletionSafely } from '../../../workflows/media-hub/store';
+import { updateVideoRecordingCompletionOutbox } from '../../../composition/persistence/recordings/completion-outbox';
 import {
   createVideoProjectFromMultiSourceRecording,
   type MultiSourceAudioProjectAssetInput,
   type MultiSourceRecordingProjectAssetInput,
 } from '../../../features/video/project/factories/multi-source-recording';
-import {
-  notifyMultiSourceSaved,
-  notifyMultiSourceStopped,
-  triggerMultiSourceDownload,
-} from './messages';
-import { buildMicrophoneFilename, buildSourceFilename } from './recorders';
+import { notifyMultiSourceSaved, notifyMultiSourceStopped } from './messages';
 import type { MultiSourceRecorder, MultiSourceSession } from './state';
-import { createWebcamProjectInput, saveWebcamRecording } from './webcam';
-import { resolveVideoRecordingArtifact } from '../../../platform/media-utils/video-recording';
+import { createWebcamProjectInput } from './webcam';
 
-async function saveSourceRecording(source: MultiSourceRecorder, duration: number) {
-  const artifact = resolveVideoRecordingArtifact(
-    source.recorder.mimeType || source.chunks[0]?.type || ''
-  );
-  const blob = new Blob(source.chunks, { type: artifact.mimeType });
-  const filename = buildSourceFilename(source.sourceIndex, artifact.mimeType);
-  await saveRecordingSafely(source.recordingId, blob, filename);
-  await triggerMultiSourceDownload(source.recordingId, filename);
-  return { blob, filename, mimeType: artifact.mimeType, source, duration };
-}
-
-async function saveMicrophoneRecording(source: MultiSourceRecorder, duration: number) {
-  const mimeType = source.recorder.mimeType || source.chunks[0]?.type || 'audio/webm';
-  const blob = new Blob(source.chunks, { type: mimeType });
-  const filename = buildMicrophoneFilename();
-  await saveRecordingSafely(source.recordingId, blob, filename);
-  await triggerMultiSourceDownload(source.recordingId, filename);
-  return { blob, filename, mimeType, source, duration };
-}
+const logger = createLogger({ namespace: 'OffscreenMultiSourceFinalize' });
 
 async function createProjectForSession(
-  session: MultiSourceSession,
   videos: MultiSourceRecordingProjectAssetInput[],
   microphoneAudio: MultiSourceAudioProjectAssetInput | null,
   webcamVideo: ReturnType<typeof createWebcamProjectInput>
 ): Promise<string | null> {
-  if (!session.settings.openEditorAfterRecording) {
+  try {
+    const project = createVideoProjectFromMultiSourceRecording({
+      name: `${RECORDING_EXPORT_FILENAME_PREFIX}-multi-source`,
+      microphoneAudio,
+      videos,
+      webcamVideo,
+    });
+    await commitVideoProjectMutation(project, { baseRevision: null });
+    return project.id;
+  } catch (error) {
+    logger.error('Failed to create a multi-source project; preserving raw recordings', error);
     return null;
   }
-
-  const project = createVideoProjectFromMultiSourceRecording({
-    name: `${RECORDING_EXPORT_FILENAME_PREFIX}-multi-source`,
-    videos,
-    webcamVideo,
-    microphoneAudio,
-  });
-  await commitVideoProjectMutation(project, { baseRevision: null });
-  return project.id;
 }
 
 function requireSourceDimensions(source: MultiSourceRecorder): { height: number; width: number } {
@@ -73,44 +51,96 @@ function requireSourceDimensions(source: MultiSourceRecorder): { height: number;
   return { height, width };
 }
 
-export async function finalizeSession(session: MultiSourceSession): Promise<void> {
-  const duration = Math.max(0.1, (Date.now() - session.startedAt) / 1000);
+function requireArtifact(source: MultiSourceRecorder) {
+  if (!source.artifact || source.artifact.size <= 0) {
+    throw new Error(`Recording ${source.recordingId} has no finalized media to save.`);
+  }
+  return source.artifact;
+}
+
+function validateSessionForFinalization(session: MultiSourceSession): void {
+  if (session.recorders.length === 0) {
+    throw new Error('Multi-source recording has no video sources to save.');
+  }
   session.recorders.forEach(requireSourceDimensions);
-  const videoResults = await Promise.all(
-    session.recorders.map((source) => saveSourceRecording(source, duration))
-  );
-  const audioResult = session.audioRecorder
-    ? await saveMicrophoneRecording(session.audioRecorder, duration)
-    : null;
-  const webcamResult = session.webcamRecorder
-    ? await saveWebcamRecording(session.webcamRecorder, duration)
-    : null;
-  const videos = videoResults.map((result) => {
-    const dimensions = requireSourceDimensions(result.source);
+  session.recorders.forEach(requireArtifact);
+  if (session.audioRecorder) requireArtifact(session.audioRecorder);
+  if (session.webcamRecorder && !session.webcamRecorder.artifact) {
+    throw new Error(`Recording ${session.webcamRecorder.recordingId} has no finalized media.`);
+  }
+}
+
+function buildVideoProjectInputs(
+  session: MultiSourceSession,
+  duration: number
+): MultiSourceRecordingProjectAssetInput[] {
+  return session.recorders.map((source) => {
+    const artifact = requireArtifact(source);
     return {
-      recordingId: result.source.recordingId,
-      filename: result.filename,
-      width: dimensions.width,
-      height: dimensions.height,
-      duration: result.duration,
-      mimeType: result.mimeType,
-      size: result.blob.size,
+      duration,
+      filename: artifact.filename,
+      ...requireSourceDimensions(source),
+      mimeType: artifact.mimeType,
+      recordingId: source.recordingId,
+      size: artifact.size,
     };
   });
-  const microphoneAudio = audioResult
-    ? {
-        recordingId: audioResult.source.recordingId,
-        filename: audioResult.filename,
-        duration: audioResult.duration,
-        mimeType: audioResult.mimeType,
-        size: audioResult.blob.size,
-      }
-    : null;
-  const webcamVideo = createWebcamProjectInput(webcamResult);
-  const projectId = await createProjectForSession(session, videos, microphoneAudio, webcamVideo);
-  await notifyMultiSourceSaved({
-    projectId,
-    recordingId: videos[0]?.recordingId ?? session.recordingId,
+}
+
+function buildMicrophoneProjectInput(
+  source: MultiSourceRecorder | null,
+  duration: number
+): MultiSourceAudioProjectAssetInput | null {
+  if (!source) return null;
+  const artifact = requireArtifact(source);
+  return {
+    duration,
+    filename: artifact.filename,
+    mimeType: artifact.mimeType,
+    recordingId: source.recordingId,
+    size: artifact.size,
+  };
+}
+
+export async function finalizeSession(session: MultiSourceSession): Promise<void> {
+  validateSessionForFinalization(session);
+  const duration = Math.max(0.1, (Date.now() - session.startedAt) / 1000);
+  const sources = [...session.recorders, session.audioRecorder, session.webcamRecorder].filter(
+    (source): source is NonNullable<typeof source> => source !== null
+  );
+  const primaryRecordingId = session.recorders[0]?.recordingId;
+  if (!primaryRecordingId) throw new Error('Multi-source recording has no saved video source.');
+  const completion = {
+    primaryRecordingId,
+    projectId: null,
+    recordingId: session.recordingId,
+  };
+  await saveRecordingsBatchWithCompletionSafely(
+    sources.map((source) => {
+      const artifact = source.artifact!;
+      return {
+        blob: artifact.file,
+        filename: artifact.filename,
+        id: source.recordingId,
+      };
+    }),
+    completion
+  );
+  await session.staging.delete().catch((error) => {
+    logger.warn('Committed multi-source staging cleanup failed; orphan recovery will retry', {
+      errorMessage: error instanceof Error ? error.message : String(error),
+      recordingId: session.recordingId,
+    });
   });
+
+  const videos = buildVideoProjectInputs(session, duration);
+  const microphoneAudio = buildMicrophoneProjectInput(session.audioRecorder, duration);
+  const webcamVideo = createWebcamProjectInput(session.webcamRecorder, duration);
+  const projectId = await createProjectForSession(videos, microphoneAudio, webcamVideo);
+  const publishedCompletion = { ...completion, projectId };
+  if (projectId !== null) {
+    await updateVideoRecordingCompletionOutbox(publishedCompletion);
+  }
+  await notifyMultiSourceSaved(publishedCompletion);
   await notifyMultiSourceStopped(session.recordingId);
 }

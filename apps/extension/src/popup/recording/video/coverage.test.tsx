@@ -21,7 +21,7 @@ vi.mock('../../../ui/popup-shell/icon-state-button', () => ({
 }));
 
 import {
-  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  DEFAULT_VIDEO_OUTPUT_PROFILE,
   VideoRecordingBuiltInProfileId,
   VideoQuality,
   type VideoRecordingSettings,
@@ -43,8 +43,7 @@ function createSettings(quality: VideoQuality): VideoRecordingSettings {
     microphoneDeviceId: null,
     microphoneEnabled: false,
     openEditorAfterRecording: false,
-    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-    quality,
+    outputProfile: { ...DEFAULT_VIDEO_OUTPUT_PROFILE, quality },
     qualityProfileId: VideoRecordingBuiltInProfileId.OPTIMAL,
     systemAudioEnabled: true,
   };
@@ -96,7 +95,7 @@ it('resolves translated quality labels and materializes selected recording profi
 
   expect(onSettingsChange).toHaveBeenCalledWith(
     expect.objectContaining({
-      quality: VideoQuality.ULTRA,
+      outputProfile: expect.objectContaining({ quality: VideoQuality.ULTRA }),
       qualityProfileId: VideoRecordingBuiltInProfileId.MAXIMUM,
     })
   );

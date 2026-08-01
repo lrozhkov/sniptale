@@ -1,23 +1,18 @@
-import { VIDEO_QUALITY_CONFIGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
-  VideoQuality,
-  VideoResolutionPreset,
-  resolveVideoOutputDimensions,
+  resolveVideoOutputProfile,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { createSourceVideo, waitForSourceMetadata } from './video-source';
-import { isOnePixelEncoderCrop, resolveContainedFrame } from './contain-frame';
+import { createRecordingGeometryPlan } from '../geometry/plan';
 import { createCanvasVideoOutput } from './canvas-video-output';
+import { resolveFixedVideoFrameRate } from './frame-pump';
+import { resolveContainedFrame } from '../geometry/contain-frame';
+import { createSourceVideo, waitForSourceMetadata } from './video-source';
 
 type FixedVideoOutputStream = {
   dimensions: { height: number; width: number };
   frameRate: number;
   stream: MediaStream;
 };
-
-function getFrameRate(quality: VideoRecordingSettings['quality']): number {
-  return (VIDEO_QUALITY_CONFIGS[quality] || VIDEO_QUALITY_CONFIGS[VideoQuality.HIGH]).frameRate;
-}
 
 function releaseVideo(video: HTMLVideoElement): void {
   video.pause();
@@ -32,37 +27,31 @@ function fillCanvasBackground(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasE
 
 function createFrameDrawer(params: {
   canvas: HTMLCanvasElement;
-  cropOddSourceEdges: boolean;
   ctx: CanvasRenderingContext2D;
+  outputBasis: { height: number; width: number };
+  sourceRect: { height: number; width: number; x: number; y: number };
   video: HTMLVideoElement;
-}): () => void {
+}): () => boolean {
   return () => {
     fillCanvasBackground(params.ctx, params.canvas);
-    const source = { height: params.video.videoHeight, width: params.video.videoWidth };
-    if (source.width <= 0 || source.height <= 0) return;
-    if (params.cropOddSourceEdges && isOnePixelEncoderCrop(source, params.canvas)) {
-      params.ctx.imageSmoothingEnabled = false;
-      params.ctx.drawImage(
-        params.video,
-        0,
-        0,
-        params.canvas.width,
-        params.canvas.height,
-        0,
-        0,
-        params.canvas.width,
-        params.canvas.height
-      );
-      return;
-    }
+    const currentSource = {
+      height: params.video.videoHeight,
+      width: params.video.videoWidth,
+    };
+    if (currentSource.width <= 0 || currentSource.height <= 0) return false;
+    const source =
+      currentSource.width === params.outputBasis.width &&
+      currentSource.height === params.outputBasis.height
+        ? params.sourceRect
+        : { x: 0, y: 0, ...currentSource };
     const destination = resolveContainedFrame(source, params.canvas);
     const scaled = source.width !== destination.width || source.height !== destination.height;
     params.ctx.imageSmoothingEnabled = scaled;
     if (scaled) params.ctx.imageSmoothingQuality = 'high';
     params.ctx.drawImage(
       params.video,
-      0,
-      0,
+      source.x,
+      source.y,
       source.width,
       source.height,
       destination.x,
@@ -70,6 +59,7 @@ function createFrameDrawer(params: {
       destination.width,
       destination.height
     );
+    return true;
   };
 }
 
@@ -79,8 +69,13 @@ function stopStreamTracks(stream: MediaStream): void {
 
 export async function createFixedVideoOutputStream(
   sourceStream: MediaStream,
-  settings: Pick<VideoRecordingSettings, 'output' | 'quality'>,
-  options: { contentHint?: 'detail' | 'motion'; frameRate?: number } = {}
+  settings: Pick<VideoRecordingSettings, 'outputProfile'>,
+  options: {
+    contentHint?: 'detail' | 'motion';
+    frameRate?: number;
+    includeSourceAudio?: boolean;
+    sourceOwnership?: 'caller' | 'output';
+  } = {}
 ): Promise<FixedVideoOutputStream> {
   const video = createSourceVideo(sourceStream);
   let released = false;
@@ -88,33 +83,43 @@ export async function createFixedVideoOutputStream(
     if (released) return;
     released = true;
     releaseVideo(video);
-    stopStreamTracks(sourceStream);
+    if (options.sourceOwnership !== 'caller') stopStreamTracks(sourceStream);
   };
   try {
     await waitForSourceMetadata(video);
-
-    const dimensions = resolveVideoOutputDimensions(
-      video.videoWidth,
-      video.videoHeight,
-      settings.output.resolution
+    const outputProfile = resolveVideoOutputProfile(settings);
+    const requestedFrameRate = Math.min(
+      options.frameRate ?? outputProfile.frameRate,
+      outputProfile.frameRate
     );
-    const frameRate = options.frameRate ?? getFrameRate(settings.quality);
+    const frameRate = resolveFixedVideoFrameRate(
+      requestedFrameRate,
+      sourceStream.getVideoTracks()[0]?.getSettings().frameRate
+    );
+    const geometry = createRecordingGeometryPlan({
+      frameRateCap: outputProfile.frameRate,
+      outputBasis: { height: video.videoHeight, width: video.videoWidth },
+      resolution: outputProfile.resolution,
+      sourceRect: { x: 0, y: 0, height: video.videoHeight, width: video.videoWidth },
+    });
     const normalizedStream = createCanvasVideoOutput({
+      ...(options.includeSourceAudio ? { audioTracks: sourceStream.getAudioTracks() } : {}),
       contentHint: options.contentHint ?? 'detail',
-      dimensions,
+      dimensions: geometry.outputSize,
       frameRate,
       initializeDrawing: ({ canvas, context }) => ({
         drawLiveFrame: createFrameDrawer({
           canvas,
-          cropOddSourceEdges: settings.output.resolution === VideoResolutionPreset.SOURCE,
           ctx: context,
+          outputBasis: geometry.outputBasis,
+          sourceRect: geometry.sourceRect,
           video,
         }),
       }),
       release,
     });
 
-    return { dimensions, frameRate, stream: normalizedStream };
+    return { dimensions: geometry.outputSize, frameRate, stream: normalizedStream };
   } catch (error) {
     release();
     throw error;

@@ -1,23 +1,27 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { VideoSetupFooter } from '../footer';
-import { VideoSetupBody } from './body';
-import { getVideoSetupViewModel } from './view-model';
-import type { VideoSetupPageProps } from './types';
+import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
-import { getRecording } from '../../../../composition/persistence/recordings/index';
-import { useSavedRecordingMessageEffect } from './saved-recording-effect';
-
-const POST_RECORD_SAVE_CHECK_ATTEMPTS = 8;
-const POST_RECORD_SAVE_CHECK_DELAY_MS = 250;
+import { translate } from '../../../../platform/i18n';
+import { VideoSetupFooter } from '../footer';
+import {
+  acknowledgeVideoPostRecordResult,
+  loadPendingVideoPostRecordResult,
+} from '../post-record/result-runtime';
+import { VideoSetupBody } from './body';
+import type { VideoSetupPageProps } from './types';
+import { getVideoSetupViewModel } from './view-model';
 
 type PostRecordEffectArgs = {
   activeRecordingId: string | null;
-  lastActiveRecordingIdRef: MutableRefObject<string | null>;
   recordingStatus: VideoRecordingStatus;
   setIsCancellingStart: (value: boolean) => void;
   setIsDiscardingRecording: (value: boolean) => void;
-  setPostRecordRecordingId: (value: string | null) => void;
-  shouldShowPostRecordRef: MutableRefObject<boolean>;
+  setFailedVerificationKey: (value: string | null) => void;
+  setPostRecordResult: (value: VideoPostRecordResult | null) => void;
+  setVerifiedRecordingKey: (value: string) => void;
+  shouldVerify: boolean;
+  verificationAttempt: number;
+  verificationKey: string;
   verificationTokenRef: MutableRefObject<number>;
 };
 
@@ -27,50 +31,59 @@ export default function VideoSetupPage(props: VideoSetupPageProps) {
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <VideoSetupBody
-        {...postRecord.displayProps}
-        postRecordRecordingId={postRecord.postRecordRecordingId}
-        onClosePostRecord={postRecord.closePostRecord}
-        showSavingState={postRecord.showSavingState}
-        viewModel={viewModel}
-      />
-      <VideoSetupFooter
-        canStart={viewModel.canStart}
-        startButtonLabel={viewModel.startButtonLabel}
-        startDisabledReason={viewModel.startDisabledReason}
-        onStart={props.onStart}
-        onPauseResume={props.onPauseResume}
-        onStop={postRecord.handleStop}
-        onCancel={postRecord.handleCancel}
-        recordingState={postRecord.displayProps.recordingState}
-        galleryTitle={viewModel.galleryTitle}
-      />
+      {postRecord.hasVerificationError ? (
+        <PostRecordVerificationError onRetry={postRecord.retryVerification} />
+      ) : (
+        <VideoSetupBody
+          {...postRecord.displayProps}
+          postRecordResult={postRecord.postRecordResult}
+          onAcknowledgePostRecord={postRecord.acknowledgePostRecord}
+          showSavingState={postRecord.showSavingState}
+          viewModel={viewModel}
+        />
+      )}
+      {postRecord.postRecordResult ||
+      postRecord.isVerificationPending ||
+      postRecord.hasVerificationError ? null : (
+        <VideoSetupFooter
+          canStart={viewModel.canStart}
+          startButtonLabel={viewModel.startButtonLabel}
+          startDisabledReason={viewModel.startDisabledReason}
+          onStart={props.onStart}
+          onPauseResume={props.onPauseResume}
+          onStop={props.onStop}
+          onCancel={postRecord.handleCancel}
+          recordingState={postRecord.displayProps.recordingState}
+          galleryTitle={viewModel.galleryTitle}
+        />
+      )}
     </div>
   );
 }
 
 function useVideoPostRecordState(props: VideoSetupPageProps) {
-  const lastActiveRecordingIdRef = useRef<string | null>(null);
   const postRecordVerificationTokenRef = useRef(0);
-  const shouldShowPostRecordRef = useRef(false);
   const state = usePostRecordLocalState();
   const displayProps = createPostRecordDisplayProps(props, state);
+  const verificationKey = createPostRecordVerificationKey(props);
+  const hasVerificationError = state.failedVerificationKey === verificationKey;
+  const isVerificationPending =
+    state.verifiedRecordingKey !== verificationKey && !hasVerificationError;
+  const verifiedPostRecordResult = isVerificationPending ? null : state.postRecordResult;
 
-  usePostRecordEffects({
+  usePostRecordResultEffect({
     activeRecordingId: props.activeRecordingId,
-    lastActiveRecordingIdRef,
     recordingStatus: props.recordingState.status,
     setIsCancellingStart: state.setIsCancellingStart,
     setIsDiscardingRecording: state.setIsDiscardingRecording,
-    setPostRecordRecordingId: state.setPostRecordRecordingId,
-    shouldShowPostRecordRef,
+    setFailedVerificationKey: state.setFailedVerificationKey,
+    setPostRecordResult: state.setPostRecordResult,
+    setVerifiedRecordingKey: state.setVerifiedRecordingKey,
+    shouldVerify: state.verifiedRecordingKey !== verificationKey,
+    verificationAttempt: state.verificationAttempt,
+    verificationKey,
     verificationTokenRef: postRecordVerificationTokenRef,
   });
-
-  const handleStop = () => {
-    shouldShowPostRecordRef.current = true;
-    props.onStop();
-  };
 
   const handleCancel = () =>
     handlePostRecordCancel({
@@ -78,16 +91,31 @@ function useVideoPostRecordState(props: VideoSetupPageProps) {
       recordingStatus: props.recordingState.status,
       setIsCancellingStart: state.setIsCancellingStart,
       setIsDiscardingRecording: state.setIsDiscardingRecording,
-      setPostRecordRecordingId: state.setPostRecordRecordingId,
-      shouldShowPostRecordRef,
+      setPostRecordResult: state.setPostRecordResult,
     });
 
+  const acknowledgePostRecord = async () => {
+    const result = state.postRecordResult;
+    if (!result) {
+      return;
+    }
+    const acknowledgement = await acknowledgeVideoPostRecordResult(result.recordingId);
+    state.setPostRecordResult(
+      acknowledgement === 'stale' ? await loadPendingVideoPostRecordResult() : null
+    );
+  };
+
   return {
-    closePostRecord: () => state.setPostRecordRecordingId(null),
+    acknowledgePostRecord,
     displayProps,
     handleCancel,
-    handleStop,
-    postRecordRecordingId: state.postRecordRecordingId,
+    hasVerificationError,
+    isVerificationPending,
+    postRecordResult: verifiedPostRecordResult,
+    retryVerification: () => {
+      state.setFailedVerificationKey(null);
+      state.setVerificationAttempt((attempt) => attempt + 1);
+    },
     showSavingState: state.isDiscardingRecording,
   };
 }
@@ -95,59 +123,119 @@ function useVideoPostRecordState(props: VideoSetupPageProps) {
 function usePostRecordLocalState() {
   const [isCancellingStart, setIsCancellingStart] = useState(false);
   const [isDiscardingRecording, setIsDiscardingRecording] = useState(false);
-  const [postRecordRecordingId, setPostRecordRecordingId] = useState<string | null>(null);
+  const [failedVerificationKey, setFailedVerificationKey] = useState<string | null>(null);
+  const [postRecordResult, setPostRecordResult] = useState<VideoPostRecordResult | null>(null);
+  const [verificationAttempt, setVerificationAttempt] = useState(0);
+  const [verifiedRecordingKey, setVerifiedRecordingKey] = useState<string | null>(null);
 
   return {
+    failedVerificationKey,
     isCancellingStart,
     isDiscardingRecording,
-    postRecordRecordingId,
+    postRecordResult,
+    setFailedVerificationKey,
     setIsCancellingStart,
     setIsDiscardingRecording,
-    setPostRecordRecordingId,
+    setPostRecordResult,
+    setVerificationAttempt,
+    setVerifiedRecordingKey,
+    verificationAttempt,
+    verifiedRecordingKey,
   };
 }
 
-function usePostRecordEffects(args: PostRecordEffectArgs) {
-  usePostRecordVerificationEffect(args);
-  useSavedRecordingMessageEffect(args);
-}
-
-function usePostRecordVerificationEffect({
+function usePostRecordResultEffect({
   activeRecordingId,
-  lastActiveRecordingIdRef,
   recordingStatus,
   setIsCancellingStart,
   setIsDiscardingRecording,
-  setPostRecordRecordingId,
-  shouldShowPostRecordRef,
+  setFailedVerificationKey,
+  setPostRecordResult,
+  setVerifiedRecordingKey,
+  shouldVerify,
+  verificationAttempt,
+  verificationKey,
   verificationTokenRef,
 }: PostRecordEffectArgs) {
   useEffect(() => {
-    const recordingId = syncPostRecordState({
-      activeRecordingId,
-      lastActiveRecordingIdRef,
-      recordingStatus,
-      setIsCancellingStart,
-      setIsDiscardingRecording,
-      shouldShowPostRecordRef,
-    });
-    return recordingId
-      ? verifyPostRecordAvailability({
-          recordingId,
-          setPostRecordRecordingId,
-          verificationTokenRef,
-        })
-      : undefined;
+    if (recordingStatus === VideoRecordingStatus.IDLE) {
+      setIsCancellingStart(false);
+      setIsDiscardingRecording(false);
+    }
+
+    const verificationToken = verificationTokenRef.current + 1;
+    verificationTokenRef.current = verificationToken;
+    if (activeRecordingId !== null) {
+      setFailedVerificationKey(null);
+      setPostRecordResult(null);
+      setVerifiedRecordingKey(verificationKey);
+      return;
+    }
+    if (!shouldVerify) {
+      return;
+    }
+
+    let cancelled = false;
+    void loadPendingVideoPostRecordResult()
+      .then((result) => {
+        if (!cancelled && verificationTokenRef.current === verificationToken) {
+          setFailedVerificationKey(null);
+          setPostRecordResult(result);
+          setVerifiedRecordingKey(verificationKey);
+        }
+      })
+      .catch(() => {
+        if (!cancelled && verificationTokenRef.current === verificationToken) {
+          setFailedVerificationKey(verificationKey);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     activeRecordingId,
-    lastActiveRecordingIdRef,
     recordingStatus,
     setIsCancellingStart,
     setIsDiscardingRecording,
-    setPostRecordRecordingId,
-    shouldShowPostRecordRef,
+    setFailedVerificationKey,
+    setPostRecordResult,
+    setVerifiedRecordingKey,
+    shouldVerify,
+    verificationAttempt,
+    verificationKey,
     verificationTokenRef,
   ]);
+}
+
+function PostRecordVerificationError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <section
+      className={[
+        'flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-[16px] border p-4 text-center',
+        'border-[var(--sniptale-color-danger-soft)] bg-[var(--sniptale-color-surface-canvas)]',
+      ].join(' ')}
+      role="alert"
+    >
+      <p className="text-xs text-[var(--sniptale-color-danger)]">
+        {translate('popup.video.postRecordLoadError')}
+      </p>
+      <button
+        className={[
+          'inline-flex h-9 items-center justify-center rounded-[10px] px-4 text-xs font-semibold',
+          'bg-[var(--sniptale-color-accent)] text-white transition-opacity hover:opacity-90',
+        ].join(' ')}
+        type="button"
+        onClick={onRetry}
+      >
+        {translate('popup.video.postRecordRetry')}
+      </button>
+    </section>
+  );
+}
+
+function createPostRecordVerificationKey(props: VideoSetupPageProps): string {
+  return props.activeRecordingId ?? 'none';
 }
 
 function handlePostRecordCancel({
@@ -155,18 +243,15 @@ function handlePostRecordCancel({
   recordingStatus,
   setIsCancellingStart,
   setIsDiscardingRecording,
-  setPostRecordRecordingId,
-  shouldShowPostRecordRef,
+  setPostRecordResult,
 }: {
   onCancel: () => void;
   recordingStatus: VideoRecordingStatus;
   setIsCancellingStart: (value: boolean) => void;
   setIsDiscardingRecording: (value: boolean) => void;
-  setPostRecordRecordingId: (value: string | null) => void;
-  shouldShowPostRecordRef: MutableRefObject<boolean>;
+  setPostRecordResult: (value: VideoPostRecordResult | null) => void;
 }): void {
-  shouldShowPostRecordRef.current = false;
-  setPostRecordRecordingId(null);
+  setPostRecordResult(null);
   if (isStartInProgress(recordingStatus)) {
     setIsCancellingStart(true);
     setIsDiscardingRecording(false);
@@ -176,32 +261,6 @@ function handlePostRecordCancel({
 
   setIsDiscardingRecording(true);
   onCancel();
-}
-
-function verifyPostRecordAvailability({
-  recordingId,
-  setPostRecordRecordingId,
-  verificationTokenRef,
-}: {
-  recordingId: string;
-  setPostRecordRecordingId: (value: string | null) => void;
-  verificationTokenRef: MutableRefObject<number>;
-}) {
-  const verificationToken = verificationTokenRef.current + 1;
-  verificationTokenRef.current = verificationToken;
-  let cancelled = false;
-
-  void verifySavedRecordingAvailable(recordingId).then((available) => {
-    if (cancelled || verificationTokenRef.current !== verificationToken || !available) {
-      return;
-    }
-
-    setPostRecordRecordingId(recordingId);
-  });
-
-  return () => {
-    cancelled = true;
-  };
 }
 
 function createPostRecordDisplayProps(
@@ -228,61 +287,6 @@ function createPostRecordDisplayProps(
   };
 }
 
-function syncPostRecordState({
-  activeRecordingId,
-  lastActiveRecordingIdRef,
-  recordingStatus,
-  setIsCancellingStart,
-  setIsDiscardingRecording,
-  shouldShowPostRecordRef,
-}: {
-  activeRecordingId: string | null;
-  lastActiveRecordingIdRef: MutableRefObject<string | null>;
-  recordingStatus: VideoRecordingStatus;
-  setIsCancellingStart: (value: boolean) => void;
-  setIsDiscardingRecording: (value: boolean) => void;
-  shouldShowPostRecordRef: MutableRefObject<boolean>;
-}): string | null {
-  if (recordingStatus !== VideoRecordingStatus.IDLE && activeRecordingId) {
-    lastActiveRecordingIdRef.current = activeRecordingId;
-  }
-
-  let recordingIdToVerify: string | null = null;
-  if (
-    recordingStatus === VideoRecordingStatus.IDLE &&
-    shouldShowPostRecordRef.current &&
-    lastActiveRecordingIdRef.current
-  ) {
-    recordingIdToVerify = lastActiveRecordingIdRef.current;
-    shouldShowPostRecordRef.current = false;
-  }
-
-  if (recordingStatus === VideoRecordingStatus.IDLE) {
-    setIsCancellingStart(false);
-    setIsDiscardingRecording(false);
-  }
-
-  return recordingIdToVerify;
-}
-
 function isStartInProgress(status: VideoRecordingStatus) {
   return status === VideoRecordingStatus.COUNTDOWN || status === VideoRecordingStatus.PREPARING;
-}
-
-async function verifySavedRecordingAvailable(recordingId: string): Promise<boolean> {
-  for (let attempt = 0; attempt < POST_RECORD_SAVE_CHECK_ATTEMPTS; attempt += 1) {
-    if (await getRecording(recordingId)) {
-      return true;
-    }
-
-    await delay(POST_RECORD_SAVE_CHECK_DELAY_MS);
-  }
-
-  return false;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
 }

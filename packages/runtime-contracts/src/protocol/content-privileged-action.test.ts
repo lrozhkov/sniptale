@@ -11,7 +11,6 @@ import {
   isContentPrivilegedActionRequestSource,
   isContentPrivilegedActionRuntimeToken,
   isContentPrivilegedActionTrustedEventProof,
-  isContentPrivilegedActionType,
 } from './content-privileged-action';
 
 it('matches the exact protected message type set', () => {
@@ -28,19 +27,9 @@ it('matches the exact protected message type set', () => {
     MessageType.EXECUTE_SAVE,
     MessageType.OPEN_EDITOR_WITH_IMAGE,
     MessageType.SAVE_SCREENSHOT_TO_GALLERY,
-    MessageType.STAGE_RECORDING_DOWNLOAD_CHUNK,
-    MessageType.SAVE_RECORDING_FOR_DOWNLOAD,
-    MessageType.RELEASE_RECORDING_DOWNLOAD,
     MessageType.TRIGGER_QUICK_ACTION,
     MessageType.CONTENT_RUNTIME_WAKEUP,
   ]);
-});
-
-it('classifies staged recording download routes as content privileged action types', () => {
-  expect(isContentPrivilegedActionType(MessageType.STAGE_RECORDING_DOWNLOAD_CHUNK)).toBe(true);
-  expect(isContentPrivilegedActionType(MessageType.SAVE_RECORDING_FOR_DOWNLOAD)).toBe(true);
-  expect(isContentPrivilegedActionType(MessageType.RELEASE_RECORDING_DOWNLOAD)).toBe(true);
-  expect(isContentPrivilegedActionType('UNLISTED_RECORDING_ROUTE')).toBe(false);
 });
 
 it('validates content privileged action capabilities and request sources narrowly', () => {
@@ -92,7 +81,7 @@ it('validates content privileged action activation and runtime tokens narrowly',
   expect(isContentPrivilegedActionActivationKey(activationKey)).toBe(true);
   expect(isContentPrivilegedActionActivationKey({ keyId: 'key-1' })).toBe(false);
   expect(isContentPrivilegedActionActivationProof(activationKey)).toBe(true);
-  expect(isContentPrivilegedActionActivationPurpose('recording-download')).toBe(true);
+  expect(isContentPrivilegedActionActivationPurpose('recording-download')).toBe(false);
   expect(isContentPrivilegedActionActivationPurpose('trusted-content-event')).toBe(true);
   expect(isContentPrivilegedActionActivationPurpose('other')).toBe(false);
 });

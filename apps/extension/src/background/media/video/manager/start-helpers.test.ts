@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { FakeRuntimeMessagingTransport } from '../../../../platform/runtime-messaging/fake';
 const getBackgroundRuntimeMessagingMock = vi.hoisted(() => vi.fn());
@@ -21,7 +21,6 @@ const settings = {
   webcamEnabled: false,
   webcamDeviceId: null,
   systemAudioEnabled: true,
-  quality: VideoQuality.HIGH,
   countdownSeconds: 3,
   autoFadeDelay: 3,
   openEditorAfterRecording: false,

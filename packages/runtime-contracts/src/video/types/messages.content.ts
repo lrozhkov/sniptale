@@ -62,8 +62,8 @@ export interface GetRecordingStateMessage {
 
 export interface RegisterCameraRecorderControlMessage {
   type: typeof VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL;
-  cameraLaunchToken: string;
-  recordingId: string;
+  cameraRegistrationToken?: string;
+  recordingId?: string;
 }
 
 export interface GetRecordingTabIdMessage {

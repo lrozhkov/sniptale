@@ -53,7 +53,6 @@ vi.mock('../../public/preparation-surface/styles', async (importOriginal) => ({
 
 vi.mock('./diagnostics', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./diagnostics')>()),
-  logRegionCaptureApiSupport: vi.fn(),
   logTopLevelContentScriptLoad: logTopLevelContentScriptLoadMock,
 }));
 

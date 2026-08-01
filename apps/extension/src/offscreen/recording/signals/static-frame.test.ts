@@ -2,13 +2,22 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getRecordingTelemetryMock, loggerWarnMock, saveRecordingTelemetrySafelyMock } = vi.hoisted(
-  () => ({
-    getRecordingTelemetryMock: vi.fn(),
-    loggerWarnMock: vi.fn(),
-    saveRecordingTelemetrySafelyMock: vi.fn(),
-  })
-);
+const {
+  getRecordingMock,
+  getRecordingTelemetryMock,
+  loggerWarnMock,
+  saveRecordingTelemetrySafelyMock,
+} = vi.hoisted(() => ({
+  getRecordingMock: vi.fn(),
+  getRecordingTelemetryMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
+  saveRecordingTelemetrySafelyMock: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/recordings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/recordings')>()),
+  getRecording: getRecordingMock,
+}));
 
 vi.mock('../../../composition/persistence/recordings/telemetry', async (importOriginal) => ({
   ...(await importOriginal<
@@ -148,6 +157,7 @@ function createStaticFrameEnvironment(duration = 2): void {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getRecordingMock.mockResolvedValue({ blob: new Blob(['video'], { type: 'video/webm' }) });
 });
 
 afterEach(() => {
@@ -179,7 +189,7 @@ function registerStaticFramePersistenceTest(): void {
       viewport: null,
     });
 
-    await persistStaticFrameSignals('recording-1', new Blob(['video'], { type: 'video/webm' }));
+    await persistStaticFrameSignals('recording-1');
 
     expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -203,10 +213,7 @@ function registerStaticFrameMissingTelemetryTest(): void {
     vi.useFakeTimers();
     getRecordingTelemetryMock.mockResolvedValue(null);
 
-    const pending = persistStaticFrameSignals(
-      'recording-missing',
-      new Blob(['video'], { type: 'video/webm' })
-    );
+    const pending = persistStaticFrameSignals('recording-missing');
     await vi.runAllTimersAsync();
     await pending;
 
@@ -242,7 +249,7 @@ function registerStaticFrameReplacementTest(): void {
       viewport: null,
     });
 
-    await persistStaticFrameSignals('recording-2', new Blob(['video'], { type: 'video/webm' }));
+    await persistStaticFrameSignals('recording-2');
 
     expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -1,31 +1,33 @@
 import { translate } from '../../../../../platform/i18n';
 import {
-  getVideoRecordingQualityProfile,
+  getVideoRecordingProfile,
   type VideoRecordingSettings,
+  type VideoOutputDimensions,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { InlineCurtainSelect } from '../../inline-controls/curtain-select';
 import { OutputSettingsPanel } from '../output-card/panel';
 import { getRecordingProfileOptions } from './options';
 
 export function QualityCard({
+  knownOutputBasisDimensions,
   settings,
   onSettingsChange,
 }: {
+  knownOutputBasisDimensions?: VideoOutputDimensions | null;
   settings: VideoRecordingSettings;
   onSettingsChange: (patch: Partial<VideoRecordingSettings>) => void;
 }) {
-  const profileState = getRecordingProfileOptions(settings);
+  const profileState = getRecordingProfileOptions(settings, knownOutputBasisDimensions ?? null);
 
   return (
     <InlineCurtainSelect
       ariaLabel={translate('popup.video.qualityAria')}
       label={translate('popup.video.qualityLabel')}
       onChange={(profileId) => {
-        const profile = getVideoRecordingQualityProfile(settings, profileId);
+        const profile = getVideoRecordingProfile(settings, profileId);
         if (profile) {
           onSettingsChange({
-            output: { ...profile.output },
-            quality: profile.quality,
+            outputProfile: { ...profile.configuration },
             qualityProfileId: profile.id,
           });
         }
@@ -34,7 +36,13 @@ export function QualityCard({
       secondaryAction={{
         ariaLabel: translate('popup.video.outputSettingsActionAria'),
         label: translate('popup.video.outputSettingsAction'),
-        panel: <OutputSettingsPanel settings={settings} onChange={onSettingsChange} />,
+        panel: (
+          <OutputSettingsPanel
+            knownOutputBasisDimensions={knownOutputBasisDimensions ?? null}
+            settings={settings}
+            onChange={onSettingsChange}
+          />
+        ),
       }}
       value={profileState.selectedProfileId}
     />

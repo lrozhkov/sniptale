@@ -4,14 +4,27 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { createTrackedStream } from '../multi-source/media-stream.test-support';
+import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
 
-const { normalizeMultiSourceVideoStreamMock } = vi.hoisted(() => ({
-  normalizeMultiSourceVideoStreamMock: vi.fn(),
-}));
+const { buildVideoMediaRecorderOptionsMock, normalizeMultiSourceVideoStreamMock } = vi.hoisted(
+  () => ({
+    buildVideoMediaRecorderOptionsMock: vi.fn(),
+    normalizeMultiSourceVideoStreamMock: vi.fn(),
+  })
+);
 
 vi.mock('../stream/fixed-video-output', () => ({
   createFixedVideoOutputStream: normalizeMultiSourceVideoStreamMock,
 }));
+vi.mock('../../../platform/media-utils/video-recording', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../../platform/media-utils/video-recording')>();
+  buildVideoMediaRecorderOptionsMock.mockImplementation(original.buildVideoMediaRecorderOptions);
+  return {
+    ...original,
+    buildVideoMediaRecorderOptions: buildVideoMediaRecorderOptionsMock,
+  };
+});
 
 import { createWebcamSidecarRecorder } from './webcam';
 
@@ -22,11 +35,17 @@ class FakeMediaRecorder {
 
   ondataavailable: ((event: BlobEvent) => void) | null = null;
   onerror: (() => void) | null = null;
+  onstart = null;
+  onstop = null;
+  state: RecordingState = 'inactive';
+  mimeType: string;
 
   constructor(
     readonly stream: MediaStream,
     readonly options: MediaRecorderOptions
-  ) {}
+  ) {
+    this.mimeType = options.mimeType ?? '';
+  }
 }
 
 const stopOutputTrack = vi.fn();
@@ -63,6 +82,7 @@ it('records the webcam through the fixed output stream', async () => {
   const settings = createSettings();
   const recorder = await createWebcamSidecarRecorder({
     baseRecordingId: 'recording-1',
+    coordinator: createRecordingStagingCoordinatorTestDouble(),
     settings,
   });
 
@@ -75,18 +95,34 @@ it('records the webcam through the fixed output stream', async () => {
     stream: recorder?.stream,
   });
   expect(recorder?.trackSettings).toEqual({ frameRate: 30, height: 1080, width: 1920 });
-  expect(recorder?.recorder.onerror).not.toBeNull();
+  expect(recorder?.artifactSession).toBeDefined();
   expect(stopOutputTrack).not.toHaveBeenCalled();
   expect(stopSourceTrack).not.toHaveBeenCalled();
 });
 
-it('stops the normalized webcam stream when recorder creation owns a terminal error', async () => {
+it('aborts the normalized webcam artifact through its shared session', async () => {
+  const coordinator = createRecordingStagingCoordinatorTestDouble();
   const recorder = await createWebcamSidecarRecorder({
     baseRecordingId: 'recording-1',
+    coordinator,
     settings: createSettings(),
   });
 
-  recorder?.recorder.onerror?.(new ErrorEvent('error'));
+  await recorder?.artifactSession.abort();
+
+  expect(coordinator.abort).toHaveBeenCalledOnce();
+});
+
+it('rejects and releases normalized media when recorder options omit a MIME type', async () => {
+  buildVideoMediaRecorderOptionsMock.mockReturnValueOnce({ videoBitsPerSecond: 8_000_000 });
+
+  await expect(
+    createWebcamSidecarRecorder({
+      baseRecordingId: 'recording-1',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: createSettings(),
+    })
+  ).rejects.toThrow('Unsupported recorded video MIME type: (empty)');
 
   expect(stopOutputTrack).toHaveBeenCalledOnce();
 });

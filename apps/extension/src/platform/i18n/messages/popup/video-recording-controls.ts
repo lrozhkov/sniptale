@@ -149,6 +149,14 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
     ru: 'Не удалось выполнить действие. Попробуйте ещё раз.',
     en: 'The action failed. Try again.',
   },
+  postRecordLoadError: {
+    ru: 'Не удалось проверить сохранённую запись. Повторите попытку.',
+    en: 'Could not check the saved recording. Try again.',
+  },
+  postRecordRetry: {
+    ru: 'Повторить',
+    en: 'Retry',
+  },
   cancelContinueRecording: {
     ru: 'Продолжить запись',
     en: 'Continue recording',

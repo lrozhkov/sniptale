@@ -9,7 +9,7 @@ import { initializeAppTheme } from '../../../ui/theme';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 import { App } from '../../overlay/app/view';
-import { logRegionCaptureApiSupport, logTopLevelContentScriptLoad } from './diagnostics';
+import { logTopLevelContentScriptLoad } from './diagnostics';
 import { initializeTopLevelContentRuntime } from '../bootstrap';
 import { installContentUiActivationBridge } from '../ui-activation-bridge';
 import { installContentToastHostAdapter } from '../../platform/dom-host/toast-host';
@@ -93,5 +93,4 @@ export function initializeTopLevelContentEntry(): void {
   });
 
   logTopLevelContentScriptLoad();
-  logRegionCaptureApiSupport();
 }

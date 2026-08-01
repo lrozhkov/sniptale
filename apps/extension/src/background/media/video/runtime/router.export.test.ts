@@ -14,28 +14,6 @@ const {
   handleStartProjectExportMock: vi.fn(),
 }));
 
-vi.mock('./handlers', () => ({
-  RouteResult: undefined,
-  createUnhandledRouteResult: createUnhandledRouteResultMock,
-  handleCancelProjectExport: handleCancelProjectExportMock,
-  handleDownloadRecording: vi.fn(),
-  handleDownloadRecordingSidecar: vi.fn(),
-  handleGetProjectExportCapabilities: handleGetProjectExportCapabilitiesMock,
-  handleInternalVideoSignal: vi.fn(),
-  handleOffscreenError: vi.fn(),
-  handleOffscreenReady: handleOffscreenReadyMock,
-  handleOffscreenRecordingPaused: vi.fn(),
-  handleOffscreenRecordingResumed: vi.fn(),
-  handleOffscreenRecordingStarted: vi.fn(),
-  handleOffscreenRecordingStopped: vi.fn(),
-  handleRecordingDurationUpdated: vi.fn(),
-  handleRecordingState: vi.fn(),
-  handleRecordingTabId: vi.fn(),
-  handleProjectExportLifecycleMessage: vi.fn(),
-  handleRegisterCameraRecorderControl: vi.fn(),
-  handleStartProjectExport: handleStartProjectExportMock,
-  handleVideoSavedToIdb: vi.fn(),
-}));
 vi.mock('./handlers/export/project-export', () => ({
   handleCancelProjectExport: handleCancelProjectExportMock,
   handleGetProjectExportCapabilities: handleGetProjectExportCapabilitiesMock,

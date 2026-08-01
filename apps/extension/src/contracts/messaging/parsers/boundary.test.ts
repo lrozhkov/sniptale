@@ -14,10 +14,7 @@ import {
 } from './boundary';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import {
-  RegionCaptureControlMessageType,
-  VideoMessageType,
-} from '@sniptale/runtime-contracts/video/messages';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 function verifyBackgroundRuntimeMessageParsing() {
   const message = parseBackgroundRuntimeMessage({
@@ -53,7 +50,7 @@ function verifyUnsupportedPopupRuntimeMessageRejected() {
 function verifyMalformedContentPayloadRejection() {
   expect(() =>
     parseContentTabMessage({
-      type: RegionCaptureControlMessageType.START,
+      type: VideoMessageType.SHOW_REGION_SELECTOR,
     })
   ).toThrow(MessageContractError);
 }

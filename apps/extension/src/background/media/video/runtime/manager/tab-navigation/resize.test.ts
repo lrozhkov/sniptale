@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   active: true,
+  captureMode: 'TAB_CROP',
   createTransitionId: vi.fn(),
   currentRecordingId: 'recording-1',
   getRecordingTabId: vi.fn(),
@@ -46,7 +47,7 @@ vi.mock('./binding', async (importOriginal) => ({
   resolveNavigationBinding: (tabId: number) =>
     mocks.active && tabId === mocks.recordingTabId
       ? {
-          captureMode: 'TAB',
+          captureMode: mocks.captureMode,
           generation: 2,
           recordingId: mocks.currentRecordingId,
           streamInstanceId: 'stream-1',
@@ -80,6 +81,7 @@ beforeEach(() => {
   resetTabRecordingResizeForTests();
   resetExactOutputTransitionForTests();
   mocks.active = true;
+  mocks.captureMode = 'TAB_CROP';
   mocks.currentRecordingId = 'recording-1';
   mocks.navigationPending = false;
   mocks.recordingTabId = 7;
@@ -91,6 +93,26 @@ beforeEach(() => {
   mocks.setViewportOutputFrozen.mockResolvedValue('applied');
   mocks.stop.mockResolvedValue({ result: 'accepted' });
   mocks.waitForNavigationIdle.mockResolvedValue(undefined);
+});
+
+it('freezes, remeasures, remaps, and thaws full TAB without replacing the output canvas', async () => {
+  mocks.captureMode = 'TAB';
+
+  expect(queueTabRecordingWindowBoundsChanged(4)).toBe(true);
+  await vi.waitFor(() => expect(mocks.revalidateSource).toHaveBeenCalledOnce());
+
+  expect(mocks.getTab).toHaveBeenCalledWith(7);
+  expect(mocks.readViewport).toHaveBeenCalledWith(7);
+  expect(mocks.revalidateSource).toHaveBeenCalledWith(
+    expect.objectContaining({ captureMode: 'TAB', recordingId: 'recording-1' }),
+    viewport,
+    'resize-1'
+  );
+  expect(mocks.setViewportOutputFrozen.mock.calls.map(([, frozen]) => frozen)).toEqual([
+    true,
+    false,
+  ]);
+  expect(mocks.stop).not.toHaveBeenCalled();
 });
 
 it('ignores unrelated windows and non-tab recording state', async () => {
@@ -242,6 +264,19 @@ it('stops the active binding when exact geometry revalidation fails', async () =
 
   expect(mocks.setRuntimeState).toHaveBeenCalledWith({ error: 'resize geometry unavailable' });
   expect(mocks.setViewportOutputFrozen.mock.calls.map(([, frozen]) => frozen)).toEqual([true]);
+});
+
+it('thaws after a recoverable TAB_CROP resize without invoking critical STOP', async () => {
+  expect(queueTabRecordingWindowBoundsChanged(4)).toBe(true);
+  await vi.waitFor(() =>
+    expect(mocks.setViewportOutputFrozen.mock.calls.map(([, frozen]) => frozen)).toEqual([
+      true,
+      false,
+    ])
+  );
+
+  expect(mocks.stop).not.toHaveBeenCalled();
+  expect(mocks.setRuntimeState).not.toHaveBeenCalled();
 });
 
 it('does not revalidate or thaw after the binding changes during viewport read', async () => {

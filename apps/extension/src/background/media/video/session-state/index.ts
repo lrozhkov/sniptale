@@ -36,6 +36,7 @@ export {
   hasActiveVideoRecordingTab,
   isVideoRecordingPreparationInProgress,
   isVideoRecordingStopInProgress,
+  isCurrentVideoRecordingId,
 } from './reads';
 export {
   beginVideoRecordingStop,

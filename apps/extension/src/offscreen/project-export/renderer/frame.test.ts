@@ -156,7 +156,7 @@ function createExportSettings(
 
 it('applies camera transforms before rendering export layers and overlays', verifyFrameRendering);
 
-it('uses one cover scale instead of stretching a rounded standard output', async () => {
+it('contains a rounded standard output without stretching or cropping project coordinates', async () => {
   const { drawProjectFrame } = await import('./frame');
   const { clipTranslations, context, readTranslationX } = createTransformTrackingContext();
   const transitionTranslations: number[] = [];
@@ -195,16 +195,20 @@ it('uses one cover scale instead of stretching a rounded standard output', async
   expect(drawCompositionLayerMock).toHaveBeenCalledWith(
     context,
     frame.visualLayers[0],
-    expect.closeTo(240 / 51),
-    expect.closeTo(240 / 51),
+    expect.closeTo(roundedSettings.width / roundedProject.width),
+    expect.closeTo(roundedSettings.width / roundedProject.width),
     loadedImages,
     expect.any(Map),
     1
   );
   expect(context.translate).toHaveBeenNthCalledWith(
     1,
-    expect.closeTo((roundedSettings.width - roundedProject.width * (240 / 51)) / 2),
-    0
+    0,
+    expect.closeTo(
+      (roundedSettings.height -
+        roundedProject.height * (roundedSettings.width / roundedProject.width)) /
+        2
+    )
   );
   expect(clipTranslations).toEqual([0]);
   expect(transitionTranslations).toEqual([0]);

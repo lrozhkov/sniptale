@@ -82,6 +82,10 @@ export const settingsVideoQualityMessages = defineMessageSource({
     ru: 'Разрешение',
     en: 'Resolution',
   },
+  frameRateLabel: {
+    ru: 'Частота кадров',
+    en: 'Frame rate',
+  },
   save: {
     ru: 'Сохранить',
     en: 'Save',

@@ -15,6 +15,7 @@ const {
   sendRuntimeMessageMock,
   resetVideoRecordingRuntimeStateMock,
   resetVideoRecordingStartSessionMock,
+  readStoredVideoPostRecordResultMock,
   setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
 } = vi.hoisted(() => ({
@@ -31,6 +32,7 @@ const {
   sendRuntimeMessageMock: vi.fn(),
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   resetVideoRecordingStartSessionMock: vi.fn(),
+  readStoredVideoPostRecordResultMock: vi.fn(),
   setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
 }));
@@ -77,6 +79,10 @@ vi.mock('../recording-control-lease', async (importOriginal) => ({
   activateVideoRecordingLease: vi.fn().mockResolvedValue({ controlToken: 'control-token-1' }),
   issuePreparedVideoRecordingLease: issuePreparedVideoRecordingLeaseMock,
 }));
+vi.mock('../../../storage/video/post-record-result', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../storage/video/post-record-result')>()),
+  readStoredVideoPostRecordResult: readStoredVideoPostRecordResultMock,
+}));
 import {
   CaptureMode,
   VideoQuality,
@@ -97,7 +103,7 @@ const multiSourceSettings: VideoRecordingSettings = {
   microphoneDeviceId: null,
   microphoneEnabled: false,
   openEditorAfterRecording: false,
-  quality: VideoQuality.HIGH,
+  outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
   sourceCount: 3,
   systemAudioEnabled: true,
 };
@@ -127,6 +133,7 @@ beforeEach(() => {
     recordingId: 'recording-1',
   });
   runCountdownMock.mockResolvedValue(true);
+  readStoredVideoPostRecordResultMock.mockResolvedValue(null);
   sendRuntimeMessageMock.mockImplementation((message: { type?: string }) =>
     message.type === VideoMessageType.OFFSCREEN_STOP_RECORDING
       ? Promise.resolve({ success: true, result: 'accepted' })

@@ -9,6 +9,7 @@ const {
   closeOffscreenDocumentForPrivacyErasureMock,
   ensureActiveVideoRecordingLeaseHydratedMock,
   finishVideoRecordingStopMock,
+  forgetCameraRecorderControlGrantMock,
   getCurrentRecordingIdMock,
   inspectActiveProjectExportJobLedgerEntryMock,
   inspectPersistedLeaseMock,
@@ -28,6 +29,7 @@ const {
   closeOffscreenDocumentForPrivacyErasureMock: vi.fn(),
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
   finishVideoRecordingStopMock: vi.fn(),
+  forgetCameraRecorderControlGrantMock: vi.fn(),
   getCurrentRecordingIdMock: vi.fn(),
   inspectActiveProjectExportJobLedgerEntryMock: vi.fn(),
   inspectPersistedLeaseMock: vi.fn(),
@@ -48,6 +50,10 @@ vi.mock('../video/recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../video/recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
   ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
+}));
+vi.mock('../video/runtime/camera-recorder-control', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../video/runtime/camera-recorder-control')>()),
+  forgetCameraRecorderControlGrant: forgetCameraRecorderControlGrantMock,
 }));
 vi.mock('../video/runtime/manager', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../video/runtime/manager')>()),
@@ -140,6 +146,7 @@ it('hydrates and terminates a persisted recording before clearing its durable le
   expect(resetRecordingTabIdMock).toHaveBeenCalledOnce();
   expect(resetVideoRecordingStartSessionMock).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
+  expect(forgetCameraRecorderControlGrantMock).toHaveBeenCalledOnce();
 });
 
 it('closes detached offscreen persistence without a lease and stays idempotent', async () => {
@@ -150,6 +157,7 @@ it('closes detached offscreen persistence without a lease and stays idempotent',
   expect(stopRecordingForPrivacyErasureMock).not.toHaveBeenCalled();
   expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
   expect(closeOffscreenDocumentForPrivacyErasureMock).toHaveBeenCalledTimes(2);
+  expect(forgetCameraRecorderControlGrantMock).toHaveBeenCalledTimes(2);
   expect(first).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ id: 'recording-runtime-state', status: 'verified-empty' }),

@@ -30,7 +30,7 @@ it('creates and updates live media state from recording settings', () => {
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,
     openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: false,
     webcamDeviceId: 'cam-1',
     webcamEnabled: true,

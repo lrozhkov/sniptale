@@ -132,8 +132,14 @@ async function expectStartRecordingMessage(page: Page) {
     captureMode: CaptureMode.TAB,
     tabId: 1,
     settings: expect.objectContaining({
-      quality: expect.any(String),
       countdownSeconds: expect.any(Number),
+      outputProfile: expect.objectContaining({
+        codec: expect.any(String),
+        container: expect.any(String),
+        frameRate: expect.any(Number),
+        quality: expect.any(String),
+        resolution: expect.any(String),
+      }),
     }),
   });
 }

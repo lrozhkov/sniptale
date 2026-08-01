@@ -1,9 +1,8 @@
 // Types shared across video recording contracts, messages, and annotations.
 
 import type { NativeCaptureSettings } from './native-settings';
-import type { VideoRecordingOutputSettings } from './output-profile';
-import type { VideoQuality } from './quality';
-import type { VideoRecordingQualityProfile } from './quality-profiles';
+import type { VideoOutputProfile } from './output-profile';
+import type { VideoRecordingProfile } from './quality-profiles';
 
 export type * from './native-settings';
 export * from './output-profile';
@@ -55,6 +54,12 @@ export const VideoRecordingStatus = {
 } as const;
 
 export type VideoRecordingStatus = (typeof VideoRecordingStatus)[keyof typeof VideoRecordingStatus];
+
+export type VideoPostRecordResult = {
+  primaryRecordingId: string;
+  projectId: string | null;
+  recordingId: string;
+};
 
 export const WebcamResolutionPreset = {
   AUTO: 'AUTO',
@@ -123,10 +128,9 @@ export interface VideoRecordingSettings {
   webcamQuality?: WebcamQualitySettings;
   systemAudioEnabled: boolean;
   sourceCount?: number;
-  quality: VideoQuality;
-  output: VideoRecordingOutputSettings;
+  outputProfile: VideoOutputProfile;
   qualityProfileId: string | null;
-  qualityProfiles: VideoRecordingQualityProfile[];
+  qualityProfiles: VideoRecordingProfile[];
   countdownSeconds: number;
   autoFadeDelay: number;
   openEditorAfterRecording: boolean;

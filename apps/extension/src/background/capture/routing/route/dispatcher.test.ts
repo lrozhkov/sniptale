@@ -14,11 +14,8 @@ const {
   handleReleaseWebSnapshotStagedBlobsMock,
   handleRequestGalleryImageUpdateCapabilityMock,
   handleRequestExportHarStartCapabilityMock,
-  handleReleaseRecordingDownloadMock,
-  handleSaveRecordingForDownloadMock,
   handleSaveScreenshotToGalleryMock,
   handleSaveWebSnapshotToGalleryMock,
-  handleStageRecordingDownloadChunkMock,
   handleStageWebSnapshotBlobChunkMock,
   handleTriggerQuickActionMock,
   handleUpdateGalleryImageAssetMock,
@@ -38,11 +35,8 @@ const {
   handleReleaseWebSnapshotStagedBlobsMock: vi.fn(),
   handleRequestGalleryImageUpdateCapabilityMock: vi.fn(),
   handleRequestExportHarStartCapabilityMock: vi.fn(),
-  handleReleaseRecordingDownloadMock: vi.fn(),
-  handleSaveRecordingForDownloadMock: vi.fn(),
   handleSaveScreenshotToGalleryMock: vi.fn(),
   handleSaveWebSnapshotToGalleryMock: vi.fn(),
-  handleStageRecordingDownloadChunkMock: vi.fn(),
   handleStageWebSnapshotBlobChunkMock: vi.fn(),
   handleTriggerQuickActionMock: vi.fn(),
   handleUpdateGalleryImageAssetMock: vi.fn(),
@@ -68,9 +62,6 @@ vi.mock('../handlers.visible', () => ({
 vi.mock('../actions.download', () => ({
   handleExecuteSave: handleExecuteSaveMock,
   handleOpenEditorWithImage: handleOpenEditorWithImageMock,
-  handleReleaseRecordingDownload: handleReleaseRecordingDownloadMock,
-  handleSaveRecordingForDownload: handleSaveRecordingForDownloadMock,
-  handleStageRecordingDownloadChunk: handleStageRecordingDownloadChunkMock,
 }));
 
 vi.mock('../actions.export', () => ({

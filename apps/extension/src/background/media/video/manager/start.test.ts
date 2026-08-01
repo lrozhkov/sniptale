@@ -16,6 +16,7 @@ const {
   sendRuntimeMessageMock,
   resetVideoRecordingRuntimeStateMock,
   resetVideoRecordingStartSessionMock,
+  readStoredVideoPostRecordResultMock,
   setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
 } = vi.hoisted(() => ({
@@ -34,6 +35,7 @@ const {
   sendRuntimeMessageMock: vi.fn(),
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   resetVideoRecordingStartSessionMock: vi.fn(),
+  readStoredVideoPostRecordResultMock: vi.fn(),
   setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
 }));
@@ -80,6 +82,10 @@ vi.mock('../recording-control-lease', async (importOriginal) => ({
   activateVideoRecordingLease: vi.fn().mockResolvedValue({ controlToken: 'control-token-1' }),
   issuePreparedVideoRecordingLease: issuePreparedVideoRecordingLeaseMock,
 }));
+vi.mock('../../../storage/video/post-record-result', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../storage/video/post-record-result')>()),
+  readStoredVideoPostRecordResult: readStoredVideoPostRecordResultMock,
+}));
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { startRecording } from './start';
@@ -97,6 +103,7 @@ function resetStartRecordingTestState() {
   isVideoRecordingPreparationInProgressMock.mockReturnValue(false);
   initializeRecordingContextMock.mockResolvedValue(recordingContext);
   runCountdownMock.mockResolvedValue(true);
+  readStoredVideoPostRecordResultMock.mockResolvedValue(null);
   sendRuntimeMessageMock.mockImplementation((message: { type?: string }) =>
     Promise.resolve(
       message.type === VideoMessageType.OFFSCREEN_STOP_RECORDING ||

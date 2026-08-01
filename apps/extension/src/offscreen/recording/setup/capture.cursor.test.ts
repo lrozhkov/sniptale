@@ -60,12 +60,12 @@ function createControlledTabSettings(): VideoRecordingSettings {
     microphoneDeviceId: null,
     microphoneEnabled: false,
     openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: false,
   };
 }
 
-it('requests tab capture without the native cursor when controlled cursor capture is enabled', async () => {
+it('keeps the Chrome tab source binding isolated from standard track constraints', async () => {
   const getUserMedia = vi.fn().mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
     getVideoTracks: () => [{ getSettings: () => ({ cursor: 'never' }), readyState: 'live' }],
@@ -82,7 +82,6 @@ it('requests tab capture without the native cursor when controlled cursor captur
   expect(getUserMedia).toHaveBeenCalledWith({
     audio: false,
     video: {
-      cursor: 'never',
       mandatory: {
         chromeMediaSource: 'tab',
         chromeMediaSourceId: 'tab-stream-controlled',
@@ -99,40 +98,12 @@ it('requests tab capture without the native cursor when controlled cursor captur
   expect(loggerWarnMock).not.toHaveBeenCalled();
 });
 
-it('requests the measured viewport as a non-blocking ideal over the tab source binding', async () => {
-  const getUserMedia = vi.fn().mockResolvedValue({
-    getTracks: () => [{ stop: vi.fn() }],
-    getVideoTracks: () => [{ getSettings: () => ({ width: 1024, height: 768 }) }],
-  });
-  installMediaDevicesMocks({ getUserMedia });
-
-  await acquireRecordingSourceStream({
-    captureMode: CaptureMode.TAB,
-    settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
-    streamId: 'tab-stream-viewport',
-    viewport: { width: 1904, height: 985 },
-  });
-
-  expect(getUserMedia).toHaveBeenCalledWith({
-    audio: false,
-    video: {
-      aspectRatio: { ideal: 1904 / 985 },
-      height: { ideal: 985 },
-      mandatory: {
-        chromeMediaSource: 'tab',
-        chromeMediaSourceId: 'tab-stream-viewport',
-      },
-      width: { ideal: 1904 },
-    },
-  });
-});
-
 it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
-  'excludes the native cursor from viewport-projected %s without enabling action telemetry',
+  'uses only the canonical Chrome source binding for %s',
   async (captureMode) => {
     const getUserMedia = vi.fn().mockResolvedValue({
       getTracks: () => [{ stop: vi.fn() }],
-      getVideoTracks: () => [{ getSettings: () => ({ cursor: 'never' }), readyState: 'live' }],
+      getVideoTracks: () => [{ getSettings: () => ({}), readyState: 'live' }],
       id: 'tab-stream',
     });
     installMediaDevicesMocks({ getUserMedia });
@@ -140,19 +111,17 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
     await expect(
       acquireRecordingSourceStream({
         captureMode,
-        excludeNativeCursor: true,
         settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
-        streamId: 'tab-stream-viewport-cursor',
+        streamId: 'tab-stream-source',
       })
     ).resolves.toEqual(expect.objectContaining({ cursorCaptureMode: null }));
 
     expect(getUserMedia).toHaveBeenCalledWith({
       audio: false,
       video: {
-        cursor: 'never',
         mandatory: {
           chromeMediaSource: 'tab',
-          chromeMediaSourceId: 'tab-stream-viewport-cursor',
+          chromeMediaSourceId: 'tab-stream-source',
         },
       },
     });
@@ -163,122 +132,38 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
   }
 );
 
-it('keeps viewport-projected tab capture when Chrome omits cursor track settings', async () => {
-  const stop = vi.fn();
+it('uses the same isolated source binding for system audio and video', async () => {
   const getUserMedia = vi.fn().mockResolvedValue({
-    getTracks: () => [{ stop }],
+    getTracks: () => [{ stop: vi.fn() }],
     getVideoTracks: () => [{ getSettings: () => ({}), readyState: 'live' }],
     id: 'tab-stream',
   });
   installMediaDevicesMocks({ getUserMedia });
 
-  await expect(
-    acquireRecordingSourceStream({
-      captureMode: CaptureMode.TAB,
-      excludeNativeCursor: true,
-      settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
-      streamId: 'tab-stream-unreported-cursor',
-    })
-  ).resolves.toEqual(expect.objectContaining({ cursorCaptureMode: null }));
+  await acquireRecordingSourceStream({
+    captureMode: CaptureMode.TAB,
+    settings: {
+      ...createControlledTabSettings(),
+      controlledCursorCaptureEnabled: false,
+      systemAudioEnabled: true,
+    },
+    streamId: 'tab-stream-with-audio',
+  });
 
   expect(getUserMedia).toHaveBeenCalledWith({
-    audio: false,
-    video: {
-      cursor: 'never',
+    audio: {
       mandatory: {
         chromeMediaSource: 'tab',
-        chromeMediaSourceId: 'tab-stream-unreported-cursor',
+        chromeMediaSourceId: 'tab-stream-with-audio',
+      },
+    },
+    video: {
+      mandatory: {
+        chromeMediaSource: 'tab',
+        chromeMediaSourceId: 'tab-stream-with-audio',
       },
     },
   });
-  expect(stop).not.toHaveBeenCalled();
-  expect(loggerDebugMock).toHaveBeenCalledWith(
-    'Tab capture accepted cursor-free constraints without cursor track settings',
-    { displaySurface: null }
-  );
-});
-
-it.each(['always', 'motion'] as const)(
-  'fails closed and releases the source when native cursor exclusion reports %s',
-  async (cursor) => {
-    const videoTrack = {
-      getSettings: () => ({ cursor }),
-      readyState: 'live',
-      stop: vi.fn(),
-    };
-    const audioTrack = { stop: vi.fn() };
-    installMediaDevicesMocks({
-      getUserMedia: vi.fn().mockResolvedValue({
-        getTracks: () => [videoTrack, audioTrack],
-        getVideoTracks: () => [videoTrack],
-        id: 'tab-stream',
-      }),
-    });
-
-    await expect(
-      acquireRecordingSourceStream({
-        captureMode: CaptureMode.TAB,
-        excludeNativeCursor: true,
-        settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
-        streamId: 'tab-stream-cursor-leak',
-      })
-    ).rejects.toThrow('Native cursor exclusion could not be verified');
-
-    expect(videoTrack.stop).toHaveBeenCalledOnce();
-    expect(audioTrack.stop).toHaveBeenCalledOnce();
-  }
-);
-
-it('fails closed and releases an unverified source without a video track', async () => {
-  const audioTrack = { stop: vi.fn() };
-  installMediaDevicesMocks({
-    getUserMedia: vi.fn().mockResolvedValue({
-      getTracks: () => [audioTrack],
-      getVideoTracks: () => [],
-      id: 'tab-stream',
-    }),
-  });
-
-  await expect(
-    acquireRecordingSourceStream({
-      captureMode: CaptureMode.TAB,
-      excludeNativeCursor: true,
-      settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
-      streamId: 'tab-stream-without-video',
-    })
-  ).rejects.toThrow('Native cursor exclusion could not be verified');
-
-  expect(audioTrack.stop).toHaveBeenCalledOnce();
-});
-
-it('fails closed and releases every track when cursor settings cannot be read', async () => {
-  const videoTrack = {
-    getSettings: () => {
-      throw new Error('track settings unavailable');
-    },
-    readyState: 'live',
-    stop: vi.fn(),
-  };
-  const audioTrack = { stop: vi.fn() };
-  installMediaDevicesMocks({
-    getUserMedia: vi.fn().mockResolvedValue({
-      getTracks: () => [videoTrack, audioTrack],
-      getVideoTracks: () => [videoTrack],
-      id: 'tab-stream',
-    }),
-  });
-
-  await expect(
-    acquireRecordingSourceStream({
-      captureMode: CaptureMode.TAB,
-      excludeNativeCursor: true,
-      settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
-      streamId: 'tab-stream-settings-error',
-    })
-  ).rejects.toThrow('Native cursor exclusion could not be verified');
-
-  expect(videoTrack.stop).toHaveBeenCalledOnce();
-  expect(audioTrack.stop).toHaveBeenCalledOnce();
 });
 
 it('keeps controlled tab telemetry alive when native cursor exclusion was not requested', async () => {

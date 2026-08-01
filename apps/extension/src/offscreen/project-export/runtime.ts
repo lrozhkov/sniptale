@@ -5,7 +5,6 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   getVideoRecordingMimeTypeCandidates,
   VideoOutputContainer,
-  VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { sendRuntimeMessageBestEffort } from '../runtime-messaging/best-effort';
 import {
@@ -25,7 +24,6 @@ export function getSupportedWebmExportMimeType(
     {
       codec,
       container: VideoOutputContainer.WEBM,
-      resolution: VideoResolutionPreset.SOURCE,
     },
     hasAudioTracks
   );

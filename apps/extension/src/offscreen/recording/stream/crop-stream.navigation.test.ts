@@ -19,7 +19,11 @@ import { createStream, createTrackedStream } from '../multi-source/media-stream.
 
 type NavigationHarness = {
   canvas: HTMLCanvasElement;
-  context: { drawImage: ReturnType<typeof vi.fn> };
+  context: {
+    drawImage: ReturnType<typeof vi.fn>;
+    fillRect: ReturnType<typeof vi.fn>;
+    fillStyle: string;
+  };
   video: {
     videoHeight: number;
     videoWidth: number;
@@ -28,7 +32,7 @@ type NavigationHarness = {
 
 function installNavigationHarness(): NavigationHarness {
   const output = createTrackedStream();
-  const context = { drawImage: vi.fn() };
+  const context = { drawImage: vi.fn(), fillRect: vi.fn(), fillStyle: '' };
   const canvases: HTMLCanvasElement[] = [];
   Object.defineProperty(HTMLCanvasElement.prototype, 'captureStream', {
     configurable: true,

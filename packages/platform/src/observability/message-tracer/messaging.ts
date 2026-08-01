@@ -2,7 +2,6 @@ import { getActiveTraceObserver } from './runtime';
 import type { TraceConfig, TraceContext, TraceEvent, TraceMessageEvent } from './types';
 import { sanitizeHarTracePayload } from './har-payload';
 import { sanitizeLlmTracePayload } from './llm-payload';
-import { sanitizeRecordingTracePayload } from './recording-payload';
 import { sanitizeRuntimeBlobTracePayload } from './runtime-blob-payload';
 import { sanitizeTraceErrorText } from './utils';
 
@@ -163,10 +162,7 @@ function extractMessageType(message: unknown): string | undefined {
 
 function sanitizeMessageTracePayload(messageType: string, payload: unknown): unknown {
   return sanitizeRuntimeBlobTracePayload(
-    sanitizeRecordingTracePayload(
-      messageType,
-      sanitizeLlmTracePayload(messageType, sanitizeHarTracePayload(messageType, payload))
-    )
+    sanitizeLlmTracePayload(messageType, sanitizeHarTracePayload(messageType, payload))
   );
 }
 

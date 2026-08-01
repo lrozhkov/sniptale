@@ -51,37 +51,6 @@ it('classifies staged web snapshot chunks as background capture messages', () =>
   expect(isBackgroundTabMessage(message)).toBe(true);
 });
 
-it('classifies staged recording download messages as background capture messages', () => {
-  const stageMessage = {
-    base64: 'dmlkZW8=',
-    chunkIndex: 0,
-    recordingSessionId: 'recording-session-1',
-    stagedRecordingId: 'staged-recording-1',
-    totalBytes: 5,
-    totalChunks: 1,
-    type: MessageType.STAGE_RECORDING_DOWNLOAD_CHUNK,
-  };
-  const saveMessage = {
-    filename: 'clip.webm',
-    mimeType: 'video/webm',
-    recordingSessionId: 'recording-session-1',
-    stagedRecordingId: 'staged-recording-1',
-    type: MessageType.SAVE_RECORDING_FOR_DOWNLOAD,
-  };
-  const releaseMessage = {
-    recordingSessionId: 'recording-session-1',
-    stagedRecordingId: 'staged-recording-1',
-    type: MessageType.RELEASE_RECORDING_DOWNLOAD,
-  };
-
-  expect(isRouteCaptureMessage(stageMessage)).toBe(true);
-  expect(isBackgroundTabMessage(stageMessage)).toBe(true);
-  expect(isRouteCaptureMessage(saveMessage)).toBe(true);
-  expect(isBackgroundTabMessage(saveMessage)).toBe(true);
-  expect(isRouteCaptureMessage(releaseMessage)).toBe(true);
-  expect(isBackgroundTabMessage(releaseMessage)).toBe(true);
-});
-
 it('classifies viewer-routed popup export messages as background tab messages', () => {
   const message = {
     tabId: 7,

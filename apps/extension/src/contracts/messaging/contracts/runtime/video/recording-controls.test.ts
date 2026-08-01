@@ -55,6 +55,24 @@ it('allows camera recording start requests without a tab id', () => {
   });
 });
 
+it('rejects legacy recording settings on start requests', () => {
+  const contract = runtimeVideoSessionMessageContracts[VideoMessageType.START_RECORDING];
+
+  for (const settings of [
+    { ...recordingSettings, quality: 'HIGH' },
+    { ...recordingSettings, output: {} },
+  ]) {
+    expect(() =>
+      contract.parseRequest({
+        type: VideoMessageType.START_RECORDING,
+        settings,
+        tabId: 1,
+        captureMode: CaptureMode.TAB,
+      })
+    ).toThrow(/START_RECORDING/);
+  }
+});
+
 it('rejects non-camera start recording requests without a tab id', () => {
   expect(() =>
     runtimeVideoSessionMessageContracts[VideoMessageType.START_RECORDING].parseRequest({
@@ -158,18 +176,18 @@ it('allows start recording responses to carry the recording control capability',
   });
 });
 
-it('registers camera recorder controls through an explicit launch-token route', () => {
+it('registers launch tokens and accepts only tokenless same-tab reconnect requests', () => {
   expect(
     runtimeVideoSessionMessageContracts[
       VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL
     ].parseRequest({
       type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
-      cameraLaunchToken: 'launch-token-1',
+      cameraRegistrationToken: 'launch-token-1',
       recordingId: 'recording-1',
     })
   ).toEqual({
     type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
-    cameraLaunchToken: 'launch-token-1',
+    cameraRegistrationToken: 'launch-token-1',
     recordingId: 'recording-1',
   });
 
@@ -180,12 +198,38 @@ it('registers camera recorder controls through an explicit launch-token route', 
       success: true,
       recordingId: 'recording-1',
       controlToken: 'control-token-1',
+      result: 'active',
     })
   ).toEqual({
     success: true,
     recordingId: 'recording-1',
     controlToken: 'control-token-1',
+    result: 'active',
   });
+  expect(() =>
+    runtimeVideoSessionMessageContracts[
+      VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL
+    ].parseResponse({
+      success: true,
+      recordingId: 'recording-1',
+      result: 'invented-state',
+    })
+  ).toThrow(/REGISTER_CAMERA_RECORDER_CONTROL/);
+
+  expect(
+    runtimeVideoSessionMessageContracts[
+      VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL
+    ].parseRequest({ type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL })
+  ).toEqual({ type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL });
+
+  expect(() =>
+    runtimeVideoSessionMessageContracts[
+      VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL
+    ].parseRequest({
+      type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
+      cameraRegistrationToken: 'launch-token-1',
+    })
+  ).toThrow(/REGISTER_CAMERA_RECORDER_CONTROL/);
 
   expect(() =>
     runtimeVideoSessionMessageContracts[
@@ -215,4 +259,71 @@ it('allows recording lifecycle async routes to acknowledge accepted updates', ()
     success: true,
     result: 'accepted',
   });
+});
+
+it('validates the complete persisted post-record result in recording-state responses', () => {
+  const parseResponse =
+    runtimeVideoSessionMessageContracts[VideoMessageType.GET_RECORDING_STATE].parseResponse;
+  const baseResult = {
+    primaryRecordingId: 'recording-1-window-1',
+    projectId: null,
+    recordingId: 'recording-1',
+  };
+
+  expect(parseResponse({ success: true, postRecordResult: baseResult })).toEqual({
+    success: true,
+    postRecordResult: baseResult,
+  });
+  expect(
+    parseResponse({
+      success: true,
+      postRecordResult: { ...baseResult, projectId: 'project-1' },
+    })
+  ).toEqual({
+    success: true,
+    postRecordResult: { ...baseResult, projectId: 'project-1' },
+  });
+
+  for (const postRecordResult of [
+    'recording-1',
+    { ...baseResult, primaryRecordingId: null },
+    { ...baseResult, primaryRecordingId: '' },
+    { ...baseResult, projectId: 1 },
+    { ...baseResult, projectId: '' },
+    { ...baseResult, recordingId: null },
+    { ...baseResult, recordingId: '' },
+  ]) {
+    expect(() => parseResponse({ success: true, postRecordResult })).toThrow(/GET_RECORDING_STATE/);
+  }
+});
+
+it('requires an exact recording group when acknowledging a post-record result', () => {
+  const contract =
+    runtimeVideoSessionMessageContracts[VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT];
+
+  expect(
+    contract.parseRequest({
+      type: VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
+      recordingId: 'recording-1',
+    })
+  ).toEqual({
+    type: VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
+    recordingId: 'recording-1',
+  });
+  expect(() =>
+    contract.parseRequest({ type: VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT })
+  ).toThrow(/ACKNOWLEDGE_POST_RECORD_RESULT/);
+  expect(() =>
+    contract.parseRequest({
+      type: VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
+      recordingId: '',
+    })
+  ).toThrow(/ACKNOWLEDGE_POST_RECORD_RESULT/);
+  expect(contract.parseResponse({ success: true, result: 'acknowledged' })).toEqual({
+    success: true,
+    result: 'acknowledged',
+  });
+  expect(() => contract.parseResponse({ success: true, result: 'invented-state' })).toThrow(
+    /ACKNOWLEDGE_POST_RECORD_RESULT/
+  );
 });

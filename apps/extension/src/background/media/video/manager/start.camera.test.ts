@@ -6,7 +6,9 @@ const {
   beginPreparedRecordingMock,
   finalizeRecordingStartMock,
   initializeRecordingContextMock,
+  issueCameraRecorderLaunchTokenMock,
   issuePreparedVideoRecordingLeaseMock,
+  readStoredVideoPostRecordResultMock,
   runCountdownMock,
   scheduleRecordingStartActivationWatchdogMock,
   sendRuntimeMessageMock,
@@ -17,7 +19,9 @@ const {
   beginPreparedRecordingMock: vi.fn(),
   finalizeRecordingStartMock: vi.fn(),
   initializeRecordingContextMock: vi.fn(),
+  issueCameraRecorderLaunchTokenMock: vi.fn(),
   issuePreparedVideoRecordingLeaseMock: vi.fn(),
+  readStoredVideoPostRecordResultMock: vi.fn(),
   runCountdownMock: vi.fn(),
   scheduleRecordingStartActivationWatchdogMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
@@ -56,6 +60,14 @@ vi.mock('../recording-control-lease', async (importOriginal) => ({
   activateVideoRecordingLease: vi.fn().mockResolvedValue({ controlToken: 'control-token-1' }),
   issuePreparedVideoRecordingLease: issuePreparedVideoRecordingLeaseMock,
 }));
+vi.mock('../runtime/camera-recorder-control', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/camera-recorder-control')>()),
+  issueCameraRecorderLaunchToken: issueCameraRecorderLaunchTokenMock,
+}));
+vi.mock('../../../storage/video/post-record-result', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../storage/video/post-record-result')>()),
+  readStoredVideoPostRecordResult: readStoredVideoPostRecordResultMock,
+}));
 
 import {
   CaptureMode,
@@ -75,7 +87,7 @@ const defaultSettings: VideoRecordingSettings = {
   microphoneDeviceId: null,
   microphoneEnabled: false,
   openEditorAfterRecording: false,
-  quality: VideoQuality.HIGH,
+  outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
   systemAudioEnabled: true,
 };
 
@@ -90,6 +102,8 @@ beforeEach(() => {
     controlToken: 'control-token-1',
     recordingId: 'recording-1',
   });
+  readStoredVideoPostRecordResultMock.mockResolvedValue(null);
+  issueCameraRecorderLaunchTokenMock.mockResolvedValue('recording-1');
 });
 
 it('finalizes a camera recording with a launch token and control capability', async () => {

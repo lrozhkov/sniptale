@@ -25,10 +25,6 @@ export const recordingDownloadRouteDescriptor = {
   authorityFamily: 'offscreen-runtime-capability',
   handlerAdapter: 'routeVideoRuntimeAction',
   keepChannelBehaviorSource: 'video-runtime-router-result',
-  messageTypes: [
-    VideoMessageType.DOWNLOAD_RECORDING_SIDECAR,
-    VideoMessageType.DOWNLOAD_RECORDING,
-    VideoMessageType.VIDEO_SAVED_TO_IDB,
-  ],
+  messageTypes: [VideoMessageType.DOWNLOAD_RECORDING_SIDECAR, VideoMessageType.DOWNLOAD_RECORDING],
   ownerModule: 'apps/extension/src/background/media/video/runtime/handlers/export/download.ts',
 } as const;

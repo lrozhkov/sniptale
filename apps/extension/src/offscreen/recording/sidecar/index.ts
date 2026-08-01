@@ -5,10 +5,12 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { WebcamActualSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { pickNumericWebcamActualSettings } from '@sniptale/runtime-contracts/video/types/webcam-actual-settings';
-import { finalizeSidecarRecording } from '../finalizer';
 import { createWebcamSidecarRecorder } from './webcam';
 import type { RecordingSidecarRecorder, RecordingSidecarSession } from './types';
-import { getMediaRecorderError } from '../recorder-error';
+import type {
+  FinalizedRecordingStagingArtifact,
+  RecordingStagingCoordinator,
+} from '../../../composition/persistence/recordings/staging';
 export { createWebcamSidecarRecorder };
 
 const logger = createLogger({ namespace: 'OffscreenRecordingSidecar' });
@@ -35,6 +37,7 @@ function stopSidecarStreams(recorders: RecordingSidecarRecorder[]): void {
 export async function initializeSidecarRecorders(params: {
   baseRecordingId: string;
   captureMode?: CaptureMode;
+  coordinator: RecordingStagingCoordinator;
   settings: VideoRecordingSettings;
 }): Promise<void> {
   if (params.captureMode === CaptureMode.CAMERA) {
@@ -65,19 +68,19 @@ export async function initializeSidecarRecorders(params: {
   });
 }
 
-export function startActiveSidecarRecorders(
-  timeslice: number,
-  onUnexpectedFailure: (error: Error) => void
-): void {
+export function startActiveSidecarRecorders(onUnexpectedFailure: (error: Error) => void): void {
   getActiveSidecarSession()?.recorders.forEach((sidecar) => {
-    sidecar.recorder.onerror = (event) => {
-      onUnexpectedFailure(getMediaRecorderError(event, 'A sidecar recorder failed.'));
-    };
-    sidecar.recorder.onstop = () => {
-      onUnexpectedFailure(new Error('A sidecar recorder stopped unexpectedly.'));
-    };
+    sidecar.artifactSession.setLifecycleCallbacks({
+      onFailure: onUnexpectedFailure,
+      onStop: (artifact) => {
+        sidecar.artifact = artifact;
+        if (!getActiveSidecarSession()?.stopPromise) {
+          onUnexpectedFailure(new Error('A sidecar recorder stopped unexpectedly.'));
+        }
+      },
+    });
     try {
-      sidecar.recorder.start(timeslice);
+      sidecar.artifactSession.start();
     } catch (error) {
       throw error instanceof Error ? error : new Error(String(error));
     }
@@ -119,76 +122,41 @@ export function getActiveSidecarWebcamSettings(): WebcamActualSettings | null {
   return pickNumericWebcamActualSettings(webcam.trackSettings);
 }
 
-export async function finalizeActiveSidecarRecordings(discard: boolean): Promise<void> {
-  const session = getActiveSidecarSession();
-  if (!session) {
-    return;
-  }
-
-  await Promise.all(
-    session.recorders.map((sidecar) =>
-      finalizeSidecarRecording({
-        chunks: sidecar.chunks,
-        discard,
-        filenameSuffix: sidecar.filenameSuffix,
-        mimeType: sidecar.recorder.mimeType,
-        recordingId: sidecar.recordingId,
-      })
-    )
-  );
-}
-
-function createSidecarStopPromise(session: RecordingSidecarSession): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let pendingStops = session.recorders.length;
-
-    const finishOne = () => {
-      if (settled) {
-        return;
-      }
-
-      pendingStops -= 1;
-      if (pendingStops > 0) {
-        return;
-      }
-
-      settled = true;
-      resolve();
-    };
-
-    const fail = (error: unknown) => {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      reject(error);
-    };
-
-    session.recorders.forEach((sidecar) => {
-      if (sidecar.recorder.state === 'inactive') {
-        finishOne();
-        return;
-      }
-
-      sidecar.recorder.onstop = () => {
-        sidecar.recorder.onstop = null;
-        finishOne();
-      };
-      sidecar.recorder.onerror = (event) => {
-        fail((event as ErrorEvent).error ?? new Error('A sidecar recorder failed.'));
-      };
-      sidecar.recorder.requestData?.();
-      sidecar.recorder.stop();
-    });
+export function getActiveSidecarVideoDimensions(): Array<{ height: number; width: number }> {
+  return (getActiveSidecarSession()?.recorders ?? []).map((sidecar) => {
+    const { height, width } = sidecar.trackSettings;
+    if (
+      typeof width !== 'number' ||
+      typeof height !== 'number' ||
+      !Number.isInteger(width) ||
+      !Number.isInteger(height) ||
+      width <= 0 ||
+      height <= 0
+    ) {
+      throw new Error(`Webcam recording dimensions are unavailable for ${sidecar.recordingId}.`);
+    }
+    return { height, width };
   });
 }
 
-export function stopActiveSidecarRecordersWithFlush(): Promise<void> {
+async function createSidecarStopPromise(
+  session: RecordingSidecarSession
+): Promise<FinalizedRecordingStagingArtifact[]> {
+  return Promise.all(
+    session.recorders.map(async (sidecar) => {
+      const artifact = await sidecar.artifactSession.stop();
+      sidecar.artifact = artifact;
+      return artifact;
+    })
+  );
+}
+
+export function stopActiveSidecarRecordersWithFlush(): Promise<
+  FinalizedRecordingStagingArtifact[]
+> {
   const session = getActiveSidecarSession();
   if (!session) {
-    return Promise.resolve();
+    return Promise.resolve([]);
   }
 
   if (!session.stopPromise) {
@@ -205,15 +173,9 @@ export function cleanupActiveSidecarRecorders(): void {
   }
 
   session.recorders.forEach((sidecar) => {
-    sidecar.recorder.onerror = null;
-    sidecar.recorder.onstop = null;
-    if (sidecar.recorder.state !== 'inactive') {
-      try {
-        sidecar.recorder.stop();
-      } catch (error) {
-        logger.debug('Failed to stop sidecar recorder during cleanup', error);
-      }
-    }
+    void sidecar.artifactSession.abort().catch((error) => {
+      logger.debug('Failed to abort sidecar artifact during cleanup', error);
+    });
   });
   stopSidecarStreams(session.recorders);
   setActiveSidecarSession(null);

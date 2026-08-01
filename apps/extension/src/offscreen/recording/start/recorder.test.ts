@@ -24,10 +24,8 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 
 import { recordingContext } from '../context';
 import { finalizeRecordingBootstrap } from './recorder';
-import {
-  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-  VideoQuality,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
+import { DEFAULT_VIDEO_OUTPUT_PROFILE } from '@sniptale/runtime-contracts/video/types/types';
 
 type MediaRecorderMockInstance = {
   config: {
@@ -86,11 +84,11 @@ function createVideoStream(audioTrackCount = 0) {
 }
 
 function bootstrapRecorder() {
-  finalizeRecordingBootstrap({
+  recordingContext.bindStagingCoordinator(createRecordingStagingCoordinatorTestDouble());
+  return finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
     settings: {
-      output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-      quality: VideoQuality.HIGH,
+      outputProfile: DEFAULT_VIDEO_OUTPUT_PROFILE,
     } as never,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker: {
@@ -101,11 +99,11 @@ function bootstrapRecorder() {
 }
 
 function bootstrapRecorderWithCursorMode(cursorCaptureMode: 'separate' | 'embedded-fallback') {
-  finalizeRecordingBootstrap({
+  recordingContext.bindStagingCoordinator(createRecordingStagingCoordinatorTestDouble());
+  return finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
     settings: {
-      output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-      quality: VideoQuality.HIGH,
+      outputProfile: DEFAULT_VIDEO_OUTPUT_PROFILE,
     } as never,
     cursorCaptureMode,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
@@ -117,11 +115,11 @@ function bootstrapRecorderWithCursorMode(cursorCaptureMode: 'separate' | 'embedd
 }
 
 function bootstrapRecorderWithSurface(displaySurface: string | undefined) {
-  finalizeRecordingBootstrap({
+  recordingContext.bindStagingCoordinator(createRecordingStagingCoordinatorTestDouble());
+  return finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
     settings: {
-      output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-      quality: VideoQuality.HIGH,
+      outputProfile: DEFAULT_VIDEO_OUTPUT_PROFILE,
     } as never,
     cursorCaptureMode: 'separate',
     trackSettings: {
@@ -144,68 +142,67 @@ function registerRecorderTestSetup() {
     recordingContext.mediaRecorder = null;
     recordingContext.videoStream = null;
     recordingContext.sourceStream = null;
-    recordingContext.recordedChunks = [];
   });
 }
 
 function runMimeTypeSelectionSuite() {
-  it('prefers compatibility recorder mime types when the stream carries audio', () => {
+  it('prefers compatibility recorder mime types when the stream carries audio', async () => {
     installMediaRecorderMock(['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus']);
     recordingContext.videoStream = createVideoStream(1);
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');
 
-    bootstrapRecorder();
+    await bootstrapRecorder();
 
     expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp9,opus');
   });
 
-  it('keeps the selected codec for derived canvas streams', () => {
+  it('keeps the selected codec for derived canvas streams', async () => {
     installMediaRecorderMock(['video/webm;codecs=vp8', 'video/webm;codecs=vp9']);
     recordingContext.sourceStream = createVideoStream();
     recordingContext.videoStream = createVideoStream();
     recordingContext.beginRecordingSession('recording-1');
 
-    bootstrapRecorder();
+    await bootstrapRecorder();
 
     expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp9');
   });
 }
 
 function runAudioFallbackMimeTypeSelectionSuite() {
-  it('keeps the selected codec for streams with mixed audio', () => {
+  it('keeps the selected codec for streams with mixed audio', async () => {
     installMediaRecorderMock(['video/webm;codecs=vp9,opus']);
     recordingContext.audioMixer = {} as never;
     recordingContext.videoStream = createVideoStream(1);
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');
 
-    bootstrapRecorder();
+    await bootstrapRecorder();
 
     expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp9,opus');
     expect(lastMediaRecorderInstance?.config).not.toHaveProperty('audioBitsPerSecond');
   });
 
-  it('rejects another codec instead of silently falling back when audio is present', () => {
+  it('rejects another codec instead of silently falling back when audio is present', async () => {
     installMediaRecorderMock(['video/webm;codecs=vp8,opus']);
     recordingContext.videoStream = createVideoStream(1);
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-2');
 
-    expect(() => bootstrapRecorder()).toThrow(
+    await expect(bootstrapRecorder()).rejects.toThrow(
       'selected recording container and codec are not supported'
     );
   });
 }
 
 function runCursorModeMessageSuite() {
-  it('includes the verified cursor capture mode in the runtime start event when provided', () => {
+  it('includes the verified cursor capture mode in the runtime start event when provided', async () => {
     installMediaRecorderMock(['video/webm;codecs=vp9']);
     recordingContext.videoStream = createVideoStream();
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');
 
-    bootstrapRecorderWithCursorMode('embedded-fallback');
+    await bootstrapRecorderWithCursorMode('embedded-fallback');
 
     expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -220,13 +217,13 @@ function runCursorModeMessageSuite() {
 }
 
 function runDisplaySurfaceMessageSuite() {
-  it('includes the validated display surface in the runtime start event when available', () => {
+  it('includes the validated display surface in the runtime start event when available', async () => {
     installMediaRecorderMock(['video/webm;codecs=vp9']);
     recordingContext.videoStream = createVideoStream();
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');
 
-    bootstrapRecorderWithSurface('window');
+    await bootstrapRecorderWithSurface('window');
 
     expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -240,13 +237,13 @@ function runDisplaySurfaceMessageSuite() {
     );
   });
 
-  it('omits unknown display-surface values from the runtime start event', () => {
+  it('omits unknown display-surface values from the runtime start event', async () => {
     installMediaRecorderMock(['video/webm;codecs=vp9']);
     recordingContext.videoStream = createVideoStream();
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');
 
-    bootstrapRecorderWithSurface(undefined);
+    await bootstrapRecorderWithSurface(undefined);
 
     expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -261,13 +258,13 @@ function runDisplaySurfaceMessageSuite() {
 }
 
 function runCursorModeSurfaceFilterSuite() {
-  it('filters unsupported display-surface values from the runtime start event', () => {
+  it('filters unsupported display-surface values from the runtime start event', async () => {
     installMediaRecorderMock(['video/webm;codecs=vp9']);
     recordingContext.videoStream = createVideoStream();
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');
 
-    bootstrapRecorderWithSurface('tab');
+    await bootstrapRecorderWithSurface('tab');
 
     expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({

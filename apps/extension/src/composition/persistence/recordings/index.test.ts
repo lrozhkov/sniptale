@@ -190,6 +190,24 @@ async function verifyInvalidListRootWarning() {
   );
 }
 
+async function verifyListRecordingMimeTypeFallback() {
+  dbGetAllMock.mockResolvedValueOnce([
+    {
+      ...createRecordingEntry('recording-without-mime'),
+      blob: new Blob(['video']),
+    },
+  ]);
+
+  const { listRecordings } = await import('./index');
+
+  await expect(listRecordings()).resolves.toEqual([
+    expect.objectContaining({
+      id: 'recording-without-mime',
+      mimeType: 'video/webm',
+    }),
+  ]);
+}
+
 describe('recordings-db', () => {
   beforeEach(resetRecordingsDbMocks);
 
@@ -203,5 +221,9 @@ describe('recordings-db', () => {
   it(
     'warns and returns an empty list for an invalid recordings root payload',
     verifyInvalidListRootWarning
+  );
+  it(
+    'uses the recording MIME fallback when the stored blob has no type',
+    verifyListRecordingMimeTypeFallback
   );
 });

@@ -18,7 +18,7 @@ function createSettings(): VideoRecordingSettings {
     microphoneEnabled: true,
     microphoneDeviceId: 'mic-1',
     systemAudioEnabled: true,
-    quality: VideoQuality.MEDIUM,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
     countdownSeconds: 3,
     autoFadeDelay: 2,
     openEditorAfterRecording: false,

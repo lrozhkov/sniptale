@@ -137,18 +137,27 @@ it('shows the saving panel while recording stop or discard is in progress', asyn
   expect(mocks.captureModeSelectorMock).not.toHaveBeenCalled();
 });
 
-it('shows post-record actions after a saved recording returns to idle', async () => {
-  const onClosePostRecord = vi.fn();
+it('lets an authoritative post-record result override stale stopping state', async () => {
+  const onAcknowledgePostRecord = vi.fn().mockResolvedValue(undefined);
+  const postRecordResult = {
+    primaryRecordingId: 'recording-1',
+    projectId: null,
+    recordingId: 'recording-1',
+  };
   await renderBody({
     ...createProps(),
-    onClosePostRecord,
-    postRecordRecordingId: 'recording-1',
+    onAcknowledgePostRecord,
+    postRecordResult,
+    recordingState: {
+      ...createProps().recordingState,
+      status: VideoRecordingStatus.STOPPING,
+    },
   });
 
   expect(container?.textContent).toContain('post-record');
   expect(mocks.postRecordPanelMock).toHaveBeenCalledWith({
-    recordingId: 'recording-1',
-    onClose: onClosePostRecord,
+    onAcknowledge: onAcknowledgePostRecord,
+    result: postRecordResult,
   });
   expect(mocks.captureModeSelectorMock).not.toHaveBeenCalled();
 });

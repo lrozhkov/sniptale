@@ -9,8 +9,8 @@ export type ControlCapability = {
 };
 
 export type CameraRecorderRouteState = {
-  launchToken: string;
-  recordingId: string;
+  registrationToken: string | null;
+  recordingId: string | null;
   routeError: string | null;
 };
 

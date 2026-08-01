@@ -5,27 +5,27 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { buildVideoMediaRecorderOptions } from '../../../platform/media-utils/video-recording';
+import {
+  buildVideoMediaRecorderOptions,
+  resolveVideoRecordingArtifact,
+} from '../../../platform/media-utils/video-recording';
 import { sendRuntimeMessageBestEffort } from '../../runtime-messaging/best-effort';
 import { recordingContext } from '../context';
+import { buildRecordingFilename, finalizeRecording } from '../finalizer';
 import {
-  finalizeRecording,
-  notifyRecordingStoppedBestEffort,
-  notifyVideoSavedToIdbBestEffort,
-} from '../finalizer';
-import {
-  finalizeActiveSidecarRecordings,
+  getActiveSidecarVideoDimensions,
   getActiveSidecarWebcamSettings,
-  hasActiveSidecarSession,
   startActiveSidecarRecorders,
   stopActiveSidecarRecordersWithFlush,
 } from '../sidecar';
-import { getMediaRecorderError } from '../recorder-error';
+import { PostRecordPublicationError } from '../post-record-publication';
 import { cleanupResources } from './cleanup';
 import { handleRecordingStartError } from './session';
+import { createRecordingArtifactSession } from '../encoding/artifact-session';
+import { assertRecordingResourceBudget } from '../encoding/resource-budget';
+import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingStart' });
-const RECORDER_TIMESLICE_MS = 1000;
 
 function resolveDisplaySurface(
   value: string | undefined
@@ -58,14 +58,14 @@ function buildRecorderConfig(
   const config = buildVideoMediaRecorderOptions(settings, videoStream, trackSettings);
 
   logger.debug('Built recorder config', {
-    quality: settings.quality,
+    quality: settings.outputProfile.quality,
     ...config,
   });
 
   return config;
 }
 
-export function finalizeRecordingBootstrap(params: {
+export async function finalizeRecordingBootstrap(params: {
   resolvedRecordingId: string;
   settings: VideoRecordingSettings;
   cursorCaptureMode?: VideoCursorCaptureMode | null;
@@ -73,13 +73,43 @@ export function finalizeRecordingBootstrap(params: {
   durationTracker: typeof recordingContext.durationTracker;
 }) {
   const videoStream = requireRecordingVideoStream();
+  const stagingCoordinator = recordingContext.stagingCoordinator;
+  if (!stagingCoordinator) {
+    throw new Error('Recording staging is not initialized');
+  }
   const displaySurface = resolveDisplaySurface(params.trackSettings.displaySurface);
   const webcamSettings = getActiveSidecarWebcamSettings();
+  const width = params.trackSettings.width;
+  const height = params.trackSettings.height;
+  if (
+    typeof width !== 'number' ||
+    typeof height !== 'number' ||
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    throw new Error('Recording output dimensions are unavailable');
+  }
+  assertRecordingResourceBudget({
+    dimensions: [{ height, width }, ...getActiveSidecarVideoDimensions()],
+    frameRate: params.settings.outputProfile.frameRate,
+    resolution: params.settings.outputProfile.resolution,
+  });
   const recorderConfig = buildRecorderConfig(params.settings, videoStream, params.trackSettings);
-  const mediaRecorder = new MediaRecorder(videoStream, recorderConfig);
-  recordingContext.bindStartingRecorder(mediaRecorder);
-  recordingContext.recordedChunks.length = 0;
-  const cancelStartingRecorder = attachRecorderHandlers({
+  const artifact = resolveVideoRecordingArtifact(recorderConfig.mimeType ?? '');
+  const artifactSession = await createRecordingArtifactSession({
+    artifactId: params.resolvedRecordingId,
+    coordinator: stagingCoordinator,
+    filename: buildRecordingFilename(artifact.mimeType),
+    mimeType: artifact.mimeType,
+    recorderOptions: recorderConfig,
+    stream: videoStream,
+  });
+  const mediaRecorder = artifactSession.recorder;
+  recordingContext.bindStartingArtifactSession(artifactSession);
+  const cancelStartingRecorder = attachRecorderLifecycle({
+    artifactSession,
     ...(params.cursorCaptureMode === undefined
       ? {}
       : { cursorCaptureMode: params.cursorCaptureMode }),
@@ -92,7 +122,7 @@ export function finalizeRecordingBootstrap(params: {
   });
   recordingContext.registerStartingRecorderCancellation(mediaRecorder, cancelStartingRecorder);
   params.durationTracker.reset();
-  mediaRecorder.start(RECORDER_TIMESLICE_MS);
+  artifactSession.start();
 }
 
 function notifyRecordingStarted(params: {
@@ -130,34 +160,33 @@ function attachOwnedVideoTrackEndedHandlers(
   return () => tracks.forEach((track) => track.removeEventListener('ended', onEnded));
 }
 
-async function finalizeStoppedRecorder(recordingId: string, mediaRecorder: MediaRecorder) {
+async function finalizeStoppedRecorder(
+  recordingId: string,
+  primaryArtifact: FinalizedRecordingStagingArtifact
+) {
   const resolveStop = recordingContext.stopRecordingResolve;
   const rejectStop = recordingContext.stopRecordingReject;
   try {
-    const shouldFinalizeSidecars = hasActiveSidecarSession();
-    await stopActiveSidecarRecordersWithFlush();
-    const result = await finalizeRecording(
-      recordingContext.recordedChunks,
-      recordingId,
-      mediaRecorder.mimeType,
-      recordingContext.discardOnStop,
-      {
-        notifySaved: !shouldFinalizeSidecars,
-        notifyStopped: !shouldFinalizeSidecars,
-      }
-    );
-    if (shouldFinalizeSidecars) {
-      await finalizeActiveSidecarRecordings(recordingContext.discardOnStop);
-      if (result) {
-        await notifyVideoSavedToIdbBestEffort(result.recordingId, result.filename);
-      }
-      notifyRecordingStoppedBestEffort('recording-finalized-with-sidecars', recordingId);
-    }
+    const sidecarArtifacts = await stopActiveSidecarRecordersWithFlush();
+    const staging = recordingContext.stagingCoordinator;
+    if (!staging) throw new Error('Recording staging is unavailable during stop.');
+    await finalizeRecording({
+      artifacts: [primaryArtifact, ...sidecarArtifacts],
+      discard: recordingContext.discardOnStop,
+      primaryRecordingId: recordingId,
+      staging,
+    });
+    recordingContext.artifactSession = null;
+    recordingContext.stagingCoordinator = null;
     cleanupResources();
     resolveStop?.({ result: 'stopped' });
   } catch (error) {
+    recordingContext.artifactSession = null;
+    recordingContext.stagingCoordinator = null;
     cleanupResources();
-    if (resolveStop) {
+    if (error instanceof PostRecordPublicationError) {
+      rejectStop?.(error);
+    } else if (resolveStop) {
       resolveStop({
         error: error instanceof Error ? error.message : String(error),
         result: 'terminal-failure',
@@ -165,10 +194,12 @@ async function finalizeStoppedRecorder(recordingId: string, mediaRecorder: Media
     } else {
       rejectStop?.(error);
     }
+    throw error;
   }
 }
 
-function attachRecorderHandlers(params: {
+function attachRecorderLifecycle(params: {
+  artifactSession: Awaited<ReturnType<typeof createRecordingArtifactSession>>;
   cursorCaptureMode?: VideoCursorCaptureMode | null;
   displaySurface: (typeof VideoDisplaySurface)[keyof typeof VideoDisplaySurface] | null;
   durationTracker: typeof recordingContext.durationTracker;
@@ -177,7 +208,7 @@ function attachRecorderHandlers(params: {
   videoStream: MediaStream;
   webcamSettings: ReturnType<typeof getActiveSidecarWebcamSettings>;
 }) {
-  const { mediaRecorder, recordingId } = params;
+  const { artifactSession, mediaRecorder, recordingId } = params;
   let phase: 'starting' | 'recording' | 'terminal' = 'starting';
 
   const isTerminal = () => phase === 'terminal';
@@ -188,10 +219,6 @@ function attachRecorderHandlers(params: {
 
   const detachRecorderHandlers = () => {
     detachTrackEndedHandlers();
-    mediaRecorder.ondataavailable = null;
-    mediaRecorder.onerror = null;
-    mediaRecorder.onstart = null;
-    mediaRecorder.onstop = null;
   };
 
   const beginTerminalHandling = (): boolean => {
@@ -231,69 +258,65 @@ function attachRecorderHandlers(params: {
     cleanupResources();
   };
 
-  mediaRecorder.ondataavailable = (event) => {
-    if (event.data && event.data.size > 0) {
-      recordingContext.recordedChunks.push(event.data);
-    }
-  };
-
-  mediaRecorder.onstart = () => {
-    if (phase !== 'starting') {
-      return;
-    }
-    try {
-      startActiveSidecarRecorders(RECORDER_TIMESLICE_MS, failUnexpectedly);
-      if (isTerminal()) {
-        return;
-      }
+  artifactSession.setLifecycleCallbacks({
+    onFailure: failUnexpectedly,
+    onStart: () => {
+      if (phase !== 'starting') return;
+      startActiveSidecarRecorders(failUnexpectedly);
+      if (isTerminal()) return;
       recordingContext.activateRecorder(mediaRecorder);
       phase = 'recording';
       params.durationTracker.startSegment();
       notifyRecordingStarted(params);
-    } catch (error) {
-      failUnexpectedly(error instanceof Error ? error : new Error(String(error)));
-    }
-  };
-
-  mediaRecorder.onstop = async () => {
-    logger.debug('MediaRecorder stopped');
-    if (recordingContext.lifecycleState !== 'stopping') {
-      failUnexpectedly(
-        new Error(
-          phase === 'starting'
-            ? 'The recording stopped before the encoder started.'
-            : 'The recording stopped unexpectedly.'
-        )
-      );
-      return;
-    }
-    if (beginTerminalHandling()) {
-      await finalizeStoppedRecorder(recordingId, mediaRecorder);
-    }
-  };
-
-  mediaRecorder.onerror = (event) => {
-    const fallbackMessage =
-      recordingContext.lifecycleState === 'stopping'
-        ? 'The recording failed to stop cleanly.'
-        : phase === 'starting'
-          ? 'The recording encoder failed to start.'
-          : 'The recording encoder failed unexpectedly.';
-    failUnexpectedly(getMediaRecorderError(event, fallbackMessage));
-  };
+    },
+    onStop: async (artifact) => {
+      logger.debug('MediaRecorder stopped');
+      if (recordingContext.lifecycleState !== 'stopping') {
+        failUnexpectedly(
+          new Error(
+            phase === 'starting'
+              ? 'The recording stopped before the encoder started.'
+              : 'The recording stopped unexpectedly.'
+          )
+        );
+        return;
+      }
+      if (beginTerminalHandling()) {
+        await finalizeStoppedRecorder(recordingId, artifact);
+      }
+    },
+  });
 
   function handleTrackEnded() {
-    failUnexpectedly(
-      new Error(
-        phase === 'starting'
-          ? 'The recording source ended before the encoder started.'
-          : 'The recording source ended unexpectedly.'
-      )
-    );
+    if (phase === 'starting') {
+      failUnexpectedly(new Error('The recording source ended before the encoder started.'));
+      return;
+    }
+    if (phase !== 'recording' || recordingContext.lifecycleState !== 'recording') return;
+
+    params.durationTracker.freeze();
+    params.durationTracker.stopSegment();
+    params.durationTracker.publishDuration();
+    recordingContext.beginStopRequest({
+      discard: false,
+      reject: (reason) => {
+        notifyRecordingRuntimeErrorBestEffort(
+          recordingId,
+          reason instanceof Error ? reason : new Error(String(reason))
+        );
+      },
+      resolve: (outcome) => {
+        if (outcome?.result === 'terminal-failure') {
+          notifyRecordingRuntimeErrorBestEffort(recordingId, new Error(outcome.error));
+        }
+      },
+    });
+    void artifactSession.stop().catch(() => undefined);
   }
 
   return () => {
     beginTerminalHandling();
+    void artifactSession.abort().catch(() => undefined);
   };
 }
 

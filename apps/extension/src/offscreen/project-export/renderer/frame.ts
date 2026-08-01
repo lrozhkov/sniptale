@@ -48,7 +48,7 @@ function resolveProjectOutputTransform(
     return { offsetX: 0, offsetY: 0, scale: 1 };
   }
 
-  const scale = Math.max(settings.width / project.width, settings.height / project.height);
+  const scale = Math.min(settings.width / project.width, settings.height / project.height);
   return {
     offsetX: (settings.width - project.width * scale) / 2,
     offsetY: (settings.height - project.height * scale) / 2,

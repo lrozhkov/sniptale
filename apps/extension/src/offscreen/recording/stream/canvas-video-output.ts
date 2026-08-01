@@ -2,8 +2,8 @@ import { applyVideoTrackContentHint } from '../../../platform/media-utils/video-
 import { startVideoFramePump } from './frame-pump';
 
 type CanvasVideoOutputDrawing = {
-  drawHeldFrame?: () => void;
-  drawLiveFrame: () => void;
+  drawHeldFrame?: () => boolean;
+  drawLiveFrame: () => boolean;
 };
 
 type CanvasVideoOutputParams = {
@@ -38,11 +38,11 @@ export function createCanvasVideoOutput(params: CanvasVideoOutputParams): MediaS
   let stopFramePump: (() => void) | null = null;
   try {
     const surface = createCanvasSurface(params.dimensions);
+    const drawing = params.initializeDrawing(surface);
     const output = surface.canvas.captureStream(params.frameRate);
     canvasTrack = requireCanvasVideoTrack(output);
     params.audioTracks?.forEach((track) => output.addTrack(track));
     applyVideoTrackContentHint(canvasTrack, params.contentHint ?? 'detail');
-    const drawing = params.initializeDrawing(surface);
     drawing.drawLiveFrame();
     stopFramePump = startVideoFramePump({
       ...(drawing.drawHeldFrame === undefined ? {} : { drawHeldFrame: drawing.drawHeldFrame }),

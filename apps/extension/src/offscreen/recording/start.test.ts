@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const {
   cleanupResourcesMock,
+  createRecordingStagingCoordinatorMock,
   durationTrackerMock,
   finalizeRecordingBootstrapMock,
   handleRecordingStartErrorMock,
@@ -12,6 +13,7 @@ const {
   sendRuntimeMessageMock,
 } = vi.hoisted(() => ({
   cleanupResourcesMock: vi.fn(),
+  createRecordingStagingCoordinatorMock: vi.fn(),
   durationTrackerMock: { publishDuration: vi.fn() },
   finalizeRecordingBootstrapMock: vi.fn(),
   handleRecordingStartErrorMock: vi.fn((error: unknown) => error),
@@ -20,6 +22,7 @@ const {
   prepareRecordingStreamMock: vi.fn(),
   recordingContextMock: {
     bindStreamInstance: vi.fn(),
+    bindStagingCoordinator: vi.fn(),
     currentRecordingId: 'recording-1' as string | null,
     durationTracker: { publishDuration: vi.fn() },
     lifecycleState: 'starting' as 'idle' | 'starting' | 'recording' | 'stopping',
@@ -28,6 +31,11 @@ const {
     tabOutputGeometry: null as unknown,
   },
   sendRuntimeMessageMock: vi.fn(),
+}));
+
+vi.mock('../../composition/persistence/recordings/staging', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../composition/persistence/recordings/staging')>()),
+  createRecordingStagingCoordinator: createRecordingStagingCoordinatorMock,
 }));
 
 vi.mock('./context', () => ({
@@ -52,6 +60,7 @@ import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { startRecording } from './start/index';
 import { createSettings } from './start/helpers.test-support';
 import { allowRecordingBegin, cancelRecordingBegin } from './start/gate';
+import { createRecordingStagingCoordinatorTestDouble } from './encoding/artifact-session.test-support';
 
 const prepared = {
   cursorCaptureMode: null,
@@ -65,6 +74,9 @@ const messaging = { sendRuntimeMessage: sendRuntimeMessageMock };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  createRecordingStagingCoordinatorMock.mockImplementation(async () =>
+    createRecordingStagingCoordinatorTestDouble()
+  );
   recordingContextMock.currentRecordingId = 'recording-1';
   recordingContextMock.durationTracker = durationTrackerMock;
   recordingContextMock.lifecycleState = 'starting';
@@ -215,6 +227,32 @@ it('cleans up when the session becomes stale during setup', async () => {
 
   expect(cleanupResourcesMock).toHaveBeenCalledOnce();
   expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+});
+
+it('aborts newly opened staging when the session becomes stale before binding it', async () => {
+  const coordinator = createRecordingStagingCoordinatorTestDouble();
+  createRecordingStagingCoordinatorMock.mockImplementationOnce(async () => {
+    recordingContextMock.currentRecordingId = null;
+    recordingContextMock.lifecycleState = 'idle';
+    return coordinator;
+  });
+
+  await startRecording(
+    {
+      generation: 1,
+      recordingId: 'recording-stale',
+      streamInstanceId: 'stream-instance-stale',
+      settings: createSettings(),
+      streamId: 'stream-stale',
+    },
+    messaging
+  );
+
+  expect(coordinator.abort).toHaveBeenCalledOnce();
+  expect(cleanupResourcesMock).toHaveBeenCalledOnce();
+  expect(recordingContextMock.bindStagingCoordinator).not.toHaveBeenCalled();
+  expect(initializeSidecarRecordersMock).not.toHaveBeenCalled();
+  expect(finalizeRecordingBootstrapMock).not.toHaveBeenCalled();
 });
 
 it('routes setup errors through the shared start-error path', async () => {

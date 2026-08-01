@@ -34,7 +34,3 @@ export interface PathAnnotation extends Annotation {
   points: Array<{ x: number; y: number }>;
   d: string;
 }
-
-export interface VideoQualityConfig {
-  frameRate: number;
-}

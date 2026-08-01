@@ -161,7 +161,7 @@ async function rejectsMalformedTabResponses() {
 
   await expect(
     transport.sendTabMessage(7, {
-      type: 'CHECK_REGION_CAPTURE_SUPPORT',
+      type: VideoMessageType.HIDE_COUNTDOWN,
     })
   ).rejects.toThrow(MessageContractError);
 }

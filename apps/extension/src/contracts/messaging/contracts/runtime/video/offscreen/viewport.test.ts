@@ -30,6 +30,28 @@ it('accepts both viewport and window preset surfaces on recording start', () => 
   }
 });
 
+it('rejects legacy recording settings on offscreen start requests', () => {
+  const contract =
+    runtimeVideoOffscreenViewportMessageContracts[VideoMessageType.OFFSCREEN_START_RECORDING];
+  const message = {
+    type: VideoMessageType.OFFSCREEN_START_RECORDING,
+    capabilityToken: 'capability-1',
+    generation: 2,
+    recordingId: 'recording-1',
+    streamId: 'stream-1',
+    streamInstanceId: 'stream-instance-1',
+  };
+
+  for (const settings of [
+    { ...DEFAULT_VIDEO_SETTINGS, quality: 'HIGH' },
+    { ...DEFAULT_VIDEO_SETTINGS, output: {} },
+  ]) {
+    expect(() => contract.parseRequest({ ...message, settings })).toThrow(
+      /OFFSCREEN_START_RECORDING/
+    );
+  }
+});
+
 it('binds viewport frame freezing to the active recording source', () => {
   const contract =
     runtimeVideoOffscreenViewportMessageContracts[

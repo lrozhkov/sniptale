@@ -1,19 +1,10 @@
 import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
-import type {
-  RegionCaptureControlMessageType,
-  VideoMessageType,
-} from '@sniptale/runtime-contracts/video/messages';
+import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { RuntimeRequestByType } from '../contracts/runtime-message/index';
 import type {
   RecordingTelemetryResponse,
   ViewportCoordsResponse,
 } from '../contracts/response-types';
-import type {
-  CheckRegionCaptureSupportMessage,
-  RegionCaptureSupportResponse,
-  StartRegionCaptureMessage,
-  StopRegionCaptureMessage,
-} from '../contracts/types';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import type { ViewportCursorProjectionAuthority } from '@sniptale/runtime-contracts/video/types/messages.content';
 
@@ -81,9 +72,6 @@ export type TabVideoRequestByType = {
   [VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER]: {
     type: typeof VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER;
   };
-  [RegionCaptureControlMessageType.START]: StartRegionCaptureMessage;
-  [RegionCaptureControlMessageType.STOP]: StopRegionCaptureMessage;
-  [RegionCaptureControlMessageType.CHECK_SUPPORT]: CheckRegionCaptureSupportMessage;
 };
 
 export type TabVideoResponseByType = {
@@ -112,7 +100,4 @@ export type TabVideoResponseByType = {
   [VideoMessageType.HIDE_RECORDING_OVERLAY]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER]: RuntimeMessageResponse<Record<string, never>>;
-  [RegionCaptureControlMessageType.START]: RuntimeMessageResponse<Record<string, never>>;
-  [RegionCaptureControlMessageType.STOP]: RuntimeMessageResponse<Record<string, never>>;
-  [RegionCaptureControlMessageType.CHECK_SUPPORT]: RegionCaptureSupportResponse;
 };

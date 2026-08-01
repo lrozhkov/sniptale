@@ -126,7 +126,7 @@ function verifiesDefaultLiveMediaState() {
       microphoneDeviceId: null,
       microphoneEnabled: false,
       openEditorAfterRecording: false,
-      quality: VideoQuality.MEDIUM,
+      outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
       systemAudioEnabled: false,
       webcamDeviceId: null,
       webcamEnabled: false,

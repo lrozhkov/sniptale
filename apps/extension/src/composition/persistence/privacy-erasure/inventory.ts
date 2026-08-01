@@ -94,6 +94,8 @@ const sessionSensitiveKeys = [
   'diagnostics-active-sessions',
   'scenario-tab-sessions',
   'video-active-recording-lease',
+  'video-camera-recorder-grant',
+  'video-post-record-result',
   'video-project-export-capabilities',
   'sniptale_page_access_active_tabs',
   'sniptale_popup_export_tab_selection_session',

@@ -8,19 +8,13 @@ import type {
   ContentPrivilegedActionAutoStartGrant,
   ContentPrivilegedActionCapability,
 } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
-import type {
-  RegionCaptureControlMessageType,
-  VideoMessageType,
-} from '@sniptale/runtime-contracts/video/messages';
+import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type {
   VideoExportCapabilities,
   VideoProjectExportSettings,
   VideoProjectExportStatus,
 } from '../../../features/video/project/types';
-import type {
-  VideoRecordingRuntimeState,
-  VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
+import type { VideoRecordingRuntimeState } from '@sniptale/runtime-contracts/video/types/types';
 import type { ProjectExportInputReference } from '../../video/types/project-export-input';
 
 export type {
@@ -38,13 +32,7 @@ export type MessageTypeWithString =
   | CaptureMessageType
   | VideoMessageType
   | 'AREA_SELECTED'
-  | 'KEEP_ALIVE'
-  | 'REGION_CAPTURE_ERROR'
-  | 'REGION_CAPTURE_STARTED'
-  | 'REGION_CAPTURE_STOPPED'
-  | typeof RegionCaptureControlMessageType.CHECK_SUPPORT
-  | typeof RegionCaptureControlMessageType.START
-  | typeof RegionCaptureControlMessageType.STOP;
+  | 'KEEP_ALIVE';
 
 export type ShowToastPayload = {
   type?: 'info' | 'success' | 'warning' | 'error';
@@ -183,26 +171,13 @@ export type RuntimeDownloadRecordingSidecarMessage = {
 export type RuntimeVideoSavedToIdbMessage = {
   type: VideoMessageType.VIDEO_SAVED_TO_IDB;
   recordingId: string;
-  filename?: string;
+  primaryRecordingId: string;
   projectId?: string;
 };
 
 export type RuntimeAreaSelectedMessage = {
   type: 'AREA_SELECTED';
   area: ViewportRegion;
-};
-
-export type RuntimeRegionCaptureStartedMessage = {
-  type: 'REGION_CAPTURE_STARTED';
-};
-
-export type RuntimeRegionCaptureErrorMessage = {
-  type: 'REGION_CAPTURE_ERROR';
-  error: string;
-};
-
-export type RuntimeRegionCaptureStoppedMessage = {
-  type: 'REGION_CAPTURE_STOPPED';
 };
 
 export type RuntimeRecordingStateSyncMessage = {
@@ -271,24 +246,4 @@ export type ProjectExportCapabilitiesPayload = {
   cancelCapabilityToken?: string;
   capabilities?: VideoExportCapabilities;
   ownerDocumentId?: string;
-};
-
-type RegionCaptureSettingsPayload = VideoRecordingSettings;
-export type StartRegionCaptureMessage = {
-  type: typeof RegionCaptureControlMessageType.START;
-  settings: RegionCaptureSettingsPayload;
-};
-
-export type StopRegionCaptureMessage = {
-  type: typeof RegionCaptureControlMessageType.STOP;
-};
-
-export type CheckRegionCaptureSupportMessage = {
-  type: typeof RegionCaptureControlMessageType.CHECK_SUPPORT;
-};
-
-export type RegionCaptureSupportResponse = {
-  supported: boolean;
-  produceCropTarget: boolean;
-  cropTo: boolean;
 };

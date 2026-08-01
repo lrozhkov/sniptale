@@ -16,8 +16,6 @@ export async function acquireRecordingSourceStream(params: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
-  excludeNativeCursor?: boolean;
-  viewport?: { width: number; height: number };
 }) {
   if (params.captureMode === CaptureMode.SCREEN) {
     return acquireDesktopStream(params.settings);
@@ -65,28 +63,12 @@ async function acquireCameraStream(settings: VideoRecordingSettings) {
   };
 }
 
-function createTabVideoConstraints(params: {
-  streamId: string;
-  controlledCursorCaptureEnabled?: boolean;
-  excludeNativeCursor?: boolean;
-  viewport?: { width: number; height: number };
-}): MediaTrackConstraints {
-  const mandatory: Record<string, unknown> = {
-    chromeMediaSource: 'tab',
-    chromeMediaSourceId: params.streamId,
-  };
+function createTabSourceConstraints(streamId: string): MediaTrackConstraints {
   return {
-    mandatory,
-    ...(params.viewport
-      ? {
-          aspectRatio: { ideal: params.viewport.width / params.viewport.height },
-          height: { ideal: params.viewport.height },
-          width: { ideal: params.viewport.width },
-        }
-      : {}),
-    ...(params.controlledCursorCaptureEnabled === true || params.excludeNativeCursor === true
-      ? { cursor: 'never' as const }
-      : {}),
+    mandatory: {
+      chromeMediaSource: 'tab',
+      chromeMediaSourceId: streamId,
+    },
   } as MediaTrackConstraints;
 }
 
@@ -94,38 +76,19 @@ async function acquireTabStream({
   streamId,
   settings,
   captureMode,
-  excludeNativeCursor,
-  viewport,
 }: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
-  excludeNativeCursor?: boolean;
-  viewport?: { width: number; height: number };
 }) {
   const audioConstraints: MediaTrackConstraints | false = settings.systemAudioEnabled
-    ? ({
-        mandatory: {
-          chromeMediaSource: 'tab',
-          chromeMediaSourceId: streamId,
-        },
-      } as MediaTrackConstraints)
+    ? createTabSourceConstraints(streamId)
     : false;
-
-  const videoConstraints = createTabVideoConstraints({
-    streamId,
-    ...(viewport === undefined ? {} : { viewport }),
-    ...(settings.controlledCursorCaptureEnabled === undefined
-      ? {}
-      : { controlledCursorCaptureEnabled: settings.controlledCursorCaptureEnabled }),
-    ...(excludeNativeCursor === undefined ? {} : { excludeNativeCursor }),
-  });
 
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: audioConstraints,
-    video: videoConstraints,
+    video: createTabSourceConstraints(streamId),
   });
-  if (excludeNativeCursor === true) assertNativeCursorExclusionNotContradicted(stream);
   const cursorCaptureMode = resolveCursorCaptureMode(stream, settings, captureMode);
   logger.debug('Acquired tab capture stream', {
     hasAudio: Boolean(audioConstraints),
@@ -156,42 +119,6 @@ function getTrackSettings(stream: MediaStream): {
     cursor: readStringSetting(settings, 'cursor'),
     displaySurface: readStringSetting(settings, 'displaySurface'),
   };
-}
-
-function stopAcquiredStream(stream: MediaStream): void {
-  for (const track of stream.getTracks()) {
-    try {
-      track.stop();
-    } catch (error) {
-      logger.warn('Failed to stop a rejected tab capture track', error);
-    }
-  }
-}
-
-function assertNativeCursorExclusionNotContradicted(stream: MediaStream): void {
-  if (!stream.getVideoTracks()[0]) {
-    stopAcquiredStream(stream);
-    throw new Error('Native cursor exclusion could not be verified');
-  }
-  let cursorSetting: string | null;
-  let displaySurface: string | null;
-  try {
-    const trackSettings = getTrackSettings(stream);
-    cursorSetting = trackSettings.cursor;
-    displaySurface = trackSettings.displaySurface;
-  } catch (error) {
-    stopAcquiredStream(stream);
-    throw new Error('Native cursor exclusion could not be verified', { cause: error });
-  }
-  if (cursorSetting === 'never') return;
-  if (cursorSetting === null) {
-    logger.debug('Tab capture accepted cursor-free constraints without cursor track settings', {
-      displaySurface,
-    });
-    return;
-  }
-  stopAcquiredStream(stream);
-  throw new Error('Native cursor exclusion could not be verified');
 }
 
 function resolveCursorCaptureMode(

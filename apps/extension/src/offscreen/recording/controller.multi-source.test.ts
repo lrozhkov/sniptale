@@ -4,6 +4,7 @@ const {
   getActiveMultiSourceRecordingIdMock,
   hasActiveMultiSourceRecordingMock,
   pauseMultiSourceRecordingMock,
+  retryPendingPostRecordResultMock,
   resumeMultiSourceRecordingMock,
   sendRuntimeMessageMock,
   startMultiSourceRecordingMock,
@@ -13,6 +14,7 @@ const {
   getActiveMultiSourceRecordingIdMock: vi.fn(),
   hasActiveMultiSourceRecordingMock: vi.fn(),
   pauseMultiSourceRecordingMock: vi.fn(),
+  retryPendingPostRecordResultMock: vi.fn(),
   resumeMultiSourceRecordingMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   startMultiSourceRecordingMock: vi.fn(),
@@ -26,6 +28,10 @@ vi.mock('./start/index', async (importOriginal) => ({
 }));
 vi.mock('./start/cleanup', () => ({
   cleanupResources: vi.fn(),
+}));
+vi.mock('./post-record-publication', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./post-record-publication')>()),
+  retryPendingPostRecordResult: retryPendingPostRecordResultMock,
 }));
 
 vi.mock('./multi-source', async (importOriginal) => ({
@@ -55,11 +61,9 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 
 import { pauseRecording, resumeRecording, startRecording, stopRecording } from './controller';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import {
-  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-  VideoQuality,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_OUTPUT_PROFILE } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { PostRecordPublicationError } from './post-record-publication';
 
 function createSettings() {
   return {
@@ -70,8 +74,7 @@ function createSettings() {
     microphoneDeviceId: null,
     microphoneEnabled: false,
     openEditorAfterRecording: false,
-    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-    quality: VideoQuality.HIGH,
+    outputProfile: DEFAULT_VIDEO_OUTPUT_PROFILE,
     sourceCount: 2,
     systemAudioEnabled: true,
   };
@@ -82,8 +85,40 @@ beforeEach(() => {
   getActiveMultiSourceRecordingIdMock.mockReturnValue('multi-1');
   hasActiveMultiSourceRecordingMock.mockReturnValueOnce(false).mockReturnValue(true);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
+  retryPendingPostRecordResultMock.mockResolvedValue(false);
   startMultiSourceRecordingMock.mockResolvedValue(undefined);
   stopMultiSourceRecordingMock.mockResolvedValue(undefined);
+});
+
+it('retains the multi-source binding and retries only result publication after rejection', async () => {
+  await startRecording({
+    generation: 1,
+    recordingId: 'multi-1',
+    streamInstanceId: 'stream-instance-multi-1',
+    settings: createSettings(),
+    streamId: 'desktop-multi',
+  });
+  const binding = {
+    generation: 1,
+    recordingId: 'multi-1',
+    streamInstanceId: 'stream-instance-multi-1',
+  };
+  stopMultiSourceRecordingMock.mockRejectedValueOnce(
+    new PostRecordPublicationError(
+      { primaryRecordingId: 'multi-1-window-1', projectId: 'project-1', recordingId: 'multi-1' },
+      new Error('session storage failed')
+    )
+  );
+
+  await expect(stopRecording(binding)).rejects.toBeInstanceOf(PostRecordPublicationError);
+  retryPendingPostRecordResultMock.mockResolvedValueOnce(true);
+  await expect(stopRecording(binding)).resolves.toEqual({ result: 'stopped' });
+
+  expect(stopMultiSourceRecordingMock).toHaveBeenCalledOnce();
+  expect(retryPendingPostRecordResultMock).toHaveBeenLastCalledWith(
+    'multi-1',
+    expect.objectContaining({ sendRuntimeMessage: expect.any(Function) })
+  );
 });
 
 it('routes multi-source starts to the multi-source session owner', async () => {

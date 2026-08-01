@@ -35,7 +35,7 @@ const settings: VideoRecordingSettings = {
   microphoneEnabled: false,
   microphoneDeviceId: null,
   openEditorAfterRecording: false,
-  quality: VideoQuality.MEDIUM,
+  outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
   systemAudioEnabled: false,
 };
 

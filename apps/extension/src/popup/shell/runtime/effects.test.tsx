@@ -116,7 +116,10 @@ function createEffectsState(overrides: Partial<Parameters<typeof usePopupRuntime
       microphoneDeviceId: null,
       microphoneEnabled: true,
       openEditorAfterRecording: true,
-      quality: VideoQuality.MEDIUM,
+      outputProfile: {
+        ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+        quality: VideoQuality.MEDIUM,
+      },
       systemAudioEnabled: true,
     },
     ...overrides,
@@ -311,19 +314,29 @@ async function verifyRapidVideoSettingsReversionIsSerialized() {
     <EffectsHarness
       state={{
         ...initial,
-        videoSettings: { ...initial.videoSettings, quality: VideoQuality.LOW },
+        videoSettings: {
+          ...initial.videoSettings,
+          outputProfile: { ...initial.videoSettings.outputProfile, quality: VideoQuality.LOW },
+        },
       }}
     />
   );
   await renderHarness(<EffectsHarness state={initial} />);
   await flushMicrotasks();
   expect(persistVideoSettingsMock).toHaveBeenCalledTimes(1);
-  expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(1, { quality: VideoQuality.LOW });
+  expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(1, {
+    outputProfile: { ...initial.videoSettings.outputProfile, quality: VideoQuality.LOW },
+  });
 
-  first.resolve({ ...initial.videoSettings, quality: VideoQuality.LOW });
+  first.resolve({
+    ...initial.videoSettings,
+    outputProfile: { ...initial.videoSettings.outputProfile, quality: VideoQuality.LOW },
+  });
   await flushMicrotasks();
   expect(persistVideoSettingsMock).toHaveBeenCalledTimes(2);
-  expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(2, { quality: VideoQuality.MEDIUM });
+  expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(2, {
+    outputProfile: { ...initial.videoSettings.outputProfile, quality: VideoQuality.MEDIUM },
+  });
 
   second.resolve(initial.videoSettings);
   await flushMicrotasks();
@@ -336,7 +349,10 @@ async function verifyQueuedSettingsPreserveExternalFields() {
   persistVideoSettingsMock.mockReset();
   persistVideoSettingsMock.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
   const initial = createEffectsState();
-  const firstLocalSettings = { ...initial.videoSettings, quality: VideoQuality.LOW };
+  const firstLocalSettings = {
+    ...initial.videoSettings,
+    outputProfile: { ...initial.videoSettings.outputProfile, quality: VideoQuality.LOW },
+  };
   const secondLocalSettings = { ...firstLocalSettings, microphoneEnabled: false };
 
   await renderHarness(<EffectsHarness state={initial} />);
@@ -347,7 +363,9 @@ async function verifyQueuedSettingsPreserveExternalFields() {
   );
   await flushMicrotasks();
 
-  expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(1, { quality: VideoQuality.LOW });
+  expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(1, {
+    outputProfile: firstLocalSettings.outputProfile,
+  });
   const firstAuthoritative = { ...firstLocalSettings, diagnosticsEnabled: true };
   first.resolve(firstAuthoritative);
   await flushMicrotasks();

@@ -31,7 +31,7 @@ it('exposes content action request and response contract types', () => {
   expectTypeOf<
     RuntimeContentActionRequestByType[typeof MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY]
   >().toMatchTypeOf<{
-    purpose: 'recording-download' | 'trusted-content-event';
+    purpose: 'trusted-content-event';
     type: typeof MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY;
   }>();
   expectTypeOf<

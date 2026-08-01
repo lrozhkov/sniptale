@@ -7,22 +7,29 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRuntimeMessage } from '../../../../contracts/video/types/messages';
 import { appendContentDiagnosticEvent } from '../../../diagnostics/public/event-sink';
 import {
-  createUnhandledRouteResult,
   handleDownloadRecording,
   handleDownloadRecordingSidecar,
+} from './handlers/export/download';
+import { routeExportRuntimeMessage } from './handlers/export/route';
+import type { RouteResult } from './handlers/shared';
+import { handleRegisterCameraRecorderControl } from './handlers/state/camera-recorder-registration';
+import {
+  createUnhandledRouteResult,
   handleOffscreenError,
+  handleVideoSavedToIdb,
+} from './handlers/state/offscreen-lifecycle';
+import {
   handleOffscreenRecordingPaused,
   handleOffscreenRecordingResumed,
   handleOffscreenRecordingStarted,
   handleOffscreenRecordingStopped,
   handleRecordingDurationUpdated,
-  handleRegisterCameraRecorderControl,
-  handleRecordingState,
   handleRecordingTabId,
-  handleVideoSavedToIdb,
-  type RouteResult,
-} from './handlers';
-import { routeExportRuntimeMessage } from './handlers/export/route';
+} from './handlers/state/recording-state';
+import {
+  handleAcknowledgePostRecordResult,
+  handleRecordingState,
+} from './handlers/state/recording-state-response';
 import { routeStateLifecycleRuntimeMessage } from './handlers/state/route';
 import type { ProjectExportPreauthorization } from '../../../routing-contracts/project-export-preauthorization';
 import { acceptVideoSourceReady } from '../capture-surface';
@@ -61,6 +68,9 @@ function routeRecordingRuntimeMessage(
 ): RouteResult | null {
   if (message.type === VideoMessageType.GET_RECORDING_STATE) {
     return handleRecordingState(sendResponse, sender);
+  }
+  if (message.type === VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT) {
+    return handleAcknowledgePostRecordResult(message, sendResponse, sender);
   }
   if (message.type === VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL) {
     return handleRegisterCameraRecorderControl(message, sendResponse, sender);

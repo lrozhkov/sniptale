@@ -73,6 +73,9 @@ it('accepts valid size payloads and rejects malformed size payloads', () => {
 
 it('accepts valid viewport regions and rejects malformed viewport regions', () => {
   expect(isViewportRegion({ height: 200, width: 100, x: 10, y: 20 })).toBe(true);
+  expect(
+    isViewportRegion({ height: 200, output: {}, quality: 'HIGH', width: 100, x: 10, y: 20 })
+  ).toBe(true);
   expect(isViewportRegion({ height: 200, width: 100, x: '10', y: 20 })).toBe(false);
   expect(isViewportRegion({ height: 200, width: 100, x: 10 })).toBe(false);
 });
@@ -117,13 +120,17 @@ it('accepts controlled cursor capture settings with microphone processing settin
       microphoneDeviceId: null,
       microphoneEnabled: true,
       openEditorAfterRecording: false,
-      quality: 'HIGH',
       sourceCount: 2,
       systemAudioEnabled: true,
       webcamDeviceId: 'cam-1',
       webcamEnabled: true,
     })
   ).toBe(true);
+});
+
+it('rejects legacy quality and output settings at the runtime boundary', () => {
+  expect(isVideoRecordingSettings({ ...DEFAULT_VIDEO_SETTINGS, quality: 'HIGH' })).toBe(false);
+  expect(isVideoRecordingSettings({ ...DEFAULT_VIDEO_SETTINGS, output: {} })).toBe(false);
 });
 
 it('rejects invalid video recording settings flag and source count values', () => {
@@ -137,7 +144,6 @@ it('rejects invalid video recording settings flag and source count values', () =
       microphoneDeviceId: null,
       microphoneEnabled: true,
       openEditorAfterRecording: false,
-      quality: 'HIGH',
       systemAudioEnabled: true,
       webcamDeviceId: null,
       webcamEnabled: false,
@@ -152,7 +158,6 @@ it('rejects invalid video recording settings flag and source count values', () =
       microphoneDeviceId: null,
       microphoneEnabled: true,
       openEditorAfterRecording: false,
-      quality: '1080p',
       sourceCount: '2',
       systemAudioEnabled: true,
       webcamDeviceId: null,

@@ -6,7 +6,12 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 }));
 
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import {
+  CaptureMode,
+  VideoFrameRate,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoSetupPageProps } from './types';
 import { getGalleryTitle, getVideoSetupViewModel } from './view-model';
 
@@ -17,6 +22,7 @@ type VideoSetupViewModelTestProps = Pick<
   | 'galleryStatus'
   | 'isStartPending'
   | 'isLoadingWebcams'
+  | 'settings'
   | 'selectedPresetId'
   | 'viewportPresets'
   | 'webcamDevices'
@@ -53,6 +59,7 @@ function createProps(
     galleryStatus: { text: '3 projects', pressure: 'healthy' as const },
     isLoadingWebcams: false,
     isStartPending: false,
+    settings: DEFAULT_VIDEO_SETTINGS,
     selectedPresetId: 'preset-1',
     viewportPresets: [
       {
@@ -178,4 +185,40 @@ it('keeps camera mode startable while disabling incompatible setup options', () 
 
 it('formats the gallery title consistently', () => {
   expect(getGalleryTitle(null)).toBe('t:popup.video.galleryTitle');
+});
+
+it('blocks a known TAB output that exceeds the shared live pixel-rate budget', () => {
+  const viewModel = getVideoSetupViewModel(
+    createProps({
+      settings: {
+        ...DEFAULT_VIDEO_SETTINGS,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          frameRate: VideoFrameRate.FPS60,
+          resolution: VideoResolutionPreset.P2160,
+        },
+      },
+      viewportPresets: [
+        {
+          enabled: true,
+          height: 900,
+          id: 'preset-1',
+          kind: 'user',
+          name: '1440 × 900',
+          order: 0,
+          target: 'viewport',
+          width: 1440,
+        },
+      ],
+    })
+  );
+
+  expect(viewModel).toEqual(
+    expect.objectContaining({
+      canStart: false,
+      knownOutputBasisDimensions: { height: 900, width: 1440 },
+      startButtonLabel: 't:popup.video.startUnavailable',
+      startDisabledReason: 't:popup.video.outputResourceUnsupported',
+    })
+  );
 });

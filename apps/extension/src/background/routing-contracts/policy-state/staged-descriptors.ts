@@ -15,25 +15,6 @@ export const stagedPolicyStateDescriptors = [
     storageClass: 'memory-only',
   },
   {
-    authorityFamily: 'recording-download-staged-chunks',
-    failClosedOnRestart: true,
-    id: 'recording-download-staged-chunks',
-    oneShot: false,
-    ownerModule:
-      'apps/extension/src/background/capture/routing/recording-download/staged-recordings.ts',
-    proofModules: [
-      'apps/extension/src/background/capture/routing/recording-download/staged-recordings.test.ts',
-    ],
-    requiresTtl: false,
-    restartBehavior: [
-      'In-flight recording chunks are transaction-bound;',
-      'final save fails closed when staging state is absent.',
-    ].join(' '),
-    restartClass: 'transaction-bound',
-    stateClass: 'staged-artifact',
-    storageClass: 'memory-only',
-  },
-  {
     authorityFamily: 'web-snapshot-save',
     failClosedOnRestart: true,
     id: 'web-snapshot-staged-blobs',

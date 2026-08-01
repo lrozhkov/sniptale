@@ -114,7 +114,7 @@ function createStartMessage(): StartRecordingMessage {
       microphoneEnabled: true,
       microphoneDeviceId: null,
       systemAudioEnabled: true,
-      quality: VideoQuality.HIGH,
+      outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
       countdownSeconds: 3,
       autoFadeDelay: 1500,
       openEditorAfterRecording: true,

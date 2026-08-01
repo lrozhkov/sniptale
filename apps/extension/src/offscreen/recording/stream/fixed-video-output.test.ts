@@ -13,30 +13,20 @@ vi.mock('./video-source', async (importOriginal) => ({
   waitForSourceMetadata: waitForSourceMetadataMock,
 }));
 
-import { createFixedVideoOutputStream } from './fixed-video-output';
-import {
-  VideoQuality,
-  VideoResolutionPreset,
-  type VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
+  createAudioStream,
   createEmptyStream,
   createStream,
   createTrackedStream,
 } from '../multi-source/media-stream.test-support';
+import { createFixedVideoOutputStream } from './fixed-video-output';
 
-function createSettings(
-  resolution: VideoRecordingSettings['output']['resolution'] = VideoResolutionPreset.SOURCE
-): Pick<VideoRecordingSettings, 'output' | 'quality'> {
+function createSettings(resolution: VideoResolutionPreset = VideoResolutionPreset.SOURCE) {
   return {
-    output: { ...DEFAULT_VIDEO_SETTINGS.output, resolution },
-    quality: VideoQuality.HIGH,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, resolution },
   };
-}
-
-function createSourceStream() {
-  return createTrackedStream({ height: 1304, width: 2560 });
 }
 
 function installCanvasFixture(stream: MediaStream) {
@@ -56,113 +46,78 @@ function installCanvasFixture(stream: MediaStream) {
   return { canvas, ctx };
 }
 
-function installBrokenCanvasFixture(params: { stream: MediaStream; withContext: boolean }) {
-  const canvas = Object.assign(document.createElement('canvas'), {
-    captureStream: vi.fn(() => params.stream),
-    getContext: vi.fn(() => (params.withContext ? { clearRect: vi.fn() } : null)),
-  });
-  vi.spyOn(document, 'createElement').mockReturnValue(canvas);
-}
-
 beforeEach(() => {
-  vi.useRealTimers();
+  vi.useFakeTimers();
   vi.clearAllMocks();
-  vi.restoreAllMocks();
   waitForSourceMetadataMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
-it('records multi-source video through a fixed-size canvas when source dimensions drift', async () => {
-  vi.useFakeTimers();
+it('contains a changed window source inside its immutable SOURCE canvas', async () => {
   const canvasStream = createTrackedStream({ frameRate: 30, height: 1304, width: 2560 });
-  const canvasTrack = canvasStream.track;
-  const sourceStream = createSourceStream();
+  const sourceStream = createTrackedStream({ height: 1304, width: 2560 });
   const { canvas, ctx } = installCanvasFixture(canvasStream);
-  const video = { pause: vi.fn(), srcObject: sourceStream, videoHeight: 1304, videoWidth: 2560 };
-
+  const video = {
+    pause: vi.fn(),
+    srcObject: sourceStream,
+    videoHeight: 1304,
+    videoWidth: 2560,
+  };
   createSourceVideoMock.mockReturnValue(video);
 
   const result = await createFixedVideoOutputStream(sourceStream, createSettings());
+  expect(canvas.captureStream).toHaveBeenCalledOnce();
   video.videoHeight = 1192;
   vi.advanceTimersToNextTimer();
 
-  expect(result.stream).toBe(canvasStream);
   expect(result.dimensions).toEqual({ height: 1304, width: 2560 });
-  expect(canvas.width).toBe(2560);
-  expect(canvas.height).toBe(1304);
-  expect(canvas.captureStream).toHaveBeenCalledWith(30);
-  expect(canvas.getContext).toHaveBeenCalledWith('2d', { alpha: false });
-  expect(ctx.imageSmoothingEnabled).toBe(false);
+  expect(canvas).toEqual(expect.objectContaining({ height: 1304, width: 2560 }));
   expect(ctx.drawImage).toHaveBeenLastCalledWith(video, 0, 0, 2560, 1192, 0, 56, 2560, 1192);
-  canvasTrack.stop();
-  canvasTrack.stop();
-  expect(sourceStream.track.stop).toHaveBeenCalledOnce();
-  expect(video.pause).toHaveBeenCalled();
-});
-
-it('uses one timed canvas track at the requested capped cadence and content hint', async () => {
-  const timedStream = createTrackedStream({ frameRate: 24 });
-  const timedTrack = timedStream.track;
-  const sourceStream = createSourceStream();
-  const { canvas } = installCanvasFixture(timedStream);
-  const video = { pause: vi.fn(), srcObject: sourceStream, videoHeight: 720, videoWidth: 1280 };
-
-  createSourceVideoMock.mockReturnValue(video);
-
-  const result = await createFixedVideoOutputStream(sourceStream, createSettings(), {
-    contentHint: 'motion',
-    frameRate: 24,
-  });
-
-  expect(result.stream).toBe(timedStream);
   expect(canvas.captureStream).toHaveBeenCalledOnce();
-  expect(canvas.captureStream).toHaveBeenCalledWith(24);
-  expect(timedTrack.contentHint).toBe('motion');
-  timedTrack.stop();
-  expect(sourceStream.track.stop).toHaveBeenCalled();
+  canvasStream.track.stop();
+  canvasStream.track.stop();
+  expect(sourceStream.track.stop).toHaveBeenCalledOnce();
+  expect(video.pause).toHaveBeenCalledOnce();
 });
 
-it('cleans up the source stream when fixed canvas creation fails', async () => {
-  const sourceStream = createSourceStream();
-  const video = { pause: vi.fn(), srcObject: sourceStream, videoHeight: 720, videoWidth: 1280 };
-
-  createSourceVideoMock.mockReturnValue(video);
-  installBrokenCanvasFixture({ stream: createEmptyStream(), withContext: false });
-
-  await expect(createFixedVideoOutputStream(sourceStream, createSettings())).rejects.toThrow(
-    'canvas context'
-  );
-
-  expect(sourceStream.track.stop).toHaveBeenCalled();
-  expect(video.pause).toHaveBeenCalled();
-  expect(video.srcObject).toBeNull();
-});
-
-it('rejects canvas streams without a video track', async () => {
-  const sourceStream = createSourceStream();
-  const video = { pause: vi.fn(), srcObject: sourceStream, videoHeight: 720, videoWidth: 1280 };
-  const canvasStream = createEmptyStream();
-
-  createSourceVideoMock.mockReturnValue(video);
-  installBrokenCanvasFixture({ stream: canvasStream, withContext: true });
-
-  await expect(createFixedVideoOutputStream(sourceStream, createSettings())).rejects.toThrow(
-    'no video track'
-  );
-});
-
-it('normalizes an arbitrary source to the selected short edge without distortion', async () => {
-  vi.useFakeTimers();
-  const canvasStream = createStream(2346, 1080);
-  const canvasTrack = Object.assign(canvasStream.getVideoTracks()[0]!, {
-    requestFrame: vi.fn(),
+it('preserves primary source-audio ownership only when explicitly requested', async () => {
+  const canvasStream = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
+  const sourceStream = createTrackedStream({ height: 720, width: 1280 });
+  const audioTrack = createAudioStream().getAudioTracks()[0]!;
+  vi.spyOn(sourceStream, 'getAudioTracks').mockReturnValue([audioTrack]);
+  const addTrack = vi.spyOn(canvasStream, 'addTrack');
+  installCanvasFixture(canvasStream);
+  createSourceVideoMock.mockReturnValue({
+    pause: vi.fn(),
+    srcObject: sourceStream,
+    videoHeight: 720,
+    videoWidth: 1280,
   });
-  const sourceStream = createSourceStream();
+
+  await createFixedVideoOutputStream(sourceStream, createSettings(), {
+    includeSourceAudio: true,
+    sourceOwnership: 'caller',
+  });
+
+  expect(addTrack).toHaveBeenCalledWith(audioTrack);
+  canvasStream.track.stop();
+  expect(sourceStream.track.stop).not.toHaveBeenCalled();
+});
+
+it('uses exact preset height and proportional even width', async () => {
+  const canvasStream = createStream(2346, 1080);
+  const sourceStream = createTrackedStream({ height: 500, width: 1086 });
   const { canvas, ctx } = installCanvasFixture(canvasStream);
-  const video = { pause: vi.fn(), srcObject: sourceStream, videoHeight: 500, videoWidth: 1086 };
+  const video = {
+    pause: vi.fn(),
+    srcObject: sourceStream,
+    videoHeight: 500,
+    videoWidth: 1086,
+  };
   createSourceVideoMock.mockReturnValue(video);
 
   const result = await createFixedVideoOutputStream(
@@ -182,5 +137,66 @@ it('normalizes an arbitrary source to the selected short edge without distortion
     expect.closeTo((1086 * 1080) / 500),
     1080,
   ]);
-  canvasTrack.stop();
+  canvasStream.getVideoTracks()[0]?.stop();
+});
+
+it('caps an adapter cadence at the selected profile frame rate', async () => {
+  const canvasStream = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });
+  const sourceStream = createTrackedStream({ height: 720, width: 1280 });
+  const { canvas } = installCanvasFixture(canvasStream);
+  createSourceVideoMock.mockReturnValue({
+    pause: vi.fn(),
+    srcObject: sourceStream,
+    videoHeight: 720,
+    videoWidth: 1280,
+  });
+
+  const result = await createFixedVideoOutputStream(sourceStream, createSettings(), {
+    frameRate: 60,
+  });
+
+  expect(result.frameRate).toBe(30);
+  expect(canvas.captureStream).toHaveBeenCalledWith(30);
+  canvasStream.track.stop();
+});
+
+it('caps the fixed cadence once at the source track rate reported on start', async () => {
+  const canvasStream = createTrackedStream({ frameRate: 24, height: 720, width: 1280 });
+  const sourceStream = createTrackedStream({ frameRate: 24, height: 720, width: 1280 });
+  const { canvas } = installCanvasFixture(canvasStream);
+  createSourceVideoMock.mockReturnValue({
+    pause: vi.fn(),
+    srcObject: sourceStream,
+    videoHeight: 720,
+    videoWidth: 1280,
+  });
+
+  const result = await createFixedVideoOutputStream(sourceStream, createSettings());
+
+  expect(result.frameRate).toBe(24);
+  expect(canvas.captureStream).toHaveBeenCalledWith(24);
+  canvasStream.track.stop();
+});
+
+it('cleans up the source when canvas output creation fails', async () => {
+  const sourceStream = createTrackedStream({ height: 720, width: 1280 });
+  const video = {
+    pause: vi.fn(),
+    srcObject: sourceStream,
+    videoHeight: 720,
+    videoWidth: 1280,
+  };
+  createSourceVideoMock.mockReturnValue(video);
+  const canvas = Object.assign(document.createElement('canvas'), {
+    captureStream: vi.fn(() => createEmptyStream()),
+    getContext: vi.fn(() => null),
+  });
+  vi.spyOn(document, 'createElement').mockReturnValue(canvas);
+
+  await expect(createFixedVideoOutputStream(sourceStream, createSettings())).rejects.toThrow(
+    'canvas context'
+  );
+  expect(sourceStream.track.stop).toHaveBeenCalledOnce();
+  expect(video.pause).toHaveBeenCalledOnce();
+  expect(video.srcObject).toBeNull();
 });

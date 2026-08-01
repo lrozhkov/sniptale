@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   BUILT_IN_VIDEO_RECORDING_QUALITY_PROFILES,
   VIDEO_RECORDING_CUSTOM_PROFILE_LIMIT,
-  type VideoRecordingQualityProfile,
+  type VideoRecordingProfile,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import {
@@ -12,7 +12,7 @@ import {
 } from '../../../composition/persistence/capture-settings';
 import { translate } from '../../../platform/i18n';
 
-type ProfileEditorState = { profile?: VideoRecordingQualityProfile } | null;
+type ProfileEditorState = { profile?: VideoRecordingProfile } | null;
 
 function createProfileId(): string {
   return typeof crypto.randomUUID === 'function'
@@ -23,7 +23,7 @@ function createProfileId(): string {
 export function useVideoQualityProfiles() {
   const [settings, setSettings] = useState<VideoRecordingSettings | null>(null);
   const [editor, setEditor] = useState<ProfileEditorState>(null);
-  const [deleteProfile, setDeleteProfile] = useState<VideoRecordingQualityProfile | null>(null);
+  const [deleteProfile, setDeleteProfile] = useState<VideoRecordingProfile | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +60,7 @@ export function useVideoQualityProfiles() {
     }
   };
 
-  const saveProfile = async (draft: VideoRecordingQualityProfile) => {
+  const saveProfile = async (draft: VideoRecordingProfile) => {
     if (!settings) return;
     const profile = { ...draft, id: draft.id || createProfileId(), name: draft.name.trim() };
     if (
@@ -76,8 +76,7 @@ export function useVideoQualityProfiles() {
         return current.qualityProfileId === profile.id
           ? {
               ...current,
-              output: { ...profile.output },
-              quality: profile.quality,
+              outputProfile: { ...profile.configuration },
               qualityProfiles: nextProfiles,
             }
           : { ...current, qualityProfiles: nextProfiles };
@@ -103,12 +102,11 @@ export function useVideoQualityProfiles() {
     }
   };
 
-  const selectProfile = async (profile: VideoRecordingQualityProfile) => {
+  const selectProfile = async (profile: VideoRecordingProfile) => {
     if (!settings) return;
     await commit((current) => ({
       ...current,
-      output: { ...profile.output },
-      quality: profile.quality,
+      outputProfile: { ...profile.configuration },
       qualityProfileId: profile.id,
     }));
   };

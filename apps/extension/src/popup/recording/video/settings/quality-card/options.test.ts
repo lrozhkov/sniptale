@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  DEFAULT_VIDEO_OUTPUT_PROFILE,
+  VideoFrameRate,
   VideoRecordingBuiltInProfileId,
+  VideoResolutionPreset,
   VideoQuality,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { getQualityIndex, getQualityOption, getRecordingProfileOptions } from './options';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 describe('quality card options', () => {
   it('maps known qualities to their indices', () => {
@@ -33,8 +36,10 @@ describe('quality card options', () => {
     const customProfile = {
       id: 'custom:review',
       name: 'Review',
-      output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-      quality: VideoQuality.MEDIUM,
+      configuration: {
+        ...DEFAULT_VIDEO_OUTPUT_PROFILE,
+        quality: VideoQuality.MEDIUM,
+      },
     };
     const common = {
       autoFadeDelay: 2,
@@ -48,9 +53,12 @@ describe('quality card options', () => {
 
     expect(
       getRecordingProfileOptions({
+        ...DEFAULT_VIDEO_SETTINGS,
         ...common,
-        output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-        quality: VideoQuality.HIGH,
+        outputProfile: {
+          ...DEFAULT_VIDEO_OUTPUT_PROFILE,
+          quality: VideoQuality.HIGH,
+        },
         qualityProfileId: VideoRecordingBuiltInProfileId.OPTIMAL,
         qualityProfiles: [customProfile],
       })
@@ -65,12 +73,44 @@ describe('quality card options', () => {
     );
     expect(
       getRecordingProfileOptions({
+        ...DEFAULT_VIDEO_SETTINGS,
         ...common,
-        output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-        quality: VideoQuality.LOW,
+        outputProfile: {
+          ...DEFAULT_VIDEO_OUTPUT_PROFILE,
+          quality: VideoQuality.LOW,
+        },
         qualityProfileId: null,
         qualityProfiles: [],
       }).selectedProfileId
     ).toBe('current:custom');
+  });
+
+  it('disables a profile that exceeds the shared budget for a known source basis', () => {
+    const settings = {
+      ...DEFAULT_VIDEO_SETTINGS,
+      qualityProfiles: [
+        {
+          configuration: {
+            ...DEFAULT_VIDEO_OUTPUT_PROFILE,
+            frameRate: VideoFrameRate.FPS60,
+            resolution: VideoResolutionPreset.P2160,
+          },
+          id: 'custom:oversized',
+          name: 'Oversized',
+        },
+      ],
+    };
+
+    const oversized = getRecordingProfileOptions(settings, {
+      height: 900,
+      width: 1440,
+    }).options.find((option) => option.value === 'custom:oversized');
+
+    expect(oversized).toEqual(
+      expect.objectContaining({
+        detail: expect.any(String),
+        disabled: true,
+      })
+    );
   });
 });

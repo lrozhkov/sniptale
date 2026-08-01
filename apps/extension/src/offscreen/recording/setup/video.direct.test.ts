@@ -7,11 +7,7 @@ import {
   createEmptyStream,
   createStream,
 } from '../multi-source/media-stream.test-support';
-import {
-  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-  VideoQuality,
-  type VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { type VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { audioMixerInstances, loggerWarnMock } = vi.hoisted(() => ({
@@ -47,11 +43,7 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 import { recordingContext } from '../context';
 import { attachMicrophoneAudioIfEnabled } from './video';
 
-function createSettings(
-  overrides: Partial<
-    Omit<VideoRecordingSettings, 'output' | 'qualityProfileId' | 'qualityProfiles'>
-  > = {}
-): VideoRecordingSettings {
+function createSettings(overrides: Partial<VideoRecordingSettings> = {}): VideoRecordingSettings {
   return {
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
@@ -60,8 +52,7 @@ function createSettings(
     microphoneDeviceId: null,
     microphoneEnabled: false,
     openEditorAfterRecording: false,
-    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-    quality: VideoQuality.HIGH,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile },
     systemAudioEnabled: false,
     ...overrides,
   };

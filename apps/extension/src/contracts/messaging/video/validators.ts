@@ -1,9 +1,8 @@
 import {
   CaptureMode,
-  isVideoRecordingOutputSettings,
-  parseVideoRecordingQualityProfiles,
+  isVideoOutputProfile,
+  parseVideoRecordingProfiles,
   VideoResolutionPreset,
-  VideoQuality,
   type CaptureMode as CaptureModeValue,
   type VideoRecordingLiveMediaState,
   type VideoRecordingRuntimeState,
@@ -48,7 +47,6 @@ const videoExportScopeSet = new Set<string>(Object.values(VideoExportScope));
 const videoMp4CodecSet = new Set<string>(Object.values(VideoMp4Codec));
 const videoWebmCodecSet = new Set<string>(Object.values(VideoWebmCodec));
 const videoResolutionPresetSet = new Set<string>(Object.values(VideoResolutionPreset));
-const videoQualitySet = new Set<string>(Object.values(VideoQuality));
 const captureModeSet = new Set<string>(Object.values(CaptureMode));
 
 function isEnumValue(value: unknown, allowedValues: ReadonlySet<string>): value is string {
@@ -89,6 +87,8 @@ export function isCaptureSource(value: unknown): boolean {
 export function isVideoRecordingSettings(value: unknown): value is VideoRecordingSettings {
   return (
     isRecord(value) &&
+    !Object.hasOwn(value, 'quality') &&
+    !Object.hasOwn(value, 'output') &&
     isBoolean(value['microphoneEnabled']) &&
     (value['microphoneDeviceId'] === null || isString(value['microphoneDeviceId'])) &&
     hasOptionalField(value, 'echoCancellation', isBoolean) &&
@@ -100,10 +100,9 @@ export function isVideoRecordingSettings(value: unknown): value is VideoRecordin
     hasOptionalField(value, 'webcamQuality', isWebcamQualitySettings) &&
     isBoolean(value['systemAudioEnabled']) &&
     hasOptionalField(value, 'sourceCount', isNumber) &&
-    isEnumValue(value['quality'], videoQualitySet) &&
-    isVideoRecordingOutputSettings(value['output']) &&
+    isVideoOutputProfile(value['outputProfile']) &&
     (value['qualityProfileId'] === null || isString(value['qualityProfileId'])) &&
-    parseVideoRecordingQualityProfiles(value['qualityProfiles']) !== null &&
+    parseVideoRecordingProfiles(value['qualityProfiles']) !== null &&
     isNumber(value['countdownSeconds']) &&
     isNumber(value['autoFadeDelay']) &&
     isBoolean(value['openEditorAfterRecording']) &&

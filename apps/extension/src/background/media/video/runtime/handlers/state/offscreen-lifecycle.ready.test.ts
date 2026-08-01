@@ -35,6 +35,8 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../session-state')>()),
   finishVideoRecordingStop: vi.fn(),
   getVideoRecordingId: getVideoRecordingIdMock,
+  isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
+    recordingId != null && getVideoRecordingIdMock() === recordingId,
   shouldOpenVideoEditorAfterRecording: vi.fn(() => false),
 }));
 
@@ -59,6 +61,10 @@ vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
   restoreCurrentRecordingFromLease: vi.fn(() => false),
 }));
+vi.mock('../../camera-recorder-control', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../camera-recorder-control')>()),
+  clearCameraRecorderControlGrant: vi.fn().mockResolvedValue(true),
+}));
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { handleOffscreenError, handleOffscreenReady } from './offscreen-lifecycle';
 
@@ -67,8 +73,7 @@ function createSendResponse() {
 }
 
 async function flushAsyncRoute() {
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 beforeEach(() => {
@@ -105,7 +110,8 @@ it('uses the translated fallback for start failures without an error string', as
   expect(translateMock).toHaveBeenCalledWith('background.runtime.recordingError');
   expect(clearRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('rec-1');
   expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith(
-    't:background.runtime.recordingError'
+    't:background.runtime.recordingError',
+    { recordingId: 'rec-1' }
   );
   expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-1');
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });

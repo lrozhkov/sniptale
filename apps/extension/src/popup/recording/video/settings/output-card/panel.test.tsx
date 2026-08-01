@@ -4,9 +4,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
-  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  DEFAULT_VIDEO_OUTPUT_PROFILE,
+  VideoFrameRate,
   VideoOutputCodec,
   VideoOutputContainer,
+  VideoResolutionPreset,
   VideoQuality,
 } from '@sniptale/runtime-contracts/video/types/types';
 
@@ -60,8 +62,10 @@ it('offers fast advanced choices and marks manual combinations as custom', () =>
           microphoneDeviceId: null,
           microphoneEnabled: false,
           openEditorAfterRecording: false,
-          output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
-          quality: VideoQuality.HIGH,
+          outputProfile: {
+            ...DEFAULT_VIDEO_OUTPUT_PROFILE,
+            quality: VideoQuality.HIGH,
+          },
           qualityProfileId: 'builtin:optimal',
           systemAudioEnabled: true,
         }}
@@ -71,20 +75,57 @@ it('offers fast advanced choices and marks manual combinations as custom', () =>
 
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
   const mp4Button = buttons.find((button) => button.textContent === 'MP4');
+  const fourKButton = buttons.find((button) => button.textContent === '2160p (4K)');
   const manageButton = buttons.find(
     (button) => button.textContent === 'popup.video.manageQualityProfiles'
   );
 
   act(() => mp4Button?.click());
   expect(onChange).toHaveBeenCalledWith({
-    output: {
-      ...DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+    outputProfile: {
+      ...DEFAULT_VIDEO_OUTPUT_PROFILE,
       codec: VideoOutputCodec.AVC,
       container: VideoOutputContainer.MP4,
     },
     qualityProfileId: null,
   });
 
+  act(() => fourKButton?.click());
+  expect(onChange).toHaveBeenCalledWith({
+    outputProfile: {
+      ...DEFAULT_VIDEO_OUTPUT_PROFILE,
+      frameRate: VideoFrameRate.FPS24,
+      quality: VideoQuality.HIGH,
+      resolution: VideoResolutionPreset.P2160,
+    },
+    qualityProfileId: null,
+  });
+
   act(() => manageButton?.click());
   expect(openSettingsPageMock).toHaveBeenCalledWith({ section: 'video' });
+});
+
+it('disables a known over-budget frame-rate choice instead of silently accepting it', () => {
+  act(() => {
+    root?.render(
+      <OutputSettingsPanel
+        knownOutputBasisDimensions={{ height: 900, width: 1440 }}
+        onChange={vi.fn()}
+        settings={{
+          ...DEFAULT_VIDEO_SETTINGS,
+          outputProfile: {
+            ...DEFAULT_VIDEO_OUTPUT_PROFILE,
+            frameRate: VideoFrameRate.FPS24,
+            resolution: VideoResolutionPreset.P2160,
+          },
+        }}
+      />
+    );
+  });
+
+  const sixtyFps = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+    (button) => button.textContent === '60 fps'
+  );
+  expect(sixtyFps?.disabled).toBe(true);
+  expect(sixtyFps?.getAttribute('title')).toBe('popup.video.outputResourceUnsupported');
 });

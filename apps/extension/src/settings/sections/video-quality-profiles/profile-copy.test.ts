@@ -7,6 +7,7 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 
 import {
   BUILT_IN_VIDEO_RECORDING_QUALITY_PROFILES,
+  DEFAULT_VIDEO_OUTPUT_PROFILE,
   VideoOutputCodec,
   VideoOutputContainer,
   VideoQuality,
@@ -33,12 +34,13 @@ describe('video quality profile copy', () => {
       getProfileName({
         id: 'custom:review',
         name: 'Review',
-        output: {
+        configuration: {
+          ...DEFAULT_VIDEO_OUTPUT_PROFILE,
           codec: VideoOutputCodec.VP9,
           container: VideoOutputContainer.WEBM,
           resolution: VideoResolutionPreset.P720,
+          quality: VideoQuality.MEDIUM,
         },
-        quality: VideoQuality.MEDIUM,
       })
     ).toBe('Review');
   });

@@ -5,6 +5,7 @@ import {
   VIDEO_SOURCE_COUNT_MAX,
   VIDEO_SOURCE_COUNT_MIN,
   type VideoRecordingSettings,
+  type VideoOutputDimensions,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { CounterCard } from './counter-card';
 import { QualityCard } from './quality-card/view';
@@ -50,10 +51,12 @@ function formatCountdownSelectedValue(value: number): string {
 
 export function VideoSettingsGrid({
   captureMode,
+  knownOutputBasisDimensions,
   settings,
   onSettingsChange,
 }: {
   captureMode?: CaptureMode;
+  knownOutputBasisDimensions?: VideoOutputDimensions | null;
   settings: VideoRecordingSettings;
   onSettingsChange: (patch: Partial<VideoRecordingSettings>) => void;
 }) {
@@ -61,7 +64,11 @@ export function VideoSettingsGrid({
 
   return (
     <div className="mt-0.5 flex flex-col">
-      <QualityCard settings={settings} onSettingsChange={onSettingsChange} />
+      <QualityCard
+        knownOutputBasisDimensions={knownOutputBasisDimensions ?? null}
+        settings={settings}
+        onSettingsChange={onSettingsChange}
+      />
       {showSourceCount ? (
         <CounterCard
           label={translate('popup.video.sourceCountLabel')}

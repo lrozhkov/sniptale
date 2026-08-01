@@ -17,7 +17,6 @@ const SECOND_LEVEL_SCC_OUTGOING_EDGE_IGNORE_PATTERNS = [
   /^apps\/extension\/src\/content\/runtime\/diagnostics\/runtime\//u,
   /^apps\/extension\/src\/content\/runtime\/entrypoint\//u,
   /^apps\/extension\/src\/content\/runtime\/message-bridge\//u,
-  /^apps\/extension\/src\/content\/runtime\/tab-capture-fallback\//u,
 ];
 
 function isSecondLevelSccTopologyFile(file) {

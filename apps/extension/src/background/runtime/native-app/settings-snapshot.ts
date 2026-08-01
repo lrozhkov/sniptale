@@ -76,15 +76,16 @@ export async function loadNativeSettingsSnapshot(
   trayActions: NativeTrayActionRegistry;
 }> {
   const [settings, quickActions] = await Promise.all([loadVideoSettings(), getQuickActions()]);
-  const native = normalizeNativeCaptureSettings(settings.native, settings.quality);
+  const quality = settings.outputProfile.quality;
+  const native = normalizeNativeCaptureSettings(settings.native, quality);
   const schemaVersion = NATIVE_APP_SETTINGS_SCHEMA_VERSION;
   const trayActions = await createNativeTrayActionRegistry(native, capabilities, quickActions);
   return {
     native,
-    quality: settings.quality,
+    quality,
     revision: await createSettingsRevision({
       native,
-      quality: settings.quality,
+      quality,
       schemaVersion,
       trayActions,
     }),

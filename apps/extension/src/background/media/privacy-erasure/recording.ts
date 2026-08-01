@@ -17,9 +17,11 @@ import { inspectPersistedLease } from '../../storage/video/recording-control-lea
 import { readCaptureSurfaceJournal } from '../../storage/capture-surface';
 import { getCaptureSurfaceService } from '../../capture-surface';
 import { disableViewportCursorProjection } from '../video/capture-surface/cursor-projection';
+import { forgetCameraRecorderControlGrant } from '../video/runtime/camera-recorder-control';
 import { failed, RECORDING_PARTICIPANT_ID, verified } from './result';
 
 export function resetRecordingRuntimeStateForPrivacyErasure(): void {
+  forgetCameraRecorderControlGrant();
   finishVideoRecordingStop();
   resetRecordingId();
   resetRecordingTabId();
