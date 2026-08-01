@@ -17,6 +17,7 @@ import {
 import type {
   VideoExportCapabilities,
   VideoProjectExportSettings,
+  VideoProjectExportSettingsPatch,
 } from '../../../features/video/project/types';
 import { useExportDialogCapabilities } from './capability-state';
 import { ExportDialogFields } from './fields';
@@ -24,8 +25,9 @@ import { ExportDialogFields } from './fields';
 interface ExportDialogProps {
   selectedClipAvailable?: boolean;
   settings: VideoProjectExportSettings;
+  sourceDimensions: { height: number; width: number };
   onClose: () => void;
-  onChange: (patch: Partial<VideoProjectExportSettings>) => void;
+  onChange: (patch: VideoProjectExportSettingsPatch) => void;
   onExport: () => void;
 }
 
@@ -105,7 +107,7 @@ function ExportDialogDownloadToggle({
   onChange,
 }: {
   settings: VideoProjectExportSettings;
-  onChange: (patch: Partial<VideoProjectExportSettings>) => void;
+  onChange: (patch: VideoProjectExportSettingsPatch) => void;
 }) {
   return (
     <ExportDialogBooleanToggle
@@ -122,7 +124,7 @@ function ExportDialogSubtitleToggle({
   onChange,
 }: {
   settings: VideoProjectExportSettings;
-  onChange: (patch: Partial<VideoProjectExportSettings>) => void;
+  onChange: (patch: VideoProjectExportSettingsPatch) => void;
 }) {
   const enabled = (settings.subtitleSidecarFormats?.length ?? 0) > 0;
 
@@ -147,7 +149,7 @@ function ExportDialogBurnInToggle({
   onChange,
 }: {
   settings: VideoProjectExportSettings;
-  onChange: (patch: Partial<VideoProjectExportSettings>) => void;
+  onChange: (patch: VideoProjectExportSettingsPatch) => void;
 }) {
   return (
     <ExportDialogBooleanToggle
@@ -183,6 +185,7 @@ function ExportDialogActions(props: {
 export const ExportDialog: React.FC<ExportDialogProps> = ({
   selectedClipAvailable = false,
   settings,
+  sourceDimensions,
   onClose,
   onChange,
   onExport,
@@ -196,9 +199,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     settings.format === VideoExportFormat.MP4
       ? translate('videoEditor.exportDialog.formatMp4Label')
       : translate('videoEditor.exportDialog.formatWebmLabel');
-  const canExport =
-    !capabilitiesPending &&
-    (settings.format !== VideoExportFormat.MP4 || settings.mp4VideoCodec !== undefined);
+  const canExport = !capabilitiesPending;
 
   return (
     <ProductModal onClose={onClose} closeOnBackdrop width="min(880px, calc(100vw - 32px))">
@@ -210,6 +211,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         <ExportDialogFields
           capabilities={capabilities}
           settings={settings}
+          sourceDimensions={sourceDimensions}
           onChange={onChange}
           selectedClipAvailable={selectedClipAvailable}
         />

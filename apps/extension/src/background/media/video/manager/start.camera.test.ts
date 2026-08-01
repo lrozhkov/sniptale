@@ -63,9 +63,11 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { startRecording } from './start';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 const defaultSettings: VideoRecordingSettings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 1500,
   controlledCursorCaptureEnabled: true,
   countdownSeconds: 3,

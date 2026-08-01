@@ -1,12 +1,18 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { finalizeSession } from './finalize';
-import type { MultiSourceRecorder, MultiSourceSession } from './state';
+import {
+  createMultiSourceLifecycle,
+  type MultiSourceRecorder,
+  type MultiSourceSession,
+} from './state';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { saveRecordingSafelyMock, saveVideoProjectMock, sendRuntimeMessageMock } = vi.hoisted(
   () => ({
@@ -46,43 +52,51 @@ beforeEach(() => {
   sendRuntimeMessageMock.mockResolvedValue({ success: true });
 });
 
-it('falls back to chunk/default mime types and default source dimensions', async () => {
-  await finalizeSession(createFallbackMimeSession());
+it('uses each recorder container for artifact MIME, extension, and project metadata', async () => {
+  await finalizeSession(createMixedContainerSession());
 
-  expectFallbackRecordingWrites();
+  expectContainerAwareRecordingWrites();
 });
 
-function createFallbackMimeSession(): MultiSourceSession {
+function createMixedContainerSession(): MultiSourceSession {
   return {
     ...createSession(),
     audioRecorder: createRecorder({
-      chunks: [],
+      chunks: [new Blob(['microphone'], { type: 'audio/webm' })],
+      mimeType: 'audio/webm',
       recordingId: 'rec-mic',
       sourceIndex: 999,
       trackSettings: {},
     }),
     recorders: [
       createRecorder({
-        chunks: [new Blob(['source'], { type: 'video/custom' })],
+        chunks: [new Blob(['source'], { type: 'video/mp4' })],
+        mimeType: 'video/mp4;codecs=avc1.640028',
         recordingId: 'rec-window-1',
         sourceIndex: 0,
-        trackSettings: {},
+        trackSettings: { height: 1080, width: 1920 },
       }),
       createRecorder({
-        chunks: [],
+        chunks: [new Blob(['source'], { type: 'video/webm' })],
+        mimeType: 'video/webm;codecs=vp9',
         recordingId: 'rec-window-2',
         sourceIndex: 1,
-        trackSettings: {},
+        trackSettings: { height: 720, width: 1280 },
       }),
     ],
   };
 }
 
-function expectFallbackRecordingWrites() {
+function expectContainerAwareRecordingWrites() {
   expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
     'rec-window-1',
-    expect.any(Blob),
-    expect.stringContaining('window-1.webm')
+    expect.objectContaining({ type: 'video/mp4' }),
+    expect.stringContaining('window-1.mp4')
+  );
+  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
+    'rec-window-2',
+    expect.objectContaining({ type: 'video/webm' }),
+    expect.stringContaining('window-2.webm')
   );
   expect(saveVideoProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -90,7 +104,7 @@ function expectFallbackRecordingWrites() {
         expect.objectContaining({
           metadata: expect.objectContaining({
             height: 1080,
-            mimeType: 'video/custom',
+            mimeType: 'video/mp4',
             width: 1920,
           }),
         }),
@@ -126,8 +140,30 @@ it('notifies saved sessions with the base recording id when no sources were capt
   });
 });
 
+it('rejects missing source dimensions before writing partial recording artifacts', async () => {
+  await expect(
+    finalizeSession({
+      ...createSession(),
+      recorders: [
+        createRecorder({
+          chunks: [new Blob(['source'], { type: 'video/webm' })],
+          mimeType: 'video/webm;codecs=vp9',
+          recordingId: 'rec-window-1',
+          sourceIndex: 0,
+          trackSettings: {},
+        }),
+      ],
+    })
+  ).rejects.toThrow('Multi-source recording dimensions are unavailable for source 1.');
+
+  expect(saveRecordingSafelyMock).not.toHaveBeenCalled();
+  expect(saveVideoProjectMock).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+});
+
 function createSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 3,
     controlledCursorCaptureEnabled: false,
     countdownSeconds: 0,
@@ -135,6 +171,7 @@ function createSettings(): VideoRecordingSettings {
     microphoneDeviceId: null,
     microphoneEnabled: true,
     openEditorAfterRecording: true,
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.HIGH,
     sourceCount: 2,
     systemAudioEnabled: false,
@@ -143,9 +180,12 @@ function createSettings(): VideoRecordingSettings {
 }
 
 function createSession(): MultiSourceSession {
+  const lifecycle = createMultiSourceLifecycle();
+  lifecycle.activate();
   return {
     audioRecorder: null,
     durationTimer: null,
+    lifecycle,
     recorders: [],
     recordingId: 'rec',
     settings: createSettings(),
@@ -179,6 +219,7 @@ function createMediaStreamFixture(): MediaStream {
 
 function createRecorder(params: {
   chunks: Blob[];
+  mimeType: string;
   recordingId: string;
   sourceIndex: number;
   trackSettings: MediaTrackSettings;
@@ -186,7 +227,7 @@ function createRecorder(params: {
   return {
     chunks: params.chunks,
     label: null,
-    recorder: { mimeType: '' } as MediaRecorder,
+    recorder: { mimeType: params.mimeType } as MediaRecorder,
     recordingId: params.recordingId,
     sourceIndex: params.sourceIndex,
     stream: createMediaStreamFixture(),

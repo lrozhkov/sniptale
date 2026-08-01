@@ -5,11 +5,13 @@ const { normalizeMultiSourceVideoStreamMock } = vi.hoisted(() => ({
   normalizeMultiSourceVideoStreamMock: vi.fn(),
 }));
 
-vi.mock('./normalize', () => ({
-  normalizeMultiSourceVideoStream: normalizeMultiSourceVideoStreamMock,
+vi.mock('../stream/fixed-video-output', () => ({
+  createFixedVideoOutputStream: normalizeMultiSourceVideoStreamMock,
 }));
 import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
   VideoQuality,
+  VideoResolutionPreset,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import {
@@ -20,10 +22,11 @@ import {
   stopRecorderStreams,
 } from './recorders';
 import { createAudioStream, createStream, createTrackedStream } from './media-stream.test-support';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 class FakeMediaRecorder {
   static instances: FakeMediaRecorder[] = [];
-  static supportedMimeTypes = new Set(['audio/webm']);
+  static supportedMimeTypes = new Set(['audio/webm', 'video/webm;codecs=vp9']);
   static isTypeSupported(mimeType: string) {
     return FakeMediaRecorder.supportedMimeTypes.has(mimeType);
   }
@@ -40,9 +43,12 @@ class FakeMediaRecorder {
 
 function createSettings(
   microphoneEnabled: boolean,
-  overrides: Partial<VideoRecordingSettings> = {}
+  overrides: Partial<
+    Omit<VideoRecordingSettings, 'output' | 'qualityProfileId' | 'qualityProfiles'>
+  > = {}
 ): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     autoGainControl: false,
     countdownSeconds: 0,
@@ -53,6 +59,7 @@ function createSettings(
     microphoneGain: 1,
     noiseSuppression: true,
     openEditorAfterRecording: false,
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.HIGH,
     sourceCount: 2,
     systemAudioEnabled: false,
@@ -71,7 +78,7 @@ function getOnlyAudioTrack(stream: MediaStream): MediaStreamTrack {
 beforeEach(() => {
   vi.clearAllMocks();
   FakeMediaRecorder.instances = [];
-  FakeMediaRecorder.supportedMimeTypes = new Set(['audio/webm']);
+  FakeMediaRecorder.supportedMimeTypes = new Set(['audio/webm', 'video/webm;codecs=vp9']);
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
   vi.stubGlobal('navigator', {
     mediaDevices: {
@@ -84,7 +91,8 @@ it('builds stable source filenames and creates audio-only microphone recorders',
   const rawStream = createAudioStream();
   const rawTrack = getOnlyAudioTrack(rawStream);
   vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(rawStream);
-  expect(buildSourceFilename(1)).toContain('window-2.webm');
+  expect(buildSourceFilename(1, 'video/webm;codecs=vp9')).toContain('window-2.webm');
+  expect(buildSourceFilename(1, 'video/mp4;codecs=avc1.640028')).toContain('window-2.mp4');
   expect(buildMicrophoneFilename()).toContain('microphone.webm');
   expect(await createMicrophoneRecorder('rec', createSettings(false))).toBeNull();
 
@@ -232,11 +240,60 @@ it('releases processed microphone streams when recorder creation fails', async (
   expect(close).toHaveBeenCalledOnce();
 });
 
+it('normalizes differently sized windows independently without sharing geometry', async () => {
+  const settings = {
+    ...createSettings(false),
+    output: {
+      ...DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+      resolution: VideoResolutionPreset.P480,
+    },
+  };
+  const wideSource = createStream(1920, 1080);
+  const classicSource = createStream(1024, 768);
+  const wideOutput = createStream(854, 480);
+  const classicOutput = createStream(640, 480);
+  normalizeMultiSourceVideoStreamMock
+    .mockResolvedValueOnce({
+      dimensions: { height: 480, width: 854 },
+      frameRate: 30,
+      stream: wideOutput,
+    })
+    .mockResolvedValueOnce({
+      dimensions: { height: 480, width: 640 },
+      frameRate: 30,
+      stream: classicOutput,
+    });
+
+  const recorders = await createSourceRecorders({
+    baseRecordingId: 'rec',
+    settings,
+    sources: [
+      { label: 'Wide', stream: wideSource },
+      { label: 'Classic', stream: classicSource },
+    ],
+  });
+
+  expect(normalizeMultiSourceVideoStreamMock).toHaveBeenNthCalledWith(1, wideSource, settings);
+  expect(normalizeMultiSourceVideoStreamMock).toHaveBeenNthCalledWith(2, classicSource, settings);
+  expect(recorders.map((recorder) => recorder.trackSettings)).toEqual([
+    { frameRate: 30, height: 480, width: 854 },
+    { frameRate: 30, height: 480, width: 640 },
+  ]);
+  expect(FakeMediaRecorder.instances.map((recorder) => recorder.stream)).toEqual([
+    wideOutput,
+    classicOutput,
+  ]);
+});
+
 it('rolls back already normalized source recorders when a later source fails', async () => {
   const normalizedStream = createTrackedStream();
 
   normalizeMultiSourceVideoStreamMock
-    .mockResolvedValueOnce({ dimensions: { height: 720, width: 1280 }, stream: normalizedStream })
+    .mockResolvedValueOnce({
+      dimensions: { height: 720, width: 1280 },
+      frameRate: 30,
+      stream: normalizedStream,
+    })
     .mockRejectedValueOnce(new Error('normalize failed'));
 
   await expect(
@@ -253,10 +310,24 @@ it('rolls back already normalized source recorders when a later source fails', a
   expect(normalizedStream.track.stop).toHaveBeenCalled();
 });
 
+it('rejects a capture source that has no video track', async () => {
+  await expect(
+    createSourceRecorders({
+      baseRecordingId: 'rec',
+      settings: createSettings(false),
+      sources: [{ label: 'Audio only', stream: createAudioStream() }],
+    })
+  ).rejects.toThrow('Multi-source capture source is missing a video track.');
+
+  expect(normalizeMultiSourceVideoStreamMock).not.toHaveBeenCalled();
+  expect(FakeMediaRecorder.instances).toHaveLength(0);
+});
+
 it('stops a normalized source stream when recorder construction fails', async () => {
   const normalizedStream = createTrackedStream();
   normalizeMultiSourceVideoStreamMock.mockResolvedValueOnce({
     dimensions: { height: 720, width: 1280 },
+    frameRate: 30,
     stream: normalizedStream,
   });
   vi.stubGlobal(

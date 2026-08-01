@@ -48,9 +48,11 @@ function createProject(overrides: Partial<VideoProject> = {}): VideoProject {
 const settings = {
   downloadAfterExport: true,
   format: VideoExportFormat.MP4,
+  resolution: 'SOURCE' as const,
+  mp4VideoCodec: 'AVC' as const,
   fps: 30,
   height: 720,
-  quality: VideoExportQualityPreset.BALANCED,
+  quality: VideoExportQualityPreset.MEDIUM,
   width: 1280,
 };
 

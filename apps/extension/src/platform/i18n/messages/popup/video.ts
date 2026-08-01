@@ -149,6 +149,66 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Качество видео',
     en: 'Video quality',
   },
+  profileCompact: {
+    ru: 'Экономное',
+    en: 'Compact',
+  },
+  profileOptimal: {
+    ru: 'Оптимальное',
+    en: 'Optimal',
+  },
+  profileHigh: {
+    ru: 'Высокое',
+    en: 'High',
+  },
+  profileMaximum: {
+    ru: 'Максимальное',
+    en: 'Maximum',
+  },
+  profileCustom: {
+    ru: 'Свои параметры',
+    en: 'Custom settings',
+  },
+  manageQualityProfiles: {
+    ru: 'Управление профилями…',
+    en: 'Manage profiles…',
+  },
+  outputLabel: {
+    ru: 'Формат',
+    en: 'Output',
+  },
+  outputAria: {
+    ru: 'Формат итогового видео',
+    en: 'Video output format',
+  },
+  outputSettingsAction: {
+    ru: 'Настроить',
+    en: 'Settings',
+  },
+  outputSettingsActionAria: {
+    ru: 'Настроить кодек и разрешение',
+    en: 'Configure codec and resolution',
+  },
+  outputSettingsTitle: {
+    ru: 'Параметры итогового видео',
+    en: 'Video output settings',
+  },
+  outputCodecLabel: {
+    ru: 'Кодек',
+    en: 'Codec',
+  },
+  outputResolutionLabel: {
+    ru: 'Разрешение',
+    en: 'Resolution',
+  },
+  outputResolutionSource: {
+    ru: 'Исходное',
+    en: 'Source',
+  },
+  outputAspectNotice: {
+    ru: 'Видео вписывается в выбранный стандарт без обрезки, растяжения и чёрных полей.',
+    en: 'Video fits the selected standard without cropping, stretching, or black bars.',
+  },
   countdownLabel: {
     ru: 'Старт',
     en: 'Start',

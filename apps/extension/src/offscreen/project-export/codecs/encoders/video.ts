@@ -5,7 +5,7 @@ import {
 import { translate } from '../../../../platform/i18n';
 import { MP4_CODEC_PRIORITY, MP4_VIDEO_ENCODER_CANDIDATES_BY_CODEC } from '../constants';
 import type { SupportedMp4VideoEncoder } from '../types';
-import { scaleBitrate } from '../bitrate';
+import { resolveExportTargetBitrate } from '../bitrate';
 import { buildMissingEncoderMessage, recordEncoderAttemptFailure } from './messages';
 
 type VideoEncoderSupportResult = Awaited<ReturnType<typeof VideoEncoder.isConfigSupported>>;
@@ -16,10 +16,7 @@ function getVideoEncoderBitrate(
   settings: VideoProjectExportSettings,
   codec: VideoMp4CodecType
 ): number {
-  return Math.max(
-    1_200_000,
-    scaleBitrate(settings.quality, settings.width, settings.height, codec)
-  );
+  return resolveExportTargetBitrate(settings, codec);
 }
 
 function createVideoEncoderConfig(params: {
@@ -34,6 +31,7 @@ function createVideoEncoderConfig(params: {
     width: settings.width,
     height: settings.height,
     bitrate,
+    bitrateMode: 'variable',
     framerate: settings.fps,
     hardwareAcceleration: candidate.hardwareAcceleration,
     ...(candidate.avcFormat ? { avc: { format: candidate.avcFormat } } : {}),
@@ -45,14 +43,34 @@ function createSupportedEncoder(params: {
   codec: VideoMp4CodecType;
   config: VideoEncoderConfig;
   label: string;
-  support: VideoEncoderSupportResult;
 }): SupportedMp4VideoEncoder {
   return {
     codec: params.codec,
     muxerCodec: params.candidate.muxerCodec,
     label: params.label,
-    config: params.support.config ?? params.config,
+    config: params.config,
   };
+}
+
+function getValidatedEffectiveVideoEncoderConfig(
+  requested: VideoEncoderConfig,
+  support: VideoEncoderSupportResult
+): VideoEncoderConfig | null {
+  const effective = support.config;
+  if (
+    !support.supported ||
+    !effective ||
+    effective.codec !== requested.codec ||
+    effective.width !== requested.width ||
+    effective.height !== requested.height ||
+    effective.framerate !== requested.framerate ||
+    effective.bitrate !== requested.bitrate ||
+    effective.bitrateMode !== 'variable'
+  ) {
+    return null;
+  }
+
+  return effective;
 }
 
 async function probeSupportedMp4VideoEncoder(
@@ -69,8 +87,9 @@ async function probeSupportedMp4VideoEncoder(
 
     try {
       const support: VideoEncoderSupportResult = await VideoEncoder.isConfigSupported(config);
-      if (support.supported) {
-        return createSupportedEncoder({ candidate, codec, config, label, support });
+      const effectiveConfig = getValidatedEffectiveVideoEncoderConfig(config, support);
+      if (effectiveConfig) {
+        return createSupportedEncoder({ candidate, codec, config: effectiveConfig, label });
       }
 
       recordEncoderAttemptFailure(attempts, label, candidate.codec);

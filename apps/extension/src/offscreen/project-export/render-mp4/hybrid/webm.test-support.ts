@@ -122,9 +122,11 @@ function createSettings(): VideoProjectExportSettings {
   return {
     downloadAfterExport: true,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     fps: 2,
     height: 720,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     width: 1280,
   };
 }

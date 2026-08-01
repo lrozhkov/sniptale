@@ -7,7 +7,7 @@ import {
 } from './tab-output';
 
 describe('tab output geometry', () => {
-  it('normalizes a DPR2 full TAB source to the measured CSS viewport', () => {
+  it('keeps a DPR2 full TAB source at its physical source resolution', () => {
     expect(
       resolveTabOutputGeometry(
         { x: 0, y: 0, width: 1280, height: 720 },
@@ -16,11 +16,11 @@ describe('tab output geometry', () => {
       )
     ).toMatchObject({
       sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
-      outputSize: { width: 1280, height: 720 },
+      outputSize: { width: 2560, height: 1440 },
     });
   });
 
-  it('keeps the selected visual area while encoding a 300x300 CSS result at DPR2', () => {
+  it('keeps the selected visual area at its mapped physical resolution', () => {
     expect(
       resolveTabOutputGeometry(
         { x: 100, y: 80, width: 300, height: 300 },
@@ -29,7 +29,7 @@ describe('tab output geometry', () => {
       )
     ).toMatchObject({
       sourceRect: { x: 200, y: 160, width: 600, height: 600 },
-      outputSize: { width: 300, height: 300 },
+      outputSize: { width: 600, height: 600 },
     });
   });
 
@@ -42,7 +42,7 @@ describe('tab output geometry', () => {
       )
     ).toMatchObject({
       sourceRect: { x: 0, y: 0, width: 1920, height: 998 },
-      outputSize: { width: 1425, height: 740 },
+      outputSize: { width: 1920, height: 998 },
     });
   });
 
@@ -55,7 +55,7 @@ describe('tab output geometry', () => {
       )
     ).toMatchObject({
       sourceRect: { x: 135, y: 108, width: 404, height: 404 },
-      outputSize: { width: 300, height: 300 },
+      outputSize: { width: 404, height: 404 },
     });
   });
 
@@ -79,7 +79,7 @@ describe('tab output geometry', () => {
     ).toMatchObject({
       requestedCrop: { x: 10, y: 20, width: 301, height: 299 },
       sourceRect: { x: 20, y: 40, width: 602, height: 598 },
-      outputSize: { width: 301, height: 299 },
+      outputSize: { width: 602, height: 598 },
     });
   });
 
@@ -92,7 +92,7 @@ describe('tab output geometry', () => {
       )
     ).toMatchObject({
       sourceRect: { x: 0, y: 0, width: 2558, height: 1442 },
-      outputSize: { width: 1279, height: 721 },
+      outputSize: { width: 2558, height: 1442 },
     });
   });
 

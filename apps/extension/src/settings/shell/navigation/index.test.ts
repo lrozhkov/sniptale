@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_NAV_ITEMS } from '.';
+import { normalizeSettingsTab, SETTINGS_NAV_ITEMS } from '.';
 
 describe('settings navigation items', () => {
   it('keeps product settings and omits retired page style management', () => {
@@ -9,6 +9,14 @@ describe('settings navigation items', () => {
     expect(SETTINGS_NAV_ITEMS).toContainEqual(
       expect.objectContaining({ id: 'privacy', label: 'settings.navigation.privacy' })
     );
+    expect(SETTINGS_NAV_ITEMS).toContainEqual(
+      expect.objectContaining({ id: 'video', label: 'settings.navigation.video' })
+    );
     expect(SETTINGS_NAV_ITEMS).not.toContainEqual(expect.objectContaining({ id: 'pageStyles' }));
+  });
+
+  it('keeps visible tabs and normalizes unknown persisted values', () => {
+    expect(normalizeSettingsTab('video')).toBe('video');
+    expect(normalizeSettingsTab('retired')).toBe('appearance');
   });
 });

@@ -57,15 +57,21 @@ function createProject(duration = 1) {
   return { ...createEmptyVideoProject('Project', 1280, 720), duration };
 }
 
-function createSettings(format = VideoExportFormat.WEBM, fps = 4): VideoProjectExportSettings {
-  return {
+function createSettings(
+  format: VideoExportFormat = VideoExportFormat.WEBM,
+  fps = 4
+): VideoProjectExportSettings {
+  const base = {
     width: 1280,
     height: 720,
     fps,
-    quality: VideoExportQualityPreset.BALANCED,
-    format,
+    quality: VideoExportQualityPreset.MEDIUM,
+    resolution: 'SOURCE' as const,
     downloadAfterExport: true,
   };
+  return format === VideoExportFormat.MP4
+    ? { ...base, format, mp4VideoCodec: 'AVC' }
+    : { ...base, format, webmVideoCodec: 'VP9' };
 }
 
 function createLoadedImages(): LoadedImagesMap {

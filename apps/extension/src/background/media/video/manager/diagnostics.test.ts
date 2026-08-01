@@ -25,8 +25,10 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { attemptDiagnosticsStart } from './diagnostics';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const settings: VideoRecordingSettings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 0,
   countdownSeconds: 3,
   diagnosticsEnabled: true,

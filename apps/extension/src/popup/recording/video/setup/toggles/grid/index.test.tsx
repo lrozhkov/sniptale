@@ -10,9 +10,11 @@ import {
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 function createSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     microphoneEnabled: true,
     microphoneDeviceId: 'mic-1',
     systemAudioEnabled: true,

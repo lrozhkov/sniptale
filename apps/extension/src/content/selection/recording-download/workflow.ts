@@ -2,6 +2,7 @@ import { runBestEffort } from '@sniptale/foundation/best-effort';
 import type { Logger } from '@sniptale/platform/observability/logger/types';
 import { getContentRuntimeServices } from '../../application/runtime-services/services';
 import { stageRecordingDownload, type RecordingDownloadSendMessage } from './staged-transfer';
+import { resolveVideoRecordingArtifact } from '../../../platform/media-utils/video-recording';
 
 type ScheduleTimeout = (callback: () => void, delay: number) => ReturnType<typeof setTimeout>;
 
@@ -11,13 +12,14 @@ interface RecordingDownloadPayload {
 }
 
 interface RecordingDownloadWorkflowOptions {
-  buildFilename: (now: Date) => string;
+  buildFilename: (now: Date, extension: 'mp4' | 'webm') => string;
   logger: Logger;
   logChunkCount?: (count: number) => void;
   logCleanup?: () => void;
   logPreparedPayload?: (payload: RecordingDownloadPayload) => void;
   onChunksReset?: () => void;
   recordedChunks: Blob[];
+  recorderMimeType?: string;
   schedule?: ScheduleTimeout;
   sendMessage?: RecordingDownloadSendMessage;
   stopMessageFailure: string;
@@ -26,6 +28,7 @@ interface RecordingDownloadWorkflowOptions {
 type RecordingWorkflowPropOptions = {
   onChunksReset?: (() => void) | undefined;
   recordedChunks: Blob[];
+  recorderMimeType?: string | undefined;
   schedule?: ScheduleTimeout | undefined;
   sendMessage?: RecordingDownloadSendMessage | undefined;
 };
@@ -38,6 +41,7 @@ type RecordingWorkflowLogOptions = Pick<
 type RecordingSaveProps = {
   onChunksReset?: (() => void) | undefined;
   recordedChunks: Blob[];
+  recorderMimeType?: string | undefined;
   schedule?: ScheduleTimeout | undefined;
   sendMessage?: RecordingDownloadSendMessage | undefined;
 };
@@ -51,15 +55,20 @@ type RecordingLoggerOptions = {
   preparedPayloadMessage: string;
 };
 
-export function buildTimestampedRecordingFilename(prefix: string, now: Date): string {
+export function buildTimestampedRecordingFilename(
+  prefix: string,
+  now: Date,
+  extension: 'mp4' | 'webm'
+): string {
   const [date = now.toISOString()] = now.toISOString().split('T');
   const [timeSegment = now.toTimeString()] = now.toTimeString().split(' ');
   const time = timeSegment.replace(/:/g, '-');
-  return `${prefix}_${date}_${time}.webm`;
+  return `${prefix}_${date}_${time}.${extension}`;
 }
 
 function createTimestampedRecordingFilenameBuilder(prefix: string) {
-  return (now: Date): string => buildTimestampedRecordingFilename(prefix, now);
+  return (now: Date, extension: 'mp4' | 'webm'): string =>
+    buildTimestampedRecordingFilename(prefix, now, extension);
 }
 
 function createRecordingLoggerOptions(args: {
@@ -114,6 +123,9 @@ export function buildRecordingDownloadWorkflowOptions(args: {
     buildFilename: args.buildFilename,
     logger: args.logger,
     recordedChunks: args.props.recordedChunks,
+    ...(args.props.recorderMimeType === undefined
+      ? {}
+      : { recorderMimeType: args.props.recorderMimeType }),
     stopMessageFailure: args.stopMessageFailure,
     ...(args.logOptions?.logChunkCount === undefined
       ? {}
@@ -159,8 +171,11 @@ function runRecordingDownloadWorkflow(options: RecordingDownloadWorkflowOptions)
 
   const sendMessage = options.sendMessage ?? sendDefaultRecordingDownloadMessage;
   const schedule = options.schedule ?? ((callback, delay) => setTimeout(callback, delay));
-  const blob = new Blob(options.recordedChunks, { type: 'video/webm' });
-  const filename = options.buildFilename(new Date());
+  const artifact = resolveVideoRecordingArtifact(
+    options.recorderMimeType || options.recordedChunks[0]?.type || ''
+  );
+  const blob = new Blob(options.recordedChunks, { type: artifact.mimeType });
+  const filename = options.buildFilename(new Date(), artifact.extension);
 
   options.logPreparedPayload?.({ filename, size: blob.size });
 

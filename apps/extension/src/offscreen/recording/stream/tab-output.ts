@@ -62,11 +62,6 @@ export function resolveTabOutputGeometry(
   const source = requirePositiveSize(sourceSize, 'Tab source');
   const cssViewport = requireCoordinateSpace(coordinateSpace);
   const requested = requireRequestedCrop(requestedCrop, cssViewport);
-  const outputSize = {
-    width: requested.width,
-    height: requested.height,
-  };
-
   const aspectError = Math.abs(
     source.width * cssViewport.height - source.height * cssViewport.width
   );
@@ -104,7 +99,7 @@ export function resolveTabOutputGeometry(
 
   return {
     coordinateSpace: { ...cssViewport },
-    outputSize,
+    outputSize: { width: sourceRect.width, height: sourceRect.height },
     requestedCrop: { ...requested },
     sourceRect,
     sourceSize: { ...source },
@@ -152,7 +147,7 @@ export function revalidateTabOutputGeometry(
 export function createTabOutputStream(
   sourceStream: MediaStream,
   geometry: TabOutputGeometry,
-  options: { initiallySuspended?: boolean } = {}
+  options: { frameRate?: number; initiallySuspended?: boolean } = {}
 ): Promise<GatedCropStream> {
   return createGatedCropStream(sourceStream, geometry, options);
 }

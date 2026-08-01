@@ -89,6 +89,14 @@ vi.mock('../../sections/quick-actions', () => {
   settingsPageDelayMocks.loadedSectionModules.push('quickactions');
   return { QuickActionsSection: markerComponent('quickactions-section') };
 });
+vi.mock('../../sections/video-quality-profiles', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('video');
+  return { VideoQualityProfilesSection: markerComponent('video-section') };
+});
+vi.mock('../../sections/native-app', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('native');
+  return { NativeAppSection: markerComponent('native-section') };
+});
 vi.mock('../../sections/permissions', () => {
   settingsPageDelayMocks.loadedSectionModules.push('permissions');
   return { PermissionsSection: markerComponent('permissions-section') };
@@ -195,6 +203,8 @@ describe('SettingsPage delayed loading', () => {
         'image',
         'templates',
         'quickactions',
+        'video',
+        'native',
         'permissions',
         'privacy',
       ])

@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { finalizeRecordingMock, getSupportedRecordingMimeTypeMock, sendRuntimeMessageMock } =
-  vi.hoisted(() => ({
-    finalizeRecordingMock: vi.fn(),
-    getSupportedRecordingMimeTypeMock: vi.fn(),
-    sendRuntimeMessageMock: vi.fn(),
-  }));
+const { finalizeRecordingMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
+  finalizeRecordingMock: vi.fn(),
+  sendRuntimeMessageMock: vi.fn(),
+}));
 
 vi.mock('../finalizer', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../finalizer')>();
@@ -26,14 +24,6 @@ vi.mock('../sidecar', async (importOriginal) => {
     hasActiveSidecarSession: vi.fn(() => false),
     startActiveSidecarRecorders: vi.fn(),
     stopActiveSidecarRecordersWithFlush: vi.fn(() => Promise.resolve()),
-  };
-});
-
-vi.mock('../recorder-mime', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../recorder-mime')>();
-  return {
-    ...actual,
-    getSupportedRecordingMimeType: getSupportedRecordingMimeTypeMock,
   };
 });
 
@@ -59,7 +49,9 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => {
     ...actual,
     createLogger: () => ({
       debug: vi.fn(),
+      error: vi.fn(),
       info: vi.fn(),
+      warn: vi.fn(),
     }),
   };
 });
@@ -71,6 +63,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 type MediaRecorderMockInstance = {
   onerror: ((event: Event) => void) | null;
+  onstart: (() => void) | null;
   onstop: (() => Promise<void>) | null;
 };
 
@@ -78,12 +71,16 @@ let lastMediaRecorderInstance: MediaRecorderMockInstance | null = null;
 
 function installMediaRecorderMock() {
   class MediaRecorderMock {
-    static isTypeSupported = vi.fn(() => false);
+    static isTypeSupported = vi.fn(() => true);
 
     ondataavailable: ((event: { data?: Blob | null }) => void) | null = null;
     onstop: (() => Promise<void>) | null = null;
     onerror: ((event: Event) => void) | null = null;
-    start = vi.fn();
+    onstart: (() => void) | null = null;
+    start = vi.fn(() => {
+      this.state = 'recording';
+      this.onstart?.();
+    });
     stop = vi.fn();
     state: 'inactive' | 'recording' = 'inactive';
     mimeType: string;
@@ -115,7 +112,6 @@ function createVideoStream() {
 beforeEach(() => {
   vi.clearAllMocks();
   installMediaRecorderMock();
-  getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm;codecs=vp9');
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   finalizeRecordingMock.mockResolvedValue(undefined);
   recordingContext.resetRecordingSession();
@@ -170,8 +166,7 @@ function registerFinalizeFailureTest() {
 }
 
 function registerRecorderErrorFallbackTest() {
-  it('uses a fallback error when MediaRecorder error events omit native errors', () => {
-    const rejectStopRecording = vi.fn();
+  it('uses a visible runtime fallback when an active recorder error omits native details', () => {
     recordingContext.beginRecordingSession('recording-error');
 
     finalizeRecordingBootstrap({
@@ -180,13 +175,17 @@ function registerRecorderErrorFallbackTest() {
       trackSettings: { width: 1920, height: 1080, frameRate: 30 },
       durationTracker: recordingContext.durationTracker,
     });
-    recordingContext.stopRecordingReject = rejectStopRecording;
-
     lastMediaRecorderInstance?.onerror?.({} as Event);
 
-    expect(rejectStopRecording).toHaveBeenCalledWith(expect.any(Error));
-    expect(rejectStopRecording.mock.calls[0]?.[0]).toEqual(
-      new Error('The recording failed to stop cleanly.')
+    expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: {
+          type: VideoMessageType.OFFSCREEN_ERROR,
+          error: 'The recording encoder failed unexpectedly.',
+          phase: 'runtime',
+          recordingId: 'recording-error',
+        },
+      })
     );
   });
 }
@@ -210,7 +209,7 @@ function registerRecorderErrorTerminalNotificationTest() {
         payload: {
           type: VideoMessageType.OFFSCREEN_ERROR,
           error: 'encoder failed',
-          phase: 'stop',
+          phase: 'runtime',
           recordingId: 'recording-runtime-error',
         },
       })

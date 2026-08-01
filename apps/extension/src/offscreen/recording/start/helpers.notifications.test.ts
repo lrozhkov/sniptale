@@ -3,7 +3,6 @@ import { createSettings, createVideoStream } from './helpers.test-support';
 
 const {
   finalizeRecordingMock,
-  getSupportedRecordingMimeTypeMock,
   loggerDebugMock,
   loggerErrorMock,
   loggerInfoMock,
@@ -11,7 +10,6 @@ const {
   sendRuntimeMessageMock,
 } = vi.hoisted(() => ({
   finalizeRecordingMock: vi.fn(),
-  getSupportedRecordingMimeTypeMock: vi.fn(),
   loggerDebugMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerInfoMock: vi.fn(),
@@ -70,25 +68,22 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => {
   };
 });
 
-vi.mock('../recorder-mime', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../recorder-mime')>();
-  return {
-    ...actual,
-    getSupportedRecordingMimeType: getSupportedRecordingMimeTypeMock,
-  };
-});
-
 import { finalizeRecordingBootstrap } from './recorder';
 import { handleRecordingStartError } from './session';
 import { recordingContext } from '../context';
 import { createDurationTracker } from '../duration';
 
 class MediaRecorderMock {
-  static isTypeSupported = vi.fn(() => false);
+  static isTypeSupported = vi.fn(() => true);
 
   ondataavailable: ((event: { data?: Blob | null }) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onstart: (() => void) | null = null;
   onstop: (() => Promise<void>) | null = null;
-  start = vi.fn();
+  start = vi.fn(() => {
+    this.state = 'recording';
+    this.onstart?.();
+  });
   stop = vi.fn();
   state: 'inactive' | 'recording' = 'inactive';
   mimeType: string;
@@ -194,7 +189,6 @@ describe('offscreen-recording-start notification traces', () => {
     Object.assign(globalThis, {
       MediaRecorder: MediaRecorderMock,
     });
-    getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm;codecs=vp9');
     sendRuntimeMessageMock.mockResolvedValue(undefined);
     resetRecordingBootstrapContext();
   });

@@ -1,28 +1,22 @@
 import type { VideoQualityConfig } from './annotations';
+import { DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS } from './output-profile';
 import { VideoQuality } from './types';
 import { VideoAutoProcessingAction } from './types';
 import type { VideoAutoProcessingSettings, VideoRecordingSettings } from './types';
 import { DEFAULT_WEBCAM_QUALITY_SETTINGS } from './webcam-quality';
+import { DEFAULT_VIDEO_RECORDING_QUALITY_PROFILE_ID } from './quality-profiles';
 
 export const VIDEO_QUALITY_CONFIGS: Record<VideoQuality, VideoQualityConfig> = {
   [VideoQuality.ULTRA]: {
-    mimeType: 'video/webm;codecs=vp9,opus',
-    videoBitsPerSecond: 15000000,
     frameRate: 60,
   },
   [VideoQuality.HIGH]: {
-    mimeType: 'video/webm;codecs=vp9,opus',
-    videoBitsPerSecond: 12000000,
     frameRate: 30,
   },
   [VideoQuality.MEDIUM]: {
-    mimeType: 'video/webm;codecs=vp8,opus',
-    videoBitsPerSecond: 9000000,
     frameRate: 30,
   },
   [VideoQuality.LOW]: {
-    mimeType: 'video/webm;codecs=vp8,opus',
-    videoBitsPerSecond: 5000000,
     frameRate: 24,
   },
 };
@@ -40,6 +34,9 @@ export const DEFAULT_VIDEO_SETTINGS: VideoRecordingSettings = {
   systemAudioEnabled: true,
   sourceCount: 1,
   quality: VideoQuality.HIGH,
+  output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  qualityProfileId: DEFAULT_VIDEO_RECORDING_QUALITY_PROFILE_ID,
+  qualityProfiles: [],
   countdownSeconds: 3,
   autoFadeDelay: 3,
   openEditorAfterRecording: false,

@@ -98,7 +98,7 @@ export function runWithPersistentDataErasureBarrier<T>(
   return runWithPersistenceLock('exclusive', operation);
 }
 
-export type PersistenceMutationDomain = 'highlighter-settings';
+export type PersistenceMutationDomain = 'highlighter-settings' | 'video-settings';
 
 export function runWithPersistenceDomainMutationLock<T>(
   domain: PersistenceMutationDomain,

@@ -47,8 +47,14 @@ function createDeferred() {
 }
 
 it('ignores repeated main recording finalization for the same recording id', async () => {
-  const first = await finalizeRecording([new Blob(['video'])], 'rec-replay-main');
-  const second = await finalizeRecording([new Blob(['video-again'])], 'rec-replay-main');
+  const first = await finalizeRecording(
+    [new Blob(['video'], { type: 'video/webm' })],
+    'rec-replay-main'
+  );
+  const second = await finalizeRecording(
+    [new Blob(['video-again'], { type: 'video/webm' })],
+    'rec-replay-main'
+  );
 
   expect(first).toEqual({
     recordingId: 'rec-replay-main',
@@ -67,9 +73,15 @@ it('ignores concurrent main recording finalization for the same recording id', a
   const save = createDeferred();
   saveRecordingSafelyMock.mockReturnValueOnce(save.promise);
 
-  const first = finalizeRecording([new Blob(['video'])], 'rec-replay-in-flight');
+  const first = finalizeRecording(
+    [new Blob(['video'], { type: 'video/webm' })],
+    'rec-replay-in-flight'
+  );
   await Promise.resolve();
-  const second = await finalizeRecording([new Blob(['video-again'])], 'rec-replay-in-flight');
+  const second = await finalizeRecording(
+    [new Blob(['video-again'], { type: 'video/webm' })],
+    'rec-replay-in-flight'
+  );
 
   expect(second).toBeNull();
   expect(saveRecordingSafelyMock).toHaveBeenCalledOnce();
@@ -83,13 +95,13 @@ it('ignores concurrent main recording finalization for the same recording id', a
 
 it('ignores repeated sidecar finalization for the same recording id', async () => {
   const first = await finalizeSidecarRecording({
-    chunks: [new Blob(['webcam'])],
+    chunks: [new Blob(['webcam'], { type: 'video/webm' })],
     discard: false,
     filenameSuffix: 'webcam',
     recordingId: 'rec-replay-webcam',
   });
   const second = await finalizeSidecarRecording({
-    chunks: [new Blob(['webcam-again'])],
+    chunks: [new Blob(['webcam-again'], { type: 'video/webm' })],
     discard: false,
     filenameSuffix: 'webcam',
     recordingId: 'rec-replay-webcam',

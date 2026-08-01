@@ -28,6 +28,7 @@ vi.mock('../../manager', () => ({
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { routeVideoControlMessage } from './control-route';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 it('rejects start recording when no target tab is resolved', () => {
   const sendResponse = vi.fn();
@@ -36,6 +37,7 @@ it('rejects start recording when no target tab is resolved', () => {
     routeVideoControlMessage({
       message: {
         settings: {
+          ...DEFAULT_VIDEO_SETTINGS,
           autoFadeDelay: 1500,
           countdownSeconds: 3,
           diagnosticsEnabled: false,

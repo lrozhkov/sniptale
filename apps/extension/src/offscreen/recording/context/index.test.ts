@@ -51,6 +51,10 @@ function verifyLifecycleOwnerApi() {
   expect(recordingContext.lifecycleState).toBe('starting');
   expect(recordingContext.currentRecordingId).toBe('recording-1');
 
+  recordingContext.bindStartingRecorder(mediaRecorder);
+  expect(recordingContext.lifecycleState).toBe('starting');
+  expect(recordingContext.mediaRecorder).toBe(mediaRecorder);
+
   recordingContext.activateRecorder(mediaRecorder);
   expect(recordingContext.lifecycleState).toBe('recording');
   expect(recordingContext.mediaRecorder).toBe(mediaRecorder);
@@ -126,7 +130,9 @@ describe('offscreen-recording-context', () => {
       })
     ).toBe(false);
 
-    recordingContext.activateRecorder({ state: 'recording' } as MediaRecorder);
+    const mediaRecorder = { state: 'recording' } as MediaRecorder;
+    recordingContext.bindStartingRecorder(mediaRecorder);
+    recordingContext.activateRecorder(mediaRecorder);
     expect(() =>
       recordingContext.bindStreamInstance({
         generation: 3,
@@ -146,13 +152,31 @@ describe('offscreen-recording-context', () => {
     const reject = vi.fn();
 
     recordingContext.beginRecordingSession('recording-1');
-    recordingContext.activateRecorder({ state: 'recording' } as MediaRecorder);
+    const mediaRecorder = { state: 'recording' } as MediaRecorder;
+    recordingContext.bindStartingRecorder(mediaRecorder);
+    recordingContext.activateRecorder(mediaRecorder);
     recordingContext.beginStopRequest({ discard: true, resolve, reject });
 
     expect(recordingContext.discardOnStop).toBe(true);
     expect(recordingContext.clearStopRequest()).toEqual({ resolve, reject });
     expect(recordingContext.stopRecordingResolve).toBeNull();
     expect(recordingContext.stopRecordingReject).toBeNull();
+  });
+
+  it('cancels a bound starting recorder before native activation', () => {
+    const mediaRecorder = { state: 'inactive' } as MediaRecorder;
+    const cancel = vi.fn();
+    recordingContext.beginRecordingSession('recording-1');
+    recordingContext.bindStartingRecorder(mediaRecorder);
+    recordingContext.registerStartingRecorderCancellation(mediaRecorder, cancel);
+
+    expect(recordingContext.cancelStartingRecorder()).toBe(true);
+
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(recordingContext.lifecycleState).toBe('stopping');
+    expect(() => recordingContext.activateRecorder(mediaRecorder)).toThrow(
+      'Illegal recording lifecycle transition: stopping -> recording'
+    );
   });
 
   it('treats lifecycle and active media resources as recording-session ownership signals', () => {

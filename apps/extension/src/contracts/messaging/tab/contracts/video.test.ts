@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { MessageContractError } from '@sniptale/runtime-contracts/messaging/parsers/utils';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   RegionCaptureControlMessageType,
   VideoMessageType,
@@ -10,17 +11,13 @@ import { tabVideoMessageContracts } from './video';
 
 function createVideoSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     controlledCursorCaptureEnabled: false,
     countdownSeconds: 3,
-    diagnosticsEnabled: false,
-    microphoneDeviceId: null,
     microphoneEnabled: true,
-    webcamDeviceId: null,
-    webcamEnabled: false,
     openEditorAfterRecording: true,
     quality: VideoQuality.MEDIUM,
-    systemAudioEnabled: true,
   };
 }
 

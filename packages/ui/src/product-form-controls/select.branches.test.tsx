@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../glass-select/overlay-state', () => ({
   useGlassSelectOverlay: () => ({
-    menuPosition: 'top' as const,
+    portalStyle: { left: 24, position: 'fixed', top: 48, width: 220 },
   }),
 }));
 
@@ -41,7 +41,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function verifyTopPositionedSmallSelect() {
+function verifyPortaledSmallSelect() {
   renderElement(
     <ProductSelect
       value=""
@@ -71,9 +71,10 @@ function verifyTopPositionedSmallSelect() {
   });
 
   const shell = container?.querySelector('[data-ui="shared.ui.product-select"]');
-  const menu = container?.querySelector('[role="listbox"]');
+  const menu = document.body.querySelector('[role="listbox"]');
   expect(shell?.className).toContain('sniptale-select-shell-sm');
-  expect(menu?.className).toContain('sniptale-select-menu-top');
+  expect(menu?.className).toContain('sniptale-select-menu-portal');
+  expect(container?.contains(menu ?? null)).toBe(false);
   expect(menu?.textContent).toContain('First option');
   expect(menu?.querySelector('[data-testid="branch-icon"]')).not.toBeNull();
 }
@@ -116,7 +117,7 @@ function verifyDisabledSelectBranches() {
   });
 
   const disabledOption = Array.from(
-    container?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []
+    document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')
   ).find((option) => option.textContent?.includes('Two'));
 
   expect(disabledOption?.className).toContain('sniptale-select-option-disabled');
@@ -129,7 +130,7 @@ function verifyDisabledSelectBranches() {
 }
 
 describe('ProductSelect branch coverage', () => {
-  it('renders placeholder, small shell, and top-positioned menu', verifyTopPositionedSmallSelect);
+  it('renders placeholder, small shell, and portaled menu', verifyPortaledSmallSelect);
 
   it(
     'keeps disabled triggers closed and ignores disabled option selection',

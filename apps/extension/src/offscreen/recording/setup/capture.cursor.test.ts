@@ -30,6 +30,7 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { acquireRecordingSourceStream } from './capture';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -51,6 +52,7 @@ function installMediaDevicesMocks(overrides: Partial<MediaDevices> = {}) {
 
 function createControlledTabSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     controlledCursorCaptureEnabled: true,
@@ -97,7 +99,7 @@ it('requests tab capture without the native cursor when controlled cursor captur
   expect(loggerWarnMock).not.toHaveBeenCalled();
 });
 
-it('requests a viewport-shaped source for current-size tab recording', async () => {
+it('requests the measured viewport instead of inheriting the screen-sized tab track default', async () => {
   const getUserMedia = vi.fn().mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
     getVideoTracks: () => [{ getSettings: () => ({ width: 1024, height: 768 }) }],
@@ -108,7 +110,7 @@ it('requests a viewport-shaped source for current-size tab recording', async () 
     captureMode: CaptureMode.TAB,
     settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
     streamId: 'tab-stream-viewport',
-    viewport: { width: 1919, height: 947 },
+    viewport: { width: 1904, height: 985 },
   });
 
   expect(getUserMedia).toHaveBeenCalledWith({
@@ -117,10 +119,10 @@ it('requests a viewport-shaped source for current-size tab recording', async () 
       mandatory: {
         chromeMediaSource: 'tab',
         chromeMediaSourceId: 'tab-stream-viewport',
-        maxHeight: 947,
-        maxWidth: 1919,
-        minHeight: 947,
-        minWidth: 1919,
+        maxHeight: 985,
+        maxWidth: 1904,
+        minHeight: 985,
+        minWidth: 1904,
       },
     },
   });

@@ -1,15 +1,18 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import {
+  createMultiSourceLifecycle,
   setActiveMultiSourceSession,
   type MultiSourceRecorder,
   type MultiSourceSession,
 } from './state';
 import type { RecordingSidecarRecorder } from '../sidecar/types';
 import { stopMultiSourceSession } from './stop';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 type FakeRecorder = {
   onstop: (() => void) | null;
@@ -20,6 +23,7 @@ type FakeRecorder = {
 
 function createSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 3,
     controlledCursorCaptureEnabled: false,
     countdownSeconds: 0,
@@ -27,6 +31,7 @@ function createSettings(): VideoRecordingSettings {
     microphoneDeviceId: null,
     microphoneEnabled: false,
     openEditorAfterRecording: false,
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.HIGH,
     sourceCount: 2,
     systemAudioEnabled: false,
@@ -60,9 +65,12 @@ function createRecorder(sourceIndex: number): MultiSourceRecorder & { fakeRecord
 }
 
 function createSession(recorders: MultiSourceRecorder[]): MultiSourceSession {
+  const lifecycle = createMultiSourceLifecycle();
+  lifecycle.activate();
   return {
     audioRecorder: null,
     durationTimer: null,
+    lifecycle,
     recorders,
     recordingId: 'rec',
     settings: createSettings(),

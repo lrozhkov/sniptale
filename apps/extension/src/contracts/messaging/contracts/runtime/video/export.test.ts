@@ -20,8 +20,10 @@ function createExportSettings() {
     width: 1280,
     height: 720,
     fps: 30,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     downloadAfterExport: true,
   };
 }

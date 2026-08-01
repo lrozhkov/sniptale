@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { startRecordingHandler } from './start-recording';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 vi.mock('../../recording/microphone', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../recording/microphone')>()),
@@ -19,6 +20,7 @@ const setRecordingControlCapability = vi.fn();
 const setStartError = vi.fn();
 
 const settings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 3,
   controlledCursorCaptureEnabled: false,
   countdownSeconds: 3,

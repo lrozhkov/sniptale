@@ -1,30 +1,66 @@
 import { translate } from '../../../platform/i18n';
 import { NumericRow, SelectField, StatusRow } from '../../../ui/compact-inspector-controls';
+import {
+  resolveVideoOutputDimensions,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
 import type {
   VideoExportCapabilities,
   VideoProjectExportSettings,
+  VideoProjectExportSettingsPatch,
 } from '../../../features/video/project/types';
 import {
   VideoExportFormat,
   VideoMp4Codec,
   VideoExportScope,
   VideoExportQualityPreset,
+  VideoWebmCodec,
 } from '../../../features/video/project/types';
 import { getMp4CodecOptions } from './codec-options';
 
 const EXPORT_QUALITY_OPTIONS = [
   {
-    value: VideoExportQualityPreset.DRAFT,
-    label: translate('videoEditor.exportDialog.qualityDraft'),
+    value: VideoExportQualityPreset.LOW,
+    label: translate('videoEditor.exportDialog.qualityLow'),
   },
   {
-    value: VideoExportQualityPreset.BALANCED,
-    label: translate('videoEditor.exportDialog.qualityBalanced'),
+    value: VideoExportQualityPreset.MEDIUM,
+    label: translate('videoEditor.exportDialog.qualityMedium'),
   },
   {
     value: VideoExportQualityPreset.HIGH,
     label: translate('videoEditor.exportDialog.qualityHigh'),
   },
+  {
+    value: VideoExportQualityPreset.ULTRA,
+    label: translate('videoEditor.exportDialog.qualityUltra'),
+  },
+] as const;
+
+const EXPORT_RESOLUTION_OPTIONS = [
+  VideoResolutionPreset.SOURCE,
+  VideoResolutionPreset.P240,
+  VideoResolutionPreset.P360,
+  VideoResolutionPreset.P480,
+  VideoResolutionPreset.P720,
+  VideoResolutionPreset.P1080,
+  VideoResolutionPreset.P1440,
+  VideoResolutionPreset.P2160,
+].map((value) => ({
+  value,
+  label:
+    value === VideoResolutionPreset.SOURCE
+      ? translate('videoEditor.exportDialog.resolutionSource')
+      : value === VideoResolutionPreset.P1440
+        ? '1440p (2K)'
+        : value === VideoResolutionPreset.P2160
+          ? '2160p (4K)'
+          : value.toLowerCase(),
+}));
+
+const WEBM_CODEC_OPTIONS = [
+  { value: VideoWebmCodec.VP9, label: 'VP9' },
+  { value: VideoWebmCodec.VP8, label: 'VP8' },
 ] as const;
 
 function getExportScopeOptions(selectedClipAvailable: boolean) {
@@ -77,10 +113,10 @@ function getExportFormatOptions(capabilities?: VideoExportCapabilities | null) {
   }));
 }
 
-function ExportDialogCodecField(props: {
-  codecOptions: Array<{ label: string; value: VideoMp4Codec }>;
-  currentCodec: VideoMp4Codec;
-  onChange: (patch: Partial<VideoProjectExportSettings>) => void;
+function ExportDialogCodecField<TCodec extends string>(props: {
+  codecOptions: ReadonlyArray<{ label: string; value: TCodec }>;
+  currentCodec: TCodec;
+  onChange: (codec: TCodec) => void;
 }) {
   const label = translate('videoEditor.exportDialog.codecLabel');
 
@@ -92,7 +128,7 @@ function ExportDialogCodecField(props: {
         <SelectField
           label={label}
           value={props.currentCodec}
-          onChange={(mp4VideoCodec) => props.onChange({ mp4VideoCodec })}
+          onChange={props.onChange}
           options={props.codecOptions}
         />
       )}
@@ -104,31 +140,37 @@ function buildFormatPatch(args: {
   capabilities: VideoExportCapabilities | null | undefined;
   format: VideoExportFormat;
   settings: VideoProjectExportSettings;
-}): Partial<VideoProjectExportSettings> {
-  if (args.format !== VideoExportFormat.MP4 || args.settings.mp4VideoCodec !== undefined) {
-    return { format: args.format };
+}): VideoProjectExportSettingsPatch {
+  if (args.format === VideoExportFormat.WEBM) {
+    return {
+      format: args.format,
+      mp4VideoCodec: undefined,
+      webmVideoCodec: args.settings.webmVideoCodec ?? VideoWebmCodec.VP9,
+    };
   }
 
   return {
     format: args.format,
-    ...(args.capabilities?.defaultMp4VideoCodec
-      ? { mp4VideoCodec: args.capabilities.defaultMp4VideoCodec }
-      : {}),
+    mp4VideoCodec:
+      args.settings.mp4VideoCodec ?? args.capabilities?.defaultMp4VideoCodec ?? VideoMp4Codec.AVC,
+    webmVideoCodec: undefined,
   };
 }
 
 export function ExportDialogSelectFields(params: {
   capabilities: VideoExportCapabilities | null | undefined;
-  onChange: (patch: Partial<VideoProjectExportSettings>) => void;
+  onChange: (patch: VideoProjectExportSettingsPatch) => void;
   selectedClipAvailable: boolean;
   settings: VideoProjectExportSettings;
+  sourceDimensions: { height: number; width: number };
 }) {
-  const { capabilities, onChange, selectedClipAvailable, settings } = params;
+  const { capabilities, onChange, selectedClipAvailable, settings, sourceDimensions } = params;
   const scopeOptions = getExportScopeOptions(selectedClipAvailable);
   const currentScope = settings.scope ?? VideoExportScope.PROJECT;
   const formatOptions = getExportFormatOptions(capabilities);
   const codecOptions = capabilities ? getMp4CodecOptions(capabilities) : [];
   const currentCodec = settings.mp4VideoCodec ?? codecOptions[0]?.value ?? VideoMp4Codec.AVC;
+  const currentResolution = settings.resolution;
 
   return (
     <>
@@ -148,9 +190,29 @@ export function ExportDialogSelectFields(params: {
         <ExportDialogCodecField
           codecOptions={codecOptions}
           currentCodec={currentCodec}
-          onChange={onChange}
+          onChange={(mp4VideoCodec) => onChange({ mp4VideoCodec })}
         />
       ) : null}
+      {settings.format === VideoExportFormat.WEBM ? (
+        <ExportDialogCodecField
+          codecOptions={WEBM_CODEC_OPTIONS}
+          currentCodec={settings.webmVideoCodec}
+          onChange={(webmVideoCodec) => onChange({ webmVideoCodec })}
+        />
+      ) : null}
+      <SelectField
+        label={translate('videoEditor.exportDialog.resolutionLabel')}
+        value={currentResolution}
+        onChange={(resolution) => {
+          const dimensions = resolveVideoOutputDimensions(
+            sourceDimensions.width,
+            sourceDimensions.height,
+            resolution
+          );
+          onChange({ resolution, ...dimensions });
+        }}
+        options={EXPORT_RESOLUTION_OPTIONS}
+      />
       <SelectField
         label={translate('videoEditor.exportDialog.qualityLabel')}
         value={settings.quality}

@@ -28,8 +28,8 @@ export function createAsyncLifecycleRoute(
   return HANDLED_ASYNC_RESULT;
 }
 
-export function shouldNotifyRecordingStartFailure(
+export function shouldNotifyRecordingFailure(
   phase?: 'start' | 'stop' | 'runtime' | 'export'
 ): boolean {
-  return phase === undefined || phase === 'start';
+  return phase === undefined || phase === 'start' || phase === 'runtime';
 }

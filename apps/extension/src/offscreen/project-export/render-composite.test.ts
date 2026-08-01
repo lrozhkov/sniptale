@@ -64,14 +64,17 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 function createSettings(
   format: VideoExportFormat = VideoExportFormat.MP4
 ): VideoProjectExportSettings {
-  return {
+  const base = {
     downloadAfterExport: true,
-    format,
+    resolution: 'SOURCE' as const,
     fps: 30,
     height: 720,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     width: 1280,
   };
+  return format === VideoExportFormat.MP4
+    ? { ...base, format, mp4VideoCodec: 'AVC' }
+    : { ...base, format, webmVideoCodec: 'VP9' };
 }
 
 function createJob(): ExportJobState {
@@ -122,7 +125,11 @@ afterEach(() => {
 
 it('renders composite exports through mp4 and webm paths with the job abort signal', async () => {
   const { renderCompositeExport } = await import('./render');
-  const context = { marker: '2d' };
+  const context = {
+    imageSmoothingEnabled: false,
+    imageSmoothingQuality: 'low',
+    marker: '2d',
+  };
   const job = createJob();
   const project = createEmptyVideoProject('Composite', 1280, 720);
   const mp4Settings = createSettings(VideoExportFormat.MP4);
@@ -137,6 +144,8 @@ it('renders composite exports through mp4 and webm paths with the job abort sign
   await renderCompositeExport(job, project, mp4Settings, {});
   await renderCompositeExport(job, project, webmSettings, {});
 
+  expect(context.imageSmoothingEnabled).toBe(true);
+  expect(context.imageSmoothingQuality).toBe('high');
   expect(preloadClipVideosMock).toHaveBeenCalledTimes(2);
   expect(preloadClipVideosMock).toHaveBeenNthCalledWith(
     1,

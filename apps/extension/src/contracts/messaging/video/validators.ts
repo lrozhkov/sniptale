@@ -1,19 +1,24 @@
-import type {
-  CaptureMode as CaptureModeValue,
-  VideoRecordingLiveMediaState,
-  VideoRecordingRuntimeState,
-  VideoRecordingSettings,
+import {
+  CaptureMode,
+  isVideoRecordingOutputSettings,
+  parseVideoRecordingQualityProfiles,
+  VideoResolutionPreset,
+  VideoQuality,
+  type CaptureMode as CaptureModeValue,
+  type VideoRecordingLiveMediaState,
+  type VideoRecordingRuntimeState,
+  type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type {
   VideoProject,
   VideoProjectExportSettings,
 } from '../../../features/video/project/types';
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
   VideoExportScope,
   VideoMp4Codec,
+  VideoWebmCodec,
 } from '../../../features/video/project/types';
 import { recordingStateHealthValues, type RecordingStateHealth } from '../contracts/response-types';
 import type { Size2d, ViewportRegion } from '../contracts/types';
@@ -41,6 +46,9 @@ const videoExportFormatSet = new Set<string>(Object.values(VideoExportFormat));
 const videoExportQualitySet = new Set<string>(Object.values(VideoExportQualityPreset));
 const videoExportScopeSet = new Set<string>(Object.values(VideoExportScope));
 const videoMp4CodecSet = new Set<string>(Object.values(VideoMp4Codec));
+const videoWebmCodecSet = new Set<string>(Object.values(VideoWebmCodec));
+const videoResolutionPresetSet = new Set<string>(Object.values(VideoResolutionPreset));
+const videoQualitySet = new Set<string>(Object.values(VideoQuality));
 const captureModeSet = new Set<string>(Object.values(CaptureMode));
 
 function isEnumValue(value: unknown, allowedValues: ReadonlySet<string>): value is string {
@@ -92,7 +100,10 @@ export function isVideoRecordingSettings(value: unknown): value is VideoRecordin
     hasOptionalField(value, 'webcamQuality', isWebcamQualitySettings) &&
     isBoolean(value['systemAudioEnabled']) &&
     hasOptionalField(value, 'sourceCount', isNumber) &&
-    isString(value['quality']) &&
+    isEnumValue(value['quality'], videoQualitySet) &&
+    isVideoRecordingOutputSettings(value['output']) &&
+    (value['qualityProfileId'] === null || isString(value['qualityProfileId'])) &&
+    parseVideoRecordingQualityProfiles(value['qualityProfiles']) !== null &&
     isNumber(value['countdownSeconds']) &&
     isNumber(value['autoFadeDelay']) &&
     isBoolean(value['openEditorAfterRecording']) &&
@@ -151,7 +162,7 @@ export function isVideoProjectExportSettings(value: unknown): value is VideoProj
       isEnumValue(value['quality'], videoExportQualitySet) &&
       isEnumValue(value['format'], videoExportFormatSet) &&
       isBoolean(value['downloadAfterExport']) &&
-      hasOptionalField(value, 'mp4VideoCodec', (entry) => isEnumValue(entry, videoMp4CodecSet)) &&
+      isEnumValue(value['resolution'], videoResolutionPresetSet) &&
       hasOptionalField(value, 'scope', (entry) => isEnumValue(entry, videoExportScopeSet)) &&
       hasOptionalField(value, 'selectedClipIds', isStringArray) &&
       hasOptionalField(value, 'burnInSubtitles', isBoolean) &&
@@ -159,6 +170,17 @@ export function isVideoProjectExportSettings(value: unknown): value is VideoProj
       hasOptionalField(value, 'rangeStartSeconds', isNumber) &&
       hasOptionalField(value, 'rangeEndSeconds', isNumber)
     )
+  ) {
+    return false;
+  }
+
+  if (
+    (value['format'] === VideoExportFormat.WEBM &&
+      (!isEnumValue(value['webmVideoCodec'], videoWebmCodecSet) ||
+        value['mp4VideoCodec'] !== undefined)) ||
+    (value['format'] === VideoExportFormat.MP4 &&
+      (!isEnumValue(value['mp4VideoCodec'], videoMp4CodecSet) ||
+        value['webmVideoCodec'] !== undefined))
   ) {
     return false;
   }

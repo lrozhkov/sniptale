@@ -18,14 +18,6 @@ const {
   stopActiveSidecarRecordersWithFlushMock: vi.fn(),
 }));
 
-vi.mock('../recorder-mime', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../recorder-mime')>();
-  return {
-    ...actual,
-    getSupportedRecordingMimeType: vi.fn(() => 'video/webm'),
-  };
-});
-
 vi.mock('../finalizer', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../finalizer')>();
   return {
@@ -66,16 +58,22 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => {
     ...actual,
     createLogger: () => ({
       debug: vi.fn(),
+      error: vi.fn(),
       info: vi.fn(),
+      warn: vi.fn(),
     }),
   };
 });
 
 import { recordingContext } from '../context';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { finalizeRecordingBootstrap } from './recorder';
 
 type MediaRecorderMockInstance = {
+  onstart: (() => void) | null;
   onstop: (() => Promise<void>) | null;
 };
 
@@ -87,8 +85,9 @@ function installMediaRecorderMock() {
 
     ondataavailable = null;
     onerror = null;
+    onstart: (() => void) | null = null;
     onstop = null;
-    start = vi.fn();
+    start = vi.fn(() => this.onstart?.());
 
     constructor() {
       lastMediaRecorderInstance = this as unknown as MediaRecorderMockInstance;
@@ -122,24 +121,26 @@ beforeEach(() => {
   hasActiveSidecarSessionMock.mockReturnValue(true);
   stopActiveSidecarRecordersWithFlushMock.mockResolvedValue(undefined);
   recordingContext.resetRecordingSession();
+  recordingContext.mediaRecorder = null;
   recordingContext.videoStream = createVideoStream();
   recordingContext.sourceStream = recordingContext.videoStream;
   recordingContext.beginRecordingSession('recording-1');
 });
 
 it('does not send a saved notification when sidecar-aware main finalization is discarded', async () => {
-  recordingContext.discardOnStop = true;
-  recordingContext.stopRecordingResolve = vi.fn();
-
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
-    settings: { quality: VideoQuality.HIGH } as never,
+    settings: {
+      output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+      quality: VideoQuality.HIGH,
+    } as never,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker: {
       reset: vi.fn(),
       startSegment: vi.fn(),
     } as never,
   });
+  recordingContext.beginStopRequest({ discard: true, reject: vi.fn(), resolve: vi.fn() });
   await lastMediaRecorderInstance?.onstop?.();
 
   expect(finalizeRecordingMock).toHaveBeenCalledWith([], 'recording-1', undefined, true, {
@@ -160,7 +161,10 @@ it('starts audio-bearing main streams while sidecar recording is active', () => 
 
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
-    settings: { quality: VideoQuality.HIGH } as never,
+    settings: {
+      output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+      quality: VideoQuality.HIGH,
+    } as never,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker: {
       reset: vi.fn(),

@@ -117,7 +117,7 @@ function createContentPopupExportMessage(
   switch (message.type) {
     case MessageType.EXPORT_POPUP_PREVIEW:
       return { type: message.type };
-    case MessageType.EXPORT_POPUP_START:
+    case MessageType.EXPORT_POPUP_START: {
       const startAction = resolveFullPageCaptureAction(message, target);
       return {
         ...(shouldGrantFullPageExportIntent(message)
@@ -130,7 +130,8 @@ function createContentPopupExportMessage(
         requestId: message.requestId,
         type: message.type,
       };
-    case MessageType.EXPORT_POPUP_BUILD_PACKAGE:
+    }
+    case MessageType.EXPORT_POPUP_BUILD_PACKAGE: {
       const packageAction = resolveFullPageCaptureAction(message, target);
       return {
         ...(shouldGrantFullPageExportIntent(message)
@@ -146,6 +147,7 @@ function createContentPopupExportMessage(
         options: message.options,
         type: message.type,
       };
+    }
     case MessageType.EXPORT_POPUP_CANCEL:
       return { type: message.type, exportRunId: message.exportRunId };
   }

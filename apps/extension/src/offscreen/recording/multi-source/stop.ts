@@ -1,5 +1,6 @@
 import { stopRecorderStreams } from './recorders';
 import {
+  getActiveMultiSourceSession,
   setActiveMultiSourceSession,
   type MultiSourceRecorder,
   type MultiSourceSession,
@@ -28,6 +29,7 @@ function getSessionRecorders(session: MultiSourceSession) {
 
 function stopSessionRecorders(session: MultiSourceSession): void {
   getSessionRecorders(session).forEach((source) => {
+    source.recorder.onstart = null;
     source.recorder.onstop = null;
     source.recorder.onerror = null;
     if (source.recorder.state !== 'inactive') {
@@ -57,11 +59,15 @@ function finalizeStoppedSession(params: {
   params.finalizeSession(params.session).then(params.resolve, params.reject);
 }
 
-export function failMultiSourceSession(session: MultiSourceSession, error: Error): void {
+export function failMultiSourceSession(session: MultiSourceSession, error: Error): boolean {
+  if (getActiveMultiSourceSession() !== session) return false;
+  const transitioned = session.lifecycle.fail(error);
+  if (!transitioned && !session.stopReject) return false;
   setActiveMultiSourceSession(null);
   stopSessionRecorders(session);
   stopSessionStreams(session);
   session.stopReject?.(error);
+  return true;
 }
 
 export function stopMultiSourceSession(params: {
@@ -71,6 +77,16 @@ export function stopMultiSourceSession(params: {
 }): Promise<void> {
   const { discard, finalizeSession, session } = params;
   if (session.stopPromise) {
+    return session.stopPromise;
+  }
+
+  const previousPhase = session.lifecycle.beginStop();
+  if (previousPhase === null) return Promise.resolve();
+  if (previousPhase === 'starting') {
+    session.stopPromise = Promise.resolve();
+    setActiveMultiSourceSession(null);
+    stopSessionRecorders(session);
+    stopSessionStreams(session);
     return session.stopPromise;
   }
 

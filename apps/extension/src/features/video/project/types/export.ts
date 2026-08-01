@@ -1,11 +1,10 @@
-export const VideoExportQualityPreset = {
-  DRAFT: 'DRAFT',
-  BALANCED: 'BALANCED',
-  HIGH: 'HIGH',
-} as const;
+import {
+  VideoQuality,
+  type VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
 
-export type VideoExportQualityPreset =
-  (typeof VideoExportQualityPreset)[keyof typeof VideoExportQualityPreset];
+export const VideoExportQualityPreset = VideoQuality;
+export type VideoExportQualityPreset = VideoQuality;
 
 export const VideoExportFormat = {
   WEBM: 'WEBM',
@@ -21,6 +20,13 @@ export const VideoMp4Codec = {
 } as const;
 
 export type VideoMp4Codec = (typeof VideoMp4Codec)[keyof typeof VideoMp4Codec];
+
+export const VideoWebmCodec = {
+  VP8: 'VP8',
+  VP9: 'VP9',
+} as const;
+
+export type VideoWebmCodec = (typeof VideoWebmCodec)[keyof typeof VideoWebmCodec];
 
 export const VideoExportCapabilityReason = {
   VIDEO_ENCODER_UNAVAILABLE: 'VIDEO_ENCODER_UNAVAILABLE',
@@ -75,13 +81,12 @@ export interface VideoExportCapabilities {
   defaultMp4VideoCodec: VideoMp4Codec | null;
 }
 
-export interface VideoProjectExportSettings {
+interface VideoProjectExportSettingsBase {
   width: number;
   height: number;
   fps: number;
   quality: VideoExportQualityPreset;
-  format: VideoExportFormat;
-  mp4VideoCodec?: VideoMp4Codec;
+  resolution: VideoResolutionPreset;
   scope?: VideoExportScope;
   selectedClipIds?: string[];
   burnInSubtitles?: boolean;
@@ -90,6 +95,26 @@ export interface VideoProjectExportSettings {
   rangeStartSeconds?: number;
   rangeEndSeconds?: number;
 }
+
+export type VideoProjectExportSettings = VideoProjectExportSettingsBase &
+  (
+    | {
+        format: typeof VideoExportFormat.MP4;
+        mp4VideoCodec: VideoMp4Codec;
+        webmVideoCodec?: never;
+      }
+    | {
+        format: typeof VideoExportFormat.WEBM;
+        mp4VideoCodec?: never;
+        webmVideoCodec: VideoWebmCodec;
+      }
+  );
+
+export type VideoProjectExportSettingsPatch = Partial<VideoProjectExportSettingsBase> & {
+  format?: VideoExportFormat;
+  mp4VideoCodec?: VideoMp4Codec | undefined;
+  webmVideoCodec?: VideoWebmCodec | undefined;
+};
 
 export interface VideoProjectExportStatus {
   phase: VideoProjectExportPhase;

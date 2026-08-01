@@ -1,8 +1,33 @@
 // @vitest-environment jsdom
 
 import { expect, it, vi } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { configureRegionCaptureRecorder } from './helpers';
+
+function createStream(hasAudio = false): MediaStream {
+  return {
+    getAudioTracks: () => (hasAudio ? ([{ kind: 'audio' }] as MediaStreamTrack[]) : []),
+    getVideoTracks: () =>
+      [
+        {
+          getSettings: () => ({ frameRate: 30, height: 1080, width: 1920 }),
+          kind: 'video',
+        },
+      ] as MediaStreamTrack[],
+  } as MediaStream;
+}
+
+function createSettings() {
+  return {
+    microphoneEnabled: false,
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+    quality: VideoQuality.MEDIUM,
+    systemAudioEnabled: false,
+  };
+}
 
 it('wires MediaRecorder progress, stop, and error events into the recorder bridge', () => {
   const mediaRecorderStart = vi.fn();
@@ -23,10 +48,10 @@ it('wires MediaRecorder progress, stop, and error events into the recorder bridg
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder as unknown as typeof MediaRecorder);
 
   const recorder = configureRegionCaptureRecorder({
-    finalStream: { kind: 'final-stream' } as unknown as MediaStream,
+    finalStream: createStream(),
     onProgress,
     onSaveRecording,
-    quality: VideoQuality.MEDIUM,
+    settings: createSettings(),
     recordedChunks,
   });
 
@@ -45,7 +70,7 @@ it('wires MediaRecorder progress, stop, and error events into the recorder bridg
   expect(onSaveRecording).toHaveBeenCalledOnce();
 });
 
-it('falls back to the shared webm recorder mime type when the preferred codec is unsupported', () => {
+it('uses the selected WebM codec without a generic MIME fallback', () => {
   class FakeMediaRecorder {
     static isTypeSupported = vi.fn((mimeType: string) => mimeType === 'video/webm;codecs=vp9,opus');
     ondataavailable: ((event: BlobEvent) => void) | null = null;
@@ -61,19 +86,19 @@ it('falls back to the shared webm recorder mime type when the preferred codec is
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder as unknown as typeof MediaRecorder);
 
   const recorder = configureRegionCaptureRecorder({
-    finalStream: { kind: 'final-stream' } as unknown as MediaStream,
+    finalStream: createStream(true),
     onProgress: null,
     onSaveRecording: vi.fn(),
-    quality: VideoQuality.MEDIUM,
+    settings: createSettings(),
     recordedChunks: [],
   }) as unknown as FakeMediaRecorder;
 
   expect(recorder.options.mimeType).toBe('video/webm;codecs=vp9,opus');
 });
 
-it('falls back to plain webm and stringifies non-Error recorder errors', () => {
+it('stringifies non-Error recorder errors', () => {
   class FakeMediaRecorder {
-    static isTypeSupported = vi.fn(() => false);
+    static isTypeSupported = vi.fn((mimeType: string) => mimeType === 'video/webm;codecs=vp9');
     ondataavailable: ((event: BlobEvent) => void) | null = null;
     onerror: ((event: Event) => void) | null = null;
     onstop: ((event: Event) => void) | null = null;
@@ -88,18 +113,36 @@ it('falls back to plain webm and stringifies non-Error recorder errors', () => {
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder as unknown as typeof MediaRecorder);
 
   const recorder = configureRegionCaptureRecorder({
-    finalStream: { kind: 'final-stream' } as unknown as MediaStream,
+    finalStream: createStream(),
     onProgress,
     onSaveRecording: vi.fn(),
-    quality: VideoQuality.HIGH,
+    settings: createSettings(),
     recordedChunks: [],
   }) as unknown as FakeMediaRecorder;
 
   recorder.onerror?.(new Event('error'));
 
-  expect(recorder.options.mimeType).toBe('video/webm');
+  expect(recorder.options.mimeType).toBe('video/webm;codecs=vp9');
   expect(onProgress).toHaveBeenCalledWith({
     error: '[object Event]',
     type: 'ERROR',
   });
+});
+
+it('rejects an unsupported selected container and codec', () => {
+  class FakeMediaRecorder {
+    static isTypeSupported = vi.fn(() => false);
+  }
+
+  vi.stubGlobal('MediaRecorder', FakeMediaRecorder as unknown as typeof MediaRecorder);
+
+  expect(() =>
+    configureRegionCaptureRecorder({
+      finalStream: createStream(),
+      onProgress: null,
+      onSaveRecording: vi.fn(),
+      settings: createSettings(),
+      recordedChunks: [],
+    })
+  ).toThrow('selected recording container and codec are not supported');
 });

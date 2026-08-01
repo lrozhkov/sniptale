@@ -183,12 +183,7 @@ export {
   isTextClip,
   isVisualClip,
 } from './presentation';
-export {
-  buildClipLabel,
-  getDefaultExportSettings,
-  isSimplePassthroughProject,
-  normalizeTrackOrder,
-} from './meta';
+export { buildClipLabel, getDefaultExportSettings, normalizeTrackOrder } from './meta';
 export {
   assignVideoProjectClipsToLogicalLanes,
   createVideoProjectClipLogicalLaneId,

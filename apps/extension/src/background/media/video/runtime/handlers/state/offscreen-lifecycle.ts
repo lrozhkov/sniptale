@@ -31,7 +31,7 @@ import {
   createAsyncLifecycleRoute,
   HANDLED_SYNC_RESULT,
   UNHANDLED_RESULT,
-  shouldNotifyRecordingStartFailure,
+  shouldNotifyRecordingFailure,
   type RouteResult,
 } from '../shared';
 
@@ -73,7 +73,7 @@ async function handleOffscreenErrorAsync(message: {
       return;
     }
 
-    if (shouldNotifyRecordingStartFailure(message.phase)) {
+    if (shouldNotifyRecordingFailure(message.phase)) {
       clearRecordingStartActivationWatchdog(message.recordingId);
       await notifyRecordingStartFailed(
         message.error || translate('background.runtime.recordingError')

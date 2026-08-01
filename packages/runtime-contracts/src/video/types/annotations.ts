@@ -36,7 +36,5 @@ export interface PathAnnotation extends Annotation {
 }
 
 export interface VideoQualityConfig {
-  mimeType: string;
-  videoBitsPerSecond: number;
   frameRate: number;
 }

@@ -9,6 +9,7 @@ type MediaRecorderMockInstance = {
   config: { mimeType: string; videoBitsPerSecond: number };
   ondataavailable: ((event: { data?: Blob | null }) => void) | null;
   onerror: ((event: Event & { error?: unknown }) => void) | null;
+  onstart: (() => void) | null;
   onstop: (() => Promise<void>) | null;
   start: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
@@ -25,9 +26,11 @@ export function installMediaRecorderMock(isTypeSupported: boolean) {
 
     ondataavailable: ((event: { data?: Blob | null }) => void) | null = null;
     onerror: ((event: Event & { error?: unknown }) => void) | null = null;
+    onstart: (() => void) | null = null;
     onstop: (() => Promise<void>) | null = null;
     start = vi.fn(() => {
       this.state = 'recording';
+      this.onstart?.();
     });
     stop = vi.fn(() => {
       this.state = 'inactive';

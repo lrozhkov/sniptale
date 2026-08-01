@@ -5,6 +5,10 @@ import {
   createRecorderHandlers,
   resolveRecorderOptions,
 } from './helpers';
+import {
+  applyVideoRecordingOutputConstraints,
+  applyVideoTrackContentHint,
+} from '../../../platform/media-utils/video-recording';
 
 const logger = createLogger({ namespace: 'ContentTabCaptureFallbackStream' });
 
@@ -44,6 +48,9 @@ export async function resolveFinalCaptureStream(
   logger.log('Stream ID obtained', streamId);
 
   const captureStream = await createMediaStreamFromId(streamId);
+  await applyVideoRecordingOutputConstraints(captureStream, settings);
+  const videoTrack = captureStream.getVideoTracks()[0];
+  if (videoTrack) applyVideoTrackContentHint(videoTrack, 'detail');
   logger.log('MediaStream created');
 
   if (!settings.microphoneEnabled) {
@@ -76,18 +83,14 @@ export function configureTabCaptureRecorder(props: {
   onSaveRecording: () => void;
   recordedChunks: Blob[];
 }): MediaRecorder {
-  const { mimeType, qualityConfig } = resolveRecorderOptions(props.settings);
+  const options = resolveRecorderOptions(props.settings, props.stream);
   logger.log('Resolved recorder options', {
     quality: props.settings.quality,
-    mimeType,
-    bitrate: qualityConfig.videoBitsPerSecond,
-    fps: qualityConfig.frameRate,
+    mimeType: options.mimeType,
+    bitrate: options.videoBitsPerSecond,
   });
 
-  const recorder = new MediaRecorder(props.stream, {
-    mimeType,
-    videoBitsPerSecond: qualityConfig.videoBitsPerSecond,
-  });
+  const recorder = new MediaRecorder(props.stream, options);
   const recorderHandlers = createRecorderHandlers({
     onProgress: props.onProgress,
     onSaveRecording: props.onSaveRecording,

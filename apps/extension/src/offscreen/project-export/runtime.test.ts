@@ -144,16 +144,16 @@ function expectCleanupJobState(cleanup: ReturnType<typeof createCleanupJob>) {
   expect(loggerWarnMock).toHaveBeenCalledWith('Failed to close AudioContext', expect.any(Error));
 }
 
-it('chooses the first supported WebM mime type and falls back to plain webm', () => {
+it('chooses the requested WebM codec and rejects unsupported codec selection', () => {
   const mediaRecorderMock = {
-    isTypeSupported: vi.fn((type: string) => type === 'video/webm;codecs=vp8'),
+    isTypeSupported: vi.fn((type: string) => type === 'video/webm;codecs=vp9'),
   };
 
   vi.stubGlobal('MediaRecorder', mediaRecorderMock);
-  expect(getSupportedWebmExportMimeType()).toBe('video/webm;codecs=vp8');
+  expect(getSupportedWebmExportMimeType()).toBe('video/webm;codecs=vp9');
 
   mediaRecorderMock.isTypeSupported.mockReturnValue(false);
-  expect(getSupportedWebmExportMimeType()).toBe('video/webm');
+  expect(() => getSupportedWebmExportMimeType()).toThrow('selected WebM codec is not supported');
 });
 
 it('sends clamped progress updates and logs best-effort transport failures', async () => {

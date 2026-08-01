@@ -1,7 +1,11 @@
 import { translate } from '../../../../../platform/i18n';
-import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  getVideoRecordingQualityProfile,
+  type VideoRecordingSettings,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { InlineCurtainSelect } from '../../inline-controls/curtain-select';
-import { QUALITY_OPTIONS, getQualityOption } from './options';
+import { OutputSettingsPanel } from '../output-card/panel';
+import { getRecordingProfileOptions } from './options';
 
 export function QualityCard({
   settings,
@@ -10,27 +14,29 @@ export function QualityCard({
   settings: VideoRecordingSettings;
   onSettingsChange: (patch: Partial<VideoRecordingSettings>) => void;
 }) {
-  const qualityOption = getQualityOption(settings.quality);
+  const profileState = getRecordingProfileOptions(settings);
 
   return (
     <InlineCurtainSelect
       ariaLabel={translate('popup.video.qualityAria')}
       label={translate('popup.video.qualityLabel')}
-      onChange={(quality) =>
-        onSettingsChange({
-          quality: quality as VideoRecordingSettings['quality'],
-        })
-      }
-      options={QUALITY_OPTIONS.map((option) => {
-        const translated = getQualityOption(option.value);
-
-        return {
-          value: option.value,
-          label: translated.label,
-          description: translated.description,
-        };
-      })}
-      value={qualityOption.value}
+      onChange={(profileId) => {
+        const profile = getVideoRecordingQualityProfile(settings, profileId);
+        if (profile) {
+          onSettingsChange({
+            output: { ...profile.output },
+            quality: profile.quality,
+            qualityProfileId: profile.id,
+          });
+        }
+      }}
+      options={profileState.options}
+      secondaryAction={{
+        ariaLabel: translate('popup.video.outputSettingsActionAria'),
+        label: translate('popup.video.outputSettingsAction'),
+        panel: <OutputSettingsPanel settings={settings} onChange={onSettingsChange} />,
+      }}
+      value={profileState.selectedProfileId}
     />
   );
 }

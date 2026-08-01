@@ -12,6 +12,8 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupPage } from '../navigation/actions';
 import { usePopupRuntimeEffects } from './effects';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+
 const { loggerErrorMock, persistVideoSettingsMock, persistVideoUiStateMock, toastErrorMock } =
   vi.hoisted(() => ({
     loggerErrorMock: vi.fn(),
@@ -45,7 +47,8 @@ vi.mock('../../recording/microphone', (_importOriginal) => ({
 vi.mock('../../recording/webcam', (_importOriginal) => ({
   resolveWebcamDeviceId: (deviceId: string | null) => deviceId,
 }));
-vi.mock('../../recording/persistence', (_importOriginal) => ({
+vi.mock('../../recording/persistence', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording/persistence')>()),
   persistVideoSettings: persistVideoSettingsMock,
   persistVideoUiState: persistVideoUiStateMock,
 }));
@@ -106,6 +109,7 @@ function createEffectsState(overrides: Partial<Parameters<typeof usePopupRuntime
     setVideoSettings: setVideoSettingsMock,
     videoCaptureMode: CaptureMode.TAB,
     videoSettings: {
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 3,
       diagnosticsEnabled: false,
@@ -153,7 +157,10 @@ beforeEach(() => {
   persistVideoSettingsMock.mockReset();
   persistVideoUiStateMock.mockReset();
   toastErrorMock.mockReset();
-  persistVideoSettingsMock.mockResolvedValue(undefined);
+  persistVideoSettingsMock.mockImplementation(async (patch) => ({
+    ...createEffectsState().videoSettings,
+    ...patch,
+  }));
   persistVideoUiStateMock.mockResolvedValue(undefined);
   Object.defineProperty(navigator, 'mediaDevices', {
     configurable: true,
@@ -179,7 +186,16 @@ async function verifyPersistenceFailures() {
   persistVideoSettingsMock.mockRejectedValueOnce(new Error('settings failed'));
   persistVideoUiStateMock.mockRejectedValueOnce(new Error('ui state failed'));
 
-  await renderHarness(<EffectsHarness state={createEffectsState()} />);
+  const initial = createEffectsState();
+  await renderHarness(<EffectsHarness state={initial} />);
+  await renderHarness(
+    <EffectsHarness
+      state={{
+        ...initial,
+        videoSettings: { ...initial.videoSettings, diagnosticsEnabled: true },
+      }}
+    />
+  );
   await flushMicrotasks();
 
   expect(loggerErrorMock).toHaveBeenCalledWith(
@@ -258,6 +274,92 @@ async function verifyPersistenceSkipsWhileNotReady() {
   expect(persistVideoUiStateMock).not.toHaveBeenCalled();
 }
 
+async function verifyReadyHydrationBecomesPersistenceBaseline() {
+  const initial = createEffectsState({ isReady: false });
+  const hydrated = createEffectsState({
+    isReady: true,
+    videoSettings: { ...initial.videoSettings, diagnosticsEnabled: true },
+  });
+
+  await renderHarness(<EffectsHarness state={initial} />);
+  await renderHarness(<EffectsHarness state={hydrated} />);
+  await flushMicrotasks();
+  expect(persistVideoSettingsMock).not.toHaveBeenCalled();
+
+  await renderHarness(
+    <EffectsHarness
+      state={{
+        ...hydrated,
+        videoSettings: { ...hydrated.videoSettings, microphoneEnabled: false },
+      }}
+    />
+  );
+  await flushMicrotasks();
+  expect(persistVideoSettingsMock).toHaveBeenCalledWith({ microphoneEnabled: false });
+}
+
+async function verifyRapidVideoSettingsReversionIsSerialized() {
+  const first = Promise.withResolvers<VideoRecordingSettings>();
+  const second = Promise.withResolvers<VideoRecordingSettings>();
+  persistVideoSettingsMock.mockReset();
+  persistVideoSettingsMock.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  const initial = createEffectsState();
+
+  await renderHarness(<EffectsHarness state={initial} />);
+  setVideoSettingsMock.mockClear();
+  await renderHarness(
+    <EffectsHarness
+      state={{
+        ...initial,
+        videoSettings: { ...initial.videoSettings, quality: VideoQuality.LOW },
+      }}
+    />
+  );
+  await renderHarness(<EffectsHarness state={initial} />);
+  await flushMicrotasks();
+  expect(persistVideoSettingsMock).toHaveBeenCalledTimes(1);
+  expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(1, { quality: VideoQuality.LOW });
+
+  first.resolve({ ...initial.videoSettings, quality: VideoQuality.LOW });
+  await flushMicrotasks();
+  expect(persistVideoSettingsMock).toHaveBeenCalledTimes(2);
+  expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(2, { quality: VideoQuality.MEDIUM });
+
+  second.resolve(initial.videoSettings);
+  await flushMicrotasks();
+  expect(setVideoSettingsMock).not.toHaveBeenCalled();
+}
+
+async function verifyQueuedSettingsPreserveExternalFields() {
+  const first = Promise.withResolvers<VideoRecordingSettings>();
+  const second = Promise.withResolvers<VideoRecordingSettings>();
+  persistVideoSettingsMock.mockReset();
+  persistVideoSettingsMock.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  const initial = createEffectsState();
+  const firstLocalSettings = { ...initial.videoSettings, quality: VideoQuality.LOW };
+  const secondLocalSettings = { ...firstLocalSettings, microphoneEnabled: false };
+
+  await renderHarness(<EffectsHarness state={initial} />);
+  setVideoSettingsMock.mockClear();
+  await renderHarness(<EffectsHarness state={{ ...initial, videoSettings: firstLocalSettings }} />);
+  await renderHarness(
+    <EffectsHarness state={{ ...initial, videoSettings: secondLocalSettings }} />
+  );
+  await flushMicrotasks();
+
+  expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(1, { quality: VideoQuality.LOW });
+  const firstAuthoritative = { ...firstLocalSettings, diagnosticsEnabled: true };
+  first.resolve(firstAuthoritative);
+  await flushMicrotasks();
+
+  expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(2, { microphoneEnabled: false });
+  const secondAuthoritative = { ...firstAuthoritative, microphoneEnabled: false };
+  second.resolve(secondAuthoritative);
+  await flushMicrotasks();
+
+  expect(setVideoSettingsMock).toHaveBeenCalledWith(secondAuthoritative);
+}
+
 function runPopupRuntimeEffectsSuite() {
   it('logs persistence failures for video settings and UI state', verifyPersistenceFailures);
   it(
@@ -275,6 +377,18 @@ function runPopupRuntimeEffectsSuite() {
   it(
     'skips persistence effects while popup state is not ready',
     verifyPersistenceSkipsWhileNotReady
+  );
+  it(
+    'treats ready-state hydration as the persistence baseline before writing user edits',
+    verifyReadyHydrationBecomesPersistenceBaseline
+  );
+  it(
+    'serializes rapid settings changes against the latest desired snapshot',
+    verifyRapidVideoSettingsReversionIsSerialized
+  );
+  it(
+    'preserves authoritative cross-context fields across queued local edits',
+    verifyQueuedSettingsPreserveExternalFields
   );
 }
 

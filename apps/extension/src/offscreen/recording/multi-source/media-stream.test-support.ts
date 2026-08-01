@@ -103,8 +103,29 @@ export function createStream(width: number, height: number): MediaStream {
   return new TestMediaStream([new TestVideoTrack({ height, width })]);
 }
 
-export function createTrackedStream() {
-  const track = new TestVideoTrack({ height: 720, width: 1280 });
+export function createConfigurableVideoStream(params: {
+  applyConstraints?: (constraints?: MediaTrackConstraints) => Promise<void>;
+  hasAudio?: boolean;
+  resizeModes?: string[];
+  settings: MediaTrackSettings;
+}): MediaStream {
+  const videoTrack = new TestVideoTrack(params.settings);
+  if (params.applyConstraints) {
+    vi.spyOn(videoTrack, 'applyConstraints').mockImplementation(params.applyConstraints);
+  }
+  if (params.resizeModes) {
+    const capabilities: MediaTrackCapabilities & { resizeMode: string[] } = {
+      resizeMode: params.resizeModes,
+    };
+    vi.spyOn(videoTrack, 'getCapabilities').mockReturnValue(capabilities);
+  }
+  const tracks: Array<MediaStreamAudioTrack | MediaStreamVideoTrack> = [videoTrack];
+  if (params.hasAudio) tracks.push(new TestAudioTrack());
+  return new TestMediaStream(tracks);
+}
+
+export function createTrackedStream(settings: MediaTrackSettings = { height: 720, width: 1280 }) {
+  const track = new TestVideoTrack(settings);
   return Object.assign(new TestMediaStream([track]), { track });
 }
 

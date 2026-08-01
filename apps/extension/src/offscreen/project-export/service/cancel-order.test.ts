@@ -9,9 +9,7 @@ import {
 } from '../../../features/video/project/types';
 
 const {
-  canUsePassthroughPathMock,
   cleanupJobMock,
-  exportPassthroughMock,
   loadActiveLedgerMock,
   loadImagesForProjectMock,
   markTerminalMock,
@@ -21,9 +19,7 @@ const {
   sendRuntimeMessageBestEffortMock,
   upsertLedgerMock,
 } = vi.hoisted(() => ({
-  canUsePassthroughPathMock: vi.fn(),
   cleanupJobMock: vi.fn(),
-  exportPassthroughMock: vi.fn(),
   loadActiveLedgerMock: vi.fn(),
   loadImagesForProjectMock: vi.fn(),
   markTerminalMock: vi.fn(),
@@ -46,8 +42,6 @@ vi.mock('../media', async (importOriginal) => ({
 }));
 
 vi.mock('../render', () => ({
-  canUsePassthroughPath: canUsePassthroughPathMock,
-  exportPassthrough: exportPassthroughMock,
   renderCompositeExport: renderCompositeExportMock,
 }));
 
@@ -73,9 +67,11 @@ function createSettings(): VideoProjectExportSettings {
   return {
     downloadAfterExport: true,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     fps: 30,
     height: 720,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     width: 1280,
   };
 }
@@ -89,8 +85,6 @@ async function flushPromises(): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  canUsePassthroughPathMock.mockReturnValue(false);
-  exportPassthroughMock.mockResolvedValue(undefined);
   loadActiveLedgerMock.mockResolvedValue(null);
   loadImagesForProjectMock.mockResolvedValue(new Map());
   markTerminalMock.mockResolvedValue(null);
@@ -129,7 +123,6 @@ it('aborts the active job before waiting for cancel ledger persistence', async (
   resolvePreparingProgress();
   await flushPromises();
 
-  expect(canUsePassthroughPathMock).not.toHaveBeenCalled();
   expect(loadImagesForProjectMock).not.toHaveBeenCalled();
   expect(renderCompositeExportMock).not.toHaveBeenCalled();
   expect(sendRuntimeMessageBestEffortMock).toHaveBeenCalledWith(

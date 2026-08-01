@@ -10,8 +10,30 @@ import {
   getSupportedMp4VideoCodecProfiles,
   getSupportedMp4VideoEncoder,
 } from './encoders/index';
-import { VideoExportQualityPreset, VideoMp4Codec } from '../../../features/video/project/types';
+import {
+  VideoExportFormat,
+  VideoExportQualityPreset,
+  VideoMp4Codec,
+  type VideoProjectExportSettings,
+} from '../../../features/video/project/types';
 import { MP4_VIDEO_ENCODER_CANDIDATES_BY_CODEC } from './constants';
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
+
+function createVideoExportSettings(
+  overrides: Partial<VideoProjectExportSettings> = {}
+): VideoProjectExportSettings {
+  return {
+    downloadAfterExport: true,
+    format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
+    fps: 30,
+    height: 1080,
+    quality: VideoExportQualityPreset.MEDIUM,
+    width: 1920,
+    ...overrides,
+  } as VideoProjectExportSettings;
+}
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -35,7 +57,7 @@ it('selects supported MP4 video and audio encoder candidates', async () => {
   const videoSupportMock = vi
     .fn()
     .mockRejectedValueOnce(new Error('probe failed'))
-    .mockResolvedValueOnce({ supported: true, config: { codec: 'avc1.640028' } });
+    .mockImplementationOnce(async (config: VideoEncoderConfig) => ({ supported: true, config }));
   const audioSupportMock = vi.fn().mockResolvedValueOnce({
     supported: true,
     config: { codec: 'mp4a.40.2' },
@@ -53,7 +75,7 @@ it('selects supported MP4 video and audio encoder candidates', async () => {
       width: 1920,
       height: 1080,
       fps: 30,
-      quality: VideoExportQualityPreset.BALANCED,
+      quality: VideoExportQualityPreset.MEDIUM,
     } as never,
     VideoMp4Codec.AVC
   );
@@ -62,10 +84,54 @@ it('selects supported MP4 video and audio encoder candidates', async () => {
     numberOfChannels: 2,
   });
 
-  expect(videoEncoder.config).toEqual({ codec: 'avc1.640028' });
+  expect(videoEncoder.config).toEqual(
+    expect.objectContaining({
+      bitrate: 5_000_000,
+      bitrateMode: 'variable',
+      codec: 'avc1.4D401F',
+      framerate: 30,
+      height: 1080,
+      width: 1920,
+    })
+  );
   expect(audioEncoder.config).toEqual({ codec: 'mp4a.40.2' });
   expect(videoEncoder.muxerCodec).toBe('avc');
   expect(audioEncoder.muxerCodec).toBe('aac');
+});
+
+it('passes the exact low-tier bitrate through the effective MP4 encoder config', async () => {
+  const videoSupportMock = vi.fn(async (config: VideoEncoderConfig) => ({
+    supported: true,
+    config,
+  }));
+  vi.stubGlobal('VideoEncoder', { isConfigSupported: videoSupportMock });
+
+  const videoEncoder = await getSupportedMp4VideoEncoder(
+    createVideoExportSettings({
+      width: 426,
+      height: 240,
+      quality: VideoExportQualityPreset.LOW,
+      resolution: VideoResolutionPreset.P240,
+    }),
+    VideoMp4Codec.AVC
+  );
+
+  expect(videoSupportMock).toHaveBeenCalledWith(
+    expect.objectContaining({ bitrate: 250_000, bitrateMode: 'variable' })
+  );
+  expect(videoEncoder.config.bitrate).toBe(250_000);
+});
+
+it('rejects a supported result whose normalized config drops variable bitrate', async () => {
+  const videoSupportMock = vi.fn(async (config: VideoEncoderConfig) => {
+    const { bitrateMode: _droppedBitrateMode, ...normalized } = config;
+    return { supported: true, config: normalized };
+  });
+  vi.stubGlobal('VideoEncoder', { isConfigSupported: videoSupportMock });
+
+  await expect(
+    getSupportedMp4VideoEncoder(createVideoExportSettings(), VideoMp4Codec.AVC)
+  ).rejects.toThrow('offscreenExport.supportedVideoEncoderMissingPrefix');
 });
 
 it('reports missing MP4 encoders when all probe candidates fail', async () => {
@@ -84,7 +150,7 @@ it('reports missing MP4 encoders when all probe candidates fail', async () => {
         width: 1920,
         height: 1080,
         fps: 30,
-        quality: VideoExportQualityPreset.BALANCED,
+        quality: VideoExportQualityPreset.MEDIUM,
       } as never,
       VideoMp4Codec.AVC
     )
@@ -112,7 +178,7 @@ it('collects only codec families that pass support probing', async () => {
     width: 1920,
     height: 1080,
     fps: 30,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
   } as never);
 
   expect(profiles.map((profile) => profile.codec)).toEqual([VideoMp4Codec.HEVC, VideoMp4Codec.VP9]);
@@ -138,7 +204,7 @@ it('skips codec families that throw during capability probing when collecting pr
     width: 1920,
     height: 1080,
     fps: 30,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
   } as never);
 
   expect(profiles).toHaveLength(1);
@@ -159,7 +225,7 @@ it('throws a deterministic missing-codec error when the selected codec has no ca
         width: 1920,
         height: 1080,
         fps: 30,
-        quality: VideoExportQualityPreset.BALANCED,
+        quality: VideoExportQualityPreset.MEDIUM,
       } as never,
       VideoMp4Codec.AVC
     )

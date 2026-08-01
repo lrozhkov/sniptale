@@ -13,7 +13,11 @@ export const VIDEO_RECORDING_OWNER_MAPPINGS = [
     reason:
       'Video capture-surface session registration, source handshake, recovery, and release ' +
       'are covered by the focused capture-surface suite.',
-    testFiles: ['apps/extension/src/background/media/video/capture-surface.test.ts'],
+    testFiles: [
+      'apps/extension/src/background/media/video/capture-surface.test.ts',
+      'apps/extension/src/background/media/video/capture-surface.crop-recovery.test.ts',
+      'apps/extension/src/background/media/video/capture-surface.recovery-ordering.test.ts',
+    ],
   },
   {
     owner: 'background-video-recording-start-watchdog',

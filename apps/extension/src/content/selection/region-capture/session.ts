@@ -1,5 +1,6 @@
 import type {
   applyVideoTrackHints,
+  applyRegionCaptureOutputConstraints,
   applyViewportCrop,
   getRegionCaptureDisplayStream,
   resolveRegionCaptureStream,
@@ -11,6 +12,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 
 export interface RegionCaptureSessionDeps {
   applyTrackHints?: typeof applyVideoTrackHints;
+  applyOutputConstraints?: typeof applyRegionCaptureOutputConstraints;
   applyViewportCrop?: typeof applyViewportCrop;
   configureRecorder?: (props: RegionCaptureRecorderConfig) => MediaRecorder;
   createCropTarget?: () => Promise<ViewportCropTarget>;
@@ -90,6 +92,7 @@ function createSaveRecordingHandler(
   return () => {
     saveRecording({
       recordedChunks: state.recordedChunks,
+      recorderMimeType: state.mediaRecorder?.mimeType,
       onChunksReset: () => {
         state.recordedChunks = [];
       },
@@ -113,6 +116,7 @@ async function prepareRegionCaptureRecorder(args: {
 
   args.deps.applyTrackHints(videoTrack);
   await args.deps.applyViewportCrop(videoTrack, cropTarget);
+  await args.deps.applyOutputConstraints?.(displayStream, args.settings);
 
   const captureStream = await args.deps.resolveCaptureStream(args.settings, displayStream);
   args.state.mixingAudioContext = captureStream.audioContext;
@@ -122,7 +126,7 @@ async function prepareRegionCaptureRecorder(args: {
     finalStream: captureStream.finalStream,
     onProgress: args.state.onProgressCallback,
     onSaveRecording: args.onSaveRecording,
-    quality: args.settings.quality,
+    settings: args.settings,
     recordedChunks: args.state.recordedChunks,
   });
 }

@@ -5,6 +5,7 @@ import { sendRuntimeMessage } from '../../platform/runtime-messaging/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { beginRecordingFinalization, finishRecordingFinalization } from './finalization-replay';
 import { persistStaticFrameSignals } from './signals/static-frame';
+import { resolveVideoRecordingArtifact } from '../../platform/media-utils/video-recording';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingFinalize' });
 
@@ -22,13 +23,9 @@ function stringifyFinalizeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function getRecordingFilenameExtension(mimeType: string): 'mp4' | 'webm' {
-  return mimeType.toLowerCase().includes('video/mp4') ? 'mp4' : 'webm';
-}
-
 function buildFinalizeResult(currentRecordingId: string | null, blob: Blob) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-  const extension = getRecordingFilenameExtension(blob.type);
+  const { extension } = resolveVideoRecordingArtifact(blob.type);
   return {
     blob,
     filename: `${RECORDING_EXPORT_FILENAME_PREFIX}-${timestamp}.${extension}`,
@@ -36,8 +33,9 @@ function buildFinalizeResult(currentRecordingId: string | null, blob: Blob) {
   };
 }
 
-export function buildSidecarFilename(filenameSuffix: string, extension = 'webm'): string {
+export function buildSidecarFilename(filenameSuffix: string, mimeType: string): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  const { extension } = resolveVideoRecordingArtifact(mimeType);
   return `${RECORDING_EXPORT_FILENAME_PREFIX}-${timestamp}-${filenameSuffix}.${extension}`;
 }
 
@@ -48,7 +46,7 @@ function buildSidecarFinalizeResult(params: {
 }) {
   return {
     blob: params.blob,
-    filename: buildSidecarFilename(params.filenameSuffix),
+    filename: buildSidecarFilename(params.filenameSuffix, params.blob.type),
     recordingId: params.recordingId,
   };
 }
@@ -120,10 +118,10 @@ export async function finalizeRecording(
     return null;
   }
 
-  const mimeType = recorderMimeType || recordedChunks[0]?.type || 'video/webm';
+  const artifact = resolveVideoRecordingArtifact(recorderMimeType || recordedChunks[0]?.type || '');
   const { blob, filename, recordingId } = buildFinalizeResult(
     currentRecordingId,
-    new Blob(recordedChunks, { type: mimeType })
+    new Blob(recordedChunks, { type: artifact.mimeType })
   );
   if (!beginRecordingFinalization(recordingId, logger)) {
     return null;
@@ -234,9 +232,9 @@ export async function finalizeSidecarRecording(params: {
     return null;
   }
 
-  const mimeType = params.mimeType || params.chunks[0]?.type || 'video/webm';
+  const artifact = resolveVideoRecordingArtifact(params.mimeType || params.chunks[0]?.type || '');
   const { blob, filename, recordingId } = buildSidecarFinalizeResult({
-    blob: new Blob(params.chunks, { type: mimeType }),
+    blob: new Blob(params.chunks, { type: artifact.mimeType }),
     filenameSuffix: params.filenameSuffix,
     recordingId: params.recordingId,
   });

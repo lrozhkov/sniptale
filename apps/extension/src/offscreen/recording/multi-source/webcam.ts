@@ -4,6 +4,7 @@ import { buildSidecarFilename } from '../finalizer';
 import { createWebcamSidecarRecorder } from '../sidecar';
 import type { RecordingSidecarRecorder } from '../sidecar/types';
 import { triggerMultiSourceDownload } from './messages';
+import { resolveVideoRecordingArtifact } from '../../../platform/media-utils/video-recording';
 
 type SavedWebcamRecording = {
   blob: Blob;
@@ -38,26 +39,40 @@ export async function saveWebcamRecording(
   source: RecordingSidecarRecorder,
   duration: number
 ): Promise<SavedWebcamRecording> {
-  const mimeType = source.recorder.mimeType || source.chunks[0]?.type || 'video/webm';
-  const blob = new Blob(source.chunks, { type: mimeType });
-  const filename = buildSidecarFilename(source.filenameSuffix);
+  const artifact = resolveVideoRecordingArtifact(
+    source.recorder.mimeType || source.chunks[0]?.type || ''
+  );
+  const blob = new Blob(source.chunks, { type: artifact.mimeType });
+  const filename = buildSidecarFilename(source.filenameSuffix, artifact.mimeType);
   await saveRecordingSafely(source.recordingId, blob, filename);
   await triggerMultiSourceDownload(source.recordingId, filename);
-  return { blob, filename, mimeType, source, duration };
+  return { blob, filename, mimeType: artifact.mimeType, source, duration };
 }
 
 export function createWebcamProjectInput(
   result: SavedWebcamRecording | null
 ): WebcamProjectInput | null {
-  return result
-    ? {
-        recordingId: result.source.recordingId,
-        filename: result.filename,
-        width: result.source.trackSettings.width ?? 1280,
-        height: result.source.trackSettings.height ?? 720,
-        duration: result.duration,
-        mimeType: result.mimeType,
-        size: result.blob.size,
-      }
-    : null;
+  if (!result) {
+    return null;
+  }
+  const { height, width } = result.source.trackSettings;
+  if (
+    typeof width !== 'number' ||
+    typeof height !== 'number' ||
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    throw new Error('Webcam recording dimensions are unavailable.');
+  }
+  return {
+    recordingId: result.source.recordingId,
+    filename: result.filename,
+    width,
+    height,
+    duration: result.duration,
+    mimeType: result.mimeType,
+    size: result.blob.size,
+  };
 }

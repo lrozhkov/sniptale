@@ -1,9 +1,10 @@
-import { scaleBitrate } from './codecs';
+import { resolveExportTargetBitrate } from './codecs';
 import { setupExportAudio } from './media';
 import { type LoadedImagesMap } from './renderer';
 import { runCompositeRenderLoop } from './render-loop';
 import { getSupportedWebmExportMimeType } from './runtime';
 import type { VideoProject, VideoProjectExportSettings } from '../../features/video/project/types';
+import { VideoWebmCodec } from '../../features/video/project/types';
 import { translate } from '../../platform/i18n';
 import { type ExportJobState } from './types';
 
@@ -29,8 +30,9 @@ export async function renderCompositeToWebm(
     capturedTracks = [...canvasStream.getVideoTracks(), ...preparedAudio.tracks];
     stream = new MediaStream(capturedTracks);
     job.exportStream = stream;
-    const mimeType = getSupportedWebmExportMimeType();
-    const recorder = createWebmRecorder(stream, settings, mimeType);
+    const codec = settings.webmVideoCodec ?? VideoWebmCodec.VP9;
+    const mimeType = getSupportedWebmExportMimeType(codec, preparedAudio.tracks.length > 0);
+    const recorder = createWebmRecorder(stream, settings, codec, mimeType);
     job.mediaRecorder = recorder;
     const blobRecorder = createWebmBlobRecorder(recorder, mimeType, () => job.cancelled);
     return await runWebmRecording({
@@ -90,11 +92,12 @@ async function runWebmRecording(input: WebmRecordingInput): Promise<Blob> {
 function createWebmRecorder(
   stream: MediaStream,
   settings: VideoProjectExportSettings,
+  codec: VideoWebmCodec,
   mimeType: string
 ) {
   return new MediaRecorder(stream, {
     mimeType,
-    videoBitsPerSecond: scaleBitrate(settings.quality, settings.width, settings.height),
+    videoBitsPerSecond: resolveExportTargetBitrate(settings, codec),
   });
 }
 

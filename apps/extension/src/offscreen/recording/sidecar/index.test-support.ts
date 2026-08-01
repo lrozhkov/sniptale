@@ -1,8 +1,10 @@
 import { vi } from 'vitest';
 import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 export class FakeMediaRecorder {
   static instances: FakeMediaRecorder[] = [];
@@ -47,15 +49,19 @@ export class FakeMediaRecorder {
 }
 
 export function createSettings(
-  overrides: Partial<VideoRecordingSettings> = {}
+  overrides: Partial<
+    Omit<VideoRecordingSettings, 'output' | 'qualityProfileId' | 'qualityProfiles'>
+  > = {}
 ): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 3,
     countdownSeconds: 0,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     openEditorAfterRecording: false,
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.HIGH,
     systemAudioEnabled: false,
     webcamDeviceId: 'cam-1',

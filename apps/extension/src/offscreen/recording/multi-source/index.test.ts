@@ -1,5 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createAudioStream, createStream, createTrackedStream } from './media-stream.test-support';
+import {
+  createAudioStream,
+  createConfigurableVideoStream,
+  createStream,
+  createTrackedStream,
+} from './media-stream.test-support';
 import { createDeferred, createSettings, FakeMediaRecorder } from './index.test-support';
 
 const {
@@ -27,8 +32,8 @@ vi.mock('../setup/desktop-media', async (importOriginal) => {
   };
 });
 
-vi.mock('./normalize', () => ({
-  normalizeMultiSourceVideoStream: normalizeMultiSourceVideoStreamMock,
+vi.mock('../stream/fixed-video-output', () => ({
+  createFixedVideoOutputStream: normalizeMultiSourceVideoStreamMock,
 }));
 
 vi.mock('../../../composition/persistence/projects/index-mutations', async (importOriginal) => ({
@@ -61,9 +66,12 @@ import {
   stopMultiSourceRecording,
   updateMultiSourceRecordingSettings,
 } from '.';
+import { setActiveMultiSourceSession } from './state';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setActiveMultiSourceSession(null);
+  FakeMediaRecorder.autoEmitStart = true;
   FakeMediaRecorder.instances = [];
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
   sendRuntimeMessageMock.mockResolvedValue({ success: true });
@@ -72,6 +80,7 @@ beforeEach(() => {
   normalizeMultiSourceVideoStreamMock.mockImplementation((stream: MediaStream) =>
     Promise.resolve({
       dimensions: stream.getVideoTracks()[0]?.getSettings() ?? { height: 720, width: 1280 },
+      frameRate: 30,
       stream,
     })
   );
@@ -84,6 +93,91 @@ beforeEach(() => {
     { label: 'Window 1', stream: createStream(1280, 720) },
     { label: 'Window 2', stream: createStream(1024, 768) },
   ]);
+});
+
+function findRuntimeMessages(type: string) {
+  return sendRuntimeMessageMock.mock.calls.filter(([message]) => message.type === type);
+}
+
+it('publishes started only after every required recorder emits its native start event', async () => {
+  FakeMediaRecorder.autoEmitStart = false;
+
+  const start = startMultiSourceRecording({
+    recordingId: 'aggregate-start',
+    settings: createSettings(),
+  });
+  await vi.waitFor(() => expect(FakeMediaRecorder.instances).toHaveLength(3));
+
+  expect(findRuntimeMessages('OFFSCREEN_RECORDING_STARTED')).toHaveLength(0);
+  FakeMediaRecorder.instances[0]?.emitStart();
+  FakeMediaRecorder.instances[1]?.emitStart();
+  await Promise.resolve();
+  expect(findRuntimeMessages('OFFSCREEN_RECORDING_STARTED')).toHaveLength(0);
+
+  FakeMediaRecorder.instances[2]?.emitStart();
+  await start;
+
+  expect(findRuntimeMessages('OFFSCREEN_RECORDING_STARTED')).toHaveLength(1);
+  await stopMultiSourceRecording(true);
+});
+
+it('fails aggregate start when one required recorder errors before activation', async () => {
+  FakeMediaRecorder.autoEmitStart = false;
+  const start = startMultiSourceRecording({
+    recordingId: 'failed-start',
+    settings: createSettings(),
+  });
+  const startError = start.catch((error: unknown) => error);
+  await vi.waitFor(() => expect(FakeMediaRecorder.instances).toHaveLength(3));
+
+  FakeMediaRecorder.instances[0]?.emitStart();
+  FakeMediaRecorder.instances[1]?.onerror?.(
+    Object.assign(new Event('error'), { error: new Error('source encoder failed') })
+  );
+
+  expect(await startError).toEqual(new Error('source encoder failed'));
+  expect(hasActiveMultiSourceRecording()).toBe(false);
+  expect(FakeMediaRecorder.instances.every((recorder) => recorder.state === 'inactive')).toBe(true);
+  expect(findRuntimeMessages('OFFSCREEN_RECORDING_STARTED')).toHaveLength(0);
+  expect(saveRecordingSafelyMock).not.toHaveBeenCalled();
+});
+
+it('fails aggregate start when a required recorder stops before activation', async () => {
+  FakeMediaRecorder.autoEmitStart = false;
+  const start = startMultiSourceRecording({
+    recordingId: 'stopped-start',
+    settings: createSettings(),
+  });
+  const startError = start.catch((error: unknown) => error);
+  await vi.waitFor(() => expect(FakeMediaRecorder.instances).toHaveLength(3));
+
+  FakeMediaRecorder.instances[0]?.emitStart();
+  FakeMediaRecorder.instances[1]?.emitUnexpectedStop();
+
+  expect(await startError).toEqual(
+    new Error('A required recorder stopped before multi-source activation.')
+  );
+  expect(hasActiveMultiSourceRecording()).toBe(false);
+  expect(findRuntimeMessages('OFFSCREEN_RECORDING_STARTED')).toHaveLength(0);
+  expect(saveRecordingSafelyMock).not.toHaveBeenCalled();
+});
+
+it('cancels stop-before-activation without publishing or saving a recording', async () => {
+  FakeMediaRecorder.autoEmitStart = false;
+  const start = startMultiSourceRecording({
+    recordingId: 'cancel-start',
+    settings: createSettings(),
+  });
+  await vi.waitFor(() => expect(FakeMediaRecorder.instances).toHaveLength(3));
+
+  await stopMultiSourceRecording();
+  await expect(start).resolves.toBeUndefined();
+
+  expect(hasActiveMultiSourceRecording()).toBe(false);
+  expect(FakeMediaRecorder.instances.every((recorder) => recorder.state === 'inactive')).toBe(true);
+  expect(findRuntimeMessages('OFFSCREEN_RECORDING_STARTED')).toHaveLength(0);
+  expect(saveRecordingSafelyMock).not.toHaveBeenCalled();
+  expect(saveVideoProjectMock).not.toHaveBeenCalled();
 });
 
 it('starts all prepared source recorders and finalizes video plus separate microphone assets', async () => {
@@ -142,6 +236,12 @@ it('tears down an active session on recorder failure and ignores its stale error
 
   expect(hasActiveMultiSourceRecording()).toBe(false);
   expect(FakeMediaRecorder.instances.every((recorder) => recorder.state === 'inactive')).toBe(true);
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: 'OFFSCREEN_ERROR',
+    error: 'source recorder failed',
+    phase: 'runtime',
+    recordingId: 'failure',
+  });
 
   expect(() => errorHandler?.(new Event('error'))).not.toThrow();
 });
@@ -178,6 +278,7 @@ it('stops prepared source streams when microphone acquisition fails during start
 it('cancels a delayed multi-source start before recorder activation', async () => {
   let resolveFirstNormalization!: (value: {
     dimensions: { height: number; width: number };
+    frameRate: number;
     stream: MediaStream;
   }) => void;
   const firstStream = createTrackedStream();
@@ -195,7 +296,11 @@ it('cancels a delayed multi-source start before recorder activation', async () =
   const start = startMultiSourceRecording({ recordingId: 'cancelled', settings: createSettings() });
   await vi.waitFor(() => expect(normalizeMultiSourceVideoStreamMock).toHaveBeenCalledOnce());
   cancelPendingMultiSourceRecordingStart();
-  resolveFirstNormalization({ dimensions: { height: 720, width: 1280 }, stream: firstStream });
+  resolveFirstNormalization({
+    dimensions: { height: 720, width: 1280 },
+    frameRate: 30,
+    stream: firstStream,
+  });
 
   await expect(start).resolves.toBeUndefined();
   expect(hasActiveMultiSourceRecording()).toBe(false);
@@ -240,7 +345,11 @@ it('can discard a mic-free multi-source session without saving outputs', async (
 it('updates live microphone and webcam track state on the active session', async () => {
   vi.mocked(navigator.mediaDevices.getUserMedia)
     .mockResolvedValueOnce(createAudioStream())
-    .mockResolvedValueOnce(createStream(320, 180));
+    .mockResolvedValueOnce(
+      createConfigurableVideoStream({
+        settings: { frameRate: 30, height: 180, width: 320 },
+      })
+    );
 
   await startMultiSourceRecording({
     recordingId: 'live-settings',

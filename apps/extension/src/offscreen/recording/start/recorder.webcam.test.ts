@@ -37,6 +37,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   installMediaRecorderMock(true);
   recordingContext.resetRecordingSession();
+  recordingContext.mediaRecorder = null;
   recordingContext.videoStream = createVideoStream();
 });
 
@@ -121,7 +122,8 @@ it('uses the fallback recorder error when native error details are absent', () =
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({
       payload: expect.objectContaining({
-        error: 'The recording failed to stop cleanly.',
+        error: 'The recording encoder failed unexpectedly.',
+        phase: 'runtime',
         recordingId: 'recording-fallback-error',
       }),
     })

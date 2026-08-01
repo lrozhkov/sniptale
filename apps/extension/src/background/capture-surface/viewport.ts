@@ -133,7 +133,8 @@ export async function restoreViewportSnapshot(args: {
       } catch (detachError) {
         throw new AggregateError(
           [restoreError, detachError],
-          'Viewport restoration and detach failed'
+          'Viewport restoration and detach failed',
+          { cause: detachError }
         );
       }
       throw restoreError;

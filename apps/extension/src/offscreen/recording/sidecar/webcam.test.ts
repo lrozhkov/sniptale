@@ -1,7 +1,18 @@
 // @vitest-environment jsdom
 
 import { beforeEach, expect, it, vi } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { createTrackedStream } from '../multi-source/media-stream.test-support';
+
+const { normalizeMultiSourceVideoStreamMock } = vi.hoisted(() => ({
+  normalizeMultiSourceVideoStreamMock: vi.fn(),
+}));
+
+vi.mock('../stream/fixed-video-output', () => ({
+  createFixedVideoOutputStream: normalizeMultiSourceVideoStreamMock,
+}));
+
 import { createWebcamSidecarRecorder } from './webcam';
 
 class FakeMediaRecorder {
@@ -18,11 +29,12 @@ class FakeMediaRecorder {
   ) {}
 }
 
-const stopTrack = vi.fn();
+const stopOutputTrack = vi.fn();
+const stopSourceTrack = vi.fn();
 
-function createSettings() {
+function createSettings(): VideoRecordingSettings {
   return {
-    quality: VideoQuality.HIGH,
+    ...DEFAULT_VIDEO_SETTINGS,
     webcamDeviceId: null,
     webcamEnabled: true,
   };
@@ -31,23 +43,50 @@ function createSettings() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+  const sourceStream = createTrackedStream({ frameRate: 60, height: 720, width: 1280 });
+  sourceStream.track.stop.mockImplementation(stopSourceTrack);
+  const normalizedStream = createTrackedStream({ frameRate: 30, height: 1080, width: 1920 });
+  normalizedStream.track.stop.mockImplementation(stopOutputTrack);
+  normalizeMultiSourceVideoStreamMock.mockResolvedValue({
+    dimensions: { height: 1080, width: 1920 },
+    frameRate: 30,
+    stream: normalizedStream,
+  });
   vi.stubGlobal('navigator', {
     mediaDevices: {
-      getUserMedia: vi.fn().mockResolvedValue({
-        getTracks: () => [{ stop: stopTrack }],
-        getVideoTracks: () => [{ getSettings: () => ({ height: 720, width: 1280 }) }],
-      }),
+      getUserMedia: vi.fn().mockResolvedValue(sourceStream),
     },
   });
 });
 
-it('stops webcam tracks when the recorder emits a terminal error', async () => {
+it('records the webcam through the fixed output stream', async () => {
+  const settings = createSettings();
   const recorder = await createWebcamSidecarRecorder({
     baseRecordingId: 'recording-1',
-    settings: createSettings() as never,
+    settings,
+  });
+
+  expect(normalizeMultiSourceVideoStreamMock).toHaveBeenCalledWith(expect.anything(), settings, {
+    contentHint: 'motion',
+    frameRate: 30,
+  });
+  expect(recorder?.recorder).toMatchObject({
+    options: { videoBitsPerSecond: 6_000_000 },
+    stream: recorder?.stream,
+  });
+  expect(recorder?.trackSettings).toEqual({ frameRate: 30, height: 1080, width: 1920 });
+  expect(recorder?.recorder.onerror).not.toBeNull();
+  expect(stopOutputTrack).not.toHaveBeenCalled();
+  expect(stopSourceTrack).not.toHaveBeenCalled();
+});
+
+it('stops the normalized webcam stream when recorder creation owns a terminal error', async () => {
+  const recorder = await createWebcamSidecarRecorder({
+    baseRecordingId: 'recording-1',
+    settings: createSettings(),
   });
 
   recorder?.recorder.onerror?.(new ErrorEvent('error'));
 
-  expect(stopTrack).toHaveBeenCalledOnce();
+  expect(stopOutputTrack).toHaveBeenCalledOnce();
 });

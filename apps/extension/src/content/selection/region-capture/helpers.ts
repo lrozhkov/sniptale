@@ -1,10 +1,10 @@
-import { VIDEO_QUALITY_CONFIGS } from '@sniptale/runtime-contracts/video/types/defaults';
-import {
-  VideoQuality,
-  type VideoQuality as VideoQualityRole,
-} from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { CaptureProgress, RegionCaptureSettings } from './types';
+import {
+  applyVideoTrackContentHint,
+  applyVideoRecordingOutputConstraints,
+  buildVideoMediaRecorderOptions,
+} from '../../../platform/media-utils/video-recording';
 
 const logger = createLogger({ namespace: 'ContentRegionCapture' });
 
@@ -15,7 +15,7 @@ export interface RegionCaptureRecorderConfig {
   onProgress: ((progress: CaptureProgress) => void) | null;
   onSaveRecording: () => void;
   recordedChunks: Blob[];
-  quality: VideoQualityRole;
+  settings: RegionCaptureSettings;
 }
 
 type MediaDevicesWithRegionCapture = MediaDevices & {
@@ -88,9 +88,7 @@ export function applyVideoTrackHints(videoTrack: MediaStreamTrack): void {
     width: videoTrack.getSettings().width,
   });
 
-  if ('contentHint' in videoTrack) {
-    (videoTrack as MediaStreamTrack & { contentHint: string }).contentHint = 'detail';
-  }
+  applyVideoTrackContentHint(videoTrack, 'detail');
 }
 
 export async function resolveRegionCaptureStream(
@@ -140,27 +138,11 @@ export async function resolveRegionCaptureStream(
   }
 }
 
-function createMediaRecorderMimeType(quality: VideoQuality): {
-  mimeType: string;
-  qualityConfig: (typeof VIDEO_QUALITY_CONFIGS)[VideoQualityRole];
-} {
-  const qualityConfig =
-    VIDEO_QUALITY_CONFIGS[quality] ?? VIDEO_QUALITY_CONFIGS[VideoQuality.MEDIUM];
-  const mimeType = MediaRecorder.isTypeSupported(qualityConfig.mimeType)
-    ? qualityConfig.mimeType
-    : MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-      ? 'video/webm;codecs=vp9,opus'
-      : 'video/webm';
-
-  return { mimeType, qualityConfig };
-}
-
 export function configureRegionCaptureRecorder(props: RegionCaptureRecorderConfig): MediaRecorder {
-  const { mimeType, qualityConfig } = createMediaRecorderMimeType(props.quality);
-  const mediaRecorder = new MediaRecorder(props.finalStream, {
-    mimeType,
-    videoBitsPerSecond: qualityConfig.videoBitsPerSecond,
-  });
+  const mediaRecorder = new MediaRecorder(
+    props.finalStream,
+    buildVideoMediaRecorderOptions(props.settings, props.finalStream)
+  );
 
   mediaRecorder.ondataavailable = (event) => {
     if (event.data && event.data.size > 0) {
@@ -183,6 +165,13 @@ export function configureRegionCaptureRecorder(props: RegionCaptureRecorderConfi
   };
 
   return mediaRecorder;
+}
+
+export async function applyRegionCaptureOutputConstraints(
+  stream: MediaStream,
+  settings: RegionCaptureSettings
+): Promise<void> {
+  await applyVideoRecordingOutputConstraints(stream, settings);
 }
 
 function resolveRecorderErrorMessage(event: Event) {

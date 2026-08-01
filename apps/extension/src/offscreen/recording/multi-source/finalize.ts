@@ -14,14 +14,17 @@ import {
 import { buildMicrophoneFilename, buildSourceFilename } from './recorders';
 import type { MultiSourceRecorder, MultiSourceSession } from './state';
 import { createWebcamProjectInput, saveWebcamRecording } from './webcam';
+import { resolveVideoRecordingArtifact } from '../../../platform/media-utils/video-recording';
 
 async function saveSourceRecording(source: MultiSourceRecorder, duration: number) {
-  const mimeType = source.recorder.mimeType || source.chunks[0]?.type || 'video/webm';
-  const blob = new Blob(source.chunks, { type: mimeType });
-  const filename = buildSourceFilename(source.sourceIndex);
+  const artifact = resolveVideoRecordingArtifact(
+    source.recorder.mimeType || source.chunks[0]?.type || ''
+  );
+  const blob = new Blob(source.chunks, { type: artifact.mimeType });
+  const filename = buildSourceFilename(source.sourceIndex, artifact.mimeType);
   await saveRecordingSafely(source.recordingId, blob, filename);
   await triggerMultiSourceDownload(source.recordingId, filename);
-  return { blob, filename, mimeType, source, duration };
+  return { blob, filename, mimeType: artifact.mimeType, source, duration };
 }
 
 async function saveMicrophoneRecording(source: MultiSourceRecorder, duration: number) {
@@ -53,8 +56,26 @@ async function createProjectForSession(
   return project.id;
 }
 
+function requireSourceDimensions(source: MultiSourceRecorder): { height: number; width: number } {
+  const { height, width } = source.trackSettings;
+  if (
+    typeof width !== 'number' ||
+    typeof height !== 'number' ||
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    throw new Error(
+      `Multi-source recording dimensions are unavailable for source ${source.sourceIndex + 1}.`
+    );
+  }
+  return { height, width };
+}
+
 export async function finalizeSession(session: MultiSourceSession): Promise<void> {
   const duration = Math.max(0.1, (Date.now() - session.startedAt) / 1000);
+  session.recorders.forEach(requireSourceDimensions);
   const videoResults = await Promise.all(
     session.recorders.map((source) => saveSourceRecording(source, duration))
   );
@@ -64,15 +85,18 @@ export async function finalizeSession(session: MultiSourceSession): Promise<void
   const webcamResult = session.webcamRecorder
     ? await saveWebcamRecording(session.webcamRecorder, duration)
     : null;
-  const videos = videoResults.map((result) => ({
-    recordingId: result.source.recordingId,
-    filename: result.filename,
-    width: result.source.trackSettings.width ?? 1920,
-    height: result.source.trackSettings.height ?? 1080,
-    duration: result.duration,
-    mimeType: result.mimeType,
-    size: result.blob.size,
-  }));
+  const videos = videoResults.map((result) => {
+    const dimensions = requireSourceDimensions(result.source);
+    return {
+      recordingId: result.source.recordingId,
+      filename: result.filename,
+      width: dimensions.width,
+      height: dimensions.height,
+      duration: result.duration,
+      mimeType: result.mimeType,
+      size: result.blob.size,
+    };
+  });
   const microphoneAudio = audioResult
     ? {
         recordingId: audioResult.source.recordingId,

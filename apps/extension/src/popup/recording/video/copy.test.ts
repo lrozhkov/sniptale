@@ -21,6 +21,7 @@ import {
   VideoQuality,
   VideoRecordingStatus,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 function verifiesStatusLabels() {
   expect(getRecordingStatusLabel(VideoRecordingStatus.PREPARING)).toBe(
@@ -118,6 +119,7 @@ function verifiesViewportPresetLabels() {
 function verifiesDefaultLiveMediaState() {
   expect(
     createVideoRecordingLiveMediaState({
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 0,
       diagnosticsEnabled: false,

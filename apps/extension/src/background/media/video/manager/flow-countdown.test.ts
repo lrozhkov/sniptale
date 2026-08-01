@@ -4,6 +4,7 @@ import {
   VideoRecordingStatus,
   VideoQuality,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const {
   isVideoRecordingStartCancelled,
@@ -43,6 +44,7 @@ import {
 import { videoManagerSession } from './session';
 
 const defaultSettings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 0,
   countdownSeconds: 3,
   diagnosticsEnabled: false,

@@ -98,9 +98,11 @@ function createExportSettings(
     fps: 60,
     quality: VideoExportQualityPreset.HIGH,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     downloadAfterExport: true,
     ...overrides,
-  };
+  } as VideoProjectExportSettings;
 }
 
 function createSubtitleExportProject() {

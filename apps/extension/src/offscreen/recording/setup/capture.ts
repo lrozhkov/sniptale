@@ -76,10 +76,10 @@ function createTabVideoConstraints(params: {
     chromeMediaSourceId: params.streamId,
     ...(params.viewport
       ? {
-          minWidth: params.viewport.width,
+          maxHeight: params.viewport.height,
           maxWidth: params.viewport.width,
           minHeight: params.viewport.height,
-          maxHeight: params.viewport.height,
+          minWidth: params.viewport.width,
         }
       : {}),
   };

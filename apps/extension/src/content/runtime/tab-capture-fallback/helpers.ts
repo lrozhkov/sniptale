@@ -1,6 +1,5 @@
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import type { CaptureProgress, TabCaptureSettings } from './types';
-import { VIDEO_QUALITY_CONFIGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { buildVideoMediaRecorderOptions } from '../../../platform/media-utils/video-recording';
 
 export async function createMixedCaptureStream(props: {
   captureStream: MediaStream;
@@ -75,17 +74,6 @@ export function createRecorderHandlers(props: {
   };
 }
 
-export function resolveRecorderOptions(settings: TabCaptureSettings) {
-  const qualityConfig =
-    VIDEO_QUALITY_CONFIGS[settings.quality] ?? VIDEO_QUALITY_CONFIGS[VideoQuality.MEDIUM];
-  const mimeType = MediaRecorder.isTypeSupported(qualityConfig.mimeType)
-    ? qualityConfig.mimeType
-    : MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-      ? 'video/webm;codecs=vp9,opus'
-      : 'video/webm';
-
-  return {
-    mimeType,
-    qualityConfig,
-  };
+export function resolveRecorderOptions(settings: TabCaptureSettings, stream: MediaStream) {
+  return buildVideoMediaRecorderOptions(settings, stream);
 }

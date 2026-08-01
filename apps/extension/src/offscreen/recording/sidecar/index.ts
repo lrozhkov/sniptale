@@ -8,6 +8,7 @@ import { pickNumericWebcamActualSettings } from '@sniptale/runtime-contracts/vid
 import { finalizeSidecarRecording } from '../finalizer';
 import { createWebcamSidecarRecorder } from './webcam';
 import type { RecordingSidecarRecorder, RecordingSidecarSession } from './types';
+import { getMediaRecorderError } from '../recorder-error';
 export { createWebcamSidecarRecorder };
 
 const logger = createLogger({ namespace: 'OffscreenRecordingSidecar' });
@@ -64,9 +65,22 @@ export async function initializeSidecarRecorders(params: {
   });
 }
 
-export function startActiveSidecarRecorders(timeslice: number): void {
+export function startActiveSidecarRecorders(
+  timeslice: number,
+  onUnexpectedFailure: (error: Error) => void
+): void {
   getActiveSidecarSession()?.recorders.forEach((sidecar) => {
-    sidecar.recorder.start(timeslice);
+    sidecar.recorder.onerror = (event) => {
+      onUnexpectedFailure(getMediaRecorderError(event, 'A sidecar recorder failed.'));
+    };
+    sidecar.recorder.onstop = () => {
+      onUnexpectedFailure(new Error('A sidecar recorder stopped unexpectedly.'));
+    };
+    try {
+      sidecar.recorder.start(timeslice);
+    } catch (error) {
+      throw error instanceof Error ? error : new Error(String(error));
+    }
   });
 }
 
@@ -191,6 +205,8 @@ export function cleanupActiveSidecarRecorders(): void {
   }
 
   session.recorders.forEach((sidecar) => {
+    sidecar.recorder.onerror = null;
+    sidecar.recorder.onstop = null;
     if (sidecar.recorder.state !== 'inactive') {
       try {
         sidecar.recorder.stop();

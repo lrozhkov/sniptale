@@ -99,7 +99,7 @@ function restoreDesignReviewStyles(): void {
     const compensationFailures = compensateAppliedBatches(appliedBatches);
     const restorationFailure =
       error instanceof Error ? error.message : 'Design Review session restoration failed';
-    throw new Error([restorationFailure, ...compensationFailures].join(', '));
+    throw new Error([restorationFailure, ...compensationFailures].join(', '), { cause: error });
   }
 }
 

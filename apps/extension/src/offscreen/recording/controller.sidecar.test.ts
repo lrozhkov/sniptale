@@ -122,11 +122,13 @@ it('kicks off webcam sidecar flush when stopping the main recorder', async () =>
     streamInstanceId: 'stream-instance-1',
   };
   recordingContext.bindStreamInstance(binding);
-  recordingContext.activateRecorder({
+  const mediaRecorder = {
     requestData: vi.fn(),
     state: 'recording',
     stop: vi.fn(),
-  } as never);
+  } as never;
+  recordingContext.bindStartingRecorder(mediaRecorder);
+  recordingContext.activateRecorder(mediaRecorder);
 
   const stopPromise = stopRecording(binding);
   recordingContext.stopRecordingResolve?.();
@@ -144,11 +146,13 @@ it('keeps sidecar stop rejection handled while the main recorder owns stop compl
     streamInstanceId: 'stream-instance-1',
   };
   recordingContext.bindStreamInstance(binding);
-  recordingContext.activateRecorder({
+  const mediaRecorder = {
     requestData: vi.fn(),
     state: 'recording',
     stop: vi.fn(),
-  } as never);
+  } as never;
+  recordingContext.bindStartingRecorder(mediaRecorder);
+  recordingContext.activateRecorder(mediaRecorder);
 
   const stopPromise = stopRecording(binding);
   await Promise.resolve();

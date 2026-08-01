@@ -90,7 +90,6 @@ async function sendScreenshotModeDisable(
     (response?.error === 'authorization-expired' || response?.error === 'stale-generation') &&
     !recoveryAttempted
   ) {
-    recoveryAttempted = true;
     const recovery = await recoverScreenshotSurfaceForExit(contentIntentSource);
     if (recovery.kind === 'already-disabled') {
       return { success: true as const };

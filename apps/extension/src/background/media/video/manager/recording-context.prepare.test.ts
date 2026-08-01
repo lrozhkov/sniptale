@@ -64,9 +64,11 @@ vi.mock('../session-state', async (importOriginal) => ({
 
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { initializeRecordingContext } from './recording-context.prepare';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 function createSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 1500,
     countdownSeconds: 3,
     diagnosticsEnabled: false,

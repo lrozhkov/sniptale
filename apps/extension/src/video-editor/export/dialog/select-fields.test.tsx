@@ -9,10 +9,12 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 import { createVideoExportCapabilities } from '../../../features/video/project/export/capabilities';
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
   VideoMp4Codec,
+  type VideoProjectExportSettings,
 } from '../../../features/video/project/types';
 import { ExportDialogNumberField, ExportDialogSelectFields } from './select-fields';
 
@@ -71,12 +73,15 @@ it('renders a read-only codec field when MP4 has only one available codec', () =
         })}
         onChange={onChange}
         selectedClipAvailable={false}
+        sourceDimensions={{ height: 1080, width: 1920 }}
         settings={{
           downloadAfterExport: true,
           format: VideoExportFormat.MP4,
+          resolution: 'SOURCE' as const,
+          mp4VideoCodec: 'AVC' as const,
           fps: 30,
           height: 1080,
-          quality: VideoExportQualityPreset.BALANCED,
+          quality: VideoExportQualityPreset.MEDIUM,
           width: 1920,
         }}
       />
@@ -106,12 +111,15 @@ it('hides MP4 from format options when capability probing marks it unavailable',
         })}
         onChange={onChange}
         selectedClipAvailable={false}
+        sourceDimensions={{ height: 1080, width: 1920 }}
         settings={{
           downloadAfterExport: true,
           format: VideoExportFormat.WEBM,
+          resolution: 'SOURCE' as const,
+          webmVideoCodec: 'VP9' as const,
           fps: 30,
           height: 1080,
-          quality: VideoExportQualityPreset.BALANCED,
+          quality: VideoExportQualityPreset.MEDIUM,
           width: 1920,
         }}
       />
@@ -132,4 +140,117 @@ it('hides MP4 from format options when capability probing marks it unavailable',
 
   expect(options).toContain('videoEditor.exportDialog.formatWebmLabel');
   expect(options).not.toContain('videoEditor.exportDialog.formatMp4Label');
+});
+
+it('fits an arbitrary source into the selected standard resolution without distortion', () => {
+  const onChange = vi.fn();
+
+  act(() => {
+    root?.render(
+      <ExportDialogSelectFields
+        capabilities={null}
+        onChange={onChange}
+        selectedClipAvailable={false}
+        sourceDimensions={{ height: 500, width: 1086 }}
+        settings={{
+          downloadAfterExport: true,
+          format: VideoExportFormat.WEBM,
+          resolution: 'SOURCE' as const,
+          webmVideoCodec: 'VP9' as const,
+          fps: 30,
+          height: 500,
+          quality: VideoExportQualityPreset.MEDIUM,
+          width: 1086,
+        }}
+      />
+    );
+  });
+
+  const resolutionTrigger = container?.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.exportDialog.resolutionLabel"]'
+  );
+  act(() => resolutionTrigger?.click());
+  const option = Array.from(
+    document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')
+  ).find((button) => button.textContent === '1080p');
+  act(() => option?.click());
+
+  expect(onChange).toHaveBeenCalledWith({
+    height: 1080,
+    resolution: VideoResolutionPreset.P1080,
+    width: 2346,
+  });
+});
+
+it('resolves every selection from immutable source dimensions without sequential drift', () => {
+  const onChange = vi.fn();
+  const sourceDimensions = { height: 479, width: 853 };
+  const settings: VideoProjectExportSettings = {
+    downloadAfterExport: true,
+    format: VideoExportFormat.WEBM,
+    resolution: 'SOURCE' as const,
+    webmVideoCodec: 'VP9' as const,
+    fps: 30,
+    height: 479,
+    quality: VideoExportQualityPreset.MEDIUM,
+    width: 853,
+  };
+
+  const renderFields = (nextSettings: VideoProjectExportSettings) => {
+    act(() => {
+      root?.render(
+        <ExportDialogSelectFields
+          capabilities={null}
+          onChange={onChange}
+          selectedClipAvailable={false}
+          settings={nextSettings}
+          sourceDimensions={sourceDimensions}
+        />
+      );
+    });
+  };
+  const selectResolution = (label: string) => {
+    const trigger = container?.querySelector<HTMLButtonElement>(
+      '[aria-label="videoEditor.exportDialog.resolutionLabel"]'
+    );
+    act(() => trigger?.click());
+    const option = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')
+    ).find((button) => button.textContent === label);
+    act(() => option?.click());
+  };
+
+  renderFields(settings);
+  selectResolution('480p');
+  expect(onChange).toHaveBeenLastCalledWith({
+    height: 480,
+    resolution: VideoResolutionPreset.P480,
+    width: 854,
+  });
+
+  renderFields({
+    ...settings,
+    height: 480,
+    resolution: VideoResolutionPreset.P480,
+    width: 854,
+  });
+  selectResolution('1080p');
+  expect(onChange).toHaveBeenLastCalledWith({
+    height: 1080,
+    resolution: VideoResolutionPreset.P1080,
+    width: 1924,
+  });
+
+  renderFields({
+    ...settings,
+    height: 1080,
+    resolution: VideoResolutionPreset.P1080,
+    width: 1924,
+  });
+  selectResolution('videoEditor.exportDialog.resolutionSource');
+  expect(onChange).toHaveBeenLastCalledWith({
+    height: 478,
+    resolution: VideoResolutionPreset.SOURCE,
+    width: 852,
+  });
 });

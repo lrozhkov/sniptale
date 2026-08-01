@@ -106,7 +106,8 @@ async function updateRecoveredViewportOutput(
       }
       throw new AggregateError(
         [initialError, error],
-        `Recovered viewport output ${frozen ? 'freeze' : 'resume'} could not be confirmed`
+        `Recovered viewport output ${frozen ? 'freeze' : 'resume'} could not be confirmed`,
+        { cause: error }
       );
     }
   }
@@ -271,7 +272,8 @@ async function recoverVideoCaptureSurfaceInternal(
     } catch (cleanupError) {
       throw new AggregateError(
         [error, cleanupError],
-        'Recovered recording validation and fail-closed cleanup both failed'
+        'Recovered recording validation and fail-closed cleanup both failed',
+        { cause: cleanupError }
       );
     }
   }

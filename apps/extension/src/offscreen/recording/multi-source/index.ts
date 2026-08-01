@@ -4,9 +4,10 @@ import { pauseSessionRecorders, resumeSessionRecorders, setSessionMediaEnabled }
 import { consumeDesktopStreams, disposeMultiSourceDesktopMedia } from '../setup/desktop-media';
 import { RECORDER_TIMESLICE_MS, initializeDurationPublishing } from './duration';
 import { finalizeSession } from './finalize';
-import { notifyMultiSourceStarted } from './messages';
+import { notifyMultiSourceRuntimeFailure, notifyMultiSourceStarted } from './messages';
 import { createMicrophoneRecorder, createSourceRecorders, stopRecorderStreams } from './recorders';
 import {
+  createMultiSourceLifecycle,
   getActiveMultiSourceSession,
   setActiveMultiSourceSession,
   type MultiSourceRecorder,
@@ -23,19 +24,6 @@ type PreparedMultiSourceRecorders = {
   recorders: MultiSourceRecorder[];
   webcamRecorder: RecordingSidecarRecorder | null;
 };
-
-function attachMultiSourceErrorHandler(recorder: MediaRecorder): void {
-  recorder.onerror = (event) => {
-    const session = getActiveMultiSourceSession();
-    if (!session) {
-      return;
-    }
-    failMultiSourceSession(
-      session,
-      getMediaRecorderError(event, 'A multi-source recorder failed.')
-    );
-  };
-}
 
 export function hasActiveMultiSourceRecording(): boolean {
   return getActiveMultiSourceSession() !== null;
@@ -82,9 +70,8 @@ async function orchestrateMultiSourceRecordingStart(params: {
     settings: params.settings,
   });
   setActiveMultiSourceSession(session);
-  startSessionRecorders(prepared);
-  initializeDurationPublishing(session);
-  notifyMultiSourceStarted(params.recordingId);
+  startSessionRecorders(session);
+  await session.lifecycle.startPromise;
 }
 
 async function prepareMultiSourceRecorders(params: {
@@ -153,6 +140,7 @@ function createMultiSourceSession(
   return {
     audioRecorder: params.audioRecorder,
     durationTimer: null,
+    lifecycle: createMultiSourceLifecycle(),
     recorders: params.recorders,
     recordingId: params.recordingId,
     settings: params.settings,
@@ -164,19 +152,53 @@ function createMultiSourceSession(
   };
 }
 
-function startSessionRecorders(prepared: PreparedMultiSourceRecorders): void {
-  [...prepared.recorders, prepared.audioRecorder, prepared.webcamRecorder].forEach((source) =>
-    startSessionRecorder(source?.recorder ?? null)
+function startSessionRecorders(session: MultiSourceSession): void {
+  const sources = [...session.recorders, session.audioRecorder, session.webcamRecorder].filter(
+    (source) => source !== null
   );
-}
+  const started = new Set<MediaRecorder>();
+  const fail = (error: Error) => {
+    const phase = session.lifecycle.phase;
+    if (failMultiSourceSession(session, error) && phase === 'active') {
+      notifyMultiSourceRuntimeFailure(session.recordingId, error);
+    }
+  };
 
-function startSessionRecorder(recorder: MediaRecorder | null): void {
-  if (!recorder) {
-    return;
+  sources.forEach((source) => {
+    const { recorder } = source;
+    recorder.onstart = () => {
+      if (session.lifecycle.phase !== 'starting') return;
+      started.add(recorder);
+      if (started.size !== sources.length || !session.lifecycle.activate()) return;
+      sources.forEach((activeSource) => {
+        activeSource.recorder.onstart = null;
+      });
+      session.startedAt = Date.now();
+      initializeDurationPublishing(session);
+      notifyMultiSourceStarted(session.recordingId);
+    };
+    recorder.onerror = (event) => {
+      fail(getMediaRecorderError(event, 'A multi-source recorder failed.'));
+    };
+    recorder.onstop = () => {
+      fail(
+        new Error(
+          session.lifecycle.phase === 'starting'
+            ? 'A required recorder stopped before multi-source activation.'
+            : 'A multi-source recorder stopped unexpectedly.'
+        )
+      );
+    };
+  });
+
+  for (const source of sources) {
+    if (session.lifecycle.phase === 'terminal') break;
+    try {
+      source.recorder.start(RECORDER_TIMESLICE_MS);
+    } catch (error) {
+      fail(error instanceof Error ? error : new Error(String(error)));
+    }
   }
-
-  attachMultiSourceErrorHandler(recorder);
-  recorder.start(RECORDER_TIMESLICE_MS);
 }
 
 export function pauseMultiSourceRecording(): void {

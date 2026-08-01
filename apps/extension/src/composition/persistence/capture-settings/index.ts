@@ -7,17 +7,33 @@ import type {
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { parseStoredVideoSettings, parseStoredVideoUiState } from './guards';
+import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
 
 const VIDEO_SETTINGS_KEY = 'sniptale_video_settings';
 const VIDEO_UI_STATE_KEY = 'sniptale_video_ui_state';
 const logger = createLogger({ namespace: 'SharedVideoStorage' });
 
+export type VideoSettingsMutation = (current: VideoRecordingSettings) => VideoRecordingSettings;
+
 /**
- * Saves video recording settings to chrome.storage.local
+ * Serializes every video-settings read-modify-write operation across extension contexts.
  */
-export async function saveVideoSettings(settings: VideoRecordingSettings): Promise<void> {
-  await browserStorage.local.set({ [VIDEO_SETTINGS_KEY]: settings });
-  logger.debug('Saved video settings');
+export function mutateVideoSettings(
+  mutation: VideoSettingsMutation
+): Promise<VideoRecordingSettings> {
+  return runWithPersistenceDomainMutationLock('video-settings', async (permit) => {
+    const current = await loadVideoSettings();
+    const next = mutation(current);
+    await browserStorage.local.set({ [VIDEO_SETTINGS_KEY]: next }, permit);
+    logger.debug('Saved video settings');
+    return next;
+  });
+}
+
+export function patchVideoSettings(
+  patch: Partial<VideoRecordingSettings>
+): Promise<VideoRecordingSettings> {
+  return mutateVideoSettings((current) => ({ ...current, ...patch }));
 }
 
 /**

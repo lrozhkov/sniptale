@@ -9,7 +9,7 @@ import type { NativeAppRuntimeStatus } from '../../../contracts/native-app/runti
 
 const mocks = vi.hoisted(() => ({
   loadVideoSettings: vi.fn(),
-  saveVideoSettings: vi.fn(),
+  mutateVideoSettings: vi.fn(),
   sendRuntimeMessage: vi.fn(),
 }));
 
@@ -26,7 +26,7 @@ function createDeferred<T>() {
 vi.mock('../../../composition/persistence/capture-settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/capture-settings')>()),
   loadVideoSettings: mocks.loadVideoSettings,
-  saveVideoSettings: mocks.saveVideoSettings,
+  mutateVideoSettings: mocks.mutateVideoSettings,
 }));
 
 vi.mock('../../runtime/messaging', () => ({
@@ -41,7 +41,9 @@ let root: Root | null = null;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.loadVideoSettings.mockResolvedValue(DEFAULT_VIDEO_SETTINGS);
-  mocks.saveVideoSettings.mockResolvedValue(undefined);
+  mocks.mutateVideoSettings.mockImplementation(async (mutation) =>
+    mutation(DEFAULT_VIDEO_SETTINGS)
+  );
   mocks.sendRuntimeMessage.mockResolvedValue({
     settings: DEFAULT_VIDEO_SETTINGS.native,
     status: createStatus('connected'),
@@ -73,8 +75,8 @@ async function renderSection() {
 }
 
 it('keeps an older settings save success from overwriting a newer action result', async () => {
-  const save = createDeferred<void>();
-  mocks.saveVideoSettings.mockReturnValueOnce(save.promise);
+  const save = createDeferred<typeof DEFAULT_VIDEO_SETTINGS>();
+  mocks.mutateVideoSettings.mockReturnValueOnce(save.promise);
   await renderSection();
   mocks.sendRuntimeMessage
     .mockResolvedValueOnce({
@@ -91,7 +93,7 @@ it('keeps an older settings save success from overwriting a newer action result'
   await clickFirstNativeSettingSwitch();
   await clickSyncSettings();
   await act(async () => {
-    save.resolve(undefined);
+    save.resolve(DEFAULT_VIDEO_SETTINGS);
     await Promise.resolve();
   });
 
@@ -100,8 +102,8 @@ it('keeps an older settings save success from overwriting a newer action result'
 });
 
 it('does not let an older settings save failure overwrite a newer action result', async () => {
-  const save = createDeferred<void>();
-  mocks.saveVideoSettings.mockReturnValueOnce(save.promise);
+  const save = createDeferred<typeof DEFAULT_VIDEO_SETTINGS>();
+  mocks.mutateVideoSettings.mockReturnValueOnce(save.promise);
   await renderSection();
   mocks.sendRuntimeMessage.mockResolvedValueOnce({
     settings: DEFAULT_VIDEO_SETTINGS.native,
@@ -123,8 +125,8 @@ it('does not let an older settings save failure overwrite a newer action result'
 });
 
 it('rolls back an optimistic settings change when the current save fails', async () => {
-  const save = createDeferred<void>();
-  mocks.saveVideoSettings.mockReturnValueOnce(save.promise);
+  const save = createDeferred<typeof DEFAULT_VIDEO_SETTINGS>();
+  mocks.mutateVideoSettings.mockReturnValueOnce(save.promise);
   await renderSection();
   const switchButton = container?.querySelector<HTMLButtonElement>('button[role="switch"]');
 

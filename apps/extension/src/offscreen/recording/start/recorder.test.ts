@@ -1,13 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // State-machine proof: terminal recorder lifecycle emits start/failure/cancel events through owners.
-const {
-  getSupportedRecordingMimeTypeMock,
-  loggerDebugMock,
-  loggerInfoMock,
-  sendRuntimeMessageMock,
-} = vi.hoisted(() => ({
-  getSupportedRecordingMimeTypeMock: vi.fn(),
+const { loggerDebugMock, loggerInfoMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
   loggerDebugMock: vi.fn(),
   loggerInfoMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
@@ -22,18 +16,18 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/observability/logger')>()),
   createLogger: () => ({
     debug: loggerDebugMock,
+    error: vi.fn(),
     info: loggerInfoMock,
+    warn: vi.fn(),
   }),
-}));
-
-vi.mock('../recorder-mime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../recorder-mime')>()),
-  getSupportedRecordingMimeType: getSupportedRecordingMimeTypeMock,
 }));
 
 import { recordingContext } from '../context';
 import { finalizeRecordingBootstrap } from './recorder';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
 
 type MediaRecorderMockInstance = {
   config: {
@@ -53,9 +47,11 @@ function installMediaRecorderMock(supportedMimeTypes: string[]) {
 
     ondataavailable = null;
     onerror = null;
+    onstart: (() => void) | null = null;
     onstop = null;
     start = vi.fn(() => {
       this.state = 'recording';
+      this.onstart?.();
     });
     stop = vi.fn(() => {
       this.state = 'inactive';
@@ -92,7 +88,10 @@ function createVideoStream(audioTrackCount = 0) {
 function bootstrapRecorder() {
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
-    settings: { quality: VideoQuality.HIGH } as never,
+    settings: {
+      output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+      quality: VideoQuality.HIGH,
+    } as never,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker: {
       reset: vi.fn(),
@@ -104,7 +103,10 @@ function bootstrapRecorder() {
 function bootstrapRecorderWithCursorMode(cursorCaptureMode: 'separate' | 'embedded-fallback') {
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
-    settings: { quality: VideoQuality.HIGH } as never,
+    settings: {
+      output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+      quality: VideoQuality.HIGH,
+    } as never,
     cursorCaptureMode,
     trackSettings: { width: 1280, height: 720, frameRate: 30 },
     durationTracker: {
@@ -117,7 +119,10 @@ function bootstrapRecorderWithCursorMode(cursorCaptureMode: 'separate' | 'embedd
 function bootstrapRecorderWithSurface(displaySurface: string | undefined) {
   finalizeRecordingBootstrap({
     resolvedRecordingId: 'recording-1',
-    settings: { quality: VideoQuality.HIGH } as never,
+    settings: {
+      output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+      quality: VideoQuality.HIGH,
+    } as never,
     cursorCaptureMode: 'separate',
     trackSettings: {
       width: 1280,
@@ -135,7 +140,6 @@ function bootstrapRecorderWithSurface(displaySurface: string | undefined) {
 function registerRecorderTestSetup() {
   beforeEach(() => {
     vi.clearAllMocks();
-    getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm;codecs=vp9');
     recordingContext.resetRecordingSession();
     recordingContext.mediaRecorder = null;
     recordingContext.videoStream = null;
@@ -154,10 +158,9 @@ function runMimeTypeSelectionSuite() {
     bootstrapRecorder();
 
     expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp9,opus');
-    expect(getSupportedRecordingMimeTypeMock).not.toHaveBeenCalled();
   });
 
-  it('prefers compatibility recorder mime types for derived canvas streams', () => {
+  it('keeps the selected codec for derived canvas streams', () => {
     installMediaRecorderMock(['video/webm;codecs=vp8', 'video/webm;codecs=vp9']);
     recordingContext.sourceStream = createVideoStream();
     recordingContext.videoStream = createVideoStream();
@@ -165,15 +168,13 @@ function runMimeTypeSelectionSuite() {
 
     bootstrapRecorder();
 
-    expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp8');
-    expect(getSupportedRecordingMimeTypeMock).not.toHaveBeenCalled();
+    expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp9');
   });
 }
 
 function runAudioFallbackMimeTypeSelectionSuite() {
-  it('prefers plain webm for streams with mixed audio', () => {
-    installMediaRecorderMock(['video/webm', 'video/webm;codecs=vp8,opus']);
-    getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm');
+  it('keeps the selected codec for streams with mixed audio', () => {
+    installMediaRecorderMock(['video/webm;codecs=vp9,opus']);
     recordingContext.audioMixer = {} as never;
     recordingContext.videoStream = createVideoStream(1);
     recordingContext.sourceStream = recordingContext.videoStream;
@@ -181,27 +182,25 @@ function runAudioFallbackMimeTypeSelectionSuite() {
 
     bootstrapRecorder();
 
-    expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm');
+    expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp9,opus');
     expect(lastMediaRecorderInstance?.config).not.toHaveProperty('audioBitsPerSecond');
   });
 
-  it('falls back to the canonical recorder mime order when audio is present', () => {
+  it('rejects another codec instead of silently falling back when audio is present', () => {
     installMediaRecorderMock(['video/webm;codecs=vp8,opus']);
-    getSupportedRecordingMimeTypeMock.mockReturnValue('video/webm;codecs=vp8,opus');
     recordingContext.videoStream = createVideoStream(1);
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-2');
 
-    bootstrapRecorder();
-
-    expect(lastMediaRecorderInstance?.config.mimeType).toBe('video/webm;codecs=vp8,opus');
-    expect(getSupportedRecordingMimeTypeMock).toHaveBeenCalledOnce();
+    expect(() => bootstrapRecorder()).toThrow(
+      'selected recording container and codec are not supported'
+    );
   });
 }
 
 function runCursorModeMessageSuite() {
   it('includes the verified cursor capture mode in the runtime start event when provided', () => {
-    installMediaRecorderMock(['video/webm;codecs=vp8']);
+    installMediaRecorderMock(['video/webm;codecs=vp9']);
     recordingContext.videoStream = createVideoStream();
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');
@@ -222,7 +221,7 @@ function runCursorModeMessageSuite() {
 
 function runDisplaySurfaceMessageSuite() {
   it('includes the validated display surface in the runtime start event when available', () => {
-    installMediaRecorderMock(['video/webm;codecs=vp8']);
+    installMediaRecorderMock(['video/webm;codecs=vp9']);
     recordingContext.videoStream = createVideoStream();
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');
@@ -242,7 +241,7 @@ function runDisplaySurfaceMessageSuite() {
   });
 
   it('omits unknown display-surface values from the runtime start event', () => {
-    installMediaRecorderMock(['video/webm;codecs=vp8']);
+    installMediaRecorderMock(['video/webm;codecs=vp9']);
     recordingContext.videoStream = createVideoStream();
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');
@@ -263,7 +262,7 @@ function runDisplaySurfaceMessageSuite() {
 
 function runCursorModeSurfaceFilterSuite() {
   it('filters unsupported display-surface values from the runtime start event', () => {
-    installMediaRecorderMock(['video/webm;codecs=vp8']);
+    installMediaRecorderMock(['video/webm;codecs=vp9']);
     recordingContext.videoStream = createVideoStream();
     recordingContext.sourceStream = recordingContext.videoStream;
     recordingContext.beginRecordingSession('recording-1');

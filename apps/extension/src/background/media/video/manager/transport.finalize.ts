@@ -51,15 +51,14 @@ export async function finalizeRecordingStart(context: {
   const multiSource =
     context.captureMode === CaptureMode.SCREEN &&
     normalizeVideoSourceCount(context.settings.sourceCount) > 1;
+  const requiresStableViewport =
+    context.captureMode === CaptureMode.TAB_CROP || context.surface?.target === 'viewport';
   const ready = multiSource
     ? null
     : waitForVideoSourceReady({
         recordingId: context.recordingId,
         expectedStreamInstanceId: context.streamInstanceId,
-        expectedViewport:
-          context.captureMode === CaptureMode.TAB || context.captureMode === CaptureMode.TAB_CROP
-            ? (context.viewport ?? null)
-            : null,
+        expectedViewport: requiresStableViewport ? (context.viewport ?? null) : null,
         tabId: context.tabId,
       });
   const observedReady = ready?.catch(() => null);

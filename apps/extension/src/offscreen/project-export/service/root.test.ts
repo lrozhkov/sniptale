@@ -15,8 +15,6 @@ const {
   cleanupJobMock,
   sendProgressMock,
   loadImagesForProjectMock,
-  canUsePassthroughPathMock,
-  exportPassthroughMock,
   loggerDebugMock,
   loggerErrorMock,
   renderCompositeExportMock,
@@ -29,8 +27,6 @@ const {
   cleanupJobMock: vi.fn(),
   sendProgressMock: vi.fn(),
   loadImagesForProjectMock: vi.fn(),
-  canUsePassthroughPathMock: vi.fn(),
-  exportPassthroughMock: vi.fn(),
   loggerDebugMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   renderCompositeExportMock: vi.fn(),
@@ -53,8 +49,6 @@ vi.mock('../media', async (importOriginal) => ({
 }));
 
 vi.mock('../render', () => ({
-  canUsePassthroughPath: canUsePassthroughPathMock,
-  exportPassthrough: exportPassthroughMock,
   renderCompositeExport: renderCompositeExportMock,
 }));
 
@@ -124,8 +118,10 @@ function createExportSettings(): VideoProjectExportSettings {
     width: 1280,
     height: 720,
     fps: 30,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     downloadAfterExport: true,
   };
 }
@@ -152,8 +148,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   sendProgressMock.mockResolvedValue(undefined);
   loadImagesForProjectMock.mockResolvedValue(new Map());
-  canUsePassthroughPathMock.mockReturnValue(false);
-  exportPassthroughMock.mockResolvedValue(undefined);
   sendRuntimeMessageBestEffortMock.mockReturnValue(undefined);
   loadActiveLedgerMock.mockResolvedValue(null);
   markTerminalMock.mockResolvedValue(null);

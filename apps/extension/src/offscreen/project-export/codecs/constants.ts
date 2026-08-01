@@ -1,6 +1,5 @@
 import type { TranslationKey } from '../../../platform/i18n';
 import {
-  VideoExportQualityPreset,
   VideoMp4Codec,
   type VideoMp4Codec as VideoMp4CodecType,
 } from '../../../features/video/project/types/export';
@@ -26,27 +25,6 @@ export const MP4_CODEC_PRIORITY: readonly VideoMp4CodecType[] = [
   VideoMp4Codec.HEVC,
   VideoMp4Codec.VP9,
 ] as const;
-
-export const EXPORT_BITRATES_BY_CODEC: Record<
-  VideoMp4CodecType,
-  Record<VideoExportQualityPreset, number>
-> = {
-  [VideoMp4Codec.AVC]: {
-    [VideoExportQualityPreset.DRAFT]: 4_000_000,
-    [VideoExportQualityPreset.BALANCED]: 8_000_000,
-    [VideoExportQualityPreset.HIGH]: 12_000_000,
-  },
-  [VideoMp4Codec.HEVC]: {
-    [VideoExportQualityPreset.DRAFT]: 2_800_000,
-    [VideoExportQualityPreset.BALANCED]: 5_600_000,
-    [VideoExportQualityPreset.HIGH]: 8_400_000,
-  },
-  [VideoMp4Codec.VP9]: {
-    [VideoExportQualityPreset.DRAFT]: 3_200_000,
-    [VideoExportQualityPreset.BALANCED]: 6_400_000,
-    [VideoExportQualityPreset.HIGH]: 9_600_000,
-  },
-};
 
 const MP4_AUDIO_BITRATE = 192_000;
 const MP4_OPUS_AUDIO_BITRATE = 160_000;

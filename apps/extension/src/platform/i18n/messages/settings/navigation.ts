@@ -33,6 +33,10 @@ export const settingsNavigationMessages = defineMessageSource({
     ru: 'Изображения',
     en: 'Images',
   },
+  video: {
+    ru: 'Качество видео',
+    en: 'Video quality',
+  },
   quickactions: {
     ru: 'Быстрые действия',
     en: 'Quick actions',

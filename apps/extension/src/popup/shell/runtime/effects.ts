@@ -11,7 +11,12 @@ import { type MicrophoneOption } from '../../recording/microphone';
 import { type RefreshMicrophoneDevicesOptions } from '../../recording/microphone-flow';
 import { type WebcamOption } from '../../recording/webcam';
 import { type RefreshWebcamDevicesOptions } from '../../recording/webcam-flow';
-import { persistVideoSettings, persistVideoUiState } from '../../recording/persistence';
+import {
+  areVideoSettingsEqual,
+  createVideoSettingsPatch,
+  persistVideoSettings,
+  persistVideoUiState,
+} from '../../recording/persistence';
 import type { PopupPage } from '../navigation/actions';
 import { usePopupMediaDeviceEffects } from './media-device-effects';
 import type { RecordingControlCapability } from './recording-control-capability';
@@ -70,40 +75,90 @@ function useVideoSettingsPersistenceEffect(state: {
   setVideoSettings: Dispatch<SetStateAction<VideoRecordingSettings>>;
 }) {
   const committedVideoSettingsRef = useRef(state.videoSettings);
+  const enqueuedVideoSettingsRef = useRef(state.videoSettings);
+  const latestVideoSettingsRef = useRef(state.videoSettings);
+  const failedVideoSettingsPatchRef = useRef<Partial<VideoRecordingSettings>>({});
+  const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const mountedRef = useRef(true);
   const restoringVideoSettingsRef = useRef(false);
+  const wasReadyRef = useRef(state.isReady);
   const { isReady, setVideoSettings, videoSettings } = state;
+  latestVideoSettingsRef.current = videoSettings;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isReady) {
+      committedVideoSettingsRef.current = videoSettings;
+      enqueuedVideoSettingsRef.current = videoSettings;
+      failedVideoSettingsPatchRef.current = {};
+      wasReadyRef.current = false;
+      return;
+    }
+
+    if (!wasReadyRef.current) {
+      committedVideoSettingsRef.current = videoSettings;
+      enqueuedVideoSettingsRef.current = videoSettings;
+      failedVideoSettingsPatchRef.current = {};
+      wasReadyRef.current = true;
       return;
     }
 
     if (restoringVideoSettingsRef.current) {
       restoringVideoSettingsRef.current = false;
+      enqueuedVideoSettingsRef.current = videoSettings;
       return;
     }
 
-    let cancelled = false;
+    if (areVideoSettingsEqual(enqueuedVideoSettingsRef.current, videoSettings)) {
+      return;
+    }
 
-    persistVideoSettings(videoSettings)
-      .then(() => {
-        if (!cancelled) {
-          committedVideoSettingsRef.current = videoSettings;
+    const previousEnqueued = enqueuedVideoSettingsRef.current;
+    const desired = videoSettings;
+    const localPatch = createVideoSettingsPatch(previousEnqueued, desired);
+    enqueuedVideoSettingsRef.current = desired;
+    persistenceQueueRef.current = persistenceQueueRef.current.then(async () => {
+      const patch = { ...failedVideoSettingsPatchRef.current, ...localPatch };
+      failedVideoSettingsPatchRef.current = {};
+      if (Object.keys(patch).length === 0) return;
+      try {
+        const persisted = await persistVideoSettings(patch);
+        committedVideoSettingsRef.current = persisted;
+        if (
+          mountedRef.current &&
+          areVideoSettingsEqual(enqueuedVideoSettingsRef.current, desired) &&
+          !areVideoSettingsEqual(persisted, latestVideoSettingsRef.current)
+        ) {
+          restoringVideoSettingsRef.current = true;
+          enqueuedVideoSettingsRef.current = persisted;
+          setVideoSettings(persisted);
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         logger.error('Failed to persist video settings', error);
-        if (cancelled) {
-          return;
+        const hasNewerLocalSettings = !areVideoSettingsEqual(
+          enqueuedVideoSettingsRef.current,
+          desired
+        );
+        if (hasNewerLocalSettings) {
+          failedVideoSettingsPatchRef.current = {
+            ...patch,
+            ...failedVideoSettingsPatchRef.current,
+          };
+        } else if (mountedRef.current) {
+          const committed = committedVideoSettingsRef.current;
+          restoringVideoSettingsRef.current = true;
+          enqueuedVideoSettingsRef.current = committed;
+          setVideoSettings(committed);
         }
-        restoringVideoSettingsRef.current = true;
-        setVideoSettings(committedVideoSettingsRef.current);
         toast.error(translate('common.states.error'));
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      }
+    });
   }, [isReady, setVideoSettings, videoSettings]);
 }
 

@@ -8,6 +8,7 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { MicrophoneSettingsPanel } from './microphone-settings-panel';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
@@ -70,6 +71,7 @@ class FakeStream {
 
 function createSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 3,
     autoGainControl: true,
     countdownSeconds: 0,

@@ -1,7 +1,6 @@
-import type { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 
-export interface TabCaptureSettings {
-  quality: VideoQuality;
+export interface TabCaptureSettings extends Pick<VideoRecordingSettings, 'output' | 'quality'> {
   streamId: string;
   systemAudioEnabled: boolean;
   microphoneEnabled: boolean;

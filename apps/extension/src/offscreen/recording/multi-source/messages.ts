@@ -18,6 +18,17 @@ export function notifyMultiSourceStarted(
   });
 }
 
+export function notifyMultiSourceRuntimeFailure(recordingId: string, error: Error): void {
+  void sendRuntimeMessage({
+    type: VideoMessageType.OFFSCREEN_ERROR,
+    error: error.message,
+    phase: 'runtime',
+    recordingId,
+  }).catch((notifyError) => {
+    logger.debug('Failed to notify multi-source runtime failure', notifyError);
+  });
+}
+
 export async function notifyMultiSourceStopped(recordingId: string): Promise<void> {
   await sendRuntimeMessage({
     type: VideoMessageType.OFFSCREEN_RECORDING_STOPPED,

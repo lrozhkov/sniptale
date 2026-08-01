@@ -56,7 +56,8 @@ export async function releaseQuickActionSurfaceAfterFailure(
   } catch (rollbackError) {
     throw new AggregateError(
       [cause, rollbackError],
-      'Quick-action surface operation and rollback both failed'
+      'Quick-action surface operation and rollback both failed',
+      { cause: rollbackError }
     );
   }
   throw cause;

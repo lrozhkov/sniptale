@@ -94,11 +94,11 @@ function createStreamWithStops(stops: Array<() => void>) {
 }
 
 function verifiesTabCaptureFilename(): void {
-  expect(buildTabCaptureFilename(createFakeTraceDate())).toBe(
+  expect(buildTabCaptureFilename(createFakeTraceDate(), 'webm')).toBe(
     'Sniptale_TabCapture_2026-03-20_08-09-10.webm'
   );
-  expect(buildTabCaptureFilename(createFakeTraceDate())).toBe(
-    buildTimestampedRecordingFilename('Sniptale_TabCapture', createFakeTraceDate())
+  expect(buildTabCaptureFilename(createFakeTraceDate(), 'webm')).toBe(
+    buildTimestampedRecordingFilename('Sniptale_TabCapture', createFakeTraceDate(), 'webm')
   );
 }
 

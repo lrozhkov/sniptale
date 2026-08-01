@@ -1,5 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { createAudioStream, createStream, createTrackedStream } from './media-stream.test-support';
 
 const {
@@ -25,8 +28,8 @@ vi.mock('../setup/desktop-media', async (importOriginal) => {
   };
 });
 
-vi.mock('./normalize', () => ({
-  normalizeMultiSourceVideoStream: normalizeMultiSourceVideoStreamMock,
+vi.mock('../stream/fixed-video-output', () => ({
+  createFixedVideoOutputStream: normalizeMultiSourceVideoStreamMock,
 }));
 
 vi.mock('../../../composition/persistence/projects/index-mutations', async (importOriginal) => ({
@@ -53,8 +56,12 @@ vi.mock('../../../platform/runtime-messaging', async (importOriginal) => {
 });
 
 import { startMultiSourceRecording, stopMultiSourceRecording } from '.';
+import { createMultiSourceWebcamRecorder, saveWebcamRecording } from './webcam';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 class FakeMediaRecorder {
+  static emittedChunkMimeType: string | null = null;
+  static forceEmptyMimeType = false;
   static instances: FakeMediaRecorder[] = [];
   static isTypeSupported() {
     return true;
@@ -63,6 +70,7 @@ class FakeMediaRecorder {
   mimeType: string;
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onerror: ((event: { error?: Error }) => void) | null = null;
+  onstart: (() => void) | null = null;
   onstop: (() => void) | null = null;
   state: RecordingState = 'inactive';
 
@@ -70,16 +78,21 @@ class FakeMediaRecorder {
     readonly stream: MediaStream,
     options: MediaRecorderOptions
   ) {
-    this.mimeType = options.mimeType ?? 'video/webm';
+    this.mimeType = FakeMediaRecorder.forceEmptyMimeType ? '' : (options.mimeType ?? 'video/webm');
     FakeMediaRecorder.instances.push(this);
   }
 
   requestData() {
-    this.ondataavailable?.({ data: new Blob(['chunk'], { type: this.mimeType }) });
+    this.ondataavailable?.({
+      data: new Blob(['chunk'], {
+        type: FakeMediaRecorder.emittedChunkMimeType ?? this.mimeType,
+      }),
+    });
   }
 
   start() {
     this.state = 'recording';
+    this.onstart?.();
   }
 
   stop() {
@@ -90,6 +103,7 @@ class FakeMediaRecorder {
 
 function createSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 3,
     controlledCursorCaptureEnabled: false,
     countdownSeconds: 0,
@@ -97,6 +111,7 @@ function createSettings() {
     microphoneDeviceId: null,
     microphoneEnabled: true,
     openEditorAfterRecording: true,
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.HIGH,
     sourceCount: 2,
     systemAudioEnabled: false,
@@ -108,6 +123,8 @@ function createSettings() {
 beforeEach(() => {
   vi.clearAllMocks();
   FakeMediaRecorder.instances = [];
+  FakeMediaRecorder.emittedChunkMimeType = null;
+  FakeMediaRecorder.forceEmptyMimeType = false;
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
   sendRuntimeMessageMock.mockResolvedValue({ success: true });
   saveRecordingSafelyMock.mockResolvedValue(undefined);
@@ -115,6 +132,7 @@ beforeEach(() => {
   normalizeMultiSourceVideoStreamMock.mockImplementation((stream: MediaStream) =>
     Promise.resolve({
       dimensions: stream.getVideoTracks()[0]?.getSettings() ?? { height: 720, width: 1280 },
+      frameRate: 30,
       stream,
     })
   );
@@ -176,6 +194,45 @@ it('saves webcam recordings without creating a project when editor-open is disab
     expect.stringContaining('webcam.webm')
   );
   expect(saveVideoProjectMock).not.toHaveBeenCalled();
+});
+
+it('uses the emitted chunk MIME when a recorder does not expose its MIME type', async () => {
+  FakeMediaRecorder.forceEmptyMimeType = true;
+  FakeMediaRecorder.emittedChunkMimeType = 'video/webm';
+  vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(createStream(640, 360));
+
+  await startMultiSourceRecording({
+    recordingId: 'chunk-mime',
+    settings: {
+      ...createSettings(),
+      microphoneEnabled: false,
+      openEditorAfterRecording: false,
+    },
+  });
+  await stopMultiSourceRecording();
+
+  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
+    'chunk-mime-webcam',
+    expect.objectContaining({ type: 'video/webm' }),
+    expect.stringContaining('webcam.webm')
+  );
+});
+
+it('rejects webcam artifacts when neither the recorder nor its chunks expose a MIME type', async () => {
+  vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(createStream(640, 360));
+  const source = await createMultiSourceWebcamRecorder({
+    baseRecordingId: 'missing-mime',
+    settings: createSettings(),
+  });
+  if (!source) {
+    throw new Error('Expected a webcam recorder fixture');
+  }
+  Object.defineProperty(source.recorder, 'mimeType', { configurable: true, value: '' });
+
+  await expect(saveWebcamRecording(source, 1)).rejects.toThrow(
+    'Unsupported recorded video MIME type: (empty)'
+  );
+  expect(saveRecordingSafelyMock).not.toHaveBeenCalled();
 });
 
 it('discards webcam sessions without saving outputs', async () => {

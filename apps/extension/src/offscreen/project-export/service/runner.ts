@@ -1,7 +1,7 @@
 import { cleanupJob, sendProgress } from '../runtime';
 import { loadImagesForProject } from '../media';
 import { translate } from '../../../platform/i18n';
-import { canUsePassthroughPath, exportPassthrough, renderCompositeExport } from '../render';
+import { renderCompositeExport } from '../render';
 import { resolveProjectRenderScope } from '../scope';
 import type { ExportJobState } from '../types';
 import {
@@ -32,11 +32,6 @@ export async function runProjectExport(
   );
 
   assertProjectExportNotCancelled(jobState);
-
-  if (canUsePassthroughPath(project, settings)) {
-    await exportPassthrough(jobState, project, settings);
-    return;
-  }
 
   const renderProject = resolveProjectRenderScope(project, settings);
   const loadedImages = await loadImagesForProject(

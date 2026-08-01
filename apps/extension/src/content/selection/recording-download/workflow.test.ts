@@ -52,7 +52,7 @@ async function flushRecordingWorkflow(): Promise<void> {
 
 function runFilenameTests() {
   it('builds a timestamped recording filename from the provided prefix', () => {
-    expect(buildTimestampedRecordingFilename('Sniptale_Test', createFakeTraceDate())).toBe(
+    expect(buildTimestampedRecordingFilename('Sniptale_Test', createFakeTraceDate(), 'webm')).toBe(
       'Sniptale_Test_2026-03-20_08-09-10.webm'
     );
   });
@@ -207,11 +207,32 @@ function runContentRecordingArtifactTests() {
     expect(didSave).toBe(true);
     await flushRecordingWorkflow();
 
-    expect(artifacts.buildFilename(createFakeTraceDate())).toBe(
+    expect(artifacts.buildFilename(createFakeTraceDate(), 'webm')).toBe(
       'Sniptale_Test_2026-03-20_08-09-10.webm'
     );
     expectPreparedPayloadLog(logger);
     expectRecordingMessages(sendMessage);
+  });
+
+  it('uses the actual MP4 recorder MIME for the staged artifact and filename', async () => {
+    const logger = createLoggerMock();
+    const sendMessage = createRecordingSendMessageMock();
+
+    const didSave = createTestArtifacts(logger).saveRecording({
+      recordedChunks: [new Blob(['video-data'], { type: 'video/mp4' })],
+      recorderMimeType: 'video/mp4;codecs=avc1.640028',
+      sendMessage,
+    });
+    await flushRecordingWorkflow();
+
+    expect(didSave).toBe(true);
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: expect.stringMatching(/\.mp4$/),
+        mimeType: 'video/mp4',
+        type: 'SAVE_RECORDING_FOR_DOWNLOAD',
+      })
+    );
   });
 }
 

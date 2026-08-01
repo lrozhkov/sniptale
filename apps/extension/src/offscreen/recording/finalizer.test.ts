@@ -119,7 +119,7 @@ async function verifySuccessfulFinalizePath() {
   });
   expect(persistStaticFrameSignalsMock).toHaveBeenCalledWith(
     'rec-1',
-    expect.objectContaining({ type: 'video/webm;codecs=vp8,opus' })
+    expect.objectContaining({ type: 'video/webm' })
   );
   expect(
     sendRuntimeMessageMock.mock.calls.findIndex(
@@ -132,7 +132,7 @@ async function verifySuccessfulFinalizePath() {
   );
   expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
     'rec-1',
-    expect.objectContaining({ type: 'video/webm;codecs=vp8,opus' }),
+    expect.objectContaining({ type: 'video/webm' }),
     expect.stringMatching(/^Sniptale-.*\.webm$/)
   );
 }
@@ -162,7 +162,9 @@ async function verifyFailedSavePath() {
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   saveRecordingSafelyMock.mockRejectedValue(new Error('save failed'));
 
-  await expect(finalizeRecording([new Blob(['video'])], null)).resolves.toBeNull();
+  await expect(
+    finalizeRecording([new Blob(['video'], { type: 'video/webm' })], null)
+  ).resolves.toBeNull();
 
   expect(loggerErrorMock).toHaveBeenCalledWith(
     'Failed to save recording to media hub',
@@ -178,7 +180,7 @@ async function verifyDiscardedFinalizePath() {
   sendRuntimeMessageMock.mockResolvedValue(undefined);
 
   await expect(
-    finalizeRecording([new Blob(['video'])], 'rec-2', undefined, true)
+    finalizeRecording([new Blob(['video'], { type: 'video/webm' })], 'rec-2', undefined, true)
   ).resolves.toBeNull();
 
   expect(persistStaticFrameSignalsMock).not.toHaveBeenCalled();
@@ -267,6 +269,26 @@ async function verifySidecarDiscardPath() {
   expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
 }
 
+async function verifyMp4SidecarFinalizePath() {
+  sendRuntimeMessageMock.mockResolvedValue(undefined);
+  saveRecordingSafelyMock.mockResolvedValue(undefined);
+
+  const result = await finalizeSidecarRecording({
+    chunks: [new Blob(['webcam'], { type: 'video/mp4' })],
+    discard: false,
+    filenameSuffix: 'webcam',
+    mimeType: 'video/mp4;codecs=avc1.640028',
+    recordingId: 'rec-1-webcam-mp4',
+  });
+
+  expect(result?.filename).toMatch(/-webcam\.mp4$/);
+  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
+    'rec-1-webcam-mp4',
+    expect.objectContaining({ type: 'video/mp4' }),
+    expect.stringMatching(/-webcam\.mp4$/)
+  );
+}
+
 function runOffscreenFinalizerSuite() {
   it(
     'returns null and notifies the runtime when there are no recorded chunks',
@@ -288,6 +310,7 @@ function runOffscreenFinalizerSuite() {
     'backs up and saves webcam sidecar recordings without main-recording events',
     verifySidecarFinalizePath
   );
+  it('uses an mp4 artifact for an mp4 webcam sidecar recorder', verifyMp4SidecarFinalizePath);
   it('skips webcam sidecar persistence on discard', verifySidecarDiscardPath);
 }
 

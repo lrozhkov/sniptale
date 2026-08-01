@@ -118,6 +118,8 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
     reason:
       'Runtime popup-export web snapshot routing is covered by focused popup-export route tests.',
     testFiles: [
+      'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.branches.test.ts',
+      'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.content-intent.test.ts',
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.test.ts',
       'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.viewer.test.ts',
     ],

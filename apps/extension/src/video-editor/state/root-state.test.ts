@@ -183,8 +183,9 @@ function verifyProjectHydration(): void {
     error: null,
     exportState: {
       settings: expect.objectContaining({
-        height: 900,
-        width: 1440,
+        height: 1080,
+        resolution: '1080P',
+        width: 1728,
       }),
     },
     isReady: true,

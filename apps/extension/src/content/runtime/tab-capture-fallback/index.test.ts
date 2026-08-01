@@ -1,5 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { createTabCaptureSession } from '.';
 import type { CaptureProgress, TabCaptureSettings } from './types';
 
@@ -85,6 +88,7 @@ class FakeMediaRecorder extends EventTarget implements MediaRecorder {
 
 function createSettings(): TabCaptureSettings {
   return {
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.MEDIUM,
     streamId: 'stream-id',
     systemAudioEnabled: true,

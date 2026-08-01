@@ -56,6 +56,7 @@ class OffscreenRecordingContext {
   });
 
   #lifecycleState: RecordingLifecycleState = 'idle';
+  #startingRecorderCancellation: (() => void) | null = null;
 
   get lifecycleState(): RecordingLifecycleState {
     return this.#lifecycleState;
@@ -99,9 +100,37 @@ class OffscreenRecordingContext {
     );
   }
 
-  activateRecorder(mediaRecorder: MediaRecorder): void {
-    this.#setLifecycleState('recording', 'activateRecorder');
+  bindStartingRecorder(mediaRecorder: MediaRecorder): void {
+    if (this.lifecycleState !== 'starting' || this.mediaRecorder !== null) {
+      throw new Error('Recording session cannot bind a starting recorder');
+    }
     this.mediaRecorder = mediaRecorder;
+  }
+
+  registerStartingRecorderCancellation(mediaRecorder: MediaRecorder, cancel: () => void): void {
+    if (this.lifecycleState !== 'starting' || this.mediaRecorder !== mediaRecorder) {
+      throw new Error('Recording session cannot register stale recorder cancellation');
+    }
+    this.#startingRecorderCancellation = cancel;
+  }
+
+  cancelStartingRecorder(): boolean {
+    if (this.lifecycleState !== 'starting') {
+      return false;
+    }
+    this.#setLifecycleState('stopping', 'cancelStartingRecorder');
+    const cancel = this.#startingRecorderCancellation;
+    this.#startingRecorderCancellation = null;
+    cancel?.();
+    return true;
+  }
+
+  activateRecorder(mediaRecorder: MediaRecorder): void {
+    if (this.mediaRecorder !== mediaRecorder) {
+      throw new Error('Recording session cannot activate an unbound recorder');
+    }
+    this.#setLifecycleState('recording', 'activateRecorder');
+    this.#startingRecorderCancellation = null;
   }
 
   beginStopRequest(handlers: StopRequestHandlers): void {
@@ -119,6 +148,7 @@ class OffscreenRecordingContext {
     const reject = this.stopRecordingReject;
     this.stopRecordingResolve = null;
     this.stopRecordingReject = null;
+    this.#startingRecorderCancellation = null;
     return { resolve, reject };
   }
 
@@ -144,6 +174,7 @@ class OffscreenRecordingContext {
     this.discardOnStop = false;
     this.stopRecordingResolve = null;
     this.stopRecordingReject = null;
+    this.#startingRecorderCancellation = null;
     this.#setLifecycleState('idle', 'resetRecordingSession');
   }
 
@@ -151,7 +182,7 @@ class OffscreenRecordingContext {
     const allowedTransitions: Record<RecordingLifecycleState, readonly RecordingLifecycleState[]> =
       {
         idle: ['idle', 'starting'],
-        starting: ['idle', 'recording'],
+        starting: ['idle', 'recording', 'stopping'],
         recording: ['idle', 'stopping'],
         stopping: ['idle', 'stopping'],
       };

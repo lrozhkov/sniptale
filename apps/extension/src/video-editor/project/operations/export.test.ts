@@ -68,14 +68,17 @@ function createInputReference(jobId: string, projectId: string) {
 function createSettings(
   format: VideoExportFormat = VideoExportFormat.MP4
 ): VideoProjectExportSettings {
-  return {
-    format,
+  const base = {
+    resolution: 'SOURCE' as const,
     width: 1920,
     height: 1080,
     fps: 30,
     quality: VideoExportQualityPreset.HIGH,
     downloadAfterExport: true,
   };
+  return format === VideoExportFormat.MP4
+    ? { ...base, format, mp4VideoCodec: 'AVC' }
+    : { ...base, format, webmVideoCodec: 'VP9' };
 }
 
 it('sends start export requests through the runtime transport', async () => {

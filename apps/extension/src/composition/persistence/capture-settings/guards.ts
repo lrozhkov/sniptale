@@ -1,6 +1,8 @@
 import {
   CaptureMode,
+  isVideoRecordingOutputSettings,
   normalizeVideoSourceCount,
+  parseVideoRecordingQualityProfiles,
   VideoQuality,
   WebcamFrameRatePreset,
   WebcamResolutionPreset,
@@ -110,6 +112,25 @@ function parseOptionalWebcamQuality(
   };
 }
 
+function parseOptionalVideoOutput(
+  value: unknown
+): ParsedFieldValue<VideoRecordingSettings['output']> {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return isVideoRecordingOutputSettings(value) ? value : INVALID_FIELD;
+}
+
+function parseOptionalVideoQualityProfiles(
+  value: unknown
+): ParsedFieldValue<VideoRecordingSettings['qualityProfiles']> {
+  if (value === undefined) {
+    return undefined;
+  }
+  return parseVideoRecordingQualityProfiles(value) ?? INVALID_FIELD;
+}
+
 function assignParsedVideoSettingsField<TKey extends keyof VideoRecordingSettings>(
   target: Partial<VideoRecordingSettings>,
   key: TKey,
@@ -139,6 +160,9 @@ const VIDEO_SETTINGS_FIELD_PARSERS = [
   ['systemAudioEnabled', parseOptionalBoolean],
   ['sourceCount', parseOptionalNumber],
   ['quality', parseOptionalVideoQuality],
+  ['output', parseOptionalVideoOutput],
+  ['qualityProfileId', parseOptionalNullableString],
+  ['qualityProfiles', parseOptionalVideoQualityProfiles],
   ['countdownSeconds', parseOptionalNumber],
   ['autoFadeDelay', parseOptionalNumber],
   ['openEditorAfterRecording', parseOptionalBoolean],
@@ -179,6 +203,14 @@ export function parseStoredVideoSettings(value: unknown): ParsedVideoSettingsSto
   }
 
   if (!isRecord(value)) {
+    return { value: {}, hasInvalidRoot: true, invalidFieldCount: 0 };
+  }
+
+  if (
+    !Object.hasOwn(value, 'output') ||
+    !Object.hasOwn(value, 'qualityProfileId') ||
+    !Object.hasOwn(value, 'qualityProfiles')
+  ) {
     return { value: {}, hasInvalidRoot: true, invalidFieldCount: 0 };
   }
 

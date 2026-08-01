@@ -21,25 +21,31 @@ vi.mock('../../../ui/popup-shell/icon-state-button', () => ({
 }));
 
 import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoRecordingBuiltInProfileId,
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { getQualityOption } from './settings/quality-card/options';
 import { QualityCard } from './settings/quality-card/view';
 import { ModeIconButton } from './setup/primitives';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 function createSettings(quality: VideoQuality): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     openEditorAfterRecording: false,
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality,
+    qualityProfileId: VideoRecordingBuiltInProfileId.OPTIMAL,
     systemAudioEnabled: true,
   };
 }
@@ -66,11 +72,11 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('resolves translated quality labels and patches selected quality changes', () => {
+it('resolves translated quality labels and materializes selected recording profiles', () => {
   const onSettingsChange = vi.fn();
   const low = QualityCard({
     onSettingsChange,
-    settings: createSettings(VideoQuality.LOW),
+    settings: createSettings(VideoQuality.HIGH),
   });
 
   expect(getQualityOption(VideoQuality.LOW)).toEqual(
@@ -81,15 +87,19 @@ it('resolves translated quality labels and patches selected quality changes', ()
   );
   expect(low.props.options).toContainEqual(
     expect.objectContaining({
-      description: 't:popup.labels.qualityUltraDescription',
-      label: 't:popup.labels.qualityUltra',
-      value: VideoQuality.ULTRA,
+      label: 't:popup.video.profileMaximum',
+      value: VideoRecordingBuiltInProfileId.MAXIMUM,
     })
   );
 
-  low.props.onChange(VideoQuality.ULTRA);
+  low.props.onChange(VideoRecordingBuiltInProfileId.MAXIMUM);
 
-  expect(onSettingsChange).toHaveBeenCalledWith({ quality: VideoQuality.ULTRA });
+  expect(onSettingsChange).toHaveBeenCalledWith(
+    expect.objectContaining({
+      quality: VideoQuality.ULTRA,
+      qualityProfileId: VideoRecordingBuiltInProfileId.MAXIMUM,
+    })
+  );
 });
 
 it('forwards the disabled state through the shared mode button helper', async () => {

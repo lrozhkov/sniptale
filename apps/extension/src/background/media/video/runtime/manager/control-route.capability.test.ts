@@ -62,6 +62,7 @@ vi.mock('../camera-recorder-control', async (importOriginal) => ({
   isAuthorizedCameraRecorderDocument: isAuthorizedCameraRecorderDocumentMock,
 }));
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { routeVideoControlMessage as routeVideoControlMessageBase } from './control-route';
 
@@ -85,6 +86,7 @@ function createStartMessage() {
   return {
     type: VideoMessageType.START_RECORDING,
     settings: {
+      ...DEFAULT_VIDEO_SETTINGS,
       microphoneEnabled: true,
       microphoneDeviceId: null,
       systemAudioEnabled: true,

@@ -46,6 +46,7 @@ vi.mock('../sender-policy', async (importOriginal) => ({
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { routeVideoControlMessage } from './control-route';
 
 function createLowHeadroomError() {
@@ -69,6 +70,7 @@ function createLowHeadroomError() {
 function createStartRecordingMessage() {
   return {
     settings: {
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 1500,
       countdownSeconds: 3,
       diagnosticsEnabled: false,

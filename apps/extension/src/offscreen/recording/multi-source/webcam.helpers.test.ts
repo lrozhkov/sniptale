@@ -41,22 +41,15 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-it('saves webcam recordings with video defaults for empty recorder metadata', async () => {
-  const result = await saveWebcamRecording(createWebcamRecorder(), 3);
-
-  expect(result.mimeType).toBe('video/webm');
-  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
-    'rec-webcam',
-    expect.objectContaining({ type: 'video/webm' }),
-    expect.stringContaining('webcam.webm')
+it('rejects webcam artifacts when recorder and chunk MIME metadata are empty', async () => {
+  await expect(saveWebcamRecording(createWebcamRecorder(), 3)).rejects.toThrow(
+    'Unsupported recorded video MIME type: (empty)'
   );
-  expect(triggerMultiSourceDownloadMock).toHaveBeenCalledWith(
-    'rec-webcam',
-    expect.stringContaining('webcam.webm')
-  );
+  expect(saveRecordingSafelyMock).not.toHaveBeenCalled();
+  expect(triggerMultiSourceDownloadMock).not.toHaveBeenCalled();
 });
 
-it('builds webcam project input with default dimensions and null passthrough', () => {
+it('builds webcam project input from verified dimensions and preserves null passthrough', () => {
   expect(createWebcamProjectInput(null)).toBeNull();
   expect(
     createWebcamProjectInput({
@@ -64,7 +57,7 @@ it('builds webcam project input with default dimensions and null passthrough', (
       duration: 3,
       filename: 'webcam.webm',
       mimeType: 'video/webm',
-      source: createWebcamRecorder(),
+      source: createWebcamRecorder({ trackSettings: { height: 720, width: 1280 } }),
     })
   ).toEqual({
     recordingId: 'rec-webcam',
@@ -75,6 +68,18 @@ it('builds webcam project input with default dimensions and null passthrough', (
     mimeType: 'video/webm',
     size: 6,
   });
+});
+
+it('rejects webcam project input when recorded dimensions are unavailable', () => {
+  expect(() =>
+    createWebcamProjectInput({
+      blob: new Blob(['webcam'], { type: 'video/webm' }),
+      duration: 3,
+      filename: 'webcam.webm',
+      mimeType: 'video/webm',
+      source: createWebcamRecorder(),
+    })
+  ).toThrow('Webcam recording dimensions are unavailable.');
 });
 
 it('stops webcam recorder streams when rollback owns a created recorder', () => {

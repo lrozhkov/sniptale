@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   createSourceVideo: vi.fn(),
   createTabOutput: vi.fn(),
   releaseSourceVideo: vi.fn(),
-  resolveCrop: vi.fn(),
   resolveTabGeometry: vi.fn(),
   waitForSourceMetadata: vi.fn(),
 }));
@@ -17,7 +16,6 @@ vi.mock('./video', () => ({ attachMicrophoneAudioIfEnabled: mocks.attachMicropho
 vi.mock('../stream/crop-stream', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../stream/crop-stream')>()),
   createCropStream: mocks.createCrop,
-  resolveOnePixelEncodingCrop: mocks.resolveCrop,
 }));
 vi.mock('../stream/tab-output', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../stream/tab-output')>()),
@@ -30,18 +28,29 @@ vi.mock('../stream/video-source', () => ({
   waitForSourceMetadata: mocks.waitForSourceMetadata,
 }));
 
-import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  CaptureMode,
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { recordingContext } from '../context';
 import { prepareRecordingStream } from '.';
-import { createEmptyStream, createStream } from '../multi-source/media-stream.test-support';
+import {
+  createConfigurableVideoStream,
+  createEmptyStream,
+} from '../multi-source/media-stream.test-support';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const settings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 0,
   countdownSeconds: 0,
   diagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
   openEditorAfterRecording: false,
+  output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
   quality: VideoQuality.HIGH,
   systemAudioEnabled: false,
 };
@@ -60,25 +69,56 @@ const tabOutputControls = {
   setFrozen: vi.fn(),
 };
 
+function createRecordingStream(
+  width: number,
+  height: number,
+  frameRate = 30,
+  additionalSettings: MediaTrackSettings = {}
+): MediaStream {
+  const trackSettings: MediaTrackSettings = {
+    ...additionalSettings,
+    frameRate,
+    height,
+    width,
+  };
+  const stream = createConfigurableVideoStream({
+    applyConstraints: async () => {
+      throw new Error('Source-track constraints must not realize recording output geometry');
+    },
+    settings: trackSettings,
+  });
+  vi.spyOn(stream.getVideoTracks()[0]!, 'getSettings').mockImplementation(() => ({
+    ...trackSettings,
+  }));
+  return stream;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   recordingContext.sourceStream = null;
   recordingContext.videoStream = null;
-  const source = createStream(2560, 1440);
+  const source = createRecordingStream(2560, 1440);
   mocks.acquire.mockResolvedValue({ cursorCaptureMode: null, stream: source });
   mocks.createSourceVideo.mockReturnValue({ videoHeight: 1440, videoWidth: 2560 });
   mocks.waitForSourceMetadata.mockResolvedValue(undefined);
-  mocks.resolveCrop.mockReturnValue(null);
   mocks.resolveTabGeometry.mockReturnValue(geometry);
-  mocks.createCrop.mockResolvedValue(createStream(1278, 720));
-  mocks.createTabOutput.mockResolvedValue({
-    controls: tabOutputControls,
-    stream: createStream(1280, 720),
-  });
+  mocks.createCrop.mockImplementation(
+    async (_source: MediaStream, cropGeometry: { outputSize: { width: number; height: number } }) =>
+      createRecordingStream(cropGeometry.outputSize.width, cropGeometry.outputSize.height)
+  );
+  mocks.createTabOutput.mockImplementation(
+    async (
+      _source: MediaStream,
+      tabGeometry: { outputSize: { width: number; height: number } }
+    ) => ({
+      controls: tabOutputControls,
+      stream: createRecordingStream(tabGeometry.outputSize.width, tabGeometry.outputSize.height),
+    })
+  );
   mocks.attachMicrophone.mockResolvedValue(undefined);
 });
 
-it('accepts a natural physical TAB source and produces the canonical CSS output', async () => {
+it('materializes the selected output geometry for a normal full-tab source', async () => {
   await expect(
     prepareRecordingStream({
       captureMode: CaptureMode.TAB,
@@ -88,28 +128,34 @@ it('accepts a natural physical TAB source and produces the canonical CSS output'
     })
   ).resolves.toEqual({
     cursorCaptureMode: null,
-    rawTrackSettings: { height: 1440, width: 2560 },
+    rawTrackSettings: { frameRate: 30, height: 1440, width: 2560 },
     rawVideoHeight: 1440,
     rawVideoWidth: 2560,
     tabOutputControls: null,
-    tabOutputGeometry: geometry,
-    trackSettings: { height: 720, width: 1280 },
+    tabOutputGeometry: null,
+    trackSettings: { frameRate: 30, height: 1080, width: 1920 },
   });
 
   expect(mocks.acquire).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
     settings,
     streamId: 'stream-1',
-    viewport: { width: 1280, height: 720 },
+    viewport: { height: 720, width: 1280 },
   });
-  expect(mocks.resolveTabGeometry).toHaveBeenCalledWith(
-    { x: 0, y: 0, width: 1280, height: 720 },
-    { width: 2560, height: 1440 },
-    { width: 1280, height: 720, devicePixelRatio: 2 }
+  expect(mocks.resolveTabGeometry).not.toHaveBeenCalled();
+  expect(mocks.createTabOutput).not.toHaveBeenCalled();
+  expect(mocks.createCrop).toHaveBeenCalledWith(
+    expect.anything(),
+    {
+      sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
+      outputSize: { width: 1920, height: 1080 },
+    },
+    {
+      dynamicSourceFit: true,
+      frameRate: 30,
+      logicalSourceSize: { height: 720, width: 1280 },
+    }
   );
-  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
-    initiallySuspended: false,
-  });
   expect(mocks.releaseSourceVideo).toHaveBeenCalledOnce();
 });
 
@@ -127,16 +173,18 @@ it('starts viewport-preset output behind a closed frame gate', async () => {
     viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
   });
 
-  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
-    initiallySuspended: true,
-  });
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
+    { frameRate: 30, initiallySuspended: true }
+  );
   expect(mocks.acquire).toHaveBeenCalledWith(
     expect.objectContaining({ excludeNativeCursor: true, streamId: 'stream-viewport' })
   );
   expect(prepared.tabOutputControls).toBe(tabOutputControls);
 });
 
-it('keeps a window-preset TAB output outside the viewport frame gate', async () => {
+it('keeps a window-preset TAB output on the fixed canvas path', async () => {
   const prepared = await prepareRecordingStream({
     captureMode: CaptureMode.TAB,
     settings,
@@ -151,8 +199,52 @@ it('keeps a window-preset TAB output outside the viewport frame gate', async () 
   });
 
   expect(prepared.tabOutputControls).toBeNull();
-  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
-    initiallySuspended: false,
+  expect(mocks.createTabOutput).not.toHaveBeenCalled();
+  expect(mocks.createCrop).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
+    {
+      dynamicSourceFit: true,
+      frameRate: 30,
+      logicalSourceSize: { height: 720, width: 1280 },
+    }
+  );
+});
+
+it('snapshots verified encoder metadata before audio stream composition', async () => {
+  const source = createRecordingStream(2560, 1440);
+  const track = source.getVideoTracks()[0]!;
+  mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
+  mocks.attachMicrophone.mockImplementationOnce(async () => {
+    vi.mocked(track.getSettings).mockReturnValue({});
+  });
+
+  const prepared = await prepareRecordingStream({
+    captureMode: CaptureMode.TAB,
+    settings,
+    streamId: 'stream-audio-composition',
+    viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
+  });
+
+  expect(prepared.trackSettings).toEqual({ frameRate: 30, height: 1080, width: 1920 });
+});
+
+it('retains source display-surface provenance on the derived encoder track metadata', async () => {
+  const source = createRecordingStream(2560, 1440, 30, { displaySurface: 'browser' });
+  mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
+
+  const prepared = await prepareRecordingStream({
+    captureMode: CaptureMode.TAB,
+    settings,
+    streamId: 'stream-display-surface',
+    viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
+  });
+
+  expect(prepared.trackSettings).toEqual({
+    displaySurface: 'browser',
+    frameRate: 30,
+    height: 1080,
+    width: 1920,
   });
 });
 
@@ -171,9 +263,11 @@ it('uses the selected CSS region for TAB_CROP output mapping', async () => {
     { width: 1280, height: 720, devicePixelRatio: 2 }
   );
   expect(prepared.tabOutputControls).toBe(tabOutputControls);
-  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
-    initiallySuspended: false,
-  });
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
+    { frameRate: 30, initiallySuspended: false }
+  );
 });
 
 it('retains exact-output controls for TAB_CROP with a window preset', async () => {
@@ -192,9 +286,11 @@ it('retains exact-output controls for TAB_CROP with a window preset', async () =
   });
 
   expect(prepared.tabOutputControls).toBe(tabOutputControls);
-  expect(mocks.createTabOutput).toHaveBeenCalledWith(expect.anything(), geometry, {
-    initiallySuspended: false,
-  });
+  expect(mocks.createTabOutput).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
+    { frameRate: 30, initiallySuspended: false }
+  );
 });
 
 it('fails TAB/TAB_CROP when the CSS viewport is unavailable', async () => {
@@ -211,7 +307,8 @@ it('fails TAB/TAB_CROP when the CSS viewport is unavailable', async () => {
 it('fails closed when the applied viewport and measured CSS viewport disagree', async () => {
   await expect(
     prepareRecordingStream({
-      captureMode: CaptureMode.TAB,
+      captureMode: CaptureMode.TAB_CROP,
+      cropRegion: { x: 0, y: 0, width: 1280, height: 720 },
       settings,
       streamId: 'stream-mismatch',
       surface: {
@@ -237,14 +334,152 @@ it.each([CaptureMode.SCREEN, CaptureMode.CAMERA])(
   }
 );
 
-it('keeps the legacy odd-axis raw crop 1:1', async () => {
+it('materializes the selected 480p envelope on the actual recording stream', async () => {
+  const source = createRecordingStream(1902, 984);
+  mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
+  mocks.createSourceVideo.mockReturnValueOnce({ videoHeight: 984, videoWidth: 1902 });
+
+  const prepared = await prepareRecordingStream({
+    captureMode: CaptureMode.SCREEN,
+    settings: {
+      ...settings,
+      output: {
+        ...settings.output,
+        resolution: VideoResolutionPreset.P480,
+      },
+    },
+    streamId: 'stream-480p',
+  });
+
+  expect(mocks.createCrop).toHaveBeenCalledWith(
+    source,
+    {
+      sourceRect: { x: 0, y: 0, width: 1902, height: 984 },
+      outputSize: { width: 928, height: 480 },
+    },
+    { dynamicSourceFit: true, frameRate: 30 }
+  );
+  expect(prepared.trackSettings).toMatchObject({ height: 480, width: 928 });
+  expect(recordingContext.videoStream?.getVideoTracks()[0]?.contentHint).toBe('detail');
+});
+
+it('encodes a 2560x1440 full-tab source as an exact 854x480 output', async () => {
+  const source = createRecordingStream(2560, 1440);
+  mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
+
+  const prepared = await prepareRecordingStream({
+    captureMode: CaptureMode.TAB,
+    settings: {
+      ...settings,
+      output: {
+        ...settings.output,
+        resolution: VideoResolutionPreset.P480,
+      },
+    },
+    streamId: 'stream-full-tab-480p',
+    viewport: { width: 1920, height: 1080, devicePixelRatio: 4 / 3 },
+  });
+
+  expect(mocks.createCrop).toHaveBeenCalledWith(
+    source,
+    {
+      sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
+      outputSize: { width: 854, height: 480 },
+    },
+    {
+      dynamicSourceFit: true,
+      frameRate: 30,
+      logicalSourceSize: { height: 1080, width: 1920 },
+    }
+  );
+  expect(prepared.trackSettings).toEqual({ frameRate: 30, height: 480, width: 854 });
+});
+
+it('uses the measured TAB viewport as Source output authority instead of the screen-sized raw track', async () => {
+  const source = createRecordingStream(2560, 1440);
+  mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
+
+  const prepared = await prepareRecordingStream({
+    captureMode: CaptureMode.TAB,
+    settings: {
+      ...settings,
+      output: {
+        ...settings.output,
+        resolution: VideoResolutionPreset.SOURCE,
+      },
+    },
+    streamId: 'stream-full-tab-source',
+    viewport: { width: 1904, height: 985, devicePixelRatio: 1 },
+  });
+
+  expect(mocks.createCrop).toHaveBeenCalledWith(
+    source,
+    {
+      sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
+      outputSize: { width: 1904, height: 984 },
+    },
+    {
+      cropOddSourceEdges: true,
+      dynamicSourceFit: true,
+      frameRate: 30,
+      logicalSourceSize: { height: 985, width: 1904 },
+    }
+  );
+  expect(prepared.trackSettings).toEqual({ frameRate: 30, height: 984, width: 1904 });
+});
+
+it('preserves the measured TAB aspect ratio for a 1440p output profile', async () => {
+  const source = createRecordingStream(2560, 1440);
+  mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
+
+  const prepared = await prepareRecordingStream({
+    captureMode: CaptureMode.TAB,
+    settings: {
+      ...settings,
+      output: {
+        ...settings.output,
+        resolution: VideoResolutionPreset.P1440,
+      },
+    },
+    streamId: 'stream-full-tab-1440p',
+    viewport: { width: 1904, height: 985, devicePixelRatio: 1 },
+  });
+
+  expect(mocks.createCrop).toHaveBeenCalledWith(
+    source,
+    {
+      sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
+      outputSize: { width: 2784, height: 1440 },
+    },
+    {
+      dynamicSourceFit: true,
+      frameRate: 30,
+      logicalSourceSize: { height: 985, width: 1904 },
+    }
+  );
+  expect(prepared.trackSettings).toEqual({ frameRate: 30, height: 1440, width: 2784 });
+});
+
+it('contains an odd-axis source in an encoder-safe even output', async () => {
+  const source = createRecordingStream(1279, 721);
+  mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
+  mocks.createSourceVideo.mockReturnValueOnce({ videoHeight: 721, videoWidth: 1279 });
   const encodingCrop = {
-    sourceRect: { x: 0, y: 0, width: 1278, height: 720 },
+    sourceRect: { x: 0, y: 0, width: 1279, height: 721 },
     outputSize: { width: 1278, height: 720 },
   };
-  mocks.resolveCrop.mockReturnValueOnce(encodingCrop);
-  await prepareRecordingStream({ settings, streamId: 'stream-odd' });
-  expect(mocks.createCrop).toHaveBeenCalledWith(expect.anything(), encodingCrop);
+  await prepareRecordingStream({
+    settings: {
+      ...settings,
+      output: { ...settings.output, resolution: VideoResolutionPreset.SOURCE },
+    },
+    streamId: 'stream-odd',
+  });
+  expect(mocks.createCrop).toHaveBeenCalledWith(source, encodingCrop, {
+    cropOddSourceEdges: true,
+    dynamicSourceFit: true,
+    frameRate: 30,
+  });
 });
 
 it('fails when the raw or output stream has no video track', async () => {
@@ -255,7 +490,7 @@ it('fails when the raw or output stream has no video track', async () => {
 
   mocks.acquire.mockResolvedValueOnce({
     cursorCaptureMode: null,
-    stream: createStream(2560, 1440),
+    stream: createRecordingStream(2560, 1440),
   });
   mocks.createTabOutput.mockResolvedValueOnce({
     controls: tabOutputControls,
@@ -263,7 +498,8 @@ it('fails when the raw or output stream has no video track', async () => {
   });
   await expect(
     prepareRecordingStream({
-      captureMode: CaptureMode.TAB,
+      captureMode: CaptureMode.TAB_CROP,
+      cropRegion: { x: 0, y: 0, width: 1280, height: 720 },
       settings,
       streamId: 'missing-output',
       viewport: { width: 1280, height: 720, devicePixelRatio: 2 },

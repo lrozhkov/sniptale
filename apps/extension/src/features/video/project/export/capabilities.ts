@@ -1,10 +1,12 @@
 import {
   VideoExportFormat,
   VideoMp4Codec,
+  VideoWebmCodec,
   type VideoExportCapabilities,
   type VideoExportFormatCapability,
   type VideoMp4CodecCapability,
   type VideoProjectExportSettings,
+  type VideoProjectExportSettingsPatch,
 } from '../types/index';
 
 const MP4_CODEC_PRIORITY: readonly VideoMp4Codec[] = [
@@ -13,9 +15,49 @@ const MP4_CODEC_PRIORITY: readonly VideoMp4Codec[] = [
   VideoMp4Codec.VP9,
 ] as const;
 
-function withoutMp4VideoCodec(settings: VideoProjectExportSettings): VideoProjectExportSettings {
-  const { mp4VideoCodec: _mp4VideoCodec, ...rest } = settings;
-  return rest;
+function normalizeWebmSettings(settings: VideoProjectExportSettings): VideoProjectExportSettings {
+  const { mp4VideoCodec: _mp4VideoCodec, webmVideoCodec, format: _format, ...rest } = settings;
+  return {
+    ...rest,
+    format: VideoExportFormat.WEBM,
+    webmVideoCodec: webmVideoCodec ?? VideoWebmCodec.VP9,
+  };
+}
+
+function normalizeMp4Settings(
+  settings: VideoProjectExportSettings,
+  codec: VideoMp4Codec
+): VideoProjectExportSettings {
+  const {
+    mp4VideoCodec: _mp4VideoCodec,
+    webmVideoCodec: _webmVideoCodec,
+    format: _format,
+    ...rest
+  } = settings;
+  return {
+    ...rest,
+    format: VideoExportFormat.MP4,
+    mp4VideoCodec: codec,
+  };
+}
+
+export function mergeVideoProjectExportSettings(
+  settings: VideoProjectExportSettings,
+  patch: VideoProjectExportSettingsPatch
+): VideoProjectExportSettings {
+  const merged = { ...settings, ...patch };
+  const { format, mp4VideoCodec, webmVideoCodec, ...base } = merged;
+  return format === VideoExportFormat.WEBM
+    ? {
+        ...base,
+        format,
+        webmVideoCodec: webmVideoCodec ?? VideoWebmCodec.VP9,
+      }
+    : {
+        ...base,
+        format,
+        mp4VideoCodec: mp4VideoCodec ?? VideoMp4Codec.AVC,
+      };
 }
 
 export function getDefaultMp4VideoCodec(
@@ -46,7 +88,9 @@ export function normalizeVideoProjectExportSettings(
   capabilities?: VideoExportCapabilities | null
 ): VideoProjectExportSettings {
   if (!capabilities) {
-    return settings.format === VideoExportFormat.MP4 ? settings : withoutMp4VideoCodec(settings);
+    return settings.format === VideoExportFormat.MP4
+      ? normalizeMp4Settings(settings, settings.mp4VideoCodec)
+      : normalizeWebmSettings(settings);
   }
 
   const availableFormats = capabilities.formats.filter((entry) => entry.available);
@@ -58,10 +102,7 @@ export function normalizeVideoProjectExportSettings(
       : settings.format;
 
   if (nextFormat !== VideoExportFormat.MP4) {
-    return withoutMp4VideoCodec({
-      ...settings,
-      format: nextFormat,
-    });
+    return normalizeWebmSettings(settings);
   }
 
   const availableMp4Codecs = getAvailableMp4VideoCodecs(capabilities);
@@ -70,16 +111,7 @@ export function normalizeVideoProjectExportSettings(
       ? settings.mp4VideoCodec
       : (capabilities.defaultMp4VideoCodec ?? getDefaultMp4VideoCodec(capabilities.mp4Codecs));
 
-  return nextCodec
-    ? {
-        ...settings,
-        format: nextFormat,
-        mp4VideoCodec: nextCodec,
-      }
-    : withoutMp4VideoCodec({
-        ...settings,
-        format: nextFormat,
-      });
+  return nextCodec ? normalizeMp4Settings(settings, nextCodec) : normalizeWebmSettings(settings);
 }
 
 export function createVideoExportCapabilities(

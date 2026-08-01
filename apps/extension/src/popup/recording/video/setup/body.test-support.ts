@@ -4,6 +4,7 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { ViewportPreset } from '../../../../contracts/settings';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 export function createSelectedPreset(): ViewportPreset {
   return {
@@ -39,6 +40,7 @@ export function createActiveTabCapabilities() {
 
 export function createBodySettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 2,
     countdownSeconds: 3,
     diagnosticsEnabled: true,

@@ -170,9 +170,20 @@
   padding: 6px;
 }
 
-.sniptale-select-menu-top {
+.sniptale-select-menu-portal {
+  position: fixed;
   top: auto;
-  bottom: calc(100% + 8px);
+  right: auto;
+  bottom: auto;
+  left: auto;
+  width: auto;
+  max-height: calc(100dvh - 16px);
+}
+
+.sniptale-select-menu-overflow-visible {
+  max-height: none;
+  overflow-y: visible;
+  overscroll-behavior: auto;
 }
 
 .sniptale-select-option {

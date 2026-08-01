@@ -11,6 +11,7 @@ import {
 import type { MicrophoneOption } from '../../recording/microphone';
 import type { WebcamOption } from '../../recording/webcam';
 import { usePopupMediaDeviceEffects } from './media-device-effects';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { resolveMicrophoneDeviceIdMock, resolveWebcamDeviceIdMock } = vi.hoisted(() => ({
   resolveMicrophoneDeviceIdMock: vi.fn((deviceId: string | null) => deviceId),
@@ -30,6 +31,7 @@ let root: Root | null = null;
 
 function createSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: false,

@@ -12,8 +12,10 @@ vi.mock('../../../routing-contracts/runtime-messaging/services', async (importOr
 }));
 
 import { sendOffscreenBeginRecording, sendOffscreenStartRecording } from './start-helpers';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const settings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   microphoneEnabled: false,
   microphoneDeviceId: null,
   webcamEnabled: false,

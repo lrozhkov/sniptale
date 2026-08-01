@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 import {
   isVideoExportCapabilities,
@@ -104,6 +105,7 @@ it('accepts valid viewport info payloads and rejects malformed viewport info', (
 it('accepts controlled cursor capture settings with microphone processing settings', () => {
   expect(
     isVideoRecordingSettings({
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 300,
       controlledCursorCaptureEnabled: true,
       countdownSeconds: 3,
@@ -115,7 +117,7 @@ it('accepts controlled cursor capture settings with microphone processing settin
       microphoneDeviceId: null,
       microphoneEnabled: true,
       openEditorAfterRecording: false,
-      quality: '1080p',
+      quality: 'HIGH',
       sourceCount: 2,
       systemAudioEnabled: true,
       webcamDeviceId: 'cam-1',
@@ -127,6 +129,7 @@ it('accepts controlled cursor capture settings with microphone processing settin
 it('rejects invalid video recording settings flag and source count values', () => {
   expect(
     isVideoRecordingSettings({
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 300,
       controlledCursorCaptureEnabled: 'yes',
       countdownSeconds: 3,
@@ -134,7 +137,7 @@ it('rejects invalid video recording settings flag and source count values', () =
       microphoneDeviceId: null,
       microphoneEnabled: true,
       openEditorAfterRecording: false,
-      quality: '1080p',
+      quality: 'HIGH',
       systemAudioEnabled: true,
       webcamDeviceId: null,
       webcamEnabled: false,
@@ -142,6 +145,7 @@ it('rejects invalid video recording settings flag and source count values', () =
   ).toBe(false);
   expect(
     isVideoRecordingSettings({
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 300,
       countdownSeconds: 3,
       diagnosticsEnabled: true,

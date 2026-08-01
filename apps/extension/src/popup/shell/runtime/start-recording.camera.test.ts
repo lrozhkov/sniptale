@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { startRecordingHandler } from './start-recording';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { openCameraRecorderPage, requestMicrophonePermission, requestWebcamPermission } = vi.hoisted(
   () => ({
@@ -25,6 +26,7 @@ vi.mock('../../../platform/navigation/extension-pages', async (importOriginal) =
 }));
 
 const defaultSettings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 3,
   controlledCursorCaptureEnabled: true,
   countdownSeconds: 3,

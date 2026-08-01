@@ -8,6 +8,7 @@ import {
   VideoRecordingAudioMode,
   VideoQuality,
 } from './types';
+import { DEFAULT_VIDEO_SETTINGS } from './defaults';
 
 it('clamps video source counts and derives the recording audio policy', () => {
   expect(normalizeVideoSourceCount(undefined)).toBe(1);
@@ -22,6 +23,7 @@ it('clamps video source counts and derives the recording audio policy', () => {
 
 it('creates and updates live media state from recording settings', () => {
   const liveMedia = createVideoRecordingLiveMediaState({
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 0,
     diagnosticsEnabled: false,

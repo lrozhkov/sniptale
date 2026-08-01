@@ -33,10 +33,13 @@ export function VideoEditorWorkspaceOverlays({
         onConfirm={controller.onConfirmDialogConfirm}
         onCancel={controller.onConfirmDialogCancel}
       />
-      {controller.exportDialog.isOpen && controller.exportDialog.settings ? (
+      {controller.exportDialog.isOpen &&
+      controller.exportDialog.settings &&
+      controller.exportDialog.sourceDimensions ? (
         <ExportDialog
           selectedClipAvailable={controller.exportDialog.selectedClipId !== null}
           settings={controller.exportDialog.settings}
+          sourceDimensions={controller.exportDialog.sourceDimensions}
           onClose={controller.exportDialog.onClose}
           onChange={controller.exportDialog.onChange}
           onExport={controller.exportDialog.onExport}

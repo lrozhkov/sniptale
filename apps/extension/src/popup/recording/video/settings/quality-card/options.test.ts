@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
-import { getQualityIndex, getQualityOption } from './options';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoRecordingBuiltInProfileId,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
+import { getQualityIndex, getQualityOption, getRecordingProfileOptions } from './options';
 
 describe('quality card options', () => {
   it('maps known qualities to their indices', () => {
@@ -23,5 +27,50 @@ describe('quality card options', () => {
         value: VideoQuality.LOW,
       })
     );
+  });
+
+  it('shows concise built-in and custom profiles while preserving an advanced custom state', () => {
+    const customProfile = {
+      id: 'custom:review',
+      name: 'Review',
+      output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+      quality: VideoQuality.MEDIUM,
+    };
+    const common = {
+      autoFadeDelay: 2,
+      countdownSeconds: 3,
+      diagnosticsEnabled: false,
+      microphoneDeviceId: null,
+      microphoneEnabled: false,
+      openEditorAfterRecording: false,
+      systemAudioEnabled: true,
+    };
+
+    expect(
+      getRecordingProfileOptions({
+        ...common,
+        output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+        quality: VideoQuality.HIGH,
+        qualityProfileId: VideoRecordingBuiltInProfileId.OPTIMAL,
+        qualityProfiles: [customProfile],
+      })
+    ).toEqual(
+      expect.objectContaining({
+        selectedProfileId: VideoRecordingBuiltInProfileId.OPTIMAL,
+        options: expect.arrayContaining([
+          expect.objectContaining({ value: VideoRecordingBuiltInProfileId.OPTIMAL }),
+          expect.objectContaining({ label: 'Review', value: 'custom:review' }),
+        ]),
+      })
+    );
+    expect(
+      getRecordingProfileOptions({
+        ...common,
+        output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+        quality: VideoQuality.LOW,
+        qualityProfileId: null,
+        qualityProfiles: [],
+      }).selectedProfileId
+    ).toBe('current:custom');
   });
 });

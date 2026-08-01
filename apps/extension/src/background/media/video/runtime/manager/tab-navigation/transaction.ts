@@ -109,7 +109,7 @@ async function performCriticalOutputFailureStop(
   logger.error('Exact tab output recovery failed; stopping bound recording', error);
   abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
   setVideoRecordingRuntimeState({ error: message });
-  let stopFailure: unknown = null;
+  let stopFailure: unknown;
   try {
     const result = await stopRecording(false);
     if (result.result !== 'failed') {

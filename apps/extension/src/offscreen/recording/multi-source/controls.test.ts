@@ -1,6 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { createAudioStream, createTrackedStream } from './media-stream.test-support';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { createMultiSourceLifecycle } from './state';
 
 const { consumeDesktopStreamsMock, normalizeMultiSourceVideoStreamMock } = vi.hoisted(() => ({
   consumeDesktopStreamsMock: vi.fn(),
@@ -16,8 +21,8 @@ vi.mock('../setup/desktop-media', async (importOriginal) => {
   };
 });
 
-vi.mock('./normalize', () => ({
-  normalizeMultiSourceVideoStream: normalizeMultiSourceVideoStreamMock,
+vi.mock('../stream/fixed-video-output', () => ({
+  createFixedVideoOutputStream: normalizeMultiSourceVideoStreamMock,
 }));
 
 vi.mock('../../../platform/runtime-messaging', async (importOriginal) => {
@@ -37,6 +42,7 @@ class FakeMediaRecorder {
   mimeType: string;
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onerror: ((event: { error?: Error }) => void) | null = null;
+  onstart: (() => void) | null = null;
   onstop: (() => void) | null = null;
   state: RecordingState = 'inactive';
 
@@ -62,6 +68,7 @@ class FakeMediaRecorder {
 
   start() {
     this.state = 'recording';
+    this.onstart?.();
   }
 
   stop() {
@@ -71,7 +78,10 @@ class FakeMediaRecorder {
 }
 
 function createStream(video = true): MediaStream {
-  const track = { getSettings: () => ({ height: 720, width: 1280 }), stop: vi.fn() };
+  const track = {
+    getSettings: () => ({ frameRate: 30, height: 720, width: 1280 }),
+    stop: vi.fn(),
+  };
   return {
     getAudioTracks: () => (video ? [] : [track]),
     getTracks: () => [track],
@@ -81,12 +91,14 @@ function createStream(video = true): MediaStream {
 
 function createSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 3,
     countdownSeconds: 0,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: true,
     openEditorAfterRecording: false,
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.HIGH,
     sourceCount: 2,
     systemAudioEnabled: false,
@@ -103,7 +115,7 @@ beforeEach(() => {
     mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(createStream(false)) },
   });
   normalizeMultiSourceVideoStreamMock.mockImplementation((stream: MediaStream) =>
-    Promise.resolve({ dimensions: { height: 720, width: 1280 }, stream })
+    Promise.resolve({ dimensions: { height: 720, width: 1280 }, frameRate: 30, stream })
   );
   consumeDesktopStreamsMock.mockReturnValue([
     { label: 'Window 1', stream: createStream() },
@@ -195,6 +207,7 @@ it('toggles active microphone and webcam tracks for a multi-source session', asy
         trackSettings: {},
       },
       durationTimer: null,
+      lifecycle: createMultiSourceLifecycle(),
       recorders: [],
       recordingId: 'rec',
       settings: createSettings(),
@@ -227,6 +240,7 @@ it('leaves webcam tracks unchanged when only microphone settings change', async 
     {
       audioRecorder: null,
       durationTimer: null,
+      lifecycle: createMultiSourceLifecycle(),
       recorders: [],
       recordingId: 'rec',
       settings: createSettings(),
@@ -270,6 +284,7 @@ it('leaves microphone tracks unchanged when only webcam settings change', async 
         trackSettings: {},
       },
       durationTimer: null,
+      lifecycle: createMultiSourceLifecycle(),
       recorders: [],
       recordingId: 'rec',
       settings: createSettings(),

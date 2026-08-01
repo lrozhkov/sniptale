@@ -1,9 +1,7 @@
-import { loadBlobForAsset, preloadClipVideos } from './media';
-import { finalizeExport, isMimeTypeCompatibleWithFormat, prepareOutputBlob } from './persistence';
+import { preloadClipVideos } from './media';
+import { finalizeExport } from './persistence';
 import { type LoadedImagesMap } from './renderer';
 import { sendProgress } from './runtime';
-import { getAssetById, isVideoClip } from '../../features/video/project/timeline/basics';
-import { isSimplePassthroughProject } from '../../features/video/project/timeline/meta';
 import {
   VideoExportFormat,
   VideoProjectExportPhase,
@@ -14,23 +12,6 @@ import { translate } from '../../platform/i18n';
 import { type ExportJobState } from './types';
 import { renderCompositeToMp4 } from './render-mp4';
 import { renderCompositeToWebm } from './render-webm';
-
-export function canUsePassthroughPath(
-  project: VideoProject,
-  settings: VideoProjectExportSettings
-): boolean {
-  if (!isSimplePassthroughProject(project, settings)) {
-    return false;
-  }
-
-  const clip = project.clips[0];
-  if (!clip || !isVideoClip(clip)) {
-    return false;
-  }
-
-  const asset = getAssetById(project, clip.assetId);
-  return isMimeTypeCompatibleWithFormat(asset?.metadata.mimeType ?? '', settings.format);
-}
 
 function assertExportNotCancelled(job: ExportJobState): void {
   if (job.cancelled || job.exportAbortController?.signal.aborted) {
@@ -64,28 +45,6 @@ async function finalizeCompletedExport(
   await finalizeExport(job.jobId, project, settings, outputBlob, createFinalizeExportOptions(job));
 }
 
-export async function exportPassthrough(
-  job: ExportJobState,
-  project: VideoProject,
-  settings: VideoProjectExportSettings
-): Promise<void> {
-  assertExportNotCancelled(job);
-  const clip = project.clips[0];
-  if (!clip || !isVideoClip(clip)) {
-    throw new Error(translate('offscreenExport.passthroughSingleClipOnly'));
-  }
-
-  const asset = getAssetById(project, clip.assetId);
-  if (!asset) {
-    throw new Error(translate('offscreenExport.passthroughAssetMissing'));
-  }
-
-  const blob = await loadBlobForAsset(asset);
-  assertExportNotCancelled(job);
-  const outputBlob = await prepareOutputBlob(settings, blob);
-  await finalizeCompletedExport(job, project, settings, outputBlob);
-}
-
 export async function renderCompositeExport(
   job: ExportJobState,
   project: VideoProject,
@@ -100,6 +59,8 @@ export async function renderCompositeExport(
   if (!context) {
     throw new Error(translate('offscreenExport.canvasContextError'));
   }
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
 
   const container = document.createElement('div');
   container.style.position = 'fixed';

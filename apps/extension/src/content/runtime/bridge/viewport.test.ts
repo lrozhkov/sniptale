@@ -10,6 +10,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import type { ContentRuntimeMessage } from './types';
 import { handleViewportMessage } from './viewport';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const {
   loggerLog,
@@ -88,6 +89,7 @@ function createViewportInfo() {
 
 function createVideoRecordingSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 0,
     diagnosticsEnabled: false,

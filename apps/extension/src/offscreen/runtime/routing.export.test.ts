@@ -142,6 +142,7 @@ import {
   createProject,
   createProjectExportInputReference,
 } from './test-support';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -166,6 +167,7 @@ beforeEach(() => {
 
 function createRecordingSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: false,

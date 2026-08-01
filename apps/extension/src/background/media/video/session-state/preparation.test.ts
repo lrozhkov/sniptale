@@ -4,6 +4,7 @@ import {
   VideoQuality,
   VideoRecordingStatus,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { setVideoRecordingRuntimeState } = vi.hoisted(() => ({
   setVideoRecordingRuntimeState: vi.fn(),
@@ -36,6 +37,7 @@ it('resets controlled cursor state when a new recording preparation begins', () 
   beginVideoRecordingPreparation(
     CaptureMode.TAB,
     {
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 3,
       diagnosticsEnabled: false,

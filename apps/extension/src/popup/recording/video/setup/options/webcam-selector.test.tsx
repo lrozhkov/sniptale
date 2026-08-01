@@ -15,6 +15,7 @@ import {
   WebcamResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoWebcamSelector } from './webcam-selector';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -43,8 +44,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function createSettings(overrides: Partial<Parameters<typeof VideoWebcamSelector>[0]['settings']>) {
+function createSettings(
+  overrides: Partial<
+    Omit<
+      Parameters<typeof VideoWebcamSelector>[0]['settings'],
+      'output' | 'qualityProfileId' | 'qualityProfiles'
+    >
+  >
+) {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: false,

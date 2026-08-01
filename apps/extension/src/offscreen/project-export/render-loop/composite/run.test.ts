@@ -55,15 +55,18 @@ function createProject(duration = 1) {
   };
 }
 
-function createSettings(format = VideoExportFormat.WEBM, fps = 4) {
-  return {
+function createSettings(format: VideoExportFormat = VideoExportFormat.WEBM, fps = 4) {
+  const base = {
     width: 1280,
     height: 720,
     fps,
-    quality: VideoExportQualityPreset.BALANCED,
-    format,
+    quality: VideoExportQualityPreset.MEDIUM,
+    resolution: 'SOURCE' as const,
     downloadAfterExport: true,
   };
+  return format === VideoExportFormat.MP4
+    ? { ...base, format, mp4VideoCodec: 'AVC' as const }
+    : { ...base, format, webmVideoCodec: 'VP9' as const };
 }
 
 function createJob(jobId = 'job-1') {

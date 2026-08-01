@@ -308,11 +308,12 @@ async function refreshFrozenTabOutput(
         devicePixelRatio: message.viewport.devicePixelRatio,
       }
     : geometry.coordinateSpace;
-  const nextGeometry = resolveTabOutputGeometry(
+  const remappedGeometry = resolveTabOutputGeometry(
     geometry.requestedCrop,
     sourceSize,
     coordinateSpace
   );
+  const nextGeometry = { ...remappedGeometry, outputSize: geometry.outputSize };
   if (controls.applyFrozenSourceGeometry(message.transitionId, nextGeometry) !== 'applied') {
     throw new Error('Viewport source revalidation was superseded');
   }

@@ -82,10 +82,9 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
     exclusive: true,
     owner: 'effect-v1-project-meta',
     productionFile: 'apps/extension/src/features/video/project/timeline/meta.ts',
-    reason: 'The relocated project metadata owner has direct default and passthrough proof.',
+    reason: 'The relocated project metadata owner has direct default and metadata proof.',
     testFiles: [
       'apps/extension/src/features/video/project/timeline/project-meta.defaults.test.ts',
-      'apps/extension/src/features/video/project/timeline/project-meta.passthrough.test.ts',
       'apps/extension/src/features/video/project/timeline/project-meta.test.ts',
     ],
   },

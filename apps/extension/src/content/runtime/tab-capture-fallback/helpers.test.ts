@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
-import { VIDEO_QUALITY_CONFIGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
 
 import {
   createMixedCaptureStream,
@@ -10,6 +12,7 @@ import {
 
 function createSettings() {
   return {
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.MEDIUM,
     streamId: 'stream-id',
     systemAudioEnabled: true,
@@ -49,7 +52,7 @@ class FakeMediaStream extends EventTarget {
   removeTrack() {}
 }
 
-function createCaptureStream(videoTrack = { kind: 'video' }, audioTracks: unknown[] = []) {
+function createCaptureStream(videoTrack: unknown = { kind: 'video' }, audioTracks: unknown[] = []) {
   return new FakeMediaStream([videoTrack, ...audioTracks]) as MediaStream;
 }
 
@@ -210,30 +213,35 @@ describe('tab-capture-fallback recorder event helpers', () => {
 });
 
 describe('tab-capture-fallback recorder mime types', () => {
-  it('resolves recorder options through the configured quality profile', () => {
-    const isTypeSupported = vi.fn((value: string) => value === 'video/webm');
+  it('resolves exact codec and canonical bitrate through the configured profile', () => {
+    const stream = createCaptureStream({
+      kind: 'video',
+      getSettings: () => ({ frameRate: 30, height: 1080, width: 1920 }),
+    });
+    const isTypeSupported = vi.fn((value: string) => value === 'video/webm;codecs=vp9');
     vi.stubGlobal('MediaRecorder', {
       isTypeSupported,
     });
 
-    expect(resolveRecorderOptions(createSettings())).toEqual({
-      mimeType: 'video/webm',
-      qualityConfig: VIDEO_QUALITY_CONFIGS[VideoQuality.MEDIUM],
+    expect(resolveRecorderOptions(createSettings(), stream)).toEqual({
+      mimeType: 'video/webm;codecs=vp9',
+      videoBitsPerSecond: 3_750_000,
     });
 
     expect(isTypeSupported).toHaveBeenCalled();
   });
 
-  it('keeps the quality-specific mime type when the browser supports it directly', () => {
-    const isTypeSupported = vi.fn(
-      (value: string) => value === VIDEO_QUALITY_CONFIGS[VideoQuality.MEDIUM].mimeType
-    );
+  it('rejects an unsupported selected pair instead of silently changing the codec', () => {
+    const stream = createCaptureStream({
+      kind: 'video',
+      getSettings: () => ({ frameRate: 30, height: 1080, width: 1920 }),
+    });
     vi.stubGlobal('MediaRecorder', {
-      isTypeSupported,
+      isTypeSupported: vi.fn(() => false),
     });
 
-    expect(resolveRecorderOptions(createSettings()).mimeType).toBe(
-      VIDEO_QUALITY_CONFIGS[VideoQuality.MEDIUM].mimeType
+    expect(() => resolveRecorderOptions(createSettings(), stream)).toThrow(
+      'selected recording container and codec are not supported'
     );
   });
 });

@@ -53,6 +53,7 @@ import {
   updateRecordingSettings,
 } from './controller';
 import { recordingContext } from './context';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 class ActiveMediaRecorderFixture extends EventTarget implements MediaRecorder {
   readonly audioBitsPerSecond = 0;
@@ -81,6 +82,7 @@ function createStartParams(): Parameters<typeof startRecording>[0] {
     streamInstanceId: 'stream-instance-delayed',
     streamId: 'stream-delayed',
     settings: {
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 0,
       diagnosticsEnabled: false,
@@ -128,6 +130,7 @@ it('waits for a delayed start and terminates activation before acknowledging sto
         completeStart = () => {
           recordingContext.beginRecordingSession('recording-delayed', 1);
           recordingContext.bindStreamInstance(sourceBinding);
+          recordingContext.bindStartingRecorder(recorder);
           recordingContext.activateRecorder(recorder);
           resolve();
         };
@@ -148,6 +151,24 @@ it('waits for a delayed start and terminates activation before acknowledging sto
   await vi.waitFor(() => expect(stopRecorder).toHaveBeenCalledOnce());
   recordingContext.stopRecordingResolve?.();
   await expect(stop).resolves.toEqual({ result: 'stopped' });
+});
+
+it('cancels a bound recorder that has not emitted its native start event', async () => {
+  const cancelStartingRecorder = vi.fn();
+  const { recorder, stop: stopRecorder } = createActiveRecorderFixture();
+  startRecordingImplMock.mockImplementationOnce(async () => {
+    recordingContext.beginRecordingSession('recording-delayed', 1);
+    recordingContext.bindStreamInstance(sourceBinding);
+    recordingContext.bindStartingRecorder(recorder);
+    recordingContext.registerStartingRecorderCancellation(recorder, cancelStartingRecorder);
+  });
+
+  await startRecording(createStartParams());
+  await expect(stopRecording(sourceBinding, true)).resolves.toEqual({ result: 'stopped' });
+
+  expect(cancelStartingRecorder).toHaveBeenCalledOnce();
+  expect(cleanupResourcesMock).toHaveBeenCalledOnce();
+  expect(stopRecorder).not.toHaveBeenCalled();
 });
 
 it('fails a stuck start cancellation within a deadline and allows a safe retry', async () => {

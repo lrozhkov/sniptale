@@ -194,7 +194,9 @@ beforeEach(() => {
       try {
         await releaseQuickActionSurfaceMock(tabId, viewportState);
       } catch (rollbackError) {
-        throw new AggregateError([cause, rollbackError], 'rollback failed');
+        throw new AggregateError([cause, rollbackError], 'rollback failed', {
+          cause: rollbackError,
+        });
       }
       throw cause;
     }

@@ -2583,7 +2583,12 @@
         "apps/extension/src/content/overlay/design-review/feedback-panel/list.tsx",
         "apps/extension/src/content/overlay/design-review/feedback-panel/position.ts",
         "apps/extension/src/content/overlay/design-review/feedback-panel/view.tsx",
+        "apps/extension/src/content/overlay/design-review/popover/action-menu.tsx",
         "apps/extension/src/content/overlay/design-review/popover/comment.tsx",
+        "apps/extension/src/content/overlay/design-review/popover/drag.ts",
+        "apps/extension/src/content/overlay/design-review/popover/element-bar.tsx",
+        "apps/extension/src/content/overlay/design-review/popover/element-label.ts",
+        "apps/extension/src/content/overlay/design-review/popover/position.ts",
         "apps/extension/src/content/overlay/design-review/popover/view.tsx",
         "apps/extension/src/content/overlay/design-review/records.ts",
         "apps/extension/src/content/overlay/design-review/runtime/actions.ts",
@@ -2604,8 +2609,8 @@
         "apps/extension/src/content/overlay/design-review/settings/helpers.tsx",
         "apps/extension/src/content/overlay/design-review/settings/image-section.tsx",
         "apps/extension/src/content/overlay/design-review/settings/numeric-field.tsx",
-        "apps/extension/src/content/overlay/design-review/settings/section.tsx",
         "apps/extension/src/content/overlay/design-review/settings/sections/appearance.tsx",
+        "apps/extension/src/content/overlay/design-review/settings/sections/border.tsx",
         "apps/extension/src/content/overlay/design-review/settings/sections/frame.tsx",
         "apps/extension/src/content/overlay/design-review/settings/sections/text.tsx",
         "apps/extension/src/content/overlay/design-review/settings/side-fields.tsx",
@@ -3146,6 +3151,7 @@
         "apps/extension/src/content/selection/callout/width-constraints.ts",
         "apps/extension/src/content/selection/callout/width-resize.ts",
         "apps/extension/src/content/selection/controls/tooltip-copy.ts",
+        "apps/extension/src/content/selection/design-review/cursor.ts",
         "apps/extension/src/content/selection/design-review/frame.ts",
         "apps/extension/src/content/selection/design-review/inaccessible-iframe.ts",
         "apps/extension/src/content/selection/design-review/index.ts",
@@ -8555,14 +8561,12 @@
         "apps/extension/src/offscreen/recording/multi-source/finalize.ts",
         "apps/extension/src/offscreen/recording/multi-source/index.ts",
         "apps/extension/src/offscreen/recording/multi-source/messages.ts",
-        "apps/extension/src/offscreen/recording/multi-source/normalize.ts",
         "apps/extension/src/offscreen/recording/multi-source/recorders.ts",
         "apps/extension/src/offscreen/recording/multi-source/state.ts",
         "apps/extension/src/offscreen/recording/multi-source/stop.ts",
         "apps/extension/src/offscreen/recording/multi-source/webcam.ts",
         "apps/extension/src/offscreen/recording/preview.ts",
         "apps/extension/src/offscreen/recording/recorder-error.ts",
-        "apps/extension/src/offscreen/recording/recorder-mime.ts",
         "apps/extension/src/offscreen/recording/setup/capture.ts",
         "apps/extension/src/offscreen/recording/setup/desktop-media/acquire.ts",
         "apps/extension/src/offscreen/recording/setup/desktop-media/controller.ts",
@@ -8580,13 +8584,16 @@
         "apps/extension/src/offscreen/recording/start/error-reporting.ts",
         "apps/extension/src/offscreen/recording/start/gate.ts",
         "apps/extension/src/offscreen/recording/start/index.ts",
-        "apps/extension/src/offscreen/recording/start/mime.ts",
         "apps/extension/src/offscreen/recording/start/recorder.ts",
         "apps/extension/src/offscreen/recording/start/session.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer-graph.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer.ts",
+        "apps/extension/src/offscreen/recording/stream/canvas-video-output.ts",
+        "apps/extension/src/offscreen/recording/stream/contain-frame.ts",
         "apps/extension/src/offscreen/recording/stream/crop-frame-gate.ts",
         "apps/extension/src/offscreen/recording/stream/crop-stream.ts",
+        "apps/extension/src/offscreen/recording/stream/fixed-video-output.ts",
+        "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
         "apps/extension/src/offscreen/recording/stream/tab-output.ts",
         "apps/extension/src/offscreen/recording/stream/video-source.ts",
         "apps/extension/src/offscreen/recording/update-settings.ts",
@@ -8743,14 +8750,12 @@
         "apps/extension/src/offscreen/recording/multi-source/finalize.ts",
         "apps/extension/src/offscreen/recording/multi-source/index.ts",
         "apps/extension/src/offscreen/recording/multi-source/messages.ts",
-        "apps/extension/src/offscreen/recording/multi-source/normalize.ts",
         "apps/extension/src/offscreen/recording/multi-source/recorders.ts",
         "apps/extension/src/offscreen/recording/multi-source/state.ts",
         "apps/extension/src/offscreen/recording/multi-source/stop.ts",
         "apps/extension/src/offscreen/recording/multi-source/webcam.ts",
         "apps/extension/src/offscreen/recording/preview.ts",
         "apps/extension/src/offscreen/recording/recorder-error.ts",
-        "apps/extension/src/offscreen/recording/recorder-mime.ts",
         "apps/extension/src/offscreen/recording/setup/capture.ts",
         "apps/extension/src/offscreen/recording/setup/desktop-media/acquire.ts",
         "apps/extension/src/offscreen/recording/setup/desktop-media/controller.ts",
@@ -8768,13 +8773,16 @@
         "apps/extension/src/offscreen/recording/start/error-reporting.ts",
         "apps/extension/src/offscreen/recording/start/gate.ts",
         "apps/extension/src/offscreen/recording/start/index.ts",
-        "apps/extension/src/offscreen/recording/start/mime.ts",
         "apps/extension/src/offscreen/recording/start/recorder.ts",
         "apps/extension/src/offscreen/recording/start/session.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer-graph.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer.ts",
+        "apps/extension/src/offscreen/recording/stream/canvas-video-output.ts",
+        "apps/extension/src/offscreen/recording/stream/contain-frame.ts",
         "apps/extension/src/offscreen/recording/stream/crop-frame-gate.ts",
         "apps/extension/src/offscreen/recording/stream/crop-stream.ts",
+        "apps/extension/src/offscreen/recording/stream/fixed-video-output.ts",
+        "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
         "apps/extension/src/offscreen/recording/stream/tab-output.ts",
         "apps/extension/src/offscreen/recording/stream/video-source.ts",
         "apps/extension/src/offscreen/recording/update-settings.ts",
@@ -8814,11 +8822,13 @@
       "productionFiles": [
         "apps/extension/src/platform/media-utils/data-url.ts",
         "apps/extension/src/platform/media-utils/image-thumbnail.ts",
+        "apps/extension/src/platform/media-utils/video-recording.ts",
         "apps/extension/src/platform/media-utils/video-thumbnails.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/platform/media-utils/data-url.ts",
         "apps/extension/src/platform/media-utils/image-thumbnail.ts",
+        "apps/extension/src/platform/media-utils/video-recording.ts",
         "apps/extension/src/platform/media-utils/video-thumbnails.ts"
       ],
       "unownedFocusedFiles": []
@@ -8906,6 +8916,8 @@
         "apps/extension/src/popup/recording/video/settings/counter-card.tsx",
         "apps/extension/src/popup/recording/video/settings/index.tsx",
         "apps/extension/src/popup/recording/video/settings/layout.tsx",
+        "apps/extension/src/popup/recording/video/settings/output-card/options.ts",
+        "apps/extension/src/popup/recording/video/settings/output-card/panel.tsx",
         "apps/extension/src/popup/recording/video/settings/quality-card/index.tsx",
         "apps/extension/src/popup/recording/video/settings/quality-card/options.ts",
         "apps/extension/src/popup/recording/video/settings/quality-card/view.tsx",
@@ -9146,6 +9158,8 @@
         "apps/extension/src/popup/recording/video/settings/counter-card.tsx",
         "apps/extension/src/popup/recording/video/settings/index.tsx",
         "apps/extension/src/popup/recording/video/settings/layout.tsx",
+        "apps/extension/src/popup/recording/video/settings/output-card/options.ts",
+        "apps/extension/src/popup/recording/video/settings/output-card/panel.tsx",
         "apps/extension/src/popup/recording/video/settings/quality-card/index.tsx",
         "apps/extension/src/popup/recording/video/settings/quality-card/options.ts",
         "apps/extension/src/popup/recording/video/settings/quality-card/view.tsx",
@@ -10367,6 +10381,12 @@
         "apps/extension/src/settings/sections/templates/editor-state.ts",
         "apps/extension/src/settings/sections/templates/helpers.ts",
         "apps/extension/src/settings/sections/templates/index.tsx",
+        "apps/extension/src/settings/sections/video-quality-profiles/content.tsx",
+        "apps/extension/src/settings/sections/video-quality-profiles/index.tsx",
+        "apps/extension/src/settings/sections/video-quality-profiles/profile-copy.ts",
+        "apps/extension/src/settings/sections/video-quality-profiles/profile-editor.tsx",
+        "apps/extension/src/settings/sections/video-quality-profiles/types.ts",
+        "apps/extension/src/settings/sections/video-quality-profiles/use-profiles.ts",
         "apps/extension/src/settings/sections/viewport-presets/actions.ts",
         "apps/extension/src/settings/sections/viewport-presets/controller.ts",
         "apps/extension/src/settings/sections/viewport-presets/dialogs.ts",
@@ -10632,6 +10652,12 @@
         "apps/extension/src/settings/sections/templates/editor-state.ts",
         "apps/extension/src/settings/sections/templates/helpers.ts",
         "apps/extension/src/settings/sections/templates/index.tsx",
+        "apps/extension/src/settings/sections/video-quality-profiles/content.tsx",
+        "apps/extension/src/settings/sections/video-quality-profiles/index.tsx",
+        "apps/extension/src/settings/sections/video-quality-profiles/profile-copy.ts",
+        "apps/extension/src/settings/sections/video-quality-profiles/profile-editor.tsx",
+        "apps/extension/src/settings/sections/video-quality-profiles/types.ts",
+        "apps/extension/src/settings/sections/video-quality-profiles/use-profiles.ts",
         "apps/extension/src/settings/sections/viewport-presets/actions.ts",
         "apps/extension/src/settings/sections/viewport-presets/controller.ts",
         "apps/extension/src/settings/sections/viewport-presets/dialogs.ts",
@@ -12024,6 +12050,9 @@
         "packages/runtime-contracts/src/video/types/messages.control.ts",
         "packages/runtime-contracts/src/video/types/microphone-processing.ts",
         "packages/runtime-contracts/src/video/types/native-settings.ts",
+        "packages/runtime-contracts/src/video/types/output-profile.ts",
+        "packages/runtime-contracts/src/video/types/quality-profiles.ts",
+        "packages/runtime-contracts/src/video/types/quality.ts",
         "packages/runtime-contracts/src/video/types/sidecar.ts",
         "packages/runtime-contracts/src/video/types/timeouts.ts",
         "packages/runtime-contracts/src/video/types/types.ts",
@@ -12141,6 +12170,9 @@
         "packages/runtime-contracts/src/video/types/messages.control.ts",
         "packages/runtime-contracts/src/video/types/microphone-processing.ts",
         "packages/runtime-contracts/src/video/types/native-settings.ts",
+        "packages/runtime-contracts/src/video/types/output-profile.ts",
+        "packages/runtime-contracts/src/video/types/quality-profiles.ts",
+        "packages/runtime-contracts/src/video/types/quality.ts",
         "packages/runtime-contracts/src/video/types/sidecar.ts",
         "packages/runtime-contracts/src/video/types/timeouts.ts",
         "packages/runtime-contracts/src/video/types/types.ts",
@@ -15388,7 +15420,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/effect-v1-integration.mjs",
-        "contentHash": "d1283f79aa90066b8e229b812d4c94c2fcc03ec5880a72b2c17ee8000080f69a"
+        "contentHash": "dd28bf087e66bb6e1739d3e3df507c23b321d110533272b4e5dd5d7a83ae71cb"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/effect-v1-integration.mjs",
@@ -15627,7 +15659,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/extension-critical-offscreen-effects.helpers.ts",
-        "contentHash": "b6cc1eeff87fcd9aacf3114713d3a4728dd93827a96e3c1322d80a91baf2578b"
+        "contentHash": "5e3275e1e49802df93fcd5252cada5bc08f3e81419f11d0701639902065bd8cf"
       },
       "consumers": [
         "tooling/test/e2e/extension-critical-offscreen-effects.helpers.ts",
@@ -17118,6 +17150,24 @@
       "surfaces": [
         "binding:INVALID_SIGNATURE_CODES",
         "property:runAuditSignatures/args"
+      ]
+    },
+    {
+      "id": "policy.source.offscreen-ts.fea4d2b753",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/harness/offscreen.ts",
+        "contentHash": "6058a8ec7d881a75e3ed8c6d9714adfd3845e9f44147b7d21e792fd58e2a32d8"
+      },
+      "consumers": [
+        "tooling/test/harness/offscreen.ts"
+      ],
+      "surfaces": [
+        "property:recordStaticCanvasArtifact/dimensions"
       ]
     },
     {
@@ -21732,7 +21782,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/video-recording.mjs",
-        "contentHash": "b78f65df4b07b56a11ebd7d9ab46f2a5dfa1d2fc884a472e77b609dfda7b055d"
+        "contentHash": "4afa3ee1b8471d7bf6eb1f16db6febc589994ae4fd2e71153704be3d711b8b61"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -21885,7 +21935,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/web-snapshot.mjs",
-        "contentHash": "83689e379ec38c2cb652f62296d97499e4dee60311556edec532ade0a4a04e6e"
+        "contentHash": "a81ae0f89839facc1f99e1a935150eb256786fd9281f5e8f4ea97d83f073c926"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",

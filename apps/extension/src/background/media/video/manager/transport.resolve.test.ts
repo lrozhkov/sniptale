@@ -10,6 +10,7 @@ import {
   ensureOffscreenDocumentReadyOrAbort,
   resolveCaptureSourceForMode,
 } from './transport.resolve';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -17,6 +18,7 @@ beforeEach(() => {
 
 function createVideoSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 0,
     diagnosticsEnabled: false,
@@ -121,6 +123,7 @@ it('omits viewport presets when capture mode resolution does not need them', asy
     tabId: 18,
     tab: { id: 18, url: 'https://example.test/tab' },
     captureMode: CaptureMode.TAB,
+    sourceCount: 1,
   });
 });
 

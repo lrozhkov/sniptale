@@ -85,11 +85,13 @@ vi.mock('./start-activation-watchdog', async (importOriginal) => ({
   scheduleRecordingStartActivationWatchdog: scheduleRecordingStartActivationWatchdogMock,
 }));
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { startRecording } from './start';
 import { reserveMediaErasureExclusion } from '../../lifecycle-gate';
 
 const settings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   microphoneEnabled: false,
   microphoneDeviceId: null,
   systemAudioEnabled: true,

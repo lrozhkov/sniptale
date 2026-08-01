@@ -159,9 +159,12 @@ async function verifiesCleanup(): Promise<void> {
   await mixer.addMicrophone();
   await mixer.cleanup();
 
-  expect(tabTrack.stop).toHaveBeenCalledTimes(1);
+  expect(tabTrack.stop).not.toHaveBeenCalled();
   expect(micTrack.stop).toHaveBeenCalledTimes(1);
   expect(graphCleanup).toHaveBeenCalledTimes(1);
+
+  tabStream.getTracks().forEach((track) => track.stop());
+  expect(tabTrack.stop).toHaveBeenCalledTimes(1);
 }
 
 function verifiesRemoveMicrophoneWithoutActiveStream(): void {
@@ -185,7 +188,10 @@ describe('AudioMixer', () => {
     'stops acquired microphone tracks when graph connection fails',
     verifiesMicrophoneGraphFailureCleanup
   );
-  it('cleans up tracks and audio context resources', verifiesCleanup);
+  it(
+    'cleans up owned microphone tracks while leaving borrowed tab tracks to their owner',
+    verifiesCleanup
+  );
   it(
     'allows microphone removal even when no microphone stream is active',
     verifiesRemoveMicrophoneWithoutActiveStream

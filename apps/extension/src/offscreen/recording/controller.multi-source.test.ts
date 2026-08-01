@@ -55,16 +55,22 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 
 import { pauseRecording, resumeRecording, startRecording, stopRecording } from './controller';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 function createSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 0,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     openEditorAfterRecording: false,
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.HIGH,
     sourceCount: 2,
     systemAudioEnabled: true,

@@ -100,6 +100,7 @@ function createHandleSaveRecording(
   return () => {
     saveRecording({
       recordedChunks: state.recordedChunks,
+      recorderMimeType: state.mediaRecorder?.mimeType,
       onChunksReset: () => {
         state.recordedChunks = [];
       },

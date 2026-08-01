@@ -4,6 +4,7 @@
 import { REGION_CAPTURE_MARKER_ID } from '@sniptale/ui/branding';
 import { createLazyContentDefaultOwner } from '../../application/default-owner';
 import {
+  applyRegionCaptureOutputConstraints,
   applyVideoTrackHints,
   applyViewportCrop,
   configureRegionCaptureRecorder,
@@ -58,6 +59,7 @@ export function createRegionCaptureSession(
   deps: RegionCaptureSessionDeps = {}
 ): RegionCaptureSession {
   return createRegionCaptureSessionInstance({
+    applyOutputConstraints: deps.applyOutputConstraints ?? applyRegionCaptureOutputConstraints,
     applyTrackHints: deps.applyTrackHints ?? applyVideoTrackHints,
     applyViewportCrop: deps.applyViewportCrop ?? applyViewportCrop,
     configureRecorder: deps.configureRecorder ?? configureRegionCaptureRecorder,

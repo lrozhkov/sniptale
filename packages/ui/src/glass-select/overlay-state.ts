@@ -8,6 +8,7 @@ interface GlassSelectOverlayOptions {
   setIsOpen: (value: boolean | ((current: boolean) => boolean)) => void;
   containerRef: RefObject<HTMLDivElement | null>;
   menuRef: RefObject<HTMLDivElement | null>;
+  placement?: 'auto' | 'bottom';
 }
 
 export function useGlassSelectOverlay({
@@ -16,6 +17,7 @@ export function useGlassSelectOverlay({
   setIsOpen,
   containerRef,
   menuRef,
+  placement,
 }: GlassSelectOverlayOptions) {
   useGlassSelectDismiss({
     isOpen,
@@ -29,6 +31,7 @@ export function useGlassSelectOverlay({
     isOpen,
     containerRef,
     menuRef,
+    ...(placement === undefined ? {} : { placement }),
   });
 
   return {

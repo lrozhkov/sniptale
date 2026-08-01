@@ -145,6 +145,17 @@ async function stopActiveRecording(discard: boolean): Promise<RecordingStopOutco
     return { result: 'stopped' };
   }
 
+  if (recordingContext.lifecycleState === 'starting') {
+    const recordingId = recordingContext.currentRecordingId;
+    const hadActiveSession = hasActiveRecordingSession();
+    recordingContext.cancelStartingRecorder();
+    cleanupResources();
+    if (hadActiveSession) {
+      notifyRecordingStoppedBestEffort('stop-request-before-recorder-activation', recordingId);
+    }
+    return { result: 'stopped' };
+  }
+
   const { mediaRecorder, durationTracker } = recordingContext;
   const hadActiveSession = hasActiveRecordingSession();
   if (!mediaRecorder || mediaRecorder.state === 'inactive') {

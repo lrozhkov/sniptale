@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { finalizeSidecarRecordingMock } = vi.hoisted(() => ({
+const { createFixedVideoOutputStreamMock, finalizeSidecarRecordingMock } = vi.hoisted(() => ({
+  createFixedVideoOutputStreamMock: vi.fn(),
   finalizeSidecarRecordingMock: vi.fn(),
+}));
+
+vi.mock('../stream/fixed-video-output', () => ({
+  createFixedVideoOutputStream: createFixedVideoOutputStreamMock,
 }));
 
 vi.mock('../finalizer', async (importOriginal) => ({
@@ -10,6 +15,7 @@ vi.mock('../finalizer', async (importOriginal) => ({
 }));
 
 import {
+  resolveVideoOutputDimensions,
   WebcamFrameRatePreset,
   WebcamResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -36,10 +42,30 @@ beforeEach(() => {
   vi.clearAllMocks();
   FakeMediaRecorder.instances = [];
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+  createFixedVideoOutputStreamMock.mockImplementation(
+    (
+      source: MediaStream,
+      settings: ReturnType<typeof createSettings>,
+      options: { frameRate: number }
+    ) => {
+      const sourceSettings = source.getVideoTracks()[0]?.getSettings() ?? {};
+      const dimensions = resolveVideoOutputDimensions(
+        sourceSettings.width ?? 1280,
+        sourceSettings.height ?? 720,
+        settings.output.resolution
+      );
+      const derived = createStream({
+        stop: () => source.getTracks().forEach((track) => track.stop()),
+        trackSettings: { ...dimensions, frameRate: options.frameRate },
+      });
+      return Promise.resolve({ dimensions, frameRate: options.frameRate, stream: derived });
+    }
+  );
 });
 
 afterEach(() => {
   cleanupActiveSidecarRecorders();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -75,18 +101,20 @@ function registerSidecarInitializationTests() {
     expect(hasActiveSidecarSession()).toBe(false);
   });
 
-  it('uses default webcam constraints and mime type fallback when needed', async () => {
+  it('uses default webcam constraints and rejects an unsupported selected codec', async () => {
     vi.spyOn(FakeMediaRecorder, 'isTypeSupported').mockReturnValue(false);
     const getUserMedia = vi.fn().mockResolvedValue(createStream());
     vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
 
-    await initializeSidecarRecorders({
-      baseRecordingId: 'rec-1',
-      settings: createSettings({ webcamDeviceId: null }),
-    });
+    await expect(
+      initializeSidecarRecorders({
+        baseRecordingId: 'rec-1',
+        settings: createSettings({ webcamDeviceId: null }),
+      })
+    ).rejects.toThrow('selected recording container and codec are not supported');
 
     expect(getUserMedia).toHaveBeenCalledWith({ audio: false, video: {} });
-    expect(FakeMediaRecorder.instances[0]?.mimeType).toBe('video/webm');
+    expect(FakeMediaRecorder.instances).toHaveLength(0);
   });
 }
 
@@ -107,8 +135,8 @@ function registerSidecarConstraintTests() {
 
     expect(getActiveSidecarWebcamSettings()).toEqual({
       frameRate: 30,
-      height: 720,
-      width: 1280,
+      height: 1080,
+      width: 1920,
     });
   });
 
@@ -156,12 +184,13 @@ function registerSidecarFinalizationTests() {
     await finalizeActiveSidecarRecordings(true);
 
     expect(finalizeSidecarRecordingMock).toHaveBeenCalledWith({
-      chunks: [expect.any(Blob)],
+      chunks: expect.any(Array),
       discard: true,
       filenameSuffix: 'webcam',
-      mimeType: 'video/webm',
+      mimeType: 'video/webm;codecs=vp9',
       recordingId: 'rec-1-webcam',
     });
+    expect(finalizeSidecarRecordingMock.mock.calls[0]?.[0].chunks).toHaveLength(1);
   });
 
   it('surfaces sidecar finalization failures to the recording owner', async () => {
@@ -185,7 +214,7 @@ function registerSidecarControlTests() {
       baseRecordingId: 'rec-1',
       settings: createSettings(),
     });
-    startActiveSidecarRecorders(1000);
+    startActiveSidecarRecorders(1000, vi.fn());
     pauseActiveSidecarRecorders();
     expect(FakeMediaRecorder.instances[0]?.state).toBe('paused');
 
@@ -206,18 +235,34 @@ function registerSidecarControlTests() {
     pauseActiveSidecarRecorders();
     expect(FakeMediaRecorder.instances[0]?.state).toBe('inactive');
 
-    startActiveSidecarRecorders(1000);
+    startActiveSidecarRecorders(1000, vi.fn());
     resumeActiveSidecarRecorders();
     expect(FakeMediaRecorder.instances[0]?.state).toBe('recording');
   });
 
   it('keeps sidecar controls idle-safe when no sidecar session is active', async () => {
-    startActiveSidecarRecorders(1000);
+    startActiveSidecarRecorders(1000, vi.fn());
     pauseActiveSidecarRecorders();
     resumeActiveSidecarRecorders();
 
     await expect(stopActiveSidecarRecordersWithFlush()).resolves.toBeUndefined();
     expect(FakeMediaRecorder.instances).toHaveLength(0);
+  });
+
+  it('propagates an unexpected sidecar encoder failure to the recording owner', async () => {
+    installSidecarNavigator();
+    await initializeSidecarRecorders({
+      baseRecordingId: 'rec-1',
+      settings: createSettings(),
+    });
+    const onUnexpectedFailure = vi.fn();
+
+    startActiveSidecarRecorders(1000, onUnexpectedFailure);
+    FakeMediaRecorder.instances[0]?.onerror?.(
+      Object.assign(new Event('error'), { error: new Error('webcam encoder failed') }) as ErrorEvent
+    );
+
+    expect(onUnexpectedFailure).toHaveBeenCalledWith(new Error('webcam encoder failed'));
   });
 }
 
@@ -228,7 +273,7 @@ function registerSidecarStopTests() {
       baseRecordingId: 'rec-1',
       settings: createSettings(),
     });
-    startActiveSidecarRecorders(1000);
+    startActiveSidecarRecorders(1000, vi.fn());
 
     const firstStop = stopActiveSidecarRecordersWithFlush();
     const secondStop = stopActiveSidecarRecordersWithFlush();
@@ -253,7 +298,7 @@ function registerSidecarStopTests() {
       baseRecordingId: 'rec-1',
       settings: createSettings(),
     });
-    startActiveSidecarRecorders(1000);
+    startActiveSidecarRecorders(1000, vi.fn());
     const recorder = FakeMediaRecorder.instances[0];
     if (!recorder) {
       throw new Error('Expected webcam recorder');

@@ -55,6 +55,7 @@ import {
   VideoRecordingStatus,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -107,6 +108,7 @@ function createProps(overrides: Partial<React.ComponentProps<typeof VideoSetupPa
     recordingState: createRecordingState(VideoRecordingStatus.IDLE),
     selectedPresetId: null,
     settings: {
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 0,
       diagnosticsEnabled: false,

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { refreshWebcamDevices, toggleWebcam } from './index';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { loadWebcamDevicesMock, resolveWebcamDeviceIdMock } = vi.hoisted(() => ({
   loadWebcamDevicesMock: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock('../webcam', (_importOriginal) => ({
 }));
 
 const defaultSettings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   microphoneEnabled: false,
   microphoneDeviceId: null,
   webcamEnabled: false,

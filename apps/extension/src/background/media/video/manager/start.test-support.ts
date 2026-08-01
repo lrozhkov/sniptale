@@ -3,8 +3,10 @@ import {
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 export const defaultSettings: VideoRecordingSettings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 1500,
   controlledCursorCaptureEnabled: true,
   countdownSeconds: 3,

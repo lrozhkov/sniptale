@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { runtimeVideoOffscreenViewportMessageContracts } from './viewport';
 
@@ -13,16 +14,10 @@ it('accepts both viewport and window preset surfaces on recording start', () => 
     streamId: 'stream-1',
     streamInstanceId: 'stream-instance-1',
     settings: {
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 1,
       countdownSeconds: 0,
-      diagnosticsEnabled: false,
-      microphoneDeviceId: null,
-      microphoneEnabled: false,
       openEditorAfterRecording: true,
-      quality: 'HIGH',
-      systemAudioEnabled: true,
-      webcamDeviceId: null,
-      webcamEnabled: false,
     },
   };
 

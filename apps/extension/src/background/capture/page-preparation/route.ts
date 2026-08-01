@@ -67,7 +67,7 @@ export async function disablePreparationByCapability(args: {
   tabId: number;
 }): Promise<void> {
   switch (args.capability) {
-    case TabRuntimeCapability.Regular:
+    case TabRuntimeCapability.Regular: {
       const response = await getBackgroundRuntimeMessaging().sendTabMessage(args.tabId, {
         type: MessageType.DISABLE_SCREENSHOT_MODE,
       });
@@ -75,6 +75,7 @@ export async function disablePreparationByCapability(args: {
         throw new Error(response.error || 'Content screenshot teardown failed');
       }
       return;
+    }
     case TabRuntimeCapability.OwnedSnapshotViewer:
       await sendViewerPreparationCommand(args.ports, args.tabId, {
         type: MessageType.DISABLE_SCREENSHOT_MODE,

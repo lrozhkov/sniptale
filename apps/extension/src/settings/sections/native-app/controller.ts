@@ -10,7 +10,7 @@ import {
 import type { TranslationKey } from '../../../platform/i18n';
 import {
   loadVideoSettings,
-  saveVideoSettings,
+  mutateVideoSettings,
 } from '../../../composition/persistence/capture-settings';
 import type {
   NativeCaptureSettings,
@@ -121,12 +121,17 @@ async function updateNativeSettings(args: {
   const nextSettings = { ...args.settings, native: args.native };
   args.setState((current) => ({ ...current, error: null, settings: nextSettings }));
   try {
-    await saveVideoSettings(nextSettings);
+    const persistedSettings = await mutateVideoSettings((current) => ({
+      ...current,
+      native: args.native,
+    }));
     const response = await nativeAppRuntimeClient.mutate('sync-settings');
     if (!args.guard.isCurrent()) {
       return;
     }
-    args.setState((current) => applyRuntimeResponse(current, response));
+    args.setState((current) =>
+      applyRuntimeResponse({ ...current, settings: persistedSettings }, response)
+    );
   } catch (error) {
     if (!args.guard.isCurrent()) {
       return;

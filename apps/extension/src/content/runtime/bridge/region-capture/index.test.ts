@@ -6,6 +6,7 @@ import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { handleRegionCaptureMessage } from '.';
 import { createRegionCaptureProgressReporter } from './transport';
 import { installContentRuntimeMessagingMock } from '../../../application/runtime-services/services.test-support';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const {
   sendRuntimeMessage,
@@ -51,6 +52,7 @@ vi.mock('../../../selection/region-capture', () => ({
 
 function createRegionCaptureSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 0,
     diagnosticsEnabled: false,

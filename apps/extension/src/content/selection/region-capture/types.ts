@@ -1,7 +1,6 @@
-import type { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 
-export interface RegionCaptureSettings {
-  quality: VideoQuality;
+export interface RegionCaptureSettings extends Pick<VideoRecordingSettings, 'output' | 'quality'> {
   systemAudioEnabled: boolean;
   microphoneEnabled: boolean;
 }

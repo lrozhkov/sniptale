@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
 
 const helpersMock = vi.hoisted(() => ({
   createMixedCaptureStream: vi.fn(),
@@ -11,37 +14,73 @@ vi.mock('./helpers', () => helpersMock);
 
 import { configureTabCaptureRecorder, resolveFinalCaptureStream } from './stream';
 
-class FakeMediaStream extends EventTarget {
-  active = true;
-  id = 'capture-stream';
+class FakeVideoTrack extends EventTarget implements MediaStreamVideoTrack {
+  contentHint = '';
+  enabled = true;
+  readonly id = 'capture-video-track';
+  readonly kind = 'video';
+  readonly label = '';
+  readonly muted = false;
+  onended: ((this: MediaStreamTrack, event: Event) => unknown) | null = null;
+  onmute: ((this: MediaStreamTrack, event: Event) => unknown) | null = null;
+  onunmute: ((this: MediaStreamTrack, event: Event) => unknown) | null = null;
+  readonly readyState = 'live';
+  readonly stop = vi.fn();
+
+  applyConstraints(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  clone(): MediaStreamVideoTrack {
+    return new FakeVideoTrack();
+  }
+
+  getCapabilities(): MediaTrackCapabilities {
+    return {};
+  }
+
+  getConstraints(): MediaTrackConstraints {
+    return {};
+  }
+
+  getSettings(): MediaTrackSettings {
+    return { frameRate: 30, height: 1080, width: 1920 };
+  }
+}
+
+class FakeMediaStream extends EventTarget implements MediaStream {
+  readonly active = true;
+  readonly id = 'capture-stream';
   onaddtrack: ((this: MediaStream, event: MediaStreamTrackEvent) => unknown) | null = null;
   onremovetrack: ((this: MediaStream, event: MediaStreamTrackEvent) => unknown) | null = null;
+  private readonly videoTrack = new FakeVideoTrack();
 
-  addTrack() {}
-  clone() {
+  addTrack(): void {}
+  clone(): MediaStream {
     return new FakeMediaStream();
   }
-  getAudioTracks() {
+  getAudioTracks(): MediaStreamAudioTrack[] {
     return [];
   }
-  getTrackById() {
-    return null;
+  getTrackById(trackId: string): MediaStreamTrack | null {
+    return trackId === this.videoTrack.id ? this.videoTrack : null;
   }
-  getTracks() {
-    return [];
+  getTracks(): MediaStreamTrack[] {
+    return [this.videoTrack];
   }
-  getVideoTracks() {
-    return [];
+  getVideoTracks(): MediaStreamVideoTrack[] {
+    return [this.videoTrack];
   }
-  removeTrack() {}
+  removeTrack(): void {}
 }
 
 function createFakeMediaStream(): MediaStream {
-  return new FakeMediaStream() as MediaStream;
+  return new FakeMediaStream();
 }
 
 function createSettings() {
   return {
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.MEDIUM,
     streamId: 'stream-id',
     systemAudioEnabled: true,
@@ -117,11 +156,7 @@ describe('tab-capture-fallback recorder configuration', () => {
     };
     helpersMock.resolveRecorderOptions.mockReturnValue({
       mimeType: 'video/webm',
-      qualityConfig: {
-        frameRate: 30,
-        mimeType: 'video/webm',
-        videoBitsPerSecond: 1_000_000,
-      },
+      videoBitsPerSecond: 1_000_000,
     });
     helpersMock.createRecorderHandlers.mockReturnValue(handlers);
     vi.stubGlobal('MediaRecorder', FakeMediaRecorder as typeof MediaRecorder);

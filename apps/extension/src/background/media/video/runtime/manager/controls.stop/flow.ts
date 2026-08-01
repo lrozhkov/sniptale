@@ -98,7 +98,7 @@ async function sendStopSignals(
     countdownEndsAt: null,
     error: null,
   });
-  let terminalError: string | null = null;
+  let terminalError: string | null;
 
   try {
     const acknowledgement = await requestBoundOffscreenRecordingStop(sourceBinding, discard);

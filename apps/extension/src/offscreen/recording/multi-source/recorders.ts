@@ -1,19 +1,23 @@
 import { RECORDING_EXPORT_FILENAME_PREFIX } from '@sniptale/ui/branding';
-import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import {
   buildMicrophoneAudioConstraints,
   resolveMicrophoneGain,
 } from '@sniptale/runtime-contracts/video/types/microphone-processing';
-import { normalizeMultiSourceVideoStream } from './normalize';
+import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import { createFixedVideoOutputStream } from '../stream/fixed-video-output';
 import { getActiveMultiSourceSession, type MultiSourceRecorder } from './state';
-import { buildVideoMediaRecorderOptions } from '../recorder-mime';
+import {
+  buildVideoMediaRecorderOptions,
+  resolveVideoRecordingArtifact,
+} from '../../../platform/media-utils/video-recording';
 
 function getFilenameSuffix(sourceIndex: number): string {
   return `window-${sourceIndex + 1}`;
 }
 
-export function buildSourceFilename(sourceIndex: number, extension = 'webm'): string {
+export function buildSourceFilename(sourceIndex: number, mimeType: string): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  const { extension } = resolveVideoRecordingArtifact(mimeType);
   return `${RECORDING_EXPORT_FILENAME_PREFIX}-${timestamp}-${getFilenameSuffix(sourceIndex)}.${extension}`;
 }
 
@@ -22,7 +26,11 @@ export function buildMicrophoneFilename(extension = 'webm'): string {
   return `${RECORDING_EXPORT_FILENAME_PREFIX}-${timestamp}-microphone.${extension}`;
 }
 
-function buildRecorderConfig(settings: VideoRecordingSettings, stream: MediaStream) {
+function buildRecorderConfig(
+  settings: VideoRecordingSettings,
+  stream: MediaStream,
+  trackSettings?: MediaTrackSettings
+) {
   if (stream.getVideoTracks().length === 0) {
     const audioMimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'video/webm';
     return {
@@ -31,7 +39,7 @@ function buildRecorderConfig(settings: VideoRecordingSettings, stream: MediaStre
     };
   }
 
-  return buildVideoMediaRecorderOptions(settings);
+  return buildVideoMediaRecorderOptions(settings, stream, trackSettings);
 }
 
 function createMediaRecorderSource(params: {
@@ -46,7 +54,7 @@ function createMediaRecorderSource(params: {
   const [videoTrack] = params.stream.getVideoTracks();
   const recorder = new MediaRecorder(
     params.stream,
-    buildRecorderConfig(params.settings, params.stream)
+    buildRecorderConfig(params.settings, params.stream, params.trackSettings)
   );
   const source: MultiSourceRecorder = {
     chunks: [],
@@ -87,15 +95,15 @@ async function createRecorder(params: {
   stream: MediaStream;
 }): Promise<MultiSourceRecorder> {
   if (params.stream.getVideoTracks().length === 0) {
-    return createMediaRecorderSource(params);
+    throw new Error('Multi-source capture source is missing a video track.');
   }
 
-  const normalized = await normalizeMultiSourceVideoStream(params.stream, params.settings.quality);
+  const normalized = await createFixedVideoOutputStream(params.stream, params.settings);
   try {
     return createMediaRecorderSource({
       ...params,
       stream: normalized.stream,
-      trackSettings: normalized.dimensions,
+      trackSettings: { ...normalized.dimensions, frameRate: normalized.frameRate },
     });
   } catch (error) {
     normalized.stream.getTracks().forEach((track) => track.stop());

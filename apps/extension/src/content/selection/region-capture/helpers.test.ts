@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
+  VideoQuality,
+} from '@sniptale/runtime-contracts/video/types/types';
 import {
   applyVideoTrackHints,
   applyViewportCrop,
@@ -88,6 +91,7 @@ function createRegionCaptureSettings(
 ) {
   return {
     microphoneEnabled: true,
+    output: DEFAULT_VIDEO_RECORDING_OUTPUT_SETTINGS,
     quality: VideoQuality.MEDIUM,
     systemAudioEnabled: true,
     ...props,

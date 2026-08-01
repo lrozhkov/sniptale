@@ -8,6 +8,7 @@ import { settingsNativeAppMessages } from './native-app';
 import { settingsPermissionsMessages } from './permissions';
 import { settingsPrivacyMessages } from './privacy';
 import { settingsQuickActionsMessages } from './quick-actions';
+import { settingsVideoQualityMessages } from './video-quality';
 
 export const settingsMessages = defineMessageSource({
   appearance: settingsAppearanceMessages,
@@ -19,4 +20,5 @@ export const settingsMessages = defineMessageSource({
   privacy: settingsPrivacyMessages,
   quickActions: settingsQuickActionsMessages,
   hotkeyInput: settingsHotkeyInputMessages,
+  videoQuality: settingsVideoQualityMessages,
 });

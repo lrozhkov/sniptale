@@ -22,6 +22,7 @@ import {
   VideoMp4Codec,
   type VideoProjectExportSettings,
 } from '../../../features/video/project/types';
+import { mergeVideoProjectExportSettings } from '../../../features/video/project/export/capabilities';
 import { ExportDialog } from './index';
 
 let container: HTMLDivElement | null = null;
@@ -31,10 +32,11 @@ function createSettings(): VideoProjectExportSettings {
   return {
     downloadAfterExport: true,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
     fps: 30,
     height: 1080,
     mp4VideoCodec: VideoMp4Codec.AVC,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     width: 1920,
   };
 }
@@ -54,6 +56,7 @@ function renderDialog(props?: Partial<React.ComponentProps<typeof ExportDialog>>
     root?.render(
       <ExportDialog
         settings={createSettings()}
+        sourceDimensions={{ height: 1080, width: 1920 }}
         onClose={onClose}
         onChange={onChange}
         onExport={onExport}
@@ -128,7 +131,10 @@ it('renders inside the shared modal shell and wires close, export, select, and t
     exportButton?.click();
   });
 
-  expect(onChange).toHaveBeenCalledWith({ format: VideoExportFormat.WEBM });
+  expect(onChange).toHaveBeenCalledWith({
+    format: VideoExportFormat.WEBM,
+    webmVideoCodec: 'VP9',
+  });
   expect(onChange).toHaveBeenCalledWith({ downloadAfterExport: false });
   expect(onExport).toHaveBeenCalledTimes(1);
 });
@@ -161,10 +167,9 @@ it('disables export while capability probing is pending and renders WebM-only hi
   });
 
   renderDialog({
-    settings: {
-      ...createSettings(),
+    settings: mergeVideoProjectExportSettings(createSettings(), {
       format: VideoExportFormat.WEBM,
-    },
+    }),
   });
 
   const exportButton = Array.from(
@@ -193,10 +198,12 @@ it('restores the default MP4 codec when switching back from WebM during the same
   const { onChange } = renderDialog({
     settings: {
       format: VideoExportFormat.WEBM,
+      resolution: 'SOURCE' as const,
+      webmVideoCodec: 'VP9' as const,
       downloadAfterExport: true,
       fps: 30,
       height: 1080,
-      quality: VideoExportQualityPreset.BALANCED,
+      quality: VideoExportQualityPreset.MEDIUM,
       width: 1920,
     },
   });

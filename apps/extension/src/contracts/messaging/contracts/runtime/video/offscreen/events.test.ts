@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { runtimeVideoOffscreenEventMessageContracts } from './events';
@@ -21,16 +22,10 @@ const startRecordingContract =
   runtimeVideoOffscreenViewportMessageContracts[VideoMessageType.OFFSCREEN_START_RECORDING];
 
 const recordingSettings = {
-  microphoneEnabled: false,
-  microphoneDeviceId: null,
-  webcamEnabled: false,
-  webcamDeviceId: null,
-  systemAudioEnabled: true,
-  quality: 'HIGH',
+  ...DEFAULT_VIDEO_SETTINGS,
   countdownSeconds: 0,
   autoFadeDelay: 1,
   openEditorAfterRecording: true,
-  diagnosticsEnabled: false,
 };
 
 it('accepts valid cursor capture modes on offscreen recording started messages', () => {

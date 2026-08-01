@@ -37,7 +37,7 @@ beforeEach(() => {
   recordingContext.mediaRecorder = null;
 });
 
-it('publishes stopped with the session id when cleanup clears an inactive recorder session', async () => {
+it('publishes stopped with the session id when cancelling before recorder binding', async () => {
   recordingContext.beginRecordingSession('recording-race', 1);
   recordingContext.bindStreamInstance({
     generation: 1,
@@ -57,7 +57,7 @@ it('publishes stopped with the session id when cleanup clears an inactive record
   ).resolves.toEqual({ result: 'stopped' });
 
   expect(cleanupResourcesMock).toHaveBeenCalledOnce();
-  expect(loggerDebugMock).toHaveBeenCalledWith('Stop requested without an active recording');
+  expect(loggerDebugMock).not.toHaveBeenCalledWith('Stop requested without an active recording');
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
     type: VideoMessageType.OFFSCREEN_RECORDING_STOPPED,
     recordingId: 'recording-race',

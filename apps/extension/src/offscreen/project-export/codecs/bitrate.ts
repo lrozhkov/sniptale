@@ -1,18 +1,20 @@
-import {
-  VideoExportQualityPreset,
+import { resolveVideoTargetBitrate } from '@sniptale/runtime-contracts/video/types/types';
+import type {
   VideoMp4Codec,
+  VideoProjectExportSettings,
+  VideoWebmCodec,
 } from '../../../features/video/project/types/export';
-import { EXPORT_BITRATES_BY_CODEC } from './constants';
 
-export function scaleBitrate(
-  quality: VideoExportQualityPreset,
-  width: number,
-  height: number,
-  codec: VideoMp4Codec = VideoMp4Codec.AVC
+export function resolveExportTargetBitrate(
+  settings: Pick<VideoProjectExportSettings, 'fps' | 'height' | 'quality' | 'resolution' | 'width'>,
+  codec: VideoMp4Codec | VideoWebmCodec
 ): number {
-  const bitrateByQuality =
-    EXPORT_BITRATES_BY_CODEC[codec] ?? EXPORT_BITRATES_BY_CODEC[VideoMp4Codec.AVC];
-  const base = bitrateByQuality[quality] ?? bitrateByQuality[VideoExportQualityPreset.BALANCED];
-  const scale = Math.max(0.5, Math.min((width * height) / (1920 * 1080), 3));
-  return Math.round(base * scale);
+  return resolveVideoTargetBitrate({
+    codec,
+    fps: settings.fps,
+    height: settings.height,
+    quality: settings.quality,
+    resolution: settings.resolution,
+    width: settings.width,
+  });
 }

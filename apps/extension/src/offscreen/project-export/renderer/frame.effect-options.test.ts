@@ -99,9 +99,11 @@ function createSettings(): VideoProjectExportSettings {
   return {
     downloadAfterExport: false,
     format: VideoExportFormat.WEBM,
+    resolution: 'SOURCE' as const,
+    webmVideoCodec: 'VP9' as const,
     fps: 30,
     height: 100,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     width: 200,
   };
 }

@@ -85,11 +85,11 @@ function getRequiredValue<T>(value: T | null | undefined, label: string): T {
 }
 
 function verifiesRegionCaptureFilename(): void {
-  expect(buildRegionCaptureFilename(createFakeTraceDate())).toBe(
+  expect(buildRegionCaptureFilename(createFakeTraceDate(), 'webm')).toBe(
     'Sniptale_Region_2026-03-20_08-09-10.webm'
   );
-  expect(buildRegionCaptureFilename(createFakeTraceDate())).toBe(
-    buildTimestampedRecordingFilename('Sniptale_Region', createFakeTraceDate())
+  expect(buildRegionCaptureFilename(createFakeTraceDate(), 'webm')).toBe(
+    buildTimestampedRecordingFilename('Sniptale_Region', createFakeTraceDate(), 'webm')
   );
 }
 

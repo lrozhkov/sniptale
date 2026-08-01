@@ -233,7 +233,7 @@ it('uses the localized fallback when an offscreen start error has no detail', as
   expectAcceptedLifecycleResponse(sendResponse);
 });
 
-it('releases the capture surface before resetting a runtime-error session', async () => {
+it('surfaces a runtime recording failure through the visible failure path', async () => {
   const sendResponse = createSendResponse();
 
   handleOffscreenError(
@@ -242,10 +242,27 @@ it('releases the capture surface before resetting a runtime-error session', asyn
   );
   await flushAsyncRoute();
 
+  expect(clearRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('rec-1');
+  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('runtime failed');
+  expect(releaseVideoCaptureSurfaceMock).not.toHaveBeenCalled();
+  expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
+  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-1');
+  expectAcceptedLifecycleResponse(sendResponse);
+});
+
+it('releases the capture surface before resetting a stop-error session', async () => {
+  const sendResponse = createSendResponse();
+
+  handleOffscreenError({ error: 'stop failed', phase: 'stop', recordingId: 'rec-1' }, sendResponse);
+  await flushAsyncRoute();
+
   expect(releaseVideoCaptureSurfaceMock).toHaveBeenCalledWith('rec-1');
   expect(releaseVideoCaptureSurfaceMock.mock.invocationCallOrder[0]).toBeLessThan(
     resetVideoRecordingRuntimeStateMock.mock.invocationCallOrder[0] ?? 0
   );
+  expect(finishVideoRecordingStopMock).toHaveBeenCalledOnce();
+  expect(resetCompletedVideoRecordingSessionMock).toHaveBeenCalledWith('rec-1');
+  expect(resetRecordingTabIdMock).toHaveBeenCalledOnce();
   expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-1');
   expectAcceptedLifecycleResponse(sendResponse);
 });

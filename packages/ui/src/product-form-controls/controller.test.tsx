@@ -4,10 +4,13 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
+const useGlassSelectOverlayMock = vi.hoisted(() => vi.fn());
+
 vi.mock('../glass-select/overlay-state', () => ({
-  useGlassSelectOverlay: () => ({
-    menuPosition: 'bottom' as const,
-  }),
+  useGlassSelectOverlay: (options: unknown) => {
+    useGlassSelectOverlayMock(options);
+    return { menuPosition: 'bottom' as const, portalStyle: {} };
+  },
 }));
 
 import { useProductSelectController } from './controller';
@@ -47,6 +50,36 @@ async function flushMicrotasks() {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  useGlassSelectOverlayMock.mockClear();
+});
+
+it('uses safe automatic placement by default', () => {
+  renderElement(
+    <HookHarness
+      value="one"
+      onChange={() => undefined}
+      options={[{ value: 'one', label: 'One' }]}
+    />
+  );
+
+  expect(useGlassSelectOverlayMock).toHaveBeenCalledWith(
+    expect.objectContaining({ placement: 'auto', portal: true })
+  );
+});
+
+it('forwards an explicit bottom-only placement policy', () => {
+  renderElement(
+    <HookHarness
+      menuPlacement="bottom"
+      value="one"
+      onChange={() => undefined}
+      options={[{ value: 'one', label: 'One' }]}
+    />
+  );
+
+  expect(useGlassSelectOverlayMock).toHaveBeenCalledWith(
+    expect.objectContaining({ placement: 'bottom', portal: true })
+  );
 });
 
 afterEach(() => {
@@ -61,23 +94,25 @@ afterEach(() => {
 
 function HookHarness(props: {
   disabled?: boolean;
+  menuPlacement?: 'auto' | 'bottom';
   onChange: (value: string) => void;
   options: Array<{ disabled?: boolean; label: string; value: string }>;
   value: string;
 }) {
   const select = useProductSelectController({
     disabled: props.disabled ?? false,
+    ...(props.menuPlacement === undefined ? {} : { menuPlacement: props.menuPlacement }),
     onChange: props.onChange,
     options: props.options,
     value: props.value,
   });
 
   return (
-    <div ref={select.containerRef}>
+    <div ref={select.overlay.containerRef}>
       <button
-        ref={select.setTriggerRef}
-        onClick={select.handleToggle}
-        onKeyDown={select.handleTriggerKeyDown}
+        ref={select.controls.setTriggerRef}
+        onClick={select.controls.handleToggle}
+        onKeyDown={select.controls.handleTriggerKeyDown}
       >
         trigger
       </button>
@@ -85,16 +120,19 @@ function HookHarness(props: {
         <button
           key={option.value}
           ref={(node) => {
-            select.optionRefs.current[index] = node;
+            select.overlay.optionRefs.current[index] = node;
           }}
-          onClick={() => select.handleSelect(option)}
-          onKeyDown={select.handleOptionKeyDown(index)}
+          onClick={() => select.controls.handleSelect(option)}
+          onKeyDown={select.controls.handleOptionKeyDown(index)}
         >
           {option.label}
         </button>
       ))}
-      <output data-open={String(select.isOpen)} data-active={String(select.activeIndex)}>
-        {select.selectedOption?.value ?? ''}
+      <output
+        data-open={String(select.state.isOpen)}
+        data-active={String(select.state.activeIndex)}
+      >
+        {select.state.selectedOption?.value ?? ''}
       </output>
     </div>
   );

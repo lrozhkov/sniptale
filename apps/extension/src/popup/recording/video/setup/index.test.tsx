@@ -42,6 +42,7 @@ import {
   type VideoRecordingSettings,
   VideoRecordingStatus,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -115,6 +116,7 @@ function createProps(
 
 function createVideoSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: true,

@@ -1,4 +1,4 @@
-export { scaleBitrate } from './bitrate';
+export { resolveExportTargetBitrate } from './bitrate';
 export {
   ensureMp4ExportSupport,
   getSupportedMp4AudioEncoder,
