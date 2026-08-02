@@ -28,12 +28,6 @@ const CAST_CLEANUP_LOCAL_OWNER_MAPPING_ENTRIES = [
     testFiles: ['apps/extension/src/editor/chrome/tool-icons.test.tsx'],
   },
   {
-    owner: 'scenario-editor-template-picker-static-copy',
-    productionFile: 'apps/extension/src/scenario-editor/project/templates/picker.tsx',
-    reason: 'Scenario template picker copy is covered by picker rendering tests.',
-    testFiles: ['apps/extension/src/scenario-editor/project/templates/picker.test.tsx'],
-  },
-  {
     owner: 'video-editor-diagnostics-panel-action-text',
     productionFile: 'apps/extension/src/video-editor/diagnostics/panel/action-text.ts',
     reason: 'Diagnostics action text parsing is covered by action text tests.',

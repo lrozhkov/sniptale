@@ -64,7 +64,6 @@ export const SCENARIO_EXPORT_OWNER_MAPPINGS = [
       'apps/extension/src/scenario-editor/page-shell/shell-content.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/view.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/view.presentation.test.tsx',
-      'apps/extension/src/scenario-editor/page-shell/side-panels.test.tsx',
       'apps/extension/src/scenario-editor/export-dialog/deck/index.test.tsx',
       'apps/extension/src/scenario-editor/export-dialog/deck/option-toggles.test.tsx',
       'apps/extension/src/scenario-editor/export-dialog/deck/panel.test.tsx',

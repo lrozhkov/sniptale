@@ -24,7 +24,6 @@ vi.mock('./use-load', () => ({
 vi.mock('./use-save', () => ({
   useScenarioV3ProjectSaver: () => ({
     saveProject: saveProjectMock,
-    saveProjectOrThrow: saveProjectMock,
   }),
 }));
 
@@ -73,14 +72,6 @@ describe('useScenarioV3PageProjectState', () => {
     expect(saveProjectMock).toHaveBeenCalledTimes(2);
     expect(saveProjectMock).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Updated' }));
   });
-
-  it('exposes strict save for presenter launch flows', async () => {
-    renderHarness();
-
-    await clickButton('Save now');
-
-    expect(saveProjectMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'Updated' }));
-  });
 });
 
 function renderHarness() {
@@ -100,9 +91,6 @@ function RuntimeHarness() {
       </button>
       <button type="button" onClick={() => state.updateProject(project)}>
         Update project
-      </button>
-      <button type="button" onClick={() => void state.saveProject(project)}>
-        Save now
       </button>
     </div>
   );

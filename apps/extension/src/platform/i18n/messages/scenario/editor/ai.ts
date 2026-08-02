@@ -56,20 +56,20 @@ export const scenarioEditorAiMessages = {
     en: 'Close AI',
   },
   aiEditorDeckContext: {
-    ru: 'Дека',
-    en: 'Deck',
+    ru: 'Гайд',
+    en: 'Guide',
   },
   aiEditorDeckInstructionPlaceholder: {
-    ru: 'Например: сделай слайд презентационным, добавь build-шаги и выровняй выноски.',
-    en: 'For example: make the slide presentation-ready, add build steps, and align callouts.',
+    ru: 'Например: сократи заголовки, сделай шаги последовательными и улучши пояснения.',
+    en: 'For example: shorten the titles, improve the sequence, and clarify the instructions.',
   },
   aiEditorDisclosureFieldAttachments: {
     ru: 'скриншоты',
     en: 'screenshots',
   },
   aiEditorDisclosureFieldDeckOutline: {
-    ru: 'структура деки',
-    en: 'deck outline',
+    ru: 'структура гайда',
+    en: 'guide outline',
   },
   aiEditorDisclosureFieldInstruction: {
     ru: 'инструкция',
@@ -84,8 +84,8 @@ export const scenarioEditorAiMessages = {
     en: 'project snapshot',
   },
   aiEditorDisclosureFieldSelectedSlideCode: {
-    ru: 'код выбранного слайда',
-    en: 'selected slide code',
+    ru: 'данные выбранного шага',
+    en: 'selected step data',
   },
   aiEditorDisclosureFieldStepContent: {
     ru: 'текст и оверлеи',
@@ -136,8 +136,8 @@ export const scenarioEditorAiMessages = {
     en: 'AI returned unsupported operations',
   },
   aiEditorNoSelection: {
-    ru: 'Слой не выбран',
-    en: 'No layer selected',
+    ru: 'Объект не выбран',
+    en: 'No item selected',
   },
   aiEditorNoAppliedChanges: {
     ru: 'AI не предложил валидных изменений для применения.',
@@ -152,43 +152,43 @@ export const scenarioEditorAiMessages = {
     en: 'Selection',
   },
   aiEditorSlideContext: {
-    ru: 'Слайд',
-    en: 'Slide',
+    ru: 'Шаг',
+    en: 'Step',
   },
   aiOperationElement: {
     ru: 'Слой',
     en: 'Element',
   },
   aiOperationElementBuild: {
-    ru: 'Появление слоя',
-    en: 'Element build',
+    ru: 'Внешний вид слоя',
+    en: 'Element appearance',
   },
   aiOperationImageTransform: {
     ru: 'Кадрирование изображения',
     en: 'Image transform',
   },
   aiOperationProjectPresentation: {
-    ru: 'Настройки презентации',
-    en: 'Presentation defaults',
+    ru: 'Настройки гайда',
+    en: 'Guide settings',
   },
   aiOperationSlideCanvas: {
-    ru: 'Канвас слайда',
-    en: 'Slide canvas',
+    ru: 'Область шага',
+    en: 'Step area',
   },
   aiOperationSlideLayout: {
-    ru: 'Макет слайда',
-    en: 'Slide layout',
+    ru: 'Структура шага',
+    en: 'Step arrangement',
   },
   aiOperationSlideNotes: {
-    ru: 'Заметки слайда',
-    en: 'Slide notes',
+    ru: 'Описание шага',
+    en: 'Step notes',
   },
   aiOperationSlidePresentation: {
-    ru: 'Показ слайда',
-    en: 'Slide playback',
+    ru: 'Отображение шага',
+    en: 'Step display',
   },
   aiOperationSlideTitle: {
-    ru: 'Заголовок слайда',
-    en: 'Slide title',
+    ru: 'Заголовок шага',
+    en: 'Step title',
   },
 } as const;

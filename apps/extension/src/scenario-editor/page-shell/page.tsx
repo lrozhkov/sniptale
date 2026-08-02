@@ -47,7 +47,6 @@ export function ScenarioV3EditorPage() {
           retrySave: projectState.retrySave,
           state: projectState.saveState,
         }}
-        saveProject={projectState.saveProject}
       />
     </div>
   );

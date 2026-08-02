@@ -2,7 +2,6 @@ import { translate } from '../../../platform/i18n';
 import { CanvasWorkspaceToolPanel, type CanvasToolAction } from '@sniptale/ui/canvas-tools';
 import {
   createCanvasToolAction,
-  type CanvasToolActionDescriptor,
   type CanvasToolDescriptorKind,
 } from '@sniptale/ui/canvas-tools/descriptors';
 import { floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
@@ -44,11 +43,7 @@ function buildScenarioWorkspaceActions(props: {
   mode: ScenarioEditorMode;
   onModeChange: (mode: ScenarioEditorMode) => void;
 }) {
-  return [
-    ...buildScenarioModeActions(props),
-    ...buildScenarioZoomActions(props.controls),
-    ...buildScenarioCanvasToggleActions(props.controls),
-  ];
+  return [...buildScenarioModeActions(props), ...buildScenarioZoomActions(props.controls)];
 }
 
 function buildScenarioModeActions(props: {
@@ -67,18 +62,6 @@ function buildScenarioModeActions(props: {
       kind: 'video',
       label: translate('scenario.editor.modePlay'),
       mode: SCENARIO_EDITOR_MODES.play,
-    },
-    {
-      id: 'mode-presenter',
-      kind: 'select',
-      label: translate('scenario.editor.modePresenter'),
-      mode: SCENARIO_EDITOR_MODES.presenter,
-    },
-    {
-      id: 'mode-overview',
-      kind: 'layout',
-      label: translate('scenario.editor.modeOverview'),
-      mode: SCENARIO_EDITOR_MODES.overview,
     },
   ] satisfies Array<{
     id: string;
@@ -132,52 +115,7 @@ function buildScenarioZoomActions(
       label: translate('scenario.editor.zoomIn'),
       onSelect: controls.onZoomIn,
     },
-  ] satisfies CanvasToolActionDescriptor[];
+  ] satisfies Parameters<typeof createCanvasToolAction>[0][];
 
   return zoomActions.map((action) => createCanvasToolAction(action));
-}
-
-function buildScenarioCanvasToggleActions(
-  controls: ScenarioCanvasViewportController['controls']
-): CanvasToolAction[] {
-  return [
-    createScenarioCanvasToggleAction({
-      active: controls.gridVisible,
-      id: 'grid',
-      kind: 'grid',
-      label: translate('scenario.editor.toggleGrid'),
-      onSelect: () => controls.onSetGridVisible(!controls.gridVisible),
-    }),
-    createScenarioCanvasToggleAction({
-      active: controls.magnetEnabled,
-      id: 'magnet',
-      kind: 'magnet',
-      label: translate('scenario.editor.toggleMagnet'),
-      onSelect: () => controls.onSetMagnetEnabled(!controls.magnetEnabled),
-    }),
-    createScenarioCanvasToggleAction({
-      active: controls.snapToGrid,
-      id: 'snap',
-      kind: 'selection',
-      label: translate('scenario.editor.toggleSnapToGrid'),
-      onSelect: () => controls.onSetSnapToGrid(!controls.snapToGrid),
-    }),
-    createScenarioCanvasToggleAction({
-      active: controls.navigatorVisible ?? false,
-      disabled: !controls.onSetNavigatorVisible,
-      id: 'navigator',
-      kind: 'workspace',
-      label: translate('scenario.editor.toggleNavigator'),
-      onSelect: () => controls.onSetNavigatorVisible?.(!(controls.navigatorVisible ?? false)),
-    }),
-  ];
-}
-
-function createScenarioCanvasToggleAction(
-  action: Omit<CanvasToolActionDescriptor, 'group'>
-): CanvasToolAction {
-  return createCanvasToolAction({
-    group: 'workspace',
-    ...action,
-  });
 }

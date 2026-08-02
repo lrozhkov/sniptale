@@ -135,15 +135,6 @@ it('does not emit stale local state when the parent replaces the project prop', 
   );
 });
 
-it('emits deck presentation updates through project actions without resetting selection', () => {
-  renderHarness();
-  clickButton('Select second');
-  clickButton('Set graphite theme');
-
-  expect(changedProjects.at(-1)?.presentation.themeId).toBe('graphite');
-  expect(container?.querySelector('[data-testid="selected-slide"]')?.textContent).toBe('slide-2');
-});
-
 it('surfaces image import operation failures without emitting project changes', async () => {
   imageImportMock.insertImageFileIntoSelectedSlide.mockRejectedValueOnce(
     new Error('image import failed')
@@ -235,12 +226,6 @@ function ScenarioEditorStateActions({ editor }: { editor: ScenarioEditorState })
         }
       >
         Set selected element weight
-      </button>
-      <button
-        type="button"
-        onClick={() => editor.projectActions.updatePresentation({ themeId: 'graphite' })}
-      >
-        Set graphite theme
       </button>
       <button
         type="button"

@@ -6,12 +6,8 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import { moveScenarioSlideByDirection } from './slide-rail';
 import type { ScenarioCanvasElementPatch } from '../canvas';
-import type {
-  ScenarioInspectorElementPatch,
-  ScenarioInspectorProjectPresentationPatch,
-  ScenarioInspectorSlidePatch,
-} from '../inspector';
-import { clampElementPatch, clampPresentationPatch, clampSlidePatch } from './mutation-constraints';
+import type { ScenarioInspectorElementPatch, ScenarioInspectorSlidePatch } from '../inspector';
+import { clampElementPatch, clampSlidePatch } from './mutation-constraints';
 
 export type ScenarioV3ElementPatch = ScenarioCanvasElementPatch & ScenarioInspectorElementPatch;
 
@@ -20,10 +16,7 @@ export function addProjectSlide(project: ScenarioProjectV3): ScenarioProjectV3 {
   return appendProjectSlide(project, slide);
 }
 
-export function appendProjectSlide(
-  project: ScenarioProjectV3,
-  slide: ScenarioSlide
-): ScenarioProjectV3 {
+function appendProjectSlide(project: ScenarioProjectV3, slide: ScenarioSlide): ScenarioProjectV3 {
   return touchProject({
     ...project,
     slides: [...project.slides, slide],
@@ -96,18 +89,6 @@ export function deleteSlideElement(
   });
 }
 
-export function moveSlideElement(
-  project: ScenarioProjectV3,
-  slideId: string,
-  elementId: string,
-  direction: 'backward' | 'forward'
-): ScenarioProjectV3 {
-  return updateProjectSlide(project, slideId, (slide) => {
-    const elements = moveElementByDirection(slide.elements, elementId, direction);
-    return elements === slide.elements ? slide : { ...slide, elements };
-  });
-}
-
 export function updateSlideElement(
   project: ScenarioProjectV3,
   slideId: string,
@@ -132,26 +113,6 @@ export function updateSlideSettings(
     canvas: canvas ? { ...slide.canvas, ...canvas } : slide.canvas,
     clicks: clicks ? { ...slide.clicks, ...clicks } : slide.clicks,
   }));
-}
-
-export function updateProjectPresentationSettings(
-  project: ScenarioProjectV3,
-  patch: ScenarioInspectorProjectPresentationPatch
-): ScenarioProjectV3 {
-  const normalizedPatch = clampPresentationPatch(patch);
-  return touchProject({
-    ...project,
-    presentation: {
-      ...project.presentation,
-      ...normalizedPatch,
-      controls: normalizedPatch.controls
-        ? { ...project.presentation.controls, ...normalizedPatch.controls }
-        : project.presentation.controls,
-      grid: normalizedPatch.grid
-        ? { ...project.presentation.grid, ...normalizedPatch.grid }
-        : project.presentation.grid,
-    },
-  });
 }
 
 export function replaceProjectSlide(
@@ -217,22 +178,6 @@ function cloneElement(element: ScenarioElement): ScenarioElement {
     ...element,
     id: createScenarioV3Id('element'),
   } as ScenarioElement;
-}
-
-function moveElementByDirection(
-  elements: ScenarioElement[],
-  elementId: string,
-  direction: 'backward' | 'forward'
-) {
-  const index = elements.findIndex((element) => element.id === elementId);
-  const nextIndex = direction === 'forward' ? index + 1 : index - 1;
-  if (index < 0 || nextIndex < 0 || nextIndex >= elements.length) {
-    return elements;
-  }
-
-  const nextElements = [...elements];
-  [nextElements[index], nextElements[nextIndex]] = [nextElements[nextIndex]!, nextElements[index]!];
-  return nextElements;
 }
 
 function deleteElementById(elements: ScenarioElement[], elementId: string) {

@@ -10,11 +10,7 @@ import type {
   ScenarioElement,
   ScenarioProjectV3,
 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import {
-  updateProjectPresentationSettings,
-  updateSlideElement,
-  updateSlideSettings,
-} from './mutations';
+import { updateSlideElement, updateSlideSettings } from './mutations';
 
 function createProjectWithElements(elements: ScenarioElement[]): ScenarioProjectV3 {
   const project = createScenarioProjectV3('Constraints');
@@ -24,24 +20,15 @@ function createProjectWithElements(elements: ScenarioElement[]): ScenarioProject
   };
 }
 
-it('clamps slide canvas, click, and presentation grid settings in mutation owner', () => {
+it('clamps slide canvas and click settings in mutation owner', () => {
   const project = createProjectWithElements([]);
   const slideUpdated = updateSlideSettings(project, 'slide-1', {
     canvas: { height: 999999, width: 1 },
     clicks: { count: 999999, initialIndex: -50 },
   });
-  const presentationUpdated = updateProjectPresentationSettings(slideUpdated, {
-    grid: { columns: 999, gutter: -12, margin: 999, rows: 0 },
-  });
 
-  expect(presentationUpdated.slides[0]?.canvas).toMatchObject({ height: 4320, width: 320 });
-  expect(presentationUpdated.slides[0]?.clicks).toMatchObject({ count: 999, initialIndex: 0 });
-  expect(presentationUpdated.presentation.grid).toMatchObject({
-    columns: 24,
-    gutter: 0,
-    margin: 320,
-    rows: 1,
-  });
+  expect(slideUpdated.slides[0]?.canvas).toMatchObject({ height: 4320, width: 320 });
+  expect(slideUpdated.slides[0]?.clicks).toMatchObject({ count: 999, initialIndex: 0 });
 });
 
 it('clamps element frame, opacity, build, and typed style updates in mutation owner', () => {

@@ -5,13 +5,10 @@ import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/typ
 import { createProjectCommands } from './commands';
 import type { ScenarioV3EditorSession } from './types';
 
-it('commits project-level deck presentation commands', () => {
+it('commits project-level AI replacements', () => {
   const harness = createSessionHarness();
   const projectCommands = createProjectCommands(harness.setSession);
   const replacement = { ...createProject(), id: 'project-2', name: 'AI replacement' };
-
-  projectCommands.updatePresentation({ themeId: 'graphite' });
-  expect(harness.getSession().project.presentation.themeId).toBe('graphite');
 
   projectCommands.applyProject(replacement);
   expect(harness.getSession().project).toBe(replacement);

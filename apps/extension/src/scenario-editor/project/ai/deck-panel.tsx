@@ -86,11 +86,11 @@ function ScenarioEditorDeckAiContext(props: {
     >
       <ScenarioEditorDeckAiContextRow
         label={translate('scenario.editor.aiEditorDeckContext')}
-        value={`${props.project.name} · ${props.project.slides.length} ${translate('scenario.editor.slides')}`}
+        value={`${props.project.name} · ${props.project.slides.length} ${translate('scenario.editor.steps')}`}
       />
       <ScenarioEditorDeckAiContextRow
         label={translate('scenario.editor.aiEditorSlideContext')}
-        value={props.selectedSlide.title || translate('scenario.editor.untitledSlide')}
+        value={props.selectedSlide.title || translate('scenario.editor.untitledStep')}
       />
       <ScenarioEditorDeckAiContextRow
         label={translate('scenario.editor.aiEditorSelectionContext')}

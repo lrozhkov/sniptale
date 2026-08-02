@@ -13,9 +13,7 @@ import {
   deleteSlideElement,
   duplicateProjectSlide,
   moveProjectSlide,
-  moveSlideElement,
   replaceProjectSlide,
-  updateProjectPresentationSettings,
   updateSlideElement,
   updateSlideSettings,
 } from './mutations';
@@ -63,19 +61,18 @@ it('keeps invalid slide mutations as no-ops', () => {
   expect(moveProjectSlide(project, 'slide-1', 'up')).toBe(project);
 });
 
-it('adds, moves, updates, and deletes slide elements', () => {
+it('adds, updates, and deletes slide elements', () => {
   vi.spyOn(Date, 'now').mockReturnValue(200);
   const project = createProject();
   const shape = { ...createScenarioShapeElement(), id: 'shape-1' };
   const added = addSlideElement(project, 'slide-1', shape);
-  const moved = moveSlideElement(added, 'slide-1', 'shape-1', 'backward');
-  const updated = updateSlideElement(moved, 'slide-1', 'image-1', {
+  const updated = updateSlideElement(added, 'slide-1', 'image-1', {
     contentTransform: { scale: 1.4, x: 12 },
     frame: { width: 360 },
   });
   const deleted = deleteSlideElement(updated, 'slide-1', 'text-1');
 
-  expect(moved.slides[0]?.elements[1]?.id).toBe('shape-1');
+  expect(added.slides[0]?.elements.at(-1)?.id).toBe('shape-1');
   expect(updated.slides[0]?.elements.find((element) => element.id === 'image-1')).toMatchObject({
     contentTransform: { scale: 1.4, x: 12, y: 0 },
     frame: expect.objectContaining({ width: 360 }),
@@ -87,7 +84,6 @@ it('keeps invalid element and slide setting mutations as no-ops', () => {
   const project = createProject();
 
   expect(deleteSlideElement(project, 'slide-1', 'missing')).toBe(project);
-  expect(moveSlideElement(project, 'slide-1', 'text-1', 'backward')).toBe(project);
   expect(updateSlideElement(project, 'missing', 'text-1', { name: 'Nope' })).toBe(project);
   expect(updateSlideSettings(project, 'missing', { title: 'Nope' })).toBe(project);
 });
@@ -103,24 +99,4 @@ it('updates slide settings with nested canvas patches', () => {
     canvas: { background: { color: '#111111', kind: 'solid' }, height: 800 },
     notes: 'Speaker notes',
   });
-});
-
-it('updates project presentation defaults with nested controls and grid patches', () => {
-  vi.spyOn(Date, 'now').mockReturnValue(300);
-  const project = createProject();
-  const updated = updateProjectPresentationSettings(project, {
-    controls: { loop: true, showControls: false },
-    defaultLayoutId: 'summary',
-    grid: { columns: 8, gutter: 20 },
-    themeId: 'graphite',
-  });
-
-  expect(updated.presentation).toMatchObject({
-    controls: { loop: true, showControls: false },
-    defaultLayoutId: 'summary',
-    grid: { columns: 8, gutter: 20 },
-    themeId: 'graphite',
-  });
-  expect(updated.updatedAt).toBe(300);
-  expect(project.presentation.themeId).not.toBe('graphite');
 });

@@ -11,12 +11,10 @@ import {
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import type { ScenarioCanvasViewportController } from '../canvas/viewport-state';
 import { SCENARIO_EDITOR_MODES } from './presentation/mode';
-import { createScenarioV3TemplateStateStub } from './test-support';
 import { ScenarioV3Workspace } from './workspace';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
-const insertElementFromDragMock = vi.fn();
 
 function createCanvasSelectionProject(): ScenarioProjectV3 {
   const project = createScenarioProjectV3('Canvas selection');
@@ -47,26 +45,17 @@ function CanvasSelectionHarness() {
 
   return (
     <ScenarioV3Workspace
-      audienceOpening={false}
       canvasViewport={createViewportController()}
       clickIndex={0}
       editor={editor}
-      elapsedSeconds={0}
       inspectorTool={null}
       mode={SCENARIO_EDITOR_MODES.edit}
-      timelineHidden={false}
       onToggleAi={vi.fn()}
       onOpenExport={vi.fn()}
-      templates={createScenarioV3TemplateStateStub()}
-      templatePickerOpen={false}
       onClickIndexChange={vi.fn()}
       onClearInspectorTool={vi.fn()}
       onEditImageElement={vi.fn()}
       onModeChange={vi.fn()}
-      onOpenAudienceScreen={vi.fn()}
-      onTimelineHiddenChange={vi.fn()}
-      onToggleTemplatePicker={vi.fn()}
-      onPresentationPositionChange={vi.fn()}
     />
   );
 }
@@ -91,7 +80,6 @@ function useCanvasSelectionEditor(project: ScenarioProjectV3) {
     project,
     projectActions: {
       applyProject: vi.fn(),
-      updatePresentation: vi.fn(),
     },
     selectedElement,
     selectedElementId,
@@ -104,10 +92,7 @@ function createElementActions(selectElement: (id: string | null) => void) {
   return {
     deleteElement: vi.fn(),
     insertElement: vi.fn(),
-    insertElementAtPoint: vi.fn(),
-    insertElementFromDrag: insertElementFromDragMock,
     insertImageFile: vi.fn(),
-    moveElement: vi.fn(),
     selectElement,
     selectSlideSurface: () => selectElement(null),
     updateElement: vi.fn(),
@@ -117,7 +102,6 @@ function createElementActions(selectElement: (id: string | null) => void) {
 function createSlideActions() {
   return {
     addSlide: vi.fn(),
-    addTemplateSlide: vi.fn(),
     deleteSlide: vi.fn(),
     duplicateSlide: vi.fn(),
     moveSlide: vi.fn(),
@@ -130,7 +114,6 @@ function createSlideActions() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('PointerEvent', MouseEvent);
-  insertElementFromDragMock.mockClear();
 });
 
 afterEach(() => {
@@ -158,32 +141,6 @@ it('opens element parameters from a canvas pointer selection', () => {
   expect(container.querySelector('[role="tablist"]')).toBeNull();
   expect(container.querySelector('[data-ui="scenario.inspector.panel"]')?.textContent).toContain(
     translate('scenario.editor.opacity')
-  );
-});
-
-it('routes active insert drag gestures through the workspace canvas adapter', () => {
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-
-  act(() => {
-    root?.render(<CanvasSelectionHarness />);
-  });
-  act(() => {
-    getInsertShapeButton().click();
-  });
-  const stage = getCanvasStage();
-
-  act(() => {
-    stage.dispatchEvent(pointerEvent('pointerdown', 20, 24));
-    stage.dispatchEvent(pointerEvent('pointermove', 140, 164));
-    stage.dispatchEvent(pointerEvent('pointerup', 140, 164));
-  });
-
-  expect(insertElementFromDragMock).toHaveBeenCalledWith(
-    'shape',
-    { x: 20, y: 24 },
-    { x: 140, y: 164 }
   );
 });
 
@@ -220,26 +177,6 @@ function getElementOverlay(): HTMLButtonElement {
   }
 
   return overlay;
-}
-
-function getCanvasStage(): HTMLDivElement {
-  const stage = container?.querySelector<HTMLDivElement>('[data-ui="scenario.canvas.stage"]');
-  if (!stage) {
-    throw new Error('Expected scenario canvas stage');
-  }
-
-  return stage;
-}
-
-function getInsertShapeButton(): HTMLButtonElement {
-  const button = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="scenario.floating.insert-panel.shape"]'
-  );
-  if (!button) {
-    throw new Error('Expected scenario insert shape button');
-  }
-
-  return button;
 }
 
 function pointerEvent(type: string, clientX: number, clientY: number) {

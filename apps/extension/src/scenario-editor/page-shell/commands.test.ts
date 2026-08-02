@@ -107,16 +107,12 @@ it('commits element commands and selects inserted elements', () => {
 
   elements.insertElement('shape');
   const insertedId = harness.getSession().selectedElementId;
-  elements.insertElementAtPoint('arrow', { x: 64, y: 96 });
-  const pointedId = harness.getSession().selectedElementId;
   elements.selectElement('text-1');
   elements.updateElement('text-1', { name: 'Renamed' });
-  elements.moveElement('text-1', 'forward');
   elements.selectSlideSurface();
   elements.deleteElement('text-1');
 
   expect(insertedId).toMatch(/^shape-/);
-  expect(pointedId).toMatch(/^arrow-/);
   expect(harness.getSession().selectedElementId).toBeNull();
   expect(
     harness.getSession().project.slides[0]?.elements.map((element) => element.id)
@@ -259,22 +255,19 @@ it('preserves selected elements after update and move while they remain reachabl
   slides.selectSlide('slide-2');
   elements.selectElement('text-2');
   elements.updateElement('text-2', { name: 'Renamed' });
-  elements.moveElement('text-2', 'forward');
 
   expect(harness.getSession().selectedElementId).toBe('text-2');
   expect(harness.getSession().selectedSlideId).toBe('slide-2');
 });
 
-it('commits template slide replacement and add-template commands', () => {
+it('commits a template-compatible slide replacement', () => {
   const harness = createSessionHarness();
   const replacement = { ...createScenarioSlide({ title: 'Template' }), id: 'template-slide' };
   const slides = createSlideCommands(harness.setSession);
 
   slides.replaceSelectedSlide(replacement);
-  slides.addTemplateSlide(createScenarioSlide({ title: 'Appended template' }));
 
   expect(harness.getSession().project.slides[0]?.title).toBe('Template');
-  expect(harness.getSession().project.slides.at(-1)?.title).toBe('Appended template');
 });
 
 it('applies undo and redo history commands without changing empty history', () => {

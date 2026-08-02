@@ -1,4 +1,4 @@
-import { PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useState } from 'react';
 import type { ScenarioSlideRenderAssetMap } from '../../project/stage-render/slide';
 import { translate } from '../../../platform/i18n';
@@ -8,12 +8,9 @@ import {
   FloatingChromeToolbar,
   floatingChromeClassNames,
 } from '@sniptale/ui/floating-chrome';
-import type { ScenarioCanvasViewportController } from '../../canvas/viewport-state';
-import { ScenarioLayersInspector } from '../../inspector/layers';
 import { ScenarioSlideRail } from '../slide-rail';
 import { ScenarioEditorInspectorPanelBridge } from '../scenario-inspector-panel-bridge';
-import { FloatingPanelSplitHandle, useFloatingPanelSplit } from './panel-split';
-import type { ScenarioV3FloatingEditor, ScenarioV3FloatingTemplateState } from './types';
+import type { ScenarioV3FloatingEditor } from './types';
 
 const RIGHT_STACK_CLASS_NAME = floatingChromeClassNames(
   'absolute bottom-3 right-3 top-[4.5rem] z-40 flex min-h-0 w-[min(22rem,calc(100vw-1.5rem))] flex-col gap-3',
@@ -33,23 +30,18 @@ const PANEL_HEADER_CLASS_NAME = [
 
 export function ScenarioFloatingPanels(props: {
   assets: ScenarioSlideRenderAssetMap;
-  canvasControls: ScenarioCanvasViewportController['controls'];
   editor: ScenarioV3FloatingEditor;
   inspectorHidden?: boolean;
   inspectorTool: 'export' | null;
-  templatePickerOpen: boolean;
-  templates: ScenarioV3FloatingTemplateState;
   onClearInspectorTool: () => void;
   onEditImageElement: (elementId: string) => void;
   onOpenExport: () => void;
-  onToggleTemplatePicker: () => void;
 }) {
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
-  const leftSplit = useFloatingPanelSplit();
 
   return (
     <>
-      <ScenarioFloatingLeftStack leftSplit={leftSplit} {...props} />
+      <ScenarioFloatingLeftStack {...props} />
       {props.inspectorHidden ? null : (
         <ScenarioFloatingRightStack
           inspectorCollapsed={inspectorCollapsed}
@@ -61,21 +53,10 @@ export function ScenarioFloatingPanels(props: {
   );
 }
 
-function ScenarioFloatingLeftStack(
-  props: Parameters<typeof ScenarioFloatingPanels>[0] & {
-    leftSplit: ReturnType<typeof useFloatingPanelSplit>;
-  }
-) {
+function ScenarioFloatingLeftStack(props: Parameters<typeof ScenarioFloatingPanels>[0]) {
   return (
     <div data-ui="scenario.floating.left-stack" className={LEFT_STACK_CLASS_NAME}>
       <ScenarioFloatingSlidePanel {...props} />
-      <FloatingPanelSplitHandle
-        label={translate('scenario.editor.layers')}
-        onKeyStep={props.leftSplit.stepResize}
-        onPointerDown={props.leftSplit.startResize}
-        onPointerMove={props.leftSplit.updateResize}
-      />
-      <ScenarioFloatingLayersPanel {...props} />
     </div>
   );
 }
@@ -84,50 +65,20 @@ function ScenarioFloatingSlidePanel(props: Parameters<typeof ScenarioFloatingLef
   return (
     <FloatingChromePanel
       dataUi="scenario.floating.slide-panel"
-      className={PANEL_CLASS_NAME}
-      style={{ flexBasis: `${props.leftSplit.ratio * 100}%` }}
+      className={floatingChromeClassNames(PANEL_CLASS_NAME, 'flex-1')}
     >
       <ScenarioSlideRail
         assets={props.assets}
         onAddSlide={props.editor.slideActions.addSlide}
-        onCreateTemplateSlide={props.templates.createSlide}
         onDeleteSlide={props.editor.slideActions.deleteSlide}
         onDuplicateSlide={props.editor.slideActions.duplicateSlide}
         onMoveSlide={props.editor.slideActions.moveSlide}
-        onOpenTemplateManager={props.templates.openManager}
         onSelectSlide={(slideId) => {
           props.onClearInspectorTool();
           props.editor.slideActions.selectSlide(slideId);
         }}
-        onToggleTemplatePicker={props.onToggleTemplatePicker}
         selectedSlideId={props.editor.selectedSlide.id}
         slides={props.editor.project.slides}
-        templatePickerOpen={props.templatePickerOpen}
-        templates={props.templates.templates}
-        embedded
-      />
-    </FloatingChromePanel>
-  );
-}
-
-function ScenarioFloatingLayersPanel(props: Parameters<typeof ScenarioFloatingLeftStack>[0]) {
-  return (
-    <FloatingChromePanel
-      dataUi="scenario.floating.layers-panel"
-      className={floatingChromeClassNames(PANEL_CLASS_NAME, 'flex-1')}
-    >
-      <ScenarioLayersInspector
-        elements={props.editor.elements}
-        onDeleteElement={props.editor.elementActions.deleteElement}
-        onInsertImageFile={props.editor.elementActions.insertImageFile}
-        onMoveElement={props.editor.elementActions.moveElement}
-        onSelectElement={(elementId) => {
-          props.onClearInspectorTool();
-          props.editor.elementActions.selectElement(elementId);
-        }}
-        onUpdateElement={props.editor.elementActions.updateElement}
-        selectedElementId={props.editor.selectedElementId}
-        layersCollapsible={false}
       />
     </FloatingChromePanel>
   );
@@ -166,14 +117,10 @@ function ScenarioFloatingInspectorPanel(props: Parameters<typeof ScenarioFloatin
         onCollapse={() => props.onInspectorCollapsedChange(true)}
       />
       <ScenarioEditorInspectorPanelBridge
-        canvasControls={props.canvasControls}
         editor={props.editor}
         inspectorTool={props.inspectorTool}
-        onClearInspectorTool={props.onClearInspectorTool}
         onEditImageElement={props.onEditImageElement}
         onOpenExport={props.onOpenExport}
-        embedded
-        hideLayers
       />
     </FloatingChromePanel>
   );
@@ -197,21 +144,14 @@ function ScenarioFloatingPanelHeader(props: { title: string; onCollapse: () => v
 
 function ScenarioCollapsedPanelButton(props: {
   dataUi: string;
-  icon: 'left' | 'right';
+  icon: 'right';
   title: string;
   onClick: () => void;
 }) {
   return (
-    <FloatingChromeToolbar
-      dataUi={props.dataUi}
-      className={props.icon === 'right' ? 'self-end' : 'self-start'}
-    >
+    <FloatingChromeToolbar dataUi={props.dataUi} className="self-end">
       <EditorIconButton title={props.title} onClick={props.onClick}>
-        {props.icon === 'right' ? (
-          <PanelRightOpen size={17} strokeWidth={2} />
-        ) : (
-          <PanelLeftOpen size={17} strokeWidth={2} />
-        )}
+        <PanelRightOpen size={17} strokeWidth={2} />
       </EditorIconButton>
     </FloatingChromeToolbar>
   );
@@ -222,6 +162,6 @@ function resolveInspectorTitle(inspectorTool: 'export' | null, selectedElementId
     return translate('scenario.editor.export');
   }
   return selectedElementId
-    ? translate('scenario.editor.element')
-    : translate('scenario.editor.slide');
+    ? translate('scenario.editor.selectedItem')
+    : translate('scenario.editor.stepDetails');
 }

@@ -1,11 +1,7 @@
 import type { ScenarioElement, ScenarioPoint } from '@sniptale/runtime-contracts/scenario/types/v3';
 import type { ScenarioCanvasElementPatch } from '../canvas';
 import { clampScenarioNumber, SCENARIO_INSPECTOR_LIMITS } from '../inspector/constraints';
-import type {
-  ScenarioInspectorElementPatch,
-  ScenarioInspectorProjectPresentationPatch,
-  ScenarioInspectorSlidePatch,
-} from '../inspector';
+import type { ScenarioInspectorElementPatch, ScenarioInspectorSlidePatch } from '../inspector';
 
 type ScenarioV3ElementPatch = ScenarioCanvasElementPatch & ScenarioInspectorElementPatch;
 
@@ -42,36 +38,6 @@ export function clampSlidePatch(patch: ScenarioInspectorSlidePatch): ScenarioIns
               SCENARIO_INSPECTOR_LIMITS.clickCount
             ),
           }
-        : {}),
-    };
-  }
-
-  clampTransitionPatchFields(nextPatch, patch);
-
-  return nextPatch;
-}
-
-export function clampPresentationPatch(
-  patch: ScenarioInspectorProjectPresentationPatch
-): ScenarioInspectorProjectPresentationPatch {
-  const nextPatch: ScenarioInspectorProjectPresentationPatch = { ...patch };
-
-  if (patch.grid) {
-    nextPatch.grid = {
-      ...patch.grid,
-      ...(patch.grid.columns !== undefined
-        ? {
-            columns: clampScenarioNumber(patch.grid.columns, SCENARIO_INSPECTOR_LIMITS.gridColumns),
-          }
-        : {}),
-      ...(patch.grid.rows !== undefined
-        ? { rows: clampScenarioNumber(patch.grid.rows, SCENARIO_INSPECTOR_LIMITS.gridRows) }
-        : {}),
-      ...(patch.grid.gutter !== undefined
-        ? { gutter: clampScenarioNumber(patch.grid.gutter, SCENARIO_INSPECTOR_LIMITS.gridGutter) }
-        : {}),
-      ...(patch.grid.margin !== undefined
-        ? { margin: clampScenarioNumber(patch.grid.margin, SCENARIO_INSPECTOR_LIMITS.gridMargin) }
         : {}),
     };
   }

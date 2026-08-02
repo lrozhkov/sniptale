@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, useRef, useState, type MutableRefObject } from 'react';
+import { act, useRef, type MutableRefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
@@ -57,7 +57,6 @@ describe('useScenarioV3ProjectSaver', () => {
   );
   it('updates the saved baseline after the latest successful save', verifySavedBaselineAdvances);
   it('keeps the saved baseline when a stale save is rejected', verifyStaleSaveKeepsBaseline);
-  it('rethrows strict save failures for caller-owned compensation', verifyStrictSaveRethrows);
 });
 
 async function verifyStaleSaveFailureIgnoredAfterNewerSuccess() {
@@ -161,19 +160,6 @@ async function verifyStaleSaveKeepsBaseline() {
   expectSaveCalledWithBaseAndName(2, 10, 'Saved');
 }
 
-async function verifyStrictSaveRethrows() {
-  const setError = vi.fn();
-  const setSaveState = vi.fn();
-  saveScenarioProjectRecordV3Mock.mockRejectedValue(new Error('Quota exceeded'));
-  renderSaver({ setError, setSaveState });
-
-  await clickStrictSave();
-
-  expect(container?.textContent).toContain('Quota exceeded');
-  expect(setError).toHaveBeenCalledWith('Quota exceeded');
-  expect(setSaveState).toHaveBeenLastCalledWith('error');
-}
-
 function expectSaveCalledWithBaseAndName(call: number, baseUpdatedAt: number, name: string) {
   expect(saveScenarioProjectRecordV3Mock).toHaveBeenNthCalledWith(
     call,
@@ -200,7 +186,7 @@ function SaverHarness(props: Partial<SaverHarnessProps>) {
   const localSavedProjectRef = useRef<ScenarioProjectV3 | null>(props.savedProject ?? null);
   const savedProjectRef = props.savedProjectRef ?? localSavedProjectRef;
   const saveRevisionRef = useRef(0);
-  const { saveProject, saveProjectOrThrow } = useScenarioV3ProjectSaver({
+  const { saveProject } = useScenarioV3ProjectSaver({
     savedProjectRef,
     saveRevisionRef,
     setError: props.setError ?? vi.fn(),
@@ -208,25 +194,11 @@ function SaverHarness(props: Partial<SaverHarnessProps>) {
     setSaveState: props.setSaveState ?? vi.fn(),
   });
   currentSaveProject = saveProject;
-  const [strictError, setStrictError] = useState<string | null>(null);
 
   return (
-    <div>
-      <button type="button" onClick={() => void saveProject(createScenarioProjectV3('Saved'))}>
-        save
-      </button>
-      <button
-        type="button"
-        onClick={() =>
-          void saveProjectOrThrow(createScenarioProjectV3('Strict')).catch((error: unknown) =>
-            setStrictError(error instanceof Error ? error.message : 'strict failed')
-          )
-        }
-      >
-        strict save
-      </button>
-      {strictError}
-    </div>
+    <button type="button" onClick={() => void saveProject(createScenarioProjectV3('Saved'))}>
+      save
+    </button>
   );
 }
 
@@ -246,20 +218,6 @@ function requestSave(project: ScenarioProjectV3) {
     savePromise = currentSaveProject?.(project) ?? Promise.reject(new Error('missing saver'));
   });
   return savePromise;
-}
-
-async function clickStrictSave() {
-  await clickButtonByText('strict save');
-}
-
-async function clickButtonByText(text: string) {
-  const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
-  const button = buttons.find((candidate) => candidate.textContent?.trim() === text);
-  expect(button).not.toBeNull();
-  await act(async () => {
-    button?.click();
-    await Promise.resolve();
-  });
 }
 
 function createDeferred<T>() {

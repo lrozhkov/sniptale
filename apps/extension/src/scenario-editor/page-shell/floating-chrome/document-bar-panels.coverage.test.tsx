@@ -6,22 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const childSpies = vi.hoisted(() => ({
   inspectorBridge: vi.fn(),
-  layersInspector: vi.fn(),
   slideRail: vi.fn(),
-}));
-
-vi.mock('../../inspector/layers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../inspector/layers')>()),
-  ScenarioLayersInspector: (props: { onSelectElement: (elementId: string) => void }) => {
-    childSpies.layersInspector(props);
-    return (
-      <button
-        type="button"
-        aria-label="select layer"
-        onClick={() => props.onSelectElement('e-1')}
-      />
-    );
-  },
 }));
 
 vi.mock('../slide-rail', async (importOriginal) => ({
@@ -76,15 +61,11 @@ function createPanelProps(
   const props = createFloatingProps();
   return {
     assets: props.assets,
-    canvasControls: props.canvasControls,
     editor: props.editor,
     inspectorTool: props.inspectorTool,
-    templatePickerOpen: props.templatePickerOpen,
-    templates: props.templates,
     onClearInspectorTool: props.onClearInspectorTool,
     onEditImageElement: props.onEditImageElement,
     onOpenExport: props.onOpenExport,
-    onToggleTemplatePicker: props.onToggleTemplatePicker,
     ...overrides,
   };
 }
@@ -95,7 +76,6 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   childSpies.inspectorBridge.mockReset();
-  childSpies.layersInspector.mockReset();
   childSpies.slideRail.mockReset();
 });
 
@@ -175,16 +155,14 @@ it('renders panel visibility, selection, collapse, and inspector title branches'
 
   const props = createPanelProps();
   renderNode(<ScenarioFloatingPanels {...props} />);
-  expect(container?.textContent).toContain(translate('scenario.editor.slide'));
+  expect(container?.textContent).toContain(translate('scenario.editor.stepDetails'));
   clickByLabel('select slide');
-  clickByLabel('select layer');
   clickByLabel(translate('editor.toolbar.collapseInspector'));
   expect(container?.querySelector('[data-ui="scenario.floating.inspector.expand"]')).not.toBeNull();
   clickByLabel(translate('scenario.editor.inspector'));
 
-  expect(props.onClearInspectorTool).toHaveBeenCalledTimes(2);
+  expect(props.onClearInspectorTool).toHaveBeenCalledOnce();
   expect(props.editor.slideActions.selectSlide).toHaveBeenCalledWith('s-1');
-  expect(props.editor.elementActions.selectElement).toHaveBeenCalledWith('e-1');
   expect(childSpies.inspectorBridge).toHaveBeenCalled();
 
   renderNode(<ScenarioFloatingPanels {...createPanelProps({ inspectorTool: 'export' })} />);
@@ -193,5 +171,5 @@ it('renders panel visibility, selection, collapse, and inspector title branches'
   const elementProps = createPanelProps();
   elementProps.editor = { ...elementProps.editor, selectedElementId: 'e-1' };
   renderNode(<ScenarioFloatingPanels {...elementProps} />);
-  expect(container?.textContent).toContain(translate('scenario.editor.element'));
+  expect(container?.textContent).toContain(translate('scenario.editor.selectedItem'));
 });

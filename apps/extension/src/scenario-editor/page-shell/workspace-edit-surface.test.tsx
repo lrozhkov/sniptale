@@ -23,8 +23,6 @@ function renderEditSurface() {
   const editor = {
     elementActions: {
       deleteElement: vi.fn(),
-      insertElementAtPoint: vi.fn(),
-      insertElementFromDrag: vi.fn(),
       selectElement: vi.fn(),
       selectSlideSurface: vi.fn(),
       updateElement: vi.fn(),
@@ -32,7 +30,6 @@ function renderEditSurface() {
     selectedElementId: null,
     selectedSlide: createScenarioSlide({ id: 'slide-1', title: 'Slide' }),
   };
-  const onActiveInsertKindChange = vi.fn();
   const onClearInspectorTool = vi.fn();
   const onEditImageElement = vi.fn();
 
@@ -42,19 +39,17 @@ function renderEditSurface() {
   act(() => {
     root?.render(
       <ScenarioV3EditSurface
-        activeInsertKind="text"
         assetState={{ assets: {}, loading: false }}
         canvasViewport={createViewportController()}
         clickIndex={2}
         editor={editor as never}
-        onActiveInsertKindChange={onActiveInsertKindChange}
         onClearInspectorTool={onClearInspectorTool}
         onEditImageElement={onEditImageElement}
       />
     );
   });
 
-  return { editor, onActiveInsertKindChange, onClearInspectorTool, onEditImageElement };
+  return { editor, onClearInspectorTool, onEditImageElement };
 }
 
 function createViewportController() {
@@ -77,24 +72,15 @@ afterEach(() => {
 });
 
 it('routes scenario edit-surface canvas mutations through editor actions', () => {
-  const { editor, onActiveInsertKindChange, onClearInspectorTool } = renderEditSurface();
+  const { editor, onClearInspectorTool } = renderEditSurface();
 
   act(() => {
-    stageProps?.onInsertElementAtPoint?.('text', { x: 10, y: 12 });
-    stageProps?.onInsertElementFromDrag?.('shape', { x: 1, y: 2 }, { x: 40, y: 50 });
     stageProps?.onSelectElement('element-1');
     stageProps?.onSelectSlide();
-    stageProps?.onClearActiveInsertKind?.();
   });
 
-  expect(editor.elementActions.insertElementAtPoint).toHaveBeenCalledWith('text', { x: 10, y: 12 });
-  expect(editor.elementActions.insertElementFromDrag).toHaveBeenCalledWith(
-    'shape',
-    { x: 1, y: 2 },
-    { x: 40, y: 50 }
-  );
   expect(editor.elementActions.selectElement).toHaveBeenCalledWith('element-1');
   expect(editor.elementActions.selectSlideSurface).toHaveBeenCalledTimes(1);
-  expect(onActiveInsertKindChange).toHaveBeenCalledWith(null);
   expect(onClearInspectorTool).toHaveBeenCalledTimes(2);
+  expect(stageProps?.activeInsertKind).toBeUndefined();
 });

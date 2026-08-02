@@ -1,4 +1,4 @@
-import { Eye, Grid2X2, MonitorPlay, PencilLine } from 'lucide-react';
+import { Grid2X2, MonitorPlay, PencilLine } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import { ScenarioCanvasZoomControls } from '../../canvas/controls';
@@ -144,20 +144,6 @@ function EditorModeButtons(props: {
         onClick={() => props.onModeChange(SCENARIO_EDITOR_MODES.play)}
       >
         <MonitorPlay size={18} strokeWidth={2} />
-      </ModeButton>
-      <ModeButton
-        active={props.mode === SCENARIO_EDITOR_MODES.presenter}
-        title={translate('scenario.editor.modePresenter')}
-        onClick={() => props.onModeChange(SCENARIO_EDITOR_MODES.presenter)}
-      >
-        <Eye size={18} strokeWidth={2} />
-      </ModeButton>
-      <ModeButton
-        active={props.mode === SCENARIO_EDITOR_MODES.overview}
-        title={translate('scenario.editor.modeOverview')}
-        onClick={() => props.onModeChange(SCENARIO_EDITOR_MODES.overview)}
-      >
-        <Grid2X2 size={18} strokeWidth={2} />
       </ModeButton>
     </EditorToolbarSection>
   );

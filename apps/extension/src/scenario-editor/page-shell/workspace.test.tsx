@@ -11,7 +11,6 @@ import {
 import { translate } from '../../platform/i18n';
 import type { ScenarioCanvasViewportController } from '../canvas/viewport-state';
 import { SCENARIO_EDITOR_MODES } from './presentation/mode';
-import { createScenarioV3TemplateStateStub } from './test-support';
 import { ScenarioV3Workspace } from './workspace';
 import type { useScenarioV3EditorState } from './state';
 
@@ -60,7 +59,6 @@ function createEditor(project = createWorkspaceProject()): ScenarioV3EditorState
     elementActions: {
       deleteElement: vi.fn(),
       insertImageFile: vi.fn(),
-      moveElement: vi.fn(),
       selectElement: vi.fn(),
       selectSlideSurface: vi.fn(),
       updateElement: vi.fn(),
@@ -70,7 +68,7 @@ function createEditor(project = createWorkspaceProject()): ScenarioV3EditorState
     canUndo: true,
     history: { redo: vi.fn(), undo: vi.fn() },
     project,
-    projectActions: { applyProject: vi.fn(), updatePresentation: vi.fn() },
+    projectActions: { applyProject: vi.fn() },
     selectedElementId: null,
     selectedSlide: project.slides[0]!,
     slideActions: {
@@ -126,23 +124,14 @@ function renderWorkspace(args: {
         canvasViewport={createCanvasViewport()}
         clickIndex={args.clickIndex ?? 0}
         editor={editor}
-        elapsedSeconds={0}
         inspectorTool={null}
         mode={args.mode}
-        timelineHidden={false}
         onToggleAi={vi.fn()}
         onOpenExport={vi.fn()}
-        templates={createScenarioV3TemplateStateStub()}
-        templatePickerOpen={false}
-        audienceOpening={false}
         onClickIndexChange={onClickIndexChange}
         onClearInspectorTool={vi.fn()}
         onEditImageElement={onEditImageElement}
         onModeChange={vi.fn()}
-        onOpenAudienceScreen={vi.fn()}
-        onTimelineHiddenChange={vi.fn()}
-        onToggleTemplatePicker={vi.fn()}
-        onPresentationPositionChange={vi.fn()}
       />
     );
   });
@@ -168,21 +157,16 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('places inspector, canvas, build timeline, and slide rail in edit mode', () => {
-  const { onClickIndexChange } = renderWorkspace({
+it('places the step rail, canvas, and contextual inspector in edit mode', () => {
+  renderWorkspace({
     mode: SCENARIO_EDITOR_MODES.edit,
-  });
-
-  act(() => {
-    clickByLabel(`${translate('scenario.editor.buildStep')} 1`);
   });
 
   expect(container?.querySelector('[data-ui="scenario.inspector.panel"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="scenario.canvas.stage"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="scenario.canvas.floating-controls"]')).toBeNull();
-  expect(container?.querySelector('[data-ui="scenario.editor.build-timeline"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="scenario.editor.build-timeline"]')).toBeNull();
   expect(container?.querySelector('[data-ui="scenario.slide-rail.panel"]')).not.toBeNull();
-  expect(onClickIndexChange).toHaveBeenCalledWith(1);
 
   renderWorkspace({ aiPanelOpen: true, mode: SCENARIO_EDITOR_MODES.edit });
 

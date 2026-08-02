@@ -16,7 +16,6 @@ export interface ScenarioV3EditorShellProps {
   onProjectChange?: (project: ScenarioProjectV3) => void;
   project: ScenarioProjectV3;
   saveStatus?: ScenarioV3EditorSaveStatus | undefined;
-  saveProject?: (project: ScenarioProjectV3) => Promise<ScenarioProjectV3>;
 }
 
 export interface ScenarioV3EditorSession {

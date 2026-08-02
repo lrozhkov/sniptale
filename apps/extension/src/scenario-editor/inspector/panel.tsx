@@ -3,10 +3,8 @@ import type { ScenarioElement } from '@sniptale/runtime-contracts/scenario/types
 import { InspectorShellFrame, InspectorShellPanel } from '@sniptale/ui/inspector-shell';
 import { SelectedElementInspector } from './element';
 import { SCENARIO_INSPECTOR_WIDTH_CLASS_NAME } from './layout';
-import { ScenarioLayersInspector } from './layers';
 import { SlideInspector } from './slide';
 import { ScenarioExportToolInspector } from './tool-export';
-import { ScenarioGridToolInspector } from './tool-grid';
 import type { ScenarioInspectorProps, ScenarioInspectorTool } from './types';
 
 function findSelectedElement(elements: ScenarioElement[], selectedElementId: string | null) {
@@ -21,14 +19,10 @@ export function ScenarioInspectorPanel(props: ScenarioInspectorProps) {
     <InspectorShellPanel className="flex min-h-0 flex-col overflow-hidden">
       <div
         data-ui="scenario.inspector.parameters"
-        className={[
-          'min-h-0 overflow-y-auto overflow-x-hidden px-2.5 pb-5 pt-3',
-          props.hideLayers ? 'flex-1' : 'max-h-[52%] shrink-0',
-        ].join(' ')}
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2.5 pb-5 pt-3"
       >
         <ScenarioInspectorParameterBody inspectorProps={props} selectedElement={selectedElement} />
       </div>
-      {props.hideLayers ? null : <ScenarioLayersInspector {...props} />}
     </InspectorShellPanel>
   );
 
@@ -71,12 +65,6 @@ function ScenarioInspectorParameterBody(props: {
   return props.inspectorProps.slide && props.inspectorProps.onUpdateSlide ? (
     <SlideInspector
       slide={props.inspectorProps.slide}
-      {...(props.inspectorProps.onUpdatePresentation
-        ? { onUpdatePresentation: props.inspectorProps.onUpdatePresentation }
-        : {})}
-      {...(props.inspectorProps.presentation
-        ? { presentation: props.inspectorProps.presentation }
-        : {})}
       onUpdateSlide={props.inspectorProps.onUpdateSlide}
     />
   ) : (
@@ -88,14 +76,6 @@ function ScenarioInspectorToolBody(args: {
   activeTool: ScenarioInspectorTool;
   props: ScenarioInspectorProps;
 }) {
-  if (args.activeTool === 'grid') {
-    return args.props.canvasControls ? (
-      <ScenarioGridToolInspector controls={args.props.canvasControls} />
-    ) : (
-      <InspectorEmptyState label={translate('scenario.editor.toggleGrid')} />
-    );
-  }
-
   return args.props.exportCommand ? (
     <ScenarioExportToolInspector command={args.props.exportCommand} />
   ) : (
@@ -119,6 +99,7 @@ function ElementParameters(props: {
         ? { onEditImageElement: props.inspectorProps.onEditImageElement }
         : {})}
       onUpdateElement={(patch) => props.inspectorProps.onUpdateElement(selectedElement.id, patch)}
+      onDelete={() => props.inspectorProps.onDeleteElement(selectedElement.id)}
     />
   );
 }

@@ -8,7 +8,6 @@ export interface ScenarioV3PageProjectState {
   project: ScenarioProjectV3 | null;
   retryLoad: () => Promise<void>;
   retrySave: () => Promise<void>;
-  saveProject: (project: ScenarioProjectV3) => Promise<ScenarioProjectV3>;
   saveState: ScenarioV3PageSaveState;
   updateProject: (project: ScenarioProjectV3) => void;
 }

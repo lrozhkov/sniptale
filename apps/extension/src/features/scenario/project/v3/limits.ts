@@ -30,5 +30,3 @@ export const SCENARIO_V3_LIMITS = {
   maxTextLength: 20_000,
   maxTrashSlides: 300,
 } as const;
-
-export const SCENARIO_TEMPLATE_IMPORT_VALIDATION_DELAY_MS = 150;

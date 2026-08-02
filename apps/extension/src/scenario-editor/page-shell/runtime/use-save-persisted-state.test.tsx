@@ -23,8 +23,6 @@ vi.mock('../../../composition/persistence/scenario/store/v3', async (importOrigi
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let currentSaveProject: ((project: ScenarioProjectV3) => Promise<void>) | null = null;
-let currentStrictSaveProject: ((project: ScenarioProjectV3) => Promise<ScenarioProjectV3>) | null =
-  null;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -42,7 +40,6 @@ afterEach(() => {
   container?.remove();
   container = null;
   currentSaveProject = null;
-  currentStrictSaveProject = null;
   vi.unstubAllGlobals();
 });
 
@@ -52,7 +49,6 @@ describe('useScenarioV3ProjectSaver persisted project state', () => {
     'does not overwrite newer visible state with an older persisted save',
     verifyStaleSaveDoesNotOverwriteVisibleState
   );
-  it('returns the persisted project from strict saves', verifyStrictSaveReturnsPersistedProject);
 });
 
 async function verifyPersistedSaveApplied() {
@@ -96,18 +92,6 @@ async function verifyStaleSaveDoesNotOverwriteVisibleState() {
   expect(container?.textContent).toContain('Second persisted:30');
 }
 
-async function verifyStrictSaveReturnsPersistedProject() {
-  const project = withUpdatedAt(createScenarioProjectV3('Strict local'), 10);
-  const persistedProject = { ...project, name: 'Strict persisted', updatedAt: 20 };
-  saveScenarioProjectRecordV3Mock.mockResolvedValue(persistedProject);
-  renderSaver();
-
-  const result = await requestStrictSave(project);
-
-  expect(result).toBe(persistedProject);
-  expect(container?.textContent).toContain('Strict persisted:20');
-}
-
 function renderSaver(overrides: Partial<SaverHarnessProps> = {}) {
   act(() => {
     root?.render(<SaverHarness {...overrides} />);
@@ -126,7 +110,7 @@ function SaverHarness(props: Partial<SaverHarnessProps>) {
   const [visibleProject, setVisibleProject] = useState<ScenarioProjectV3 | null>(
     props.savedProject ?? null
   );
-  const { saveProject, saveProjectOrThrow } = useScenarioV3ProjectSaver({
+  const { saveProject } = useScenarioV3ProjectSaver({
     savedProjectRef,
     saveRevisionRef,
     setError: vi.fn(),
@@ -134,7 +118,6 @@ function SaverHarness(props: Partial<SaverHarnessProps>) {
     setSaveState: vi.fn(),
   });
   currentSaveProject = saveProject;
-  currentStrictSaveProject = saveProjectOrThrow;
 
   return (
     <div>
@@ -164,16 +147,6 @@ function requestSave(project: ScenarioProjectV3) {
     savePromise = currentSaveProject?.(project) ?? Promise.reject(new Error('missing saver'));
   });
   return savePromise;
-}
-
-async function requestStrictSave(project: ScenarioProjectV3) {
-  expect(currentStrictSaveProject).not.toBeNull();
-  let result!: ScenarioProjectV3;
-  await act(async () => {
-    result = await (currentStrictSaveProject?.(project) ??
-      Promise.reject(new Error('missing strict saver')));
-  });
-  return result;
 }
 
 function createDeferred<T>() {

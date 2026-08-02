@@ -8,7 +8,6 @@ import {
   createScenarioArrowElement,
   createScenarioCalloutElement,
   createScenarioCodeElement,
-  createScenarioImageElement,
   createScenarioLineElement,
   createScenarioShapeElement,
   createScenarioTextElement,
@@ -17,7 +16,6 @@ import { translate } from '../../../platform/i18n';
 import { ArrowElementFields, LineElementFields } from './connectors';
 import { CalloutElementFields } from './callout';
 import { CodeElementFields } from './code';
-import { ImageElementFields } from './image';
 import { ShapeElementFields } from './shape';
 import { TextElementFields } from './text';
 import type { ScenarioInspectorElementPatch } from '../types';
@@ -178,7 +176,6 @@ it('passes explicit scrub constraints into bounded element numeric fields', () =
       <ShapeElementFields element={createScenarioShapeElement()} onChange={onChange} />
       <CalloutElementFields element={createScenarioCalloutElement()} onChange={onChange} />
       <LineElementFields element={createScenarioLineElement()} onChange={onChange} />
-      <ImageElementFields element={createScenarioImageElement()} onChange={onChange} />
     </>
   ));
 
@@ -205,11 +202,6 @@ it('passes explicit scrub constraints into bounded element numeric fields', () =
   expect(numberField(translate('scenario.editor.startX'))).toMatchObject({
     max: '7680',
     min: '-7680',
-    scrub: 'true',
-  });
-  expect(numberField(translate('scenario.editor.contentScale'))).toMatchObject({
-    max: '10',
-    min: '0.1',
     scrub: 'true',
   });
 });

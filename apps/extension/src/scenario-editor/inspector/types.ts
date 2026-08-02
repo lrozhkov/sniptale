@@ -5,8 +5,6 @@ import type {
   ScenarioCodeElement,
   ScenarioElement,
   ScenarioElementFrame,
-  ScenarioProjectPresentationSettings,
-  ScenarioProjectV3,
   ScenarioImageElement,
   ScenarioLineElement,
   ScenarioSlideClickSettings,
@@ -15,9 +13,7 @@ import type {
   ScenarioShapeElement,
   ScenarioTextElement,
 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import type { ScenarioCanvasViewportControls } from '../canvas/viewport-state';
-
-export type ScenarioInspectorTool = 'export' | 'grid';
+export type ScenarioInspectorTool = 'export';
 
 export interface ScenarioInspectorExportCommand {
   onOpenExport: () => void;
@@ -64,33 +60,15 @@ export interface ScenarioInspectorSlidePatch {
   transition?: ScenarioSlide['transition'];
 }
 
-export interface ScenarioInspectorProjectPresentationPatch {
-  backgroundTransition?: ScenarioProjectPresentationSettings['backgroundTransition'];
-  controls?: Partial<ScenarioProjectPresentationSettings['controls']>;
-  defaultLayoutId?: ScenarioProjectPresentationSettings['defaultLayoutId'];
-  grid?: Partial<ScenarioProjectPresentationSettings['grid']>;
-  themeId?: ScenarioProjectPresentationSettings['themeId'];
-  transition?: ScenarioProjectPresentationSettings['transition'];
-}
-
 export interface ScenarioInspectorProps {
   activeTool?: ScenarioInspectorTool | null;
-  canvasControls?: ScenarioCanvasViewportControls | null;
   embedded?: boolean;
   elements: ScenarioElement[];
-  hideLayers?: boolean;
-  layersCollapsible?: boolean;
   onDeleteElement: (elementId: string) => void;
   onEditImageElement?: (elementId: string) => void;
-  onInsertImageFile?: (file?: File) => Promise<void> | void;
-  onMoveElement: (elementId: string, direction: 'backward' | 'forward') => void;
-  onSelectElement: (elementId: string) => void;
   onUpdateSlide?: (patch: ScenarioInspectorSlidePatch) => void;
-  onUpdatePresentation?: (patch: ScenarioInspectorProjectPresentationPatch) => void;
   onUpdateElement: (elementId: string, patch: ScenarioInspectorElementPatch) => void;
-  presentation?: ScenarioProjectPresentationSettings;
   exportCommand?: ScenarioInspectorExportCommand;
-  project?: ScenarioProjectV3;
   selectedElementId: string | null;
   slide?: ScenarioSlide;
 }

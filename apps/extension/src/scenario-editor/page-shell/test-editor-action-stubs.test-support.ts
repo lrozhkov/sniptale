@@ -6,10 +6,7 @@ export function createScenarioV3ElementActionStubs(
   return {
     deleteElement: vi.fn(),
     insertElement: vi.fn(),
-    insertElementAtPoint: vi.fn(),
-    insertElementFromDrag: vi.fn(),
     insertImageFile: vi.fn(),
-    moveElement: vi.fn(),
     selectElement: overrides.selectElement ?? vi.fn(),
     selectSlideSurface: vi.fn(),
     updateElement: vi.fn(),
@@ -19,7 +16,6 @@ export function createScenarioV3ElementActionStubs(
 export function createScenarioV3SlideActionStubs() {
   return {
     addSlide: vi.fn(),
-    addTemplateSlide: vi.fn(),
     deleteSlide: vi.fn(),
     duplicateSlide: vi.fn(),
     moveSlide: vi.fn(),

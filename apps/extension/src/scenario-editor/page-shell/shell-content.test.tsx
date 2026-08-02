@@ -29,17 +29,13 @@ vi.mock('./deck-export-dialog-mount', () => ({
     return props.open ? <div data-testid="deck-export-dialog" /> : null;
   },
 }));
-vi.mock('../project/templates', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../project/templates')>()),
-  ScenarioTemplateManager: () => <div data-testid="template-manager" />,
-}));
 vi.mock('./image-editor', () => ({
   ScenarioImageElementEditorMount: () => null,
 }));
 vi.mock('./workspace', () => ({
-  ScenarioV3Workspace: (props: { audienceOpening: boolean }) => {
+  ScenarioV3Workspace: (props: { mode: string }) => {
     workspacePropsMock(props);
-    return <div data-audience-opening={String(props.audienceOpening)} data-testid="workspace" />;
+    return <div data-mode={props.mode} data-testid="workspace" />;
   },
 }));
 let container: HTMLDivElement | null = null;
@@ -64,18 +60,16 @@ afterEach(() => {
 describe('ScenarioV3EditorShellContent', () => {
   registerWorkspaceStateTests();
   registerMountedPanelTests();
-  registerTemplatePickerTests();
   registerLayerClipboardTests();
 });
 
 function registerWorkspaceStateTests() {
-  it('passes audience launch state into workspace and surfaces presentation errors', () => {
-    renderContent({ audienceOpening: true, presentationError: 'Audience failed' });
+  it('passes the active guide mode into the workspace', () => {
+    renderContent({ mode: SCENARIO_EDITOR_MODES.play });
 
-    expect(
-      container?.querySelector('[data-testid="workspace"]')?.getAttribute('data-audience-opening')
-    ).toBe('true');
-    expect(container?.textContent).toContain('Audience failed');
+    expect(container?.querySelector('[data-testid="workspace"]')?.getAttribute('data-mode')).toBe(
+      SCENARIO_EDITOR_MODES.play
+    );
   });
 
   it('passes canvas viewport controls and floating callbacks into the workspace', () => {
@@ -109,7 +103,7 @@ function registerMountedPanelTests() {
     renderContent({
       aiPanelOpen: true,
       exportDialogOpen: true,
-      templates: createTemplates({ panelMode: 'manager' }),
+      templates: [],
     });
 
     const workspaceProps = getLastMockArg<{ aiPanelOpen: boolean }>(workspacePropsMock);
@@ -117,25 +111,9 @@ function registerMountedPanelTests() {
 
     expect(container?.querySelector('[data-testid="ai-panel"]')).not.toBeNull();
     expect(container?.querySelector('[data-testid="deck-export-dialog"]')).not.toBeNull();
-    expect(container?.querySelector('[data-testid="template-manager"]')).not.toBeNull();
+    expect(container?.querySelector('[data-testid="template-manager"]')).toBeNull();
     expect(workspaceProps.aiPanelOpen).toBe(true);
     expect(deckExportMountProps.open).toBe(true);
-  });
-}
-
-function registerTemplatePickerTests() {
-  it('passes right rail template picker state into the workspace seam', () => {
-    renderContent();
-    const workspaceProps = getLastMockArg<{
-      onToggleTemplatePicker: () => void;
-      templatePickerOpen: boolean;
-    }>(workspacePropsMock);
-
-    act(() => workspaceProps.onToggleTemplatePicker());
-
-    expect(
-      getLastMockArg<{ templatePickerOpen: boolean }>(workspacePropsMock).templatePickerOpen
-    ).toBe(true);
   });
 }
 
@@ -236,11 +214,9 @@ function createContentProps(
   return {
     aiPanelOpen: false,
     aiState: {},
-    audienceOpening: false,
     clickIndex: 0,
     editingImageElementId: null,
     editor,
-    elapsedSeconds: 0,
     exportDialogOpen: false,
     mode: SCENARIO_EDITOR_MODES.edit,
     onClickIndexChange: vi.fn(),
@@ -249,29 +225,11 @@ function createContentProps(
     onCloseImageElement: vi.fn(),
     onEditImageElement: vi.fn(),
     onModeChange: vi.fn(),
-    onOpenAudienceScreen: vi.fn(),
     onOpenExport: vi.fn(),
-    onPresentationPositionChange: vi.fn(),
     onToggleAi: vi.fn(),
-    presentationError: null,
-    templates: createTemplates(),
+    templates: [],
     ...overrides,
   } as Parameters<typeof ScenarioV3EditorShellContent>[0];
-}
-
-function createTemplates(overrides: Partial<Record<string, unknown>> = {}) {
-  return {
-    closePanel: vi.fn(),
-    createSlide: vi.fn(),
-    deleteLibrary: vi.fn(),
-    libraries: [],
-    openManager: vi.fn(),
-    panelMode: null,
-    saveLibrary: vi.fn(),
-    templates: [],
-    toggleLibrary: vi.fn(),
-    ...overrides,
-  };
 }
 
 function getLastMockArg<T>(mock: ReturnType<typeof vi.fn>): T {
