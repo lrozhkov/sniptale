@@ -155,13 +155,19 @@ class RecognitionRun implements VoiceInputRecognitionRun {
     this.emitSnapshot(this.args.requestId);
     this.watchdogId = globalThis.setTimeout(() => {
       if (!this.isCurrent()) return;
-      logger.warn('Voice input session watchdog expired', { sessionId: this.sessionId });
-      this.finish('error', 'timeout');
+      logger.debug('Voice input reached the session time limit', {
+        sessionId: this.sessionId,
+        timeoutMs: SESSION_WATCHDOG_MS,
+      });
+      this.stop();
     }, SESSION_WATCHDOG_MS);
     void this.resolveStartMode();
   }
 
   stop(): 'accepted' {
+    if (this.snapshot.phase === 'stopping') return 'accepted';
+    if (this.watchdogId !== null) globalThis.clearTimeout(this.watchdogId);
+    this.watchdogId = null;
     this.updateSnapshot({ phase: 'stopping' });
     this.emitSnapshot();
     if (!this.instance.stop()) {
@@ -317,10 +323,10 @@ class RecognitionRun implements VoiceInputRecognitionRun {
 
   private startMicrophoneLevelMonitor(track: MediaStreamTrack): void {
     try {
-      this.microphoneLevelMonitor = this.args.deps.observeMicrophoneLevel(track, (level) => {
+      this.microphoneLevelMonitor = this.args.deps.observeMicrophoneLevel(track, (frame) => {
         if (!this.isCurrent()) return;
         this.emit({
-          level,
+          ...frame,
           sessionId: this.sessionId,
           type: VoiceInputPortMessageType.AUDIO_LEVEL,
         });

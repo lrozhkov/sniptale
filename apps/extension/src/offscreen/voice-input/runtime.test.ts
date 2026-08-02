@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { VoiceInputPortMessageType } from '@sniptale/runtime-contracts/voice-input';
 
 const mocks = vi.hoisted(() => ({
   addEventListener: vi.fn(),
   abortOnUnload: vi.fn(),
   authorize: vi.fn(),
+  connect: vi.fn(),
   getSnapshot: vi.fn(),
   listener: null as
     | ((
@@ -13,12 +15,19 @@ const mocks = vi.hoisted(() => ({
         sendResponse?: (response?: unknown) => void
       ) => boolean | undefined)
     | null,
+  runtimeSend: vi.fn(),
+  serviceDeps: null as { emit(event: unknown): Promise<unknown> } | null,
   start: vi.fn(),
   stop: vi.fn(),
+  telemetryDisconnect: vi.fn(),
+  telemetryOnDisconnectAdd: vi.fn(),
+  telemetryOnDisconnectRemove: vi.fn(),
+  telemetryPost: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', () => ({
   browserRuntime: {
+    connect: mocks.connect,
     subscribeToMessages: vi.fn((listener) => {
       mocks.listener = listener;
       return vi.fn();
@@ -38,7 +47,7 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 
 vi.mock('../../platform/runtime-messaging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/runtime-messaging')>()),
-  createRuntimeMessagingTransport: () => ({ sendRuntimeMessage: vi.fn() }),
+  createRuntimeMessagingTransport: () => ({ sendRuntimeMessage: mocks.runtimeSend }),
 }));
 
 vi.mock('../runtime/authorization', () => ({
@@ -46,12 +55,15 @@ vi.mock('../runtime/authorization', () => ({
 }));
 
 vi.mock('./service', () => ({
-  createOffscreenVoiceInputService: () => ({
-    abortOnUnload: mocks.abortOnUnload,
-    getSnapshot: mocks.getSnapshot,
-    start: mocks.start,
-    stop: mocks.stop,
-  }),
+  createOffscreenVoiceInputService: (deps: { emit(event: unknown): Promise<unknown> }) => {
+    mocks.serviceDeps = deps;
+    return {
+      abortOnUnload: mocks.abortOnUnload,
+      getSnapshot: mocks.getSnapshot,
+      start: mocks.start,
+      stop: mocks.stop,
+    };
+  },
 }));
 
 import { registerOffscreenVoiceInputMessageListener } from './runtime';
@@ -81,6 +93,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('addEventListener', mocks.addEventListener);
   mocks.listener = null;
+  mocks.connect.mockReturnValue({
+    disconnect: mocks.telemetryDisconnect,
+    onDisconnect: {
+      addListener: mocks.telemetryOnDisconnectAdd,
+      removeListener: mocks.telemetryOnDisconnectRemove,
+    },
+    postMessage: mocks.telemetryPost,
+  });
+  mocks.runtimeSend.mockResolvedValue({ success: true });
   mocks.getSnapshot.mockReturnValue({ phase: 'idle' });
   mocks.start.mockReturnValue({ phase: 'starting', sessionId: 'session-1' });
   mocks.stop.mockReturnValue('accepted');
@@ -95,6 +116,44 @@ beforeEach(() => {
 });
 
 describe('offscreen voice input runtime boundary', () => {
+  it('streams lossy audio frames over a Port while durable events keep runtime authorization', async () => {
+    const peaks = Array.from({ length: 16 }, (_, index) => index / 16);
+    await mocks.serviceDeps?.emit({
+      level: 0.42,
+      peaks,
+      sessionId: 'session-1',
+      type: VoiceInputPortMessageType.AUDIO_LEVEL,
+    });
+
+    expect(mocks.connect).toHaveBeenCalledWith({
+      name: 'sniptale:voice-input-telemetry:v1',
+    });
+    expect(mocks.telemetryPost).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 0.42, peaks })
+    );
+    expect(mocks.runtimeSend).not.toHaveBeenCalled();
+
+    await mocks.serviceDeps?.emit({
+      confidence: 0.8,
+      isFinal: false,
+      sequence: 1,
+      sessionId: 'session-1',
+      text: 'private transcript',
+      type: VoiceInputPortMessageType.TRANSCRIPT,
+    });
+    expect(mocks.runtimeSend).toHaveBeenCalledWith(
+      expect.objectContaining({ type: MessageType.OFFSCREEN_VOICE_INPUT_EVENT })
+    );
+
+    await mocks.serviceDeps?.emit({
+      errorCode: 'unexpected',
+      sessionId: 'session-1',
+      snapshot: { phase: 'error' },
+      type: VoiceInputPortMessageType.FAILURE,
+    });
+    expect(mocks.telemetryDisconnect).toHaveBeenCalledOnce();
+  });
+
   it('authorizes, parses, and replays the exact response for a duplicate start', async () => {
     const respond = vi.fn();
     expect(mocks.listener?.(startMessage(), sender, respond)).toBe(false);

@@ -35,7 +35,7 @@ export function useVoiceInputSettings(
     begin,
     stop: stopSession,
   } = voiceSession.connection;
-  const { audioLevels, setSnapshot, snapshot } = voiceSession.snapshotState;
+  const { audioLevel, audioPeaks, setSnapshot, snapshot } = voiceSession.snapshotState;
   const capability = useLocalVoiceCapability({
     language: preferences.language,
     mode: preferences.mode,
@@ -122,7 +122,8 @@ export function useVoiceInputSettings(
       },
     },
     status: {
-      audioLevels,
+      audioLevel,
+      audioPeaks,
       checking,
       error,
       installing,

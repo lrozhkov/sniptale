@@ -1,5 +1,6 @@
 import { MessageType } from '../messaging/message-types/index';
 import {
+  VOICE_INPUT_LEVEL_PEAK_COUNT,
   VOICE_INPUT_DEVICE_ID_MAX_CHARS,
   VOICE_INPUT_LOCAL_QUALITY,
   VOICE_INPUT_TRANSCRIPT_MAX_CHARS,
@@ -31,6 +32,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
   const allowedKeys = new Set(keys);
   return Object.keys(value).every((key) => allowedKeys.has(key));
+}
+
+function parseVoiceInputLevelPeaks(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length !== VOICE_INPUT_LEVEL_PEAK_COUNT) return null;
+  const peaks: number[] = [];
+  for (const peak of value as unknown[]) {
+    if (typeof peak !== 'number' || !Number.isFinite(peak) || peak < 0 || peak > 1) {
+      return null;
+    }
+    peaks.push(peak);
+  }
+  return peaks;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -219,14 +232,17 @@ export function parseVoiceInputServerEvent(value: unknown): VoiceInputServerEven
   if (!isRecord(value)) return null;
   if (
     value['type'] === VoiceInputPortMessageType.AUDIO_LEVEL &&
-    hasOnlyKeys(value, ['level', 'sessionId', 'type']) &&
+    hasOnlyKeys(value, ['level', 'peaks', 'sessionId', 'type']) &&
     typeof value['level'] === 'number' &&
     Number.isFinite(value['level']) &&
     value['level'] >= 0 &&
     value['level'] <= 1 &&
     isNonEmptyString(value['sessionId'])
   ) {
-    return { level: value['level'], sessionId: value['sessionId'], type: value['type'] };
+    const peaks = parseVoiceInputLevelPeaks(value['peaks']);
+    return peaks
+      ? { level: value['level'], peaks, sessionId: value['sessionId'], type: value['type'] }
+      : null;
   }
   if (
     value['type'] === VoiceInputPortMessageType.SNAPSHOT &&

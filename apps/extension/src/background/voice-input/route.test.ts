@@ -35,19 +35,20 @@ describe('voice input offscreen event route', () => {
     expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
   });
 
-  it('accepts bounded audio-level telemetry without transcript payloads', () => {
+  it('rejects audio-level telemetry on the nonce-bound route reserved for durable events', () => {
     const sendResponse = vi.fn();
     const message = {
       event: {
         level: 0.4,
+        peaks: Array.from({ length: 16 }, () => 0.4),
         sessionId: 'session-1',
         type: VoiceInputPortMessageType.AUDIO_LEVEL,
       },
       type: MessageType.OFFSCREEN_VOICE_INPUT_EVENT,
     };
-    expect(routeVoiceInputOffscreenEvent(message, sendResponse)).toBe(true);
-    expect(handleVoiceInputOffscreenEvent).toHaveBeenCalledWith(message);
-    expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
+    expect(routeVoiceInputOffscreenEvent(message, sendResponse)).toBe(false);
+    expect(handleVoiceInputOffscreenEvent).not.toHaveBeenCalled();
+    expect(sendResponse).not.toHaveBeenCalled();
   });
 
   it('fails closed for malformed payloads', () => {

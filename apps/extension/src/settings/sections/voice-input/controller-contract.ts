@@ -28,17 +28,17 @@ export type VoiceInputSettingsController = {
     setMode(mode: VoiceInputMode): Promise<void>;
   };
   status: {
+    audioLevel: number;
+    audioPeaks: number[];
     checking: boolean;
     error: VoiceInputSettingsError;
     installing: boolean;
     microphoneAccess: MicrophoneAccessState;
     microphones: MicrophoneInputDevice[];
     microphonesLoading: boolean;
-    audioLevels: number[];
     snapshot: VoiceInputSnapshot;
   };
   transcript: {
-    clear(): void;
     finalText: string;
     interimText: string;
     setFinalText(value: string): void;

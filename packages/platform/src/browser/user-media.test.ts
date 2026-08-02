@@ -94,7 +94,7 @@ describe('user media adapter', () => {
     expect(removeEventListener).toHaveBeenCalledWith('devicechange', listener);
   });
 
-  it('emits normalized microphone levels and disposes its audio graph', () => {
+  it('samples the live microphone level at 10 Hz without retaining audio', () => {
     vi.useFakeTimers();
     const disconnectSource = vi.fn();
     const disconnectAnalyser = vi.fn();
@@ -119,10 +119,20 @@ describe('user media adapter', () => {
     vi.stubGlobal('MediaStream', class {});
     const listener = vi.fn();
     const monitor = observeMicrophoneLevel({} as MediaStreamTrack, listener);
-    vi.advanceTimersByTime(100);
-    expect(listener).toHaveBeenCalledWith(expect.any(Number));
-    expect(listener.mock.calls[0]?.[0]).toBeGreaterThan(0);
+    vi.advanceTimersByTime(99);
+    expect(listener).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(listener).toHaveBeenCalledWith({
+      level: expect.any(Number),
+      peaks: expect.arrayContaining([expect.any(Number)]),
+    });
+    expect(listener.mock.calls[0]?.[0].level).toBeGreaterThan(0);
+    expect(listener.mock.calls[0]?.[0].peaks).toHaveLength(16);
+    vi.advanceTimersByTime(29_900);
+    expect(listener).toHaveBeenCalledTimes(300);
     monitor.dispose();
+    vi.advanceTimersByTime(2_000);
+    expect(listener).toHaveBeenCalledTimes(300);
     expect(disconnectSource).toHaveBeenCalledOnce();
     expect(disconnectAnalyser).toHaveBeenCalledOnce();
     expect(close).toHaveBeenCalledOnce();

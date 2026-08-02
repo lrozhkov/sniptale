@@ -22,6 +22,7 @@ import { registerTabLifecycleListeners } from './tab-lifecycle';
 import { disableScreenshotMode } from '../../tab-mode-router-screenshot';
 import { registerWindowBoundsListener } from './window-bounds';
 import { registerVoiceInputPorts } from '../../../voice-input/coordinator';
+import { registerVoiceInputTelemetryPorts } from '../../../voice-input/telemetry-port';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeWiring' });
 
@@ -36,6 +37,7 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   registerNavigationListeners(state);
   registerWindowBoundsListener();
   registerVoiceInputPorts();
+  registerVoiceInputTelemetryPorts();
   initializePageAccessLifecycle(logger);
   configureScreenshotPrivacyErasureCleanupPort({
     disableScreenshotMode: (tabId, runtimeState) =>

@@ -90,11 +90,13 @@ describe('voice input session state', () => {
     );
     apply({
       level: 0.9,
+      peaks: Array.from({ length: 16 }, () => 0.9),
       sessionId: 'other-session',
       type: VoiceInputPortMessageType.AUDIO_LEVEL,
     });
     apply({
       level: 0.42,
+      peaks: Array.from({ length: 16 }, () => 0.42),
       sessionId: 'session-1',
       type: VoiceInputPortMessageType.AUDIO_LEVEL,
     });
@@ -133,10 +135,34 @@ describe('voice input session state', () => {
 
     expect(current?.transcript.finalText).toBe('final');
     expect(current?.transcript.interimText).toBe('');
-    expect(current?.snapshotState.audioLevels).toEqual([0.42]);
+    expect(current?.snapshotState.audioLevel).toBe(0.42);
+    expect(current?.snapshotState.audioPeaks).toEqual(Array.from({ length: 16 }, () => 0.42));
     act(() => current?.connection.stop(client));
     expect(client.stop).toHaveBeenCalledWith('session-1');
     expect(current?.snapshotState.snapshot.phase).toBe('stopping');
+  });
+
+  it('clears stale microphone level feedback when a session finishes', () => {
+    act(() =>
+      current?.connection.begin(client, {
+        language: 'ru-RU',
+        microphoneDeviceId: null,
+        mode: 'local-first',
+      })
+    );
+    apply({
+      level: 0.7,
+      peaks: Array.from({ length: 16 }, () => 0.7),
+      sessionId: 'session-1',
+      type: VoiceInputPortMessageType.AUDIO_LEVEL,
+    });
+    apply({
+      snapshot: { ...availableSnapshot, phase: 'ended' },
+      type: VoiceInputPortMessageType.SNAPSHOT,
+    });
+
+    expect(current?.snapshotState.audioLevel).toBe(0);
+    expect(current?.snapshotState.audioPeaks).toEqual(Array.from({ length: 16 }, () => 0));
   });
 
   it('merges capability knowledge into an idle reconciliation snapshot', () => {
@@ -173,7 +199,7 @@ describe('voice input session state', () => {
     expect(current?.snapshotState.snapshot).toEqual(availableSnapshot);
   });
 
-  it('clears terminal interim text, reports failures, and supports editable clearing', () => {
+  it('clears terminal interim text, reports failures, and keeps the result editable', () => {
     act(() => current?.connection.stop(client));
     expect(client.stop).not.toHaveBeenCalled();
     act(() =>
@@ -202,7 +228,5 @@ describe('voice input session state', () => {
 
     act(() => current?.transcript.setFinalText('editable'));
     expect(current?.transcript.finalText).toBe('editable');
-    act(() => current?.transcript.clear());
-    expect(current?.transcript.finalText).toBe('');
   });
 });

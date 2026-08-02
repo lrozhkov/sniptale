@@ -232,7 +232,7 @@ export function createSpeechRecognitionSession(args: {
     throw new SpeechRecognitionPlatformError('local-unsupported');
   }
   recognition.lang = args.language;
-  recognition.continuous = false;
+  recognition.continuous = true;
   recognition.interimResults = true;
   recognition.maxAlternatives = 1;
   if ('processLocally' in recognition) recognition.processLocally = args.processLocally;

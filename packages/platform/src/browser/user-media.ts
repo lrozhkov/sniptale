@@ -1,3 +1,5 @@
+import { VOICE_INPUT_LEVEL_PEAK_COUNT } from '@sniptale/runtime-contracts/voice-input';
+
 export type MicrophoneAccessState =
   | 'granted'
   | 'prompt'
@@ -20,6 +22,13 @@ export type MicrophoneInputAcquisition = {
 export type MicrophoneLevelMonitor = {
   dispose(): void;
 };
+
+export type MicrophoneLevelFrame = {
+  level: number;
+  peaks: number[];
+};
+
+const MICROPHONE_LEVEL_SAMPLE_INTERVAL_MS = 100;
 
 export class MicrophoneInputError extends Error {
   constructor(readonly state: MicrophoneAccessState) {
@@ -124,7 +133,7 @@ export function subscribeToMicrophoneDeviceChanges(listener: () => void): () => 
 
 export function observeMicrophoneLevel(
   track: MediaStreamTrack,
-  listener: (level: number) => void
+  listener: (frame: MicrophoneLevelFrame) => void
 ): MicrophoneLevelMonitor {
   const audioContext = new AudioContext();
   const source = audioContext.createMediaStreamSource(new MediaStream([track]));
@@ -141,8 +150,21 @@ export function observeMicrophoneLevel(
       const centered = (sample - 128) / 128;
       energy += centered * centered;
     }
-    listener(Math.min(1, Math.sqrt(energy / samples.length) * 3));
-  }, 100);
+    const bucketSize = Math.ceil(samples.length / VOICE_INPUT_LEVEL_PEAK_COUNT);
+    const peaks = Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, (_, bucketIndex) => {
+      let peak = 0;
+      const start = bucketIndex * bucketSize;
+      const end = Math.min(samples.length, start + bucketSize);
+      for (let sampleIndex = start; sampleIndex < end; sampleIndex += 1) {
+        peak = Math.max(peak, Math.abs((samples[sampleIndex]! - 128) / 128));
+      }
+      return Math.min(1, peak * 3);
+    });
+    listener({
+      level: Math.min(1, Math.sqrt(energy / samples.length) * 3),
+      peaks,
+    });
+  }, MICROPHONE_LEVEL_SAMPLE_INTERVAL_MS);
   let disposed = false;
   return {
     dispose() {

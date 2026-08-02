@@ -153,7 +153,7 @@ describe('speech recognition browser adapter', () => {
     });
   });
 
-  it('configures a one-shot session and removes every listener on disposal', () => {
+  it('keeps dictation sessions continuous until their owner stops them and removes every listener on disposal', () => {
     useChromeVersion(150);
     const instances = installRecognitionGlobal({});
     const callbacks = {
@@ -172,7 +172,7 @@ describe('speech recognition browser adapter', () => {
     const recognition = instances[0]!;
 
     expect(recognition).toMatchObject({
-      continuous: false,
+      continuous: true,
       interimResults: true,
       lang: 'ru-RU',
       maxAlternatives: 1,

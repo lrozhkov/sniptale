@@ -15,6 +15,9 @@ import {
 
 const logger = createLogger({ namespace: 'OffscreenSpeechRecognition' });
 const START_TIMEOUT_MS = 5_000;
+const UNEXPECTED_END_RESTART_BASE_DELAY_MS = 250;
+const UNEXPECTED_END_RESTART_MAX_DELAY_MS = 2_000;
+const UNEXPECTED_END_RESTART_MAX_ATTEMPTS_WITHOUT_TRANSCRIPT = 4;
 
 type RecognitionSession = ReturnType<typeof createSpeechRecognitionSession>;
 
@@ -74,6 +77,8 @@ class RecognitionInstance implements VoiceInputRecognitionInstance {
   private hasTranscript = false;
   private instanceGeneration = 0;
   private recognition: RecognitionSession | null = null;
+  private restartAttemptsWithoutTranscript = 0;
+  private restartTimeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
   private sequence = 0;
   private startTimeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
   private stopRequested = false;
@@ -94,9 +99,20 @@ class RecognitionInstance implements VoiceInputRecognitionInstance {
     fallbackReason: VoiceInputFallbackReason | null,
     audioTrack: MediaStreamTrack
   ): void {
+    this.restartAttemptsWithoutTranscript = 0;
+    this.startRecognition(effectiveMode, fallbackReason, audioTrack, false);
+  }
+
+  private startRecognition(
+    effectiveMode: VoiceInputEffectiveMode,
+    fallbackReason: VoiceInputFallbackReason | null,
+    audioTrack: MediaStreamTrack,
+    recoveringUnexpectedEnd: boolean
+  ): void {
     if (this.stopRequested || !this.args.callbacks.isCurrent()) return;
     this.fallbackUsed ||= fallbackReason !== null;
     this.audioTrack = audioTrack;
+    this.clearRestartTimeout();
     this.clearStartTimeout();
     this.detach(true);
     this.instanceGeneration += 1;
@@ -114,9 +130,8 @@ class RecognitionInstance implements VoiceInputRecognitionInstance {
               sessionId: this.args.sessionId,
             });
           },
-          onEnd: () => {
-            if (this.isCurrent(instanceGeneration)) this.args.callbacks.onFinished(null);
-          },
+          onEnd: () =>
+            this.handleEnd(instanceGeneration, effectiveMode, fallbackReason, audioTrack),
           onError: (rawErrorCode) =>
             this.handleError(instanceGeneration, effectiveMode, rawErrorCode),
           onResult: (result) => this.handleResult(instanceGeneration, result),
@@ -134,11 +149,13 @@ class RecognitionInstance implements VoiceInputRecognitionInstance {
         processLocally: effectiveMode === 'local',
       });
       this.recognition = recognition;
-      this.args.callbacks.onStarting({
-        apiFlavor: recognition.flavor,
-        effectiveMode: recognition.legacyBrowserManaged ? 'legacy' : effectiveMode,
-        fallbackReason,
-      });
+      if (!recoveringUnexpectedEnd) {
+        this.args.callbacks.onStarting({
+          apiFlavor: recognition.flavor,
+          effectiveMode: recognition.legacyBrowserManaged ? 'legacy' : effectiveMode,
+          fallbackReason,
+        });
+      }
       this.startTimeoutId = globalThis.setTimeout(() => {
         if (!this.isCurrent(instanceGeneration)) return;
         if (this.canFallback(effectiveMode)) {
@@ -162,6 +179,7 @@ class RecognitionInstance implements VoiceInputRecognitionInstance {
 
   stop(): boolean {
     this.stopRequested = true;
+    this.clearRestartTimeout();
     this.clearStartTimeout();
     const recognition = this.recognition;
     if (!recognition) return false;
@@ -174,6 +192,7 @@ class RecognitionInstance implements VoiceInputRecognitionInstance {
   }
 
   dispose(abort: boolean): void {
+    this.clearRestartTimeout();
     this.clearStartTimeout();
     this.detach(abort);
   }
@@ -191,6 +210,11 @@ class RecognitionInstance implements VoiceInputRecognitionInstance {
   private clearStartTimeout(): void {
     if (this.startTimeoutId !== null) globalThis.clearTimeout(this.startTimeoutId);
     this.startTimeoutId = null;
+  }
+
+  private clearRestartTimeout(): void {
+    if (this.restartTimeoutId !== null) globalThis.clearTimeout(this.restartTimeoutId);
+    this.restartTimeoutId = null;
   }
 
   private detach(abort: boolean): void {
@@ -222,6 +246,55 @@ class RecognitionInstance implements VoiceInputRecognitionInstance {
     this.start('browser-managed', 'local-start-failed', audioTrack);
   }
 
+  private handleEnd(
+    instanceGeneration: number,
+    effectiveMode: VoiceInputEffectiveMode,
+    fallbackReason: VoiceInputFallbackReason | null,
+    audioTrack: MediaStreamTrack
+  ): void {
+    if (!this.isCurrent(instanceGeneration)) return;
+    this.clearStartTimeout();
+    this.detach(false);
+    if (this.stopRequested) {
+      this.args.callbacks.onFinished(null);
+      return;
+    }
+    if (
+      this.restartAttemptsWithoutTranscript >=
+      UNEXPECTED_END_RESTART_MAX_ATTEMPTS_WITHOUT_TRANSCRIPT
+    ) {
+      logger.warn('Voice input recognition repeatedly ended without transcript', {
+        effectiveMode,
+        restartAttempts: this.restartAttemptsWithoutTranscript,
+        sessionId: this.args.sessionId,
+      });
+      this.args.callbacks.onFinished(null);
+      return;
+    }
+    this.restartAttemptsWithoutTranscript += 1;
+    const restartDelayMs = Math.min(
+      UNEXPECTED_END_RESTART_BASE_DELAY_MS *
+        2 ** Math.max(0, this.restartAttemptsWithoutTranscript - 1),
+      UNEXPECTED_END_RESTART_MAX_DELAY_MS
+    );
+    logger.warn('Voice input recognition ended before the session deadline', {
+      effectiveMode,
+      restartAttempt: this.restartAttemptsWithoutTranscript,
+      restartDelayMs,
+      sessionId: this.args.sessionId,
+    });
+    this.restartTimeoutId = globalThis.setTimeout(() => {
+      this.restartTimeoutId = null;
+      if (this.stopRequested || !this.args.callbacks.isCurrent()) return;
+      logger.debug('Restarting voice input recognition inside the active session', {
+        effectiveMode,
+        restartAttempt: this.restartAttemptsWithoutTranscript,
+        sessionId: this.args.sessionId,
+      });
+      this.startRecognition(effectiveMode, fallbackReason, audioTrack, true);
+    }, restartDelayMs);
+  }
+
   private handleError(
     instanceGeneration: number,
     effectiveMode: VoiceInputEffectiveMode,
@@ -244,6 +317,7 @@ class RecognitionInstance implements VoiceInputRecognitionInstance {
   private handleResult(instanceGeneration: number, result: SpeechRecognitionResult): void {
     if (this.stopRequested || !this.isCurrent(instanceGeneration)) return;
     this.hasTranscript = true;
+    this.restartAttemptsWithoutTranscript = 0;
     this.sequence += 1;
     const text = result.text.slice(0, VOICE_INPUT_TRANSCRIPT_MAX_CHARS);
     this.args.callbacks.onTranscript({ ...result, sequence: this.sequence, text });

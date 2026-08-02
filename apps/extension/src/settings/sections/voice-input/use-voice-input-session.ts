@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { resolveSpeechRecognitionApi } from '@sniptale/platform/browser/speech-recognition';
 import {
   VOICE_INPUT_LOCAL_QUALITY,
+  VOICE_INPUT_LEVEL_PEAK_COUNT,
   VOICE_INPUT_TRANSCRIPT_MAX_CHARS,
   VoiceInputPortMessageType,
   type VoiceInputLanguage,
@@ -44,7 +45,10 @@ export function useVoiceInputSessionState(args: {
   );
   const [finalText, setFinalText] = useState('');
   const [interimText, setInterimText] = useState('');
-  const [audioLevels, setAudioLevels] = useState<number[]>([]);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [audioPeaks, setAudioPeaks] = useState(() =>
+    Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, () => 0)
+  );
   const activeSessionIdRef = useRef<string | null>(null);
   const lastSequenceRef = useRef(-1);
 
@@ -52,7 +56,8 @@ export function useVoiceInputSessionState(args: {
     (event: VoiceInputServerEvent) => {
       if (event.type === VoiceInputPortMessageType.AUDIO_LEVEL) {
         if (event.sessionId !== activeSessionIdRef.current) return;
-        setAudioLevels((current) => [...current.slice(-47), event.level]);
+        setAudioLevel(event.level);
+        setAudioPeaks(event.peaks);
         return;
       }
       if (event.type === VoiceInputPortMessageType.SNAPSHOT) {
@@ -82,6 +87,8 @@ export function useVoiceInputSessionState(args: {
           event.snapshot.phase === 'error'
         ) {
           activeSessionIdRef.current = null;
+          setAudioLevel(0);
+          setAudioPeaks(Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, () => 0));
           setInterimText('');
         }
         return;
@@ -97,6 +104,8 @@ export function useVoiceInputSessionState(args: {
         }
         setSnapshot(event.snapshot);
         activeSessionIdRef.current = null;
+        setAudioLevel(0);
+        setAudioPeaks(Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, () => 0));
         setInterimText('');
         onRuntimeFailure();
         return;
@@ -124,7 +133,8 @@ export function useVoiceInputSessionState(args: {
     (client: VoiceInputClient, preferences: VoiceInputPreferences): string => {
       setFinalText('');
       setInterimText('');
-      setAudioLevels([]);
+      setAudioLevel(0);
+      setAudioPeaks(Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, () => 0));
       lastSequenceRef.current = -1;
       const sessionId = client.start(preferences);
       activeSessionIdRef.current = sessionId;
@@ -150,12 +160,8 @@ export function useVoiceInputSessionState(args: {
 
   return {
     connection: { activeSessionIdRef, applyServerEvent, begin, stop },
-    snapshotState: { audioLevels, setSnapshot, snapshot },
+    snapshotState: { audioLevel, audioPeaks, setSnapshot, snapshot },
     transcript: {
-      clear: () => {
-        setFinalText('');
-        setInterimText('');
-      },
       finalText,
       interimText,
       setFinalText,

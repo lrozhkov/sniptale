@@ -6,6 +6,7 @@ import type {
 import {
   MicrophoneInputError,
   type MicrophoneAccessState,
+  type MicrophoneLevelFrame,
 } from '@sniptale/platform/browser/user-media';
 import {
   VoiceInputPortMessageType,
@@ -52,7 +53,7 @@ function createHarness(
   const selectedTrack = { id: 'selected-track' } as MediaStreamTrack;
   const releaseMicrophone = vi.fn();
   const disposeLevelMonitor = vi.fn();
-  let levelListener: ((level: number) => void) | undefined;
+  let levelListener: ((frame: MicrophoneLevelFrame) => void) | undefined;
   const acquireMicrophone = options.acquireMicrophoneError
     ? vi
         .fn()
@@ -66,7 +67,7 @@ function createHarness(
         track: selectedTrack,
       });
   const observeMicrophoneLevel = vi.fn(
-    (_track: MediaStreamTrack, listener: (level: number) => void) => {
+    (_track: MediaStreamTrack, listener: (frame: MicrophoneLevelFrame) => void) => {
       if (options.observeLevelThrows) throw new Error('audio graph unavailable');
       levelListener = listener;
       return { dispose: disposeLevelMonitor };
@@ -125,7 +126,8 @@ function createHarness(
     acquireMicrophone,
     disposeLevelMonitor,
     events,
-    emitLevel: (level: number) => levelListener?.(level),
+    emitLevel: (level: number) =>
+      levelListener?.({ level, peaks: Array.from({ length: 16 }, () => level) }),
     loadAvailability,
     recognitions,
     releaseMicrophone,
@@ -195,11 +197,13 @@ describe('offscreen voice input service', () => {
     harness.emitLevel(0.42);
     expect(harness.events).toContainEqual({
       level: 0.42,
+      peaks: Array.from({ length: 16 }, () => 0.42),
       sessionId: 'selected-session',
       type: VoiceInputPortMessageType.AUDIO_LEVEL,
     });
     harness.recognitions[0]?.callbacks.onAudioStart();
     expect(harness.service.getSnapshot().phase).toBe('listening');
+    expect(harness.service.stop('selected-session', false)).toBe('accepted');
     harness.recognitions[0]?.callbacks.onEnd();
     expect(harness.disposeLevelMonitor).toHaveBeenCalledOnce();
     expect(harness.releaseMicrophone).toHaveBeenCalledOnce();
@@ -409,18 +413,19 @@ describe('offscreen voice input lifecycle', () => {
     expect(harness.recognitions).toHaveLength(0);
   });
 
-  it('never restarts on end and allows a later explicit start', async () => {
+  it('recovers an unexpected early end inside the bounded session', async () => {
+    vi.useFakeTimers();
     const harness = createHarness();
     start(harness.service);
     await flushStart();
+    harness.recognitions[0]?.callbacks.onAudioStart();
     harness.recognitions[0]?.callbacks.onEnd();
+    await vi.advanceTimersByTimeAsync(249);
     expect(harness.recognitions).toHaveLength(1);
-    expect(harness.service.getSnapshot().phase).toBe('ended');
-
-    start(harness.service, 's2');
-    await flushStart();
+    await vi.advanceTimersByTimeAsync(1);
     expect(harness.recognitions).toHaveLength(2);
-    expect(harness.service.getSnapshot().sessionId).toBe('s2');
+    expect(harness.service.getSnapshot()).toMatchObject({ phase: 'listening', sessionId: 's1' });
+    vi.useRealTimers();
   });
 
   it('stops manually and waits for end without auto-restart', async () => {
@@ -515,15 +520,19 @@ describe('offscreen voice input lifecycle', () => {
     expect(harness.service.getSnapshot().phase).toBe('ended');
   });
 
-  it('uses the session watchdog after recognition starts', async () => {
+  it('stops cleanly at the 30-second test limit', async () => {
     vi.useFakeTimers();
     const harness = createHarness();
     start(harness.service);
     await flushStart();
     harness.recognitions[0]?.callbacks.onStart();
+    harness.recognitions[0]?.callbacks.onAudioStart();
 
     await vi.advanceTimersByTimeAsync(30_000);
-    expect(harness.service.getSnapshot()).toMatchObject({ errorCode: 'timeout', phase: 'error' });
+    expect(harness.recognitions[0]?.stop).toHaveBeenCalledOnce();
+    expect(harness.service.getSnapshot()).toMatchObject({ errorCode: null, phase: 'stopping' });
+    harness.recognitions[0]?.callbacks.onEnd();
+    expect(harness.service.getSnapshot()).toMatchObject({ errorCode: null, phase: 'ended' });
   });
 });
 
@@ -583,6 +592,7 @@ describe('offscreen voice input media ownership', () => {
     start(harness.service);
     await flushStart();
     const first = harness.recognitions[0]!;
+    expect(harness.service.stop('s1', false)).toBe('accepted');
     first.callbacks.onEnd();
     first.callbacks.onResult(transcript('late'));
     await flushStart();

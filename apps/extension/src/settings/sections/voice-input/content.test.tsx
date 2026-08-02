@@ -60,7 +60,8 @@ function createController(overrides: ControllerOverrides = {}): VoiceInputSettin
       ...overrides.preferences,
     },
     status: {
-      audioLevels: [],
+      audioLevel: 0,
+      audioPeaks: Array.from({ length: 16 }, () => 0),
       checking: false,
       error: null,
       installing: false,
@@ -71,7 +72,6 @@ function createController(overrides: ControllerOverrides = {}): VoiceInputSettin
       snapshot,
     },
     transcript: {
-      clear: vi.fn(),
       finalText: '',
       interimText: '',
       setFinalText: vi.fn(),
@@ -100,6 +100,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -113,6 +114,7 @@ describe('voice input Settings content', () => {
     expect(button('settings.voiceInput.install')).toBeUndefined();
     expect(container.textContent).toContain('settings.voiceInput.localDisclosure');
     expect(container.textContent).toContain('settings.voiceInput.browserDisclosure');
+    expect(container.textContent).not.toContain('settings.voiceInput.clear');
     expect(container.querySelectorAll('select')).toHaveLength(3);
 
     render(createController({ status: { microphoneAccess: 'granted' } }));
@@ -213,8 +215,8 @@ describe('voice input Settings content', () => {
   });
 
   it('keeps a short press active and stops a held push-to-talk press on release', () => {
+    vi.useFakeTimers();
     const controller = createController({ status: { microphoneAccess: 'granted' } });
-    const now = vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValueOnce(100);
     render(controller);
     const microphoneButton = button('settings.voiceInput.start')!;
     const shortDown = new MouseEvent('pointerdown', { bubbles: true, button: 0 });
@@ -223,21 +225,46 @@ describe('voice input Settings content', () => {
     Object.defineProperty(shortUp, 'pointerId', { value: 1 });
     act(() => {
       microphoneButton.dispatchEvent(shortDown);
+      vi.advanceTimersByTime(100);
       microphoneButton.dispatchEvent(shortUp);
     });
     expect(controller.actions.start).toHaveBeenCalledOnce();
     expect(controller.actions.stop).not.toHaveBeenCalled();
 
-    now.mockReset().mockReturnValueOnce(0).mockReturnValueOnce(500);
     const heldDown = new MouseEvent('pointerdown', { bubbles: true, button: 0 });
     Object.defineProperty(heldDown, 'pointerId', { value: 2 });
     const heldUp = new MouseEvent('pointerup', { bubbles: true, button: 0 });
     Object.defineProperty(heldUp, 'pointerId', { value: 2 });
     act(() => {
       microphoneButton.dispatchEvent(heldDown);
+      vi.advanceTimersByTime(450);
+    });
+    expect(button('settings.voiceInput.releaseToStop')).toBeTruthy();
+    act(() => {
       microphoneButton.dispatchEvent(heldUp);
     });
     expect(controller.actions.start).toHaveBeenCalledTimes(2);
     expect(controller.actions.stop).toHaveBeenCalledOnce();
+  });
+
+  it('renders real centered amplitude peaks and explicitly reports detected voice', () => {
+    render(
+      createController({
+        status: {
+          audioLevel: 0.42,
+          audioPeaks: Array.from({ length: 16 }, (_, index) => (index + 1) / 16),
+          microphoneAccess: 'granted',
+          snapshot: { phase: 'listening', sessionId: 'session-1' },
+        },
+      })
+    );
+
+    const meter = container.querySelector('[role="meter"]');
+    expect(meter?.getAttribute('aria-valuemax')).toBe('100');
+    expect(meter?.getAttribute('aria-valuemin')).toBe('0');
+    expect(meter?.getAttribute('aria-valuenow')).toBe('42');
+    expect(meter?.querySelectorAll('[data-audio-peak]')).toHaveLength(16);
+    expect(container.textContent).toContain('42%');
+    expect(container.textContent).toContain('settings.voiceInput.signalDetected');
   });
 });

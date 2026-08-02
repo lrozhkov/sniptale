@@ -15,6 +15,7 @@ import {
 } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   parseOffscreenVoiceInputRuntimeMessage,
+  VoiceInputPortMessageType,
   type OffscreenVoiceInputCommand,
   type OffscreenVoiceInputResponse,
   type VoiceInputServerEvent,
@@ -23,9 +24,28 @@ import { createRuntimeMessagingTransport } from '../../platform/runtime-messagin
 import { authorizeOffscreenRuntimeCommand } from '../runtime/authorization';
 import { executeOffscreenResponseCommand } from '../runtime/idempotency';
 import { createOffscreenVoiceInputService } from './service';
+import { createVoiceInputTelemetryPort } from './telemetry-port';
 
 const logger = createLogger({ namespace: 'OffscreenSpeechRecognition' });
 const runtimeMessaging = createRuntimeMessagingTransport();
+const telemetryPort = createVoiceInputTelemetryPort();
+
+function emitVoiceInputEvent(event: VoiceInputServerEvent): Promise<unknown> {
+  if (event.type === VoiceInputPortMessageType.AUDIO_LEVEL) {
+    return Promise.resolve({ delivered: telemetryPort.send(event) });
+  }
+  if (
+    event.type === VoiceInputPortMessageType.FAILURE ||
+    (event.type === VoiceInputPortMessageType.SNAPSHOT &&
+      (event.snapshot.phase === 'ended' || event.snapshot.phase === 'error'))
+  ) {
+    telemetryPort.close();
+  }
+  return runtimeMessaging.sendRuntimeMessage({
+    type: MessageType.OFFSCREEN_VOICE_INPUT_EVENT,
+    event,
+  });
+}
 
 function isVoiceInputCommandCandidate(message: unknown): message is Record<string, unknown> {
   if (typeof message !== 'object' || message === null || !('type' in message)) return false;
@@ -39,8 +59,7 @@ function isVoiceInputCommandCandidate(message: unknown): message is Record<strin
 const service = createOffscreenVoiceInputService({
   acquireMicrophone: acquireMicrophoneInput,
   createRecognition: createSpeechRecognitionSession,
-  emit: (event: VoiceInputServerEvent) =>
-    runtimeMessaging.sendRuntimeMessage({ type: MessageType.OFFSCREEN_VOICE_INPUT_EVENT, event }),
+  emit: emitVoiceInputEvent,
   loadAvailability: loadSpeechRecognitionAvailability,
   observeMicrophoneLevel,
   resolveApi: resolveSpeechRecognitionApi,
@@ -114,5 +133,8 @@ export function registerOffscreenVoiceInputMessageListener(): void {
     return responseHandler ? false : undefined;
   });
 
-  globalThis.addEventListener?.('beforeunload', service.abortOnUnload);
+  globalThis.addEventListener?.('beforeunload', () => {
+    telemetryPort.close();
+    service.abortOnUnload();
+  });
 }

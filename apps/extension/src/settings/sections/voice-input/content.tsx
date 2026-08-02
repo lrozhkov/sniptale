@@ -1,5 +1,5 @@
-import { AlertCircle, CheckCircle2, Download, Mic, RefreshCw, Square, Trash2 } from 'lucide-react';
-import { useRef } from 'react';
+import { AlertCircle, CheckCircle2, Download, Mic, RefreshCw, Square } from 'lucide-react';
+import { AudioAmplitudeBars } from '@sniptale/ui/audio-amplitude-bars';
 import { translate, type TranslationKey } from '../../../platform/i18n';
 import {
   settingsPanelClassName,
@@ -7,6 +7,7 @@ import {
   SettingsSectionHeader,
 } from '../../section-surface';
 import type { VoiceInputSettingsController } from './controller-contract';
+import { usePushToTalk } from './use-push-to-talk';
 
 const buttonClassName = [
   'inline-flex min-h-10 items-center justify-center gap-2 rounded-[14px] border px-4 py-2',
@@ -28,8 +29,11 @@ const fieldClassName = [
   'text-[var(--sniptale-color-text-primary)] focus-visible:outline-none focus-visible:ring-2',
   'focus-visible:ring-[var(--sniptale-color-accent)] disabled:cursor-not-allowed disabled:opacity-60',
 ].join(' ');
-const LEVEL_METER_BAR_COUNT = 32;
-
+const activeMicrophoneIndicatorClassName = [
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]',
+  'text-[var(--sniptale-color-accent)]',
+  'ring-4 ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_8%,transparent)]',
+].join(' ');
 function statusKey(value: string): TranslationKey {
   const keys: Record<string, TranslationKey> = {
     standard: 'settings.voiceInput.statusStandard',
@@ -338,14 +342,11 @@ function VoiceInputActions({
   active,
   controller,
   installAvailable,
-  transcript,
 }: {
   active: boolean;
   controller: VoiceInputSettingsController;
   installAvailable: boolean;
-  transcript: string;
 }) {
-  const pointerStartRef = useRef<{ pointerId: number; startedAt: number } | null>(null);
   const startDisabled =
     controller.status.microphoneAccess !== 'granted' ||
     controller.status.checking ||
@@ -356,6 +357,12 @@ function VoiceInputActions({
       !controller.status.microphones.some(
         (device) => device.deviceId === controller.preferences.microphoneDeviceId
       ));
+  const pushToTalk = usePushToTalk({
+    active,
+    disabled: startDisabled,
+    onStart: () => void controller.actions.start(),
+    onStop: controller.actions.stop,
+  });
   return (
     <div className="flex flex-wrap gap-2">
       {controller.status.microphoneAccess !== 'granted' ? (
@@ -389,28 +396,16 @@ function VoiceInputActions({
         onClick={(event) => {
           if (event.detail === 0 && !active) void controller.actions.start();
         }}
-        onPointerDown={(event) => {
-          if (event.button !== 0 || active || startDisabled) return;
-          pointerStartRef.current = { pointerId: event.pointerId, startedAt: performance.now() };
-          event.currentTarget.setPointerCapture?.(event.pointerId);
-          void controller.actions.start();
-        }}
-        onPointerUp={(event) => {
-          const press = pointerStartRef.current;
-          if (!press || press.pointerId !== event.pointerId) return;
-          pointerStartRef.current = null;
-          if (performance.now() - press.startedAt >= 450) controller.actions.stop();
-        }}
-        onPointerCancel={() => {
-          if (!pointerStartRef.current) return;
-          pointerStartRef.current = null;
-          controller.actions.stop();
-        }}
+        onPointerCancel={pushToTalk.onPointerCancel}
+        onPointerDown={pushToTalk.onPointerDown}
+        onPointerUp={pushToTalk.onPointerUp}
       >
         <Mic aria-hidden="true" className="h-4 w-4" />
-        {active
-          ? translate('settings.voiceInput.microphoneActive')
-          : translate('settings.voiceInput.start')}
+        {pushToTalk.holding
+          ? translate('settings.voiceInput.releaseToStop')
+          : active
+            ? translate('settings.voiceInput.microphoneActive')
+            : translate('settings.voiceInput.start')}
       </button>
       {active ? (
         <button
@@ -424,15 +419,6 @@ function VoiceInputActions({
       ) : null}
       <button
         className={secondaryButtonClassName}
-        disabled={active || transcript.length === 0}
-        type="button"
-        onClick={controller.transcript.clear}
-      >
-        <Trash2 aria-hidden="true" className="h-4 w-4" />
-        {translate('settings.voiceInput.clear')}
-      </button>
-      <button
-        className={secondaryButtonClassName}
         disabled={active || controller.status.checking}
         type="button"
         onClick={() => void controller.actions.refresh()}
@@ -444,40 +430,85 @@ function VoiceInputActions({
   );
 }
 
-function VoiceInputLevelMeter({ levels }: { levels: readonly number[] }) {
-  const padding = Array.from(
-    { length: Math.max(0, LEVEL_METER_BAR_COUNT - levels.length) },
-    () => 0
-  );
-  const normalized: number[] = [...padding, ...levels.slice(-LEVEL_METER_BAR_COUNT)];
+function VoiceInputLevelMeter({
+  active,
+  level,
+  peaks,
+}: {
+  active: boolean;
+  level: number;
+  peaks: readonly number[];
+}) {
+  const normalizedLevel = Math.max(0, Math.min(1, level));
+  const percent = Math.round(normalizedLevel * 100);
+  const soundDetected = active && normalizedLevel >= 0.04;
+  const signalStatus = soundDetected
+    ? translate('settings.voiceInput.signalDetected')
+    : active
+      ? translate('settings.voiceInput.signalListening')
+      : translate('settings.voiceInput.signalIdle');
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs text-[var(--sniptale-color-text-muted)]">
-        <span>{translate('settings.voiceInput.signalLabel')}</span>
-        <span>{translate('settings.voiceInput.signalPrivacy')}</span>
-      </div>
-      <div
-        aria-label={translate('settings.voiceInput.signalAriaLabel')}
+    <div
+      className={[
+        'flex items-center gap-3 rounded-[12px] border px-3 py-2.5',
+        'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]',
+      ].join(' ')}
+    >
+      <span
+        aria-hidden="true"
         className={[
-          'flex h-12 items-center gap-1 overflow-hidden rounded-[12px] px-3',
-          'bg-[var(--sniptale-color-surface-canvas)]',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+          active
+            ? activeMicrophoneIndicatorClassName
+            : 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-muted)]',
         ].join(' ')}
-        role="img"
       >
-        {normalized.map((level, index) => (
-          <span
-            aria-hidden="true"
-            className={[
-              'min-h-1 flex-1 rounded-full bg-[var(--sniptale-color-accent)]',
-              'transition-[height,opacity] duration-100',
-            ].join(' ')}
-            key={index}
-            style={{
-              height: `${Math.max(8, Math.round(Math.min(1, level) * 100))}%`,
-              opacity: Math.max(0.16, Math.min(1, level + 0.16)),
-            }}
+        <Mic className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="font-medium text-[var(--sniptale-color-text-primary)]">
+            {translate('settings.voiceInput.signalLabel')}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-[var(--sniptale-color-text-muted)]">
+            <span
+              aria-hidden="true"
+              className={[
+                'h-1.5 w-1.5 rounded-full transition-colors duration-100',
+                soundDetected
+                  ? 'bg-[var(--sniptale-color-accent)]'
+                  : active
+                    ? 'bg-[var(--sniptale-color-success)]'
+                    : 'bg-[var(--sniptale-color-text-muted)] opacity-50',
+              ].join(' ')}
+            />
+            {signalStatus}
+          </span>
+        </div>
+        <div
+          aria-label={translate('settings.voiceInput.signalAriaLabel')}
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={percent}
+          className={[
+            'relative mt-2 flex h-10 items-center justify-center overflow-hidden rounded-[10px] px-12',
+            'bg-[var(--sniptale-color-surface-hover)]',
+          ].join(' ')}
+          role="meter"
+        >
+          <AudioAmplitudeBars
+            active={active}
+            className="h-7"
+            peaks={peaks}
+            soundDetected={soundDetected}
           />
-        ))}
+          <output className="absolute right-3 text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+            {percent}%
+          </output>
+        </div>
+        <p className="mt-1.5 text-[11px] text-[var(--sniptale-color-text-muted)]">
+          {translate('settings.voiceInput.signalPrivacy')}
+        </p>
       </div>
     </div>
   );
@@ -517,12 +548,15 @@ function VoiceInputTestPanel({
           onChange={(event) => controller.transcript.setFinalText(event.target.value)}
         />
       </label>
-      <VoiceInputLevelMeter levels={controller.status.audioLevels} />
+      <VoiceInputLevelMeter
+        active={active}
+        level={controller.status.audioLevel}
+        peaks={controller.status.audioPeaks}
+      />
       <VoiceInputActions
         active={active}
         controller={controller}
         installAvailable={installAvailable}
-        transcript={transcript}
       />
     </div>
   );

@@ -2,8 +2,10 @@ import type { MessageType } from '../messaging/message-types/index';
 import type { RuntimeMessageResponse } from '../messaging/contracts/response';
 
 export const VOICE_INPUT_PORT_NAME = 'sniptale:voice-input:v1';
+export const VOICE_INPUT_TELEMETRY_PORT_NAME = 'sniptale:voice-input-telemetry:v1';
 export const VOICE_INPUT_LOCAL_QUALITY = 'dictation' as const;
 export const VOICE_INPUT_DEVICE_ID_MAX_CHARS = 512;
+export const VOICE_INPUT_LEVEL_PEAK_COUNT = 16;
 export const VOICE_INPUT_TRANSCRIPT_MAX_CHARS = 16_000;
 
 export const VoiceInputPortMessageType = {
@@ -119,6 +121,7 @@ export type VoiceInputServerEvent =
   | {
       type: typeof VoiceInputPortMessageType.AUDIO_LEVEL;
       level: number;
+      peaks: number[];
       sessionId: string;
     }
   | {

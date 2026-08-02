@@ -101,6 +101,7 @@ describe('voice input boundary parsers', () => {
     expect(
       parseVoiceInputServerEvent({
         level: 0.42,
+        peaks: Array.from({ length: 16 }, (_, index) => index / 16),
         sessionId: 'session-1',
         type: VoiceInputPortMessageType.AUDIO_LEVEL,
       })
@@ -108,6 +109,15 @@ describe('voice input boundary parsers', () => {
     expect(
       parseVoiceInputServerEvent({
         level: 2,
+        peaks: Array.from({ length: 16 }, () => 0.2),
+        sessionId: 'session-1',
+        type: VoiceInputPortMessageType.AUDIO_LEVEL,
+      })
+    ).toBeNull();
+    expect(
+      parseVoiceInputServerEvent({
+        level: 0.4,
+        peaks: [0.2],
         sessionId: 'session-1',
         type: VoiceInputPortMessageType.AUDIO_LEVEL,
       })
