@@ -23,7 +23,6 @@ export async function renderCompositeToWebm(
     job,
     job.exportAbortController?.signal
   );
-  let stream: MediaStream | null = null;
   let capturedTracks: MediaStreamTrack[] = [];
 
   try {
@@ -32,7 +31,7 @@ export async function renderCompositeToWebm(
     const canvasTrack = canvasStream.getVideoTracks()[0];
     if (!canvasTrack) throw new Error(translate('offscreenExport.canvasContextError'));
     applyVideoTrackContentHint(canvasTrack, 'detail');
-    stream = new MediaStream(capturedTracks);
+    const stream = new MediaStream(capturedTracks);
     job.exportStream = stream;
     const codec = settings.webmVideoCodec ?? VideoWebmCodec.VP9;
     const mimeType = getSupportedWebmExportMimeType(codec, preparedAudio.tracks.length > 0);

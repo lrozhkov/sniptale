@@ -79,6 +79,7 @@ async function remapStartingCropSource(args: {
   requireAppliedOutputState(await setViewportOutputFrozen(binding, true, transitionId), 'freeze');
 
   let remapError: unknown = null;
+  let remappedSize: { height: number; width: number } | null = null;
   try {
     const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
       attachOffscreenCommandCapability({
@@ -98,27 +99,31 @@ async function remapStartingCropSource(args: {
     ) {
       throw new Error(response?.error ?? 'Starting crop source remapping failed');
     }
-    return { height: remappedHeight, width: remappedWidth };
+    remappedSize = { height: remappedHeight, width: remappedWidth };
   } catch (error) {
     remapError = error;
-    throw error;
-  } finally {
-    try {
-      requireAppliedOutputState(
-        await setViewportOutputFrozen(binding, false, transitionId),
-        'resume'
-      );
-    } catch (resumeError) {
-      if (remapError) {
-        throw new AggregateError(
-          [remapError, resumeError],
-          'Starting crop remap failed and its output could not resume',
-          { cause: resumeError }
-        );
-      }
-      throw resumeError;
-    }
   }
+
+  let resumeError: unknown = null;
+  try {
+    requireAppliedOutputState(
+      await setViewportOutputFrozen(binding, false, transitionId),
+      'resume'
+    );
+  } catch (error) {
+    resumeError = error;
+  }
+  if (remapError && resumeError) {
+    throw new AggregateError(
+      [remapError, resumeError],
+      'Starting crop remap failed and its output could not resume',
+      { cause: resumeError }
+    );
+  }
+  if (remapError) throw remapError;
+  if (resumeError) throw resumeError;
+  if (!remappedSize) throw new Error('Starting crop source remapping produced no dimensions');
+  return remappedSize;
 }
 
 async function resolveAcceptedSourceSize(

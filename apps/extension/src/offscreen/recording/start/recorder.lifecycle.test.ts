@@ -104,7 +104,7 @@ function emitVideoTrackEnded(): void {
   });
 }
 
-function useControllableArtifactSession(options: { abortError?: Error } = {}) {
+function createControllableArtifactSession(options: { abortError?: Error } = {}) {
   const file = new File(['terminal'], 'recording.webm', { type: 'video/webm' });
   const artifact = {
     artifactId: 'recording-lifecycle',
@@ -174,7 +174,7 @@ async function bootstrapControllable(
     webcamSettings?: { frameRate: number; height: number; width: number };
   } = {}
 ) {
-  const fixture = useControllableArtifactSession({
+  const fixture = createControllableArtifactSession({
     ...(params.abortError === undefined ? {} : { abortError: params.abortError }),
   });
   recordingContext.beginRecordingSession('recording-lifecycle');
