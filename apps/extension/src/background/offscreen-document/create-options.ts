@@ -4,7 +4,7 @@ const OFFSCREEN_DOCUMENT_REASON = 'USER_MEDIA' satisfies `${chrome.offscreen.Rea
 const PRIVACY_ERASURE_OFFSCREEN_DOCUMENT_REASON =
   'LOCAL_STORAGE' satisfies `${chrome.offscreen.Reason}`;
 
-type OffscreenContextFilter = Omit<chrome.runtime.ContextFilter, 'contextTypes'> & {
+type OffscreenDocumentContextFilter = Omit<chrome.runtime.ContextFilter, 'contextTypes'> & {
   contextTypes: [typeof OFFSCREEN_DOCUMENT_CONTEXT_TYPE];
 };
 type OffscreenCreateDocumentOptions = Omit<chrome.offscreen.CreateParameters, 'reasons'> & {
@@ -20,7 +20,7 @@ type PrivacyErasureOffscreenCreateDocumentOptions = Omit<
 export function createOffscreenDocumentContextFilter(): chrome.runtime.ContextFilter {
   return {
     contextTypes: [OFFSCREEN_DOCUMENT_CONTEXT_TYPE],
-  } as OffscreenContextFilter as chrome.runtime.ContextFilter;
+  } as OffscreenDocumentContextFilter as chrome.runtime.ContextFilter;
 }
 
 export function createUserMediaOffscreenDocumentOptions(

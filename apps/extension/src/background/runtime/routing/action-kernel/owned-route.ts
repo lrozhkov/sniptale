@@ -30,7 +30,10 @@ function routeAuthorizedBackgroundOwnedAction(
   authorization: IpcAuthorizationResult
 ): ActionResult {
   if (!authorization.authorized) {
-    action.context.logger.warn('Rejected background-owned runtime message');
+    action.context.logger.warn('Rejected background-owned runtime message', {
+      reason: authorization.reason,
+      routeName: action.routeName,
+    });
     action.context.sendResponse(createRouteErrorResponse(authorization.reason));
     return { handled: true, keepChannelOpen: false };
   }

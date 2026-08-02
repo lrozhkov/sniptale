@@ -119,6 +119,36 @@ it('authorizes supported background-owned owner routes', () => {
   ).toEqual({ authorized: true });
 });
 
+it('authorizes voice input events only from an exact offscreen document identity', () => {
+  const offscreenUrl =
+    'chrome-extension://test/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1';
+  const createRequest = (
+    sender: chrome.runtime.MessageSender
+  ): BackgroundOwnedAuthorizationRequest => ({
+    kind: 'background-owned',
+    message: { type: MessageType.OFFSCREEN_VOICE_INPUT_EVENT },
+    sender,
+  });
+
+  expect(
+    authorizeBackgroundOwnedRoute(createRequest({ documentId: 'offscreen-1', url: offscreenUrl }))
+  ).toEqual(expect.objectContaining({ authorized: true }));
+  expect(authorizeBackgroundOwnedRoute(createRequest({ url: offscreenUrl }))).toEqual(
+    expect.objectContaining({ authorized: true })
+  );
+  expect(
+    authorizeBackgroundOwnedRoute(
+      createRequest({
+        documentId: 'settings-1',
+        url: 'chrome-extension://test/apps/extension/src/settings/index.html',
+      })
+    )
+  ).toEqual({
+    authorized: false,
+    reason: 'Unauthorized voice input offscreen event sender',
+  });
+});
+
 it('returns explicit route context for AI secret unlock dispatch', () => {
   expect(authorizeBackgroundOwnedRoute(request(MessageType.AI_SECRET_UNLOCK))).toEqual({
     authorized: true,

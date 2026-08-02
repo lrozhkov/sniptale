@@ -51,11 +51,11 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   }),
 }));
 
-type OffscreenManagerModule = typeof import('./offscreen-manager');
+type OffscreenManagerModule = typeof import('./service');
 
 async function loadOffscreenManager(): Promise<OffscreenManagerModule> {
   vi.resetModules();
-  return import('./offscreen-manager');
+  return import('./service');
 }
 
 beforeEach(() => {
@@ -148,8 +148,8 @@ it('creates an isolated lightweight local-storage document for privacy erasure',
     readyListener = listener;
     return vi.fn();
   });
-  const { createOffscreenManagerService } = await loadOffscreenManager();
-  const manager = createOffscreenManagerService();
+  const { createOffscreenDocumentService } = await loadOffscreenManager();
+  const manager = createOffscreenDocumentService();
   const preparation = manager.ensurePrivacyErasureOffscreenDocument();
   await vi.waitFor(() => expect(readyListener).toBeDefined());
   readyListener?.(
@@ -185,7 +185,7 @@ it('creates a document after logging a failed runtime-context lookup', async () 
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
     reasons: ['USER_MEDIA'],
-    justification: 'Recording tab video',
+    justification: 'Run extension-owned offscreen media work',
   });
 });
 
@@ -233,8 +233,8 @@ it('closes a timed-out startup before creating a replacement offscreen document'
 });
 
 it('supports isolated service instances for owner-local readiness checks', async () => {
-  const { createOffscreenManagerService } = await loadOffscreenManager();
-  const manager = createOffscreenManagerService();
+  const { createOffscreenDocumentService } = await loadOffscreenManager();
+  const manager = createOffscreenDocumentService();
 
   expect(manager.hasOffscreenDocument()).toBe(false);
   expect(manager.markOffscreenDocumentReady()).toBe(true);

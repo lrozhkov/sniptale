@@ -52,6 +52,11 @@ function arrangeStoredSettingsWithNestedSiblings(): void {
         freezeMotion: true,
         preloadLazyContent: false,
       },
+      voiceInput: {
+        language: 'en-US',
+        microphoneDeviceId: 'microphone-1',
+        mode: 'local-first',
+      },
     },
   });
 }
@@ -73,6 +78,11 @@ function expectPersistedNestedMerge(): void {
         freezeMotion: false,
         preloadLazyContent: false,
       },
+      voiceInput: {
+        language: 'en-US',
+        microphoneDeviceId: 'microphone-1',
+        mode: 'browser-managed',
+      },
     }),
   });
 }
@@ -88,6 +98,7 @@ describe('settings nested patch persistence', () => {
         contentToolbar: { position: { x: 96, y: 120 } },
         contextMenu: { showSettings: false },
         fullPageCapture: { freezeMotion: false },
+        voiceInput: { mode: 'browser-managed' },
       })
     ).resolves.toMatchObject({
       contentToolbar: {
@@ -103,6 +114,11 @@ describe('settings nested patch persistence', () => {
         floatingElements: 'repeat',
         freezeMotion: false,
         preloadLazyContent: false,
+      },
+      voiceInput: {
+        language: 'en-US',
+        microphoneDeviceId: 'microphone-1',
+        mode: 'browser-managed',
       },
     });
 

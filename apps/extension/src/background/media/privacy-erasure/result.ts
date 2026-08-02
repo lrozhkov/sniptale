@@ -3,6 +3,7 @@ import type { ErasureParticipantResult } from '@sniptale/runtime-contracts/priva
 export const RECORDING_PARTICIPANT_ID = 'recording-runtime-state';
 export const PROJECT_EXPORT_PARTICIPANT_ID = 'project-export-runtime-state';
 export const OFFSCREEN_EXPORT_PARTICIPANT_ID = 'offscreen-export-runtime-state';
+export const VOICE_INPUT_PARTICIPANT_ID = 'voice-input-runtime-state';
 
 export function verified(id: string): ErasureParticipantResult {
   return {

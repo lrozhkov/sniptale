@@ -91,7 +91,7 @@ import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/typ
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { startRecording } from './start';
-import { reserveMediaErasureExclusion } from '../../lifecycle-gate';
+import { reserveMediaErasureExclusion } from '../../../mutation-exclusion/media-activity';
 
 const settings = {
   ...DEFAULT_VIDEO_SETTINGS,

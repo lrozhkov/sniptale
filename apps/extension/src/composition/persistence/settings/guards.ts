@@ -6,6 +6,8 @@ import type {
   Settings,
 } from '../../../contracts/settings';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
+import { parseVoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
+import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
 import { parseSavePresets, parseViewportPresets } from './array.guards.ts';
 import { assignParsedContextMenuSettings } from './context-menu.guards.ts';
@@ -140,6 +142,13 @@ function parseOptionalFullPageCapture(
   };
 }
 
+function parseOptionalVoiceInput(value: unknown): ParsedFieldValue<VoiceInputPreferences> {
+  if (value === undefined) {
+    return undefined;
+  }
+  return parseVoiceInputPreferences(value) ?? INVALID_FIELD;
+}
+
 function assignParsedSettingsField<TKey extends keyof Settings>(
   target: Partial<Settings>,
   key: TKey,
@@ -231,6 +240,11 @@ function parseScalarSettingsFields(
     nextValue,
     'fullPageCapture',
     parseOptionalFullPageCapture(value['fullPageCapture'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'voiceInput',
+    parseOptionalVoiceInput(value['voiceInput'])
   );
   invalidFieldCount += assignParsedContextMenuSettings(nextValue, value['contextMenu']);
   invalidFieldCount += assignParsedSettingsField(

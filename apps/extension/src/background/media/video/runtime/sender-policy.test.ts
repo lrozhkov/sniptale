@@ -2,8 +2,6 @@ import { expect, it, vi } from 'vitest';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   isOffscreenOnlyVideoRuntimeMessage,
-  isTrustedOffscreenRuntimeSender,
-  resolveOffscreenRuntimeCapabilityContext,
   resolveTrustedCameraRecorderRuntimeSenderUrl,
   resolveTrustedPopupRuntimeSenderUrl,
   resolveTrustedVideoEditorRuntimeSender,
@@ -71,35 +69,6 @@ it('accepts only the moved camera recorder document and rejects retired or spoof
   expect(
     resolveTrustedCameraRecorderRuntimeSenderUrl({
       url: 'chrome-extension://test/apps/extension/src/camera-recorder/index.html.evil',
-    })
-  ).toBeNull();
-});
-
-it('resolves offscreen runtime senders through a scoped CapabilityContext', () => {
-  expect(
-    isTrustedOffscreenRuntimeSender({
-      url: 'chrome-extension://test/apps/extension/src/offscreen/offscreen.html',
-    })
-  ).toBe(true);
-  expect(
-    resolveOffscreenRuntimeCapabilityContext(
-      {
-        documentId: 'offscreen-doc-1',
-        url: 'chrome-extension://test/apps/extension/src/offscreen/offscreen.html',
-      },
-      1_000
-    )
-  ).toEqual({
-    expiresAtEpochMs: 2_000,
-    origin: 'chrome-extension://test',
-    scopes: ['offscreen:runtime'],
-    tabId: null,
-    token: 'offscreen-doc-1',
-  });
-  expect(
-    resolveOffscreenRuntimeCapabilityContext({
-      documentId: 'content-doc-1',
-      url: 'https://example.test/page',
     })
   ).toBeNull();
 });

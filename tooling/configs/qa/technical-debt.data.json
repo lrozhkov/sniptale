@@ -541,7 +541,6 @@
         "apps/extension/src/background/media-hub/web-snapshot-validation.ts",
         "apps/extension/src/background/media-hub/web-snapshot.ts",
         "apps/extension/src/background/media/desktop-capture/source-picker.ts",
-        "apps/extension/src/background/media/lifecycle-gate.ts",
         "apps/extension/src/background/media/lifecycle.ts",
         "apps/extension/src/background/media/privacy-erasure/cleanup.ts",
         "apps/extension/src/background/media/privacy-erasure/project-export.ts",
@@ -633,11 +632,6 @@
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/resize.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/source-validation.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/transaction.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-document-dto.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-manager-state.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-manager.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-readiness.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-startup-id.ts",
         "apps/extension/src/background/media/video/runtime/router.ts",
         "apps/extension/src/background/media/video/runtime/sender-policy.ts",
         "apps/extension/src/background/media/video/runtime/session-state/badge-state/apply-badge-state.ts",
@@ -672,6 +666,13 @@
         "apps/extension/src/background/media/video/ui/request-workflow.ts",
         "apps/extension/src/background/media/video/ui/shared.ts",
         "apps/extension/src/background/mutation-exclusion/gate.ts",
+        "apps/extension/src/background/mutation-exclusion/media-activity.ts",
+        "apps/extension/src/background/offscreen-document/create-options.ts",
+        "apps/extension/src/background/offscreen-document/readiness.ts",
+        "apps/extension/src/background/offscreen-document/sender-policy.ts",
+        "apps/extension/src/background/offscreen-document/service.ts",
+        "apps/extension/src/background/offscreen-document/startup-id.ts",
+        "apps/extension/src/background/offscreen-document/state.ts",
         "apps/extension/src/background/routing-contracts/authorization-result.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/activation-store.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/authority-shape.ts",
@@ -936,7 +937,16 @@
         "apps/extension/src/background/storage/video/post-record-result.ts",
         "apps/extension/src/background/storage/video/project-export-capabilities.ts",
         "apps/extension/src/background/storage/video/recording-authority-mutation.ts",
-        "apps/extension/src/background/storage/video/recording-control-lease.ts"
+        "apps/extension/src/background/storage/video/recording-control-lease.ts",
+        "apps/extension/src/background/voice-input/consumer-policy.ts",
+        "apps/extension/src/background/voice-input/coordinator.ts",
+        "apps/extension/src/background/voice-input/offscreen-gateway.ts",
+        "apps/extension/src/background/voice-input/protocol.ts",
+        "apps/extension/src/background/voice-input/route-descriptors.ts",
+        "apps/extension/src/background/voice-input/route.ts",
+        "apps/extension/src/background/voice-input/session-authority.ts",
+        "apps/extension/src/background/voice-input/start-dispatch.ts",
+        "apps/extension/src/background/voice-input/start-operation.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/background/ai/llm/authorization/egress.ts",
@@ -1187,7 +1197,6 @@
         "apps/extension/src/background/media-hub/web-snapshot-validation.ts",
         "apps/extension/src/background/media-hub/web-snapshot.ts",
         "apps/extension/src/background/media/desktop-capture/source-picker.ts",
-        "apps/extension/src/background/media/lifecycle-gate.ts",
         "apps/extension/src/background/media/lifecycle.ts",
         "apps/extension/src/background/media/privacy-erasure/cleanup.ts",
         "apps/extension/src/background/media/privacy-erasure/project-export.ts",
@@ -1279,11 +1288,6 @@
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/resize.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/source-validation.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/transaction.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-document-dto.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-manager-state.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-manager.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-readiness.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-startup-id.ts",
         "apps/extension/src/background/media/video/runtime/router.ts",
         "apps/extension/src/background/media/video/runtime/sender-policy.ts",
         "apps/extension/src/background/media/video/runtime/session-state/badge-state/apply-badge-state.ts",
@@ -1318,6 +1322,13 @@
         "apps/extension/src/background/media/video/ui/request-workflow.ts",
         "apps/extension/src/background/media/video/ui/shared.ts",
         "apps/extension/src/background/mutation-exclusion/gate.ts",
+        "apps/extension/src/background/mutation-exclusion/media-activity.ts",
+        "apps/extension/src/background/offscreen-document/create-options.ts",
+        "apps/extension/src/background/offscreen-document/readiness.ts",
+        "apps/extension/src/background/offscreen-document/sender-policy.ts",
+        "apps/extension/src/background/offscreen-document/service.ts",
+        "apps/extension/src/background/offscreen-document/startup-id.ts",
+        "apps/extension/src/background/offscreen-document/state.ts",
         "apps/extension/src/background/routing-contracts/authorization-result.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/activation-store.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/authority-shape.ts",
@@ -1582,7 +1593,16 @@
         "apps/extension/src/background/storage/video/post-record-result.ts",
         "apps/extension/src/background/storage/video/project-export-capabilities.ts",
         "apps/extension/src/background/storage/video/recording-authority-mutation.ts",
-        "apps/extension/src/background/storage/video/recording-control-lease.ts"
+        "apps/extension/src/background/storage/video/recording-control-lease.ts",
+        "apps/extension/src/background/voice-input/consumer-policy.ts",
+        "apps/extension/src/background/voice-input/coordinator.ts",
+        "apps/extension/src/background/voice-input/offscreen-gateway.ts",
+        "apps/extension/src/background/voice-input/protocol.ts",
+        "apps/extension/src/background/voice-input/route-descriptors.ts",
+        "apps/extension/src/background/voice-input/route.ts",
+        "apps/extension/src/background/voice-input/session-authority.ts",
+        "apps/extension/src/background/voice-input/start-dispatch.ts",
+        "apps/extension/src/background/voice-input/start-operation.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -3921,6 +3941,7 @@
         "apps/extension/src/contracts/messaging/contracts/runtime/video/offscreen/viewport.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/video/recording.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/video/session.ts",
+        "apps/extension/src/contracts/messaging/contracts/runtime/voice-input.ts",
         "apps/extension/src/contracts/messaging/contracts/types.ts",
         "apps/extension/src/contracts/messaging/llm.ts",
         "apps/extension/src/contracts/messaging/parsers/boundary.ts",
@@ -3998,6 +4019,7 @@
         "apps/extension/src/contracts/messaging/contracts/runtime/video/offscreen/viewport.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/video/recording.ts",
         "apps/extension/src/contracts/messaging/contracts/runtime/video/session.ts",
+        "apps/extension/src/contracts/messaging/contracts/runtime/voice-input.ts",
         "apps/extension/src/contracts/messaging/contracts/types.ts",
         "apps/extension/src/contracts/messaging/llm.ts",
         "apps/extension/src/contracts/messaging/parsers/boundary.ts",
@@ -8417,6 +8439,8 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
+        "apps/extension/src/offscreen/media-activity/lease.ts",
+        "apps/extension/src/offscreen/media-activity/video-recording-lease.ts",
         "apps/extension/src/offscreen/offscreen.ts",
         "apps/extension/src/offscreen/project-export/application/use-case.ts",
         "apps/extension/src/offscreen/project-export/capabilities.ts",
@@ -8608,9 +8632,15 @@
         "apps/extension/src/offscreen/runtime/routing.project-export.ts",
         "apps/extension/src/offscreen/runtime/routing.ts",
         "apps/extension/src/offscreen/runtime/sender-policy.ts",
-        "apps/extension/src/offscreen/runtime/test-support.ts"
+        "apps/extension/src/offscreen/runtime/test-support.ts",
+        "apps/extension/src/offscreen/voice-input/recognition-instance.ts",
+        "apps/extension/src/offscreen/voice-input/recognition-run.ts",
+        "apps/extension/src/offscreen/voice-input/runtime.ts",
+        "apps/extension/src/offscreen/voice-input/service.ts"
       ],
       "rolloutFiles": [
+        "apps/extension/src/offscreen/media-activity/lease.ts",
+        "apps/extension/src/offscreen/media-activity/video-recording-lease.ts",
         "apps/extension/src/offscreen/offscreen.ts",
         "apps/extension/src/offscreen/project-export/application/use-case.ts",
         "apps/extension/src/offscreen/project-export/capabilities.ts",
@@ -8802,7 +8832,11 @@
         "apps/extension/src/offscreen/runtime/routing.project-export.ts",
         "apps/extension/src/offscreen/runtime/routing.ts",
         "apps/extension/src/offscreen/runtime/sender-policy.ts",
-        "apps/extension/src/offscreen/runtime/test-support.ts"
+        "apps/extension/src/offscreen/runtime/test-support.ts",
+        "apps/extension/src/offscreen/voice-input/recognition-instance.ts",
+        "apps/extension/src/offscreen/voice-input/recognition-run.ts",
+        "apps/extension/src/offscreen/voice-input/runtime.ts",
+        "apps/extension/src/offscreen/voice-input/service.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -10409,6 +10443,16 @@
         "apps/extension/src/settings/sections/viewport-presets/section-content/types.ts",
         "apps/extension/src/settings/sections/viewport-presets/section-content/viewport-confirm-dialog.tsx",
         "apps/extension/src/settings/sections/viewport-presets/sync.ts",
+        "apps/extension/src/settings/sections/voice-input/content.tsx",
+        "apps/extension/src/settings/sections/voice-input/controller-contract.ts",
+        "apps/extension/src/settings/sections/voice-input/index.tsx",
+        "apps/extension/src/settings/sections/voice-input/use-local-voice-capability.ts",
+        "apps/extension/src/settings/sections/voice-input/use-local-voice-installation.ts",
+        "apps/extension/src/settings/sections/voice-input/use-microphone-capability.ts",
+        "apps/extension/src/settings/sections/voice-input/use-voice-input-owner-lifecycle.ts",
+        "apps/extension/src/settings/sections/voice-input/use-voice-input-session.ts",
+        "apps/extension/src/settings/sections/voice-input/use-voice-input-start-action.ts",
+        "apps/extension/src/settings/sections/voice-input/use-voice-input.ts",
         "apps/extension/src/settings/shell/command-palette/index.tsx",
         "apps/extension/src/settings/shell/navigation/index.tsx",
         "apps/extension/src/settings/shell/navigation/sidebar.tsx",
@@ -10680,6 +10724,16 @@
         "apps/extension/src/settings/sections/viewport-presets/section-content/types.ts",
         "apps/extension/src/settings/sections/viewport-presets/section-content/viewport-confirm-dialog.tsx",
         "apps/extension/src/settings/sections/viewport-presets/sync.ts",
+        "apps/extension/src/settings/sections/voice-input/content.tsx",
+        "apps/extension/src/settings/sections/voice-input/controller-contract.ts",
+        "apps/extension/src/settings/sections/voice-input/index.tsx",
+        "apps/extension/src/settings/sections/voice-input/use-local-voice-capability.ts",
+        "apps/extension/src/settings/sections/voice-input/use-local-voice-installation.ts",
+        "apps/extension/src/settings/sections/voice-input/use-microphone-capability.ts",
+        "apps/extension/src/settings/sections/voice-input/use-voice-input-owner-lifecycle.ts",
+        "apps/extension/src/settings/sections/voice-input/use-voice-input-session.ts",
+        "apps/extension/src/settings/sections/voice-input/use-voice-input-start-action.ts",
+        "apps/extension/src/settings/sections/voice-input/use-voice-input.ts",
         "apps/extension/src/settings/shell/command-palette/index.tsx",
         "apps/extension/src/settings/shell/navigation/index.tsx",
         "apps/extension/src/settings/shell/navigation/sidebar.tsx",
@@ -11731,6 +11785,17 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/workflows/voice-input",
+      "disposition": "unmapped",
+      "reason": "This owner family has focused owner tests but is outside the hard coverage rollout; add an explicit rollout target before enabling thresholds.",
+      "productionFiles": [
+        "apps/extension/src/workflows/voice-input/client.ts",
+        "apps/extension/src/workflows/voice-input/index.ts"
+      ],
+      "rolloutFiles": [],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "packages/foundation",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -11789,10 +11854,12 @@
         "packages/platform/src/browser/runtime.ts",
         "packages/platform/src/browser/scripting.ts",
         "packages/platform/src/browser/shadow-dom/index.ts",
+        "packages/platform/src/browser/speech-recognition.ts",
         "packages/platform/src/browser/storage-types.ts",
         "packages/platform/src/browser/tab-capture.ts",
         "packages/platform/src/browser/tabs.ts",
         "packages/platform/src/browser/test-fixtures.ts",
+        "packages/platform/src/browser/user-media.ts",
         "packages/platform/src/browser/web-navigation.ts",
         "packages/platform/src/browser/windows.ts",
         "packages/platform/src/data/state-manager/manager.ts",
@@ -11827,6 +11894,7 @@
         "packages/platform/src/observability/message-tracer/transport.ts",
         "packages/platform/src/observability/message-tracer/types.ts",
         "packages/platform/src/observability/message-tracer/utils.ts",
+        "packages/platform/src/observability/message-tracer/voice-input-payload.ts",
         "packages/platform/src/ports/runtime-messaging/content-runtime-shim.ts",
         "packages/platform/src/security/ai-dom-privacy/model.ts",
         "packages/platform/src/security/ai-payload-input.ts",
@@ -11872,10 +11940,12 @@
         "packages/platform/src/browser/runtime.ts",
         "packages/platform/src/browser/scripting.ts",
         "packages/platform/src/browser/shadow-dom/index.ts",
+        "packages/platform/src/browser/speech-recognition.ts",
         "packages/platform/src/browser/storage-types.ts",
         "packages/platform/src/browser/tab-capture.ts",
         "packages/platform/src/browser/tabs.ts",
         "packages/platform/src/browser/test-fixtures.ts",
+        "packages/platform/src/browser/user-media.ts",
         "packages/platform/src/browser/web-navigation.ts",
         "packages/platform/src/browser/windows.ts",
         "packages/platform/src/data/state-manager/manager.ts",
@@ -11910,6 +11980,7 @@
         "packages/platform/src/observability/message-tracer/transport.ts",
         "packages/platform/src/observability/message-tracer/types.ts",
         "packages/platform/src/observability/message-tracer/utils.ts",
+        "packages/platform/src/observability/message-tracer/voice-input-payload.ts",
         "packages/platform/src/ports/runtime-messaging/content-runtime-shim.ts",
         "packages/platform/src/security/ai-dom-privacy/model.ts",
         "packages/platform/src/security/ai-payload-input.ts",
@@ -12055,6 +12126,9 @@
         "packages/runtime-contracts/src/video/types/types.ts",
         "packages/runtime-contracts/src/video/types/webcam-actual-settings.ts",
         "packages/runtime-contracts/src/video/types/webcam-quality.ts",
+        "packages/runtime-contracts/src/voice-input/index.ts",
+        "packages/runtime-contracts/src/voice-input/parsers.ts",
+        "packages/runtime-contracts/src/voice-input/types.ts",
         "packages/runtime-contracts/src/web-snapshot/index.ts"
       ],
       "rolloutFiles": [
@@ -12174,6 +12248,9 @@
         "packages/runtime-contracts/src/video/types/types.ts",
         "packages/runtime-contracts/src/video/types/webcam-actual-settings.ts",
         "packages/runtime-contracts/src/video/types/webcam-quality.ts",
+        "packages/runtime-contracts/src/voice-input/index.ts",
+        "packages/runtime-contracts/src/voice-input/parsers.ts",
+        "packages/runtime-contracts/src/voice-input/types.ts",
         "packages/runtime-contracts/src/web-snapshot/index.ts"
       ],
       "unownedFocusedFiles": []
@@ -12401,7 +12478,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "3edd4b447672bf15a36743bf48a6acedcc9433b396553680e5771bf57ba0d04b"
+        "contentHash": "a7bda2bebf90dec5fa7d1ec97c08b572724dc9224bf529e08ee433d955441efc"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -13688,7 +13765,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/as-never.mjs",
-        "contentHash": "bdd30c1c3eb16e7e374f9883953d95b985197238d8b0a543c6ad3944d4ffd75d"
+        "contentHash": "3eec9fb9efd73ad0dcf706c2115c3172a6996847f109551a3105e876cb6ed7d3"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/as-never.mjs",
@@ -17157,7 +17234,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/offscreen.ts",
-        "contentHash": "67bbaa06b09db8c5384a3bbbf0eda9781d0d17ef576ab58f3ad491818fc7637e"
+        "contentHash": "0c6fe5ff360c6afd670f7eade4130d11662475bfa8cab6d09a4772e494a494be"
       },
       "consumers": [
         "tooling/test/harness/offscreen.ts"
@@ -17758,7 +17835,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/privacy-erasure.mjs",
-        "contentHash": "362971b6fcd18a531eb7a9a5fb73a30b03ac53f02731976ff65cda59f3c3de15"
+        "contentHash": "ab60349ab988b65cd18cafbc8af8065c5b56f5d7c506f459eafd2e92a729f7eb"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",
@@ -17805,7 +17882,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/privacy-erasure-runtime.mjs",
-        "contentHash": "103c03aeeb4e4422c2837352bd41ddd62a34a5b17618074c7800eaab28cae305"
+        "contentHash": "ea8530ec96f798714029776e55a6484acd75898b438f61d8ec4a254e43bcb136"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/privacy-erasure-runtime.mjs",
@@ -20439,7 +20516,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.config.mjs",
-        "contentHash": "b66e5776377ea34bebd09c847d7c619b0ca89c7b12adec57188be1d89245b9ee"
+        "contentHash": "532c59cf9f149d50f4b2719fbb8ce342c92ba3a97ee8d0e44663e8e785915d66"
       },
       "consumers": [
         "tooling/qa/core/active-path-drift.test.ts",
@@ -20854,7 +20931,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs",
-        "contentHash": "f0406eda2a6b7208c5164adeb0b28481fb37ac18cb0583b9f56af67e3c567199"
+        "contentHash": "95ee4a1bf92aecc30be57ec32560dc31090ead150fc34379837769ce9b9c0efc"
       },
       "consumers": [
         "tooling/qa/core/harness-freshness-step.mjs",
@@ -20864,6 +20941,7 @@
       ],
       "surfaces": [
         "binding:OWNERSHIP_RULES",
+        "binding:REVIEWED_CROSS_OWNER_PATH_REPLACEMENTS",
         "binding:WAVE_KEYS",
         "property:collectInstanceOwnershipInventoryReview/reclassifications",
         "property:collectInstanceOwnershipInventoryReview/reclassifications[1]",
@@ -21720,7 +21798,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/video-project-export.mjs",
-        "contentHash": "73fc7407a2976108d01864c627853f12dd111070ac057901f84c662ad41564dd"
+        "contentHash": "e613a702194fac6b972d7a8f6fc0996a1d41922a1e9468180173e5285e6484c0"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",

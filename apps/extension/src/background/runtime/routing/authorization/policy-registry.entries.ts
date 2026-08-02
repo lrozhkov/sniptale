@@ -2,9 +2,9 @@ import type { PopupExportViewerMessage } from '../message-guards/guards/shared';
 import { isPopupExportViewerMessage } from '../message-guards/guards/tab';
 import {
   authorizeProjectExportRuntimeMessage as authorizeProjectExportRuntimeMessageFromRoutes,
-  hasOffscreenRuntimeCapability,
   isOffscreenOnlyVideoRuntimeMessage,
 } from '../../../media/routes';
+import { hasOffscreenRuntimeCapability } from '../../../offscreen-document/sender-policy';
 import {
   AUTHORIZED,
   reject,
@@ -49,10 +49,10 @@ export const authorizationPolicyRegistryEntries = [
   {
     authorizationMode: 'sync',
     authorize: authorizeRegisteredOffscreenRuntimePolicy,
-    capabilityOwnerModule: 'apps/extension/src/background/media/video/runtime/sender-policy.ts',
+    capabilityOwnerModule: 'apps/extension/src/background/offscreen-document/sender-policy.ts',
     key: 'offscreen-runtime',
     policyStateIds: OFFSCREEN_RUNTIME_POLICY_STATE_IDS,
-    policyOwnerModule: 'apps/extension/src/background/media/video/runtime/sender-policy.ts',
+    policyOwnerModule: 'apps/extension/src/background/offscreen-document/sender-policy.ts',
   },
   {
     authorizationMode: 'sync',

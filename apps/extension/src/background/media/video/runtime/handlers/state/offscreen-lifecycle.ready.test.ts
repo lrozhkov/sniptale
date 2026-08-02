@@ -50,8 +50,8 @@ vi.mock('../../../manager/start-activation-watchdog', async (importOriginal) => 
   clearRecordingStartActivationWatchdog: clearRecordingStartActivationWatchdogMock,
 }));
 
-vi.mock('../../offscreen-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../offscreen-manager')>()),
+vi.mock('../../../../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../offscreen-document/service')>()),
   markOffscreenDocumentReady: markOffscreenDocumentReadyMock,
 }));
 

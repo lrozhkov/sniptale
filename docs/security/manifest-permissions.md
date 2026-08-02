@@ -23,7 +23,7 @@ This document explains high-impact grants and manifest topology. `tooling/config
 | Browser baseline | `minimum_chrome_version: "140"` | manifest and browser adapters | Lowering requires compatibility and owner proof. |
 | Browser action | popup HTML and title | popup runtime | Privileged work routes through background owners. |
 | Context menu | `contextMenus` | context-menu runtime | User entrypoint, not blanket authority; route policy still applies. |
-| Offscreen media | `offscreen`, `USER_MEDIA` | video runtime and offscreen document | Recording/export only; reason and capability policy stay aligned. |
+| Offscreen media and voice input | `offscreen`, `USER_MEDIA` | shared offscreen-document lifecycle, video runtime, and voice-input runtime | Video recording and one-shot speech recognition share one offscreen media lease. Microphone access is requested only by an explicit action in a visible extension page; signed commands, exact sender policy, freshness, and runtime capability checks remain aligned. |
 | Effect runtime | manifest sandbox page and sandbox CSP without dynamic-code permission | sandbox broker, preview, export | Persistent build-owned blob Worker; declarative interpreter only, private ports, typed envelopes, content hashes, no network/storage, bounded media and timeout termination. Request-owned bitmaps and the hydrated SVG/Path2D cache are released after every success or failure. |
 
 ## Reduction rules

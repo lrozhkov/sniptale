@@ -32,6 +32,7 @@ import {
   classifySettingsPageSenderUrl,
   isPageAccessSenderUrl,
 } from './sender-classification';
+import { hasOffscreenRuntimeCapability } from '../../../offscreen-document/sender-policy';
 
 export const backgroundOwnedPolicyAuthorityByMessageType = new Map(
   getBackgroundOwnedPolicyEntries()
@@ -131,6 +132,25 @@ function authorizePopupTabRouteCapabilityIssuance(
   }
   markPreauthorizedPopupTabRouteCapabilityRequestMessage(request.message);
   return AUTHORIZED;
+}
+
+function authorizeVoiceInputOffscreenEvent(
+  request: BackgroundOwnedAuthorizationRequest,
+  routeEntry: BackgroundOwnedRouteInventoryEntry
+): IpcAuthorizationResult {
+  // Chrome may omit documentId for offscreen senders. The canonical policy still binds the
+  // sender to this extension's exact offscreen document path and rejects neighboring pages.
+  if (!hasOffscreenRuntimeCapability(request.sender)) {
+    return reject('Unauthorized voice input offscreen event sender');
+  }
+  return authorize(
+    createBackgroundOwnedRoutePreauthorization({
+      entry: routeEntry,
+      handle: { kind: 'background-owned-route-policy' },
+      message: request.message,
+      senderClassification: 'offscreen-document',
+    })
+  );
 }
 
 function authorizeContentActionCapabilityIssuance(
@@ -240,6 +260,8 @@ function getBackgroundOwnedAuthorizationHandler(
       return authorizePopupExportArchiveRoute;
     case 'popup-tab-route-capability-issuance':
       return authorizePopupTabRouteCapabilityIssuance;
+    case 'voice-input-offscreen-event':
+      return authorizeVoiceInputOffscreenEvent;
   }
 }
 

@@ -5,6 +5,7 @@ import {
   type MultiSourceRecorder,
   type MultiSourceSession,
 } from './state';
+import { releaseVideoRecordingMediaActivityLease } from '../../media-activity/video-recording-lease';
 
 type SessionRecorder = MultiSourceRecorder | NonNullable<MultiSourceSession['webcamRecorder']>;
 
@@ -20,6 +21,12 @@ function stopSessionStreams(session: MultiSourceSession): void {
   if (session.durationTimer) clearInterval(session.durationTimer);
 }
 
+function retireMultiSourceSession(session: MultiSourceSession): void {
+  setActiveMultiSourceSession(null);
+  stopSessionStreams(session);
+  releaseVideoRecordingMediaActivityLease();
+}
+
 async function abortSession(session: MultiSourceSession): Promise<void> {
   await session.staging.abort();
 }
@@ -28,11 +35,10 @@ export function failMultiSourceSession(session: MultiSourceSession, error: Error
   if (getActiveMultiSourceSession() !== session) return false;
   const transitioned = session.lifecycle.fail(error);
   if (!transitioned && !session.stopReject) return false;
-  setActiveMultiSourceSession(null);
   getSessionRecorders(session).forEach((source) => {
     void source.artifactSession.abort().catch(() => undefined);
   });
-  stopSessionStreams(session);
+  retireMultiSourceSession(session);
   session.stopReject?.(error);
   return true;
 }
@@ -49,16 +55,14 @@ async function stopAndFinalizeSession(params: {
         source.artifact = await source.artifactSession.stop();
       })
     );
-    setActiveMultiSourceSession(null);
-    stopSessionStreams(session);
+    retireMultiSourceSession(session);
     if (discard) {
       await abortSession(session);
       return;
     }
     await finalizeSession(session);
   } catch (error) {
-    setActiveMultiSourceSession(null);
-    stopSessionStreams(session);
+    retireMultiSourceSession(session);
     try {
       await abortSession(session);
     } catch (abortError) {
@@ -83,11 +87,10 @@ export function stopMultiSourceSession(params: {
   const previousPhase = session.lifecycle.beginStop();
   if (previousPhase === null) return Promise.resolve();
   if (previousPhase === 'starting') {
-    setActiveMultiSourceSession(null);
     getSessionRecorders(session).forEach((source) => {
       void source.artifactSession.abort().catch(() => undefined);
     });
-    stopSessionStreams(session);
+    retireMultiSourceSession(session);
     session.stopPromise = abortSession(session);
     return session.stopPromise;
   }

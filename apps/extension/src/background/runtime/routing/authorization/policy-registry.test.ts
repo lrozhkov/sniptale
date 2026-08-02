@@ -78,9 +78,9 @@ it('records truthful popup and offscreen policy owners', () => {
   expect(authorizationPolicyRegistry).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
-        capabilityOwnerModule: 'apps/extension/src/background/media/video/runtime/sender-policy.ts',
+        capabilityOwnerModule: 'apps/extension/src/background/offscreen-document/sender-policy.ts',
         key: 'offscreen-runtime',
-        policyOwnerModule: 'apps/extension/src/background/media/video/runtime/sender-policy.ts',
+        policyOwnerModule: 'apps/extension/src/background/offscreen-document/sender-policy.ts',
       }),
       expect.objectContaining({
         capabilityOwnerModule:

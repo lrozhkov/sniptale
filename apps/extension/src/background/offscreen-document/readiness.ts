@@ -1,10 +1,10 @@
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import type { OffscreenManagerState } from './offscreen-manager-state';
+import type { OffscreenDocumentState } from './state';
 import { isTrustedOffscreenRuntimeSender } from './sender-policy';
 
-const logger = createLogger({ namespace: 'BackgroundOffscreenManager' });
+const logger = createLogger({ namespace: 'BackgroundOffscreenDocument' });
 
 type ReadyWaitArgs = {
   message: unknown;
@@ -12,13 +12,13 @@ type ReadyWaitArgs = {
   resolve: () => void;
   sender: chrome.runtime.MessageSender;
   settledRef: { value: boolean };
-  state: OffscreenManagerState;
+  state: OffscreenDocumentState;
   timeoutId: ReturnType<typeof setTimeout>;
   unsubscribe: () => void;
 };
 
 export function waitForOffscreenReadyForState(
-  state: OffscreenManagerState,
+  state: OffscreenDocumentState,
   timeoutMs: number
 ): Promise<void> {
   if (state.offscreenReady) {
@@ -54,7 +54,7 @@ export function waitForOffscreenReadyForState(
 }
 
 export function markOffscreenDocumentReadyForState(
-  state: OffscreenManagerState,
+  state: OffscreenDocumentState,
   offscreenStartupId?: string
 ): boolean {
   if (typeof offscreenStartupId === 'string' && state.expectedStartupId === null) {
@@ -184,7 +184,7 @@ function isOffscreenRuntimeErrorMessage(message: unknown): message is OffscreenR
 }
 
 function isCurrentOffscreenStartupId(
-  state: OffscreenManagerState,
+  state: OffscreenDocumentState,
   offscreenStartupId: string,
   signal: 'error' | 'ready'
 ): boolean {

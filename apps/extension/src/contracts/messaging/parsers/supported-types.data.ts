@@ -104,6 +104,7 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>([
   VideoMessageType.OFFSCREEN_RECORDING_PAUSED,
   VideoMessageType.OFFSCREEN_RECORDING_RESUMED,
   VideoMessageType.OFFSCREEN_ERROR,
+  MessageType.OFFSCREEN_VOICE_INPUT_EVENT,
   VideoMessageType.REGION_SELECTED,
   VideoMessageType.REGION_SELECTION_CANCELLED,
   VideoMessageType.DESKTOP_MEDIA_OBTAINED,
@@ -135,6 +136,9 @@ export const popupRuntimeTypes = new Set<RuntimeMessageType>([
 
 export const offscreenRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE,
+  MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
+  MessageType.OFFSCREEN_VOICE_INPUT_START,
+  MessageType.OFFSCREEN_VOICE_INPUT_STOP,
   VideoMessageType.GET_DESKTOP_MEDIA,
   VideoMessageType.DISPOSE_DESKTOP_MEDIA,
   VideoMessageType.OFFSCREEN_START_RECORDING,

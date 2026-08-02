@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { translate } from '../../../../../platform/i18n';
-import { reserveMediaErasureExclusion } from '../../../lifecycle-gate';
+import { reserveMediaErasureExclusion } from '../../../../mutation-exclusion/media-activity';
 import { getProjectExportCapabilitiesUseCase } from './capabilities';
 import {
   createProjectExportPorts as createPorts,

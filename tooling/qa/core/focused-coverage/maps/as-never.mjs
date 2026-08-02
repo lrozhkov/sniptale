@@ -18,23 +18,21 @@ export const AS_NEVER_REMOVAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/background/runtime/routing/runtime-wiring/parsers.test.ts'],
   },
   {
-    owner: 'video-offscreen-manager-boundary',
-    productionFile: 'apps/extension/src/background/media/video/runtime/offscreen-manager.ts',
+    owner: 'background-offscreen-document-boundary',
+    productionFile: 'apps/extension/src/background/offscreen-document/service.ts',
     reason:
-      'Offscreen context lookup and document creation DTOs are covered by offscreen manager suites.',
+      'Offscreen context lookup and document creation are covered by shared lifecycle owner suites.',
     testFiles: [
-      'apps/extension/src/background/media/video/runtime/offscreen-manager.creation.test.ts',
-      'apps/extension/src/background/media/video/runtime/offscreen-manager.test.ts',
+      'apps/extension/src/background/offscreen-document/service.creation.test.ts',
+      'apps/extension/src/background/offscreen-document/service.test.ts',
     ],
   },
   {
-    owner: 'video-offscreen-manager-boundary',
-    productionFile: 'apps/extension/src/background/media/video/runtime/offscreen-document-dto.ts',
+    owner: 'background-offscreen-document-boundary',
+    productionFile: 'apps/extension/src/background/offscreen-document/create-options.ts',
     reason:
-      'Offscreen Chrome enum-compatible DTO construction is covered by offscreen manager creation tests.',
-    testFiles: [
-      'apps/extension/src/background/media/video/runtime/offscreen-manager.creation.test.ts',
-    ],
+      'Offscreen Chrome enum-compatible DTO construction is covered by shared lifecycle creation tests.',
+    testFiles: ['apps/extension/src/background/offscreen-document/service.creation.test.ts'],
   },
   {
     owner: 'editor-raster-metadata',

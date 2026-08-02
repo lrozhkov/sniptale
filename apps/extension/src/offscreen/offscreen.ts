@@ -1,6 +1,7 @@
 import { bootstrapOffscreenDocument } from './runtime/bootstrap';
 import { registerOffscreenRuntimeMessageListener } from './runtime';
 import { getCurrentLocale, translate } from '../platform/i18n';
+import { registerOffscreenVoiceInputMessageListener } from './voice-input/runtime';
 
 function applyOffscreenDocumentMetadata(): void {
   if (typeof document === 'undefined') {
@@ -21,3 +22,4 @@ function applyOffscreenDocumentMetadata(): void {
 applyOffscreenDocumentMetadata();
 bootstrapOffscreenDocument();
 registerOffscreenRuntimeMessageListener();
+registerOffscreenVoiceInputMessageListener();

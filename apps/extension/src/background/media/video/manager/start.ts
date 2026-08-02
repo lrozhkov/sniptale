@@ -22,7 +22,7 @@ import { resetVideoRecordingRuntimeState } from '../runtime/session-state';
 import { initializeRecordingContext } from './recording-context.prepare';
 import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 import { sanitizeRecordingSettings } from './start-settings';
-import { acquireMediaMutationPermit } from '../../lifecycle-gate';
+import { acquireMediaMutationPermit } from '../../../mutation-exclusion/media-activity';
 import { finalizeAcceptedRecordingStart, type RecordingStartResult } from './start-delivery';
 import { releaseVideoCaptureSurface, waitForVideoCaptureSurfaceRecovery } from '../capture-surface';
 import {

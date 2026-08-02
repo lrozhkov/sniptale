@@ -6,6 +6,7 @@ import {
 
 const {
   clearActiveVideoRecordingLeaseMock,
+  cleanupVoiceInputForPrivacyErasureMock,
   closeOffscreenDocumentForPrivacyErasureMock,
   ensureActiveVideoRecordingLeaseHydratedMock,
   finishVideoRecordingStopMock,
@@ -26,6 +27,7 @@ const {
   waitForStopSideEffectsMock,
 } = vi.hoisted(() => ({
   clearActiveVideoRecordingLeaseMock: vi.fn(),
+  cleanupVoiceInputForPrivacyErasureMock: vi.fn(),
   closeOffscreenDocumentForPrivacyErasureMock: vi.fn(),
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
   finishVideoRecordingStopMock: vi.fn(),
@@ -66,8 +68,8 @@ vi.mock('../video/runtime/manager/controls.stop/effects', async (importOriginal)
   ...(await importOriginal<typeof import('../video/runtime/manager/controls.stop/effects')>()),
   waitForStopSideEffects: waitForStopSideEffectsMock,
 }));
-vi.mock('../video/runtime/offscreen-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../video/runtime/offscreen-manager')>()),
+vi.mock('../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../offscreen-document/service')>()),
   closeOffscreenDocumentForPrivacyErasure: closeOffscreenDocumentForPrivacyErasureMock,
 }));
 vi.mock('../video/runtime/session-state', async (importOriginal) => ({
@@ -103,6 +105,10 @@ vi.mock('../../capture-surface', async (importOriginal) => ({
     releaseOwners: releaseOwnersMock,
   }),
 }));
+vi.mock('../../voice-input/coordinator', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../voice-input/coordinator')>()),
+  cleanupVoiceInputForPrivacyErasure: cleanupVoiceInputForPrivacyErasureMock,
+}));
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { mediaPrivacyErasureCleanupAdapter } from './cleanup';
@@ -110,6 +116,7 @@ import { mediaPrivacyErasureCleanupAdapter } from './cleanup';
 beforeEach(() => {
   vi.clearAllMocks();
   clearActiveVideoRecordingLeaseMock.mockResolvedValue(undefined);
+  cleanupVoiceInputForPrivacyErasureMock.mockResolvedValue(true);
   closeOffscreenDocumentForPrivacyErasureMock.mockResolvedValue(undefined);
   ensureActiveVideoRecordingLeaseHydratedMock.mockResolvedValue(null);
   getCurrentRecordingIdMock.mockReturnValue(null);
@@ -323,4 +330,43 @@ it('fails closed when durable media storage is unavailable', async () => {
   );
   expect(stopRecordingForPrivacyErasureMock).not.toHaveBeenCalled();
   expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+  expect(cleanupVoiceInputForPrivacyErasureMock).toHaveBeenCalledOnce();
+  expect(result).toContainEqual(
+    expect.objectContaining({ id: 'voice-input-runtime-state', status: 'verified-empty' })
+  );
+});
+
+it('stops voice input before returning a durable authority read failure', async () => {
+  inspectPersistedLeaseMock.mockRejectedValueOnce(new Error('private storage failure'));
+
+  const result = await mediaPrivacyErasureCleanupAdapter.cleanup();
+
+  expect(cleanupVoiceInputForPrivacyErasureMock).toHaveBeenCalledOnce();
+  expect(result).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'voice-input-runtime-state', status: 'verified-empty' }),
+      expect.objectContaining({
+        error: 'media-authority-read-failed',
+        id: 'recording-runtime-state',
+        status: 'failed',
+      }),
+    ])
+  );
+});
+
+it('closes offscreen as containment when voice input cleanup cannot be verified', async () => {
+  cleanupVoiceInputForPrivacyErasureMock.mockResolvedValueOnce(false);
+
+  const result = await mediaPrivacyErasureCleanupAdapter.cleanup();
+
+  expect(closeOffscreenDocumentForPrivacyErasureMock).toHaveBeenCalledOnce();
+  expect(result).toContainEqual({
+    error: 'voice-input-stop-failed',
+    id: 'voice-input-runtime-state',
+    severity: 'required',
+    status: 'failed',
+  });
+  expect(result).toContainEqual(
+    expect.objectContaining({ id: 'recording-runtime-state', status: 'verified-empty' })
+  );
 });

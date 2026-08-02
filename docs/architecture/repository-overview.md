@@ -7,7 +7,7 @@ Sniptale is a TypeScript and React Manifest V3 Chromium extension built with Vit
 - `apps/extension/src/background` owns the service worker, privileged browser APIs, authorization, routing, capture, recording, and background lifecycle state.
 - `apps/extension/src/content` owns page overlays, DOM interaction, capture preparation, parsing, export preparation, and apply-back behavior.
 - `apps/extension/src/camera-recorder` owns the isolated camera recorder page.
-- `apps/extension/src/offscreen` owns media and export work that cannot run in the service worker.
+- `apps/extension/src/offscreen` owns media, export, and voice-input work that cannot run in the service worker; the shared offscreen document lifecycle remains background-owned.
 - `apps/extension/src/effect-runtime-sandbox` owns isolated interpretation of validated declarative EffectV1 documents.
 - `apps/extension/src/popup`, `settings`, `gallery`, `design-system`, and `web-snapshot-viewer` own extension pages.
 - `apps/extension/src/editor`, `video-editor`, and `scenario-editor` own editing runtimes.

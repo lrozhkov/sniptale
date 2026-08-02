@@ -8,6 +8,15 @@ type CommandEntry = {
   resolve(value: unknown): void;
 };
 
+type VoiceInputCommandMessageType =
+  | typeof MessageType.OFFSCREEN_VOICE_INPUT_STATUS
+  | typeof MessageType.OFFSCREEN_VOICE_INPUT_START
+  | typeof MessageType.OFFSCREEN_VOICE_INPUT_STOP;
+
+type OffscreenIdempotencyMessageType =
+  | HandledOffscreenRuntimeMessageType
+  | VoiceInputCommandMessageType;
+
 type IdempotencyResult =
   | { duplicate: true; completion: Promise<unknown> }
   | { duplicate: false; completeWith(work: Promise<unknown>): Promise<unknown> }
@@ -18,8 +27,10 @@ type OffscreenIdempotencyMessage = {
   generation?: unknown;
   jobId?: unknown;
   recordingId?: unknown;
+  requestId?: unknown;
+  sessionId?: unknown;
   streamInstanceId?: unknown;
-  type: HandledOffscreenRuntimeMessageType;
+  type: OffscreenIdempotencyMessageType;
 };
 
 type OffscreenCommandIdempotencyPolicy = {
@@ -87,17 +98,32 @@ const idempotencyPolicyByType = {
     idempotent: false,
     reason: 'capability probing is read-like and owns its manual response',
   },
-} as const satisfies Record<HandledOffscreenRuntimeMessageType, OffscreenCommandIdempotencyPolicy>;
+  [MessageType.OFFSCREEN_VOICE_INPUT_STATUS]: {
+    idempotent: true,
+    reason: 'status retries must replay the snapshot observed by the signed request',
+  },
+  [MessageType.OFFSCREEN_VOICE_INPUT_START]: {
+    idempotent: true,
+    reason: 'voice startup and its request-scoped snapshot are bound to one signed generation',
+  },
+  [MessageType.OFFSCREEN_VOICE_INPUT_STOP]: {
+    idempotent: true,
+    reason:
+      'voice stop and its exact stale or accepted response are bound to one signed generation',
+  },
+} as const satisfies Record<OffscreenIdempotencyMessageType, OffscreenCommandIdempotencyPolicy>;
 
 export const OFFSCREEN_COMMAND_CORRELATION_KEYS = [
   'jobId',
   'recordingId',
   'desktopMediaRequestId',
+  'requestId',
+  'sessionId',
   'runtime',
 ] as const;
 
 export function getOffscreenCommandIdempotencyPolicy(
-  type: HandledOffscreenRuntimeMessageType
+  type: OffscreenIdempotencyMessageType
 ): OffscreenCommandIdempotencyPolicy {
   return idempotencyPolicyByType[type];
 }
@@ -114,6 +140,12 @@ function readCorrelationId(message: OffscreenIdempotencyMessage): string {
     message.desktopMediaRequestId.length > 0
   ) {
     return message.desktopMediaRequestId;
+  }
+  if (typeof message.requestId === 'string' && message.requestId.length > 0) {
+    return message.requestId;
+  }
+  if (typeof message.sessionId === 'string' && message.sessionId.length > 0) {
+    return message.sessionId;
   }
 
   return 'runtime';
@@ -189,4 +221,33 @@ export function markOffscreenSideEffectCommand(args: {
       return work;
     },
   };
+}
+
+export function executeOffscreenResponseCommand<TResponse>(args: {
+  capabilityGeneration: string;
+  execute(): TResponse;
+  message: OffscreenIdempotencyMessage;
+}):
+  | { duplicate: true; completion: Promise<TResponse> }
+  | { duplicate: false; response: TResponse } {
+  const idempotency = markOffscreenSideEffectCommand(args);
+  if (idempotency.duplicate) {
+    return {
+      duplicate: true,
+      completion: idempotency.completion as Promise<TResponse>,
+    };
+  }
+
+  try {
+    const response = args.execute();
+    if (!('tracked' in idempotency)) {
+      void idempotency.completeWith(Promise.resolve(response));
+    }
+    return { duplicate: false, response };
+  } catch (error) {
+    if (!('tracked' in idempotency)) {
+      void idempotency.completeWith(Promise.reject(error));
+    }
+    throw error;
+  }
 }

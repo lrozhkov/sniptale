@@ -35,7 +35,7 @@ export const VIDEO_PROJECT_EXPORT_OWNER_MAPPINGS = [
   {
     owner: 'video-project-export-runtime-authority',
     productionFile: 'apps/extension/src/background/media/video/runtime/sender-policy.ts',
-    reason: 'Video editor/offscreen sender ownership is covered by sender-policy and router tests.',
+    reason: 'Video editor sender ownership is covered by sender-policy and router tests.',
     testFiles: [
       'apps/extension/src/background/media/video/runtime/sender-policy.test.ts',
       'apps/extension/src/background/media/video/runtime/router.export.test.ts',

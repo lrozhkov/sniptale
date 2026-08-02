@@ -100,8 +100,8 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   markVideoRecordingPreparationSettled: markVideoRecordingPreparationSettledMock,
 }));
 
-vi.mock('../../offscreen-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../offscreen-manager')>()),
+vi.mock('../../../../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../offscreen-document/service')>()),
   ensureOffscreenDocument: vi.fn(),
   hasOffscreenDocument: vi.fn(),
   markOffscreenDocumentReady: vi.fn(),

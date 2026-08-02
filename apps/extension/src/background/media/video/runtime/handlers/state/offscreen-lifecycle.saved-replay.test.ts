@@ -115,13 +115,13 @@ vi.mock('../../../manager/start-activation-watchdog', async (importOriginal) => 
   ...(await importOriginal<typeof import('../../../manager/start-activation-watchdog')>()),
   clearRecordingStartActivationWatchdog: vi.fn(),
 }));
-vi.mock('../../offscreen-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../offscreen-manager')>()),
+vi.mock('../../../../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../offscreen-document/service')>()),
   markOffscreenDocumentReady: markOffscreenDocumentReadyMock,
 }));
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { reserveMediaErasureExclusion } from '../../../../lifecycle-gate';
+import { reserveMediaErasureExclusion } from '../../../../../mutation-exclusion/media-activity';
 import {
   createUnhandledRouteResult,
   handleOffscreenReady,

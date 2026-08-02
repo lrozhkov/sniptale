@@ -17,6 +17,7 @@ import { pageAccessRouteDescriptor } from '../../page-access/route-descriptors';
 import { contentRuntimeWakeupRouteDescriptor } from '../../page-access/wakeup-route-descriptors';
 import { popupTabRouteCapabilityIssuanceDescriptor } from '../capabilities/popup-tab/route-descriptors';
 import type { BackgroundOwnedRouteDescriptor } from './route-descriptors';
+import { voiceInputOffscreenEventRouteDescriptor } from '../../../voice-input/route-descriptors';
 
 export const backgroundOwnedRouteInventory = [
   llmSessionRouteDescriptor,
@@ -32,6 +33,7 @@ export const backgroundOwnedRouteInventory = [
   llmScenarioEditorProcessingRouteDescriptor,
   popupTabRouteCapabilityIssuanceDescriptor,
   contentActionRouteDescriptor,
+  voiceInputOffscreenEventRouteDescriptor,
 ] as const satisfies readonly BackgroundOwnedRouteDescriptor[];
 
 export function getBackgroundOwnedRouteInventoryEntry(

@@ -102,7 +102,7 @@ function writeStandardManifestFiles(root: string) {
   writeFile(root, 'apps/extension/public/icons/icon-16.png', 'png');
   writeFile(
     root,
-    'apps/extension/src/background/media/video/runtime/offscreen-document-dto.ts',
+    'apps/extension/src/background/offscreen-document/create-options.ts',
     "const OFFSCREEN_DOCUMENT_REASON = 'USER_MEDIA';\n"
   );
 }

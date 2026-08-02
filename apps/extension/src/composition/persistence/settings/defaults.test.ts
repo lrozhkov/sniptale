@@ -39,6 +39,7 @@ describe('settings default graph', () => {
     expect(firstSettings.contextMenu).not.toBe(secondSettings.contextMenu);
     expect(firstSettings.contentToolbar).not.toBe(secondSettings.contentToolbar);
     expect(firstSettings.fullPageCapture).not.toBe(secondSettings.fullPageCapture);
+    expect(firstSettings.voiceInput).not.toBe(secondSettings.voiceInput);
   });
 
   it('creates fresh nested defaults for direct default-settings consumers', () => {
@@ -49,6 +50,7 @@ describe('settings default graph', () => {
     expect(firstSettings.contextMenu).not.toBe(secondSettings.contextMenu);
     expect(firstSettings.contentToolbar).not.toBe(secondSettings.contentToolbar);
     expect(firstSettings.fullPageCapture).not.toBe(secondSettings.fullPageCapture);
+    expect(firstSettings.voiceInput).not.toBe(secondSettings.voiceInput);
   });
 
   it('uses the v2 system catalog and current size as the default', () => {
@@ -70,6 +72,14 @@ describe('settings default graph', () => {
       floatingElements: 'once',
       freezeMotion: true,
       preloadLazyContent: true,
+    });
+  });
+
+  it('defaults reusable voice input to Russian local-first dictation', () => {
+    expect(createDefaultSettings().voiceInput).toEqual({
+      language: 'ru-RU',
+      microphoneDeviceId: null,
+      mode: 'local-first',
     });
   });
 });

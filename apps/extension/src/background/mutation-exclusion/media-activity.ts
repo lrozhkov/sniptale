@@ -1,10 +1,11 @@
-import { createMutationExclusion, type MutationPermit } from '../mutation-exclusion/gate';
+import { createMutationExclusion, type MutationPermit } from './gate';
 
 type MediaMutationPermit = MutationPermit;
 
-// policyStateIds: video-recording-control-lease, project-export-capabilities,
-// project-export-job-ledger.
-// This worker-local gate coordinates mutations of those registered authorities during erasure.
+// policyStateIds: offscreen-media-activity-lease, video-recording-control-lease,
+// project-export-capabilities, project-export-job-ledger.
+// This worker-local gate coordinates privileged media mutations across voice input, recording,
+// export, and privacy erasure without making any one feature the shared authority owner.
 const mediaMutationExclusion = createMutationExclusion();
 let authorityGeneration = 0;
 

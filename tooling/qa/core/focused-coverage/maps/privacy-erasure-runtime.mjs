@@ -29,10 +29,8 @@ export const PRIVACY_ERASURE_RUNTIME_OWNER_MAPPINGS = [
   {
     allowCrossOwner: true,
     owner: 'local-data-erasure-offscreen-lifecycle-owner',
-    productionFile: 'apps/extension/src/background/media/video/runtime/offscreen-startup-id.ts',
+    productionFile: 'apps/extension/src/background/offscreen-document/startup-id.ts',
     reason: 'Privacy-erasure offscreen startup URLs are covered by isolated creation proof.',
-    testFiles: [
-      'apps/extension/src/background/media/video/runtime/offscreen-manager.creation.test.ts',
-    ],
+    testFiles: ['apps/extension/src/background/offscreen-document/service.creation.test.ts'],
   },
 ];

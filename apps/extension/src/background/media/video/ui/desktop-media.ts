@@ -11,7 +11,7 @@ import {
   resolveDesktopMediaSourceRequestResult,
   runDesktopMediaRequestWorkflow,
 } from './desktop-media.workflow';
-import { isTrustedOffscreenRuntimeSender } from '../runtime/sender-policy';
+import { isTrustedOffscreenRuntimeSender } from '../../../offscreen-document/sender-policy';
 
 const chooseDesktopMediaSource = createDesktopMediaSourceChooser();
 

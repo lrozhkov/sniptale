@@ -2,7 +2,7 @@ import {
   ensureOffscreenDocument,
   hasOffscreenDocument,
   waitForOffscreenReady,
-} from '../runtime/offscreen-manager';
+} from '../../../offscreen-document/service';
 
 type OffscreenDocumentDeps = {
   ensureOffscreenDocument: typeof ensureOffscreenDocument;

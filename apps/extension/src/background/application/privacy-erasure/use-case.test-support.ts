@@ -6,7 +6,7 @@ import type {
 
 import { createBackgroundRuntimeState } from '../runtime-state';
 import { reserveDiagnosticsErasureExclusion } from '../../diagnostics/lifecycle-gate';
-import { reserveMediaErasureExclusion } from '../../media/lifecycle-gate';
+import { reserveMediaErasureExclusion } from '../../mutation-exclusion/media-activity';
 import { reserveNativeIngestionErasureExclusion } from '../../capture/native-app/lifecycle-gate';
 import type { PrivacyErasurePorts } from './ports';
 
