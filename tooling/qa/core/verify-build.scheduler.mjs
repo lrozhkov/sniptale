@@ -5,7 +5,13 @@ import {
 } from '../runtime/resource-profile.mjs';
 import { parseLaneResult } from '../runtime/lane-worker-contract.mjs';
 import { runQaLaneWorker } from '../runtime/lane-worker-runner.mjs';
-import { formatTaskScheduleDetail, runBoundedTasks } from '../runtime/task-scheduler.mjs';
+import {
+  appendTaskScheduleDetail,
+  appendTaskScheduleDetailToFirst,
+  appendTaskResultScheduleDetail,
+  formatTaskScheduleDetail,
+  runBoundedTasks,
+} from '../runtime/task-scheduler.mjs';
 import { BUILD_TEST_EXECUTION_CLASSES } from './verify-build.test-profiles.mjs';
 
 const BUILD_WORKER_URL = new URL('./verify-build.worker.mjs', import.meta.url);
@@ -108,30 +114,30 @@ function requireExecutionClass(buildScope) {
   return executionClass;
 }
 
-function appendDetail(step, detail) {
-  return { ...step, detail: [step.detail, detail].filter(Boolean).join('; ') };
-}
-
 function annotate(result, profile) {
   const detail = formatTaskScheduleDetail(result, profile);
   const value = result.value;
   if (result.id === 'typecheck') {
-    return { ...value, typecheckStep: appendDetail(value.typecheckStep, detail) };
+    return appendTaskResultScheduleDetail(value, 'typecheckStep', detail);
   }
   if (result.id === 'tests') {
-    const [unitTestStep, ...remaining] = value.testSteps;
-    return { ...value, testSteps: [appendDetail(unitTestStep, detail), ...remaining] };
+    return appendTaskResultScheduleDetail(value, 'testSteps', detail, { list: true });
   }
   if (result.id === 'security') {
-    return { ...value, securityStep: appendDetail(value.securityStep, detail) };
+    return { ...value, securityStep: appendTaskScheduleDetail(value.securityStep, detail) };
   }
   if (result.id === 'graph') {
-    const [first, ...remaining] = value.dependencySteps;
-    return { ...value, dependencySteps: [appendDetail(first, detail), ...remaining] };
+    return {
+      ...value,
+      dependencySteps: appendTaskScheduleDetailToFirst(value.dependencySteps, detail),
+    };
   }
   return {
     ...value,
-    namingStep: appendDetail(value.namingStep, `${detail}; ${formatQaResourceProfile(profile)}`),
+    namingStep: appendTaskScheduleDetail(
+      value.namingStep,
+      `${detail}; ${formatQaResourceProfile(profile)}`
+    ),
   };
 }
 

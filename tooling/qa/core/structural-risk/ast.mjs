@@ -42,6 +42,21 @@ export function getTransparentExpressionRoot(node) {
   return current;
 }
 
+export function unwrapExpression(node) {
+  let current = node;
+  while (
+    current &&
+    (ts.isParenthesizedExpression(current) ||
+      ts.isNonNullExpression(current) ||
+      ts.isAsExpression(current) ||
+      ts.isTypeAssertionExpression(current) ||
+      current.kind === ts.SyntaxKind.SatisfiesExpression)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
 function functionName(node, sourceFile) {
   if (node.name && ts.isIdentifier(node.name)) return node.name.text;
   const parent = node.parent;
@@ -56,7 +71,7 @@ function functionName(node, sourceFile) {
   return '<anonymous>';
 }
 
-function isFunctionNode(node) {
+export function isFunctionNode(node, { includeConstructor = true } = {}) {
   return (
     ts.isFunctionDeclaration(node) ||
     ts.isFunctionExpression(node) ||
@@ -64,7 +79,16 @@ function isFunctionNode(node) {
     ts.isMethodDeclaration(node) ||
     ts.isGetAccessorDeclaration(node) ||
     ts.isSetAccessorDeclaration(node) ||
-    ts.isConstructorDeclaration(node)
+    (includeConstructor && ts.isConstructorDeclaration(node))
+  );
+}
+
+export function hasExportModifier(node) {
+  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+  return modifiers?.some(
+    (modifier) =>
+      modifier.kind === ts.SyntaxKind.ExportKeyword ||
+      modifier.kind === ts.SyntaxKind.DefaultKeyword
   );
 }
 

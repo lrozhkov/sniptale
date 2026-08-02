@@ -15,24 +15,10 @@ import {
   isImageDataUrl,
   isNullable,
   isNumber,
-  isRecord,
   isShowToastPayload,
   isString,
 } from '../../validators/index';
-
-const isAppliedViewportPreset = (
-  value: unknown
-): value is {
-  presetId: string;
-  target: 'viewport' | 'window';
-  width: number;
-  height: number;
-} =>
-  isRecord(value) &&
-  isString(value['presetId']) &&
-  (value['target'] === 'viewport' || value['target'] === 'window') &&
-  isNumber(value['width']) &&
-  isNumber(value['height']);
+import { isAppliedViewportPreset } from '../../validators/ui';
 
 type PartialTabRegistry = Partial<MessageContractRegistry<TabRequestByType, TabResponseByType>>;
 

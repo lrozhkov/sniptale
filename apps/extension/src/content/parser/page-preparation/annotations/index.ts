@@ -1,6 +1,7 @@
 export { browserAnnotationSession, createBrowserAnnotationSession } from './session';
 export { createBrowserAnnotationTargetEvidence } from './evidence';
 export { subscribeToBrowserAnnotationDocumentNavigation } from './document-navigation';
+export { areBrowserFrameAnnotationsEqual } from './frame-equality';
 export {
   formatBrowserAnnotationSnapshot,
   formatBrowserDomAnnotationRecord,

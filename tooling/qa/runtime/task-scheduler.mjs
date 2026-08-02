@@ -124,3 +124,25 @@ export function formatTaskScheduleDetail(result, profile) {
     `profile=${profile.cpuTokens}cpu/${profile.memoryMiB}MiB`,
   ].join('; ');
 }
+
+export function appendTaskScheduleDetail(step, detail) {
+  return { ...step, detail: [step.detail, detail].filter(Boolean).join('; ') };
+}
+
+export function appendTaskScheduleDetailToFirst(steps, detail) {
+  const [first, ...remaining] = steps;
+  return [appendTaskScheduleDetail(first, detail), ...remaining];
+}
+
+export function indexTaskResults(results) {
+  return Object.fromEntries(results.map((result) => [result.id, result.value]));
+}
+
+export function appendTaskResultScheduleDetail(value, key, detail, { list = false } = {}) {
+  return {
+    ...value,
+    [key]: list
+      ? appendTaskScheduleDetailToFirst(value[key], detail)
+      : appendTaskScheduleDetail(value[key], detail),
+  };
+}

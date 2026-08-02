@@ -1,11 +1,5 @@
-import {
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type PointerEvent,
-  type RefObject,
-} from 'react';
+import { useLayoutEffect, useState, type RefObject } from 'react';
+import { useDesignReviewPointerDrag } from '../pointer-drag';
 
 const VIEWPORT_GAP = 12;
 
@@ -30,12 +24,6 @@ function clampPanelPosition(element: HTMLElement | null, position: PanelPosition
 
 export function useFeedbackPanelPosition(panelRef: RefObject<HTMLElement | null>, open: boolean) {
   const [position, setPosition] = useState<PanelPosition>({ x: 24, y: 72 });
-  const dragRef = useRef<{
-    origin: PanelPosition;
-    pointerId: number;
-    startX: number;
-    startY: number;
-  } | null>(null);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -49,42 +37,18 @@ export function useFeedbackPanelPosition(panelRef: RefObject<HTMLElement | null>
     return () => window.removeEventListener('resize', clampCurrent);
   }, [open, panelRef]);
 
-  const onPointerDown = useCallback(
-    (event: PointerEvent<HTMLElement>) => {
-      if (event.button !== 0 || (event.target as Element).closest('button, input, select')) {
-        return;
-      }
-      event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId);
-      dragRef.current = {
-        origin: position,
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-      };
-    },
-    [position]
-  );
-
-  const onPointerMove = useCallback(
-    (event: PointerEvent<HTMLElement>) => {
-      const drag = dragRef.current;
-      if (!drag || drag.pointerId !== event.pointerId) return;
+  const drag = useDesignReviewPointerDrag({
+    canStart: (event) => !(event.target as Element).closest('button, input, select'),
+    move: (origin, deltaX, deltaY) => {
       setPosition(
         clampPanelPosition(panelRef.current, {
-          x: drag.origin.x + event.clientX - drag.startX,
-          y: drag.origin.y + event.clientY - drag.startY,
+          x: origin.x + deltaX,
+          y: origin.y + deltaY,
         })
       );
     },
-    [panelRef]
-  );
+    position,
+  });
 
-  const onPointerUp = useCallback((event: PointerEvent<HTMLElement>) => {
-    if (dragRef.current?.pointerId !== event.pointerId) return;
-    dragRef.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-  }, []);
-
-  return { onPointerDown, onPointerMove, onPointerUp, position };
+  return { ...drag, position };
 }

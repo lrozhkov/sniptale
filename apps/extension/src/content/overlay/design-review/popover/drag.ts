@@ -1,11 +1,5 @@
-import {
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type PointerEvent,
-  type RefObject,
-} from 'react';
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useDesignReviewPointerDrag } from '../pointer-drag';
 
 const VIEWPORT_GAP = 12;
 
@@ -39,21 +33,28 @@ export function useDesignReviewPopoverDrag(args: {
   resetKey: Element | null;
 }) {
   const [manualPosition, setManualPosition] = useState<DesignReviewPopoverPosition | null>(null);
-  const dragRef = useRef<{
-    origin: DesignReviewPopoverPosition;
-    pointerId: number;
-    startX: number;
-    startY: number;
-  } | null>(null);
   const previousResetKeyRef = useRef<Element | null>(args.resetKey);
+  const position = manualPosition ?? args.basePosition;
+  const { cancelPointerDrag, onPointerDown, onPointerMove, onPointerUp } =
+    useDesignReviewPointerDrag({
+      move: (origin, deltaX, deltaY) => {
+        setManualPosition(
+          clampPopoverPosition(args.popoverRef.current, {
+            left: origin.left + deltaX,
+            top: origin.top + deltaY,
+          })
+        );
+      },
+      position,
+    });
 
   useLayoutEffect(() => {
     if (!args.active || previousResetKeyRef.current !== args.resetKey) {
       previousResetKeyRef.current = args.resetKey;
-      dragRef.current = null;
+      cancelPointerDrag();
       setManualPosition(null);
     }
-  }, [args.active, args.resetKey]);
+  }, [args.active, args.resetKey, cancelPointerDrag]);
 
   useLayoutEffect(() => {
     if (!args.active) return;
@@ -69,39 +70,5 @@ export function useDesignReviewPopoverDrag(args: {
     return () => window.removeEventListener('resize', clampCurrent);
   }, [args.active, args.geometryKey, args.popoverRef]);
 
-  const position = manualPosition ?? args.basePosition;
-  const onPointerDown = useCallback(
-    (event: PointerEvent<HTMLElement>) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId);
-      dragRef.current = {
-        origin: position,
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-      };
-    },
-    [position]
-  );
-  const onPointerMove = useCallback(
-    (event: PointerEvent<HTMLElement>) => {
-      const drag = dragRef.current;
-      if (!drag || drag.pointerId !== event.pointerId) return;
-      setManualPosition(
-        clampPopoverPosition(args.popoverRef.current, {
-          left: drag.origin.left + event.clientX - drag.startX,
-          top: drag.origin.top + event.clientY - drag.startY,
-        })
-      );
-    },
-    [args.popoverRef]
-  );
-  const onPointerUp = useCallback((event: PointerEvent<HTMLElement>) => {
-    if (dragRef.current?.pointerId !== event.pointerId) return;
-    dragRef.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-  }, []);
-
-  return { onPointerDown, onPointerMove, onPointerUp, position };
+  return { cancelPointerDrag, onPointerDown, onPointerMove, onPointerUp, position };
 }

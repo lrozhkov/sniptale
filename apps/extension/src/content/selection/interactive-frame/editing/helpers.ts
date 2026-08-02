@@ -29,7 +29,7 @@ export function syncInteractiveFrameContainer(
   }
 }
 
-export function applyDragUpdate(params: {
+function applyDragUpdate(params: {
   event: Pick<MouseEvent, 'clientX' | 'clientY'>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   startX: number;
@@ -90,7 +90,7 @@ function getResizedFrame(
   return { x: newX, y: newY, width: newWidth, height: newHeight };
 }
 
-export function applyResizeUpdate(params: {
+function applyResizeUpdate(params: {
   event: Pick<MouseEvent, 'clientX' | 'clientY'>;
   direction: ResizeDirection;
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -113,4 +113,38 @@ export function applyResizeUpdate(params: {
   if (params.tempFrameRef) params.tempFrameRef.current = nextFrame;
   params.setTempFrame(nextFrame);
   updateEffectOverlay(params.effectMode, params.frameId, resizedFrame);
+}
+
+type InteractiveFrameListenerUpdateParams = {
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  effectModeRef: React.MutableRefObject<EffectMode>;
+  frameId: string;
+  setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
+  startFrameRef: React.MutableRefObject<FrameData>;
+  startXRef: React.MutableRefObject<number>;
+  startYRef: React.MutableRefObject<number>;
+  tempFrameRef: React.MutableRefObject<FrameData>;
+};
+
+export function applyInteractiveFramePointerUpdate(
+  params: InteractiveFrameListenerUpdateParams,
+  event: Pick<MouseEvent, 'clientX' | 'clientY'>,
+  direction: ResizeDirection | null
+) {
+  const update = {
+    containerRef: params.containerRef,
+    effectMode: params.effectModeRef.current,
+    event,
+    frameId: params.frameId,
+    setTempFrame: params.setTempFrame,
+    startFrame: params.startFrameRef.current,
+    startX: params.startXRef.current,
+    startY: params.startYRef.current,
+    tempFrameRef: params.tempFrameRef,
+  };
+  if (direction) {
+    applyResizeUpdate({ ...update, direction });
+    return;
+  }
+  applyDragUpdate(update);
 }

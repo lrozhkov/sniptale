@@ -5,6 +5,7 @@ import type { ViewportPreset } from '../../../contracts/settings';
 import type { ViewportPresetAvailabilityPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getContentRuntimeServices } from '../../application/runtime-services/services';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { createViewportPresetAvailabilityMap } from '../../../features/viewport-presets/availability';
 
 const logger = createLogger({ namespace: 'ContentViewportSelector' });
 
@@ -33,43 +34,16 @@ export function useViewportSelectorPresets(active: boolean): {
             })
             .then((response) => {
               const availabilities = response?.success ? response.availabilities : undefined;
-              const byId = new Map(
-                availabilities?.map(
-                  (availability) => [availability.presetId, availability] as const
-                )
-              );
-              const entries = nextPresets.map(
-                (preset) =>
-                  [
-                    preset.id,
-                    byId.get(preset.id) ?? {
-                      status: 'unavailable',
-                      presetId: preset.id,
-                      target: preset.target,
-                      reason: 'platform-rejected',
-                      required: { width: preset.width, height: preset.height },
-                    },
-                  ] as const
-              );
-              if (!disposed) setAvailabilityById(new Map(entries));
+              if (!disposed) {
+                setAvailabilityById(
+                  createViewportPresetAvailabilityMap(nextPresets, availabilities)
+                );
+              }
             })
             .catch((error) => {
               logger.warn('Failed to load preset availability', error);
               if (!disposed) {
-                setAvailabilityById(
-                  new Map(
-                    nextPresets.map((preset) => [
-                      preset.id,
-                      {
-                        status: 'unavailable',
-                        presetId: preset.id,
-                        target: preset.target,
-                        reason: 'platform-rejected',
-                        required: { width: preset.width, height: preset.height },
-                      } as const,
-                    ])
-                  )
-                );
+                setAvailabilityById(createViewportPresetAvailabilityMap(nextPresets, undefined));
               }
             });
         }

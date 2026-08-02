@@ -15,6 +15,7 @@ import {
 import {
   collectTopologyFragmentationReport,
   formatTopologyFragmentationConsole,
+  interleaveTopologyClusters,
 } from '../core/topology-fragmentation.mjs';
 import {
   collectSensitiveEnvironmentValues,
@@ -84,31 +85,6 @@ function serializedArtifactBytes(artifact) {
   return Buffer.byteLength(`${JSON.stringify(artifact, null, 2)}\n`);
 }
 
-function interleaveAuditClusters(clusters) {
-  const decisionOrder = ['Split', 'Consolidate', 'Keep'];
-  const groups = new Map(decisionOrder.map((decision) => [decision, []]));
-  for (const cluster of clusters) {
-    const group = groups.get(cluster.decision);
-    if (group) group.push(cluster);
-  }
-  for (const group of groups.values()) {
-    group.sort(
-      (left, right) =>
-        right.maximumStructuralScore - left.maximumStructuralScore ||
-        left.id.localeCompare(right.id)
-    );
-  }
-  const ordered = [];
-  const maximumLength = Math.max(0, ...[...groups.values()].map((group) => group.length));
-  for (let index = 0; index < maximumLength; index += 1) {
-    for (const decision of decisionOrder) {
-      const cluster = groups.get(decision)[index];
-      if (cluster) ordered.push(cluster);
-    }
-  }
-  return ordered;
-}
-
 function boundAuditArtifact(artifact, maximumBytes) {
   const fallbackTrimOrder = ['clusters', 'functions', 'files', 'findings'];
   while (serializedArtifactBytes(artifact) > maximumBytes) {
@@ -167,7 +143,7 @@ export function createStructuralAuditArtifact(
     )
     .slice(0, ARTIFACT_ITEM_LIMIT)
     .map((finding) => sanitizeMetric(finding, sanitizerOptions));
-  const clusters = interleaveAuditClusters(fragmentationReport.clusters)
+  const clusters = interleaveTopologyClusters(fragmentationReport.clusters)
     .slice(0, ARTIFACT_ITEM_LIMIT)
     .map((cluster) => sanitizeMetric(cluster, sanitizerOptions, { omitFunctions: true }));
   const forwardingEdges = fragmentationReport.clusters

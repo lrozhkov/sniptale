@@ -118,10 +118,11 @@ export const FUNCTION_PROFILES = {
 export const STRUCTURAL_ALLOWANCES_PATH = 'tooling/configs/qa/structural-risk-allowances.data.json';
 
 export const JAVASCRIPT_FILE_PATTERN = /\.(?:[cm]?[jt]sx?|mjs|cjs)$/u;
-export const TEST_FILE_PATTERN = /(?:^|\/)(?:__tests__\/|test\/)|\.(?:test|spec)\.[cm]?[jt]sx?$/u;
+export const TEST_FILE_PATTERN =
+  /(?:(?:^|\/)(?:__tests__\/|test\/)|\.(?:test|spec)\.[cm]?[jt]sx?$)/u;
 const GENERATED_DATA_FILE_PATTERNS = [
   /(?:^|\/)(?:generated|fixtures?|snapshots?|catalog|registry)(?:\/|\.)/u,
-  /\.(?:data|constants|generated)\.[cm]?[jt]sx?$/u,
+  /(?:\.(?:data|constants|generated)\.[cm]?[jt]sx?$)/u,
   /\.d\.[cm]?ts$/u,
 ];
 

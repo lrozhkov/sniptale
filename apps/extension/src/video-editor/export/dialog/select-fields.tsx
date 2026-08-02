@@ -17,6 +17,7 @@ import {
   VideoWebmCodec,
 } from '../../../features/video/project/types';
 import { getMp4CodecOptions } from './codec-options';
+import type { ExportDialogFieldParams } from './field-contract';
 
 const EXPORT_QUALITY_OPTIONS = [
   {
@@ -157,13 +158,7 @@ function buildFormatPatch(args: {
   };
 }
 
-export function ExportDialogSelectFields(params: {
-  capabilities: VideoExportCapabilities | null | undefined;
-  onChange: (patch: VideoProjectExportSettingsPatch) => void;
-  selectedClipAvailable: boolean;
-  settings: VideoProjectExportSettings;
-  sourceDimensions: { height: number; width: number };
-}) {
+export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
   const { capabilities, onChange, selectedClipAvailable, settings, sourceDimensions } = params;
   const scopeOptions = getExportScopeOptions(selectedClipAvailable);
   const currentScope = settings.scope ?? VideoExportScope.PROJECT;

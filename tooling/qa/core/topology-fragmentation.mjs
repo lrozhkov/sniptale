@@ -442,9 +442,10 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
   };
 }
 
-export function formatTopologyFragmentationConsole(report, { limit = 12 } = {}) {
-  const groups = new Map(['Split', 'Consolidate', 'Keep'].map((decision) => [decision, []]));
-  for (const cluster of report.clusters) groups.get(cluster.decision)?.push(cluster);
+export function interleaveTopologyClusters(clusters) {
+  const decisions = ['Split', 'Consolidate', 'Keep'];
+  const groups = new Map(decisions.map((decision) => [decision, []]));
+  for (const cluster of clusters) groups.get(cluster.decision)?.push(cluster);
   for (const group of groups.values()) {
     group.sort(
       (left, right) =>
@@ -455,11 +456,16 @@ export function formatTopologyFragmentationConsole(report, { limit = 12 } = {}) 
   const ordered = [];
   const maximumLength = Math.max(0, ...[...groups.values()].map((group) => group.length));
   for (let index = 0; index < maximumLength; index += 1) {
-    for (const decision of ['Split', 'Consolidate', 'Keep']) {
+    for (const decision of decisions) {
       const cluster = groups.get(decision)[index];
       if (cluster) ordered.push(cluster);
     }
   }
+  return ordered;
+}
+
+export function formatTopologyFragmentationConsole(report, { limit = 12 } = {}) {
+  const ordered = interleaveTopologyClusters(report.clusters);
   const summary = [
     `clusters=${report.summary.totalClusters}`,
     `candidates=${report.summary.candidateClusters}`,

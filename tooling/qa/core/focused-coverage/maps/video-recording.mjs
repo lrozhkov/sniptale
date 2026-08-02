@@ -17,6 +17,7 @@ export const VIDEO_RECORDING_OWNER_MAPPINGS = [
       'apps/extension/src/background/media/video/capture-surface.test.ts',
       'apps/extension/src/background/media/video/capture-surface.crop-recovery.test.ts',
       'apps/extension/src/background/media/video/capture-surface.recovery-ordering.test.ts',
+      'apps/extension/src/background/media/video/capture-surface/source-handshake.crop-remap.test.ts',
     ],
   },
   {

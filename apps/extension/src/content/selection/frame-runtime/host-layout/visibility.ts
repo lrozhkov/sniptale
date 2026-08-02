@@ -3,8 +3,7 @@ import {
   getDocumentViewportBounds,
   getTopViewportPoint,
 } from '../../../platform/frame';
-
-type AnchorRect = { x: number; y: number; width: number; height: number };
+import { isFinitePositiveRect, type AnchorRect } from './geometry';
 
 type AnchorVisibilityResult = {
   presentation: 'visible' | 'offscreen' | 'suspended';
@@ -21,17 +20,6 @@ type VisibilityCheckElement = HTMLElement & {
     visibilityProperty?: boolean;
   }) => boolean;
 };
-
-function isFinitePositiveRect(rect: AnchorRect): boolean {
-  return (
-    Number.isFinite(rect.x) &&
-    Number.isFinite(rect.y) &&
-    Number.isFinite(rect.width) &&
-    Number.isFinite(rect.height) &&
-    rect.width > 0 &&
-    rect.height > 0
-  );
-}
 
 function intersection(left: AnchorRect, right: AnchorRect): AnchorRect | null {
   const x = Math.max(left.x, right.x);

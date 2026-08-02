@@ -5,7 +5,7 @@ import type {
   ResizeDirection,
 } from '../../../../features/highlighter/contracts';
 import { pauseHighlighter, resumeHighlighter } from '../../highlighter';
-import { applyDragUpdate, syncInteractiveFrameContainer } from './helpers';
+import { applyInteractiveFramePointerUpdate, syncInteractiveFrameContainer } from './helpers';
 import { updateEffectOverlay } from '../layout/portal';
 import type {
   InteractiveFrameHandlerConfig,
@@ -123,17 +123,7 @@ export function createInteractiveFramePointerMoveHandler(params: InteractiveFram
     event.stopPropagation();
 
     if (params.isDraggingRef.current) {
-      applyDragUpdate({
-        event,
-        containerRef: params.containerRef,
-        startX: params.startXRef.current,
-        startY: params.startYRef.current,
-        startFrame: params.startFrameRef.current,
-        setTempFrame: params.setTempFrame,
-        frameId: params.frameId,
-        effectMode: params.effectModeRef.current,
-        tempFrameRef: params.tempFrameRef,
-      });
+      applyInteractiveFramePointerUpdate(params, event, null);
     }
 
     if (params.isResizingRef.current && params.resizeDirectionRef.current) {

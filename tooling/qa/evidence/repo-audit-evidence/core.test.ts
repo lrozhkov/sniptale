@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { createSmellInventory, printTextReport } from './core.mjs';
+import { collectRepoAuditEvidence, createSmellInventory, printTextReport } from './core.mjs';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -92,4 +92,11 @@ it('retains every concrete smell finding while bounding family examples', () => 
       examples: ['src/example-1.ts:1', 'src/example-2.ts:2', 'src/example-3.ts:3'],
     },
   ]);
+});
+
+it('keeps the collected evidence compatible with the audit artifact contract', () => {
+  const evidence = collectRepoAuditEvidence({ rootDir: process.cwd(), topCount: 1 });
+
+  expect(evidence.smellFindings).toEqual([]);
+  expect(evidence.smellFamilies).toEqual([]);
 });

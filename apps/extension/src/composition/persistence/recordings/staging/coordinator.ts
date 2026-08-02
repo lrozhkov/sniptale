@@ -113,7 +113,8 @@ export async function createRecordingStagingCoordinator(
           } catch (cleanupError) {
             throw new AggregateError(
               [error, cleanupError],
-              'Recording staging became unavailable while an artifact was opening.'
+              'Recording staging became unavailable while an artifact was opening.',
+              { cause: cleanupError }
             );
           }
           throw error;

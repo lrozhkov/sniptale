@@ -1,26 +1,8 @@
+import { hasModifier, isTypeOnlyImport } from './deleted-build-ast.mjs';
 import { listHeadCodeFilesContainingText } from './git-head-sources.mjs';
 import { isBuildTestFile } from './build-test-file-classifier.mjs';
 import { isCodeFile } from './shared.mjs';
 import { createSourceFile, ts } from './structural-risk/ast.mjs';
-
-function hasModifier(node, kind) {
-  return Boolean(
-    ts.canHaveModifiers(node) && ts.getModifiers(node)?.some((modifier) => modifier.kind === kind)
-  );
-}
-
-function isTypeOnlyImport(statement) {
-  const clause = statement.importClause;
-  if (!clause) return false;
-  if (clause.isTypeOnly) return true;
-  if (clause.name || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) {
-    return false;
-  }
-  return (
-    clause.namedBindings.elements.length > 0 &&
-    clause.namedBindings.elements.every((element) => element.isTypeOnly)
-  );
-}
 
 function collectSideEffectFreeFunctionExports(file, source) {
   const sourceFile = createSourceFile(file, source);

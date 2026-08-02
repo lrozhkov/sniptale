@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { hasModifier, isTypeOnlyImport } from './deleted-build-ast.mjs';
 import { CODE_EXTENSIONS } from './module-import-graph.mjs';
 import { createSourceFile, ts } from './structural-risk/ast.mjs';
 
@@ -8,25 +9,6 @@ const MAX_AGGREGATE_PROVIDERS = 12;
 
 function uniqueSorted(values) {
   return [...new Set(values)].sort();
-}
-
-function hasModifier(node, kind) {
-  return Boolean(
-    ts.canHaveModifiers(node) && ts.getModifiers(node)?.some((modifier) => modifier.kind === kind)
-  );
-}
-
-function isTypeOnlyImport(statement) {
-  const clause = statement.importClause;
-  if (!clause) return false;
-  if (clause.isTypeOnly) return true;
-  if (clause.name || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) {
-    return false;
-  }
-  return (
-    clause.namedBindings.elements.length > 0 &&
-    clause.namedBindings.elements.every((element) => element.isTypeOnly)
-  );
 }
 
 function isTypeOnlyExport(statement) {

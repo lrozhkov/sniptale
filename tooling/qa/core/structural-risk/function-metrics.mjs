@@ -5,7 +5,9 @@ import {
   getCallName,
   getNodeEndLine,
   getNodeLine,
+  isFunctionNode,
   ts,
+  unwrapExpression,
 } from './ast.mjs';
 import {
   classifyArchitecturalLayer,
@@ -61,58 +63,32 @@ function rootIdentifier(callName) {
   return callName?.match(/^[A-Za-z_$][\w$]*/u)?.[0] ?? null;
 }
 
-function isFunctionNode(node) {
-  return (
-    ts.isFunctionDeclaration(node) ||
-    ts.isFunctionExpression(node) ||
-    ts.isArrowFunction(node) ||
-    ts.isMethodDeclaration(node) ||
-    ts.isGetAccessorDeclaration(node) ||
-    ts.isSetAccessorDeclaration(node) ||
-    ts.isConstructorDeclaration(node)
-  );
-}
-
 function isLogicalExpression(node) {
   return ts.isBinaryExpression(node) && LOGICAL_OPERATOR_KINDS.has(node.operatorToken.kind);
 }
 
-function unwrapAssignmentExpression(node) {
-  let current = node;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isNonNullExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isTypeAssertionExpression(current) ||
-    current.kind === ts.SyntaxKind.SatisfiesExpression
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
-
 function assignedReceiver(node) {
-  const target = unwrapAssignmentExpression(node);
+  const target = unwrapExpression(node);
   if (!ts.isPropertyAccessExpression(target) && !ts.isElementAccessExpression(target)) {
     return null;
   }
 
-  let receiver = unwrapAssignmentExpression(target.expression);
+  let receiver = unwrapExpression(target.expression);
   if (
     ts.isPropertyAccessExpression(receiver) &&
     (receiver.name.text === 'style' || receiver.name.text === 'dataset')
   ) {
-    receiver = unwrapAssignmentExpression(receiver.expression);
+    receiver = unwrapExpression(receiver.expression);
   }
   return receiver;
 }
 
 function stateReceiverRoot(node) {
-  let current = unwrapAssignmentExpression(node);
+  let current = unwrapExpression(node);
   const properties = [];
   while (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
     if (ts.isPropertyAccessExpression(current)) properties.unshift(current.name.text);
-    current = unwrapAssignmentExpression(current.expression);
+    current = unwrapExpression(current.expression);
   }
   return { root: current, properties };
 }
@@ -136,7 +112,7 @@ function stateReceiverIdentity(node, sourceFile) {
 
 function stateCallReceiver(node, sourceFile, callName) {
   if (!ts.isCallExpression(node) && !ts.isNewExpression(node)) return null;
-  const expression = unwrapAssignmentExpression(node.expression);
+  const expression = unwrapExpression(node.expression);
   if (!ts.isPropertyAccessExpression(expression) && !ts.isElementAccessExpression(expression)) {
     return null;
   }
@@ -154,11 +130,11 @@ function stateAssignmentAuthority(node, sourceFile) {
 
 function hasDynamicCallReceiver(node) {
   if (!ts.isCallExpression(node) && !ts.isNewExpression(node)) return false;
-  const expression = unwrapAssignmentExpression(node.expression);
+  const expression = unwrapExpression(node.expression);
   if (!ts.isPropertyAccessExpression(expression) && !ts.isElementAccessExpression(expression)) {
     return false;
   }
-  const receiver = unwrapAssignmentExpression(expression.expression);
+  const receiver = unwrapExpression(expression.expression);
   return ts.isCallExpression(receiver) || ts.isNewExpression(receiver);
 }
 
@@ -167,7 +143,7 @@ function recordStateCall(node, sourceFile, callName, signals) {
   signals.stateAuthorities.add(callName);
   const receiver = stateCallReceiver(node, sourceFile, callName);
   if (receiver) {
-    const expression = unwrapAssignmentExpression(node.expression);
+    const expression = unwrapExpression(node.expression);
     const receiverNode = receiver === callName ? expression : expression.expression;
     signals.stateReceivers.add(receiver);
     signals.stateReceiverKeys.add(stateReceiverKey(receiverNode, sourceFile));

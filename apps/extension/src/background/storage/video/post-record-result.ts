@@ -2,6 +2,7 @@
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { browserStorage } from '../../../composition/persistence/infrastructure/browser-storage';
 import { runSerializedVideoRecordingAuthorityMutation } from './recording-authority-mutation';
+import { isNonEmptyString, isRecord } from './guards';
 
 export const VIDEO_POST_RECORD_RESULT_STORAGE_KEY = 'video-post-record-result';
 export const VIDEO_POST_RECORD_RESULT_TTL_MS = 12 * 60 * 60 * 1000;
@@ -29,14 +30,6 @@ export type StoredVideoPostRecordResult = {
   result: VideoPostRecordResult;
   status: VideoPostRecordResultStatus;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
-}
 
 function parseStatus(value: unknown): VideoPostRecordResultStatus | null {
   return value === 'acknowledged' || value === 'ready' || value === 'staged' ? value : null;

@@ -2,6 +2,7 @@
 import { browserStorage } from '../../../composition/persistence/infrastructure/browser-storage';
 import type { PersistenceMutationPermit } from '../../../composition/persistence/infrastructure/mutation-barrier';
 import { runSerializedVideoRecordingAuthorityMutation } from './recording-authority-mutation';
+import { isNonEmptyString, isRecord } from './guards';
 
 export const CAMERA_RECORDER_GRANT_STORAGE_KEY = 'video-camera-recorder-grant';
 export const CAMERA_RECORDER_LAUNCH_TTL_MS = 60_000;
@@ -22,14 +23,6 @@ type PersistedCameraRecorderGrant = CameraRecorderGrant & {
   createdAt: number;
   version: 1;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
-}
 
 function parseGrantLifetime(
   value: Record<string, unknown>,

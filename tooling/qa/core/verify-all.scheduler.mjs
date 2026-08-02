@@ -5,7 +5,14 @@ import {
 } from '../runtime/resource-profile.mjs';
 import { parseLaneResult } from '../runtime/lane-worker-contract.mjs';
 import { runQaLaneWorker } from '../runtime/lane-worker-runner.mjs';
-import { formatTaskScheduleDetail, runBoundedTasks } from '../runtime/task-scheduler.mjs';
+import {
+  appendTaskScheduleDetail,
+  appendTaskScheduleDetailToFirst,
+  appendTaskResultScheduleDetail,
+  formatTaskScheduleDetail,
+  indexTaskResults,
+  runBoundedTasks,
+} from '../runtime/task-scheduler.mjs';
 import { replaceDeferredOwnerGuardSteps } from './owner-guard-step-helpers.mjs';
 
 const FULL_VERIFY_WORKER_URL = new URL('./verify-all.worker.mjs', import.meta.url);
@@ -90,33 +97,30 @@ function createTasks({ context, profile, workerRunner }) {
   );
 }
 
-function appendDetail(step, detail) {
-  return { ...step, detail: [step.detail, detail].filter(Boolean).join('; ') };
-}
-
 function annotate(result, profile) {
   const detail = formatTaskScheduleDetail(result, profile);
   const value = result.value;
   if (result.id === 'appOwners' || result.id === 'targetPaths') {
-    return { ...value, ownerStep: appendDetail(value.ownerStep, detail) };
+    return { ...value, ownerStep: appendTaskScheduleDetail(value.ownerStep, detail) };
   }
   if (result.id === 'typecheck') {
-    return { ...value, typecheckStep: appendDetail(value.typecheckStep, detail) };
+    return appendTaskResultScheduleDetail(value, 'typecheckStep', detail);
   }
   if (result.id === 'tests') {
-    const [unitTestStep, ...remaining] = value.testSteps;
-    return { ...value, testSteps: [appendDetail(unitTestStep, detail), ...remaining] };
+    return appendTaskResultScheduleDetail(value, 'testSteps', detail, { list: true });
   }
   if (result.id === 'lint') {
-    return { ...value, eslintStep: appendDetail(value.eslintStep, detail) };
+    return { ...value, eslintStep: appendTaskScheduleDetail(value.eslintStep, detail) };
   }
   if (result.id === 'graph') {
-    const [first, ...remaining] = value.dependencySteps;
-    return { ...value, dependencySteps: [appendDetail(first, detail), ...remaining] };
+    return {
+      ...value,
+      dependencySteps: appendTaskScheduleDetailToFirst(value.dependencySteps, detail),
+    };
   }
   return {
     ...value,
-    lineLengthStep: appendDetail(
+    lineLengthStep: appendTaskScheduleDetail(
       value.lineLengthStep,
       `${detail}; ${formatQaResourceProfile(profile)}`
     ),
@@ -124,13 +128,9 @@ function annotate(result, profile) {
 }
 
 function assemble(results, releaseMode) {
-  const lanes = new Map(results.map((result) => [result.id, result.value]));
-  const light = lanes.get('light');
-  const lint = lanes.get('lint');
-  const graph = lanes.get('graph');
-  const typecheck = lanes.get('typecheck');
-  const tests = lanes.get('tests');
-  const ownerSteps = [lanes.get('appOwners').ownerStep, lanes.get('targetPaths').ownerStep];
+  const { appOwners, graph, light, lint, targetPaths, tests, typecheck } =
+    indexTaskResults(results);
+  const ownerSteps = [appOwners.ownerStep, targetPaths.ownerStep];
   return [
     light.lineLengthStep,
     light.oxlintStep,

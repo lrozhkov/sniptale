@@ -48,6 +48,28 @@ export function createMutationExclusion(): MutationExclusion {
   return { acquirePermit, reserveExclusion };
 }
 
+export function createGenerationTrackedMutationExclusion() {
+  const exclusion = createMutationExclusion();
+  let generation = 0;
+  return {
+    acquirePermit: exclusion.acquirePermit,
+    getGeneration(): number {
+      return generation;
+    },
+    reserveExclusion(): MutationExclusionReservation {
+      const reservation = exclusion.reserveExclusion();
+      generation += 1;
+      return {
+        release: createIdempotentRelease(() => {
+          reservation.release();
+          generation += 1;
+        }),
+        waitForActiveMutations: reservation.waitForActiveMutations,
+      };
+    },
+  };
+}
+
 function createIdempotentRelease(release: () => void): () => void {
   let released = false;
   return () => {

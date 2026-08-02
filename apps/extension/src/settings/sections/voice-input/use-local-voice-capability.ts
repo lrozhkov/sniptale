@@ -11,30 +11,12 @@ import {
 import type { VoiceInputSettingsError } from './controller-contract';
 import { useLocalVoiceInstallation } from './use-local-voice-installation';
 import { useMicrophoneCapability } from './use-microphone-capability';
+import { withTimeout } from './async';
 
 // policyStateIds: [] - Settings-local generations only discard stale browser capability probes;
 // they grant no runtime, microphone, or recognition authority.
 
 const logger = createLogger({ namespace: 'SettingsSpeechRecognition' });
-
-function withTimeout<TValue>(work: Promise<TValue>, timeoutMs: number): Promise<TValue> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = globalThis.setTimeout(
-      () => reject(new Error('voice-input-timeout')),
-      timeoutMs
-    );
-    void work.then(
-      (value) => {
-        globalThis.clearTimeout(timeoutId);
-        resolve(value);
-      },
-      (error) => {
-        globalThis.clearTimeout(timeoutId);
-        reject(error);
-      }
-    );
-  });
-}
 
 export function useLocalVoiceCapability(args: {
   language: VoiceInputLanguage;

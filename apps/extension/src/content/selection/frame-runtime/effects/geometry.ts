@@ -10,6 +10,13 @@ export function getFocusMaskBox(frame: FrameEffectBox): FrameBox {
   return { x, y, width, height };
 }
 
+export function setFocusMaskRectBox(rect: SVGRectElement, box: FrameBox): void {
+  rect.setAttribute('x', String(box.x));
+  rect.setAttribute('y', String(box.y));
+  rect.setAttribute('width', String(box.width));
+  rect.setAttribute('height', String(box.height));
+}
+
 export function createFocusMaskRectNodes(frames: FrameData[]): SVGRectElement[] {
   return frames.map((frame) => {
     const focusMaskBox = getFocusMaskBox(frame);
@@ -17,10 +24,7 @@ export function createFocusMaskRectNodes(frames: FrameData[]): SVGRectElement[] 
     const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
 
     rect.dataset['frameId'] = frame.id;
-    rect.setAttribute('x', String(focusMaskBox.x));
-    rect.setAttribute('y', String(focusMaskBox.y));
-    rect.setAttribute('width', String(focusMaskBox.width));
-    rect.setAttribute('height', String(focusMaskBox.height));
+    setFocusMaskRectBox(rect, focusMaskBox);
     rect.setAttribute('fill', 'black');
 
     if (radius > 0) {

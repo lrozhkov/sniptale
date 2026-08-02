@@ -8,7 +8,7 @@ const CONTRACT_PATTERN =
 const PROXY_PATTERN =
   /(?:^|\/)(?:getters?|setters?|readers?|refs?|sync|bindings?|facades?|proxies?)(?:\/|\.|$)/u;
 const DATA_PATTERN =
-  /(?:^|\/)(?:generated|fixtures?|snapshots?|data)(?:\/|\.)|\.(?:data|constants|generated)\.[cm]?[jt]sx?$/u;
+  /(?:(?:^|\/)(?:generated|fixtures?|snapshots?|data)(?:\/|\.)|\.(?:data|constants|generated)\.[cm]?[jt]sx?$)/u;
 const PRODUCTION_REASONS = new Set(['contract', 'effect-adapter', 'orchestration', 'ui', 'state']);
 
 export function isTopologyProxyPath(file) {

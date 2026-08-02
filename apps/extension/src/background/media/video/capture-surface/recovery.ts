@@ -30,7 +30,9 @@ import {
 
 const logger = createLogger({ namespace: 'BackgroundVideoCaptureSurfaceRecovery' });
 
-let pendingRecovery: Promise<void> | null = null;
+type PendingRecovery = { promise: Promise<void> };
+
+let pendingRecovery: PendingRecovery | null = null;
 let recoveryFailure: unknown = null;
 
 const unavailablePageAccessVerifier: VideoCaptureSurfacePageAccessVerifier = async () => {
@@ -282,11 +284,11 @@ async function recoverVideoCaptureSurfaceInternal(
 export async function recoverVideoCaptureSurfaceOnStartup(
   pageAccessVerifier: VideoCaptureSurfacePageAccessVerifier = unavailablePageAccessVerifier
 ): Promise<void> {
-  if (pendingRecovery) return pendingRecovery;
-  const recovery = recoverVideoCaptureSurfaceInternal(pageAccessVerifier);
+  if (pendingRecovery) return await pendingRecovery.promise;
+  const recovery = { promise: recoverVideoCaptureSurfaceInternal(pageAccessVerifier) };
   pendingRecovery = recovery;
   try {
-    await recovery;
+    await recovery.promise;
     recoveryFailure = null;
   } catch (error) {
     recoveryFailure = error;
@@ -302,11 +304,11 @@ export function deferVideoCaptureSurfaceWorkUntilRecovery(
 ): boolean {
   const recovery = pendingRecovery;
   if (!recovery) return false;
-  void recovery.then(run, onFailure);
+  void recovery.promise.then(run, onFailure);
   return true;
 }
 
 export async function waitForVideoCaptureSurfaceRecovery(): Promise<void> {
-  await pendingRecovery;
+  await pendingRecovery?.promise;
   if (recoveryFailure) throw recoveryFailure;
 }

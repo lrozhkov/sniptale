@@ -127,6 +127,26 @@ export const CONTENT_SELECTION_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'content-interactive-frame-editing-helpers',
+    productionFile: 'apps/extension/src/content/selection/interactive-frame/editing/helpers.ts',
+    exclusive: true,
+    reason: 'Interactive-frame drag and resize geometry is covered by pointer-action proof.',
+    testFiles: [
+      'apps/extension/src/content/selection/interactive-frame/editing/pointer-actions.test.ts',
+    ],
+  },
+  {
+    owner: 'content-interactive-frame-resize-scheduler',
+    productionFile:
+      'apps/extension/src/content/selection/interactive-frame/editing/resize-scheduler.ts',
+    exclusive: true,
+    reason:
+      'Resize coalescing, cancellation, and flush behavior is covered by pointer-action proof.',
+    testFiles: [
+      'apps/extension/src/content/selection/interactive-frame/editing/pointer-actions.test.ts',
+    ],
+  },
+  {
     owner: 'content-selection-mode-overlay-cancel-style-predecessor',
     productionFile:
       'apps/extension/src/content/selection/selection-mode/ui/styles.cancel-button.data.ts',

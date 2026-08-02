@@ -46,7 +46,7 @@ function resolveExportKeyForTarget(packageRoot, exportKey, target, file) {
   const [prefix, suffix] = normalizedTarget.split('*');
   if (!file.startsWith(prefix) || !file.endsWith(suffix)) return null;
   const wildcard = file.slice(prefix.length, file.length - suffix.length);
-  return exportKey.includes('*') ? exportKey.replace('*', wildcard) : null;
+  return exportKey.includes('*') ? exportKey.replaceAll('*', wildcard) : null;
 }
 
 function readHeadJson(file, readHeadSource) {

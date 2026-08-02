@@ -11,6 +11,7 @@ import {
 import { notifyMultiSourceSaved, notifyMultiSourceStopped } from './messages';
 import type { MultiSourceRecorder, MultiSourceSession } from './state';
 import { createWebcamProjectInput } from './webcam';
+import { requireRecordingDimensions } from './dimensions';
 
 const logger = createLogger({ namespace: 'OffscreenMultiSourceFinalize' });
 
@@ -35,20 +36,10 @@ async function createProjectForSession(
 }
 
 function requireSourceDimensions(source: MultiSourceRecorder): { height: number; width: number } {
-  const { height, width } = source.trackSettings;
-  if (
-    typeof width !== 'number' ||
-    typeof height !== 'number' ||
-    !Number.isInteger(width) ||
-    !Number.isInteger(height) ||
-    width <= 0 ||
-    height <= 0
-  ) {
-    throw new Error(
-      `Multi-source recording dimensions are unavailable for source ${source.sourceIndex + 1}.`
-    );
-  }
-  return { height, width };
+  return requireRecordingDimensions(
+    source,
+    `Multi-source recording dimensions are unavailable for source ${source.sourceIndex + 1}.`
+  );
 }
 
 function requireArtifact(source: MultiSourceRecorder) {

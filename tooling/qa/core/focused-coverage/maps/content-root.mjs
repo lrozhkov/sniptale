@@ -21,4 +21,11 @@ export const CONTENT_ROOT_OWNER_MAPPINGS = [
     ].join(' '),
     testFiles: ['apps/extension/src/content/platform/dom-host/ui-roots.test.ts'],
   },
+  {
+    owner: 'content-design-review-feedback-panel-position',
+    productionFile: 'apps/extension/src/content/overlay/design-review/feedback-panel/position.ts',
+    exclusive: true,
+    reason: 'Feedback-panel drag positioning is exercised through its owner surface suite.',
+    testFiles: ['apps/extension/src/content/overlay/design-review/feedback-panel/view.test.tsx'],
+  },
 ];

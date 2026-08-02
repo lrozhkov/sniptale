@@ -4,17 +4,17 @@
     {
       "category": "archive-integration",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "bcddbf5b47f42fdd255af4345b69ecf5ce42213b3127fa7f89509020b75ca9aa"
+      "sha256": "611c4d0856746b9aa15c2212939e1fcb78e9c0d7ca4439fed2be87980f23a0c4"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "bcddbf5b47f42fdd255af4345b69ecf5ce42213b3127fa7f89509020b75ca9aa"
+      "sha256": "611c4d0856746b9aa15c2212939e1fcb78e9c0d7ca4439fed2be87980f23a0c4"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/manifest.json",
-      "sha256": "54761e0e63eb4fa920bd70d23abd35aced6eebf48fcb0545ab803dcc27a9336e"
+      "sha256": "d9ef0f311e55a08761c987f76d2930687d3522389624d26b4508d54dba4e3829"
     },
     {
       "category": "bundled-font",
@@ -24,12 +24,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "19df089b791c76fca28846161a1dc36dfef00e94762d4b4bc11e4d7afaa8f8ac"
+      "sha256": "3d36424a4e6effebb0a606a90f107e0b4cee259d25e383e589d6ac75388e0b8e"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "19df089b791c76fca28846161a1dc36dfef00e94762d4b4bc11e4d7afaa8f8ac"
+      "sha256": "3d36424a4e6effebb0a606a90f107e0b4cee259d25e383e589d6ac75388e0b8e"
     },
     {
       "category": "bundled-font",
