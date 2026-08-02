@@ -1,4 +1,5 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { areBrowserFrameAnnotationsEqual } from './frame-equality';
 import {
   BROWSER_ANNOTATION_SCHEMA_VERSION,
   type BrowserAnnotationCommentInput,
@@ -363,26 +364,6 @@ function setComment(
   return record.markerNumber ?? null;
 }
 
-function frameRecordsEqual(
-  left: BrowserFrameAnnotationRecord,
-  right: BrowserFrameAnnotationRecord
-): boolean {
-  return (
-    left.borderPresetName === right.borderPresetName &&
-    left.comment === right.comment &&
-    left.frameId === right.frameId &&
-    left.kind === right.kind &&
-    left.linkedElementSelector === right.linkedElementSelector &&
-    left.pageUrl === right.pageUrl &&
-    left.rect.height === right.rect.height &&
-    left.rect.width === right.rect.width &&
-    left.rect.x === right.rect.x &&
-    left.rect.y === right.rect.y &&
-    left.viewport.height === right.viewport.height &&
-    left.viewport.width === right.viewport.width
-  );
-}
-
 function syncFrames(
   state: BrowserAnnotationRuntimeState,
   inputs: readonly BrowserFrameAnnotationInput[],
@@ -412,7 +393,7 @@ function syncFrames(
         rect: { ...input.rect },
         viewport: { ...input.viewport },
       };
-      if (!frameRecordsEqual(existing, next)) {
+      if (!areBrowserFrameAnnotationsEqual(existing, next)) {
         state.frameOrders.set(input.frameId, next);
         changed = true;
       }

@@ -1,4 +1,9 @@
 import React from 'react';
+import {
+  acceptPointerDragEvent,
+  commitPointerDragDraft,
+  registerPointerDragSession,
+} from '../pointer-drag-session';
 import type {
   StepBadgeBoundarySide,
   StepBadgeManualPlacement,
@@ -68,9 +73,7 @@ export function useStepBadgeBoundaryDrag(args: {
   React.useEffect(() => {
     if (!isDragging) return;
     const handleMove = (event: PointerEvent) => {
-      if (event.pointerId !== pointerIdRef.current) return;
-      event.preventDefault();
-      event.stopPropagation();
+      if (!acceptPointerDragEvent(event, pointerIdRef.current)) return;
       const placement = projectStepBadgeToFrameBoundary({
         frameRect: args.frameRect,
         point: {
@@ -84,38 +87,18 @@ export function useStepBadgeBoundaryDrag(args: {
       setDraftPlacement(placement);
     };
     const handleUp = (event: PointerEvent) => {
-      if (event.pointerId !== pointerIdRef.current) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const placement = draftRef.current;
-      pointerIdRef.current = null;
-      setIsDragging(false);
-      if (!placement) return;
-      if (areStepBadgePlacementsEqual(placement, args.initialPlacement)) {
-        draftRef.current = null;
-        setDraftPlacement(null);
-      }
-      args.onPositionChange(placement);
+      commitPointerDragDraft({
+        draftRef,
+        event,
+        initialValue: args.initialPlacement,
+        isEqual: (left, right) => Boolean(right && areStepBadgePlacementsEqual(left, right)),
+        onClear: () => setDraftPlacement(null),
+        onCommit: args.onPositionChange,
+        onFinish: () => setIsDragging(false),
+        pointerIdRef,
+      });
     };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !cancel()) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-    document.addEventListener('pointermove', handleMove, { capture: true });
-    document.addEventListener('pointerup', handleUp, { capture: true });
-    document.addEventListener('pointercancel', cancel, { capture: true });
-    document.addEventListener('lostpointercapture', cancel, { capture: true });
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
-    window.addEventListener('blur', cancel);
-    return () => {
-      document.removeEventListener('pointermove', handleMove, { capture: true });
-      document.removeEventListener('pointerup', handleUp, { capture: true });
-      document.removeEventListener('pointercancel', cancel, { capture: true });
-      document.removeEventListener('lostpointercapture', cancel, { capture: true });
-      window.removeEventListener('keydown', handleKeyDown, { capture: true });
-      window.removeEventListener('blur', cancel);
-    };
+    return registerPointerDragSession({ cancel, move: handleMove, up: handleUp });
   }, [args, cancel, isDragging]);
 
   return {

@@ -1,23 +1,8 @@
-import { ts } from './ast.mjs';
+import { ts, unwrapExpression } from './ast.mjs';
 
 const COMPOSITE_SESSION_ANCHOR_PATTERN = /(?:Persistence|Sync|Transaction|Workflow)Session$/u;
-const COMPOSITE_SESSION_MEMBER_PATTERN = /^(?:set|update|dispatch|commit)[A-Z]|Ref$/u;
+const COMPOSITE_SESSION_MEMBER_PATTERN = /(?:^(?:set|update|dispatch|commit)[A-Z]|Ref$)/u;
 const AMBIGUOUS_COMPOSITE_SESSION = '<ambiguous-composite-session>';
-
-function unwrapExpression(node) {
-  let current = node;
-  while (
-    current &&
-    (ts.isParenthesizedExpression(current) ||
-      ts.isNonNullExpression(current) ||
-      ts.isAsExpression(current) ||
-      ts.isTypeAssertionExpression(current) ||
-      current.kind === ts.SyntaxKind.SatisfiesExpression)
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
 
 function objectPropertyDescriptor(property) {
   if (ts.isShorthandPropertyAssignment(property)) {

@@ -2,18 +2,18 @@ import React from 'react';
 import type { CalloutManualPlacement } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCalloutKeyboardDelta, type CalloutHandleKeyboardEvent } from './keyboard';
 import { useTransientControlVisibility } from '../interactive-frame/overlays/transient-control-visibility';
+import {
+  acceptPointerDragEvent,
+  commitPointerDragDraft,
+  registerPointerDragSession,
+  type PointerDragStartEvent,
+} from '../pointer-drag-session';
 
 type Rect = { x: number; y: number; width: number; height: number };
 
-export interface CalloutDragStartEvent {
-  button: number;
+export interface CalloutDragStartEvent extends PointerDragStartEvent {
   clientX: number;
   clientY: number;
-  currentTarget: { setPointerCapture(pointerId: number): void };
-  nativeEvent: { stopImmediatePropagation(): void };
-  pointerId: number;
-  preventDefault(): void;
-  stopPropagation(): void;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -84,9 +84,7 @@ export function useCalloutDrag(args: {
   React.useEffect(() => {
     if (!isDragging) return;
     const handleMove = (event: PointerEvent) => {
-      if (event.pointerId !== pointerIdRef.current) return;
-      event.preventDefault();
-      event.stopPropagation();
+      if (!acceptPointerDragEvent(event, pointerIdRef.current)) return;
       const width = args.dimensions.width || args.wrapperRef.current?.offsetWidth || 0;
       const height = args.dimensions.height || args.wrapperRef.current?.offsetHeight || 0;
       const left = clamp(
@@ -104,38 +102,18 @@ export function useCalloutDrag(args: {
       setDraftPlacement(placement);
     };
     const handleUp = (event: PointerEvent) => {
-      if (event.pointerId !== pointerIdRef.current) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const placement = draftRef.current;
-      pointerIdRef.current = null;
-      setIsDragging(false);
-      if (!placement) return;
-      if (areManualPlacementsEqual(placement, args.manualPlacement)) {
-        draftRef.current = null;
-        setDraftPlacement(null);
-      }
-      args.onPositionChange(placement);
+      commitPointerDragDraft({
+        draftRef,
+        event,
+        initialValue: args.manualPlacement,
+        isEqual: areManualPlacementsEqual,
+        onClear: () => setDraftPlacement(null),
+        onCommit: args.onPositionChange,
+        onFinish: () => setIsDragging(false),
+        pointerIdRef,
+      });
     };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !cancel()) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-    document.addEventListener('pointermove', handleMove, { capture: true });
-    document.addEventListener('pointerup', handleUp, { capture: true });
-    document.addEventListener('pointercancel', cancel, { capture: true });
-    document.addEventListener('lostpointercapture', cancel, { capture: true });
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
-    window.addEventListener('blur', cancel);
-    return () => {
-      document.removeEventListener('pointermove', handleMove, { capture: true });
-      document.removeEventListener('pointerup', handleUp, { capture: true });
-      document.removeEventListener('pointercancel', cancel, { capture: true });
-      document.removeEventListener('lostpointercapture', cancel, { capture: true });
-      window.removeEventListener('keydown', handleKeyDown, { capture: true });
-      window.removeEventListener('blur', cancel);
-    };
+    return registerPointerDragSession({ cancel, move: handleMove, up: handleUp });
   }, [args, cancel, isDragging]);
 
   return {

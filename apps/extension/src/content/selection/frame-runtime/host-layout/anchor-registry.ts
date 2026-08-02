@@ -1,9 +1,10 @@
 import { resolveDocumentPagePlacement, type DocumentPagePlacement } from '../../../platform/frame';
 import { createAnchorFingerprint, type AnchorFingerprint } from './anchor-identity';
+import { isFinitePositiveRect, type AnchorRect } from './geometry';
 import { HOST_LAYOUT_GEOMETRY_TOLERANCE_PX, type HostLayoutStabilitySample } from './scheduler';
 import { isAnchorNodeCurrentDocument } from './visibility';
 
-export type AnchorRect = { x: number; y: number; width: number; height: number };
+export type { AnchorRect } from './geometry';
 type AnchorBindingStatus = 'bound' | 'reacquired' | 'missing' | 'ambiguous';
 export type AnchorPresentation = 'visible' | 'offscreen' | 'suspended' | 'missing' | 'ambiguous';
 
@@ -53,17 +54,6 @@ type AcceptedMeasurement = {
 
 function clonePlacement(placement: DocumentPagePlacement): DocumentPagePlacement {
   return { ...placement, iframePath: [...placement.iframePath] };
-}
-
-function isFinitePositiveRect(rect: AnchorRect): boolean {
-  return (
-    Number.isFinite(rect.x) &&
-    Number.isFinite(rect.y) &&
-    Number.isFinite(rect.width) &&
-    Number.isFinite(rect.height) &&
-    rect.width > 0 &&
-    rect.height > 0
-  );
 }
 
 export function isFrameRecoveryPlacementValid(placement: DocumentPagePlacement): boolean {

@@ -38,13 +38,16 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 import { handleToolbarViewportChange } from '.';
 import { setScreenshotSurfaceBinding } from '../../viewport-selector/capability';
 
+const SURFACE_BINDING_FIXTURE_A = 'fixture-a';
+const SURFACE_BINDING_FIXTURE_B = 'fixture-b';
+
 beforeEach(() => {
   installContentRuntimeMessagingMock(viewportChangeMocks.sendRuntimeMessage);
   vi.clearAllMocks();
   setScreenshotSurfaceBinding({
     leaseGeneration: 1,
     operationGeneration: 0,
-    token: 'surface-capability-1',
+    token: SURFACE_BINDING_FIXTURE_A,
   });
 });
 
@@ -57,7 +60,7 @@ describe('toolbar viewport change action', () => {
       .mockResolvedValueOnce({
         success: true,
         enabled: true,
-        surfaceCapabilityToken: 'surface-capability-1',
+        surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_A,
         viewport: { width: 800, height: 600 },
       });
     await handleToolbarViewportChange(
@@ -132,7 +135,7 @@ describe('toolbar viewport change action', () => {
       .mockResolvedValueOnce({ success: false, error: 'authorization-expired' })
       .mockResolvedValueOnce({
         success: true,
-        surfaceCapabilityToken: 'surface-capability-2',
+        surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_B,
         surfaceLeaseGeneration: 1,
         surfaceOperationGeneration: 0,
       })
@@ -140,7 +143,7 @@ describe('toolbar viewport change action', () => {
       .mockResolvedValueOnce({
         success: true,
         enabled: true,
-        surfaceCapabilityToken: 'surface-capability-2',
+        surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_B,
         viewport: { width: 1024, height: 768 },
       });
 
@@ -159,7 +162,7 @@ describe('toolbar viewport change action', () => {
       type: 'APPLY_VIEWPORT_PRESET',
       operationGeneration: 1,
       presetId: 'viewport-1024',
-      surfaceCapabilityToken: 'surface-capability-2',
+      surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_B,
     });
     expect(viewportChangeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(4);
     expect(setCurrentViewport).toHaveBeenLastCalledWith({ width: 1024, height: 768 });
@@ -171,14 +174,14 @@ describe('toolbar viewport change action', () => {
     viewportChangeMocks.sendRuntimeMessage
       .mockResolvedValueOnce({
         success: true,
-        surfaceCapabilityToken: 'surface-capability-2',
+        surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_B,
         surfaceOperationGeneration: 0,
       })
       .mockResolvedValueOnce({ success: true })
       .mockResolvedValueOnce({
         success: true,
         enabled: true,
-        surfaceCapabilityToken: 'surface-capability-2',
+        surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_B,
         surfaceLeaseGeneration: 1,
         surfaceOperationGeneration: 1,
         viewport: { height: 720, width: 1280 },
@@ -200,7 +203,7 @@ describe('toolbar viewport change action', () => {
       expect.objectContaining({
         operationGeneration: 1,
         presetId: 'viewport-1280',
-        surfaceCapabilityToken: 'surface-capability-2',
+        surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_B,
         type: 'APPLY_VIEWPORT_PRESET',
       })
     );

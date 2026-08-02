@@ -1,7 +1,13 @@
 import { formatQaResourceProfile, resolveQaResourceProfile } from '../runtime/resource-profile.mjs';
 import { parseLaneResult } from '../runtime/lane-worker-contract.mjs';
 import { runQaLaneWorker } from '../runtime/lane-worker-runner.mjs';
-import { formatTaskScheduleDetail, runBoundedTasks } from '../runtime/task-scheduler.mjs';
+import {
+  appendTaskScheduleDetail,
+  appendTaskScheduleDetailToFirst,
+  formatTaskScheduleDetail,
+  indexTaskResults,
+  runBoundedTasks,
+} from '../runtime/task-scheduler.mjs';
 import { replaceDeferredOwnerGuardSteps } from './owner-guard-step-helpers.mjs';
 
 const FOCUSED_WORKER_URL = new URL('./verify-focused.worker.mjs', import.meta.url);
@@ -99,50 +105,41 @@ function createFocusedLaneTasks({ context, profile, workerRunner }) {
   );
 }
 
-function appendDetail(step, detail) {
-  return {
-    ...step,
-    detail: [step.detail, detail].filter(Boolean).join('; '),
-  };
-}
-
 function annotateLaneResult(scheduled, profile) {
   const detail = formatTaskScheduleDetail(scheduled, profile);
   const value = scheduled.value;
   if (scheduled.id === 'appOwners' || scheduled.id === 'targetPaths') {
-    return { ...value, ownerStep: appendDetail(value.ownerStep, detail) };
+    return { ...value, ownerStep: appendTaskScheduleDetail(value.ownerStep, detail) };
   }
   if (scheduled.id === 'typecheck') {
-    return { ...value, typecheckStep: appendDetail(value.typecheckStep, detail) };
+    return { ...value, typecheckStep: appendTaskScheduleDetail(value.typecheckStep, detail) };
   }
   if (scheduled.id === 'tests') {
     const [unitTestStep, ...remaining] = value.testSteps;
-    return { ...value, testSteps: [appendDetail(unitTestStep, detail), ...remaining] };
+    return { ...value, testSteps: [appendTaskScheduleDetail(unitTestStep, detail), ...remaining] };
   }
   if (scheduled.id === 'lint') {
-    return { ...value, eslintStep: appendDetail(value.eslintStep, detail) };
+    return { ...value, eslintStep: appendTaskScheduleDetail(value.eslintStep, detail) };
   }
   if (scheduled.id === 'graph') {
-    const [firstDependencyStep, ...remaining] = value.dependencySteps;
     return {
       ...value,
-      dependencySteps: [appendDetail(firstDependencyStep, detail), ...remaining],
+      dependencySteps: appendTaskScheduleDetailToFirst(value.dependencySteps, detail),
     };
   }
   return {
     ...value,
-    oxlintStep: appendDetail(value.oxlintStep, `${detail}; ${formatQaResourceProfile(profile)}`),
+    oxlintStep: appendTaskScheduleDetail(
+      value.oxlintStep,
+      `${detail}; ${formatQaResourceProfile(profile)}`
+    ),
   };
 }
 
 function assembleFocusedSteps(results) {
-  const lanes = new Map(results.map((result) => [result.id, result.value]));
-  const light = lanes.get('light');
-  const lint = lanes.get('lint');
-  const graph = lanes.get('graph');
-  const typecheck = lanes.get('typecheck');
-  const tests = lanes.get('tests');
-  const ownerSteps = [lanes.get('appOwners').ownerStep, lanes.get('targetPaths').ownerStep];
+  const { appOwners, graph, light, lint, targetPaths, tests, typecheck } =
+    indexTaskResults(results);
+  const ownerSteps = [appOwners.ownerStep, targetPaths.ownerStep];
 
   return [
     light.oxlintStep,

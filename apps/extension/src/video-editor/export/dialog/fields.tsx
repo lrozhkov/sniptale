@@ -1,19 +1,9 @@
 import { translate } from '../../../platform/i18n';
 import { StatusRow } from '../../../ui/compact-inspector-controls';
-import type {
-  VideoExportCapabilities,
-  VideoProjectExportSettings,
-  VideoProjectExportSettingsPatch,
-} from '../../../features/video/project/types';
 import { ExportDialogNumberField, ExportDialogSelectFields } from './select-fields';
+import type { ExportDialogFieldParams } from './field-contract';
 
-export function ExportDialogFields(params: {
-  capabilities: VideoExportCapabilities | null | undefined;
-  onChange: (patch: VideoProjectExportSettingsPatch) => void;
-  selectedClipAvailable: boolean;
-  settings: VideoProjectExportSettings;
-  sourceDimensions: { height: number; width: number };
-}) {
+export function ExportDialogFields(params: ExportDialogFieldParams) {
   const { capabilities, onChange, selectedClipAvailable, settings, sourceDimensions } = params;
 
   return (

@@ -8,29 +8,11 @@ import {
   type VoiceInputSnapshot,
 } from '@sniptale/runtime-contracts/voice-input';
 import type { VoiceInputSettingsError } from './controller-contract';
+import { withTimeout } from './async';
 
 const logger = createLogger({ namespace: 'SettingsSpeechRecognition' });
 const INSTALL_TIMEOUT_MS = 90_000;
 const INSTALL_POLL_INTERVAL_MS = 500;
-
-function withTimeout<TValue>(work: Promise<TValue>, timeoutMs: number): Promise<TValue> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = globalThis.setTimeout(
-      () => reject(new Error('voice-input-timeout')),
-      timeoutMs
-    );
-    void work.then(
-      (value) => {
-        globalThis.clearTimeout(timeoutId);
-        resolve(value);
-      },
-      (error) => {
-        globalThis.clearTimeout(timeoutId);
-        reject(error);
-      }
-    );
-  });
-}
 
 function waitForDelay(timeoutMs: number): Promise<void> {
   return new Promise((resolve) => globalThis.setTimeout(resolve, timeoutMs));

@@ -15,26 +15,13 @@ import {
   isString,
 } from '../../validators/index';
 import * as ContentActionContract from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+import { isAppliedViewportPreset } from '../../validators/ui';
 
 type PartialRuntimeRegistry = Partial<
   MessageContractRegistry<RuntimeRequestByType, RuntimeResponseByType>
 >;
 
 const asyncRouteAckFields = { result: isString };
-const isAppliedViewportPreset = (
-  value: unknown
-): value is {
-  presetId: string;
-  target: 'viewport' | 'window';
-  width: number;
-  height: number;
-} =>
-  isRecord(value) &&
-  isString(value['presetId']) &&
-  (value['target'] === 'viewport' || value['target'] === 'window') &&
-  isNumber(value['width']) &&
-  isNumber(value['height']);
-
 const availabilityReasons = new Set([
   'disabled',
   'missing',

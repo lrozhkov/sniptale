@@ -3,6 +3,7 @@ import type {
   BrowserAnnotationViewport,
   BrowserFrameAnnotationInput,
 } from '../../parser/page-preparation/annotations';
+import { areBrowserFrameAnnotationsEqual } from '../../parser/page-preparation/annotations';
 
 function readCalloutNode(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) {
@@ -59,26 +60,6 @@ function createFrameInput(
   };
 }
 
-function frameInputsEqual(
-  left: BrowserFrameAnnotationInput,
-  right: BrowserFrameAnnotationInput
-): boolean {
-  return (
-    left.borderPresetName === right.borderPresetName &&
-    left.comment === right.comment &&
-    left.frameId === right.frameId &&
-    left.kind === right.kind &&
-    left.linkedElementSelector === right.linkedElementSelector &&
-    left.pageUrl === right.pageUrl &&
-    left.rect.height === right.rect.height &&
-    left.rect.width === right.rect.width &&
-    left.rect.x === right.rect.x &&
-    left.rect.y === right.rect.y &&
-    left.viewport.height === right.viewport.height &&
-    left.viewport.width === right.viewport.width
-  );
-}
-
 function resolveFrameAnnotationContext(context?: {
   pageUrl: string;
   viewport: BrowserAnnotationViewport;
@@ -117,7 +98,7 @@ export function createBrowserFrameAnnotationSync(
     updatedFrameIds: inputs
       .filter((input) => {
         const before = beforeInputs.find((entry) => entry.frameId === input.frameId);
-        return !before || !frameInputsEqual(before, input);
+        return !before || !areBrowserFrameAnnotationsEqual(before, input);
       })
       .map((input) => input.frameId),
   };

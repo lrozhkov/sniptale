@@ -1,19 +1,4 @@
-import { createLexicalBindingKey, ts } from './ast.mjs';
-
-function unwrapExpression(node) {
-  let current = node;
-  while (
-    current &&
-    (ts.isParenthesizedExpression(current) ||
-      ts.isNonNullExpression(current) ||
-      ts.isAsExpression(current) ||
-      ts.isTypeAssertionExpression(current) ||
-      current.kind === ts.SyntaxKind.SatisfiesExpression)
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
+import { createLexicalBindingKey, ts, unwrapExpression } from './ast.mjs';
 
 function isReactImport(statement) {
   return (

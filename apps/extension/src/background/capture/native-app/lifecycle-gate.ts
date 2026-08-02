@@ -1,6 +1,6 @@
 // policyStateId: native-ingestion-erasure-exclusion
 import {
-  createMutationExclusion,
+  createGenerationTrackedMutationExclusion,
   type MutationExclusionReservation,
   type MutationPermit,
 } from '../../mutation-exclusion/gate';
@@ -8,30 +8,16 @@ import {
 type NativeIngestionPermit = MutationPermit;
 type NativeIngestionErasureExclusion = MutationExclusionReservation;
 
-let authorityGeneration = 0;
-const nativeIngestionMutationExclusion = createMutationExclusion();
+const nativeIngestionMutationExclusion = createGenerationTrackedMutationExclusion();
 
 export function acquireNativeIngestionPermit(): NativeIngestionPermit | null {
   return nativeIngestionMutationExclusion.acquirePermit();
 }
 
 export function getNativeIngestionAuthorityGeneration(): number {
-  return authorityGeneration;
+  return nativeIngestionMutationExclusion.getGeneration();
 }
 
 export function reserveNativeIngestionErasureExclusion(): NativeIngestionErasureExclusion {
-  const exclusion = nativeIngestionMutationExclusion.reserveExclusion();
-  authorityGeneration += 1;
-  let released = false;
-  return {
-    release(): void {
-      if (released) return;
-      released = true;
-      exclusion.release();
-      authorityGeneration += 1;
-    },
-    waitForActiveMutations(): Promise<void> {
-      return exclusion.waitForActiveMutations();
-    },
-  };
+  return nativeIngestionMutationExclusion.reserveExclusion();
 }

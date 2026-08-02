@@ -64,6 +64,8 @@ export function collectRepoAuditEvidence({ rootDir = process.cwd(), topCount = 1
   return {
     generatedAt: new Date().toISOString(),
     repository: profile,
+    smellFindings: [],
+    smellFamilies: [],
     structuralMaintenance: {
       enforcementScope: 'current-diff',
       auditCommand: 'npm run qa:structural-audit',

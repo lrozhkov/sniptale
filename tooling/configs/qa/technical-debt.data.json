@@ -201,8 +201,8 @@
       "scope": {
         "count": 1,
         "family": "apps/extension/src/content/selection/frame-settings-popover",
-        "lines": 9,
-        "sampleFingerprint": "55c139b5f88bc3321c9fd3ed2214a15a6b27296e7cdb29738670dc6e2305fc2d"
+        "lines": 6,
+        "sampleFingerprint": "bca3231afbeca5290ff719e3f95e7d9ec61c7494b31a48140ed5cfa9167c9b3a"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
     },
@@ -283,6 +283,286 @@
         "family": "apps/extension/src/video-editor/project/state",
         "lines": 9,
         "sampleFingerprint": "4414b41209bb2f2bbeb99debbcde0f1665bc38269d867e950057bb546de71380"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.settings-sections-video-quality-profiles.553ddf0b71ce",
+      "classification": "tool-noise",
+      "owner": "settings-video-quality-profiles",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live samples are overlapping clones inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file blocks visible and remove the entry if jscpd stops reporting them",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/settings/sections/video-quality-profiles"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/settings/sections/video-quality-profiles",
+        "lines": 81,
+        "sampleFingerprint": "553ddf0b71ce3cacf2a3878249647115e4499823a64cc7847f9e89faebde3722"
+      },
+      "targetAction": "keep the overlapping same-file blocks visible and remove the entry if jscpd stops reporting them"
+    },
+    {
+      "id": "noise.jscpd.content-parser-export-manager.a844b3c0f09f",
+      "classification": "tool-noise",
+      "owner": "content-parser-export-manager",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/parser/export-manager"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/parser/export-manager",
+        "lines": 23,
+        "sampleFingerprint": "a844b3c0f09f82f2d30ba8328625b9206185569d633b49d9cc31be6d2665772a"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.content-public-preparation-surface.79af704f37cc",
+      "classification": "tool-noise",
+      "owner": "content-public-preparation-surface",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/public/preparation-surface"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/public/preparation-surface",
+        "lines": 22,
+        "sampleFingerprint": "79af704f37cc515dc3c80d356e52b02b0816643e3d52f13d439234cfa280aa7f"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.core.c471b9017a2b",
+      "classification": "tool-noise",
+      "owner": "qa-core",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "tooling/qa/core"
+      },
+      "scope": {
+        "count": 1,
+        "family": "tooling/qa/core",
+        "lines": 21,
+        "sampleFingerprint": "c471b9017a2b3ebfb00fd8baf018768cd6e956fe7848b2325e7f31743415e99c"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.background-capture-quick-actions.95db4768f15f",
+      "classification": "tool-noise",
+      "owner": "background-capture-quick-actions",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/capture/quick-actions"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/capture/quick-actions",
+        "lines": 18,
+        "sampleFingerprint": "95db4768f15f7a170c78ead212849a29df2ef36c537016c6fc1e3d642b6ccdf7"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.background-runtime-tab-mode-router-screenshot.48ab9b9ed8f8",
+      "classification": "tool-noise",
+      "owner": "background-tab-mode-router-screenshot",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/runtime/tab-mode-router-screenshot"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/runtime/tab-mode-router-screenshot",
+        "lines": 18,
+        "sampleFingerprint": "48ab9b9ed8f8f1d35b10afe8a6f8c6630e66597975816006f6ad738f9bf207e6"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.content-selection-callout.3c8d27f404bb",
+      "classification": "tool-noise",
+      "owner": "content-selection-callout",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/selection/callout"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/selection/callout",
+        "lines": 15,
+        "sampleFingerprint": "3c8d27f404bba455297cf37c0fd1ff3d470d1f4ff05f971c786544aff93fbc31"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.content-selection-callout-apps-extension-src-content-selection-step-badge.2c323f43b348",
+      "classification": "tool-noise",
+      "owner": "content-selection-pointer-drag-consumers",
+      "risk": "Clone grouping can mistake declarative use of a shared owner for duplicated behavior; unreviewed growth could still conceal divergence.",
+      "reason": "The live sample is matching declarative call-site setup for the canonical pointer-drag owner, not duplicate drag-session behavior.",
+      "removalCondition": "keep the shared-owner call sites exact and remove the entry if jscpd stops grouping them",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/selection/callout <-> apps/extension/src/content/selection/step-badge"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/selection/callout <-> apps/extension/src/content/selection/step-badge",
+        "lines": 14,
+        "sampleFingerprint": "2c323f43b348cf9d83850b47c410b961be4b0b70ea0fab095d7a7ba9737167cd"
+      },
+      "targetAction": "keep the shared-owner call sites exact and remove the entry if jscpd stops grouping them"
+    },
+    {
+      "id": "noise.jscpd.content-selection-frame-runtime.a8aecc935edd",
+      "classification": "tool-noise",
+      "owner": "content-selection-frame-runtime",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/selection/frame-runtime"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/selection/frame-runtime",
+        "lines": 13,
+        "sampleFingerprint": "a8aecc935edd218370b3b23d9da63ce6207d6e35bce73568774aad6a769be5cd"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.content-selection-highlighter-hover-preview.36ffb7157235",
+      "classification": "tool-noise",
+      "owner": "content-selection-highlighter-hover-preview",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/selection/highlighter-hover-preview"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/selection/highlighter-hover-preview",
+        "lines": 13,
+        "sampleFingerprint": "36ffb7157235d388604558677040ff6d4e6356fdf4474a9dcfdfad32241a56bf"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.background-capture-surface.86ace87041eb",
+      "classification": "tool-noise",
+      "owner": "background-capture-surface",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/capture-surface"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/capture-surface",
+        "lines": 11,
+        "sampleFingerprint": "86ace87041ebb573de413bdb42b2f02573a80685f9783ea7bd36be049477b456"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.settings-sections-viewport-presets.b80dffc340ce",
+      "classification": "tool-noise",
+      "owner": "settings-viewport-presets",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/settings/sections/viewport-presets"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/settings/sections/viewport-presets",
+        "lines": 10,
+        "sampleFingerprint": "b80dffc340ce9bfbe5cc72d774acbe1cb707366b1171c391c51d6bfd608e245d"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.runtime.976c2c57fd5f",
+      "classification": "tool-noise",
+      "owner": "qa-runtime",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "tooling/qa/runtime"
+      },
+      "scope": {
+        "count": 1,
+        "family": "tooling/qa/runtime",
+        "lines": 10,
+        "sampleFingerprint": "976c2c57fd5f47f808f0e4626433d12b9e63749c6ecdd5acf2ee4df7a13494a1"
+      },
+      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "noise.jscpd.content-selection-interactive-frame.85a688ed4566",
+      "classification": "tool-noise",
+      "owner": "content-selection-interactive-frame",
+      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
+      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
+      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
+      "reviewBy": "2027-07-14",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/selection/interactive-frame"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/selection/interactive-frame",
+        "lines": 9,
+        "sampleFingerprint": "85a688ed4566b1e12c6ce161610d7eaa0ce96d3bd7d2aa8023c68fea26dfd52f"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
     }
@@ -933,6 +1213,7 @@
         "apps/extension/src/background/storage/scenario/session/index.ts",
         "apps/extension/src/background/storage/scenario/session/test-support.ts",
         "apps/extension/src/background/storage/video/camera-recorder-grant.ts",
+        "apps/extension/src/background/storage/video/guards.ts",
         "apps/extension/src/background/storage/video/post-record-acknowledgement.ts",
         "apps/extension/src/background/storage/video/post-record-result.ts",
         "apps/extension/src/background/storage/video/project-export-capabilities.ts",
@@ -946,7 +1227,8 @@
         "apps/extension/src/background/voice-input/route.ts",
         "apps/extension/src/background/voice-input/session-authority.ts",
         "apps/extension/src/background/voice-input/start-dispatch.ts",
-        "apps/extension/src/background/voice-input/start-operation.ts"
+        "apps/extension/src/background/voice-input/start-operation.ts",
+        "apps/extension/src/background/voice-input/telemetry-port.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/background/ai/llm/authorization/egress.ts",
@@ -1589,6 +1871,7 @@
         "apps/extension/src/background/storage/scenario/session/index.ts",
         "apps/extension/src/background/storage/scenario/session/test-support.ts",
         "apps/extension/src/background/storage/video/camera-recorder-grant.ts",
+        "apps/extension/src/background/storage/video/guards.ts",
         "apps/extension/src/background/storage/video/post-record-acknowledgement.ts",
         "apps/extension/src/background/storage/video/post-record-result.ts",
         "apps/extension/src/background/storage/video/project-export-capabilities.ts",
@@ -1602,7 +1885,8 @@
         "apps/extension/src/background/voice-input/route.ts",
         "apps/extension/src/background/voice-input/session-authority.ts",
         "apps/extension/src/background/voice-input/start-dispatch.ts",
-        "apps/extension/src/background/voice-input/start-operation.ts"
+        "apps/extension/src/background/voice-input/start-operation.ts",
+        "apps/extension/src/background/voice-input/telemetry-port.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -2624,6 +2908,7 @@
         "apps/extension/src/content/overlay/design-review/feedback-panel/list.tsx",
         "apps/extension/src/content/overlay/design-review/feedback-panel/position.ts",
         "apps/extension/src/content/overlay/design-review/feedback-panel/view.tsx",
+        "apps/extension/src/content/overlay/design-review/pointer-drag.ts",
         "apps/extension/src/content/overlay/design-review/popover/action-menu.tsx",
         "apps/extension/src/content/overlay/design-review/popover/comment.tsx",
         "apps/extension/src/content/overlay/design-review/popover/drag.ts",
@@ -2926,6 +3211,7 @@
         "apps/extension/src/content/parser/page-preparation/annotations/format/application.ts",
         "apps/extension/src/content/parser/page-preparation/annotations/format/formatter.ts",
         "apps/extension/src/content/parser/page-preparation/annotations/format/index.ts",
+        "apps/extension/src/content/parser/page-preparation/annotations/frame-equality.ts",
         "apps/extension/src/content/parser/page-preparation/annotations/index.ts",
         "apps/extension/src/content/parser/page-preparation/annotations/session.ts",
         "apps/extension/src/content/parser/page-preparation/annotations/types.ts",
@@ -3216,6 +3502,7 @@
         "apps/extension/src/content/selection/frame-runtime/host-layout/anchor-identity.ts",
         "apps/extension/src/content/selection/frame-runtime/host-layout/anchor-registry.ts",
         "apps/extension/src/content/selection/frame-runtime/host-layout/document-signals.ts",
+        "apps/extension/src/content/selection/frame-runtime/host-layout/geometry.ts",
         "apps/extension/src/content/selection/frame-runtime/host-layout/iframe-signals.ts",
         "apps/extension/src/content/selection/frame-runtime/host-layout/reconcile.ts",
         "apps/extension/src/content/selection/frame-runtime/host-layout/scheduler.ts",
@@ -3379,6 +3666,7 @@
         "apps/extension/src/content/selection/locker/routing.ts",
         "apps/extension/src/content/selection/locker/runtime-lifecycle.ts",
         "apps/extension/src/content/selection/locker/runtime.ts",
+        "apps/extension/src/content/selection/pointer-drag-session.ts",
         "apps/extension/src/content/selection/popover-sync/anchor-grid.ts",
         "apps/extension/src/content/selection/popover-sync/hooks.ts",
         "apps/extension/src/content/selection/quick-edit-runtime/annotation.ts",
@@ -8245,6 +8533,7 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
+        "apps/extension/src/features/viewport-presets/availability.ts",
         "apps/extension/src/features/viewport-presets/catalog.ts",
         "apps/extension/src/features/viewport-presets/contracts.ts",
         "apps/extension/src/features/viewport-presets/display-name.ts",
@@ -8255,6 +8544,7 @@
         "apps/extension/src/features/viewport-presets/video-recording-policy.ts"
       ],
       "rolloutFiles": [
+        "apps/extension/src/features/viewport-presets/availability.ts",
         "apps/extension/src/features/viewport-presets/catalog.ts",
         "apps/extension/src/features/viewport-presets/contracts.ts",
         "apps/extension/src/features/viewport-presets/display-name.ts",
@@ -8579,6 +8869,7 @@
         "apps/extension/src/offscreen/recording/geometry/plan.ts",
         "apps/extension/src/offscreen/recording/geometry/tab-source.ts",
         "apps/extension/src/offscreen/recording/multi-source/controls.ts",
+        "apps/extension/src/offscreen/recording/multi-source/dimensions.ts",
         "apps/extension/src/offscreen/recording/multi-source/duration.ts",
         "apps/extension/src/offscreen/recording/multi-source/finalize.ts",
         "apps/extension/src/offscreen/recording/multi-source/index.ts",
@@ -8636,7 +8927,8 @@
         "apps/extension/src/offscreen/voice-input/recognition-instance.ts",
         "apps/extension/src/offscreen/voice-input/recognition-run.ts",
         "apps/extension/src/offscreen/voice-input/runtime.ts",
-        "apps/extension/src/offscreen/voice-input/service.ts"
+        "apps/extension/src/offscreen/voice-input/service.ts",
+        "apps/extension/src/offscreen/voice-input/telemetry-port.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/offscreen/media-activity/lease.ts",
@@ -8779,6 +9071,7 @@
         "apps/extension/src/offscreen/recording/geometry/plan.ts",
         "apps/extension/src/offscreen/recording/geometry/tab-source.ts",
         "apps/extension/src/offscreen/recording/multi-source/controls.ts",
+        "apps/extension/src/offscreen/recording/multi-source/dimensions.ts",
         "apps/extension/src/offscreen/recording/multi-source/duration.ts",
         "apps/extension/src/offscreen/recording/multi-source/finalize.ts",
         "apps/extension/src/offscreen/recording/multi-source/index.ts",
@@ -8836,7 +9129,8 @@
         "apps/extension/src/offscreen/voice-input/recognition-instance.ts",
         "apps/extension/src/offscreen/voice-input/recognition-run.ts",
         "apps/extension/src/offscreen/voice-input/runtime.ts",
-        "apps/extension/src/offscreen/voice-input/service.ts"
+        "apps/extension/src/offscreen/voice-input/service.ts",
+        "apps/extension/src/offscreen/voice-input/telemetry-port.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -10443,12 +10737,14 @@
         "apps/extension/src/settings/sections/viewport-presets/section-content/types.ts",
         "apps/extension/src/settings/sections/viewport-presets/section-content/viewport-confirm-dialog.tsx",
         "apps/extension/src/settings/sections/viewport-presets/sync.ts",
+        "apps/extension/src/settings/sections/voice-input/async.ts",
         "apps/extension/src/settings/sections/voice-input/content.tsx",
         "apps/extension/src/settings/sections/voice-input/controller-contract.ts",
         "apps/extension/src/settings/sections/voice-input/index.tsx",
         "apps/extension/src/settings/sections/voice-input/use-local-voice-capability.ts",
         "apps/extension/src/settings/sections/voice-input/use-local-voice-installation.ts",
         "apps/extension/src/settings/sections/voice-input/use-microphone-capability.ts",
+        "apps/extension/src/settings/sections/voice-input/use-push-to-talk.ts",
         "apps/extension/src/settings/sections/voice-input/use-voice-input-owner-lifecycle.ts",
         "apps/extension/src/settings/sections/voice-input/use-voice-input-session.ts",
         "apps/extension/src/settings/sections/voice-input/use-voice-input-start-action.ts",
@@ -10724,12 +11020,14 @@
         "apps/extension/src/settings/sections/viewport-presets/section-content/types.ts",
         "apps/extension/src/settings/sections/viewport-presets/section-content/viewport-confirm-dialog.tsx",
         "apps/extension/src/settings/sections/viewport-presets/sync.ts",
+        "apps/extension/src/settings/sections/voice-input/async.ts",
         "apps/extension/src/settings/sections/voice-input/content.tsx",
         "apps/extension/src/settings/sections/voice-input/controller-contract.ts",
         "apps/extension/src/settings/sections/voice-input/index.tsx",
         "apps/extension/src/settings/sections/voice-input/use-local-voice-capability.ts",
         "apps/extension/src/settings/sections/voice-input/use-local-voice-installation.ts",
         "apps/extension/src/settings/sections/voice-input/use-microphone-capability.ts",
+        "apps/extension/src/settings/sections/voice-input/use-push-to-talk.ts",
         "apps/extension/src/settings/sections/voice-input/use-voice-input-owner-lifecycle.ts",
         "apps/extension/src/settings/sections/voice-input/use-voice-input-session.ts",
         "apps/extension/src/settings/sections/voice-input/use-voice-input-start-action.ts",
@@ -10992,6 +11290,7 @@
         "apps/extension/src/video-editor/diagnostics/panel/useDiagnosticsPanelLoader.ts",
         "apps/extension/src/video-editor/export/dialog/capability-state.ts",
         "apps/extension/src/video-editor/export/dialog/codec-options.ts",
+        "apps/extension/src/video-editor/export/dialog/field-contract.ts",
         "apps/extension/src/video-editor/export/dialog/fields.tsx",
         "apps/extension/src/video-editor/export/dialog/index.tsx",
         "apps/extension/src/video-editor/export/dialog/select-fields.tsx",
@@ -12261,6 +12560,7 @@
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
         "packages/ui/src/annotatable-image-surface/index.tsx",
+        "packages/ui/src/audio-amplitude-bars/index.tsx",
         "packages/ui/src/branding/index.ts",
         "packages/ui/src/canvas-tools/active-insert-escape.ts",
         "packages/ui/src/canvas-tools/common-insert-actions.ts",
@@ -12364,6 +12664,7 @@
       ],
       "rolloutFiles": [
         "packages/ui/src/annotatable-image-surface/index.tsx",
+        "packages/ui/src/audio-amplitude-bars/index.tsx",
         "packages/ui/src/branding/index.ts",
         "packages/ui/src/canvas-tools/active-insert-escape.ts",
         "packages/ui/src/canvas-tools/common-insert-actions.ts",
@@ -14087,14 +14388,14 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/authority-aliases.mjs",
-        "contentHash": "748c98e24e4b039a32deb9d45c1a2ea8acfb11313d97aebdd018e2cb3b42273c"
+        "contentHash": "f36c5b0979f4aad757ac6a7615837e078d5f49948057a89a795433cecb4dfe66"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/authority-aliases.mjs",
         "tooling/qa/core/structural-risk/file-metrics.mjs"
       ],
       "surfaces": [
-        "property:collectCallsByFunction/anonymous-122/calls"
+        "property:collectCallsByFunction/anonymous-96/calls"
       ]
     },
     {
@@ -14765,7 +15066,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/config.mjs",
-        "contentHash": "864adef6be6217affb51a7b1e60c792e03bbbd362e8d41be3b972987002b9274"
+        "contentHash": "268114ed47d3406aa4e711af138d4c72dcc19197b1e6bb533c2c0fc7d472582e"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/config.mjs",
@@ -14846,7 +15147,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/content-root.mjs",
-        "contentHash": "d8205340c8f48e9b45c82382895f49798afb79e1bc0d568aa96fa0d34b4108a4"
+        "contentHash": "bd7edb82660ea793fe9188670cf63c4846090834029d64e2d0bd4022d6c1f7da"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/content-root.mjs",
@@ -14855,7 +15156,8 @@
       "surfaces": [
         "binding:CONTENT_ROOT_OWNER_MAPPINGS",
         "property:testFiles",
-        "property:testFiles[1]"
+        "property:testFiles[1]",
+        "property:testFiles[2]"
       ]
     },
     {
@@ -14867,7 +15169,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
-        "contentHash": "9344e0938a926c986b5d41c9da38a1e71cc18e1ac21b6f23d2102c2cef4d437c"
+        "contentHash": "026e911cba62a3f77e8ce12de3ea6f0d71ad6fdfb50060a764504d18dbaf3077"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/content-selection.mjs",
@@ -14881,6 +15183,8 @@
         "property:testFiles[11]",
         "property:testFiles[12]",
         "property:testFiles[13]",
+        "property:testFiles[14]",
+        "property:testFiles[15]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
@@ -14953,7 +15257,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/evidence/repo-audit-evidence/core.mjs",
-        "contentHash": "972b5f7fb345d69af911f210559aa1ac4470f814f99afe21309179415f56bd9a"
+        "contentHash": "964976cabe6a7d49549c11abeedbb024afcae783d084d2257739da766242c0ab"
       },
       "consumers": [
         "tooling/qa/audits/evidence.mjs",
@@ -14963,6 +15267,8 @@
       ],
       "surfaces": [
         "property:collectRepoAuditEvidence/recommendedAuditCommands",
+        "property:collectRepoAuditEvidence/smellFamilies",
+        "property:collectRepoAuditEvidence/smellFindings",
         "property:collectRepoAuditEvidence/structuralMaintenance"
       ]
     },
@@ -16016,7 +16322,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/function-metrics.mjs",
-        "contentHash": "44f24cb7a07415ecf56001fb3d65ee5f527b1df29a91f59e5ba62fda51ef3bec"
+        "contentHash": "17d121d07a7ab6383ab6c1d29901444705752fcb7da68e7d9d333bd9481096e8"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -16048,7 +16354,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/function-profile.mjs",
-        "contentHash": "cc5104c1b6bf559f2b993bacdcb96fc72cdb8dd6ce10bdb6536c7ac8936d8531"
+        "contentHash": "240215de2c2545604d094e150cfd41404268cf880c612bbc06437711f4859746"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/function-metrics.mjs",
@@ -18820,7 +19126,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/structural-audit.mjs",
-        "contentHash": "76059de33b305db44d9ff14a724958372a4099614e267620a8aaaeec55ba9e86"
+        "contentHash": "d6cf2d80cb69d5ea30929fd75cb354baba4b3d1677d4ea149375c9c995bc579e"
       },
       "consumers": [
         "tooling/qa/wrappers/structural-audit.mjs",
@@ -19228,7 +19534,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/topology-fragmentation.mjs",
-        "contentHash": "abff39968dc6bf1bfe64abc5eb0ed0ff5438e44c5eecaca82a3f17f989dbc1c8"
+        "contentHash": "1d1ad5b3148619d4d09f02dd96afe6f20cbd17447df7bc3b01307d1aab3655e5"
       },
       "consumers": [
         "tooling/qa/core/topology-fragmentation.mjs",
@@ -19250,7 +19556,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/topology-fragmentation.policy.mjs",
-        "contentHash": "758cb051e3ffebfb59e065000208834525b74fabce8ec79a67928b7c36acf8d9"
+        "contentHash": "ac901eb3d12b341f67b5698fe94a0bdfceaf8bde2ae8c2d1ad27964521a91fe7"
       },
       "consumers": [
         "tooling/qa/core/topology-fragmentation.mjs",
@@ -19686,7 +19992,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-all.scheduler.mjs",
-        "contentHash": "33787dcbec50b43b8f5dd8dde8ff5385cfa9e2ada940da644028a5c6efd83f45"
+        "contentHash": "429f2e44da3aa8eceeba19af9e8334d3664784522f5bd4dab6dc1d935f71e55f"
       },
       "consumers": [
         "tooling/qa/core/verify-all.execution.mjs",
@@ -19696,8 +20002,6 @@
       "surfaces": [
         "binding:FULL_RESULT_SHAPES",
         "binding:LANE_RESOURCES",
-        "property:annotate/dependencySteps",
-        "property:annotate/testSteps",
         "property:appOwners",
         "property:appOwners[1]",
         "property:graph",
@@ -19975,7 +20279,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.deleted-aggregate.mjs",
-        "contentHash": "c1f8ef6447fb49ddfe86deb6707115e3ac8293c21f18e6fc90a476ba74e98006"
+        "contentHash": "5ffec0f2e0792171a0b121e243a4029586554a5608610f7ddb30f1921f6d5d1a"
       },
       "consumers": [
         "tooling/qa/core/verify-build.deleted-aggregate.mjs",
@@ -19994,7 +20298,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.deleted-closure.mjs",
-        "contentHash": "9a2f50cdc046404c02592bc8f0af5d4dd6aaf8c727744a10250b0efdc6a78b8e"
+        "contentHash": "7fcbf1e236311ad4d366eef8f60f7198c72bc6905f7a2d013c75700c5718a80c"
       },
       "consumers": [
         "tooling/qa/core/verify-build.deleted-closure.mjs",
@@ -20031,7 +20335,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-build.scheduler.mjs",
-        "contentHash": "db0577b78f39bc4521833b41bc84bb8ba1fe8ae453be9c0f3468de1a6941ca95"
+        "contentHash": "79ee9890d390d0775ef6302beed1d8a2f30a372fd0eec0b11e55ced62cf585f5"
       },
       "consumers": [
         "tooling/qa/core/verify-build.execution.mjs",
@@ -20041,8 +20345,6 @@
       "surfaces": [
         "binding:BUILD_LANE_RESOURCES",
         "binding:BUILD_RESULT_SHAPES",
-        "property:annotate/dependencySteps",
-        "property:annotate/testSteps",
         "property:createBuildWorkerScope/testScope",
         "property:graph",
         "property:graph[1]",
@@ -20600,7 +20902,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.scheduler.mjs",
-        "contentHash": "694f467283615b6812995575c8140b3ea963272791faa1bb3fc7a98a36dfb4c9"
+        "contentHash": "369baa7495db6a6a2adb6a1f25f436af6624d6ddc7c265dc977e41dd7d116008"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.execution.mjs",
@@ -20610,7 +20912,6 @@
       "surfaces": [
         "binding:FOCUSED_RESULT_SHAPES",
         "binding:LANE_RESOURCES",
-        "property:annotateLaneResult/dependencySteps",
         "property:annotateLaneResult/testSteps",
         "property:appOwners",
         "property:appOwners[1]",
@@ -20732,7 +21033,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-harness.scheduler.mjs",
-        "contentHash": "9f8e5b703dd445723ee1cdd5f8fd4cb65a967073246c0fe56d6733e5e1e4ae04"
+        "contentHash": "1d3d1d9a6fa669140156527c389189f3873fc1caaa00d53ca94da9e8143e8ed2"
       },
       "consumers": [
         "tooling/qa/core/verify-harness.execution.mjs",

@@ -282,7 +282,7 @@ async function recoverVideoCaptureSurfaceInternal(
 export async function recoverVideoCaptureSurfaceOnStartup(
   pageAccessVerifier: VideoCaptureSurfacePageAccessVerifier = unavailablePageAccessVerifier
 ): Promise<void> {
-  if (pendingRecovery) return pendingRecovery;
+  if (pendingRecovery) return await pendingRecovery;
   const recovery = recoverVideoCaptureSurfaceInternal(pageAccessVerifier);
   pendingRecovery = recovery;
   try {

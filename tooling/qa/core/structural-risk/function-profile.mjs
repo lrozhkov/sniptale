@@ -1,4 +1,4 @@
-import { getTransparentExpressionRoot, ts } from './ast.mjs';
+import { getTransparentExpressionRoot, hasExportModifier, ts, unwrapExpression } from './ast.mjs';
 import { isGeneratedDataFile, TEST_FILE_PATTERN } from './config.mjs';
 import {
   classifyArchitecturalLayer,
@@ -29,15 +29,6 @@ function containsJsx(node) {
   return found;
 }
 
-function hasExportModifier(node) {
-  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
-  return modifiers?.some(
-    (modifier) =>
-      modifier.kind === ts.SyntaxKind.ExportKeyword ||
-      modifier.kind === ts.SyntaxKind.DefaultKeyword
-  );
-}
-
 function directVariableBindingName(node) {
   const current = getTransparentExpressionRoot(node);
   const declaration = current.parent;
@@ -53,20 +44,6 @@ function functionBindingName(node) {
 }
 
 const TEST_FIXTURE_BUILDER_PATTERN = /^(?:create|build|make)[A-Z]|(?:Fixture|Mock)$/u;
-
-function unwrapReturnedExpression(node) {
-  let current = node;
-  while (
-    current &&
-    (ts.isParenthesizedExpression(current) ||
-      ts.isAsExpression(current) ||
-      ts.isTypeAssertionExpression(current) ||
-      current.kind === ts.SyntaxKind.SatisfiesExpression)
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
 
 export function getDeclarativeTestFixtureRoot(relativePath, symbol, node, metrics = null) {
   if (!TEST_FILE_PATTERN.test(relativePath) || !TEST_FIXTURE_BUILDER_PATTERN.test(symbol)) {
@@ -87,7 +64,7 @@ export function getDeclarativeTestFixtureRoot(relativePath, symbol, node, metric
     }
     returned = returned.statements[0].expression;
   }
-  const root = returned ? unwrapReturnedExpression(returned) : null;
+  const root = returned ? unwrapExpression(returned) : null;
   return root && (ts.isObjectLiteralExpression(root) || ts.isArrayLiteralExpression(root))
     ? root
     : null;

@@ -6,7 +6,7 @@ import { QUALITY_LIMITS } from '../../core/quality.config.mjs';
 import { isDataCarrierFile } from '../../core/shared.mjs';
 
 const GENERATED_DATA_FIXTURE_PATTERN =
-  /(?:^|\/)(?:generated|fixtures?|snapshots?)(?:\/|\.)|\.(?:snap|snapshot|fixture|generated)\.[cm]?[jt]sx?$/u;
+  /(?:(?:^|\/)(?:generated|fixtures?|snapshots?)(?:\/|\.)|\.(?:snap|snapshot|fixture|generated)\.[cm]?[jt]sx?$)/u;
 
 function isStaticModuleSpecifierLine(line) {
   const trimmed = line.trim();

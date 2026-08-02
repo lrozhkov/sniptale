@@ -7,6 +7,7 @@ import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../../../platform/i18n';
 import { getPopupRuntimeServices } from '../../../../runtime-services';
 import { getViewportPresetErrorMessage } from '../../../../../features/viewport-presets/error-message';
+import { createViewportPresetAvailabilityMap } from '../../../../../features/viewport-presets/availability';
 
 export function getVideoPresetAvailabilityDescription(
   availability: ViewportPresetAvailabilityPayload | undefined,
@@ -68,40 +69,13 @@ export function useVideoPresetAvailability(
       })
       .then((response) => {
         const availabilities = response?.success ? response.availabilities : undefined;
-        const byId = new Map(
-          availabilities?.map((availability) => [availability.presetId, availability] as const)
-        );
-        const entries = presets.map(
-          (preset) =>
-            [
-              preset.id,
-              byId.get(preset.id) ?? {
-                status: 'unavailable',
-                presetId: preset.id,
-                target: preset.target,
-                reason: 'platform-rejected',
-                required: { width: preset.width, height: preset.height },
-              },
-            ] as const
-        );
-        if (!disposed) setAvailabilityById(new Map(entries));
+        if (!disposed) {
+          setAvailabilityById(createViewportPresetAvailabilityMap(presets, availabilities));
+        }
       })
       .catch(() => {
         if (!disposed) {
-          setAvailabilityById(
-            new Map(
-              presets.map((preset) => [
-                preset.id,
-                {
-                  status: 'unavailable',
-                  presetId: preset.id,
-                  target: preset.target,
-                  reason: 'platform-rejected',
-                  required: { width: preset.width, height: preset.height },
-                } as const,
-              ])
-            )
-          );
+          setAvailabilityById(createViewportPresetAvailabilityMap(presets, undefined));
         }
       });
     return () => {

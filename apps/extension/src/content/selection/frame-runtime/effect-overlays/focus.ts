@@ -3,7 +3,11 @@ import { appendToContentOverlayRoot } from '../../../platform/dom-host';
 import { applyIsolatedContentRootStyle } from '../../../platform/dom-host/isolated';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { resolveFrameSurface } from '../../../../features/highlighter/frame-surface';
-import { createFocusMaskRectNodes, getFocusMaskBox } from '../effects/geometry';
+import {
+  createFocusMaskRectNodes,
+  getFocusMaskBox,
+  setFocusMaskRectBox,
+} from '../effects/geometry';
 import type { OverlayRefs } from './types';
 
 export function updateFocusOverlayMask(allFrames: FrameData[], refs: OverlayRefs) {
@@ -33,7 +37,9 @@ export function registerImmediateFocusOverlayUpdates(
   { focusSvgRef }: OverlayRefs
 ) {
   window.sniptaleUpdateFocusMaskImmediate = (frameId: string, geometry) => {
-    const rect = focusSvgRef.current?.querySelector(`rect[data-frame-id="${frameId}"]`);
+    const rect = focusSvgRef.current?.querySelector<SVGRectElement>(
+      `rect[data-frame-id="${frameId}"]`
+    );
     if (!rect) {
       return;
     }
@@ -48,10 +54,7 @@ export function registerImmediateFocusOverlayUpdates(
     };
     const focusMaskBox = getFocusMaskBox(liveFrame);
     const surface = resolveFrameSurface(liveFrame);
-    rect.setAttribute('x', String(focusMaskBox.x));
-    rect.setAttribute('y', String(focusMaskBox.y));
-    rect.setAttribute('width', String(focusMaskBox.width));
-    rect.setAttribute('height', String(focusMaskBox.height));
+    setFocusMaskRectBox(rect, focusMaskBox);
     rect.setAttribute('rx', String(surface.geometry.radius));
     rect.setAttribute('ry', String(surface.geometry.radius));
   };

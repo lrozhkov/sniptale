@@ -1,4 +1,5 @@
 import React from 'react';
+import { registerPointerDragSession } from '../pointer-drag-session';
 import type {
   CalloutManualPlacement,
   CalloutSettings,
@@ -181,25 +182,7 @@ function useCalloutWidthResizeLifecycle(args: {
       }
       onWidthChange(committedDraft.maxWidth, committedDraft.placement);
     };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !cancel()) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-    document.addEventListener('pointermove', handleMove, { capture: true });
-    document.addEventListener('pointerup', handleUp, { capture: true });
-    document.addEventListener('pointercancel', cancel, { capture: true });
-    document.addEventListener('lostpointercapture', cancel, { capture: true });
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
-    window.addEventListener('blur', cancel);
-    return () => {
-      document.removeEventListener('pointermove', handleMove, { capture: true });
-      document.removeEventListener('pointerup', handleUp, { capture: true });
-      document.removeEventListener('pointercancel', cancel, { capture: true });
-      document.removeEventListener('lostpointercapture', cancel, { capture: true });
-      window.removeEventListener('keydown', handleKeyDown, { capture: true });
-      window.removeEventListener('blur', cancel);
-    };
+    return registerPointerDragSession({ cancel, move: handleMove, up: handleUp });
   }, [
     activeRef,
     activeSide,

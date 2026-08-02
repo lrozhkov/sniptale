@@ -1,17 +1,16 @@
 import React from 'react';
+import {
+  acceptPointerDragEvent,
+  finishPointerDragEvent,
+  registerPointerDragSession,
+  type PointerDragStartEvent,
+} from '../pointer-drag-session';
 import type { ConnectorSide } from './dynamic-tail';
 import { getCalloutKeyboardDelta, type CalloutHandleKeyboardEvent } from './keyboard';
 
 type Rect = { x: number; y: number; width: number; height: number };
 
-export interface CalloutTailDragStartEvent {
-  button: number;
-  currentTarget: { setPointerCapture(pointerId: number): void };
-  nativeEvent: { stopImmediatePropagation(): void };
-  pointerId: number;
-  preventDefault(): void;
-  stopPropagation(): void;
-}
+export type CalloutTailDragStartEvent = PointerDragStartEvent;
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
@@ -81,9 +80,7 @@ export function useCalloutEdgeDrag(args: {
     const connectorSide = args.connectorSide;
     if (!isDragging || !connectorSide) return;
     const handleMove = (event: PointerEvent) => {
-      if (event.pointerId !== pointerIdRef.current) return;
-      event.preventDefault();
-      event.stopPropagation();
+      if (!acceptPointerDragEvent(event, pointerIdRef.current)) return;
       const position = getPointerPosition(
         event,
         args.edgeRect,
@@ -95,34 +92,12 @@ export function useCalloutEdgeDrag(args: {
       setDraftPosition(position);
     };
     const handleUp = (event: PointerEvent) => {
-      if (event.pointerId !== pointerIdRef.current) return;
-      event.preventDefault();
-      event.stopPropagation();
+      if (!finishPointerDragEvent(event, pointerIdRef, () => setIsDragging(false))) return;
       const position = draftRef.current;
-      pointerIdRef.current = null;
       draftRef.current = null;
-      setIsDragging(false);
       if (position !== null) args.onPositionChange(position);
     };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !cancel()) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-    document.addEventListener('pointermove', handleMove, { capture: true });
-    document.addEventListener('pointerup', handleUp, { capture: true });
-    document.addEventListener('pointercancel', cancel, { capture: true });
-    document.addEventListener('lostpointercapture', cancel, { capture: true });
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
-    window.addEventListener('blur', cancel);
-    return () => {
-      document.removeEventListener('pointermove', handleMove, { capture: true });
-      document.removeEventListener('pointerup', handleUp, { capture: true });
-      document.removeEventListener('pointercancel', cancel, { capture: true });
-      document.removeEventListener('lostpointercapture', cancel, { capture: true });
-      window.removeEventListener('keydown', handleKeyDown, { capture: true });
-      window.removeEventListener('blur', cancel);
-    };
+    return registerPointerDragSession({ cancel, move: handleMove, up: handleUp });
   }, [args, cancel, isDragging, maxPosition, minPosition]);
 
   return {

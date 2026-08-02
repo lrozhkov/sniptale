@@ -1,4 +1,4 @@
-import { applyResizeUpdate } from './helpers';
+import { applyInteractiveFramePointerUpdate } from './helpers';
 import type {
   InteractiveFrameListenerConfig,
   InteractiveFramePointerSample,
@@ -11,18 +11,7 @@ function applyResizeSample(
   const direction = params.resizeDirectionRef.current;
   if (!params.isResizingRef.current || !direction) return;
   if (params.pointerIdRef.current !== sample.pointerId) return;
-  applyResizeUpdate({
-    event: sample,
-    direction,
-    containerRef: params.containerRef,
-    startX: params.startXRef.current,
-    startY: params.startYRef.current,
-    startFrame: params.startFrameRef.current,
-    setTempFrame: params.setTempFrame,
-    frameId: params.frameId,
-    effectMode: params.effectModeRef.current,
-    tempFrameRef: params.tempFrameRef,
-  });
+  applyInteractiveFramePointerUpdate(params, sample, direction);
 }
 
 export function cancelPendingInteractiveFrameResize(

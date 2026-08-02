@@ -1,7 +1,11 @@
 import { formatQaResourceProfile, resolveQaResourceProfile } from '../runtime/resource-profile.mjs';
 import { parseLaneResult } from '../runtime/lane-worker-contract.mjs';
 import { runQaLaneWorker } from '../runtime/lane-worker-runner.mjs';
-import { formatTaskScheduleDetail, runBoundedTasks } from '../runtime/task-scheduler.mjs';
+import {
+  appendTaskScheduleDetail,
+  formatTaskScheduleDetail,
+  runBoundedTasks,
+} from '../runtime/task-scheduler.mjs';
 
 const HARNESS_WORKER_URL = new URL('./verify-harness.worker.mjs', import.meta.url);
 const LANE_RESOURCES = Object.freeze({
@@ -63,28 +67,27 @@ export function createHarnessLaneTasks({ context, profile, workerRunner = runHar
   });
 }
 
-function appendDetail(step, detail) {
-  return { ...step, detail: [step.detail, detail].filter(Boolean).join('; ') };
-}
-
 function annotate(result, profile) {
   const detail = formatTaskScheduleDetail(result, profile);
   if (result.id === 'static') {
     const [first, ...remaining] = result.value.steps;
     return {
       ...result.value,
-      steps: [appendDetail(first, `${detail}; ${formatQaResourceProfile(profile)}`), ...remaining],
+      steps: [
+        appendTaskScheduleDetail(first, `${detail}; ${formatQaResourceProfile(profile)}`),
+        ...remaining,
+      ],
     };
   }
   if (result.id === 'typecheck') {
     return {
       ...result.value,
-      typecheckStep: appendDetail(result.value.typecheckStep, detail),
+      typecheckStep: appendTaskScheduleDetail(result.value.typecheckStep, detail),
     };
   }
   return {
     ...result.value,
-    unitTestStep: appendDetail(result.value.unitTestStep, detail),
+    unitTestStep: appendTaskScheduleDetail(result.value.unitTestStep, detail),
   };
 }
 

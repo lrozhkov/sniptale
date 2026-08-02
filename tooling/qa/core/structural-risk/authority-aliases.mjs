@@ -1,21 +1,13 @@
-import { createLexicalBindingKey, getTransparentExpressionRoot, ts } from './ast.mjs';
+import {
+  createLexicalBindingKey,
+  getTransparentExpressionRoot,
+  hasExportModifier,
+  isFunctionNode,
+  ts,
+  unwrapExpression,
+} from './ast.mjs';
 import { collectCompositeSessionAliases } from './composite-session-aliases.mjs';
 import { collectReactRefBindings } from './react-ref-provenance.mjs';
-
-function unwrapExpression(node) {
-  let current = node;
-  while (
-    current &&
-    (ts.isParenthesizedExpression(current) ||
-      ts.isNonNullExpression(current) ||
-      ts.isAsExpression(current) ||
-      ts.isTypeAssertionExpression(current) ||
-      current.kind === ts.SyntaxKind.SatisfiesExpression)
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
 
 function propertySegment(node) {
   if (ts.isStringLiteral(node) || ts.isNumericLiteral(node)) {
@@ -65,21 +57,10 @@ function functionBindingIdentifier(node) {
   return ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name) ? parent.name : null;
 }
 
-function isFunctionNode(node) {
-  return (
-    ts.isFunctionDeclaration(node) ||
-    ts.isFunctionExpression(node) ||
-    ts.isArrowFunction(node) ||
-    ts.isMethodDeclaration(node) ||
-    ts.isGetAccessorDeclaration(node) ||
-    ts.isSetAccessorDeclaration(node)
-  );
-}
-
 function collectLocalFunctions(sourceFile) {
   const functions = new Map();
   function visit(node) {
-    if (isFunctionNode(node)) {
+    if (isFunctionNode(node, { includeConstructor: false })) {
       const binding = functionBindingIdentifier(node);
       if (binding) functions.set(createLexicalBindingKey(binding, sourceFile), node);
     }
@@ -89,22 +70,15 @@ function collectLocalFunctions(sourceFile) {
   return functions;
 }
 
-function hasExportModifier(node) {
-  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
-  return modifiers?.some(
-    (modifier) =>
-      modifier.kind === ts.SyntaxKind.ExportKeyword ||
-      modifier.kind === ts.SyntaxKind.DefaultKeyword
-  );
-}
-
 function directlyExportedFunction(node) {
   if (hasExportModifier(node) || ts.isExportAssignment(getTransparentExpressionRoot(node).parent)) {
     return true;
   }
   let current = node.parent;
   while (current && !ts.isSourceFile(current)) {
-    if (current !== node.parent && isFunctionNode(current)) return false;
+    if (current !== node.parent && isFunctionNode(current, { includeConstructor: false })) {
+      return false;
+    }
     if (ts.isVariableStatement(current)) return hasExportModifier(current) ?? false;
     current = current.parent;
   }

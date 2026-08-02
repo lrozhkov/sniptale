@@ -18,6 +18,7 @@ import { createMultiSourceWebcamRecorder, stopWebcamRecorderStream } from './web
 import { createRecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
 import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
 import { assertRecordingResourceBudget } from '../encoding/resource-budget';
+import { requireRecordingDimensions } from './dimensions';
 
 let startSequence = 0;
 
@@ -39,18 +40,10 @@ function requireVideoDimensions(source: {
   recordingId: string;
   trackSettings: MediaTrackSettings;
 }): { height: number; width: number } {
-  const { height, width } = source.trackSettings;
-  if (
-    typeof width !== 'number' ||
-    typeof height !== 'number' ||
-    !Number.isInteger(width) ||
-    !Number.isInteger(height) ||
-    width <= 0 ||
-    height <= 0
-  ) {
-    throw new Error(`Recording dimensions are unavailable for ${source.recordingId}.`);
-  }
-  return { height, width };
+  return requireRecordingDimensions(
+    source,
+    `Recording dimensions are unavailable for ${source.recordingId}.`
+  );
 }
 
 function assertMultiSourceResourceBudget(
