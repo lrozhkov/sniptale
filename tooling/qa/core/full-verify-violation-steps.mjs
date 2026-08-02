@@ -1,22 +1,23 @@
 import { createSkippedStep, createViolationStep } from './focused-qa-results.mjs';
 import { isOwnerGuardLabel } from './owner-guard-step-helpers.mjs';
-import { measureSyncStep } from './step-timing.helpers.mjs';
+import { measureAsyncStep } from './step-timing.helpers.mjs';
 import { VERIFY_ALL_VIOLATION_STEPS } from './verify-all.violation-steps.mjs';
 
-export function collectViolationSteps({
-  codeFiles,
-  deferOwnerGuards = false,
-  releaseMode,
-  targetFiles,
-}) {
+export async function collectViolationSteps(
+  { codeFiles, deferOwnerGuards = false, releaseMode, targetFiles },
+  violationSteps = VERIFY_ALL_VIOLATION_STEPS
+) {
   const runnerScope = releaseMode
     ? { scope: 'repo-wide' }
     : { files: codeFiles, scope: 'workspace', targetFiles };
-  return VERIFY_ALL_VIOLATION_STEPS.map(([label, header, runner]) => {
+  const steps = [];
+  for (const [label, header, runner] of violationSteps) {
     if (deferOwnerGuards && isOwnerGuardLabel(label)) {
-      return createSkippedStep(label, 'scheduled in bounded owner lane');
+      steps.push(createSkippedStep(label, 'scheduled in bounded owner lane'));
+      continue;
     }
-    const { durationMs, value: result } = measureSyncStep(() => runner(runnerScope));
-    return { ...createViolationStep(label, header, result), durationMs };
-  });
+    const { durationMs, value: result } = await measureAsyncStep(() => runner(runnerScope));
+    steps.push({ ...createViolationStep(label, header, result), durationMs });
+  }
+  return steps;
 }
