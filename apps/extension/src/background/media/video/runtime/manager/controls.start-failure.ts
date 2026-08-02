@@ -4,9 +4,9 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   getVideoRecordingTabId,
   getVideoRecordingId,
+  isCurrentVideoRecordingId,
   isControlledCursorCaptureEnabled,
   resetVideoRecordingStartSession,
-  setOpenEditorAfterRecording,
   setVideoRecordingId,
 } from '../../session-state';
 import { resetVideoRecordingRuntimeState } from '../session-state';
@@ -39,14 +39,24 @@ function disableControlledCursorCapture(tabId: number): void {
 
 export async function notifyRecordingStartFailed(
   error: string,
-  options: { retainAuthority?: boolean } = {}
+  options: { recordingId?: string; retainAuthority?: boolean } = {}
 ): Promise<void> {
   logger.error('Recording start failed', error);
+  const recordingId = options.recordingId ?? getVideoRecordingId();
+  if (options.recordingId && !isCurrentVideoRecordingId(options.recordingId)) {
+    logger.warn('Ignoring stale recording start failure', { recordingId: options.recordingId });
+    return;
+  }
   const recordingTabId = getVideoRecordingTabId();
-  const recordingId = getVideoRecordingId();
   if (options.retainAuthority !== true) {
     if (recordingId) cancelVideoSourceReadyWait(recordingId, new Error(error));
     await releaseVideoCaptureSurface(recordingId);
+    if (recordingId && !isCurrentVideoRecordingId(recordingId)) {
+      logger.warn('Ignored stale recording start cleanup after recording identity changed', {
+        recordingId,
+      });
+      return;
+    }
   }
 
   if (recordingTabId !== null) {
@@ -58,7 +68,6 @@ export async function notifyRecordingStartFailed(
 
   if (options.retainAuthority !== true) {
     setVideoRecordingId(null);
-    setOpenEditorAfterRecording(false);
     resetVideoRecordingStartSession();
     resetVideoRecordingRuntimeState();
   }

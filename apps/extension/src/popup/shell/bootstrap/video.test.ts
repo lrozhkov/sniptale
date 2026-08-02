@@ -82,7 +82,6 @@ function createVideoSettings(overrides: Record<string, unknown> = {}) {
     microphoneEnabled: true,
     webcamDeviceId: 'missing-camera',
     webcamEnabled: true,
-    openEditorAfterRecording: true,
     quality: VideoQuality.HIGH,
     systemAudioEnabled: true,
     ...overrides,
@@ -119,20 +118,16 @@ async function verifiesHydratedPopupVideoBootstrapState() {
     knownDevices: [{ deviceId: 'cam-known', label: 'Known Camera' }],
     preferredDeviceId: 'missing-camera',
   });
-  expect(mocks.resolveMicrophoneDeviceIdMock).toHaveBeenCalledWith('missing-device', [
-    { deviceId: 'mic-2', label: 'Hydrated Mic' },
-  ]);
-  expect(mocks.resolveWebcamDeviceIdMock).toHaveBeenCalledWith('missing-camera', [
-    { deviceId: 'cam-2', label: 'Hydrated Camera' },
-  ]);
+  expect(mocks.resolveMicrophoneDeviceIdMock).not.toHaveBeenCalled();
+  expect(mocks.resolveWebcamDeviceIdMock).not.toHaveBeenCalled();
   expect(result).toEqual({
     captureMode: CaptureMode.TAB,
     microphones: [{ deviceId: 'mic-2', label: 'Hydrated Mic' }],
     webcams: [{ deviceId: 'cam-2', label: 'Hydrated Camera' }],
     selectedPresetId: null,
     videoSettings: expect.objectContaining({
-      microphoneDeviceId: 'mic-2',
-      webcamDeviceId: 'cam-2',
+      microphoneDeviceId: 'missing-device',
+      webcamDeviceId: 'missing-camera',
     }),
     viewportPresets: createSettings().viewportPresets,
   });
@@ -168,7 +163,7 @@ async function verifiesViewportFallbackCaptureMode() {
 
   expect(result.captureMode).toBe(CaptureMode.TAB);
   expect(result.selectedPresetId).toBeNull();
-  expect(result.videoSettings.microphoneDeviceId).toBe('mic-passive');
+  expect(result.videoSettings.microphoneDeviceId).toBe('missing-device');
   expect(mocks.loadMicrophoneDevicesMock).toHaveBeenCalledTimes(1);
   expect(mocks.loadWebcamDevicesMock).toHaveBeenCalledTimes(1);
 }

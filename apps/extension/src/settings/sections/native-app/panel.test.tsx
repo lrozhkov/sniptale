@@ -229,10 +229,10 @@ async function selectProductOption(label: string, optionLabel: string): Promise<
     trigger?.click();
   });
   const target = [
-    ...(container?.querySelectorAll<HTMLButtonElement>('button[role="option"]') ?? []),
+    ...document.body.querySelectorAll<HTMLButtonElement>('button[role="option"]'),
   ].find((node) => node.textContent?.trim() === optionLabel);
   const optionTexts = [
-    ...(container?.querySelectorAll<HTMLButtonElement>('button[role="option"]') ?? []),
+    ...document.body.querySelectorAll<HTMLButtonElement>('button[role="option"]'),
   ].map((node) => node.textContent?.trim());
   expect(target, `Missing option "${optionLabel}" in ${optionTexts.join(', ')}`).toBeTruthy();
   await act(async () => {

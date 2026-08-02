@@ -84,7 +84,7 @@ it('acquires background-selected desktop stream ids with getUserMedia', async ()
       mandatory: {
         chromeMediaSource: 'desktop',
         chromeMediaSourceId: 'desktop-2',
-        maxFrameRate: 30,
+        maxFrameRate: 60,
       },
     },
   });
@@ -104,7 +104,7 @@ it('acquires multi-source display media without a desktop stream id', async () =
   });
 
   expect(navigator.mediaDevices.getDisplayMedia).toHaveBeenCalledWith({
-    video: { frameRate: { ideal: 30 } },
+    video: { frameRate: { ideal: 60 } },
     audio: false,
   });
   expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();

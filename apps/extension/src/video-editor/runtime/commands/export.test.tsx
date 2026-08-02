@@ -91,9 +91,11 @@ function createExportState() {
     settings: {
       downloadAfterExport: true,
       format: VideoExportFormat.MP4,
+      resolution: 'SOURCE' as const,
+      mp4VideoCodec: 'AVC' as const,
       fps: 30,
       height: 720,
-      quality: VideoExportQualityPreset.BALANCED,
+      quality: VideoExportQualityPreset.MEDIUM,
       scope: VideoExportScope.SELECTED_CLIP,
       width: 1280,
     },

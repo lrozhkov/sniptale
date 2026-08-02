@@ -7,6 +7,7 @@ const {
   beginVideoRecordingStopMock,
   finishVideoRecordingStopMock,
   getVideoRecordingRuntimeStateMock,
+  getVideoRecordingIdMock,
   isVideoRecordingStopInProgressMock,
   loggerErrorMock,
   releaseVideoCaptureSurfaceMock,
@@ -18,6 +19,7 @@ const {
   beginVideoRecordingStopMock: vi.fn(),
   finishVideoRecordingStopMock: vi.fn(),
   getVideoRecordingRuntimeStateMock: vi.fn(),
+  getVideoRecordingIdMock: vi.fn(),
   isVideoRecordingStopInProgressMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   releaseVideoCaptureSurfaceMock: vi.fn(),
@@ -45,7 +47,9 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   isVideoRecordingStopInProgress: isVideoRecordingStopInProgressMock,
   resetCompletedVideoRecordingSession: vi.fn(),
   restoreVideoRecordingOffscreenStartPending: vi.fn(),
-  getVideoRecordingId: vi.fn(() => 'recording-1'),
+  getVideoRecordingId: getVideoRecordingIdMock,
+  isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
+    recordingId != null && getVideoRecordingIdMock() === recordingId,
 }));
 vi.mock('../../../capture-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../capture-surface')>()),
@@ -72,6 +76,7 @@ beforeEach(() => {
     countdownEndsAt: null,
     error: null,
   });
+  getVideoRecordingIdMock.mockReturnValue('recording-1');
   beginVideoRecordingStopMock.mockReturnValue({
     mode: CaptureMode.TAB,
     shouldResetImmediately: false,

@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { runtimeVideoOffscreenEventMessageContracts } from './events';
@@ -17,20 +18,15 @@ const desktopMediaFailedContract =
 const errorContract = runtimeVideoOffscreenEventMessageContracts[VideoMessageType.OFFSCREEN_ERROR];
 const sourceReadyContract =
   runtimeVideoOffscreenEventMessageContracts[VideoMessageType.OFFSCREEN_SOURCE_READY];
+const savedContract =
+  runtimeVideoOffscreenEventMessageContracts[VideoMessageType.VIDEO_SAVED_TO_IDB];
 const startRecordingContract =
   runtimeVideoOffscreenViewportMessageContracts[VideoMessageType.OFFSCREEN_START_RECORDING];
 
 const recordingSettings = {
-  microphoneEnabled: false,
-  microphoneDeviceId: null,
-  webcamEnabled: false,
-  webcamDeviceId: null,
-  systemAudioEnabled: true,
-  quality: 'HIGH',
+  ...DEFAULT_VIDEO_SETTINGS,
   countdownSeconds: 0,
   autoFadeDelay: 1,
-  openEditorAfterRecording: true,
-  diagnosticsEnabled: false,
 };
 
 it('accepts valid cursor capture modes on offscreen recording started messages', () => {
@@ -178,6 +174,47 @@ it('requires recording ids on offscreen recording lifecycle messages', () => {
       type: VideoMessageType.OFFSCREEN_RECORDING_RESUMED,
     })
   ).toThrow(/OFFSCREEN_RECORDING_RESUMED/);
+});
+
+it('requires non-empty recording identities for saved-video lifecycle messages', () => {
+  const message = {
+    projectId: 'project-1',
+    primaryRecordingId: 'recording-1-window-1',
+    recordingId: 'recording-1',
+    type: VideoMessageType.VIDEO_SAVED_TO_IDB,
+  };
+  expect(savedContract.parseRequest(message)).toEqual(message);
+
+  for (const invalidMessage of [
+    { type: VideoMessageType.VIDEO_SAVED_TO_IDB },
+    { ...message, primaryRecordingId: '' },
+    { ...message, projectId: '' },
+    { ...message, recordingId: '' },
+  ]) {
+    expect(() => savedContract.parseRequest(invalidMessage)).toThrow(/VIDEO_SAVED_TO_IDB/);
+  }
+  expect(savedContract.parseResponse({ success: true, result: 'accepted' })).toEqual({
+    success: true,
+    result: 'accepted',
+  });
+  for (const result of ['discarded', 'superseded'] as const) {
+    expect(savedContract.parseResponse({ success: true, result })).toEqual({
+      success: true,
+      result,
+    });
+  }
+  expect(savedContract.parseResponse({ success: false, error: 'storage failed' })).toEqual({
+    success: false,
+    error: 'storage failed',
+  });
+  for (const invalidResponse of [
+    { success: true },
+    { success: true, result: 'stale' },
+    { success: true, result: 'invented' },
+  ]) {
+    expect(() => savedContract.parseResponse(invalidResponse)).toThrow(/VIDEO_SAVED_TO_IDB/);
+  }
+  expect(() => savedContract.parseResponse(undefined)).toThrow(/VIDEO_SAVED_TO_IDB/);
 });
 
 it('rejects invalid display-surface payloads on recording started messages', () => {

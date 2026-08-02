@@ -12,6 +12,7 @@ import {
   hasActiveVideoRecordingSession,
   isVideoRecordingPreparationInProgress,
   isVideoRecordingStopInProgress,
+  isCurrentVideoRecordingId,
   resetCompletedVideoRecordingSession,
   restoreVideoRecordingOffscreenStartPending,
 } from '../../../session-state';
@@ -28,6 +29,7 @@ import {
   requestBoundOffscreenRecordingStop,
   type RecordingSourceBinding,
 } from '../../../offscreen-recording-stop';
+import { readStoredVideoPostRecordResult } from '../../../../../storage/video/post-record-result';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeControls' });
 
@@ -66,9 +68,17 @@ async function completeEarlyStop(): Promise<RecordingStopResult> {
     await clearActiveVideoRecordingLease(recordingId ?? undefined);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    setVideoRecordingRuntimeState({ error: message });
+    if (isCurrentVideoRecordingId(recordingId)) {
+      setVideoRecordingRuntimeState({ error: message });
+    }
     logger.error('Failed to restore capture surface after early stop', error);
     return { error: message, result: 'failed' };
+  }
+  if (!isCurrentVideoRecordingId(recordingId)) {
+    logger.warn('Ignored stale early-stop completion after recording identity changed', {
+      recordingId,
+    });
+    return { result: 'accepted' };
   }
   resetCompletedVideoRecordingSession();
   resetVideoRecordingRuntimeState();
@@ -86,24 +96,56 @@ async function sendStopSignals(
   failureLogging: StopFailureLogging = 'detailed'
 ): Promise<RecordingStopResult> {
   const recordingId = getVideoRecordingId();
-  const sourceBinding = await resolveRecordingSourceBinding(recordingId);
-  if (!sourceBinding) {
+  const previousState = getVideoRecordingRuntimeState();
+  if (!recordingId) {
     const error = 'Recording source binding is unavailable';
+    finishVideoRecordingStop();
     setVideoRecordingRuntimeState({ error });
     return { error, result: 'failed' };
   }
-  const previousState = getVideoRecordingRuntimeState();
+  const sourceBinding = await resolveRecordingSourceBinding(recordingId);
+  if (!isCurrentVideoRecordingId(recordingId)) {
+    logger.warn('Ignored stale stop binding after recording identity changed', { recordingId });
+    return { result: 'accepted' };
+  }
+  if (!sourceBinding) {
+    const error = 'Recording source binding is unavailable';
+    finishVideoRecordingStop();
+    setVideoRecordingRuntimeState({ error });
+    return { error, result: 'failed' };
+  }
   setVideoRecordingRuntimeState({
     status: VideoRecordingStatus.STOPPING,
     countdownEndsAt: null,
     error: null,
   });
-  let terminalError: string | null = null;
+  let terminalError: string | null;
 
   try {
     const acknowledgement = await requestBoundOffscreenRecordingStop(sourceBinding, discard);
     terminalError = acknowledgement.terminalError;
   } catch (error) {
+    if (await hasCommittedPostRecordResult(recordingId)) {
+      if (isCurrentVideoRecordingId(recordingId)) {
+        finishVideoRecordingStop();
+        resetCompletedVideoRecordingSession(recordingId ?? undefined);
+        resetVideoRecordingRuntimeState();
+        logger.warn('Recovered committed recording completion after stop response loss', {
+          recordingId,
+        });
+      } else {
+        logger.warn('Ignored stale committed stop recovery after recording identity changed', {
+          recordingId,
+        });
+      }
+      return { result: 'accepted' };
+    }
+    if (!isCurrentVideoRecordingId(recordingId)) {
+      logger.warn('Ignored stale stop delivery failure after recording identity changed', {
+        recordingId,
+      });
+      return { result: 'accepted' };
+    }
     const failedStopState = getVideoRecordingRuntimeState();
     finishVideoRecordingStop();
     if (
@@ -130,18 +172,43 @@ async function sendStopSignals(
     await releaseVideoCaptureSurface(recordingId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    setVideoRecordingRuntimeState({ error: message });
+    if (isCurrentVideoRecordingId(recordingId)) {
+      finishVideoRecordingStop();
+      setVideoRecordingRuntimeState({
+        status: previousState.status,
+        countdownEndsAt: previousState.countdownEndsAt,
+        error: message,
+      });
+    }
     logger.error('Failed to restore capture surface after stop', error);
     return { error: message, result: 'failed' };
   }
   if (terminalError !== null) {
-    finishVideoRecordingStop();
-    resetCompletedVideoRecordingSession(recordingId ?? undefined);
-    resetVideoRecordingRuntimeState();
+    if (isCurrentVideoRecordingId(recordingId)) {
+      finishVideoRecordingStop();
+      resetCompletedVideoRecordingSession(recordingId ?? undefined);
+      resetVideoRecordingRuntimeState();
+    }
     await clearActiveVideoRecordingLease(recordingId ?? undefined);
     return { error: terminalError, result: 'failed' };
   }
   return { result: 'accepted' };
+}
+
+async function hasCommittedPostRecordResult(recordingId: string | null): Promise<boolean> {
+  if (!recordingId) {
+    return false;
+  }
+  try {
+    const state = await readStoredVideoPostRecordResult();
+    return (
+      state?.result.recordingId === recordingId &&
+      (state.status === 'ready' || state.status === 'acknowledged')
+    );
+  } catch (error) {
+    logger.warn('Failed to reconcile post-record completion after stop delivery failure', error);
+    return false;
+  }
 }
 
 async function resolveRecordingSourceBinding(

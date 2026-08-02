@@ -1,10 +1,24 @@
 import { expect, it } from 'vitest';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 import { parseStoredVideoSettings, parseStoredVideoUiState } from './guards';
 
+const CURRENT_VIDEO_SETTINGS_CONTRACT = {
+  outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
+  qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
+  qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
+};
+
+function parseCurrentVideoSettings(value: Record<string, unknown>) {
+  return parseStoredVideoSettings({
+    ...CURRENT_VIDEO_SETTINGS_CONTRACT,
+    ...value,
+  });
+}
+
 it('parses the controlled cursor capture flag and rejects invalid values', () => {
   expect(
-    parseStoredVideoSettings({
+    parseCurrentVideoSettings({
       controlledCursorCaptureEnabled: true,
       microphoneEnabled: false,
       webcamDeviceId: null,
@@ -14,6 +28,7 @@ it('parses the controlled cursor capture flag and rejects invalid values', () =>
     hasInvalidRoot: false,
     invalidFieldCount: 0,
     value: {
+      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
       controlledCursorCaptureEnabled: true,
       microphoneEnabled: false,
       webcamDeviceId: null,
@@ -21,7 +36,7 @@ it('parses the controlled cursor capture flag and rejects invalid values', () =>
     },
   });
   expect(
-    parseStoredVideoSettings({
+    parseCurrentVideoSettings({
       controlledCursorCaptureEnabled: 'yes',
       microphoneEnabled: false,
       webcamDeviceId: null,
@@ -31,6 +46,7 @@ it('parses the controlled cursor capture flag and rejects invalid values', () =>
     hasInvalidRoot: false,
     invalidFieldCount: 1,
     value: {
+      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
       microphoneEnabled: false,
       webcamDeviceId: null,
       webcamEnabled: false,
@@ -40,25 +56,22 @@ it('parses the controlled cursor capture flag and rejects invalid values', () =>
 
 it('keeps valid string and numeric settings while counting invalid field variants', () => {
   expect(
-    parseStoredVideoSettings({
+    parseCurrentVideoSettings({
       autoFadeDelay: 300,
       countdownSeconds: '3',
       controlledCursorCaptureEnabled: false,
       diagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',
-      openEditorAfterRecording: true,
-      quality: 'HIGH',
     })
   ).toEqual({
     hasInvalidRoot: false,
     invalidFieldCount: 1,
     value: {
+      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
       autoFadeDelay: 300,
       controlledCursorCaptureEnabled: false,
       diagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',
-      openEditorAfterRecording: true,
-      quality: 'HIGH',
     },
   });
 });

@@ -42,7 +42,7 @@ export const capabilityPolicyStateDescriptors = [
     ownerModule:
       'apps/extension/src/background/routing-contracts/capabilities/content-action/capability-store.ts',
     proofModules: [
-      'apps/extension/src/background/routing-contracts/capabilities/content-action/capabilities.recording.test.ts',
+      'apps/extension/src/background/routing-contracts/capabilities/content-action/capability-store.test.ts',
     ],
     requiresTtl: true,
     restartBehavior:

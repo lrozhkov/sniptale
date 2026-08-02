@@ -1,6 +1,10 @@
 import { translate } from '../../../../platform/i18n';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { supportsCursorTrackTelemetry } from '../copy';
+import {
+  isKnownVideoOutputProfileSupported,
+  resolveKnownVideoOutputBasis,
+} from '../output-resource-policy';
 import type { VideoSetupPageProps, VideoSetupViewModel } from './types';
 
 type VideoSetupViewModelArgs = Pick<
@@ -14,6 +18,7 @@ type VideoSetupViewModelArgs = Pick<
   | 'galleryStatus'
   | 'webcamDevices'
   | 'isLoadingWebcams'
+  | 'settings'
 >;
 
 export function getGalleryTitle(galleryStatus: VideoSetupPageProps['galleryStatus']): string {
@@ -32,8 +37,14 @@ export function getGalleryTitle(galleryStatus: VideoSetupPageProps['galleryStatu
 
 function getStartDisabledReason(params: {
   currentModeCapability: VideoSetupViewModel['currentModeCapability'];
+  isKnownOutputProfileSupported: boolean;
 }): string | null {
-  return params.currentModeCapability.reason ?? null;
+  return (
+    params.currentModeCapability.reason ??
+    (params.isKnownOutputProfileSupported
+      ? null
+      : translate('popup.video.outputResourceUnsupported'))
+  );
 }
 
 function getModeCapabilities(params: {
@@ -79,14 +90,14 @@ function getModeCapabilities(params: {
 
 function getStartButtonLabel(params: {
   canStart: boolean;
-  currentModeCapability: VideoSetupViewModel['currentModeCapability'];
   isStartPending: boolean;
+  startDisabledReason: string | null;
 }): string {
   if (params.isStartPending) {
     return translate('popup.video.startPending');
   }
 
-  if (params.currentModeCapability.reason) {
+  if (params.startDisabledReason) {
     return translate('popup.video.startUnavailable');
   }
 
@@ -103,6 +114,7 @@ export function getVideoSetupViewModel({
   galleryStatus,
   webcamDevices,
   isLoadingWebcams,
+  settings,
 }: VideoSetupViewModelArgs): VideoSetupViewModel {
   const selectedPreset = viewportPresets.find((preset) => preset.id === selectedPresetId) ?? null;
   const modeCapabilities = getModeCapabilities({
@@ -112,8 +124,13 @@ export function getVideoSetupViewModel({
     webcamDevices,
   });
   const currentModeCapability = modeCapabilities[captureMode];
+  const knownOutputBasisDimensions = resolveKnownVideoOutputBasis(captureMode, selectedPreset);
   const startDisabledReason = getStartDisabledReason({
     currentModeCapability,
+    isKnownOutputProfileSupported: isKnownVideoOutputProfileSupported(
+      knownOutputBasisDimensions,
+      settings.outputProfile
+    ),
   });
   const canStart = !isStartPending && !startDisabledReason;
   const recordingOptionState = getRecordingOptionState({
@@ -124,6 +141,7 @@ export function getVideoSetupViewModel({
 
   return {
     selectedPreset,
+    knownOutputBasisDimensions,
     currentModeCapability,
     modeCapabilities,
     startDisabledReason,
@@ -132,7 +150,7 @@ export function getVideoSetupViewModel({
     diagnosticsDisabled: recordingOptionState.diagnosticsDisabled,
     controlledCursorDisabled,
     controlledCursorDisabledReason,
-    startButtonLabel: getStartButtonLabel({ canStart, currentModeCapability, isStartPending }),
+    startButtonLabel: getStartButtonLabel({ canStart, isStartPending, startDisabledReason }),
     galleryTitle: getGalleryTitle(galleryStatus),
   };
 }

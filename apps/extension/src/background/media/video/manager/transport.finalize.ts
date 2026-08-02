@@ -15,6 +15,18 @@ import { isVideoRecordingStartCancelled } from './flow-cancellation';
 
 const logger = createLogger({ namespace: 'BackgroundVideoFlowTransport:FinalizeStart' });
 
+type RecordingStartContext = {
+  tabId: number | null;
+  captureMode: CaptureMode;
+  captureSource: NonNullable<Awaited<ReturnType<typeof resolveCaptureSource>>>;
+  generation: number;
+  recordingId: string;
+  settings: VideoRecordingSettings;
+  surface: AppliedCaptureSurface | null;
+  streamInstanceId: string;
+  viewport?: Awaited<ReturnType<typeof enableAnnotationsIfNeeded>>;
+};
+
 function resolveOffscreenStartSettings(
   captureMode: CaptureMode,
   settings: VideoRecordingSettings
@@ -26,17 +38,27 @@ function resolveOffscreenStartSettings(
     : { ...settings, systemAudioEnabled: false };
 }
 
-export async function finalizeRecordingStart(context: {
-  tabId: number | null;
-  captureMode: CaptureMode;
-  captureSource: NonNullable<Awaited<ReturnType<typeof resolveCaptureSource>>>;
-  generation: number;
-  recordingId: string;
-  settings: VideoRecordingSettings;
-  surface: AppliedCaptureSurface | null;
-  streamInstanceId: string;
-  viewport?: Awaited<ReturnType<typeof enableAnnotationsIfNeeded>>;
-}): Promise<string | null> {
+function waitForRecordingSourceAdmission(
+  context: RecordingStartContext,
+  multiSource: boolean
+): Promise<string> | null {
+  if (multiSource) return null;
+  const requiresStableViewport =
+    context.captureMode === CaptureMode.TAB_CROP || context.surface?.target === 'viewport';
+  return waitForVideoSourceReady({
+    recordingId: context.recordingId,
+    expectedStreamInstanceId: context.streamInstanceId,
+    expectedViewport: requiresStableViewport ? (context.viewport ?? null) : null,
+    tabId: context.tabId,
+    ...(context.captureMode === CaptureMode.TAB_CROP
+      ? { viewportMismatchPolicy: 'remap' as const }
+      : {}),
+  });
+}
+
+export async function finalizeRecordingStart(
+  context: RecordingStartContext
+): Promise<string | null> {
   markVideoRecordingOffscreenStartDispatched();
   await attemptDiagnosticsStart({
     captureMode: context.captureMode,
@@ -51,17 +73,7 @@ export async function finalizeRecordingStart(context: {
   const multiSource =
     context.captureMode === CaptureMode.SCREEN &&
     normalizeVideoSourceCount(context.settings.sourceCount) > 1;
-  const ready = multiSource
-    ? null
-    : waitForVideoSourceReady({
-        recordingId: context.recordingId,
-        expectedStreamInstanceId: context.streamInstanceId,
-        expectedViewport:
-          context.captureMode === CaptureMode.TAB || context.captureMode === CaptureMode.TAB_CROP
-            ? (context.viewport ?? null)
-            : null,
-        tabId: context.tabId,
-      });
+  const ready = waitForRecordingSourceAdmission(context, multiSource);
   const observedReady = ready?.catch(() => null);
   try {
     await sendOffscreenStartRecording({

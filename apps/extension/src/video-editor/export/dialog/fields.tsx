@@ -1,39 +1,33 @@
 import { translate } from '../../../platform/i18n';
+import { StatusRow } from '../../../ui/compact-inspector-controls';
 import type {
   VideoExportCapabilities,
   VideoProjectExportSettings,
+  VideoProjectExportSettingsPatch,
 } from '../../../features/video/project/types';
 import { ExportDialogNumberField, ExportDialogSelectFields } from './select-fields';
 
 export function ExportDialogFields(params: {
   capabilities: VideoExportCapabilities | null | undefined;
-  onChange: (patch: Partial<VideoProjectExportSettings>) => void;
+  onChange: (patch: VideoProjectExportSettingsPatch) => void;
   selectedClipAvailable: boolean;
   settings: VideoProjectExportSettings;
+  sourceDimensions: { height: number; width: number };
 }) {
-  const { capabilities, onChange, selectedClipAvailable, settings } = params;
+  const { capabilities, onChange, selectedClipAvailable, settings, sourceDimensions } = params;
 
   return (
     <div className="grid grid-cols-2 gap-4">
       <ExportDialogSelectFields
         capabilities={capabilities}
         settings={settings}
+        sourceDimensions={sourceDimensions}
         onChange={onChange}
         selectedClipAvailable={selectedClipAvailable}
       />
-      <ExportDialogNumberField
-        label={translate('videoEditor.exportDialog.widthLabel')}
-        min={320}
-        step={2}
-        value={settings.width}
-        onChange={(value) => onChange({ width: value })}
-      />
-      <ExportDialogNumberField
-        label={translate('videoEditor.exportDialog.heightLabel')}
-        min={180}
-        step={2}
-        value={settings.height}
-        onChange={(value) => onChange({ height: value })}
+      <StatusRow
+        label={translate('videoEditor.exportDialog.outputSizeLabel')}
+        value={`${settings.width} × ${settings.height}`}
       />
       <ExportDialogNumberField
         label={translate('videoEditor.exportDialog.fpsLabel')}

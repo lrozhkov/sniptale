@@ -1,16 +1,22 @@
 import { RECORDING_EXPORT_FILENAME_PREFIX } from '@sniptale/ui/branding';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { saveRecordingSafely } from '../../workflows/media-hub/store';
+import { saveRecordingsBatchWithCompletionSafely } from '../../workflows/media-hub/store';
 import { sendRuntimeMessage } from '../../platform/runtime-messaging/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { beginRecordingFinalization, finishRecordingFinalization } from './finalization-replay';
 import { persistStaticFrameSignals } from './signals/static-frame';
+import { resolveVideoRecordingArtifact } from '../../platform/media-utils/video-recording';
+import { stageAndPublishPostRecordResult } from './post-record-publication';
+import type {
+  FinalizedRecordingStagingArtifact,
+  RecordingStagingCoordinator,
+} from '../../composition/persistence/recordings/staging';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingFinalize' });
 
 type FinalizeResult = {
-  recordingId: string;
   filename: string;
+  recordingId: string;
 };
 
 type FinalizeRecordingOptions = {
@@ -18,55 +24,33 @@ type FinalizeRecordingOptions = {
   notifyStopped?: boolean;
 };
 
+interface FinalizeRecordingInput {
+  artifacts: readonly FinalizedRecordingStagingArtifact[];
+  discard: boolean;
+  options?: FinalizeRecordingOptions;
+  primaryRecordingId: string;
+  staging: RecordingStagingCoordinator | null;
+}
+
+function buildTimestamp(): string {
+  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+}
+
+export function buildRecordingFilename(mimeType: string): string {
+  const { extension } = resolveVideoRecordingArtifact(mimeType);
+  return `${RECORDING_EXPORT_FILENAME_PREFIX}-${buildTimestamp()}.${extension}`;
+}
+
+export function buildSidecarFilename(filenameSuffix: string, mimeType: string): string {
+  const { extension } = resolveVideoRecordingArtifact(mimeType);
+  return `${RECORDING_EXPORT_FILENAME_PREFIX}-${buildTimestamp()}-${filenameSuffix}.${extension}`;
+}
+
 function stringifyFinalizeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function getRecordingFilenameExtension(mimeType: string): 'mp4' | 'webm' {
-  return mimeType.toLowerCase().includes('video/mp4') ? 'mp4' : 'webm';
-}
-
-function buildFinalizeResult(currentRecordingId: string | null, blob: Blob) {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-  const extension = getRecordingFilenameExtension(blob.type);
-  return {
-    blob,
-    filename: `${RECORDING_EXPORT_FILENAME_PREFIX}-${timestamp}.${extension}`,
-    recordingId: currentRecordingId ?? `rec-${Date.now()}`,
-  };
-}
-
-export function buildSidecarFilename(filenameSuffix: string, extension = 'webm'): string {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-  return `${RECORDING_EXPORT_FILENAME_PREFIX}-${timestamp}-${filenameSuffix}.${extension}`;
-}
-
-function buildSidecarFinalizeResult(params: {
-  blob: Blob;
-  filenameSuffix: string;
-  recordingId: string;
-}) {
-  return {
-    blob: params.blob,
-    filename: buildSidecarFilename(params.filenameSuffix),
-    recordingId: params.recordingId,
-  };
-}
-
-async function triggerBackupDownload(recordingId: string, filename: string) {
-  try {
-    await sendRuntimeMessage({
-      type: VideoMessageType.DOWNLOAD_RECORDING,
-      recordingId,
-      filename,
-    });
-    logger.debug('Backup download initiated', { filename });
-  } catch (err) {
-    logger.warn('Backup download failed', err);
-  }
-}
-
-export function notifyRecordingStoppedBestEffort(reason: string, recordingId: string): void {
+function notifyRecordingStoppedBestEffort(reason: string, recordingId: string): void {
   void sendRuntimeMessage({
     type: VideoMessageType.OFFSCREEN_RECORDING_STOPPED,
     recordingId,
@@ -79,185 +63,114 @@ export function notifyRecordingStoppedBestEffort(reason: string, recordingId: st
   });
 }
 
-async function notifyVideoSavedToIdb(recordingId: string, filename: string): Promise<void> {
-  await sendRuntimeMessage({
-    type: VideoMessageType.VIDEO_SAVED_TO_IDB,
+function createPostRecordResult(recordingId: string) {
+  return {
+    primaryRecordingId: recordingId,
+    projectId: null,
     recordingId,
-    filename,
-  }).catch((error) => {
-    logger.debug('Failed to notify runtime about saved recording', {
-      errorMessage: stringifyFinalizeError(error),
-      filename,
-      recordingId,
-    });
+  } as const;
+}
+
+function publishVideoSavedToIdb(recordingId: string): Promise<void> {
+  return stageAndPublishPostRecordResult(createPostRecordResult(recordingId), {
+    sendRuntimeMessage,
   });
 }
 
-export function notifyVideoSavedToIdbBestEffort(
-  recordingId: string,
-  filename: string
-): Promise<void> {
-  return notifyVideoSavedToIdb(recordingId, filename);
+function validateArtifacts(input: FinalizeRecordingInput): FinalizedRecordingStagingArtifact {
+  if (!input.staging) throw new Error('Recording staging is unavailable during finalization.');
+  const ids = new Set<string>();
+  for (const artifact of input.artifacts) {
+    if (artifact.size <= 0) {
+      throw new Error(`Recording ${artifact.artifactId} has no media bytes to save.`);
+    }
+    if (ids.has(artifact.artifactId)) {
+      throw new Error(`Duplicate recording artifact: ${artifact.artifactId}.`);
+    }
+    ids.add(artifact.artifactId);
+  }
+  const primary = input.artifacts.find(
+    (artifact) => artifact.artifactId === input.primaryRecordingId
+  );
+  if (!primary) throw new Error('Primary recording artifact is unavailable.');
+  return primary;
+}
+
+async function abortAfterFailure(
+  staging: RecordingStagingCoordinator,
+  error: unknown
+): Promise<never> {
+  try {
+    await staging.abort();
+  } catch (abortError) {
+    throw new AggregateError(
+      [error, abortError],
+      'Recording finalization and staging abort failed.',
+      { cause: abortError }
+    );
+  }
+  throw error;
 }
 
 export async function finalizeRecording(
-  recordedChunks: Blob[],
-  currentRecordingId: string | null,
-  recorderMimeType?: string,
-  discard = false,
-  options: FinalizeRecordingOptions = {}
+  input: FinalizeRecordingInput
 ): Promise<FinalizeResult | null> {
-  const shouldNotifySaved = options.notifySaved ?? true;
-  const shouldNotifyStopped = options.notifyStopped ?? true;
-
-  if (recordedChunks.length === 0) {
-    logger.warn('No recorded chunks to process');
-    notifyRecordingStoppedWhenEnabled(
-      shouldNotifyStopped,
-      'no-recorded-chunks',
-      currentRecordingId
-    );
-    return null;
-  }
-
-  const mimeType = recorderMimeType || recordedChunks[0]?.type || 'video/webm';
-  const { blob, filename, recordingId } = buildFinalizeResult(
-    currentRecordingId,
-    new Blob(recordedChunks, { type: mimeType })
-  );
-  if (!beginRecordingFinalization(recordingId, logger)) {
-    return null;
-  }
-
-  return persistFinalizedRecording({
-    blob,
-    discard,
-    filename,
-    recordingId,
-    shouldNotifySaved,
-    shouldNotifyStopped,
-  });
-}
-
-function notifyRecordingStoppedWhenEnabled(
-  enabled: boolean,
-  reason: string,
-  recordingId: string | null
-) {
-  if (enabled && recordingId) {
-    notifyRecordingStoppedBestEffort(reason, recordingId);
-  }
-}
-
-async function saveFinalizedRecording(params: {
-  blob: Blob;
-  filename: string;
-  recordingId: string;
-  shouldNotifySaved: boolean;
-}): Promise<boolean> {
-  try {
-    await saveRecordingSafely(params.recordingId, params.blob, params.filename);
-    logger.info('Recording saved to media hub', {
-      recordingId: params.recordingId,
-      filename: params.filename,
+  const primary = validateArtifacts(input);
+  const staging = input.staging!;
+  const shouldNotifySaved = input.options?.notifySaved ?? true;
+  const shouldNotifyStopped = input.options?.notifyStopped ?? true;
+  if (!beginRecordingFinalization(input.primaryRecordingId, logger)) {
+    await staging.delete().catch((error) => {
+      logger.warn('Replay staging cleanup failed; orphan recovery will retry', {
+        errorMessage: stringifyFinalizeError(error),
+        recordingId: input.primaryRecordingId,
+      });
     });
-    await triggerBackupDownload(params.recordingId, params.filename);
-    if (params.shouldNotifySaved) {
-      await notifyVideoSavedToIdb(params.recordingId, params.filename);
+    return null;
+  }
+
+  let terminal = false;
+  try {
+    if (input.discard) {
+      await staging.abort();
+      if (shouldNotifyStopped) {
+        notifyRecordingStoppedBestEffort('recording-discarded', input.primaryRecordingId);
+      }
+      terminal = true;
+      return null;
     }
-    void persistStaticFrameSignals(params.recordingId, params.blob);
-    return true;
-  } catch (err) {
-    logger.error('Failed to save recording to media hub', err);
-    return false;
-  }
-}
 
-async function persistFinalizedRecording(params: {
-  blob: Blob;
-  discard: boolean;
-  filename: string;
-  recordingId: string;
-  shouldNotifySaved: boolean;
-  shouldNotifyStopped: boolean;
-}): Promise<FinalizeResult | null> {
-  let terminal = false;
-  try {
-    logger.info('Recording finalized', {
-      filename: params.filename,
-      discard: params.discard,
-      sizeMb: Number((params.blob.size / 1024 / 1024).toFixed(2)),
+    try {
+      await saveRecordingsBatchWithCompletionSafely(
+        input.artifacts.map((artifact) => ({
+          blob: artifact.file,
+          filename: artifact.filename,
+          id: artifact.artifactId,
+        })),
+        createPostRecordResult(input.primaryRecordingId)
+      );
+    } catch (error) {
+      return await abortAfterFailure(staging, error);
+    }
+    await staging.delete().catch((error) => {
+      logger.warn('Committed recording staging cleanup failed; orphan recovery will retry', {
+        errorMessage: stringifyFinalizeError(error),
+        recordingId: input.primaryRecordingId,
+      });
     });
-    terminal = await persistFinalizedRecordingBody(params);
-    return terminal && !params.discard
-      ? { recordingId: params.recordingId, filename: params.filename }
-      : null;
-  } finally {
-    finishRecordingFinalization(params.recordingId, terminal);
-  }
-}
 
-async function persistFinalizedRecordingBody(params: {
-  blob: Blob;
-  discard: boolean;
-  filename: string;
-  recordingId: string;
-  shouldNotifySaved: boolean;
-  shouldNotifyStopped: boolean;
-}): Promise<boolean> {
-  if (params.discard) {
-    notifyRecordingStoppedWhenEnabled(
-      params.shouldNotifyStopped,
-      'recording-discarded',
-      params.recordingId
-    );
-    return true;
-  }
-
-  const saved = await saveFinalizedRecording(params);
-  notifyRecordingStoppedWhenEnabled(
-    params.shouldNotifyStopped,
-    saved ? 'recording-finalized' : 'media-hub-save-failed',
-    params.recordingId
-  );
-  return saved;
-}
-
-export async function finalizeSidecarRecording(params: {
-  chunks: Blob[];
-  discard: boolean;
-  filenameSuffix: string;
-  mimeType?: string;
-  recordingId: string;
-}): Promise<FinalizeResult | null> {
-  if (params.chunks.length === 0 || params.discard) {
-    return null;
-  }
-
-  const mimeType = params.mimeType || params.chunks[0]?.type || 'video/webm';
-  const { blob, filename, recordingId } = buildSidecarFinalizeResult({
-    blob: new Blob(params.chunks, { type: mimeType }),
-    filenameSuffix: params.filenameSuffix,
-    recordingId: params.recordingId,
-  });
-  if (!beginRecordingFinalization(recordingId, logger)) {
-    return null;
-  }
-
-  let terminal = false;
-  try {
-    await saveRecordingSafely(recordingId, blob, filename);
-    await triggerBackupDownload(recordingId, filename);
+    logger.info('Recording artifacts saved to media hub', {
+      artifactCount: input.artifacts.length,
+      recordingId: input.primaryRecordingId,
+    });
+    void persistStaticFrameSignals(input.primaryRecordingId);
+    if (shouldNotifySaved) await publishVideoSavedToIdb(input.primaryRecordingId);
+    if (shouldNotifyStopped) {
+      notifyRecordingStoppedBestEffort('recording-finalized', input.primaryRecordingId);
+    }
     terminal = true;
-  } catch (err) {
-    logger.error('Failed to save sidecar recording to media hub', err);
-    return null;
+    return { filename: primary.filename, recordingId: input.primaryRecordingId };
   } finally {
-    finishRecordingFinalization(recordingId, terminal);
+    finishRecordingFinalization(input.primaryRecordingId, terminal);
   }
-
-  return {
-    recordingId,
-    filename,
-  };
 }

@@ -5,6 +5,7 @@ import {
   type AppLocale,
   type TranslationKey,
 } from '../../../../../platform/i18n';
+import { openSettingsPage } from '../../../../../platform/navigation/extension-pages';
 import type { ViewportPreset } from '../../../../../contracts/settings';
 import { getViewportPresetDisplayName } from '../../../../../features/viewport-presets/display-name';
 import { formatViewportPresetDimensions } from '../../../../../features/viewport-presets/format';
@@ -166,6 +167,24 @@ export function VideoPresetSelector({
       onChange={(value) => {
         void onPresetChange(value || null);
       }}
+      optionsFooter={<ManageSizePresetsButton />}
     />
+  );
+}
+
+function ManageSizePresetsButton() {
+  return (
+    <button
+      type="button"
+      className={[
+        'min-h-8 w-full rounded-[8px] border border-[var(--sniptale-color-border-soft)] px-2',
+        'text-xs font-medium text-[var(--sniptale-color-text-secondary)] transition-colors',
+        'hover:bg-[var(--sniptale-color-surface-hover)]',
+        'hover:text-[var(--sniptale-color-text-primary)]',
+      ].join(' ')}
+      onClick={() => void openSettingsPage({ section: 'presets' })}
+    >
+      {translate('popup.video.manageSizePresets')}
+    </button>
   );
 }

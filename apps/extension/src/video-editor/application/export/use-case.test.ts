@@ -68,6 +68,8 @@ function createProject(): VideoProject {
 function createSettings(): VideoProjectExportSettings {
   return {
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     width: 1920,
     height: 1080,
     fps: 30,

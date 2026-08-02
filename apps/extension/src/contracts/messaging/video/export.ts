@@ -12,9 +12,6 @@ import type {
   RuntimeOffscreenGetProjectExportCapabilitiesMessage,
   RuntimeProjectExportCompletedMessage,
   RuntimeProjectExportProgressMessage,
-  RuntimeRegionCaptureErrorMessage,
-  RuntimeRegionCaptureStartedMessage,
-  RuntimeRegionCaptureStoppedMessage,
   RuntimeStartProjectExportMessage,
   RuntimeVideoSavedToIdbMessage,
 } from '../contracts/types';
@@ -27,6 +24,10 @@ import type { VideoProjectExportSettings } from '../../../features/video/project
 import type { ProjectExportInputReference } from '../../video/types/project-export-input';
 
 export type RuntimeProjectExportLifecycleResponse = RuntimeMessageResponse<{ result?: string }>;
+export type VideoSavedToIdbOutcome = 'accepted' | 'discarded' | 'superseded';
+export type RuntimeVideoSavedToIdbResponse = RuntimeMessageResponse<{
+  result: VideoSavedToIdbOutcome;
+}>;
 
 export type RuntimeVideoExportRequestByType = {
   [VideoMessageType.START_PROJECT_EXPORT]: RuntimeStartProjectExportMessage;
@@ -70,9 +71,6 @@ export type RuntimeVideoExportRequestByType = {
   [VideoMessageType.VIDEO_SAVED_TO_IDB]: RuntimeVideoSavedToIdbMessage;
   KEEP_ALIVE: { type: 'KEEP_ALIVE'; tabId?: number };
   AREA_SELECTED: RuntimeAreaSelectedMessage;
-  REGION_CAPTURE_STARTED: RuntimeRegionCaptureStartedMessage;
-  REGION_CAPTURE_ERROR: RuntimeRegionCaptureErrorMessage;
-  REGION_CAPTURE_STOPPED: RuntimeRegionCaptureStoppedMessage;
 };
 
 export type RuntimeVideoExportResponseByType = {
@@ -89,10 +87,7 @@ export type RuntimeVideoExportResponseByType = {
   [VideoMessageType.DIAGNOSTIC_EVENT_FROM_CS]: RuntimeAckResponse;
   [VideoMessageType.DOWNLOAD_RECORDING_SIDECAR]: DownloadRecordingResponse;
   [VideoMessageType.DOWNLOAD_RECORDING]: DownloadRecordingResponse;
-  [VideoMessageType.VIDEO_SAVED_TO_IDB]: RuntimeAckResponse;
+  [VideoMessageType.VIDEO_SAVED_TO_IDB]: RuntimeVideoSavedToIdbResponse;
   KEEP_ALIVE: RuntimeAckResponse;
   AREA_SELECTED: RuntimeAckResponse;
-  REGION_CAPTURE_STARTED: RuntimeAckResponse;
-  REGION_CAPTURE_ERROR: RuntimeAckResponse;
-  REGION_CAPTURE_STOPPED: RuntimeAckResponse;
 };

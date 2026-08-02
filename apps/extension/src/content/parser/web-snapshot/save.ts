@@ -137,10 +137,14 @@ async function saveStagedWebSnapshot(
         type: MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
       });
       if (response.success !== true) {
-        throw new Error(response.error || 'Failed to release staged web snapshot payloads.');
+        throw new Error(response.error || 'Failed to release staged web snapshot payloads.', {
+          cause: error,
+        });
       }
     } catch (cleanupError) {
-      throw new AggregateError([error, cleanupError], 'Web snapshot staging and rollback failed');
+      throw new AggregateError([error, cleanupError], 'Web snapshot staging and rollback failed', {
+        cause: cleanupError,
+      });
     }
     throw error;
   }

@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 import {
   parseRuntimeRequestMessage,
@@ -9,16 +10,10 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 function createRecordingSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 300,
     countdownSeconds: 0,
     diagnosticsEnabled: true,
-    microphoneDeviceId: null,
-    microphoneEnabled: false,
-    openEditorAfterRecording: false,
-    quality: '1080p',
-    systemAudioEnabled: true,
-    webcamDeviceId: null,
-    webcamEnabled: false,
   };
 }
 

@@ -1,14 +1,11 @@
 import type { VideoCursorCaptureMode } from '../../../features/video/project/types/interaction';
 import {
   CaptureMode,
+  resolveVideoOutputProfile,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { recordingContext } from '../context';
-import {
-  createCropStream,
-  resolveOnePixelEncodingCrop,
-  type CropStreamControls,
-} from '../stream/crop-stream';
+import type { CropStreamControls } from '../stream/crop-stream';
 import {
   createTabOutputStream,
   resolveTabOutputGeometry,
@@ -21,6 +18,12 @@ import {
 } from '../stream/video-source';
 import { acquireRecordingSourceStream } from './capture';
 import { attachMicrophoneAudioIfEnabled } from './video';
+import { createFixedVideoOutputStream } from '../stream/fixed-video-output';
+import {
+  applyVideoTrackContentHint,
+  resolveVideoRecordingFrameRate,
+} from '../../../platform/media-utils/video-recording';
+import type { VideoOutputDimensions } from '@sniptale/runtime-contracts/video/types/types';
 
 type RecordingSetupParams = {
   streamId: string;
@@ -60,9 +63,12 @@ async function createOutputVideoStream(
   raw: { width: number; height: number }
 ): Promise<{
   controls: CropStreamControls | null;
+  frameRate: number;
+  outputSize: VideoOutputDimensions;
   stream: MediaStream;
   tabOutputGeometry: TabOutputGeometry | null;
 }> {
+  const frameRate = resolveVideoRecordingFrameRate(params.settings);
   if (params.captureMode === CaptureMode.TAB || params.captureMode === CaptureMode.TAB_CROP) {
     if (!params.viewport) throw new Error('Tab recording viewport geometry is unavailable');
     if (!params.viewport.devicePixelRatio) {
@@ -77,32 +83,91 @@ async function createOutputVideoStream(
       params.captureMode === CaptureMode.TAB_CROP && params.cropRegion
         ? params.cropRegion
         : { x: 0, y: 0, width: coordinateSpace.width, height: coordinateSpace.height };
+    const outputProfile = resolveVideoOutputProfile(params.settings);
     const tabOutputGeometry = resolveTabOutputGeometry(
       requestedCrop,
       { width: raw.width, height: raw.height },
-      coordinateSpace
+      coordinateSpace,
+      {
+        frameRateCap: outputProfile.frameRate,
+        resolution: outputProfile.resolution,
+        tracksFullViewport: params.captureMode === CaptureMode.TAB,
+      }
     );
-    const output = await createTabOutputStream(source, tabOutputGeometry, {
+    const tabOutput = await createTabOutputStream(source, tabOutputGeometry, {
+      frameRate,
       initiallySuspended: params.surface?.target === 'viewport',
     });
     return {
-      controls:
-        params.captureMode === CaptureMode.TAB_CROP || params.surface?.target === 'viewport'
-          ? output.controls
-          : null,
-      stream: output.stream,
+      controls: tabOutput.controls,
+      frameRate: tabOutput.frameRate,
+      outputSize: tabOutputGeometry.outputSize,
+      stream: tabOutput.stream,
       tabOutputGeometry,
     };
   }
-  if (params.captureMode !== undefined) {
-    return { controls: null, stream: source, tabOutputGeometry: null };
+  if (params.captureMode === CaptureMode.CAMERA) {
+    const fixedOutput = await createFixedOutputStream(source, params.settings);
+    return {
+      controls: null,
+      frameRate: fixedOutput.frameRate,
+      outputSize: fixedOutput.outputSize,
+      stream: fixedOutput.stream,
+      tabOutputGeometry: null,
+    };
   }
-  const encodingCrop = resolveOnePixelEncodingCrop(raw);
+  const fixedOutput = await createFixedOutputStream(source, params.settings);
   return {
     controls: null,
-    stream: encodingCrop ? await createCropStream(source, encodingCrop) : source,
+    frameRate: fixedOutput.frameRate,
+    outputSize: fixedOutput.outputSize,
+    stream: fixedOutput.stream,
     tabOutputGeometry: null,
   };
+}
+
+async function createFixedOutputStream(
+  source: MediaStream,
+  settings: VideoRecordingSettings
+): Promise<{ frameRate: number; outputSize: VideoOutputDimensions; stream: MediaStream }> {
+  const fixedOutput = await createFixedVideoOutputStream(source, settings, {
+    frameRate: resolveVideoRecordingFrameRate(settings),
+    includeSourceAudio: true,
+    sourceOwnership: 'caller',
+  });
+  return {
+    frameRate: fixedOutput.frameRate,
+    outputSize: fixedOutput.dimensions,
+    stream: fixedOutput.stream,
+  };
+}
+
+function assertEncoderInputSettings(
+  track: MediaStreamTrack,
+  expectedSize: VideoOutputDimensions,
+  expectedFrameRate: number
+): MediaTrackSettings {
+  const applied = track.getSettings();
+  if (applied.width !== expectedSize.width || applied.height !== expectedSize.height) {
+    throw new Error(
+      `Recording output geometry is invalid: expected ${expectedSize.width}x${expectedSize.height}, ` +
+        `received ${applied.width ?? 'unknown'}x${applied.height ?? 'unknown'}`
+    );
+  }
+  const appliedFrameRate = applied.frameRate;
+  const frameRate = appliedFrameRate ?? expectedFrameRate;
+  if (
+    typeof frameRate !== 'number' ||
+    !Number.isFinite(frameRate) ||
+    frameRate <= 0 ||
+    frameRate > expectedFrameRate
+  ) {
+    throw new Error(
+      `Recording output frame rate is invalid: expected at most ${expectedFrameRate}, ` +
+        `received ${appliedFrameRate ?? 'unknown'}`
+    );
+  }
+  return { ...applied, frameRate };
 }
 
 function assertTabSourceGeometry(
@@ -141,20 +206,32 @@ export async function prepareRecordingStream(
   const { stream: sourceStream, cursorCaptureMode } = await acquireRecordingSourceStream({
     streamId: params.streamId,
     settings: params.settings,
-    ...(params.surface?.target === 'viewport' ? { excludeNativeCursor: true } : {}),
     ...(params.captureMode === undefined ? {} : { captureMode: params.captureMode }),
-    ...(params.viewport === undefined
-      ? {}
-      : { viewport: { width: params.viewport.width, height: params.viewport.height } }),
   });
   recordingContext.sourceStream = sourceStream;
   const raw = await readRawSource(sourceStream);
   assertTabSourceGeometry(params, raw);
-  const output = await createOutputVideoStream(sourceStream, params, raw);
+  const output = await createOutputVideoStream(sourceStream, params, {
+    height: raw.height,
+    width: raw.width,
+  });
+  const outputTrack = output.stream.getVideoTracks()[0];
+  if (!outputTrack) throw new Error('Recording output is missing a video track');
+  const outputTrackSettings = assertEncoderInputSettings(
+    outputTrack,
+    output.outputSize,
+    output.frameRate
+  );
   recordingContext.videoStream = output.stream;
   await attachMicrophoneAudioIfEnabled(params.settings);
-  const outputTrack = recordingContext.videoStream?.getVideoTracks()[0];
-  if (!outputTrack) throw new Error('Recording output is missing a video track');
+  applyVideoTrackContentHint(
+    outputTrack,
+    params.captureMode === CaptureMode.CAMERA
+      ? 'motion'
+      : params.captureMode === CaptureMode.TAB || params.captureMode === CaptureMode.TAB_CROP
+        ? 'text'
+        : 'detail'
+  );
   return {
     cursorCaptureMode,
     rawTrackSettings: raw.trackSettings,
@@ -162,6 +239,11 @@ export async function prepareRecordingStream(
     rawVideoWidth: raw.width,
     tabOutputControls: output.controls,
     tabOutputGeometry: output.tabOutputGeometry,
-    trackSettings: outputTrack.getSettings(),
+    trackSettings: {
+      ...outputTrackSettings,
+      ...(raw.trackSettings.displaySurface === undefined
+        ? {}
+        : { displaySurface: raw.trackSettings.displaySurface }),
+    },
   };
 }

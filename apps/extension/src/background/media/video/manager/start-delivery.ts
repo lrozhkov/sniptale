@@ -18,7 +18,7 @@ export async function finalizeAcceptedRecordingStart(
   context: {
     captureMode: CaptureMode;
     generation: number;
-    settings: { openEditorAfterRecording: boolean; sourceCount?: number };
+    settings: { sourceCount?: number };
     viewportPresetId: string | null;
   },
   streamInstanceId: string
@@ -39,10 +39,12 @@ export async function finalizeAcceptedRecordingStart(
     streamInstanceId,
   });
   scheduleRecordingStartActivationWatchdog(recordingId);
+  const cameraLaunchToken =
+    context.captureMode === CaptureMode.CAMERA
+      ? await issueCameraRecorderLaunchToken(recordingId)
+      : null;
   return {
-    ...(context.captureMode === CaptureMode.CAMERA
-      ? { cameraLaunchToken: issueCameraRecorderLaunchToken(recordingId) }
-      : {}),
+    ...(cameraLaunchToken === null ? {} : { cameraLaunchToken }),
     controlToken: activeLease.controlToken,
     recordingId,
     result: 'accepted',

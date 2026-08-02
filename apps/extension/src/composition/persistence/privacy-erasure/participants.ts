@@ -12,6 +12,10 @@ import {
   createVideoPreviewCacheParticipant,
   type VideoPreviewCacheErasureAdapter,
 } from './video-preview-participant';
+import {
+  createRecordingStagingErasureParticipant,
+  type RecordingStagingErasureAdapter,
+} from './recording-staging-participant';
 
 interface ErasureIndexedDbAdapter {
   countStores(storeNames: readonly string[]): Promise<number>;
@@ -29,6 +33,7 @@ export interface LocalExtensionDataErasureDeps {
     verifyEmpty(): Promise<boolean>;
   };
   indexedDb: ErasureIndexedDbAdapter;
+  recordingStaging: RecordingStagingErasureAdapter;
   extensionPageLocalStorage?: ExtensionPageLocalStorageErasureAdapter;
   videoPreviewCache: VideoPreviewCacheErasureAdapter;
 }
@@ -105,6 +110,7 @@ function buildErasureParticipants(
     createIndexedDbParticipant({ deps, storeNames }),
     createEditorBootstrapParticipant(deps),
     createVideoPreviewCacheParticipant(deps.videoPreviewCache),
+    createRecordingStagingErasureParticipant(deps.recordingStaging),
     ...(deps.extensionPageLocalStorage
       ? [createExtensionPageLocalStorageParticipant(deps.extensionPageLocalStorage, options)]
       : []),

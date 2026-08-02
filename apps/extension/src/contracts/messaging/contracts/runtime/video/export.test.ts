@@ -20,8 +20,10 @@ function createExportSettings() {
     width: 1280,
     height: 720,
     fps: 30,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     downloadAfterExport: true,
   };
 }
@@ -161,35 +163,6 @@ it('parses recordingId-only download messages and rejects arbitrary URL payloads
       type: VideoMessageType.DOWNLOAD_RECORDING_SIDECAR,
     })
   );
-});
-
-it('requires recording ids for saved-video notifications', () => {
-  expect(
-    runtimeVideoExportMessageContracts[VideoMessageType.VIDEO_SAVED_TO_IDB].parseRequest({
-      projectId: 'project-1',
-      recordingId: 'recording-1',
-      type: VideoMessageType.VIDEO_SAVED_TO_IDB,
-    })
-  ).toEqual(
-    expect.objectContaining({
-      projectId: 'project-1',
-      recordingId: 'recording-1',
-    })
-  );
-  expect(() =>
-    runtimeVideoExportMessageContracts[VideoMessageType.VIDEO_SAVED_TO_IDB].parseRequest({
-      type: VideoMessageType.VIDEO_SAVED_TO_IDB,
-    })
-  ).toThrow(/VIDEO_SAVED_TO_IDB/);
-  expect(
-    runtimeVideoExportMessageContracts[VideoMessageType.VIDEO_SAVED_TO_IDB].parseResponse({
-      success: true,
-      result: 'accepted',
-    })
-  ).toEqual({
-    success: true,
-    result: 'accepted',
-  });
 });
 
 it('parses diagnostic runtime messages', () => {

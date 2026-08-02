@@ -1,6 +1,6 @@
 # Security data handling
 
-Updated: 2026-07-19
+Updated: 2026-08-01
 
 ## Scope
 
@@ -35,6 +35,8 @@ This policy covers AI credentials and request history, secret-bearing network tr
 - Model egress uses the shared payload-bound lease, proof, normalization, redaction, and transport pipeline. Point-of-action UI discloses provider, model, prompt inclusion, page-data classes, and metadata-only retention before submit.
 - Scenario pending-capture session state may hold metadata and a temporary asset reference; screenshot blobs stay in the scenario temp-asset store.
 - User-selected video-editor Cache mode may retain local-only derived AVC preview segments in the dedicated IndexedDB database `sniptale-video-preview-cache`. The cache is advisory, limited to 14 days, 12 records, and 512 MiB, excluded from project export, backup, sync, and diagnostics, removed before project deletion, and always removed and absence-verified by local-data erasure. Preview preferences follow `preservePreferences`; derived media never does.
+- Active video recording writes uncommitted MediaRecorder chunks to the extension origin private file system under `sniptale-recording-staging`. Staging is local-only, excluded from backup, sync, export, diagnostics, and the media library, and has a 64 MiB aggregate in-flight write ceiling per recording session. A successful atomic media-library commit deletes the staging session; discard and terminal failure abort it. Normal offscreen startup removes orphan sessions before announcing readiness. Local-data erasure invalidates and aborts active staging writers, removes every staging session, and verifies an empty directory under the persistent-data erasure barrier after media mutations have been excluded and the recording offscreen runtime has closed.
+- A finalized recording creates one exact `video-recording-completion-outbox` row in the existing IndexedDB `state_manager` store in the same transaction as its recording and media-library rows. The outbox contains recording IDs and an optional project ID, never media bytes, URLs, page data, or diagnostics. Offscreen restart replays this row before readiness, and exact background acceptance retires it. An unacknowledged post-record decision does not expire; only an acknowledged session-storage tombstone has a 12-hour retention bound. Local-data erasure clears and verifies the complete `state_manager` store together with committed media and prevents an active writer from recreating the row across the erasure barrier.
 
 ## Network secret ownership
 

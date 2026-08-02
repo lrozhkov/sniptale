@@ -7,6 +7,7 @@ import type {
   VideoProjectCursorTrack,
 } from '../../../features/video/project/types';
 import type {
+  VideoPostRecordResult,
   VideoRecordingRuntimeState,
   ViewportInfo,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -19,6 +20,7 @@ export type RecordingStateHealth = (typeof recordingStateHealthValues)[number];
 
 export type RecordingStateResponse = RuntimeMessageResponse<{
   controlToken?: string;
+  postRecordResult?: VideoPostRecordResult;
   recordingHealth: RecordingStateHealth;
   recordingId?: string;
   state?: VideoRecordingRuntimeState;

@@ -1,4 +1,3 @@
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { resolveVideoViewportPresetId } from '../../../../features/viewport-presets/video-recording-policy';
 import type { PopupVideoSetupRuntime } from '../../runtime/types/video-setup';
 type RecordingControls = PopupVideoSetupRuntime['recording'];
@@ -25,9 +24,6 @@ export function createPopupVideoSetupHandlers(runtime: PopupVideoSetupRuntime) {
         runtime.recording.setSelectedPresetId(selectedPresetId);
       }
       setVideoCaptureMode(mode);
-      if (mode === CaptureMode.CAMERA) {
-        forceCameraModeSettings(runtime);
-      }
     },
     onPresetChange: createPresetChangeHandler(runtime, runtime.recording),
     onMicrophoneDeviceChange: (microphoneDeviceId: string | null) => {
@@ -55,19 +51,6 @@ export function createPopupVideoSetupHandlers(runtime: PopupVideoSetupRuntime) {
       }));
     },
   };
-}
-
-function forceCameraModeSettings(runtime: PopupVideoSetupRuntime): void {
-  const firstWebcamDeviceId = runtime.recording.webcamDevices[0]?.deviceId ?? null;
-  runtime.recording.setVideoSettings((previous: VideoSettings) => ({
-    ...previous,
-    controlledCursorCaptureEnabled: false,
-    diagnosticsEnabled: false,
-    sourceCount: 1,
-    systemAudioEnabled: false,
-    webcamDeviceId: previous.webcamDeviceId ?? firstWebcamDeviceId,
-    webcamEnabled: true,
-  }));
 }
 
 function createPresetChangeHandler(runtime: PopupVideoSetupRuntime, recording: RecordingControls) {

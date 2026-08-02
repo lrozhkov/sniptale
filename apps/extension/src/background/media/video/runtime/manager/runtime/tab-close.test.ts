@@ -68,10 +68,10 @@ it('stops the recording when the active recording tab closes', async () => {
   await handleTabClose(7);
 
   expect(stopRecordingMock).toHaveBeenCalledTimes(1);
-  expect(stopRecordingMock).toHaveBeenCalledWith(true);
+  expect(stopRecordingMock).toHaveBeenCalledWith(false);
   expect(markTabClosedMock).toHaveBeenCalledWith('recording-1', 7);
-  expect(releaseSurfaceMock).toHaveBeenCalledWith('recording-1');
-  expect(clearActiveLeaseMock).toHaveBeenCalledWith('recording-1');
+  expect(releaseSurfaceMock).not.toHaveBeenCalled();
+  expect(clearActiveLeaseMock).not.toHaveBeenCalled();
   expect(logger.log).toHaveBeenCalledWith('Recording tab closed, stopping recording');
 });
 

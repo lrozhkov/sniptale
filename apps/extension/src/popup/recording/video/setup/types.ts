@@ -3,6 +3,7 @@ import type { StoragePressureLevel } from '../../../../features/media-hub/storag
 import type { ViewportPreset } from '../../../../contracts/settings';
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
+  type VideoOutputDimensions,
   type VideoRecordingRuntimeState,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -54,4 +55,5 @@ export interface VideoSetupViewModel {
   controlledCursorDisabledReason: string | null;
   startButtonLabel: string;
   galleryTitle: string;
+  knownOutputBasisDimensions: VideoOutputDimensions | null;
 }

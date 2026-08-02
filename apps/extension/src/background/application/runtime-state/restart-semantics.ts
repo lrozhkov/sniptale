@@ -110,16 +110,6 @@ export const runtimeAuthorityRestartSemantics = [
     restartClass: 'transaction-bound',
   },
   {
-    authority: 'Recording download staged chunks',
-    ownerModule:
-      'apps/extension/src/background/capture/routing/recording-download/staged-recordings.ts',
-    proofModule:
-      'apps/extension/src/background/capture/routing/recording-download/staged-recordings.test.ts',
-    restartBehavior:
-      'In-flight recording chunks are transaction-bound; final save fails closed when staging state is absent.',
-    restartClass: 'transaction-bound',
-  },
-  {
     authority: 'Popup export staged archives',
     ownerModule: 'apps/extension/src/background/capture/popup-export/staged-archives.ts',
     proofModule: 'apps/extension/src/background/capture/popup-export/staged-archives.test.ts',

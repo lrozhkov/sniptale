@@ -2,6 +2,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { sendRuntimeMessage } from '../../../platform/runtime-messaging';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { WebcamActualSettings } from '@sniptale/runtime-contracts/video/types/types';
+import { stageAndPublishPostRecordResult } from '../post-record-publication';
 
 const logger = createLogger({ namespace: 'OffscreenMultiSourceMessages' });
 
@@ -18,6 +19,17 @@ export function notifyMultiSourceStarted(
   });
 }
 
+export function notifyMultiSourceRuntimeFailure(recordingId: string, error: Error): void {
+  void sendRuntimeMessage({
+    type: VideoMessageType.OFFSCREEN_ERROR,
+    error: error.message,
+    phase: 'runtime',
+    recordingId,
+  }).catch((notifyError) => {
+    logger.debug('Failed to notify multi-source runtime failure', notifyError);
+  });
+}
+
 export async function notifyMultiSourceStopped(recordingId: string): Promise<void> {
   await sendRuntimeMessage({
     type: VideoMessageType.OFFSCREEN_RECORDING_STOPPED,
@@ -28,25 +40,16 @@ export async function notifyMultiSourceStopped(recordingId: string): Promise<voi
 }
 
 export async function notifyMultiSourceSaved(params: {
+  primaryRecordingId: string;
   projectId: string | null;
   recordingId: string;
 }): Promise<void> {
-  await sendRuntimeMessage({
-    type: VideoMessageType.VIDEO_SAVED_TO_IDB,
-    recordingId: params.recordingId,
-    ...(params.projectId === null ? {} : { projectId: params.projectId }),
-  }).catch((error) => logger.debug('Failed to notify multi-source save', error));
-}
-
-export async function triggerMultiSourceDownload(
-  recordingId: string,
-  filename: string
-): Promise<void> {
-  await sendRuntimeMessage({
-    type: VideoMessageType.DOWNLOAD_RECORDING,
-    recordingId,
-    filename,
-  }).catch((error) => {
-    logger.warn('Multi-source backup download failed', error);
-  });
+  await stageAndPublishPostRecordResult(
+    {
+      primaryRecordingId: params.primaryRecordingId,
+      projectId: params.projectId,
+      recordingId: params.recordingId,
+    },
+    { sendRuntimeMessage }
+  );
 }

@@ -82,6 +82,7 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => {
 
 import { pauseRecording, resumeRecording, startRecording, stopRecording } from './controller';
 import { recordingContext } from './context';
+import { createRecordingStagingCoordinatorTestDouble } from './encoding/artifact-session.test-support';
 
 function createDurationTracker() {
   return {
@@ -91,6 +92,43 @@ function createDurationTracker() {
     startSegment: vi.fn(),
     stopSegment: vi.fn(),
   };
+}
+
+function bindActiveArtifactSession(binding: {
+  generation: number;
+  recordingId: string;
+  streamInstanceId: string;
+}) {
+  const mediaRecorder = Object.assign(new EventTarget(), {
+    pause: vi.fn(),
+    requestData: vi.fn(),
+    resume: vi.fn(),
+    start: vi.fn(),
+    state: 'recording' as RecordingState,
+    stop: vi.fn(),
+  }) as unknown as MediaRecorder;
+  const file = new File(['saved'], 'recording.webm', { type: 'video/webm' });
+  const artifactStop = vi.fn(async () => {
+    mediaRecorder.dispatchEvent(new Event('stop'));
+    recordingContext.stopRecordingResolve?.({ result: 'stopped' });
+    return {
+      artifactId: binding.recordingId,
+      file,
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+    };
+  });
+  recordingContext.stagingCoordinator = createRecordingStagingCoordinatorTestDouble();
+  recordingContext.bindStartingArtifactSession({
+    abort: vi.fn().mockResolvedValue(undefined),
+    recorder: mediaRecorder,
+    setLifecycleCallbacks: vi.fn(),
+    start: vi.fn(),
+    stop: artifactStop,
+  });
+  recordingContext.activateRecorder(mediaRecorder);
+  return artifactStop;
 }
 
 beforeEach(() => {
@@ -114,7 +152,7 @@ it('rejects duplicate starts when only a webcam sidecar session is active', asyn
   expect(startRecordingImplMock).not.toHaveBeenCalled();
 });
 
-it('kicks off webcam sidecar flush when stopping the main recorder', async () => {
+it('delegates main and sidecar finalization to the artifact lifecycle owner', async () => {
   recordingContext.beginRecordingSession('recording-1');
   const binding = {
     generation: 0,
@@ -122,20 +160,15 @@ it('kicks off webcam sidecar flush when stopping the main recorder', async () =>
     streamInstanceId: 'stream-instance-1',
   };
   recordingContext.bindStreamInstance(binding);
-  recordingContext.activateRecorder({
-    requestData: vi.fn(),
-    state: 'recording',
-    stop: vi.fn(),
-  } as never);
+  const artifactStop = bindActiveArtifactSession(binding);
 
-  const stopPromise = stopRecording(binding);
-  recordingContext.stopRecordingResolve?.();
+  await expect(stopRecording(binding)).resolves.toEqual({ result: 'stopped' });
 
-  expect(stopActiveSidecarRecordersWithFlushMock).toHaveBeenCalledOnce();
-  await expect(stopPromise).resolves.toEqual({ result: 'stopped' });
+  expect(artifactStop).toHaveBeenCalledOnce();
+  expect(stopActiveSidecarRecordersWithFlushMock).not.toHaveBeenCalled();
 });
 
-it('keeps sidecar stop rejection handled while the main recorder owns stop completion', async () => {
+it('does not start a competing sidecar stop when the artifact lifecycle owns completion', async () => {
   stopActiveSidecarRecordersWithFlushMock.mockRejectedValueOnce(new Error('sidecar failed'));
   recordingContext.beginRecordingSession('recording-1');
   const binding = {
@@ -144,17 +177,12 @@ it('keeps sidecar stop rejection handled while the main recorder owns stop compl
     streamInstanceId: 'stream-instance-1',
   };
   recordingContext.bindStreamInstance(binding);
-  recordingContext.activateRecorder({
-    requestData: vi.fn(),
-    state: 'recording',
-    stop: vi.fn(),
-  } as never);
+  const artifactStop = bindActiveArtifactSession(binding);
 
-  const stopPromise = stopRecording(binding);
-  await Promise.resolve();
-  recordingContext.stopRecordingResolve?.();
+  await expect(stopRecording(binding)).resolves.toEqual({ result: 'stopped' });
 
-  await expect(stopPromise).resolves.toEqual({ result: 'stopped' });
+  expect(artifactStop).toHaveBeenCalledOnce();
+  expect(stopActiveSidecarRecordersWithFlushMock).not.toHaveBeenCalled();
 });
 
 it('routes pause and resume to active webcam sidecars', () => {

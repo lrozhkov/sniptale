@@ -99,7 +99,8 @@ vi.mock('../../offscreen-manager', async (importOriginal) => ({
 }));
 
 import { installBackgroundRuntimeMessagingMock } from '../../../../../routing-contracts/runtime-messaging/mock';
-import { handleDownloadRecording, handleStartProjectExport } from './index';
+import { handleDownloadRecording } from './download';
+import { handleStartProjectExport } from './project-export';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   createExportHandlerInputReference as createInputReference,

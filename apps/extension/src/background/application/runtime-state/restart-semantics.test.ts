@@ -46,7 +46,6 @@ it('keeps MV3 restart semantics explicit for in-memory authority owners', () => 
       expect.objectContaining({ authority: 'Content privileged action capabilities' }),
       expect.objectContaining({ authority: 'Gallery image update capabilities' }),
       expect.objectContaining({ authority: 'Web snapshot staged blobs' }),
-      expect.objectContaining({ authority: 'Recording download staged chunks' }),
       expect.objectContaining({ authority: 'Popup export staged archives' }),
       expect.objectContaining({ authority: 'Video recording control lease' }),
       expect.objectContaining({ authority: 'Project export ledger and capabilities' }),

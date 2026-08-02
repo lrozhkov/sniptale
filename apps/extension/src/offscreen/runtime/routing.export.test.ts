@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import type { TabOutputGeometry } from '../recording/geometry/tab-source';
 
 const {
   activateViewportOutputMock,
@@ -43,13 +44,7 @@ const {
     sourceStream: null,
     sourceVideoHeight: 720,
     sourceVideoWidth: 1280,
-    tabOutputGeometry: null as null | {
-      coordinateSpace: { devicePixelRatio: number; width: number; height: number };
-      requestedCrop: { x: number; y: number; width: number; height: number };
-      sourceSize: { width: number; height: number };
-      sourceRect: { x: number; y: number; width: number; height: number };
-      outputSize: { width: number; height: number };
-    },
+    tabOutputGeometry: null as TabOutputGeometry | null,
     tabOutputControls: null as null | {
       activate: ReturnType<typeof vi.fn>;
       applyFrozenSourceGeometry: ReturnType<typeof vi.fn>;
@@ -142,6 +137,7 @@ import {
   createProject,
   createProjectExportInputReference,
 } from './test-support';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -166,12 +162,12 @@ beforeEach(() => {
 
 function createRecordingSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
-    openEditorAfterRecording: false,
     quality: VideoQuality.HIGH,
     systemAudioEnabled: false,
   };
@@ -489,10 +485,15 @@ it('revalidates source metadata and returns typed ALLOW or DENY responses', asyn
 
   recordingContextMock.tabOutputGeometry = {
     coordinateSpace: { devicePixelRatio: 1, width: 1280, height: 720 },
+    fit: 'contain',
+    frameRateCap: 30,
+    logicalContentRect: { x: 0, y: 0, width: 1280, height: 720 },
+    outputBasis: { width: 300, height: 300 },
     requestedCrop: { x: 100, y: 80, width: 300, height: 300 },
     sourceSize: { width: 1280, height: 720 },
     sourceRect: { x: 100, y: 80, width: 300, height: 300 },
     outputSize: { width: 300, height: 300 },
+    tracksFullViewport: false,
   };
   await handleOffscreenRuntimeMessage(
     {
@@ -566,10 +567,15 @@ it('remaps a frozen viewport crop without waiting for starved media callbacks', 
   };
   const geometry = {
     coordinateSpace: { devicePixelRatio: 1, width: 1280, height: 720 },
+    fit: 'contain' as const,
+    frameRateCap: 30 as const,
+    logicalContentRect: { x: 0, y: 0, width: 1280, height: 720 },
+    outputBasis: { width: 300, height: 300 },
     requestedCrop: { x: 100, y: 80, width: 300, height: 300 },
     sourceSize: { width: 1280, height: 720 },
     sourceRect: { x: 100, y: 80, width: 300, height: 300 },
     outputSize: { width: 300, height: 300 },
+    tracksFullViewport: false,
   };
   Object.assign(recordingContextMock, {
     sourceStream: { id: 'source-stream' },
@@ -602,10 +608,15 @@ it('remaps a frozen viewport crop without waiting for starved media callbacks', 
   expect(readFrozenSourceSize).toHaveBeenCalledWith('navigation-1');
   expect(applyFrozenSourceGeometry).toHaveBeenCalledWith('navigation-1', {
     coordinateSpace: { devicePixelRatio: 1, width: 1280, height: 720 },
+    fit: 'contain',
+    frameRateCap: 30,
+    logicalContentRect: { x: 0, y: 0, width: 1920, height: 1080 },
+    outputBasis: { width: 300, height: 300 },
     requestedCrop: { x: 100, y: 80, width: 300, height: 300 },
     sourceSize: { height: 1080, width: 1920 },
     sourceRect: { x: 150, y: 120, width: 450, height: 450 },
     outputSize: { width: 300, height: 300 },
+    tracksFullViewport: false,
   });
   expect(recordingContextMock.sourceVideoHeight).toBe(1080);
   expect(recordingContextMock.sourceVideoWidth).toBe(1920);

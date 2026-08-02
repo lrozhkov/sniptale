@@ -9,8 +9,11 @@ export function getVideoRecordingId(): string | null {
   return videoManagerSession.currentRecordingId;
 }
 
-export function shouldOpenVideoEditorAfterRecording(): boolean {
-  return videoManagerSession.openEditorAfterRecording;
+export function isCurrentVideoRecordingId(
+  recordingId: string | null | undefined
+): recordingId is string {
+  if (typeof recordingId !== 'string') return false;
+  return getVideoRecordingId() === recordingId;
 }
 
 export function getVideoRecordingCaptureMode(): CaptureMode | null {

@@ -33,6 +33,10 @@ vi.mock('../../sections/image', () => ({
   ImageSettingsSection: () => 'image',
 }));
 
+vi.mock('../../sections/video-quality-profiles', () => ({
+  VideoQualityProfilesSection: () => 'video',
+}));
+
 vi.mock('../../sections/templates', () => ({
   TemplatesSection: () => 'templates',
 }));
@@ -103,5 +107,13 @@ describe('settings page section registry', () => {
     await render(<Suspense fallback="loading">{renderSettingsTabContent('privacy')}</Suspense>);
 
     expect(container?.textContent).toBe('privacy');
+  });
+
+  it('preloads and resolves the video quality profiles section', async () => {
+    await preloadDeferredSettingsSections();
+
+    await render(<Suspense fallback="loading">{renderSettingsTabContent('video')}</Suspense>);
+
+    expect(container?.textContent).toBe('video');
   });
 });

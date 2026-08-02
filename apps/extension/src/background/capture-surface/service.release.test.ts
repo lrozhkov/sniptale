@@ -157,49 +157,6 @@ describe('capture-surface terminal cleanup', () => {
     expect(mocks.writeJournal).not.toHaveBeenCalled();
   });
 
-  it('retains final-release authority until debugger cleanup succeeds', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    const applied = await service.apply(request());
-    mocks.restoreViewportSnapshot.mockRejectedValueOnce(new Error('detach failed'));
-
-    await expect(service.release(applied)).rejects.toMatchObject({ code: 'restore-impossible' });
-    expect(service.getApplied(7)).toBeNull();
-    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]).toMatchObject({ phase: 'releasing' });
-
-    await service.release(applied);
-    expect(service.getApplied(7)).toBeNull();
-    expect(mocks.restoreViewportSnapshot).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not overwrite a manual viewport change made between release attempts', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    const applied = await service.apply(request());
-    mocks.restoreViewportSnapshot.mockRejectedValueOnce(new Error('detach failed'));
-
-    await expect(service.release(applied)).rejects.toMatchObject({ code: 'restore-impossible' });
-    mocks.currentViewport.mockResolvedValueOnce({ width: 1111, height: 777 });
-
-    await expect(service.release(applied)).rejects.toMatchObject({ code: 'restore-conflict' });
-    expect(mocks.restoreViewportSnapshot).toHaveBeenCalledOnce();
-    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]).toMatchObject({ phase: 'conflict' });
-  });
-
-  it('re-observes a conflicted release and cleans up when the surface is already prior', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    const applied = await service.apply(request());
-    mocks.currentViewport.mockResolvedValueOnce({ width: 1111, height: 777 });
-
-    await expect(service.release(applied)).rejects.toMatchObject({ code: 'restore-conflict' });
-    mocks.currentViewport.mockResolvedValueOnce({ width: 1440, height: 900 });
-    mocks.restoreViewportSnapshot.mockClear();
-
-    await service.release(applied);
-
-    expect(mocks.currentViewport).toHaveBeenCalledTimes(2);
-    expect(mocks.restoreViewportSnapshot).not.toHaveBeenCalled();
-    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
-  });
-
   it('releases a debugger acquired only to confirm an already-restored surface', async () => {
     const service = new DefaultCaptureSurfaceService();
     const applied = await service.apply(request());

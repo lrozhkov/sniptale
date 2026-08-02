@@ -42,7 +42,9 @@ function createExportSettings(): VideoProjectExportSettings {
     height: 1080,
     fps: 60,
     format: VideoExportFormat.MP4,
-    quality: VideoExportQualityPreset.BALANCED,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
+    quality: VideoExportQualityPreset.MEDIUM,
     downloadAfterExport: true,
   } satisfies VideoProjectExportSettings;
 

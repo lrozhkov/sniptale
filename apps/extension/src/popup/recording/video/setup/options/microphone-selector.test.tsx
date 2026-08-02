@@ -26,18 +26,19 @@ vi.mock('./media-device-selector', (_importOriginal) => ({
 
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMicrophoneSelector } from './microphone-selector';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
 function createSettings(enabled = true) {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: false,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: enabled,
-    openEditorAfterRecording: false,
     quality: VideoQuality.MEDIUM,
     systemAudioEnabled: true,
     webcamDeviceId: null,

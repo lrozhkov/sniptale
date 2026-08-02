@@ -58,85 +58,20 @@ function renderSelectWithSecondaryAction() {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
-    configurable: true,
-    value: 100,
-  });
-  Object.defineProperty(HTMLElement.prototype, 'offsetTop', {
-    configurable: true,
-    get() {
-      return this.textContent?.includes('Studio microphone') ? 160 : 0;
-    },
-  });
-  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
-    configurable: true,
-    value: 20,
-  });
-  HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
-    const isPanel = this.id !== '';
-    return {
-      bottom: isPanel ? 100 : 180,
-      height: isPanel ? 100 : 40,
-      left: 0,
-      right: 100,
-      top: isPanel ? 0 : 140,
-      width: 100,
-      x: 0,
-      y: isPanel ? 0 : 140,
-      toJSON: () => ({}),
-    };
-  };
 });
 
-it('anchors the option list near the trigger when the active value is missing', () => {
+it('keeps the option list top-aligned with manual scrolling and no automatic offset', () => {
   renderSelect(vi.fn(), 'missing-device');
 
   act(() => {
     container?.querySelector<HTMLButtonElement>('button')?.click();
   });
 
-  const list = container?.querySelector('[id] div[style]');
-  expect(list?.getAttribute('style')).toContain('padding-top: 60px');
-});
-
-it('anchors the active option near the pointer position used to open the curtain', () => {
-  renderSelect();
-
-  act(() => {
-    const button = container?.querySelector<HTMLButtonElement>('button');
-    button?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientY: 210 }));
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-  });
-
   const panel = container?.querySelector<HTMLElement>('[id]');
-  const list = container?.querySelector('[id] div[style]');
+  const list = panel?.querySelector('div[style]');
   expect(panel?.scrollTop).toBe(0);
-  expect(list?.getAttribute('style')).toContain('padding-top: 40px');
-});
-
-it('uses free space above the list before scrolling lower-row triggers', () => {
-  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
-    configurable: true,
-    value: 400,
-  });
-  Object.defineProperty(HTMLElement.prototype, 'offsetTop', {
-    configurable: true,
-    get() {
-      return this.textContent?.includes('Studio microphone') ? 160 : 100;
-    },
-  });
-  renderSelect();
-
-  act(() => {
-    const button = container?.querySelector<HTMLButtonElement>('button');
-    button?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientY: 360 }));
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-  });
-
-  const panel = container?.querySelector<HTMLElement>('[id]');
-  const list = container?.querySelector('[id] div[style]');
-  expect(panel?.scrollTop).toBe(0);
-  expect(list?.getAttribute('style')).toContain('padding-top: 290px');
+  expect(panel?.className).toContain('overflow-y-auto');
+  expect(list).toBeNull();
 });
 
 afterEach(() => {
@@ -147,7 +82,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('opens a full-height curtain, titles truncated text, centers the active option, and closes outside', () => {
+it('opens a full-height top-aligned curtain, titles truncated text, and closes outside', () => {
   renderSelect();
 
   act(() => {
@@ -155,7 +90,7 @@ it('opens a full-height curtain, titles truncated text, centers the active optio
   });
 
   const panel = container?.querySelector<HTMLElement>('[id]');
-  expect(panel?.scrollTop).toBe(10);
+  expect(panel?.scrollTop).toBe(0);
   expect(panel?.className).toContain('absolute inset-y-0');
   expect(container?.querySelector('[title="Studio microphone with a long name"]')).not.toBeNull();
   expect(container?.querySelector('[title="Full device path"]')).not.toBeNull();

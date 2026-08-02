@@ -6,7 +6,7 @@ import {
   getActiveVideoRecordingLeaseSnapshot,
   validateRecordingControlCapability,
 } from '../../recording-control-lease';
-import { isAuthorizedCameraRecorderDocument } from '../camera-recorder-control';
+import { restoreAuthorizedCameraRecorderDocument } from '../camera-recorder-control';
 import {
   resolveTrustedCameraRecorderRuntimeSenderUrl,
   resolveTrustedPopupRuntimeSenderUrl,
@@ -26,7 +26,10 @@ export async function isAuthorizedRecordingControl(args: {
   sender: chrome.runtime.MessageSender | undefined;
 }): Promise<boolean> {
   await ensureActiveVideoRecordingLeaseHydrated();
-  const ownerSenderUrl = resolveRecordingControlOwnerSenderUrl(args.sender);
+  const ownerSenderUrl = await resolveRecordingControlOwnerSenderUrl(
+    args.sender,
+    args.message.recordingId
+  );
   if (
     validateRecordingControlCapability({
       controlToken: args.message.controlToken,
@@ -41,9 +44,10 @@ export async function isAuthorizedRecordingControl(args: {
   return false;
 }
 
-function resolveRecordingControlOwnerSenderUrl(
-  sender: chrome.runtime.MessageSender | undefined
-): string | null {
+async function resolveRecordingControlOwnerSenderUrl(
+  sender: chrome.runtime.MessageSender | undefined,
+  recordingId: string
+): Promise<string | null> {
   const popupSenderUrl = resolveTrustedPopupRuntimeSenderUrl(sender);
   if (popupSenderUrl) {
     return popupSenderUrl;
@@ -56,11 +60,12 @@ function resolveRecordingControlOwnerSenderUrl(
 
   const activeLease = getActiveVideoRecordingLeaseSnapshot();
   if (
-    !isAuthorizedCameraRecorderDocument({
+    !(await restoreAuthorizedCameraRecorderDocument({
       documentId: sender?.documentId,
-      recordingId: activeLease?.recordingId,
+      recordingId,
       senderUrl: cameraSenderUrl,
-    })
+      tabId: sender?.tab?.id,
+    }))
   ) {
     return null;
   }

@@ -30,8 +30,6 @@ vi.mock('../media', async (importOriginal) => ({
 }));
 
 vi.mock('../render', () => ({
-  canUsePassthroughPath: vi.fn(() => false),
-  exportPassthrough: vi.fn(),
   renderCompositeExport: renderCompositeExportMock,
 }));
 
@@ -81,8 +79,10 @@ function createExportSettings(): VideoProjectExportSettings {
     width: 1280,
     height: 720,
     fps: 30,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     downloadAfterExport: true,
   };
 }

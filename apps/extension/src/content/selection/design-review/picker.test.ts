@@ -52,9 +52,9 @@ function makeVisible<T extends Element>(element: T): T {
 }
 
 function expectFrameSummary(tagName: string): void {
-  expect(queryContentUiElement('.sniptale-design-review-frame-summary')?.textContent).toMatch(
-    new RegExp(`^${tagName}`)
-  );
+  expect(
+    queryContentUiElement('.sniptale-design-review-frame-summary')?.textContent?.startsWith(tagName)
+  ).toBe(true);
 }
 
 let pickerRuntime: DesignReviewPickerRuntime | null = null;

@@ -29,6 +29,10 @@ function createErasureDeps() {
       countStores: vi.fn<(storeNames: readonly string[]) => Promise<number>>().mockResolvedValue(0),
       clearStores: vi.fn<(storeNames: readonly string[]) => Promise<void>>().mockResolvedValue(),
     },
+    recordingStaging: {
+      countSessions: vi.fn<() => Promise<number>>().mockResolvedValue(0),
+      erase: vi.fn<() => Promise<number>>().mockResolvedValue(0),
+    },
     videoPreviewCache: {
       erase: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       verifyEmpty: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
@@ -54,6 +58,8 @@ it('clears every IndexedDB store before removing browser storage keys', async ()
   expect(deps.editorBootstrapRetention.verifyEmpty).toHaveBeenCalledTimes(2);
   expect(deps.videoPreviewCache.erase).toHaveBeenCalledOnce();
   expect(deps.videoPreviewCache.verifyEmpty).toHaveBeenCalledTimes(2);
+  expect(deps.recordingStaging.erase).toHaveBeenCalledOnce();
+  expect(deps.recordingStaging.countSessions).toHaveBeenCalledTimes(2);
   expect(deps.browserStorageAreas.local.remove).toHaveBeenCalled();
   expect(deps.browserStorageAreas.session.remove).toHaveBeenCalled();
   expect(deps.browserStorageAreas.sync.remove).toHaveBeenCalled();
@@ -156,6 +162,7 @@ it('does not remove browser storage when a plan has no direct or prefix keys', a
       },
       indexedDb: deps.indexedDb,
       editorBootstrapRetention: deps.editorBootstrapRetention,
+      recordingStaging: deps.recordingStaging,
       videoPreviewCache: deps.videoPreviewCache,
     }
   );

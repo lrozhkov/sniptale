@@ -19,9 +19,10 @@ export type PolicyStateId =
   | 'popup-tab-route-capabilities'
   | 'project-export-capabilities'
   | 'project-export-job-ledger'
-  | 'recording-download-staged-chunks'
   | 'tab-mode-runtime-state'
   | 'video-capture-surface-sessions'
+  | 'video-camera-recorder-grant'
+  | 'video-post-record-results'
   | 'video-recording-control-lease'
   | 'web-snapshot-staged-blobs';
 

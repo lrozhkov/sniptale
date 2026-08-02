@@ -7,10 +7,8 @@ import {
   createEmptyStream,
   createStream,
 } from '../multi-source/media-stream.test-support';
-import {
-  VideoQuality,
-  type VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { type VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { audioMixerInstances, loggerWarnMock } = vi.hoisted(() => ({
   audioMixerInstances: [] as Array<{
@@ -47,13 +45,13 @@ import { attachMicrophoneAudioIfEnabled } from './video';
 
 function createSettings(overrides: Partial<VideoRecordingSettings> = {}): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
-    openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile },
     systemAudioEnabled: false,
     ...overrides,
   };

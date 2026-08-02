@@ -1,9 +1,6 @@
 import type { TabMessageType } from '../../../contracts/messaging/tab';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import {
-  RegionCaptureControlMessageType,
-  VideoMessageType,
-} from '@sniptale/runtime-contracts/video/messages';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 type RuntimeMessageTypeEnvelope<TType extends string = string> = { type: TType };
 type UiRuntimeBridgeMessageType =
@@ -50,9 +47,6 @@ const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
   VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE,
-  RegionCaptureControlMessageType.START,
-  RegionCaptureControlMessageType.STOP,
-  RegionCaptureControlMessageType.CHECK_SUPPORT,
   VideoMessageType.SHOW_REGION_SELECTOR,
   VideoMessageType.HIDE_REGION_SELECTOR,
   VideoMessageType.REGION_SELECTED,

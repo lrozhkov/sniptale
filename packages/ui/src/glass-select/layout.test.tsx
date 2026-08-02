@@ -37,7 +37,7 @@ function stubRect(element: HTMLDivElement, rect: RectShape) {
   } as DOMRect);
 }
 
-function LayoutHarness(props: { portal: boolean; isOpen: boolean }) {
+function LayoutHarness(props: { portal: boolean; isOpen: boolean; placement?: 'auto' | 'bottom' }) {
   const containerRef = { current: document.getElementById('select-root') as HTMLDivElement | null };
   const menuRef = { current: document.getElementById('menu-root') as HTMLDivElement | null };
   const { menuPosition, portalStyle } = useGlassSelectLayout({
@@ -45,6 +45,7 @@ function LayoutHarness(props: { portal: boolean; isOpen: boolean }) {
     isOpen: props.isOpen,
     containerRef,
     menuRef,
+    ...(props.placement === undefined ? {} : { placement: props.placement }),
   });
 
   return (
@@ -58,7 +59,7 @@ function LayoutHarness(props: { portal: boolean; isOpen: boolean }) {
 }
 
 function renderHarness(
-  props: { portal: boolean; isOpen: boolean },
+  props: { portal: boolean; isOpen: boolean; placement?: 'auto' | 'bottom' },
   rect: RectShape,
   height: number
 ) {
@@ -121,6 +122,19 @@ describe('useGlassSelectLayout', () => {
 
     expect(layout?.dataset['position']).toBe('top');
     expect(layout?.dataset['top']).toBe('172');
+    expect(layout?.dataset['left']).toBe('24');
+  });
+
+  it('keeps an explicitly bottom-anchored portal below the trigger in a cramped viewport', () => {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 480 });
+    const layout = renderHarness(
+      { portal: true, isOpen: true, placement: 'bottom' },
+      { top: 320, bottom: 380, left: 24, width: 260, height: 60 },
+      140
+    );
+
+    expect(layout?.dataset['position']).toBe('bottom');
+    expect(layout?.dataset['top']).toBe('388');
     expect(layout?.dataset['left']).toBe('24');
   });
 });

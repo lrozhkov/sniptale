@@ -1,27 +1,29 @@
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
+  VideoWebmCodec,
   type VideoProjectExportSettings,
 } from '../../features/video/project/types';
 import type { ExportJobState } from './types';
+import { resolveExportTargetBitrate as resolveActualExportTargetBitrate } from './codecs/bitrate';
 
 const {
   getSupportedWebmExportMimeTypeMock,
+  resolveExportTargetBitrateMock,
   runCompositeRenderLoopMock,
-  scaleBitrateMock,
   setupExportAudioMock,
 } = vi.hoisted(() => ({
   getSupportedWebmExportMimeTypeMock: vi.fn(),
+  resolveExportTargetBitrateMock: vi.fn(),
   runCompositeRenderLoopMock: vi.fn(),
-  scaleBitrateMock: vi.fn(),
   setupExportAudioMock: vi.fn(),
 }));
 
 vi.mock('./codecs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./codecs')>()),
-  scaleBitrate: scaleBitrateMock,
+  resolveExportTargetBitrate: resolveExportTargetBitrateMock,
 }));
 
 vi.mock('./media', async (importOriginal) => ({
@@ -83,6 +85,11 @@ class FakeMediaStream {
 vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
 vi.stubGlobal('MediaStream', FakeMediaStream);
 
+beforeEach(() => {
+  FakeMediaRecorder.lastInstance = null;
+  vi.clearAllMocks();
+});
+
 function createJob(): ExportJobState {
   return {
     assetUrls: [],
@@ -101,20 +108,25 @@ function createJob(): ExportJobState {
 }
 
 function createCanvas(stopVideoTrack: () => void) {
-  return {
-    captureStream: vi.fn(() => ({
-      getVideoTracks: () => [{ stop: stopVideoTrack }],
-    })),
-  } as unknown as HTMLCanvasElement;
+  const videoTrack = { contentHint: '', stop: stopVideoTrack };
+  const canvas: HTMLCanvasElement & { videoTrack: typeof videoTrack } = Object.create(null);
+  canvas.videoTrack = videoTrack;
+  Object.defineProperty(canvas, 'captureStream', {
+    configurable: true,
+    value: vi.fn(() => new FakeMediaStream([videoTrack])),
+  });
+  return canvas;
 }
 
 function createSettings(): VideoProjectExportSettings {
   return {
     downloadAfterExport: false,
     format: VideoExportFormat.WEBM,
+    resolution: 'SOURCE' as const,
+    webmVideoCodec: 'VP9' as const,
     fps: 30,
     height: 720,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     width: 1280,
   };
 }
@@ -131,6 +143,15 @@ function createCaptureFailureCanvas(): HTMLCanvasElement {
   return canvas;
 }
 
+function createMissingVideoTrackCanvas(): HTMLCanvasElement {
+  const canvas: HTMLCanvasElement = Object.create(null);
+  Object.defineProperty(canvas, 'captureStream', {
+    configurable: true,
+    value: vi.fn(() => new FakeMediaStream([])),
+  });
+  return canvas;
+}
+
 function createPreparedAudio(tracks: Array<{ stop: () => void }> = []) {
   return { dispose: vi.fn(), start: vi.fn(), tracks };
 }
@@ -140,8 +161,9 @@ it('records a composite webm export and cleans up stream state', async () => {
   const stopVideoTrack = vi.fn();
   const stopAudioTrack = vi.fn();
   const preparedAudio = createPreparedAudio([{ stop: stopAudioTrack }]);
+  const canvas = createCanvas(stopVideoTrack);
 
-  scaleBitrateMock.mockReturnValue(42);
+  resolveExportTargetBitrateMock.mockImplementation(resolveActualExportTargetBitrate);
   getSupportedWebmExportMimeTypeMock.mockReturnValue('video/webm');
   setupExportAudioMock.mockResolvedValue(preparedAudio);
   runCompositeRenderLoopMock.mockImplementation(async () => {
@@ -156,15 +178,43 @@ it('records a composite webm export and cleans up stream state', async () => {
     createSettings(),
     {},
     createContext(),
-    createCanvas(stopVideoTrack)
+    canvas
   );
 
   expect(blob.type).toBe('video/webm');
-  expect(scaleBitrateMock).toHaveBeenCalled();
+  expect(getSupportedWebmExportMimeTypeMock).toHaveBeenCalledWith(VideoWebmCodec.VP9, true);
+  expect(resolveExportTargetBitrateMock).toHaveBeenCalledWith(
+    expect.objectContaining({ height: 720, width: 1280 })
+  );
+  expect(FakeMediaRecorder.lastInstance?.options.videoBitsPerSecond).toBe(3_200_000);
+  expect(canvas.videoTrack.contentHint).toBe('detail');
   expect(preparedAudio.start).toHaveBeenCalledOnce();
   expect(preparedAudio.dispose).toHaveBeenCalledOnce();
   expect(stopVideoTrack).toHaveBeenCalledOnce();
   expect(stopAudioTrack).toHaveBeenCalledOnce();
+});
+
+it('fails before recorder creation when canvas capture returns no video track', async () => {
+  const { renderCompositeToWebm } = await import('./render-webm');
+  const stopAudioTrack = vi.fn();
+  const preparedAudio = createPreparedAudio([{ stop: stopAudioTrack }]);
+
+  setupExportAudioMock.mockResolvedValue(preparedAudio);
+
+  await expect(
+    renderCompositeToWebm(
+      createJob(),
+      createEmptyVideoProject('WebM'),
+      createSettings(),
+      {},
+      createContext(),
+      createMissingVideoTrackCanvas()
+    )
+  ).rejects.toThrow('offscreenExport.canvasContextError');
+
+  expect(preparedAudio.dispose).toHaveBeenCalledOnce();
+  expect(stopAudioTrack).toHaveBeenCalledOnce();
+  expect(FakeMediaRecorder.lastInstance).toBeNull();
 });
 
 it('rejects the blob promise when the job has been cancelled', async () => {
@@ -172,7 +222,7 @@ it('rejects the blob promise when the job has been cancelled', async () => {
   const job = createJob();
   job.cancelled = true;
 
-  scaleBitrateMock.mockReturnValue(42);
+  resolveExportTargetBitrateMock.mockReturnValue(42);
   getSupportedWebmExportMimeTypeMock.mockReturnValue('video/webm');
   setupExportAudioMock.mockResolvedValue(createPreparedAudio());
   runCompositeRenderLoopMock.mockResolvedValue(undefined);
@@ -192,7 +242,7 @@ it('rejects the blob promise when the job has been cancelled', async () => {
 it('stops the recorder and rethrows render loop failures', async () => {
   const { renderCompositeToWebm } = await import('./render-webm');
 
-  scaleBitrateMock.mockReturnValue(42);
+  resolveExportTargetBitrateMock.mockReturnValue(42);
   getSupportedWebmExportMimeTypeMock.mockReturnValue('video/webm');
   setupExportAudioMock.mockResolvedValue(createPreparedAudio());
   runCompositeRenderLoopMock.mockRejectedValue(new Error('render failed'));

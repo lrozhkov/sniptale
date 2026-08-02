@@ -25,6 +25,12 @@ import {
   eraseVideoPreviewCacheForPrivacyErasure,
   verifyVideoPreviewCacheEmptyAfterPrivacyErasure,
 } from '../video-preview-cache/privacy-erasure';
+import {
+  createOpfsRecordingStagingStorage,
+  invalidateAndAbortActiveRecordingStaging,
+} from '../recordings/staging';
+
+const recordingStagingStorage = createOpfsRecordingStagingStorage();
 
 async function clearIndexedDbStores(storeNames: readonly string[]): Promise<void> {
   void storeNames;
@@ -49,6 +55,13 @@ const defaultErasureDeps: LocalExtensionDataErasureDeps = {
   indexedDb: {
     countStores: countIndexedDbStores,
     clearStores: clearIndexedDbStores,
+  },
+  recordingStaging: {
+    countSessions: () => recordingStagingStorage.countSessions(),
+    async erase() {
+      await invalidateAndAbortActiveRecordingStaging();
+      return recordingStagingStorage.removeAllSessions();
+    },
   },
   videoPreviewCache: {
     erase: eraseVideoPreviewCacheForPrivacyErasure,

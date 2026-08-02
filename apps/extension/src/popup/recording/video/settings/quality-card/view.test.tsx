@@ -7,38 +7,47 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 
 import { QualityCard } from './view';
 import {
+  DEFAULT_VIDEO_OUTPUT_PROFILE,
+  VideoRecordingBuiltInProfileId,
   VideoQuality,
+  type VideoOutputProfile,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
-function createSettings(quality: VideoRecordingSettings['quality']): VideoRecordingSettings {
+function createSettings(quality: VideoOutputProfile['quality']): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     microphoneEnabled: true,
     microphoneDeviceId: null,
     systemAudioEnabled: true,
-    quality,
+    outputProfile: { ...DEFAULT_VIDEO_OUTPUT_PROFILE, quality },
     countdownSeconds: 3,
     autoFadeDelay: 2,
-    openEditorAfterRecording: false,
     diagnosticsEnabled: false,
+    qualityProfileId: VideoRecordingBuiltInProfileId.OPTIMAL,
   };
 }
 
 describe('quality card view', () => {
-  it('renders quality options and patches selected quality', () => {
+  it('renders concise profiles and materializes the selected profile settings', () => {
     const onSettingsChange = vi.fn();
 
     const card = QualityCard({
-      settings: createSettings(VideoQuality.LOW),
+      settings: createSettings(VideoQuality.HIGH),
       onSettingsChange,
     });
 
-    expect(card.props.value).toBe(VideoQuality.LOW);
+    expect(card.props.value).toBe(VideoRecordingBuiltInProfileId.OPTIMAL);
     expect(card.props.options).toHaveLength(4);
 
-    card.props.onChange(VideoQuality.MEDIUM);
+    card.props.onChange(VideoRecordingBuiltInProfileId.COMPACT);
 
-    expect(onSettingsChange).toHaveBeenCalledWith({ quality: VideoQuality.MEDIUM });
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      outputProfile: expect.objectContaining({ quality: VideoQuality.MEDIUM, resolution: '720P' }),
+      qualityProfileId: VideoRecordingBuiltInProfileId.COMPACT,
+    });
+    expect(card.props.secondaryAction.panel).toBeTruthy();
   });
 
   it('falls back through quality option normalization for unknown settings', () => {
@@ -48,6 +57,8 @@ describe('quality card view', () => {
       onSettingsChange,
     });
 
-    expect(card.props.value).toBe(VideoQuality.HIGH);
+    expect(card.props.value).toBe('current:custom');
+    card.props.onChange('missing-profile');
+    expect(onSettingsChange).not.toHaveBeenCalled();
   });
 });

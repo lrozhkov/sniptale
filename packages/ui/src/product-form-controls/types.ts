@@ -1,4 +1,12 @@
-import type { ButtonHTMLAttributes, KeyboardEvent, MutableRefObject, ReactNode, Ref } from 'react';
+import type {
+  ButtonHTMLAttributes,
+  CSSProperties,
+  KeyboardEvent,
+  MutableRefObject,
+  ReactNode,
+  Ref,
+} from 'react';
+import type { AppTheme } from '../theme/types';
 
 export interface ProductSelectOption<T extends string = string> {
   value: T;
@@ -19,6 +27,8 @@ export interface ProductSelectProps<T extends string = string> extends Omit<
   controlSize?: 'sm' | 'md';
   containerClassName?: string;
   menuClassName?: string;
+  menuPlacement?: 'auto' | 'bottom';
+  menuScrollable?: boolean;
   dataUi?: string;
 }
 
@@ -39,6 +49,8 @@ export interface ProductSelectTriggerProps<T extends string = string> {
     | 'controlSize'
     | 'dataUi'
     | 'menuClassName'
+    | 'menuPlacement'
+    | 'menuScrollable'
     | 'onChange'
     | 'options'
     | 'placeholder'
@@ -51,12 +63,13 @@ export interface ProductSelectMenuProps<T extends string = string> {
   controlSize: 'sm' | 'md';
   menuClassName: string;
   menuId: string;
-  menuPosition: 'bottom' | 'top';
   menuRef: MutableRefObject<HTMLDivElement | null>;
   onOptionKeyDown: (index: number) => (event: KeyboardEvent<HTMLButtonElement>) => void;
   onOptionMouseEnter: (index: number) => void;
   onSelect: (option: ProductSelectOption<T>) => void;
   options: readonly ProductSelectOption<T>[];
   optionRefs: MutableRefObject<Array<HTMLButtonElement | null>>;
+  portalStyle: CSSProperties;
+  portalTheme: AppTheme | null;
   value: T | '';
 }

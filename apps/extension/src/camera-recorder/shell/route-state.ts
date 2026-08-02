@@ -4,17 +4,19 @@ import type { CameraRecorderRouteState } from './types';
 
 export function consumeCameraRecorderRouteState(): CameraRecorderRouteState {
   const params = new URLSearchParams(window.location.search);
-  const launchToken = params.get('launchToken');
+  const registrationToken = params.get('launchToken');
   const recordingId = params.get('recordingId');
   clearCameraRecorderLaunchUrlParams();
 
-  if (!launchToken || !recordingId) {
-    return {
-      launchToken: '',
-      recordingId: '',
-      routeError: translate('popup.video.startRecordingError'),
-    };
+  if (registrationToken && recordingId) {
+    return { recordingId, registrationToken, routeError: null };
   }
-
-  return { launchToken, recordingId, routeError: null };
+  if (!registrationToken && !recordingId) {
+    return { recordingId: null, registrationToken: null, routeError: null };
+  }
+  return {
+    registrationToken: null,
+    recordingId: null,
+    routeError: translate('popup.video.startRecordingError'),
+  };
 }

@@ -120,6 +120,7 @@ function createSurfaceSession(applied: TestAppliedSurface | null = viewportSurfa
     applied,
     generation: 1,
     recordingId: 'recording-1',
+    sourceReady: true,
     sourceVideoHeight: 1440,
     sourceVideoWidth: 2560,
     streamInstanceId: 'stream-1',
@@ -188,7 +189,7 @@ beforeEach(() => {
   mocks.suspendEffects.mockResolvedValue(undefined);
 });
 
-it('keeps plain TAB recording continuous while navigation recovery runs', async () => {
+it('guards ordinary full TAB output with an exact navigation transition', async () => {
   mocks.getSurfaceSession.mockReturnValue(createSurfaceSession(null));
 
   expect(handleTabRecordingNavigationStart(7)).toBe(true);
@@ -198,7 +199,7 @@ it('keeps plain TAB recording continuous while navigation recovery runs', async 
 
   expect(mocks.restoreEffects).toHaveBeenCalledOnce();
   expect(mocks.revalidateSource).toHaveBeenCalledOnce();
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expectViewportDrawStates([true, false]);
   expect(mocks.stop).not.toHaveBeenCalled();
 });
 
@@ -216,7 +217,7 @@ it('revalidates a window-preset TAB recording without reasserting viewport metri
   expect(mocks.revalidateSource).toHaveBeenCalledOnce();
 });
 
-it('keeps plain TAB recording active when source revalidation is unavailable', async () => {
+it('stops ordinary full TAB when exact source revalidation is unavailable', async () => {
   mocks.getSurfaceSession.mockReturnValue(createSurfaceSession(null));
   mocks.revalidateSource.mockRejectedValueOnce(new Error('raw geometry changed'));
 
@@ -225,8 +226,8 @@ it('keeps plain TAB recording active when source revalidation is unavailable', a
   handleTabRecordingNavigationCompleted(7, 'document-1');
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
-  expect(mocks.stop).not.toHaveBeenCalled();
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(mocks.stop).toHaveBeenCalledOnce();
+  expectViewportDrawStates([true]);
 });
 
 it('defers every navigation signal while capture-surface recovery owns startup', () => {
@@ -459,7 +460,7 @@ it('fails closed when secure viewport transition identity cannot be created', as
   expect(mocks.setRuntimeState).toHaveBeenCalledWith(
     expect.objectContaining({ error: 'secure random unavailable' })
   );
-  expect(isTabRecordingNavigationPending()).toBe(false);
+  await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 });
 
 it('guards current-size TAB_CROP output with a tokenized navigation transaction', async () => {
@@ -675,7 +676,7 @@ it('keeps TAB recording active when controlled-cursor bootstrap is unavailable',
   await vi.waitFor(() => expect(isTabRecordingNavigationPending()).toBe(false));
 
   expect(mocks.stop).not.toHaveBeenCalled();
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expectViewportDrawStates([true, false]);
 });
 
 it('clears only the current controlled-cursor recovery when page access is unavailable', async () => {

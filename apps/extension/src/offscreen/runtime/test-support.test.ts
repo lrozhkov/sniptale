@@ -13,12 +13,12 @@ describe('offscreen runtime test support', () => {
     );
   });
 
-  it('creates balanced mp4 export settings by default', () => {
+  it('creates medium-quality mp4 export settings by default', () => {
     expect(createExportSettings()).toEqual(
       expect.objectContaining({
         downloadAfterExport: true,
         format: 'MP4',
-        quality: 'BALANCED',
+        quality: 'MEDIUM',
       })
     );
   });

@@ -1,10 +1,14 @@
 import { Download, Film, Images, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
-import { openGalleryPage, openVideoEditorPage } from '../../platform/navigation/extension-pages';
+import { useRef, useState } from 'react';
+import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../platform/i18n';
-import { deleteSavedRecordingTracks } from '../../composition/persistence/recordings/tracks';
 import { CameraWindowButton } from './button';
-import { downloadSavedRecordingTracks } from './download';
+import {
+  deleteVideoPostRecordResult,
+  downloadSavedRecordingTracks,
+  openLatestRecordingInGallery,
+  openSavedRecordingInVideoEditor,
+} from '../../workflows/media-hub/post-record-actions';
 
 const POST_RECORD_MAIN_CLASS = [
   'flex h-screen items-center justify-center',
@@ -17,12 +21,34 @@ const POST_RECORD_PANEL_CLASS = [
   'bg-[var(--sniptale-color-surface-panel)] p-5',
 ].join(' ');
 
-export function CameraPostRecordPanel({ recordingId }: { recordingId: string }) {
+export function CameraPostRecordPanel({
+  onAcknowledge,
+  result,
+}: {
+  onAcknowledge: () => Promise<void>;
+  result: VideoPostRecordResult;
+}) {
   const [error, setError] = useState<string | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
+  const isBusyRef = useRef(false);
   const run = (action: () => Promise<void>) => {
+    if (isBusyRef.current) return;
+    isBusyRef.current = true;
     setError(null);
-    void action().catch(() => setError(translate('popup.video.postRecordActionError')));
+    setIsBusy(true);
+    void action()
+      .catch(() => setError(translate('popup.video.postRecordActionError')))
+      .finally(() => {
+        isBusyRef.current = false;
+        setIsBusy(false);
+      });
   };
+  const decide = (action: () => Promise<void>, closeAfter = false) =>
+    run(async () => {
+      await action();
+      await onAcknowledge();
+      if (closeAfter) window.close();
+    });
 
   return (
     <main className={POST_RECORD_MAIN_CLASS}>
@@ -33,7 +59,7 @@ export function CameraPostRecordPanel({ recordingId }: { recordingId: string }) 
             {translate('popup.video.postRecordDescription')}
           </div>
         </div>
-        <CameraPostRecordActions recordingId={recordingId} run={run} />
+        <CameraPostRecordActions isBusy={isBusy} result={result} decide={decide} />
         {error ? <div className="text-sm text-[var(--sniptale-color-danger)]">{error}</div> : null}
       </section>
     </main>
@@ -41,49 +67,56 @@ export function CameraPostRecordPanel({ recordingId }: { recordingId: string }) 
 }
 
 function CameraPostRecordActions(props: {
-  recordingId: string;
-  run: (action: () => Promise<void>) => void;
+  decide: (action: () => Promise<void>, closeAfter?: boolean) => void;
+  isBusy: boolean;
+  result: VideoPostRecordResult;
 }) {
   return (
     <>
       <CameraWindowButton
         icon={Film}
+        disabled={props.isBusy}
         label={translate('popup.video.postRecordOpenEditor')}
-        onClick={() => props.run(() => openVideoEditorPage(null, props.recordingId).then(close))}
+        onClick={() => props.decide(() => openSavedRecordingInVideoEditor(props.result), true)}
       />
       <CameraWindowButton
         icon={Images}
+        disabled={props.isBusy}
         label={translate('popup.video.postRecordOpenGallery')}
         onClick={() =>
-          props.run(() => openGalleryPage({ recordingId: props.recordingId }).then(close))
+          props.decide(() => openLatestRecordingInGallery(props.result.primaryRecordingId), true)
         }
       />
       <CameraWindowButton
         icon={Download}
+        disabled={props.isBusy}
         label={translate('popup.video.postRecordDownload')}
-        onClick={() => props.run(() => downloadSavedRecordingTracks(props.recordingId))}
+        onClick={() =>
+          props.decide(() => downloadSavedRecordingTracks(props.result.recordingId), true)
+        }
       />
       <CameraWindowButton
         icon={X}
+        disabled={props.isBusy}
         label={translate('popup.video.postRecordClose')}
-        onClick={() => window.close()}
+        onClick={() => props.decide(() => Promise.resolve(), true)}
       />
       <CameraWindowButton
         icon={Trash2}
+        disabled={props.isBusy}
         label={translate('popup.video.postRecordDelete')}
         tone="danger"
-        onClick={() => confirmDelete(props.recordingId, props.run)}
+        onClick={() => confirmDelete(props.result, props.decide)}
       />
     </>
   );
 }
 
-function close(): void {
-  window.close();
-}
-
-function confirmDelete(recordingId: string, run: (action: () => Promise<void>) => void): void {
+function confirmDelete(
+  result: VideoPostRecordResult,
+  decide: (action: () => Promise<void>, closeAfter?: boolean) => void
+): void {
   if (window.confirm(translate('popup.video.postRecordDeleteConfirm'))) {
-    run(() => deleteSavedRecordingTracks(recordingId).then(close));
+    decide(() => deleteVideoPostRecordResult(result), true);
   }
 }

@@ -137,30 +137,6 @@ export type RouteCaptureMessage =
       filename?: string;
     }
   | {
-      type: 'STAGE_RECORDING_DOWNLOAD_CHUNK';
-      base64: string;
-      chunkIndex: number;
-      recordingSessionId: string;
-      stagedRecordingId: string;
-      totalBytes: number;
-      totalChunks: number;
-      contentIntent?: ContentPrivilegedActionCapability;
-    }
-  | {
-      type: 'SAVE_RECORDING_FOR_DOWNLOAD';
-      filename: string;
-      mimeType: string;
-      recordingSessionId: string;
-      stagedRecordingId: string;
-      contentIntent?: ContentPrivilegedActionCapability;
-    }
-  | {
-      type: 'RELEASE_RECORDING_DOWNLOAD';
-      recordingSessionId: string;
-      stagedRecordingId: string;
-      contentIntent?: ContentPrivilegedActionCapability;
-    }
-  | {
       type: 'TRIGGER_QUICK_ACTION';
       actionId: string;
       contentIntent?: ContentPrivilegedActionCapability;

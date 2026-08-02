@@ -1,4 +1,4 @@
-import { useId, useState, type Ref, type RefObject } from 'react';
+import { useId, useState } from 'react';
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
@@ -43,21 +43,13 @@ export function InlineCurtainNotice({ notice }: { notice?: string }) {
 }
 
 export function InlineCurtainOptionList({
-  activeOptionRef,
   activeValue,
   emptyText,
-  firstOptionRef,
-  listOffsetTop,
-  listRef,
   onChange,
   options,
 }: {
-  activeOptionRef: RefObject<HTMLButtonElement | null>;
   activeValue: string;
   emptyText?: string;
-  firstOptionRef: RefObject<HTMLButtonElement | null>;
-  listOffsetTop: number;
-  listRef: RefObject<HTMLDivElement | null>;
   onChange: (value: string) => void;
   options: InlineCurtainOption[];
 }) {
@@ -77,7 +69,7 @@ export function InlineCurtainOptionList({
       : highlightedDetail;
 
   return (
-    <div ref={listRef} style={{ paddingTop: listOffsetTop }}>
+    <div>
       {visibleDetail ? (
         <div id={detailId} role="status" className={INLINE_CURTAIN_DETAIL_CLASS_NAME}>
           {visibleDetail}
@@ -99,13 +91,6 @@ export function InlineCurtainOptionList({
           ) : null}
           <InlineCurtainOptionButton
             active={option.value === activeValue}
-            buttonRef={
-              option.value === activeValue
-                ? activeOptionRef
-                : options[0] === option
-                  ? firstOptionRef
-                  : null
-            }
             onClick={() => onChange(option.value)}
             detailId={detailId}
             onHighlight={() => setHighlightedDetail(option.detail ?? null)}
@@ -119,14 +104,12 @@ export function InlineCurtainOptionList({
 
 function InlineCurtainOptionButton({
   active,
-  buttonRef,
   detailId,
   onClick,
   onHighlight,
   option,
 }: {
   active: boolean;
-  buttonRef: Ref<HTMLButtonElement> | null;
   detailId: string;
   onClick: () => void;
   onHighlight: () => void;
@@ -134,7 +117,6 @@ function InlineCurtainOptionButton({
 }) {
   return (
     <button
-      ref={buttonRef}
       type="button"
       aria-describedby={option.detail ? detailId : undefined}
       aria-disabled={option.disabled || undefined}

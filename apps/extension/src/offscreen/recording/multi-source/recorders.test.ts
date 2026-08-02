@@ -1,17 +1,6 @@
-import { beforeEach, expect, it, vi } from 'vitest';
-
-// State-machine proof: recorder failure rolls back already-created sources.
-const { normalizeMultiSourceVideoStreamMock } = vi.hoisted(() => ({
-  normalizeMultiSourceVideoStreamMock: vi.fn(),
-}));
-
-vi.mock('./normalize', () => ({
-  normalizeMultiSourceVideoStream: normalizeMultiSourceVideoStreamMock,
-}));
-import {
-  VideoQuality,
-  type VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
 import {
   buildMicrophoneFilename,
   buildSourceFilename,
@@ -19,263 +8,221 @@ import {
   createSourceRecorders,
   stopRecorderStreams,
 } from './recorders';
-import { createAudioStream, createStream, createTrackedStream } from './media-stream.test-support';
+import { createAudioStream, createStream } from './media-stream.test-support';
+import { createFixedVideoOutputStream } from '../stream/fixed-video-output';
 
-class FakeMediaRecorder {
-  static instances: FakeMediaRecorder[] = [];
-  static supportedMimeTypes = new Set(['audio/webm']);
-  static isTypeSupported(mimeType: string) {
-    return FakeMediaRecorder.supportedMimeTypes.has(mimeType);
-  }
+vi.mock('../stream/fixed-video-output', () => ({
+  createFixedVideoOutputStream: vi.fn(async (stream: MediaStream) => ({
+    dimensions: stream.getVideoTracks()[0]?.getSettings() ?? { height: 720, width: 1280 },
+    frameRate: 30,
+    stream,
+  })),
+}));
 
+class MediaRecorderMock {
+  static constructorCount = 0;
+  static isTypeSupported = vi.fn(() => true);
+  static throwAt: number | null = null;
   mimeType: string;
-  readonly stream: MediaStream;
+  ondataavailable = null;
+  onerror = null;
+  onstart = null;
+  onstop = null;
+  state: RecordingState = 'inactive';
 
-  constructor(stream: MediaStream, options: MediaRecorderOptions) {
-    this.stream = stream;
-    this.mimeType = options.mimeType ?? 'video/webm';
-    FakeMediaRecorder.instances.push(this);
+  constructor(_stream: MediaStream, options: MediaRecorderOptions) {
+    MediaRecorderMock.constructorCount += 1;
+    if (MediaRecorderMock.constructorCount === MediaRecorderMock.throwAt) {
+      throw new Error('encoder construction failed');
+    }
+    this.mimeType = options.mimeType ?? '';
   }
-}
-
-function createSettings(
-  microphoneEnabled: boolean,
-  overrides: Partial<VideoRecordingSettings> = {}
-): VideoRecordingSettings {
-  return {
-    autoFadeDelay: 0,
-    autoGainControl: false,
-    countdownSeconds: 0,
-    diagnosticsEnabled: false,
-    echoCancellation: false,
-    microphoneDeviceId: 'mic-1',
-    microphoneEnabled,
-    microphoneGain: 1,
-    noiseSuppression: true,
-    openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
-    sourceCount: 2,
-    systemAudioEnabled: false,
-    ...overrides,
-  };
-}
-
-function getOnlyAudioTrack(stream: MediaStream): MediaStreamTrack {
-  const [track] = stream.getAudioTracks();
-  if (!track) {
-    throw new Error('Expected an audio track in the media stream fixture.');
-  }
-  return track;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  FakeMediaRecorder.instances = [];
-  FakeMediaRecorder.supportedMimeTypes = new Set(['audio/webm']);
-  vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
-  vi.stubGlobal('navigator', {
-    mediaDevices: {
-      getUserMedia: vi.fn().mockResolvedValue(createAudioStream()),
-    },
-  });
+  MediaRecorderMock.constructorCount = 0;
+  MediaRecorderMock.throwAt = null;
+  MediaRecorderMock.isTypeSupported.mockReturnValue(true);
+  vi.stubGlobal('MediaRecorder', MediaRecorderMock);
 });
 
-it('builds stable source filenames and creates audio-only microphone recorders', async () => {
-  const rawStream = createAudioStream();
-  const rawTrack = getOnlyAudioTrack(rawStream);
-  vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(rawStream);
-  expect(buildSourceFilename(1)).toContain('window-2.webm');
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+it('builds container-aware filenames without using a byte accumulator', () => {
+  expect(buildSourceFilename(1, 'video/mp4;codecs=avc1.640028')).toContain('window-2.mp4');
   expect(buildMicrophoneFilename()).toContain('microphone.webm');
-  expect(await createMicrophoneRecorder('rec', createSettings(false))).toBeNull();
-
-  const recorder = await createMicrophoneRecorder('rec', createSettings(true));
-
-  expect(recorder?.recordingId).toBe('rec-window-1000');
-  expect(recorder?.recorder.mimeType).toBe('audio/webm');
-  expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith(
-    expect.objectContaining({
-      audio: expect.objectContaining({
-        autoGainControl: false,
-        deviceId: { exact: 'mic-1' },
-        echoCancellation: false,
-        noiseSuppression: true,
-      }),
-    })
-  );
-  stopRecorderStreams([recorder]);
-  expect(rawTrack.stop).toHaveBeenCalledOnce();
 });
 
-it('routes multi-source microphone audio through software gain when requested', async () => {
-  const rawStream = createAudioStream();
-  const processedStream = createAudioStream();
-  const rawTrack = getOnlyAudioTrack(rawStream);
-  const processedTrack = getOnlyAudioTrack(processedStream);
-  vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(rawStream);
-  const sourceNode = { connect: vi.fn(), disconnect: vi.fn() };
-  const gainNode = { connect: vi.fn(), disconnect: vi.fn(), gain: { value: 1 } };
-  const close = vi.fn().mockResolvedValue(undefined);
-  const AudioContextMock = vi.fn(function MockAudioContext() {
-    return {
-      close,
-      createGain: vi.fn(() => gainNode),
-      createMediaStreamDestination: vi.fn(() => ({ stream: processedStream })),
-      createMediaStreamSource: vi.fn(() => sourceNode),
-    };
+it('creates independently staged normalized source artifacts', async () => {
+  const coordinator = createRecordingStagingCoordinatorTestDouble();
+  const recorders = await createSourceRecorders({
+    baseRecordingId: 'rec',
+    coordinator,
+    settings: DEFAULT_VIDEO_SETTINGS,
+    sources: [
+      { label: 'A', stream: createStream(1280, 720) },
+      { label: 'B', stream: createStream(1920, 1080) },
+    ],
   });
+
+  expect(recorders.map((recorder) => recorder.recordingId)).toEqual([
+    'rec-window-1',
+    'rec-window-2',
+  ]);
+  expect(coordinator.openArtifact).toHaveBeenCalledTimes(2);
+});
+
+it('creates and releases a separately staged microphone artifact', async () => {
+  const audio = createAudioStream();
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: vi.fn().mockResolvedValue(audio) },
+  });
+  const recorder = await createMicrophoneRecorder(
+    'rec',
+    { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true },
+    createRecordingStagingCoordinatorTestDouble()
+  );
+  expect(recorder?.recordingId).toBe('rec-window-1000');
+
+  stopRecorderStreams([recorder]);
+  expect(audio.getTracks()[0]?.stop).toHaveBeenCalledOnce();
+});
+
+it('rejects a source without video before creating an encoder', async () => {
+  await expect(
+    createSourceRecorders({
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: DEFAULT_VIDEO_SETTINGS,
+      sources: [{ label: 'audio-only', stream: createAudioStream() }],
+    })
+  ).rejects.toThrow('missing a video track');
+
+  expect(MediaRecorderMock.constructorCount).toBe(0);
+});
+
+it('stops every normalized source when a later encoder cannot be constructed', async () => {
+  const first = createStream(1280, 720);
+  const second = createStream(1920, 1080);
+  MediaRecorderMock.throwAt = 2;
+
+  await expect(
+    createSourceRecorders({
+      baseRecordingId: 'rec',
+      coordinator: createRecordingStagingCoordinatorTestDouble(),
+      settings: DEFAULT_VIDEO_SETTINGS,
+      sources: [
+        { label: 'first', stream: first },
+        { label: 'second', stream: second },
+      ],
+    })
+  ).rejects.toThrow('encoder construction failed');
+
+  expect(first.getVideoTracks()[0]?.stop).toHaveBeenCalledOnce();
+  expect(second.getVideoTracks()[0]?.stop).toHaveBeenCalledOnce();
+  expect(createFixedVideoOutputStream).toHaveBeenCalledTimes(2);
+});
+
+it('does not request microphone media when the microphone is disabled', async () => {
+  const getUserMedia = vi.fn();
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia },
+  });
+
+  await expect(
+    createMicrophoneRecorder(
+      'rec',
+      { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: false },
+      createRecordingStagingCoordinatorTestDouble()
+    )
+  ).resolves.toBeNull();
+  expect(getUserMedia).not.toHaveBeenCalled();
+});
+
+it('stops the raw microphone stream when encoder construction fails', async () => {
+  const audio = createAudioStream();
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: vi.fn().mockResolvedValue(audio) },
+  });
+  MediaRecorderMock.throwAt = 1;
+
+  await expect(
+    createMicrophoneRecorder(
+      'rec',
+      { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true },
+      createRecordingStagingCoordinatorTestDouble()
+    )
+  ).rejects.toThrow('encoder construction failed');
+  expect(audio.getTracks()[0]?.stop).toHaveBeenCalledOnce();
+});
+
+it('owns and releases the complete gain-processing graph', async () => {
+  const raw = createAudioStream();
+  const processed = createAudioStream();
+  const sourceNode = { connect: vi.fn(), disconnect: vi.fn() };
+  const gainNode = { connect: vi.fn(), disconnect: vi.fn(), gain: { value: 0 } };
+  const close = vi.fn().mockResolvedValue(undefined);
+  class AudioContextMock {
+    createGain = vi.fn(() => gainNode);
+    createMediaStreamDestination = vi.fn(() => ({ stream: processed }));
+    createMediaStreamSource = vi.fn(() => sourceNode);
+    close = close;
+  }
   vi.stubGlobal('AudioContext', AudioContextMock);
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: vi.fn().mockResolvedValue(raw) },
+  });
 
   const recorder = await createMicrophoneRecorder(
     'rec',
-    createSettings(true, { microphoneGain: 1.75 })
+    { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true, microphoneGain: 2 },
+    createRecordingStagingCoordinatorTestDouble()
   );
-
-  expect(gainNode.gain.value).toBe(1.75);
-  expect(sourceNode.connect).toHaveBeenCalledWith(gainNode);
-  expect(gainNode.connect).toHaveBeenCalledTimes(1);
-  expect(FakeMediaRecorder.instances[0]?.stream).toBe(processedStream);
-
   stopRecorderStreams([recorder]);
 
-  expect(processedTrack.stop).toHaveBeenCalledOnce();
-  expect(rawTrack.stop).toHaveBeenCalledOnce();
+  expect(gainNode.gain.value).toBe(2);
+  expect(sourceNode.connect).toHaveBeenCalledWith(gainNode);
+  expect(gainNode.connect).toHaveBeenCalledOnce();
   expect(sourceNode.disconnect).toHaveBeenCalledOnce();
   expect(gainNode.disconnect).toHaveBeenCalledOnce();
+  expect(raw.getTracks()[0]?.stop).toHaveBeenCalledOnce();
+  expect(processed.getTracks()[0]?.stop).toHaveBeenCalledOnce();
   expect(close).toHaveBeenCalledOnce();
 });
 
-it('stops the raw microphone stream when gain graph setup fails', async () => {
-  const rawStream = createAudioStream();
-  const rawTrack = getOnlyAudioTrack(rawStream);
-  vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(rawStream);
-  vi.stubGlobal(
-    'AudioContext',
-    vi.fn(function MockAudioContext() {
-      throw new Error('audio graph failed');
-    })
-  );
-
-  await expect(
-    createMicrophoneRecorder('rec', createSettings(true, { microphoneGain: 1.25 }))
-  ).rejects.toThrow('audio graph failed');
-
-  expect(rawTrack.stop).toHaveBeenCalledOnce();
-});
-
-it('closes a partially created gain graph when node setup fails', async () => {
-  const rawStream = createAudioStream();
-  const rawTrack = getOnlyAudioTrack(rawStream);
-  vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(rawStream);
+it('rolls back a partially created gain-processing graph', async () => {
+  const raw = createAudioStream();
   const sourceNode = { connect: vi.fn(), disconnect: vi.fn() };
   const close = vi.fn().mockResolvedValue(undefined);
-  vi.stubGlobal(
-    'AudioContext',
-    vi.fn(function MockAudioContext() {
-      return {
-        close,
-        createGain: vi.fn(() => {
-          throw new Error('gain node failed');
-        }),
-        createMediaStreamDestination: vi.fn(),
-        createMediaStreamSource: vi.fn(() => sourceNode),
-      };
-    })
-  );
-
-  await expect(
-    createMicrophoneRecorder('rec', createSettings(true, { microphoneGain: 1.25 }))
-  ).rejects.toThrow('gain node failed');
-
-  expect(sourceNode.disconnect).toHaveBeenCalledOnce();
-  expect(close).toHaveBeenCalledOnce();
-  expect(rawTrack.stop).toHaveBeenCalledOnce();
-});
-
-it('releases processed microphone streams when recorder creation fails', async () => {
-  const rawStream = createAudioStream();
-  const processedStream = createAudioStream();
-  const rawTrack = getOnlyAudioTrack(rawStream);
-  const processedTrack = getOnlyAudioTrack(processedStream);
-  vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(rawStream);
-  const sourceNode = { connect: vi.fn(), disconnect: vi.fn() };
-  const gainNode = { connect: vi.fn(), disconnect: vi.fn(), gain: { value: 1 } };
-  const close = vi.fn().mockResolvedValue(undefined);
-  vi.stubGlobal(
-    'AudioContext',
-    vi.fn(function MockAudioContext() {
-      return {
-        close,
-        createGain: vi.fn(() => gainNode),
-        createMediaStreamDestination: vi.fn(() => ({ stream: processedStream })),
-        createMediaStreamSource: vi.fn(() => sourceNode),
-      };
-    })
-  );
-  vi.stubGlobal(
-    'MediaRecorder',
-    Object.assign(
-      vi.fn(function MockMediaRecorder() {
-        throw new Error('recorder failed');
-      }),
-      { isTypeSupported: vi.fn(() => true) }
-    )
-  );
-
-  await expect(
-    createMicrophoneRecorder('rec', createSettings(true, { microphoneGain: 1.25 }))
-  ).rejects.toThrow('recorder failed');
-
-  expect(processedTrack.stop).toHaveBeenCalledOnce();
-  expect(rawTrack.stop).toHaveBeenCalledOnce();
-  expect(sourceNode.disconnect).toHaveBeenCalledOnce();
-  expect(gainNode.disconnect).toHaveBeenCalledOnce();
-  expect(close).toHaveBeenCalledOnce();
-});
-
-it('rolls back already normalized source recorders when a later source fails', async () => {
-  const normalizedStream = createTrackedStream();
-
-  normalizeMultiSourceVideoStreamMock
-    .mockResolvedValueOnce({ dimensions: { height: 720, width: 1280 }, stream: normalizedStream })
-    .mockRejectedValueOnce(new Error('normalize failed'));
-
-  await expect(
-    createSourceRecorders({
-      baseRecordingId: 'rec',
-      settings: createSettings(false),
-      sources: [
-        { label: 'Window 1', stream: createStream(1280, 720) },
-        { label: 'Window 2', stream: createStream(1280, 720) },
-      ],
-    })
-  ).rejects.toThrow('normalize failed');
-
-  expect(normalizedStream.track.stop).toHaveBeenCalled();
-});
-
-it('stops a normalized source stream when recorder construction fails', async () => {
-  const normalizedStream = createTrackedStream();
-  normalizeMultiSourceVideoStreamMock.mockResolvedValueOnce({
-    dimensions: { height: 720, width: 1280 },
-    stream: normalizedStream,
+  class AudioContextMock {
+    createGain = vi.fn(() => {
+      throw new Error('gain unavailable');
+    });
+    createMediaStreamSource = vi.fn(() => sourceNode);
+    close = close;
+  }
+  vi.stubGlobal('AudioContext', AudioContextMock);
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: vi.fn().mockResolvedValue(raw) },
   });
-  vi.stubGlobal(
-    'MediaRecorder',
-    Object.assign(
-      vi.fn(function MockMediaRecorder() {
-        throw new Error('source recorder failed');
-      }),
-      { isTypeSupported: vi.fn(() => true) }
-    )
-  );
 
   await expect(
-    createSourceRecorders({
-      baseRecordingId: 'rec',
-      settings: createSettings(false),
-      sources: [{ label: 'Window 1', stream: createStream(1280, 720) }],
-    })
-  ).rejects.toThrow('source recorder failed');
+    createMicrophoneRecorder(
+      'rec',
+      { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true, microphoneGain: 2 },
+      createRecordingStagingCoordinatorTestDouble()
+    )
+  ).rejects.toThrow('gain unavailable');
 
-  expect(normalizedStream.track.stop).toHaveBeenCalled();
+  expect(sourceNode.disconnect).toHaveBeenCalledOnce();
+  expect(close).toHaveBeenCalledOnce();
+  expect(raw.getTracks()[0]?.stop).toHaveBeenCalledOnce();
 });

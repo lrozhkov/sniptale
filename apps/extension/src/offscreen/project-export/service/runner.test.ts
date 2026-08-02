@@ -3,21 +3,13 @@ import { cancelActiveProjectExportJob, releaseProjectExportJob, runProjectExport
 import { VideoExportFormat, VideoExportQualityPreset } from '../../../features/video/project/types';
 
 // State-machine proof: cancel/failure cleanup keeps export resources terminal.
-const {
-  exportPassthroughMock,
-  canUsePassthroughPathMock,
-  loadImagesForProjectMock,
-  renderCompositeExportMock,
-  sendProgressMock,
-  cleanupJobMock,
-} = vi.hoisted(() => ({
-  exportPassthroughMock: vi.fn(),
-  canUsePassthroughPathMock: vi.fn(),
-  loadImagesForProjectMock: vi.fn(),
-  renderCompositeExportMock: vi.fn(),
-  sendProgressMock: vi.fn(),
-  cleanupJobMock: vi.fn(),
-}));
+const { loadImagesForProjectMock, renderCompositeExportMock, sendProgressMock, cleanupJobMock } =
+  vi.hoisted(() => ({
+    loadImagesForProjectMock: vi.fn(),
+    renderCompositeExportMock: vi.fn(),
+    sendProgressMock: vi.fn(),
+    cleanupJobMock: vi.fn(),
+  }));
 
 vi.mock('../runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../runtime')>()),
@@ -31,8 +23,6 @@ vi.mock('../media', async (importOriginal) => ({
 }));
 
 vi.mock('../render', () => ({
-  canUsePassthroughPath: canUsePassthroughPathMock,
-  exportPassthrough: exportPassthroughMock,
   renderCompositeExport: renderCompositeExportMock,
 }));
 
@@ -43,8 +33,6 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  canUsePassthroughPathMock.mockReturnValue(false);
-  exportPassthroughMock.mockResolvedValue(undefined);
   loadImagesForProjectMock.mockResolvedValue(new Map());
   renderCompositeExportMock.mockResolvedValue(undefined);
   sendProgressMock.mockResolvedValue(undefined);
@@ -63,9 +51,11 @@ it('scopes selected-clip renders before loading media', async () => {
     burnInSubtitles: true,
     downloadAfterExport: true,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     fps: 30,
     height: 720,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     scope: 'selected-clip',
     selectedClipIds: ['clip-1'],
     width: 1280,
@@ -95,30 +85,6 @@ it('scopes selected-clip renders before loading media', async () => {
     expect.any(Map),
     project
   );
-});
-
-it('short-circuits into the passthrough export path when the project qualifies', async () => {
-  const project = { clips: [], id: 'project-1' };
-  const settings = {
-    downloadAfterExport: true,
-    format: VideoExportFormat.MP4,
-    fps: 30,
-    height: 720,
-    quality: VideoExportQualityPreset.BALANCED,
-    width: 1280,
-  };
-
-  canUsePassthroughPathMock.mockReturnValue(true);
-
-  await runProjectExport('job-2', project as never, settings as never, { jobId: 'job-2' } as never);
-
-  expect(exportPassthroughMock).toHaveBeenCalledWith(
-    expect.objectContaining({ jobId: 'job-2' }),
-    project,
-    settings
-  );
-  expect(loadImagesForProjectMock).not.toHaveBeenCalled();
-  expect(renderCompositeExportMock).not.toHaveBeenCalled();
 });
 
 it('cancels active export resources and releases completed jobs', () => {

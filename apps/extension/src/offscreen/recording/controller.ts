@@ -10,7 +10,6 @@ import {
   hasActiveSidecarSession,
   pauseActiveSidecarRecorders,
   resumeActiveSidecarRecorders,
-  stopActiveSidecarRecordersWithFlush,
 } from './sidecar';
 import {
   cancelPendingMultiSourceRecordingStart,
@@ -23,11 +22,16 @@ import {
 } from './multi-source';
 import { updateRecordingSettings as applyRecordingSettings } from './update-settings';
 import type { CropStreamDrawStateResult } from './stream/crop-stream';
+import {
+  PostRecordPublicationError,
+  retryPendingPostRecordResult,
+} from './post-record-publication';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingController' });
 const runtimeMessaging = createRuntimeMessagingTransport();
 const STOP_RECORDING_TIMEOUT_MS = 10_000;
 let pendingRecordingStart: Promise<void> | null = null;
+let pendingRecordingStop: Promise<RecordingStopOutcome> | null = null;
 let activeRecordingBinding: RecordingSourceBinding | null = null;
 
 type StateMessage =
@@ -73,42 +77,70 @@ export function startRecording(params: Parameters<typeof startRecordingImpl>[0])
     return Promise.reject(new Error(translate('background.runtime.recordingAlreadyRunning')));
   }
 
+  const previousBinding = activeRecordingBinding;
   const binding = {
     generation: params.generation,
     recordingId: params.recordingId,
     streamInstanceId: params.streamInstanceId,
   };
   activeRecordingBinding = binding;
-
-  const work =
-    (params.settings?.sourceCount ?? 1) > 1
-      ? startMultiSourceRecording({
-          recordingId: params.recordingId ?? `rec-${Date.now()}`,
-          settings: {
-            ...params.settings,
-            systemAudioEnabled: false,
-          },
-        })
-      : startRecordingImpl(params, runtimeMessaging);
-  const tracked = work
-    .then(
-      () => {
-        if (!hasActiveRecordingSession() && matchesActiveRecordingBinding(binding)) {
-          activeRecordingBinding = null;
-        }
-      },
-      (error: unknown) => {
-        if (matchesActiveRecordingBinding(binding)) activeRecordingBinding = null;
-        throw error;
-      }
-    )
-    .finally(() => {
-      if (pendingRecordingStart === tracked) {
-        pendingRecordingStart = null;
-      }
-    });
+  const work = startRecordingAfterPendingPublication(params, binding, previousBinding);
+  const tracked = work.finally(() => {
+    if (pendingRecordingStart === tracked) {
+      pendingRecordingStart = null;
+    }
+  });
   pendingRecordingStart = tracked;
   return tracked;
+}
+
+async function startRecordingAfterPendingPublication(
+  params: Parameters<typeof startRecordingImpl>[0],
+  binding: RecordingSourceBinding,
+  previousBinding: RecordingSourceBinding | null
+): Promise<void> {
+  let previousBindingRetired = false;
+  try {
+    if (previousBinding) {
+      previousBindingRetired =
+        await reconcilePendingPostRecordPublicationBeforeStart(previousBinding);
+    }
+    if ((params.settings?.sourceCount ?? 1) > 1) {
+      await startMultiSourceRecording({
+        recordingId: params.recordingId ?? `rec-${Date.now()}`,
+        settings: {
+          ...params.settings,
+          systemAudioEnabled: false,
+        },
+      });
+    } else {
+      await startRecordingImpl(params, runtimeMessaging);
+    }
+    if (!hasActiveRecordingSession() && matchesActiveRecordingBinding(binding)) {
+      activeRecordingBinding = null;
+    }
+  } catch (error) {
+    if (matchesActiveRecordingBinding(binding)) {
+      activeRecordingBinding = previousBindingRetired ? null : previousBinding;
+    }
+    throw error;
+  }
+}
+
+async function reconcilePendingPostRecordPublicationBeforeStart(
+  previousBinding: RecordingSourceBinding | null
+): Promise<boolean> {
+  if (
+    !previousBinding ||
+    !(await retryPendingPostRecordResult(previousBinding.recordingId, runtimeMessaging))
+  ) {
+    return false;
+  }
+  notifyRecordingStoppedBestEffort(
+    'post-record-publication-reconciled-before-start',
+    previousBinding.recordingId
+  );
+  return true;
 }
 
 function handleStopWithoutActiveRecorder(hadActiveSession: boolean): Promise<RecordingStopOutcome> {
@@ -119,13 +151,6 @@ function handleStopWithoutActiveRecorder(hadActiveSession: boolean): Promise<Rec
     notifyRecordingStoppedBestEffort('stop-request-without-active-recorder', recordingId);
   }
   return Promise.resolve({ result: 'stopped' });
-}
-
-function stopMediaRecorderWithFlush(mediaRecorder: MediaRecorder): void {
-  if (typeof mediaRecorder.requestData === 'function') {
-    mediaRecorder.requestData();
-  }
-  mediaRecorder.stop();
 }
 
 function publishFinalRecordingDuration(
@@ -139,23 +164,81 @@ function publishFinalRecordingDuration(
   });
 }
 
-async function stopActiveRecording(discard: boolean): Promise<RecordingStopOutcome> {
+async function waitForExistingArtifactStop(): Promise<RecordingStopOutcome> {
+  const artifactSession = recordingContext.artifactSession;
+  if (!artifactSession) {
+    return handleStopWithoutActiveRecorder(hasActiveRecordingSession());
+  }
+  try {
+    await artifactSession.stop();
+    return { result: 'stopped' };
+  } catch (error) {
+    if (error instanceof PostRecordPublicationError) throw error;
+    return {
+      error: error instanceof Error ? error.message : String(error),
+      result: 'terminal-failure',
+    };
+  }
+}
+
+async function stopActiveRecording(
+  discard: boolean,
+  stopRequested: boolean
+): Promise<RecordingStopOutcome> {
+  const retriedPublicationRecordingId = await retryPostRecordPublication(stopRequested);
+  if (retriedPublicationRecordingId) {
+    notifyRecordingStoppedBestEffort(
+      'post-record-publication-retried',
+      retriedPublicationRecordingId
+    );
+    return { result: 'stopped' };
+  }
+
   if (hasActiveMultiSourceRecording()) {
     await stopMultiSourceRecording(discard);
     return { result: 'stopped' };
   }
 
-  const { mediaRecorder, durationTracker } = recordingContext;
+  if (recordingContext.lifecycleState === 'starting') {
+    const recordingId = recordingContext.currentRecordingId;
+    const hadActiveSession = hasActiveRecordingSession();
+    recordingContext.cancelStartingRecorder();
+    cleanupResources();
+    if (hadActiveSession) {
+      notifyRecordingStoppedBestEffort('stop-request-before-recorder-activation', recordingId);
+    }
+    return { result: 'stopped' };
+  }
+
+  if (recordingContext.lifecycleState === 'stopping') {
+    return waitForExistingArtifactStop();
+  }
+
+  const { artifactSession, mediaRecorder, durationTracker } = recordingContext;
   const hadActiveSession = hasActiveRecordingSession();
-  if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+  if (!artifactSession || !mediaRecorder || mediaRecorder.state === 'inactive') {
     return handleStopWithoutActiveRecorder(hadActiveSession);
   }
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     logger.debug('Stopping recording');
     publishFinalRecordingDuration(durationTracker);
 
-    const timeoutId = setTimeout(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const clearRecorderTerminalDeadline = () => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      mediaRecorder.removeEventListener('stop', handleRecorderTerminal);
+    };
+    const handleRecorderTerminal = () => {
+      clearRecorderTerminalDeadline();
+    };
+    mediaRecorder.addEventListener('stop', handleRecorderTerminal, { once: true });
+
+    timeoutId = setTimeout(() => {
+      clearRecorderTerminalDeadline();
       const pendingStopRequest = clearPendingStopRequest();
       if (!pendingStopRequest.reject) {
         return;
@@ -169,13 +252,17 @@ async function stopActiveRecording(discard: boolean): Promise<RecordingStopOutco
     recordingContext.beginStopRequest({
       discard,
       resolve: (outcome = { result: 'stopped' }) => {
-        clearTimeout(timeoutId);
+        clearRecorderTerminalDeadline();
         clearPendingStopRequest();
         resolve(outcome);
       },
       reject: (error) => {
-        clearTimeout(timeoutId);
+        clearRecorderTerminalDeadline();
         clearPendingStopRequest();
+        if (error instanceof PostRecordPublicationError) {
+          reject(error);
+          return;
+        }
         resolve({
           error: error instanceof Error ? error.message : String(error),
           result: 'terminal-failure',
@@ -183,29 +270,61 @@ async function stopActiveRecording(discard: boolean): Promise<RecordingStopOutco
       },
     });
 
-    try {
-      void stopActiveSidecarRecordersWithFlush().catch(() => undefined);
-      stopMediaRecorderWithFlush(mediaRecorder);
-    } catch (error) {
-      clearTimeout(timeoutId);
+    void artifactSession.stop().catch((error: unknown) => {
+      clearRecorderTerminalDeadline();
       const pendingStopRequest = clearPendingStopRequest();
+      if (!pendingStopRequest.resolve && !pendingStopRequest.reject) return;
       cleanupResources();
+      if (error instanceof PostRecordPublicationError) {
+        pendingStopRequest.reject?.(error);
+        return;
+      }
       pendingStopRequest.resolve?.({
         error: error instanceof Error ? error.message : String(error),
         result: 'terminal-failure',
       });
-    }
+    });
   });
 }
 
-export async function stopRecording(
+async function retryPostRecordPublication(stopRequested: boolean): Promise<string | null> {
+  if (!stopRequested) {
+    return null;
+  }
+  const recordingId = activeRecordingBinding?.recordingId;
+  if (!recordingId || !(await retryPendingPostRecordResult(recordingId, runtimeMessaging))) {
+    return null;
+  }
+  return recordingId;
+}
+
+export function stopRecording(
   binding: RecordingSourceBinding,
   discard = false
 ): Promise<RecordingStopOutcome> {
-  assertActiveRecordingBinding(binding, { allowIdleStop: true });
+  try {
+    assertActiveRecordingBinding(binding, { allowIdleStop: true });
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  if (pendingRecordingStop) {
+    return pendingRecordingStop;
+  }
+
+  const work = stopRecordingOnce(discard);
+  const tracked = work.finally(() => {
+    if (pendingRecordingStop === tracked) {
+      pendingRecordingStop = null;
+    }
+  });
+  pendingRecordingStop = tracked;
+  return tracked;
+}
+
+async function stopRecordingOnce(discard: boolean): Promise<RecordingStopOutcome> {
   const pendingStart = pendingRecordingStart;
   cancelPendingMultiSourceRecordingStart();
-  let outcome = await stopActiveRecording(discard);
+  let outcome = await stopActiveRecording(discard, true);
   if (!pendingStart) {
     if (outcome.result === 'stopped') activeRecordingBinding = null;
     return outcome;
@@ -219,7 +338,7 @@ export async function stopRecording(
       result: 'terminal-failure',
     };
   }
-  outcome = await stopActiveRecording(discard);
+  outcome = await stopActiveRecording(discard, true);
   if (outcome.result === 'stopped' || !hasActiveRecordingSession()) {
     activeRecordingBinding = null;
   }

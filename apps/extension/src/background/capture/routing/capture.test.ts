@@ -22,9 +22,6 @@ vi.mock('./handlers.visible', () => ({
 vi.mock('./actions.download', () => ({
   handleExecuteSave: vi.fn(),
   handleOpenEditorWithImage: vi.fn(),
-  handleReleaseRecordingDownload: vi.fn(),
-  handleSaveRecordingForDownload: vi.fn(),
-  handleStageRecordingDownloadChunk: vi.fn(),
 }));
 
 vi.mock('./actions.export', () => ({

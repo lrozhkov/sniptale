@@ -40,20 +40,21 @@ const {
   handleVideoSavedToIdbMock: vi.fn(),
 }));
 
-vi.mock('./handlers', () => ({
-  RouteResult: undefined,
-  createUnhandledRouteResult: createUnhandledRouteResultMock,
+vi.mock('./handlers/export/download', () => ({
   handleDownloadRecording: handleDownloadRecordingMock,
   handleDownloadRecordingSidecar: handleDownloadRecordingSidecarMock,
-  handleOffscreenError: handleOffscreenErrorMock,
+}));
+vi.mock('./handlers/state/recording-state', () => ({
   handleOffscreenRecordingPaused: handleOffscreenRecordingPausedMock,
   handleOffscreenRecordingResumed: handleOffscreenRecordingResumedMock,
   handleOffscreenRecordingStarted: handleOffscreenRecordingStartedMock,
   handleOffscreenRecordingStopped: handleOffscreenRecordingStoppedMock,
   handleRecordingDurationUpdated: handleRecordingDurationUpdatedMock,
-  handleRecordingState: handleRecordingStateMock,
   handleRecordingTabId: handleRecordingTabIdMock,
-  handleVideoSavedToIdb: handleVideoSavedToIdbMock,
+}));
+vi.mock('./handlers/state/recording-state-response', () => ({
+  handleAcknowledgePostRecordResult: vi.fn(),
+  handleRecordingState: handleRecordingStateMock,
 }));
 vi.mock('./handlers/export/project-export', () => ({
   handleCancelProjectExport: handleCancelProjectExportMock,

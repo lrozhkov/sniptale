@@ -14,8 +14,14 @@ import { useRecordingState } from './use-recording-state';
 
 export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTransport }) {
   const routeState = useMemo(consumeCameraRecorderRouteState, []);
-  const { capability, postRecordRecordingId, refreshState, registrationError, state } =
-    useRecordingState(routeState, messaging);
+  const {
+    acknowledgePostRecord,
+    capability,
+    postRecordResult,
+    refreshState,
+    registrationError,
+    state,
+  } = useRecordingState(routeState, messaging);
   const [error, setError] = useState<string | null>(routeState.routeError);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
@@ -38,8 +44,10 @@ export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTr
     [messaging, refreshState]
   );
 
-  if (postRecordRecordingId) {
-    return <CameraPostRecordPanel recordingId={postRecordRecordingId} />;
+  if (postRecordResult) {
+    return (
+      <CameraPostRecordPanel result={postRecordResult} onAcknowledge={acknowledgePostRecord} />
+    );
   }
 
   return (
@@ -49,7 +57,7 @@ export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTr
       error={error}
       onCancel={() => setCancelConfirmOpen(true)}
       onControl={runControl}
-      recordingId={routeState.recordingId}
+      recordingId={routeState.recordingId ?? ''}
       registrationError={registrationError}
       state={state}
     />

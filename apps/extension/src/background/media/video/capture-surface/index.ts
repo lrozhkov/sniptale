@@ -1,5 +1,9 @@
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import { getCaptureSurfaceService, type AppliedCaptureSurface } from '../../../capture-surface';
+import {
+  CaptureSurfaceError,
+  getCaptureSurfaceService,
+  type AppliedCaptureSurface,
+} from '../../../capture-surface';
 import { cancelVideoSourceReadyWait } from './source-handshake';
 import {
   clearClosedVideoSurfaceTab,
@@ -65,7 +69,14 @@ async function releaseVideoCaptureSurfaceInternal(recordingId: string): Promise<
     deleteVideoSurfaceSession(recordingId);
     return;
   }
-  await releaseAppliedVideoCaptureSurface(session.applied, session.tabId);
+  try {
+    await releaseAppliedVideoCaptureSurface(session.applied, session.tabId);
+  } catch (error) {
+    if (!(error instanceof CaptureSurfaceError) || error.code !== 'restore-conflict') {
+      throw error;
+    }
+    await getCaptureSurfaceService().abandonConflicted(session.applied);
+  }
   deleteVideoSurfaceSession(recordingId);
 }
 

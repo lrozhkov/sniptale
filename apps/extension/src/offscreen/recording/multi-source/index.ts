@@ -2,11 +2,12 @@ import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/t
 import type { RecordingSidecarRecorder } from '../sidecar/types';
 import { pauseSessionRecorders, resumeSessionRecorders, setSessionMediaEnabled } from './controls';
 import { consumeDesktopStreams, disposeMultiSourceDesktopMedia } from '../setup/desktop-media';
-import { RECORDER_TIMESLICE_MS, initializeDurationPublishing } from './duration';
+import { initializeDurationPublishing } from './duration';
 import { finalizeSession } from './finalize';
-import { notifyMultiSourceStarted } from './messages';
+import { notifyMultiSourceRuntimeFailure, notifyMultiSourceStarted } from './messages';
 import { createMicrophoneRecorder, createSourceRecorders, stopRecorderStreams } from './recorders';
 import {
+  createMultiSourceLifecycle,
   getActiveMultiSourceSession,
   setActiveMultiSourceSession,
   type MultiSourceRecorder,
@@ -14,7 +15,9 @@ import {
 } from './state';
 import { failMultiSourceSession, stopMultiSourceSession } from './stop';
 import { createMultiSourceWebcamRecorder, stopWebcamRecorderStream } from './webcam';
-import { getMediaRecorderError } from '../recorder-error';
+import { createRecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
+import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
+import { assertRecordingResourceBudget } from '../encoding/resource-budget';
 
 let startSequence = 0;
 
@@ -24,25 +27,44 @@ type PreparedMultiSourceRecorders = {
   webcamRecorder: RecordingSidecarRecorder | null;
 };
 
-function attachMultiSourceErrorHandler(recorder: MediaRecorder): void {
-  recorder.onerror = (event) => {
-    const session = getActiveMultiSourceSession();
-    if (!session) {
-      return;
-    }
-    failMultiSourceSession(
-      session,
-      getMediaRecorderError(event, 'A multi-source recorder failed.')
-    );
-  };
-}
-
 export function hasActiveMultiSourceRecording(): boolean {
   return getActiveMultiSourceSession() !== null;
 }
 
 export function getActiveMultiSourceRecordingId(): string | null {
   return getActiveMultiSourceSession()?.recordingId ?? null;
+}
+
+function requireVideoDimensions(source: {
+  recordingId: string;
+  trackSettings: MediaTrackSettings;
+}): { height: number; width: number } {
+  const { height, width } = source.trackSettings;
+  if (
+    typeof width !== 'number' ||
+    typeof height !== 'number' ||
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    throw new Error(`Recording dimensions are unavailable for ${source.recordingId}.`);
+  }
+  return { height, width };
+}
+
+function assertMultiSourceResourceBudget(
+  prepared: PreparedMultiSourceRecorders,
+  settings: VideoRecordingSettings
+): void {
+  assertRecordingResourceBudget({
+    dimensions: [
+      ...prepared.recorders.map(requireVideoDimensions),
+      ...(prepared.webcamRecorder ? [requireVideoDimensions(prepared.webcamRecorder)] : []),
+    ],
+    frameRate: settings.outputProfile.frameRate,
+    resolution: settings.outputProfile.resolution,
+  });
 }
 
 export async function startMultiSourceRecording(params: {
@@ -67,28 +89,45 @@ async function orchestrateMultiSourceRecordingStart(params: {
     throw new Error('Multi-source recording requires at least two prepared sources.');
   }
 
-  const prepared = await prepareMultiSourceRecorders({
-    baseRecordingId: params.recordingId,
-    sequence,
-    settings: params.settings,
-    sources,
-  });
+  const coordinator = await createRecordingStagingCoordinator();
+  let prepared: PreparedMultiSourceRecorders | null;
+  try {
+    prepared = await prepareMultiSourceRecorders({
+      baseRecordingId: params.recordingId,
+      coordinator,
+      sequence,
+      settings: params.settings,
+      sources,
+    });
+  } catch (error) {
+    await coordinator.abort();
+    throw error;
+  }
   if (!prepared) {
+    await coordinator.abort();
     return;
+  }
+  try {
+    assertMultiSourceResourceBudget(prepared, params.settings);
+  } catch (error) {
+    disposePreparedMultiSourceRecorders({ ...prepared, sources });
+    await coordinator.abort();
+    throw error;
   }
   const session = createMultiSourceSession({
     ...prepared,
     recordingId: params.recordingId,
     settings: params.settings,
+    staging: coordinator,
   });
   setActiveMultiSourceSession(session);
-  startSessionRecorders(prepared);
-  initializeDurationPublishing(session);
-  notifyMultiSourceStarted(params.recordingId);
+  startSessionRecorders(session);
+  await session.lifecycle.startPromise;
 }
 
 async function prepareMultiSourceRecorders(params: {
   baseRecordingId: string;
+  coordinator: RecordingStagingCoordinator;
   sequence: number;
   settings: VideoRecordingSettings;
   sources: ReturnType<typeof consumeDesktopStreams>;
@@ -99,12 +138,18 @@ async function prepareMultiSourceRecorders(params: {
   try {
     recorders = await createSourceRecorders({
       baseRecordingId: params.baseRecordingId,
+      coordinator: params.coordinator,
       settings: params.settings,
       sources: params.sources,
     });
-    audioRecorder = await createMicrophoneRecorder(params.baseRecordingId, params.settings);
+    audioRecorder = await createMicrophoneRecorder(
+      params.baseRecordingId,
+      params.settings,
+      params.coordinator
+    );
     webcamRecorder = await createMultiSourceWebcamRecorder({
       baseRecordingId: params.baseRecordingId,
+      coordinator: params.coordinator,
       settings: params.settings,
     });
     if (params.sequence !== startSequence || getActiveMultiSourceSession()) {
@@ -148,14 +193,17 @@ function createMultiSourceSession(
   params: PreparedMultiSourceRecorders & {
     recordingId: string;
     settings: VideoRecordingSettings;
+    staging: RecordingStagingCoordinator;
   }
 ): MultiSourceSession {
   return {
     audioRecorder: params.audioRecorder,
     durationTimer: null,
+    lifecycle: createMultiSourceLifecycle(),
     recorders: params.recorders,
     recordingId: params.recordingId,
     settings: params.settings,
+    staging: params.staging,
     startedAt: Date.now(),
     stopReject: null,
     stopPromise: null,
@@ -164,19 +212,52 @@ function createMultiSourceSession(
   };
 }
 
-function startSessionRecorders(prepared: PreparedMultiSourceRecorders): void {
-  [...prepared.recorders, prepared.audioRecorder, prepared.webcamRecorder].forEach((source) =>
-    startSessionRecorder(source?.recorder ?? null)
+function startSessionRecorders(session: MultiSourceSession): void {
+  const sources = [...session.recorders, session.audioRecorder, session.webcamRecorder].filter(
+    (source) => source !== null
   );
-}
+  const started = new Set<MediaRecorder>();
+  const fail = (error: Error) => {
+    const phase = session.lifecycle.phase;
+    if (failMultiSourceSession(session, error) && phase === 'active') {
+      notifyMultiSourceRuntimeFailure(session.recordingId, error);
+    }
+  };
 
-function startSessionRecorder(recorder: MediaRecorder | null): void {
-  if (!recorder) {
-    return;
+  sources.forEach((source) => {
+    const { recorder } = source;
+    source.artifactSession.setLifecycleCallbacks({
+      onFailure: fail,
+      onStart: () => {
+        if (session.lifecycle.phase !== 'starting') return;
+        started.add(recorder);
+        if (started.size !== sources.length || !session.lifecycle.activate()) return;
+        session.startedAt = Date.now();
+        initializeDurationPublishing(session);
+        notifyMultiSourceStarted(session.recordingId);
+      },
+      onStop: (artifact) => {
+        source.artifact = artifact;
+        if (session.lifecycle.phase === 'terminal') return;
+        fail(
+          new Error(
+            session.lifecycle.phase === 'starting'
+              ? 'A required recorder stopped before multi-source activation.'
+              : 'A multi-source recorder stopped unexpectedly.'
+          )
+        );
+      },
+    });
+  });
+
+  for (const source of sources) {
+    if (session.lifecycle.phase === 'terminal') break;
+    try {
+      source.artifactSession.start();
+    } catch (error) {
+      fail(error instanceof Error ? error : new Error(String(error)));
+    }
   }
-
-  attachMultiSourceErrorHandler(recorder);
-  recorder.start(RECORDER_TIMESLICE_MS);
 }
 
 export function pauseMultiSourceRecording(): void {

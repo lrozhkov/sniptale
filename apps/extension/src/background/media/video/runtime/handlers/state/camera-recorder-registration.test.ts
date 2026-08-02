@@ -4,11 +4,13 @@ const {
   authorizeCameraRecorderDocumentMock,
   ensureActiveVideoRecordingLeaseHydratedMock,
   getActiveVideoRecordingLeaseSnapshotMock,
+  reconnectCameraRecorderDocumentMock,
   resolveTrustedCameraRecorderRuntimeSenderUrlMock,
 } = vi.hoisted(() => ({
   authorizeCameraRecorderDocumentMock: vi.fn(),
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
   getActiveVideoRecordingLeaseSnapshotMock: vi.fn(),
+  reconnectCameraRecorderDocumentMock: vi.fn(),
   resolveTrustedCameraRecorderRuntimeSenderUrlMock: vi.fn(),
 }));
 
@@ -20,6 +22,7 @@ vi.mock('../../../recording-control-lease', async (importOriginal) => ({
 vi.mock('../../camera-recorder-control', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../camera-recorder-control')>()),
   authorizeCameraRecorderDocument: authorizeCameraRecorderDocumentMock,
+  reconnectCameraRecorderDocument: reconnectCameraRecorderDocumentMock,
 }));
 vi.mock('../../sender-policy', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../sender-policy')>()),
@@ -33,8 +36,7 @@ function createSendResponse() {
 }
 
 async function flushAsyncRoute() {
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 beforeEach(() => {
@@ -47,15 +49,22 @@ beforeEach(() => {
     recordingId: 'rec-1',
   });
   resolveTrustedCameraRecorderRuntimeSenderUrlMock.mockReturnValue('camera-url');
-  authorizeCameraRecorderDocumentMock.mockReturnValue(true);
+  authorizeCameraRecorderDocumentMock.mockResolvedValue({
+    recordingId: 'rec-1',
+  });
+  reconnectCameraRecorderDocumentMock.mockResolvedValue({ recordingId: 'rec-1' });
 });
 
 it('returns camera recorder control capability after launch-token document binding', async () => {
   const sendResponse = createSendResponse();
-  const sender = { documentId: 'document-1', url: 'camera-url' } as chrome.runtime.MessageSender;
+  const sender = {
+    documentId: 'document-1',
+    tab: { id: 7 },
+    url: 'camera-url',
+  } as chrome.runtime.MessageSender;
 
   handleRegisterCameraRecorderControl(
-    { cameraLaunchToken: 'launch-token-1', recordingId: 'rec-1' },
+    { cameraRegistrationToken: 'launch-token-1', recordingId: 'rec-1' },
     sendResponse,
     sender
   );
@@ -63,43 +72,51 @@ it('returns camera recorder control capability after launch-token document bindi
 
   expect(authorizeCameraRecorderDocumentMock).toHaveBeenCalledWith({
     documentId: 'document-1',
-    launchToken: 'launch-token-1',
+    registrationToken: 'launch-token-1',
     recordingId: 'rec-1',
     senderUrl: 'camera-url',
+    tabId: 7,
   });
   expect(sendResponse).toHaveBeenLastCalledWith({
     controlToken: 'control-token-1',
     recordingId: 'rec-1',
+    result: 'active',
     success: true,
   });
 });
 
-it('rejects registration before consuming launch tokens when lease is unavailable', async () => {
+it('reconnects the same post-record camera tab without retaining a page token', async () => {
   const sendResponse = createSendResponse();
   getActiveVideoRecordingLeaseSnapshotMock.mockReturnValue(null);
 
-  handleRegisterCameraRecorderControl(
-    { cameraLaunchToken: 'launch-token-1', recordingId: 'rec-1' },
-    sendResponse,
-    { documentId: 'document-1', url: 'camera-url' } as chrome.runtime.MessageSender
-  );
+  handleRegisterCameraRecorderControl({}, sendResponse, {
+    documentId: 'document-2',
+    tab: { id: 7 },
+    url: 'camera-url',
+  } as chrome.runtime.MessageSender);
   await flushAsyncRoute();
 
   expect(authorizeCameraRecorderDocumentMock).not.toHaveBeenCalled();
+  expect(reconnectCameraRecorderDocumentMock).toHaveBeenCalledWith({
+    documentId: 'document-2',
+    senderUrl: 'camera-url',
+    tabId: 7,
+  });
   expect(sendResponse).toHaveBeenLastCalledWith({
-    success: false,
-    error: 'Recording control lease is unavailable',
+    recordingId: 'rec-1',
+    result: 'post-record-only',
+    success: true,
   });
 });
 
 it('rejects unauthorized registration without returning control capability', async () => {
   const sendResponse = createSendResponse();
-  authorizeCameraRecorderDocumentMock.mockReturnValueOnce(false);
+  authorizeCameraRecorderDocumentMock.mockResolvedValueOnce(null);
 
   handleRegisterCameraRecorderControl(
-    { cameraLaunchToken: 'wrong-launch-token', recordingId: 'rec-1' },
+    { cameraRegistrationToken: 'wrong-launch-token', recordingId: 'rec-1' },
     sendResponse,
-    { documentId: 'document-1', url: 'camera-url' } as chrome.runtime.MessageSender
+    { documentId: 'document-1', tab: { id: 7 }, url: 'camera-url' } as chrome.runtime.MessageSender
   );
   await flushAsyncRoute();
 

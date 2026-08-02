@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  abandonConflicted: vi.fn(),
   apply: vi.fn(),
   clearActiveLease: vi.fn(),
   createTransitionId: vi.fn(() => 'recovery-transition-1'),
@@ -27,6 +28,7 @@ vi.mock('@sniptale/platform/security/secure-random-id', () => ({
 vi.mock('../../capture-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../capture-surface')>()),
   getCaptureSurfaceService: () => ({
+    abandonConflicted: mocks.abandonConflicted,
     apply: mocks.apply,
     getAppliedBindingForSession: mocks.getAppliedBindingForSession,
     getAppliedForSession: mocks.getAppliedForSession,
@@ -109,6 +111,7 @@ beforeEach(() => {
   mocks.getAppliedForSession.mockReset();
   mocks.hasSessionLease.mockReset();
   mocks.apply.mockResolvedValue(appliedSurface());
+  mocks.abandonConflicted.mockResolvedValue(undefined);
   mocks.clearActiveLease.mockResolvedValue(undefined);
   mocks.disableViewportCursorProjection.mockResolvedValue(undefined);
   mocks.enableViewportCursorProjection.mockResolvedValue(undefined);
@@ -398,6 +401,22 @@ describe('video capture-surface session termination', () => {
     resolveRelease();
     await Promise.all([first, second]);
     expect(mocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('relinquishes a manually changed surface and completes terminal release', async () => {
+    await acquireVideoCaptureSurface({
+      captureMode: CaptureMode.TAB,
+      presetId: 'preset-1',
+      recordingId: 'recording-1',
+      tabId: 7,
+    });
+    const { CaptureSurfaceError } = await import('../../capture-surface');
+    mocks.release.mockRejectedValueOnce(new CaptureSurfaceError('restore-conflict'));
+
+    await expect(releaseVideoCaptureSurface('recording-1')).resolves.toBeUndefined();
+
+    expect(mocks.abandonConflicted).toHaveBeenCalledWith(appliedSurface());
+    expect(getVideoSurfaceSession('recording-1')).toBeNull();
   });
 
   it('terminates a closed viewport tab without ordinary restoration', async () => {

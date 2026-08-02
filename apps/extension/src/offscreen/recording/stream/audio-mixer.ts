@@ -11,7 +11,6 @@ const logger = createLogger({ namespace: 'OffscreenAudioMixer' });
 
 export class AudioMixer {
   private readonly graph = new AudioMixerGraph();
-  private tabStream: MediaStream | null = null;
   private micStream: MediaStream | null = null;
 
   private stopStreamTracks(stream: MediaStream | null): void {
@@ -20,8 +19,6 @@ export class AudioMixer {
 
   private releaseTabStream(): void {
     this.graph.disconnectTabStream();
-    this.stopStreamTracks(this.tabStream);
-    this.tabStream = null;
   }
 
   private releaseMicrophoneStream(): void {
@@ -46,7 +43,6 @@ export class AudioMixer {
 
     this.releaseTabStream();
     const audioOnlyStream = new MediaStream(audioTracks);
-    this.tabStream = audioOnlyStream;
     this.graph.connectTabStream(audioOnlyStream);
 
     logger.log('Tab audio added');

@@ -10,7 +10,6 @@ export type VideoRecordingControlLease = {
   controlToken: string;
   cropRegion: { x: number; y: number; width: number; height: number } | null;
   expiresAt: number;
-  openEditorAfterRecording: boolean;
   ownerSenderUrl: string;
   phase: 'prepared' | 'active';
   recordingId: string;
@@ -50,7 +49,6 @@ function parsePersistedLease(value: unknown, now = Date.now()): VideoRecordingCo
     !isCropRegion(cropRegion) ||
     typeof value['expiresAt'] !== 'number' ||
     !Number.isFinite(value['expiresAt']) ||
-    typeof value['openEditorAfterRecording'] !== 'boolean' ||
     typeof value['ownerSenderUrl'] !== 'string' ||
     (value['phase'] !== 'prepared' && value['phase'] !== 'active') ||
     typeof value['recordingId'] !== 'string' ||
@@ -67,7 +65,6 @@ function parsePersistedLease(value: unknown, now = Date.now()): VideoRecordingCo
     controlToken: value['controlToken'],
     cropRegion,
     expiresAt: value['expiresAt'],
-    openEditorAfterRecording: value['openEditorAfterRecording'],
     ownerSenderUrl: value['ownerSenderUrl'],
     phase: value['phase'],
     recordingId: value['recordingId'],
@@ -136,7 +133,6 @@ export function createLeaseSnapshot(args: {
   captureMode: CaptureMode;
   ownerSenderUrl: string;
   cropRegion?: { x: number; y: number; width: number; height: number } | null;
-  openEditorAfterRecording: boolean;
   recordingId: string;
   recordingTabId: number | null;
   surfaceBinding?: { generation: number; streamInstanceId: string } | null;
@@ -147,7 +143,6 @@ export function createLeaseSnapshot(args: {
     controlToken: crypto.randomUUID(),
     cropRegion: args.cropRegion ?? null,
     expiresAt: Date.now() + RECORDING_LEASE_TTL_MS,
-    openEditorAfterRecording: args.openEditorAfterRecording,
     ownerSenderUrl: args.ownerSenderUrl,
     phase: 'prepared',
     recordingId: args.recordingId,

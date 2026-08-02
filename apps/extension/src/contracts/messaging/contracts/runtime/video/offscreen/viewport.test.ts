@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { runtimeVideoOffscreenViewportMessageContracts } from './viewport';
 
@@ -13,16 +14,9 @@ it('accepts both viewport and window preset surfaces on recording start', () => 
     streamId: 'stream-1',
     streamInstanceId: 'stream-instance-1',
     settings: {
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 1,
       countdownSeconds: 0,
-      diagnosticsEnabled: false,
-      microphoneDeviceId: null,
-      microphoneEnabled: false,
-      openEditorAfterRecording: true,
-      quality: 'HIGH',
-      systemAudioEnabled: true,
-      webcamDeviceId: null,
-      webcamEnabled: false,
     },
   };
 
@@ -32,6 +26,28 @@ it('accepts both viewport and window preset surfaces on recording start', () => 
       surface: { height: 720, presetId: 'preset-1', target, width: 1280 },
     };
     expect(contract.parseRequest(request)).toEqual(request);
+  }
+});
+
+it('rejects legacy recording settings on offscreen start requests', () => {
+  const contract =
+    runtimeVideoOffscreenViewportMessageContracts[VideoMessageType.OFFSCREEN_START_RECORDING];
+  const message = {
+    type: VideoMessageType.OFFSCREEN_START_RECORDING,
+    capabilityToken: 'capability-1',
+    generation: 2,
+    recordingId: 'recording-1',
+    streamId: 'stream-1',
+    streamInstanceId: 'stream-instance-1',
+  };
+
+  for (const settings of [
+    { ...DEFAULT_VIDEO_SETTINGS, quality: 'HIGH' },
+    { ...DEFAULT_VIDEO_SETTINGS, output: {} },
+  ]) {
+    expect(() => contract.parseRequest({ ...message, settings })).toThrow(
+      /OFFSCREEN_START_RECORDING/
+    );
   }
 });
 

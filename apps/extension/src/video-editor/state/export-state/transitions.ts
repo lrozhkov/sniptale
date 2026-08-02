@@ -1,5 +1,8 @@
 import { translate } from '../../../platform/i18n';
-import { normalizeVideoProjectExportSettings } from '../../../features/video/project/export/capabilities';
+import {
+  mergeVideoProjectExportSettings,
+  normalizeVideoProjectExportSettings,
+} from '../../../features/video/project/export/capabilities';
 import { getDefaultExportSettings } from '../../../features/video/project/timeline';
 import {
   VideoProjectExportPhase,
@@ -68,10 +71,9 @@ export function updateExportSettingsState(
   return {
     ...exportState,
     settings: exportState.settings
-      ? normalizeVideoProjectExportSettings({
-          ...exportState.settings,
-          ...normalizedPatch,
-        })
+      ? normalizeVideoProjectExportSettings(
+          mergeVideoProjectExportSettings(exportState.settings, normalizedPatch)
+        )
       : null,
   };
 }

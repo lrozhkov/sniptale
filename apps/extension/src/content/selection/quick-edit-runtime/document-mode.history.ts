@@ -373,7 +373,8 @@ function commitDocumentModeHistory(state: DocumentModeHistoryState): void {
       } catch (cancelError) {
         throw new AggregateError(
           [error, cancelError],
-          'Quick Edit document-mode commit and cancellation failed'
+          'Quick Edit document-mode commit and cancellation failed',
+          { cause: cancelError }
         );
       }
     }

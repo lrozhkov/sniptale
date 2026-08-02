@@ -52,14 +52,15 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 }));
 
 import { finalizeRecordingStart } from './transport.finalize';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const settings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 0,
   countdownSeconds: 3,
   diagnosticsEnabled: true,
   microphoneDeviceId: null,
   microphoneEnabled: true,
-  openEditorAfterRecording: false,
   quality: VideoQuality.HIGH,
   systemAudioEnabled: true,
 };
@@ -137,37 +138,115 @@ it('dispatches exact surface metadata and waits for source validation', async ()
   );
 });
 
-it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
-  'validates %s source readiness against its initiating tab viewport',
-  async (captureMode) => {
-    const viewport = {
-      devicePixelRatio: 2,
-      height: 720,
-      scrollX: 0,
-      scrollY: 0,
-      width: 1280,
-    };
+it('does not bind ordinary full-tab startup to a second viewport measurement', async () => {
+  const viewport = {
+    devicePixelRatio: 2,
+    height: 720,
+    scrollX: 0,
+    scrollY: 0,
+    width: 1280,
+  };
 
-    await finalizeRecordingStart({
-      captureMode,
-      captureSource: { mode: captureMode, streamId: 'tab-1' },
+  await finalizeRecordingStart({
+    captureMode: CaptureMode.TAB,
+    captureSource: { mode: CaptureMode.TAB, streamId: 'tab-1' },
+    generation: 1,
+    recordingId: 'recording-42',
+    streamInstanceId: 'stream-instance-1',
+    settings,
+    surface: {
       generation: 1,
-      recordingId: 'recording-42',
-      streamInstanceId: 'stream-instance-1',
-      settings,
-      surface: null,
-      tabId: 12,
-      viewport,
-    });
+      height: 1080,
+      leaseId: 'lease-1',
+      presetId: 'system:window-full-hd',
+      sessionId: 'recording-42',
+      target: 'window',
+      width: 1920,
+    },
+    tabId: 12,
+    viewport,
+  });
 
-    expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
-      expectedStreamInstanceId: 'stream-instance-1',
-      expectedViewport: viewport,
-      recordingId: 'recording-42',
-      tabId: 12,
-    });
-  }
-);
+  expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
+    expectedStreamInstanceId: 'stream-instance-1',
+    expectedViewport: null,
+    recordingId: 'recording-42',
+    tabId: 12,
+  });
+});
+
+it('requests an atomic remap when crop geometry changes during source opening', async () => {
+  const viewport = {
+    devicePixelRatio: 2,
+    height: 720,
+    scrollX: 0,
+    scrollY: 0,
+    width: 1280,
+  };
+
+  await finalizeRecordingStart({
+    captureMode: CaptureMode.TAB_CROP,
+    captureSource: { mode: CaptureMode.TAB_CROP, streamId: 'tab-1' },
+    generation: 1,
+    recordingId: 'recording-42',
+    streamInstanceId: 'stream-instance-1',
+    settings,
+    surface: null,
+    tabId: 12,
+    viewport,
+  });
+
+  expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
+    expectedStreamInstanceId: 'stream-instance-1',
+    expectedViewport: viewport,
+    recordingId: 'recording-42',
+    tabId: 12,
+    viewportMismatchPolicy: 'remap',
+  });
+});
+
+it('allows startup crop remapping for a window-target preset', async () => {
+  const viewport = {
+    devicePixelRatio: 2,
+    height: 985,
+    scrollX: 0,
+    scrollY: 0,
+    width: 1904,
+  };
+
+  await finalizeRecordingStart({
+    captureMode: CaptureMode.TAB_CROP,
+    captureSource: {
+      captureViewport: viewport,
+      cropRegion: { height: 400, width: 800, x: 20, y: 30 },
+      mode: CaptureMode.TAB_CROP,
+      streamId: 'tab-crop-1',
+    },
+    generation: 1,
+    recordingId: 'recording-window-crop',
+    streamInstanceId: 'stream-window-crop',
+    settings,
+    surface: {
+      generation: 1,
+      height: 1080,
+      leaseId: 'lease-window-crop',
+      presetId: 'system:window-full-hd',
+      sessionId: 'recording-window-crop',
+      target: 'window',
+      width: 1920,
+    },
+    tabId: 12,
+    viewport,
+  });
+
+  expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
+    expectedStreamInstanceId: 'stream-window-crop',
+    expectedViewport: viewport,
+    recordingId: 'recording-window-crop',
+    tabId: 12,
+    viewportMismatchPolicy: 'remap',
+  });
+});
 
 it('does not validate a SCREEN source against the initiating tab viewport', async () => {
   supportsSystemAudioMock.mockReturnValue(false);

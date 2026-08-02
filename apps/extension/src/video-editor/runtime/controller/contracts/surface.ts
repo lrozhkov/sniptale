@@ -16,6 +16,7 @@ export interface VideoEditorOverlaysController {
     onExport: VideoEditorActionHandlers['handleStartExport'];
     selectedClipId?: string | null;
     settings: VideoEditorExportRuntimeState['settings'];
+    sourceDimensions: { height: number; width: number } | null;
   };
   exportProgress: {
     isRunning: boolean;

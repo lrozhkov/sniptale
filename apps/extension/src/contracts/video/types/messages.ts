@@ -37,6 +37,10 @@ export type * from './messages.offscreen.ts';
 
 export type VideoRuntimeMessage =
   | GetRecordingStateMessage
+  | {
+      type: typeof VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT;
+      recordingId: string;
+    }
   | RegisterCameraRecorderControlMessage
   | GetRecordingTabIdMessage
   | RecordingDurationUpdatedMessage
@@ -67,7 +71,7 @@ export type VideoRuntimeMessage =
   | DesktopMediaFailedMessage
   | {
       type: typeof VideoMessageType.VIDEO_SAVED_TO_IDB;
-      filename?: string;
+      primaryRecordingId: string;
       recordingId: string;
       projectId?: string;
     }

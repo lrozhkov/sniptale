@@ -44,7 +44,6 @@ import {
   VideoMp4Codec,
   VideoTimelinePlacementMode,
 } from '../../../../features/video/project/types';
-import { translate } from '../../../../platform/i18n';
 import { createMp4Pipeline } from './build';
 
 function createProject() {
@@ -72,8 +71,9 @@ function createMp4Settings() {
     width: 1280,
     height: 720,
     fps: 30,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
     mp4VideoCodec: VideoMp4Codec.AVC,
     downloadAfterExport: true,
   };
@@ -130,16 +130,4 @@ it('skips fallback warnings when the primary AVC path is available and there is 
   expect(pipeline.audioProfile).toBeNull();
   expect(pipeline.fallbackNotes).toEqual([]);
   expect(loggerWarnMock).not.toHaveBeenCalled();
-});
-
-it('fails early when MP4 export settings omit the selected codec', async () => {
-  await expect(
-    createMp4Pipeline(
-      createProject() as never,
-      (() => {
-        const { mp4VideoCodec: _mp4VideoCodec, ...settings } = createMp4Settings();
-        return settings;
-      })()
-    )
-  ).rejects.toThrow(translate('offscreenExport.mp4VideoCodecRequired'));
 });

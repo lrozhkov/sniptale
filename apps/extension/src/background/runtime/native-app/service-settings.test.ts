@@ -41,6 +41,8 @@ vi.mock('./ids', () => ({
   createNativeConnectionId: () => 'conn-1',
 }));
 
+import { createNativeAppRuntimeService } from './service';
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.cleanupStaleNativeTransferSessionsMock.mockResolvedValue([]);
@@ -50,7 +52,6 @@ beforeEach(() => {
 });
 
 async function createConnectedService(port = createNativeTestPort()) {
-  const { createNativeAppRuntimeService } = await import('./service');
   const service = createNativeAppRuntimeService({
     connectNative: createNativeConnect(port),
     hostName: 'com.sniptale.native_host',
@@ -93,7 +94,10 @@ it('ignores settings accepted messages for stale revisions', async () => {
 
   mocks.loadVideoSettingsMock.mockResolvedValueOnce({
     ...DEFAULT_VIDEO_SETTINGS,
-    quality: VideoQuality.LOW,
+    outputProfile: {
+      ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+      quality: VideoQuality.LOW,
+    },
   });
   await service.syncSettings();
 
@@ -117,7 +121,6 @@ it('ignores settings accepted messages for stale revisions', async () => {
 it('syncs native shortcut priority after quick-action hotkey changes', async () => {
   const storageListenerRef: { current: BrowserStorageChangeListener | null } = { current: null };
   const port = createNativeTestPort();
-  const { createNativeAppRuntimeService } = await import('./service');
   const service = createNativeAppRuntimeService({
     connectNative: createNativeConnect(port),
     hostName: 'com.sniptale.native_host',

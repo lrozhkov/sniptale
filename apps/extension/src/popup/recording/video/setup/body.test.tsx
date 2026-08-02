@@ -222,6 +222,7 @@ function expectSetupControlProps(props: React.ComponentProps<typeof VideoSetupBo
   );
   expect(videoSetupBodyMocks.webcamSelectorMock).toHaveBeenCalledWith(
     expect.objectContaining({
+      required: false,
       settings: props.settings,
       webcamDevices: props.webcamDevices,
     })
@@ -229,6 +230,7 @@ function expectSetupControlProps(props: React.ComponentProps<typeof VideoSetupBo
   expect(videoSetupBodyMocks.settingsGridMock).toHaveBeenCalledWith(
     expect.objectContaining({
       captureMode: CaptureMode.TAB,
+      knownOutputBasisDimensions: props.viewModel.knownOutputBasisDimensions,
       onSettingsChange: props.onSettingsChange,
       settings: props.settings,
     })
@@ -247,6 +249,9 @@ function expectSetupOnlySections() {
 it('composes capture, preset, toggle, settings, and warning sections from the video setup view model', async () => {
   const props = await renderBody();
 
+  const setupSection = container?.querySelector('section');
+  expect(setupSection?.className).toContain('px-3 py-2 pr-2');
+  expect(setupSection?.className).not.toContain('p-3');
   expectSetupSectionOrder();
   expectSelectorProps(props);
   expectSetupControlProps(props);
@@ -267,6 +272,9 @@ it('locks webcam and hides screen preset controls in camera mode', async () => {
   expect(videoSetupBodyMocks.presetSelectorMock).not.toHaveBeenCalled();
   expect(videoSetupBodyMocks.toggleGridMock).toHaveBeenCalledWith(
     expect.objectContaining({ captureMode: CaptureMode.CAMERA, webcamLocked: true })
+  );
+  expect(videoSetupBodyMocks.webcamSelectorMock).toHaveBeenCalledWith(
+    expect.objectContaining({ required: true })
   );
 });
 

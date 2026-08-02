@@ -1,7 +1,8 @@
 import {
-  VideoQuality,
+  DEFAULT_VIDEO_OUTPUT_PROFILE,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 export function createDeferred<T>() {
   let resolve!: (value: T) => void;
@@ -12,6 +13,7 @@ export function createDeferred<T>() {
 }
 
 export class FakeMediaRecorder {
+  static autoEmitStart = true;
   static instances: FakeMediaRecorder[] = [];
   static isTypeSupported() {
     return true;
@@ -20,7 +22,9 @@ export class FakeMediaRecorder {
   mimeType: string;
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
+  onstart: (() => void) | null = null;
   onstop: (() => void) | null = null;
+  readonly startTimeslices: Array<number | undefined> = [];
   state: RecordingState = 'inactive';
 
   constructor(
@@ -35,8 +39,21 @@ export class FakeMediaRecorder {
     this.ondataavailable?.({ data: new Blob(['chunk'], { type: this.mimeType }) });
   }
 
-  start() {
+  emitStart() {
+    this.onstart?.();
+  }
+
+  emitUnexpectedStop() {
+    this.state = 'inactive';
+    this.onstop?.();
+  }
+
+  start(timeslice?: number) {
+    this.startTimeslices.push(timeslice);
     this.state = 'recording';
+    if (FakeMediaRecorder.autoEmitStart) {
+      this.emitStart();
+    }
   }
 
   stop() {
@@ -47,14 +64,14 @@ export class FakeMediaRecorder {
 
 export function createSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 3,
     controlledCursorCaptureEnabled: false,
     countdownSeconds: 0,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: true,
-    openEditorAfterRecording: true,
-    quality: VideoQuality.HIGH,
+    outputProfile: DEFAULT_VIDEO_OUTPUT_PROFILE,
     sourceCount: 2,
     systemAudioEnabled: false,
     webcamDeviceId: 'cam-1',

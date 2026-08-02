@@ -6,12 +6,11 @@ const { deleteRecordingMock, getRecordingMock, listRecordingsMock } = vi.hoisted
   listRecordingsMock: vi.fn(),
 }));
 
-vi.mock('./index', () => ({
-  cleanupOldRecordings: vi.fn(),
+vi.mock('./index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./index')>()),
   deleteRecording: deleteRecordingMock,
   getRecording: getRecordingMock,
   listRecordings: listRecordingsMock,
-  saveRecording: vi.fn(),
 }));
 
 import { deleteSavedRecordingTracks, loadSavedRecordingTrackBlobs } from './tracks';

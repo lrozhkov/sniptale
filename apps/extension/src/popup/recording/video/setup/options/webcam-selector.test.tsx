@@ -15,6 +15,7 @@ import {
   WebcamResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoWebcamSelector } from './webcam-selector';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -43,8 +44,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function createSettings(overrides: Partial<Parameters<typeof VideoWebcamSelector>[0]['settings']>) {
+function createSettings(
+  overrides: Partial<
+    Omit<
+      Parameters<typeof VideoWebcamSelector>[0]['settings'],
+      'output' | 'qualityProfileId' | 'qualityProfiles'
+    >
+  >
+) {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: false,
@@ -52,7 +61,6 @@ function createSettings(overrides: Partial<Parameters<typeof VideoWebcamSelector
     microphoneEnabled: false,
     webcamDeviceId: 'cam-1',
     webcamEnabled: true,
-    openEditorAfterRecording: false,
     quality: VideoQuality.MEDIUM,
     systemAudioEnabled: true,
     webcamQuality: {
@@ -101,6 +109,21 @@ it('hides the webcam selector until webcam capture is enabled', () => {
   );
 
   expect(container?.textContent ?? '').not.toContain('t:popup.video.webcamRowLabel');
+});
+
+it('shows the required camera selector without changing a disabled saved preference', () => {
+  renderNode(
+    <VideoWebcamSelector
+      required
+      settings={createSettings({ webcamDeviceId: null, webcamEnabled: false })}
+      webcamDevices={[]}
+      isLoadingWebcams={false}
+      onWebcamDeviceChange={() => undefined}
+      onSettingsChange={() => undefined}
+    />
+  );
+
+  expect(container?.textContent).toContain('t:popup.video.webcamRowLabel');
 });
 
 it('shows the webcam select control and emits selected device changes', async () => {

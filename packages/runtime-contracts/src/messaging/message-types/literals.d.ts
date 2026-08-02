@@ -85,10 +85,6 @@ declare module './' {
     type REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY =
       typeof import('./').MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY;
     type UPDATE_GALLERY_IMAGE_ASSET = typeof import('./').MessageType.UPDATE_GALLERY_IMAGE_ASSET;
-    type STAGE_RECORDING_DOWNLOAD_CHUNK =
-      typeof import('./').MessageType.STAGE_RECORDING_DOWNLOAD_CHUNK;
-    type SAVE_RECORDING_FOR_DOWNLOAD = typeof import('./').MessageType.SAVE_RECORDING_FOR_DOWNLOAD;
-    type RELEASE_RECORDING_DOWNLOAD = typeof import('./').MessageType.RELEASE_RECORDING_DOWNLOAD;
     type SCENARIO_GET_SESSION = typeof import('./').MessageType.SCENARIO_GET_SESSION;
     type SCENARIO_SET_ENABLED = typeof import('./').MessageType.SCENARIO_SET_ENABLED;
     type SCENARIO_SET_CAPTURE_MODE = typeof import('./').MessageType.SCENARIO_SET_CAPTURE_MODE;

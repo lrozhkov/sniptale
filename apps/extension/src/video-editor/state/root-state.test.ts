@@ -184,6 +184,7 @@ function verifyProjectHydration(): void {
     exportState: {
       settings: expect.objectContaining({
         height: 900,
+        resolution: 'SOURCE',
         width: 1440,
       }),
     },

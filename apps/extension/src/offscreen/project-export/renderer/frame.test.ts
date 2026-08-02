@@ -1,5 +1,17 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { VideoMotionOverlayZoomMode } from '../../../features/video/project/types';
+import {
+  resolveVideoOutputDimensions,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import {
+  VideoExportFormat,
+  VideoExportQualityPreset,
+  VideoMotionOverlayZoomMode,
+  VideoMp4Codec,
+  type VideoProjectExportSettings,
+} from '../../../features/video/project/types';
+import type { LoadedImagesMap } from './types';
 const {
   drawActionCompositionStateMock,
   drawCompositionLayerMock,
@@ -68,6 +80,22 @@ function createContext() {
   } as unknown as CanvasRenderingContext2D;
 }
 
+function createTransformTrackingContext() {
+  let translationX = 0;
+  const savedTranslations: number[] = [];
+  const clipTranslations: number[] = [];
+  const context = createContext();
+  context.save = vi.fn(() => savedTranslations.push(translationX));
+  context.restore = vi.fn(() => {
+    translationX = savedTranslations.pop() ?? 0;
+  });
+  context.translate = vi.fn((x: number) => {
+    translationX += x;
+  });
+  context.rect = vi.fn(() => clipTranslations.push(translationX));
+  return { clipTranslations, context, readTranslationX: () => translationX };
+}
+
 function createRenderedFrame() {
   return {
     project: {
@@ -111,7 +139,107 @@ function createRenderedFrame() {
   };
 }
 
+function createExportSettings(
+  project: { height: number; width: number },
+  resolution: VideoResolutionPreset
+): VideoProjectExportSettings {
+  return {
+    ...resolveVideoOutputDimensions(project.width, project.height, resolution),
+    downloadAfterExport: false,
+    format: VideoExportFormat.MP4,
+    fps: 30,
+    mp4VideoCodec: VideoMp4Codec.AVC,
+    quality: VideoExportQualityPreset.HIGH,
+    resolution,
+  };
+}
+
 it('applies camera transforms before rendering export layers and overlays', verifyFrameRendering);
+
+it('contains a rounded standard output without stretching or cropping project coordinates', async () => {
+  const { drawProjectFrame } = await import('./frame');
+  const { clipTranslations, context, readTranslationX } = createTransformTrackingContext();
+  const transitionTranslations: number[] = [];
+  const { frame } = createRenderedFrame();
+  const roundedProject = createEmptyVideoProject('Rounded output', 100, 51);
+  const roundedSettings = createExportSettings(roundedProject, VideoResolutionPreset.P240);
+  const loadedImages: LoadedImagesMap = {};
+
+  resolveVideoCompositionRenderPassesMock.mockReturnValue({
+    overlayFrame: frame,
+    visualPasses: [
+      {
+        alpha: 1,
+        frame,
+        time: 0,
+        transitionOverlays: [
+          {
+            alpha: 1,
+            color: '#000000',
+            direction: 'LEFT',
+            kind: 'fill',
+            progress: 0.5,
+            softness: 0,
+            width: 1,
+          },
+        ],
+      },
+    ],
+  });
+  drawTransitionOverlayMock.mockImplementation(() => {
+    transitionTranslations.push(readTranslationX());
+  });
+
+  drawProjectFrame(context, roundedProject, roundedSettings, 0, loadedImages, new Map());
+
+  expect(drawCompositionLayerMock).toHaveBeenCalledWith(
+    context,
+    frame.visualLayers[0],
+    expect.closeTo(roundedSettings.width / roundedProject.width),
+    expect.closeTo(roundedSettings.width / roundedProject.width),
+    loadedImages,
+    expect.any(Map),
+    1
+  );
+  expect(context.translate).toHaveBeenNthCalledWith(
+    1,
+    0,
+    expect.closeTo(
+      (roundedSettings.height -
+        roundedProject.height * (roundedSettings.width / roundedProject.width)) /
+        2
+    )
+  );
+  expect(clipTranslations).toEqual([0]);
+  expect(transitionTranslations).toEqual([0]);
+});
+
+it('crops only the odd Source encoder edge without a resampling transform', async () => {
+  const { drawProjectFrame } = await import('./frame');
+  const context = createContext();
+  const { frame } = createRenderedFrame();
+  const project = createEmptyVideoProject('Odd Source output', 1904, 985);
+  const settings = createExportSettings(project, VideoResolutionPreset.SOURCE);
+  const loadedImages: LoadedImagesMap = {};
+
+  resolveVideoCompositionRenderPassesMock.mockReturnValue({
+    overlayFrame: frame,
+    visualPasses: [{ alpha: 1, frame, time: 0, transitionOverlays: [] }],
+  });
+
+  drawProjectFrame(context, project, settings, 0, loadedImages, new Map());
+
+  expect(drawCompositionLayerMock).toHaveBeenCalledWith(
+    context,
+    frame.visualLayers[0],
+    1,
+    1,
+    loadedImages,
+    expect.any(Map),
+    1
+  );
+  expect(context.translate).toHaveBeenNthCalledWith(1, -10, -5);
+});
 
 async function verifyFrameRendering() {
   const { drawProjectFrame } = await import('./frame');

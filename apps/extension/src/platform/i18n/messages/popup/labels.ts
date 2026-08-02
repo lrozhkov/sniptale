@@ -38,8 +38,8 @@ export const popupLabelsMessages = defineMessageSource({
     en: 'Low',
   },
   qualityUltraDescription: {
-    ru: '60 fps',
-    en: '60 fps',
+    ru: 'Максимальный битрейт',
+    en: 'Maximum bitrate',
   },
   qualityHighDescription: {
     ru: '30 fps',

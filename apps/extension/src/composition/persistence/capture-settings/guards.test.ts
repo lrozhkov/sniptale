@@ -1,7 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
-import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  CaptureMode,
+  VideoOutputCodec,
+  VideoOutputContainer,
+  VideoFrameRate,
+  VideoQuality,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { parseStoredVideoSettings, parseStoredVideoUiState } from './guards';
+
+const CURRENT_VIDEO_SETTINGS_CONTRACT = {
+  outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
+  qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
+  qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
+};
+
+function parseCurrentVideoSettings(value: Record<string, unknown>) {
+  return parseStoredVideoSettings({
+    ...CURRENT_VIDEO_SETTINGS_CONTRACT,
+    ...value,
+  });
+}
 
 describe('video guards roots', () => {
   it('returns empty values for undefined and marks invalid non-record roots', () => {
@@ -27,6 +47,14 @@ describe('video guards roots', () => {
       value: {},
     });
   });
+
+  it('rejects the previous recording-quality schema instead of migrating it', () => {
+    expect(parseStoredVideoSettings({ quality: VideoQuality.HIGH })).toEqual({
+      hasInvalidRoot: true,
+      invalidFieldCount: 0,
+      value: {},
+    });
+  });
 });
 
 describe('video guards valid settings', () => {
@@ -39,7 +67,7 @@ describe('video guards valid settings', () => {
 function registerFullVideoSettingsTests() {
   it('parses a fully valid video settings payload', () => {
     expect(
-      parseStoredVideoSettings({
+      parseCurrentVideoSettings({
         autoFadeDelay: 250,
         countdownSeconds: 3,
         diagnosticsEnabled: true,
@@ -49,8 +77,10 @@ function registerFullVideoSettingsTests() {
         microphoneGain: 1.5,
         microphoneDeviceId: null,
         microphoneEnabled: true,
-        openEditorAfterRecording: false,
-        quality: VideoQuality.HIGH,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          quality: VideoQuality.HIGH,
+        },
         sourceCount: 2,
         systemAudioEnabled: true,
         webcamDeviceId: 'cam-1',
@@ -60,6 +90,7 @@ function registerFullVideoSettingsTests() {
       hasInvalidRoot: false,
       invalidFieldCount: 0,
       value: {
+        ...CURRENT_VIDEO_SETTINGS_CONTRACT,
         autoFadeDelay: 250,
         countdownSeconds: 3,
         diagnosticsEnabled: true,
@@ -69,8 +100,10 @@ function registerFullVideoSettingsTests() {
         microphoneGain: 1.5,
         microphoneDeviceId: null,
         microphoneEnabled: true,
-        openEditorAfterRecording: false,
-        quality: VideoQuality.HIGH,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          quality: VideoQuality.HIGH,
+        },
         sourceCount: 2,
         systemAudioEnabled: true,
         webcamDeviceId: 'cam-1',
@@ -82,31 +115,83 @@ function registerFullVideoSettingsTests() {
 
 function registerPartialVideoSettingsTests() {
   it('clamps stored source counts to the supported multi-source range', () => {
-    expect(parseStoredVideoSettings({ sourceCount: 0 }).value).toEqual({ sourceCount: 1 });
-    expect(parseStoredVideoSettings({ sourceCount: 8 }).value).toEqual({ sourceCount: 3 });
+    expect(parseCurrentVideoSettings({ sourceCount: 0 }).value).toEqual({
+      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
+      sourceCount: 1,
+    });
+    expect(parseCurrentVideoSettings({ sourceCount: 8 }).value).toEqual({
+      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
+      sourceCount: 3,
+    });
   });
 
   it('clamps stored microphone gain to the supported software range', () => {
-    expect(parseStoredVideoSettings({ microphoneGain: -1 }).value).toEqual({ microphoneGain: 0 });
-    expect(parseStoredVideoSettings({ microphoneGain: 3 }).value).toEqual({ microphoneGain: 2 });
+    expect(parseCurrentVideoSettings({ microphoneGain: -1 }).value).toEqual({
+      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
+      microphoneGain: 0,
+    });
+    expect(parseCurrentVideoSettings({ microphoneGain: 3 }).value).toEqual({
+      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
+      microphoneGain: 2,
+    });
   });
 
   it('keeps partial valid settings without requiring every optional field', () => {
     expect(
-      parseStoredVideoSettings({
+      parseCurrentVideoSettings({
         microphoneEnabled: false,
         webcamDeviceId: null,
         webcamEnabled: false,
-        quality: VideoQuality.LOW,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          quality: VideoQuality.LOW,
+        },
       })
     ).toEqual({
       hasInvalidRoot: false,
       invalidFieldCount: 0,
       value: {
+        ...CURRENT_VIDEO_SETTINGS_CONTRACT,
         microphoneEnabled: false,
         webcamDeviceId: null,
         webcamEnabled: false,
-        quality: VideoQuality.LOW,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          quality: VideoQuality.LOW,
+        },
+      },
+    });
+  });
+
+  it('parses explicit output settings and compatible custom quality profiles', () => {
+    const outputProfile = {
+      codec: VideoOutputCodec.AVC,
+      container: VideoOutputContainer.MP4,
+      frameRate: VideoFrameRate.FPS30,
+      quality: VideoQuality.MEDIUM,
+      resolution: VideoResolutionPreset.P720,
+    };
+    const qualityProfiles = [
+      {
+        id: 'custom:review',
+        name: 'Review',
+        configuration: outputProfile,
+      },
+    ];
+
+    expect(
+      parseCurrentVideoSettings({
+        outputProfile,
+        qualityProfileId: 'custom:review',
+        qualityProfiles,
+      })
+    ).toEqual({
+      hasInvalidRoot: false,
+      invalidFieldCount: 0,
+      value: {
+        outputProfile,
+        qualityProfileId: 'custom:review',
+        qualityProfiles,
       },
     });
   });
@@ -116,11 +201,14 @@ function registerCompleteNativeSettingsTests() {
   it('parses a complete native settings snapshot and rejects partial native payloads', () => {
     const native = createCompleteNativeSettings();
 
-    expect(parseStoredVideoSettings({ native }).value).toEqual({ native });
-    expect(parseStoredVideoSettings({ native: { video: { enabled: true } } })).toEqual({
+    expect(parseCurrentVideoSettings({ native }).value).toEqual({
+      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
+      native,
+    });
+    expect(parseCurrentVideoSettings({ native: { video: { enabled: true } } })).toEqual({
       hasInvalidRoot: false,
       invalidFieldCount: 1,
-      value: {},
+      value: CURRENT_VIDEO_SETTINGS_CONTRACT,
     });
   });
 }
@@ -143,7 +231,8 @@ function registerLegacyNativeSettingsTests() {
       },
     };
 
-    expect(parseStoredVideoSettings({ native: legacyNative }).value).toEqual({
+    expect(parseCurrentVideoSettings({ native: legacyNative }).value).toEqual({
+      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
       native: {
         screenshots: legacyNative.screenshots,
         trayActions: {
@@ -205,14 +294,13 @@ function createCompleteNativeSettings() {
 describe('video guards invalid settings', () => {
   it('keeps valid settings fields and counts every invalid field', () => {
     expect(
-      parseStoredVideoSettings({
+      parseCurrentVideoSettings({
         autoFadeDelay: '250',
         countdownSeconds: 3,
         diagnosticsEnabled: 'true',
         microphoneDeviceId: 7,
         microphoneEnabled: true,
-        openEditorAfterRecording: false,
-        quality: 'BROKEN',
+        outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: 'BROKEN' },
         systemAudioEnabled: null,
         webcamDeviceId: false,
         webcamEnabled: 'yes',
@@ -223,7 +311,37 @@ describe('video guards invalid settings', () => {
       value: {
         countdownSeconds: 3,
         microphoneEnabled: true,
-        openEditorAfterRecording: false,
+        qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
+        qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
+      },
+    });
+  });
+
+  it('drops incompatible output settings and malformed profile collections independently', () => {
+    expect(
+      parseCurrentVideoSettings({
+        outputProfile: {
+          codec: VideoOutputCodec.AVC,
+          container: VideoOutputContainer.WEBM,
+          frameRate: VideoFrameRate.FPS30,
+          quality: VideoQuality.HIGH,
+          resolution: VideoResolutionPreset.P1080,
+        },
+        qualityProfiles: [
+          {
+            id: 'custom:broken',
+            name: '',
+            configuration: { ...DEFAULT_VIDEO_SETTINGS.outputProfile },
+          },
+        ],
+        systemAudioEnabled: false,
+      })
+    ).toEqual({
+      hasInvalidRoot: false,
+      invalidFieldCount: 2,
+      value: {
+        qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
+        systemAudioEnabled: false,
       },
     });
   });

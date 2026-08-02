@@ -57,17 +57,33 @@ export const videoEditorExportDialogMessages = defineMessageSource({
     ru: 'Качество',
     en: 'Quality',
   },
-  qualityDraft: {
-    ru: 'Черновик',
-    en: 'Draft',
+  qualityLow: {
+    ru: 'Низкое',
+    en: 'Low',
   },
-  qualityBalanced: {
-    ru: 'Баланс',
-    en: 'Balanced',
+  qualityMedium: {
+    ru: 'Среднее',
+    en: 'Medium',
   },
   qualityHigh: {
     ru: 'Высокое',
     en: 'High',
+  },
+  qualityUltra: {
+    ru: 'Ультра',
+    en: 'Ultra',
+  },
+  resolutionLabel: {
+    ru: 'Разрешение',
+    en: 'Resolution',
+  },
+  resolutionSource: {
+    ru: 'Исходное',
+    en: 'Source',
+  },
+  outputSizeLabel: {
+    ru: 'Итоговый размер',
+    en: 'Output size',
   },
   widthLabel: {
     ru: 'Ширина',

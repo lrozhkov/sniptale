@@ -10,6 +10,15 @@ import { authorizeIPCMessage } from '../authorization';
 import { isVideoControlMessage } from '../message-guards/guards/tab';
 import { createRouteErrorResponse } from '../../../routing-contracts/response';
 import type { TabRouteArgs } from '../boundary/shared';
+import { restoreAuthorizedCameraRecorderDocument } from '../../../media/video/runtime/camera-recorder-control';
+import type { VideoControlMessage } from '../../../../contracts/video/types/messages';
+
+type NoTabVideoControlArgs = {
+  message: VideoControlMessage;
+  resolvedTabId: number | undefined;
+  sendResponse: ResponseSender;
+  sender: chrome.runtime.MessageSender | undefined;
+};
 
 function isCameraStartWithoutTab(message: TabRouteArgs['message']): boolean {
   return (
@@ -48,6 +57,40 @@ export function routePopupRecordingControlWithoutTabId(args: {
     return false;
   }
 
+  if (authorizationKind === 'video-control-camera-recorder-route') {
+    void routeHydratedCameraRecorderControl({ ...args, message: args.message });
+    return true;
+  }
+
+  return authorizeAndRouteNoTabControl({ ...args, message: args.message }, authorizationKind);
+}
+
+async function routeHydratedCameraRecorderControl(args: NoTabVideoControlArgs): Promise<void> {
+  const senderUrl = resolveTrustedCameraRecorderRuntimeSenderUrl(args.sender);
+  const recordingId =
+    'recordingId' in args.message && typeof args.message.recordingId === 'string'
+      ? args.message.recordingId
+      : undefined;
+  try {
+    await restoreAuthorizedCameraRecorderDocument({
+      documentId: args.sender?.documentId,
+      recordingId,
+      senderUrl,
+      tabId: args.sender?.tab?.id,
+    });
+    authorizeAndRouteNoTabControl(args, 'video-control-camera-recorder-route');
+  } catch (error) {
+    args.sendResponse(createRouteErrorResponse(error));
+  }
+}
+
+function authorizeAndRouteNoTabControl(
+  args: NoTabVideoControlArgs,
+  authorizationKind:
+    | 'video-control-camera-recorder-route'
+    | 'video-control-no-tab-route'
+    | 'video-control-owner-no-tab-route'
+): boolean {
   const authorization = authorizeIPCMessage({
     kind: authorizationKind,
     message: args.message,

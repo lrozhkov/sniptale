@@ -1,22 +1,37 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { VideoProjectExportPhase } from '../../features/video/project/types';
+import { VideoWebmCodec } from '../../features/video/project/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import {
+  getVideoRecordingMimeTypeCandidates,
+  VideoOutputContainer,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { sendRuntimeMessageBestEffort } from '../runtime-messaging/best-effort';
 import {
   loadActiveProjectExportJobLedgerEntry,
   upsertProjectExportJobLedgerEntry,
 } from '../../composition/persistence/export-ledger';
-import {
-  getFirstSupportedMediaRecorderMimeType,
-  WEBM_EXPORT_MIME_TYPE_CANDIDATES,
-} from '../recording/recorder-mime';
 import type { ProjectExportRuntimeState } from './types';
 export { waitForDelay } from './timing';
 
 const logger = createLogger({ namespace: 'OffscreenProjectExport' });
 
-export function getSupportedWebmExportMimeType(): string {
-  return getFirstSupportedMediaRecorderMimeType(WEBM_EXPORT_MIME_TYPE_CANDIDATES);
+export function getSupportedWebmExportMimeType(
+  codec: VideoWebmCodec = VideoWebmCodec.VP9,
+  hasAudioTracks = true
+): string {
+  const candidates = getVideoRecordingMimeTypeCandidates(
+    {
+      codec,
+      container: VideoOutputContainer.WEBM,
+    },
+    hasAudioTracks
+  );
+  const supported = candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+  if (!supported) {
+    throw new Error('The selected WebM codec is not supported');
+  }
+  return supported;
 }
 
 export async function sendProgress(

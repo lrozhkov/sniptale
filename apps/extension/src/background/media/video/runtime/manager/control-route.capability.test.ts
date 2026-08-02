@@ -6,7 +6,7 @@ const {
   ensureActiveVideoRecordingLeaseHydratedMock,
   ensureActivePageAccessRuntimeMock,
   getActiveVideoRecordingLeaseSnapshotMock,
-  isAuthorizedCameraRecorderDocumentMock,
+  restoreAuthorizedCameraRecorderDocumentMock,
   resolveTrustedCameraRecorderRuntimeSenderUrlMock,
   resolveTrustedPopupRuntimeSenderUrlMock,
   startRecordingMock,
@@ -18,7 +18,7 @@ const {
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
   getActiveVideoRecordingLeaseSnapshotMock: vi.fn(),
-  isAuthorizedCameraRecorderDocumentMock: vi.fn(),
+  restoreAuthorizedCameraRecorderDocumentMock: vi.fn(),
   resolveTrustedCameraRecorderRuntimeSenderUrlMock: vi.fn(),
   resolveTrustedPopupRuntimeSenderUrlMock: vi.fn(),
   startRecordingMock: vi.fn(),
@@ -59,9 +59,10 @@ vi.mock('../sender-policy', async (importOriginal) => ({
 }));
 vi.mock('../camera-recorder-control', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../camera-recorder-control')>()),
-  isAuthorizedCameraRecorderDocument: isAuthorizedCameraRecorderDocumentMock,
+  restoreAuthorizedCameraRecorderDocument: restoreAuthorizedCameraRecorderDocumentMock,
 }));
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { routeVideoControlMessage as routeVideoControlMessageBase } from './control-route';
 
@@ -85,13 +86,13 @@ function createStartMessage() {
   return {
     type: VideoMessageType.START_RECORDING,
     settings: {
+      ...DEFAULT_VIDEO_SETTINGS,
       microphoneEnabled: true,
       microphoneDeviceId: null,
       systemAudioEnabled: true,
       quality: VideoQuality.HIGH,
       countdownSeconds: 3,
       autoFadeDelay: 1500,
-      openEditorAfterRecording: true,
       diagnosticsEnabled: false,
     },
     tabId: 17,
@@ -108,7 +109,7 @@ beforeEach(() => {
   ensureMediaHubStorageHeadroomMock.mockResolvedValue(undefined);
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
   getActiveVideoRecordingLeaseSnapshotMock.mockReturnValue(null);
-  isAuthorizedCameraRecorderDocumentMock.mockReturnValue(false);
+  restoreAuthorizedCameraRecorderDocumentMock.mockResolvedValue(false);
   resolveTrustedCameraRecorderRuntimeSenderUrlMock.mockReturnValue(null);
   resolveTrustedPopupRuntimeSenderUrlMock.mockReturnValue(popupSenderUrl);
   startRecordingMock.mockResolvedValue({ result: 'started', recordingId: 'recording-1' });

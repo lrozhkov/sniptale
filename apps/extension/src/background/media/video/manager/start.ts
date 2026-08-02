@@ -16,7 +16,6 @@ import {
   isVideoRecordingPreparationInProgress,
   resetVideoRecordingStartSession,
   clearVideoRecordingOffscreenStartDispatched,
-  setOpenEditorAfterRecording,
   setVideoRecordingId,
 } from '../session-state';
 import { resetVideoRecordingRuntimeState } from '../runtime/session-state';
@@ -36,12 +35,12 @@ import {
   requiresRecordingAuthorityRetention,
   type RecordingSourceBinding,
 } from '../offscreen-recording-stop';
+import { readStoredVideoPostRecordResult } from '../../../storage/video/post-record-result';
 
 const logger = createLogger({ namespace: 'BackgroundVideoManager' });
 
 function rollbackRecordingStartState(): void {
   setVideoRecordingId(null);
-  setOpenEditorAfterRecording(false);
   resetVideoRecordingStartSession();
   resetVideoRecordingRuntimeState();
 }
@@ -108,6 +107,21 @@ async function startRecordingWithPermit(
     };
   }
 
+  try {
+    const postRecordState = await readStoredVideoPostRecordResult();
+    if (postRecordState?.status === 'staged' || postRecordState?.status === 'ready') {
+      return {
+        error: 'Resolve the previous recording before starting another.',
+        result: 'failed',
+      };
+    }
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+      result: 'failed',
+    };
+  }
+
   if (isVideoRecordingPreparationInProgress()) {
     logger.warn('Ignoring duplicate start while recording initialization is already in progress');
     return { result: 'duplicate-preparing' };
@@ -163,7 +177,6 @@ async function executeRecordingStart(props: {
   let preparedBindingPersisted = false;
   let sourceBinding: RecordingSourceBinding | null = null;
   setVideoRecordingId(recordingId);
-  setOpenEditorAfterRecording(settings.openEditorAfterRecording);
   logger.log('Starting recording', { captureMode, recordingId, tabId: tabId ?? null });
 
   try {
@@ -188,7 +201,6 @@ async function executeRecordingStart(props: {
       captureMode,
       cropRegion: context.captureSource.cropRegion ?? null,
       ownerSenderUrl,
-      openEditorAfterRecording: settings.openEditorAfterRecording,
       surfaceBinding: {
         generation: sourceBinding.generation,
         streamInstanceId: sourceBinding.streamInstanceId,

@@ -66,7 +66,9 @@ function createViewerViewportMutation(args: {
             manifest: args.manifest,
           });
         } catch (rollbackError) {
-          throw new AggregateError([error, rollbackError], 'Snapshot viewer rollback failed.');
+          throw new AggregateError([error, rollbackError], 'Snapshot viewer rollback failed.', {
+            cause: rollbackError,
+          });
         }
         throw error;
       }
@@ -144,7 +146,8 @@ function useViewerSurfaceTransaction(args: {
               } catch (rollbackError) {
                 throw new AggregateError(
                   [error, rollbackError],
-                  'Snapshot viewer rollback failed.'
+                  'Snapshot viewer rollback failed.',
+                  { cause: rollbackError }
                 );
               }
               throw error;

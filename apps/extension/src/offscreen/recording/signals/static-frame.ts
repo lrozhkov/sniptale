@@ -1,4 +1,5 @@
 import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
+import { getRecording } from '../../../composition/persistence/recordings';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { saveRecordingTelemetrySafely } from '../../../workflows/media-hub/store';
 import { RecordingTelemetrySignalKind } from '../../../features/video/project/types';
@@ -208,7 +209,7 @@ async function detectStaticFrameSignals(blob: Blob) {
   return createStaticFrameTelemetrySignals(signals);
 }
 
-export async function persistStaticFrameSignals(recordingId: string, blob: Blob): Promise<void> {
+export async function persistStaticFrameSignals(recordingId: string): Promise<void> {
   try {
     const entry = await getTelemetryEntryWithRetry(recordingId);
     if (!entry) {
@@ -218,7 +219,14 @@ export async function persistStaticFrameSignals(recordingId: string, blob: Blob)
       return;
     }
 
-    const staticSignals = await detectStaticFrameSignals(blob);
+    const recording = await getRecording(recordingId);
+    if (!recording) {
+      logger.warn('Skipping static-frame pass because committed media is unavailable', {
+        recordingId,
+      });
+      return;
+    }
+    const staticSignals = await detectStaticFrameSignals(recording.blob);
     const baseSignals = entry.signals.filter(
       (signal) => signal.kind !== RecordingTelemetrySignalKind.STATIC_FRAME
     );

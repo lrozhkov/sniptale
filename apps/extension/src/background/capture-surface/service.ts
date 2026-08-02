@@ -39,6 +39,12 @@ export class DefaultCaptureSurfaceService implements CaptureSurfaceService {
     return this.afterRecovery(() => this.enqueue(() => this.application.apply(request)));
   }
 
+  abandonConflicted(request: CaptureSurfaceReleaseRequest): Promise<void> {
+    return this.afterRecovery(() =>
+      this.enqueue(() => this.releaseOwner.abandonConflicted(request))
+    );
+  }
+
   replace(request: CaptureSurfaceLeaseRequest): Promise<AppliedCaptureSurface> {
     return this.afterRecovery(() =>
       this.enqueue(() => this.application.apply(request, { replaceCurrent: true }))

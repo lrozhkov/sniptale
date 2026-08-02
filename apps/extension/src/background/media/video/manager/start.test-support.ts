@@ -3,16 +3,17 @@ import {
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 export const defaultSettings: VideoRecordingSettings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 1500,
   controlledCursorCaptureEnabled: true,
   countdownSeconds: 3,
   diagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
-  openEditorAfterRecording: false,
-  quality: VideoQuality.HIGH,
+  outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
   systemAudioEnabled: true,
 };
 

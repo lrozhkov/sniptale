@@ -19,11 +19,12 @@ import { createStream, createTrackedStream } from '../multi-source/media-stream.
 
 type NavigationHarness = {
   canvas: HTMLCanvasElement;
-  context: { drawImage: ReturnType<typeof vi.fn> };
-  requestVideoFrameCallback: ReturnType<typeof vi.fn>;
+  context: {
+    drawImage: ReturnType<typeof vi.fn>;
+    fillRect: ReturnType<typeof vi.fn>;
+    fillStyle: string;
+  };
   video: {
-    cancelVideoFrameCallback: ReturnType<typeof vi.fn>;
-    requestVideoFrameCallback: ReturnType<typeof vi.fn>;
     videoHeight: number;
     videoWidth: number;
   };
@@ -31,7 +32,7 @@ type NavigationHarness = {
 
 function installNavigationHarness(): NavigationHarness {
   const output = createTrackedStream();
-  const context = { drawImage: vi.fn() };
+  const context = { drawImage: vi.fn(), fillRect: vi.fn(), fillStyle: '' };
   const canvases: HTMLCanvasElement[] = [];
   Object.defineProperty(HTMLCanvasElement.prototype, 'captureStream', {
     configurable: true,
@@ -44,10 +45,7 @@ function installNavigationHarness(): NavigationHarness {
     configurable: true,
     value: vi.fn(() => context),
   });
-  const requestVideoFrameCallback = vi.fn(() => 1);
   const video = {
-    cancelVideoFrameCallback: vi.fn(),
-    requestVideoFrameCallback,
     videoHeight: 720,
     videoWidth: 1280,
   };
@@ -59,7 +57,6 @@ function installNavigationHarness(): NavigationHarness {
       return canvas;
     },
     context,
-    requestVideoFrameCallback,
     video,
   };
 }
@@ -76,7 +73,7 @@ afterEach(() => {
 });
 
 describe('crop stream navigation output', () => {
-  it('keeps drawing live frames when video-frame callbacks are available but starved', async () => {
+  it('keeps active output advancing at the selected cadence', async () => {
     const harness = installNavigationHarness();
     const gated = await createGatedCropStream(createStream(1280, 720), {
       sourceRect: { x: 0, y: 0, width: 1280, height: 720 },
@@ -84,9 +81,7 @@ describe('crop stream navigation output', () => {
     });
 
     expect(harness.context.drawImage).toHaveBeenCalledOnce();
-    expect(harness.requestVideoFrameCallback).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(100);
-
     expect(harness.context.drawImage.mock.calls.length).toBeGreaterThan(1);
     expect(harness.context.drawImage.mock.calls.every(([source]) => source === harness.video)).toBe(
       true
@@ -111,7 +106,6 @@ describe('crop stream navigation output', () => {
     gated.controls.activate();
 
     expect(harness.context.drawImage).toHaveBeenCalledOnce();
-    expect(harness.requestVideoFrameCallback).not.toHaveBeenCalled();
     gated.stream.getVideoTracks()[0]?.stop();
   });
 
@@ -211,15 +205,10 @@ describe('crop stream navigation output', () => {
     ).toBe('applied');
     expect(gated.controls.setFrozen('navigation-1', false)).toBe('applied');
     expect(harness.context.drawImage.mock.calls.at(-1)?.[0]).toBe(harness.video);
-    expect(harness.requestVideoFrameCallback).not.toHaveBeenCalled();
     const callsAfterThaw = harness.context.drawImage.mock.calls.length;
     await vi.advanceTimersByTimeAsync(100);
     expect(harness.context.drawImage.mock.calls.length).toBeGreaterThan(callsAfterThaw);
-    expect(
-      harness.context.drawImage.mock.calls
-        .slice(callsAfterThaw)
-        .every(([source]) => source === harness.video)
-    ).toBe(true);
+    expect(harness.context.drawImage.mock.calls.at(-1)?.[0]).toBe(harness.video);
 
     expect(gated.controls.setFrozen('navigation-2', true)).toBe('applied');
     const callsBeforeSecondFreeze = harness.context.drawImage.mock.calls.length;

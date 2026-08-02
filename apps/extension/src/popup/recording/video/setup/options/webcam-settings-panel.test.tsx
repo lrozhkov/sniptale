@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { createPopupPreviewStream } from './webcam-preview.test-support';
 import { WebcamSettingsPanel } from './webcam-settings-panel';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
@@ -17,12 +18,12 @@ let root: Root | null = null;
 
 function createSettings() {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 3,
     countdownSeconds: 0,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
-    openEditorAfterRecording: false,
     quality: VideoQuality.HIGH,
     systemAudioEnabled: false,
     webcamDeviceId: 'cam-1',

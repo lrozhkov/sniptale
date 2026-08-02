@@ -77,6 +77,9 @@ describe('browser storage adapters', () => {
     chromeStub.storage.sync.set.mockImplementation((_items: unknown, callback: () => void) =>
       callback()
     );
+    chromeStub.storage.sync.remove.mockImplementation((_keys: unknown, callback: () => void) =>
+      callback()
+    );
     vi.stubGlobal('chrome', chromeStub);
     const requestedLocks: string[] = [];
     const lockManager: PersistenceLockManager = {
@@ -91,9 +94,10 @@ describe('browser storage adapters', () => {
     };
     installPersistenceLockManagerForTests(lockManager);
 
-    await runWithPersistenceDomainMutationLock('highlighter-settings', (permit) =>
-      browserStorage.sync.set({ demo: 42 }, permit)
-    );
+    await runWithPersistenceDomainMutationLock('highlighter-settings', async (permit) => {
+      await browserStorage.sync.set({ demo: 42 }, permit);
+      await browserStorage.sync.remove('demo', permit);
+    });
 
     expect(requestedLocks).toEqual([
       'sniptale:persistence:privacy-erasure',

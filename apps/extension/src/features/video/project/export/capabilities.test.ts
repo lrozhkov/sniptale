@@ -4,12 +4,14 @@ import {
   createVideoExportCapabilities,
   getAvailableMp4VideoCodecs,
   getDefaultMp4VideoCodec,
+  mergeVideoProjectExportSettings,
   normalizeVideoProjectExportSettings,
 } from './capabilities';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
   VideoMp4Codec,
+  VideoWebmCodec,
   type VideoProjectExportSettings,
 } from '../types/index';
 
@@ -17,9 +19,11 @@ function createSettings(): VideoProjectExportSettings {
   return {
     downloadAfterExport: true,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     fps: 30,
     height: 1080,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     width: 1920,
   };
 }
@@ -56,31 +60,23 @@ it('normalizes selected codec against capability-aware MP4 defaults', () => {
     ],
   });
 
-  expect(
-    normalizeVideoProjectExportSettings(
-      { ...settings, mp4VideoCodec: VideoMp4Codec.AVC },
-      capabilities
-    )
-  ).toMatchObject({
+  expect(normalizeVideoProjectExportSettings(settings, capabilities)).toMatchObject({
     format: VideoExportFormat.MP4,
     mp4VideoCodec: VideoMp4Codec.HEVC,
   });
 });
 
 it('drops MP4 codec state when MP4 is unavailable or not selected', () => {
-  const settings = { ...createSettings(), mp4VideoCodec: VideoMp4Codec.AVC };
+  const settings = createSettings();
 
-  expect(
-    normalizeVideoProjectExportSettings({
-      ...settings,
-      format: VideoExportFormat.WEBM,
-    })
-  ).toEqual({
+  expect(mergeVideoProjectExportSettings(settings, { format: VideoExportFormat.WEBM })).toEqual({
     format: VideoExportFormat.WEBM,
+    resolution: 'SOURCE' as const,
     downloadAfterExport: true,
     fps: 30,
     height: 1080,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
+    webmVideoCodec: VideoWebmCodec.VP9,
     width: 1920,
   });
 
@@ -97,10 +93,12 @@ it('drops MP4 codec state when MP4 is unavailable or not selected', () => {
     )
   ).toEqual({
     format: VideoExportFormat.WEBM,
+    resolution: 'SOURCE' as const,
     downloadAfterExport: true,
     fps: 30,
     height: 1080,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
+    webmVideoCodec: VideoWebmCodec.VP9,
     width: 1920,
   });
 });

@@ -7,6 +7,7 @@ import {
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { useMicrophoneProbe } from './microphone-probe';
 
 let container: HTMLDivElement | null = null;
@@ -32,16 +33,20 @@ class FakeStream {
   }
 }
 
-function createSettings(overrides: Partial<VideoRecordingSettings> = {}): VideoRecordingSettings {
+function createSettings(
+  overrides: Partial<
+    Omit<VideoRecordingSettings, 'output' | 'qualityProfileId' | 'qualityProfiles'>
+  > = {}
+): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 0,
     diagnosticsEnabled: false,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,
     microphoneGain: 1,
-    openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: false,
     webcamDeviceId: null,
     webcamEnabled: false,

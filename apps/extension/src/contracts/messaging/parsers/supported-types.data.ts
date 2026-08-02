@@ -2,10 +2,7 @@ import {
   CaptureMessageType,
   MessageType,
 } from '@sniptale/runtime-contracts/messaging/message-types';
-import {
-  RegionCaptureControlMessageType,
-  VideoMessageType,
-} from '@sniptale/runtime-contracts/video/messages';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { RuntimeMessageType } from '../contracts/runtime-message/index';
 import type { TabMessageType } from '../tab/index';
 
@@ -47,9 +44,6 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
   MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY,
   MessageType.UPDATE_GALLERY_IMAGE_ASSET,
-  MessageType.STAGE_RECORDING_DOWNLOAD_CHUNK,
-  MessageType.SAVE_RECORDING_FOR_DOWNLOAD,
-  MessageType.RELEASE_RECORDING_DOWNLOAD,
   MessageType.SCENARIO_GET_SESSION,
   MessageType.SCENARIO_GET_RESTORE_SNAPSHOT,
   MessageType.SCENARIO_SET_ENABLED,
@@ -98,6 +92,7 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>([
   VideoMessageType.RESUME_RECORDING,
   VideoMessageType.UPDATE_SETTINGS,
   VideoMessageType.GET_RECORDING_STATE,
+  VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
   VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
   VideoMessageType.GET_RECORDING_TAB_ID,
   VideoMessageType.COUNTDOWN_COMPLETE,
@@ -129,9 +124,6 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>([
   VideoMessageType.VIDEO_SAVED_TO_IDB,
   'KEEP_ALIVE',
   'AREA_SELECTED',
-  'REGION_CAPTURE_STARTED',
-  'REGION_CAPTURE_ERROR',
-  'REGION_CAPTURE_STOPPED',
 ]);
 
 export const popupRuntimeTypes = new Set<RuntimeMessageType>([
@@ -139,7 +131,6 @@ export const popupRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.EXPORT_POPUP_RESULT,
   VideoMessageType.RECORDING_STATE_SYNC,
   VideoMessageType.RECORDING_START_FAILED,
-  VideoMessageType.VIDEO_SAVED_TO_IDB,
 ]);
 
 export const offscreenRuntimeTypes = new Set<RuntimeMessageType>([
@@ -205,7 +196,4 @@ export const contentTabTypes = new Set<TabMessageType>([
   VideoMessageType.HIDE_RECORDING_OVERLAY,
   VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER,
   VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER,
-  RegionCaptureControlMessageType.START,
-  RegionCaptureControlMessageType.STOP,
-  RegionCaptureControlMessageType.CHECK_SUPPORT,
 ]);

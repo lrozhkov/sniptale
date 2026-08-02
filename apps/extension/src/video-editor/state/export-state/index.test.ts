@@ -59,13 +59,13 @@ function verifyUpdateExportSettingsState() {
   });
 
   const nextState = updateExportSettingsState(baseState, {
-    quality: VideoExportQualityPreset.DRAFT,
+    quality: VideoExportQualityPreset.LOW,
   });
 
   expect(nextState.settings).toMatchObject({
     width: 1920,
     height: 1080,
-    quality: VideoExportQualityPreset.DRAFT,
+    quality: VideoExportQualityPreset.LOW,
   });
 }
 
@@ -198,7 +198,7 @@ function verifyCancelExportState() {
 function runExportStateActions(actions: ReturnType<typeof createExportStateActions>) {
   actions.openExportDialog();
   actions.closeExportDialog();
-  actions.updateExportSettings({ quality: VideoExportQualityPreset.DRAFT });
+  actions.updateExportSettings({ quality: VideoExportQualityPreset.LOW });
   actions.startExport('job-9');
   actions.updateExportStatus({
     phase: VideoProjectExportPhase.RENDERING,
@@ -219,7 +219,7 @@ function expectRecordedExportStates(recordedStates: unknown[]) {
   expect(recordedStates[0]).toMatchObject({ dialogOpen: true });
   expect(recordedStates[1]).toMatchObject({ dialogOpen: false });
   expect(recordedStates[2]).toMatchObject({
-    settings: expect.objectContaining({ quality: VideoExportQualityPreset.DRAFT }),
+    settings: expect.objectContaining({ quality: VideoExportQualityPreset.LOW }),
   });
   expect(recordedStates[3]).toMatchObject({
     isRunning: true,

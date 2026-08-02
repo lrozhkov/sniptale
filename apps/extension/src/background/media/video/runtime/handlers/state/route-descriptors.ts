@@ -7,10 +7,11 @@ export const videoRuntimeStateRouteDescriptor = {
   keepChannelBehaviorSource: 'video-runtime-router-result',
   messageTypes: [
     VideoMessageType.GET_RECORDING_STATE,
+    VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
     VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
     VideoMessageType.GET_RECORDING_TAB_ID,
   ],
-  ownerModule: 'apps/extension/src/background/media/video/runtime/handlers/state/index.ts',
+  ownerModule: 'apps/extension/src/background/media/video/runtime/router.ts',
 } as const;
 
 export const offscreenLifecycleRouteDescriptor = {
@@ -26,6 +27,7 @@ export const offscreenLifecycleRouteDescriptor = {
     VideoMessageType.OFFSCREEN_RECORDING_PAUSED,
     VideoMessageType.OFFSCREEN_RECORDING_RESUMED,
     VideoMessageType.OFFSCREEN_ERROR,
+    VideoMessageType.VIDEO_SAVED_TO_IDB,
     VideoMessageType.OFFSCREEN_READY,
     VideoMessageType.DESKTOP_MEDIA_OBTAINED,
     VideoMessageType.DESKTOP_MEDIA_CANCELLED,

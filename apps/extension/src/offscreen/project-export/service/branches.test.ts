@@ -13,8 +13,6 @@ const {
   cleanupJobMock,
   sendProgressMock,
   loadImagesForProjectMock,
-  canUsePassthroughPathMock,
-  exportPassthroughMock,
   loggerDebugMock,
   loggerErrorMock,
   renderCompositeExportMock,
@@ -23,8 +21,6 @@ const {
   cleanupJobMock: vi.fn(),
   sendProgressMock: vi.fn(),
   loadImagesForProjectMock: vi.fn(),
-  canUsePassthroughPathMock: vi.fn(),
-  exportPassthroughMock: vi.fn(),
   loggerDebugMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   renderCompositeExportMock: vi.fn(),
@@ -43,8 +39,6 @@ vi.mock('../media', async (importOriginal) => ({
 }));
 
 vi.mock('../render', () => ({
-  canUsePassthroughPath: canUsePassthroughPathMock,
-  exportPassthrough: exportPassthroughMock,
   renderCompositeExport: renderCompositeExportMock,
 }));
 
@@ -93,28 +87,12 @@ function createExportSettings(): VideoProjectExportSettings {
     width: 1280,
     height: 720,
     fps: 30,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     downloadAfterExport: true,
   };
-}
-
-async function verifiesPassthroughExportPath() {
-  const service = createProjectExportService();
-  const project = createProject();
-  const settings = createExportSettings();
-
-  canUsePassthroughPathMock.mockReturnValue(true);
-
-  await service.startProjectExport('job-1', project, settings);
-
-  expect(exportPassthroughMock).toHaveBeenCalledWith(
-    expect.objectContaining({ jobId: 'job-1' }),
-    project,
-    settings
-  );
-  expect(loadImagesForProjectMock).not.toHaveBeenCalled();
-  expect(renderCompositeExportMock).not.toHaveBeenCalled();
 }
 
 async function verifiesCancelledRenderFailurePath() {
@@ -203,13 +181,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   sendProgressMock.mockResolvedValue(undefined);
   loadImagesForProjectMock.mockResolvedValue(new Map());
-  canUsePassthroughPathMock.mockReturnValue(false);
-  exportPassthroughMock.mockResolvedValue(undefined);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
 });
 
 describe('project-export service ownership branches', () => {
-  it('uses the passthrough export path when the project qualifies', verifiesPassthroughExportPath);
   it(
     'reports cancelled render failures through the cancelled runtime message path',
     verifiesCancelledRenderFailurePath

@@ -11,6 +11,7 @@ import { cleanupResources } from './cleanup';
 import { finalizeRecordingBootstrap } from './recorder';
 import { handleRecordingStartError, initializeRecordingSession } from './session';
 import { waitForRecordingBegin } from './gate';
+import { createRecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
 
 type StartRecordingParams = {
   streamId: string;
@@ -114,12 +115,20 @@ async function startRecordingInternal(
     return;
   }
 
+  const coordinator = await createRecordingStagingCoordinator();
+  if (!isStillStarting(recordingId)) {
+    await coordinator.abort();
+    cleanupResources();
+    return;
+  }
+  recordingContext.bindStagingCoordinator(coordinator);
   await initializeSidecarRecorders({
     baseRecordingId: recordingId,
+    coordinator,
     settings: params.settings,
     ...(params.captureMode === undefined ? {} : { captureMode: params.captureMode }),
   });
-  finalizeRecordingBootstrap({
+  await finalizeRecordingBootstrap({
     resolvedRecordingId: recordingId,
     settings: params.settings,
     cursorCaptureMode: prepared.cursorCaptureMode,

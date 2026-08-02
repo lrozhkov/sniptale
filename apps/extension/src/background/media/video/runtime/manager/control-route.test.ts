@@ -78,6 +78,7 @@ import type { StartRecordingMessage } from '../../../../../contracts/video/types
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { routeVideoControlMessage as routeVideoControlMessageBase } from './control-route';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const popupSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 const controlCapability = {
@@ -109,13 +110,13 @@ function createStartMessage(): StartRecordingMessage {
   return {
     type: VideoMessageType.START_RECORDING,
     settings: {
+      ...DEFAULT_VIDEO_SETTINGS,
       microphoneEnabled: true,
       microphoneDeviceId: null,
       systemAudioEnabled: true,
-      quality: VideoQuality.HIGH,
+      outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
       countdownSeconds: 3,
       autoFadeDelay: 1500,
-      openEditorAfterRecording: true,
       diagnosticsEnabled: false,
     },
     tabId: 17,

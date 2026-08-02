@@ -1,19 +1,25 @@
 import { RECORDING_EXPORT_FILENAME_PREFIX } from '@sniptale/ui/branding';
-import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import {
   buildMicrophoneAudioConstraints,
   resolveMicrophoneGain,
 } from '@sniptale/runtime-contracts/video/types/microphone-processing';
-import { normalizeMultiSourceVideoStream } from './normalize';
-import { getActiveMultiSourceSession, type MultiSourceRecorder } from './state';
-import { buildVideoMediaRecorderOptions } from '../recorder-mime';
+import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import { createFixedVideoOutputStream } from '../stream/fixed-video-output';
+import type { MultiSourceRecorder } from './state';
+import {
+  buildVideoMediaRecorderOptions,
+  resolveVideoRecordingArtifact,
+} from '../../../platform/media-utils/video-recording';
+import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
+import { createRecordingArtifactSession } from '../encoding/artifact-session';
 
 function getFilenameSuffix(sourceIndex: number): string {
   return `window-${sourceIndex + 1}`;
 }
 
-export function buildSourceFilename(sourceIndex: number, extension = 'webm'): string {
+export function buildSourceFilename(sourceIndex: number, mimeType: string): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  const { extension } = resolveVideoRecordingArtifact(mimeType);
   return `${RECORDING_EXPORT_FILENAME_PREFIX}-${timestamp}-${getFilenameSuffix(sourceIndex)}.${extension}`;
 }
 
@@ -22,7 +28,11 @@ export function buildMicrophoneFilename(extension = 'webm'): string {
   return `${RECORDING_EXPORT_FILENAME_PREFIX}-${timestamp}-microphone.${extension}`;
 }
 
-function buildRecorderConfig(settings: VideoRecordingSettings, stream: MediaStream) {
+function buildRecorderConfig(
+  settings: VideoRecordingSettings,
+  stream: MediaStream,
+  trackSettings?: MediaTrackSettings
+): MediaRecorderOptions & { mimeType: string } {
   if (stream.getVideoTracks().length === 0) {
     const audioMimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'video/webm';
     return {
@@ -31,44 +41,54 @@ function buildRecorderConfig(settings: VideoRecordingSettings, stream: MediaStre
     };
   }
 
-  return buildVideoMediaRecorderOptions(settings);
+  const config = buildVideoMediaRecorderOptions(settings, stream, trackSettings);
+  if (!config.mimeType) {
+    throw new Error('Video recorder MIME type is unavailable.');
+  }
+  return { ...config, mimeType: config.mimeType };
 }
 
-function createMediaRecorderSource(params: {
+async function createMediaRecorderSource(params: {
   baseRecordingId: string;
+  coordinator: RecordingStagingCoordinator;
   label: string | null;
   release?: () => void;
   settings: VideoRecordingSettings;
   sourceIndex: number;
   stream: MediaStream;
   trackSettings?: MediaTrackSettings;
-}): MultiSourceRecorder {
+}): Promise<MultiSourceRecorder> {
   const [videoTrack] = params.stream.getVideoTracks();
-  const recorder = new MediaRecorder(
-    params.stream,
-    buildRecorderConfig(params.settings, params.stream)
-  );
+  const recorderOptions = buildRecorderConfig(params.settings, params.stream, params.trackSettings);
+  const recordingId = `${params.baseRecordingId}-${getFilenameSuffix(params.sourceIndex)}`;
+  const hasVideo = params.stream.getVideoTracks().length > 0;
+  const artifact = hasVideo
+    ? resolveVideoRecordingArtifact(recorderOptions.mimeType)
+    : { extension: 'webm' as const, mimeType: recorderOptions.mimeType };
+  const filename = hasVideo
+    ? buildSourceFilename(params.sourceIndex, artifact.mimeType)
+    : buildMicrophoneFilename(artifact.extension);
+  const artifactSession = await createRecordingArtifactSession({
+    artifactId: recordingId,
+    coordinator: params.coordinator,
+    filename,
+    mimeType: artifact.mimeType,
+    recorderOptions,
+    stream: params.stream,
+  });
+  const recorder = artifactSession.recorder;
   const source: MultiSourceRecorder = {
-    chunks: [],
+    artifact: null,
+    artifactSession,
     label: params.label,
     recorder,
-    recordingId: `${params.baseRecordingId}-${getFilenameSuffix(params.sourceIndex)}`,
+    recordingId,
     ...(params.release ? { release: params.release } : {}),
     sourceIndex: params.sourceIndex,
     stream: params.stream,
     trackSettings: params.trackSettings ?? videoTrack?.getSettings() ?? {},
   };
 
-  recorder.ondataavailable = (event) => {
-    if (event.data && event.data.size > 0) {
-      source.chunks.push(event.data);
-    }
-  };
-  recorder.onerror = (event) => {
-    getActiveMultiSourceSession()?.stopReject?.(
-      (event as ErrorEvent).error ?? new Error('A multi-source recorder failed.')
-    );
-  };
   return source;
 }
 
@@ -81,21 +101,22 @@ export function stopRecorderStreams(recorders: Array<MultiSourceRecorder | null>
 
 async function createRecorder(params: {
   baseRecordingId: string;
+  coordinator: RecordingStagingCoordinator;
   label: string | null;
   settings: VideoRecordingSettings;
   sourceIndex: number;
   stream: MediaStream;
 }): Promise<MultiSourceRecorder> {
   if (params.stream.getVideoTracks().length === 0) {
-    return createMediaRecorderSource(params);
+    throw new Error('Multi-source capture source is missing a video track.');
   }
 
-  const normalized = await normalizeMultiSourceVideoStream(params.stream, params.settings.quality);
+  const normalized = await createFixedVideoOutputStream(params.stream, params.settings);
   try {
-    return createMediaRecorderSource({
+    return await createMediaRecorderSource({
       ...params,
       stream: normalized.stream,
-      trackSettings: normalized.dimensions,
+      trackSettings: { ...normalized.dimensions, frameRate: normalized.frameRate },
     });
   } catch (error) {
     normalized.stream.getTracks().forEach((track) => track.stop());
@@ -105,6 +126,7 @@ async function createRecorder(params: {
 
 export async function createSourceRecorders(params: {
   baseRecordingId: string;
+  coordinator: RecordingStagingCoordinator;
   settings: VideoRecordingSettings;
   sources: Array<{ label: string | null; stream: MediaStream }>;
 }): Promise<MultiSourceRecorder[]> {
@@ -115,6 +137,7 @@ export async function createSourceRecorders(params: {
       recorders.push(
         await createRecorder({
           baseRecordingId: params.baseRecordingId,
+          coordinator: params.coordinator,
           label: source.label,
           settings: params.settings,
           sourceIndex,
@@ -171,7 +194,8 @@ function createGainProcessedMicrophoneStream(params: {
 
 export async function createMicrophoneRecorder(
   recordingId: string,
-  settings: VideoRecordingSettings
+  settings: VideoRecordingSettings,
+  coordinator: RecordingStagingCoordinator
 ): Promise<MultiSourceRecorder | null> {
   if (!settings.microphoneEnabled) {
     return null;
@@ -188,8 +212,9 @@ export async function createMicrophoneRecorder(
     throw error;
   }
   try {
-    return createMediaRecorderSource({
+    return await createMediaRecorderSource({
       baseRecordingId: recordingId,
+      coordinator,
       label: null,
       release: processed.release,
       settings,

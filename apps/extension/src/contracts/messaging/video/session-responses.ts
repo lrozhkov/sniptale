@@ -22,9 +22,13 @@ export type RuntimeVideoSessionResponseByType = {
   [VideoMessageType.RESUME_RECORDING]: RuntimeMessageResponse<RuntimeRecordingCommandResult>;
   [VideoMessageType.UPDATE_SETTINGS]: RuntimeMessageResponse<RuntimeRecordingCommandResult>;
   [VideoMessageType.GET_RECORDING_STATE]: RecordingStateResponse;
+  [VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT]: RuntimeMessageResponse<{
+    result?: 'acknowledged' | 'stale';
+  }>;
   [VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL]: RuntimeMessageResponse<{
     controlToken?: string;
     recordingId?: string;
+    result?: 'active' | 'post-record-only';
   }>;
   [VideoMessageType.GET_RECORDING_TAB_ID]: RecordingTabResponse;
   [VideoMessageType.RECORDING_STATE_SYNC]: RuntimeAckResponse;

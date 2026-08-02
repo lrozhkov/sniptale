@@ -35,6 +35,9 @@ export function createVideoEditorOverlaysController(args: {
       onExport: args.actions.handleStartExport,
       selectedClipId: args.store.selectedClipId,
       settings: args.store.exportState.settings,
+      sourceDimensions: args.store.project
+        ? { height: args.store.project.height, width: args.store.project.width }
+        : null,
     },
     exportProgress: {
       isRunning: args.store.exportState.isRunning,

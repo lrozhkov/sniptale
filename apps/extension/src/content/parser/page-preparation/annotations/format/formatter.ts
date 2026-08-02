@@ -20,14 +20,29 @@ type OrderedAnnotationRecord =
   | { kind: 'dom'; record: BrowserDomAnnotationRecord }
   | { kind: 'frame'; record: BrowserFrameAnnotationRecord };
 
+function isUnsafeTextCodePoint(value: number): boolean {
+  return (
+    value <= 0x08 ||
+    value === 0x0b ||
+    value === 0x0c ||
+    (value >= 0x0e && value <= 0x1f) ||
+    (value >= 0x7f && value <= 0x9f) ||
+    value === 0x061c ||
+    value === 0x200e ||
+    value === 0x200f ||
+    (value >= 0x202a && value <= 0x202e) ||
+    (value >= 0x2066 && value <= 0x2069)
+  );
+}
+
+function removeUnsafeTextCharacters(value: string): string {
+  return Array.from(value)
+    .filter((character) => !isUnsafeTextCodePoint(character.codePointAt(0) ?? 0))
+    .join('');
+}
+
 function normalizeText(value: string): string {
-  return value
-    .replace(/\r\n?/g, '\n')
-    .replace(/\t/g, '  ')
-    .replace(
-      /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,
-      ''
-    );
+  return removeUnsafeTextCharacters(value.replace(/\r\n?/g, '\n').replace(/\t/g, '  '));
 }
 
 function escapeMarkdownPunctuation(value: string): string {

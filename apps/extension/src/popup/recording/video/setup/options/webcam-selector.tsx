@@ -4,19 +4,21 @@ import { VideoMediaDeviceSelector } from './media-device-selector';
 import { WebcamSettingsPanel } from './webcam-settings-panel';
 
 export function VideoWebcamSelector({
+  required = false,
   settings,
   webcamDevices,
   isLoadingWebcams,
   onWebcamDeviceChange,
   onSettingsChange,
 }: {
+  required?: boolean;
   settings: VideoRecordingSettings;
   webcamDevices: Array<{ deviceId: string; label: string }>;
   isLoadingWebcams: boolean;
   onWebcamDeviceChange: (webcamDeviceId: string | null) => void;
   onSettingsChange: (patch: Partial<VideoRecordingSettings>) => void;
 }) {
-  if (!settings.webcamEnabled) {
+  if (!settings.webcamEnabled && !required) {
     return null;
   }
 

@@ -32,7 +32,7 @@ function isNativeMutationMessage(message: unknown): message is NativeAppMutation
 async function buildResponse(): Promise<NativeAppRuntimeResponse> {
   const settings = await loadVideoSettings();
   return {
-    settings: normalizeNativeCaptureSettings(settings.native, settings.quality),
+    settings: normalizeNativeCaptureSettings(settings.native, settings.outputProfile.quality),
     status: await getNativeAppRuntimeService().getStatus(),
     success: true,
   };

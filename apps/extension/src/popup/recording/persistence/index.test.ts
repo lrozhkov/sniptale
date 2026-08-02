@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  saveVideoSettingsMock: vi.fn(),
+  patchVideoSettingsMock: vi.fn(),
   saveVideoUiStateMock: vi.fn(),
 }));
 
 vi.mock('../../../composition/persistence/capture-settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/capture-settings')>()),
-  saveVideoSettings: mocks.saveVideoSettingsMock,
+  patchVideoSettings: mocks.patchVideoSettingsMock,
   saveVideoUiState: mocks.saveVideoUiStateMock,
 }));
 
@@ -16,31 +16,37 @@ import {
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { persistVideoSettings, persistVideoUiState } from './index';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { createVideoSettingsPatch, persistVideoSettings, persistVideoUiState } from './index';
 
 function createVideoSettings(
-  overrides: Partial<VideoRecordingSettings> = {}
+  overrides: Partial<
+    Omit<VideoRecordingSettings, 'output' | 'qualityProfileId' | 'qualityProfiles'>
+  > = {}
 ): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
-    openEditorAfterRecording: true,
-    quality: VideoQuality.HIGH,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: true,
     ...overrides,
   };
 }
 
 describe('popup persistence', () => {
-  it('persists video settings directly', async () => {
+  it('persists only changed video setting fields', async () => {
+    const previous = createVideoSettings();
     const settings = createVideoSettings({ diagnosticsEnabled: true });
+    const patch = createVideoSettingsPatch(previous, settings);
 
-    await persistVideoSettings(settings);
+    await persistVideoSettings(patch);
 
-    expect(mocks.saveVideoSettingsMock).toHaveBeenCalledWith(settings);
+    expect(patch).toEqual({ diagnosticsEnabled: true });
+    expect(mocks.patchVideoSettingsMock).toHaveBeenCalledWith(patch);
   });
 
   it('stores current size independently from tab capture mode', async () => {

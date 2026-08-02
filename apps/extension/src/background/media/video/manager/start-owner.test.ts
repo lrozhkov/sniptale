@@ -14,9 +14,9 @@ const {
   notifyRecordingStartFailedMock,
   runCountdownMock,
   releaseVideoCaptureSurfaceMock,
+  readStoredVideoPostRecordResultMock,
   scheduleRecordingStartActivationWatchdogMock,
   sendRuntimeMessageMock,
-  setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
   waitForVideoCaptureSurfaceRecoveryMock,
 } = vi.hoisted(() => ({
@@ -32,9 +32,9 @@ const {
   notifyRecordingStartFailedMock: vi.fn(),
   runCountdownMock: vi.fn(),
   releaseVideoCaptureSurfaceMock: vi.fn(),
+  readStoredVideoPostRecordResultMock: vi.fn(),
   scheduleRecordingStartActivationWatchdogMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
-  setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
   waitForVideoCaptureSurfaceRecoveryMock: vi.fn(),
 }));
@@ -55,7 +55,6 @@ vi.mock('../session-state', async (importOriginal) => ({
   beginVideoRecordingPreparation: beginVideoRecordingPreparationMock,
   hasActiveVideoRecordingSession: hasActiveVideoRecordingSessionMock,
   isVideoRecordingPreparationInProgress: isVideoRecordingPreparationInProgressMock,
-  setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
 vi.mock('../recording-control-lease', async (importOriginal) => ({
@@ -76,6 +75,10 @@ vi.mock('../capture-surface', async (importOriginal) => ({
   releaseVideoCaptureSurface: releaseVideoCaptureSurfaceMock,
   waitForVideoCaptureSurfaceRecovery: waitForVideoCaptureSurfaceRecoveryMock,
 }));
+vi.mock('../../../storage/video/post-record-result', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../storage/video/post-record-result')>()),
+  readStoredVideoPostRecordResult: readStoredVideoPostRecordResultMock,
+}));
 vi.mock('./recording-context.prepare', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./recording-context.prepare')>()),
   initializeRecordingContext: initializeRecordingContextMock,
@@ -85,18 +88,19 @@ vi.mock('./start-activation-watchdog', async (importOriginal) => ({
   scheduleRecordingStartActivationWatchdog: scheduleRecordingStartActivationWatchdogMock,
 }));
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { startRecording } from './start';
 import { reserveMediaErasureExclusion } from '../../lifecycle-gate';
 
 const settings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   microphoneEnabled: false,
   microphoneDeviceId: null,
   systemAudioEnabled: true,
   quality: VideoQuality.HIGH,
   countdownSeconds: 3,
   autoFadeDelay: 1500,
-  openEditorAfterRecording: false,
   diagnosticsEnabled: false,
 };
 
@@ -111,6 +115,7 @@ beforeEach(() => {
   beginPreparedRecordingMock.mockResolvedValue(undefined);
   finalizeRecordingStartMock.mockResolvedValue('stream-instance-1');
   releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
+  readStoredVideoPostRecordResultMock.mockResolvedValue(null);
   waitForVideoCaptureSurfaceRecoveryMock.mockResolvedValue(undefined);
   sendRuntimeMessageMock.mockImplementation((message: { type?: string }) =>
     message.type === VideoMessageType.OFFSCREEN_STOP_RECORDING
@@ -175,7 +180,6 @@ it('issues an owner-bound control lease before accepting a recording start', asy
   expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
     cropRegion: null,
-    openEditorAfterRecording: false,
     ownerSenderUrl,
     surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
     viewportPresetId: undefined,
@@ -205,6 +209,56 @@ it('fails visibly before preparation while local data erasure owns media lifecyc
 
   releaseErasure();
   await erasure;
+});
+
+it.each(['staged', 'ready'] as const)(
+  'blocks a direct start while a previous result is %s',
+  async (status) => {
+    readStoredVideoPostRecordResultMock.mockResolvedValueOnce({
+      acknowledgedBy: null,
+      createdAt: 1,
+      expiresAt: Date.now() + 1_000,
+      result: {
+        primaryRecordingId: 'recording-previous',
+        projectId: null,
+        recordingId: 'recording-previous',
+      },
+      status,
+    });
+
+    await expect(
+      startRecording(
+        17,
+        settings,
+        CaptureMode.TAB,
+        null,
+        'chrome-extension://test/apps/extension/src/popup/index.html'
+      )
+    ).resolves.toEqual({
+      error: 'Resolve the previous recording before starting another.',
+      result: 'failed',
+    });
+
+    expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+    expect(initializeRecordingContextMock).not.toHaveBeenCalled();
+  }
+);
+
+it('fails closed before preparation when post-record authority cannot be read', async () => {
+  readStoredVideoPostRecordResultMock.mockRejectedValueOnce(new Error('session unavailable'));
+
+  await expect(
+    startRecording(
+      17,
+      settings,
+      CaptureMode.TAB,
+      null,
+      'chrome-extension://test/apps/extension/src/popup/index.html'
+    )
+  ).resolves.toEqual({ error: 'session unavailable', result: 'failed' });
+
+  expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+  expect(initializeRecordingContextMock).not.toHaveBeenCalled();
 });
 
 it('waits for startup recovery before inspecting session state or preparing a current-size start', async () => {
@@ -288,7 +342,6 @@ it('persists source authority before delivery and waits to arm the activation wa
   expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
     cropRegion: null,
-    openEditorAfterRecording: false,
     ownerSenderUrl,
     surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
     viewportPresetId: undefined,
@@ -303,7 +356,6 @@ it('persists source authority before delivery and waits to arm the activation wa
   expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
     cropRegion: null,
-    openEditorAfterRecording: false,
     ownerSenderUrl,
     surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
     viewportPresetId: undefined,
@@ -398,7 +450,6 @@ it('rolls back and cleans up when raw source validation times out', async () => 
   expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
     cropRegion: null,
-    openEditorAfterRecording: false,
     ownerSenderUrl,
     surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
     viewportPresetId: undefined,

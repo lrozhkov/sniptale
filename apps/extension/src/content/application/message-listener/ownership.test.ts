@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import {
-  RegionCaptureControlMessageType,
-  VideoMessageType,
-} from '@sniptale/runtime-contracts/video/messages';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { isTopLevelContentRuntimeMessage, isUiRuntimeBridgeMessage } from './ownership';
 
 describe('runtime-message-listener shared ownership routing', () => {
@@ -43,15 +40,6 @@ describe('runtime-message-listener specialized routing', () => {
     expect(
       isTopLevelContentRuntimeMessage({ type: VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER })
     ).toBe(false);
-  });
-
-  it('routes canonical region capture controls through the top-level listener', () => {
-    expect(
-      isTopLevelContentRuntimeMessage({ type: RegionCaptureControlMessageType.CHECK_SUPPORT })
-    ).toBe(true);
-    expect(isUiRuntimeBridgeMessage({ type: RegionCaptureControlMessageType.CHECK_SUPPORT })).toBe(
-      false
-    );
   });
 
   it('rejects unsupported raw runtime types for both listeners', () => {

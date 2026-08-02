@@ -12,6 +12,9 @@ const {
   verifySniptaleDatabaseAbsentAfterPrivacyErasureMock,
   eraseVideoPreviewCacheForPrivacyErasureMock,
   verifyVideoPreviewCacheEmptyAfterPrivacyErasureMock,
+  countRecordingStagingSessionsMock,
+  invalidateAndAbortActiveRecordingStagingMock,
+  removeAllRecordingStagingSessionsMock,
 } = vi.hoisted(() => ({
   browserStorageAreaMock: {
     get: vi.fn(),
@@ -29,6 +32,9 @@ const {
   verifySniptaleDatabaseAbsentAfterPrivacyErasureMock: vi.fn(),
   eraseVideoPreviewCacheForPrivacyErasureMock: vi.fn(),
   verifyVideoPreviewCacheEmptyAfterPrivacyErasureMock: vi.fn(),
+  countRecordingStagingSessionsMock: vi.fn(),
+  invalidateAndAbortActiveRecordingStagingMock: vi.fn(),
+  removeAllRecordingStagingSessionsMock: vi.fn(),
 }));
 
 vi.mock('../infrastructure/browser-storage/privacy-erasure', async (importOriginal) => ({
@@ -59,6 +65,14 @@ vi.mock('../video-preview-cache/privacy-erasure', () => ({
   verifyVideoPreviewCacheEmptyAfterPrivacyErasure:
     verifyVideoPreviewCacheEmptyAfterPrivacyErasureMock,
 }));
+vi.mock('../recordings/staging', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../recordings/staging')>()),
+  createOpfsRecordingStagingStorage: () => ({
+    countSessions: countRecordingStagingSessionsMock,
+    removeAllSessions: removeAllRecordingStagingSessionsMock,
+  }),
+  invalidateAndAbortActiveRecordingStaging: invalidateAndAbortActiveRecordingStagingMock,
+}));
 
 import { erasePersistentLocalExtensionData } from './cleanup';
 
@@ -73,6 +87,9 @@ beforeEach(() => {
   verifySniptaleDatabaseAbsentAfterPrivacyErasureMock.mockResolvedValue(true);
   eraseVideoPreviewCacheForPrivacyErasureMock.mockResolvedValue(undefined);
   verifyVideoPreviewCacheEmptyAfterPrivacyErasureMock.mockResolvedValue(true);
+  countRecordingStagingSessionsMock.mockResolvedValue(0);
+  invalidateAndAbortActiveRecordingStagingMock.mockResolvedValue(undefined);
+  removeAllRecordingStagingSessionsMock.mockResolvedValue(2);
 });
 
 it('clears IndexedDB through the default database adapter', async () => {
@@ -87,6 +104,9 @@ it('clears IndexedDB through the default database adapter', async () => {
   expect(verifyEditorBootstrapRetentionEmptyMock).toHaveBeenCalledTimes(2);
   expect(eraseVideoPreviewCacheForPrivacyErasureMock).toHaveBeenCalledOnce();
   expect(verifyVideoPreviewCacheEmptyAfterPrivacyErasureMock).toHaveBeenCalledTimes(2);
+  expect(invalidateAndAbortActiveRecordingStagingMock).toHaveBeenCalledOnce();
+  expect(removeAllRecordingStagingSessionsMock).toHaveBeenCalledOnce();
+  expect(countRecordingStagingSessionsMock).toHaveBeenCalledTimes(2);
   expect(browserStorageAreaMock.remove).toHaveBeenCalled();
 });
 

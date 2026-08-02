@@ -8,7 +8,6 @@ import { setVideoRecordingRuntimeState } from '../runtime/session-state';
 import {
   getVideoRecordingId,
   getVideoRecordingTabId,
-  setOpenEditorAfterRecording,
   setVideoRecordingId,
   setVideoRecordingTabId,
 } from '../session-state';
@@ -27,10 +26,17 @@ let activeLease: VideoRecordingControlLease | null = null;
 let hydrationPromise: Promise<VideoRecordingControlLease | null> | null = null;
 let leaseHydrated = false;
 
+function getUnexpiredActiveLease(): VideoRecordingControlLease | null {
+  if (activeLease && activeLease.expiresAt <= Date.now()) {
+    activeLease = null;
+    leaseHydrated = true;
+  }
+  return activeLease;
+}
+
 function hydrateSessionFromLease(lease: VideoRecordingControlLease): void {
   setVideoRecordingId(lease.recordingId);
   setVideoRecordingTabId(lease.recordingTabId);
-  setOpenEditorAfterRecording(lease.openEditorAfterRecording);
   setVideoRecordingRuntimeState({
     captureMode: lease.captureMode,
     cropRegion: lease.cropRegion,
@@ -45,7 +51,6 @@ export async function issuePreparedVideoRecordingLease(args: {
   captureMode: CaptureMode;
   cropRegion?: { x: number; y: number; width: number; height: number } | null;
   ownerSenderUrl: string;
-  openEditorAfterRecording: boolean;
   surfaceBinding?: { generation: number; streamInstanceId: string } | null;
   viewportPresetId?: string | null;
 }): Promise<VideoRecordingControlLease | null> {
@@ -63,7 +68,6 @@ export async function issuePreparedVideoRecordingLease(args: {
     captureMode: args.captureMode,
     cropRegion: args.cropRegion ?? null,
     ownerSenderUrl: args.ownerSenderUrl,
-    openEditorAfterRecording: args.openEditorAfterRecording,
     recordingId,
     recordingTabId,
     surfaceBinding: args.surfaceBinding ?? null,
@@ -80,7 +84,7 @@ export async function activateVideoRecordingLease(args: {
   recordingId: string;
   streamInstanceId: string | null;
 }): Promise<VideoRecordingControlLease> {
-  const lease = activeLease ?? (await readPersistedLease());
+  const lease = getUnexpiredActiveLease() ?? (await readPersistedLease());
   if (
     !lease ||
     lease.recordingId !== args.recordingId ||
@@ -160,8 +164,9 @@ export async function hydrateActiveVideoRecordingLease(): Promise<VideoRecording
 }
 
 export async function ensureActiveVideoRecordingLeaseHydrated(): Promise<VideoRecordingControlLease | null> {
-  if (activeLease && activeLease.expiresAt > Date.now()) {
-    return activeLease;
+  const lease = getUnexpiredActiveLease();
+  if (lease) {
+    return lease;
   }
   if (leaseHydrated) return null;
 
@@ -172,11 +177,24 @@ export async function ensureActiveVideoRecordingLeaseHydrated(): Promise<VideoRe
 }
 
 export async function restoreCurrentRecordingFromLease(recordingId: string): Promise<boolean> {
-  const lease = activeLease ?? (await ensureActiveVideoRecordingLeaseHydrated());
-  if (!lease || lease.recordingId !== recordingId || lease.phase !== 'active') {
+  const currentRecordingId = getVideoRecordingId();
+  if (currentRecordingId !== null && currentRecordingId !== recordingId) {
     return false;
   }
 
+  const lease = getUnexpiredActiveLease() ?? (await readPersistedLease());
+  const recordingIdAfterHydration = getVideoRecordingId();
+  if (
+    (recordingIdAfterHydration !== null && recordingIdAfterHydration !== recordingId) ||
+    !lease ||
+    lease.recordingId !== recordingId ||
+    lease.phase !== 'active'
+  ) {
+    return false;
+  }
+
+  activeLease = lease;
+  leaseHydrated = true;
   hydrateSessionFromLease(lease);
   return true;
 }
@@ -186,13 +204,13 @@ export function validateRecordingControlCapability(args: {
   ownerSenderUrl: string | null;
   recordingId: string;
 }): boolean {
+  const lease = getUnexpiredActiveLease();
   if (
-    !activeLease ||
-    activeLease.recordingId !== args.recordingId ||
-    activeLease.phase !== 'active' ||
-    activeLease.controlToken !== args.controlToken ||
-    activeLease.ownerSenderUrl !== args.ownerSenderUrl ||
-    activeLease.expiresAt <= Date.now()
+    !lease ||
+    lease.recordingId !== args.recordingId ||
+    lease.phase !== 'active' ||
+    lease.controlToken !== args.controlToken ||
+    lease.ownerSenderUrl !== args.ownerSenderUrl
   ) {
     return false;
   }
@@ -201,7 +219,7 @@ export function validateRecordingControlCapability(args: {
 }
 
 export function getActiveVideoRecordingLeaseSnapshot(): VideoRecordingControlLease | null {
-  return activeLease;
+  return getUnexpiredActiveLease();
 }
 
 export async function requireActiveVideoRecordingSourceBinding(): Promise<{
@@ -209,7 +227,7 @@ export async function requireActiveVideoRecordingSourceBinding(): Promise<{
   recordingId: string;
   streamInstanceId: string;
 }> {
-  const lease = activeLease ?? (await ensureActiveVideoRecordingLeaseHydrated());
+  const lease = getUnexpiredActiveLease() ?? (await ensureActiveVideoRecordingLeaseHydrated());
   if (!lease || lease.phase !== 'active' || !lease.surfaceBinding) {
     throw new Error('Active recording source binding is unavailable');
   }

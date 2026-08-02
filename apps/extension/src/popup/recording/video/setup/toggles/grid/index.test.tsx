@@ -10,16 +10,17 @@ import {
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 function createSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     microphoneEnabled: true,
     microphoneDeviceId: 'mic-1',
     systemAudioEnabled: true,
-    quality: VideoQuality.MEDIUM,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
     countdownSeconds: 3,
     autoFadeDelay: 2,
-    openEditorAfterRecording: false,
     diagnosticsEnabled: true,
     controlledCursorCaptureEnabled: false,
   };
@@ -47,10 +48,10 @@ describe('video toggle grid view', () => {
       onSettingsChange,
     });
 
-    expect(element.props.className).toContain('grid-cols-6');
-    expect(element.props.children).toHaveLength(6);
-    expect(element.props.children[4].props.disabled).toBe(true);
-    expect(element.props.children[4].props.disabledReason).toBe('unsupported');
+    expect(element.props.className).toContain('grid-cols-5');
+    expect(element.props.children).toHaveLength(5);
+    expect(element.props.children[3].props.disabled).toBe(true);
+    expect(element.props.children[3].props.disabledReason).toBe('unsupported');
   });
 
   it('forces the webcam toggle active and disabled when camera mode locks the webcam', () => {

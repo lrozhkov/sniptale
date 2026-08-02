@@ -1,6 +1,10 @@
 import { ChevronDown } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { forwardRef } from 'react';
-import type { Ref, ReactNode } from 'react';
+import type { CSSProperties, Ref, ReactNode } from 'react';
+import { mergeFloatingInteractionLayerStyle } from '../floating-interactions/placement';
+import { mergeThemeScopedStyle, resolveThemeSafePortalTarget } from '../theme/safe-portal';
+import type { AppTheme } from '../theme/types';
 import {
   createProductSelectTriggerKeyDown,
   createProductSelectTriggerRef,
@@ -46,6 +50,8 @@ interface ProductSelectShellProps {
     | 'controlSize'
     | 'dataUi'
     | 'menuClassName'
+    | 'menuPlacement'
+    | 'menuScrollable'
     | 'onChange'
     | 'options'
     | 'placeholder'
@@ -159,10 +165,12 @@ function ProductSelectMenu<T extends string = string>(props: ProductSelectMenuPr
       id={props.menuId}
       ref={props.menuRef}
       role="listbox"
+      data-floating-ui-root="true"
+      data-theme={props.portalTheme ?? undefined}
+      style={resolveProductSelectPortalStyle(props.portalStyle, props.portalTheme)}
       className={getProductSelectMenuClassName({
         controlSize: props.controlSize,
         menuClassName: props.menuClassName,
-        menuPosition: props.menuPosition,
       })}
     >
       {props.options.map((option, index) => renderProductSelectMenuOption(props, option, index))}
@@ -170,25 +178,48 @@ function ProductSelectMenu<T extends string = string>(props: ProductSelectMenuPr
   );
 }
 
+function resolveProductSelectPortalStyle(
+  portalStyle: CSSProperties = {},
+  portalTheme: AppTheme | null = null
+) {
+  const positioned = portalStyle.top !== undefined && portalStyle.left !== undefined;
+  const floatingStyle = mergeFloatingInteractionLayerStyle({
+    ...portalStyle,
+    zIndex: undefined,
+    ...(positioned ? {} : { pointerEvents: 'none', visibility: 'hidden' }),
+  });
+  return mergeThemeScopedStyle(portalTheme, floatingStyle);
+}
+
 function ProductSelectMenuLayer(props: ProductSelectMenuLayerProps) {
-  if (!props.selectState.isOpen) {
+  if (!props.selectState.state.isOpen) {
     return null;
   }
 
-  return (
+  const menu = (
     <ProductSelectMenu
       controlSize={props.controlSize}
       menuClassName={props.menuClassName}
-      menuId={props.selectState.menuId}
-      menuPosition={props.selectState.menuPosition}
-      menuRef={props.selectState.menuRef}
-      onOptionKeyDown={props.selectState.handleOptionKeyDown}
-      onOptionMouseEnter={props.selectState.setActiveIndex}
-      onSelect={props.selectState.handleSelect}
+      menuId={props.selectState.state.menuId}
+      menuRef={props.selectState.overlay.menuRef}
+      onOptionKeyDown={props.selectState.controls.handleOptionKeyDown}
+      onOptionMouseEnter={props.selectState.controls.setActiveIndex}
+      onSelect={props.selectState.controls.handleSelect}
       options={props.options}
-      optionRefs={props.selectState.optionRefs}
+      optionRefs={props.selectState.overlay.optionRefs}
+      portalStyle={props.selectState.overlay.portalStyle}
+      portalTheme={props.selectState.overlay.portalTheme}
       value={props.value}
     />
+  );
+
+  if (typeof document === 'undefined') {
+    return menu;
+  }
+
+  return createPortal(
+    menu,
+    resolveThemeSafePortalTarget(props.selectState.overlay.containerRef.current)
   );
 }
 
@@ -203,6 +234,8 @@ function useProductSelectShellProps(
     dataUi,
     disabled = false,
     menuClassName = '',
+    menuPlacement = 'auto',
+    menuScrollable = true,
     onChange,
     options,
     placeholder,
@@ -210,12 +243,18 @@ function useProductSelectShellProps(
     value,
     ...triggerProps
   } = props;
-  const selectState = useProductSelectController({ disabled, onChange, options, value });
+  const selectState = useProductSelectController({
+    disabled,
+    menuPlacement,
+    onChange,
+    options,
+    value,
+  });
   const handleTriggerKeyDown = createProductSelectTriggerKeyDown(
     triggerProps.onKeyDown,
-    selectState.handleTriggerKeyDown
+    selectState.controls.handleTriggerKeyDown
   );
-  const triggerRef = createProductSelectTriggerRef(ref, selectState.setTriggerRef);
+  const triggerRef = createProductSelectTriggerRef(ref, selectState.controls.setTriggerRef);
 
   return {
     ariaLabel,
@@ -224,12 +263,18 @@ function useProductSelectShellProps(
     controlSize,
     dataUi,
     disabled,
-    menuClassName,
+    menuClassName: joinClassNames(
+      menuClassName,
+      !menuScrollable && 'sniptale-select-menu-overflow-visible'
+    ),
     options,
     placeholder,
     selectState: {
       ...selectState,
-      handleTriggerKeyDown,
+      controls: {
+        ...selectState.controls,
+        handleTriggerKeyDown,
+      },
     },
     triggerProps,
     triggerRef,
@@ -240,20 +285,20 @@ function useProductSelectShellProps(
 function ProductSelectShell(props: ProductSelectShellProps) {
   return (
     <div
-      ref={props.selectState.containerRef}
+      ref={props.selectState.overlay.containerRef}
       data-ui={props.dataUi ?? 'shared.ui.product-select'}
       className={getProductSelectShellClassName(props.controlSize, props.containerClassName)}
     >
       <ProductSelectTrigger
         ariaLabel={props.ariaLabel}
-        ariaControls={props.selectState.menuId}
+        ariaControls={props.selectState.state.menuId}
         className={props.className}
         controlSize={props.controlSize}
         disabled={props.disabled}
-        isOpen={props.selectState.isOpen}
-        onKeyDown={props.selectState.handleTriggerKeyDown}
-        onToggle={props.selectState.handleToggle}
-        selectedOption={props.selectState.selectedOption}
+        isOpen={props.selectState.state.isOpen}
+        onKeyDown={props.selectState.controls.handleTriggerKeyDown}
+        onToggle={props.selectState.controls.handleToggle}
+        selectedOption={props.selectState.state.selectedOption}
         placeholder={props.placeholder}
         triggerProps={props.triggerProps}
         triggerRef={props.triggerRef}

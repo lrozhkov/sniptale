@@ -33,6 +33,11 @@ vi.mock('../../platform/dom-host/isolated', () => ({
     element.style.cssText = cssText;
   },
 }));
+vi.mock('../highlighter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../highlighter')>()),
+  isHighlighterEnabled: () => true,
+  isHighlighterPausedState: () => false,
+}));
 
 import { createFreeFrameDrawingHandlers, type FreeFramePointerEvent } from './drawing';
 import { createHoverInteractionHandlers } from './interactions';

@@ -1,92 +1,65 @@
-import { beforeEach, expect, it, vi } from 'vitest';
-
-const { saveRecordingSafelyMock, triggerMultiSourceDownloadMock } = vi.hoisted(() => ({
-  saveRecordingSafelyMock: vi.fn(),
-  triggerMultiSourceDownloadMock: vi.fn(),
-}));
-
-vi.mock('../../../workflows/media-hub/store', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../workflows/media-hub/store')>();
-  return {
-    ...actual,
-    saveRecordingSafely: saveRecordingSafelyMock,
-  };
-});
-
-vi.mock('./messages', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./messages')>();
-  return {
-    ...actual,
-    triggerMultiSourceDownload: triggerMultiSourceDownloadMock,
-  };
-});
-
+import { expect, it, vi } from 'vitest';
 import type { RecordingSidecarRecorder } from '../sidecar/types';
-import { createWebcamProjectInput, saveWebcamRecording, stopWebcamRecorderStream } from './webcam';
+import { createWebcamProjectInput, stopWebcamRecorderStream } from './webcam';
 
-function createWebcamRecorder(overrides: Partial<RecordingSidecarRecorder> = {}) {
+function createWebcamRecorder(
+  overrides: Partial<RecordingSidecarRecorder> = {}
+): RecordingSidecarRecorder {
+  const file = new File(['webcam'], 'webcam.webm', { type: 'video/webm' });
   return {
-    chunks: [new Blob(['webcam'])],
+    artifact: {
+      artifactId: 'rec-webcam',
+      file,
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+    },
+    artifactSession: {
+      abort: vi.fn(),
+      recorder: {} as MediaRecorder,
+      setLifecycleCallbacks: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+    },
     filenameSuffix: 'webcam',
     kind: 'webcam',
-    recorder: { mimeType: '' } as MediaRecorder,
+    recorder: {} as MediaRecorder,
     recordingId: 'rec-webcam',
     stream: {} as MediaStream,
-    trackSettings: {},
+    trackSettings: { height: 720, width: 1280 },
     ...overrides,
-  } satisfies RecordingSidecarRecorder;
+  };
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
-it('saves webcam recordings with video defaults for empty recorder metadata', async () => {
-  const result = await saveWebcamRecording(createWebcamRecorder(), 3);
-
-  expect(result.mimeType).toBe('video/webm');
-  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
-    'rec-webcam',
-    expect.objectContaining({ type: 'video/webm' }),
-    expect.stringContaining('webcam.webm')
-  );
-  expect(triggerMultiSourceDownloadMock).toHaveBeenCalledWith(
-    'rec-webcam',
-    expect.stringContaining('webcam.webm')
-  );
-});
-
-it('builds webcam project input with default dimensions and null passthrough', () => {
-  expect(createWebcamProjectInput(null)).toBeNull();
-  expect(
-    createWebcamProjectInput({
-      blob: new Blob(['webcam'], { type: 'video/webm' }),
-      duration: 3,
-      filename: 'webcam.webm',
-      mimeType: 'video/webm',
-      source: createWebcamRecorder(),
-    })
-  ).toEqual({
-    recordingId: 'rec-webcam',
-    filename: 'webcam.webm',
-    width: 1280,
-    height: 720,
+it('builds project input only from a finalized webcam artifact', () => {
+  expect(createWebcamProjectInput(null, 3)).toBeNull();
+  expect(createWebcamProjectInput(createWebcamRecorder(), 3)).toEqual({
     duration: 3,
+    filename: 'webcam.webm',
+    height: 720,
     mimeType: 'video/webm',
+    recordingId: 'rec-webcam',
     size: 6,
+    width: 1280,
   });
+  expect(() => createWebcamProjectInput(createWebcamRecorder({ artifact: null }), 3)).toThrow(
+    'has no finalized media'
+  );
+});
+
+it('rejects webcam project input when recorded dimensions are unavailable', () => {
+  expect(() => createWebcamProjectInput(createWebcamRecorder({ trackSettings: {} }), 3)).toThrow(
+    'Webcam recording dimensions are unavailable.'
+  );
 });
 
 it('stops webcam recorder streams when rollback owns a created recorder', () => {
   const stop = vi.fn();
   const recorder = createWebcamRecorder({
-    stream: {
-      getTracks: () => [{ stop }],
-    } as unknown as MediaStream,
+    stream: { getTracks: () => [{ stop }] } as unknown as MediaStream,
   });
 
   stopWebcamRecorderStream(null);
   stopWebcamRecorderStream(recorder);
-
   expect(stop).toHaveBeenCalledOnce();
 });

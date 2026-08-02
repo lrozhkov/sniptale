@@ -10,6 +10,7 @@ import {
 } from 'react';
 
 import { useGlassSelectOverlay } from '../glass-select/overlay-state';
+import { useResolvedPortalTheme } from '../theme/safe-portal';
 import {
   createOptionKeyDownHandler,
   createTriggerKeyDownHandler,
@@ -21,6 +22,7 @@ import {
 
 interface ProductSelectControllerArgs<T extends ProductSelectControllerOption> {
   disabled: boolean;
+  menuPlacement?: 'auto' | 'bottom';
   onChange: (value: string) => void;
   options: readonly T[];
   value: string;
@@ -30,24 +32,31 @@ function resolveSelectedIndex(options: readonly ProductSelectControllerOption[],
   return options.findIndex((option) => option.value === value);
 }
 
-function useProductSelectOverlay(isOpen: boolean, setIsOpen: Dispatch<SetStateAction<boolean>>) {
+function useProductSelectOverlay(
+  isOpen: boolean,
+  setIsOpen: Dispatch<SetStateAction<boolean>>,
+  placement: 'auto' | 'bottom'
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const { menuPosition } = useGlassSelectOverlay({
-    portal: false,
+  const portalTheme = useResolvedPortalTheme(containerRef.current);
+  const { portalStyle } = useGlassSelectOverlay({
+    portal: true,
     isOpen,
     setIsOpen,
     containerRef,
     menuRef,
+    placement,
   });
 
   return {
     containerRef,
-    menuPosition,
     menuRef,
     optionRefs,
+    portalStyle,
+    portalTheme,
     triggerRef,
   };
 }
@@ -216,7 +225,7 @@ export function useProductSelectController<T extends ProductSelectControllerOpti
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const menuId = useId();
-  const overlayState = useProductSelectOverlay(isOpen, setIsOpen);
+  const overlayState = useProductSelectOverlay(isOpen, setIsOpen, args.menuPlacement ?? 'auto');
   const { selectedIndex, selectedOption } = useSelectedOption(args.options, args.value);
   const closeMenu = createCloseMenu({
     setActiveIndex,
@@ -247,15 +256,22 @@ export function useProductSelectController<T extends ProductSelectControllerOpti
   });
 
   return {
-    activeIndex,
-    containerRef: overlayState.containerRef,
-    isOpen,
-    menuId,
-    menuPosition: overlayState.menuPosition,
-    menuRef: overlayState.menuRef,
-    optionRefs: overlayState.optionRefs,
-    selectedOption,
-    setActiveIndex,
-    ...handlers,
+    controls: {
+      ...handlers,
+      setActiveIndex,
+    },
+    overlay: {
+      containerRef: overlayState.containerRef,
+      menuRef: overlayState.menuRef,
+      optionRefs: overlayState.optionRefs,
+      portalStyle: overlayState.portalStyle,
+      portalTheme: overlayState.portalTheme,
+    },
+    state: {
+      activeIndex,
+      isOpen,
+      menuId,
+      selectedOption,
+    },
   };
 }

@@ -74,11 +74,13 @@ function createSettings(
     width: 1280,
     height: 720,
     fps: 2,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     format: VideoExportFormat.WEBM,
+    resolution: 'SOURCE' as const,
+    webmVideoCodec: 'VP9' as const,
     downloadAfterExport: true,
     ...overrides,
-  };
+  } as VideoProjectExportSettings;
 }
 
 function createJob(cancelled = false): RenderLoopJobState {

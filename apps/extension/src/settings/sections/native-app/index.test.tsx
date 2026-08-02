@@ -9,14 +9,14 @@ import type { NativeAppRuntimeStatus } from '../../../contracts/native-app/runti
 
 const mocks = vi.hoisted(() => ({
   loadVideoSettings: vi.fn(),
-  saveVideoSettings: vi.fn(),
+  mutateVideoSettings: vi.fn(),
   sendRuntimeMessage: vi.fn(),
 }));
 
 vi.mock('../../../composition/persistence/capture-settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/capture-settings')>()),
   loadVideoSettings: mocks.loadVideoSettings,
-  saveVideoSettings: mocks.saveVideoSettings,
+  mutateVideoSettings: mocks.mutateVideoSettings,
 }));
 
 vi.mock('../../runtime/messaging', () => ({
@@ -31,7 +31,9 @@ let root: Root | null = null;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.loadVideoSettings.mockResolvedValue(DEFAULT_VIDEO_SETTINGS);
-  mocks.saveVideoSettings.mockResolvedValue(undefined);
+  mocks.mutateVideoSettings.mockImplementation(async (mutation) =>
+    mutation(DEFAULT_VIDEO_SETTINGS)
+  );
   mocks.sendRuntimeMessage.mockResolvedValue({
     settings: DEFAULT_VIDEO_SETTINGS.native,
     status: createStatus(),
@@ -102,7 +104,9 @@ it('renders native app status and saves changed native settings', async () => {
       toggle.click();
     }
   });
-  expect(mocks.saveVideoSettings).toHaveBeenCalledWith(
+  const mutation = mocks.mutateVideoSettings.mock.calls[0]?.[0];
+  expect(mutation).toEqual(expect.any(Function));
+  expect(mutation?.(DEFAULT_VIDEO_SETTINGS)).toEqual(
     expect.objectContaining({
       native: expect.objectContaining({ screenshots: { includeCursor: false } }),
     })

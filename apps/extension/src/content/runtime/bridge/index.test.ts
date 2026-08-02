@@ -5,7 +5,6 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 const parseContentTabMessage = vi.fn();
 const handleCoreModeMessage = vi.fn();
 const handleViewportMessage = vi.fn();
-const handleRegionCaptureMessage = vi.fn();
 const handleRegionOverlayMessage = vi.fn();
 const createRegionOverlayBridgeDeps = vi.fn();
 
@@ -22,10 +21,6 @@ vi.mock('./viewport', () => ({
   handleViewportMessage,
 }));
 
-vi.mock('./region-capture', () => ({
-  handleRegionCaptureMessage,
-}));
-
 vi.mock('./region-overlay', () => ({
   createRegionOverlayBridgeDeps,
   handleRegionOverlayMessage,
@@ -35,7 +30,6 @@ function resetContentRuntimeBridgeMocks() {
   vi.clearAllMocks();
   handleCoreModeMessage.mockReturnValue(null);
   handleViewportMessage.mockReturnValue(null);
-  handleRegionCaptureMessage.mockReturnValue(null);
   createRegionOverlayBridgeDeps.mockReturnValue({});
   handleRegionOverlayMessage.mockReturnValue(null);
 }
@@ -81,7 +75,6 @@ async function expectFirstHandlerWins() {
   ).toBe(false);
   expect(handleCoreModeMessage).toHaveBeenCalledWith(parsedMessage);
   expect(handleViewportMessage).not.toHaveBeenCalled();
-  expect(handleRegionCaptureMessage).not.toHaveBeenCalled();
   expect(handleRegionOverlayMessage).not.toHaveBeenCalled();
 }
 
@@ -105,14 +98,10 @@ async function expectInvalidPayloadStopsAtBoundary() {
 }
 
 async function expectLaterHandlerPayloadPassesThrough() {
-  const parsedMessage = { type: 'CHECK_REGION_CAPTURE_SUPPORT' };
-  const supportPayload = {
-    cropTo: true,
-    produceCropTarget: true,
-    supported: true,
-  };
+  const parsedMessage = { type: 'SHOW_REGION_SELECTOR' };
+  const overlayPayload = { success: true };
   parseContentTabMessage.mockReturnValue(parsedMessage);
-  handleRegionCaptureMessage.mockReturnValue(supportPayload);
+  handleRegionOverlayMessage.mockReturnValue(overlayPayload);
 
   const { createContentRuntimeMessageListener } = await import('.');
   const listener = createContentRuntimeMessageListener(vi.fn(), {
@@ -120,12 +109,15 @@ async function expectLaterHandlerPayloadPassesThrough() {
   });
 
   expect(
-    listener({ type: 'CHECK_REGION_CAPTURE_SUPPORT' }, {} as chrome.runtime.MessageSender, vi.fn())
-  ).toEqual(supportPayload);
+    listener({ type: 'SHOW_REGION_SELECTOR' }, {} as chrome.runtime.MessageSender, vi.fn())
+  ).toEqual(overlayPayload);
   expect(handleCoreModeMessage).toHaveBeenCalledWith(parsedMessage);
   expect(handleViewportMessage).toHaveBeenCalled();
-  expect(handleRegionCaptureMessage).toHaveBeenCalledWith(parsedMessage, expect.any(Function));
-  expect(handleRegionOverlayMessage).not.toHaveBeenCalled();
+  expect(handleRegionOverlayMessage).toHaveBeenCalledWith(
+    parsedMessage,
+    expect.any(Function),
+    expect.any(Object)
+  );
 }
 
 async function expectUiOnlyMessagesAreIgnoredBeforeParsing() {

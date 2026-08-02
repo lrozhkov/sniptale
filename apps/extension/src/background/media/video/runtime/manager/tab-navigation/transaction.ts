@@ -1,15 +1,9 @@
 // policyStateId: video-capture-surface-sessions
 // Navigation recovery restores page-owned effects without interrupting the media recorder.
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
-import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
+import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { getVideoSurfaceSession } from '../../../capture-surface';
-import {
-  setViewportOutputFrozen,
-  type ViewportOutputStateResult,
-} from '../../../capture-surface/output-state';
-import { getVideoRecordingRuntimeState, setVideoRecordingRuntimeState } from '../../session-state';
-import { stopRecording } from '../controls.stop';
+import { getVideoRecordingRuntimeState } from '../../session-state';
 import {
   isCurrentNavigationBinding,
   resolveNavigationBinding,
@@ -25,6 +19,14 @@ import {
   type TabNavigationPageEffects,
   type TabNavigationPageAccessVerifier,
 } from './page-effects';
+import {
+  createExactOutputTransitionId,
+  freezeExactOutput,
+  resetExactOutputTransitionForTests,
+  serializeExactOutputWork,
+  stopAfterCriticalOutputFailure as stopBoundRecordingAfterCriticalOutputFailure,
+  thawExactOutput,
+} from './output-transition';
 import { reassertViewportSurface, revalidateTabSource } from './source-validation';
 
 const logger = createLogger({ namespace: 'BackgroundVideoTabNavigationTransaction' });
@@ -51,7 +53,7 @@ type TabNavigationTransaction = {
 type OperationResult = { ok: true } | { error: unknown; ok: false };
 
 let activeTransaction: TabNavigationTransaction | null = null;
-let exactOutputFreezeQueue: Promise<void> | null = null;
+const navigationIdleWaiters = new Set<() => void>();
 
 function observeOperation(work: Promise<void>): Promise<OperationResult> {
   return work.then(
@@ -79,11 +81,18 @@ function abandonCurrentTransaction(transaction: TabNavigationTransaction, error:
   if (!isCurrentTransaction(transaction)) return;
   logger.warn('Tab recording page recovery was skipped; media recording continues', error);
   abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
-  activeTransaction = null;
+  clearActiveTransaction(transaction);
 }
 
-function resolveErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function resolveNavigationIdleWaiters(): void {
+  for (const resolve of navigationIdleWaiters) resolve();
+  navigationIdleWaiters.clear();
+}
+
+function clearActiveTransaction(transaction: TabNavigationTransaction): void {
+  if (activeTransaction !== transaction) return;
+  activeTransaction = null;
+  resolveNavigationIdleWaiters();
 }
 
 async function stopAfterCriticalOutputFailure(
@@ -105,61 +114,16 @@ async function performCriticalOutputFailureStop(
   error: unknown
 ): Promise<void> {
   if (!isCurrentTransaction(transaction)) return;
-  const message = resolveErrorMessage(error);
-  logger.error('Exact tab output recovery failed; stopping bound recording', error);
-  abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
-  setVideoRecordingRuntimeState({ error: message });
-  let stopFailure: unknown = null;
-  try {
-    const result = await stopRecording(false);
-    if (result.result !== 'failed') {
-      if (activeTransaction === transaction) activeTransaction = null;
-      return;
-    }
-    stopFailure = result.error;
-    logger.error('Bound recording stop failed after tab output recovery failure', result.error);
-  } catch (stopError) {
-    stopFailure = stopError;
-    logger.error('Bound recording stop threw after tab output recovery failure', stopError);
+  const result = await stopBoundRecordingAfterCriticalOutputFailure({
+    beforeStop: () =>
+      abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction)),
+    ...(transaction.outputTransitionId ? { compensate: () => resumeExactOutput(transaction) } : {}),
+    error,
+    isCurrent: () => isCurrentTransaction(transaction),
+  });
+  if (result === 'stopped' || (result === 'compensated' && !transaction.outputFrozen)) {
+    clearActiveTransaction(transaction);
   }
-
-  if (activeTransaction !== transaction || !isCurrentNavigationBinding(transaction.binding)) {
-    return;
-  }
-  if (!transaction.outputTransitionId) {
-    logger.error('Tab output transition authority retained after rejected bound stop', stopFailure);
-    return;
-  }
-  try {
-    await resumeExactOutput(transaction);
-    if (activeTransaction === transaction && !transaction.outputFrozen) {
-      activeTransaction = null;
-    }
-  } catch (resumeError) {
-    logger.error(
-      'Tab output transition authority retained after rejected stop and thaw',
-      resumeError
-    );
-  }
-}
-
-async function requireAppliedOutputState(
-  transaction: TabNavigationTransaction,
-  frozen: boolean
-): Promise<void> {
-  const transitionId = transaction.outputTransitionId;
-  if (!transitionId) throw new Error('Tab output transition identity is unavailable');
-  const result: ViewportOutputStateResult = await setViewportOutputFrozen(
-    transaction.binding,
-    frozen,
-    transitionId
-  );
-  if (result !== 'applied') {
-    throw new Error(
-      `Tab output ${frozen ? 'freeze' : 'resume'} was superseded by another navigation`
-    );
-  }
-  if (activeTransaction === transaction) transaction.outputFrozen = frozen;
 }
 
 function enqueueOutputFreeze(
@@ -168,25 +132,7 @@ function enqueueOutputFreeze(
 ): Promise<OperationResult> {
   const runIfCurrent = (): Promise<OperationResult> | OperationResult =>
     isCurrentTransaction(transaction) ? work() : { ok: true };
-  let queued: Promise<OperationResult>;
-  if (exactOutputFreezeQueue) {
-    queued = exactOutputFreezeQueue.then(runIfCurrent, runIfCurrent);
-  } else {
-    try {
-      queued = Promise.resolve(runIfCurrent());
-    } catch (error) {
-      queued = Promise.reject(error);
-    }
-  }
-  const tail = queued.then(
-    () => undefined,
-    () => undefined
-  );
-  exactOutputFreezeQueue = tail;
-  void tail.then(() => {
-    if (exactOutputFreezeQueue === tail) exactOutputFreezeQueue = null;
-  });
-  return queued;
+  return serializeExactOutputWork(runIfCurrent);
 }
 
 async function createOutputSuspension(
@@ -195,16 +141,24 @@ async function createOutputSuspension(
 ): Promise<OperationResult> {
   if (!enabled) return { ok: true };
   return enqueueOutputFreeze(transaction, async () => {
-    const initial = await observeOperation(requireAppliedOutputState(transaction, true));
-    if (initial.ok || !isCurrentTransaction(transaction)) return initial;
-    logger.warn('Initial tab output freeze was not acknowledged; retrying', initial.error);
-    const retry = await observeOperation(requireAppliedOutputState(transaction, true));
-    if (retry.ok || !isCurrentTransaction(transaction)) return retry;
-    await stopAfterCriticalOutputFailure(
-      transaction,
-      new AggregateError([initial.error, retry.error], 'Tab output freeze could not be confirmed')
+    const transitionId = transaction.outputTransitionId;
+    if (!transitionId) {
+      return { error: new Error('Tab output transition identity is unavailable'), ok: false };
+    }
+    const result = await observeOperation(
+      freezeExactOutput({
+        binding: transaction.binding,
+        isCurrent: () => isCurrentTransaction(transaction),
+        onApplied: (frozen) => {
+          if (activeTransaction === transaction) transaction.outputFrozen = frozen;
+        },
+        transitionId,
+      })
     );
-    return retry;
+    if (!result.ok && isCurrentTransaction(transaction)) {
+      await stopAfterCriticalOutputFailure(transaction, result.error);
+    }
+    return result;
   });
 }
 
@@ -223,8 +177,7 @@ function createTransaction(
 ): TabNavigationTransaction | null {
   const reassertViewport =
     getVideoSurfaceSession(binding.recordingId)?.applied?.target === 'viewport';
-  const requiresExactOutputRecovery =
-    binding.captureMode === CaptureMode.TAB_CROP || reassertViewport;
+  const requiresExactOutputRecovery = true;
   const effects = resolveTabNavigationPageEffects(reassertViewport);
   const transaction: TabNavigationTransaction = {
     binding,
@@ -249,7 +202,7 @@ function createTransaction(
   activeTransaction = transaction;
   if (requiresExactOutputRecovery) {
     try {
-      transaction.outputTransitionId = createSecureRandomUuid(
+      transaction.outputTransitionId = createExactOutputTransitionId(
         'Secure navigation transition generation is unavailable'
       );
     } catch (error) {
@@ -274,11 +227,16 @@ function startViewportReassertion(transaction: TabNavigationTransaction): void {
 }
 
 async function resumeExactOutput(transaction: TabNavigationTransaction): Promise<void> {
-  const initial = await observeOperation(requireAppliedOutputState(transaction, false));
-  if (initial.ok || !isCurrentTransaction(transaction)) return;
-  logger.warn('Initial tab output resume was not acknowledged; retrying', initial.error);
-  const retry = await observeOperation(requireAppliedOutputState(transaction, false));
-  if (!retry.ok) throw retry.error;
+  const transitionId = transaction.outputTransitionId;
+  if (!transitionId) throw new Error('Tab output transition identity is unavailable');
+  await thawExactOutput({
+    binding: transaction.binding,
+    isCurrent: () => isCurrentTransaction(transaction),
+    onApplied: (frozen) => {
+      if (activeTransaction === transaction) transaction.outputFrozen = frozen;
+    },
+    transitionId,
+  });
 }
 
 async function restoreOptionalPageEffects(
@@ -363,7 +321,7 @@ async function restoreTransaction(transaction: TabNavigationTransaction): Promis
     if (!isCurrentTransaction(transaction)) return;
     await restoreOptionalPageEffects(transaction, pageAccessVerifier);
     if (!isCurrentTransaction(transaction)) return;
-    if (activeTransaction === transaction) activeTransaction = null;
+    clearActiveTransaction(transaction);
   } catch (error) {
     if (transaction.requiresExactOutputRecovery) {
       await stopAfterCriticalOutputFailure(transaction, error);
@@ -440,6 +398,11 @@ export function isTabNavigationTransactionPending(): boolean {
   return activeTransaction !== null && isCurrentTransaction(activeTransaction);
 }
 
+export function waitForTabNavigationTransactionIdle(): Promise<void> {
+  if (!isTabNavigationTransactionPending()) return Promise.resolve();
+  return new Promise((resolve) => navigationIdleWaiters.add(resolve));
+}
+
 export function markTabNavigationManuallyPaused(): void {
   const transaction = activeTransaction;
   if (transaction && isCurrentTransaction(transaction)) transaction.shouldResume = false;
@@ -447,5 +410,6 @@ export function markTabNavigationManuallyPaused(): void {
 
 export function resetTabNavigationTransactionForTests(): void {
   activeTransaction = null;
-  exactOutputFreezeQueue = null;
+  resolveNavigationIdleWaiters();
+  resetExactOutputTransitionForTests();
 }

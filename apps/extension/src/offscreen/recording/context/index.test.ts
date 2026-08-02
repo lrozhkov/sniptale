@@ -19,6 +19,7 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 
 import { recordingContext } from '.';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
 
 async function flushPromises() {
   await Promise.resolve();
@@ -39,9 +40,21 @@ function expectEmptyRecordingState() {
   expect(recordingContext.videoStream).toBeNull();
   expect(recordingContext.sourceStream).toBeNull();
   expect(recordingContext.audioMixer).toBeNull();
-  expect(recordingContext.recordedChunks).toEqual([]);
+  expect(recordingContext.artifactSession).toBeNull();
+  expect(recordingContext.stagingCoordinator).toBeNull();
   expect(recordingContext.currentRecordingId).toBeNull();
   expect(recordingContext.lifecycleState).toBe('idle');
+}
+
+function bindStartingArtifactSession(mediaRecorder: MediaRecorder): void {
+  recordingContext.bindStagingCoordinator(createRecordingStagingCoordinatorTestDouble());
+  recordingContext.bindStartingArtifactSession({
+    abort: vi.fn().mockResolvedValue(undefined),
+    recorder: mediaRecorder,
+    setLifecycleCallbacks: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+  });
 }
 
 function verifyLifecycleOwnerApi() {
@@ -50,6 +63,10 @@ function verifyLifecycleOwnerApi() {
   recordingContext.beginRecordingSession('recording-1');
   expect(recordingContext.lifecycleState).toBe('starting');
   expect(recordingContext.currentRecordingId).toBe('recording-1');
+
+  bindStartingArtifactSession(mediaRecorder);
+  expect(recordingContext.lifecycleState).toBe('starting');
+  expect(recordingContext.mediaRecorder).toBe(mediaRecorder);
 
   recordingContext.activateRecorder(mediaRecorder);
   expect(recordingContext.lifecycleState).toBe('recording');
@@ -87,6 +104,30 @@ describe('offscreen-recording-context', () => {
   });
 
   it('tracks legal recording lifecycle transitions through the owner API', verifyLifecycleOwnerApi);
+
+  it('binds the artifact owner and its recorder atomically after staging is ready', () => {
+    const mediaRecorder = { state: 'inactive' } as MediaRecorder;
+    const artifactSession = {
+      abort: vi.fn().mockResolvedValue(undefined),
+      recorder: mediaRecorder,
+      setLifecycleCallbacks: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+    };
+    recordingContext.beginRecordingSession('recording-1');
+
+    expect(() => recordingContext.bindStartingArtifactSession(artifactSession)).toThrow(
+      'Recording session cannot bind stale artifacts'
+    );
+    expect(recordingContext.artifactSession).toBeNull();
+    expect(recordingContext.mediaRecorder).toBeNull();
+
+    recordingContext.bindStagingCoordinator(createRecordingStagingCoordinatorTestDouble());
+    recordingContext.bindStartingArtifactSession(artifactSession);
+
+    expect(recordingContext.artifactSession).toBe(artifactSession);
+    expect(recordingContext.mediaRecorder).toBe(mediaRecorder);
+  });
 
   it('binds a stream instance only to the matching starting session', () => {
     recordingContext.beginRecordingSession('recording-1', 3);
@@ -126,7 +167,9 @@ describe('offscreen-recording-context', () => {
       })
     ).toBe(false);
 
-    recordingContext.activateRecorder({ state: 'recording' } as MediaRecorder);
+    const mediaRecorder = { state: 'recording' } as MediaRecorder;
+    bindStartingArtifactSession(mediaRecorder);
+    recordingContext.activateRecorder(mediaRecorder);
     expect(() =>
       recordingContext.bindStreamInstance({
         generation: 3,
@@ -146,13 +189,31 @@ describe('offscreen-recording-context', () => {
     const reject = vi.fn();
 
     recordingContext.beginRecordingSession('recording-1');
-    recordingContext.activateRecorder({ state: 'recording' } as MediaRecorder);
+    const mediaRecorder = { state: 'recording' } as MediaRecorder;
+    bindStartingArtifactSession(mediaRecorder);
+    recordingContext.activateRecorder(mediaRecorder);
     recordingContext.beginStopRequest({ discard: true, resolve, reject });
 
     expect(recordingContext.discardOnStop).toBe(true);
     expect(recordingContext.clearStopRequest()).toEqual({ resolve, reject });
     expect(recordingContext.stopRecordingResolve).toBeNull();
     expect(recordingContext.stopRecordingReject).toBeNull();
+  });
+
+  it('cancels a bound starting recorder before native activation', () => {
+    const mediaRecorder = { state: 'inactive' } as MediaRecorder;
+    const cancel = vi.fn();
+    recordingContext.beginRecordingSession('recording-1');
+    bindStartingArtifactSession(mediaRecorder);
+    recordingContext.registerStartingRecorderCancellation(mediaRecorder, cancel);
+
+    expect(recordingContext.cancelStartingRecorder()).toBe(true);
+
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(recordingContext.lifecycleState).toBe('stopping');
+    expect(() => recordingContext.activateRecorder(mediaRecorder)).toThrow(
+      'Illegal recording lifecycle transition: stopping -> recording'
+    );
   });
 
   it('treats lifecycle and active media resources as recording-session ownership signals', () => {

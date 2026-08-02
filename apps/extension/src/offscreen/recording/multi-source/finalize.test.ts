@@ -1,155 +1,105 @@
-import { beforeEach, expect, it, vi } from 'vitest';
-
-import {
-  VideoQuality,
-  type VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { finalizeSession } from './finalize';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
 import type { MultiSourceRecorder, MultiSourceSession } from './state';
+import { createMultiSourceLifecycle } from './state';
+import { TestMediaRecorder } from './media-recorder.test-support';
 
-const { saveRecordingSafelyMock, saveVideoProjectMock, sendRuntimeMessageMock } = vi.hoisted(
-  () => ({
-    saveRecordingSafelyMock: vi.fn(),
-    saveVideoProjectMock: vi.fn(),
-    sendRuntimeMessageMock: vi.fn(),
-  })
-);
+const {
+  commitProjectMock,
+  createProjectMock,
+  notifySavedMock,
+  notifyStoppedMock,
+  saveBatchMock,
+  updateOutboxMock,
+} = vi.hoisted(() => ({
+  commitProjectMock: vi.fn(),
+  createProjectMock: vi.fn(() => ({ id: 'project-1' })),
+  notifySavedMock: vi.fn(),
+  notifyStoppedMock: vi.fn(),
+  saveBatchMock: vi.fn(),
+  updateOutboxMock: vi.fn(),
+}));
 
 vi.mock('../../../composition/persistence/projects/index-mutations', async (importOriginal) => ({
   ...(await importOriginal<
     typeof import('../../../composition/persistence/projects/index-mutations')
   >()),
-  commitVideoProjectMutation: saveVideoProjectMock,
+  commitVideoProjectMutation: commitProjectMock,
+}));
+vi.mock('../../../features/video/project/factories/multi-source-recording', async (original) => ({
+  ...(await original<
+    typeof import('../../../features/video/project/factories/multi-source-recording')
+  >()),
+  createVideoProjectFromMultiSourceRecording: createProjectMock,
+}));
+vi.mock('../../../workflows/media-hub/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../workflows/media-hub/store')>()),
+  saveRecordingsBatchWithCompletionSafely: saveBatchMock,
+}));
+vi.mock(
+  '../../../composition/persistence/recordings/completion-outbox',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/recordings/completion-outbox')
+    >()),
+    updateVideoRecordingCompletionOutbox: updateOutboxMock,
+  })
+);
+vi.mock('./messages', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./messages')>()),
+  notifyMultiSourceSaved: notifySavedMock,
+  notifyMultiSourceStopped: notifyStoppedMock,
 }));
 
-vi.mock('../../../workflows/media-hub/store', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../workflows/media-hub/store')>();
+import { finalizeSession } from './finalize';
+
+function createArtifact(id: string, mimeType = 'video/webm'): FinalizedRecordingStagingArtifact {
+  const file = new File([id], `${id}.webm`, { type: mimeType });
   return {
-    ...actual,
-    saveRecordingSafely: saveRecordingSafelyMock,
-  };
-});
-
-vi.mock('../../../platform/runtime-messaging', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../platform/runtime-messaging')>();
-  return {
-    ...actual,
-    sendRuntimeMessage: sendRuntimeMessageMock,
-  };
-});
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  saveRecordingSafelyMock.mockResolvedValue(undefined);
-  saveVideoProjectMock.mockResolvedValue(undefined);
-  sendRuntimeMessageMock.mockResolvedValue({ success: true });
-});
-
-it('falls back to chunk/default mime types and default source dimensions', async () => {
-  await finalizeSession(createFallbackMimeSession());
-
-  expectFallbackRecordingWrites();
-});
-
-function createFallbackMimeSession(): MultiSourceSession {
-  return {
-    ...createSession(),
-    audioRecorder: createRecorder({
-      chunks: [],
-      recordingId: 'rec-mic',
-      sourceIndex: 999,
-      trackSettings: {},
-    }),
-    recorders: [
-      createRecorder({
-        chunks: [new Blob(['source'], { type: 'video/custom' })],
-        recordingId: 'rec-window-1',
-        sourceIndex: 0,
-        trackSettings: {},
-      }),
-      createRecorder({
-        chunks: [],
-        recordingId: 'rec-window-2',
-        sourceIndex: 1,
-        trackSettings: {},
-      }),
-    ],
+    artifactId: id,
+    file,
+    filename: file.name,
+    mimeType,
+    size: file.size,
   };
 }
 
-function expectFallbackRecordingWrites() {
-  expect(saveRecordingSafelyMock).toHaveBeenCalledWith(
-    'rec-window-1',
-    expect.any(Blob),
-    expect.stringContaining('window-1.webm')
-  );
-  expect(saveVideoProjectMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      assets: expect.arrayContaining([
-        expect.objectContaining({
-          metadata: expect.objectContaining({
-            height: 1080,
-            mimeType: 'video/custom',
-            width: 1920,
-          }),
-        }),
-        expect.objectContaining({
-          metadata: expect.objectContaining({ mimeType: 'video/webm' }),
-          name: expect.stringContaining('window-2.webm'),
-        }),
-        expect.objectContaining({
-          metadata: expect.objectContaining({ hasAudio: true, mimeType: 'audio/webm' }),
-          name: expect.stringContaining('microphone.webm'),
-        }),
-      ]),
-    }),
-    { baseRevision: null }
-  );
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
-    expect.objectContaining({ recordingId: 'rec-window-1' })
-  );
-}
-
-it('notifies saved sessions with the base recording id when no sources were captured', async () => {
-  await finalizeSession({
-    ...createSession(),
-    recorders: [],
-    settings: { ...createSettings(), openEditorAfterRecording: false },
-  });
-
-  expect(saveRecordingSafelyMock).not.toHaveBeenCalled();
-  expect(saveVideoProjectMock).not.toHaveBeenCalled();
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: VideoMessageType.VIDEO_SAVED_TO_IDB,
-    recordingId: 'rec',
-  });
-});
-
-function createSettings(): VideoRecordingSettings {
+function createRecorder(id: string, index: number): MultiSourceRecorder {
+  const recorder = new TestMediaRecorder();
   return {
-    autoFadeDelay: 3,
-    controlledCursorCaptureEnabled: false,
-    countdownSeconds: 0,
-    diagnosticsEnabled: false,
-    microphoneDeviceId: null,
-    microphoneEnabled: true,
-    openEditorAfterRecording: true,
-    quality: VideoQuality.HIGH,
-    sourceCount: 2,
-    systemAudioEnabled: false,
-    webcamEnabled: false,
+    artifact: createArtifact(id),
+    artifactSession: {
+      abort: vi.fn(),
+      recorder,
+      setLifecycleCallbacks: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+    },
+    label: `Source ${index + 1}`,
+    recorder,
+    recordingId: id,
+    sourceIndex: index,
+    stream: recorder.stream,
+    trackSettings: { frameRate: 30, height: 720, width: 1280 },
   };
 }
 
-function createSession(): MultiSourceSession {
+function createSession(id: string): MultiSourceSession {
   return {
     audioRecorder: null,
     durationTimer: null,
-    recorders: [],
-    recordingId: 'rec',
-    settings: createSettings(),
-    startedAt: Date.now() - 1000,
+    lifecycle: createMultiSourceLifecycle(),
+    recorders: [createRecorder(`${id}-window-1`, 0), createRecorder(`${id}-window-2`, 1)],
+    recordingId: id,
+    settings: DEFAULT_VIDEO_SETTINGS,
+    staging: {
+      abort: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+      getPendingBytes: vi.fn(() => 0),
+      openArtifact: vi.fn(),
+    },
+    startedAt: Date.now() - 1_000,
     stopPromise: null,
     stopReject: null,
     stopResolve: null,
@@ -157,39 +107,76 @@ function createSession(): MultiSourceSession {
   };
 }
 
-function createMediaStreamFixture(): MediaStream {
-  const eventTarget = new EventTarget();
-  return {
-    active: true,
-    addEventListener: eventTarget.addEventListener.bind(eventTarget),
-    addTrack: () => undefined,
-    clone: createMediaStreamFixture,
-    dispatchEvent: eventTarget.dispatchEvent.bind(eventTarget),
-    getAudioTracks: () => [],
-    getTrackById: () => null,
-    getTracks: () => [],
-    getVideoTracks: () => [],
-    id: 'media-stream-fixture',
-    onaddtrack: null,
-    onremovetrack: null,
-    removeEventListener: eventTarget.removeEventListener.bind(eventTarget),
-    removeTrack: () => undefined,
-  };
-}
+beforeEach(() => {
+  vi.clearAllMocks();
+  saveBatchMock.mockResolvedValue(undefined);
+  commitProjectMock.mockResolvedValue(undefined);
+  notifySavedMock.mockResolvedValue(undefined);
+  notifyStoppedMock.mockResolvedValue(undefined);
+  updateOutboxMock.mockResolvedValue(undefined);
+});
 
-function createRecorder(params: {
-  chunks: Blob[];
-  recordingId: string;
-  sourceIndex: number;
-  trackSettings: MediaTrackSettings;
-}): MultiSourceRecorder {
-  return {
-    chunks: params.chunks,
-    label: null,
-    recorder: { mimeType: '' } as MediaRecorder,
-    recordingId: params.recordingId,
-    sourceIndex: params.sourceIndex,
-    stream: createMediaStreamFixture(),
-    trackSettings: params.trackSettings,
-  };
-}
+describe('multi-source finalization', () => {
+  it('commits every required artifact in one batch before project creation and staging deletion', async () => {
+    const session = createSession('multi-batch');
+    await finalizeSession(session);
+
+    expect(saveBatchMock).toHaveBeenCalledOnce();
+    expect(saveBatchMock.mock.calls[0]?.[0]).toHaveLength(2);
+    expect(saveBatchMock.mock.calls[0]?.[1]).toEqual({
+      primaryRecordingId: 'multi-batch-window-1',
+      projectId: null,
+      recordingId: 'multi-batch',
+    });
+    expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
+      commitProjectMock.mock.invocationCallOrder[0]!
+    );
+    expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(session.staging.delete).mock.invocationCallOrder[0]!
+    );
+    expect(updateOutboxMock).toHaveBeenCalledWith({
+      primaryRecordingId: 'multi-batch-window-1',
+      projectId: 'project-1',
+      recordingId: 'multi-batch',
+    });
+    expect(updateOutboxMock.mock.invocationCallOrder[0]).toBeLessThan(
+      notifySavedMock.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('publishes projectId null when optional project creation fails after media commit', async () => {
+    const session = createSession('multi-project-failure');
+    commitProjectMock.mockRejectedValueOnce(new Error('project failed'));
+
+    await expect(finalizeSession(session)).resolves.toBeUndefined();
+    expect(saveBatchMock).toHaveBeenCalledOnce();
+    expect(session.staging.delete).toHaveBeenCalledOnce();
+    expect(notifySavedMock).toHaveBeenCalledWith({
+      primaryRecordingId: 'multi-project-failure-window-1',
+      projectId: null,
+      recordingId: 'multi-project-failure',
+    });
+    expect(updateOutboxMock).not.toHaveBeenCalled();
+  });
+
+  it('does not create a project or delete staging when the atomic media batch fails', async () => {
+    const session = createSession('multi-batch-failure');
+    saveBatchMock.mockRejectedValueOnce(new Error('batch failed'));
+
+    await expect(finalizeSession(session)).rejects.toThrow('batch failed');
+    expect(commitProjectMock).not.toHaveBeenCalled();
+    expect(session.staging.delete).not.toHaveBeenCalled();
+  });
+
+  it('continues project and result publication when post-commit staging cleanup fails', async () => {
+    const session = createSession('multi-cleanup-failure');
+    vi.mocked(session.staging.delete).mockRejectedValueOnce(new Error('cleanup failed'));
+
+    await expect(finalizeSession(session)).resolves.toBeUndefined();
+    expect(commitProjectMock).toHaveBeenCalledOnce();
+    expect(notifySavedMock).toHaveBeenCalledWith(
+      expect.objectContaining({ recordingId: 'multi-cleanup-failure' })
+    );
+    expect(session.staging.abort).not.toHaveBeenCalled();
+  });
+});

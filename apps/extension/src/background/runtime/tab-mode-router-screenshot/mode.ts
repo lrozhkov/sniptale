@@ -397,7 +397,8 @@ async function disableScreenshotModeOperation(args: DisableScreenshotModeArgs): 
       } catch (compensationError) {
         throw new AggregateError(
           [error, compensationError],
-          'Content teardown and screenshot surface compensation both failed'
+          'Content teardown and screenshot surface compensation both failed',
+          { cause: compensationError }
         );
       }
     }

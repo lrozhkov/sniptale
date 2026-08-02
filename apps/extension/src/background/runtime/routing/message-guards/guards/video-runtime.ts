@@ -4,6 +4,7 @@ import type { RuntimeMessageEnvelope } from './shared';
 
 export const videoRuntimeMessageTypes = [
   VideoMessageType.GET_RECORDING_STATE,
+  VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
   VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
   VideoMessageType.GET_RECORDING_TAB_ID,
   VideoMessageType.RECORDING_DURATION_UPDATED,

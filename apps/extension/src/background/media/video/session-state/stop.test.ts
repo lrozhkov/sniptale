@@ -10,7 +10,6 @@ beforeEach(() => {
   videoManagerSession.isStarting = false;
   videoManagerSession.isStopping = false;
   videoManagerSession.offscreenStartDispatched = false;
-  videoManagerSession.openEditorAfterRecording = true;
   videoManagerSession.controlledCursorCaptureEnabled = true;
   videoManagerSession.controlledCursorAutoPaused = true;
   videoManagerSession.controlledCursorNavigationEpoch = 3;
@@ -48,7 +47,6 @@ it('resets active session fields immediately when start/countdown teardown is st
 
   finishVideoRecordingStop();
   expect(videoManagerSession.isStopping).toBe(false);
-  expect(videoManagerSession.openEditorAfterRecording).toBe(false);
   expect(videoManagerSession.controlledCursorCaptureEnabled).toBe(false);
   expect(videoManagerSession.controlledCursorAutoPaused).toBe(false);
   expect(videoManagerSession.controlledCursorNavigationEpoch).toBe(3);

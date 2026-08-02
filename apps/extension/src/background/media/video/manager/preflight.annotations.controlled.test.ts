@@ -12,18 +12,19 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { enableAnnotationsIfNeeded } from './preflight.annotations';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 type AnnotationDeps = NonNullable<Parameters<typeof enableAnnotationsIfNeeded>[4]>;
 
 function createVideoSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 0,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: true,
-    openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: true,
     controlledCursorCaptureEnabled: true,
   };

@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 import {
   isVideoExportCapabilities,
@@ -72,6 +73,9 @@ it('accepts valid size payloads and rejects malformed size payloads', () => {
 
 it('accepts valid viewport regions and rejects malformed viewport regions', () => {
   expect(isViewportRegion({ height: 200, width: 100, x: 10, y: 20 })).toBe(true);
+  expect(
+    isViewportRegion({ height: 200, output: {}, quality: 'HIGH', width: 100, x: 10, y: 20 })
+  ).toBe(true);
   expect(isViewportRegion({ height: 200, width: 100, x: '10', y: 20 })).toBe(false);
   expect(isViewportRegion({ height: 200, width: 100, x: 10 })).toBe(false);
 });
@@ -104,6 +108,7 @@ it('accepts valid viewport info payloads and rejects malformed viewport info', (
 it('accepts controlled cursor capture settings with microphone processing settings', () => {
   expect(
     isVideoRecordingSettings({
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 300,
       controlledCursorCaptureEnabled: true,
       countdownSeconds: 3,
@@ -114,8 +119,6 @@ it('accepts controlled cursor capture settings with microphone processing settin
       microphoneGain: 1.25,
       microphoneDeviceId: null,
       microphoneEnabled: true,
-      openEditorAfterRecording: false,
-      quality: '1080p',
       sourceCount: 2,
       systemAudioEnabled: true,
       webcamDeviceId: 'cam-1',
@@ -124,17 +127,21 @@ it('accepts controlled cursor capture settings with microphone processing settin
   ).toBe(true);
 });
 
+it('rejects legacy quality and output settings at the runtime boundary', () => {
+  expect(isVideoRecordingSettings({ ...DEFAULT_VIDEO_SETTINGS, quality: 'HIGH' })).toBe(false);
+  expect(isVideoRecordingSettings({ ...DEFAULT_VIDEO_SETTINGS, output: {} })).toBe(false);
+});
+
 it('rejects invalid video recording settings flag and source count values', () => {
   expect(
     isVideoRecordingSettings({
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 300,
       controlledCursorCaptureEnabled: 'yes',
       countdownSeconds: 3,
       diagnosticsEnabled: true,
       microphoneDeviceId: null,
       microphoneEnabled: true,
-      openEditorAfterRecording: false,
-      quality: '1080p',
       systemAudioEnabled: true,
       webcamDeviceId: null,
       webcamEnabled: false,
@@ -142,13 +149,12 @@ it('rejects invalid video recording settings flag and source count values', () =
   ).toBe(false);
   expect(
     isVideoRecordingSettings({
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 300,
       countdownSeconds: 3,
       diagnosticsEnabled: true,
       microphoneDeviceId: null,
       microphoneEnabled: true,
-      openEditorAfterRecording: false,
-      quality: '1080p',
       sourceCount: '2',
       systemAudioEnabled: true,
       webcamDeviceId: null,

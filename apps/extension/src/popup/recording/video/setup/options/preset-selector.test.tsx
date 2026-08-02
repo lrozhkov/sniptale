@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const runtimeMocks = vi.hoisted(() => ({
+  openSettingsPage: vi.fn().mockResolvedValue(undefined),
   sendRuntimeMessage: vi.fn(),
 }));
 
@@ -19,6 +20,10 @@ vi.mock('../../../../runtime-services', async (importOriginal) => ({
       sendRuntimeMessage: runtimeMocks.sendRuntimeMessage,
     },
   }),
+}));
+vi.mock('../../../../../platform/navigation/extension-pages', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/navigation/extension-pages')>()),
+  openSettingsPage: runtimeMocks.openSettingsPage,
 }));
 
 import { VideoPresetSelector } from './preset-selector';
@@ -155,9 +160,44 @@ it('shows native size and viewport presets in an inline curtain', async () => {
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledOnce();
 
   act(() => {
-    buttons()[2]?.click();
+    container?.querySelector<HTMLElement>('[title="Preset"]')?.closest('button')?.click();
   });
   expect(onPresetChange).toHaveBeenCalledWith('preset-1');
+});
+
+it('opens the size-preset settings section from the selector management action', async () => {
+  renderNode(
+    <VideoPresetSelector
+      captureMode={CaptureMode.TAB}
+      viewportPresets={[]}
+      selectedPresetId={null}
+      onPresetChange={vi.fn()}
+    />
+  );
+
+  await act(async () => {
+    container?.querySelector<HTMLButtonElement>('button')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  const manageButton = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
+  ).find((button) => button.textContent === 't:popup.video.manageSizePresets');
+  const nativeOption = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
+  ).find((button) => button.textContent === 't:viewportPresets.section.nativeOption');
+  expect(manageButton).toBeTruthy();
+  expect(container?.querySelectorAll('[aria-controls]')).toHaveLength(1);
+  expect(manageButton?.closest('[id]')).not.toBeNull();
+  expect(
+    nativeOption && manageButton
+      ? Boolean(
+          nativeOption.compareDocumentPosition(manageButton) & Node.DOCUMENT_POSITION_FOLLOWING
+        )
+      : false
+  ).toBe(true);
+
+  act(() => manageButton?.click());
+  expect(runtimeMocks.openSettingsPage).toHaveBeenCalledWith({ section: 'presets' });
 });
 
 it('selects native size when the native curtain option is clicked', async () => {
@@ -189,7 +229,9 @@ it('selects native size when the native curtain option is clicked', async () => 
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
   act(() => {
-    Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])[1]?.click();
+    Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find((button) => button.textContent === 't:viewportPresets.section.nativeOption')
+      ?.click();
   });
 
   expect(onPresetChange).toHaveBeenCalledWith(null);
@@ -223,9 +265,9 @@ it('keeps a preset disabled when runtime availability fails', async () => {
     container?.querySelector<HTMLButtonElement>('button')?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
-  const presetButton = Array.from(
-    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
-  )[2];
+  const presetButton = container
+    ?.querySelector<HTMLElement>('[title="Preset"]')
+    ?.closest<HTMLButtonElement>('button');
   expect(presetButton?.disabled).toBe(false);
   expect(presetButton?.getAttribute('aria-disabled')).toBe('true');
   expect(container?.textContent).toContain('t:viewportPresets.availability.platformRejected');

@@ -8,7 +8,7 @@ describe('project-export codecs owner facade', () => {
   it('stays a thin re-export surface over the canonical codecs owner folder', () => {
     expect(codecsStylesheet.trim()).toBe(
       [
-        "export { scaleBitrate } from './bitrate';",
+        "export { resolveExportTargetBitrate } from './bitrate';",
         'export {',
         '  ensureMp4ExportSupport,',
         '  getSupportedMp4AudioEncoder,',

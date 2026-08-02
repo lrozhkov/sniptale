@@ -55,6 +55,14 @@ function openRenderedSelect() {
   });
 }
 
+function getRenderedMenu() {
+  return document.body.querySelector('[role="listbox"]');
+}
+
+function getRenderedOptions() {
+  return Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+}
+
 function dispatchKeydown(target: Element | null | undefined, key: string) {
   act(() => {
     target?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key }));
@@ -75,8 +83,12 @@ it('renders a custom listbox and marks the selected option', () => {
 
   openRenderedSelect();
 
-  const selectedOption = container?.querySelector('[aria-selected="true"]');
-  expect(container?.querySelector('[role="listbox"]')).toBeTruthy();
+  const menu = getRenderedMenu();
+  const selectedOption = menu?.querySelector('[aria-selected="true"]');
+  expect(menu).toBeTruthy();
+  expect(container?.contains(menu ?? null)).toBe(false);
+  expect(menu?.className).toContain('sniptale-select-menu-portal');
+  expect((menu as HTMLElement | null)?.style.zIndex).toBe('2147483647');
   expect(trigger?.className).toContain('sniptale-select-open');
   expect(selectedOption?.className).toContain('sniptale-select-option-selected');
   expect(selectedOption?.textContent).toContain('Русский');
@@ -89,9 +101,9 @@ it('calls onChange when a new option is chosen from the custom menu', () => {
   renderLanguageSelect({ onChange });
   openRenderedSelect();
 
-  const englishOption = Array.from(
-    container?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []
-  ).find((option) => option.textContent?.includes('English'));
+  const englishOption = getRenderedOptions().find((option) =>
+    option.textContent?.includes('English')
+  );
 
   expect(englishOption).toBeTruthy();
 
@@ -100,7 +112,7 @@ it('calls onChange when a new option is chosen from the custom menu', () => {
   });
 
   expect(onChange).toHaveBeenCalledWith('en');
-  expect(container?.querySelector('[role="listbox"]')).toBeNull();
+  expect(getRenderedMenu()).toBeNull();
 });
 
 it('applies custom menu classes to the rendered listbox', () => {
@@ -110,7 +122,14 @@ it('applies custom menu classes to the rendered listbox', () => {
   });
   openRenderedSelect();
 
-  expect(container?.querySelector('[role="listbox"]')?.className).toContain('w-[15rem]');
+  expect(getRenderedMenu()?.className).toContain('w-[15rem]');
+});
+
+it('opts a consumer into an unbounded portaled menu without changing the default', () => {
+  renderLanguageSelect({ menuScrollable: false });
+  openRenderedSelect();
+
+  expect(getRenderedMenu()?.className).toContain('sniptale-select-menu-overflow-visible');
 });
 
 it('supports keyboard navigation, selection, and escape-to-trigger focus restoration', async () => {
@@ -122,10 +141,8 @@ it('supports keyboard navigation, selection, and escape-to-trigger focus restora
   trigger?.focus();
   dispatchKeydown(trigger, 'ArrowDown');
 
-  const options = Array.from(
-    container?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []
-  );
-  expect(container?.querySelector('[role="listbox"]')).not.toBeNull();
+  const options = getRenderedOptions();
+  expect(getRenderedMenu()).not.toBeNull();
   expect(document.activeElement?.textContent).toContain('Русский');
 
   dispatchKeydown(options[0], 'ArrowDown');
@@ -137,17 +154,15 @@ it('supports keyboard navigation, selection, and escape-to-trigger focus restora
   await flushMicrotasks();
 
   expect(onChange).toHaveBeenCalledWith('en');
-  expect(container?.querySelector('[role="listbox"]')).toBeNull();
+  expect(getRenderedMenu()).toBeNull();
   expect(document.activeElement).toBe(trigger);
 
   dispatchKeydown(trigger, 'ArrowDown');
-  const reopenedOptions = Array.from(
-    container?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []
-  );
+  const reopenedOptions = getRenderedOptions();
   dispatchKeydown(reopenedOptions[1], 'Escape');
   await flushMicrotasks();
 
-  expect(container?.querySelector('[role="listbox"]')).toBeNull();
+  expect(getRenderedMenu()).toBeNull();
   expect(document.activeElement).toBe(trigger);
 });
 

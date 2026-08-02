@@ -65,7 +65,8 @@ export async function createCdpFullPageRasterBackend(args: {
     } catch (detachError) {
       throw new AggregateError(
         [error, detachError],
-        `Full-page CDP initialization and detach failed: ${String(error)}; ${String(detachError)}`
+        `Full-page CDP initialization and detach failed: ${String(error)}; ${String(detachError)}`,
+        { cause: detachError }
       );
     }
     throw error;

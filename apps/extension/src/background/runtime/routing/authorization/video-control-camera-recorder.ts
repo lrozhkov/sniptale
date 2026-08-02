@@ -41,6 +41,7 @@ export function authorizeVideoControlCameraRecorderRoute(
       documentId: request.sender?.documentId,
       recordingId: request.message.recordingId,
       senderUrl,
+      tabId: request.sender?.tab?.id,
     })
   ) {
     return reject('Unauthorized camera recorder control sender');

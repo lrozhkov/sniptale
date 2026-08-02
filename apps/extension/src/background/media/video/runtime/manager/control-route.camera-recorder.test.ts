@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const {
   ensureActiveVideoRecordingLeaseHydratedMock,
   getActiveVideoRecordingLeaseSnapshotMock,
-  isAuthorizedCameraRecorderDocumentMock,
+  restoreAuthorizedCameraRecorderDocumentMock,
   resolveTrustedCameraRecorderRuntimeSenderUrlMock,
   resolveTrustedPopupRuntimeSenderUrlMock,
   stopRecordingMock,
@@ -11,7 +11,7 @@ const {
 } = vi.hoisted(() => ({
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
   getActiveVideoRecordingLeaseSnapshotMock: vi.fn(),
-  isAuthorizedCameraRecorderDocumentMock: vi.fn(),
+  restoreAuthorizedCameraRecorderDocumentMock: vi.fn(),
   resolveTrustedCameraRecorderRuntimeSenderUrlMock: vi.fn(),
   resolveTrustedPopupRuntimeSenderUrlMock: vi.fn(),
   stopRecordingMock: vi.fn(),
@@ -48,7 +48,7 @@ vi.mock('../sender-policy', async (importOriginal) => ({
 }));
 vi.mock('../camera-recorder-control', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../camera-recorder-control')>()),
-  isAuthorizedCameraRecorderDocument: isAuthorizedCameraRecorderDocumentMock,
+  restoreAuthorizedCameraRecorderDocument: restoreAuthorizedCameraRecorderDocumentMock,
 }));
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -57,8 +57,9 @@ import { routeVideoControlMessage } from './control-route';
 const popupSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 const cameraSender = {
   documentId: 'camera-document-1',
+  tab: { id: 7 },
   url: 'chrome-extension://test/apps/extension/src/camera-recorder/index.html',
-} satisfies chrome.runtime.MessageSender;
+} as chrome.runtime.MessageSender;
 
 async function flushAsync(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -75,7 +76,7 @@ beforeEach(() => {
     ownerSenderUrl: popupSenderUrl,
     recordingId: 'recording-1',
   });
-  isAuthorizedCameraRecorderDocumentMock.mockReturnValue(true);
+  restoreAuthorizedCameraRecorderDocumentMock.mockResolvedValue(true);
   validateRecordingControlCapabilityMock.mockReturnValue(true);
   stopRecordingMock.mockResolvedValue({ result: 'accepted' });
 });
@@ -102,8 +103,41 @@ it('authorizes registered camera recorder document controls through the active l
     ownerSenderUrl: popupSenderUrl,
     recordingId: 'recording-1',
   });
+  expect(restoreAuthorizedCameraRecorderDocumentMock).toHaveBeenCalledWith({
+    documentId: 'camera-document-1',
+    recordingId: 'recording-1',
+    senderUrl: cameraSender.url,
+    tabId: 7,
+  });
   expect(stopRecordingMock).toHaveBeenCalledTimes(1);
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
+});
+
+it('rejects camera controls when the sender tab differs from the grant', async () => {
+  const sendResponse = vi.fn();
+  restoreAuthorizedCameraRecorderDocumentMock.mockImplementation(
+    async ({ tabId }: { tabId?: number }) => tabId === 7
+  );
+  validateRecordingControlCapabilityMock.mockImplementation(
+    ({ ownerSenderUrl }: { ownerSenderUrl: string | null }) => ownerSenderUrl !== null
+  );
+
+  routeVideoControlMessage({
+    message: {
+      controlToken: 'control-token-1',
+      recordingId: 'recording-1',
+      type: VideoMessageType.STOP_RECORDING,
+    },
+    sender: { ...cameraSender, tab: { id: 8 } } as chrome.runtime.MessageSender,
+    sendResponse,
+  });
+  await flushAsync();
+
+  expect(stopRecordingMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenCalledWith({
+    success: false,
+    error: 'Unauthorized recording control capability',
+  });
 });
 
 it('rejects registered camera recorder document controls with the wrong lease token', async () => {

@@ -94,3 +94,14 @@ describe('Video annotation recovery i18n', () => {
     expect(russianCopy).not.toContain('before/after');
   });
 });
+
+describe('Popup video controls i18n', () => {
+  it('uses concise countdown and size-preset management copy in both locales', () => {
+    expect(translate('popup.video.countdownLabel', 'ru')).toBe('Отсчёт');
+    expect(translate('popup.video.countdownLabel', 'en')).toBe('Countdown');
+    expect(translate('popup.video.countdownZeroOption', 'ru')).toBe('Выкл.');
+    expect(translate('popup.video.countdownZeroOption', 'en')).toBe('Off');
+    expect(translate('popup.video.manageSizePresets', 'ru')).toBe('Управление пресетами размеров…');
+    expect(translate('popup.video.manageSizePresets', 'en')).toBe('Manage presets…');
+  });
+});

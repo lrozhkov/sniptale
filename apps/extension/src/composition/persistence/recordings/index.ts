@@ -7,12 +7,15 @@ import {
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
 import { createRecordingMediaId } from '../../../features/media-hub/media-id';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { collectReferencedRecordingIdReferences } from '../../../features/media-hub/references';
 import { parseRecordingEntries, parseRecordingEntry } from './index.guards.ts';
 import type { RecordingEntry } from './contracts';
+import { saveRecordingsBatch } from './batch';
+
+export { saveRecordingsBatch, saveRecordingsBatchWithCompletion } from './batch';
+export type { SaveRecordingBatchInput } from './batch';
 
 const logger = createLogger({ namespace: 'SharedRecordingsDb' });
 type RecordingCleanupCursor = { delete: () => Promise<void> };
@@ -51,20 +54,7 @@ async function loadReferencedRecordingIdsForCleanup(
 }
 
 export async function saveRecording(id: string, blob: Blob, filename: string): Promise<void> {
-  await runWithIndexedDbMutation(async (db) => {
-    const entry: RecordingEntry = {
-      id,
-      blob,
-      filename,
-      createdAt: Date.now(),
-      size: blob.size,
-    };
-    const tx = db.transaction([STORE_NAME, MEDIA_LIBRARY_STORE], 'readwrite');
-
-    await tx.objectStore(STORE_NAME).put(entry);
-    await tx.objectStore(MEDIA_LIBRARY_STORE).put(buildRecordingMediaEntry(entry));
-    await tx.done;
-  });
+  await saveRecordingsBatch([{ id, blob, filename }]);
 }
 
 export async function getRecording(id: string): Promise<RecordingEntry | undefined> {

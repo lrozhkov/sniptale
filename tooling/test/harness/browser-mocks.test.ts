@@ -62,6 +62,24 @@ it('allows explicit typed-success runtime fallback through harness bootstrap', a
   });
 });
 
+it('returns the current parsed recording-state contract from the default harness', async () => {
+  await loadHarness();
+
+  await expect(chrome.runtime.sendMessage({ type: 'GET_RECORDING_STATE' })).resolves.toEqual({
+    recordingHealth: 'healthy',
+    success: true,
+    state: {
+      captureMode: null,
+      captureSource: null,
+      countdownEndsAt: null,
+      duration: 0,
+      error: null,
+      status: 'IDLE',
+      viewportPresetId: null,
+    },
+  });
+});
+
 it('emits trusted offscreen commands with authorization metadata and background ownership', async () => {
   await loadHarness();
   const listener = vi.fn();

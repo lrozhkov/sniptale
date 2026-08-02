@@ -7,10 +7,17 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   bodyMock: vi.fn(),
   footerMock: vi.fn(),
-  getRecording: vi.fn(),
   parsePopupRuntimeMessage: vi.fn(),
   runtimeInfoGetUrl: vi.fn(),
   subscribeToMessages: vi.fn(),
+  sendRuntimeMessage: vi.fn(),
+}));
+
+vi.mock('../../../runtime-services', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../runtime-services')>()),
+  getPopupRuntimeServices: () => ({
+    messaging: { sendRuntimeMessage: mocks.sendRuntimeMessage },
+  }),
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
@@ -40,14 +47,6 @@ vi.mock('../footer', () => ({
   VideoSetupWarnings: () => <div data-testid="video-setup-warnings" />,
 }));
 
-vi.mock('../../../../composition/persistence/recordings/index', () => ({
-  cleanupOldRecordings: vi.fn(),
-  deleteRecording: vi.fn(),
-  getRecording: mocks.getRecording,
-  listRecordings: vi.fn(),
-  saveRecording: vi.fn(),
-}));
-
 import VideoSetupPage from './index';
 import {
   CaptureMode,
@@ -55,6 +54,8 @@ import {
   VideoRecordingStatus,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { translate } from '../../../../platform/i18n';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -63,14 +64,21 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.bodyMock.mockReset();
   mocks.footerMock.mockReset();
-  mocks.getRecording.mockReset();
-  mocks.getRecording.mockResolvedValue(createSavedRecording('recording-1'));
   mocks.parsePopupRuntimeMessage.mockReset();
   mocks.parsePopupRuntimeMessage.mockImplementation((message: unknown) => message);
   mocks.runtimeInfoGetUrl.mockReset();
   mocks.runtimeInfoGetUrl.mockImplementation((path: string) => `chrome-extension://test/${path}`);
   mocks.subscribeToMessages.mockReset();
   mocks.subscribeToMessages.mockReturnValue(() => undefined);
+  mocks.sendRuntimeMessage.mockReset();
+  mocks.sendRuntimeMessage.mockResolvedValue({
+    success: true,
+    postRecordResult: {
+      primaryRecordingId: 'recording-1',
+      projectId: null,
+      recordingId: 'recording-1',
+    },
+  });
 });
 
 afterEach(() => {
@@ -107,12 +115,12 @@ function createProps(overrides: Partial<React.ComponentProps<typeof VideoSetupPa
     recordingState: createRecordingState(VideoRecordingStatus.IDLE),
     selectedPresetId: null,
     settings: {
+      ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 0,
       diagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: false,
-      openEditorAfterRecording: false,
       quality: VideoQuality.MEDIUM,
       systemAudioEnabled: true,
     },
@@ -164,18 +172,9 @@ async function renderNode(node: React.ReactNode) {
   await act(async () => root?.render(node));
 }
 
-function createSavedRecording(id: string) {
-  return {
-    blob: new Blob([id], { type: 'video/webm' }),
-    createdAt: 1,
-    filename: `${id}.webm`,
-    id,
-    size: 12,
-  };
-}
-
 async function stopAndRenderIdle(props: React.ComponentProps<typeof VideoSetupPage>) {
   await renderNode(<VideoSetupPage {...props} />);
+  await act(async () => Promise.resolve());
   const footerProps = mocks.footerMock.mock.calls.at(-1)?.[0] as { onStop: () => void };
   await act(async () => footerProps.onStop());
   await renderNode(
@@ -199,15 +198,113 @@ it('keeps the saved recording id for post-record actions after verified save', a
   await act(async () => Promise.resolve());
 
   expect(onStop).toHaveBeenCalled();
-  expect(mocks.getRecording).toHaveBeenCalledWith('recording-1');
   expect(mocks.bodyMock).toHaveBeenLastCalledWith(
-    expect.objectContaining({ postRecordRecordingId: 'recording-1' })
+    expect.objectContaining({
+      postRecordResult: expect.objectContaining({ recordingId: 'recording-1' }),
+    })
+  );
+  expect(container?.querySelector('[data-testid="footer"]')).toBeNull();
+});
+
+it('restores post-record actions when recording ended outside the current popup controls', async () => {
+  const props = createProps({
+    activeRecordingId: 'recording-1',
+    recordingState: createRecordingState(VideoRecordingStatus.RECORDING),
+  });
+
+  await renderNode(<VideoSetupPage {...props} />);
+  await renderNode(
+    <VideoSetupPage
+      {...props}
+      activeRecordingId={null}
+      recordingState={createRecordingState(VideoRecordingStatus.IDLE)}
+    />
+  );
+  await act(async () => Promise.resolve());
+
+  expect(props.onStop).not.toHaveBeenCalled();
+  expect(mocks.bodyMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      postRecordResult: expect.objectContaining({ recordingId: 'recording-1' }),
+    })
   );
 });
 
-it('does not expose post-record actions when the saved recording is unavailable', async () => {
+it('restores the durable result when runtime status is stale but no live recording is active', async () => {
+  await renderNode(
+    <VideoSetupPage
+      {...createProps({
+        activeRecordingId: null,
+        recordingState: createRecordingState(VideoRecordingStatus.RECORDING),
+      })}
+    />
+  );
+  await act(async () => Promise.resolve());
+
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith({
+    type: 'GET_RECORDING_STATE',
+  });
+  expect(mocks.bodyMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      postRecordResult: expect.objectContaining({ recordingId: 'recording-1' }),
+    })
+  );
+  expect(container?.querySelector('[data-testid="footer"]')).toBeNull();
+});
+
+it('never mounts recording controls while the durable result check is unresolved', async () => {
+  let resolveRecordingState: ((value: { success: boolean }) => void) | null = null;
+  mocks.sendRuntimeMessage.mockReturnValue(
+    new Promise((resolve) => {
+      resolveRecordingState = resolve;
+    })
+  );
+
+  await renderNode(<VideoSetupPage {...createProps()} />);
+
+  expect(container?.querySelector('[data-testid="footer"]')).toBeNull();
+  expect(mocks.footerMock).not.toHaveBeenCalled();
+
+  await act(async () => resolveRecordingState?.({ success: true }));
+
+  expect(container?.querySelector('[data-testid="footer"]')).not.toBeNull();
+});
+
+it('recovers from a rejected durable result read through an explicit localized retry', async () => {
+  const durableResult = {
+    primaryRecordingId: 'recording-recovered',
+    projectId: 'project-recovered',
+    recordingId: 'recording-recovered',
+  };
+  mocks.sendRuntimeMessage
+    .mockRejectedValueOnce(new Error('recording state unavailable'))
+    .mockResolvedValueOnce({ success: true, postRecordResult: durableResult });
+
+  await renderNode(<VideoSetupPage {...createProps()} />);
+  await act(async () => Promise.resolve());
+
+  expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
+    translate('popup.video.postRecordLoadError')
+  );
+  expect(container?.querySelector('[data-testid="footer"]')).toBeNull();
+  const retryButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+    button.textContent?.includes(translate('popup.video.postRecordRetry'))
+  );
+  expect(retryButton).toBeDefined();
+
+  await act(async () => retryButton?.click());
+  await act(async () => Promise.resolve());
+
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledTimes(2);
+  expect(mocks.bodyMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ postRecordResult: durableResult })
+  );
+  expect(container?.querySelector('[role="alert"]')).toBeNull();
+  expect(container?.querySelector('[data-testid="footer"]')).toBeNull();
+});
+
+it('keeps durable post-record authority blocking until ACK succeeds', async () => {
   vi.useFakeTimers();
-  mocks.getRecording.mockResolvedValue(undefined);
 
   await stopAndRenderIdle(
     createProps({
@@ -218,6 +315,36 @@ it('does not expose post-record actions when the saved recording is unavailable'
   await act(async () => vi.runAllTimersAsync());
 
   expect(mocks.bodyMock).toHaveBeenLastCalledWith(
-    expect.objectContaining({ postRecordRecordingId: null })
+    expect.objectContaining({
+      postRecordResult: expect.objectContaining({ recordingId: 'recording-1' }),
+    })
+  );
+  expect(container?.querySelector('[data-testid="footer"]')).toBeNull();
+});
+
+it('replaces stale local post-record state with the durable latest result after ACK', async () => {
+  const resultA = {
+    primaryRecordingId: 'recording-1',
+    projectId: null,
+    recordingId: 'recording-1',
+  };
+  const resultB = {
+    primaryRecordingId: 'recording-2',
+    projectId: null,
+    recordingId: 'recording-2',
+  };
+  mocks.sendRuntimeMessage
+    .mockResolvedValueOnce({ success: true, postRecordResult: resultA })
+    .mockResolvedValueOnce({ success: true, result: 'stale' })
+    .mockResolvedValueOnce({ success: true, postRecordResult: resultB });
+  await renderNode(<VideoSetupPage {...createProps()} />);
+  await act(async () => Promise.resolve());
+  const bodyProps = mocks.bodyMock.mock.calls.at(-1)?.[0] as {
+    onAcknowledgePostRecord: () => Promise<void>;
+  };
+  await act(async () => bodyProps.onAcknowledgePostRecord());
+
+  expect(mocks.bodyMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ postRecordResult: resultB })
   );
 });

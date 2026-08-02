@@ -60,7 +60,6 @@ it('persists and reads a valid recording lease record', async () => {
     captureMode: CaptureMode.TAB,
     cropRegion: { x: 10, y: 20, width: 300, height: 200 },
     ownerSenderUrl: 'chrome-extension://test/apps/extension/src/popup/index.html',
-    openEditorAfterRecording: true,
     recordingId: 'recording-1',
     recordingTabId: 42,
   });
@@ -90,7 +89,6 @@ it('rejects invalid persisted crop geometry', async () => {
   const lease = createLeaseSnapshot({
     captureMode: CaptureMode.TAB_CROP,
     ownerSenderUrl: 'chrome-extension://test/apps/extension/src/popup/index.html',
-    openEditorAfterRecording: true,
     recordingId: 'recording-crop',
     recordingTabId: 42,
   });
@@ -105,7 +103,6 @@ it('persists and reads a camera recording lease without a tab id', async () => {
   const lease = createLeaseSnapshot({
     captureMode: CaptureMode.CAMERA,
     ownerSenderUrl: 'chrome-extension://test/apps/extension/src/popup/index.html',
-    openEditorAfterRecording: false,
     recordingId: 'recording-camera-1',
     recordingTabId: null,
   });
@@ -136,7 +133,6 @@ it('drops expired persisted lease records and removes only when storage is avail
       captureMode: CaptureMode.TAB,
       controlToken: 'control-token-1',
       expiresAt: Date.now() - 1,
-      openEditorAfterRecording: true,
       ownerSenderUrl: 'chrome-extension://test/apps/extension/src/popup/index.html',
       recordingId: 'recording-1',
       recordingTabId: 42,
@@ -157,7 +153,6 @@ it('atomically rejects a legacy lease without an exact surface binding field', a
       captureMode: CaptureMode.TAB,
       controlToken: 'control-token-legacy',
       expiresAt: Date.now() + 60_000,
-      openEditorAfterRecording: true,
       ownerSenderUrl: 'chrome-extension://test/apps/extension/src/popup/index.html',
       recordingId: 'recording-legacy',
       recordingTabId: 42,
@@ -175,7 +170,6 @@ it('atomically rejects a legacy lease without an explicit lifecycle phase', asyn
       captureMode: CaptureMode.TAB,
       controlToken: 'control-token-legacy-phase',
       expiresAt: Date.now() + 60_000,
-      openEditorAfterRecording: true,
       ownerSenderUrl: 'chrome-extension://test/apps/extension/src/popup/index.html',
       recordingId: 'recording-legacy-phase',
       recordingTabId: 42,

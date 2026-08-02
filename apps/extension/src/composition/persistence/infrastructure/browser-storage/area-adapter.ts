@@ -10,7 +10,14 @@ import {
   type PersistenceMutationPermit,
 } from '../mutation-barrier';
 
-type PersistenceAwareBrowserStorageAreaAdapter = Omit<BrowserStorageAreaAdapter, 'set'> & {
+type PersistenceAwareBrowserStorageAreaAdapter = Omit<
+  BrowserStorageAreaAdapter,
+  'remove' | 'set'
+> & {
+  remove(
+    keys: Parameters<BrowserStorageAreaAdapter['remove']>[0],
+    permit?: PersistenceMutationPermit
+  ): Promise<void>;
   set(
     items: Parameters<BrowserStorageAreaAdapter['set']>[0],
     permit?: PersistenceMutationPermit
@@ -96,7 +103,7 @@ export function createStorageAreaAdapter(
         : write());
     },
 
-    async remove(keys) {
+    async remove(keys, permit) {
       if (!getStorageArea(areaName)) {
         return Promise.reject(new Error(`chrome.storage.${areaName} is unavailable`));
       }
@@ -106,7 +113,9 @@ export function createStorageAreaAdapter(
           getStateManagerDomain(areaName),
           Array.isArray(keys) ? keys : [keys]
         );
-      await (guardMutations ? runWithPersistenceMutationPermit(remove) : remove());
+      await (guardMutations && !isActivePersistenceMutationPermit(permit)
+        ? runWithPersistenceMutationPermit(remove)
+        : remove());
     },
   };
 }

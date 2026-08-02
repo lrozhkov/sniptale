@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
   clearActiveVideoRecordingLeaseMock,
+  clearCameraRecorderControlGrantMock,
   finishVideoRecordingStopMock,
   getVideoRecordingIdMock,
   resetCompletedVideoRecordingSessionMock,
@@ -11,6 +12,7 @@ const {
   releaseVideoCaptureSurfaceMock,
 } = vi.hoisted(() => ({
   clearActiveVideoRecordingLeaseMock: vi.fn(),
+  clearCameraRecorderControlGrantMock: vi.fn(),
   finishVideoRecordingStopMock: vi.fn(),
   getVideoRecordingIdMock: vi.fn(),
   resetCompletedVideoRecordingSessionMock: vi.fn(),
@@ -32,12 +34,18 @@ vi.mock('../../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../session-state')>()),
   finishVideoRecordingStop: finishVideoRecordingStopMock,
   getVideoRecordingId: getVideoRecordingIdMock,
+  isCurrentVideoRecordingId: (recordingId: string | null | undefined) =>
+    recordingId != null && getVideoRecordingIdMock() === recordingId,
   resetCompletedVideoRecordingSession: resetCompletedVideoRecordingSessionMock,
 }));
 vi.mock('../../../recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
   restoreCurrentRecordingFromLease: restoreCurrentRecordingFromLeaseMock,
+}));
+vi.mock('../../camera-recorder-control', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../camera-recorder-control')>()),
+  clearCameraRecorderControlGrant: clearCameraRecorderControlGrantMock,
 }));
 vi.mock('../../../capture-surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../capture-surface')>()),
@@ -51,8 +59,7 @@ function createSendResponse() {
 }
 
 async function flushAsyncRoute() {
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 beforeEach(() => {
@@ -60,6 +67,7 @@ beforeEach(() => {
   getVideoRecordingIdMock.mockReturnValue('rec-1');
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
   releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
+  clearCameraRecorderControlGrantMock.mockResolvedValue(true);
 });
 
 it('clears completed session state for current stop-phase offscreen errors', async () => {
@@ -81,5 +89,6 @@ it('clears completed session state for current stop-phase offscreen errors', asy
   expect(resetRecordingTabIdMock).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
   expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('rec-1');
+  expect(clearCameraRecorderControlGrantMock).toHaveBeenCalledWith('rec-1');
   expect(sendResponse).toHaveBeenLastCalledWith({ success: true, result: 'accepted' });
 });

@@ -25,7 +25,7 @@ export async function acquireDesktopStream(
         mandatory: {
           chromeMediaSource: 'desktop',
           chromeMediaSourceId: options.desktopStreamId,
-          maxFrameRate: 30,
+          maxFrameRate: 60,
         },
       } as MediaTrackConstraints,
     });
@@ -33,7 +33,7 @@ export async function acquireDesktopStream(
 
   return navigator.mediaDevices.getDisplayMedia({
     video: {
-      frameRate: { ideal: 30 },
+      frameRate: { ideal: 60 },
       ...(options.controlledCursorCaptureEnabled ? { cursor: 'never' as const } : {}),
     },
     audio: false,

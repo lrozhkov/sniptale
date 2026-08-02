@@ -4,6 +4,7 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { ViewportPreset } from '../../../../contracts/settings';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 export function createSelectedPreset(): ViewportPreset {
   return {
@@ -39,13 +40,13 @@ export function createActiveTabCapabilities() {
 
 export function createBodySettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 2,
     countdownSeconds: 3,
     diagnosticsEnabled: true,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,
-    openEditorAfterRecording: true,
-    quality: VideoQuality.MEDIUM,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
     systemAudioEnabled: true,
   };
 }
@@ -58,6 +59,7 @@ export function createBodyViewModel(selectedPreset: ReturnType<typeof createSele
     currentModeCapability: { supported: true, reason: null },
     diagnosticsDisabled: false,
     galleryTitle: 'Gallery title',
+    knownOutputBasisDimensions: { height: selectedPreset.height, width: selectedPreset.width },
     selectedPreset,
     startButtonLabel: 'Start recording',
     startDisabledReason: null,

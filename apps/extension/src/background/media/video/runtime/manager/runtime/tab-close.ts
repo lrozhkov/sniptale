@@ -2,10 +2,8 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { getVideoRecordingId, getVideoRecordingTabId } from '../../../session-state';
 import {
   markVideoCaptureSurfaceTabClosed,
-  releaseVideoCaptureSurface,
   waitForVideoCaptureSurfaceRecovery,
 } from '../../../capture-surface';
-import { clearActiveVideoRecordingLease } from '../../../recording-control-lease';
 import { stopRecording } from '../controls.stop';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntime' });
@@ -17,7 +15,7 @@ export async function handleTabClose(tabId: number): Promise<void> {
   if (!recordingId) return;
   logger.log('Recording tab closed, stopping recording');
   markVideoCaptureSurfaceTabClosed(recordingId, tabId);
-  const result = await stopRecording(true);
+  const result = await stopRecording(false);
   if (result.result !== 'accepted') {
     throw new Error(
       result.result === 'failed'
@@ -25,6 +23,4 @@ export async function handleTabClose(tabId: number): Promise<void> {
         : `Recording stop was not accepted: ${result.result}`
     );
   }
-  await releaseVideoCaptureSurface(recordingId);
-  await clearActiveVideoRecordingLease(recordingId);
 }

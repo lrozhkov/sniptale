@@ -30,9 +30,8 @@ vi.mock('../../../diagnostics/public/event-sink', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../diagnostics/public/event-sink')>()),
   appendContentDiagnosticEvent: appendContentDiagnosticEventMock,
 }));
-vi.mock('./handlers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./handlers')>()),
-  createUnhandledRouteResult: createUnhandledRouteResultMock,
+vi.mock('./handlers/state/recording-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./handlers/state/recording-state')>()),
   handleOffscreenRecordingPaused: handleOffscreenRecordingPausedMock,
   handleOffscreenRecordingResumed: handleOffscreenRecordingResumedMock,
   handleOffscreenRecordingStarted: handleOffscreenRecordingStartedMock,
@@ -46,6 +45,7 @@ vi.mock('./handlers/export/project-export', async (importOriginal) => ({
 }));
 vi.mock('./handlers/state/offscreen-lifecycle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./handlers/state/offscreen-lifecycle')>()),
+  createUnhandledRouteResult: createUnhandledRouteResultMock,
   handleInternalVideoSignal: handleInternalVideoSignalMock,
 }));
 vi.mock('./sender-policy', async (importOriginal) => ({
@@ -82,9 +82,11 @@ const flushPromises = async () => {
 const exportSettings: VideoProjectExportSettings = {
   downloadAfterExport: true,
   format: VideoExportFormat.MP4,
+  resolution: 'SOURCE' as const,
+  mp4VideoCodec: 'AVC' as const,
   fps: 30,
   height: 720,
-  quality: VideoExportQualityPreset.BALANCED,
+  quality: VideoExportQualityPreset.MEDIUM,
   width: 1280,
 };
 const videoProject: VideoProject = {

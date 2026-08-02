@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   qualityCardMock: vi.fn(),
-  translateMock: vi.fn((key: string) => key),
+  translateMock: vi.fn((key: string) =>
+    key === 'popup.video.countdownFewOption' || key === 'popup.video.countdownManyOption'
+      ? `${key}:{count}`
+      : key
+  ),
 }));
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
@@ -73,9 +77,9 @@ describe('popup video settings grid', () => {
       />
     );
 
-    expect(container?.textContent).toContain('popup.video.countdownDelayedValue');
+    expect(container?.textContent).toContain('popup.video.countdownFewOption:3');
     clickButtonContaining('popup.video.countdownLabel');
-    clickButtonContaining('popup.video.countdownFewOption');
+    clickButtonContaining('popup.video.countdownFewOption:2');
 
     expect(mocks.qualityCardMock).toHaveBeenCalled();
     expect(onSettingsChange).toHaveBeenCalledWith({ countdownSeconds: 2 });
@@ -97,7 +101,7 @@ describe('popup video settings grid', () => {
     expect(onChange).toHaveBeenCalledWith(1);
   });
 
-  it('renders immediate countdown copy for a zero second start', () => {
+  it('renders the off option for a zero second countdown', () => {
     render(
       <VideoSettingsGrid
         settings={{ ...DEFAULT_VIDEO_SETTINGS, countdownSeconds: 0 }}
@@ -105,7 +109,7 @@ describe('popup video settings grid', () => {
       />
     );
 
-    expect(container?.textContent).toContain('popup.video.countdownImmediateValue');
+    expect(container?.textContent).toContain('popup.video.countdownZeroOption');
   });
 
   it('shows source count controls only for screen capture', () => {

@@ -94,7 +94,6 @@ function createVideoSettings() {
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
-    openEditorAfterRecording: true,
     quality: 'HIGH',
     systemAudioEnabled: true,
   };

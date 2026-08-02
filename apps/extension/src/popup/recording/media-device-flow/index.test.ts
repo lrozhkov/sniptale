@@ -6,6 +6,7 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { refreshPopupMediaDevices, togglePopupMediaDevice } from '.';
 import type { PopupMediaDeviceOption } from '../media-devices';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 type Deferred<TValue> = {
   promise: Promise<TValue>;
@@ -30,13 +31,13 @@ function createDevice(deviceId: string): PopupMediaDeviceOption {
 
 function createSettings(): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 3,
     countdownSeconds: 0,
     diagnosticsEnabled: false,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: false,
-    openEditorAfterRecording: false,
-    quality: VideoQuality.HIGH,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: true,
     webcamDeviceId: 'cam-1',
     webcamEnabled: false,

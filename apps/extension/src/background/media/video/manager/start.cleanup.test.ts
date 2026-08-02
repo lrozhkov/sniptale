@@ -15,7 +15,7 @@ const {
   sendRuntimeMessageMock,
   resetVideoRecordingRuntimeStateMock,
   resetVideoRecordingStartSessionMock,
-  setOpenEditorAfterRecordingMock,
+  readStoredVideoPostRecordResultMock,
   setVideoRecordingIdMock,
 } = vi.hoisted(() => ({
   beginVideoRecordingPreparationMock: vi.fn(),
@@ -31,7 +31,7 @@ const {
   sendRuntimeMessageMock: vi.fn(),
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   resetVideoRecordingStartSessionMock: vi.fn(),
-  setOpenEditorAfterRecordingMock: vi.fn(),
+  readStoredVideoPostRecordResultMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
 }));
 
@@ -52,7 +52,6 @@ vi.mock('../session-state', async (importOriginal) => ({
   hasActiveVideoRecordingSession: hasActiveVideoRecordingSessionMock,
   isVideoRecordingPreparationInProgress: isVideoRecordingPreparationInProgressMock,
   resetVideoRecordingStartSession: resetVideoRecordingStartSessionMock,
-  setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
 vi.mock('../runtime/session-state', async (importOriginal) => ({
@@ -77,6 +76,10 @@ vi.mock('../recording-control-lease', async (importOriginal) => ({
   activateVideoRecordingLease: vi.fn().mockResolvedValue({ controlToken: 'control-token-1' }),
   issuePreparedVideoRecordingLease: issuePreparedVideoRecordingLeaseMock,
 }));
+vi.mock('../../../storage/video/post-record-result', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../storage/video/post-record-result')>()),
+  readStoredVideoPostRecordResult: readStoredVideoPostRecordResultMock,
+}));
 import {
   CaptureMode,
   VideoQuality,
@@ -84,18 +87,19 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { startRecording } from './start';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 
 const multiSourceSettings: VideoRecordingSettings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 1500,
   controlledCursorCaptureEnabled: true,
   countdownSeconds: 0,
   diagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
-  openEditorAfterRecording: false,
-  quality: VideoQuality.HIGH,
+  outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
   sourceCount: 3,
   systemAudioEnabled: true,
 };
@@ -125,6 +129,7 @@ beforeEach(() => {
     recordingId: 'recording-1',
   });
   runCountdownMock.mockResolvedValue(true);
+  readStoredVideoPostRecordResultMock.mockResolvedValue(null);
   sendRuntimeMessageMock.mockImplementation((message: { type?: string }) =>
     message.type === VideoMessageType.OFFSCREEN_STOP_RECORDING
       ? Promise.resolve({ success: true, result: 'accepted' })
@@ -181,7 +186,6 @@ it('disposes prepared multi-source streams and resets state when start is cancel
   );
   expect(finalizeRecordingStartMock).toHaveBeenCalledOnce();
   expect(setVideoRecordingIdMock).toHaveBeenLastCalledWith(null);
-  expect(setOpenEditorAfterRecordingMock).toHaveBeenLastCalledWith(false);
   expect(resetVideoRecordingStartSessionMock).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
   expect(notifyRecordingStartFailedMock).not.toHaveBeenCalled();

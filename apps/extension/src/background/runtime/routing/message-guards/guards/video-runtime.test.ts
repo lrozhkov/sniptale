@@ -5,6 +5,9 @@ import { isVideoRuntimeMessage } from './video-runtime';
 describe('video-runtime runtime-message guards', () => {
   it('recognizes supported video runtime messages', () => {
     expect(isVideoRuntimeMessage({ type: VideoMessageType.GET_RECORDING_STATE })).toBe(true);
+    expect(isVideoRuntimeMessage({ type: VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT })).toBe(
+      true
+    );
     expect(isVideoRuntimeMessage({ type: VideoMessageType.GET_PROJECT_EXPORT_CAPABILITIES })).toBe(
       true
     );

@@ -106,6 +106,7 @@ function getKnownRuntimeResponse(message: unknown) {
     message.type === 'GET_RECORDING_STATE'
   ) {
     return {
+      recordingHealth: 'healthy',
       success: true,
       state: {
         status: 'IDLE',
@@ -113,7 +114,7 @@ function getKnownRuntimeResponse(message: unknown) {
         countdownEndsAt: null,
         captureMode: null,
         captureSource: null,
-        viewportPreset: null,
+        viewportPresetId: null,
         error: null,
       },
     };

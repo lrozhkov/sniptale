@@ -75,6 +75,10 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Пресет размера записи',
     en: 'Recording size preset',
   },
+  manageSizePresets: {
+    ru: 'Управление пресетами размеров…',
+    en: 'Manage presets…',
+  },
   choosePresetError: {
     ru: 'Сначала выберите пресет',
     en: 'Select a preset first',
@@ -96,14 +100,6 @@ export const popupVideoMessages = defineMessageSource({
   systemAudioDisabledDescription: {
     ru: 'Недоступно для режима Экран',
     en: 'Unavailable in Screen mode',
-  },
-  openEditorLabel: {
-    ru: 'Открыть редактор',
-    en: 'Open editor',
-  },
-  openEditorDescription: {
-    ru: 'Открывать после записи',
-    en: 'Open after recording',
   },
   controlledCursorLabel: {
     ru: 'История действий',
@@ -149,9 +145,77 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Качество видео',
     en: 'Video quality',
   },
+  profileCompact: {
+    ru: 'Экономное',
+    en: 'Compact',
+  },
+  profileOptimal: {
+    ru: 'Оптимальное',
+    en: 'Optimal',
+  },
+  profileHigh: {
+    ru: 'Высокое',
+    en: 'High',
+  },
+  profileMaximum: {
+    ru: 'Максимальное',
+    en: 'Maximum',
+  },
+  profileCustom: {
+    ru: 'Свои параметры',
+    en: 'Custom settings',
+  },
+  manageQualityProfiles: {
+    ru: 'Управление профилями…',
+    en: 'Manage profiles…',
+  },
+  outputLabel: {
+    ru: 'Формат',
+    en: 'Output',
+  },
+  outputAria: {
+    ru: 'Формат итогового видео',
+    en: 'Video output format',
+  },
+  outputSettingsAction: {
+    ru: 'Настроить',
+    en: 'Settings',
+  },
+  outputSettingsActionAria: {
+    ru: 'Настроить кодек и разрешение',
+    en: 'Configure codec and resolution',
+  },
+  outputSettingsTitle: {
+    ru: 'Параметры итогового видео',
+    en: 'Video output settings',
+  },
+  outputCodecLabel: {
+    ru: 'Кодек',
+    en: 'Codec',
+  },
+  outputResolutionLabel: {
+    ru: 'Разрешение',
+    en: 'Resolution',
+  },
+  outputFrameRateLabel: {
+    ru: 'Частота кадров',
+    en: 'Frame rate',
+  },
+  outputResolutionSource: {
+    ru: 'Исходное',
+    en: 'Source',
+  },
+  outputAspectNotice: {
+    ru: 'Пропорции сохраняются без растяжения и обрезки; при изменении формы окна возможны поля.',
+    en: 'Aspect ratio is preserved without stretching or cropping; window shape changes may add padding.',
+  },
+  outputResourceUnsupported: {
+    ru: 'Эта комбинация разрешения и частоты кадров слишком тяжёлая для записи выбранного размера.',
+    en: 'This resolution and frame-rate combination is too demanding for the selected recording size.',
+  },
   countdownLabel: {
-    ru: 'Старт',
-    en: 'Start',
+    ru: 'Отсчёт',
+    en: 'Countdown',
   },
   autoHideLabel: {
     ru: 'Скрыть',

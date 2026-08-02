@@ -22,12 +22,11 @@ export function getProductSelectTriggerClassName(args: {
 export function getProductSelectMenuClassName(args: {
   controlSize: 'sm' | 'md';
   menuClassName: string;
-  menuPosition: 'bottom' | 'top';
 }) {
   return joinClassNames(
     'sniptale-select-menu',
+    'sniptale-select-menu-portal',
     args.controlSize === 'sm' && 'sniptale-select-menu-sm',
-    args.menuPosition === 'top' && 'sniptale-select-menu-top',
     args.menuClassName
   );
 }

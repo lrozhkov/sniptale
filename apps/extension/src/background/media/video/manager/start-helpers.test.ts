@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { FakeRuntimeMessagingTransport } from '../../../../platform/runtime-messaging/fake';
 const getBackgroundRuntimeMessagingMock = vi.hoisted(() => vi.fn());
@@ -12,17 +12,17 @@ vi.mock('../../../routing-contracts/runtime-messaging/services', async (importOr
 }));
 
 import { sendOffscreenBeginRecording, sendOffscreenStartRecording } from './start-helpers';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const settings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   microphoneEnabled: false,
   microphoneDeviceId: null,
   webcamEnabled: false,
   webcamDeviceId: null,
   systemAudioEnabled: true,
-  quality: VideoQuality.HIGH,
   countdownSeconds: 3,
   autoFadeDelay: 3,
-  openEditorAfterRecording: false,
   diagnosticsEnabled: false,
 };
 

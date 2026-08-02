@@ -197,7 +197,7 @@ async function verifiesControlledCursorDesktopConstraints() {
     audio: false,
     video: {
       cursor: 'never',
-      frameRate: { ideal: 30 },
+      frameRate: { ideal: 60 },
     },
   });
 }

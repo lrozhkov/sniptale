@@ -67,14 +67,12 @@ it('requires a complete recording source binding for pause and resume', () => {
       streamInstanceId: 'stream-instance-1',
     };
 
-    expect(() => contract.parseRequest(unbound)).toThrow(new RegExp(type));
+    expect(() => contract.parseRequest(unbound)).toThrow(type);
     expect(contract.parseRequest(bound)).toEqual(bound);
-    expect(() => contract.parseRequest({ ...unbound, recordingId: 'recording-1' })).toThrow(
-      new RegExp(type)
-    );
+    expect(() => contract.parseRequest({ ...unbound, recordingId: 'recording-1' })).toThrow(type);
     expect(() =>
       contract.parseRequest({ ...unbound, generation: 2, streamInstanceId: 'stream-instance-1' })
-    ).toThrow(new RegExp(type));
+    ).toThrow(type);
   }
 });
 

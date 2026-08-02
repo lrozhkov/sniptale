@@ -11,6 +11,7 @@ import {
 import type {
   VideoExportCapabilities,
   VideoProjectExportSettings,
+  VideoProjectExportSettingsPatch,
 } from '../../../features/video/project/types';
 import { getProjectExportCapabilities } from '../../project/operations/ops';
 
@@ -29,16 +30,45 @@ function createFallbackExportCapabilities(): VideoExportCapabilities {
   });
 }
 
+function createEncoderInputFingerprint(settings: VideoProjectExportSettings): string {
+  return JSON.stringify([
+    settings.resolution,
+    settings.width,
+    settings.height,
+    settings.fps,
+    settings.quality,
+  ]);
+}
+
 function buildSettingsPatch(
   currentSettings: VideoProjectExportSettings,
   nextSettings: VideoProjectExportSettings
-): Partial<VideoProjectExportSettings> | null {
-  const changedEntries = (Object.keys(nextSettings) as (keyof VideoProjectExportSettings)[])
-    .filter((key) => currentSettings[key] !== nextSettings[key])
-    .map((key) => [key, nextSettings[key]]);
+): VideoProjectExportSettingsPatch | null {
+  const keys: Array<keyof VideoProjectExportSettingsPatch> = [
+    'width',
+    'height',
+    'fps',
+    'quality',
+    'format',
+    'mp4VideoCodec',
+    'webmVideoCodec',
+    'resolution',
+    'scope',
+    'selectedClipIds',
+    'burnInSubtitles',
+    'subtitleSidecarFormats',
+    'downloadAfterExport',
+    'rangeStartSeconds',
+    'rangeEndSeconds',
+  ];
+  const current = currentSettings as unknown as Record<string, unknown>;
+  const next = nextSettings as unknown as Record<string, unknown>;
+  const changedEntries = keys
+    .filter((key) => current[key] !== next[key])
+    .map((key) => [key, next[key]]);
 
   return changedEntries.length > 0
-    ? (Object.fromEntries(changedEntries) as Partial<VideoProjectExportSettings>)
+    ? (Object.fromEntries(changedEntries) as VideoProjectExportSettingsPatch)
     : null;
 }
 
@@ -50,7 +80,7 @@ interface CapabilityResolutionStateSetters {
 
 interface CapabilityResolutionActions {
   currentSettings: VideoProjectExportSettings;
-  onChange: (patch: Partial<VideoProjectExportSettings>) => void;
+  onChange: (patch: VideoProjectExportSettingsPatch) => void;
 }
 
 type CapabilityResolutionArgs = CapabilityResolutionActions &
@@ -113,19 +143,26 @@ function handleCapabilityFailure(
 }
 
 function runCapabilityResolution(
-  args: CapabilityResolutionActions &
-    CapabilityResolutionStateSetters & {
-      activeRef: { current: boolean };
-    }
+  args: CapabilityResolutionStateSetters & {
+    activeRef: { current: boolean };
+    committedFingerprintRef: { current: string };
+    onChange: CapabilityResolutionActions['onChange'];
+    requestedFingerprint: string;
+    settingsRef: { current: VideoProjectExportSettings };
+  }
 ) {
-  void getProjectExportCapabilities(args.currentSettings)
+  const requestedSettings = args.settingsRef.current;
+  void getProjectExportCapabilities(requestedSettings)
     .then((response) => {
-      if (!args.activeRef.current) {
+      if (
+        !args.activeRef.current ||
+        args.committedFingerprintRef.current !== args.requestedFingerprint
+      ) {
         return;
       }
 
       handleCapabilitySuccess({
-        currentSettings: args.currentSettings,
+        currentSettings: args.settingsRef.current,
         onChange: args.onChange,
         response,
         setCapabilities: args.setCapabilities,
@@ -134,12 +171,15 @@ function runCapabilityResolution(
       });
     })
     .catch((error: unknown) => {
-      if (!args.activeRef.current) {
+      if (
+        !args.activeRef.current ||
+        args.committedFingerprintRef.current !== args.requestedFingerprint
+      ) {
         return;
       }
 
       handleCapabilityFailure({
-        currentSettings: args.currentSettings,
+        currentSettings: args.settingsRef.current,
         error,
         onChange: args.onChange,
         setCapabilities: args.setCapabilities,
@@ -150,7 +190,7 @@ function runCapabilityResolution(
 }
 
 export function useExportDialogCapabilities(args: {
-  onChange: (patch: Partial<VideoProjectExportSettings>) => void;
+  onChange: (patch: VideoProjectExportSettingsPatch) => void;
   settings: VideoProjectExportSettings;
 }) {
   const { onChange, settings } = args;
@@ -158,10 +198,13 @@ export function useExportDialogCapabilities(args: {
   const [capabilitiesPending, setCapabilitiesPending] = React.useState(true);
   const [capabilityError, setCapabilityError] = React.useState<string | null>(null);
   const settingsRef = React.useRef(settings);
+  const encoderInputFingerprint = createEncoderInputFingerprint(settings);
+  const committedFingerprintRef = React.useRef(encoderInputFingerprint);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     settingsRef.current = settings;
-  }, [settings]);
+    committedFingerprintRef.current = encoderInputFingerprint;
+  }, [encoderInputFingerprint, settings]);
 
   React.useEffect(() => {
     const activeRef = { current: true };
@@ -170,8 +213,10 @@ export function useExportDialogCapabilities(args: {
     setCapabilityError(null);
     runCapabilityResolution({
       activeRef,
-      currentSettings: settingsRef.current,
+      committedFingerprintRef,
       onChange,
+      requestedFingerprint: encoderInputFingerprint,
+      settingsRef,
       setCapabilities,
       setCapabilitiesPending,
       setCapabilityError,
@@ -180,7 +225,7 @@ export function useExportDialogCapabilities(args: {
     return () => {
       activeRef.current = false;
     };
-  }, [onChange]);
+  }, [encoderInputFingerprint, onChange]);
 
   return { capabilities, capabilitiesPending, capabilityError };
 }

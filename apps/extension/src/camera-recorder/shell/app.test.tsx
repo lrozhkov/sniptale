@@ -4,21 +4,13 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { getRecordingMock, runtimeInfoGetUrlMock, sendRuntimeMessageMock, subscribeToMessagesMock } =
-  vi.hoisted(() => ({
-    getRecordingMock: vi.fn(),
+const { runtimeInfoGetUrlMock, sendRuntimeMessageMock, subscribeToMessagesMock } = vi.hoisted(
+  () => ({
     runtimeInfoGetUrlMock: vi.fn(),
     sendRuntimeMessageMock: vi.fn(),
     subscribeToMessagesMock: vi.fn(),
-  }));
-
-vi.mock('../../composition/persistence/recordings/index', () => ({
-  cleanupOldRecordings: vi.fn(),
-  deleteRecording: vi.fn(),
-  getRecording: getRecordingMock,
-  listRecordings: vi.fn(),
-  saveRecording: vi.fn(),
-}));
+  })
+);
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
@@ -43,7 +35,7 @@ import { CameraRecorderApp } from './app';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function createRecordingState(status = VideoRecordingStatus.RECORDING) {
+function createRecordingState(status: VideoRecordingStatus = VideoRecordingStatus.RECORDING) {
   return {
     captureMode: 'CAMERA',
     captureSource: { mode: 'CAMERA', streamId: 'camera' },
@@ -84,6 +76,15 @@ async function renderApp() {
   });
 }
 
+function unmountApp() {
+  act(() => {
+    root?.unmount();
+  });
+  root = null;
+  container?.remove();
+  container = null;
+}
+
 function createMessaging(): RuntimeMessagingTransport {
   return {
     sendRuntimeMessage: sendRuntimeMessageMock,
@@ -91,18 +92,12 @@ function createMessaging(): RuntimeMessagingTransport {
   };
 }
 
-function createSavedRecording(id: string) {
-  return {
-    blob: new Blob([id], { type: 'video/webm' }),
-    createdAt: 1,
-    filename: `${id}.webm`,
-    id,
-    size: 12,
-  };
-}
-
-function createOffscreenSender(): chrome.runtime.MessageSender {
-  return { url: 'chrome-extension://test/apps/extension/src/offscreen/offscreen.html' };
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
 }
 
 function installRecordingMessageListener() {
@@ -112,9 +107,12 @@ function installRecordingMessageListener() {
     return () => undefined;
   });
   return {
-    emitSaved: async (recordingId: string, sender = createOffscreenSender()) => {
+    emitState: async (status: VideoRecordingStatus) => {
       await act(async () => {
-        listener?.({ type: VideoMessageType.VIDEO_SAVED_TO_IDB, recordingId }, sender);
+        listener?.({
+          type: VideoMessageType.RECORDING_STATE_SYNC,
+          state: createRecordingState(status),
+        });
         await Promise.resolve();
       });
     },
@@ -127,16 +125,18 @@ function mockRegisteredRecordingState() {
       success: true,
       controlToken: 'control-token-1',
       recordingId: 'rec-1',
+      result: 'active',
     })
     .mockResolvedValueOnce({
       success: true,
+      controlToken: 'control-token-1',
+      recordingId: 'rec-1',
       state: createRecordingState(),
     });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getRecordingMock.mockResolvedValue(createSavedRecording('rec-1'));
   runtimeInfoGetUrlMock.mockImplementation((path: string) => `chrome-extension://test/${path}`);
   subscribeToMessagesMock.mockReturnValue(() => undefined);
   Object.defineProperty(navigator, 'mediaDevices', {
@@ -152,12 +152,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
-  root = null;
-  container?.remove();
-  container = null;
+  unmountApp();
+  window.sessionStorage.clear();
 });
 
 it('surfaces camera recorder registration failures', async () => {
@@ -171,9 +167,17 @@ it('surfaces camera recorder registration failures', async () => {
   expect(container?.textContent).toContain('Recording control lease is unavailable');
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
     type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
-    cameraLaunchToken: 'launch-1',
+    cameraRegistrationToken: 'launch-1',
     recordingId: 'rec-1',
   });
+});
+
+it('does not retain the recording identity or registration token in page storage', async () => {
+  mockRegisteredRecordingState();
+
+  await renderApp();
+
+  expect(window.sessionStorage.length).toBe(0);
 });
 
 it('surfaces rejected camera recorder control responses', async () => {
@@ -182,9 +186,12 @@ it('surfaces rejected camera recorder control responses', async () => {
       success: true,
       controlToken: 'control-token-1',
       recordingId: 'rec-1',
+      result: 'active',
     })
     .mockResolvedValueOnce({
       success: true,
+      controlToken: 'control-token-1',
+      recordingId: 'rec-1',
       state: createRecordingState(),
     })
     .mockResolvedValueOnce({
@@ -240,25 +247,198 @@ it('keeps camera recording details compactly below the video preview', async () 
   expect(container?.textContent).toContain('00:07');
 });
 
-it('opens post-record actions from a trusted saved-recording event', async () => {
+it('restores post-record actions from the persisted result after the recording becomes idle', async () => {
   const harness = installRecordingMessageListener();
   mockRegisteredRecordingState();
+  sendRuntimeMessageMock.mockResolvedValueOnce({
+    postRecordResult: {
+      primaryRecordingId: 'rec-1',
+      projectId: null,
+      recordingId: 'rec-1',
+    },
+    state: createRecordingState(VideoRecordingStatus.IDLE),
+    success: true,
+  });
 
   await renderApp();
-  await harness.emitSaved('rec-1');
+  await harness.emitState(VideoRecordingStatus.IDLE);
 
   expect(container?.textContent).toContain('popup.video.postRecordTitle');
 });
 
-it('ignores unrelated, untrusted, or unavailable saved-recording events', async () => {
-  const harness = installRecordingMessageListener();
-  mockRegisteredRecordingState();
+it('reconnects the same camera tab without page identity and can GET then ACK the result', async () => {
+  const result = {
+    primaryRecordingId: 'rec-1',
+    projectId: null,
+    recordingId: 'rec-1',
+  };
+  sendRuntimeMessageMock
+    .mockResolvedValueOnce({
+      controlToken: 'control-token-1',
+      recordingId: 'rec-1',
+      result: 'active',
+      success: true,
+    })
+    .mockResolvedValueOnce({ success: true, state: createRecordingState() });
 
   await renderApp();
-  await harness.emitSaved('rec-2');
-  await harness.emitSaved('rec-1', { url: 'https://example.test/content.js' });
-  getRecordingMock.mockResolvedValueOnce(undefined);
-  await harness.emitSaved('rec-1');
+  expect(window.location.search).toBe('');
+  expect(window.sessionStorage.length).toBe(0);
+  unmountApp();
+
+  sendRuntimeMessageMock
+    .mockResolvedValueOnce({
+      recordingId: 'rec-1',
+      result: 'post-record-only',
+      success: true,
+    })
+    .mockResolvedValueOnce({
+      postRecordResult: result,
+      state: createRecordingState(VideoRecordingStatus.IDLE),
+      success: true,
+    })
+    .mockResolvedValueOnce({ result: 'acknowledged', success: true });
+
+  await renderApp();
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
+  });
+  expect(container?.textContent).toContain('popup.video.postRecordTitle');
+
+  const closeButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+    button.textContent?.includes('popup.video.postRecordClose')
+  );
+  vi.spyOn(window, 'close').mockImplementation(() => undefined);
+  await act(async () => {
+    closeButton?.click();
+    await Promise.resolve();
+  });
+  expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith({
+    recordingId: 'rec-1',
+    type: VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
+  });
+  expect(window.sessionStorage.length).toBe(0);
+});
+
+it('serializes post-record decisions and keeps durable authority visible when ACK fails', async () => {
+  const result = {
+    primaryRecordingId: 'rec-1',
+    projectId: null,
+    recordingId: 'rec-1',
+  };
+  const acknowledgement = createDeferred<{ error: string; success: false }>();
+  sendRuntimeMessageMock
+    .mockResolvedValueOnce({
+      recordingId: 'rec-1',
+      result: 'post-record-only',
+      success: true,
+    })
+    .mockResolvedValueOnce({
+      postRecordResult: result,
+      state: createRecordingState(VideoRecordingStatus.IDLE),
+      success: true,
+    })
+    .mockReturnValueOnce(acknowledgement.promise);
+
+  await renderApp();
+  const closeButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+    button.textContent?.includes('popup.video.postRecordClose')
+  );
+
+  await act(async () => {
+    closeButton?.click();
+    closeButton?.click();
+    await Promise.resolve();
+  });
+
+  expect(
+    sendRuntimeMessageMock.mock.calls.filter(
+      ([message]) => message.type === VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT
+    )
+  ).toHaveLength(1);
+  expect(
+    Array.from(container?.querySelectorAll('button') ?? []).every((button) => button.disabled)
+  ).toBe(true);
+
+  acknowledgement.resolve({ error: 'Session write failed', success: false });
+  await act(async () => {
+    await acknowledgement.promise;
+    await Promise.resolve();
+  });
+
+  expect(container?.textContent).toContain('popup.video.postRecordTitle');
+  expect(container?.textContent).toContain('popup.video.postRecordActionError');
+});
+
+it('does not invent post-record actions when the persisted result is unavailable', async () => {
+  const harness = installRecordingMessageListener();
+  mockRegisteredRecordingState();
+  sendRuntimeMessageMock.mockResolvedValueOnce({
+    state: createRecordingState(VideoRecordingStatus.IDLE),
+    success: true,
+  });
+
+  await renderApp();
+  await harness.emitState(VideoRecordingStatus.IDLE);
 
   expect(container?.textContent).not.toContain('popup.video.postRecordTitle');
+});
+
+it('does not restore an acknowledged result from an older in-flight refresh', async () => {
+  const harness = installRecordingMessageListener();
+  const result = {
+    primaryRecordingId: 'rec-1',
+    projectId: null,
+    recordingId: 'rec-1',
+  };
+  const delayedRefresh = createDeferred<{
+    postRecordResult: typeof result;
+    state: ReturnType<typeof createRecordingState>;
+    success: true;
+  }>();
+  const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => undefined);
+  sendRuntimeMessageMock
+    .mockResolvedValueOnce({
+      success: true,
+      controlToken: 'control-token-1',
+      recordingId: 'rec-1',
+      result: 'active',
+    })
+    .mockResolvedValueOnce({
+      postRecordResult: result,
+      state: createRecordingState(VideoRecordingStatus.IDLE),
+      success: true,
+    })
+    .mockReturnValueOnce(delayedRefresh.promise)
+    .mockResolvedValueOnce({ result: 'acknowledged', success: true });
+
+  await renderApp();
+  expect(container?.textContent).toContain('popup.video.postRecordTitle');
+
+  await harness.emitState(VideoRecordingStatus.IDLE);
+  const closeButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+    button.textContent?.includes('popup.video.postRecordClose')
+  );
+  await act(async () => {
+    closeButton?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  delayedRefresh.resolve({
+    postRecordResult: result,
+    state: createRecordingState(VideoRecordingStatus.IDLE),
+    success: true,
+  });
+  await act(async () => {
+    await delayedRefresh.promise;
+    await Promise.resolve();
+  });
+
+  expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith({
+    type: VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
+    recordingId: 'rec-1',
+  });
+  expect(container?.textContent).not.toContain('popup.video.postRecordTitle');
+  closeSpy.mockRestore();
 });

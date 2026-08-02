@@ -6,9 +6,17 @@ interface GlassSelectLayoutOptions {
   isOpen: boolean;
   containerRef: RefObject<HTMLDivElement | null>;
   menuRef: RefObject<HTMLDivElement | null>;
+  placement?: 'auto' | 'bottom';
 }
 
-function getNextMenuPosition(containerRect: DOMRect, menuHeight: number) {
+function getNextMenuPosition(
+  containerRect: DOMRect,
+  menuHeight: number,
+  placement: 'auto' | 'bottom'
+) {
+  if (placement === 'bottom') {
+    return 'bottom';
+  }
   const spaceBelow = window.innerHeight - containerRect.bottom;
   const spaceAbove = containerRect.top;
   return spaceBelow < menuHeight && spaceAbove > spaceBelow ? 'top' : 'bottom';
@@ -38,6 +46,7 @@ export function useGlassSelectLayout({
   isOpen,
   containerRef,
   menuRef,
+  placement = 'auto',
 }: GlassSelectLayoutOptions) {
   const [menuPosition, setMenuPosition] = useState<'bottom' | 'top'>('bottom');
   const [portalStyle, setPortalStyle] = useState<CSSProperties>({});
@@ -52,14 +61,16 @@ export function useGlassSelectLayout({
         position: 'fixed',
         left: containerRect.left,
         top:
-          nextPosition === 'top'
-            ? Math.max(8, containerRect.top - menuHeight - 8)
-            : Math.min(window.innerHeight - menuHeight - 8, containerRect.bottom + 8),
+          placement === 'bottom'
+            ? containerRect.bottom + 8
+            : nextPosition === 'top'
+              ? Math.max(8, containerRect.top - menuHeight - 8)
+              : Math.min(window.innerHeight - menuHeight - 8, containerRect.bottom + 8),
         width: containerRect.width,
         zIndex: 80,
       });
     },
-    [portal]
+    [placement, portal]
   );
 
   const updateMenuLayout = useCallback(() => {
@@ -69,11 +80,11 @@ export function useGlassSelectLayout({
 
     const containerRect = containerRef.current.getBoundingClientRect();
     const menuHeight = menuRef.current.offsetHeight || 200;
-    const nextPosition = getNextMenuPosition(containerRect, menuHeight);
+    const nextPosition = getNextMenuPosition(containerRect, menuHeight, placement);
 
     setMenuPosition(nextPosition);
     updatePortalStyle(containerRect, menuHeight, nextPosition);
-  }, [containerRef, menuRef, updatePortalStyle]);
+  }, [containerRef, menuRef, placement, updatePortalStyle]);
 
   useGlassSelectWindowListeners(isOpen, updateMenuLayout);
 

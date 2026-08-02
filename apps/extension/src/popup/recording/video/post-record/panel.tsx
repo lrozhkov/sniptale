@@ -1,20 +1,23 @@
 import { Download, Film, Images, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../../platform/i18n';
 import {
-  deleteSavedRecordingTracks,
+  deleteVideoPostRecordResult,
   downloadSavedRecordingTracks,
   openLatestRecordingInGallery,
   openSavedRecordingInVideoEditor,
-} from './actions';
+} from '../../../../workflows/media-hub/post-record-actions';
 
 function PostRecordActionButton({
   icon: Icon,
+  disabled,
   label,
   onClick,
   tone = 'default',
 }: {
   icon: typeof Images;
+  disabled: boolean;
   label: string;
   onClick: () => void;
   tone?: 'danger' | 'default';
@@ -22,8 +25,11 @@ function PostRecordActionButton({
   return (
     <button
       type="button"
+      disabled={disabled}
       className={[
-        'inline-flex h-9 items-center justify-center gap-2 rounded-[10px] px-3 text-xs font-semibold transition-colors',
+        'inline-flex h-9 items-center justify-center gap-2 rounded-[10px] px-3',
+        'text-xs font-semibold transition-colors',
+        'disabled:cursor-not-allowed disabled:opacity-60',
         tone === 'danger'
           ? 'text-[var(--sniptale-color-danger)] hover:bg-[var(--sniptale-color-danger-soft)]'
           : 'text-[var(--sniptale-color-text-primary)] hover:bg-[var(--sniptale-color-surface-hover)]',
@@ -38,16 +44,22 @@ function PostRecordActionButton({
 }
 
 export function VideoPostRecordPanel({
-  onClose,
-  recordingId,
+  onAcknowledge,
+  result,
 }: {
-  onClose: () => void;
-  recordingId: string;
+  onAcknowledge: () => Promise<void>;
+  result: VideoPostRecordResult;
 }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const runAction = createPostRecordActionRunner({ setActionError, setIsBusy });
-  const handleDelete = createPostRecordDeleteHandler({ onClose, recordingId, runAction });
+  const isBusyRef = useRef(false);
+  const runAction = createPostRecordActionRunner({ isBusyRef, setActionError, setIsBusy });
+  const runDecision = (action: () => Promise<void>) =>
+    runAction(async () => {
+      await action();
+      await onAcknowledge();
+    });
+  const handleDelete = createPostRecordDeleteHandler({ result, runDecision });
 
   return (
     <div
@@ -66,10 +78,9 @@ export function VideoPostRecordPanel({
       </div>
       <PostRecordActionGrid
         isBusy={isBusy}
-        onClose={onClose}
         onDelete={handleDelete}
-        recordingId={recordingId}
-        runAction={runAction}
+        result={result}
+        runDecision={runDecision}
       />
       {actionError ? (
         <div
@@ -87,50 +98,53 @@ export function VideoPostRecordPanel({
 }
 
 function createPostRecordActionRunner({
+  isBusyRef,
   setActionError,
   setIsBusy,
 }: {
+  isBusyRef: { current: boolean };
   setActionError: (error: string | null) => void;
   setIsBusy: (isBusy: boolean) => void;
 }) {
   return (action: () => Promise<void>) => {
+    if (isBusyRef.current) return;
+    isBusyRef.current = true;
     setActionError(null);
     setIsBusy(true);
     void action()
       .catch(() => setActionError(translate('popup.video.postRecordActionError')))
-      .finally(() => setIsBusy(false));
+      .finally(() => {
+        isBusyRef.current = false;
+        setIsBusy(false);
+      });
   };
 }
 
 function createPostRecordDeleteHandler(args: {
-  onClose: () => void;
-  recordingId: string;
-  runAction: (action: () => Promise<void>) => void;
+  result: VideoPostRecordResult;
+  runDecision: (action: () => Promise<void>) => void;
 }) {
   return () => {
     if (!window.confirm(translate('popup.video.postRecordDeleteConfirm'))) {
       return;
     }
 
-    args.runAction(async () => {
-      await deleteSavedRecordingTracks(args.recordingId);
-      args.onClose();
+    args.runDecision(async () => {
+      await deleteVideoPostRecordResult(args.result);
     });
   };
 }
 
 function PostRecordActionGrid({
   isBusy,
-  onClose,
   onDelete,
-  recordingId,
-  runAction,
+  result,
+  runDecision,
 }: {
   isBusy: boolean;
-  onClose: () => void;
   onDelete: () => void;
-  recordingId: string;
-  runAction: (action: () => Promise<void>) => void;
+  result: VideoPostRecordResult;
+  runDecision: (action: () => Promise<void>) => void;
 }) {
   return (
     <div
@@ -138,26 +152,31 @@ function PostRecordActionGrid({
       data-busy={isBusy}
     >
       <PostRecordActionButton
+        disabled={isBusy}
         icon={Film}
         label={translate('popup.video.postRecordOpenEditor')}
-        onClick={() => runAction(() => openSavedRecordingInVideoEditor(recordingId))}
+        onClick={() => runDecision(() => openSavedRecordingInVideoEditor(result))}
       />
       <PostRecordActionButton
+        disabled={isBusy}
         icon={Images}
         label={translate('popup.video.postRecordOpenGallery')}
-        onClick={() => runAction(() => openLatestRecordingInGallery(recordingId))}
+        onClick={() => runDecision(() => openLatestRecordingInGallery(result.primaryRecordingId))}
       />
       <PostRecordActionButton
+        disabled={isBusy}
         icon={Download}
         label={translate('popup.video.postRecordDownload')}
-        onClick={() => runAction(() => downloadSavedRecordingTracks(recordingId))}
+        onClick={() => runDecision(() => downloadSavedRecordingTracks(result.recordingId))}
       />
       <PostRecordActionButton
+        disabled={isBusy}
         icon={X}
         label={translate('popup.video.postRecordClose')}
-        onClick={onClose}
+        onClick={() => runDecision(() => Promise.resolve())}
       />
       <PostRecordActionButton
+        disabled={isBusy}
         icon={Trash2}
         label={translate('popup.video.postRecordDelete')}
         tone="danger"

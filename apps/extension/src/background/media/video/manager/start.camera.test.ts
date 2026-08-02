@@ -6,22 +6,24 @@ const {
   beginPreparedRecordingMock,
   finalizeRecordingStartMock,
   initializeRecordingContextMock,
+  issueCameraRecorderLaunchTokenMock,
   issuePreparedVideoRecordingLeaseMock,
+  readStoredVideoPostRecordResultMock,
   runCountdownMock,
   scheduleRecordingStartActivationWatchdogMock,
   sendRuntimeMessageMock,
-  setOpenEditorAfterRecordingMock,
   setVideoRecordingIdMock,
 } = vi.hoisted(() => ({
   beginVideoRecordingPreparationMock: vi.fn(),
   beginPreparedRecordingMock: vi.fn(),
   finalizeRecordingStartMock: vi.fn(),
   initializeRecordingContextMock: vi.fn(),
+  issueCameraRecorderLaunchTokenMock: vi.fn(),
   issuePreparedVideoRecordingLeaseMock: vi.fn(),
+  readStoredVideoPostRecordResultMock: vi.fn(),
   runCountdownMock: vi.fn(),
   scheduleRecordingStartActivationWatchdogMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
-  setOpenEditorAfterRecordingMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
 }));
 
@@ -33,7 +35,6 @@ vi.mock('../session-state', async (importOriginal) => ({
   beginVideoRecordingPreparation: beginVideoRecordingPreparationMock,
   hasActiveVideoRecordingSession: vi.fn(() => false),
   isVideoRecordingPreparationInProgress: vi.fn(() => false),
-  setOpenEditorAfterRecording: setOpenEditorAfterRecordingMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
 vi.mock('./flow', async (importOriginal) => ({
@@ -56,6 +57,14 @@ vi.mock('../recording-control-lease', async (importOriginal) => ({
   activateVideoRecordingLease: vi.fn().mockResolvedValue({ controlToken: 'control-token-1' }),
   issuePreparedVideoRecordingLease: issuePreparedVideoRecordingLeaseMock,
 }));
+vi.mock('../runtime/camera-recorder-control', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/camera-recorder-control')>()),
+  issueCameraRecorderLaunchToken: issueCameraRecorderLaunchTokenMock,
+}));
+vi.mock('../../../storage/video/post-record-result', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../storage/video/post-record-result')>()),
+  readStoredVideoPostRecordResult: readStoredVideoPostRecordResultMock,
+}));
 
 import {
   CaptureMode,
@@ -63,17 +72,18 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { startRecording } from './start';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const ownerSenderUrl = 'chrome-extension://test/apps/extension/src/popup/index.html';
 const defaultSettings: VideoRecordingSettings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 1500,
   controlledCursorCaptureEnabled: true,
   countdownSeconds: 3,
   diagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
-  openEditorAfterRecording: false,
-  quality: VideoQuality.HIGH,
+  outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
   systemAudioEnabled: true,
 };
 
@@ -88,6 +98,8 @@ beforeEach(() => {
     controlToken: 'control-token-1',
     recordingId: 'recording-1',
   });
+  readStoredVideoPostRecordResultMock.mockResolvedValue(null);
+  issueCameraRecorderLaunchTokenMock.mockResolvedValue('recording-1');
 });
 
 it('finalizes a camera recording with a launch token and control capability', async () => {
@@ -128,7 +140,6 @@ it('finalizes a camera recording with a launch token and control capability', as
     captureMode: CaptureMode.CAMERA,
     cropRegion: null,
     ownerSenderUrl,
-    openEditorAfterRecording: false,
     surfaceBinding: { generation: 1, streamInstanceId: 'recording-1' },
     viewportPresetId: null,
   });

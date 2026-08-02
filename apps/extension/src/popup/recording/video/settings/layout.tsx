@@ -5,6 +5,7 @@ import {
   VIDEO_SOURCE_COUNT_MAX,
   VIDEO_SOURCE_COUNT_MIN,
   type VideoRecordingSettings,
+  type VideoOutputDimensions,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { CounterCard } from './counter-card';
 import { QualityCard } from './quality-card/view';
@@ -37,31 +38,26 @@ function formatCountdownOption(value: number): string {
   return replaceCount(translate('popup.video.countdownManyOption'), value);
 }
 
-function formatCountdownSelectedValue(value: number): string {
-  if (value === 0) {
-    return translate('popup.video.countdownImmediateValue');
-  }
-
-  return translate('popup.video.countdownDelayedValue').replace(
-    '{duration}',
-    formatCountdownOption(value)
-  );
-}
-
 export function VideoSettingsGrid({
   captureMode,
+  knownOutputBasisDimensions,
   settings,
   onSettingsChange,
 }: {
   captureMode?: CaptureMode;
+  knownOutputBasisDimensions?: VideoOutputDimensions | null;
   settings: VideoRecordingSettings;
   onSettingsChange: (patch: Partial<VideoRecordingSettings>) => void;
 }) {
   const showSourceCount = captureMode === CaptureMode.SCREEN;
 
   return (
-    <div className="mt-0.5 flex flex-col">
-      <QualityCard settings={settings} onSettingsChange={onSettingsChange} />
+    <div className="flex flex-col">
+      <QualityCard
+        knownOutputBasisDimensions={knownOutputBasisDimensions ?? null}
+        settings={settings}
+        onSettingsChange={onSettingsChange}
+      />
       {showSourceCount ? (
         <CounterCard
           label={translate('popup.video.sourceCountLabel')}
@@ -81,7 +77,7 @@ export function VideoSettingsGrid({
         max={10}
         suffix={translate('popup.video.secondsSuffix')}
         formatValue={formatCountdownOption}
-        formatSelectedValue={formatCountdownSelectedValue}
+        formatSelectedValue={formatCountdownOption}
         onChange={(value) => onSettingsChange({ countdownSeconds: value })}
       />
     </div>

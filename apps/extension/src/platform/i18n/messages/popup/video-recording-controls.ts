@@ -18,8 +18,8 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
     en: 'Enable',
   },
   countdownZeroOption: {
-    ru: '0 секунд',
-    en: '0 seconds',
+    ru: 'Выкл.',
+    en: 'Off',
   },
   countdownOneOption: {
     ru: '1 секунда',
@@ -32,14 +32,6 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
   countdownManyOption: {
     ru: '{count} секунд',
     en: '{count} seconds',
-  },
-  countdownImmediateValue: {
-    ru: 'Запись начнется сразу',
-    en: 'Recording starts immediately',
-  },
-  countdownDelayedValue: {
-    ru: 'Пауза перед началом записи {duration}',
-    en: 'Pause before recording starts: {duration}',
   },
   sourceCountOne: {
     ru: '1 окно',
@@ -148,6 +140,14 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
   postRecordActionError: {
     ru: 'Не удалось выполнить действие. Попробуйте ещё раз.',
     en: 'The action failed. Try again.',
+  },
+  postRecordLoadError: {
+    ru: 'Не удалось проверить сохранённую запись. Повторите попытку.',
+    en: 'Could not check the saved recording. Try again.',
+  },
+  postRecordRetry: {
+    ru: 'Повторить',
+    en: 'Retry',
   },
   cancelContinueRecording: {
     ru: 'Продолжить запись',

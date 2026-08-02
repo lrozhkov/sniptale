@@ -12,15 +12,63 @@ import {
   isLiveVideoRecordingSettingsPatch,
   isNumber,
   isRecordingStateHealth,
+  isRecord,
   isString,
   isVideoRecordingRuntimeState,
   isVideoRecordingSettings,
 } from '../../../validators/index';
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  CaptureMode,
+  type VideoPostRecordResult,
+} from '@sniptale/runtime-contracts/video/types/types';
 
 type PartialRuntimeRegistry = Partial<
   MessageContractRegistry<RuntimeRequestByType, RuntimeResponseByType>
 >;
+
+function isVideoPostRecordResult(value: unknown): value is VideoPostRecordResult {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value['primaryRecordingId']) &&
+    (value['projectId'] === null || isNonEmptyString(value['projectId'])) &&
+    isNonEmptyString(value['recordingId'])
+  );
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return isString(value) && value.length > 0;
+}
+
+function isPostRecordAcknowledgementResult(value: unknown): value is 'acknowledged' | 'stale' {
+  return value === 'acknowledged' || value === 'stale';
+}
+
+function isCameraRegistrationResult(value: unknown): value is 'active' | 'post-record-only' {
+  return value === 'active' || value === 'post-record-only';
+}
+
+function isCameraRegistrationRequest(
+  value: unknown
+): value is RuntimeRequestByType[typeof VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL] {
+  type CameraRegistrationCandidate =
+    RuntimeRequestByType[typeof VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL];
+  const isCandidate = createMessageGuard<
+    typeof VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
+    CameraRegistrationCandidate
+  >({
+    type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
+    optional: {
+      cameraRegistrationToken: isNonEmptyString,
+      recordingId: isNonEmptyString,
+    },
+  });
+  if (!isCandidate(value)) {
+    return false;
+  }
+  const hasToken = value.cameraRegistrationToken !== undefined;
+  const hasRecordingId = value.recordingId !== undefined;
+  return hasToken === hasRecordingId;
+}
 
 function isStartRecordingRequest(
   value: unknown
@@ -142,24 +190,39 @@ export const runtimeVideoSessionMessageContracts = {
         optional: {
           recordingHealth: isRecordingStateHealth,
           controlToken: isString,
+          postRecordResult: isVideoPostRecordResult,
           recordingId: isString,
           state: isVideoRecordingRuntimeState,
         },
       })
     ),
   },
+  [VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT]: {
+    parseRequest: createGuardParser(
+      'runtime ACKNOWLEDGE_POST_RECORD_RESULT message',
+      createMessageGuard({
+        type: VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
+        required: { recordingId: isNonEmptyString },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime ACKNOWLEDGE_POST_RECORD_RESULT response',
+      createRuntimeResponseGuard({ optional: { result: isPostRecordAcknowledgementResult } })
+    ),
+  },
   [VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL]: {
     parseRequest: createGuardParser(
       'runtime REGISTER_CAMERA_RECORDER_CONTROL message',
-      createMessageGuard({
-        type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
-        required: { cameraLaunchToken: isString, recordingId: isString },
-      })
+      isCameraRegistrationRequest
     ),
     parseResponse: createGuardParser(
       'runtime REGISTER_CAMERA_RECORDER_CONTROL response',
       createRuntimeResponseGuard({
-        optional: { controlToken: isString, recordingId: isString },
+        optional: {
+          controlToken: isString,
+          recordingId: isString,
+          result: isCameraRegistrationResult,
+        },
       })
     ),
   },

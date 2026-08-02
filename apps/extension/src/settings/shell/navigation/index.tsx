@@ -10,6 +10,7 @@ import {
   Sparkles,
   SunMoon,
   Zap,
+  Video,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { TranslationKey } from '../../../platform/i18n';
@@ -24,6 +25,7 @@ export type SettingsTab =
   | 'permissions'
   | 'privacy'
   | 'image'
+  | 'video'
   | 'quickactions'
   | 'nativeApp'
   | 'highlighter';
@@ -42,6 +44,7 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
   { id: 'highlighter', label: 'settings.navigation.highlighter', icon: PenTool },
   { id: 'editor', label: 'settings.navigation.editor', icon: Image },
   { id: 'image', label: 'settings.navigation.image', icon: Image },
+  { id: 'video', label: 'settings.navigation.video', icon: Video },
   { id: 'quickactions', label: 'settings.navigation.quickactions', icon: Zap },
   { id: 'nativeApp', label: 'settings.navigation.nativeApp', icon: MonitorCog },
   { id: 'templates', label: 'settings.navigation.templates', icon: MessageSquare },
@@ -49,10 +52,10 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
   { id: 'privacy', label: 'settings.navigation.privacy', icon: Shield },
 ] as const;
 
-export function isSettingsTabVisible(tab: SettingsTab): boolean {
+export function isSettingsTabVisible(tab: unknown): tab is SettingsTab {
   return SETTINGS_NAV_ITEMS.some((item) => item.id === tab);
 }
 
-export function normalizeSettingsTab(tab: SettingsTab): SettingsTab {
+export function normalizeSettingsTab(tab: unknown): SettingsTab {
   return isSettingsTabVisible(tab) ? tab : 'appearance';
 }

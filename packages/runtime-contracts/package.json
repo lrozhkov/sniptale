@@ -25,7 +25,6 @@
     "./messaging/message-types": "./src/messaging/message-types/index.ts",
     "./messaging/page-access": "./src/messaging/page-access.ts",
     "./messaging/parsers/utils": "./src/messaging/parsers/utils.ts",
-    "./messaging/recording-download": "./src/messaging/recording-download.ts",
     "./native-app/constants": "./src/native-app/constants.ts",
     "./native-app/handshake-message-types": "./src/native-app/handshake-message-types.ts",
     "./native-app/platform-types": "./src/native-app/platform-types.ts",

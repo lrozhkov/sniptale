@@ -1,6 +1,5 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { detachCachedPreview } from '../setup/desktop-media';
-import { logOffscreenDebugError } from '../../runtime-messaging/best-effort';
 import { recordingContext } from '../context';
 import { cleanupActiveSidecarRecorders } from '../sidecar';
 import { cancelRecordingBegin } from './gate';
@@ -14,6 +13,16 @@ export function cleanupResources(): void {
   detachCachedPreview();
   cleanupActiveSidecarRecorders();
 
+  const artifactSession = recordingContext.artifactSession;
+  const stagingCoordinator = recordingContext.stagingCoordinator;
+  void (artifactSession?.abort() ?? stagingCoordinator?.abort() ?? Promise.resolve()).catch(
+    (error) => {
+      logger.warn('Recording staging cleanup failed', error);
+    }
+  );
+
+  recordingContext.mediaRecorder = null;
+
   if (recordingContext.audioMixer) {
     recordingContext.audioMixer.cleanup().catch((error) => {
       logger.warn('Audio mixer cleanup failed', error);
@@ -21,31 +30,13 @@ export function cleanupResources(): void {
     recordingContext.audioMixer = null;
   }
 
-  if (recordingContext.sourceStream) {
-    const sourceTrackCount = recordingContext.sourceStream.getTracks().length;
-    recordingContext.sourceStream.getTracks().forEach((track) => {
-      track.stop();
-    });
-    logger.debug('Stopped source stream tracks', { count: sourceTrackCount });
-    recordingContext.sourceStream = null;
-  }
+  const ownedTracks = new Set<MediaStreamTrack>();
+  recordingContext.sourceStream?.getTracks().forEach((track) => ownedTracks.add(track));
+  recordingContext.videoStream?.getTracks().forEach((track) => ownedTracks.add(track));
+  recordingContext.sourceStream = null;
+  recordingContext.videoStream = null;
+  ownedTracks.forEach((track) => track.stop());
+  logger.debug('Stopped recording session tracks', { count: ownedTracks.size });
 
-  if (recordingContext.videoStream) {
-    const videoTrackCount = recordingContext.videoStream.getTracks().length;
-    recordingContext.videoStream.getTracks().forEach((track) => {
-      track.stop();
-    });
-    logger.debug('Stopped recording stream tracks', { count: videoTrackCount });
-    recordingContext.videoStream = null;
-  }
-
-  if (recordingContext.mediaRecorder && recordingContext.mediaRecorder.state !== 'inactive') {
-    try {
-      recordingContext.mediaRecorder.stop();
-    } catch (error) {
-      logOffscreenDebugError(logger, 'Failed to stop MediaRecorder during cleanup', error);
-    }
-  }
-  recordingContext.mediaRecorder = null;
   recordingContext.resetRecordingSession();
 }

@@ -1,39 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
-import {
-  logIframeContentScriptLoad,
-  logRegionCaptureApiSupport,
-  logTopLevelContentScriptLoad,
-} from './diagnostics';
+import { logIframeContentScriptLoad, logTopLevelContentScriptLoad } from './diagnostics';
 
 afterEach(() => {
   Reflect.deleteProperty(globalThis, '__SNIPTALE_TRACE_NAMESPACES__');
-});
-
-it('logs a single structured region capture support snapshot', () => {
-  const logger = { log: vi.fn() };
-  const mediaDevices = {
-    produceCropTarget: vi.fn(),
-    getUserMedia: vi.fn(),
-  } as unknown as MediaDevices;
-  const mediaStreamTrackPrototype = {
-    cropTo: vi.fn(),
-    clone: vi.fn(),
-  };
-
-  logRegionCaptureApiSupport(logger, mediaDevices, mediaStreamTrackPrototype);
-
-  expect(logger.log).toHaveBeenCalledTimes(2);
-  expect(logger.log).toHaveBeenLastCalledWith(
-    expect.stringContaining('[Sniptale] API Support Check:'),
-    expect.objectContaining({
-      hasProduceCropTarget: true,
-      hasCropTo: true,
-      cropMediaDeviceKeys: ['produceCropTarget'],
-      cropTrackMethods: ['cropTo'],
-      mediaDevicesType: 'object',
-    })
-  );
 });
 
 it('logs top-level bootstrap context without logging iframe URLs by default', () => {

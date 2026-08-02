@@ -1,3 +1,4 @@
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import {
   createEffectRuntimeDrawState,
   drawEffectRuntimeVisualLayer,
@@ -33,15 +34,40 @@ type OverlayFrame = RenderPasses['overlayFrame'];
 type VisualLayer = ReturnType<typeof mapVisualLayerToViewportSpace>;
 type DrawParams = Parameters<typeof drawVisualPasses>[0];
 
+function resolveProjectOutputTransform(
+  project: Pick<VideoProject, 'height' | 'width'>,
+  settings: Pick<VideoProjectExportSettings, 'height' | 'resolution' | 'width'>
+) {
+  const isOnePixelSourceCrop =
+    settings.resolution === VideoResolutionPreset.SOURCE &&
+    project.width >= settings.width &&
+    project.width - settings.width <= 1 &&
+    project.height >= settings.height &&
+    project.height - settings.height <= 1;
+  if (isOnePixelSourceCrop) {
+    return { offsetX: 0, offsetY: 0, scale: 1 };
+  }
+
+  const scale = Math.min(settings.width / project.width, settings.height / project.height);
+  return {
+    offsetX: (settings.width - project.width * scale) / 2,
+    offsetY: (settings.height - project.height * scale) / 2,
+    scale,
+  };
+}
+
 function beginExportCameraPass(
   context: CanvasRenderingContext2D,
   pass: VisualPass,
-  params: Pick<DrawParams, 'scaleX' | 'scaleY' | 'settings'>
+  params: Pick<DrawParams, 'offsetX' | 'offsetY' | 'scaleX' | 'scaleY' | 'settings'>
 ) {
   context.save();
   context.beginPath();
   context.rect(0, 0, params.settings.width, params.settings.height);
   context.clip();
+  if (params.offsetX !== 0 || params.offsetY !== 0) {
+    context.translate(params.offsetX, params.offsetY);
+  }
   context.scale(pass.frame.camera.scale, pass.frame.camera.scale);
   context.translate(
     -pass.frame.camera.viewportX * params.scaleX,
@@ -54,6 +80,8 @@ function drawVisualPasses(params: {
   context: CanvasRenderingContext2D;
   effectRuntimeFrames?: EffectRuntimeRenderedComposition;
   loadedImages: LoadedImagesMap;
+  offsetX: number;
+  offsetY: number;
   renderPasses: RenderPasses;
   scaleX: number;
   scaleY: number;
@@ -81,13 +109,6 @@ function drawVisualPasses(params: {
 
     drawUnlockedOverlayGroup(segment.layers, params, passEffectStates);
   }
-
-  drawExportTransitionOverlayPasses(
-    params.context,
-    params.renderPasses.visualPasses,
-    params.settings,
-    params.effectRuntimeFrames
-  );
 }
 
 function drawVisualPassLayers(
@@ -127,10 +148,17 @@ function drawLockedOverlayLayers(
   context: CanvasRenderingContext2D,
   layers: VisualLayer[],
   overlayFrame: OverlayFrame,
-  params: Pick<DrawParams, 'clipMediaElements' | 'loadedImages' | 'scaleX' | 'scaleY'>,
+  params: Pick<
+    DrawParams,
+    'clipMediaElements' | 'loadedImages' | 'offsetX' | 'offsetY' | 'scaleX' | 'scaleY'
+  >,
   effectRuntimeFrames: EffectRuntimeRenderedFrameMap | undefined,
   effectRuntimeState: EffectRuntimeDrawState
 ) {
+  context.save();
+  if (params.offsetX !== 0 || params.offsetY !== 0) {
+    context.translate(params.offsetX, params.offsetY);
+  }
   for (const layer of layers) {
     const mappedLayer = mapVisualLayerToViewportSpace(layer, overlayFrame.camera);
     if (
@@ -154,6 +182,7 @@ function drawLockedOverlayLayers(
       );
     }
   }
+  context.restore();
 }
 
 function drawUnlockedOverlayGroup(
@@ -207,8 +236,7 @@ export function drawProjectFrame(
     effectRuntimeFrames?: EffectRuntimeRenderedComposition;
   } = {}
 ): void {
-  const scaleX = settings.width / project.width;
-  const scaleY = settings.height / project.height;
+  const { offsetX, offsetY, scale } = resolveProjectOutputTransform(project, settings);
   const renderPasses = resolveVideoCompositionRenderPasses(project, currentTime, {
     includeSubtitles: settings.burnInSubtitles === true,
     ...(options.compositionIndex ? { timelineIndex: options.compositionIndex } : {}),
@@ -225,18 +253,30 @@ export function drawProjectFrame(
     project,
     width: settings.width,
   });
-
   drawVisualPasses({
     clipMediaElements,
     context,
     ...(options.effectRuntimeFrames ? { effectRuntimeFrames: options.effectRuntimeFrames } : {}),
     loadedImages,
+    offsetX,
+    offsetY,
     renderPasses,
-    scaleX,
-    scaleY,
+    scaleX: scale,
+    scaleY: scale,
     settings,
   });
-  drawExportOverlayPass(context, renderPasses.overlayFrame, scaleX, scaleY);
+  drawExportTransitionOverlayPasses(
+    context,
+    renderPasses.visualPasses,
+    settings,
+    options.effectRuntimeFrames
+  );
+  context.save();
+  if (offsetX !== 0 || offsetY !== 0) {
+    context.translate(offsetX, offsetY);
+  }
+  drawExportOverlayPass(context, renderPasses.overlayFrame, scale, scale);
+  context.restore();
 
   context.restore();
 }

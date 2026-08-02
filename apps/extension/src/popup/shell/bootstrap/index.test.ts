@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
   loadSettingsMock: vi.fn(),
   loadVideoSettingsMock: vi.fn(),
   loadVideoUiStateMock: vi.fn(),
-  resolveMicrophoneDeviceIdMock: vi.fn(),
   runtimeTransportMock: { sendRuntimeMessage: vi.fn(), sendTabMessage: vi.fn() },
   startPopupPerfSpanMock: vi.fn(),
   trackPopupPerfAsyncMock: vi.fn(),
@@ -43,7 +42,6 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 }));
 vi.mock('../../recording/microphone', (_importOriginal) => ({
   loadMicrophoneDevices: mocks.loadMicrophoneDevicesMock,
-  resolveMicrophoneDeviceId: mocks.resolveMicrophoneDeviceIdMock,
 }));
 
 vi.mock('../../diagnostics/performance', (_importOriginal) => ({
@@ -81,9 +79,6 @@ function expectHydratedBootstrapResult(result: PopupBootstrapResult) {
     knownDevices: [{ deviceId: 'mic-known', label: 'Known Mic' }],
     preferredDeviceId: 'missing-device',
   });
-  expect(mocks.resolveMicrophoneDeviceIdMock).toHaveBeenCalledWith('missing-device', [
-    { deviceId: 'mic-2', label: 'Hydrated Mic' },
-  ]);
   expect(result).toEqual({
     captureMode: CaptureMode.TAB,
     homeError: null,
@@ -102,7 +97,7 @@ function expectHydratedBootstrapResult(result: PopupBootstrapResult) {
     recordingState: createPopupBootstrapRecordingState(),
     recordingStatusError: null,
     selectedPresetId: null,
-    videoSettings: expect.objectContaining({ microphoneDeviceId: 'mic-2' }),
+    videoSettings: expect.objectContaining({ microphoneDeviceId: 'missing-device' }),
     viewportPresets: createPopupBootstrapSettings().viewportPresets,
     webcams: [],
   });
@@ -147,7 +142,7 @@ async function verifiesFailedRecordingBootstrapFallback() {
   expect(result.recordingStatusError).toBe('background.runtime.recordingUnavailable');
   expect(result.captureMode).toBe(CaptureMode.TAB);
   expect(result.selectedPresetId).toBeNull();
-  expect(result.videoSettings.microphoneDeviceId).toBe('mic-passive');
+  expect(result.videoSettings.microphoneDeviceId).toBe('missing-device');
 }
 
 beforeEach(() => {
@@ -192,9 +187,6 @@ beforeEach(() => {
   mocks.loadMicrophoneDevicesMock
     .mockResolvedValueOnce([{ deviceId: 'mic-known', label: 'Known Mic' }])
     .mockResolvedValueOnce([{ deviceId: 'mic-2', label: 'Hydrated Mic' }]);
-  mocks.resolveMicrophoneDeviceIdMock.mockImplementation(
-    (_deviceId: string | null, devices: Array<{ deviceId: string }>) => devices[0]?.deviceId ?? null
-  );
 });
 
 describe('popup-bootstrap hydration', () => {
@@ -206,7 +198,7 @@ describe('popup-bootstrap hydration', () => {
 
 describe('popup-bootstrap fallbacks', () => {
   it(
-    'falls back to idle recording state, default preset selection, and default transport',
+    'falls back to idle recording state without replacing the stored microphone preference',
     verifiesFailedRecordingBootstrapFallback
   );
 });

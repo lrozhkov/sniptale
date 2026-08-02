@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  buildClipLabel,
-  getDefaultExportSettings,
-  isSimplePassthroughProject,
-  normalizeTrackOrder,
-} from './meta';
+import { buildClipLabel, getDefaultExportSettings, normalizeTrackOrder } from './meta';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
@@ -17,7 +12,6 @@ import {
   createShapeClip,
   createTextClip,
   createTrack,
-  createTransform,
   createVideoClip,
 } from './project-meta.test.helpers.ts';
 
@@ -26,25 +20,16 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
-function createBaseSettings() {
-  return {
-    downloadAfterExport: true,
-    format: VideoExportFormat.MP4,
-    fps: 30,
-    height: 720,
-    quality: VideoExportQualityPreset.BALANCED,
-    width: 1280,
-  };
-}
-
 function expectDefaultExportSettings(project: ReturnType<typeof createProject>) {
   expect(getDefaultExportSettings(project)).toEqual({
     burnInSubtitles: false,
     downloadAfterExport: true,
     format: VideoExportFormat.MP4,
+    mp4VideoCodec: 'AVC' as const,
     fps: 30,
     height: 720,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
+    resolution: 'SOURCE',
     scope: 'project',
     subtitleSidecarFormats: [],
     width: 1280,
@@ -104,49 +89,5 @@ describe('video project meta defaults', () => {
         createVideoClip({ assetId: 'missing-asset', name: 'Visual fallback' })
       )
     ).toBe('Visual fallback');
-  });
-});
-
-describe('video project meta passthrough exact coverage', () => {
-  it('accepts passthrough projects with aligned retiming and video-only projects', () => {
-    expect(
-      isSimplePassthroughProject(
-        createProject([createVideoClip({ playbackRate: 1 }), createAudioClip({ playbackRate: 1 })]),
-        createBaseSettings()
-      )
-    ).toBe(true);
-    expect(
-      isSimplePassthroughProject(createProject([createVideoClip()]), createBaseSettings())
-    ).toBe(true);
-  });
-
-  it('rejects passthrough when clip retiming, transforms, or audio pairing drift', () => {
-    expect(
-      isSimplePassthroughProject(
-        createProject([createVideoClip({ playbackRate: 1.5 }), createAudioClip()]),
-        createBaseSettings()
-      )
-    ).toBe(false);
-    expect(
-      isSimplePassthroughProject(
-        createProject([createVideoClip(), createAudioClip({ playbackRate: 1.5 })]),
-        createBaseSettings()
-      )
-    ).toBe(false);
-    expect(
-      isSimplePassthroughProject(
-        createProject([
-          createVideoClip({ transform: { ...createTransform(), x: 12 } }),
-          createAudioClip(),
-        ]),
-        createBaseSettings()
-      )
-    ).toBe(false);
-    expect(
-      isSimplePassthroughProject(
-        createProject([createVideoClip(), createAudioClip({ muted: true })]),
-        createBaseSettings()
-      )
-    ).toBe(false);
   });
 });

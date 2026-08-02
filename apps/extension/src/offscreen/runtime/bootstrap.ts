@@ -7,6 +7,8 @@ import { initTracer } from '@sniptale/platform/observability/message-tracer';
 import { sendRuntimeMessage } from '../../platform/runtime-messaging/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { reconcileProjectExportJobs } from '../project-export';
+import { cleanupOrphanedRecordingStaging } from '../../composition/persistence/recordings/staging';
+import { reconcileRecordingCompletionOutbox } from '../recording/post-record-publication';
 
 const logger = createLogger({ namespace: 'OffscreenDocument' });
 const OFFSCREEN_STARTUP_ID_PARAM = 'offscreenStartupId';
@@ -47,7 +49,9 @@ async function initializeOffscreenDb(offscreenStartupId: string): Promise<void> 
 }
 
 async function reconcileOffscreenRuntimeState(): Promise<void> {
+  await cleanupOrphanedRecordingStaging();
   await reconcileProjectExportJobs();
+  await reconcileRecordingCompletionOutbox({ sendRuntimeMessage });
 }
 
 export function bootstrapOffscreenDocument(): void {

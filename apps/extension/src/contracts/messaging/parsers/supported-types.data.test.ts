@@ -7,10 +7,7 @@ import {
   popupRuntimeTypes,
 } from './supported-types.data.ts';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import {
-  RegionCaptureControlMessageType,
-  VideoMessageType,
-} from '@sniptale/runtime-contracts/video/messages';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 function hasBoundaryType(boundary: ReadonlySet<string>, type: string): boolean {
   return boundary.has(type);
@@ -19,11 +16,6 @@ function hasBoundaryType(boundary: ReadonlySet<string>, type: string): boolean {
 it('keeps canonical content tab control types in the content boundary', () => {
   expect(hasBoundaryType(contentTabTypes, VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER)).toBe(true);
   expect(hasBoundaryType(contentTabTypes, VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER)).toBe(true);
-  expect(hasBoundaryType(contentTabTypes, RegionCaptureControlMessageType.START)).toBe(true);
-  expect(hasBoundaryType(contentTabTypes, RegionCaptureControlMessageType.STOP)).toBe(true);
-  expect(hasBoundaryType(contentTabTypes, RegionCaptureControlMessageType.CHECK_SUPPORT)).toBe(
-    true
-  );
   expect(hasBoundaryType(contentTabTypes, MessageType.EXPORT_POPUP_BUILD_PACKAGE)).toBe(true);
 });
 
@@ -34,7 +26,7 @@ it('keeps runtime-only video sync messages out of the content tab boundary', () 
 
 it('limits popup and offscreen boundaries to their dedicated runtime contracts', () => {
   expect(hasBoundaryType(popupRuntimeTypes, VideoMessageType.RECORDING_STATE_SYNC)).toBe(true);
-  expect(hasBoundaryType(popupRuntimeTypes, VideoMessageType.VIDEO_SAVED_TO_IDB)).toBe(true);
+  expect(hasBoundaryType(popupRuntimeTypes, VideoMessageType.VIDEO_SAVED_TO_IDB)).toBe(false);
   expect(hasBoundaryType(popupRuntimeTypes, MessageType.ENABLE_SCREENSHOT_MODE)).toBe(false);
   expect(hasBoundaryType(offscreenRuntimeTypes, VideoMessageType.OFFSCREEN_START_RECORDING)).toBe(
     true

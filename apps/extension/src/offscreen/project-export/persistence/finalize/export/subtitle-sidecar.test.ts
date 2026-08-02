@@ -88,9 +88,11 @@ function createSettings(
     fps: 30,
     quality: 'HIGH',
     format: 'MP4',
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     downloadAfterExport: true,
     ...overrides,
-  } satisfies VideoProjectExportSettings;
+  } as VideoProjectExportSettings;
 
   return settings;
 }

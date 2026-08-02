@@ -17,6 +17,7 @@ const {
   handleTabRecordingNavigationCompletedFromOwner,
   handleTabRecordingNavigationErrorFromOwner,
   handleTabRecordingNavigationStartFromOwner,
+  handleTabRecordingWindowBoundsChangedFromOwner,
 } = vi.hoisted(() => ({
   finalizeRecordingDiagnosticsFromOwner: vi.fn(),
   getCurrentRecordingIdFromOwner: vi.fn(),
@@ -34,6 +35,7 @@ const {
   handleTabRecordingNavigationCompletedFromOwner: vi.fn(),
   handleTabRecordingNavigationErrorFromOwner: vi.fn(),
   handleTabRecordingNavigationStartFromOwner: vi.fn(),
+  handleTabRecordingWindowBoundsChangedFromOwner: vi.fn(),
 }));
 
 vi.mock('./runtime', () => ({
@@ -60,6 +62,7 @@ vi.mock('./tab-navigation', async (importOriginal) => ({
   handleTabRecordingNavigationCompleted: handleTabRecordingNavigationCompletedFromOwner,
   handleTabRecordingNavigationError: handleTabRecordingNavigationErrorFromOwner,
   handleTabRecordingNavigationStart: handleTabRecordingNavigationStartFromOwner,
+  handleTabRecordingWindowBoundsChanged: handleTabRecordingWindowBoundsChangedFromOwner,
 }));
 
 import {
@@ -72,6 +75,7 @@ import {
   handleTabRecordingNavigationCompleted,
   handleTabRecordingNavigationError,
   handleTabRecordingNavigationStart,
+  handleTabRecordingWindowBoundsChanged,
   isRecording,
   notifyRecordingStartFailed,
   pauseRecording,
@@ -95,6 +99,9 @@ it('re-exports the runtime facade without wrapping', () => {
   );
   expect(handleTabRecordingNavigationError).toBe(handleTabRecordingNavigationErrorFromOwner);
   expect(handleTabRecordingNavigationStart).toBe(handleTabRecordingNavigationStartFromOwner);
+  expect(handleTabRecordingWindowBoundsChanged).toBe(
+    handleTabRecordingWindowBoundsChangedFromOwner
+  );
   expect(isRecording).toBe(isRecordingFromOwner);
   expect(notifyRecordingStartFailed).toBe(notifyRecordingStartFailedFromOwner);
   expect(pauseRecording).toBe(pauseRecordingFromOwner);

@@ -1,7 +1,8 @@
 import {
   CaptureMode,
+  isVideoOutputProfile,
   normalizeVideoSourceCount,
-  VideoQuality,
+  parseVideoRecordingProfiles,
   WebcamFrameRatePreset,
   WebcamResolutionPreset,
   type VideoRecordingSettings,
@@ -29,17 +30,12 @@ interface ParsedVideoUiStateStorageValue {
 }
 
 const captureModes = new Set<VideoRecordingUiState['captureMode']>(Object.values(CaptureMode));
-const videoQualities = new Set<VideoRecordingSettings['quality']>(Object.values(VideoQuality));
 const webcamFrameRatePresets = new Set<WebcamQualitySettings['frameRate']>(
   Object.values(WebcamFrameRatePreset)
 );
 const webcamResolutionPresets = new Set<WebcamQualitySettings['resolution']>(
   Object.values(WebcamResolutionPreset)
 );
-function isVideoQuality(value: unknown): value is VideoRecordingSettings['quality'] {
-  return isString(value) && videoQualities.has(value as VideoRecordingSettings['quality']);
-}
-
 function isCaptureMode(value: unknown): value is VideoRecordingUiState['captureMode'] {
   return isString(value) && captureModes.has(value as VideoRecordingUiState['captureMode']);
 }
@@ -77,16 +73,6 @@ function parseOptionalMicrophoneGain(value: unknown): ParsedFieldValue<number> {
   return Math.max(MICROPHONE_GAIN_MIN, Math.min(MICROPHONE_GAIN_MAX, parsed));
 }
 
-function parseOptionalVideoQuality(
-  value: unknown
-): ParsedFieldValue<VideoRecordingSettings['quality']> {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  return isVideoQuality(value) ? value : INVALID_FIELD;
-}
-
 function parseOptionalWebcamQuality(
   value: unknown
 ): ParsedFieldValue<VideoRecordingSettings['webcamQuality']> {
@@ -108,6 +94,25 @@ function parseOptionalWebcamQuality(
     frameRate: value['frameRate'] as WebcamQualitySettings['frameRate'],
     resolution: value['resolution'] as WebcamQualitySettings['resolution'],
   };
+}
+
+function parseOptionalVideoOutputProfile(
+  value: unknown
+): ParsedFieldValue<VideoRecordingSettings['outputProfile']> {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return isVideoOutputProfile(value) ? value : INVALID_FIELD;
+}
+
+function parseOptionalVideoQualityProfiles(
+  value: unknown
+): ParsedFieldValue<VideoRecordingSettings['qualityProfiles']> {
+  if (value === undefined) {
+    return undefined;
+  }
+  return parseVideoRecordingProfiles(value) ?? INVALID_FIELD;
 }
 
 function assignParsedVideoSettingsField<TKey extends keyof VideoRecordingSettings>(
@@ -138,10 +143,11 @@ const VIDEO_SETTINGS_FIELD_PARSERS = [
   ['webcamQuality', parseOptionalWebcamQuality],
   ['systemAudioEnabled', parseOptionalBoolean],
   ['sourceCount', parseOptionalNumber],
-  ['quality', parseOptionalVideoQuality],
+  ['outputProfile', parseOptionalVideoOutputProfile],
+  ['qualityProfileId', parseOptionalNullableString],
+  ['qualityProfiles', parseOptionalVideoQualityProfiles],
   ['countdownSeconds', parseOptionalNumber],
   ['autoFadeDelay', parseOptionalNumber],
-  ['openEditorAfterRecording', parseOptionalBoolean],
   ['diagnosticsEnabled', parseOptionalBoolean],
   ['controlledCursorCaptureEnabled', parseOptionalBoolean],
   ['native', parseOptionalNativeSettings],
@@ -179,6 +185,16 @@ export function parseStoredVideoSettings(value: unknown): ParsedVideoSettingsSto
   }
 
   if (!isRecord(value)) {
+    return { value: {}, hasInvalidRoot: true, invalidFieldCount: 0 };
+  }
+
+  if (
+    Object.hasOwn(value, 'quality') ||
+    Object.hasOwn(value, 'output') ||
+    !Object.hasOwn(value, 'outputProfile') ||
+    !Object.hasOwn(value, 'qualityProfileId') ||
+    !Object.hasOwn(value, 'qualityProfiles')
+  ) {
     return { value: {}, hasInvalidRoot: true, invalidFieldCount: 0 };
   }
 

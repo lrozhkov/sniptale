@@ -16,24 +16,12 @@ import type { ExportJobState } from './types';
 
 const {
   finalizeExportMock,
-  getAssetByIdMock,
-  isMimeTypeCompatibleWithFormatMock,
-  isSimplePassthroughProjectMock,
-  isVideoClipMock,
-  loadBlobForAssetMock,
-  prepareOutputBlobMock,
   preloadClipVideosMock,
   renderCompositeToMp4Mock,
   renderCompositeToWebmMock,
   sendProgressMock,
 } = vi.hoisted(() => ({
   finalizeExportMock: vi.fn(),
-  getAssetByIdMock: vi.fn(),
-  isMimeTypeCompatibleWithFormatMock: vi.fn(),
-  isSimplePassthroughProjectMock: vi.fn(),
-  isVideoClipMock: vi.fn(),
-  loadBlobForAssetMock: vi.fn(),
-  prepareOutputBlobMock: vi.fn(),
   preloadClipVideosMock: vi.fn(),
   renderCompositeToMp4Mock: vi.fn(),
   renderCompositeToWebmMock: vi.fn(),
@@ -44,7 +32,6 @@ vi.mock('./media', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./media')>()),
   ClipAudioNode: undefined,
   ProjectExportMediaState: undefined,
-  loadBlobForAsset: loadBlobForAssetMock,
   loadImagesForProject: vi.fn(),
   preloadClipVideos: preloadClipVideosMock,
   setupExportAudio: vi.fn(),
@@ -52,11 +39,10 @@ vi.mock('./media', async (importOriginal) => ({
   syncVideoClipFrame: vi.fn(),
 }));
 
-vi.mock('./persistence', () => ({
+vi.mock('./persistence', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./persistence')>()),
   finalizeExport: finalizeExportMock,
   getExportFormatDescriptor: vi.fn(),
-  isMimeTypeCompatibleWithFormat: isMimeTypeCompatibleWithFormatMock,
-  prepareOutputBlob: prepareOutputBlobMock,
 }));
 
 vi.mock('./runtime', () => ({
@@ -72,17 +58,6 @@ vi.mock('./render-mp4', () => ({
 
 vi.mock('./render-webm', () => ({
   renderCompositeToWebm: renderCompositeToWebmMock,
-}));
-
-vi.mock('../../features/video/project/timeline/basics', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../features/video/project/timeline/basics')>()),
-  getAssetById: getAssetByIdMock,
-  isVideoClip: isVideoClipMock,
-}));
-
-vi.mock('../../features/video/project/timeline/meta', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../features/video/project/timeline/meta')>()),
-  isSimplePassthroughProject: isSimplePassthroughProjectMock,
 }));
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -115,9 +90,11 @@ function createSettings(): VideoProjectExportSettings {
   return {
     downloadAfterExport: true,
     format: VideoExportFormat.MP4,
+    resolution: 'SOURCE' as const,
+    mp4VideoCodec: 'AVC' as const,
     fps: 30,
     height: 720,
-    quality: VideoExportQualityPreset.BALANCED,
+    quality: VideoExportQualityPreset.MEDIUM,
     width: 1280,
   };
 }
@@ -164,57 +141,6 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
-});
-
-it('rejects passthrough cancellation before persisting or notifying completion', async () => {
-  const { exportPassthrough } = await import('./render');
-  const job = createJob();
-  const project = createProjectWithVideoClip();
-  const settings = createSettings();
-  const outputBlob = new Blob(['output'], { type: 'video/mp4' });
-
-  isVideoClipMock.mockReturnValue(true);
-  getAssetByIdMock.mockReturnValue(project.assets[0]);
-  loadBlobForAssetMock.mockResolvedValue(new Blob(['source'], { type: 'video/mp4' }));
-  prepareOutputBlobMock.mockImplementation(async () => {
-    job.cancelled = true;
-    return outputBlob;
-  });
-
-  await expect(exportPassthrough(job, project, settings)).rejects.toThrow(
-    'PROJECT_EXPORT_CANCELLED'
-  );
-
-  expect(sendProgressMock).not.toHaveBeenCalledWith(
-    'job-1',
-    VideoProjectExportPhase.SAVING,
-    expect.any(Number),
-    expect.any(String)
-  );
-  expect(finalizeExportMock).not.toHaveBeenCalled();
-});
-
-it('rejects passthrough cancellation after saving progress before finalization', async () => {
-  const { exportPassthrough } = await import('./render');
-  const job = createJob();
-  const project = createProjectWithVideoClip();
-  const settings = createSettings();
-
-  isVideoClipMock.mockReturnValue(true);
-  getAssetByIdMock.mockReturnValue(project.assets[0]);
-  loadBlobForAssetMock.mockResolvedValue(new Blob(['source'], { type: 'video/mp4' }));
-  prepareOutputBlobMock.mockResolvedValue(new Blob(['output'], { type: 'video/mp4' }));
-  sendProgressMock.mockImplementation(async (_jobId, phase) => {
-    if (phase === VideoProjectExportPhase.SAVING) {
-      job.cancelled = true;
-    }
-  });
-
-  await expect(exportPassthrough(job, project, settings)).rejects.toThrow(
-    'PROJECT_EXPORT_CANCELLED'
-  );
-
-  expect(finalizeExportMock).not.toHaveBeenCalled();
 });
 
 it('rejects composite cancellation before persisting or notifying completion', async () => {

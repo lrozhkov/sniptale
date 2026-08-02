@@ -31,9 +31,10 @@ const EXPECTED_POLICY_STATE_IDS = [
   'popup-tab-route-capabilities',
   'project-export-capabilities',
   'project-export-job-ledger',
-  'recording-download-staged-chunks',
   'tab-mode-runtime-state',
+  'video-camera-recorder-grant',
   'video-capture-surface-sessions',
+  'video-post-record-results',
   'video-recording-control-lease',
   'web-snapshot-staged-blobs',
 ] as const satisfies readonly PolicyStateId[];

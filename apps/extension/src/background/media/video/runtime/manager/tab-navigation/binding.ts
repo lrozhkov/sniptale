@@ -29,6 +29,7 @@ export function resolveNavigationBinding(tabId: number): NavigationBinding | nul
     getVideoRecordingTabId() !== tabId ||
     !isTabCaptureMode(captureMode) ||
     session?.tabId !== tabId ||
+    !session.sourceReady ||
     typeof session.streamInstanceId !== 'string'
   ) {
     return null;
@@ -49,6 +50,7 @@ export function isCurrentNavigationBinding(binding: NavigationBinding): boolean 
     getVideoRecordingTabId() === binding.tabId &&
     getVideoRecordingCaptureMode() === binding.captureMode &&
     session?.generation === binding.generation &&
+    session.sourceReady &&
     session.streamInstanceId === binding.streamInstanceId &&
     session.tabId === binding.tabId
   );

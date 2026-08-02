@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { refreshMicrophoneDevices, toggleMicrophone } from './index';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { loadMicrophoneDevicesMock } = vi.hoisted(() => ({
   loadMicrophoneDevicesMock: vi.fn(),
@@ -16,13 +17,13 @@ vi.mock('../microphone', (_importOriginal) => ({
 }));
 
 const defaultSettings = {
+  ...DEFAULT_VIDEO_SETTINGS,
   microphoneEnabled: false,
   microphoneDeviceId: 'mic-1',
   systemAudioEnabled: true,
   quality: VideoQuality.HIGH,
   countdownSeconds: 3,
   autoFadeDelay: 3,
-  openEditorAfterRecording: false,
   diagnosticsEnabled: false,
 };
 

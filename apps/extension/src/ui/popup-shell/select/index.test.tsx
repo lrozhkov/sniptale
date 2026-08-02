@@ -72,10 +72,8 @@ it('passes through custom data-ui, menu classes, and change handling', () => {
   const trigger = container?.querySelector('button[aria-haspopup="listbox"]');
   act(() => trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
-  const menu = container?.querySelector('[role="listbox"]');
-  const options = Array.from(
-    container?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []
-  );
+  const menu = document.body.querySelector('[role="listbox"]');
+  const options = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="option"]'));
 
   expect(container?.querySelector('[data-ui="popup.video.device-select"]')).not.toBeNull();
   expect(menu?.className).toContain('sniptale-popup-select-menu');

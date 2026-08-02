@@ -5,6 +5,8 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { TabOutputGeometry } from '../stream/tab-output';
 import type { CropStreamControls } from '../stream/crop-stream';
+import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
+import type { RecordingArtifactSession } from '../encoding/artifact-session';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingContext' });
 
@@ -25,7 +27,8 @@ class OffscreenRecordingContext {
   videoStream: MediaStream | null = null;
   sourceStream: MediaStream | null = null;
   audioMixer: AudioMixer | null = null;
-  recordedChunks: Blob[] = [];
+  artifactSession: RecordingArtifactSession | null = null;
+  stagingCoordinator: RecordingStagingCoordinator | null = null;
   currentRecordingId: string | null = null;
   generation: number | null = null;
   streamInstanceId: string | null = null;
@@ -56,6 +59,7 @@ class OffscreenRecordingContext {
   });
 
   #lifecycleState: RecordingLifecycleState = 'idle';
+  #startingRecorderCancellation: (() => void) | null = null;
 
   get lifecycleState(): RecordingLifecycleState {
     return this.#lifecycleState;
@@ -99,9 +103,50 @@ class OffscreenRecordingContext {
     );
   }
 
+  bindStagingCoordinator(coordinator: RecordingStagingCoordinator): void {
+    if (this.lifecycleState !== 'starting' || this.stagingCoordinator !== null) {
+      throw new Error('Recording session cannot bind stale staging');
+    }
+    this.stagingCoordinator = coordinator;
+  }
+
+  bindStartingArtifactSession(artifactSession: RecordingArtifactSession): void {
+    if (
+      this.lifecycleState !== 'starting' ||
+      this.stagingCoordinator === null ||
+      this.artifactSession !== null ||
+      this.mediaRecorder !== null
+    ) {
+      throw new Error('Recording session cannot bind stale artifacts');
+    }
+    this.artifactSession = artifactSession;
+    this.mediaRecorder = artifactSession.recorder;
+  }
+
+  registerStartingRecorderCancellation(mediaRecorder: MediaRecorder, cancel: () => void): void {
+    if (this.lifecycleState !== 'starting' || this.mediaRecorder !== mediaRecorder) {
+      throw new Error('Recording session cannot register stale recorder cancellation');
+    }
+    this.#startingRecorderCancellation = cancel;
+  }
+
+  cancelStartingRecorder(): boolean {
+    if (this.lifecycleState !== 'starting') {
+      return false;
+    }
+    this.#setLifecycleState('stopping', 'cancelStartingRecorder');
+    const cancel = this.#startingRecorderCancellation;
+    this.#startingRecorderCancellation = null;
+    cancel?.();
+    return true;
+  }
+
   activateRecorder(mediaRecorder: MediaRecorder): void {
+    if (this.mediaRecorder !== mediaRecorder) {
+      throw new Error('Recording session cannot activate an unbound recorder');
+    }
     this.#setLifecycleState('recording', 'activateRecorder');
-    this.mediaRecorder = mediaRecorder;
+    this.#startingRecorderCancellation = null;
   }
 
   beginStopRequest(handlers: StopRequestHandlers): void {
@@ -119,6 +164,7 @@ class OffscreenRecordingContext {
     const reject = this.stopRecordingReject;
     this.stopRecordingResolve = null;
     this.stopRecordingReject = null;
+    this.#startingRecorderCancellation = null;
     return { resolve, reject };
   }
 
@@ -140,10 +186,12 @@ class OffscreenRecordingContext {
     this.sourceVideoWidth = null;
     this.tabOutputControls = null;
     this.tabOutputGeometry = null;
-    this.recordedChunks.length = 0;
+    this.artifactSession = null;
+    this.stagingCoordinator = null;
     this.discardOnStop = false;
     this.stopRecordingResolve = null;
     this.stopRecordingReject = null;
+    this.#startingRecorderCancellation = null;
     this.#setLifecycleState('idle', 'resetRecordingSession');
   }
 
@@ -151,7 +199,7 @@ class OffscreenRecordingContext {
     const allowedTransitions: Record<RecordingLifecycleState, readonly RecordingLifecycleState[]> =
       {
         idle: ['idle', 'starting'],
-        starting: ['idle', 'recording'],
+        starting: ['idle', 'recording', 'stopping'],
         recording: ['idle', 'stopping'],
         stopping: ['idle', 'stopping'],
       };

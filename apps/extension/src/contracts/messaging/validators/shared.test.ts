@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 import {
   createMessageGuard,
@@ -129,13 +130,12 @@ describe('shared messaging validators recording settings', () => {
   it('validates recording settings and viewport preset selections', () => {
     expect(
       isVideoRecordingSettings({
+        ...DEFAULT_VIDEO_SETTINGS,
         autoFadeDelay: 300,
         countdownSeconds: 3,
         diagnosticsEnabled: true,
         microphoneDeviceId: null,
         microphoneEnabled: true,
-        openEditorAfterRecording: false,
-        quality: '1080p',
         systemAudioEnabled: true,
         webcamDeviceId: null,
         webcamEnabled: false,
@@ -143,13 +143,12 @@ describe('shared messaging validators recording settings', () => {
     ).toBe(true);
     expect(
       isVideoRecordingSettings({
+        ...DEFAULT_VIDEO_SETTINGS,
         autoFadeDelay: 300,
         countdownSeconds: 3,
         diagnosticsEnabled: true,
         microphoneDeviceId: 123,
         microphoneEnabled: true,
-        openEditorAfterRecording: false,
-        quality: '1080p',
         systemAudioEnabled: true,
         webcamDeviceId: null,
         webcamEnabled: false,

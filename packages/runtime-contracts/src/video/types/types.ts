@@ -1,8 +1,13 @@
 // Types shared across video recording contracts, messages, and annotations.
 
 import type { NativeCaptureSettings } from './native-settings';
+import type { VideoOutputProfile } from './output-profile';
+import type { VideoRecordingProfile } from './quality-profiles';
 
 export type * from './native-settings';
+export * from './output-profile';
+export * from './quality';
+export * from './quality-profiles';
 
 export const CaptureMode = {
   TAB: 'TAB',
@@ -50,14 +55,11 @@ export const VideoRecordingStatus = {
 
 export type VideoRecordingStatus = (typeof VideoRecordingStatus)[keyof typeof VideoRecordingStatus];
 
-export const VideoQuality = {
-  ULTRA: 'ULTRA',
-  HIGH: 'HIGH',
-  MEDIUM: 'MEDIUM',
-  LOW: 'LOW',
-} as const;
-
-export type VideoQuality = (typeof VideoQuality)[keyof typeof VideoQuality];
+export type VideoPostRecordResult = {
+  primaryRecordingId: string;
+  projectId: string | null;
+  recordingId: string;
+};
 
 export const WebcamResolutionPreset = {
   AUTO: 'AUTO',
@@ -126,10 +128,11 @@ export interface VideoRecordingSettings {
   webcamQuality?: WebcamQualitySettings;
   systemAudioEnabled: boolean;
   sourceCount?: number;
-  quality: VideoQuality;
+  outputProfile: VideoOutputProfile;
+  qualityProfileId: string | null;
+  qualityProfiles: VideoRecordingProfile[];
   countdownSeconds: number;
   autoFadeDelay: number;
-  openEditorAfterRecording: boolean;
   diagnosticsEnabled: boolean;
   controlledCursorCaptureEnabled?: boolean;
   native?: NativeCaptureSettings;

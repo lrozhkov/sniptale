@@ -40,13 +40,7 @@ export const captureDownloadRouteDescriptor = {
   authorityFamily: 'capture-privileged-tab-route',
   handlerAdapter: 'routeTabAction',
   keepChannelBehaviorSource: 'tab-routing-adapter',
-  messageTypes: [
-    MessageType.EXECUTE_SAVE,
-    MessageType.OPEN_EDITOR_WITH_IMAGE,
-    MessageType.STAGE_RECORDING_DOWNLOAD_CHUNK,
-    MessageType.SAVE_RECORDING_FOR_DOWNLOAD,
-    MessageType.RELEASE_RECORDING_DOWNLOAD,
-  ],
+  messageTypes: [MessageType.EXECUTE_SAVE, MessageType.OPEN_EDITOR_WITH_IMAGE],
   ownerModule: 'apps/extension/src/background/capture/routing/actions.download.ts',
 } as const;
 

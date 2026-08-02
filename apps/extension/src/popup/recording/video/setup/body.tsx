@@ -5,6 +5,7 @@ import {
   createVideoRecordingLiveMediaState,
   VideoRecordingStatus,
   type VideoRecordingLiveMediaState,
+  type VideoPostRecordResult,
   type VideoRecordingRuntimeState,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -62,22 +63,26 @@ interface VideoSetupBodyProps {
   onActiveRecordingSettingsChange: (patch: Partial<VideoRecordingSettings>) => Promise<void>;
   onSettingsChange: (patch: Partial<VideoRecordingSettings>) => void;
   showSavingState?: boolean;
-  postRecordRecordingId?: string | null;
-  onClosePostRecord?: () => void;
+  postRecordResult?: VideoPostRecordResult | null;
+  onAcknowledgePostRecord?: () => Promise<void>;
   viewModel: VideoSetupViewModel;
 }
 
 export function VideoSetupBody(props: VideoSetupBodyProps) {
-  if (props.showSavingState || props.recordingState.status === VideoRecordingStatus.STOPPING) {
+  if (props.showSavingState) {
+    return <VideoSavingSection />;
+  }
+
+  if (props.postRecordResult && props.onAcknowledgePostRecord) {
+    return <VideoPostRecordSection {...props} />;
+  }
+
+  if (props.recordingState.status === VideoRecordingStatus.STOPPING) {
     return <VideoSavingSection />;
   }
 
   if (props.recordingState.status !== VideoRecordingStatus.IDLE) {
     return <VideoActiveRecordingSection {...props} />;
-  }
-
-  if (props.postRecordRecordingId && props.onClosePostRecord) {
-    return <VideoPostRecordSection {...props} />;
   }
 
   return <VideoIdleSetupSection {...props} />;
@@ -87,7 +92,7 @@ const VIDEO_SETUP_SECTION_CLASS_NAME = [
   'flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,var(--sniptale-color-surface-canvas)_4%)]',
-  'p-3 pr-2',
+  'px-3 py-2 pr-2',
 ].join(' ');
 
 function VideoActiveRecordingSection(props: VideoSetupBodyProps) {
@@ -118,12 +123,15 @@ function VideoActiveRecordingSection(props: VideoSetupBodyProps) {
 }
 
 function VideoPostRecordSection(props: VideoSetupBodyProps) {
+  const result = props.postRecordResult;
+  const onAcknowledge = props.onAcknowledgePostRecord;
+  if (!result || !onAcknowledge) {
+    return null;
+  }
+
   return (
     <section className={VIDEO_SETUP_SECTION_CLASS_NAME}>
-      <VideoPostRecordPanel
-        recordingId={props.postRecordRecordingId ?? ''}
-        onClose={props.onClosePostRecord ?? (() => undefined)}
-      />
+      <VideoPostRecordPanel result={result} onAcknowledge={onAcknowledge} />
     </section>
   );
 }
@@ -148,6 +156,7 @@ function VideoIdleSetupSection(props: VideoSetupBodyProps) {
         onSettingsChange={props.onSettingsChange}
       />
       <VideoWebcamSelector
+        required={props.captureMode === CaptureMode.CAMERA}
         settings={props.settings}
         webcamDevices={props.webcamDevices}
         isLoadingWebcams={props.isLoadingWebcams}
@@ -164,6 +173,7 @@ function VideoIdleSetupSection(props: VideoSetupBodyProps) {
       )}
       <VideoSettingsGrid
         captureMode={props.captureMode}
+        knownOutputBasisDimensions={props.viewModel.knownOutputBasisDimensions}
         settings={props.settings}
         onSettingsChange={props.onSettingsChange}
       />

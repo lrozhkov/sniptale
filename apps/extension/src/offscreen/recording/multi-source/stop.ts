@@ -1,67 +1,75 @@
 import { stopRecorderStreams } from './recorders';
 import {
+  getActiveMultiSourceSession,
   setActiveMultiSourceSession,
   type MultiSourceRecorder,
   type MultiSourceSession,
 } from './state';
 
-type StoppableSessionRecorder =
-  | MultiSourceRecorder
-  | NonNullable<MultiSourceSession['webcamRecorder']>;
+type SessionRecorder = MultiSourceRecorder | NonNullable<MultiSourceSession['webcamRecorder']>;
+
+function getSessionRecorders(session: MultiSourceSession): SessionRecorder[] {
+  return [...session.recorders, session.audioRecorder, session.webcamRecorder].filter(
+    (source): source is SessionRecorder => source !== null
+  );
+}
 
 function stopSessionStreams(session: MultiSourceSession): void {
-  const allRecorders = [...session.recorders, session.audioRecorder].filter(
-    (recorder): recorder is MultiSourceRecorder => recorder !== null
-  );
-  stopRecorderStreams(allRecorders);
+  stopRecorderStreams([...session.recorders, session.audioRecorder]);
   session.webcamRecorder?.stream.getTracks().forEach((track) => track.stop());
-  if (session.durationTimer) {
-    clearInterval(session.durationTimer);
-  }
+  if (session.durationTimer) clearInterval(session.durationTimer);
 }
 
-function getSessionRecorders(session: MultiSourceSession) {
-  return [...session.recorders, session.audioRecorder, session.webcamRecorder].filter(
-    (source): source is StoppableSessionRecorder => source !== null
-  );
+async function abortSession(session: MultiSourceSession): Promise<void> {
+  await session.staging.abort();
 }
 
-function stopSessionRecorders(session: MultiSourceSession): void {
+export function failMultiSourceSession(session: MultiSourceSession, error: Error): boolean {
+  if (getActiveMultiSourceSession() !== session) return false;
+  const transitioned = session.lifecycle.fail(error);
+  if (!transitioned && !session.stopReject) return false;
+  setActiveMultiSourceSession(null);
   getSessionRecorders(session).forEach((source) => {
-    source.recorder.onstop = null;
-    source.recorder.onerror = null;
-    if (source.recorder.state !== 'inactive') {
-      try {
-        source.recorder.stop();
-      } catch {
-        // Stream cleanup below is the terminal owner; recorder stop can throw after a runtime error.
-      }
-    }
+    void source.artifactSession.abort().catch(() => undefined);
   });
-}
-
-function finalizeStoppedSession(params: {
-  discard: boolean;
-  finalizeSession: (session: MultiSourceSession) => Promise<void>;
-  reject: (reason?: unknown) => void;
-  resolve: () => void;
-  session: MultiSourceSession;
-}) {
-  setActiveMultiSourceSession(null);
-  stopSessionStreams(params.session);
-  if (params.discard) {
-    params.resolve();
-    return;
-  }
-
-  params.finalizeSession(params.session).then(params.resolve, params.reject);
-}
-
-export function failMultiSourceSession(session: MultiSourceSession, error: Error): void {
-  setActiveMultiSourceSession(null);
-  stopSessionRecorders(session);
   stopSessionStreams(session);
   session.stopReject?.(error);
+  return true;
+}
+
+async function stopAndFinalizeSession(params: {
+  discard: boolean;
+  finalizeSession: (session: MultiSourceSession) => Promise<void>;
+  session: MultiSourceSession;
+}): Promise<void> {
+  const { discard, finalizeSession, session } = params;
+  try {
+    await Promise.all(
+      getSessionRecorders(session).map(async (source) => {
+        source.artifact = await source.artifactSession.stop();
+      })
+    );
+    setActiveMultiSourceSession(null);
+    stopSessionStreams(session);
+    if (discard) {
+      await abortSession(session);
+      return;
+    }
+    await finalizeSession(session);
+  } catch (error) {
+    setActiveMultiSourceSession(null);
+    stopSessionStreams(session);
+    try {
+      await abortSession(session);
+    } catch (abortError) {
+      throw new AggregateError(
+        [error, abortError],
+        'Multi-source stop failed and recording staging abort also failed.',
+        { cause: abortError }
+      );
+    }
+    throw error;
+  }
 }
 
 export function stopMultiSourceSession(params: {
@@ -69,43 +77,21 @@ export function stopMultiSourceSession(params: {
   finalizeSession: (session: MultiSourceSession) => Promise<void>;
   session: MultiSourceSession;
 }): Promise<void> {
-  const { discard, finalizeSession, session } = params;
-  if (session.stopPromise) {
+  const { session } = params;
+  if (session.stopPromise) return session.stopPromise;
+
+  const previousPhase = session.lifecycle.beginStop();
+  if (previousPhase === null) return Promise.resolve();
+  if (previousPhase === 'starting') {
+    setActiveMultiSourceSession(null);
+    getSessionRecorders(session).forEach((source) => {
+      void source.artifactSession.abort().catch(() => undefined);
+    });
+    stopSessionStreams(session);
+    session.stopPromise = abortSession(session);
     return session.stopPromise;
   }
 
-  session.stopPromise = new Promise((resolve, reject) => {
-    let didFinalize = false;
-    const sessionRecorders = getSessionRecorders(session);
-    let pendingStops = sessionRecorders.length;
-    const finishOne = () => {
-      if (didFinalize) {
-        return;
-      }
-
-      pendingStops -= 1;
-      if (pendingStops > 0) {
-        return;
-      }
-
-      didFinalize = true;
-      finalizeStoppedSession({ discard, finalizeSession, reject, resolve, session });
-    };
-
-    session.stopResolve = resolve;
-    session.stopReject = reject;
-    sessionRecorders.forEach((source) => {
-      if (source.recorder.state === 'inactive') {
-        finishOne();
-        return;
-      }
-      source.recorder.onstop = () => {
-        source.recorder.onstop = null;
-        finishOne();
-      };
-      source.recorder.requestData?.();
-      source.recorder.stop();
-    });
-  });
+  session.stopPromise = stopAndFinalizeSession(params);
   return session.stopPromise;
 }

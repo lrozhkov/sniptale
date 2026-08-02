@@ -15,6 +15,7 @@ import {
   finishVideoRecordingStop,
   getVideoRecordingId,
   getVideoRecordingTabId,
+  isCurrentVideoRecordingId,
   markVideoRecordingPreparationSettled,
   resetCompletedVideoRecordingSession,
   setControlledCursorDisplaySurface,
@@ -31,7 +32,10 @@ import { clearRecordingStartActivationWatchdog } from '../../../manager/start-ac
 import { createAsyncLifecycleRoute, HANDLED_ASYNC_RESULT, type RouteResult } from '../shared';
 import { releaseVideoCaptureSurface } from '../../../capture-surface';
 
-export { handleRecordingState } from './recording-state-response';
+export {
+  handleAcknowledgePostRecordResult,
+  handleRecordingState,
+} from './recording-state-response';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeRouterHandlers' });
 
@@ -108,6 +112,7 @@ async function updateRecordingDurationIfCurrent(message: {
   if (!(await isCurrentRecordingLifecycleEvent(message))) {
     return;
   }
+  if (!isCurrentVideoRecordingId(message.recordingId)) return;
   setVideoRecordingRuntimeState({ duration: Number(message.duration) || 0 });
 }
 
@@ -139,6 +144,7 @@ async function handleOffscreenRecordingStartedIfCurrent(message?: {
   if (!message || !(await isCurrentRecordingLifecycleEvent(message))) {
     return;
   }
+  if (!isCurrentVideoRecordingId(message.recordingId)) return;
   clearRecordingStartActivationWatchdog(message.recordingId);
   markVideoRecordingPreparationSettled();
   if (message?.cursorCaptureMode) {
@@ -180,11 +186,13 @@ async function handleOffscreenRecordingStoppedIfCurrent(message?: {
     return;
   }
   await releaseVideoCaptureSurface(message.recordingId);
-  finishVideoRecordingStop();
-  resetCompletedVideoRecordingSession(message.recordingId);
-  resetRecordingTabId();
-  resetVideoRecordingRuntimeState();
-  clearCameraRecorderControlGrant(message.recordingId);
+  if (isCurrentVideoRecordingId(message.recordingId)) {
+    finishVideoRecordingStop();
+    resetCompletedVideoRecordingSession(message.recordingId);
+    resetRecordingTabId();
+    resetVideoRecordingRuntimeState();
+  }
+  await clearCameraRecorderControlGrant(message.recordingId);
   await clearActiveVideoRecordingLease(message.recordingId);
 }
 
@@ -206,6 +214,7 @@ async function handleOffscreenRecordingPausedIfCurrent(message?: {
   if (!message || !(await isCurrentRecordingLifecycleEvent(message))) {
     return;
   }
+  if (!isCurrentVideoRecordingId(message.recordingId)) return;
   logger.log('Recording paused');
   setVideoRecordingRuntimeState({ status: VideoRecordingStatus.PAUSED });
 }
@@ -228,6 +237,7 @@ async function handleOffscreenRecordingResumedIfCurrent(message?: {
   if (!message || !(await isCurrentRecordingLifecycleEvent(message))) {
     return;
   }
+  if (!isCurrentVideoRecordingId(message.recordingId)) return;
   logger.log('Recording resumed');
   setVideoRecordingRuntimeState({ status: VideoRecordingStatus.RECORDING });
 }

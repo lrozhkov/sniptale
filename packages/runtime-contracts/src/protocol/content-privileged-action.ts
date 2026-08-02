@@ -11,9 +11,6 @@ export const CONTENT_PRIVILEGED_ACTION_TYPES = [
   'EXECUTE_SAVE',
   'OPEN_EDITOR_WITH_IMAGE',
   'SAVE_SCREENSHOT_TO_GALLERY',
-  'STAGE_RECORDING_DOWNLOAD_CHUNK',
-  'SAVE_RECORDING_FOR_DOWNLOAD',
-  'RELEASE_RECORDING_DOWNLOAD',
   'TRIGGER_QUICK_ACTION',
   'CONTENT_RUNTIME_WAKEUP',
 ] as const;
@@ -49,9 +46,7 @@ export type ContentPrivilegedActionActivationProof = {
   secret: string;
 };
 
-export type ContentPrivilegedActionActivationPurpose =
-  | 'recording-download'
-  | 'trusted-content-event';
+export type ContentPrivilegedActionActivationPurpose = 'trusted-content-event';
 
 export type ContentPrivilegedActionRequestSource =
   | { kind: 'background-auto-start'; grantToken: string }
@@ -126,7 +121,7 @@ export function isContentPrivilegedActionActivationProof(
 export function isContentPrivilegedActionActivationPurpose(
   value: unknown
 ): value is ContentPrivilegedActionActivationPurpose {
-  return value === 'recording-download' || value === 'trusted-content-event';
+  return value === 'trusted-content-event';
 }
 
 export function isContentPrivilegedActionRequestSource(

@@ -10,8 +10,16 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { StartRecordingMessage } from '../../../contracts/video/types/messages';
-import { requestMicrophonePermission } from '../../recording/microphone';
-import { requestWebcamPermission } from '../../recording/webcam';
+import {
+  requestMicrophonePermission,
+  resolveMicrophoneDeviceId,
+  type MicrophoneOption,
+} from '../../recording/microphone';
+import {
+  requestWebcamPermission,
+  resolveWebcamDeviceId,
+  type WebcamOption,
+} from '../../recording/webcam';
 import {
   getPopupResponseErrorMessage,
   getPopupRuntimeErrorMessage,
@@ -21,7 +29,9 @@ import { getPopupRuntimeServices } from '../../runtime-services';
 type StartRecordingArgs = {
   videoSettings: VideoRecordingSettings;
   captureMode: CaptureMode;
+  microphoneDevices: MicrophoneOption[];
   viewportPresetId: string | null;
+  webcamDevices: WebcamOption[];
   setRecordingControlCapability: Dispatch<
     SetStateAction<{ controlToken: string; recordingId: string } | null>
   >;
@@ -41,14 +51,23 @@ type StartRecordingResponseActions = {
 
 function sanitizeRecordingSettings(
   settings: VideoRecordingSettings,
-  captureMode: CaptureMode
+  captureMode: CaptureMode,
+  microphoneDevices: MicrophoneOption[],
+  webcamDevices: WebcamOption[]
 ): VideoRecordingSettings {
   const sourceCount =
     captureMode === CaptureMode.SCREEN ? normalizeVideoSourceCount(settings.sourceCount) : 1;
+  const webcamEnabled = captureMode === CaptureMode.CAMERA || settings.webcamEnabled === true;
 
   return {
     ...settings,
+    microphoneDeviceId: settings.microphoneEnabled
+      ? resolveMicrophoneDeviceId(settings.microphoneDeviceId, microphoneDevices)
+      : settings.microphoneDeviceId,
     sourceCount,
+    webcamDeviceId: webcamEnabled
+      ? resolveWebcamDeviceId(settings.webcamDeviceId ?? null, webcamDevices)
+      : (settings.webcamDeviceId ?? null),
     ...(sourceCount > 1 ? { systemAudioEnabled: false } : {}),
     ...(captureMode === CaptureMode.CAMERA
       ? {
@@ -56,7 +75,7 @@ function sanitizeRecordingSettings(
           diagnosticsEnabled: false,
           sourceCount: 1,
           systemAudioEnabled: false,
-          webcamEnabled: true,
+          webcamEnabled,
         }
       : {}),
     controlledCursorCaptureEnabled: false,
@@ -183,7 +202,12 @@ export async function startRecordingHandler(args: StartRecordingArgs): Promise<v
     setStartError,
   } = args;
   const recordingCaptureMode = captureMode;
-  const sanitizedSettings = sanitizeRecordingSettings(videoSettings, recordingCaptureMode);
+  const sanitizedSettings = sanitizeRecordingSettings(
+    videoSettings,
+    recordingCaptureMode,
+    args.microphoneDevices,
+    args.webcamDevices
+  );
 
   try {
     if (!(await ensureCapturePermissions(sanitizedSettings, setStartError))) {

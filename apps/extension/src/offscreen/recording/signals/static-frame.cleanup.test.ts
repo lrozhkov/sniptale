@@ -2,9 +2,16 @@
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { getRecordingTelemetryMock, saveRecordingTelemetrySafelyMock } = vi.hoisted(() => ({
-  getRecordingTelemetryMock: vi.fn(),
-  saveRecordingTelemetrySafelyMock: vi.fn(),
+const { getRecordingMock, getRecordingTelemetryMock, saveRecordingTelemetrySafelyMock } =
+  vi.hoisted(() => ({
+    getRecordingMock: vi.fn(),
+    getRecordingTelemetryMock: vi.fn(),
+    saveRecordingTelemetrySafelyMock: vi.fn(),
+  }));
+
+vi.mock('../../../composition/persistence/recordings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/recordings')>()),
+  getRecording: getRecordingMock,
 }));
 
 vi.mock('../../../composition/persistence/recordings/telemetry', async (importOriginal) => ({
@@ -57,6 +64,7 @@ function createFailingMetadataVideo(createElement: Document['createElement']): F
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getRecordingMock.mockResolvedValue({ blob: new Blob(['video'], { type: 'video/webm' }) });
 });
 
 afterEach(() => {
@@ -92,10 +100,7 @@ it('revokes object URLs and removes the video element when metadata loading fail
     viewport: null,
   });
 
-  await persistStaticFrameSignals(
-    'recording-metadata-failure',
-    new Blob(['video'], { type: 'video/webm' })
-  );
+  await persistStaticFrameSignals('recording-metadata-failure');
 
   expect(revokeObjectUrl).toHaveBeenCalledWith('blob:recording');
   expect(video.remove).toHaveBeenCalledOnce();

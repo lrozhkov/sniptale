@@ -1,20 +1,22 @@
 import { expect, it } from 'vitest';
-import { VideoExportQualityPreset, VideoMp4Codec } from '../../../features/video/project/types';
-import { scaleBitrate } from './bitrate';
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
+import { VideoExportQualityPreset } from '../../../features/video/project/types';
+import { resolveExportTargetBitrate } from './bitrate';
 
-it('scales bitrate by the export size and falls back to the balanced preset', () => {
-  const balanced = scaleBitrate(VideoExportQualityPreset.BALANCED, 1920, 1080);
-  const fallback = scaleBitrate('unknown' as never, 1920, 1080);
+function createSettings(overrides: Record<string, unknown> = {}) {
+  return {
+    fps: 30,
+    height: 1080,
+    quality: VideoExportQualityPreset.HIGH,
+    resolution: VideoResolutionPreset.P1080,
+    width: 1920,
+    ...overrides,
+  } as never;
+}
 
-  expect(balanced).toBeGreaterThan(0);
-  expect(fallback).toBe(balanced);
-});
-
-it('uses codec-specific bitrate ladders for the same quality preset', () => {
-  const avc = scaleBitrate(VideoExportQualityPreset.BALANCED, 1920, 1080, VideoMp4Codec.AVC);
-  const hevc = scaleBitrate(VideoExportQualityPreset.BALANCED, 1920, 1080, VideoMp4Codec.HEVC);
-  const vp9 = scaleBitrate(VideoExportQualityPreset.BALANCED, 1920, 1080, VideoMp4Codec.VP9);
-
-  expect(avc).toBeGreaterThan(vp9);
-  expect(vp9).toBeGreaterThan(hevc);
+it('uses an exact standard-profile ladder instead of a pixel-ratio heuristic', () => {
+  expect(resolveExportTargetBitrate(createSettings())).toBe(8_000_000);
+  expect(
+    resolveExportTargetBitrate(createSettings({ fps: 60, resolution: VideoResolutionPreset.P1440 }))
+  ).toBe(24_000_000);
 });

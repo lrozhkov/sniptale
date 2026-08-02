@@ -18,7 +18,7 @@ import {
   VideoProjectAssetType,
 } from '../types/index';
 
-export function createTransform() {
+function createTransform() {
   return {
     height: 720,
     opacity: 1,

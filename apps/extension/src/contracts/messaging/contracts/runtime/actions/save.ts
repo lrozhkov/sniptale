@@ -17,7 +17,6 @@ import {
 } from '../../../validators/index';
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
 import type { StagePopupExportArchiveChunkMessage } from '../../types';
-import { runtimeActionRecordingSaveMessageContracts } from './save.recording.ts';
 import { runtimeActionWebSnapshotSaveMessageContracts } from './save.web-snapshot.ts';
 import { isContentPrivilegedActionCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 const isPopupExportArchiveChunkBase64 = (value: unknown): value is string =>
@@ -166,7 +165,6 @@ export const runtimeActionSaveMessageContracts = {
     ),
   },
   ...runtimeActionWebSnapshotSaveMessageContracts,
-  ...runtimeActionRecordingSaveMessageContracts,
   [MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY]: {
     parseRequest: createGuardParser(
       'runtime REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY message',

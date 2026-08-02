@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const handleCoreModeMessage = vi.fn();
 const handleViewportMessage = vi.fn();
-const handleRegionCaptureMessage = vi.fn();
 const handleRegionOverlayMessage = vi.fn();
 const createRegionOverlayBridgeDeps = vi.fn();
 const handleFullPageCaptureMessage = vi.fn();
@@ -13,10 +12,6 @@ vi.mock('./core', () => ({
 
 vi.mock('./viewport', () => ({
   handleViewportMessage,
-}));
-
-vi.mock('./region-capture', () => ({
-  handleRegionCaptureMessage,
 }));
 
 vi.mock('./region-overlay', () => ({
@@ -73,7 +68,7 @@ describe('createContentRuntimeMessageHandlers', () => {
       fullPageCaptureAgent
     );
 
-    expect(handlers).toHaveLength(5);
+    expect(handlers).toHaveLength(4);
     handlers.forEach((handler) => handler());
 
     expect(handleCoreModeMessage).toHaveBeenCalledWith(message);
@@ -83,7 +78,6 @@ describe('createContentRuntimeMessageHandlers', () => {
       getViewportInfo,
       regionSelectorController
     );
-    expect(handleRegionCaptureMessage).toHaveBeenCalledWith(message, sendResponse);
     expect(createRegionOverlayBridgeDeps).toHaveBeenCalledWith(regionSelectorController);
     expect(handleRegionOverlayMessage).toHaveBeenCalledWith(message, sendResponse, {
       overlay: 'deps',

@@ -4,33 +4,7 @@ import { openEditorWithImage } from '../editor/index';
 import { createRenderedCaptureJob } from '../jobs/rendered-job';
 import { transitionCaptureJob } from '../jobs/state-machine';
 import { createRouteErrorResponse } from '../../routing-contracts/response';
-import { saveRecordingBlobForDownload } from '../../media-hub/recording-download';
-import {
-  consumeRecordingDownload,
-  releaseRecordingDownload,
-  stageRecordingDownloadChunk,
-} from './recording-download/staged-recordings';
-import {
-  isSafeDownloadFilename,
-  isSafeDownloadMimeType,
-} from '@sniptale/runtime-contracts/validation/base64';
-import { isRecordingDownloadStageId } from '@sniptale/runtime-contracts/messaging/recording-download';
-import type { ContentSenderBinding } from './authorization/content-action';
 import type { SendResponse } from './types';
-
-function isValidStagedRecordingDownloadPayload(payload: {
-  filename: string;
-  mimeType: string;
-  recordingSessionId: string;
-  stagedRecordingId: string;
-}): boolean {
-  return (
-    isSafeDownloadFilename(payload.filename) &&
-    isSafeDownloadMimeType(payload.mimeType) &&
-    isRecordingDownloadStageId(payload.recordingSessionId) &&
-    isRecordingDownloadStageId(payload.stagedRecordingId)
-  );
-}
 
 function isDownloadAction(actionType: CaptureActionType): boolean {
   return actionType !== 'copy' && actionType !== 'edit' && actionType !== 'scenario';
@@ -86,74 +60,6 @@ export function handleExecuteSave(
 ): boolean {
   executeSaveWithCaptureJob(message, resolvedTabId)
     .then(() => sendResponse({ success: true, result: 'accepted' }))
-    .catch((error) => sendResponse(createRouteErrorResponse(error)));
-  return true;
-}
-
-export function handleSaveRecordingForDownload(
-  payload: {
-    filename: string;
-    mimeType: string;
-    recordingSessionId: string;
-    stagedRecordingId: string;
-  },
-  owner: ContentSenderBinding,
-  sendResponse: SendResponse
-): boolean {
-  if (!isValidStagedRecordingDownloadPayload(payload)) {
-    sendResponse(createRouteErrorResponse('Invalid recording download payload'));
-    return true;
-  }
-
-  Promise.resolve()
-    .then(() => {
-      const blob = consumeRecordingDownload({
-        mimeType: payload.mimeType,
-        owner,
-        recordingSessionId: payload.recordingSessionId,
-        stagedRecordingId: payload.stagedRecordingId,
-      });
-      return saveRecordingBlobForDownload({
-        blob,
-        filename: payload.filename,
-        mimeType: payload.mimeType,
-      });
-    })
-    .then((result) => sendResponse({ success: true, result: 'accepted', ...result }))
-    .catch((error) => sendResponse(createRouteErrorResponse(error)));
-  return true;
-}
-
-export function handleStageRecordingDownloadChunk(
-  payload: {
-    base64: string;
-    chunkIndex: number;
-    recordingSessionId: string;
-    stagedRecordingId: string;
-    totalBytes: number;
-    totalChunks: number;
-  },
-  owner: ContentSenderBinding,
-  sendResponse: SendResponse
-): boolean {
-  Promise.resolve()
-    .then(() => stageRecordingDownloadChunk({ ...payload, owner }))
-    .then((result) => sendResponse({ success: true, ...result }))
-    .catch((error) => sendResponse(createRouteErrorResponse(error)));
-  return true;
-}
-
-export function handleReleaseRecordingDownload(
-  payload: {
-    recordingSessionId: string;
-    stagedRecordingId: string;
-  },
-  owner: ContentSenderBinding,
-  sendResponse: SendResponse
-): boolean {
-  Promise.resolve()
-    .then(() => releaseRecordingDownload({ ...payload, owner }))
-    .then(() => sendResponse({ success: true, result: 'released' }))
     .catch((error) => sendResponse(createRouteErrorResponse(error)));
   return true;
 }

@@ -20,6 +20,7 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 function OverlayHarness(props: {
+  placement?: 'auto' | 'bottom';
   setIsOpen: (value: boolean | ((current: boolean) => boolean)) => void;
 }) {
   const containerRef = { current: document.createElement('div') };
@@ -30,6 +31,7 @@ function OverlayHarness(props: {
     setIsOpen: props.setIsOpen,
     containerRef,
     menuRef,
+    ...(props.placement === undefined ? {} : { placement: props.placement }),
   });
 
   return (
@@ -82,5 +84,19 @@ describe('useGlassSelectOverlay', () => {
     expect(overlay?.dataset['top']).toBe('128');
     dismissArgs.setIsOpen(false);
     expect(setIsOpen).toHaveBeenCalledWith(false);
+  });
+
+  it('forwards explicit placement to layout instead of the dismiss owner', () => {
+    const setIsOpen = vi.fn();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(<OverlayHarness placement="bottom" setIsOpen={setIsOpen} />);
+    });
+
+    expect(dismissMock).toHaveBeenCalledWith(expect.not.objectContaining({ placement: 'bottom' }));
+    expect(layoutMock).toHaveBeenCalledWith(expect.objectContaining({ placement: 'bottom' }));
   });
 });

@@ -158,5 +158,11 @@ function getInitialSettingsTab(): SettingsTab {
   if (section === 'permissions') {
     return 'permissions';
   }
+  if (section === 'video') {
+    return 'video';
+  }
+  if (section === 'presets') {
+    return 'presets';
+  }
   return 'appearance';
 }

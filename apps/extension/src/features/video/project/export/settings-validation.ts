@@ -1,9 +1,17 @@
 import {
+  VideoExportFormat,
+  VideoExportQualityPreset,
+  VideoMp4Codec,
   VideoExportScope,
   VideoSubtitleSidecarFormat,
+  VideoWebmCodec,
   type VideoProject,
   type VideoProjectExportSettings,
 } from '../types/index';
+import {
+  resolveVideoOutputDimensions,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
 
 const MAX_EXPORT_DIMENSION_PX = 7680;
 const MAX_EXPORT_FPS = 120;
@@ -61,6 +69,31 @@ function hasValidSubtitleSidecarFormats(settings: Record<string, unknown>): bool
   );
 }
 
+function hasCanonicalOutputSettings(settings: Record<string, unknown>): boolean {
+  if (
+    !Object.values(VideoExportQualityPreset).includes(
+      settings['quality'] as VideoExportQualityPreset
+    ) ||
+    !Object.values(VideoResolutionPreset).includes(settings['resolution'] as VideoResolutionPreset)
+  ) {
+    return false;
+  }
+
+  if (settings['format'] === VideoExportFormat.MP4) {
+    return (
+      Object.values(VideoMp4Codec).includes(settings['mp4VideoCodec'] as VideoMp4Codec) &&
+      settings['webmVideoCodec'] === undefined
+    );
+  }
+  if (settings['format'] === VideoExportFormat.WEBM) {
+    return (
+      Object.values(VideoWebmCodec).includes(settings['webmVideoCodec'] as VideoWebmCodec) &&
+      settings['mp4VideoCodec'] === undefined
+    );
+  }
+  return false;
+}
+
 export function isBoundedVideoProjectExportSettings(
   settings: unknown
 ): settings is VideoProjectExportSettings {
@@ -71,7 +104,10 @@ export function isBoundedVideoProjectExportSettings(
   return (
     isPositiveInteger(settings['width'], MAX_EXPORT_DIMENSION_PX) &&
     isPositiveInteger(settings['height'], MAX_EXPORT_DIMENSION_PX) &&
+    settings['width'] % 2 === 0 &&
+    settings['height'] % 2 === 0 &&
     isPositiveInteger(settings['fps'], MAX_EXPORT_FPS) &&
+    hasCanonicalOutputSettings(settings) &&
     hasValidRangeShape(settings) &&
     hasValidSelectedClipShape(settings) &&
     hasValidSubtitleSidecarFormats(settings)
@@ -79,10 +115,19 @@ export function isBoundedVideoProjectExportSettings(
 }
 
 function isVideoProjectExportSettingsCompatibleWithProject(
-  project: Pick<VideoProject, 'clips' | 'duration'>,
-  settings: VideoProjectExportSettings
+  project: Pick<VideoProject, 'clips' | 'duration' | 'height' | 'width'>,
+  settings: unknown
 ): boolean {
   if (!isBoundedVideoProjectExportSettings(settings)) {
+    return false;
+  }
+
+  const dimensions = resolveVideoOutputDimensions(
+    project.width,
+    project.height,
+    settings.resolution
+  );
+  if (settings.width !== dimensions.width || settings.height !== dimensions.height) {
     return false;
   }
 
@@ -103,8 +148,8 @@ function isVideoProjectExportSettingsCompatibleWithProject(
 }
 
 export function assertVideoProjectExportSettingsCompatibleWithProject(
-  project: Pick<VideoProject, 'clips' | 'duration'>,
-  settings: VideoProjectExportSettings
+  project: Pick<VideoProject, 'clips' | 'duration' | 'height' | 'width'>,
+  settings: unknown
 ): void {
   if (!isVideoProjectExportSettingsCompatibleWithProject(project, settings)) {
     throw new Error('Invalid video project export settings');

@@ -54,7 +54,10 @@ it('loads stable native settings snapshots with revision and tray registry', asy
         },
       },
     },
-    quality: VideoQuality.LOW,
+    outputProfile: {
+      ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+      quality: VideoQuality.LOW,
+    },
   });
   const { loadNativeSettingsSnapshot } = await import('./settings-snapshot');
 

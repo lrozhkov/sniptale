@@ -8,21 +8,26 @@ import {
   VideoQuality,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 import { VideoDiagnosticsToggle } from './diagnostics-toggle';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function createSettings(overrides: Partial<VideoRecordingSettings> = {}): VideoRecordingSettings {
+function createSettings(
+  overrides: Partial<
+    Omit<VideoRecordingSettings, 'output' | 'qualityProfileId' | 'qualityProfiles'>
+  > = {}
+): VideoRecordingSettings {
   return {
+    ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
     diagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
-    openEditorAfterRecording: true,
-    quality: VideoQuality.HIGH,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     systemAudioEnabled: false,
     ...overrides,
   };
