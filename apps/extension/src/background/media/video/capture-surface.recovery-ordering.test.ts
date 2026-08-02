@@ -116,6 +116,28 @@ beforeEach(() => {
 });
 
 describe('bound recording recovery barrier', () => {
+  it('keeps the public recovery waiter pending until in-flight reconciliation settles', async () => {
+    let resolvePageAccess!: () => void;
+    const ensurePageAccess = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolvePageAccess = resolve;
+        })
+    );
+    const recovery = recoverVideoCaptureSurfaceOnStartup(ensurePageAccess);
+    let waiterSettled = false;
+    const waiter = waitForVideoCaptureSurfaceRecovery().then(() => {
+      waiterSettled = true;
+    });
+
+    await vi.waitFor(() => expect(ensurePageAccess).toHaveBeenCalledOnce());
+    expect(waiterSettled).toBe(false);
+    resolvePageAccess();
+    await expect(recovery).resolves.toBeUndefined();
+    await expect(waiter).resolves.toBeUndefined();
+    expect(waiterSettled).toBe(true);
+  });
+
   it('acknowledges bound STOP before cursor or physical nested-stack cleanup', async () => {
     const ensurePageAccess = vi.fn().mockResolvedValue(undefined);
 
