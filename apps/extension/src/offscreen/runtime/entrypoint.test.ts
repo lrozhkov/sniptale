@@ -4,11 +4,13 @@ const {
   bootstrapOffscreenDocumentMock,
   getCurrentLocaleMock,
   registerOffscreenRuntimeMessageListenerMock,
+  registerOffscreenVoiceInputMessageListenerMock,
   translateMock,
 } = vi.hoisted(() => ({
   bootstrapOffscreenDocumentMock: vi.fn(),
   getCurrentLocaleMock: vi.fn(() => 'en'),
   registerOffscreenRuntimeMessageListenerMock: vi.fn(),
+  registerOffscreenVoiceInputMessageListenerMock: vi.fn(),
   translateMock: vi.fn((key: string) => key),
 }));
 
@@ -18,6 +20,10 @@ vi.mock('./bootstrap', () => ({
 
 vi.mock('./index', () => ({
   registerOffscreenRuntimeMessageListener: registerOffscreenRuntimeMessageListenerMock,
+}));
+
+vi.mock('../voice-input/runtime', () => ({
+  registerOffscreenVoiceInputMessageListener: registerOffscreenVoiceInputMessageListenerMock,
 }));
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -51,6 +57,7 @@ describe('offscreen entrypoint', () => {
     expect(statusText.textContent).toBe('popup.labels.statusReady');
     expect(bootstrapOffscreenDocumentMock).toHaveBeenCalledOnce();
     expect(registerOffscreenRuntimeMessageListenerMock).toHaveBeenCalledOnce();
+    expect(registerOffscreenVoiceInputMessageListenerMock).toHaveBeenCalledOnce();
   });
 
   it('updates document metadata when the optional status node is missing', async () => {
@@ -72,5 +79,6 @@ describe('offscreen entrypoint', () => {
     expect(getCurrentLocaleMock).not.toHaveBeenCalled();
     expect(bootstrapOffscreenDocumentMock).toHaveBeenCalledOnce();
     expect(registerOffscreenRuntimeMessageListenerMock).toHaveBeenCalledOnce();
+    expect(registerOffscreenVoiceInputMessageListenerMock).toHaveBeenCalledOnce();
   });
 });

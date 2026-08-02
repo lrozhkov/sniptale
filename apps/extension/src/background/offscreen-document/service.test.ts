@@ -52,13 +52,12 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   }),
 }));
 
-type OffscreenManagerModule = typeof import('./offscreen-manager');
+type OffscreenManagerModule = typeof import('./service');
 
 async function loadOffscreenManager(): Promise<OffscreenManagerModule> {
   vi.resetModules();
-  return import('./offscreen-manager');
+  return import('./service');
 }
-
 function resetOffscreenMocks() {
   vi.clearAllMocks();
   randomUuidMock.mockReturnValue('startup-1');
@@ -71,7 +70,6 @@ function resetOffscreenMocks() {
   browserOffscreenCreateDocumentMock.mockResolvedValue(undefined);
   browserRuntimeSubscribeToMessagesMock.mockImplementation(() => vi.fn());
 }
-
 function createMessageSubscription() {
   const unsubscribeMock = vi.fn();
   let listener: ((message: unknown, sender: chrome.runtime.MessageSender) => void) | undefined;
@@ -91,94 +89,60 @@ function createMessageSubscription() {
     unsubscribeMock,
   };
 }
-
+function useOffscreenTestScope() {
+  beforeEach(() => {
+    resetOffscreenMocks();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+}
 async function expectReadyTimeout(waitPromise: Promise<unknown>): Promise<void> {
-  await expect(waitPromise).resolves.toEqual(
+  const timeoutError = await waitPromise;
+  expect(timeoutError).toEqual(
     expect.objectContaining({ message: 'Timed out while waiting for offscreen ready signal' })
   );
 }
-
-async function verifyReadyFromNonOffscreenSenderIsIgnored() {
+async function verifyWaitForReadySignal() {
   vi.useFakeTimers();
   const manager = await loadOffscreenManager();
   await manager.ensureOffscreenDocument('Start recording');
   const subscription = createMessageSubscription();
-  const timeoutResult = manager.waitForOffscreenReady(25).catch((error: unknown) => error);
-
+  const waitPromise = manager.waitForOffscreenReady(250);
+  subscription.emit({ type: 'IGNORED_MESSAGE' });
+  expect(subscription.unsubscribeMock).not.toHaveBeenCalled();
   subscription.emit(
     { type: VideoMessageType.OFFSCREEN_READY, offscreenStartupId: 'startup-1' },
-    { url: 'chrome-extension://id/apps/extension/src/settings/index.html' }
+    { url: 'chrome-extension://id/apps/extension/src/popup/index.html' }
   );
-  await vi.advanceTimersByTimeAsync(25);
-
-  await expectReadyTimeout(timeoutResult);
-  expect(subscription.unsubscribeMock).toHaveBeenCalledOnce();
-  expect(manager.hasOffscreenDocument()).toBe(true);
-}
-
-async function verifyReadyTimeoutIsClearedAfterSuccess() {
-  vi.useFakeTimers();
-  const manager = await loadOffscreenManager();
-  await manager.ensureOffscreenDocument('Start recording');
-  const subscription = createMessageSubscription();
-  const waitPromise = manager.waitForOffscreenReady(250);
-
+  expect(subscription.unsubscribeMock).not.toHaveBeenCalled();
   subscription.emit({ type: VideoMessageType.OFFSCREEN_READY, offscreenStartupId: 'startup-1' });
   await waitPromise;
-  await vi.advanceTimersByTimeAsync(250);
-
-  expect(loggerWarnMock).not.toHaveBeenCalledWith(
-    'Timed out while waiting for offscreen ready signal'
-  );
+  expect(subscription.unsubscribeMock).toHaveBeenCalledOnce();
+  expect(loggerDebugMock).toHaveBeenCalledWith('Received offscreen ready signal');
+  expect(manager.hasOffscreenDocument()).toBe(true);
+  vi.clearAllTimers();
 }
-
-async function verifyStaleReadySignalIsIgnored() {
+async function verifyReadyTimeoutFailure() {
   vi.useFakeTimers();
   const manager = await loadOffscreenManager();
   await manager.ensureOffscreenDocument('Start recording');
   const subscription = createMessageSubscription();
   const timeoutResult = manager.waitForOffscreenReady(25).catch((error: unknown) => error);
-
-  subscription.emit({ type: VideoMessageType.OFFSCREEN_READY, offscreenStartupId: 'old-startup' });
   await vi.advanceTimersByTimeAsync(25);
-
   await expectReadyTimeout(timeoutResult);
-  expect(loggerWarnMock).toHaveBeenCalledWith('Ignoring stale offscreen ready signal', {
-    expectedStartupId: 'startup-1',
-    offscreenStartupId: 'old-startup',
-  });
+  expect(subscription.unsubscribeMock).toHaveBeenCalledOnce();
+  expect(loggerWarnMock).toHaveBeenCalledWith('Timed out while waiting for offscreen ready signal');
+  expect(manager.hasOffscreenDocument()).toBe(true);
+  vi.clearAllTimers();
 }
-
-async function verifyStaleRuntimeStartupErrorIsIgnored() {
+async function verifyRuntimeStartupFailure() {
   vi.useFakeTimers();
   const manager = await loadOffscreenManager();
-  await manager.ensureOffscreenDocument('Start recording');
-  const subscription = createMessageSubscription();
-  const timeoutResult = manager.waitForOffscreenReady(25).catch((error: unknown) => error);
-
-  subscription.emit({
-    type: VideoMessageType.OFFSCREEN_ERROR,
-    offscreenStartupId: 'old-startup',
-    phase: 'runtime',
-    error: 'stale db unavailable',
-  });
-  await vi.advanceTimersByTimeAsync(25);
-
-  await expectReadyTimeout(timeoutResult);
-  expect(loggerWarnMock).toHaveBeenCalledWith('Ignoring stale offscreen error signal', {
-    expectedStartupId: 'startup-1',
-    offscreenStartupId: 'old-startup',
-  });
-}
-
-async function verifyFailedStartupIgnoresLateReady() {
-  vi.useFakeTimers();
-  const manager = await loadOffscreenManager();
-  randomUuidMock.mockReturnValueOnce('startup-1').mockReturnValueOnce('startup-2');
   await manager.ensureOffscreenDocument('Start recording');
   const subscription = createMessageSubscription();
   const waitPromise = manager.waitForOffscreenReady(250);
-
   subscription.emit({
     type: VideoMessageType.OFFSCREEN_ERROR,
     offscreenStartupId: 'startup-1',
@@ -186,33 +150,94 @@ async function verifyFailedStartupIgnoresLateReady() {
     error: 'db unavailable',
   });
   await expect(waitPromise).rejects.toThrow('db unavailable');
-
-  expect(manager.markOffscreenDocumentReady('startup-1')).toBe(false);
+  expect(subscription.unsubscribeMock).toHaveBeenCalledOnce();
+  expect(loggerWarnMock).toHaveBeenCalledWith('Offscreen reported a startup failure', {
+    error: 'db unavailable',
+    phase: 'runtime',
+  });
+}
+async function verifyRecreateAfterRuntimeStartupFailure() {
+  vi.useFakeTimers();
+  const manager = await loadOffscreenManager();
+  randomUuidMock.mockReturnValueOnce('startup-1').mockReturnValueOnce('startup-2');
+  await manager.ensureOffscreenDocument('Start recording');
+  const subscription = createMessageSubscription();
+  const waitPromise = manager.waitForOffscreenReady(250);
+  subscription.emit({
+    type: VideoMessageType.OFFSCREEN_ERROR,
+    offscreenStartupId: 'startup-1',
+    phase: 'runtime',
+    error: 'db unavailable',
+  });
+  await expect(waitPromise).rejects.toThrow('db unavailable');
   await expect(manager.ensureOffscreenDocument('Retry startup')).resolves.toBe(true);
   expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
-  expect(browserOffscreenCreateDocumentMock).toHaveBeenLastCalledWith({
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
     reasons: ['USER_MEDIA'],
     justification: 'Retry startup',
   });
 }
-
-describe('offscreen-manager stale generation readiness', () => {
-  beforeEach(resetOffscreenMocks);
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
+async function verifyRecreateAfterReadyTimeout() {
+  vi.useFakeTimers();
+  const manager = await loadOffscreenManager();
+  randomUuidMock.mockReturnValueOnce('startup-1').mockReturnValueOnce('startup-2');
+  await manager.ensureOffscreenDocument('Start recording');
+  createMessageSubscription();
+  const timeoutResult = manager.waitForOffscreenReady(25).catch((error: unknown) => error);
+  await vi.advanceTimersByTimeAsync(25);
+  await expectReadyTimeout(timeoutResult);
+  await expect(manager.ensureOffscreenDocument('Retry after timeout')).resolves.toBe(true);
+  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
+    url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
+    reasons: ['USER_MEDIA'],
+    justification: 'Retry after timeout',
   });
-
-  it(
-    'ignores ready signals from non-offscreen senders',
-    verifyReadyFromNonOffscreenSenderIsIgnored
+}
+async function verifyRetryFailsWhenBrokenOffscreenDocumentCannotBeClosed() {
+  vi.useFakeTimers();
+  const manager = await loadOffscreenManager();
+  await manager.ensureOffscreenDocument('Start recording');
+  const subscription = createMessageSubscription();
+  browserOffscreenCloseDocumentMock.mockRejectedValueOnce(new Error('close failed'));
+  const waitPromise = manager.waitForOffscreenReady(250);
+  subscription.emit({
+    type: VideoMessageType.OFFSCREEN_ERROR,
+    offscreenStartupId: 'startup-1',
+    phase: 'runtime',
+    error: 'db unavailable',
+  });
+  await expect(waitPromise).rejects.toThrow('db unavailable');
+  await expect(manager.ensureOffscreenDocument('Retry startup')).rejects.toThrow('close failed');
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledTimes(1);
+  expect(loggerWarnMock).toHaveBeenCalledWith(
+    'Failed to close offscreen document after startup failure',
+    expect.objectContaining({
+      error: expect.any(Error),
+      reason: 'runtime failure',
+    })
   );
-  it('clears the ready timeout after a successful signal', verifyReadyTimeoutIsClearedAfterSuccess);
-  it('ignores stale ready signals', verifyStaleReadySignalIsIgnored);
-  it('ignores stale runtime startup errors', verifyStaleRuntimeStartupErrorIsIgnored);
+}
+
+describe('offscreen-manager waitForOffscreenReady', () => {
+  useOffscreenTestScope();
   it(
-    'keeps a failed startup generation failed after late ready',
-    verifyFailedStartupIgnoresLateReady
+    'resolves on the OFFSCREEN_READY message and marks the document as ready',
+    verifyWaitForReadySignal
+  );
+  it('rejects after timeout when the ready signal never arrives', verifyReadyTimeoutFailure);
+  it(
+    'rejects when the offscreen document reports a runtime startup failure',
+    verifyRuntimeStartupFailure
+  );
+  it(
+    'recreates the offscreen document after a runtime startup failure',
+    verifyRecreateAfterRuntimeStartupFailure
+  );
+  it('recreates the offscreen document after a ready timeout', verifyRecreateAfterReadyTimeout);
+  it(
+    'fails the retry when the broken offscreen document cannot be closed',
+    verifyRetryFailsWhenBrokenOffscreenDocumentCannotBeClosed
   );
 });

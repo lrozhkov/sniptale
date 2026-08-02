@@ -15,7 +15,8 @@ export type BackgroundOwnedRouteHandlerId =
   | 'native-app-runtime'
   | 'page-access'
   | 'popup-export-archive'
-  | 'popup-tab-route-capability-issuance';
+  | 'popup-tab-route-capability-issuance'
+  | 'voice-input-offscreen-event';
 
 export type BackgroundOwnedRouteInventoryEntry = {
   readonly handlerId: BackgroundOwnedRouteHandlerId;

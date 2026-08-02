@@ -1,6 +1,6 @@
 # Security data handling
 
-Updated: 2026-08-01
+Updated: 2026-08-02
 
 ## Scope
 
@@ -37,6 +37,7 @@ This policy covers AI credentials and request history, secret-bearing network tr
 - User-selected video-editor Cache mode may retain local-only derived AVC preview segments in the dedicated IndexedDB database `sniptale-video-preview-cache`. The cache is advisory, limited to 14 days, 12 records, and 512 MiB, excluded from project export, backup, sync, and diagnostics, removed before project deletion, and always removed and absence-verified by local-data erasure. Preview preferences follow `preservePreferences`; derived media never does.
 - Active video recording writes uncommitted MediaRecorder chunks to the extension origin private file system under `sniptale-recording-staging`. Staging is local-only, excluded from backup, sync, export, diagnostics, and the media library, and has a 64 MiB aggregate in-flight write ceiling per recording session. A successful atomic media-library commit deletes the staging session; discard and terminal failure abort it. Normal offscreen startup removes orphan sessions before announcing readiness. Local-data erasure invalidates and aborts active staging writers, removes every staging session, and verifies an empty directory under the persistent-data erasure barrier after media mutations have been excluded and the recording offscreen runtime has closed.
 - A finalized recording creates one exact `video-recording-completion-outbox` row in the existing IndexedDB `state_manager` store in the same transaction as its recording and media-library rows. The outbox contains recording IDs and an optional project ID, never media bytes, URLs, page data, or diagnostics. Offscreen restart replays this row before readiness, and exact background acceptance retires it. An unacknowledged post-record decision does not expire; only an acknowledged session-storage tombstone has a 12-hour retention bound. Local-data erasure clears and verifies the complete `state_manager` store together with committed media and prevents an active writer from recreating the row across the erasure barrier.
+- Voice-input transcripts and recognition results are session-only. They may pass from the offscreen document through the background coordinator to the single owning extension-page Port, but must not enter local, sync, or session storage, exports, diagnostics, or traces. Language, recognition mode, and the selected microphone device identifier are persisted as ordinary sync preferences; the device identifier is never logged or rendered as a fallback label. Local recognition requests the fixed `dictation` quality when Chrome supports that option; browser-managed fallback uses Chrome's built-in service without extension-owned credentials or network transport.
 
 ## Network secret ownership
 
@@ -51,6 +52,7 @@ This policy covers AI credentials and request history, secret-bearing network tr
 - Only exact `diagnosticSanitizerOwners` entries are tracer exceptions. Other collectors and sinks must import the canonical sanitizer and prove sanitization before every write.
 - Recording diagnostics UI discloses captured tab URL, sanitized console/errors, network failures, service logs, IndexedDB retention, and JSON/ZIP export behavior before enablement or download.
 - Preview-cache diagnostics contain fixed reason codes, counts, durations, byte totals, and phase names only. They exclude project IDs, digests, fingerprints, source URLs, blobs, frame content, document source, and asset bytes.
+- Voice-input diagnostics contain request/session identifiers, language, requested and effective mode, API flavor, fixed quality, normalized availability and error/fallback codes, phase, duration, sequence, character count, confidence, and a bounded normalized microphone level only. The offscreen document derives that scalar level at 10 Hz for the owning live Port and retains no history; the Settings consumer builds its short waveform in memory. Device identifiers, transcript text, PCM/audio, raw recognition results, and raw exception messages are excluded; the runtime message tracer replaces transcript text with character count before generic sanitization.
 
 ## Deterministic guardrails
 

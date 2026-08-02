@@ -134,11 +134,11 @@ export const PRIVACY_ERASURE_OWNER_MAPPINGS = [
   {
     allowCrossOwner: true,
     owner: 'local-data-erasure-media-lifecycle-owner',
-    productionFile: 'apps/extension/src/background/media/lifecycle-gate.ts',
+    productionFile: 'apps/extension/src/background/mutation-exclusion/media-activity.ts',
     reason: 'Media lifecycle proof covers mutation drain and capability denial.',
     testFiles: [
       'apps/extension/src/background/application/privacy-erasure/use-case.test.ts',
-      'apps/extension/src/background/media/lifecycle-gate.test.ts',
+      'apps/extension/src/background/mutation-exclusion/media-activity.test.ts',
       'apps/extension/src/background/media/video/application/export/use-case.test.ts',
       'apps/extension/src/background/media/video/manager/start-owner.test.ts',
     ],

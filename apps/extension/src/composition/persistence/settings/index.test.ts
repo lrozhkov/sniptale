@@ -65,6 +65,11 @@ const DEFAULT_FULL_PAGE_CAPTURE = {
   freezeMotion: true,
   preloadLazyContent: true,
 };
+const DEFAULT_VOICE_INPUT = {
+  language: 'ru-RU' as const,
+  microphoneDeviceId: null,
+  mode: 'local-first' as const,
+};
 
 function resetSettingsStorageMocks() {
   vi.clearAllMocks();
@@ -138,6 +143,7 @@ async function verifyLoadMigration() {
     imageFormat: 'webp',
     imageQuality: 75,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+    voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,
   });
   expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
@@ -189,6 +195,11 @@ async function verifyStoredSettings() {
     authenticatedSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: true,
     rawDiagnosticsEnabled: true,
+    voiceInput: {
+      language: 'en-US' as const,
+      microphoneDeviceId: null,
+      mode: 'browser-managed' as const,
+    },
   };
 
   browserStorageSyncGetMock.mockResolvedValue({ sniptale_settings: storedSettings });
@@ -241,6 +252,7 @@ const invalidStoredSettingsFixture = {
   authenticatedSnapshotAssetsEnabled: 'yes',
   skipWebSnapshotSaveDisclosure: 'yes',
   rawDiagnosticsEnabled: 'sometimes',
+  voiceInput: { language: 'fr-FR', mode: 'always-local' },
 };
 
 const expectedInvalidStoredSettingsResult = {
@@ -267,6 +279,7 @@ const expectedInvalidStoredSettingsResult = {
   imageFormat: 'png',
   imageQuality: 100,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+  voiceInput: DEFAULT_VOICE_INPUT,
   ...PRIVACY_DEFAULTS,
 };
 
@@ -300,6 +313,7 @@ async function verifyInvalidRootFallback() {
     imageFormat: 'png',
     imageQuality: 100,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
+    voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,
   });
 
@@ -322,6 +336,20 @@ describe('settings', () => {
       defaultViewportPresetId: null,
       imageFormat: 'png',
     });
+  });
+
+  it('normalizes legacy voice preferences with the default microphone selection', async () => {
+    browserStorageSyncGetMock.mockResolvedValueOnce({
+      sniptale_settings: { voiceInput: { language: 'en-US', mode: 'browser-managed' } },
+    });
+    await expect(loadSettings()).resolves.toMatchObject({
+      voiceInput: {
+        language: 'en-US',
+        microphoneDeviceId: null,
+        mode: 'browser-managed',
+      },
+    });
+    expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
   });
 
   it('reads revision-1 viewport settings with the new system preset without writing storage', async () => {

@@ -161,6 +161,9 @@ function getInitialSettingsTab(): SettingsTab {
   if (section === 'video') {
     return 'video';
   }
+  if (section === 'voice-input') {
+    return 'voiceInput';
+  }
   if (section === 'presets') {
     return 'presets';
   }

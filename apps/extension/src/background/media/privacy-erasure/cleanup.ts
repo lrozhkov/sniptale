@@ -7,16 +7,31 @@ import {
 import { sendRuntimeMessage } from '../../../platform/runtime-messaging';
 import { inspectPersistedLease } from '../../storage/video/recording-control-lease';
 import type { PersistedLeaseInspection } from '../../storage/video/recording-control-lease';
-import { reserveMediaErasureExclusion } from '../lifecycle-gate';
-import { closeOffscreenDocumentForPrivacyErasure } from '../video/runtime/offscreen-manager';
+import { reserveMediaErasureExclusion } from '../../mutation-exclusion/media-activity';
+import { closeOffscreenDocumentForPrivacyErasure } from '../../offscreen-document/service';
 import { cleanupProjectExport } from './project-export';
 import { cleanupRecording } from './recording';
 import { recoverInvalidDurableMediaState } from './recovery';
-import { failed, failedExportParticipants, RECORDING_PARTICIPANT_ID } from './result';
+import {
+  failed,
+  failedExportParticipants,
+  RECORDING_PARTICIPANT_ID,
+  verified,
+  VOICE_INPUT_PARTICIPANT_ID,
+} from './result';
+import { cleanupVoiceInputForPrivacyErasure } from '../../voice-input/coordinator';
 
 export const mediaPrivacyErasureCleanupAdapter = {
   reserveErasureExclusion: reserveMediaErasureExclusion,
   async cleanup(): Promise<readonly ErasureParticipantResult[]> {
+    let voiceInputResult: ErasureParticipantResult;
+    try {
+      voiceInputResult = (await cleanupVoiceInputForPrivacyErasure())
+        ? verified(VOICE_INPUT_PARTICIPANT_ID)
+        : failed(VOICE_INPUT_PARTICIPANT_ID, 'voice-input-stop-failed');
+    } catch {
+      voiceInputResult = failed(VOICE_INPUT_PARTICIPANT_ID, 'voice-input-stop-failed');
+    }
     let persistedLease: PersistedLeaseInspection;
     let exportLedger: ProjectExportJobLedgerInspection;
     try {
@@ -26,6 +41,7 @@ export const mediaPrivacyErasureCleanupAdapter = {
       ]);
     } catch {
       return [
+        voiceInputResult,
         failed(RECORDING_PARTICIPANT_ID, 'media-authority-read-failed'),
         ...failedExportParticipants('media-authority-read-failed'),
       ];
@@ -33,20 +49,24 @@ export const mediaPrivacyErasureCleanupAdapter = {
 
     if (persistedLease.status === 'unavailable' || exportLedger.status === 'unavailable') {
       return [
+        voiceInputResult,
         failed(RECORDING_PARTICIPANT_ID, 'media-authority-read-unavailable'),
         ...failedExportParticipants('media-authority-read-unavailable'),
       ];
     }
     if (persistedLease.status === 'invalid' || exportLedger.status === 'invalid') {
-      return recoverInvalidDurableMediaState();
+      return [voiceInputResult, ...(await recoverInvalidDurableMediaState())];
     }
 
     const [recording, projectExport] = await Promise.all([
       cleanupRecording(),
       cleanupProjectExport(exportLedger, { sendRuntimeMessage }),
     ]);
-    const results = [recording, ...projectExport];
-    if (results.some((result) => result.severity === 'required' && result.status === 'failed')) {
+    const mediaResults = [recording, ...projectExport];
+    const results = [voiceInputResult, ...mediaResults];
+    if (
+      mediaResults.some((result) => result.severity === 'required' && result.status === 'failed')
+    ) {
       return results;
     }
 
@@ -54,7 +74,11 @@ export const mediaPrivacyErasureCleanupAdapter = {
       await closeOffscreenDocumentForPrivacyErasure();
       return results;
     } catch {
-      return [failed(RECORDING_PARTICIPANT_ID, 'offscreen-media-close-failed'), ...projectExport];
+      return [
+        voiceInputResult,
+        failed(RECORDING_PARTICIPANT_ID, 'offscreen-media-close-failed'),
+        ...projectExport,
+      ];
     }
   },
 };

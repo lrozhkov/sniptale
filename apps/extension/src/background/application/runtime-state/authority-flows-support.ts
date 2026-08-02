@@ -35,7 +35,7 @@ export const SUPPORT_RUNTIME_STATE_AUTHORITY_FLOWS = [
     ownerModule: 'apps/extension/src/background/application/privacy-erasure/use-case.ts',
     proofModules: [
       'apps/extension/src/background/application/privacy-erasure/use-case.test.ts',
-      'apps/extension/src/background/media/lifecycle-gate.test.ts',
+      'apps/extension/src/background/mutation-exclusion/media-activity.test.ts',
       'apps/extension/src/background/media/privacy-erasure/cleanup.test.ts',
     ],
     restartBehavior: [

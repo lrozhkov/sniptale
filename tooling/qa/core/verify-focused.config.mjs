@@ -75,7 +75,7 @@ export const EXPORT_ARTIFACT_BOUNDARY_TRIGGER_PATTERNS = [
 
 export const MANIFEST_INTEGRITY_TRIGGER_FILES = new Set([
   'tooling/qa/core/verify-manifest-integrity.mjs',
-  'apps/extension/src/background/media/video/runtime/offscreen-document-dto.ts',
+  'apps/extension/src/background/offscreen-document/create-options.ts',
   'apps/extension/manifest.json',
   'apps/extension/vite.config.ts',
   'apps/extension/build/layout.data.json',

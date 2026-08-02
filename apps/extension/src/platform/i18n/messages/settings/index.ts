@@ -9,6 +9,7 @@ import { settingsPermissionsMessages } from './permissions';
 import { settingsPrivacyMessages } from './privacy';
 import { settingsQuickActionsMessages } from './quick-actions';
 import { settingsVideoQualityMessages } from './video-quality';
+import { settingsVoiceInputMessages } from './voice-input';
 
 export const settingsMessages = defineMessageSource({
   appearance: settingsAppearanceMessages,
@@ -21,4 +22,5 @@ export const settingsMessages = defineMessageSource({
   quickActions: settingsQuickActionsMessages,
   hotkeyInput: settingsHotkeyInputMessages,
   videoQuality: settingsVideoQualityMessages,
+  voiceInput: settingsVoiceInputMessages,
 });

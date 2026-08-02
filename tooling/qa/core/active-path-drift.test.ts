@@ -20,6 +20,59 @@ function expectPathsToExist(paths: Iterable<string>) {
   }
 }
 
+function collectSourceFiles(directory: string): string[] {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return collectSourceFiles(entryPath);
+    return /\.(?:ts|tsx)$/.test(entry.name) && !entry.name.includes('.test.') ? [entryPath] : [];
+  });
+}
+
+function expectSharedOffscreenLifecycleOwnership() {
+  const extensionSourceRoot = path.join(repoRoot, 'apps/extension/src');
+  const retiredImportSpecifiers = [
+    '/runtime/offscreen-manager',
+    './offscreen-manager',
+    'offscreen-document-dto',
+    'offscreen-manager-state',
+    'offscreen-readiness',
+    'offscreen-startup-id',
+  ];
+  for (const sourceFile of collectSourceFiles(extensionSourceRoot)) {
+    const source = fs.readFileSync(sourceFile, 'utf8');
+    const importSpecifiers = [...source.matchAll(/(?:from\s+|import\s*)['"]([^'"]+)['"]/g)].map(
+      (match) => match[1] ?? ''
+    );
+    for (const specifier of retiredImportSpecifiers) {
+      expect(
+        importSpecifiers.some((candidate) => candidate.includes(specifier)),
+        `${path.relative(repoRoot, sourceFile)} imports ${specifier}`
+      ).toBe(false);
+    }
+  }
+
+  const videoOwnerRoot = path.join(extensionSourceRoot, 'background/media/video');
+  const genericSymbols = [
+    'createOffscreenDocumentContextFilter',
+    'createOffscreenStartupId',
+    'createUserMediaOffscreenDocumentOptions',
+    'hasOffscreenRuntimeCapability',
+    'resolveExistingOffscreenStartupId',
+    'resolveOffscreenRuntimeCapabilityContext',
+    'waitForOffscreenReadyForState',
+  ];
+  const definitionPrefixes = ['class ', 'const ', 'function ', 'interface ', 'type '];
+  for (const sourceFile of collectSourceFiles(videoOwnerRoot)) {
+    const source = fs.readFileSync(sourceFile, 'utf8');
+    for (const symbol of genericSymbols) {
+      expect(
+        definitionPrefixes.some((prefix) => source.includes(`${prefix}${symbol}`)),
+        `${path.relative(repoRoot, sourceFile)} defines ${symbol}`
+      ).toBe(false);
+    }
+  }
+}
+
 function expectActiveWorkflowDocPaths() {
   const codeQuality = fs.readFileSync(path.join(repoRoot, 'docs/tooling/code-quality.md'), 'utf8');
   const repoAuditSkill = fs.readFileSync(
@@ -84,7 +137,7 @@ function expectFocusedTriggerPaths() {
   );
   expect(focusedConfig).toContain('DESIGN.md');
   expect(focusedConfig).toContain(
-    'apps/extension/src/background/media/video/runtime/offscreen-document-dto.ts'
+    'apps/extension/src/background/offscreen-document/create-options.ts'
   );
   expect(focusedConfig).not.toContain(['docs/design', 'ux-ui-concept'].join('/'));
 
@@ -122,6 +175,10 @@ function expectRetiredRootDocs() {
 }
 
 describe('active QA policy path integrity', () => {
+  it('keeps generic offscreen lifecycle ownership outside the video tree', () => {
+    expectSharedOffscreenLifecycleOwnership();
+  });
+
   it('keeps active allowlists aligned with real canonical owner paths', () => {
     expectPathsToExist(LOCAL_STORAGE_OWNER_FILES);
     expectPathsToExist(LOGGING_ALLOWLISTED_FILES);

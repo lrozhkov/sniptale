@@ -106,7 +106,7 @@
         "apps/extension/src/background/capture/download/download-router/index.ts",
         "apps/extension/src/background/offscreen-manager.ts",
         "apps/extension/src/background/media/video/manager/session.ts",
-        "apps/extension/src/background/media/video/runtime/offscreen-manager.ts",
+        "apps/extension/src/background/offscreen-document/service.ts",
         "apps/extension/src/background/media/video/runtime/export-capabilities.ts",
         "apps/extension/src/background/media/video/runtime/session-state/index.ts",
         "apps/extension/src/background/media/video/runtime/session-state/service/index.ts",

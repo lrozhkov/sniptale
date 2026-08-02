@@ -52,6 +52,7 @@
     "./validation/primitives": "./src/validation/primitives.ts",
     "./validation/string-literals": "./src/validation/string-literals.ts",
     "./validation/text": "./src/validation/text.ts",
+    "./voice-input": "./src/voice-input/index.ts",
     "./video/messages": "./src/video/messages/index.ts",
     "./video/types/defaults": "./src/video/types/defaults.ts",
     "./video/types/messages.content": "./src/video/types/messages.content.ts",

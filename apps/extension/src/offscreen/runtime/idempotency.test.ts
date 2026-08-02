@@ -1,7 +1,9 @@
 import { expect, it } from 'vitest';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   OFFSCREEN_COMMAND_CORRELATION_KEYS,
+  executeOffscreenResponseCommand,
   getOffscreenCommandIdempotencyPolicy,
   markOffscreenSideEffectCommand,
 } from './idempotency';
@@ -25,12 +27,25 @@ it('declares idempotency policy for every offscreen side-effect route', () => {
     'jobId',
     'recordingId',
     'desktopMediaRequestId',
+    'requestId',
+    'sessionId',
     'runtime',
   ]);
 
   for (const type of handledCommandTypes) {
     const policy = getOffscreenCommandIdempotencyPolicy(type);
     expect(policy.reason.length).toBeGreaterThan(0);
+  }
+
+  for (const type of [
+    MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
+    MessageType.OFFSCREEN_VOICE_INPUT_START,
+    MessageType.OFFSCREEN_VOICE_INPUT_STOP,
+  ] as const) {
+    expect(getOffscreenCommandIdempotencyPolicy(type)).toEqual({
+      idempotent: true,
+      reason: expect.any(String),
+    });
   }
 });
 
@@ -77,4 +92,33 @@ it('does not mutate idempotency state for commands that are intentionally untrac
 
   expect(first).toEqual({ duplicate: false, tracked: false });
   expect(second).toEqual({ duplicate: false, tracked: false });
+});
+
+it('replays the exact response produced by a signed voice command', async () => {
+  const execute = () => ({ success: true as const, snapshot: { phase: 'idle' as const } });
+  const message = {
+    requestId: 'voice-status-response-replay',
+    type: MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
+  };
+  const first = executeOffscreenResponseCommand({
+    capabilityGeneration: 'voice-generation-response-replay',
+    execute,
+    message,
+  });
+  const duplicate = executeOffscreenResponseCommand({
+    capabilityGeneration: 'voice-generation-response-replay',
+    execute,
+    message,
+  });
+
+  expect(first).toEqual({
+    duplicate: false,
+    response: { success: true, snapshot: { phase: 'idle' } },
+  });
+  expect(duplicate).toEqual({ duplicate: true, completion: expect.any(Promise) });
+  if (!duplicate.duplicate) throw new Error('Expected duplicate voice command');
+  await expect(duplicate.completion).resolves.toEqual({
+    success: true,
+    snapshot: { phase: 'idle' },
+  });
 });

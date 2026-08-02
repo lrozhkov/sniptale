@@ -25,6 +25,8 @@ const EXPECTED_POLICY_STATE_IDS = [
   'gallery-image-update-capabilities',
   'llm-session-tokens',
   'native-ingestion-erasure-exclusion',
+  'offscreen-command-capability-generations',
+  'offscreen-media-activity-lease',
   'page-access-tab-activation',
   'persistent-data-erasure-lease',
   'popup-export-staged-archives',
@@ -36,6 +38,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'video-capture-surface-sessions',
   'video-post-record-results',
   'video-recording-control-lease',
+  'voice-input-port-session-authority',
   'web-snapshot-staged-blobs',
 ] as const satisfies readonly PolicyStateId[];
 
@@ -102,6 +105,7 @@ it('marks delete-on-consume capability states as one-shot', () => {
     'content-action-trusted-event-proofs',
     'gallery-image-update-capabilities',
     'llm-session-tokens',
+    'offscreen-command-capability-generations',
     'popup-tab-route-capabilities',
     'project-export-capabilities',
   ]);

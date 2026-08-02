@@ -6,25 +6,19 @@ import {
   createOffscreenDocumentContextFilter,
   createPrivacyErasureOffscreenDocumentOptions,
   createUserMediaOffscreenDocumentOptions,
-} from './offscreen-document-dto';
-import {
-  createInitialOffscreenManagerState,
-  type OffscreenManagerState,
-} from './offscreen-manager-state';
-import {
-  markOffscreenDocumentReadyForState,
-  waitForOffscreenReadyForState,
-} from './offscreen-readiness';
+} from './create-options';
+import { createInitialOffscreenDocumentState, type OffscreenDocumentState } from './state';
+import { markOffscreenDocumentReadyForState, waitForOffscreenReadyForState } from './readiness';
 import {
   createOffscreenDocumentUrl,
   createPrivacyErasureOffscreenDocumentUrl,
   createOffscreenStartupId,
   resolveExistingOffscreenStartupId,
-} from './offscreen-startup-id';
+} from './startup-id';
 
-const logger = createLogger({ namespace: 'BackgroundOffscreenManager' });
+const logger = createLogger({ namespace: 'BackgroundOffscreenDocument' });
 
-function resetClosedOffscreenState(state: OffscreenManagerState): void {
+function resetClosedOffscreenState(state: OffscreenDocumentState): void {
   state.offscreenCreated = false;
   state.offscreenReady = false;
   state.startupFailed = false;
@@ -32,7 +26,7 @@ function resetClosedOffscreenState(state: OffscreenManagerState): void {
 }
 
 async function closeOffscreenDocumentForState(
-  state: OffscreenManagerState,
+  state: OffscreenDocumentState,
   reason: 'runtime failure' | 'timeout'
 ): Promise<void> {
   try {
@@ -51,7 +45,7 @@ async function closeOffscreenDocumentForState(
 }
 
 async function closeOffscreenDocumentForPrivacyErasureForState(
-  state: OffscreenManagerState
+  state: OffscreenDocumentState
 ): Promise<void> {
   const contextFilter = createOffscreenDocumentContextFilter();
   const existingContexts = await browserRuntime.getContexts(contextFilter);
@@ -71,7 +65,7 @@ async function closeOffscreenDocumentForPrivacyErasureForState(
 }
 
 async function ensureOffscreenDocumentForState(
-  state: OffscreenManagerState,
+  state: OffscreenDocumentState,
   justification: string
 ): Promise<boolean> {
   if (state.offscreenCreated && !state.startupFailed) {
@@ -120,7 +114,7 @@ async function ensureOffscreenDocumentForState(
 }
 
 async function ensurePrivacyErasureOffscreenDocumentForState(
-  state: OffscreenManagerState
+  state: OffscreenDocumentState
 ): Promise<void> {
   if (state.offscreenCreated) {
     throw new Error('Privacy erasure requires an isolated offscreen document');
@@ -145,8 +139,8 @@ async function ensurePrivacyErasureOffscreenDocumentForState(
   logger.log('Created isolated offscreen document for local data erasure');
 }
 
-export function createOffscreenManagerService() {
-  const state = createInitialOffscreenManagerState();
+export function createOffscreenDocumentService() {
+  const state = createInitialOffscreenDocumentState();
 
   function hasOffscreenDocument(): boolean {
     return state.offscreenCreated;
@@ -156,7 +150,9 @@ export function createOffscreenManagerService() {
     return markOffscreenDocumentReadyForState(state, offscreenStartupId);
   }
 
-  async function ensureOffscreenDocument(justification = 'Recording tab video'): Promise<boolean> {
+  async function ensureOffscreenDocument(
+    justification = 'Run extension-owned offscreen media work'
+  ): Promise<boolean> {
     return ensureOffscreenDocumentForState(state, justification);
   }
 
@@ -183,30 +179,30 @@ export function createOffscreenManagerService() {
   };
 }
 
-const defaultOffscreenManagerService = createLazyDefaultOwner(createOffscreenManagerService);
+const defaultOffscreenDocumentService = createLazyDefaultOwner(createOffscreenDocumentService);
 
 export function hasOffscreenDocument(): boolean {
-  return defaultOffscreenManagerService.getOwner().hasOffscreenDocument();
+  return defaultOffscreenDocumentService.getOwner().hasOffscreenDocument();
 }
 
 export function markOffscreenDocumentReady(offscreenStartupId?: string): boolean {
-  return defaultOffscreenManagerService.getOwner().markOffscreenDocumentReady(offscreenStartupId);
+  return defaultOffscreenDocumentService.getOwner().markOffscreenDocumentReady(offscreenStartupId);
 }
 
 export async function ensureOffscreenDocument(
-  justification = 'Recording tab video'
+  justification = 'Run extension-owned offscreen media work'
 ): Promise<boolean> {
-  return defaultOffscreenManagerService.getOwner().ensureOffscreenDocument(justification);
+  return defaultOffscreenDocumentService.getOwner().ensureOffscreenDocument(justification);
 }
 
 export function waitForOffscreenReady(timeoutMs = 5000): Promise<void> {
-  return defaultOffscreenManagerService.getOwner().waitForOffscreenReady(timeoutMs);
+  return defaultOffscreenDocumentService.getOwner().waitForOffscreenReady(timeoutMs);
 }
 
 export function closeOffscreenDocumentForPrivacyErasure(): Promise<void> {
-  return defaultOffscreenManagerService.getOwner().closeOffscreenDocumentForPrivacyErasure();
+  return defaultOffscreenDocumentService.getOwner().closeOffscreenDocumentForPrivacyErasure();
 }
 
 export function ensurePrivacyErasureOffscreenDocument(): Promise<void> {
-  return defaultOffscreenManagerService.getOwner().ensurePrivacyErasureOffscreenDocument();
+  return defaultOffscreenDocumentService.getOwner().ensurePrivacyErasureOffscreenDocument();
 }

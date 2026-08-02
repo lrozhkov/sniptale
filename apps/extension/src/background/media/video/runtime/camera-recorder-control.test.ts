@@ -36,7 +36,7 @@ import {
   reconnectCameraRecorderDocument,
   restoreAuthorizedCameraRecorderDocument,
 } from './camera-recorder-control';
-import { reserveMediaErasureExclusion } from '../../lifecycle-gate';
+import { reserveMediaErasureExclusion } from '../../../mutation-exclusion/media-activity';
 
 const CAMERA_URL = 'chrome-extension://test/apps/extension/src/camera-recorder/index.html';
 

@@ -114,11 +114,11 @@
     {
       "name": "offscreen",
       "owner": "packages/platform/src/browser/offscreen.ts",
-      "feature": "Recording and export composition offscreen document",
-      "runtimeRoute": "shared offscreen adapter with background/offscreen lifecycle owners",
-      "capabilityPolicy": "Only background-owned recording/export sessions create or tear down offscreen work.",
-      "failureBehavior": "Creation failure rejects the session before media/export state is committed.",
-      "justification": "Creates and manages the offscreen document used for recording and export composition jobs.",
+      "feature": "Recording, export composition, and voice-input offscreen document",
+      "runtimeRoute": "shared offscreen adapter with background offscreen-document, video, and voice-input lifecycle owners",
+      "capabilityPolicy": "Only background-owned recording, export, or Port-bound voice-input sessions create or tear down offscreen work; microphone access is requested from visible extension UI.",
+      "failureBehavior": "Creation failure rejects the session before media/export state is committed; voice input surfaces a normalized unavailable error without retaining transcript text.",
+      "justification": "Creates and manages the offscreen document used for recording, export composition, and one-shot speech recognition jobs.",
       "reviewNote": "Keep lifecycle orchestration centralized in the background/offscreen owners.",
       "userFacingDisclosure": "settings.permissions.requiredOffscreenDescription"
     },

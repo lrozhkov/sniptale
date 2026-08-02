@@ -13,6 +13,8 @@ export type PolicyStateId =
   | 'gallery-image-update-capabilities'
   | 'llm-session-tokens'
   | 'native-ingestion-erasure-exclusion'
+  | 'offscreen-command-capability-generations'
+  | 'offscreen-media-activity-lease'
   | 'page-access-tab-activation'
   | 'persistent-data-erasure-lease'
   | 'popup-export-staged-archives'
@@ -24,6 +26,7 @@ export type PolicyStateId =
   | 'video-camera-recorder-grant'
   | 'video-post-record-results'
   | 'video-recording-control-lease'
+  | 'voice-input-port-session-authority'
   | 'web-snapshot-staged-blobs';
 
 export type PolicyStateClass =

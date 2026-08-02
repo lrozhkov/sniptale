@@ -101,6 +101,19 @@ it('requires harness verification when a retired target moves across owner direc
   ).toMatchObject([{ rule: 'instance-ownership-inventory-addition-requires-harness' }]);
 });
 
+it('accepts the reviewed generic offscreen lifecycle owner move', () => {
+  const retired = 'apps/extension/src/background/media/video/runtime/offscreen-manager.ts';
+  const successor = 'apps/extension/src/background/offscreen-document/service.ts';
+
+  expect(
+    validateInventory({
+      current: inventory([wave([successor], 'facade-default-owner', 'background-runtime-facades')]),
+      head: inventory([wave([retired], 'facade-default-owner', 'background-runtime-facades')]),
+      liveFiles: [successor],
+    })
+  ).toEqual([]);
+});
+
 it('requires harness verification when a retired target is replaced by a missing successor', () => {
   const retired = 'apps/extension/src/offscreen/recording/start/helpers.ts';
   const missingSuccessor = 'apps/extension/src/offscreen/recording/start/missing.ts';

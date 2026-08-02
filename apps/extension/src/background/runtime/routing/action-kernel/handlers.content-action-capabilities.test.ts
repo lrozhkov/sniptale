@@ -144,7 +144,11 @@ it('rejects unauthorized content action proof issuance before routing', () => {
     success: false,
   });
   expect(action.context.logger.warn).toHaveBeenCalledWith(
-    'Rejected background-owned runtime message'
+    'Rejected background-owned runtime message',
+    {
+      reason: 'Unauthorized content action capability sender',
+      routeName: `background-owned:${MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY}`,
+    }
   );
   const serializedLogs = JSON.stringify(vi.mocked(action.context.logger.warn).mock.calls);
   expect(serializedLogs).not.toContain(sensitiveRequestId);

@@ -4,7 +4,7 @@ import { getBackgroundRuntimeMessaging } from '../../routing-contracts/runtime-m
 import {
   closeOffscreenDocumentForPrivacyErasure,
   ensurePrivacyErasureOffscreenDocument,
-} from '../../media/video/runtime/offscreen-manager';
+} from '../../offscreen-document/service';
 
 async function runPageStorageCommand(
   operation: 'erase' | 'verify',

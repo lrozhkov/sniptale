@@ -2,6 +2,7 @@ import { defineMessageContractRegistry } from '@sniptale/runtime-contracts/messa
 import type { RuntimeRequestByType, RuntimeResponseByType } from '../runtime-message/index';
 import { runtimeCoreMessageContracts } from './core';
 import { runtimeVideoMessageContracts } from './video';
+import { runtimeVoiceInputMessageContracts } from './voice-input';
 
 const defineRuntimeMessageRegistry = defineMessageContractRegistry<
   RuntimeRequestByType,
@@ -11,4 +12,5 @@ const defineRuntimeMessageRegistry = defineMessageContractRegistry<
 export const runtimeMessageContracts = defineRuntimeMessageRegistry({
   ...runtimeCoreMessageContracts,
   ...runtimeVideoMessageContracts,
+  ...runtimeVoiceInputMessageContracts,
 });

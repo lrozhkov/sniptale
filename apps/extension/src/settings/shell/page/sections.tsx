@@ -29,6 +29,7 @@ const deferredSettingsSectionLoaders: Record<DeferredSettingsTab, SettingsSectio
   editor: () => import('../../sections/editor'),
   image: () => import('../../sections/image'),
   video: () => import('../../sections/video-quality-profiles'),
+  voiceInput: () => import('../../sections/voice-input'),
   templates: () => import('../../sections/templates'),
   quickactions: () => import('../../sections/quick-actions'),
   nativeApp: () => import('../../sections/native-app'),
@@ -52,6 +53,10 @@ const deferredSettingsSections: Record<
   video: createLazySettingsSection(
     deferredSettingsSectionLoaders.video,
     'VideoQualityProfilesSection'
+  ),
+  voiceInput: createLazySettingsSection(
+    deferredSettingsSectionLoaders.voiceInput,
+    'VoiceInputSettingsSection'
   ),
   templates: createLazySettingsSection(
     deferredSettingsSectionLoaders.templates,

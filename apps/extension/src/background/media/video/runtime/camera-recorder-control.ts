@@ -6,7 +6,10 @@ import {
   rebindCameraRecorderDocumentGrant,
   type CameraRecorderGrant,
 } from '../../../storage/video/camera-recorder-grant';
-import { acquireMediaMutationPermit, getMediaAuthorityGeneration } from '../../lifecycle-gate';
+import {
+  acquireMediaMutationPermit,
+  getMediaAuthorityGeneration,
+} from '../../../mutation-exclusion/media-activity';
 
 let activeGrant: CameraRecorderGrant | null = null;
 let activeGrantAuthorityGeneration = -1;

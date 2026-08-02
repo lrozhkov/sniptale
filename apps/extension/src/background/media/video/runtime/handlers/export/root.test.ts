@@ -90,8 +90,8 @@ vi.mock('../../manager', async (importOriginal) => ({
   resetRecordingTabId: vi.fn(),
 }));
 
-vi.mock('../../offscreen-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../offscreen-manager')>()),
+vi.mock('../../../../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../offscreen-document/service')>()),
   ensureOffscreenDocument: ensureOffscreenDocumentMock,
   hasOffscreenDocument: hasOffscreenDocumentMock,
   markOffscreenDocumentReady: vi.fn(),

@@ -7,7 +7,7 @@ import {
   ensureActiveVideoRecordingLeaseHydrated,
 } from '../video/recording-control-lease';
 import { waitForStopSideEffects } from '../video/runtime/manager/controls.stop/effects';
-import { closeOffscreenDocumentForPrivacyErasure } from '../video/runtime/offscreen-manager';
+import { closeOffscreenDocumentForPrivacyErasure } from '../../offscreen-document/service';
 import { inspectPersistedLease } from '../../storage/video/recording-control-lease';
 import {
   cleanupVideoCaptureSurfacesForPrivacyErasure,

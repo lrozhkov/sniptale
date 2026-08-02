@@ -73,8 +73,8 @@ vi.mock(
   })
 );
 
-vi.mock('../../offscreen-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../offscreen-manager')>()),
+vi.mock('../../../../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../offscreen-document/service')>()),
   ensureOffscreenDocument: ensureOffscreenDocumentMock,
   hasOffscreenDocument: hasOffscreenDocumentMock,
   waitForOffscreenReady: waitForOffscreenReadyMock,

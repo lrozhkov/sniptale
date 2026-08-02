@@ -22,7 +22,7 @@ import {
   finalizeRecordingDiagnostics,
 } from '../../manager';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
-import { markOffscreenDocumentReady } from '../../offscreen-manager';
+import { markOffscreenDocumentReady } from '../../../../../offscreen-document/service';
 import { releaseVideoCaptureSurface } from '../../../capture-surface';
 import {
   commitPendingVideoPostRecordResult,
@@ -32,7 +32,7 @@ import {
   type VideoPostRecordResultStatus,
 } from '../../../../../storage/video/post-record-result';
 import { clearCameraRecorderControlGrant } from '../../camera-recorder-control';
-import { acquireMediaMutationPermit } from '../../../../lifecycle-gate';
+import { acquireMediaMutationPermit } from '../../../../../mutation-exclusion/media-activity';
 import { removeVideoRecordingCompletionOutbox } from '../../../../../../composition/persistence/recordings/completion-outbox';
 import {
   createAsyncLifecycleRoute,

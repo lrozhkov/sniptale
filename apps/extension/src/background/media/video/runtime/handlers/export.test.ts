@@ -53,8 +53,8 @@ vi.mock('../../../../routing-contracts/download-port', async (importOriginal) =>
   ...(await importOriginal<typeof import('../../../../routing-contracts/download-port')>()),
   executeDownloadBlob: executeDownloadBlobMock,
 }));
-vi.mock('../offscreen-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../offscreen-manager')>()),
+vi.mock('../../../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../offscreen-document/service')>()),
   ensureOffscreenDocument: ensureOffscreenDocumentMock,
   hasOffscreenDocument: vi.fn().mockReturnValue(true),
   waitForOffscreenReady: waitForOffscreenReadyMock,

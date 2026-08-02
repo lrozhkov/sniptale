@@ -172,8 +172,8 @@ export const settingsPermissionsMessages = defineMessageSource({
     en: 'Background media processing',
   },
   requiredOffscreenDescription: {
-    ru: 'Обрабатывает запись и экспорт в скрытой странице Sniptale, пока вы продолжаете работать.',
-    en: 'Processes recording and export work in a hidden Sniptale page while you continue working.',
+    ru: 'Обрабатывает запись, экспорт и голосовой ввод в скрытой странице Sniptale, пока вы продолжаете работать.',
+    en: 'Processes recording, export, and voice input in a hidden Sniptale page while you continue working.',
   },
   requiredTabCaptureName: {
     ru: 'Запись вкладки',

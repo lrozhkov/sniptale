@@ -37,6 +37,10 @@ export const settingsNavigationMessages = defineMessageSource({
     ru: 'Качество видео',
     en: 'Video quality',
   },
+  voiceInput: {
+    ru: 'Голосовой ввод',
+    en: 'Voice input',
+  },
   quickactions: {
     ru: 'Быстрые действия',
     en: 'Quick actions',

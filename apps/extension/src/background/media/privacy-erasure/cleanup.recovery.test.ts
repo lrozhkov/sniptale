@@ -3,6 +3,7 @@ import { recordingLease } from './cleanup.test-support';
 
 const {
   clearActiveVideoRecordingLeaseMock,
+  cleanupVoiceInputForPrivacyErasureMock,
   clearProjectExportJobLedgerForPrivacyErasureMock,
   closeOffscreenDocumentForPrivacyErasureMock,
   ensureActiveVideoRecordingLeaseHydratedMock,
@@ -22,6 +23,7 @@ const {
   disableViewportCursorProjectionMock,
 } = vi.hoisted(() => ({
   clearActiveVideoRecordingLeaseMock: vi.fn(),
+  cleanupVoiceInputForPrivacyErasureMock: vi.fn(),
   clearProjectExportJobLedgerForPrivacyErasureMock: vi.fn(),
   closeOffscreenDocumentForPrivacyErasureMock: vi.fn(),
   ensureActiveVideoRecordingLeaseHydratedMock: vi.fn(),
@@ -57,8 +59,8 @@ vi.mock('../video/runtime/manager/controls.stop/effects', async (importOriginal)
   ...(await importOriginal<typeof import('../video/runtime/manager/controls.stop/effects')>()),
   waitForStopSideEffects: waitForStopSideEffectsMock,
 }));
-vi.mock('../video/runtime/offscreen-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../video/runtime/offscreen-manager')>()),
+vi.mock('../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../offscreen-document/service')>()),
   closeOffscreenDocumentForPrivacyErasure: closeOffscreenDocumentForPrivacyErasureMock,
 }));
 vi.mock('../video/runtime/session-state', async (importOriginal) => ({
@@ -96,12 +98,17 @@ vi.mock('../video/capture-surface/cursor-projection', async (importOriginal) => 
   ...(await importOriginal<typeof import('../video/capture-surface/cursor-projection')>()),
   disableViewportCursorProjection: disableViewportCursorProjectionMock,
 }));
+vi.mock('../../voice-input/coordinator', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../voice-input/coordinator')>()),
+  cleanupVoiceInputForPrivacyErasure: cleanupVoiceInputForPrivacyErasureMock,
+}));
 
 import { mediaPrivacyErasureCleanupAdapter } from './cleanup';
 
 beforeEach(() => {
   vi.clearAllMocks();
   clearActiveVideoRecordingLeaseMock.mockResolvedValue(undefined);
+  cleanupVoiceInputForPrivacyErasureMock.mockResolvedValue(true);
   clearProjectExportJobLedgerForPrivacyErasureMock.mockResolvedValue(undefined);
   closeOffscreenDocumentForPrivacyErasureMock.mockResolvedValue(undefined);
   ensureActiveVideoRecordingLeaseHydratedMock.mockResolvedValue(null);
@@ -252,6 +259,10 @@ it('quiesces offscreen work and removes corrupt durable media authorities before
   expect(recovered.every((participant) => participant.status === 'verified-empty')).toBe(true);
   expect(retried).toEqual(recovered);
   expect(closeOffscreenDocumentForPrivacyErasureMock).toHaveBeenCalledTimes(2);
+  expect(cleanupVoiceInputForPrivacyErasureMock).toHaveBeenCalledTimes(2);
+  expect(recovered).toContainEqual(
+    expect.objectContaining({ id: 'voice-input-runtime-state', status: 'verified-empty' })
+  );
   expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledOnce();
   expect(clearProjectExportJobLedgerForPrivacyErasureMock).toHaveBeenCalledOnce();
   expect(closeOffscreenDocumentForPrivacyErasureMock.mock.invocationCallOrder[0]).toBeLessThan(

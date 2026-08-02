@@ -4,6 +4,7 @@ import {
   MessageSquare,
   Monitor,
   MonitorCog,
+  Mic,
   PenTool,
   Shield,
   ShieldCheck,
@@ -26,6 +27,7 @@ export type SettingsTab =
   | 'privacy'
   | 'image'
   | 'video'
+  | 'voiceInput'
   | 'quickactions'
   | 'nativeApp'
   | 'highlighter';
@@ -45,6 +47,7 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
   { id: 'editor', label: 'settings.navigation.editor', icon: Image },
   { id: 'image', label: 'settings.navigation.image', icon: Image },
   { id: 'video', label: 'settings.navigation.video', icon: Video },
+  { id: 'voiceInput', label: 'settings.navigation.voiceInput', icon: Mic },
   { id: 'quickactions', label: 'settings.navigation.quickactions', icon: Zap },
   { id: 'nativeApp', label: 'settings.navigation.nativeApp', icon: MonitorCog },
   { id: 'templates', label: 'settings.navigation.templates', icon: MessageSquare },

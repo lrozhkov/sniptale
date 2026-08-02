@@ -22,6 +22,7 @@ import {
 import { backgroundOwnedRouteInventory } from './owned-route-inventory';
 import type { BackgroundOwnedRouteHandlerId } from '../../../routing-contracts/owned-route-context';
 import type { ActionResult, BackgroundOwnedAction } from './types';
+import { routeVoiceInputOffscreenEvent } from '../../../voice-input/route';
 
 type BackgroundOwnedRouteHandler = (
   action: BackgroundOwnedAction,
@@ -85,7 +86,13 @@ function getBackgroundOwnedRouteHandler(
       return routePopupExportArchiveAction;
     case 'popup-tab-route-capability-issuance':
       return routePopupTabRouteCapabilityAction;
+    case 'voice-input-offscreen-event':
+      return routeVoiceInputOffscreenEventAction;
   }
+}
+
+function routeVoiceInputOffscreenEventAction(action: BackgroundOwnedAction): ActionResult | null {
+  return keepOpen(routeVoiceInputOffscreenEvent(action.message, action.context.sendResponse));
 }
 
 function routeNativeAppRuntimeAction(action: BackgroundOwnedAction): ActionResult | null {

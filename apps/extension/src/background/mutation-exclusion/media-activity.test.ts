@@ -4,9 +4,9 @@ import {
   acquireMediaMutationPermit,
   getMediaAuthorityGeneration,
   reserveMediaErasureExclusion,
-} from './lifecycle-gate';
+} from './media-activity';
 
-it('blocks new starts immediately and waits for already admitted starts to finish', async () => {
+it('blocks new media starts immediately and waits for already admitted starts to finish', async () => {
   const releaseExistingStart = acquireMediaMutationPermit();
   expect(releaseExistingStart).not.toBeNull();
   const exclusion = reserveMediaErasureExclusion();

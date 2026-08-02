@@ -8,12 +8,15 @@ export const localDataErasureRouteDescriptor = {
   policyStateIds: [
     'diagnostics-erasure-exclusion',
     'native-ingestion-erasure-exclusion',
+    'offscreen-command-capability-generations',
+    'offscreen-media-activity-lease',
     'page-access-tab-activation',
     'persistent-data-erasure-lease',
     'project-export-capabilities',
     'project-export-job-ledger',
     'tab-mode-runtime-state',
     'video-recording-control-lease',
+    'voice-input-port-session-authority',
   ],
   routeAuthorityFamily: 'background-owned-ipc',
 } as const;

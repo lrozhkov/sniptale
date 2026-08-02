@@ -1,0 +1,192 @@
+import { defineMessageSource } from '../source';
+
+export const settingsVoiceInputMessages = defineMessageSource({
+  kicker: { ru: 'Речь и ввод', en: 'Speech and input' },
+  title: { ru: 'Голосовой ввод', en: 'Voice input' },
+  description: {
+    ru: 'Проверьте распознавание речи перед использованием в аннотациях, комментариях и редакторах.',
+    en: 'Test speech recognition before using it in annotations, comments, and editors.',
+  },
+  languageLabel: { ru: 'Язык распознавания', en: 'Recognition language' },
+  languageRu: { ru: 'Русский (ru-RU)', en: 'Russian (ru-RU)' },
+  languageEn: { ru: 'Английский (en-US)', en: 'English (en-US)' },
+  microphoneLabel: { ru: 'Источник звука', en: 'Audio input' },
+  microphoneDefault: { ru: 'Микрофон по умолчанию', en: 'Default microphone' },
+  microphoneUnavailable: {
+    ru: 'Выбранный микрофон сейчас недоступен',
+    en: 'The selected microphone is currently unavailable',
+  },
+  microphoneFallback: { ru: 'Микрофон', en: 'Microphone' },
+  modeLabel: { ru: 'Режим распознавания', en: 'Recognition mode' },
+  modeLocalFirst: { ru: 'Сначала локально', en: 'Local first' },
+  modeBrowserManaged: { ru: 'Управляется Chrome', en: 'Browser managed' },
+  testTitle: { ru: 'Тестовое поле', en: 'Test field' },
+  testDescription: {
+    ru: 'Короткое нажатие запускает ввод до 30 секунд. Удерживайте кнопку для push-to-talk и отпустите, чтобы остановить.',
+    en: 'A short press starts input for up to 30 seconds. Hold for push-to-talk and release to stop.',
+  },
+  textareaLabel: { ru: 'Распознанный текст', en: 'Recognized text' },
+  textareaPlaceholder: {
+    ru: 'Здесь появится распознанный текст…',
+    en: 'Recognized text appears here…',
+  },
+  allowMicrophone: { ru: 'Разрешить микрофон', en: 'Allow microphone' },
+  install: { ru: 'Установить dictation-пакет', en: 'Install dictation package' },
+  start: { ru: 'Начать', en: 'Start' },
+  microphoneActive: { ru: 'Микрофон активен', en: 'Microphone active' },
+  releaseToStop: { ru: 'Отпустите для остановки', en: 'Release to stop' },
+  stop: { ru: 'Остановить', en: 'Stop' },
+  refresh: { ru: 'Обновить статусы', en: 'Refresh statuses' },
+  apiStatus: { ru: 'Web Speech API', en: 'Web Speech API' },
+  microphoneStatus: { ru: 'Микрофон', en: 'Microphone' },
+  packageStatus: { ru: 'Локальный dictation-пакет', en: 'Local dictation package' },
+  runtimeStatus: { ru: 'Текущий сеанс', en: 'Current session' },
+  statusStandard: { ru: 'Поддерживается', en: 'Supported' },
+  statusPrefixed: { ru: 'Legacy API', en: 'Legacy API' },
+  statusUnsupported: { ru: 'Не поддерживается', en: 'Unsupported' },
+  statusGranted: { ru: 'Разрешён', en: 'Granted' },
+  statusPrompt: { ru: 'Требуется разрешение', en: 'Permission required' },
+  statusDenied: { ru: 'Заблокирован', en: 'Blocked' },
+  statusNoDevice: { ru: 'Устройство не найдено', en: 'No device found' },
+  statusDeviceBusy: { ru: 'Микрофон занят', en: 'Microphone is busy' },
+  statusUnknown: { ru: 'Статус неизвестен', en: 'Unknown' },
+  statusAvailable: { ru: 'Готов для диктовки', en: 'Ready for dictation' },
+  statusDownloadable: { ru: 'Можно установить', en: 'Available to install' },
+  statusDownloading: { ru: 'Устанавливается', en: 'Installing' },
+  statusUnavailable: {
+    ru: 'Недоступен — будет fallback',
+    en: 'Unavailable — fallback will be used',
+  },
+  phaseIdle: { ru: 'Готов', en: 'Ready' },
+  phaseChecking: { ru: 'Проверка', en: 'Checking' },
+  phaseInstalling: { ru: 'Установка', en: 'Installing' },
+  phaseStarting: { ru: 'Запуск', en: 'Starting' },
+  phaseListening: { ru: 'Слушаю', en: 'Listening' },
+  phaseStopping: { ru: 'Остановка', en: 'Stopping' },
+  phaseEnded: { ru: 'Завершено', en: 'Finished' },
+  phaseError: { ru: 'Ошибка', en: 'Error' },
+  phaseIdleDescription: {
+    ru: 'Активной offscreen-сессии нет',
+    en: 'No active offscreen session',
+  },
+  phaseCheckingDescription: {
+    ru: 'Проверяется локальный dictation-пакет',
+    en: 'Checking the local dictation package',
+  },
+  phaseInstallingDescription: {
+    ru: 'Chrome устанавливает языковой пакет',
+    en: 'Chrome is installing the language package',
+  },
+  phaseStartingDescription: {
+    ru: 'Offscreen получает микрофон и ожидает audiostart',
+    en: 'Offscreen is acquiring the microphone and waiting for audiostart',
+  },
+  phaseListeningDescription: {
+    ru: 'Chrome подтвердил захват аудио',
+    en: 'Chrome confirmed audio capture',
+  },
+  phaseStoppingDescription: {
+    ru: 'Ожидается end; затем принудительный abort',
+    en: 'Waiting for end, then forcing abort',
+  },
+  phaseEndedDescription: { ru: 'Сессия освобождена', en: 'Session released' },
+  phaseErrorDescription: { ru: 'Сессия завершена с ошибкой', en: 'Session ended with an error' },
+  fallbackLocalApiUnsupported: {
+    ru: 'Local API отсутствует; используется режим Chrome',
+    en: 'Local API is unavailable; using Chrome-managed mode',
+  },
+  fallbackLocalUnavailable: {
+    ru: 'Локальный режим недоступен; используется режим Chrome',
+    en: 'Local mode is unavailable; using Chrome-managed mode',
+  },
+  fallbackDictationUnsupported: {
+    ru: 'Параметр dictation не поддерживается; используется режим Chrome',
+    en: 'Dictation quality is unsupported; using Chrome-managed mode',
+  },
+  fallbackDictationUnavailable: {
+    ru: 'Dictation-пакет недоступен; используется режим Chrome',
+    en: 'The dictation package is unavailable; using Chrome-managed mode',
+  },
+  fallbackInstallFailed: {
+    ru: 'Установка не завершилась; используется режим Chrome',
+    en: 'Installation did not complete; using Chrome-managed mode',
+  },
+  fallbackCheckFailed: {
+    ru: 'Проверка local API завершилась ошибкой; используется режим Chrome',
+    en: 'The local API check failed; using Chrome-managed mode',
+  },
+  fallbackStartFailed: {
+    ru: 'Локальный запуск не удался; используется режим Chrome',
+    en: 'Local start failed; using Chrome-managed mode',
+  },
+  signalLabel: { ru: 'Уровень микрофона', en: 'Microphone level' },
+  signalPrivacy: { ru: 'Аудио не сохраняется', en: 'Audio is not saved' },
+  signalIdle: { ru: 'Микрофон неактивен', en: 'Microphone idle' },
+  signalListening: { ru: 'Ожидаю речь', en: 'Listening for speech' },
+  signalDetected: { ru: 'Речь обнаружена', en: 'Voice detected' },
+  signalAriaLabel: {
+    ru: 'Текущий уровень входного сигнала',
+    en: 'Current input signal level',
+  },
+  effectiveLocal: { ru: 'Локально, quality: dictation', en: 'Local, quality: dictation' },
+  effectiveBrowser: { ru: 'Управляется Chrome', en: 'Browser managed' },
+  effectiveLegacy: { ru: 'Legacy browser-managed', en: 'Legacy browser-managed' },
+  qualitySupported: {
+    ru: 'Chrome 150+: запрошен dictation',
+    en: 'Chrome 150+: dictation requested',
+  },
+  qualityLegacy: {
+    ru: 'Этот Chrome не поддерживает параметр quality',
+    en: 'This Chrome does not support the quality parameter',
+  },
+  localDisclosure: {
+    ru: 'При локальном режиме звук и распознанная речь обрабатываются на устройстве.',
+    en: 'In local mode, audio and recognized speech are processed on the device.',
+  },
+  browserDisclosure: {
+    ru: 'В режиме, управляемом Chrome, браузер сам выбирает локальную или серверную обработку. Расширение не использует API-ключ и платный API; квоты, SLA и серверный провайдер не гарантируются.',
+    en: 'In browser-managed mode, Chrome chooses local or server processing. The extension uses no API key or paid API; quotas, SLA, and server provider are not guaranteed.',
+  },
+  permissionError: {
+    ru: 'Разрешите доступ к микрофону в настройках Chrome.',
+    en: 'Allow microphone access in Chrome settings.',
+  },
+  installError: {
+    ru: 'Dictation-пакет установить не удалось. Будет использован режим Chrome.',
+    en: 'The dictation package could not be installed. Chrome-managed mode will be used.',
+  },
+  runtimeError: {
+    ru: 'Распознавание завершилось с ошибкой. Обновите статус и попробуйте снова.',
+    en: 'Recognition failed. Refresh the status and try again.',
+  },
+  busyVideo: { ru: 'Сначала завершите запись видео.', en: 'Finish video recording first.' },
+  busySpeech: { ru: 'Голосовой ввод уже используется.', en: 'Voice input is already in use.' },
+  busyPrivacy: {
+    ru: 'Дождитесь завершения удаления локальных данных.',
+    en: 'Wait for local data erasure to finish.',
+  },
+  errorUnsupported: {
+    ru: 'SpeechRecognition недоступен в этом браузере или профиле.',
+    en: 'SpeechRecognition is unavailable in this browser or profile.',
+  },
+  errorNoSpeech: {
+    ru: 'Речь не обнаружена. Попробуйте ещё раз.',
+    en: 'No speech was detected. Try again.',
+  },
+  errorMicrophone: {
+    ru: 'Микрофон недоступен или занят другим приложением.',
+    en: 'The microphone is unavailable or in use by another app.',
+  },
+  errorLanguage: {
+    ru: 'Выбранный язык не поддерживается текущим сервисом Chrome.',
+    en: 'The selected language is unsupported by the current Chrome service.',
+  },
+  errorNetwork: {
+    ru: 'Сервис Chrome недоступен по сети. Повторите попытку позже.',
+    en: 'The Chrome service is unavailable over the network. Try again later.',
+  },
+  errorTimeout: {
+    ru: 'Время ожидания истекло. Запустите ввод снова.',
+    en: 'Recognition timed out. Start again.',
+  },
+});

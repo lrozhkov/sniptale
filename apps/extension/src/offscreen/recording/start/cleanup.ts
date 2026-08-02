@@ -3,10 +3,19 @@ import { detachCachedPreview } from '../setup/desktop-media';
 import { recordingContext } from '../context';
 import { cleanupActiveSidecarRecorders } from '../sidecar';
 import { cancelRecordingBegin } from './gate';
+import { releaseVideoRecordingMediaActivityLease } from '../../media-activity/video-recording-lease';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingStart' });
 
 export function cleanupResources(): void {
+  try {
+    cleanupOwnedRecordingResources();
+  } finally {
+    releaseVideoRecordingMediaActivityLease();
+  }
+}
+
+function cleanupOwnedRecordingResources(): void {
   logger.debug('Cleaning up recording resources');
   cancelRecordingBegin();
 

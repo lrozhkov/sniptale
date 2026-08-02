@@ -92,9 +92,19 @@ import {
 } from '.';
 import { setActiveMultiSourceSession } from './state';
 import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
+import {
+  acquireVideoRecordingMediaActivityLease,
+  releaseVideoRecordingMediaActivityLease,
+} from '../../media-activity/video-recording-lease';
+import {
+  acquireOffscreenMediaActivityLease,
+  resetOffscreenMediaActivityLeaseForTests,
+} from '../../media-activity/lease';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  releaseVideoRecordingMediaActivityLease();
+  resetOffscreenMediaActivityLeaseForTests();
   completionOutboxState.result = null;
   createRecordingStagingCoordinatorMock.mockImplementation(async () =>
     createRecordingStagingCoordinatorTestDouble()
@@ -290,6 +300,20 @@ it('tears down an active session on recorder failure and ignores its stale error
   });
 
   expect(() => errorHandler?.(new Event('error'))).not.toThrow();
+});
+
+it('releases the shared video lease when an active multi-source recorder fails', async () => {
+  expect(acquireVideoRecordingMediaActivityLease().acquired).toBe(true);
+  await startMultiSourceRecording({ recordingId: 'lease-failure', settings: createSettings() });
+
+  FakeMediaRecorder.instances[0]?.onerror?.(
+    Object.assign(new Event('error'), { error: new Error('source recorder failed') })
+  );
+
+  expect(hasActiveMultiSourceRecording()).toBe(false);
+  const speech = acquireOffscreenMediaActivityLease('speech-recognition');
+  expect(speech.acquired).toBe(true);
+  if (speech.acquired) speech.lease.release();
 });
 
 it('rejects starts without enough prepared sources and rolls back desktop media', async () => {

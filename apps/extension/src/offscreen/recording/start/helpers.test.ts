@@ -44,9 +44,19 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { recordingContext } from '../context';
 import { cleanupResources } from './cleanup';
 import { handleRecordingStartError, initializeRecordingSession } from './session';
+import {
+  acquireVideoRecordingMediaActivityLease,
+  releaseVideoRecordingMediaActivityLease,
+} from '../../media-activity/video-recording-lease';
+import {
+  acquireOffscreenMediaActivityLease,
+  resetOffscreenMediaActivityLeaseForTests,
+} from '../../media-activity/lease';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  releaseVideoRecordingMediaActivityLease();
+  resetOffscreenMediaActivityLeaseForTests();
   sendRuntimeMessageMock.mockResolvedValue(undefined);
 
   recordingContext.resetRecordingSession();
@@ -57,6 +67,29 @@ beforeEach(() => {
   recordingContext.currentRecordingId = null;
   recordingContext.stopRecordingResolve = null;
   recordingContext.stopRecordingReject = null;
+});
+
+it('releases the shared video lease from unexpected terminal cleanup', () => {
+  expect(acquireVideoRecordingMediaActivityLease().acquired).toBe(true);
+
+  cleanupResources();
+
+  const speech = acquireOffscreenMediaActivityLease('speech-recognition');
+  expect(speech.acquired).toBe(true);
+  if (speech.acquired) speech.lease.release();
+});
+
+it('releases the shared video lease even when terminal cleanup throws', () => {
+  expect(acquireVideoRecordingMediaActivityLease().acquired).toBe(true);
+  detachCachedPreviewMock.mockImplementationOnce(() => {
+    throw new Error('preview cleanup failed');
+  });
+
+  expect(() => cleanupResources()).toThrow('preview cleanup failed');
+
+  const speech = acquireOffscreenMediaActivityLease('speech-recognition');
+  expect(speech.acquired).toBe(true);
+  if (speech.acquired) speech.lease.release();
 });
 
 it('binds the background-minted recording and stream identities before source setup', () => {

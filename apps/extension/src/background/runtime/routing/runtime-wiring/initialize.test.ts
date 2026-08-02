@@ -8,6 +8,8 @@ const {
   nativeIngestionCleanupAdapter,
   registerInstallListener,
   registerWindowBoundsListener,
+  registerVoiceInputPorts,
+  registerVoiceInputTelemetryPorts,
 } = vi.hoisted(() => ({
   configureDownloadPort: vi.fn(),
   configureNativeIngestionPrivacyErasureCleanupPort: vi.fn(),
@@ -16,6 +18,8 @@ const {
   nativeIngestionCleanupAdapter: {},
   registerInstallListener: vi.fn(),
   registerWindowBoundsListener: vi.fn(),
+  registerVoiceInputPorts: vi.fn(),
+  registerVoiceInputTelemetryPorts: vi.fn(),
 }));
 
 vi.mock('../../../application/privacy-erasure/composition', () => ({
@@ -39,6 +43,16 @@ vi.mock('./install', async (importOriginal) => ({
   registerInstallListener,
 }));
 vi.mock('./window-bounds', () => ({ registerWindowBoundsListener }));
+vi.mock('../../../voice-input/coordinator', () => ({
+  cleanupVoiceInputForPrivacyErasure: vi.fn(),
+  createVoiceInputCoordinator: vi.fn(),
+  handleVoiceInputOffscreenEvent: vi.fn(),
+  registerVoiceInputPorts,
+}));
+vi.mock('../../../voice-input/telemetry-port', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../voice-input/telemetry-port')>()),
+  registerVoiceInputTelemetryPorts,
+}));
 
 import {
   createModeState,
@@ -76,6 +90,8 @@ it('registers all background listeners through the runtime-wiring owner', () => 
   expect(configureDownloadPort).toHaveBeenCalledBefore(registerInstallListener);
   expect(registerInstallListener).toHaveBeenCalledBefore(initializeBackgroundContextMenus);
   expect(registerWindowBoundsListener).toHaveBeenCalledOnce();
+  expect(registerVoiceInputPorts).toHaveBeenCalledOnce();
+  expect(registerVoiceInputTelemetryPorts).toHaveBeenCalledOnce();
   expect(nativeAppConnect).toHaveBeenCalledTimes(1);
   expect(registerWebSnapshotViewerPorts).toHaveBeenCalledWith(state.webSnapshotViewerPorts);
   expect(initializeBackgroundContextMenus).toHaveBeenCalledWith({

@@ -3,7 +3,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 import type { VideoProjectExportSettings } from '../../../../../features/video/project/types';
 import { translate } from '../../../../../platform/i18n';
-import { acquireMediaMutationPermit } from '../../../lifecycle-gate';
+import { acquireMediaMutationPermit } from '../../../../mutation-exclusion/media-activity';
 import { coordinateProjectExportLifecycle } from './coordination';
 import { getDefaultBackgroundProjectExportPorts, type BackgroundProjectExportPorts } from './ports';
 

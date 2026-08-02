@@ -12,6 +12,14 @@ const LEGACY_INSTANCE_OWNERSHIP_SOURCE = 'tooling/qa/core/verify-instance-owners
 const DEFAULT_INVENTORY_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const OWNERSHIP_RULES = new Set(['facade-default-owner', 'no-top-level-mutable-runtime-state']);
 const WAVE_KEYS = ['files', 'id', 'rule'];
+const REVIEWED_CROSS_OWNER_PATH_REPLACEMENTS = [
+  {
+    from: 'apps/extension/src/background/media/video/runtime/offscreen-manager.ts',
+    to: 'apps/extension/src/background/offscreen-document/service.ts',
+    rule: 'facade-default-owner',
+    waveId: 'background-runtime-facades',
+  },
+];
 
 function violation(rule, message) {
   return { file: INSTANCE_OWNERSHIP_INVENTORY, message, rule };
@@ -169,8 +177,25 @@ function collectRetiredPathReplacementKeys(currentTargets, headTargets, root) {
   const consumedRetiredKeys = new Set();
   const replacementKeys = new Set();
 
+  for (const replacement of REVIEWED_CROSS_OWNER_PATH_REPLACEMENTS) {
+    const retiredKey = `${replacement.rule}:${replacement.from}`;
+    const successorKey = `${replacement.rule}:${replacement.to}`;
+    const retiredTarget = headTargets.get(retiredKey);
+    const successorTarget = currentTargets.get(successorKey);
+    if (
+      retiredTarget?.waveId === replacement.waveId &&
+      successorTarget?.waveId === replacement.waveId &&
+      !currentTargets.has(retiredKey) &&
+      !isLiveTarget(root, replacement.from) &&
+      isLocalLiveTarget(root, replacement.to)
+    ) {
+      consumedRetiredKeys.add(retiredKey);
+      replacementKeys.add(successorKey);
+    }
+  }
+
   for (const [key, target] of currentTargets) {
-    if (headTargets.has(key) || !isLocalLiveTarget(root, target.file)) {
+    if (headTargets.has(key) || replacementKeys.has(key) || !isLocalLiveTarget(root, target.file)) {
       continue;
     }
     const replacement = retiredTargets.find(

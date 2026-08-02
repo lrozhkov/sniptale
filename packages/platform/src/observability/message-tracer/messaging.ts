@@ -4,6 +4,11 @@ import { sanitizeHarTracePayload } from './har-payload';
 import { sanitizeLlmTracePayload } from './llm-payload';
 import { sanitizeRuntimeBlobTracePayload } from './runtime-blob-payload';
 import { sanitizeTraceErrorText } from './utils';
+import {
+  isVoiceInputTraceMessageType,
+  sanitizeVoiceInputTracePayload,
+  VOICE_INPUT_TRACE_FAILURE_CODE,
+} from './voice-input-payload';
 
 const trimStaleTimestamps = (map: Map<string, number>): void => {
   if (map.size <= 100) return;
@@ -134,9 +139,15 @@ export function recordMessageFailure(error: unknown, tracker: SendTracker | null
   const { correlationId, config, context, target, sanitizeValue, sendEvent, messageType } = tracker;
   const start = tracker.sendTimestamps.get(correlationId);
   tracker.sendTimestamps.delete(correlationId);
+  const isVoiceInputFailure = isVoiceInputTraceMessageType(messageType);
+  const traceError = isVoiceInputFailure
+    ? VOICE_INPUT_TRACE_FAILURE_CODE
+    : sanitizeTraceErrorText(error, config);
 
   const sanitizedPayload = sanitizeValue(
-    sanitizeMessageTracePayload(messageType, { error: String(error) }),
+    sanitizeMessageTracePayload(messageType, {
+      error: isVoiceInputFailure ? VOICE_INPUT_TRACE_FAILURE_CODE : String(error),
+    }),
     config
   );
 
@@ -148,7 +159,7 @@ export function recordMessageFailure(error: unknown, tracker: SendTracker | null
       target,
       correlationId,
       ...(start ? { duration: Date.now() - start } : {}),
-      error: sanitizeTraceErrorText(error, config),
+      error: traceError,
     })
   );
 }
@@ -162,7 +173,10 @@ function extractMessageType(message: unknown): string | undefined {
 
 function sanitizeMessageTracePayload(messageType: string, payload: unknown): unknown {
   return sanitizeRuntimeBlobTracePayload(
-    sanitizeLlmTracePayload(messageType, sanitizeHarTracePayload(messageType, payload))
+    sanitizeLlmTracePayload(
+      messageType,
+      sanitizeHarTracePayload(messageType, sanitizeVoiceInputTracePayload(messageType, payload))
+    )
   );
 }
 

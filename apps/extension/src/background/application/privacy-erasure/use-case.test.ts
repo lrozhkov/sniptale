@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 
 import { acquireDiagnosticsMutationPermit } from '../../diagnostics/lifecycle-gate';
-import { acquireMediaMutationPermit } from '../../media/lifecycle-gate';
+import { acquireMediaMutationPermit } from '../../mutation-exclusion/media-activity';
 import { acquireNativeIngestionPermit } from '../../capture/native-app/lifecycle-gate';
 import { PrivacyErasureUseCase } from './use-case';
 import {

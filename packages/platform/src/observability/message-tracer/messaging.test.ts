@@ -180,6 +180,30 @@ describe('message tracer messaging helpers', () => {
     harness.dispose();
   });
 
+  it('replaces arbitrary voice input failures before trace sanitization', () => {
+    const harness = installObserver();
+    const privateFailure =
+      'recognized phrase alfa bravo from microphone device device-secret-identifier';
+    const tracker = beginSendTrace(
+      { type: 'OFFSCREEN_VOICE_INPUT_START' },
+      { type: 'OFFSCREEN_VOICE_INPUT_START' },
+      'bg'
+    );
+
+    recordMessageFailure(new Error(privateFailure), tracker);
+
+    expect(harness.events[1]).toEqual(
+      expect.objectContaining({
+        error: 'voice-input-runtime-failure',
+        payload: { sanitized: { error: 'voice-input-runtime-failure' } },
+      })
+    );
+    expect(JSON.stringify(harness.events[1])).not.toContain(privateFailure);
+    expect(JSON.stringify(harness.events[1])).not.toContain('device-secret-identifier');
+
+    harness.dispose();
+  });
+
   it('serializes primitive tab payloads and treats disabled observers as no-op', () => {
     const harness = installObserver();
     harness.dispose();

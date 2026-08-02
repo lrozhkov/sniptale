@@ -1,18 +1,10 @@
-import {
-  createCapabilityContext,
-  isCapabilityContextAuthorized,
-  resolveCapabilityOrigin,
-  type CapabilityContext,
-} from '@sniptale/platform/security/capability-context';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRuntimeMessage } from '../../../../contracts/video/types/messages';
 import { resolveExtensionDocumentSenderUrl } from '../../../../platform/runtime-messaging/document-sender';
 
-const OFFSCREEN_DOCUMENT_PATH = 'apps/extension/src/offscreen/offscreen.html';
 const CAMERA_RECORDER_DOCUMENT_PATH = 'apps/extension/src/camera-recorder/index.html';
 const POPUP_DOCUMENT_PATH = 'apps/extension/src/popup/index.html';
 const VIDEO_EDITOR_DOCUMENT_PATH = 'apps/extension/src/video-editor/index.html';
-const OFFSCREEN_RUNTIME_CAPABILITY_WINDOW_MS = 1_000;
 
 type TrustedVideoEditorRuntimeSender = {
   documentId: string;
@@ -42,43 +34,6 @@ const offscreenOnlyRuntimeTypes = new Set<VideoRuntimeMessage['type']>([
 
 export function isOffscreenOnlyVideoRuntimeMessage(message: VideoRuntimeMessage): boolean {
   return offscreenOnlyRuntimeTypes.has(message.type);
-}
-
-export function isTrustedOffscreenRuntimeSender(sender: chrome.runtime.MessageSender): boolean {
-  return hasOffscreenRuntimeCapability(sender);
-}
-
-export function hasOffscreenRuntimeCapability(
-  sender: chrome.runtime.MessageSender,
-  nowEpochMs = Date.now()
-): boolean {
-  const capabilityContext = resolveOffscreenRuntimeCapabilityContext(sender, nowEpochMs);
-  return (
-    capabilityContext !== null &&
-    isCapabilityContextAuthorized(capabilityContext, {
-      origin: resolveCapabilityOrigin(sender.url),
-      scope: 'offscreen:runtime',
-      token: capabilityContext.token,
-      nowEpochMs,
-    })
-  );
-}
-
-export function resolveOffscreenRuntimeCapabilityContext(
-  sender: chrome.runtime.MessageSender,
-  nowEpochMs = Date.now()
-): CapabilityContext | null {
-  const senderUrl = resolveExtensionDocumentSenderUrl(sender, OFFSCREEN_DOCUMENT_PATH);
-  if (!senderUrl) {
-    return null;
-  }
-
-  return createCapabilityContext({
-    expiresAtEpochMs: nowEpochMs + OFFSCREEN_RUNTIME_CAPABILITY_WINDOW_MS,
-    origin: resolveCapabilityOrigin(senderUrl),
-    scopes: ['offscreen:runtime'],
-    token: sender.documentId ?? senderUrl,
-  });
 }
 
 export function resolveTrustedVideoEditorRuntimeSenderUrl(

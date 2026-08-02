@@ -19,7 +19,7 @@ import {
   ensureOffscreenDocument,
   hasOffscreenDocument,
   waitForOffscreenReady,
-} from '../../runtime/offscreen-manager';
+} from '../../../../offscreen-document/service';
 import { reconcileProjectExportLedgerAfterOffscreenCreation } from '../../runtime/handlers/export/reconcile';
 import { getBackgroundRuntimeMessaging } from '../../../../routing-contracts/runtime-messaging/services';
 import {

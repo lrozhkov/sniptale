@@ -217,6 +217,11 @@
       "ownerClass": "workflow"
     },
     {
+      "sourcePrefix": "apps/extension/src/workflows/voice-input",
+      "ownerId": "workflow.voice-input",
+      "ownerClass": "workflow"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/ai-settings",
       "ownerId": "persistence.ai-settings",
       "ownerClass": "persistence"

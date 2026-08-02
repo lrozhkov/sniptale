@@ -6,6 +6,7 @@ import type {
   SettingsPatch,
   ViewportPreset,
 } from '../../../contracts/settings';
+import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import { DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES } from '../../../contracts/full-page-capture';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
@@ -40,6 +41,12 @@ const DEFAULT_CONTENT_TOOLBAR_SETTINGS: ContentToolbarPreferences = {
   position: null,
 };
 
+const DEFAULT_VOICE_INPUT_SETTINGS: VoiceInputPreferences = {
+  language: 'ru-RU',
+  microphoneDeviceId: null,
+  mode: 'local-first',
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   captureAction: 'download_default',
   contentToolbar: DEFAULT_CONTENT_TOOLBAR_SETTINGS,
@@ -58,6 +65,7 @@ export const DEFAULT_SETTINGS: Settings = {
   skipWebSnapshotSaveDisclosure: false,
   rawDiagnosticsEnabled: false,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
+  voiceInput: DEFAULT_VOICE_INPUT_SETTINGS,
 };
 
 function cloneViewportPresets(presets: readonly ViewportPreset[]): ViewportPreset[] {
@@ -89,6 +97,7 @@ export function createDefaultSettings(): Settings {
     contentToolbar: cloneContentToolbarSettings(DEFAULT_CONTENT_TOOLBAR_SETTINGS),
     contextMenu: cloneContextMenuSettings(DEFAULT_CONTEXT_MENU_SETTINGS),
     fullPageCapture: cloneFullPageCapturePreferences(DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES),
+    voiceInput: { ...DEFAULT_VOICE_INPUT_SETTINGS },
     presets: [],
     viewportPresets: cloneViewportPresets(DEFAULT_VIEWPORT_PRESETS),
   };
@@ -134,6 +143,10 @@ function normalizeLoadedSettings(parsedValue: Partial<Settings>): Settings {
     fullPageCapture: {
       ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
       ...parsedValue.fullPageCapture,
+    },
+    voiceInput: {
+      ...DEFAULT_VOICE_INPUT_SETTINGS,
+      ...parsedValue.voiceInput,
     },
     presets: Array.isArray(parsedValue.presets) ? parsedValue.presets : [],
     viewportPresets: Array.isArray(parsedValue.viewportPresets)
@@ -202,6 +215,11 @@ function applySettingsPatch(currentSettings: Settings, settingsPatch: SettingsPa
       ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
       ...currentSettings.fullPageCapture,
       ...settingsPatch.fullPageCapture,
+    },
+    voiceInput: {
+      ...DEFAULT_VOICE_INPUT_SETTINGS,
+      ...currentSettings.voiceInput,
+      ...settingsPatch.voiceInput,
     },
   });
 }

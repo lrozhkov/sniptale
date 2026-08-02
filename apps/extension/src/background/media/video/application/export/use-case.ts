@@ -2,7 +2,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoProjectExportSettings } from '../../../../../features/video/project/types';
 import * as settingsValidation from '../../../../../features/video/project/export/settings-validation';
 import { getDefaultBackgroundProjectExportPorts, type BackgroundProjectExportPorts } from './ports';
-import { acquireMediaMutationPermit } from '../../../lifecycle-gate';
+import { acquireMediaMutationPermit } from '../../../../mutation-exclusion/media-activity';
 import type { ProjectExportInputReference } from '../../../../../contracts/video/types/project-export-input';
 import { coordinateProjectExportLifecycle } from './coordination';
 import { ensureProjectExportOffscreenReady, type ProjectExportOwnerIdentity } from './capabilities';

@@ -1,4 +1,4 @@
-const OFFSCREEN_STARTUP_ID_PARAM = 'offscreenStartupId';
+const STARTUP_ID_PARAM = 'offscreenStartupId';
 const PRIVACY_ERASURE_MODE_PARAM = 'privacyErasure';
 
 export function createOffscreenStartupId(): string {
@@ -24,7 +24,7 @@ export function createOffscreenDocumentUrl(
   offscreenStartupId: string
 ): string {
   const url = new URL(offscreenUrl);
-  url.searchParams.set(OFFSCREEN_STARTUP_ID_PARAM, offscreenStartupId);
+  url.searchParams.set(STARTUP_ID_PARAM, offscreenStartupId);
   return url.toString();
 }
 
@@ -57,7 +57,7 @@ function parseOffscreenStartupId(documentUrl: string | null): string | null {
   }
 
   try {
-    const offscreenStartupId = new URL(documentUrl).searchParams.get(OFFSCREEN_STARTUP_ID_PARAM);
+    const offscreenStartupId = new URL(documentUrl).searchParams.get(STARTUP_ID_PARAM);
     return offscreenStartupId && offscreenStartupId.length > 0 ? offscreenStartupId : null;
   } catch {
     return null;

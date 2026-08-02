@@ -10,8 +10,8 @@ vi.mock('../../routing-contracts/runtime-messaging/services', async (importOrigi
   ...(await importOriginal<typeof import('../../routing-contracts/runtime-messaging/services')>()),
   getBackgroundRuntimeMessaging: () => ({ sendRuntimeMessage: mocks.sendRuntimeMessage }),
 }));
-vi.mock('../../media/video/runtime/offscreen-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../media/video/runtime/offscreen-manager')>()),
+vi.mock('../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../offscreen-document/service')>()),
   closeOffscreenDocumentForPrivacyErasure: mocks.close,
   ensurePrivacyErasureOffscreenDocument: mocks.ensure,
 }));

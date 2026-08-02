@@ -24,8 +24,8 @@ vi.mock('../../../../../../composition/persistence/export-ledger', async (import
   >()),
   loadActiveProjectExportJobLedgerEntry: loadActiveLedgerMock,
 }));
-vi.mock('../../offscreen-manager', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../offscreen-manager')>()),
+vi.mock('../../../../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../offscreen-document/service')>()),
   ensureOffscreenDocument: ensureOffscreenDocumentMock,
   hasOffscreenDocument: hasOffscreenDocumentMock,
   waitForOffscreenReady: waitForOffscreenReadyMock,

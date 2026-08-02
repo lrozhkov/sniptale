@@ -1,6 +1,7 @@
 import type { CaptureActionType } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../features/viewport-presets/contracts';
 import type { FullPageCapturePreferences } from '../full-page-capture';
+import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 export type {
   FullPageCapturePreferences,
   FullPageFloatingElementsMode,
@@ -70,15 +71,17 @@ export interface Settings {
   skipWebSnapshotSaveDisclosure: boolean;
   rawDiagnosticsEnabled: boolean;
   fullPageCapture?: FullPageCapturePreferences;
+  voiceInput?: VoiceInputPreferences;
 }
 
 export type SettingsPatch = Omit<
   Partial<Settings>,
-  'contentToolbar' | 'contextMenu' | 'fullPageCapture'
+  'contentToolbar' | 'contextMenu' | 'fullPageCapture' | 'voiceInput'
 > & {
   contentToolbar?: Partial<ContentToolbarPreferences>;
   contextMenu?: Partial<ContextMenuSettings>;
   fullPageCapture?: Partial<FullPageCapturePreferences>;
+  voiceInput?: Partial<VoiceInputPreferences>;
 };
 
 export type AIConnectionType = 'chrome-built-in' | 'openai-compatible';

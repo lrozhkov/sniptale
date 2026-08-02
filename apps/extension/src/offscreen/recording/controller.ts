@@ -26,6 +26,10 @@ import {
   PostRecordPublicationError,
   retryPendingPostRecordResult,
 } from './post-record-publication';
+import {
+  acquireVideoRecordingMediaActivityLease,
+  releaseVideoRecordingMediaActivityLease,
+} from '../media-activity/video-recording-lease';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingController' });
 const runtimeMessaging = createRuntimeMessagingTransport();
@@ -77,6 +81,12 @@ export function startRecording(params: Parameters<typeof startRecordingImpl>[0])
     return Promise.reject(new Error(translate('background.runtime.recordingAlreadyRunning')));
   }
 
+  releaseVideoRecordingMediaActivityLease();
+  const acquisition = acquireVideoRecordingMediaActivityLease();
+  if (!acquisition.acquired) {
+    return Promise.reject(new Error(`Offscreen media activity is busy: ${acquisition.busyOwner}`));
+  }
+
   const previousBinding = activeRecordingBinding;
   const binding = {
     generation: params.generation,
@@ -89,6 +99,7 @@ export function startRecording(params: Parameters<typeof startRecordingImpl>[0])
     if (pendingRecordingStart === tracked) {
       pendingRecordingStart = null;
     }
+    if (!hasActiveRecordingSession()) releaseVideoRecordingMediaActivityLease();
   });
   pendingRecordingStart = tracked;
   return tracked;
@@ -316,6 +327,7 @@ export function stopRecording(
     if (pendingRecordingStop === tracked) {
       pendingRecordingStop = null;
     }
+    if (!hasActiveRecordingSession()) releaseVideoRecordingMediaActivityLease();
   });
   pendingRecordingStop = tracked;
   return tracked;

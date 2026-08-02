@@ -7,6 +7,7 @@
   "type": "module",
   "exports": {
     "./annotatable-image-surface": "./src/annotatable-image-surface/index.tsx",
+    "./audio-amplitude-bars": "./src/audio-amplitude-bars/index.tsx",
     "./branding": "./src/branding/index.ts",
     "./canvas-tools/descriptors": "./src/canvas-tools/descriptors.tsx",
     "./canvas-tools": "./src/canvas-tools/index.tsx",
