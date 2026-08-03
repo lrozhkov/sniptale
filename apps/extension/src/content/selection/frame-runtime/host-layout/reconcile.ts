@@ -323,9 +323,36 @@ type LinkedReconcileArgs = {
   frame: FrameData;
   frameState: FrameState | undefined;
   movingFrameGenerations: ReadonlyMap<string, number>;
+  projectOffscreenGeometry: boolean;
   registry: AnchorRegistry;
   stageMeasurement: boolean;
 };
+
+function measureLinkedFrame(args: LinkedReconcileArgs, binding: AnchorBinding) {
+  const node = binding.node!;
+  return args.frame.offset
+    ? applyFrameOffsetToElement(node, args.frame.offset)
+    : calculateFrameViewportCoords(node, args.frame.borderSettings);
+}
+
+function projectLinkedFrameGeometry(args: LinkedReconcileArgs, binding: AnchorBinding): FrameData {
+  const node = binding.node!;
+  const nextRect = measureLinkedFrame(args, binding);
+  const placement = createDocumentPagePlacement(node.ownerDocument, nextRect.x, nextRect.y);
+  if (
+    !placement ||
+    !isFramePlacementMeasurementValid({ pagePlacement: placement, rect: nextRect })
+  ) {
+    return args.frame;
+  }
+  if (
+    !haveGeometryChanged(args.frame, nextRect) &&
+    !havePlacementChanged(args.frame.pagePlacement, placement)
+  ) {
+    return args.frame;
+  }
+  return { ...args.frame, ...nextRect, pagePlacement: placement };
+}
 
 function commitLinkedGeometry(
   args: LinkedReconcileArgs,
@@ -334,10 +361,7 @@ function commitLinkedGeometry(
   presentation: 'visible' | 'suspended'
 ): FrameData {
   const node = binding.node!;
-  const measured = args.frame.offset
-    ? applyFrameOffsetToElement(node, args.frame.offset)
-    : calculateFrameViewportCoords(node, args.frame.borderSettings);
-  const nextRect = measured;
+  const nextRect = measureLinkedFrame(args, binding);
   const placement = createDocumentPagePlacement(node.ownerDocument, nextRect.x, nextRect.y);
   const topPagePlacement = createDocumentPagePlacement(document, nextRect.x, nextRect.y);
   if (!placement || !topPagePlacement) {
@@ -388,14 +412,24 @@ function reconcileLinkedFrame(args: LinkedReconcileArgs): FrameData {
   const visibility = measureAnchorVisibility(binding.node);
   const moving = args.movingFrameGenerations.get(args.frame.id) === binding.generation;
   if (visibility.presentation !== 'visible' || !visibility.rect) {
+    const presentation =
+      moving || visibility.presentation === 'suspended' ? 'suspended' : 'offscreen';
     args.registry.recordUnavailable(
       args.frame.id,
       binding.generation,
       binding.node,
-      moving || visibility.presentation === 'suspended' ? 'suspended' : 'offscreen',
+      presentation,
       visibility.rect
     );
-    return args.frame;
+    const hasAcceptedGeometryAuthority =
+      binding.bindingStatus === 'bound' && binding.node === binding.lastAcceptedNode;
+    const canProjectOffscreenGeometry =
+      presentation === 'offscreen' &&
+      hasAcceptedGeometryAuthority &&
+      (args.projectOffscreenGeometry || !args.stageMeasurement) &&
+      args.frameState !== 'editing' &&
+      args.frameState !== 'resizing';
+    return canProjectOffscreenGeometry ? projectLinkedFrameGeometry(args, binding) : args.frame;
   }
 
   if (args.frameState === 'editing' || args.frameState === 'resizing') {
@@ -421,6 +455,7 @@ export function reconcileFrameHostLayout(args: {
   frameStates: ReadonlyMap<string, FrameState>;
   frames: FrameData[];
   movingFrameGenerations: ReadonlyMap<string, number>;
+  projectOffscreenGeometry?: boolean;
   registry: AnchorRegistry;
   stageLinkedMeasurements?: boolean;
 }): FrameHostLayoutReconcileResult {
@@ -432,6 +467,7 @@ export function reconcileFrameHostLayout(args: {
           cappedFrameGenerations: args.cappedFrameGenerations ?? new Map(),
           frameState: args.frameStates.get(frame.id),
           movingFrameGenerations: args.movingFrameGenerations,
+          projectOffscreenGeometry: args.projectOffscreenGeometry === true,
           registry: args.registry,
           stageMeasurement: args.stageLinkedMeasurements === true,
         })

@@ -86,6 +86,7 @@ describe('host document signals', () => {
     const invalidationsBeforeScroll = callbacks.invalidate.mock.calls.length;
     window.dispatchEvent(new Event('scroll'));
     expect(callbacks.invalidate.mock.calls.length).toBeGreaterThan(invalidationsBeforeScroll);
+    expect(callbacks.invalidate).toHaveBeenLastCalledWith({ viewportScroll: true });
     window.dispatchEvent(new Event('pagehide'));
     expect(callbacks.documentWillUnload).toHaveBeenCalledWith(document);
 
