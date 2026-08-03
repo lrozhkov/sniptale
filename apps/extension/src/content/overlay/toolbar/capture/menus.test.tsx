@@ -9,7 +9,7 @@ const menuComponentMocks = vi.hoisted(() => ({
   captureActionToggle: vi.fn(() => null),
   timerDropdown: vi.fn(() => null),
   timerToggle: vi.fn(() => null),
-  viewportSelector: vi.fn(() => null),
+  viewportSelector: vi.fn((_props: { onMenuStateChange: (isOpen: boolean) => void }) => null),
 }));
 
 vi.mock('./action-dropdown', () => ({
@@ -34,9 +34,11 @@ vi.mock('../../viewport-selector', async (importOriginal) => ({
 }));
 
 import { ToolbarCaptureActionMenu, ToolbarTimerMenu, ToolbarViewportMenu } from './menus';
+import { useToolbarMenuState, type ToolbarMenuState } from '../state/menu';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+let currentToolbarMenuState: ToolbarMenuState | null = null;
 
 async function renderNode(node: React.ReactNode) {
   if (!container) {
@@ -50,9 +52,36 @@ async function renderNode(node: React.ReactNode) {
   });
 }
 
+function ViewportMenuStateHarness() {
+  const toolbarMenuState = useToolbarMenuState();
+  currentToolbarMenuState = toolbarMenuState;
+
+  return (
+    <ToolbarViewportMenu
+      closeMenus={toolbarMenuState.closeMenus}
+      compactMenus={false}
+      currentViewport={null}
+      displayMode="horizontal"
+      getViewportMenuPosition={() => 'down'}
+      isLoading={false}
+      onViewportChange={vi.fn()}
+      screenshotMode
+      setViewportMenuOpen={toolbarMenuState.setViewportMenuOpen}
+      viewportSelectorRef={createRef()}
+      viewportWrapperRef={createRef()}
+    />
+  );
+}
+
+function getCurrentToolbarMenuState(): ToolbarMenuState {
+  if (!currentToolbarMenuState) throw new Error('Toolbar menu state did not render');
+  return currentToolbarMenuState;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  currentToolbarMenuState = null;
 });
 
 afterEach(() => {
@@ -62,6 +91,7 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  currentToolbarMenuState = null;
   vi.unstubAllGlobals();
 });
 
@@ -115,7 +145,6 @@ describe('toolbar capture menu composition', () => {
 
   it('keeps viewport composition behind screenshot mode', async () => {
     const props: React.ComponentProps<typeof ToolbarViewportMenu> = {
-      activeMenuType: null,
       closeMenus: vi.fn(),
       compactMenus: false,
       currentViewport: null,
@@ -124,7 +153,6 @@ describe('toolbar capture menu composition', () => {
       isLoading: false,
       onViewportChange: vi.fn(),
       screenshotMode: false,
-      setActiveMenuType: vi.fn(),
       setViewportMenuOpen: vi.fn(),
       viewportSelectorRef: createRef(),
       viewportWrapperRef: createRef(),
@@ -135,5 +163,20 @@ describe('toolbar capture menu composition', () => {
 
     await renderNode(<ToolbarViewportMenu {...props} screenshotMode />);
     expect(menuComponentMocks.viewportSelector).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a delayed viewport close after toolbar settings becomes active', async () => {
+    await renderNode(<ViewportMenuStateHarness />);
+    act(() => getCurrentToolbarMenuState().setViewportMenuOpen(true));
+
+    const staleViewportStateChange = menuComponentMocks.viewportSelector.mock.lastCall?.[0]
+      ?.onMenuStateChange as ((isOpen: boolean) => void) | undefined;
+    expect(staleViewportStateChange).toBeTypeOf('function');
+
+    act(() => getCurrentToolbarMenuState().toggleMenu('settings'));
+    expect(getCurrentToolbarMenuState().activeMenuType).toBe('settings');
+
+    act(() => staleViewportStateChange?.(false));
+    expect(getCurrentToolbarMenuState().activeMenuType).toBe('settings');
   });
 });

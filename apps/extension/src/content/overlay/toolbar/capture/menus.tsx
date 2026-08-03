@@ -5,7 +5,7 @@ import { CaptureActionDropdown } from './action-dropdown';
 import { TimerDropdown } from './timer-dropdown';
 import { ToolbarTimerToggle } from './timer-toggle';
 import { ToolbarCaptureActionToggle } from './toggle';
-import type { ToolbarCapturePopoverMenu, ToolbarPopoverMenu } from '../state/menu';
+import type { ToolbarCapturePopoverMenu } from '../state/menu';
 
 type ToolbarCaptureActionMenuProps = {
   showCaptureMenu: boolean;
@@ -158,8 +158,6 @@ type ToolbarViewportMenuProps = {
   getViewportMenuPosition: (menuHeight?: number) => 'up' | 'down';
   setViewportMenuOpen: (isOpen: boolean) => void;
   closeMenus: (except?: ToolbarCapturePopoverMenu | null) => void;
-  activeMenuType: ToolbarPopoverMenu | null;
-  setActiveMenuType: (menu: ToolbarPopoverMenu | null) => void;
 };
 
 export function ToolbarViewportMenu(props: ToolbarViewportMenuProps) {
@@ -173,8 +171,6 @@ export function ToolbarViewportMenu(props: ToolbarViewportMenuProps) {
     getViewportMenuPosition,
     setViewportMenuOpen,
     closeMenus,
-    activeMenuType,
-    setActiveMenuType,
   } = props;
   if (!screenshotMode) {
     return null;
@@ -190,9 +186,7 @@ export function ToolbarViewportMenu(props: ToolbarViewportMenuProps) {
         disabled={isLoading}
         menuPosition={getViewportMenuPosition(360)}
         onMenuStateChange={createViewportMenuStateChangeHandler({
-          activeMenuType,
           closeMenus,
-          setActiveMenuType,
           setViewportMenuOpen,
         })}
       />
@@ -201,17 +195,13 @@ export function ToolbarViewportMenu(props: ToolbarViewportMenuProps) {
 }
 
 function createViewportMenuStateChangeHandler(args: {
-  activeMenuType: ToolbarPopoverMenu | null;
   closeMenus: (except?: ToolbarCapturePopoverMenu | null) => void;
-  setActiveMenuType: (menu: ToolbarPopoverMenu | null) => void;
   setViewportMenuOpen: (isOpen: boolean) => void;
 }) {
   return (isOpen: boolean) => {
     args.setViewportMenuOpen(isOpen);
     if (isOpen) {
       args.closeMenus('viewport');
-    } else if (args.activeMenuType === 'viewport') {
-      args.setActiveMenuType(null);
     }
   };
 }
