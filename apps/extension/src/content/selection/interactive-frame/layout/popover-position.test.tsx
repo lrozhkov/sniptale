@@ -97,7 +97,8 @@ describe('main toolbar frame popover positioning', () => {
 
     const popover = container.firstElementChild as HTMLElement;
     expect(Number(popover.dataset['left'])).toBe(220);
-    expect(Number(popover.dataset['top'])).toBe(158);
+    expect(Number(popover.dataset['top'])).toBe(150);
+    expect(Number(popover.dataset['top']) - 140).toBe(10);
   });
 
   it('opens beside the complete vertical main toolbar without overlapping it', () => {
@@ -113,7 +114,8 @@ describe('main toolbar frame popover positioning', () => {
     act(() => root.render(<PositionHarness anchorEl={anchor} />));
 
     const popover = container.firstElementChild as HTMLElement;
-    expect(Number(popover.dataset['left'])).toBe(158);
+    expect(Number(popover.dataset['left'])).toBe(150);
+    expect(Number(popover.dataset['left']) - 140).toBe(10);
     expect(Number(popover.dataset['top'])).toBe(180);
   });
 
@@ -131,7 +133,8 @@ describe('main toolbar frame popover positioning', () => {
 
     const popover = container.firstElementChild as HTMLElement;
     expect(Number(popover.dataset['left'])).toBe(220);
-    expect(Number(popover.dataset['top'])).toBe(440);
+    expect(Number(popover.dataset['top'])).toBe(448);
+    expect(538 - (Number(popover.dataset['top']) + 80)).toBe(10);
   });
 
   it('opens left of a vertical main toolbar when there is no room on its right', () => {
@@ -147,7 +150,8 @@ describe('main toolbar frame popover positioning', () => {
     act(() => root.render(<PositionHarness anchorEl={anchor} />));
 
     const popover = container.firstElementChild as HTMLElement;
-    expect(Number(popover.dataset['left'])).toBe(560);
+    expect(Number(popover.dataset['left'])).toBe(568);
+    expect(738 - (Number(popover.dataset['left']) + 160)).toBe(10);
     expect(Number(popover.dataset['top'])).toBe(180);
   });
 });

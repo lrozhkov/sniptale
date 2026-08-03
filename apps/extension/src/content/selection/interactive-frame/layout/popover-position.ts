@@ -139,27 +139,37 @@ function calculateMainToolbarPopoverRect(params: {
     VIEWPORT_MARGIN,
     params.viewport.height - height - VIEWPORT_MARGIN
   );
+  const downEdge = Math.max(
+    params.toolbarRect.y + params.toolbarRect.height,
+    params.anchorRect.y + params.anchorRect.height + TOOLBAR_MENU_GAP
+  );
+  const upEdge = Math.min(params.toolbarRect.y, params.anchorRect.y - TOOLBAR_MENU_GAP);
+  const rightEdge = Math.max(
+    params.toolbarRect.x + params.toolbarRect.width,
+    params.anchorRect.x + params.anchorRect.width + TOOLBAR_MENU_GAP
+  );
+  const leftEdge = Math.min(params.toolbarRect.x, params.anchorRect.x - TOOLBAR_MENU_GAP);
   const candidates = {
     down: {
       x: horizontalX,
-      y: params.toolbarRect.y + params.toolbarRect.height + TOOLBAR_MENU_GAP,
+      y: downEdge,
       width,
       height,
     },
     up: {
       x: horizontalX,
-      y: params.toolbarRect.y - TOOLBAR_MENU_GAP - height,
+      y: upEdge - height,
       width,
       height,
     },
     right: {
-      x: params.toolbarRect.x + params.toolbarRect.width + TOOLBAR_MENU_GAP,
+      x: rightEdge,
       y: verticalY,
       width,
       height,
     },
     left: {
-      x: params.toolbarRect.x - TOOLBAR_MENU_GAP - width,
+      x: leftEdge - width,
       y: verticalY,
       width,
       height,
