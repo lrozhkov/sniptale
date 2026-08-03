@@ -11,6 +11,7 @@ vi.mock('../../../platform/i18n', () => ({
 
 import { StepBadge } from '.';
 import { createStepBadgeSettingsFixture } from '../frame-runtime/test-support';
+import { initializeContentUiRoots, resolveContentOverlayRoot } from '../../platform/dom-host';
 
 it('renders the tooltip label through the shared i18n seam', () => {
   const markup = renderToStaticMarkup(
@@ -172,6 +173,43 @@ it('reanchors move and settings controls after scroll updates the frame geometry
   );
 
   rectSpy.mockRestore();
+  act(() => root.unmount());
+  document.body.replaceChildren();
+});
+
+it('mounts a positioned badge in the shared overlay above every frame root', () => {
+  const contentHost = document.createElement('div');
+  document.body.append(contentHost);
+  const shadowRoot = contentHost.attachShadow({ mode: 'open' });
+  const { appContainer, overlayRoot } = initializeContentUiRoots(shadowRoot);
+  const frameRoot = document.createElement('div');
+  appContainer.append(frameRoot);
+  const root = createRoot(frameRoot);
+
+  act(() => {
+    root.render(
+      <StepBadge
+        settings={createStepBadgeSettingsFixture({ value: '7' })}
+        borderColor="#000"
+        borderWidth={2}
+        frameRect={{ height: 120, width: 200, x: 100, y: 80 }}
+      />
+    );
+  });
+
+  const badgeLayer = overlayRoot.querySelector<HTMLElement>('.sniptale-step-badge-layer');
+  const badge = badgeLayer?.querySelector<HTMLElement>('.sniptale-step-badge');
+  expect(resolveContentOverlayRoot()).toBe(overlayRoot);
+  expect(badgeLayer?.parentElement).toBe(overlayRoot);
+  expect(frameRoot.querySelector('.sniptale-step-badge')).toBeNull();
+  expect(badgeLayer?.style.position).toBe('fixed');
+  expect(badgeLayer?.style.left).toBe('100px');
+  expect(badgeLayer?.style.top).toBe('80px');
+  expect(badgeLayer?.style.width).toBe('200px');
+  expect(badgeLayer?.style.height).toBe('120px');
+  expect(badgeLayer?.style.zIndex).toBe('2147483647');
+  expect(badge?.style.position).toBe('absolute');
+
   act(() => root.unmount());
   document.body.replaceChildren();
 });
