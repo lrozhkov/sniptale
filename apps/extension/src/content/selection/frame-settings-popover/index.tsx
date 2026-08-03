@@ -10,6 +10,7 @@ import { FrameSettingsPopoverContent } from './views';
 import { POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
 import { BorderPresetEditor } from '../../../ui/highlighter-preset-editor';
+import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 
 function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
   event.stopPropagation();
@@ -18,6 +19,7 @@ function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
 
 export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   const state = useFrameSettingsPopoverController(props);
+  const popoverRef = useFloatingSurfaceWheelContainment(state.surface.popoverRef);
   const popoverStyle = useFramePopoverPosition({
     anchorEl: props.anchorEl,
     fallbackSize: { width: POPOVER_WIDTH, height: POPOVER_HEIGHT },
@@ -34,7 +36,7 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   return createPortal(
     <>
       <div
-        ref={state.surface.popoverRef}
+        ref={popoverRef}
         className={[
           'sniptale-frame-settings-popover',
           'sniptale-glass-popover',

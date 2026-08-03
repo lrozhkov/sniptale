@@ -4,6 +4,7 @@ import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
+import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 
 export interface ContentPopoverAdapterProps {
   isOpen: boolean;
@@ -52,6 +53,7 @@ export function ContentPopoverAdapter({
   children,
   dataUi,
 }: ContentPopoverAdapterProps) {
+  const surfaceRef = useFloatingSurfaceWheelContainment(popoverRef);
   const portalTheme = useResolvedPortalTheme(anchorEl);
 
   if (!isOpen) {
@@ -60,7 +62,7 @@ export function ContentPopoverAdapter({
 
   return createPortal(
     <div
-      ref={popoverRef}
+      ref={surfaceRef}
       className={joinClassNames('sniptale-content-popover', className)}
       data-ui={dataUi ?? 'shared.ui.content-popover'}
       data-theme={portalTheme ?? undefined}

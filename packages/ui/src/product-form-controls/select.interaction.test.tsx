@@ -125,6 +125,16 @@ it('applies custom menu classes to the rendered listbox', () => {
   expect(getRenderedMenu()?.className).toContain('w-[15rem]');
 });
 
+it('absorbs wheel input at the listbox boundary', () => {
+  renderLanguageSelect();
+  openRenderedSelect();
+  const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 80 });
+
+  getRenderedMenu()?.dispatchEvent(event);
+
+  expect(event.defaultPrevented).toBe(true);
+});
+
 it('opts a consumer into an unbounded portaled menu without changing the default', () => {
   renderLanguageSelect({ menuScrollable: false });
   openRenderedSelect();

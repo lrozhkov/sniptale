@@ -296,6 +296,13 @@ describe('FrameSettingsPopover loading state', () => {
     expect(popover?.querySelector('.sniptale-content-popover-body')).not.toBeNull();
     popover?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(hostClick).not.toHaveBeenCalled();
+    const wheelEvent = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 80,
+    });
+    popover?.dispatchEvent(wheelEvent);
+    expect(wheelEvent.defaultPrevented).toBe(true);
 
     document.body.removeEventListener('click', hostClick);
   });

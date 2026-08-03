@@ -1,5 +1,6 @@
 import { Check, ChevronDown } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 import type { BrowserDesignReviewAction } from '../../../parser/page-preparation/annotations';
 import { isContentEventWithinElement } from '../../../platform/dom-host';
 import { translate } from '../../../../platform/i18n';
@@ -15,6 +16,7 @@ export function DesignReviewActionMenu(props: {
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useFloatingSurfaceWheelContainment<HTMLDivElement>();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const selected = getDesignReviewActionOption(props.action);
   const SelectedIcon = selected.icon;
@@ -59,6 +61,7 @@ export function DesignReviewActionMenu(props: {
       </button>
       {open ? (
         <div
+          ref={menuRef}
           className={[
             'absolute left-0 top-full z-30 mt-1 w-48 cursor-pointer rounded-[10px] border p-1 shadow-xl',
             'border-[color:var(--sniptale-color-border-soft)]',

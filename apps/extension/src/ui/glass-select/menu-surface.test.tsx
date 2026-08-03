@@ -80,6 +80,24 @@ function expectHiddenPortalMenuUntilPositioned() {
   expect(menu?.style.pointerEvents).toBe('none');
 }
 
+function expectWheelContainment() {
+  const menu = renderSurface({
+    portal: false,
+    portalTheme: null,
+    portalStyle: {},
+    menuPosition: 'bottom',
+    menuSizeClasses: '',
+    menuClassName: '',
+    menuSurfaceClassName: 'surface-shell',
+    menuRef: { current: null },
+  });
+  const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 80 });
+
+  menu?.dispatchEvent(event);
+
+  expect(event.defaultPrevented).toBe(true);
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 });
@@ -102,4 +120,5 @@ describe('GlassSelectMenuSurface', () => {
     'keeps a portal menu hidden until floating coordinates are available',
     expectHiddenPortalMenuUntilPositioned
   );
+  it('absorbs wheel input at the menu boundary', expectWheelContainment);
 });

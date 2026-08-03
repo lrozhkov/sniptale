@@ -153,6 +153,9 @@ it('filters actions and dismisses the highest floating layer with focus restorat
   );
   expect(filterMenu?.getAttribute('role')).toBe('menu');
   expect(filterMenu?.closest('.overflow-hidden')).toBeNull();
+  const wheelEvent = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 80 });
+  filterMenu?.dispatchEvent(wheelEvent);
+  expect(wheelEvent.defaultPrevented).toBe(true);
   const menuItems = Array.from(filterMenu?.querySelectorAll<HTMLButtonElement>('button') ?? []);
   expect(menuItems.every((item) => item.getAttribute('role') === 'menuitemradio')).toBe(true);
   const fixItem = menuItems.find((item) => item.textContent === 'content.designReview.actionFix');
