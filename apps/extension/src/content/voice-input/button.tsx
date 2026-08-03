@@ -51,7 +51,7 @@ export function ContentVoiceInputButton(props: {
           : 'border-transparent',
         props.state.active
           ? contrast
-            ? 'text-[var(--sniptale-color-text-inverse)]'
+            ? 'text-[var(--sniptale-color-accent-emphasis)]'
             : 'text-[var(--sniptale-color-accent)]'
           : hasError
             ? 'text-[var(--sniptale-color-danger)]'
@@ -91,7 +91,7 @@ export function ContentVoiceInputButton(props: {
             'motion-reduce:transition-none',
             contrast
               ? [
-                  'border-2',
+                  'border',
                   'border-[var(--sniptale-color-accent-emphasis)]',
                   'shadow-[0_0_7px_var(--sniptale-color-accent-glow)]',
                 ].join(' ')

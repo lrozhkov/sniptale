@@ -99,9 +99,9 @@ it('uses the contrast surface and inverse icon treatment above arbitrary page co
     );
   });
 
-  expect(container.querySelector('button')?.className).toContain('text-inverse');
+  expect(container.querySelector('button')?.className).toContain('color-accent-emphasis');
   const contrastRing = container.querySelector('button span');
-  expect(contrastRing?.className).toContain('border-2');
+  expect(contrastRing?.className.split(' ')).toContain('border');
   expect(contrastRing?.className).toContain('shadow-[0_0_7px');
   expect(Number((contrastRing as HTMLElement | null)?.style.opacity)).toBeCloseTo(0.91);
 });
