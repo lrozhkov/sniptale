@@ -52,6 +52,6 @@ describe('interactive frame toolbar dispatch', () => {
     handlers.handleEffectClick('blur')(event);
 
     expect(props.handleEffectButtonClick).toHaveBeenCalledWith('blur');
-    expect(props.closePopover).toHaveBeenCalledOnce();
+    expect(props.closePopover).not.toHaveBeenCalled();
   });
 });

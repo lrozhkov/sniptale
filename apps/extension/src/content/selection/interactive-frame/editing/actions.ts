@@ -1,5 +1,4 @@
 import { resumeHighlighter } from '../../highlighter';
-import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
 
 function mergeFrameEffectSettings(frame: FrameData, effectMode: EffectMode): FrameData {
@@ -60,18 +59,12 @@ export function toggleInteractiveFrameEffectMode(params: {
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   onEffectChange?: (frameId: string, mode: EffectMode) => void;
 }) {
-  const activePopover = useFrameUIStore.getState().activePopover;
-  const isCurrentlyOpen =
-    activePopover?.frameId === params.frameId && activePopover.kind === 'frame-settings';
-
   if (params.effectMode === params.mode) {
     params.togglePopover(params.frameId, 'frame-settings');
     return;
   }
 
-  if (isCurrentlyOpen) {
-    params.closePopover();
-  }
+  params.closePopover();
   params.setEffectMode(params.mode);
   params.onEffectChange?.(params.frameId, params.mode);
 }

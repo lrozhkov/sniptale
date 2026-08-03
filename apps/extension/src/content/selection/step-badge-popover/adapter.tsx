@@ -16,7 +16,7 @@ export function StepBadgePopoverAdapter(props: {
       popoverRef={props.popoverRef}
       className={[
         'sniptale-step-badge-popover sniptale-glass-popover',
-        'sniptale-content-popover--compact',
+        'sniptale-content-popover--compact sniptale-content-popover--toolbar-menu',
       ].join(' ')}
       style={props.getPopoverStyle()}
       dataUi="content.step-badge.popover"

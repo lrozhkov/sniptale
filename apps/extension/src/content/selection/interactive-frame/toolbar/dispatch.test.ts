@@ -42,6 +42,16 @@ function createToolbarProps(
 }
 
 describe('interactive frame toolbar size actions', () => {
+  it('lets an active effect button toggle its own popover closed', () => {
+    const props = createToolbarProps(createFrameDataFixture('frame-1'), vi.fn());
+    const actions = createInteractiveFrameToolbarActions(props);
+
+    actions.handleEffectClick('border')(createEvent());
+
+    expect(props.closePopover).not.toHaveBeenCalled();
+    expect(props.handleEffectButtonClick).toHaveBeenCalledWith('border');
+  });
+
   it('changes geometry by exactly 5 px on every side', () => {
     const frame = createFrameDataFixture('frame-1', {
       x: 20,

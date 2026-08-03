@@ -5,7 +5,8 @@ import { queryAllContentUiElements } from '../../../platform/dom-host';
 import type { FloatingRect } from './floating-placement';
 
 const VIEWPORT_MARGIN = 8;
-const POPOVER_GAP = 10;
+const FRAME_TOOLBAR_POPOVER_GAP = 4;
+const TOOLBAR_MENU_GAP = 10;
 
 function toRect(rect: DOMRect): FloatingRect {
   return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
@@ -50,8 +51,8 @@ function calculateQuickControlPopoverRect(params: {
   viewport: { width: number; height: number };
   width: number;
 }): FloatingRect | null {
-  const rightX = params.anchorRect.x + params.anchorRect.width + POPOVER_GAP;
-  const leftX = params.anchorRect.x - POPOVER_GAP - params.width;
+  const rightX = params.anchorRect.x + params.anchorRect.width + TOOLBAR_MENU_GAP;
+  const leftX = params.anchorRect.x - TOOLBAR_MENU_GAP - params.width;
   const x =
     rightX + params.width <= params.viewport.width - VIEWPORT_MARGIN
       ? rightX
@@ -81,6 +82,7 @@ function calculateCanonicalPopoverRect(params: {
     Math.max(0, params.viewport.width - VIEWPORT_MARGIN * 2)
   );
   const height = params.size.height;
+  const gap = params.preferSidePlacement ? TOOLBAR_MENU_GAP : FRAME_TOOLBAR_POPOVER_GAP;
   if (params.preferSidePlacement) {
     const sideRect = calculateQuickControlPopoverRect({
       anchorRect: params.anchorRect,
@@ -96,10 +98,10 @@ function calculateCanonicalPopoverRect(params: {
     VIEWPORT_MARGIN,
     params.viewport.width - width - VIEWPORT_MARGIN
   );
-  const bottomY = params.surfaceRect.y + params.surfaceRect.height + POPOVER_GAP;
+  const bottomY = params.surfaceRect.y + params.surfaceRect.height + gap;
   const bottomAvailable = Math.max(0, params.viewport.height - VIEWPORT_MARGIN - bottomY);
   const placeBelow = height <= bottomAvailable;
-  const y = placeBelow ? bottomY : params.surfaceRect.y - POPOVER_GAP - height;
+  const y = placeBelow ? bottomY : params.surfaceRect.y - gap - height;
   return { x, y, width, height };
 }
 
@@ -140,24 +142,24 @@ function calculateMainToolbarPopoverRect(params: {
   const candidates = {
     down: {
       x: horizontalX,
-      y: params.toolbarRect.y + params.toolbarRect.height + POPOVER_GAP,
+      y: params.toolbarRect.y + params.toolbarRect.height + TOOLBAR_MENU_GAP,
       width,
       height,
     },
     up: {
       x: horizontalX,
-      y: params.toolbarRect.y - POPOVER_GAP - height,
+      y: params.toolbarRect.y - TOOLBAR_MENU_GAP - height,
       width,
       height,
     },
     right: {
-      x: params.toolbarRect.x + params.toolbarRect.width + POPOVER_GAP,
+      x: params.toolbarRect.x + params.toolbarRect.width + TOOLBAR_MENU_GAP,
       y: verticalY,
       width,
       height,
     },
     left: {
-      x: params.toolbarRect.x - POPOVER_GAP - width,
+      x: params.toolbarRect.x - TOOLBAR_MENU_GAP - width,
       y: verticalY,
       width,
       height,

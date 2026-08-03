@@ -64,6 +64,7 @@ describe('CalloutSettingsPopover', () => {
     const popover = document.querySelector('[data-ui="content.callout-settings.popover"]');
     expect(popover).not.toBeNull();
     expect(popover?.classList.contains('sniptale-content-popover--compact')).toBe(true);
+    expect(popover?.classList.contains('sniptale-content-popover--toolbar-menu')).toBe(true);
     expect(popover?.classList.contains('sniptale-glass-popover-scroll')).toBe(false);
 
     act(() => {

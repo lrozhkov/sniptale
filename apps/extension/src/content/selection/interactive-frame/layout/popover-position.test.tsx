@@ -174,7 +174,7 @@ describe('frame toolbar popover positioning', () => {
     expect(overlaps(popoverRect, { x: 200, y: 100, width: 200, height: 48 })).toBe(false);
     expect(overlaps(popoverRect, { x: 200, y: 20, width: 200, height: 60 })).toBe(false);
     expect(left).toBe(182);
-    expect(top).toBeGreaterThanOrEqual(148);
+    expect(top).toBe(152);
   });
 
   it('flips the popover above its icon only when the canonical bottom side has no room', () => {
@@ -221,8 +221,8 @@ describe('frame toolbar popover positioning', () => {
 
     const popover = container.firstElementChild as HTMLElement;
     const top = Number(popover.dataset['top']);
-    expect(top).toBe(270);
-    expect(top + 220).toBe(490);
+    expect(top).toBe(276);
+    expect(top + 220).toBe(496);
   });
 
   it('keeps the canonical bottom side even when the selected frame is below the toolbar', () => {
@@ -247,7 +247,7 @@ describe('frame toolbar popover positioning', () => {
 
     const popover = container.firstElementChild as HTMLElement;
     expect(Number(popover.dataset['left'])).toBe(182);
-    expect(Number(popover.dataset['top'])).toBe(158);
+    expect(Number(popover.dataset['top'])).toBe(152);
   });
 
   it('keeps every family-sized popover at its natural height without internal scrolling', () => {
@@ -264,7 +264,7 @@ describe('frame toolbar popover positioning', () => {
       act(() => root.render(<PositionHarness anchorEl={anchor} fallbackHeight={fallbackHeight} />));
       const popover = container.firstElementChild as HTMLElement;
       const top = Number(popover.dataset['top']);
-      expect(top).toBe(190 - fallbackHeight);
+      expect(top).toBe(196 - fallbackHeight);
       expect(popover.dataset['maxHeight']).toBe('none');
       expect(popover.dataset['overflow']).toBe('visible');
     });
@@ -306,14 +306,14 @@ describe('frame toolbar popover positioning', () => {
     const popover = container.firstElementChild as HTMLElement;
     expect(observed).toContain(toolbar);
     expect(observed).toContain(popover);
-    expect(Number(popover.dataset['top'])).toBe(158);
+    expect(Number(popover.dataset['top'])).toBe(152);
 
     toolbarTop = 180;
     act(() => notifyResize?.());
-    expect(Number(popover.dataset['top'])).toBe(158);
+    expect(Number(popover.dataset['top'])).toBe(152);
     act(() => scheduledLayout?.(0));
 
-    expect(Number(popover.dataset['top'])).toBe(158);
+    expect(Number(popover.dataset['top'])).toBe(152);
   });
 
   it('opens a quick-control popover to the right and keeps that position fixed', () => {
