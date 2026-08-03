@@ -35,7 +35,11 @@ describe('voice input consumer policy', () => {
         tab: createTab(2),
         url: 'chrome-extension://extension-id/apps/extension/src/settings/index.html?section=voice-input',
       })
-    ).toEqual({ consumerId: 'settings-test', documentId: 'settings-document' });
+    ).toEqual({
+      consumerId: 'settings-test',
+      documentId: 'settings-document',
+      maxDurationMs: 30_000,
+    });
   });
 
   it('binds a top-level web content document for Design Review voice input', () => {
@@ -46,7 +50,11 @@ describe('voice input consumer policy', () => {
         tab: createTab(7),
         url: 'https://example.com/review',
       })
-    ).toEqual({ consumerId: 'content-design-review', documentId: 'content-document' });
+    ).toEqual({
+      consumerId: 'content-design-review',
+      documentId: 'content-document',
+      maxDurationMs: null,
+    });
   });
 
   it('rejects a missing documentId and a lookalike extension path', () => {

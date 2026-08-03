@@ -77,6 +77,7 @@ let generationSequence = 0;
 function startMessage() {
   return {
     capabilityToken: 'capability',
+    maxDurationMs: null,
     preferences: {
       language: 'ru-RU' as const,
       microphoneDeviceId: null,
@@ -166,6 +167,7 @@ describe('offscreen voice input runtime boundary', () => {
 
     expect(mocks.start).toHaveBeenCalledOnce();
     expect(mocks.start).toHaveBeenCalledWith({
+      maxDurationMs: null,
       preferences: { language: 'ru-RU', microphoneDeviceId: null, mode: 'local-first' },
       requestId: 'request-1',
       sessionId: 'session-1',

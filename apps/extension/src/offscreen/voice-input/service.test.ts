@@ -140,8 +140,13 @@ async function flushStart(): Promise<void> {
   for (let index = 0; index < 10; index += 1) await Promise.resolve();
 }
 
-function start(service: ReturnType<typeof createOffscreenVoiceInputService>, sessionId = 's1') {
+function start(
+  service: ReturnType<typeof createOffscreenVoiceInputService>,
+  sessionId = 's1',
+  maxDurationMs: number | null = null
+) {
   return service.start({
+    maxDurationMs,
     preferences: { language: 'ru-RU', microphoneDeviceId: null, mode: 'local-first' },
     requestId: `request-${sessionId}`,
     sessionId,
@@ -184,6 +189,7 @@ describe('offscreen voice input service', () => {
   it('acquires the selected microphone and emits only normalized level telemetry', async () => {
     const harness = createHarness('available');
     harness.service.start({
+      maxDurationMs: null,
       preferences: {
         language: 'ru-RU',
         microphoneDeviceId: 'microphone-2',
@@ -295,6 +301,7 @@ describe('offscreen voice input service', () => {
   it('skips local availability entirely in browser-managed mode', async () => {
     const harness = createHarness();
     harness.service.start({
+      maxDurationMs: null,
       preferences: { language: 'en-US', microphoneDeviceId: null, mode: 'browser-managed' },
       requestId: 'request-browser',
       sessionId: 'session-browser',
@@ -485,6 +492,7 @@ describe('offscreen voice input lifecycle', () => {
   it('reports unsupported after a synchronous browser-managed start failure', async () => {
     const harness = createHarness('available', { startThrowsFor: [0] });
     harness.service.start({
+      maxDurationMs: null,
       preferences: { language: 'ru-RU', microphoneDeviceId: null, mode: 'browser-managed' },
       requestId: 'request-browser',
       sessionId: 'session-browser',
@@ -523,7 +531,7 @@ describe('offscreen voice input lifecycle', () => {
   it('stops cleanly at the 30-second test limit', async () => {
     vi.useFakeTimers();
     const harness = createHarness();
-    start(harness.service);
+    start(harness.service, 's1', 30_000);
     await flushStart();
     harness.recognitions[0]?.callbacks.onStart();
     harness.recognitions[0]?.callbacks.onAudioStart();
@@ -533,6 +541,20 @@ describe('offscreen voice input lifecycle', () => {
     expect(harness.service.getSnapshot()).toMatchObject({ errorCode: null, phase: 'stopping' });
     harness.recognitions[0]?.callbacks.onEnd();
     expect(harness.service.getSnapshot()).toMatchObject({ errorCode: null, phase: 'ended' });
+  });
+
+  it('keeps an unlimited consumer listening beyond the Settings test deadline', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    start(harness.service);
+    await flushStart();
+    harness.recognitions[0]?.callbacks.onStart();
+    harness.recognitions[0]?.callbacks.onAudioStart();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(harness.recognitions[0]?.stop).not.toHaveBeenCalled();
+    expect(harness.service.getSnapshot()).toMatchObject({ phase: 'listening', sessionId: 's1' });
   });
 });
 

@@ -28,6 +28,7 @@ describe('voice input runtime contracts', () => {
       },
       {
         capabilityToken: 'capability',
+        maxDurationMs: null,
         preferences: { language: 'ru-RU', microphoneDeviceId: null, mode: 'local-first' },
         quality: 'dictation',
         requestId: 'start-1',

@@ -1,3 +1,4 @@
+import { VOICE_INPUT_TEST_SESSION_DURATION_MS } from '@sniptale/runtime-contracts/voice-input';
 import { resolveExtensionDocumentSenderUrl } from '../../platform/runtime-messaging/document-sender';
 
 export type VoiceInputConsumerId = 'content-design-review' | 'settings-test';
@@ -6,6 +7,7 @@ const voiceInputConsumerPolicies = [
   {
     id: 'settings-test',
     documentPath: 'apps/extension/src/settings/index.html',
+    maxDurationMs: VOICE_INPUT_TEST_SESSION_DURATION_MS,
   },
 ] as const;
 
@@ -19,15 +21,27 @@ function isTopLevelWebContentSender(sender: chrome.runtime.MessageSender): boole
   }
 }
 
-export function authorizeVoiceInputPortSender(
-  sender: chrome.runtime.MessageSender | undefined
-): { consumerId: VoiceInputConsumerId; documentId: string } | null {
+export function authorizeVoiceInputPortSender(sender: chrome.runtime.MessageSender | undefined): {
+  consumerId: VoiceInputConsumerId;
+  documentId: string;
+  maxDurationMs: typeof VOICE_INPUT_TEST_SESSION_DURATION_MS | null;
+} | null {
   if (!sender?.documentId) return null;
   const policy = voiceInputConsumerPolicies.find((candidate) =>
     resolveExtensionDocumentSenderUrl(sender, candidate.documentPath)
   );
-  if (policy) return { consumerId: policy.id, documentId: sender.documentId };
+  if (policy) {
+    return {
+      consumerId: policy.id,
+      documentId: sender.documentId,
+      maxDurationMs: policy.maxDurationMs,
+    };
+  }
   return isTopLevelWebContentSender(sender)
-    ? { consumerId: 'content-design-review', documentId: sender.documentId }
+    ? {
+        consumerId: 'content-design-review',
+        documentId: sender.documentId,
+        maxDurationMs: null,
+      }
     : null;
 }

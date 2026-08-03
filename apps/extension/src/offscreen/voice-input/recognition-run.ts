@@ -29,7 +29,6 @@ import {
 
 const logger = createLogger({ namespace: 'OffscreenSpeechRecognition' });
 const AVAILABILITY_TIMEOUT_MS = 5_000;
-const SESSION_WATCHDOG_MS = 30_000;
 const STOP_GRACE_MS = 1_000;
 
 export type VoiceInputRecognitionDeps = {
@@ -52,6 +51,7 @@ type RecognitionRunArgs = {
   deps: VoiceInputRecognitionDeps;
   initialSnapshot: VoiceInputSnapshot;
   lease: OffscreenMediaActivityLease;
+  maxDurationMs: number | null;
   preferences: VoiceInputPreferences;
   requestId: string;
   sessionId: string;
@@ -153,14 +153,16 @@ class RecognitionRun implements VoiceInputRecognitionRun {
 
   start(): void {
     this.emitSnapshot(this.args.requestId);
-    this.watchdogId = globalThis.setTimeout(() => {
-      if (!this.isCurrent()) return;
-      logger.debug('Voice input reached the session time limit', {
-        sessionId: this.sessionId,
-        timeoutMs: SESSION_WATCHDOG_MS,
-      });
-      this.stop();
-    }, SESSION_WATCHDOG_MS);
+    if (this.args.maxDurationMs !== null) {
+      this.watchdogId = globalThis.setTimeout(() => {
+        if (!this.isCurrent()) return;
+        logger.debug('Voice input reached the session time limit', {
+          sessionId: this.sessionId,
+          timeoutMs: this.args.maxDurationMs,
+        });
+        this.stop();
+      }, this.args.maxDurationMs);
+    }
     void this.resolveStartMode();
   }
 

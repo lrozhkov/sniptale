@@ -3,6 +3,7 @@ import {
   VOICE_INPUT_LEVEL_PEAK_COUNT,
   VOICE_INPUT_DEVICE_ID_MAX_CHARS,
   VOICE_INPUT_LOCAL_QUALITY,
+  VOICE_INPUT_TEST_SESSION_DURATION_MS,
   VOICE_INPUT_TRANSCRIPT_MAX_CHARS,
   VoiceInputPortMessageType,
 } from './types';
@@ -331,9 +332,12 @@ export function parseOffscreenVoiceInputRuntimeMessage(
   if (
     value['type'] === MessageType.OFFSCREEN_VOICE_INPUT_START &&
     value['quality'] === VOICE_INPUT_LOCAL_QUALITY &&
+    (value['maxDurationMs'] === null ||
+      value['maxDurationMs'] === VOICE_INPUT_TEST_SESSION_DURATION_MS) &&
     isNonEmptyString(value['sessionId']) &&
     hasOnlyKeys(value, [
       'capabilityToken',
+      'maxDurationMs',
       'preferences',
       'quality',
       'requestId',
@@ -346,6 +350,7 @@ export function parseOffscreenVoiceInputRuntimeMessage(
     if (!preferences) return null;
     return {
       capabilityToken: value['capabilityToken'],
+      maxDurationMs: value['maxDurationMs'],
       preferences,
       quality: value['quality'],
       requestId: value['requestId'],

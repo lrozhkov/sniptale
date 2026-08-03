@@ -66,10 +66,13 @@ import { createVoiceInputCoordinator as createVoiceInputCoordinatorImplementatio
 
 let internalSessionSequence = 0;
 
-export function createVoiceInputCoordinator() {
+export function createVoiceInputCoordinator(
+  schedule: (callback: () => void, delayMs: number) => void = () => undefined
+) {
   return createVoiceInputCoordinatorImplementation(
     undefined,
-    () => `offscreen-session-${++internalSessionSequence}`
+    () => `offscreen-session-${++internalSessionSequence}`,
+    schedule
   );
 }
 
@@ -104,8 +107,20 @@ export function createPort(documentId: string, tab?: chrome.tabs.Tab) {
   });
 }
 
+export function createContentPort(documentId: string, tab = createTab(7)) {
+  return createRuntimePortFixture({
+    name: VOICE_INPUT_PORT_NAME,
+    sender: {
+      documentId,
+      frameId: 0,
+      tab,
+      url: 'https://example.com/design-review',
+    },
+  });
+}
+
 export async function flush(): Promise<void> {
-  for (let index = 0; index < 10; index += 1) await Promise.resolve();
+  for (let index = 0; index < 20; index += 1) await Promise.resolve();
 }
 
 export function createSnapshot(

@@ -81,6 +81,7 @@ export async function dispatchVoiceInputStart(args: {
     if (!args.isCurrent()) throw new Error('stale-voice-input-start');
     try {
       const response = await args.gateway.send({
+        maxDurationMs: args.session.maxDurationMs,
         preferences: args.preferences,
         quality: VOICE_INPUT_LOCAL_QUALITY,
         requestId: args.requestId,

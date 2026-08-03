@@ -71,6 +71,7 @@ function routeCommand(command: OffscreenVoiceInputCommand): OffscreenVoiceInputR
   }
   if (command.type === MessageType.OFFSCREEN_VOICE_INPUT_START) {
     const snapshot = service.start({
+      maxDurationMs: command.maxDurationMs,
       preferences: command.preferences,
       requestId: command.requestId,
       sessionId: command.sessionId,

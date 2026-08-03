@@ -62,7 +62,7 @@ export class VoiceInputStartOperation {
     try {
       const response = await dispatchVoiceInputStart({
         gateway: this.gateway,
-        isCurrent: () => this.sessions.owns(session),
+        isCurrent: () => this.sessions.owns(session) && !session.stopCleanupPending,
         preferences: request.preferences,
         requestId: request.requestId,
         session,
@@ -90,6 +90,7 @@ export class VoiceInputStartOperation {
       offscreenSessionId: this.createInternalSessionId(),
       preferences: request.preferences,
       startRollbackPending: false,
+      stopCleanupPending: false,
       sessionId: request.sessionId,
     };
     const snapshot: VoiceInputSnapshot = {
@@ -129,6 +130,7 @@ export class VoiceInputStartOperation {
     request: VoiceInputStartRequest,
     response: OffscreenVoiceInputResponse
   ): boolean {
+    if (session.stopCleanupPending) return true;
     if (response.snapshot && isTerminalVoiceInputSnapshot(response.snapshot)) {
       if (this.sessions.owns(session)) {
         const translatedSnapshot = translateVoiceInputSnapshot(response.snapshot, session);
@@ -165,7 +167,7 @@ export class VoiceInputStartOperation {
     request: VoiceInputStartRequest,
     error: unknown
   ): void {
-    if (!this.sessions.owns(session)) return;
+    if (!this.sessions.owns(session) || session.stopCleanupPending) return;
     const errorCode =
       error instanceof Error && error.message === 'privacy-erasure-in-progress'
         ? 'privacy-erasure-in-progress'

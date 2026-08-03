@@ -30,6 +30,27 @@ import { VoiceInputSessionAuthority } from './session-authority';
 import { VoiceInputStartOperation } from './start-operation';
 
 const logger = createLogger({ namespace: 'BackgroundSpeechRecognition' });
+const STOP_CLEANUP_RETRY_MS = 1_000;
+const STOP_SETTLEMENT_TIMEOUT_MS = 1_000;
+
+function withStopSettlementTimeout<TValue>(work: Promise<TValue>): Promise<TValue> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = globalThis.setTimeout(
+      () => reject(new Error('voice-input-stop-settlement-timeout')),
+      STOP_SETTLEMENT_TIMEOUT_MS
+    );
+    void work.then(
+      (value) => {
+        globalThis.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        globalThis.clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
+  });
+}
 
 class VoiceInputCoordinator {
   private readonly sessions = new VoiceInputSessionAuthority();
@@ -37,7 +58,8 @@ class VoiceInputCoordinator {
 
   constructor(
     private readonly gateway: VoiceInputOffscreenGateway,
-    private readonly createInternalSessionId: () => string
+    private readonly createInternalSessionId: () => string,
+    private readonly schedule: (callback: () => void, delayMs: number) => void
   ) {
     this.startOperation = new VoiceInputStartOperation(
       gateway,
@@ -119,20 +141,24 @@ class VoiceInputCoordinator {
     const sessionAtDispatch = this.sessions.active;
     const requestId = `privacy-erasure:${this.createInternalSessionId()}`;
     try {
-      await this.gateway.ensureReady();
-      const status = await this.gateway.send({
-        requestId,
-        type: MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
-      });
+      await withStopSettlementTimeout(this.gateway.ensureReady());
+      const status = await withStopSettlementTimeout(
+        this.gateway.send({
+          requestId,
+          type: MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
+        })
+      );
       if (status?.success !== true || !status.snapshot) return false;
       const offscreenSessionId = status.snapshot.sessionId;
       if (offscreenSessionId && isActiveVoiceInputSnapshot(status.snapshot)) {
-        const stopped = await this.gateway.send({
-          force: true,
-          requestId,
-          sessionId: offscreenSessionId,
-          type: MessageType.OFFSCREEN_VOICE_INPUT_STOP,
-        });
+        const stopped = await withStopSettlementTimeout(
+          this.gateway.send({
+            force: true,
+            requestId,
+            sessionId: offscreenSessionId,
+            type: MessageType.OFFSCREEN_VOICE_INPUT_STOP,
+          })
+        );
         if (
           stopped?.success !== true ||
           stopped.result !== 'accepted' ||
@@ -366,27 +392,16 @@ class VoiceInputCoordinator {
     });
     try {
       const sendStop = async () => {
-        const response = await this.gateway.send({
-          force: false,
-          requestId,
-          sessionId: session.offscreenSessionId,
-          type: MessageType.OFFSCREEN_VOICE_INPUT_STOP,
-        });
+        const response = await withStopSettlementTimeout(
+          this.gateway.send({
+            force: false,
+            requestId,
+            sessionId: session.offscreenSessionId,
+            type: MessageType.OFFSCREEN_VOICE_INPUT_STOP,
+          })
+        );
         if (response?.success !== true) throw new Error('offscreen-stop-rejected');
         if (this.sessions.active !== session) return;
-        if (response.result === 'stale') {
-          this.sessions.reset(session.preferences);
-          postVoiceInputPortEvent(
-            session,
-            createVoiceInputFailureEvent({
-              errorCode: 'offscreen-unavailable',
-              preferences: session.preferences,
-              requestId,
-              sessionId: session.sessionId,
-            })
-          );
-          return;
-        }
         if (response.snapshot) {
           if (
             response.snapshot.sessionId !== null &&
@@ -402,26 +417,90 @@ class VoiceInputCoordinator {
           );
           if (isTerminalVoiceInputSnapshot(translatedSnapshot)) {
             this.sessions.clearIf(session);
+            return;
+          }
+          if (this.isStopCleanupVerified(session, response.snapshot)) {
+            this.sessions.clearIf(session);
+            return;
           }
         }
+        if (response.result === 'stale') {
+          throw new Error('offscreen-stop-stale');
+        }
+        session.stopCleanupPending = true;
+        this.scheduleStopCleanupRetry(session, requestId);
       };
       if (acquireMutationPermit) await this.gateway.withMediaMutationPermit(sendStop);
       else await sendStop();
       return true;
     } catch {
       if (this.sessions.active !== session) return false;
-      this.sessions.clearIf(session);
-      postVoiceInputPortEvent(
-        session,
-        createVoiceInputFailureEvent({
-          errorCode: 'offscreen-unavailable',
-          preferences: session.preferences,
-          requestId,
-          sessionId: session.sessionId,
-        })
-      );
+      session.stopCleanupPending = true;
+      await this.recoverStopCleanup(session, requestId);
       return false;
     }
+  }
+
+  private isStopCleanupVerified(
+    session: ActiveVoiceInputSession,
+    snapshot: VoiceInputSnapshot | undefined
+  ): boolean {
+    if (!snapshot || isActiveVoiceInputSnapshot(snapshot)) return false;
+    return snapshot.sessionId === null || snapshot.sessionId === session.offscreenSessionId;
+  }
+
+  private completeStopCleanup(session: ActiveVoiceInputSession, requestId: string): void {
+    if (this.sessions.active !== session) return;
+    session.stopCleanupPending = false;
+    const idleSnapshot = this.sessions.reset(session.preferences);
+    postVoiceInputPortEvent(session, createVoiceInputSnapshotEvent(idleSnapshot, requestId));
+  }
+
+  private scheduleStopCleanupRetry(session: ActiveVoiceInputSession, requestId: string): void {
+    if (this.sessions.active !== session || !session.stopCleanupPending) return;
+    this.schedule(() => {
+      void this.recoverStopCleanup(session, requestId);
+    }, STOP_CLEANUP_RETRY_MS);
+  }
+
+  private async recoverStopCleanup(
+    session: ActiveVoiceInputSession,
+    requestId: string
+  ): Promise<void> {
+    if (this.sessions.active !== session || !session.stopCleanupPending) return;
+    try {
+      const verified = await this.gateway.withMediaMutationPermit(async () => {
+        await withStopSettlementTimeout(this.gateway.ensureReady());
+        const forced = await withStopSettlementTimeout(
+          this.gateway.send({
+            force: true,
+            requestId: `${requestId}:cleanup-stop`,
+            sessionId: session.offscreenSessionId,
+            type: MessageType.OFFSCREEN_VOICE_INPUT_STOP,
+          })
+        );
+        if (forced?.success === true && this.isStopCleanupVerified(session, forced.snapshot)) {
+          return true;
+        }
+        const status = await withStopSettlementTimeout(
+          this.gateway.send({
+            requestId: `${requestId}:cleanup-status`,
+            type: MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
+          })
+        );
+        return status?.success === true && this.isStopCleanupVerified(session, status.snapshot);
+      });
+      if (verified) {
+        this.completeStopCleanup(session, requestId);
+        return;
+      }
+    } catch {
+      logger.warn('Voice input stop cleanup remains unverified', {
+        requestId,
+        sessionId: session.sessionId,
+      });
+    }
+    this.scheduleStopCleanupRetry(session, requestId);
   }
 }
 
@@ -433,9 +512,12 @@ function createInternalVoiceInputSessionId(): string {
 
 export function createVoiceInputCoordinator(
   gateway = createVoiceInputOffscreenGateway(),
-  createInternalSessionId = createInternalVoiceInputSessionId
+  createInternalSessionId = createInternalVoiceInputSessionId,
+  schedule: (callback: () => void, delayMs: number) => void = (callback, delayMs) => {
+    globalThis.setTimeout(callback, delayMs);
+  }
 ) {
-  const coordinator = new VoiceInputCoordinator(gateway, createInternalSessionId);
+  const coordinator = new VoiceInputCoordinator(gateway, createInternalSessionId, schedule);
   return {
     cleanupForPrivacyErasure: () => coordinator.cleanupForPrivacyErasure(),
     handleOffscreenEvent: (message: OffscreenVoiceInputEventMessage) =>

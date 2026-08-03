@@ -92,7 +92,7 @@ it('starts with persisted preferences and streams only the owning session into t
   });
   emit({
     confidence: 0.8,
-    isFinal: false,
+    isFinal: true,
     sequence: 0,
     sessionId: 'other-session',
     text: 'ignored',
@@ -100,7 +100,7 @@ it('starts with persisted preferences and streams only the owning session into t
   });
   emit({
     confidence: 0.8,
-    isFinal: false,
+    isFinal: true,
     sequence: 0,
     sessionId: 'session-1',
     text: 'spoken ',
@@ -140,7 +140,7 @@ it('cancels a pending start and ignores delayed transcript after stop', async ()
   await act(async () => latest?.actions.start('Keep', 4));
   emit({
     confidence: 0.7,
-    isFinal: false,
+    isFinal: true,
     sequence: 0,
     sessionId: 'session-1',
     text: ' heard',
