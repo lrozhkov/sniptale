@@ -97,8 +97,10 @@ export function useCalloutEscapeCaptureEffect(args: {
   contentEditableRef: React.RefObject<HTMLDivElement | null>;
   finishEditing: (editableElement?: HTMLDivElement | null) => void;
   isEditing: boolean;
+  stopVoiceInput(): void;
+  voiceActive: boolean;
 }) {
-  const { contentEditableRef, finishEditing, isEditing } = args;
+  const { contentEditableRef, finishEditing, isEditing, stopVoiceInput, voiceActive } = args;
 
   useEffect(() => {
     if (!isEditing || !contentEditableRef.current) {
@@ -107,22 +109,28 @@ export function useCalloutEscapeCaptureEffect(args: {
 
     const el = contentEditableRef.current;
     const handler = (event: KeyboardEvent) => {
+      const interactionRoot = el.closest('.sniptale-callout') ?? el;
       if (
         event.key !== 'Escape' ||
-        (!el.contains(document.activeElement) && !isContentEventWithinElement(event, el))
+        (!interactionRoot.contains(document.activeElement) &&
+          !isContentEventWithinElement(event, interactionRoot))
       ) {
         return;
       }
 
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (voiceActive) {
+        stopVoiceInput();
+        return;
+      }
       finishEditing(el);
       el.blur();
     };
 
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
-  }, [contentEditableRef, finishEditing, isEditing]);
+  }, [contentEditableRef, finishEditing, isEditing, stopVoiceInput, voiceActive]);
 }
 
 export function useCalloutSelectionChangeEffect(args: {

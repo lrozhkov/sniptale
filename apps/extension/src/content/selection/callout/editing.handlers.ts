@@ -128,6 +128,7 @@ function useCalloutInputHandler(args: CalloutEditingHandlersArgs) {
       return;
     }
 
+    args.onManualInput();
     args.onContentChange(sanitizeCalloutHtml(editableElement.innerHTML));
   }, [args]);
 }
@@ -138,6 +139,14 @@ function useCalloutTextInputHandlers(args: CalloutEditingHandlersArgs): CalloutT
 
   const handleBlur = useCallback(
     (event?: ReactFocusEvent<HTMLDivElement>) => {
+      const interactionRoot = event?.currentTarget.closest('.sniptale-callout');
+      if (
+        interactionRoot &&
+        event?.relatedTarget instanceof Node &&
+        interactionRoot.contains(event.relatedTarget)
+      ) {
+        return;
+      }
       finishEditing(event?.currentTarget ?? args.contentEditableRef.current);
     },
     [args.contentEditableRef, finishEditing]

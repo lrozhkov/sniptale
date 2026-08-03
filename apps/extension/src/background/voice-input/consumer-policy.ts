@@ -1,7 +1,7 @@
 import { VOICE_INPUT_TEST_SESSION_DURATION_MS } from '@sniptale/runtime-contracts/voice-input';
 import { resolveExtensionDocumentSenderUrl } from '../../platform/runtime-messaging/document-sender';
 
-export type VoiceInputConsumerId = 'content-design-review' | 'settings-test';
+export type VoiceInputConsumerId = 'content-page-tools' | 'settings-test';
 
 const voiceInputConsumerPolicies = [
   {
@@ -39,7 +39,7 @@ export function authorizeVoiceInputPortSender(sender: chrome.runtime.MessageSend
   }
   return isTopLevelWebContentSender(sender)
     ? {
-        consumerId: 'content-design-review',
+        consumerId: 'content-page-tools',
         documentId: sender.documentId,
         maxDurationMs: null,
       }

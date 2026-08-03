@@ -13,6 +13,7 @@ function EditingHandlersHarness(props: { onContentChange: (html: string) => void
     contentEditableRef,
     frameId: 'frame-1',
     isEditing: true,
+    onManualInput: vi.fn(),
     onContentChange: props.onContentChange,
     onDelete: vi.fn(),
     onStartEditing: vi.fn(),

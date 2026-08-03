@@ -37,6 +37,18 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Добавить комментарий',
     en: 'Add comment',
   },
+  voiceInputStart: {
+    ru: 'Начать голосовой ввод. Удерживайте кнопку, чтобы говорить только во время нажатия.',
+    en: 'Start voice input. Hold the button to speak only while pressed.',
+  },
+  voiceInputStop: {
+    ru: 'Остановить голосовой ввод',
+    en: 'Stop voice input',
+  },
+  voiceInputError: {
+    ru: 'Голосовой ввод недоступен. Проверьте микрофон и настройки голосового ввода.',
+    en: 'Voice input is unavailable. Check the microphone and voice input settings.',
+  },
   editButton: {
     ru: 'Редактировать',
     en: 'Edit',

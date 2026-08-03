@@ -13,6 +13,8 @@ import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/ca
 import { resolveContentPortalTarget } from '../interactive-frame/layout/portal';
 import { resolveCalloutThemeOwner } from './dom';
 import { renderCalloutFloatingToolbar, renderDynamicCalloutTail } from './views';
+import type { useCalloutVoiceInput } from './voice-input';
+import { CalloutVoiceButton } from './voice-button';
 import type { getDynamicTailState } from './dynamic-tail';
 import { renderCalloutInteractionHandles, type CalloutInteractionHandleProps } from './handles';
 
@@ -46,6 +48,11 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
         <div ref={props.containerRef as Ref<HTMLDivElement>} style={props.cloudStyle}>
           <div {...createCalloutContentProps(props)} />
         </div>
+        <CalloutVoiceButton
+          isEditing={props.isEditing}
+          leftOffset={props.voiceButtonLeftOffset}
+          voice={props.voice}
+        />
       </div>
       {renderCalloutInteractionHandles(props)}
       {renderCalloutFloatingToolbar({
@@ -72,6 +79,8 @@ type CalloutBodyProps = CalloutInteractionHandleProps & {
   handleInput: () => void;
   handleKeyDown: (event: KeyboardEvent) => void;
   handlePaste: (event: ClipboardEvent) => void;
+  voice: ReturnType<typeof useCalloutVoiceInput>;
+  voiceButtonLeftOffset: number;
   settings: CalloutSettings;
   wrapperStyle: CSSProperties;
   containerRef: RefObject<HTMLDivElement | null>;

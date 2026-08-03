@@ -42,7 +42,7 @@ describe('voice input consumer policy', () => {
     });
   });
 
-  it('binds a top-level web content document for Design Review voice input', () => {
+  it('binds a top-level web content document for page-tool voice input', () => {
     expect(
       authorizeVoiceInputPortSender({
         documentId: 'content-document',
@@ -51,7 +51,7 @@ describe('voice input consumer policy', () => {
         url: 'https://example.com/review',
       })
     ).toEqual({
-      consumerId: 'content-design-review',
+      consumerId: 'content-page-tools',
       documentId: 'content-document',
       maxDurationMs: null,
     });
