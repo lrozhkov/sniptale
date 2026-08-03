@@ -1,6 +1,6 @@
 import { ToolbarModeButtons } from './modes';
 import type { useToolbarViewModel } from '../state/view-model';
-import type { ToolbarProps } from '../types';
+import type { ToolbarPageEditingMode, ToolbarProps } from '../types';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
@@ -29,9 +29,10 @@ export function ToolbarPrimaryControls(props: {
     ...(typeof toolbarProps.onDisableAiPickMode === 'undefined'
       ? {}
       : { onDisableAiPickMode: toolbarProps.onDisableAiPickMode }),
-    onAiPickContentStart: toolbarProps.onAiPickContentStart,
+    onSelectPageEditingMode: (mode: ToolbarPageEditingMode) => {
+      void viewModel.toggleMode(`page-editing:${mode}`);
+    },
     onToggleDesignReview: () => toolbarProps.onToggleDesignReviewMode(!viewModel.designReviewMode),
-    onToggleQuickEditDocumentMode: toolbarProps.onToggleQuickEditDocumentMode,
     onToggleQuickEdit: () => void viewModel.toggleMode('quickedit'),
     onToggleHighlighter: () => {
       void viewModel.toggleMode('highlighter');

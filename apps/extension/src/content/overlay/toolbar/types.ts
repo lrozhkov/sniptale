@@ -15,6 +15,8 @@ export type ToolbarViewportSelection = {
   height: number;
 } | null;
 
+export type ToolbarPageEditingMode = 'block-selection' | 'direct-text' | 'ai';
+
 export interface ToolbarCaptureActionsProps {
   screenshotMode: boolean;
   isLoading: boolean;

@@ -141,7 +141,7 @@ function createToolbarPrimaryViewModel(
 function createToolbarPrimaryControlsProps(params?: ToolbarPrimaryFixtureParams) {
   const resolvedParams = params ?? {};
   const toggleMode = vi.fn<ToolbarPrimaryControlsProps['viewModel']['toggleMode']>(
-    async () => undefined
+    async () => true
   );
 
   return {
@@ -184,8 +184,10 @@ function queryModeSelectorButton(): HTMLButtonElement | null {
   return document.querySelector('[data-ui="content.toolbar.mode-selector-button"]');
 }
 
-function queryQuickEditDocumentModeButton(): HTMLButtonElement | null {
-  return document.querySelector('[data-ui="content.toolbar.quick-edit-document-mode-button"]');
+function queryPageEditingModeButton(
+  mode: 'block-selection' | 'direct-text' | 'ai'
+): HTMLButtonElement | null {
+  return document.querySelector(`[data-ui="content.toolbar.page-editing-mode.${mode}"]`);
 }
 
 function openModeMenu(button: HTMLButtonElement | null): void {
@@ -199,7 +201,7 @@ function openModeMenu(button: HTMLButtonElement | null): void {
   });
 }
 
-function expectModeMenuIcon(mode: 'ai' | 'quick-edit'): void {
+function expectModeMenuIcon(mode: 'quick-edit'): void {
   const icon = document.querySelector(
     `[data-ui="content.toolbar.mode-option.${mode}"] svg`
   ) as SVGElement | null;
@@ -227,7 +229,7 @@ describe('ToolbarPrimaryControls', () => {
     ) as HTMLButtonElement | null;
 
     expect(activeModeButton?.getAttribute('data-active')).toBe('true');
-    expect(activeModeButton?.getAttribute('title')).toBe('ИИ-редактор');
+    expect(activeModeButton?.getAttribute('title')).toBe('Редактирование контента');
   });
 
   it('keeps scenario controls out of the primary group', async () => {
@@ -241,13 +243,13 @@ describe('ToolbarPrimaryControls', () => {
     expect(document.querySelector('[data-ui="test.scenario-controls"]')).toBeNull();
   });
 
-  it('keeps AI and quick edit mode icons pinned to toolbar icon size inside the mode menu', async () => {
+  it('keeps Content Editing icon pinned to toolbar size and AI out of Working Mode', async () => {
     const rendered = createToolbarPrimaryControlsProps();
     renderToolbarPrimaryControls(rendered.props);
 
     openModeMenu(queryModeSelectorButton());
-    expectModeMenuIcon('ai');
     expectModeMenuIcon('quick-edit');
+    expect(document.querySelector('[data-ui="content.toolbar.mode-option.ai"]')).toBeNull();
   });
 });
 
@@ -262,40 +264,50 @@ describe('ToolbarPrimaryControls pending mode', () => {
     const modeButton = queryModeSelectorButton();
 
     expect(modeButton?.getAttribute('data-active')).toBe('true');
-    expect(modeButton?.getAttribute('title')).toBe('Редактирование страницы');
+    expect(modeButton?.getAttribute('title')).toBe('Редактирование контента');
   });
 });
 
 describe('ToolbarPrimaryControls quick-edit document mode', () => {
-  it('shows the document-mode button only while quick edit is active', async () => {
+  it('shows all Content Editing modes only while the editing group is active', async () => {
     const inactive = createToolbarPrimaryControlsProps();
     renderToolbarPrimaryControls(inactive.props);
 
-    expect(queryQuickEditDocumentModeButton()).toBeNull();
+    expect(queryPageEditingModeButton('block-selection')).toBeNull();
+    expect(queryPageEditingModeButton('direct-text')).toBeNull();
+    expect(queryPageEditingModeButton('ai')).toBeNull();
 
     const active = createToolbarPrimaryControlsProps({ quickEditMode: true });
     renderToolbarPrimaryControls(active.props);
 
-    expect(queryQuickEditDocumentModeButton()?.getAttribute('title')).toBe(
+    expect(queryPageEditingModeButton('block-selection')?.getAttribute('title')).toBe(
+      'Выбирать блоки для редактирования'
+    );
+    expect(queryPageEditingModeButton('direct-text')?.getAttribute('title')).toBe(
       'Редактировать текст прямо на странице'
+    );
+    expect(queryPageEditingModeButton('ai')?.getAttribute('title')).toBe(
+      'Выберите элемент на странице и опишите изменение'
     );
   });
 
-  it('reflects document-mode active state and requests the next state on click', async () => {
+  it('reflects direct-text active state and selects another Content Editing mode', async () => {
     const rendered = createToolbarPrimaryControlsProps({
       quickEditDocumentMode: true,
       quickEditMode: true,
     });
     renderToolbarPrimaryControls(rendered.props);
 
-    const button = queryQuickEditDocumentModeButton();
+    const button = queryPageEditingModeButton('direct-text');
     act(() => {
-      button?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      queryPageEditingModeButton('ai')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true })
+      );
     });
 
     expect(button?.getAttribute('data-active')).toBe('true');
     expect(button?.getAttribute('aria-pressed')).toBe('true');
-    expect(button?.getAttribute('title')).toBe('Выключить свободное редактирование');
-    expect(rendered.props.toolbarProps.onToggleQuickEditDocumentMode).toHaveBeenCalledWith(false);
+    expect(button?.getAttribute('title')).toBe('Редактировать текст прямо на странице');
+    expect(rendered.toggleMode).toHaveBeenCalledWith('page-editing:ai');
   });
 });

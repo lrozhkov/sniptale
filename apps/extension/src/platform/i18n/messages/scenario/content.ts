@@ -50,8 +50,8 @@ export const scenarioContentMessages = defineMessageSource({
     en: 'Add a step when you click a page element',
   },
   modeByClickDisabledHint: {
-    ru: 'Сначала выключите аннотации, редактирование страницы и ИИ-редактор',
-    en: 'Turn off annotations, page editing, and the AI editor first',
+    ru: 'Сначала выключите аннотации и редактирование контента',
+    en: 'Turn off annotations and content editing first',
   },
   sidebarShow: {
     ru: 'Показать шаги сценария',

@@ -25,7 +25,7 @@ describe('i18n runtime contract', () => {
     expect(translate('settings.appearance.title', 'ru')).toBe('Интерфейс');
     expect(translate('common.languages.ru', 'en')).toBe('Russian');
     expect(translate('content.toolbar.quickEditDocumentModeLabel', 'ru')).toBe(
-      'Свободное редактирование'
+      'Редактирование текста'
     );
     expect(translate('content.toolbar.quickEditDocumentModeEnable', 'en')).toBe(
       'Edit text directly on the page'

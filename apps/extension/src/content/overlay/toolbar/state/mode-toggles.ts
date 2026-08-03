@@ -6,6 +6,7 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import { translate } from '../../../../platform/i18n';
 import { logToolbarReactActionReached } from '../shell/event-diagnostics';
 import type { ToolbarProps } from '../types';
+import { createPageEditingModeSelector } from './page-editing-mode';
 import {
   createDisableScreenshotModeRequest,
   getScreenshotSurfaceCapabilityToken,
@@ -23,12 +24,15 @@ interface UseToolbarModeTogglesParams {
   aiPickMode: boolean;
   screenshotMode: boolean;
   highlighterMode: boolean;
+  quickEditDocumentMode: boolean;
   quickEditMode: boolean;
   propHighlighterMode?: boolean;
   propQuickEditMode?: boolean;
   onDisableAiPickMode?: () => void;
   onToggleScreenshotMode: ToolbarProps['onToggleScreenshotMode'];
   onToggleHighlighterMode: ToolbarProps['onToggleHighlighterMode'];
+  onAiPickContentStart: ToolbarProps['onAiPickContentStart'];
+  onToggleQuickEditDocumentMode: ToolbarProps['onToggleQuickEditDocumentMode'];
   onToggleQuickEditMode: ToolbarProps['onToggleQuickEditMode'];
   onClearHighlights: ToolbarProps['onClearHighlights'];
   setIsLoading: (loading: boolean) => void;
@@ -36,6 +40,11 @@ interface UseToolbarModeTogglesParams {
 
 type PendingToolbarInteractionMode = 'highlighter' | 'quick-edit' | null;
 type ToolbarToggleMode = 'screenshot' | 'highlighter' | 'quickedit';
+type ToolbarModeAction =
+  | ToolbarToggleMode
+  | 'page-editing:block-selection'
+  | 'page-editing:direct-text'
+  | 'page-editing:ai';
 
 async function recoverScreenshotSurfaceForExit(
   contentIntentSource: ReturnType<typeof createTrustedContentActionIntentSource> | undefined
@@ -153,10 +162,10 @@ export function useToolbarModeToggles(params: UseToolbarModeTogglesParams) {
     useState<PendingToolbarInteractionMode>(null);
   const toggles = createModeToggles(params);
 
-  const toggleMode = async (mode: ToolbarToggleMode, activationEvent?: Event) => {
+  const toggleRuntimeMode = async (mode: ToolbarToggleMode, activationEvent?: Event) => {
     logToolbarReactActionReached(`toggle-mode:${mode}`);
     if (inFlightRef.current) {
-      return;
+      return false;
     }
 
     const next = toggles[mode];
@@ -188,7 +197,7 @@ export function useToolbarModeToggles(params: UseToolbarModeTogglesParams) {
         if (mode === 'screenshot' && !next.enabled) {
           showToast(translate('content.toolbar.screenshotDisableError'), 'error');
         }
-        return;
+        return false;
       }
 
       if (params.aiPickMode) {
@@ -196,15 +205,41 @@ export function useToolbarModeToggles(params: UseToolbarModeTogglesParams) {
       }
 
       next.apply(next.enabled);
+      return true;
     } catch (error) {
       logger.error('Failed to toggle mode', error);
       if (mode === 'screenshot' && !next.enabled) {
         showToast(translate('content.toolbar.screenshotDisableError'), 'error');
       }
+      return false;
     } finally {
       inFlightRef.current = false;
       setPendingInteractionMode(null);
       params.setIsLoading(false);
+    }
+  };
+
+  const selectPageEditingMode = createPageEditingModeSelector({
+    aiPickMode: params.aiPickMode,
+    onAiPickContentStart: params.onAiPickContentStart,
+    onToggleQuickEditDocumentMode: params.onToggleQuickEditDocumentMode,
+    quickEditDocumentMode: params.quickEditDocumentMode,
+    quickEditMode: params.quickEditMode,
+    toggleQuickEditMode: () => toggleRuntimeMode('quickedit'),
+  });
+
+  const toggleMode = (mode: ToolbarModeAction, activationEvent?: Event) => {
+    switch (mode) {
+      case 'page-editing:block-selection':
+        return selectPageEditingMode('block-selection');
+      case 'page-editing:direct-text':
+        return selectPageEditingMode('direct-text');
+      case 'page-editing:ai':
+        return selectPageEditingMode('ai');
+      case 'highlighter':
+      case 'quickedit':
+      case 'screenshot':
+        return toggleRuntimeMode(mode, activationEvent);
     }
   };
 
