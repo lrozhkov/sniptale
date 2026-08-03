@@ -104,4 +104,29 @@ describe('getCalloutLayoutState', () => {
     expect(manual.dynamicTail?.path).toBe(automatic.dynamicTail?.path);
     expect(manual.dynamicTail?.attachment.framePoint).toEqual({ x: 200, y: 200 });
   });
+
+  it('lets an automatic callout scroll beyond the viewport with its frame', () => {
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 100, height: 40 },
+      frameRect: { x: 200, y: -120, width: 120, height: 80 },
+      isEditing: false,
+      settings: { ...settings, side: 'auto' },
+      zIndex: 20,
+    });
+
+    expect(layout.resolvedSide).toBe('top');
+    expect(layout.calloutPos).toEqual({ x: 210, y: -178 });
+  });
+
+  it('does not clamp a manual callout back into the viewport during scroll', () => {
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 100, height: 40 },
+      frameRect: { x: 200, y: -120, width: 120, height: 80 },
+      isEditing: false,
+      settings: { ...settings, manualPlacement: { centerOffsetX: 140, centerOffsetY: 0 } },
+      zIndex: 20,
+    });
+
+    expect(layout.calloutPos).toEqual({ x: 350, y: -100 });
+  });
 });

@@ -48,7 +48,7 @@ function Harness({
   version = 0,
 }: {
   frames: FrameData[];
-  presentations?: ReadonlyMap<string, 'visible' | 'suspended'>;
+  presentations?: ReadonlyMap<string, 'visible' | 'offscreen' | 'suspended'>;
   version?: number;
 }) {
   const framesRef = useRef(frames);
@@ -64,7 +64,7 @@ function Harness({
 
 async function renderHarness(
   frames: FrameData[],
-  presentations?: ReadonlyMap<string, 'visible' | 'suspended'>,
+  presentations?: ReadonlyMap<string, 'visible' | 'offscreen' | 'suspended'>,
   version?: number
 ) {
   if (!container) {
@@ -164,21 +164,25 @@ async function expectUnmountCleanupRemovesOverlayArtifacts() {
   expect(document.querySelector('#sniptale-blur-filters-test')).toBeNull();
 }
 
-async function expectSuspensionAtomicallyHidesAndRestoresEffects() {
+async function expectSuspensionKeepsEffectsActive() {
   const frames = [createFrame('focus-1', 'focus'), createFrame('blur-1', 'blur')];
   await renderHarness(frames);
   await renderHarness(
     frames,
     new Map([
-      ['focus-1', 'suspended'],
-      ['blur-1', 'suspended'],
+      ['focus-1', 'offscreen'],
+      ['blur-1', 'offscreen'],
     ]),
     1
   );
 
-  expect(domMocks.updateFocusOverlayMask).toHaveBeenLastCalledWith([], expect.any(Object));
+  expect(domMocks.updateFocusOverlayMask).toHaveBeenLastCalledWith(
+    frames,
+    expect.any(Object),
+    expect.any(Map)
+  );
   expect(domMocks.updateBlurOverlayNodes).toHaveBeenLastCalledWith(
-    [],
+    frames,
     expect.any(Object),
     expect.any(Function),
     expect.any(Function)
@@ -192,7 +196,11 @@ async function expectSuspensionAtomicallyHidesAndRestoresEffects() {
     ]),
     2
   );
-  expect(domMocks.updateFocusOverlayMask).toHaveBeenLastCalledWith(frames, expect.any(Object));
+  expect(domMocks.updateFocusOverlayMask).toHaveBeenLastCalledWith(
+    frames,
+    expect.any(Object),
+    expect.any(Map)
+  );
   expect(domMocks.updateBlurOverlayNodes).toHaveBeenLastCalledWith(
     frames,
     expect.any(Object),
@@ -217,7 +225,7 @@ describe('useFrameEffectOverlays', () => {
   );
   it('removes overlay artifacts on unmount cleanup', expectUnmountCleanupRemovesOverlayArtifacts);
   it(
-    'atomically hides and restores focus and blur effects with anchor presentation',
-    expectSuspensionAtomicallyHidesAndRestoresEffects
+    'keeps focus and blur effects active while anchors are offscreen',
+    expectSuspensionKeepsEffectsActive
   );
 });

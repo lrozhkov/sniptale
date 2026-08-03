@@ -6,6 +6,7 @@ import type { InteractiveFrameComponent } from './component';
 import { getSortedFramesWithZIndex } from '../manager/layering';
 import { createInteractiveFrameElement, type FrameRootActionRefs } from './element';
 import type { AnchorPresentation } from '../host-layout/service';
+import { isFramePresentationRenderable } from './presentation';
 
 const logger = createLogger({ namespace: 'ContentFrameRootsRenderer' });
 
@@ -47,7 +48,7 @@ export function renderInteractiveFrames({
     const frameContainer = Array.from(container.children).find(
       (child): child is HTMLElement => child.id === `frame-container-${frameData.id}`
     );
-    const renderable = (presentations.get(frameData.id) ?? 'visible') === 'visible';
+    const renderable = isFramePresentationRenderable(presentations.get(frameData.id));
     if (!renderable) {
       try {
         root.unmount();

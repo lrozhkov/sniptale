@@ -10,6 +10,7 @@ import {
   buildFrameRenderDescriptors,
   type FrameRenderDescriptor,
 } from './descriptors';
+import { isFramePresentationRenderable } from './presentation';
 
 const logger = createLogger({ namespace: 'ContentFrameRootsRenderer' });
 
@@ -65,7 +66,7 @@ function syncFrameRoots(
 
   rootsRef.current.forEach((root, frameId) => {
     const currentFrame = currentFrameIds.has(frameId);
-    const renderable = (presentations.get(frameId) ?? 'visible') === 'visible';
+    const renderable = isFramePresentationRenderable(presentations.get(frameId));
     if (currentFrame && renderable) {
       return;
     }
@@ -79,7 +80,7 @@ function syncFrameRoots(
   currentFrames.forEach((frameData) => {
     if (
       rootsRef.current.has(frameData.id) ||
-      (presentations.get(frameData.id) ?? 'visible') !== 'visible'
+      !isFramePresentationRenderable(presentations.get(frameData.id))
     ) {
       return;
     }

@@ -1,12 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { CalloutSettings, CalloutSide } from '@sniptale/runtime-contracts/highlighter/callout';
 import { FONT_FAMILY_MAP } from './constants';
-import {
-  getAnchorPosition,
-  getCalloutPosition,
-  getPreferredSideFromAnchor,
-  pickBestSide,
-} from './geometry';
+import { getAnchorPosition, getCalloutPosition, getPreferredSideFromAnchor } from './geometry';
 import { getDynamicTailState, type ConnectorSide } from './dynamic-tail';
 
 type RegionRect = { x: number; y: number; width: number; height: number };
@@ -29,9 +24,7 @@ export function getCalloutLayoutState(args: {
         };
   const preferredSide = getPreferredSideFromAnchor(args.settings.anchor);
   const resolvedSide: Exclude<CalloutSide, 'auto'> =
-    args.settings.side === 'auto'
-      ? pickBestSide(anchorPos, effectiveDimensions, args.settings.tailSize, preferredSide)
-      : args.settings.side;
+    args.settings.side === 'auto' ? (preferredSide ?? 'top') : args.settings.side;
   const positionDimensions =
     args.dimensions.width > 0 && args.dimensions.height > 0 ? args.dimensions : effectiveDimensions;
   const calloutPos = args.settings.manualPlacement
@@ -76,14 +69,13 @@ function getManualCalloutPosition(
   dimensions: { width: number; height: number },
   placement: NonNullable<CalloutSettings['manualPlacement']>
 ) {
-  const margin = 8;
   const desiredX =
     frameRect.x + frameRect.width / 2 + placement.centerOffsetX - dimensions.width / 2;
   const desiredY =
     frameRect.y + frameRect.height / 2 + placement.centerOffsetY - dimensions.height / 2;
   return {
-    x: Math.max(margin, Math.min(desiredX, window.innerWidth - dimensions.width - margin)),
-    y: Math.max(margin, Math.min(desiredY, window.innerHeight - dimensions.height - margin)),
+    x: desiredX,
+    y: desiredY,
   };
 }
 
