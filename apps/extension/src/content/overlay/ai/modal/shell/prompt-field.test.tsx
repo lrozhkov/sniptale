@@ -5,8 +5,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../voice-input/button', () => ({
-  ContentVoiceInputButton: (props: { disabled: boolean; onStart(): void }) => (
+  ContentVoiceInputButton: (props: { appearance?: string; disabled: boolean; onStart(): void }) => (
     <button
+      data-appearance={props.appearance ?? 'default'}
       data-ui="content.ai-modal.prompt-voice-input"
       disabled={props.disabled}
       onClick={props.onStart}
@@ -86,6 +87,11 @@ describe('AI Modal prompt voice control', () => {
     });
 
     expect(start).toHaveBeenCalledWith('Keep suffix', 4);
+    expect(
+      container
+        .querySelector('[data-ui="content.ai-modal.prompt-voice-input"]')
+        ?.getAttribute('data-appearance')
+    ).toBe('default');
   });
 
   it('stops active recognition before applying manual input', () => {

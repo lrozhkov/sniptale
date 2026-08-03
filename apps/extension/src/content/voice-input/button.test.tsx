@@ -84,4 +84,20 @@ it('uses the contrast surface and inverse icon treatment above arbitrary page co
   const className = container.querySelector('button')?.className;
   expect(className).toContain('surface-contrast');
   expect(className).toContain('text-inverse');
+
+  act(() => {
+    root?.render(
+      <ContentVoiceInputButton
+        appearance="contrast"
+        dataUi="voice-contrast-test"
+        disabled={false}
+        labels={{ error: 'Error', start: 'Start', stop: 'Stop' }}
+        onStart={vi.fn()}
+        onStop={vi.fn()}
+        state={{ active: true, audioLevel: 0.5, errorCode: null, phase: 'listening' }}
+      />
+    );
+  });
+
+  expect(container.querySelector('button')?.className).toContain('text-inverse');
 });

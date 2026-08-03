@@ -47,7 +47,9 @@ export function ContentVoiceInputButton(props: {
             ].join(' ')
           : 'border-transparent',
         props.state.active
-          ? 'text-[var(--sniptale-color-accent)]'
+          ? contrast
+            ? 'text-[var(--sniptale-color-text-inverse)]'
+            : 'text-[var(--sniptale-color-accent)]'
           : hasError
             ? 'text-[var(--sniptale-color-danger)]'
             : contrast

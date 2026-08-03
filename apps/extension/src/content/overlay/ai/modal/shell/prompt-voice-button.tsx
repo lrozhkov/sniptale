@@ -14,7 +14,6 @@ export function AIModalPromptVoiceButton(props: {
       onMouseDown={(event) => event.preventDefault()}
     >
       <ContentVoiceInputButton
-        appearance="contrast"
         dataUi="content.ai-modal.prompt-voice-input"
         disabled={props.disabled}
         labels={{
