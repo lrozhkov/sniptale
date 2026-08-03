@@ -148,6 +148,42 @@ it('selects a mode option from the menu mousedown action', () => {
   expect(document.querySelector('[data-ui="content.toolbar.mode-option.quick-edit"]')).toBeNull();
 });
 
+it('orders Working Mode options as Cursor, Annotations, Content Editing, and Design Review', () => {
+  renderModeButtons();
+
+  act(() => {
+    queryModeSelectorButton()?.click();
+  });
+
+  const modes = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-ui^="content.toolbar.mode-option."]')
+  ).map((option) => option.dataset['ui']);
+  expect(modes).toEqual([
+    'content.toolbar.mode-option.cursor',
+    'content.toolbar.mode-option.highlighter',
+    'content.toolbar.mode-option.quick-edit',
+    'content.toolbar.mode-option.design-review',
+  ]);
+});
+
+it('closes the menu without toggling off the already selected mode', () => {
+  const onToggleQuickEdit = vi.fn();
+  renderModeButtons({ onToggleQuickEdit, quickEditMode: true });
+
+  act(() => {
+    queryModeSelectorButton()?.click();
+  });
+  act(() => {
+    queryQuickEditModeOption()?.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true })
+    );
+  });
+
+  expect(onToggleQuickEdit).not.toHaveBeenCalled();
+  expect(document.querySelector('[data-ui="content.toolbar.mode-option.quick-edit"]')).toBeNull();
+  expect(queryModeSelectorButton()?.getAttribute('title')).toBe('content.toolbar.quickEditLabel');
+});
+
 it('offers Design Review as a standalone mode and no longer adds a Quick Edit inspector button', () => {
   const onToggleDesignReview = vi.fn();
   renderModeButtons({ onToggleDesignReview, quickEditMode: true });

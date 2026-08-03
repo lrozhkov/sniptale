@@ -33,6 +33,12 @@ const AI_ICON_CLASS_NAME = [
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
 
 type ToolbarInteractionMode = 'cursor' | 'design-review' | 'highlighter' | 'quick-edit';
+const TOOLBAR_INTERACTION_MODES: readonly ToolbarInteractionMode[] = [
+  'cursor',
+  'highlighter',
+  'quick-edit',
+  'design-review',
+];
 
 function ToolbarAiIcon() {
   return (
@@ -104,12 +110,17 @@ function getModeCopy(mode: ToolbarInteractionMode) {
 
 function createModeSelectionHandler(
   mode: ToolbarInteractionMode,
+  selected: boolean,
   props: ToolbarModeButtonsProps,
   onClose: () => void
 ) {
   return (event: React.SyntheticEvent<HTMLElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    if (selected) {
+      onClose();
+      return;
+    }
 
     switch (mode) {
       case 'quick-edit':
@@ -194,16 +205,22 @@ function ToolbarModeMenu(props: {
         placement={menuPlacement}
         style={menuStyle}
       >
-        {(['cursor', 'quick-edit', 'design-review', 'highlighter'] as ToolbarInteractionMode[]).map(
-          (mode) => (
+        {TOOLBAR_INTERACTION_MODES.map((mode) => {
+          const selected = selectedMode === mode;
+          return (
             <ModeMenuItem
               key={mode}
               mode={mode}
-              selected={selectedMode === mode}
-              onSelect={createModeSelectionHandler(mode, props.triggerProps, props.onClose)}
+              selected={selected}
+              onSelect={createModeSelectionHandler(
+                mode,
+                selected,
+                props.triggerProps,
+                props.onClose
+              )}
             />
-          )
-        )}
+          );
+        })}
       </ProductToolbarMenu>
     </div>
   );
