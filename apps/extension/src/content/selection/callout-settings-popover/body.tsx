@@ -1,65 +1,64 @@
 import type {
+  CalloutPreset,
   CalloutSettings,
-  CalloutSide,
-  CalloutVariant,
 } from '@sniptale/runtime-contracts/highlighter/callout';
-import {
-  CalloutAppearanceSection,
-  CalloutDeleteButton,
-  CalloutPositionSection,
-  CalloutTypographySection,
-} from './views';
 import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
 import { translate } from '../../../platform/i18n';
+import type { CalloutSettingsPatch } from '../callout/model';
+import {
+  CalloutAppearanceSection,
+  CalloutConnectorSection,
+  CalloutDeleteButton,
+  CalloutPositionSection,
+  CalloutPresetSection,
+  CalloutTypographySection,
+} from './views';
 
 export function CalloutSettingsPopoverContent(props: {
   handleDelete: () => void;
-  handleSettingChange: (key: keyof CalloutSettings, value: unknown) => void;
-  isTextOnly: boolean;
+  handleSettingChange: (patch: CalloutSettingsPatch) => void;
   localSettings: CalloutSettings;
-  variantOptions: { value: CalloutVariant; label: string }[];
+  onApplyPreset: (preset: CalloutPreset) => void;
+  onEditPreset: (preset: CalloutPreset) => void;
+  onSavePreset: (name: string) => void;
+  onTogglePreset: (preset: CalloutPreset) => void;
+  presets: CalloutPreset[];
+  presetError: string | null;
 }) {
-  const { handleSettingChange, isTextOnly, localSettings } = props;
-
   return (
     <>
       <ProductToolbarMenuGroupLabel>
         {translate('content.callout.settingsTitle')}
       </ProductToolbarMenuGroupLabel>
+      <CalloutPresetSection
+        {...(props.localSettings.sourcePresetId
+          ? { activePresetId: props.localSettings.sourcePresetId }
+          : {})}
+        onApplyPreset={props.onApplyPreset}
+        onEditPreset={props.onEditPreset}
+        onSavePreset={props.onSavePreset}
+        onTogglePreset={props.onTogglePreset}
+        presets={props.presets}
+        error={props.presetError}
+      />
       <CalloutPositionSection
-        anchor={localSettings.anchor ?? 'top-center'}
-        side={localSettings.side}
-        onAnchorChange={(anchor) => handleSettingChange('anchor', anchor)}
-        onSideChange={(side) => handleSettingChange('side', side as CalloutSide)}
+        anchor={props.localSettings.placement.anchor}
+        side={props.localSettings.placement.side}
+        onAnchorChange={(anchor) => props.handleSettingChange({ placement: { anchor } })}
+        onSideChange={(side) => props.handleSettingChange({ placement: { side } })}
       />
-
       <CalloutAppearanceSection
-        bgColor={localSettings.bgColor}
-        isTextOnly={isTextOnly}
-        onBackgroundChange={(value) => handleSettingChange('bgColor', value)}
-        onTextColorChange={(value) => handleSettingChange('textColor', value)}
-        onVariantChange={(value) => handleSettingChange('variant', value)}
-        textColor={localSettings.textColor}
-        variant={localSettings.variant}
-        variantOptions={props.variantOptions}
+        settings={props.localSettings}
+        onChange={props.handleSettingChange}
       />
-
+      <CalloutConnectorSection
+        settings={props.localSettings}
+        onChange={props.handleSettingChange}
+      />
       <CalloutTypographySection
-        fontFamily={localSettings.fontFamily}
-        fontSize={localSettings.fontSize}
-        fontWeight={localSettings.fontWeight}
-        isTextOnly={isTextOnly}
-        maxWidth={localSettings.maxWidth}
-        onFontFamilyChange={(value) => handleSettingChange('fontFamily', value)}
-        onFontSizeChange={(value) => handleSettingChange('fontSize', value)}
-        onFontWeightToggle={() =>
-          handleSettingChange('fontWeight', localSettings.fontWeight === 'bold' ? 'normal' : 'bold')
-        }
-        onMaxWidthChange={(value) => handleSettingChange('maxWidth', value)}
-        onTailSizeChange={(value) => handleSettingChange('tailSize', value)}
-        tailSize={localSettings.tailSize}
+        settings={props.localSettings}
+        onChange={props.handleSettingChange}
       />
-
       <CalloutDeleteButton onDelete={props.handleDelete} />
     </>
   );

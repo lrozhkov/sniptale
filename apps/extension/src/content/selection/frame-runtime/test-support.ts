@@ -4,7 +4,16 @@ import type {
   FocusSettings,
   FrameData,
 } from '../../../features/highlighter/contracts';
-import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import type {
+  CalloutSettings,
+  LegacyCalloutSettings,
+} from '@sniptale/runtime-contracts/highlighter/callout';
+import {
+  applyCalloutSettingsPatch,
+  createDefaultCalloutSettings,
+  normalizeCalloutSettings,
+  type CalloutSettingsPatch,
+} from '../callout/model';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 
 type FrameDataFixtureOverrides = Omit<
@@ -74,9 +83,15 @@ export function createStepBadgeSettingsFixture(
 }
 
 export function createCalloutSettingsFixture(
-  overrides: Partial<CalloutSettings> = {}
+  overrides: Partial<CalloutSettings> | Partial<LegacyCalloutSettings> = {}
 ): CalloutSettings {
-  return {
+  if ('content' in overrides || 'placement' in overrides || 'style' in overrides) {
+    return applyCalloutSettingsPatch(
+      createDefaultCalloutSettings(),
+      overrides as CalloutSettingsPatch
+    );
+  }
+  return normalizeCalloutSettings({
     anchor: 'center',
     bgColor: '#fff',
     enabled: true,
@@ -90,7 +105,7 @@ export function createCalloutSettingsFixture(
     textColor: '#111',
     variant: 'bubble',
     ...overrides,
-  };
+  } as LegacyCalloutSettings);
 }
 
 export function createFrameDataFixture(

@@ -3,8 +3,14 @@ import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/ca
 import { dispatchCalloutPopoverSettingsChanged } from '../../platform/page-context/frame-events';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { normalizeCalloutSettings } from './helpers';
+import {
+  applyCalloutSettingsPatch,
+  cloneCalloutStyle,
+  type CalloutSettingsPatch,
+} from '../callout/model';
+import type { CalloutPreset } from '@sniptale/runtime-contracts/highlighter/callout';
 
-function dispatchCalloutSettingsChange(frameId: string, settings: Partial<CalloutSettings>) {
+function dispatchCalloutSettingsChange(frameId: string, settings: CalloutSettingsPatch) {
   dispatchCalloutPopoverSettingsChanged({ frameId, settings });
 }
 
@@ -68,37 +74,37 @@ export function useCalloutSettingsPopoverState(args: {
     setLocalSettings(normalizeCalloutSettings(settingsRef.current));
   }, [args.isOpen, args.settings]);
 
-  const handleSettingChange = (key: keyof CalloutSettings, value: unknown) => {
-    const resetsManualPlacement = key === 'anchor' || key === 'side';
-    const nextSettings = {
-      ...localSettings,
-      [key]: value,
-      ...(resetsManualPlacement
-        ? {
+  const handleSettingChange = (patch: CalloutSettingsPatch) => {
+    const resetsManualPlacement =
+      patch.placement?.anchor !== undefined || patch.placement?.side !== undefined;
+    const placementPatch: CalloutSettingsPatch = resetsManualPlacement
+      ? {
+          ...patch,
+          placement: {
+            ...patch.placement,
             manualPlacement: undefined,
-            tailBasePosition: undefined,
-            tailBaseWidth: undefined,
-            tailFramePosition: undefined,
-          }
-        : {}),
-    };
+            connectorBasePosition: undefined,
+            connectorBaseWidth: undefined,
+            connectorFramePosition: undefined,
+          },
+        }
+      : patch;
+    const normalizedPatch: CalloutSettingsPatch =
+      patch.style && !('sourcePresetId' in patch)
+        ? { ...placementPatch, sourcePresetId: undefined }
+        : placementPatch;
+    const nextSettings = applyCalloutSettingsPatch(localSettings, normalizedPatch);
     setLocalSettings(nextSettings);
-    dispatchCalloutSettingsChange(args.frameId, {
-      [key]: value,
-      ...(resetsManualPlacement
-        ? {
-            manualPlacement: undefined,
-            tailBasePosition: undefined,
-            tailBaseWidth: undefined,
-            tailFramePosition: undefined,
-          }
-        : {}),
-    });
+    dispatchCalloutSettingsChange(args.frameId, normalizedPatch);
+  };
+
+  const applyPreset = (preset: CalloutPreset) => {
+    handleSettingChange({ sourcePresetId: preset.id, style: cloneCalloutStyle(preset.style) });
   };
 
   return {
     handleSettingChange,
-    isTextOnly: localSettings.variant === 'text-only',
+    applyPreset,
     localSettings,
   };
 }

@@ -3,6 +3,7 @@ import type { CalloutSettings, CalloutSide } from '@sniptale/runtime-contracts/h
 import { FONT_FAMILY_MAP } from './constants';
 import { getAnchorPosition, getCalloutPosition, getPreferredSideFromAnchor } from './geometry';
 import { getDynamicTailState, type ConnectorSide } from './dynamic-tail';
+import { getLineConnectorState } from './line-connector';
 import {
   Z_INDEX_CALLOUT_EDITING,
   Z_INDEX_CALLOUT_VIEWING,
@@ -18,45 +19,62 @@ export function getCalloutLayoutState(args: {
   zIndex: number;
   previousConnectorSide?: ConnectorSide;
 }) {
-  const anchorPos = getAnchorPosition(args.settings.anchor, args.frameRect);
+  const { placement, style } = args.settings;
+  const anchorPos = getAnchorPosition(placement.anchor, args.frameRect);
   const effectiveDimensions =
     args.dimensions.width > 0 && args.dimensions.height > 0
       ? args.dimensions
       : {
-          width: Math.min(args.settings.maxWidth, 200),
-          height: Math.max(24, args.settings.fontSize * 2.5),
+          width: Math.min(style.typography.maxWidth, 200),
+          height: Math.max(24, style.typography.fontSize * 2.5),
         };
-  const preferredSide = getPreferredSideFromAnchor(args.settings.anchor);
+  const preferredSide = getPreferredSideFromAnchor(placement.anchor);
   const resolvedSide: Exclude<CalloutSide, 'auto'> =
-    args.settings.side === 'auto' ? (preferredSide ?? 'top') : args.settings.side;
+    placement.side === 'auto' ? (preferredSide ?? 'top') : placement.side;
   const positionDimensions =
     args.dimensions.width > 0 && args.dimensions.height > 0 ? args.dimensions : effectiveDimensions;
-  const calloutPos = args.settings.manualPlacement
-    ? getManualCalloutPosition(args.frameRect, positionDimensions, args.settings.manualPlacement)
-    : getCalloutPosition(resolvedSide, anchorPos, positionDimensions, args.settings.tailSize);
+  const calloutPos = placement.manualPlacement
+    ? getManualCalloutPosition(args.frameRect, positionDimensions, placement.manualPlacement)
+    : getCalloutPosition(
+        resolvedSide,
+        anchorPos,
+        positionDimensions,
+        style.connector.kind === 'wedge' ? style.connector.wedgeSize : 0
+      );
   const effectiveZIndex = args.isEditing
     ? Z_INDEX_CALLOUT_EDITING
     : Math.min(args.zIndex, Z_INDEX_CALLOUT_VIEWING);
   const dynamicTail =
-    args.settings.variant === 'bubble'
+    style.connector.kind === 'wedge'
       ? getDynamicTailState({
           anchorPoint: anchorPos,
           bubbleRect: { ...calloutPos, ...positionDimensions },
           frameRect: args.frameRect,
-          ...(args.settings.tailBasePosition === undefined
+          ...(placement.connectorBasePosition === undefined
             ? {}
-            : { tailBasePosition: args.settings.tailBasePosition }),
-          ...(args.settings.tailBaseWidth === undefined
+            : { tailBasePosition: placement.connectorBasePosition }),
+          ...(placement.connectorBaseWidth === undefined
             ? {}
-            : { tailBaseWidth: args.settings.tailBaseWidth }),
-          ...(args.settings.tailFramePosition === undefined
+            : { tailBaseWidth: placement.connectorBaseWidth }),
+          ...(placement.connectorFramePosition === undefined
             ? {}
-            : { tailFramePosition: args.settings.tailFramePosition }),
-          tailSize: args.settings.tailSize,
-          ...(args.settings.manualPlacement ? {} : { preferredSide: resolvedSide }),
+            : { tailFramePosition: placement.connectorFramePosition }),
+          tailSize: style.connector.wedgeSize,
+          ...(placement.manualPlacement ? {} : { preferredSide: resolvedSide }),
           ...(args.previousConnectorSide ? { previousSide: args.previousConnectorSide } : {}),
         })
-      : null;
+      : style.connector.kind === 'line'
+        ? getLineConnectorState({
+            anchorPoint: anchorPos,
+            bubbleRect: { ...calloutPos, ...positionDimensions },
+            frameRect: args.frameRect,
+            placement,
+            routing: style.connector.routing,
+            wedgeSize: style.connector.wedgeSize,
+            ...(placement.manualPlacement ? {} : { preferredSide: resolvedSide }),
+            ...(args.previousConnectorSide ? { previousSide: args.previousConnectorSide } : {}),
+          })
+        : null;
 
   return {
     effectiveZIndex,
@@ -73,7 +91,7 @@ export function getCalloutLayoutState(args: {
 function getManualCalloutPosition(
   frameRect: RegionRect,
   dimensions: { width: number; height: number },
-  placement: NonNullable<CalloutSettings['manualPlacement']>
+  placement: NonNullable<CalloutSettings['placement']['manualPlacement']>
 ) {
   const desiredX =
     frameRect.x + frameRect.width / 2 + placement.centerOffsetX - dimensions.width / 2;
@@ -91,9 +109,10 @@ function getCalloutWrapperStyle(
   effectiveZIndex: number
 ): CSSProperties {
   const calloutShadow =
-    settings.variant === 'text-only'
+    settings.style.surface.shadow <= 0
       ? 'none'
-      : 'drop-shadow(0 4px 12px color-mix(in srgb, var(--sniptale-color-overlay) 32%, transparent))';
+      : `drop-shadow(0 4px ${settings.style.surface.shadow}px ` +
+        'color-mix(in srgb, var(--sniptale-color-overlay) 32%, transparent))';
 
   return {
     position: 'fixed',
@@ -106,17 +125,19 @@ function getCalloutWrapperStyle(
 }
 
 function getCalloutCloudStyle(settings: CalloutSettings, isEditing: boolean): CSSProperties {
+  const { surface, typography } = settings.style;
   return {
     position: 'relative',
     minWidth: 40,
-    maxWidth: settings.maxWidth,
-    backgroundColor: settings.variant === 'text-only' ? 'transparent' : settings.bgColor,
-    color: settings.textColor,
-    borderRadius: settings.variant === 'bubble' ? 12 : 4,
-    padding: settings.variant === 'text-only' ? 0 : '8px 12px',
-    fontFamily: FONT_FAMILY_MAP[settings.fontFamily],
-    fontSize: settings.fontSize,
-    fontWeight: settings.fontWeight,
+    maxWidth: typography.maxWidth,
+    backgroundColor: surface.backgroundColor,
+    color: surface.textColor,
+    border: `${surface.borderWidth}px solid ${surface.borderColor}`,
+    borderRadius: surface.radius,
+    padding: `${surface.paddingY}px ${surface.paddingX}px`,
+    fontFamily: FONT_FAMILY_MAP[typography.fontFamily],
+    fontSize: typography.fontSize,
+    fontWeight: typography.fontWeight,
     lineHeight: 1.4,
     cursor: isEditing ? 'text' : 'pointer',
     isolation: 'isolate',

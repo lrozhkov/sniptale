@@ -8,30 +8,32 @@ import { useCalloutTailBaseRange } from './tail-base-range';
 import { useCalloutWidthResize } from './width-resize';
 
 type FrameRect = { x: number; y: number; width: number; height: number };
-
-export function useCalloutInteractionLayout(args: {
+type InteractionArgs = {
   dimensions: { width: number; height: number };
   frameRect: FrameRect;
   isEditing: boolean;
   isSettingsOpen?: boolean;
-  onPositionChange: (placement: NonNullable<CalloutSettings['manualPlacement']>) => void;
+  onPositionChange: (
+    placement: NonNullable<CalloutSettings['placement']['manualPlacement']>
+  ) => void;
   onTailBaseRangeChange: (position: number, width: number) => void;
   onTailFramePositionChange: (position: number) => void;
   onWidthChange: (
     maxWidth: number,
-    placement: NonNullable<CalloutSettings['manualPlacement']>
+    placement: NonNullable<CalloutSettings['placement']['manualPlacement']>
   ) => void;
   settings: CalloutSettings;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
   zIndex: number;
-}) {
-  const previousConnectorSideRef = React.useRef<ConnectorSide | undefined>(undefined);
+};
+
+function useCalloutPlacementDraft(args: InteractionArgs) {
   const widthResize = useCalloutWidthResize({
     dimensions: args.dimensions,
     frameRect: args.frameRect,
     isEditing: args.isEditing,
-    manualPlacement: args.settings.manualPlacement,
-    maxWidth: args.settings.maxWidth,
+    manualPlacement: args.settings.placement.manualPlacement,
+    maxWidth: args.settings.style.typography.maxWidth,
     onWidthChange: args.onWidthChange,
     wrapperRef: args.wrapperRef,
   });
@@ -40,71 +42,142 @@ export function useCalloutInteractionLayout(args: {
     dimensions: args.dimensions,
     isEditing: args.isEditing,
     isHandlePinned: Boolean(args.isSettingsOpen) || widthResize.isResizing,
-    manualPlacement: args.settings.manualPlacement,
+    manualPlacement: args.settings.placement.manualPlacement,
     onPositionChange: args.onPositionChange,
     wrapperRef: args.wrapperRef,
   });
-  const widthSettings = {
+  const widthSettings: CalloutSettings = {
     ...args.settings,
-    ...(widthResize.draftMaxWidth === null ? {} : { maxWidth: widthResize.draftMaxWidth }),
-    ...(widthResize.draftPlacement ? { manualPlacement: widthResize.draftPlacement } : {}),
+    style: {
+      ...args.settings.style,
+      typography: {
+        ...args.settings.style.typography,
+        ...(widthResize.draftMaxWidth === null ? {} : { maxWidth: widthResize.draftMaxWidth }),
+      },
+    },
+    placement: {
+      ...args.settings.placement,
+      ...(widthResize.draftPlacement ? { manualPlacement: widthResize.draftPlacement } : {}),
+    },
   };
-  const placementSettings = drag.draftPlacement
-    ? { ...widthSettings, manualPlacement: drag.draftPlacement }
+  const settings = drag.draftPlacement
+    ? {
+        ...widthSettings,
+        placement: { ...widthSettings.placement, manualPlacement: drag.draftPlacement },
+      }
     : widthSettings;
+  return { drag, settings, widthResize };
+}
+
+function useCalloutConnectorDrafts(args: {
+  baseLayout: ReturnType<typeof getCalloutLayoutState>;
+  frameRect: FrameRect;
+  isEditing: boolean;
+  onTailBaseRangeChange: InteractionArgs['onTailBaseRangeChange'];
+  onTailFramePositionChange: InteractionArgs['onTailFramePositionChange'];
+  settings: CalloutSettings;
+}) {
+  const connectorSide = args.baseLayout.dynamicTail?.side ?? null;
+  const bubbleRect = { ...args.baseLayout.calloutPos, ...args.baseLayout.calloutDimensions };
+  const tailBaseRange = useCalloutTailBaseRange({
+    bubbleRect,
+    connectorSide: args.baseLayout.dynamicTail?.kind === 'wedge' ? connectorSide : null,
+    endPoint: args.baseLayout.dynamicTail?.attachment.baseEdgeB,
+    isEditing: args.isEditing,
+    onRangeChange: args.onTailBaseRangeChange,
+    startPoint: args.baseLayout.dynamicTail?.attachment.baseEdgeA,
+  });
+  const lineBaseDrag = useCalloutEdgeDrag({
+    edgeRect: bubbleRect,
+    connectorSide: args.baseLayout.dynamicTail?.kind === 'line' ? connectorSide : null,
+    defaultPosition: getCalloutEdgePosition(
+      bubbleRect,
+      connectorSide,
+      args.baseLayout.dynamicTail?.attachment.bubbleEdgePoint
+    ),
+    isEditing: args.isEditing,
+    onPositionChange: (position) => args.onTailBaseRangeChange(position, 0),
+    position: args.settings.placement.connectorBasePosition,
+  });
+  const tailFrameDrag = useCalloutEdgeDrag({
+    edgeRect: args.frameRect,
+    connectorSide,
+    defaultPosition: getCalloutEdgePosition(
+      args.frameRect,
+      connectorSide,
+      args.baseLayout.dynamicTail?.attachment.framePoint
+    ),
+    isEditing: args.isEditing,
+    onPositionChange: args.onTailFramePositionChange,
+    position: args.settings.placement.connectorFramePosition,
+  });
+  const settings: CalloutSettings = {
+    ...args.settings,
+    placement: {
+      ...args.settings.placement,
+      ...(tailBaseRange.draftSettings
+        ? {
+            connectorBasePosition: tailBaseRange.draftSettings.tailBasePosition,
+            connectorBaseWidth: tailBaseRange.draftSettings.tailBaseWidth,
+          }
+        : {}),
+      ...(lineBaseDrag.draftPosition === null
+        ? {}
+        : { connectorBasePosition: lineBaseDrag.draftPosition }),
+      ...(tailFrameDrag.draftPosition === null
+        ? {}
+        : { connectorFramePosition: tailFrameDrag.draftPosition }),
+    },
+  };
+  return {
+    hasDraft:
+      tailBaseRange.hasDraft ||
+      lineBaseDrag.draftPosition !== null ||
+      tailFrameDrag.draftPosition !== null,
+    lineBaseDrag,
+    settings,
+    tailBaseRange,
+    tailFrameDrag,
+  };
+}
+
+export function useCalloutInteractionLayout(args: InteractionArgs) {
+  const previousConnectorSideRef = React.useRef<ConnectorSide | undefined>(undefined);
+  const placement = useCalloutPlacementDraft(args);
   const baseLayoutArgs = {
     dimensions: args.dimensions,
     frameRect: args.frameRect,
     isEditing: args.isEditing,
-    settings: placementSettings,
+    settings: placement.settings,
     zIndex: args.zIndex,
     ...(previousConnectorSideRef.current
       ? { previousConnectorSide: previousConnectorSideRef.current }
       : {}),
   };
   const baseLayout = getCalloutLayoutState(baseLayoutArgs);
-  const connectorSide = baseLayout.dynamicTail?.side ?? null;
-  const bubbleRect = { ...baseLayout.calloutPos, ...baseLayout.calloutDimensions };
-  const tailBaseRange = useCalloutTailBaseRange({
-    bubbleRect,
-    connectorSide,
-    endPoint: baseLayout.dynamicTail?.attachment.baseEdgeB,
+  const connector = useCalloutConnectorDrafts({
+    baseLayout,
+    frameRect: args.frameRect,
     isEditing: args.isEditing,
-    onRangeChange: args.onTailBaseRangeChange,
-    startPoint: baseLayout.dynamicTail?.attachment.baseEdgeA,
+    onTailBaseRangeChange: args.onTailBaseRangeChange,
+    onTailFramePositionChange: args.onTailFramePositionChange,
+    settings: placement.settings,
   });
-  const tailFrameDrag = useCalloutEdgeDrag({
-    edgeRect: args.frameRect,
-    connectorSide: baseLayout.dynamicTail?.side ?? null,
-    defaultPosition: getCalloutEdgePosition(
-      args.frameRect,
-      connectorSide,
-      baseLayout.dynamicTail?.attachment.framePoint
-    ),
-    isEditing: args.isEditing,
-    onPositionChange: args.onTailFramePositionChange,
-    position: args.settings.tailFramePosition,
-  });
-  const effectiveSettings = {
-    ...placementSettings,
-    ...(tailBaseRange.draftSettings ?? {}),
-    ...(tailFrameDrag.draftPosition === null
-      ? {}
-      : { tailFramePosition: tailFrameDrag.draftPosition }),
-  };
-  const hasTailDraft = tailBaseRange.hasDraft || tailFrameDrag.draftPosition !== null;
-  const layout = hasTailDraft
-    ? getCalloutLayoutState({ ...baseLayoutArgs, settings: effectiveSettings })
+  const layout = connector.hasDraft
+    ? getCalloutLayoutState({ ...baseLayoutArgs, settings: connector.settings })
     : baseLayout;
   if (layout.dynamicTail) previousConnectorSideRef.current = layout.dynamicTail.side;
 
   return {
-    drag,
-    effectiveSettings,
+    drag: placement.drag,
+    effectiveSettings: connector.settings,
     layout,
-    tailBaseEndDrag: tailBaseRange.endDrag,
-    tailBaseStartDrag: tailBaseRange.startDrag,
-    tailFrameDrag,
-    widthResize,
+    tailBaseEndDrag: connector.tailBaseRange.endDrag,
+    tailBaseStartDrag:
+      baseLayout.dynamicTail?.kind === 'line'
+        ? connector.lineBaseDrag
+        : connector.tailBaseRange.startDrag,
+    tailFrameDrag: connector.tailFrameDrag,
+    widthResize: placement.widthResize,
   };
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { InteractiveFrameProps } from './types';
 import { areInteractiveFramePropsEqual } from './comparison';
+import { createDefaultCalloutSettings } from '../../callout/model';
 
 function createProps(): InteractiveFrameProps {
   return {
@@ -50,34 +51,27 @@ describe('areInteractiveFramePropsEqual', () => {
 
   it('treats a tail-base-only change as render-critical', () => {
     const prevProps = createProps();
-    prevProps.frame.callout = {
-      anchor: 'center',
-      bgColor: '#fff',
-      enabled: true,
-      fontFamily: 'sans',
-      fontSize: 14,
-      fontWeight: 'normal',
-      htmlContent: 'Comment',
-      maxWidth: 200,
-      side: 'top',
-      tailBasePosition: 0.25,
-      tailBaseWidth: 0.2,
-      tailSize: 8,
-      textColor: '#111',
-      variant: 'bubble',
-    };
+    prevProps.frame.callout = createDefaultCalloutSettings();
+    prevProps.frame.callout.placement.connectorBasePosition = 0.25;
+    prevProps.frame.callout.placement.connectorBaseWidth = 0.2;
     const nextPositionProps: InteractiveFrameProps = {
       ...prevProps,
       frame: {
         ...prevProps.frame,
-        callout: { ...prevProps.frame.callout, tailBasePosition: 0.75 },
+        callout: {
+          ...prevProps.frame.callout,
+          placement: { ...prevProps.frame.callout.placement, connectorBasePosition: 0.75 },
+        },
       },
     };
     const nextWidthProps: InteractiveFrameProps = {
       ...prevProps,
       frame: {
         ...prevProps.frame,
-        callout: { ...prevProps.frame.callout, tailBaseWidth: 0.4 },
+        callout: {
+          ...prevProps.frame.callout,
+          placement: { ...prevProps.frame.callout.placement, connectorBaseWidth: 0.4 },
+        },
       },
     };
 
@@ -87,26 +81,16 @@ describe('areInteractiveFramePropsEqual', () => {
 
   it('treats a tail-frame-only change as render-critical', () => {
     const prevProps = createProps();
-    prevProps.frame.callout = {
-      anchor: 'center',
-      bgColor: '#fff',
-      enabled: true,
-      fontFamily: 'sans',
-      fontSize: 14,
-      fontWeight: 'normal',
-      htmlContent: 'Comment',
-      maxWidth: 200,
-      side: 'top',
-      tailFramePosition: 0.25,
-      tailSize: 8,
-      textColor: '#111',
-      variant: 'bubble',
-    };
+    prevProps.frame.callout = createDefaultCalloutSettings();
+    prevProps.frame.callout.placement.connectorFramePosition = 0.25;
     const nextProps: InteractiveFrameProps = {
       ...prevProps,
       frame: {
         ...prevProps.frame,
-        callout: { ...prevProps.frame.callout, tailFramePosition: 0.75 },
+        callout: {
+          ...prevProps.frame.callout,
+          placement: { ...prevProps.frame.callout.placement, connectorFramePosition: 0.75 },
+        },
       },
     };
 

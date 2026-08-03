@@ -38,7 +38,7 @@ type CalloutWidthResizeArgs = {
   dimensions: { width: number; height: number };
   frameRect: Rect;
   isEditing: boolean;
-  manualPlacement: CalloutSettings['manualPlacement'];
+  manualPlacement: CalloutSettings['placement']['manualPlacement'];
   maxWidth: number;
   onWidthChange: (maxWidth: number, placement: CalloutManualPlacement) => void;
   wrapperRef: React.RefObject<HTMLDivElement | null>;

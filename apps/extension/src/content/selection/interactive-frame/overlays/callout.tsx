@@ -45,7 +45,16 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
       onStartEditing={() => props.setIsCalloutEditing(true)}
       onStopEditing={() => props.setIsCalloutEditing(false)}
       onContentChange={(htmlContent) => {
-        applyCalloutFrameUpdate({ ...callout, htmlContent });
+        applyCalloutFrameUpdate({
+          ...callout,
+          content: { ...callout.content, bodyHtml: htmlContent },
+        });
+      }}
+      onTitleChange={(titleText) => {
+        applyCalloutFrameUpdate({
+          ...callout,
+          content: { ...callout.content, titleText },
+        });
       }}
       onDelete={() => {
         applyCalloutFrameUpdate({ ...callout, enabled: false });
@@ -53,16 +62,36 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
       }}
       onSettingsClick={() => toggleQuickPopover(props.frame.id, 'callout-settings')}
       onPositionChange={(manualPlacement) => {
-        applyCalloutFrameUpdate({ ...callout, manualPlacement });
+        applyCalloutFrameUpdate({
+          ...callout,
+          placement: { ...callout.placement, manualPlacement },
+        });
       }}
       onTailBaseRangeChange={(tailBasePosition, tailBaseWidth) => {
-        applyCalloutFrameUpdate({ ...callout, tailBasePosition, tailBaseWidth });
+        applyCalloutFrameUpdate({
+          ...callout,
+          placement: {
+            ...callout.placement,
+            connectorBasePosition: tailBasePosition,
+            connectorBaseWidth: tailBaseWidth,
+          },
+        });
       }}
       onTailFramePositionChange={(tailFramePosition) => {
-        applyCalloutFrameUpdate({ ...callout, tailFramePosition });
+        applyCalloutFrameUpdate({
+          ...callout,
+          placement: { ...callout.placement, connectorFramePosition: tailFramePosition },
+        });
       }}
       onWidthChange={(maxWidth, manualPlacement) => {
-        applyCalloutFrameUpdate({ ...callout, maxWidth, manualPlacement });
+        applyCalloutFrameUpdate({
+          ...callout,
+          placement: { ...callout.placement, manualPlacement },
+          style: {
+            ...callout.style,
+            typography: { ...callout.style.typography, maxWidth },
+          },
+        });
       }}
       settingsAnchorRef={props.calloutPopoverAnchorRef}
       showSettingsHandle={!isAnyFrameSelected}

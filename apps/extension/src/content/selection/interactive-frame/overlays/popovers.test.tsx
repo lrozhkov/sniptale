@@ -10,6 +10,7 @@ import {
   createFrameDataFixture,
 } from '../../frame-runtime/react/test-support';
 import { InteractiveFramePopovers } from './popovers';
+import { createDefaultCalloutSettings } from '../../callout/model';
 
 const frameSettingsPopoverMock = vi.hoisted(() => vi.fn((_props: Record<string, unknown>) => null));
 const stepBadgePopoverMock = vi.hoisted(() => vi.fn((_props: Record<string, unknown>) => null));
@@ -185,18 +186,8 @@ describe('InteractiveFramePopovers', () => {
           ...frame,
           stepBadge: { enabled: true, type: 'number', value: '1' },
           callout: {
-            anchor: 'top-center',
-            bgColor: '#fff',
-            enabled: true,
-            fontFamily: 'sans',
-            fontSize: 14,
-            fontWeight: 'normal',
-            htmlContent: 'Comment',
-            maxWidth: 200,
-            side: 'auto',
-            tailSize: 8,
-            textColor: '#111',
-            variant: 'bubble',
+            ...createDefaultCalloutSettings(),
+            content: { bodyHtml: 'Comment', titleText: '' },
           },
         }}
       />

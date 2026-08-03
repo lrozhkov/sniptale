@@ -4,21 +4,11 @@ import { describe, expect, it } from 'vitest';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCalloutLayoutState } from './layout';
 import { Z_INDEX_STEP_BADGE } from '../interactive-frame/layout/portal';
+import { createDefaultCalloutSettings } from './model';
 
-const settings: CalloutSettings = {
-  enabled: true,
-  htmlContent: 'Comment',
-  anchor: 'top-center',
-  side: 'top',
-  variant: 'bubble',
-  bgColor: '#fff',
-  textColor: '#111',
-  tailSize: 8,
-  fontFamily: 'sans',
-  fontWeight: 'normal',
-  fontSize: 14,
-  maxWidth: 200,
-};
+const settings: CalloutSettings = createDefaultCalloutSettings();
+settings.content.bodyHtml = 'Comment';
+settings.placement.side = 'top';
 
 describe('getCalloutLayoutState', () => {
   it('keeps identical editable box metrics when entering text editing', () => {
@@ -52,7 +42,13 @@ describe('getCalloutLayoutState', () => {
       dimensions: { width: 100, height: 40 },
       frameRect: { x: 200, y: 200, width: 120, height: 80 },
       isEditing: false,
-      settings: { ...settings, manualPlacement: { centerOffsetX: 140, centerOffsetY: 0 } },
+      settings: {
+        ...settings,
+        placement: {
+          ...settings.placement,
+          manualPlacement: { centerOffsetX: 140, centerOffsetY: 0 },
+        },
+      },
       zIndex: 20,
     });
 
@@ -80,7 +76,7 @@ describe('getCalloutLayoutState', () => {
       dimensions,
       frameRect,
       isEditing: false,
-      settings: { ...settings, manualPlacement },
+      settings: { ...settings, placement: { ...settings.placement, manualPlacement } },
       zIndex: 20,
     });
 
@@ -92,7 +88,10 @@ describe('getCalloutLayoutState', () => {
   it('preserves corner-anchor tail geometry when manual placement starts', () => {
     const dimensions = { width: 160, height: 48 };
     const frameRect = { x: 200, y: 200, width: 120, height: 80 };
-    const cornerSettings = { ...settings, anchor: 'top-left' as const };
+    const cornerSettings = {
+      ...settings,
+      placement: { ...settings.placement, anchor: 'top-left' as const },
+    };
     const automatic = getCalloutLayoutState({
       dimensions,
       frameRect,
@@ -110,7 +109,10 @@ describe('getCalloutLayoutState', () => {
       dimensions,
       frameRect,
       isEditing: false,
-      settings: { ...cornerSettings, manualPlacement },
+      settings: {
+        ...cornerSettings,
+        placement: { ...cornerSettings.placement, manualPlacement },
+      },
       zIndex: 20,
     });
 
@@ -124,7 +126,7 @@ describe('getCalloutLayoutState', () => {
       dimensions: { width: 100, height: 40 },
       frameRect: { x: 200, y: -120, width: 120, height: 80 },
       isEditing: false,
-      settings: { ...settings, side: 'auto' },
+      settings: { ...settings, placement: { ...settings.placement, side: 'auto' } },
       zIndex: 20,
     });
 
@@ -137,7 +139,13 @@ describe('getCalloutLayoutState', () => {
       dimensions: { width: 100, height: 40 },
       frameRect: { x: 200, y: -120, width: 120, height: 80 },
       isEditing: false,
-      settings: { ...settings, manualPlacement: { centerOffsetX: 140, centerOffsetY: 0 } },
+      settings: {
+        ...settings,
+        placement: {
+          ...settings.placement,
+          manualPlacement: { centerOffsetX: 140, centerOffsetY: 0 },
+        },
+      },
       zIndex: 20,
     });
 

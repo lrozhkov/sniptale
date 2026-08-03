@@ -1,14 +1,11 @@
 import { useRef } from 'react';
 import { useAppLocale } from '../../../platform/i18n';
 import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
-import type {
-  CalloutSettings,
-  CalloutVariant,
-} from '@sniptale/runtime-contracts/highlighter/callout';
+import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import { dispatchCalloutDelete } from '../../platform/page-context/frame-events';
 import { resolveContentPortalTarget } from '../interactive-frame/layout/portal';
 import { CalloutSettingsPopoverContent } from './body';
-import { createCalloutVariantOptions, POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
+import { POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
 import {
   usePopoverDistanceClose as useCalloutSettingsPopoverDistanceClose,
@@ -16,6 +13,7 @@ import {
   usePopoverOutsideClose as useCalloutSettingsPopoverOutsideClose,
 } from '../popover-sync/hooks';
 import { useCalloutSettingsPopoverState } from './state';
+import { useCalloutPresetPopoverController } from './preset-controller';
 
 interface CalloutSettingsPopoverProps {
   isOpen: boolean;
@@ -44,11 +42,12 @@ export function CalloutSettingsPopover({
     isOpen,
     popoverRef,
   });
-  const { handleSettingChange, isTextOnly, localSettings } = useCalloutSettingsPopoverState({
+  const { applyPreset, handleSettingChange, localSettings } = useCalloutSettingsPopoverState({
     frameId,
     isOpen,
     ...(settings === undefined ? {} : { settings }),
   });
+  const presets = useCalloutPresetPopoverController({ applyPreset, isOpen, localSettings });
 
   useCalloutSettingsPopoverOutsideClose({ isOpen, onClose, popoverRef });
   useCalloutSettingsPopoverDistanceClose({ isOpen, onClose, popoverRef });
@@ -58,8 +57,6 @@ export function CalloutSettingsPopover({
     dispatchCalloutDelete({ frameId });
     onClose();
   };
-
-  const variantOptions: { value: CalloutVariant; label: string }[] = createCalloutVariantOptions();
 
   return (
     <ContentPopoverAdapter
@@ -78,9 +75,13 @@ export function CalloutSettingsPopover({
       <CalloutSettingsPopoverContent
         handleDelete={handleDelete}
         handleSettingChange={handleSettingChange}
-        isTextOnly={isTextOnly}
         localSettings={localSettings}
-        variantOptions={variantOptions}
+        onApplyPreset={applyPreset}
+        onEditPreset={(preset) => void presets.edit(preset)}
+        onSavePreset={(name) => void presets.save(name)}
+        onTogglePreset={(preset) => void presets.toggle(preset)}
+        presets={presets.catalog?.presets ?? []}
+        presetError={presets.error}
       />
     </ContentPopoverAdapter>
   );

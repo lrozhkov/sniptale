@@ -3,14 +3,23 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { HighlighterSectionContentProps } from './types';
 
-const { borderPresetEditorPropsSpy, effectsPanelPropsSpy, presetsPanelPropsSpy } = vi.hoisted(
-  () => ({
+const { borderPresetEditorPropsSpy, calloutPropsSpy, effectsPanelPropsSpy, presetsPanelPropsSpy } =
+  vi.hoisted(() => ({
     borderPresetEditorPropsSpy: vi.fn(),
+    calloutPropsSpy: vi.fn(),
     effectsPanelPropsSpy: vi.fn(),
     presetsPanelPropsSpy: vi.fn(),
-  })
-);
+  }));
+
+vi.mock('../callout-presets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../callout-presets')>()),
+  CalloutPresetCatalogSettings: (props: unknown) => {
+    calloutPropsSpy(props);
+    return <div data-testid="callout-presets">callouts</div>;
+  },
+}));
 
 vi.mock('../../../../platform/i18n', () => ({
   translate: (key: string) => key,
@@ -76,23 +85,73 @@ function createPreset() {
 
 function createProps() {
   const preset = createPreset();
-  const presets = {
+  const presets: HighlighterSectionContentProps['presets'] = {
+    draggedId: null,
+    dragOverId: null,
     editingPreset: preset,
+    hoveredPresetId: null,
+    handleAddPreset: vi.fn(),
     handleCloseEditor: vi.fn(),
+    handleDeletePreset: vi.fn(),
+    handleDragEnd: vi.fn(),
+    handleDragLeave: vi.fn(),
+    handleDragOver: vi.fn(),
+    handleDragStart: vi.fn(),
+    handleDrop: vi.fn(),
+    handleEditPreset: vi.fn(),
+    handlePresetHoverChange: vi.fn(),
+    handleResetPreset: vi.fn(),
     handleSavePreset: vi.fn(),
+    handleSetDefaultPreset: vi.fn(),
+    handleTogglePresetEnabled: vi.fn(),
     isEditorOpen: true,
+  };
+  const calloutPresets: HighlighterSectionContentProps['calloutPresets'] = {
+    actions: {
+      add: vi.fn(),
+      closeEditor: vi.fn(),
+      delete: vi.fn(),
+      dragEnd: vi.fn(),
+      dragLeave: vi.fn(),
+      dragOver: vi.fn(),
+      dragStart: vi.fn(),
+      drop: vi.fn(),
+      edit: vi.fn(),
+      hover: vi.fn(),
+      reset: vi.fn(),
+      save: vi.fn(),
+      setDefault: vi.fn(),
+      toggle: vi.fn(),
+    },
+    catalog: null,
+    draggedId: null,
+    dragOverId: null,
+    editor: { isOpen: false },
+    error: false,
+    hoveredId: null,
+    isLoading: false,
+    isSaving: false,
+  };
+  const settings: HighlighterSectionContentProps['settings'] = {
+    borderPresets: [preset],
+    defaultBlurSettings: { amount: 8, blurType: 'gaussian', showBorder: true },
+    defaultBorderPresetId: preset.id,
+    defaultEffectMode: 'border',
+    defaultFocusSettings: { opacity: 0.5, showBorder: false },
+    systemPresetCatalogRevision: 1,
   };
 
   return {
     preset,
     props: {
+      calloutPresets,
       effects: {
         handleUpdateBlurSettings: vi.fn(),
         handleUpdateFocusSettings: vi.fn(),
       },
-      presets: presets as never,
-      settings: {} as never,
-    },
+      presets,
+      settings,
+    } satisfies HighlighterSectionContentProps,
     presets,
   };
 }
@@ -108,6 +167,7 @@ function verifyRenderedState({ preset, presets, props }: ReturnType<typeof creat
     effects: props.effects,
     settings: props.settings,
   });
+  expect(calloutPropsSpy).toHaveBeenCalledWith({ controller: props.calloutPresets });
   expect(borderPresetEditorPropsSpy).toHaveBeenCalledWith(
     expect.objectContaining({
       isOpen: true,
@@ -120,6 +180,7 @@ function verifyRenderedState({ preset, presets, props }: ReturnType<typeof creat
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   borderPresetEditorPropsSpy.mockReset();
+  calloutPropsSpy.mockReset();
   effectsPanelPropsSpy.mockReset();
   presetsPanelPropsSpy.mockReset();
 });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
 import type { FrameManagerRefs } from '../contracts';
 import { createFrameDataFixture } from '../test-support';
@@ -10,6 +10,9 @@ import { cloneBorderPreset } from '../../../../features/highlighter/presets/cata
 import { getFrameSessionBorderPreset, setFrameSessionBorderPreset } from '../session/border-preset';
 import { getCurrentBorderPreset as getHoverBorderPreset } from '../../highlighter-hover-preview/session';
 import { createFrameHostLayoutService } from '../host-layout/service';
+import { createDefaultCalloutSettings } from '../../callout/model';
+
+const CALLOUT_STYLE = createDefaultCalloutSettings().style;
 
 const mocks = vi.hoisted(() => ({
   applyAnnotationSnapshot: vi.fn(),
@@ -75,7 +78,7 @@ function createRefs(): FrameManagerRefs {
       },
     },
     sessionStepBadgeTemplateRef: { current: null },
-    sessionCalloutStyleRef: { current: null as Partial<CalloutSettings> | null },
+    sessionCalloutStyleRef: { current: null as CalloutVisualStyle | null },
     stepBadgeOrderRef: { current: new Map<string, number>() },
     globalStepBadgeSettingsRef: { current: { autoMode: true } },
     globalStepBadgeAutoModeRef: { current: true },
@@ -90,7 +93,10 @@ function createAppliedSnapshot() {
     globalStepBadgeSettings: { autoMode: false },
     sessionBorderPreset: cloneBorderPreset(DEFAULT_BORDER_PRESET),
     sessionBlurSettings: { amount: 10, blurType: 'gaussian' as const, showBorder: false },
-    sessionCalloutStyle: { bgColor: '#111111' },
+    sessionCalloutStyle: {
+      ...CALLOUT_STYLE,
+      surface: { ...CALLOUT_STYLE.surface, backgroundColor: '#111111' },
+    },
     sessionFocusSettings: { opacity: 0.7, showBorder: true },
     sessionStepBadgeTemplate: {
       enabled: true,
@@ -247,7 +253,10 @@ function expectBridgeSnapshotCapture() {
     showBorder: true,
   };
   refs.sessionSettingsRefs.focusSettings.current = { opacity: 0.4, showBorder: true };
-  refs.sessionCalloutStyleRef.current = { bgColor: '#fff' };
+  refs.sessionCalloutStyleRef.current = {
+    ...CALLOUT_STYLE,
+    surface: { ...CALLOUT_STYLE.surface, backgroundColor: '#ffffff' },
+  };
   refs.stepBadgeOrderRef.current = new Map([['frame-1', 1]]);
   mocks.captureFrameSessionSnapshot.mockReturnValue(expectedSnapshot);
 

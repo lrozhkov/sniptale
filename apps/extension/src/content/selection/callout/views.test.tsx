@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
 import { getDynamicTailState } from './dynamic-tail';
 import { renderDynamicCalloutTail } from './views';
+import { createDefaultCalloutSettings } from './model';
 
 it('renders a wide transparent hover corridor around the visible callout connector', () => {
   const tail = getDynamicTailState({
@@ -10,7 +11,9 @@ it('renders a wide transparent hover corridor around the visible callout connect
     preferredSide: 'top',
     tailSize: 8,
   });
-  const markup = renderToStaticMarkup(renderDynamicCalloutTail(tail, '#252830'));
+  const style = createDefaultCalloutSettings().style;
+  style.surface.backgroundColor = '#252830';
+  const markup = renderToStaticMarkup(renderDynamicCalloutTail(tail, style));
 
   expect(markup.match(/<path/g)).toHaveLength(2);
   expect(markup).toContain('stroke="transparent"');

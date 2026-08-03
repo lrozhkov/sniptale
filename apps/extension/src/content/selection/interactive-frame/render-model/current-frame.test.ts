@@ -3,6 +3,9 @@
 import { expect, it } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { resolveInteractiveCurrentFrame } from './current-frame';
+import { createDefaultCalloutSettings } from '../../callout/model';
+
+const baseCallout = createDefaultCalloutSettings();
 
 const baseFrame: FrameData = {
   id: 'frame-1',
@@ -11,20 +14,7 @@ const baseFrame: FrameData = {
   width: 100,
   height: 80,
   effectMode: 'border',
-  callout: {
-    anchor: 'center',
-    bgColor: '#fff',
-    enabled: true,
-    fontFamily: 'sans',
-    fontSize: 14,
-    fontWeight: 'normal',
-    htmlContent: '',
-    maxWidth: 180,
-    side: 'top',
-    tailSize: 10,
-    textColor: '#111',
-    variant: 'bubble',
-  },
+  callout: baseCallout,
 };
 
 it('keeps the optimistic temp frame while callout content is ahead of external frame props', () => {
@@ -32,7 +22,7 @@ it('keeps the optimistic temp frame while callout content is ahead of external f
     ...baseFrame,
     callout: {
       ...baseFrame.callout!,
-      htmlContent: '<p>saved</p>',
+      content: { ...baseFrame.callout!.content, bodyHtml: '<p>saved</p>' },
     },
   };
 
@@ -47,7 +37,7 @@ it('keeps the optimistic temp frame while callout content is ahead of external f
     ...baseFrame,
     callout: {
       ...baseFrame.callout!,
-      htmlContent: '<p>saved</p>',
+      content: { ...baseFrame.callout!.content, bodyHtml: '<p>saved</p>' },
     },
   });
 });
@@ -57,14 +47,17 @@ it('preserves external style updates while only keeping optimistic callout conte
     ...baseFrame,
     callout: {
       ...baseFrame.callout!,
-      bgColor: '#2563eb',
+      style: {
+        ...baseFrame.callout!.style,
+        surface: { ...baseFrame.callout!.style.surface, backgroundColor: '#2563eb' },
+      },
     },
   };
   const tempFrame = {
     ...baseFrame,
     callout: {
       ...baseFrame.callout!,
-      htmlContent: '<p>saved</p>',
+      content: { ...baseFrame.callout!.content, bodyHtml: '<p>saved</p>' },
     },
   };
 
@@ -79,7 +72,7 @@ it('preserves external style updates while only keeping optimistic callout conte
     ...frame,
     callout: {
       ...frame.callout!,
-      htmlContent: '<p>saved</p>',
+      content: { ...frame.callout!.content, bodyHtml: '<p>saved</p>' },
     },
   });
 });
@@ -89,7 +82,7 @@ it('falls back to the external frame after parent props catch up', () => {
     ...baseFrame,
     callout: {
       ...baseFrame.callout!,
-      htmlContent: '<p>saved</p>',
+      content: { ...baseFrame.callout!.content, bodyHtml: '<p>saved</p>' },
     },
   };
 
@@ -108,8 +101,11 @@ it('prefers the external frame when only non-content callout settings differ', (
     ...baseFrame,
     callout: {
       ...baseFrame.callout!,
-      bgColor: '#111827',
-      side: 'right' as const,
+      placement: { ...baseFrame.callout!.placement, side: 'right' as const },
+      style: {
+        ...baseFrame.callout!.style,
+        surface: { ...baseFrame.callout!.style.surface, backgroundColor: '#111827' },
+      },
     },
   };
 

@@ -8,6 +8,7 @@ import {
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import { getFrameSessionBorderPreset, setFrameSessionBorderPreset } from '../session/border-preset';
+import { cloneCalloutStyle } from '../../callout/model';
 
 export function applyHistorySnapshotToFrameManager(args: {
   refs: FrameManagerRefs;
@@ -42,7 +43,7 @@ export function applyHistorySnapshotToFrameManager(args: {
       }
     : null;
   args.refs.sessionCalloutStyleRef.current = frameSnapshot.sessionCalloutStyle
-    ? { ...frameSnapshot.sessionCalloutStyle }
+    ? cloneCalloutStyle(frameSnapshot.sessionCalloutStyle)
     : null;
 
   useFrameUIStore.getState().reset();

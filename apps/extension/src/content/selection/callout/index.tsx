@@ -21,14 +21,17 @@ interface CalloutProps {
   onStartEditing: () => void;
   onStopEditing: () => void;
   onContentChange: (htmlContent: string) => void;
+  onTitleChange: (titleText: string) => void;
   onDelete: () => void;
   onSettingsClick: () => void;
-  onPositionChange: (placement: NonNullable<CalloutSettings['manualPlacement']>) => void;
+  onPositionChange: (
+    placement: NonNullable<CalloutSettings['placement']['manualPlacement']>
+  ) => void;
   onTailBaseRangeChange: (position: number, width: number) => void;
   onTailFramePositionChange: (position: number) => void;
   onWidthChange: (
     maxWidth: number,
-    placement: NonNullable<CalloutSettings['manualPlacement']>
+    placement: NonNullable<CalloutSettings['placement']['manualPlacement']>
   ) => void;
   settingsAnchorRef: React.RefObject<HTMLButtonElement | null>;
   showSettingsHandle: boolean;
@@ -48,6 +51,7 @@ export const Callout: React.FC<CalloutProps> = ({
   onStartEditing,
   onStopEditing,
   onContentChange,
+  onTitleChange,
   onDelete,
   onSettingsClick,
   onPositionChange,
@@ -61,7 +65,8 @@ export const Callout: React.FC<CalloutProps> = ({
   const portalTheme = useResolvedPortalTheme(resolveCalloutThemeOwner());
   const editing = useCalloutEditing({
     frameId,
-    htmlContent: settings.htmlContent,
+    htmlContent: settings.content.bodyHtml,
+    titleText: settings.content.titleText,
     isEditing,
     onContentChange,
     onDelete,
@@ -92,6 +97,7 @@ export const Callout: React.FC<CalloutProps> = ({
         isEditing,
         layout: interaction.layout,
         onSettingsClick,
+        onTitleChange,
         portalTheme,
         settings: interaction.effectiveSettings,
         settingsAnchorRef,
@@ -118,11 +124,18 @@ function createCalloutBodyProps(args: {
   tailFrameDrag: ReturnType<typeof useCalloutInteractionLayout>['tailFrameDrag'];
   widthResize: ReturnType<typeof useCalloutInteractionLayout>['widthResize'];
   onSettingsClick: () => void;
+  onTitleChange: (titleText: string) => void;
   settingsAnchorRef: React.RefObject<HTMLButtonElement | null>;
   showSettingsHandle: boolean;
 }) {
-  const tailBaseStartPoint = args.layout.dynamicTail?.attachment.baseEdgeA;
-  const tailBaseEndPoint = args.layout.dynamicTail?.attachment.baseEdgeB;
+  const tailBaseStartPoint =
+    args.layout.dynamicTail?.kind === 'line'
+      ? args.layout.dynamicTail.attachment.bubbleEdgePoint
+      : args.layout.dynamicTail?.attachment.baseEdgeA;
+  const tailBaseEndPoint =
+    args.layout.dynamicTail?.kind === 'wedge'
+      ? args.layout.dynamicTail.attachment.baseEdgeB
+      : undefined;
   const tailFramePoint = args.layout.dynamicTail?.attachment.tipPoint;
   return {
     applyFormatting: args.editing.applyFormatting,
@@ -146,6 +159,7 @@ function createCalloutBodyProps(args: {
     isEditing: args.isEditing,
     portalTheme: args.portalTheme,
     settings: args.settings,
+    onTitleChange: args.onTitleChange,
     dynamicTail: args.layout.dynamicTail,
     dragHandleStyle: {
       position: 'fixed' as const,

@@ -29,6 +29,7 @@ function CalloutEditingLifecycleHarness(props: {
 
   return (
     <div data-ui="callout-wrapper" onClick={editing.handleClick}>
+      <input data-sniptale-callout-title="true" data-ui="callout-title" />
       <div
         ref={editing.contentEditableRef}
         contentEditable={isEditing}
@@ -63,7 +64,7 @@ afterEach(() => {
 function renderHarness(props: {
   onContentChange: (html: string) => void;
   onStopEditing: () => void;
-}): { editable: HTMLDivElement; wrapper: HTMLDivElement } {
+}): { editable: HTMLDivElement; title: HTMLInputElement; wrapper: HTMLDivElement } {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -76,10 +77,12 @@ function renderHarness(props: {
   expect(wrapper).toBeInstanceOf(HTMLDivElement);
   const editable = container.querySelector<HTMLDivElement>('[data-ui="callout-editable"]');
   expect(editable).toBeInstanceOf(HTMLDivElement);
+  const title = container.querySelector<HTMLInputElement>('[data-ui="callout-title"]');
+  expect(title).toBeInstanceOf(HTMLInputElement);
   editable!.innerHTML = '<p>updated</p>';
   vi.spyOn(editable!, 'blur').mockImplementation(() => undefined);
 
-  return { editable: editable!, wrapper: wrapper! };
+  return { editable: editable!, title: title!, wrapper: wrapper! };
 }
 
 function mockHistoryTransactions() {
@@ -169,6 +172,21 @@ describe('useCalloutEditing callout click lifecycle', () => {
 
     act(() => {
       editable.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    expect(history.beginTransactionSpy).toHaveBeenCalledWith('callout-editing:frame-1');
+    expect(onStopEditing).not.toHaveBeenCalled();
+    expect(history.commitTransactionSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps the callout editing transaction open when the title is clicked', () => {
+    const history = mockHistoryTransactions();
+    const onContentChange = vi.fn();
+    const onStopEditing = vi.fn();
+    const { title } = renderHarness({ onContentChange, onStopEditing });
+
+    act(() => {
+      title.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
 
     expect(history.beginTransactionSpy).toHaveBeenCalledWith('callout-editing:frame-1');

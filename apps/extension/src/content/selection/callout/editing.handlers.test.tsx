@@ -7,7 +7,11 @@ import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 
 import { useCalloutEditingHandlers } from './editing.handlers';
 
-function EditingHandlersHarness(props: { onContentChange: (html: string) => void }) {
+function EditingHandlersHarness(props: {
+  onContentChange: (html: string) => void;
+  onDelete?: () => void;
+  titleText?: string;
+}) {
   const contentEditableRef = React.useRef<HTMLDivElement | null>(null);
   const handlers = useCalloutEditingHandlers({
     contentEditableRef,
@@ -15,7 +19,8 @@ function EditingHandlersHarness(props: { onContentChange: (html: string) => void
     isEditing: true,
     onManualInput: vi.fn(),
     onContentChange: props.onContentChange,
-    onDelete: vi.fn(),
+    onDelete: props.onDelete ?? vi.fn(),
+    ...(props.titleText === undefined ? {} : { titleText: props.titleText }),
     onStartEditing: vi.fn(),
     onStopEditing: vi.fn(),
   });
@@ -25,6 +30,7 @@ function EditingHandlersHarness(props: { onContentChange: (html: string) => void
       ref={contentEditableRef}
       contentEditable
       data-ui="callout-editable"
+      onBlur={handlers.handleBlur}
       onInput={handlers.handleInput}
       onPaste={handlers.handlePaste}
       suppressContentEditableWarning
@@ -70,6 +76,32 @@ it('sanitizes contenteditable input before publishing callout content changes', 
   });
 
   expect(onContentChange).toHaveBeenCalledWith('<strong>bold</strong>');
+});
+
+it('keeps a title-only callout when the body is empty', () => {
+  const onContentChange = vi.fn();
+  const onDelete = vi.fn();
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+
+  act(() => {
+    root?.render(
+      <EditingHandlersHarness
+        onContentChange={onContentChange}
+        onDelete={onDelete}
+        titleText="Title"
+      />
+    );
+  });
+  const editable = container.querySelector<HTMLDivElement>('[data-ui="callout-editable"]')!;
+
+  act(() => {
+    editable.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  });
+
+  expect(onDelete).not.toHaveBeenCalled();
+  expect(onContentChange).toHaveBeenCalledWith('');
 });
 
 it('inserts pasted text into the callout when the document selection escaped to the page body', () => {

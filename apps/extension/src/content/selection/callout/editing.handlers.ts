@@ -90,7 +90,7 @@ function commitCalloutContent(
   const sanitizedHtml = sanitizeCalloutHtml(editableElement.innerHTML);
   const textContent = editableElement.textContent?.trim() ?? '';
 
-  if (textContent === '') {
+  if (textContent === '' && (args.titleText ?? '').trim() === '') {
     args.onDelete();
   } else {
     args.onContentChange(sanitizedHtml);
@@ -239,6 +239,12 @@ function isPointerEventWithinEditable(
   event: MouseEvent,
   editableElement: HTMLDivElement | null
 ): boolean {
+  if (
+    event.target instanceof Element &&
+    event.target.closest('[data-sniptale-callout-title="true"]')
+  ) {
+    return true;
+  }
   if (!editableElement) {
     return false;
   }

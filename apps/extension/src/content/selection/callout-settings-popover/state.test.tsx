@@ -7,6 +7,7 @@ import { addCalloutPopoverSettingsChangedListener } from '../../platform/page-co
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { useCalloutSettingsPopoverState } from './state';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import { createDefaultCalloutSettings } from '../callout/model';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -61,12 +62,15 @@ describe('useCalloutSettingsPopoverState', () => {
 
     renderHarness();
     act(() => {
-      latestState?.handleSettingChange('variant', 'text-only');
+      latestState?.handleSettingChange({ style: { surface: { backgroundColor: 'transparent' } } });
     });
 
     expect(listener).toHaveBeenCalledWith({
       frameId: 'frame-1',
-      settings: { variant: 'text-only' },
+      settings: {
+        sourcePresetId: undefined,
+        style: { surface: { backgroundColor: 'transparent' } },
+      },
     });
 
     cleanup();
@@ -84,44 +88,36 @@ describe('useCalloutSettingsPopoverState', () => {
   });
 
   it('clears manual placement when an anchor or side is selected', () => {
-    settings = {
-      anchor: 'top-center',
-      bgColor: '#fff',
-      enabled: true,
-      fontFamily: 'sans',
-      fontSize: 14,
-      fontWeight: 'normal',
-      htmlContent: 'Comment',
-      maxWidth: 200,
+    settings = createDefaultCalloutSettings();
+    settings.placement = {
+      ...settings.placement,
       manualPlacement: { centerOffsetX: 60, centerOffsetY: -30 },
-      tailBasePosition: 0.75,
-      tailBaseWidth: 0.2,
-      tailFramePosition: 0.25,
-      side: 'auto',
-      tailSize: 8,
-      textColor: '#111',
-      variant: 'bubble',
+      connectorBasePosition: 0.75,
+      connectorBaseWidth: 0.2,
+      connectorFramePosition: 0.25,
     };
     const listener = vi.fn();
     const cleanup = addCalloutPopoverSettingsChangedListener(listener);
     renderHarness();
 
-    act(() => latestState?.handleSettingChange('side', 'right'));
+    act(() => latestState?.handleSettingChange({ placement: { side: 'right' } }));
 
     expect(listener).toHaveBeenCalledWith({
       frameId: 'frame-1',
       settings: {
-        side: 'right',
-        manualPlacement: undefined,
-        tailBasePosition: undefined,
-        tailBaseWidth: undefined,
-        tailFramePosition: undefined,
+        placement: {
+          side: 'right',
+          manualPlacement: undefined,
+          connectorBasePosition: undefined,
+          connectorBaseWidth: undefined,
+          connectorFramePosition: undefined,
+        },
       },
     });
-    expect(latestState?.localSettings.manualPlacement).toBeUndefined();
-    expect(latestState?.localSettings.tailBasePosition).toBeUndefined();
-    expect(latestState?.localSettings.tailBaseWidth).toBeUndefined();
-    expect(latestState?.localSettings.tailFramePosition).toBeUndefined();
+    expect(latestState?.localSettings.placement.manualPlacement).toBeUndefined();
+    expect(latestState?.localSettings.placement.connectorBasePosition).toBeUndefined();
+    expect(latestState?.localSettings.placement.connectorBaseWidth).toBeUndefined();
+    expect(latestState?.localSettings.placement.connectorFramePosition).toBeUndefined();
     cleanup();
   });
 

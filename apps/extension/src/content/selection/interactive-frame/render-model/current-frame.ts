@@ -17,7 +17,9 @@ function resolveOptimisticCallout(frame: FrameData, tempFrame: FrameData) {
   }
 
   const hasOptimisticContent =
-    current.enabled !== optimistic.enabled || current.htmlContent !== optimistic.htmlContent;
+    current.enabled !== optimistic.enabled ||
+    current.content.bodyHtml !== optimistic.content.bodyHtml ||
+    current.content.titleText !== optimistic.content.titleText;
 
   if (!hasOptimisticContent) {
     return current;
@@ -26,7 +28,7 @@ function resolveOptimisticCallout(frame: FrameData, tempFrame: FrameData) {
   return {
     ...current,
     enabled: optimistic.enabled,
-    htmlContent: optimistic.htmlContent,
+    content: { ...optimistic.content },
   };
 }
 

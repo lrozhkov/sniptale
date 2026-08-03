@@ -4,6 +4,7 @@ import { settingsSectionClassName, SettingsSectionHeader } from '../../../sectio
 import { HighlighterEffectsPanel } from './effects-panel';
 import { HighlighterPresetsPanel } from './presets-panel';
 import type { HighlighterSectionContentProps } from './types';
+import { CalloutPresetCatalogSettings } from '../callout-presets';
 
 export function HighlighterSectionContent(props: HighlighterSectionContentProps) {
   const { presets } = props;
@@ -16,6 +17,7 @@ export function HighlighterSectionContent(props: HighlighterSectionContentProps)
       />
 
       <HighlighterPresetsPanel presets={presets} settings={props.settings} />
+      <CalloutPresetCatalogSettings controller={props.calloutPresets} />
       <HighlighterEffectsPanel effects={props.effects} settings={props.settings} />
 
       <BorderPresetEditor

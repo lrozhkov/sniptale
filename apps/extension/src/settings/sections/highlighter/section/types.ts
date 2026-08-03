@@ -3,8 +3,10 @@ import type {
   HighlighterEffectActions,
   HighlighterPresetController,
 } from './useHighlighterSection';
+import type { CalloutPresetCatalogController } from '../callout-presets';
 
 export interface HighlighterSectionContentProps {
+  calloutPresets: CalloutPresetCatalogController;
   effects: HighlighterEffectActions;
   presets: HighlighterPresetController;
   settings: HighlighterSettings;

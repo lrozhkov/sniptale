@@ -2,31 +2,35 @@
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { CalloutAppearanceSection, CalloutDeleteButton, CalloutTypographySection } from './views';
+import {
+  CalloutAppearanceSection,
+  CalloutDeleteButton,
+  CalloutTypographySection,
+  parseCalloutConnectorMarker,
+} from './views';
 import { CalloutSettingsPopoverContent } from './body';
+import { createDefaultCalloutSettings } from '../callout/model';
+
+const settings = createDefaultCalloutSettings();
 
 describe('CalloutAppearanceSection', () => {
+  it('narrows connector markers at the DOM boundary', () => {
+    expect(parseCalloutConnectorMarker('diamond')).toBe('diamond');
+    expect(parseCalloutConnectorMarker('unexpected-marker')).toBeNull();
+  });
+
   it('renders the canonical comment settings menu title', () => {
     const markup = renderToStaticMarkup(
       <CalloutSettingsPopoverContent
         handleDelete={vi.fn()}
         handleSettingChange={vi.fn()}
-        isTextOnly={false}
-        localSettings={{
-          anchor: 'top-center',
-          bgColor: '#1f2937',
-          enabled: true,
-          fontFamily: 'sans',
-          fontSize: 16,
-          fontWeight: 'normal',
-          htmlContent: 'Comment',
-          maxWidth: 300,
-          side: 'auto',
-          tailSize: 12,
-          textColor: '#ffffff',
-          variant: 'bubble',
-        }}
-        variantOptions={[{ value: 'bubble', label: 'Bubble' }]}
+        localSettings={settings}
+        onApplyPreset={vi.fn()}
+        onEditPreset={vi.fn()}
+        onSavePreset={vi.fn()}
+        onTogglePreset={vi.fn()}
+        presets={[]}
+        presetError={null}
       />
     );
 
@@ -36,25 +40,12 @@ describe('CalloutAppearanceSection', () => {
 
   it('renders inside the shared content popover section contract', () => {
     const markup = renderToStaticMarkup(
-      <CalloutAppearanceSection
-        bgColor="#1f2937"
-        isTextOnly={false}
-        onBackgroundChange={vi.fn()}
-        onTextColorChange={vi.fn()}
-        onVariantChange={vi.fn()}
-        textColor="#ffffff"
-        variant="bubble"
-        variantOptions={[
-          { value: 'bubble', label: 'Bubble' },
-          { value: 'rect', label: 'Rect' },
-        ]}
-      />
+      <CalloutAppearanceSection onChange={vi.fn()} settings={settings} />
     );
 
     expect(markup).toContain('sniptale-content-popover-section');
     expect(markup).toContain('content.callout-settings.appearance-section');
-    expect(markup).toContain('Bubble');
-    expect(markup).toContain('sniptale-glass-color-control');
+    expect(markup).toContain('shared.ui.color-selector');
   });
 
   it('keeps the destructive footer action on the shared popover danger button seam', () => {
@@ -66,23 +57,10 @@ describe('CalloutAppearanceSection', () => {
 
   it('stacks typography ranges compactly without redundant scale labels', () => {
     const markup = renderToStaticMarkup(
-      <CalloutTypographySection
-        fontFamily="sans"
-        fontSize={16}
-        fontWeight="normal"
-        isTextOnly={false}
-        maxWidth={300}
-        onFontFamilyChange={vi.fn()}
-        onFontSizeChange={vi.fn()}
-        onFontWeightToggle={vi.fn()}
-        onMaxWidthChange={vi.fn()}
-        onTailSizeChange={vi.fn()}
-        tailSize={12}
-      />
+      <CalloutTypographySection onChange={vi.fn()} settings={settings} />
     );
 
-    expect(markup).toContain('sniptale-content-popover-range-grid');
-    expect(markup.match(/sniptale-content-popover-range-field/g)).toHaveLength(3);
+    expect(markup.match(/sniptale-content-popover-range-field/g)).toHaveLength(2);
     expect(markup).not.toContain('sniptale-glass-range-meta');
   });
 });

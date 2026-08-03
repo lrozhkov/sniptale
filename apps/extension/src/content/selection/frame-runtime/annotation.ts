@@ -25,9 +25,14 @@ function readCalloutText(frame: FrameData): string | undefined {
     return undefined;
   }
 
-  const parsed = new DOMParser().parseFromString(frame.callout.htmlContent, 'text/html');
-  const text = Array.from(parsed.body.childNodes, readCalloutNode).join('').replace(/\n$/, '');
-  return text.trim() === '' ? undefined : text;
+  const parsed = new DOMParser().parseFromString(frame.callout.content.bodyHtml, 'text/html');
+  const body = Array.from(parsed.body.childNodes, readCalloutNode)
+    .join('')
+    .replace(/\n$/, '')
+    .trim();
+  const title = frame.callout.style.title.enabled ? frame.callout.content.titleText.trim() : '';
+  const text = [title, body].filter(Boolean).join('\n');
+  return text === '' ? undefined : text;
 }
 
 function readOptionalName(value: string | undefined): string | undefined {

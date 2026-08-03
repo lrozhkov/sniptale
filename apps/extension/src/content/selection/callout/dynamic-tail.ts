@@ -345,6 +345,7 @@ export function getDynamicTailState(args: {
     tipPoint: Point;
     tipVertex: Point;
   };
+  kind: 'wedge';
   path: string;
   side: ConnectorSide;
   style: CSSProperties;
@@ -382,6 +383,7 @@ export function getDynamicTailState(args: {
         ` ${geometry.localTipB.x} ${geometry.localTipB.y}`,
       `L ${geometry.localBaseB.x} ${geometry.localBaseB.y} Z`,
     ].join(' '),
+    kind: 'wedge' as const,
     side,
     style: {
       position: 'absolute',

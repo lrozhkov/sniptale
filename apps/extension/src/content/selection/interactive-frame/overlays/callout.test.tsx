@@ -150,7 +150,7 @@ describe('interactive frame callout overlay', () => {
       ...frame,
       callout: {
         ...frame.callout!,
-        htmlContent: '<p>updated</p>',
+        content: { ...frame.callout!.content, bodyHtml: '<p>updated</p>' },
       },
     };
 
@@ -183,7 +183,9 @@ describe('interactive frame callout overlay', () => {
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         callout: expect.objectContaining({
-          manualPlacement: { centerOffsetX: 70, centerOffsetY: -20 },
+          placement: expect.objectContaining({
+            manualPlacement: { centerOffsetX: 70, centerOffsetY: -20 },
+          }),
         }),
       })
     );
@@ -214,8 +216,12 @@ describe('interactive frame callout overlay', () => {
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         callout: expect.objectContaining({
-          maxWidth: 260,
-          manualPlacement: { centerOffsetX: 84, centerOffsetY: -18 },
+          placement: expect.objectContaining({
+            manualPlacement: { centerOffsetX: 84, centerOffsetY: -18 },
+          }),
+          style: expect.objectContaining({
+            typography: expect.objectContaining({ maxWidth: 260 }),
+          }),
         }),
       })
     );
@@ -245,7 +251,12 @@ describe('interactive frame callout overlay', () => {
     expect(onUpdate).toHaveBeenCalledOnce();
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        callout: expect.objectContaining({ tailBasePosition: 0.75, tailBaseWidth: 0.2 }),
+        callout: expect.objectContaining({
+          placement: expect.objectContaining({
+            connectorBasePosition: 0.75,
+            connectorBaseWidth: 0.2,
+          }),
+        }),
       })
     );
   });
@@ -274,7 +285,9 @@ describe('interactive frame callout overlay', () => {
     expect(onUpdate).toHaveBeenCalledOnce();
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        callout: expect.objectContaining({ tailFramePosition: 0.25 }),
+        callout: expect.objectContaining({
+          placement: expect.objectContaining({ connectorFramePosition: 0.25 }),
+        }),
       })
     );
   });
