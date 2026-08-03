@@ -156,3 +156,12 @@ it('offers Design Review as a standalone mode and no longer adds a Quick Edit in
 
   expect(onToggleDesignReview).toHaveBeenCalledOnce();
 });
+
+it('uses a highlighter glyph for annotations instead of the border glyph', () => {
+  renderModeButtons();
+  act(() => queryModeSelectorButton()?.click());
+
+  const icon = document.querySelector('[data-ui="content.toolbar.mode-option.highlighter"] svg');
+  expect(icon?.getAttribute('class')).toContain('lucide-highlighter');
+  expect(icon?.getAttribute('class')).not.toContain('lucide-square');
+});

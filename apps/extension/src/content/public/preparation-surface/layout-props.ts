@@ -91,6 +91,7 @@ function projectPreparationToolbar(
     captureAction: modeState.captureAction,
     currentViewport: modeState.currentViewport,
     frameCount: frameManager.frames.length,
+    futureFrameStyle: frameManager.getFutureFrameStyle(),
     handleTakeScreenshot: controllers.screenshotController.handleTakeScreenshot,
     isCompletelyHidden: modeState.isCompletelyHidden,
     isCursorMode:
@@ -110,6 +111,7 @@ function projectPreparationToolbar(
     },
     pinToTab: modeState.pinToTab,
     pinToTabAvailable: modeState.pinToTabAvailable,
+    setFutureFrameEffectMode: frameManager.setFutureFrameEffectMode,
     setCaptureAction: modeState.setCaptureAction,
     setCurrentViewport: modeState.setCurrentViewport,
     ...(args.ports.mutateViewport === undefined

@@ -1,6 +1,10 @@
 import { useMemo, useRef } from 'react';
 import type {
+  BlurSettings,
+  BorderPreset,
+  EffectMode,
   FrameData,
+  FocusSettings,
   GlobalStepBadgeSettings,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
@@ -13,10 +17,17 @@ interface FrameManagerPublicResultParams {
   clearAutoBlurFrames: FrameMutations['clearAutoBlurFrames'];
   clearFrames: FrameMutations['clearFrames'];
   frames: FrameData[];
+  getFutureFrameStyle: () => {
+    blurSettings: BlurSettings;
+    borderSettings: BorderPreset;
+    effectMode: EffectMode;
+    focusSettings: FocusSettings;
+  };
   getGlobalStepBadgeSettings: () => GlobalStepBadgeSettings;
   hasFrameForElement: (element: HTMLElement) => boolean;
   recalculateStepBadges: RecalculateStepBadges;
   removeFrame: FrameMutations['removeFrame'];
+  setFutureFrameEffectMode: (mode: EffectMode) => void;
   syncAutoBlurFrames: FrameMutations['syncAutoBlurFrames'];
   syncFocusOpacity: FrameMutations['syncFocusOpacity'];
   updateFrame: FrameMutations['updateFrame'];
@@ -51,10 +62,12 @@ function arePublicResultParamsEqual(
     prev.clearAutoBlurFrames === next.clearAutoBlurFrames &&
     prev.clearFrames === next.clearFrames &&
     prev.frames === next.frames &&
+    prev.getFutureFrameStyle === next.getFutureFrameStyle &&
     prev.getGlobalStepBadgeSettings === next.getGlobalStepBadgeSettings &&
     prev.hasFrameForElement === next.hasFrameForElement &&
     prev.recalculateStepBadges === next.recalculateStepBadges &&
     prev.removeFrame === next.removeFrame &&
+    prev.setFutureFrameEffectMode === next.setFutureFrameEffectMode &&
     prev.syncFocusOpacity === next.syncFocusOpacity &&
     prev.syncAutoBlurFrames === next.syncAutoBlurFrames &&
     prev.updateFrame === next.updateFrame &&
@@ -67,11 +80,13 @@ function arePublicResultParamsEqual(
 function buildFrameManagerResult(params: FrameManagerPublicResultParams) {
   return {
     frames: params.frames,
+    getFutureFrameStyle: params.getFutureFrameStyle,
     addAutoBlurFrames: params.addAutoBlurFrames,
     addFrame: params.addFrame,
     addFreeFrame: params.addFreeFrame,
     clearAutoBlurFrames: params.clearAutoBlurFrames,
     removeFrame: params.removeFrame,
+    setFutureFrameEffectMode: params.setFutureFrameEffectMode,
     clearFrames: params.clearFrames,
     syncAutoBlurFrames: params.syncAutoBlurFrames,
     updateFrame: params.updateFrame,

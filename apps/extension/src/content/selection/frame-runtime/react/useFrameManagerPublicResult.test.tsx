@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GlobalStepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
 import { useFrameManagerPublicResult } from './useFrameManagerPublicResult';
 
@@ -26,10 +27,17 @@ function createArgs(): Parameters<typeof useFrameManagerPublicResult>[0] {
     clearAutoBlurFrames: vi.fn(),
     clearFrames: vi.fn(),
     frames: [],
+    getFutureFrameStyle: vi.fn(() => ({
+      blurSettings: { amount: 8, blurType: 'gaussian' as const },
+      borderSettings: DEFAULT_BORDER_PRESET,
+      effectMode: 'border' as const,
+      focusSettings: { opacity: 0.5 },
+    })),
     getGlobalStepBadgeSettings,
     hasFrameForElement: vi.fn(() => false),
     recalculateStepBadges: vi.fn(),
     removeFrame: vi.fn(),
+    setFutureFrameEffectMode: vi.fn(),
     syncFocusOpacity: vi.fn(),
     syncAutoBlurFrames: vi.fn(),
     updateFrame: vi.fn(),
@@ -78,10 +86,12 @@ describe('frame-manager-public-result-hook', () => {
       clearAutoBlurFrames: currentArgs.clearAutoBlurFrames,
       clearFrames: currentArgs.clearFrames,
       frames: currentArgs.frames,
+      getFutureFrameStyle: currentArgs.getFutureFrameStyle,
       getGlobalStepBadgeSettings: currentArgs.getGlobalStepBadgeSettings,
       hasFrameForElement: currentArgs.hasFrameForElement,
       recalculateStepBadges: currentArgs.recalculateStepBadges,
       removeFrame: currentArgs.removeFrame,
+      setFutureFrameEffectMode: currentArgs.setFutureFrameEffectMode,
       syncAutoBlurFrames: currentArgs.syncAutoBlurFrames,
       syncFocusOpacity: currentArgs.syncFocusOpacity,
       updateFrame: currentArgs.updateFrame,

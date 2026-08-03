@@ -5,6 +5,7 @@ export type ToolbarPopoverMenu =
   | 'annotations-export'
   | 'capture'
   | 'full-page'
+  | 'frame-style'
   | 'mode'
   | 'scenario-mode'
   | 'scenario-project'

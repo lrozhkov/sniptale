@@ -61,7 +61,7 @@ export function createFrameBlurHandlers(args: {
 }
 
 export function createFrameFocusHandlers(args: {
-  frameId: string;
+  frameId?: string;
   localFocusSettings: FocusSettings;
   onApplyToFrame: (settings: { focusSettings?: FocusSettings }) => void;
   setLocalFocusSettings: (settings: FocusSettings) => void;
@@ -76,10 +76,12 @@ export function createFrameFocusHandlers(args: {
       const nextSettings = { ...args.localFocusSettings, opacity };
       args.setLocalFocusSettings(nextSettings);
       applyFocusSettings(nextSettings);
-      dispatchFocusOpacityChanged({
-        frameId: args.frameId,
-        opacity,
-      });
+      if (args.frameId !== undefined) {
+        dispatchFocusOpacityChanged({
+          frameId: args.frameId,
+          opacity,
+        });
+      }
     },
     handleFocusShowBorderChange: (showBorder: boolean) => {
       const nextSettings = { ...args.localFocusSettings, showBorder };

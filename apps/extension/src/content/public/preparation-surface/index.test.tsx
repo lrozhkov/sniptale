@@ -25,7 +25,9 @@ type RuntimeLayoutProps = {
   };
   toolbar: {
     aiController: unknown;
+    futureFrameStyle: unknown;
     handleTakeScreenshot: unknown;
+    setFutureFrameEffectMode: unknown;
   };
 };
 type ScreenshotControllerMockArgs = {
@@ -35,13 +37,21 @@ type ScreenshotControllerMockArgs = {
 };
 
 const runtimeMocks = vi.hoisted(() => {
+  const futureFrameStyle = {
+    blurSettings: { amount: 8, blurType: 'gaussian', showBorder: true },
+    borderSettings: { id: 'session-border' },
+    effectMode: 'border',
+    focusSettings: { opacity: 0.5, showBorder: false },
+  };
   const frameManager = {
     addFrame: vi.fn(),
     addFreeFrame: vi.fn(),
     clearFrames: vi.fn(),
     frames: [],
+    getFutureFrameStyle: vi.fn(() => futureFrameStyle),
     hasFrameForElement: vi.fn(() => false),
     removeFrame: vi.fn(),
+    setFutureFrameEffectMode: vi.fn(),
   };
   const createScenarioController = () => ({
     buildManualCapturePayload: vi.fn(),
@@ -64,6 +74,7 @@ const runtimeMocks = vi.hoisted(() => {
       buildTargetDescriptor: vi.fn(),
     })),
     frameManager,
+    futureFrameStyle,
     disableHighlighterMode: vi.fn(),
     handleTakeScreenshot: vi.fn().mockResolvedValue(undefined),
     modeState: null as ContentAppModeState | null,
@@ -231,6 +242,10 @@ it('wires screenshot, AI, dialogs, and quick-action auto-start controllers throu
         buildTargetDescriptor: expect.any(Function),
       }),
     })
+  );
+  expect(toolbarProps.futureFrameStyle).toBe(runtimeMocks.futureFrameStyle);
+  expect(toolbarProps.setFutureFrameEffectMode).toBe(
+    runtimeMocks.frameManager.setFutureFrameEffectMode
   );
   expect(runtimeMocks.useContentScreenshotAutoStart).toHaveBeenCalledWith(
     expect.objectContaining({

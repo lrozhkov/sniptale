@@ -22,12 +22,14 @@ type FrameSettingsPopoverStateArgs = {
     blurSettings?: BlurSettings;
     focusSettings?: FocusSettings;
   }) => void;
+  scope?: 'frame' | 'session';
 };
 
 export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs) {
   const session = useFrameSettingsPopoverLifecycle({
     frameId: args.frameId,
     isOpen: args.isOpen,
+    historyTransaction: (args.scope ?? 'frame') === 'frame',
     ...(args.blurSettings === undefined ? {} : { blurSettings: args.blurSettings }),
     ...(args.borderSettings === undefined ? {} : { borderSettings: args.borderSettings }),
     ...(args.focusSettings === undefined ? {} : { focusSettings: args.focusSettings }),
@@ -42,7 +44,7 @@ export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs
     setLocalBlurSettings: session.frame.applyBlurSettingsFromUser,
   });
   const focusHandlers = createFrameFocusHandlers({
-    frameId: args.frameId,
+    ...((args.scope ?? 'frame') === 'frame' ? { frameId: args.frameId } : {}),
     localFocusSettings: session.frame.localFocusSettings,
     onApplyToFrame: args.onApplyToFrame,
     setLocalFocusSettings: session.frame.applyFocusSettingsFromUser,

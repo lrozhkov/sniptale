@@ -2,9 +2,9 @@ import React, { useRef } from 'react';
 import {
   Check,
   FilePenLine,
+  Highlighter,
   MessageSquareText,
   MousePointer2,
-  Square,
   TextCursorInput,
 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
@@ -74,7 +74,7 @@ function getModeIcon(mode: ToolbarInteractionMode) {
     case 'design-review':
       return <MessageSquareText size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'highlighter':
-      return <Square size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+      return <Highlighter size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'cursor':
     default:
       return <MousePointer2 size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;

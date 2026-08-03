@@ -4,8 +4,11 @@ import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
 import type { ToolbarAutoBlurProps } from '../types';
+import type { ToolbarFutureFrameStyle } from '../types';
 import type { ToolbarMenuState } from '../state/menu';
 import { AutoBlurMenu } from './auto-blur-menu';
+import { FutureFrameStyleControls } from './frame-style';
+import type { EffectMode } from '../../../../features/highlighter/contracts';
 
 function ClearHighlightsButton(props: {
   framesCount: number;
@@ -43,6 +46,8 @@ export function ToolbarUtilityButtons(props: {
   compactMenus: boolean;
   displayMode: ContentToolbarDisplayMode;
   sidebarVisible: boolean;
+  futureFrameStyle?: ToolbarFutureFrameStyle;
+  onFutureFrameEffectModeChange?: (mode: EffectMode) => void;
 }) {
   const { autoBlur, highlighterMode, isLoading, framesCount, onClearHighlights } = props;
   const showClearHighlights = highlighterMode;
@@ -53,6 +58,13 @@ export function ToolbarUtilityButtons(props: {
 
   return (
     <ContentToolbarGroup utilities>
+      {props.futureFrameStyle && props.onFutureFrameEffectModeChange ? (
+        <FutureFrameStyleControls
+          futureFrameStyle={props.futureFrameStyle}
+          onFutureFrameEffectModeChange={props.onFutureFrameEffectModeChange}
+          toolbarMenuState={props.toolbarMenuState}
+        />
+      ) : null}
       <AutoBlurMenu
         autoBlur={autoBlur}
         compactMenus={props.compactMenus}

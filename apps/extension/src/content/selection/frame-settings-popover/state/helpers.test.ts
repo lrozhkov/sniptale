@@ -100,3 +100,26 @@ it('dispatches session focus and opacity changes through the shared event seam',
   cleanupFocus();
   cleanupOpacity();
 });
+
+it('updates only future focus settings when no existing frame owns the change', () => {
+  const focusListener = vi.fn();
+  const opacityListener = vi.fn();
+  const cleanupFocus = addSessionFocusSettingsChangedListener(focusListener);
+  const cleanupOpacity = addFocusOpacityChangedListener(opacityListener);
+  const localFocusSettings: FocusSettings = { opacity: 0.4, showBorder: false };
+  const handlers = createFrameFocusHandlers({
+    localFocusSettings,
+    onApplyToFrame: vi.fn(),
+    setLocalFocusSettings: vi.fn(),
+  });
+
+  handlers.handleFocusChange(0.8);
+
+  expect(focusListener).toHaveBeenCalledWith({
+    settings: { ...localFocusSettings, opacity: 0.8 },
+  });
+  expect(opacityListener).not.toHaveBeenCalled();
+
+  cleanupFocus();
+  cleanupOpacity();
+});

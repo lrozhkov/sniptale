@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToolbarUtilityButtons } from './utilities';
 import { useToolbarMenuState } from '../state/menu';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -17,6 +18,12 @@ let root: Root | null = null;
 function createProps() {
   return {
     framesCount: 1,
+    futureFrameStyle: {
+      blurSettings: { amount: 8, blurType: 'gaussian' as const, showBorder: true },
+      borderSettings: DEFAULT_BORDER_PRESET,
+      effectMode: 'border' as const,
+      focusSettings: { opacity: 0.5, showBorder: false },
+    },
     highlighterMode: true,
     isCursorMode: false,
     isLoading: false,
@@ -33,6 +40,7 @@ function createProps() {
     compactMenus: false,
     displayMode: 'horizontal' as const,
     onClearHighlights: vi.fn(),
+    onFutureFrameEffectModeChange: vi.fn(),
     sidebarVisible: false,
     screenshotMode: false,
     toggleNavigationLock: vi.fn(),
@@ -79,7 +87,9 @@ describe('ToolbarUtilityButtons', () => {
 
     await renderUtilities(props);
     const autoBlurButton = container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]');
-    expect(autoBlurButton?.querySelector('svg')?.getAttribute('class')).toContain('lucide-droplet');
+    expect(autoBlurButton?.querySelector('svg')?.getAttribute('class')).toContain(
+      'lucide-shield-check'
+    );
     await act(async () => {
       autoBlurButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });

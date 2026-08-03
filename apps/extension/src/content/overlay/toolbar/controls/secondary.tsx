@@ -62,6 +62,13 @@ function createUtilityButtonsProps(args: {
     displayMode: args.viewModel.derivedState.displayMode,
     sidebarVisible: args.toolbarProps.scenario?.sidebarVisible ?? false,
     ...(args.toolbarProps.autoBlur === undefined ? {} : { autoBlur: args.toolbarProps.autoBlur }),
+    ...(args.toolbarProps.futureFrameStyle === undefined ||
+    args.toolbarProps.onFutureFrameEffectModeChange === undefined
+      ? {}
+      : {
+          futureFrameStyle: args.toolbarProps.futureFrameStyle,
+          onFutureFrameEffectModeChange: args.toolbarProps.onFutureFrameEffectModeChange,
+        }),
   };
 }
 

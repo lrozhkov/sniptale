@@ -120,6 +120,7 @@ function useFrameSettingsDefaultsLoad(
 function syncFrameSettingsPopoverOpenState(
   frameId: string,
   isOpen: boolean,
+  historyTransaction: boolean,
   lifecycleRef: FrameSettingsLifecycleRef,
   setDraft: SetFrameSettingsDraft
 ): void {
@@ -127,7 +128,9 @@ function syncFrameSettingsPopoverOpenState(
   const transactionKey = `frame-settings:${frameId}`;
 
   if (isOpen && !lifecycle.previousOpen) {
-    pagePreparationHistory.beginTransaction(transactionKey);
+    if (historyTransaction) {
+      pagePreparationHistory.beginTransaction(transactionKey);
+    }
     lifecycle.dirty.blur = false;
     lifecycle.dirty.focus = false;
     setDraft((current) => ({
@@ -137,7 +140,7 @@ function syncFrameSettingsPopoverOpenState(
       localFocusSettings: { ...(lifecycle.source.focus ?? getDefaultFocusSettings()) },
       visiblePresetIds: getEnabledPresetIds(current.globalSettings),
     }));
-  } else if (!isOpen && lifecycle.previousOpen) {
+  } else if (!isOpen && lifecycle.previousOpen && historyTransaction) {
     pagePreparationHistory.commitTransaction(transactionKey);
   }
 
@@ -147,19 +150,20 @@ function syncFrameSettingsPopoverOpenState(
 function useFrameSettingsOpenTransaction(
   frameId: string,
   isOpen: boolean,
+  historyTransaction: boolean,
   lifecycleRef: FrameSettingsLifecycleRef,
   setDraft: SetFrameSettingsDraft
 ): void {
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    if (!historyTransaction) return;
+    return () => {
       pagePreparationHistory.cancelTransaction(`frame-settings:${frameId}`);
-    },
-    [frameId]
-  );
+    };
+  }, [frameId, historyTransaction]);
 
   useEffect(() => {
-    syncFrameSettingsPopoverOpenState(frameId, isOpen, lifecycleRef, setDraft);
-  }, [frameId, isOpen, lifecycleRef, setDraft]);
+    syncFrameSettingsPopoverOpenState(frameId, isOpen, historyTransaction, lifecycleRef, setDraft);
+  }, [frameId, historyTransaction, isOpen, lifecycleRef, setDraft]);
 }
 
 export function useFrameSettingsPopoverLifecycle(args: {
@@ -167,6 +171,7 @@ export function useFrameSettingsPopoverLifecycle(args: {
   borderSettings?: BorderPreset;
   focusSettings?: FocusSettings;
   frameId: string;
+  historyTransaction?: boolean;
   isOpen: boolean;
 }) {
   const [draft, setDraft] = useState(createInitialDraft);
@@ -178,7 +183,13 @@ export function useFrameSettingsPopoverLifecycle(args: {
   };
 
   useFrameSettingsDefaultsLoad(args.isOpen, lifecycleRef, setDraft);
-  useFrameSettingsOpenTransaction(args.frameId, args.isOpen, lifecycleRef, setDraft);
+  useFrameSettingsOpenTransaction(
+    args.frameId,
+    args.isOpen,
+    args.historyTransaction ?? true,
+    lifecycleRef,
+    setDraft
+  );
 
   return {
     catalog: {

@@ -1,6 +1,12 @@
 import type { CaptureActionType, ContentToolbarDisplayMode } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ToolbarMenuState } from './state/menu';
+import type {
+  BlurSettings,
+  BorderPreset,
+  EffectMode,
+  FocusSettings,
+} from '../../../features/highlighter/contracts';
 
 export type ToolbarViewportSelection = {
   presetId?: string;
@@ -49,6 +55,13 @@ export interface ToolbarAutoBlurProps {
   onToggleAutoApply: () => Promise<void>;
 }
 
+export interface ToolbarFutureFrameStyle {
+  blurSettings: BlurSettings;
+  borderSettings: BorderPreset;
+  effectMode: EffectMode;
+  focusSettings: FocusSettings;
+}
+
 export interface ToolbarProps {
   captureAction?: CaptureActionType;
   onCaptureActionChange?: (action: CaptureActionType) => void;
@@ -90,6 +103,8 @@ export interface ToolbarProps {
   onViewportChange?: (viewport: { width: number; height: number } | null) => void;
   mutateViewport?: (viewport: ToolbarViewportSelection) => Promise<void>;
   framesCount?: number;
+  futureFrameStyle?: ToolbarFutureFrameStyle;
+  onFutureFrameEffectModeChange?: (mode: EffectMode) => void;
   scenario?: {
     byClickDisabled: boolean;
     captureMode: 'manual' | 'by-click';

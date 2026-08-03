@@ -22,4 +22,5 @@ export interface FrameSettingsPopoverProps {
   isOpen: boolean;
   onApplyToFrame: (settings: FrameSettingsPopoverApplySettings) => void;
   onClose: () => void;
+  scope?: 'frame' | 'session';
 }

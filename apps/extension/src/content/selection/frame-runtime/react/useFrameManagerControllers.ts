@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { FrameData } from '../../../../features/highlighter/contracts';
+import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
 import type { InteractiveFrameComponent } from '../roots/component';
 import type {
   FrameManagerRefs,
@@ -12,6 +12,7 @@ import { useFrameManagerPublicResult } from './useFrameManagerPublicResult';
 import { useFrameManagerRuntimeSyncEffects } from './useFrameManagerRuntimeSyncEffects';
 import { useFrameManagerSessionEffects } from './useFrameManagerSessionEffects';
 import { useStepBadgeControllers } from '../manager/step-badge/controllers';
+import { getFrameSessionBorderPreset } from '../session/border-preset';
 
 /**
  * Builds the internal frame manager controllers and side effects.
@@ -39,6 +40,7 @@ export function useFrameManagerControllers(params: {
     recalculateStepBadgesRef
   );
   const getGlobalStepBadgeSettings = useGlobalStepBadgeSettingsGetter(refs);
+  const frameSessionStyle = useFrameSessionStyle(refs);
 
   useFrameManagerOwnedEffects({
     frames,
@@ -55,6 +57,7 @@ export function useFrameManagerControllers(params: {
 
   return useOwnedFrameManagerPublicResult({
     frames,
+    frameSessionStyle,
     getGlobalStepBadgeSettings,
     hasFrameForElement,
     mutations,
@@ -66,6 +69,7 @@ export function useFrameManagerControllers(params: {
 
 function useOwnedFrameManagerPublicResult(args: {
   frames: FrameData[];
+  frameSessionStyle: ReturnType<typeof useFrameSessionStyle>;
   getGlobalStepBadgeSettings: () => FrameManagerRefs['globalStepBadgeSettingsRef']['current'];
   hasFrameForElement: ReturnType<typeof useFrameManagerMutations>['hasFrameForElement'];
   mutations: ReturnType<typeof useFrameManagerMutations>['mutations'];
@@ -82,6 +86,7 @@ function useOwnedFrameManagerPublicResult(args: {
     clearAutoBlurFrames: args.mutations.clearAutoBlurFrames,
     clearFrames: args.mutations.clearFrames,
     frames: args.frames,
+    getFutureFrameStyle: args.frameSessionStyle.getFutureFrameStyle,
     hasFrameForElement: args.hasFrameForElement,
     getGlobalStepBadgeSettings: args.getGlobalStepBadgeSettings,
     updateFrameStepBadge: args.updateFrameStepBadge,
@@ -92,7 +97,29 @@ function useOwnedFrameManagerPublicResult(args: {
     syncAutoBlurFrames: args.mutations.syncAutoBlurFrames,
     updateFrame: args.mutations.updateFrame,
     updateFrameEffect: args.mutations.updateFrameEffect,
+    setFutureFrameEffectMode: args.frameSessionStyle.setFutureFrameEffectMode,
   });
+}
+
+function useFrameSessionStyle(refs: FrameManagerRefs) {
+  const getFutureFrameStyle = useCallback(
+    () => ({
+      effectMode: refs.globalEffectModeRef.current,
+      borderSettings: getFrameSessionBorderPreset(),
+      blurSettings: { ...refs.sessionSettingsRefs.blurSettings.current },
+      focusSettings: { ...refs.sessionSettingsRefs.focusSettings.current },
+    }),
+    [refs.globalEffectModeRef, refs.sessionSettingsRefs]
+  );
+  const setFutureFrameEffectMode = useCallback(
+    (mode: EffectMode) => {
+      refs.globalEffectModeRef.current = mode;
+      refs.sessionSettingsRefs.defaultsInitialized.current = true;
+    },
+    [refs.globalEffectModeRef, refs.sessionSettingsRefs]
+  );
+
+  return { getFutureFrameStyle, setFutureFrameEffectMode };
 }
 
 function useGlobalStepBadgeSettingsGetter(refs: FrameManagerRefs) {
