@@ -180,16 +180,16 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Allow the extension on all sites so the toolbar can return after navigation',
   },
   hideToolbar: {
-    ru: 'Скрыть панель',
-    en: 'Hide toolbar',
+    ru: 'Свернуть панель',
+    en: 'Collapse toolbar',
   },
   screenshotDisable: {
-    ru: 'Выйти из режима снимка',
-    en: 'Exit screenshot mode',
+    ru: 'Закрыть панель',
+    en: 'Close toolbar',
   },
   screenshotDisableError: {
-    ru: 'Не удалось выйти из режима снимка. Повторите попытку.',
-    en: 'Could not exit screenshot mode. Try again.',
+    ru: 'Не удалось закрыть панель. Повторите попытку.',
+    en: 'Could not close the toolbar. Try again.',
   },
   screenshotEnable: {
     ru: 'Перейти в режим снимка',

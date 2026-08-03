@@ -126,12 +126,12 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Allow the extension on all sites so the toolbar can return after navigation',
   },
   'content.toolbar.hideToolbar': {
-    ru: 'Скрыть панель',
-    en: 'Hide toolbar',
+    ru: 'Свернуть панель',
+    en: 'Collapse toolbar',
   },
   'content.toolbar.screenshotDisable': {
-    ru: 'Выйти из режима снимка',
-    en: 'Exit screenshot mode',
+    ru: 'Закрыть панель',
+    en: 'Close toolbar',
   },
   'content.autoBlur.autoApplyEnableHint': {
     ru: 'Автоматически размывать найденные данные перед каждым снимком',

@@ -18,6 +18,12 @@ describe('frame style catalog styles', () => {
     );
   });
 
+  it('keeps the frame-and-fill switch aligned with its option title', () => {
+    expect(stylesheet).toMatch(
+      /\.sniptale-frame-decoration-toggle-row\s*\{[^}]*align-items:\s*flex-start;/s
+    );
+  });
+
   it('reveals unboxed actions on row interaction', () => {
     expect(stylesheet).toContain(
       '.sniptale-frame-style-preset-row:hover .sniptale-frame-style-preset-actions'

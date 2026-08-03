@@ -93,6 +93,10 @@ vi.mock('../../sections/video-quality-profiles', () => {
   settingsPageDelayMocks.loadedSectionModules.push('video');
   return { VideoQualityProfilesSection: markerComponent('video-section') };
 });
+vi.mock('../../sections/voice-input', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('voice-input');
+  return { VoiceInputSettingsSection: markerComponent('voice-input-section') };
+});
 vi.mock('../../sections/native-app', () => {
   settingsPageDelayMocks.loadedSectionModules.push('native');
   return { NativeAppSection: markerComponent('native-section') };
@@ -204,6 +208,7 @@ describe('SettingsPage delayed loading', () => {
         'templates',
         'quickactions',
         'video',
+        'voice-input',
         'native',
         'permissions',
         'privacy',

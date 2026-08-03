@@ -9,10 +9,10 @@ import {
   ProductGlassPresetMeta,
   ProductGlassPresetPreview,
   ProductGlassRange,
-  ProductGlassRangeMeta,
   ProductGlassSwitch,
   ProductGlassToggleRow,
 } from '@sniptale/ui/product-glass-controls';
+import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import type {
   BlurSettings,
@@ -40,6 +40,7 @@ function BlurTypeIcon(props: { iconName: 'droplet' | 'waves' | 'square' }) {
 }
 
 export function FrameSettingsPopoverContent(props: {
+  compact?: boolean;
   effectMode: EffectMode;
   globalSettings: HighlighterSettings;
   handleBlurChange: (amount: number) => void;
@@ -70,6 +71,15 @@ export function FrameSettingsPopoverContent(props: {
 
   return (
     <>
+      <ProductToolbarMenuGroupLabel>
+        {translate(
+          props.effectMode === 'border'
+            ? 'content.interactiveFrame.effectBorder'
+            : props.effectMode === 'blur'
+              ? 'content.interactiveFrame.effectBlur'
+              : 'content.interactiveFrame.effectFocus'
+        )}
+      </ProductToolbarMenuGroupLabel>
       <FrameBorderSection
         borderPresets={props.globalSettings.borderPresets}
         decorationEnabled={decorationEnabled}
@@ -80,6 +90,7 @@ export function FrameSettingsPopoverContent(props: {
         handleTogglePresetEnabled={props.handleTogglePresetEnabled}
         pendingPresetIds={props.pendingPresetIds}
         selectedPresetId={props.selectedPresetId}
+        showDecorationHint={!props.compact}
         {...(handleDecorationToggle === undefined ? {} : { handleDecorationToggle })}
       />
 
@@ -112,6 +123,7 @@ function FrameBorderSection(props: {
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
   pendingPresetIds: ReadonlySet<string>;
   selectedPresetId: string;
+  showDecorationHint: boolean;
 }) {
   const locale = useAppLocale();
   const enabledPresetCount = props.borderPresets.filter(
@@ -124,8 +136,13 @@ function FrameBorderSection(props: {
     >
       {props.effectMode === 'border' ? null : (
         <ProductGlassToggleRow
+          className="sniptale-frame-decoration-toggle-row"
           title={translate('content.overlayControls.showBorderTitle')}
-          hint={translate('content.overlayControls.showBorderHint')}
+          hint={
+            props.showDecorationHint
+              ? translate('content.overlayControls.showBorderHint')
+              : undefined
+          }
           control={
             <ProductGlassSwitch
               onClick={() => props.handleDecorationToggle?.(!props.decorationEnabled)}
@@ -256,11 +273,6 @@ function FrameBlurStrengthSection(props: {
         value={props.amount}
         onChange={(event) => props.handleBlurChange(parseInt(event.target.value, 10))}
       />
-      <ProductGlassRangeMeta>
-        <span>1</span>
-        <span>13</span>
-        <span>25</span>
-      </ProductGlassRangeMeta>
     </ContentPopoverSection>
   );
 }
@@ -312,11 +324,6 @@ function FrameFocusSection(props: {
         value={props.localFocusSettings.opacity * 100}
         onChange={(event) => props.handleFocusChange(parseInt(event.target.value, 10) / 100)}
       />
-      <ProductGlassRangeMeta>
-        <span>10%</span>
-        <span>55%</span>
-        <span>100%</span>
-      </ProductGlassRangeMeta>
     </ContentPopoverSection>
   );
 }

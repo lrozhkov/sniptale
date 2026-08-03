@@ -23,6 +23,7 @@ function getEffectLabel(mode: EffectMode): string {
 }
 
 export function FutureFrameStyleControls(props: {
+  compactMenus?: boolean;
   futureFrameStyle: ToolbarFutureFrameStyle;
   onFutureFrameEffectModeChange: (mode: EffectMode) => void;
   toolbarMenuState: ToolbarMenuState;
@@ -75,6 +76,7 @@ export function FutureFrameStyleControls(props: {
         anchorEl={activeButtonRef.current}
         blurSettings={style.blurSettings}
         borderSettings={style.borderSettings}
+        compact={props.compactMenus ?? false}
         effectMode={style.effectMode}
         focusSettings={style.focusSettings}
         frameId={FUTURE_FRAME_ID}

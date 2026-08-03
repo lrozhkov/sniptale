@@ -42,6 +42,7 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
           'sniptale-glass-popover',
           'sniptale-content-popover',
           'sniptale-content-popover--toolbar-menu',
+          props.compact ? 'sniptale-content-popover--compact' : '',
         ].join(' ')}
         data-sniptale-activation-bridge="defer"
         data-theme={state.surface.portalTheme ?? undefined}
@@ -52,6 +53,7 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
       >
         <div className="sniptale-content-popover-body">
           <FrameSettingsPopoverContent
+            compact={props.compact ?? false}
             effectMode={props.effectMode}
             globalSettings={{
               ...state.settings.global,

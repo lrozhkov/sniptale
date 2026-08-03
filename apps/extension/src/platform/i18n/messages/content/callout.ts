@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const contentCalloutMessages = defineMessageSource({
+  settingsTitle: {
+    ru: 'Настройки комментария',
+    en: 'Comment settings',
+  },
   variantBubble: {
     ru: 'Облачко',
     en: 'Bubble',

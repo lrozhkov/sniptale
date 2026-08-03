@@ -37,6 +37,7 @@ function createStyle(effectMode: ToolbarFutureFrameStyle['effectMode']): Toolbar
 }
 
 function Harness(props: {
+  compactMenus?: boolean;
   futureFrameStyle: ToolbarFutureFrameStyle;
   onFutureFrameEffectModeChange: (mode: ToolbarFutureFrameStyle['effectMode']) => void;
 }) {
@@ -46,7 +47,8 @@ function Harness(props: {
 
 function renderControls(
   futureFrameStyle: ToolbarFutureFrameStyle,
-  onFutureFrameEffectModeChange: (mode: ToolbarFutureFrameStyle['effectMode']) => void
+  onFutureFrameEffectModeChange: (mode: ToolbarFutureFrameStyle['effectMode']) => void,
+  compactMenus = false
 ) {
   if (!container) {
     container = document.createElement('div');
@@ -56,6 +58,7 @@ function renderControls(
   act(() => {
     root?.render(
       <Harness
+        compactMenus={compactMenus}
         futureFrameStyle={futureFrameStyle}
         onFutureFrameEffectModeChange={onFutureFrameEffectModeChange}
       />
@@ -74,6 +77,12 @@ afterEach(() => {
   container?.remove();
   container = null;
   vi.unstubAllGlobals();
+});
+
+it('forwards compact menu presentation to future frame settings', () => {
+  renderControls(createStyle('blur'), vi.fn(), true);
+
+  expect(popoverMocks.props?.['compact']).toBe(true);
 });
 
 it('switches only the future mode and opens settings on the active effect', () => {

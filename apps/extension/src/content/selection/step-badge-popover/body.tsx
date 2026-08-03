@@ -1,4 +1,5 @@
 import { ProductGlassDestructiveButton } from '@sniptale/ui/product-glass-controls';
+import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
 import { translate } from '../../../platform/i18n';
 import type {
   StepBadgeAnchor,
@@ -38,6 +39,9 @@ export function StepBadgePopoverContent(props: {
 
   return (
     <>
+      <ProductToolbarMenuGroupLabel>
+        {translate('content.stepBadge.settingsTitle')}
+      </ProductToolbarMenuGroupLabel>
       <StepBadgePositionSection
         onAnchorChange={props.onAnchorChange}
         onOffsetToggle={props.onOffsetToggle}

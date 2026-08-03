@@ -15,6 +15,7 @@ export interface FrameSettingsPopoverProps {
   anchorEl: HTMLElement | null;
   blurSettings?: BlurSettings;
   borderSettings?: BorderPreset;
+  compact?: boolean;
   effectMode: EffectMode;
   focusSettings?: FocusSettings;
   frameId: string;

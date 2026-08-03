@@ -3,8 +3,37 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { CalloutAppearanceSection, CalloutDeleteButton, CalloutTypographySection } from './views';
+import { CalloutSettingsPopoverContent } from './body';
 
 describe('CalloutAppearanceSection', () => {
+  it('renders the canonical comment settings menu title', () => {
+    const markup = renderToStaticMarkup(
+      <CalloutSettingsPopoverContent
+        handleDelete={vi.fn()}
+        handleSettingChange={vi.fn()}
+        isTextOnly={false}
+        localSettings={{
+          anchor: 'top-center',
+          bgColor: '#1f2937',
+          enabled: true,
+          fontFamily: 'sans',
+          fontSize: 16,
+          fontWeight: 'normal',
+          htmlContent: 'Comment',
+          maxWidth: 300,
+          side: 'auto',
+          tailSize: 12,
+          textColor: '#ffffff',
+          variant: 'bubble',
+        }}
+        variantOptions={[{ value: 'bubble', label: 'Bubble' }]}
+      />
+    );
+
+    expect(markup).toContain('sniptale-toolbar-menu-title');
+    expect(markup).toContain('Настройки комментария');
+  });
+
   it('renders inside the shared content popover section contract', () => {
     const markup = renderToStaticMarkup(
       <CalloutAppearanceSection

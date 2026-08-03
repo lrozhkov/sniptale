@@ -3,7 +3,6 @@ import {
   ProductGlassInput,
   ProductGlassMiniButton,
   ProductGlassRange,
-  ProductGlassRangeMeta,
   ProductGlassRow,
   ProductGlassSwitch,
   ProductGlassToggleRow,
@@ -82,11 +81,6 @@ export function StepBadgeSizeSection(props: {
           props.onSizeLevelChange(Number(event.target.value) as StepBadgeSizeLevel)
         }
       />
-      <ProductGlassRangeMeta>
-        <span>S</span>
-        <span>M</span>
-        <span>L</span>
-      </ProductGlassRangeMeta>
     </ContentPopoverSection>
   );
 }

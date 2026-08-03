@@ -60,6 +60,7 @@ export function ToolbarUtilityButtons(props: {
     <ContentToolbarGroup utilities>
       {props.futureFrameStyle && props.onFutureFrameEffectModeChange ? (
         <FutureFrameStyleControls
+          compactMenus={props.compactMenus}
           futureFrameStyle={props.futureFrameStyle}
           onFutureFrameEffectModeChange={props.onFutureFrameEffectModeChange}
           toolbarMenuState={props.toolbarMenuState}

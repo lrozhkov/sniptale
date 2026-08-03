@@ -12,6 +12,10 @@
   padding-inline: 0;
 }
 
+.sniptale-frame-decoration-toggle-row {
+  align-items: flex-start;
+}
+
 .sniptale-frame-settings-popover .sniptale-glass-preset-item {
   border-color: transparent;
   background: transparent;

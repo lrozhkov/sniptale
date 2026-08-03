@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const contentStepBadgeMessages = defineMessageSource({
+  settingsTitle: {
+    ru: 'Настройки нумерации',
+    en: 'Numbering settings',
+  },
   tooltipPrefix: {
     ru: 'Шаг',
     en: 'Step',
