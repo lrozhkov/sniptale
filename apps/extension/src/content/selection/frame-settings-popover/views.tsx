@@ -135,7 +135,7 @@ function FrameBorderSection(props: {
         />
       )}
       {props.decorationEnabled ? (
-        <ProductGlassPresetList>
+        <ProductGlassPresetList scrollable>
           {props.borderPresets.map((preset) => {
             const displayName = getBorderPresetDisplayName(preset, locale);
             const isEnabled = preset.enabled !== false;

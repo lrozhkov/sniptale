@@ -82,7 +82,77 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('frame popover positioning', () => {
+describe('main toolbar frame popover positioning', () => {
+  it('opens below the complete horizontal main toolbar without overlapping it', () => {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sniptale-toolbar';
+    toolbar.dataset['displayMode'] = 'horizontal';
+    setRect(toolbar, new DOMRect(100, 100, 420, 48));
+    document.body.append(toolbar);
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(220, 108, 32, 32));
+    toolbar.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['left'])).toBe(220);
+    expect(Number(popover.dataset['top'])).toBe(158);
+  });
+
+  it('opens beside the complete vertical main toolbar without overlapping it', () => {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sniptale-toolbar';
+    toolbar.dataset['displayMode'] = 'vertical';
+    setRect(toolbar, new DOMRect(100, 80, 48, 360));
+    document.body.append(toolbar);
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(108, 180, 32, 32));
+    toolbar.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['left'])).toBe(158);
+    expect(Number(popover.dataset['top'])).toBe(180);
+  });
+
+  it('opens above a horizontal main toolbar when there is no room below it', () => {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sniptale-toolbar';
+    toolbar.dataset['displayMode'] = 'horizontal';
+    setRect(toolbar, new DOMRect(100, 530, 420, 48));
+    document.body.append(toolbar);
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(220, 538, 32, 32));
+    toolbar.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['left'])).toBe(220);
+    expect(Number(popover.dataset['top'])).toBe(440);
+  });
+
+  it('opens left of a vertical main toolbar when there is no room on its right', () => {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sniptale-toolbar';
+    toolbar.dataset['displayMode'] = 'vertical';
+    setRect(toolbar, new DOMRect(730, 80, 48, 360));
+    document.body.append(toolbar);
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(738, 180, 32, 32));
+    toolbar.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['left'])).toBe(560);
+    expect(Number(popover.dataset['top'])).toBe(180);
+  });
+});
+
+describe('frame toolbar popover positioning', () => {
   it('keeps the popover outside both the selected frame and its stable toolbar', () => {
     const toolbar = document.createElement('div');
     toolbar.className = 'sniptale-toolbar-portal-wrapper';

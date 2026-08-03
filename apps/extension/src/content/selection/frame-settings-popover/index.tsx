@@ -35,7 +35,12 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
     <>
       <div
         ref={state.surface.popoverRef}
-        className="sniptale-frame-settings-popover sniptale-glass-popover sniptale-content-popover"
+        className={[
+          'sniptale-frame-settings-popover',
+          'sniptale-glass-popover',
+          'sniptale-content-popover',
+          'sniptale-content-popover--toolbar-menu',
+        ].join(' ')}
         data-sniptale-activation-bridge="defer"
         data-theme={state.surface.portalTheme ?? undefined}
         data-frame-id={props.frameId}

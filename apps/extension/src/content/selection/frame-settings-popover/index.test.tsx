@@ -284,6 +284,7 @@ describe('FrameSettingsPopover loading state', () => {
     const popover = document.querySelector<HTMLElement>('.sniptale-frame-settings-popover');
     expect(popover?.classList).toContain('sniptale-glass-popover');
     expect(popover?.classList).toContain('sniptale-content-popover');
+    expect(popover?.classList).toContain('sniptale-content-popover--toolbar-menu');
     expect(popover?.dataset['frameId']).toBe('frame-1');
     expect(popover?.dataset['theme']).toBe('dark');
     expect(popover?.dataset['sniptaleActivationBridge']).toBe('defer');

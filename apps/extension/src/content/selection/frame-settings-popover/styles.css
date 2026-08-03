@@ -1,3 +1,7 @@
+.sniptale-frame-settings-popover {
+  --sniptale-preset-list-max-height: min(180px, max(72px, calc(100vh - 360px)));
+}
+
 .sniptale-frame-settings-popover .sniptale-content-popover-section-label {
   justify-content: flex-start;
   padding-inline: 0;
@@ -5,7 +9,12 @@
 }
 
 .sniptale-frame-style-section > .sniptale-content-popover-section-label {
-  padding-inline: 11px;
+  padding-inline: 0;
+}
+
+.sniptale-frame-settings-popover .sniptale-glass-preset-item {
+  border-color: transparent;
+  background: transparent;
 }
 
 .sniptale-frame-style-preset-row {
@@ -87,8 +96,8 @@
   justify-content: center;
   gap: 7px;
   padding: 6px 10px;
-  border: 1px solid var(--sniptale-color-border-soft);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--sniptale-color-text-primary);
   font: inherit;

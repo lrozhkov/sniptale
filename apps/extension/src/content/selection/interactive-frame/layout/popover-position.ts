@@ -28,6 +28,18 @@ function getHiddenStyle(): CSSProperties {
   };
 }
 
+function getMainToolbar(anchorEl: HTMLElement | null): {
+  displayMode: 'horizontal' | 'vertical';
+  rect: FloatingRect;
+} | null {
+  const toolbar = anchorEl?.closest<HTMLElement>('.sniptale-toolbar');
+  if (!toolbar) return null;
+  return {
+    displayMode: toolbar.dataset['displayMode'] === 'vertical' ? 'vertical' : 'horizontal',
+    rect: toRect(toolbar.getBoundingClientRect()),
+  };
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
 }
@@ -91,6 +103,76 @@ function calculateCanonicalPopoverRect(params: {
   return { x, y, width, height };
 }
 
+function isInsideViewport(
+  rect: FloatingRect,
+  viewport: { width: number; height: number }
+): boolean {
+  return (
+    rect.x >= VIEWPORT_MARGIN &&
+    rect.y >= VIEWPORT_MARGIN &&
+    rect.x + rect.width <= viewport.width - VIEWPORT_MARGIN &&
+    rect.y + rect.height <= viewport.height - VIEWPORT_MARGIN
+  );
+}
+
+function calculateMainToolbarPopoverRect(params: {
+  anchorRect: FloatingRect;
+  displayMode: 'horizontal' | 'vertical';
+  size: { width: number; height: number };
+  toolbarRect: FloatingRect;
+  viewport: { width: number; height: number };
+}): FloatingRect {
+  const width = Math.min(
+    params.size.width,
+    Math.max(0, params.viewport.width - VIEWPORT_MARGIN * 2)
+  );
+  const height = params.size.height;
+  const horizontalX = clamp(
+    params.anchorRect.x,
+    VIEWPORT_MARGIN,
+    params.viewport.width - width - VIEWPORT_MARGIN
+  );
+  const verticalY = clamp(
+    params.anchorRect.y,
+    VIEWPORT_MARGIN,
+    params.viewport.height - height - VIEWPORT_MARGIN
+  );
+  const candidates = {
+    down: {
+      x: horizontalX,
+      y: params.toolbarRect.y + params.toolbarRect.height + POPOVER_GAP,
+      width,
+      height,
+    },
+    up: {
+      x: horizontalX,
+      y: params.toolbarRect.y - POPOVER_GAP - height,
+      width,
+      height,
+    },
+    right: {
+      x: params.toolbarRect.x + params.toolbarRect.width + POPOVER_GAP,
+      y: verticalY,
+      width,
+      height,
+    },
+    left: {
+      x: params.toolbarRect.x - POPOVER_GAP - width,
+      y: verticalY,
+      width,
+      height,
+    },
+  } satisfies Record<string, FloatingRect>;
+  const orderedCandidates =
+    params.displayMode === 'vertical'
+      ? [candidates.right, candidates.left, candidates.down, candidates.up]
+      : [candidates.down, candidates.up, candidates.right, candidates.left];
+  return (
+    orderedCandidates.find((candidate) => isInsideViewport(candidate, params.viewport)) ??
+    orderedCandidates[0]!
+  );
+}
+
 export function useFramePopoverPosition(params: {
   anchorEl: HTMLElement | null;
   fallbackSize: { width: number; height: number };
@@ -144,9 +226,11 @@ export function useFramePopoverPosition(params: {
     };
     const observer = new ResizeObserver(updateAfterLayout);
     observer.observe(popover);
-    const toolbar = queryAllContentUiElements('.sniptale-toolbar-portal-wrapper').find(
-      (element) => element instanceof HTMLElement && element.dataset['frameId'] === params.frameId
-    );
+    const toolbar =
+      params.anchorEl?.closest('.sniptale-toolbar') ??
+      queryAllContentUiElements('.sniptale-toolbar-portal-wrapper').find(
+        (element) => element instanceof HTMLElement && element.dataset['frameId'] === params.frameId
+      );
     if (toolbar) observer.observe(toolbar);
     return () => {
       observer.disconnect();
@@ -172,13 +256,23 @@ export function useFramePopoverPosition(params: {
     popover && popover.offsetWidth > 0 && popover.offsetHeight > 0
       ? { width: popover.offsetWidth, height: popover.offsetHeight }
       : params.fallbackSize;
-  const rect = calculateCanonicalPopoverRect({
-    anchorRect: activePlacementSession.anchorRect,
-    preferSidePlacement: activePlacementSession.preferSidePlacement,
-    surfaceRect: activePlacementSession.surfaceRect,
-    size,
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-  });
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const mainToolbar = getMainToolbar(params.anchorEl);
+  const rect = mainToolbar
+    ? calculateMainToolbarPopoverRect({
+        anchorRect: toRect(params.anchorEl.getBoundingClientRect()),
+        displayMode: mainToolbar.displayMode,
+        size,
+        toolbarRect: mainToolbar.rect,
+        viewport,
+      })
+    : calculateCanonicalPopoverRect({
+        anchorRect: activePlacementSession.anchorRect,
+        preferSidePlacement: activePlacementSession.preferSidePlacement,
+        surfaceRect: activePlacementSession.surfaceRect,
+        size,
+        viewport,
+      });
   return {
     position: 'fixed',
     top: rect.y,

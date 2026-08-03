@@ -75,6 +75,7 @@ describe('FrameSettingsPopoverContent', () => {
     const markup = renderContent('border');
 
     expect(markup).toContain('sniptale-frame-style-section');
+    expect(markup).toContain('sniptale-glass-preset-list--scroll');
     expect(markup).toContain('sniptale-frame-style-preset-actions');
     expect(markup).toContain(translate('content.overlayControls.configureFrameStyle'));
     expect(markup).toContain(translate('content.overlayControls.hideFrameStyle'));
