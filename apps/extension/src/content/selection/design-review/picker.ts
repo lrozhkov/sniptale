@@ -14,7 +14,11 @@ import {
   getViewportClientPoint,
 } from '../../platform/frame';
 import { resolvePagePreparationElement } from '../../parser/page-preparation/target';
-import { isTrustedKeyboardEvent, isTrustedMouseEvent } from '../../platform/trusted-events';
+import {
+  isTrustedKeyboardEvent,
+  isTrustedMouseEvent,
+  isTrustedPointerEvent,
+} from '../../platform/trusted-events';
 import { mountDesignReviewCursor } from './cursor';
 import { hideDesignReviewFrame, removeDesignReviewFrame, showDesignReviewFrame } from './frame';
 import { addInaccessibleIframeSelectionListener } from './inaccessible-iframe';
@@ -39,6 +43,7 @@ interface DesignReviewPickerArgs {
 
 interface DesignReviewPickerInteractionState {
   framedElement: Element | null;
+  inspectorPointerGestureStarted: boolean;
   selectedElement: Element | null;
 }
 
@@ -163,6 +168,7 @@ function refreshPickerFrame(state: DesignReviewPickerInteractionState): void {
 function dismissPickerSelection(state: DesignReviewPickerInteractionState): void {
   state.selectedElement = null;
   state.framedElement = null;
+  state.inspectorPointerGestureStarted = false;
   hideDesignReviewFrame();
 }
 
@@ -171,6 +177,7 @@ function selectPickerSelection(
   args: DesignReviewPickerArgs,
   selection: DesignReviewSelection
 ): void {
+  state.inspectorPointerGestureStarted = false;
   state.selectedElement = selection.snapshot.element;
   state.framedElement = state.selectedElement;
   refreshPickerFrame(state);
@@ -214,6 +221,8 @@ function handlePickerClick(
   iframe?: HTMLIFrameElement
 ): void {
   if (!isTrustedMouseEvent(event)) return;
+  const inspectorPointerGestureStarted = state.inspectorPointerGestureStarted;
+  state.inspectorPointerGestureStarted = false;
   if (!state.selectedElement) {
     const selection = resolveSelection(event, iframe);
     if (!selection) return;
@@ -221,7 +230,7 @@ function handlePickerClick(
     claimPageClick(event);
     return;
   }
-  if (isInspectorInteractionEvent(event)) return;
+  if (isInspectorInteractionEvent(event) || inspectorPointerGestureStarted) return;
 
   const contentOwned = isContentOwnedEvent(event);
   const dismissed = args.onInspectorDismissRequested();
@@ -233,6 +242,16 @@ function handlePickerClick(
     refreshPickerFrame(state);
   }
   if (!contentOwned || !dismissed) claimPageClick(event);
+}
+
+function handlePickerPointerDown(
+  state: DesignReviewPickerInteractionState,
+  event: PointerEvent
+): void {
+  if (!isTrustedPointerEvent(event)) return;
+  state.inspectorPointerGestureStarted = Boolean(
+    state.selectedElement && isInspectorInteractionEvent(event)
+  );
 }
 
 function handleInaccessibleIframeSelection(
@@ -255,6 +274,7 @@ function handleInaccessibleIframeSelection(
 export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignReviewPickerRuntime {
   const state: DesignReviewPickerInteractionState = {
     framedElement: null,
+    inspectorPointerGestureStarted: false,
     selectedElement: null,
   };
   const cleanupCursor = mountDesignReviewCursor();
@@ -271,6 +291,11 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   const cleanupClick = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'click',
     (event, iframe) => handlePickerClick(state, args, event, iframe),
+    { capture: true }
+  );
+  const cleanupPointerDown = addEventListenerToAllWindowsDynamic<PointerEvent>(
+    'pointerdown',
+    (event) => handlePickerPointerDown(state, event),
     { capture: true }
   );
   const cleanupScroll = addEventListenerToAllWindowsDynamic<Event>(
@@ -317,6 +342,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
       cleanupMove();
       cleanupLeave();
       cleanupClick();
+      cleanupPointerDown();
       cleanupKeydown();
       cleanupScroll();
       cleanupResize();

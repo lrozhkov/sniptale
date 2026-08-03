@@ -15,6 +15,7 @@ vi.mock('../../platform/trusted-events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/trusted-events')>()),
   isTrustedKeyboardEvent: vi.fn(() => true),
   isTrustedMouseEvent: vi.fn(() => true),
+  isTrustedPointerEvent: vi.fn(() => true),
 }));
 
 import { startDesignReviewPicker, type DesignReviewPickerRuntime } from './picker';
@@ -213,6 +214,38 @@ it('keeps inspector interactions inside the popover without requesting dismissal
 
   expect(onInspectorDismissRequested).toHaveBeenCalledOnce();
   expect(outsideClick.defaultPrevented).toBe(false);
+});
+
+it('keeps the inspector open when text selection starts inside and releases outside', () => {
+  const contentHost = document.createElement('div');
+  const contentRoot = contentHost.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(contentRoot);
+  document.body.append(contentHost);
+  const popover = document.createElement('aside');
+  popover.dataset['ui'] = 'content.design-review.popover';
+  const textarea = document.createElement('textarea');
+  popover.append(textarea);
+  contentRoot.append(popover);
+  const selected = makeVisible(document.createElement('button'));
+  const outside = makeVisible(document.createElement('article'));
+  document.body.append(selected, outside);
+  const onInspectorDismissRequested = vi.fn(() => true);
+  startPicker({ onInspectorDismissRequested });
+  selected.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  textarea.dispatchEvent(
+    new MouseEvent('pointerdown', { bubbles: true, cancelable: true, composed: true })
+  );
+  outside.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, cancelable: true }));
+  outside.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+  expectFrameSummary('button');
+
+  outside.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+  outside.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  expect(onInspectorDismissRequested).toHaveBeenCalledOnce();
 });
 
 it('keeps feedback and marker clicks inside the Design Review dismissal boundary', () => {
