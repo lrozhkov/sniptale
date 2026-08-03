@@ -13,10 +13,17 @@ const visibleTextMocks = vi.hoisted(() => ({
   collectVisibleAutoBlurTextSources: vi.fn(),
   getAutoBlurTextSourceRangeRects: vi.fn((source: AutoBlurTextSource) => source.rects),
 }));
+const fullPageMocks = vi.hoisted(() => ({
+  visitAutoBlurPageViewports: vi.fn(),
+}));
 
 vi.mock('./visible-text', () => ({
   collectVisibleAutoBlurTextSources: visibleTextMocks.collectVisibleAutoBlurTextSources,
   getAutoBlurTextSourceRangeRects: visibleTextMocks.getAutoBlurTextSourceRangeRects,
+}));
+
+vi.mock('./full-page', () => ({
+  visitAutoBlurPageViewports: fullPageMocks.visitAutoBlurPageViewports,
 }));
 
 import { scanAutoBlurTargets } from './scan';
@@ -62,6 +69,7 @@ describe('scanAutoBlurTargets', () => {
     visibleTextMocks.getAutoBlurTextSourceRangeRects.mockImplementation(
       (source: AutoBlurTextSource) => source.rects
     );
+    fullPageMocks.visitAutoBlurPageViewports.mockReset();
   });
 
   it('dedupes overlapping detections, keeps raw values, and marks existing blur frames', async () => {
@@ -110,5 +118,54 @@ describe('scanAutoBlurTargets', () => {
     );
 
     expect(result.matches[0]?.rect).toEqual({ height: 36, width: 80, x: 10, y: 2400 });
+  });
+
+  it('collects every full-page viewport and normalizes matches to the original scroll', async () => {
+    const firstSource = createSource('first@example.com');
+    const secondSource = createSource('second@example.com');
+    visibleTextMocks.collectVisibleAutoBlurTextSources
+      .mockReturnValueOnce([firstSource])
+      .mockReturnValueOnce([secondSource]);
+    fullPageMocks.visitAutoBlurPageViewports.mockImplementation(async (visit) => {
+      visit({ x: 0, y: 0 });
+      visit({ x: 0, y: 1_000 });
+    });
+    const detector: AutoBlurDetector = {
+      detect: vi.fn(({ sources }) =>
+        sources.map((source: AutoBlurTextSource) =>
+          createDetection(source, {
+            end: source.text.length,
+            value: source.text,
+          })
+        )
+      ),
+    };
+
+    const result = await scanAutoBlurTargets({ frames: [], mode: 'full-page' }, detector);
+
+    expect(result.matches.map((match) => match.rect.y)).toEqual([20, 1_020]);
+    expect(result.matches.map((match) => match.value)).toEqual([
+      'first@example.com',
+      'second@example.com',
+    ]);
+  });
+
+  it('keeps fixed target geometry from the original scroll viewport', async () => {
+    const source = createSource('fixed@example.com');
+    source.element.style.position = 'fixed';
+    visibleTextMocks.collectVisibleAutoBlurTextSources.mockReturnValue([source]);
+    visibleTextMocks.getAutoBlurTextSourceRangeRects.mockReturnValue([
+      { height: 16, width: 120, x: 10, y: 20 },
+    ]);
+    fullPageMocks.visitAutoBlurPageViewports.mockImplementation(async (visit) => {
+      visit({ x: 0, y: 0 });
+      visit({ x: 0, y: -500 });
+    });
+    const detector = createDetector([createDetection(source, { value: 'fixed@example.com' })]);
+
+    const result = await scanAutoBlurTargets({ frames: [], mode: 'full-page' }, detector);
+
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0]?.rect.y).toBe(20);
   });
 });

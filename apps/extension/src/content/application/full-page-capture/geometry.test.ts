@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { measureCaptureGeometry, resolveScrollCaptureRoot } from './geometry';
+import { resolvePageScrollRoot } from '../../platform/page-scroll';
+import { measureCaptureGeometry } from './geometry';
 
 function defineBox(
   element: HTMLElement,
@@ -39,7 +40,7 @@ it('prefers the document root whenever either document axis scrolls', () => {
   const root = useDocumentRoot();
   defineBox(root, { clientHeight: 600, clientWidth: 800, scrollHeight: 600, scrollWidth: 1200 });
 
-  expect(resolveScrollCaptureRoot()).toEqual({ element: root, kind: 'document' });
+  expect(resolvePageScrollRoot()).toEqual({ element: root, kind: 'document' });
 });
 
 it('selects one dominant internal scroller and composes shell plus full content dimensions', () => {
@@ -76,7 +77,7 @@ it('selects one dominant internal scroller and composes shell plus full content 
   });
   document.body.append(scroller);
 
-  const root = resolveScrollCaptureRoot();
+  const root = resolvePageScrollRoot();
   expect(root).toEqual({ element: scroller, kind: 'element' });
   expect(measureCaptureGeometry(root)).toEqual(
     expect.objectContaining({
@@ -120,5 +121,5 @@ it('fails closed when two independent internal scrollers have comparable scores'
     document.body.append(scroller);
   }
 
-  expect(() => resolveScrollCaptureRoot()).toThrow('multiple independent scroll containers');
+  expect(() => resolvePageScrollRoot()).toThrow('multiple independent scroll containers');
 });

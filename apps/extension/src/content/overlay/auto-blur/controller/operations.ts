@@ -49,9 +49,13 @@ export async function applyAutoBlurWithSettings(args: {
   frameManager: AutoBlurFrameManager;
   frames: AutoBlurFrameManager['frames'];
   selectedCategories: Iterable<AutoBlurCategory>;
+  scanMode?: 'current-view' | 'full-page';
 }) {
   const selectedCategories = new Set(args.selectedCategories);
-  const result = await scanAutoBlurTargets({ frames: args.frames });
+  const result = await scanAutoBlurTargets({
+    frames: args.frames,
+    ...(args.scanMode === undefined ? {} : { mode: args.scanMode }),
+  });
   const selectedMatches = result.matches.filter(
     (match) => !match.alreadyBlurred && selectedCategories.has(match.category)
   );
