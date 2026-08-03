@@ -84,8 +84,15 @@ describe('toolbar capture options', () => {
 });
 
 function registerCaptureActionOptionTests() {
-  it('exposes scenario as an after-capture action', () => {
-    expect(getCaptureActionOptions().map((option) => option.value)).toContain('scenario');
+  it('orders all after-capture actions for the toolbar menu', () => {
+    expect(getCaptureActionOptions().map((option) => option.value)).toEqual([
+      'download_default',
+      'copy',
+      'edit',
+      'ask_system',
+      'ask_preset',
+      'scenario',
+    ]);
   });
 
   it('provides a distinct icon for every after-capture action', () => {
