@@ -3,6 +3,10 @@ import type { CalloutSettings, CalloutSide } from '@sniptale/runtime-contracts/h
 import { FONT_FAMILY_MAP } from './constants';
 import { getAnchorPosition, getCalloutPosition, getPreferredSideFromAnchor } from './geometry';
 import { getDynamicTailState, type ConnectorSide } from './dynamic-tail';
+import {
+  Z_INDEX_CALLOUT_EDITING,
+  Z_INDEX_CALLOUT_VIEWING,
+} from '../interactive-frame/layout/portal';
 
 type RegionRect = { x: number; y: number; width: number; height: number };
 
@@ -30,7 +34,9 @@ export function getCalloutLayoutState(args: {
   const calloutPos = args.settings.manualPlacement
     ? getManualCalloutPosition(args.frameRect, positionDimensions, args.settings.manualPlacement)
     : getCalloutPosition(resolvedSide, anchorPos, positionDimensions, args.settings.tailSize);
-  const effectiveZIndex = args.isEditing ? 2147483647 : args.zIndex;
+  const effectiveZIndex = args.isEditing
+    ? Z_INDEX_CALLOUT_EDITING
+    : Math.min(args.zIndex, Z_INDEX_CALLOUT_VIEWING);
   const dynamicTail =
     args.settings.variant === 'bubble'
       ? getDynamicTailState({

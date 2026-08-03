@@ -19,14 +19,14 @@ vi.mock('../../step-badge', () => ({
     onPositionChange: (placement: { position: number; side: 'bottom' }) => void;
     onSettingsClick: () => void;
   }) => (
-    <>
+    <div data-ui="step-badge">
       <button
         type="button"
         data-ui="move-step"
         onClick={() => props.onPositionChange({ position: 0.7, side: 'bottom' })}
       />
       <button type="button" data-ui="step-settings" onClick={props.onSettingsClick} />
-    </>
+    </div>
   ),
 }));
 
@@ -92,6 +92,7 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
     const surface = host.querySelector<HTMLElement>('.sniptale-interactive-frame');
     const fill = host.querySelector<HTMLElement>('.sniptale-interactive-frame-fill');
     const stroke = host.querySelector<HTMLElement>('.sniptale-interactive-frame-stroke');
+    const stepBadge = host.querySelector<HTMLElement>('[data-ui="step-badge"]');
     expect(container?.style.left).toBe(`${frame.x}px`);
     expect(container?.style.top).toBe(`${frame.y}px`);
     expect(container?.style.width).toBe(`${frame.width}px`);
@@ -99,6 +100,7 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
     expect(fill?.parentElement).toBe(surface);
     expect(stroke?.parentElement).toBe(surface);
     expect(Array.from(surface?.children ?? []).slice(0, 2)).toEqual([fill, stroke]);
+    expect(stepBadge?.parentElement).toBe(container);
     expect(fill?.style.backgroundColor).toBe('rgba(22, 163, 74, 0.25)');
     expect(fill?.style.borderRadius).toBe('8px');
     expect(stroke?.style.border).toBe('3px solid rgb(17, 17, 17)');

@@ -18,11 +18,11 @@ it('renders the tooltip label through the shared i18n seam', () => {
       settings={createStepBadgeSettingsFixture({ value: '7' })}
       borderColor="#000"
       borderWidth={2}
-      zIndex={10}
     />
   );
 
   expect(markup).toContain('title="Step 7"');
+  expect(markup).toContain('z-index:2147483647');
 });
 
 it('renders hover-only move and settings controls for an enabled badge', () => {
@@ -42,7 +42,6 @@ it('renders hover-only move and settings controls for an enabled badge', () => {
         onSettingsClick={vi.fn()}
         settingsAnchorRef={{ current: null }}
         showSettingsHandle
-        zIndex={10}
       />
     );
   });
@@ -75,7 +74,6 @@ it('keeps closed controls keyboard-reachable and reveals them on focus', () => {
         onSettingsClick={onSettingsClick}
         settingsAnchorRef={{ current: null }}
         showSettingsHandle
-        zIndex={10}
       />
     );
   });
@@ -117,7 +115,6 @@ it('hides only the quick settings button while a main toolbar owns the frame UI'
         onSettingsClick={vi.fn()}
         settingsAnchorRef={{ current: null }}
         showSettingsHandle={false}
-        zIndex={10}
       />
     );
   });
@@ -154,7 +151,6 @@ it('reanchors move and settings controls after scroll updates the frame geometry
         onSettingsClick={vi.fn()}
         settingsAnchorRef={{ current: null }}
         showSettingsHandle
-        zIndex={10}
       />
     );
   };

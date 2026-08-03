@@ -8,13 +8,13 @@ import { StepBadgeControls } from './controls';
 import { useStepBadgeInteraction } from './interaction';
 import type { StepBadgeFrameRect } from './placement';
 import { getStepBadgeStyle, StepBadgeValue } from './views';
+import { Z_INDEX_STEP_BADGE } from '../interactive-frame/layout/portal';
 
 interface StepBadgeProps {
   settings: StepBadgeSettings;
   borderColor: string;
   borderWidth: number;
   shadow?: number;
-  zIndex: number;
   frameRect?: StepBadgeFrameRect;
   isSettingsOpen?: boolean;
   onClick?: () => void;
@@ -50,7 +50,7 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
           settings: interaction.effectiveSettings,
           borderColor: props.borderColor,
           borderWidth: props.borderWidth,
-          zIndex: props.zIndex,
+          zIndex: Z_INDEX_STEP_BADGE,
           clickable: Boolean(props.onClick),
           isDragging: interaction.drag.isDragging,
           ...(props.shadow === undefined ? {} : { shadow: props.shadow }),
