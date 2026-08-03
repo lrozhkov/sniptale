@@ -291,6 +291,54 @@ describe('createAddAutoBlurFramesHandler', () => {
     });
   });
 
+  it('retains full-page scan targets that are offscreen after scroll restoration', () => {
+    const scenario = createHandlerScenario();
+    iframeUtilsMocks.getAbsolutePosition.mockReturnValue({
+      height: 30,
+      width: 90,
+      x: 100,
+      y: window.innerHeight + 500,
+    });
+    const addAutoBlurFrames = createAddAutoBlurFramesHandler(scenario.args);
+
+    const result = addAutoBlurFrames({
+      ...createAutoBlurInput(scenario.element),
+      allowDeferredInitialPlacement: true,
+      targets: [
+        {
+          element: scenario.element,
+          id: 'offscreen-full-page-match',
+          rect: {
+            height: 18,
+            width: 70,
+            x: 100,
+            y: window.innerHeight + 500,
+          },
+        },
+      ],
+    });
+
+    expect(result).toEqual({ addedCount: 1, skippedCount: 0 });
+    expect(scenario.getFrames()).toHaveLength(2);
+    expect(
+      scenario.args.hostLayoutServiceRef.current.getNode(scenario.getFrames()[1]?.id ?? '')
+    ).toBe(scenario.element);
+  });
+
+  it('rejects a detached full-page target before creating deferred placement', () => {
+    const scenario = createHandlerScenario();
+    scenario.element.remove();
+    const addAutoBlurFrames = createAddAutoBlurFramesHandler(scenario.args);
+
+    const result = addAutoBlurFrames({
+      ...createAutoBlurInput(scenario.element),
+      allowDeferredInitialPlacement: true,
+    });
+
+    expect(result).toEqual({ addedCount: 0, skippedCount: 2 });
+    expect(scenario.getFrames()).toHaveLength(1);
+  });
+
   it('clears only auto-blur frames for matching scan targets', () => {
     expectOnlyAutoBlurFramesCleared();
   });

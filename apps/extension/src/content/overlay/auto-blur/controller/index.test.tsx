@@ -356,6 +356,7 @@ describe('useAutoBlurController', () => {
 
     expect(latestController?.isApplying).toBe(false);
     expect(syncAutoBlurFrameCalls).toContainEqual({
+      allowDeferredInitialPlacement: true,
       blurSettings: controllerMocks.defaultSettings.blurSettings,
       targets: [expect.objectContaining({ id: 'email-match' })],
     });

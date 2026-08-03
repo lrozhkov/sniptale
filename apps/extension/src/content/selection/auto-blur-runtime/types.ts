@@ -62,6 +62,8 @@ export interface AutoBlurScanInput {
 }
 
 export interface AutoBlurApplyInput {
+  /** Keeps geometry measured during full-page traversal after the viewport is restored. */
+  allowDeferredInitialPlacement?: boolean;
   blurSettings: BlurSettings;
   targets: AutoBlurApplyTarget[];
 }

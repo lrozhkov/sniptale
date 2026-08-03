@@ -61,6 +61,7 @@ export async function applyAutoBlurWithSettings(args: {
   );
 
   return args.frameManager.syncAutoBlurFrames({
+    ...(args.scanMode === 'full-page' ? { allowDeferredInitialPlacement: true } : {}),
     blurSettings: args.blurSettings,
     targets: createTargets(selectedMatches),
   });

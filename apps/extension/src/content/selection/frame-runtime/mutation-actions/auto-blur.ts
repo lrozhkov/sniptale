@@ -155,6 +155,7 @@ export function createAddAutoBlurFramesHandler(args: CreateAddAutoBlurFramesHand
       if (hasBlurFrameForRect([...args.framesRef.current, ...addedFrames], target.rect)) {
         return;
       }
+      if (!target.element.isConnected) return;
 
       const frame = createAutoBlurFrame({
         borderSettings,
@@ -172,13 +173,13 @@ export function createAddAutoBlurFramesHandler(args: CreateAddAutoBlurFramesHand
           pagePlacement: frame.pagePlacement,
           rect: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
         },
-        { requireAcceptedInitial: true }
+        { requireAcceptedInitial: input.allowDeferredInitialPlacement !== true }
       );
-      if (!accepted) return;
+      if (!accepted && input.allowDeferredInitialPlacement !== true) return;
       addedFrames.push({
         ...frame,
-        ...accepted.rect,
-        pagePlacement: accepted.pagePlacement,
+        ...(accepted?.rect ?? {}),
+        pagePlacement: accepted?.pagePlacement ?? frame.pagePlacement,
       });
     });
 
