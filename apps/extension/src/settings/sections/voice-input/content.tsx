@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle2, Download, Mic, RefreshCw, Square } from 'lucide-react';
 import { AudioAmplitudeBars } from '@sniptale/ui/audio-amplitude-bars';
+import { usePushToTalk } from '@sniptale/ui/voice-input/use-push-to-talk';
 import { translate, type TranslationKey } from '../../../platform/i18n';
 import {
   settingsPanelClassName,
@@ -7,7 +8,6 @@ import {
   SettingsSectionHeader,
 } from '../../section-surface';
 import type { VoiceInputSettingsController } from './controller-contract';
-import { usePushToTalk } from './use-push-to-talk';
 
 const buttonClassName = [
   'inline-flex min-h-10 items-center justify-center gap-2 rounded-[14px] border px-4 py-2',

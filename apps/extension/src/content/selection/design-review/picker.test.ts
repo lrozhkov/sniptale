@@ -382,6 +382,32 @@ it('defers Escape to the highest open Design Review layer before disabling the m
   expect(onDisableRequested).toHaveBeenCalledOnce();
 });
 
+it('uses Escape to stop the inspector layer, then close it, before disabling Design Review', () => {
+  const selected = makeVisible(document.createElement('button'));
+  document.body.append(selected);
+  const onDisableRequested = vi.fn();
+  let dismissRequests = 0;
+  let runtime: ReturnType<typeof startPicker>;
+  const onInspectorDismissRequested = vi.fn(() => {
+    dismissRequests += 1;
+    if (dismissRequests === 2) runtime.dismissSelection();
+    return true;
+  });
+  runtime = startPicker({ onDisableRequested, onInspectorDismissRequested });
+  selected.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  expect(onInspectorDismissRequested).toHaveBeenCalledOnce();
+  expect(onDisableRequested).not.toHaveBeenCalled();
+
+  document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  expect(onInspectorDismissRequested).toHaveBeenCalledTimes(2);
+  expect(onDisableRequested).not.toHaveBeenCalled();
+
+  document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+  expect(onDisableRequested).toHaveBeenCalledOnce();
+});
+
 it('fails closed on a registered annotation marker instead of selecting the page below it', () => {
   const pageTarget = makeVisible(document.createElement('main'));
   document.body.append(pageTarget);

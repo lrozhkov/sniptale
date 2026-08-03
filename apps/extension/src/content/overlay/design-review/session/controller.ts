@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import type { BrowserDesignReviewAction } from '../../../parser/page-preparation/annotations';
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import {
@@ -9,7 +17,7 @@ import {
   subscribeToDesignReviewMode,
 } from '../../../selection/design-review';
 import { usePageStyleDraftState } from './draft';
-import { usePageStyleCommentDraft } from './comment-draft';
+import { useDesignReviewCommentController } from './comment-controller';
 import { usePageStyleValueActions } from '../value-editing/actions';
 import {
   commitDesignReviewAction,
@@ -21,6 +29,34 @@ import { copyDesignReviewText } from './clipboard';
 
 interface UseDesignReviewControllerParams {
   enabled: boolean;
+}
+
+function useDesignReviewPopoverDismissal(args: {
+  closeComment(): boolean;
+  setPopoverOpen: Dispatch<SetStateAction<boolean>>;
+  stopVoiceInput(): void;
+  voiceActive: boolean;
+}) {
+  const { closeComment, setPopoverOpen, stopVoiceInput, voiceActive } = args;
+  const closePopover = useCallback(() => {
+    stopVoiceInput();
+    if (!closeComment()) return false;
+    dismissDesignReviewSelection();
+    setPopoverOpen(false);
+    return true;
+  }, [closeComment, setPopoverOpen, stopVoiceInput]);
+
+  const dismissHighestLayer = useCallback(() => {
+    if (!voiceActive) return closePopover();
+    stopVoiceInput();
+    return true;
+  }, [closePopover, stopVoiceInput, voiceActive]);
+
+  useEffect(
+    () => registerDesignReviewInspectorDismissRequestHandler(dismissHighestLayer),
+    [dismissHighestLayer]
+  );
+  return closePopover;
 }
 
 export function useDesignReviewController(params: UseDesignReviewControllerParams) {
@@ -53,8 +89,9 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
     }
   }, [params.enabled]);
 
-  const commentDraft = usePageStyleCommentDraft({ open: popoverOpen, selection });
-  const closeComment = commentDraft.closeComment;
+  const comment = useDesignReviewCommentController({ open: popoverOpen, selection });
+  const closeComment = comment.close;
+  const stopVoiceInput = comment.stopVoice;
   const draftState = usePageStyleDraftState(selection);
   const valueActions = usePageStyleValueActions({
     defaultValues: draftState.defaultValues,
@@ -64,16 +101,14 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
   const record = selection ? readDesignReviewRecord(selection.element) : null;
   const action = record?.designReview?.action ?? 'refine';
 
-  const closePopover = useCallback(() => {
-    if (closeComment()) {
-      dismissDesignReviewSelection();
-      setPopoverOpen(false);
-      return true;
-    }
-    return false;
-  }, [closeComment]);
+  const closePopover = useDesignReviewPopoverDismissal({
+    closeComment,
+    setPopoverOpen,
+    stopVoiceInput,
+    voiceActive: comment.view.voice.active,
+  });
 
-  useEffect(() => registerDesignReviewInspectorDismissRequestHandler(closePopover), [closePopover]);
+  useEffect(() => stopVoiceInput(), [activeSelection, stopVoiceInput]);
 
   function openRecord(annotationId: number): boolean {
     const target = browserAnnotationSession.getLiveTarget(annotationId);
@@ -83,12 +118,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
   return {
     actions: {
       close: closePopover,
-      comment: {
-        commit: commentDraft.commitComment,
-        endComposition: commentDraft.endCommentComposition,
-        startComposition: commentDraft.startCommentComposition,
-        updateDraft: commentDraft.updateCommentDraft,
-      },
+      comment: comment.draftActions,
       copyElement: async () => {
         if (selection) {
           await copyDesignReviewText(
@@ -107,6 +137,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
           return;
         }
         deleteDesignReviewRecord(selection.element);
+        stopVoiceInput();
         dismissDesignReviewSelection();
         setSettingsOpen(false);
         setPopoverOpen(false);
@@ -121,6 +152,10 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
       setSideFieldLinked: draftState.setSideFieldLinked,
       updateValue: valueActions.updateValue,
       updateValues: valueActions.updateValues,
+      voice: {
+        start: comment.startVoice,
+        stop: stopVoiceInput,
+      },
     },
     inspectorOpen: popoverOpen,
     enabled: params.enabled && modeState.enabled,
@@ -133,11 +168,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
     viewState: {
       action,
       anchor: activeSelection?.anchor ?? null,
-      comment: {
-        commitFailed: commentDraft.commentCommitFailed,
-        draft: commentDraft.commentDraft,
-        marker: commentDraft.markerNumber,
-      },
+      comment: comment.view.comment,
       defaultValues: draftState.defaultValues,
       draftPatch: draftState.draftPatch,
       modifiedProperties: draftState.modifiedProperties,
@@ -145,6 +176,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
       settingsOpen,
       sideFieldLinks: draftState.sideFieldLinks,
       values: draftState.values,
+      voice: comment.view.voice,
     },
     sessionRevision,
   };

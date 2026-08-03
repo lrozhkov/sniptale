@@ -29,6 +29,7 @@ const actions: DesignReviewActions = {
   setSideFieldLinked: vi.fn(),
   updateValue: vi.fn(),
   updateValues: vi.fn(),
+  voice: { start: vi.fn(), stop: vi.fn() },
 };
 
 const element = document.createElement('h1');
@@ -50,6 +51,13 @@ const state: DesignReviewViewState = {
   },
   settingsOpen: true,
   values: {},
+  voice: {
+    active: false,
+    audioLevel: 0,
+    caretPosition: null,
+    errorCode: null,
+    phase: 'idle',
+  },
 };
 
 function dispatchPointer(

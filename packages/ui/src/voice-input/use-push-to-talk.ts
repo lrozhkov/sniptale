@@ -9,6 +9,7 @@ type PushToTalkControl = {
   onPointerUp: PointerEventHandler<HTMLButtonElement>;
 };
 
+/** Starts on press and stops on release only after the press becomes an intentional hold. */
 export function usePushToTalk(args: {
   active: boolean;
   disabled: boolean;

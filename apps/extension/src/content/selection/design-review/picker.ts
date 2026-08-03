@@ -299,6 +299,10 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
       }
       event.preventDefault();
       event.stopPropagation();
+      if (state.selectedElement) {
+        args.onInspectorDismissRequested();
+        return;
+      }
       args.onDisableRequested();
     },
     { capture: true }

@@ -52,6 +52,7 @@ function createController(): ReturnType<typeof useDesignReviewController> {
       setSideFieldLinked: vi.fn(),
       updateValue: vi.fn(),
       updateValues: vi.fn(),
+      voice: { start: vi.fn(), stop: vi.fn() },
     },
     enabled: true,
     inspectorOpen: true,
@@ -81,6 +82,13 @@ function createController(): ReturnType<typeof useDesignReviewController> {
       settingsOpen: false,
       sideFieldLinks: {},
       values: {},
+      voice: {
+        active: false,
+        audioLevel: 0,
+        caretPosition: null,
+        errorCode: null,
+        phase: 'idle',
+      },
     },
   };
 }

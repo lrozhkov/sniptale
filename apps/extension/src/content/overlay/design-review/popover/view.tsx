@@ -143,7 +143,11 @@ export function DesignReviewPopover(props: {
             onPointerCancel={drag.onPointerUp}
           />
           <PageStyleCommentField
-            actions={{ ...props.actions.comment, close: props.actions.close }}
+            actions={{
+              ...props.actions.comment,
+              close: props.actions.close,
+              voice: props.actions.voice,
+            }}
             disabled={false}
             footer={
               <DesignReviewActionMenu
@@ -152,6 +156,7 @@ export function DesignReviewPopover(props: {
               />
             }
             state={props.state.comment}
+            voice={props.state.voice}
           />
         </div>
         <div className="min-h-0 overflow-y-auto overscroll-contain">

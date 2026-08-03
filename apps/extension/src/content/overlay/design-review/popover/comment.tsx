@@ -2,22 +2,43 @@ import { CornerDownLeft } from 'lucide-react';
 import { useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
+import { DesignReviewCommentVoiceButton } from './comment-voice-button';
 
 export function PageStyleCommentField(props: {
-  actions: DesignReviewActions['comment'] & { close: () => void };
+  actions: DesignReviewActions['comment'] & {
+    close: () => void;
+    voice: DesignReviewActions['voice'];
+  };
   disabled: boolean;
   footer?: ReactNode;
   state: DesignReviewViewState['comment'];
+  voice: DesignReviewViewState['voice'];
 }) {
   const inputId = useId();
   const hintId = useId();
   const errorId = useId();
-  const describedBy = props.state.commitFailed ? `${hintId} ${errorId}` : hintId;
+  const voiceErrorId = useId();
+  const hasVoiceError = props.voice.errorCode !== null;
+  const describedBy = [
+    hintId,
+    props.state.commitFailed ? errorId : null,
+    hasVoiceError ? voiceErrorId : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useLayoutEffect(() => {
     resizeCommentTextarea(textareaRef.current);
   }, [props.state.draft]);
+
+  useLayoutEffect(() => {
+    const caretPosition = props.voice.caretPosition;
+    const textarea = textareaRef.current;
+    if (caretPosition === null || !textarea) return;
+    textarea.focus();
+    textarea.setSelectionRange(caretPosition, caretPosition);
+  }, [props.voice.caretPosition]);
 
   return (
     <section className="grid cursor-default gap-1.5" data-ui="content.design-review.comment">
@@ -57,6 +78,7 @@ export function PageStyleCommentField(props: {
           id={inputId}
           onBlur={props.actions.commit}
           onChange={(event) => {
+            if (props.voice.active) props.actions.voice.stop();
             resizeCommentTextarea(event.currentTarget);
             props.actions.updateDraft(event.currentTarget.value);
           }}
@@ -78,6 +100,15 @@ export function PageStyleCommentField(props: {
             data-ui="content.design-review.comment-footer"
           >
             <div className="min-w-0 flex-1">{props.footer}</div>
+            <DesignReviewCommentVoiceButton
+              disabled={props.disabled}
+              onStart={() => {
+                const textarea = textareaRef.current;
+                props.actions.voice.start(textarea?.selectionStart ?? props.state.draft.length);
+              }}
+              onStop={props.actions.voice.stop}
+              state={props.voice}
+            />
             <span
               aria-label={translate('content.designReview.commentHint')}
               className="inline-flex h-7 w-7 shrink-0 items-center justify-center text-[var(--sniptale-color-text-dim)]"
@@ -100,6 +131,15 @@ export function PageStyleCommentField(props: {
           role="alert"
         >
           {translate('content.designReview.commentCommitFailed')}
+        </p>
+      ) : null}
+      {hasVoiceError ? (
+        <p
+          className="text-[10px] leading-4 text-[var(--sniptale-color-danger)]"
+          id={voiceErrorId}
+          role="alert"
+        >
+          {translate('content.designReview.voiceInputError')}
         </p>
       ) : null}
     </section>

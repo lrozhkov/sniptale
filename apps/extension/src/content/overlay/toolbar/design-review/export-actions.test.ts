@@ -4,10 +4,15 @@ import { MAX_CLIPBOARD_TEXT_LENGTH } from '@sniptale/runtime-contracts/validatio
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 
 const mocks = vi.hoisted(() => ({
-  attachContentActionIntent: vi.fn(async (message: object) => ({
-    ...message,
-    contentIntent: { requestId: 'request-1', token: 'token-1' },
-  })),
+  attachContentActionIntent: vi.fn(async (message: object, source?: { kind?: string } | null) => {
+    if (source?.kind !== 'trusted-content-event') {
+      throw new Error('A trusted user event is required to export browser annotations.');
+    }
+    return {
+      ...message,
+      contentIntent: { requestId: 'request-1', token: 'token-1' },
+    };
+  }),
   prepareText: vi.fn(),
   sendRuntimeMessage: vi.fn(),
   writeText: vi.fn(),
@@ -105,6 +110,24 @@ it('rejects untrusted copy before formatter and clipboard effects', async () => 
   await expect(executeToolbarAnnotationExportAction('copy')).rejects.toThrow('trusted user event');
 
   expect(mocks.prepareText).not.toHaveBeenCalled();
+  expect(mocks.writeText).not.toHaveBeenCalled();
+});
+
+it('rejects an untrusted download before any annotation egress', async () => {
+  mocks.prepareText.mockReturnValue('# Browser comments:\nKept dictated text');
+
+  await expect(executeToolbarAnnotationExportAction('download')).rejects.toThrow(
+    'trusted user event'
+  );
+
+  expect(mocks.attachContentActionIntent).toHaveBeenCalledWith(
+    {
+      type: MessageType.DOWNLOAD_BROWSER_ANNOTATIONS,
+      text: '# Browser comments:\nKept dictated text',
+    },
+    undefined
+  );
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
   expect(mocks.writeText).not.toHaveBeenCalled();
 });
 

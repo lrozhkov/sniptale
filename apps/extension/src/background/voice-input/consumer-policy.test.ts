@@ -38,7 +38,18 @@ describe('voice input consumer policy', () => {
     ).toEqual({ consumerId: 'settings-test', documentId: 'settings-document' });
   });
 
-  it('rejects a missing documentId, content tab, and lookalike path', () => {
+  it('binds a top-level web content document for Design Review voice input', () => {
+    expect(
+      authorizeVoiceInputPortSender({
+        documentId: 'content-document',
+        frameId: 0,
+        tab: createTab(7),
+        url: 'https://example.com/review',
+      })
+    ).toEqual({ consumerId: 'content-design-review', documentId: 'content-document' });
+  });
+
+  it('rejects a missing documentId and a lookalike extension path', () => {
     expect(
       authorizeVoiceInputPortSender({
         url: 'chrome-extension://extension-id/apps/extension/src/settings/index.html',
@@ -46,15 +57,34 @@ describe('voice input consumer policy', () => {
     ).toBeNull();
     expect(
       authorizeVoiceInputPortSender({
-        documentId: 'content-document',
+        documentId: 'lookalike-document',
+        url: 'chrome-extension://extension-id/apps/extension/src/settings/index.html.evil',
+      })
+    ).toBeNull();
+  });
+
+  it('rejects nested, non-web, and tabless content senders', () => {
+    expect(
+      authorizeVoiceInputPortSender({
+        documentId: 'nested-document',
+        frameId: 2,
         tab: createTab(2),
-        url: 'https://example.com/apps/extension/src/settings/index.html',
+        url: 'https://example.com/frame',
       })
     ).toBeNull();
     expect(
       authorizeVoiceInputPortSender({
-        documentId: 'lookalike-document',
-        url: 'chrome-extension://extension-id/apps/extension/src/settings/index.html.evil',
+        documentId: 'extension-document',
+        frameId: 0,
+        tab: createTab(2),
+        url: 'chrome-extension://extension-id/apps/extension/src/popup/index.html',
+      })
+    ).toBeNull();
+    expect(
+      authorizeVoiceInputPortSender({
+        documentId: 'tabless-document',
+        frameId: 0,
+        url: 'https://example.com/review',
       })
     ).toBeNull();
   });
