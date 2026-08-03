@@ -100,6 +100,10 @@ it('uses the contrast surface and inverse icon treatment above arbitrary page co
   });
 
   expect(container.querySelector('button')?.className).toContain('text-inverse');
+  const contrastRing = container.querySelector('button span');
+  expect(contrastRing?.className).toContain('border-2');
+  expect(contrastRing?.className).toContain('shadow-[0_0_7px');
+  expect(Number((contrastRing as HTMLElement | null)?.style.opacity)).toBeCloseTo(0.91);
 });
 
 it('keeps the pointer stable while an internal stop is settling', () => {

@@ -87,11 +87,20 @@ export function ContentVoiceInputButton(props: {
         <span
           aria-hidden="true"
           className={[
-            'pointer-events-none absolute inset-1 rounded-full border',
-            'border-[var(--sniptale-color-accent)] transition-transform',
+            'pointer-events-none absolute inset-1 rounded-full transition-transform',
             'motion-reduce:transition-none',
+            contrast
+              ? [
+                  'border-2',
+                  'border-[var(--sniptale-color-accent-emphasis)]',
+                  'shadow-[0_0_7px_var(--sniptale-color-accent-glow)]',
+                ].join(' ')
+              : 'border border-[var(--sniptale-color-accent)]',
           ].join(' ')}
-          style={{ opacity: 0.45 + level * 0.45, transform: `scale(${1 + level * 0.4})` }}
+          style={{
+            opacity: contrast ? 0.82 + level * 0.18 : 0.45 + level * 0.45,
+            transform: `scale(${1 + level * 0.4})`,
+          }}
         />
       ) : null}
       <Mic aria-hidden="true" size={14} strokeWidth={1.8} />
