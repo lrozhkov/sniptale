@@ -29,8 +29,6 @@ export function createAIModalSubmitHandler(
 export function createAIModalKeyDownHandler(props: {
   canSubmit: boolean;
   handleSubmit: () => void;
-  isLoading: boolean | undefined;
-  onClose: () => void;
 }) {
   return (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
@@ -38,11 +36,6 @@ export function createAIModalKeyDownHandler(props: {
       if (props.canSubmit) {
         props.handleSubmit();
       }
-    }
-
-    if (event.key === 'Escape' && !props.isLoading) {
-      event.preventDefault();
-      props.onClose();
     }
   };
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createCommentTranscriptInsertion } from './comment-transcript';
+import { createTextTranscriptInsertion } from './text-transcript';
 
-describe('Design Review comment transcript insertion', () => {
+describe('streaming text transcript insertion', () => {
   it('streams replaceable interim hypotheses at the captured caret', () => {
-    const insertion = createCommentTranscriptInsertion('Before after', 7);
+    const insertion = createTextTranscriptInsertion('Before after', 7);
 
     expect(insertion.apply({ isFinal: false, sequence: 0, text: 'draft' })).toEqual({
       caretPosition: 13,
@@ -19,8 +19,8 @@ describe('Design Review comment transcript insertion', () => {
     });
   });
 
-  it('keeps final speech and appends later hypotheses without overwriting the original draft', () => {
-    const insertion = createCommentTranscriptInsertion('Alpha omega', 6);
+  it('keeps final speech and appends later hypotheses without overwriting the original value', () => {
+    const insertion = createTextTranscriptInsertion('Alpha omega', 6);
 
     expect(insertion.apply({ isFinal: true, sequence: 1, text: 'one ' })?.value).toBe(
       'Alpha one omega'
@@ -33,8 +33,8 @@ describe('Design Review comment transcript insertion', () => {
     );
   });
 
-  it('adds one separating space after a non-whitespace caret before dictated text', () => {
-    const insertion = createCommentTranscriptInsertion('Keep suffix', 4);
+  it('adds one separating space after a non-whitespace caret', () => {
+    const insertion = createTextTranscriptInsertion('Keep suffix', 4);
 
     expect(insertion.apply({ isFinal: true, sequence: 0, text: 'this ' })).toEqual({
       caretPosition: 10,
@@ -42,8 +42,20 @@ describe('Design Review comment transcript insertion', () => {
     });
   });
 
+  it('clears a replaceable interim without changing the original surrounding text', () => {
+    const insertion = createTextTranscriptInsertion('Keep suffix', 4);
+
+    expect(insertion.apply({ isFinal: false, sequence: 0, text: 'temporary' })?.value).toBe(
+      'Keep temporary suffix'
+    );
+    expect(insertion.apply({ isFinal: false, sequence: 1, text: '' })).toEqual({
+      caretPosition: 4,
+      value: 'Keep suffix',
+    });
+  });
+
   it('ignores replayed or stale recognition sequences', () => {
-    const insertion = createCommentTranscriptInsertion('Keep', 4);
+    const insertion = createTextTranscriptInsertion('Keep', 4);
 
     expect(insertion.apply({ isFinal: true, sequence: 3, text: ' this' })?.value).toBe('Keep this');
     expect(insertion.apply({ isFinal: true, sequence: 3, text: 'duplicate' })).toBeNull();

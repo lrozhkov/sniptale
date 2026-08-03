@@ -68,7 +68,7 @@ let root: Root | null = null;
 let latestState: ReturnType<typeof useAIModalState> | null = null;
 
 function AIModalStateHarness() {
-  latestState = useAIModalState({ isOpen: true });
+  latestState = useAIModalState({ isOpen: true, isLoading: false });
   return null;
 }
 

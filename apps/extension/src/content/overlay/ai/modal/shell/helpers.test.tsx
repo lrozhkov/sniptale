@@ -59,6 +59,16 @@ function createModalState() {
     templatesLoading: false,
     textareaRef: { current: null },
     totalTokens: 12,
+    voice: {
+      actions: { start: vi.fn(), stop: vi.fn() },
+      state: {
+        active: false,
+        audioLevel: 0,
+        caretPosition: null,
+        errorCode: null,
+        phase: 'idle',
+      },
+    },
   } satisfies ReturnType<typeof useAIModalState>;
 }
 
@@ -76,37 +86,20 @@ describe('createAIModalSubmitHandler', () => {
 });
 
 describe('createAIModalKeyDownHandler', () => {
-  it('handles keyboard shortcuts for submit and close only when submit is allowed', () => {
+  it('handles the submit shortcut only when submit is allowed', () => {
     const handleSubmit = vi.fn();
-    const onClose = vi.fn();
     const handler = createAIModalKeyDownHandler({
       canSubmit: true,
       handleSubmit,
-      isLoading: false,
-      onClose,
     });
 
     handler(createKeyboardEvent({ ctrlKey: true, key: 'Enter' }));
     handler(createKeyboardEvent({ key: 'Escape' }));
-    createAIModalKeyDownHandler({ canSubmit: false, handleSubmit, isLoading: false, onClose })(
+    createAIModalKeyDownHandler({ canSubmit: false, handleSubmit })(
       createKeyboardEvent({ ctrlKey: true, key: 'Enter' })
     );
 
     expect(handleSubmit).toHaveBeenCalledTimes(1);
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps escape disabled while the modal is loading', () => {
-    const onClose = vi.fn();
-
-    createAIModalKeyDownHandler({
-      canSubmit: true,
-      handleSubmit: vi.fn(),
-      isLoading: true,
-      onClose,
-    })(createKeyboardEvent({ key: 'Escape' }));
-
-    expect(onClose).not.toHaveBeenCalled();
   });
 });
 

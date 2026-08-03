@@ -33,6 +33,18 @@ export const aiModalMessages = defineMessageSource({
     ru: 'Опишите, что нужно сделать с выбранными данными...',
     en: 'Describe what should be done with the selected data...',
   },
+  voiceInputStart: {
+    ru: 'Начать голосовой ввод',
+    en: 'Start voice input',
+  },
+  voiceInputStop: {
+    ru: 'Остановить голосовой ввод',
+    en: 'Stop voice input',
+  },
+  voiceInputError: {
+    ru: 'Не удалось запустить голосовой ввод',
+    en: 'Voice input could not be started',
+  },
   submitShortcutSuffix: {
     ru: 'для отправки',
     en: 'to submit',

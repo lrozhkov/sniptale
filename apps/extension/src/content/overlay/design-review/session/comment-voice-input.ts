@@ -2,16 +2,16 @@ import { useCallback, useRef, useState } from 'react';
 import type { VoiceInputClient } from '../../../../workflows/voice-input';
 import { useContentVoiceInputSession } from '../../../voice-input/session';
 import {
-  createCommentTranscriptInsertion,
-  type CommentTranscriptInsertion,
-} from './comment-transcript';
+  createTextTranscriptInsertion,
+  type TextTranscriptInsertion,
+} from '../../../voice-input/text-transcript';
 
 export function useDesignReviewCommentVoiceInput(args: {
   updateDraft(value: string): void;
   createClient?: () => VoiceInputClient;
 }) {
   const [caretPosition, setCaretPosition] = useState<number | null>(null);
-  const insertionRef = useRef<CommentTranscriptInsertion | null>(null);
+  const insertionRef = useRef<TextTranscriptInsertion | null>(null);
   const updateDraftRef = useRef(args.updateDraft);
   updateDraftRef.current = args.updateDraft;
   const session = useContentVoiceInputSession({
@@ -27,7 +27,7 @@ export function useDesignReviewCommentVoiceInput(args: {
 
   const start = useCallback(
     (draft: string, caret: number) => {
-      insertionRef.current = createCommentTranscriptInsertion(draft, caret);
+      insertionRef.current = createTextTranscriptInsertion(draft, caret);
       setCaretPosition(caret);
       return startSession();
     },

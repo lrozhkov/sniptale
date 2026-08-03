@@ -10,8 +10,9 @@ import { createTemplateAddHandler, createTemplateEditHandler } from './template-
 import { createTemplateDeleteHandler, createTemplateSaveHandler } from './template-persistence';
 import { buildAIModalState } from './view-state';
 import type { AIModalCoreState } from './core-state';
+import { useAIModalPromptVoiceInput } from './prompt-voice-input';
 
-function createAIModalActions(core: AIModalCoreState) {
+function createAIModalActions(core: AIModalCoreState, stopVoiceInput: () => void) {
   return {
     handleAddTemplate: createTemplateAddHandler({
       setEditingTemplate: core.editor.setEditingTemplate,
@@ -35,13 +36,18 @@ function createAIModalActions(core: AIModalCoreState) {
     handleSelectTemplate: createTemplateSelectHandler({
       selectTemplate: core.templatesState.selectTemplate,
       setPrompt: core.setPrompt,
+      stopVoiceInput,
       textareaRef: core.resize.textareaRef,
     }),
   };
 }
 
-export function useAIModalState({ isOpen }: Pick<AIModalProps, 'isOpen'>) {
+export function useAIModalState({ isOpen, isLoading }: Pick<AIModalProps, 'isOpen' | 'isLoading'>) {
   const core = useAIModalCoreState();
+  const voice = useAIModalPromptVoiceInput({
+    enabled: isOpen && !isLoading,
+    setPrompt: core.setPrompt,
+  });
 
   useAIModalBootEffect({
     isOpen,
@@ -56,7 +62,7 @@ export function useAIModalState({ isOpen }: Pick<AIModalProps, 'isOpen'>) {
     textareaRef: core.resize.textareaRef,
   });
 
-  const actions = createAIModalActions(core);
+  const actions = createAIModalActions(core, voice.actions.stop);
 
   return buildAIModalState({
     editor: core.editor,
@@ -71,5 +77,6 @@ export function useAIModalState({ isOpen }: Pick<AIModalProps, 'isOpen'>) {
     templates: core.templatesState.templates,
     templatesLoading: core.templatesState.isLoading || core.templatesState.isMutating,
     totalTokens: core.totalTokens,
+    voice,
   });
 }

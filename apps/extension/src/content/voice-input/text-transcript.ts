@@ -1,23 +1,22 @@
 import { VOICE_INPUT_TRANSCRIPT_MAX_CHARS } from '@sniptale/runtime-contracts/voice-input';
 
-interface CommentTranscriptUpdate {
+interface TextTranscriptUpdate {
   caretPosition: number;
   value: string;
 }
 
-export interface CommentTranscriptInsertion {
-  apply(args: { isFinal: boolean; sequence: number; text: string }): CommentTranscriptUpdate | null;
+export interface TextTranscriptInsertion {
+  apply(args: { isFinal: boolean; sequence: number; text: string }): TextTranscriptUpdate | null;
 }
 
-/** Owns the replaceable voice span while preserving all text around the captured caret. */
-export function createCommentTranscriptInsertion(
-  draft: string,
+/** Owns one replaceable voice span while preserving the text around the captured caret. */
+export function createTextTranscriptInsertion(
+  value: string,
   requestedPosition: number
-): CommentTranscriptInsertion {
-  const position = Math.min(Math.max(requestedPosition, 0), draft.length);
-  const prefix = draft.slice(0, position);
-  const insertionPrefix = prefix.length > 0 && !/\s$/u.test(prefix) ? `${prefix} ` : prefix;
-  const suffix = draft.slice(position);
+): TextTranscriptInsertion {
+  const position = Math.min(Math.max(requestedPosition, 0), value.length);
+  const prefix = value.slice(0, position);
+  const suffix = value.slice(position);
   let finalText = '';
   let interimText = '';
   let lastSequence = -1;
@@ -40,8 +39,11 @@ export function createCommentTranscriptInsertion(
           Math.max(VOICE_INPUT_TRANSCRIPT_MAX_CHARS - finalText.length - separatorLength, 0)
         );
       }
+
       const voiceText = `${finalText}${finalText && interimText ? ' ' : ''}${interimText}`;
-      if (!voiceText) return null;
+      if (!voiceText) return { caretPosition: position, value };
+
+      const insertionPrefix = prefix.length > 0 && !/\s$/u.test(prefix) ? `${prefix} ` : prefix;
       const suffixSeparator = suffix.length > 0 && !/^\s/u.test(suffix) ? ' ' : '';
       const existingSuffixSpacing = /^\s+/u.exec(suffix)?.[0].length ?? 0;
       return {

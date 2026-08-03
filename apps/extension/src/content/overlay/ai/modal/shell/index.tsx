@@ -3,7 +3,7 @@ import type { AIModalProps } from './types';
 import { useAIModalState } from '../session';
 
 export default function AIModal(props: AIModalProps) {
-  const state = useAIModalState({ isOpen: props.isOpen });
+  const state = useAIModalState({ isOpen: props.isOpen, isLoading: Boolean(props.isLoading) });
 
   if (!props.isOpen) {
     return null;

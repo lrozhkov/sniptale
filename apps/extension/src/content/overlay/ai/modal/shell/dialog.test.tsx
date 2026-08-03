@@ -92,6 +92,16 @@ function createState(): ReturnType<typeof useAIModalState> {
     templates: [],
     templatesLoading: false,
     totalTokens: 0,
+    voice: {
+      actions: { start: vi.fn(), stop: vi.fn() },
+      state: {
+        active: false,
+        audioLevel: 0,
+        caretPosition: null,
+        errorCode: null,
+        phase: 'idle',
+      },
+    },
   };
 }
 
@@ -123,10 +133,12 @@ async function renderDialog(props: Partial<React.ComponentProps<typeof AIModalDi
       <AIModalDialog
         isLoading={false}
         onClose={vi.fn()}
+        onStopVoice={vi.fn()}
         promptField={<div data-ui="ai-modal.prompt-field" />}
         state={createState()}
         title="AI"
         treeData={null}
+        voiceActive={false}
         {...props}
       >
         <div data-ui="ai-modal.footer" />
@@ -194,5 +206,35 @@ describe('AIModalDialog', () => {
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops active voice input on the first Escape without closing', async () => {
+    const onClose = vi.fn();
+    const onStopVoice = vi.fn();
+
+    await renderDialog({ onClose, onStopVoice, voiceActive: true });
+
+    act(() => {
+      container
+        ?.querySelector('[data-ui="ai-modal.product-modal"]')
+        ?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    });
+
+    expect(onStopVoice).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('consumes Escape without closing while loading', async () => {
+    const onClose = vi.fn();
+
+    await renderDialog({ isLoading: true, onClose });
+
+    act(() => {
+      container
+        ?.querySelector('[data-ui="ai-modal.product-modal"]')
+        ?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
