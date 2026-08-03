@@ -101,3 +101,26 @@ it('uses the contrast surface and inverse icon treatment above arbitrary page co
 
   expect(container.querySelector('button')?.className).toContain('text-inverse');
 });
+
+it('keeps the pointer stable while an internal stop is settling', () => {
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  act(() => {
+    root?.render(
+      <ContentVoiceInputButton
+        dataUi="voice-stopping-test"
+        disabled={false}
+        labels={{ error: 'Error', start: 'Start', stop: 'Stop' }}
+        onStart={vi.fn()}
+        onStop={vi.fn()}
+        state={{ active: false, audioLevel: 0, errorCode: null, phase: 'stopping' }}
+      />
+    );
+  });
+
+  const button = container.querySelector('button');
+  expect(button?.disabled).toBe(true);
+  expect(button?.className).toContain('disabled:cursor-pointer');
+  expect(button?.className).toContain('disabled:opacity-100');
+});

@@ -38,7 +38,10 @@ export function ContentVoiceInputButton(props: {
       className={[
         'relative inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full',
         'border transition-colors focus-visible:outline-none focus-visible:ring-2',
-        'focus-visible:ring-[var(--sniptale-color-accent)] disabled:cursor-not-allowed disabled:opacity-45',
+        'focus-visible:ring-[var(--sniptale-color-accent)]',
+        props.disabled
+          ? 'disabled:cursor-not-allowed disabled:opacity-45'
+          : 'disabled:cursor-pointer disabled:opacity-100',
         contrast
           ? [
               'border-[color:color-mix(in_srgb,var(--sniptale-color-text-inverse)_26%,transparent)]',
