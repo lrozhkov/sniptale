@@ -27,6 +27,10 @@
   --sniptale-size-toolbar: 44px;
   --sniptale-size-toolbar-glass: 46px;
 
+  /* Theme-invariant control surface for UI floating above arbitrary page content. */
+  --sniptale-color-surface-contrast: #27272a;
+  --sniptale-color-surface-contrast-hover: #3f3f46;
+
   --sniptale-glass-blur: 12px;
   --sniptale-glass-blur-hover: 16px;
   --sniptale-glass-opacity: 0.85;

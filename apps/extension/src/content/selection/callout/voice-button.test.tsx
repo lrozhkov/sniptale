@@ -15,7 +15,8 @@ it('renders the microphone substrate only while the callout is being edited', ()
     <CalloutVoiceButton isEditing leftOffset={48} voice={voice} />
   );
   expect(markup).toContain('content.highlighter.callout-voice-input');
-  expect(markup).toContain('surface-elevated');
+  expect(markup).toContain('surface-contrast');
+  expect(markup).toContain('text-inverse');
 });
 
 it('moves the microphone to the left when the callout is clamped at the right viewport edge', () => {

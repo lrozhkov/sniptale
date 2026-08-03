@@ -41,10 +41,7 @@ export function CalloutVoiceButton(props: {
       onMouseDown={(event) => event.preventDefault()}
     >
       <ContentVoiceInputButton
-        className={[
-          'border-[color:var(--sniptale-color-border-soft)]',
-          'bg-[var(--sniptale-color-surface-elevated)] shadow-sm',
-        ].join(' ')}
+        appearance="contrast"
         dataUi="content.highlighter.callout-voice-input"
         disabled={false}
         labels={{

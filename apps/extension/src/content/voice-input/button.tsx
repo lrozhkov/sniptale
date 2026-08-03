@@ -5,6 +5,7 @@ import { isTrustedMouseEvent, isTrustedPointerEvent } from '../platform/trusted-
 import type { ContentVoiceInputState } from './session';
 
 export function ContentVoiceInputButton(props: {
+  appearance?: 'contrast' | 'default';
   className?: string;
   dataUi: string;
   disabled: boolean;
@@ -22,6 +23,7 @@ export function ContentVoiceInputButton(props: {
   });
   const hasError = props.state.errorCode !== null;
   const stopping = props.state.phase === 'stopping';
+  const contrast = props.appearance === 'contrast';
   const label = hasError
     ? props.labels.error
     : props.state.active
@@ -35,13 +37,22 @@ export function ContentVoiceInputButton(props: {
       aria-pressed={props.state.active}
       className={[
         'relative inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full',
-        'border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2',
+        'border transition-colors focus-visible:outline-none focus-visible:ring-2',
         'focus-visible:ring-[var(--sniptale-color-accent)] disabled:cursor-not-allowed disabled:opacity-45',
+        contrast
+          ? [
+              'border-[color:color-mix(in_srgb,var(--sniptale-color-text-inverse)_26%,transparent)]',
+              'bg-[var(--sniptale-color-surface-contrast)]',
+              'shadow-[0_3px_10px_rgba(0,0,0,0.45)]',
+            ].join(' ')
+          : 'border-transparent',
         props.state.active
           ? 'text-[var(--sniptale-color-accent)]'
           : hasError
             ? 'text-[var(--sniptale-color-danger)]'
-            : 'text-[var(--sniptale-color-text-dim)] hover:text-[var(--sniptale-color-text-primary)]',
+            : contrast
+              ? 'text-[var(--sniptale-color-text-inverse)] hover:bg-[var(--sniptale-color-surface-contrast-hover)]'
+              : 'text-[var(--sniptale-color-text-dim)] hover:text-[var(--sniptale-color-text-primary)]',
         props.className,
       ]
         .filter(Boolean)
