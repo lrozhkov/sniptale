@@ -1,5 +1,6 @@
 import { Funnel } from 'lucide-react';
 import { useEffect, type RefObject } from 'react';
+import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 import { translate } from '../../../../platform/i18n';
 import type { BrowserDesignReviewAction } from '../../../parser/page-preparation/annotations';
 import { DESIGN_REVIEW_ACTIONS, getDesignReviewActionTone } from '../action-catalog';
@@ -15,6 +16,7 @@ export function FeedbackFilter(props: {
   rootRef: RefObject<HTMLDivElement | null>;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
+  const menuRef = useFloatingSurfaceWheelContainment(props.menuRef);
   useEffect(() => {
     if (!props.open) return;
     const selected = props.menuRef.current?.querySelector<HTMLElement>('[aria-checked="true"]');
@@ -46,7 +48,7 @@ export function FeedbackFilter(props: {
       </button>
       {props.open ? (
         <div
-          ref={props.menuRef}
+          ref={menuRef}
           className={[
             'absolute right-0 top-11 z-10 w-44 rounded-[10px] border p-1 shadow-xl',
             'border-[color:var(--sniptale-color-border-soft)]',

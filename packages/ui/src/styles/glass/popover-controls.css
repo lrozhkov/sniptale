@@ -107,6 +107,15 @@
   gap: 8px;
 }
 
+.sniptale-glass-preset-list--scroll {
+  min-height: 0;
+  max-height: var(--sniptale-preset-list-max-height, 180px);
+  padding-right: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .sniptale-glass-preset-item {
   width: 100%;
   display: flex;

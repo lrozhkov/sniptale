@@ -93,6 +93,9 @@ function registerStepBadgeDisableActionTest(): void {
       />
     );
 
+    expect(markup).toContain('sniptale-toolbar-menu-title');
+    expect(markup).toContain('Настройки нумерации');
+    expect(markup).not.toContain('sniptale-glass-range-meta');
     expect(markup).toContain('Выключить');
     expect(markup).toContain('sniptale-glass-destructive');
   });

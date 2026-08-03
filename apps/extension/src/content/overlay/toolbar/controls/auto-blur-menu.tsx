@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Check, Droplet, ScanSearch, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Check, ScanSearch, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -246,7 +246,7 @@ export function AutoBlurMenu(props: AutoBlurMenuProps) {
         aria-haspopup="menu"
         aria-expanded={bindings.open}
       >
-        <Droplet size={20} strokeWidth={2} />
+        <ShieldCheck size={20} strokeWidth={2} />
       </ContentToolbarButton>
 
       {renderAutoBlurDropdown(props, bindings)}

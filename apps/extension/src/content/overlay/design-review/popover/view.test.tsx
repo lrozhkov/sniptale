@@ -29,6 +29,7 @@ const actions: DesignReviewActions = {
   setSideFieldLinked: vi.fn(),
   updateValue: vi.fn(),
   updateValues: vi.fn(),
+  voice: { start: vi.fn(), stop: vi.fn() },
 };
 
 const element = document.createElement('h1');
@@ -50,6 +51,13 @@ const state: DesignReviewViewState = {
   },
   settingsOpen: true,
   values: {},
+  voice: {
+    active: false,
+    audioLevel: 0,
+    caretPosition: null,
+    errorCode: null,
+    phase: 'idle',
+  },
 };
 
 function dispatchPointer(
@@ -353,6 +361,9 @@ it('measures and reclamps base, delete, and action-menu states inside the viewpo
     expect(actionMenu?.className).toContain('absolute');
     expect(actionMenu?.closest('.overflow-y-auto')).toBeNull();
     expect(actionMenu?.closest('[data-ui="content.design-review.comment-layer"]')).not.toBeNull();
+    const wheelEvent = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 80 });
+    actionMenu?.dispatchEvent(wheelEvent);
+    expect(wheelEvent.defaultPrevented).toBe(true);
     expect(popover.style.top).toBe('12px');
 
     act(() => {

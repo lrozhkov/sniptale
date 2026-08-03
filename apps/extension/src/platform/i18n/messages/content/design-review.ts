@@ -57,6 +57,18 @@ export const contentDesignReviewMessages = defineMessageSource({
     ru: 'Enter — сохранить и закрыть, Shift+Enter — новая строка.',
     en: 'Enter saves and closes; Shift+Enter starts a new line.',
   },
+  voiceInputStart: {
+    ru: 'Начать голосовой ввод. Удерживайте кнопку, чтобы говорить только во время нажатия.',
+    en: 'Start voice input. Hold the button to speak only while pressed.',
+  },
+  voiceInputStop: {
+    ru: 'Остановить голосовой ввод',
+    en: 'Stop voice input',
+  },
+  voiceInputError: {
+    ru: 'Голосовой ввод недоступен. Проверьте микрофон и настройки голосового ввода.',
+    en: 'Voice input is unavailable. Check the microphone and voice input settings.',
+  },
   markerNumberLabel: {
     ru: 'Замечание',
     en: 'Feedback',

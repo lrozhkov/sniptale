@@ -5,7 +5,8 @@ import { queryAllContentUiElements } from '../../../platform/dom-host';
 import type { FloatingRect } from './floating-placement';
 
 const VIEWPORT_MARGIN = 8;
-const POPOVER_GAP = 10;
+const FRAME_TOOLBAR_POPOVER_GAP = 4;
+const TOOLBAR_MENU_GAP = 10;
 
 function toRect(rect: DOMRect): FloatingRect {
   return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
@@ -28,6 +29,18 @@ function getHiddenStyle(): CSSProperties {
   };
 }
 
+function getMainToolbar(anchorEl: HTMLElement | null): {
+  displayMode: 'horizontal' | 'vertical';
+  rect: FloatingRect;
+} | null {
+  const toolbar = anchorEl?.closest<HTMLElement>('.sniptale-toolbar');
+  if (!toolbar) return null;
+  return {
+    displayMode: toolbar.dataset['displayMode'] === 'vertical' ? 'vertical' : 'horizontal',
+    rect: toRect(toolbar.getBoundingClientRect()),
+  };
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
 }
@@ -38,8 +51,8 @@ function calculateQuickControlPopoverRect(params: {
   viewport: { width: number; height: number };
   width: number;
 }): FloatingRect | null {
-  const rightX = params.anchorRect.x + params.anchorRect.width + POPOVER_GAP;
-  const leftX = params.anchorRect.x - POPOVER_GAP - params.width;
+  const rightX = params.anchorRect.x + params.anchorRect.width + TOOLBAR_MENU_GAP;
+  const leftX = params.anchorRect.x - TOOLBAR_MENU_GAP - params.width;
   const x =
     rightX + params.width <= params.viewport.width - VIEWPORT_MARGIN
       ? rightX
@@ -69,6 +82,7 @@ function calculateCanonicalPopoverRect(params: {
     Math.max(0, params.viewport.width - VIEWPORT_MARGIN * 2)
   );
   const height = params.size.height;
+  const gap = params.preferSidePlacement ? TOOLBAR_MENU_GAP : FRAME_TOOLBAR_POPOVER_GAP;
   if (params.preferSidePlacement) {
     const sideRect = calculateQuickControlPopoverRect({
       anchorRect: params.anchorRect,
@@ -84,11 +98,91 @@ function calculateCanonicalPopoverRect(params: {
     VIEWPORT_MARGIN,
     params.viewport.width - width - VIEWPORT_MARGIN
   );
-  const bottomY = params.surfaceRect.y + params.surfaceRect.height + POPOVER_GAP;
+  const bottomY = params.surfaceRect.y + params.surfaceRect.height + gap;
   const bottomAvailable = Math.max(0, params.viewport.height - VIEWPORT_MARGIN - bottomY);
   const placeBelow = height <= bottomAvailable;
-  const y = placeBelow ? bottomY : params.surfaceRect.y - POPOVER_GAP - height;
+  const y = placeBelow ? bottomY : params.surfaceRect.y - gap - height;
   return { x, y, width, height };
+}
+
+function isInsideViewport(
+  rect: FloatingRect,
+  viewport: { width: number; height: number }
+): boolean {
+  return (
+    rect.x >= VIEWPORT_MARGIN &&
+    rect.y >= VIEWPORT_MARGIN &&
+    rect.x + rect.width <= viewport.width - VIEWPORT_MARGIN &&
+    rect.y + rect.height <= viewport.height - VIEWPORT_MARGIN
+  );
+}
+
+function calculateMainToolbarPopoverRect(params: {
+  anchorRect: FloatingRect;
+  displayMode: 'horizontal' | 'vertical';
+  size: { width: number; height: number };
+  toolbarRect: FloatingRect;
+  viewport: { width: number; height: number };
+}): FloatingRect {
+  const width = Math.min(
+    params.size.width,
+    Math.max(0, params.viewport.width - VIEWPORT_MARGIN * 2)
+  );
+  const height = params.size.height;
+  const horizontalX = clamp(
+    params.anchorRect.x,
+    VIEWPORT_MARGIN,
+    params.viewport.width - width - VIEWPORT_MARGIN
+  );
+  const verticalY = clamp(
+    params.anchorRect.y,
+    VIEWPORT_MARGIN,
+    params.viewport.height - height - VIEWPORT_MARGIN
+  );
+  const downEdge = Math.max(
+    params.toolbarRect.y + params.toolbarRect.height,
+    params.anchorRect.y + params.anchorRect.height + TOOLBAR_MENU_GAP
+  );
+  const upEdge = Math.min(params.toolbarRect.y, params.anchorRect.y - TOOLBAR_MENU_GAP);
+  const rightEdge = Math.max(
+    params.toolbarRect.x + params.toolbarRect.width,
+    params.anchorRect.x + params.anchorRect.width + TOOLBAR_MENU_GAP
+  );
+  const leftEdge = Math.min(params.toolbarRect.x, params.anchorRect.x - TOOLBAR_MENU_GAP);
+  const candidates = {
+    down: {
+      x: horizontalX,
+      y: downEdge,
+      width,
+      height,
+    },
+    up: {
+      x: horizontalX,
+      y: upEdge - height,
+      width,
+      height,
+    },
+    right: {
+      x: rightEdge,
+      y: verticalY,
+      width,
+      height,
+    },
+    left: {
+      x: leftEdge - width,
+      y: verticalY,
+      width,
+      height,
+    },
+  } satisfies Record<string, FloatingRect>;
+  const orderedCandidates =
+    params.displayMode === 'vertical'
+      ? [candidates.right, candidates.left, candidates.down, candidates.up]
+      : [candidates.down, candidates.up, candidates.right, candidates.left];
+  return (
+    orderedCandidates.find((candidate) => isInsideViewport(candidate, params.viewport)) ??
+    orderedCandidates[0]!
+  );
 }
 
 export function useFramePopoverPosition(params: {
@@ -144,9 +238,11 @@ export function useFramePopoverPosition(params: {
     };
     const observer = new ResizeObserver(updateAfterLayout);
     observer.observe(popover);
-    const toolbar = queryAllContentUiElements('.sniptale-toolbar-portal-wrapper').find(
-      (element) => element instanceof HTMLElement && element.dataset['frameId'] === params.frameId
-    );
+    const toolbar =
+      params.anchorEl?.closest('.sniptale-toolbar') ??
+      queryAllContentUiElements('.sniptale-toolbar-portal-wrapper').find(
+        (element) => element instanceof HTMLElement && element.dataset['frameId'] === params.frameId
+      );
     if (toolbar) observer.observe(toolbar);
     return () => {
       observer.disconnect();
@@ -172,13 +268,23 @@ export function useFramePopoverPosition(params: {
     popover && popover.offsetWidth > 0 && popover.offsetHeight > 0
       ? { width: popover.offsetWidth, height: popover.offsetHeight }
       : params.fallbackSize;
-  const rect = calculateCanonicalPopoverRect({
-    anchorRect: activePlacementSession.anchorRect,
-    preferSidePlacement: activePlacementSession.preferSidePlacement,
-    surfaceRect: activePlacementSession.surfaceRect,
-    size,
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-  });
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const mainToolbar = getMainToolbar(params.anchorEl);
+  const rect = mainToolbar
+    ? calculateMainToolbarPopoverRect({
+        anchorRect: toRect(params.anchorEl.getBoundingClientRect()),
+        displayMode: mainToolbar.displayMode,
+        size,
+        toolbarRect: mainToolbar.rect,
+        viewport,
+      })
+    : calculateCanonicalPopoverRect({
+        anchorRect: activePlacementSession.anchorRect,
+        preferSidePlacement: activePlacementSession.preferSidePlacement,
+        surfaceRect: activePlacementSession.surfaceRect,
+        size,
+        viewport,
+      });
   return {
     position: 'fixed',
     top: rect.y,

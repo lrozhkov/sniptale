@@ -87,27 +87,26 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
           borderWidth={props.borderWidth}
           onResizeStart={props.handleResizeStart}
         />
-        {props.currentFrame.stepBadge?.enabled && props.currentFrame.stepBadge.value && (
-          <StepBadge
-            settings={props.currentFrame.stepBadge}
-            borderColor={props.borderColor}
-            borderWidth={props.borderWidth}
-            frameRect={props.currentFrame}
-            isSettingsOpen={props.isStepBadgePopoverOpen}
-            onPositionChange={(manualPlacement) => {
-              dispatchFrameStepBadgeChanged({
-                frameId: props.frame.id,
-                settings: { manualPlacement },
-              });
-            }}
-            onSettingsClick={() => toggleQuickPopover(props.frame.id, 'step-badge')}
-            settingsAnchorRef={props.stepBadgePopoverAnchorRef}
-            showSettingsHandle={!isAnyFrameSelected}
-            zIndex={props.frameZIndex}
-            {...(props.borderShadow === undefined ? {} : { shadow: props.borderShadow })}
-          />
-        )}
       </div>
+      {props.currentFrame.stepBadge?.enabled && props.currentFrame.stepBadge.value && (
+        <StepBadge
+          settings={props.currentFrame.stepBadge}
+          borderColor={props.borderColor}
+          borderWidth={props.borderWidth}
+          frameRect={props.currentFrame}
+          isSettingsOpen={props.isStepBadgePopoverOpen}
+          onPositionChange={(manualPlacement) => {
+            dispatchFrameStepBadgeChanged({
+              frameId: props.frame.id,
+              settings: { manualPlacement },
+            });
+          }}
+          onSettingsClick={() => toggleQuickPopover(props.frame.id, 'step-badge')}
+          settingsAnchorRef={props.stepBadgePopoverAnchorRef}
+          showSettingsHandle={!isAnyFrameSelected}
+          {...(props.borderShadow === undefined ? {} : { shadow: props.borderShadow })}
+        />
+      )}
     </div>
   );
 }

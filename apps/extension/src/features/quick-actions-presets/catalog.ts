@@ -20,9 +20,14 @@ export function getCaptureActionDescriptors(): CaptureActionDescriptor[] {
       hint: translate('content.toolbar.captureDownloadHint'),
     },
     {
-      value: 'ask_preset',
-      label: translate('content.toolbar.captureAskPresetLabel'),
-      hint: translate('content.toolbar.captureAskPresetHint'),
+      value: 'copy',
+      label: translate('content.toolbar.captureCopyLabel'),
+      hint: translate('content.toolbar.captureCopyHint'),
+    },
+    {
+      value: 'edit',
+      label: translate('content.toolbar.captureEditLabel'),
+      hint: translate('content.toolbar.captureEditHint'),
     },
     {
       value: 'ask_system',
@@ -30,19 +35,14 @@ export function getCaptureActionDescriptors(): CaptureActionDescriptor[] {
       hint: translate('content.toolbar.captureAskSystemHint'),
     },
     {
-      value: 'copy',
-      label: translate('content.toolbar.captureCopyLabel'),
-      hint: translate('content.toolbar.captureCopyHint'),
+      value: 'ask_preset',
+      label: translate('content.toolbar.captureAskPresetLabel'),
+      hint: translate('content.toolbar.captureAskPresetHint'),
     },
     {
       value: 'scenario',
       label: translate('content.toolbar.captureScenarioLabel'),
       hint: translate('content.toolbar.captureScenarioHint'),
-    },
-    {
-      value: 'edit',
-      label: translate('content.toolbar.captureEditLabel'),
-      hint: translate('content.toolbar.captureEditHint'),
     },
   ];
 }

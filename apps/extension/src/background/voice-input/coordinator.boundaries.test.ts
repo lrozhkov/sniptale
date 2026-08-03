@@ -1,4 +1,10 @@
-import { createPort, createVoiceInputCoordinator, flush, mocks } from './coordinator.test-support';
+import {
+  createPort,
+  createSnapshot,
+  createVoiceInputCoordinator,
+  flush,
+  mocks,
+} from './coordinator.test-support';
 import { describe, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VoiceInputPortMessageType } from '@sniptale/runtime-contracts/voice-input';
@@ -17,7 +23,11 @@ describe('background voice input coordinator boundary failures', () => {
         });
       }
       if (message.type === MessageType.OFFSCREEN_VOICE_INPUT_STOP) {
-        return Promise.resolve({ result: 'stale', success: true });
+        return Promise.resolve({
+          result: 'stale',
+          snapshot: createSnapshot(null, 'idle'),
+          success: true,
+        });
       }
       return Promise.resolve({ result: 'accepted', success: true });
     });

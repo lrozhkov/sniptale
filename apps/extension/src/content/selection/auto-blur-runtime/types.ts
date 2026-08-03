@@ -58,9 +58,12 @@ export interface AutoBlurSyncResult extends AutoBlurApplyResult {
 
 export interface AutoBlurScanInput {
   frames: FrameData[];
+  mode?: 'current-view' | 'full-page';
 }
 
 export interface AutoBlurApplyInput {
+  /** Keeps geometry measured during full-page traversal after the viewport is restored. */
+  allowDeferredInitialPlacement?: boolean;
   blurSettings: BlurSettings;
   targets: AutoBlurApplyTarget[];
 }

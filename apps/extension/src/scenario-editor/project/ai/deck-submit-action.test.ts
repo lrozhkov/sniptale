@@ -178,6 +178,21 @@ it('surfaces unknown request failures through the generic deck AI error label', 
   );
 });
 
+it('keeps retired presentation vocabulary out of AI operation summaries', () => {
+  const keys = [
+    'scenario.editor.aiOperationElementBuild',
+    'scenario.editor.aiOperationSlideCanvas',
+    'scenario.editor.aiOperationSlideLayout',
+  ] as const;
+
+  expect(keys.map((key) => translate(key, 'en')).join(' ')).not.toMatch(
+    /\b(build|canvas|layout)\b/i
+  );
+  expect(keys.map((key) => translate(key, 'ru')).join(' ')).not.toMatch(
+    /анимац|таймлайн|холст|макет/i
+  );
+});
+
 function createProject() {
   const project = createScenarioProjectV3('AI deck');
   return { ...project, slides: [{ ...project.slides[0]!, id: 'slide-1' }] };

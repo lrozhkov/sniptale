@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 import { translate } from '../../../../platform/i18n';
 import { DesignReviewSettings } from '../settings/view';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
@@ -57,6 +58,7 @@ export function DesignReviewPopover(props: {
 }) {
   const [deleteRequested, setDeleteRequested] = useState(false);
   const popoverRef = useRef<HTMLElement | null>(null);
+  const containedPopoverRef = useFloatingSurfaceWheelContainment(popoverRef);
   const previousSelectionRef = useRef<Element | null>(null);
   const selectionElement = props.state.selection?.element ?? null;
   const active = Boolean(props.open && props.state.anchor && props.state.selection);
@@ -99,7 +101,7 @@ export function DesignReviewPopover(props: {
 
   return (
     <aside
-      ref={popoverRef}
+      ref={containedPopoverRef}
       data-ui="content.design-review.popover"
       className={[
         'pointer-events-auto fixed z-[2147483646] max-h-[calc(100vh-24px)] cursor-default overflow-visible',
@@ -110,7 +112,6 @@ export function DesignReviewPopover(props: {
       style={{ left: drag.position.left, top: drag.position.top, width: basePosition.width }}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
-      onWheelCapture={(event) => event.stopPropagation()}
     >
       <button
         type="button"
@@ -143,7 +144,11 @@ export function DesignReviewPopover(props: {
             onPointerCancel={drag.onPointerUp}
           />
           <PageStyleCommentField
-            actions={{ ...props.actions.comment, close: props.actions.close }}
+            actions={{
+              ...props.actions.comment,
+              close: props.actions.close,
+              voice: props.actions.voice,
+            }}
             disabled={false}
             footer={
               <DesignReviewActionMenu
@@ -152,6 +157,7 @@ export function DesignReviewPopover(props: {
               />
             }
             state={props.state.comment}
+            voice={props.state.voice}
           />
         </div>
         <div className="min-h-0 overflow-y-auto overscroll-contain">

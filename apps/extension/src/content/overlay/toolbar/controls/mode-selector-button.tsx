@@ -3,6 +3,7 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 
 export function ModeSelectorButton(props: {
   children: React.ReactNode;
+  disabled?: boolean;
   label: string;
   menuIndicator?: boolean;
   onToggle: () => void;
@@ -16,6 +17,7 @@ export function ModeSelectorButton(props: {
       active
       className="sniptale-mode-selector-btn"
       dataUi="content.toolbar.mode-selector-button"
+      disabled={props.disabled ?? false}
       menuIndicator={props.menuIndicator ?? false}
       title={props.label}
       data-menu-open={props.open ? 'true' : 'false'}

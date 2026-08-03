@@ -38,6 +38,23 @@ describe('voice input boundary parsers', () => {
         type: VoiceInputPortMessageType.START,
       })
     ).not.toBeNull();
+    const offscreenStart = {
+      capabilityToken: 'capability',
+      preferences: { language: 'ru-RU', mode: 'local-first' },
+      quality: 'dictation',
+      requestId: 'request-1',
+      sessionId: 'session-1',
+      type: MessageType.OFFSCREEN_VOICE_INPUT_START,
+    } as const;
+    expect(
+      parseOffscreenVoiceInputRuntimeMessage({ ...offscreenStart, maxDurationMs: null })
+    ).not.toBeNull();
+    expect(
+      parseOffscreenVoiceInputRuntimeMessage({ ...offscreenStart, maxDurationMs: 30_000 })
+    ).not.toBeNull();
+    expect(
+      parseOffscreenVoiceInputRuntimeMessage({ ...offscreenStart, maxDurationMs: 30_001 })
+    ).toBeNull();
   });
 
   it('normalizes legacy preferences and bounds selected device identifiers', () => {
@@ -76,6 +93,7 @@ describe('voice input boundary parsers', () => {
     expect(
       parseOffscreenVoiceInputRuntimeMessage({
         capabilityToken: 'capability',
+        maxDurationMs: null,
         preferences: { language: 'ru-RU', mode: 'local-first' },
         quality: 'command',
         requestId: 'request-1',

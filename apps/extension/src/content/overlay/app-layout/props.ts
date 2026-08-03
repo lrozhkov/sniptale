@@ -60,6 +60,7 @@ function createToolbarLayoutSection(
     captureAction: viewModel.modeState.captureAction,
     currentViewport: viewModel.modeState.currentViewport,
     frameCount: viewModel.frameManager.frames.length,
+    futureFrameStyle: viewModel.frameManager.getFutureFrameStyle(),
     handleTakeScreenshot: viewModel.screenshotController.handleTakeScreenshot,
     isCompletelyHidden: viewModel.modeState.isCompletelyHidden,
     isCursorMode:
@@ -79,6 +80,7 @@ function createToolbarLayoutSection(
     },
     pinToTab: viewModel.modeState.pinToTab,
     pinToTabAvailable: viewModel.modeState.pinToTabAvailable,
+    setFutureFrameEffectMode: viewModel.frameManager.setFutureFrameEffectMode,
     setCaptureAction: viewModel.modeState.setCaptureAction,
     setCurrentViewport: viewModel.modeState.setCurrentViewport,
     setPinToTab: viewModel.modeState.setPinToTab,

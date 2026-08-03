@@ -26,9 +26,10 @@ function createBorderPreset(id: string, name: string) {
   };
 }
 
-function renderContent(effectMode: EffectMode, decorationVisible = true) {
+function renderContent(effectMode: EffectMode, decorationVisible = true, compact = false) {
   return renderToStaticMarkup(
     <FrameSettingsPopoverContent
+      compact={compact}
       effectMode={effectMode}
       globalSettings={{
         borderPresets: [
@@ -66,6 +67,8 @@ describe('FrameSettingsPopoverContent', () => {
   it('uses the shared content popover section contract for border mode', () => {
     const markup = renderContent('border');
 
+    expect(markup).toContain('sniptale-toolbar-menu-title');
+    expect(markup).toContain(translate('content.interactiveFrame.effectBorder'));
     expect(markup).toContain('shared.ui.content-popover-section');
     expect(markup).toContain('sniptale-content-popover-section');
     expect(markup).toContain('Default');
@@ -75,6 +78,7 @@ describe('FrameSettingsPopoverContent', () => {
     const markup = renderContent('border');
 
     expect(markup).toContain('sniptale-frame-style-section');
+    expect(markup).toContain('sniptale-glass-preset-list--scroll');
     expect(markup).toContain('sniptale-frame-style-preset-actions');
     expect(markup).toContain(translate('content.overlayControls.configureFrameStyle'));
     expect(markup).toContain(translate('content.overlayControls.hideFrameStyle'));
@@ -96,6 +100,16 @@ describe('FrameSettingsPopoverContent', () => {
       expect(markup).toContain('sniptale-frame-style-add');
     }
   );
+
+  it('hides the frame-and-fill hint only for compact toolbar menus', () => {
+    const expandedMarkup = renderContent('blur', true, false);
+    const compactMarkup = renderContent('blur', true, true);
+
+    expect(expandedMarkup).toContain(translate('content.overlayControls.showBorderHint'));
+    expect(compactMarkup).not.toContain(translate('content.overlayControls.showBorderHint'));
+    expect(compactMarkup).toContain(translate('content.overlayControls.showBorderTitle'));
+    expect(compactMarkup).toContain('sniptale-glass-switch');
+  });
 
   it.each(['blur', 'focus'] as const)(
     'keeps the %s effect controls visible while hidden decoration collapses its presets',
@@ -127,5 +141,9 @@ describe('FrameSettingsPopoverContent', () => {
     expect(focusMarkup).toContain('type="range"');
     expect(focusMarkup).toContain('65%');
     expect(focusMarkup).toContain('--sniptale-range-fill-ratio:61.1%');
+    expect(blurMarkup).toContain(translate('content.interactiveFrame.effectBlur'));
+    expect(focusMarkup).toContain(translate('content.interactiveFrame.effectFocus'));
+    expect(blurMarkup).not.toContain('sniptale-glass-range-meta');
+    expect(focusMarkup).not.toContain('sniptale-glass-range-meta');
   });
 });

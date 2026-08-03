@@ -1,5 +1,6 @@
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import type { ToolbarMenuState } from '../state/menu';
+import type { ToolbarPageEditingMode } from '../types';
 
 export interface ToolbarModeButtonsProps {
   isCursorMode: boolean;
@@ -15,9 +16,8 @@ export interface ToolbarModeButtonsProps {
   toolbarMenuState: ToolbarMenuState;
   onEnableCursorMode?: () => void;
   onDisableAiPickMode?: () => void;
-  onAiPickContentStart: () => void;
+  onSelectPageEditingMode: (mode: ToolbarPageEditingMode) => void;
   onToggleDesignReview: () => void;
-  onToggleQuickEditDocumentMode: (enabled: boolean) => void;
   onToggleQuickEdit: () => void;
   onToggleHighlighter: () => void;
 }

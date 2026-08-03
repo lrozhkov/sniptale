@@ -190,6 +190,8 @@ function renderToolbarShell(args: {
         isCursorMode={args.toolbar.isCursorMode}
         onEnableCursorMode={modeController.handleEnableCursorMode}
         framesCount={args.toolbar.frameCount}
+        futureFrameStyle={args.toolbar.futureFrameStyle}
+        onFutureFrameEffectModeChange={args.toolbar.setFutureFrameEffectMode}
       />
     </div>
   );

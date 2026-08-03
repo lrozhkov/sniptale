@@ -4,10 +4,13 @@ import type { AIModalTemplateDraft } from '../shell/types';
 export function createTemplateSelectHandler(props: {
   selectTemplate: (template: AIModalTemplateDraft) => Promise<string>;
   setPrompt: React.Dispatch<React.SetStateAction<string>>;
+  stopVoiceInput(): void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   return async (template: AIModalTemplateDraft) => {
+    props.stopVoiceInput();
     const content = await props.selectTemplate(template);
+    props.stopVoiceInput();
     const textarea = props.textareaRef.current;
 
     if (textarea && document.activeElement === textarea) {

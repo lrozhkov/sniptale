@@ -69,8 +69,10 @@ describe('frame host-layout presentation lifecycle', () => {
     stop();
   });
 
-  it('reports ordinary viewport loss as offscreen without changing frame geometry', () => {
+  it('keeps projecting frame geometry after ordinary scrolling moves its anchor offscreen', () => {
     vi.useFakeTimers();
+    let scrollY = 0;
+    vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => scrollY);
     const target = document.createElement('button');
     target.id = 'target';
     document.body.appendChild(target);
@@ -95,14 +97,15 @@ describe('frame host-layout presentation lifecycle', () => {
     service.start(scenario.runtime);
     vi.advanceTimersByTime(64);
     onAnchorUnavailable.mockClear();
-    const lastVisibleFrame = scenario.framesRef.current[0]!;
-
-    targetRect = { x: -1_200, y: 60, width: 140, height: 44 };
+    const initialFrame = scenario.framesRef.current[0]!;
+    scrollY = 1_260;
+    targetRect = { x: 120, y: -1_200, width: 140, height: 44 };
     window.dispatchEvent(new Event('scroll'));
     vi.advanceTimersByTime(64);
 
     expect(onAnchorUnavailable).toHaveBeenCalledWith('frame-1', 'offscreen');
-    expect(scenario.framesRef.current).toEqual([lastVisibleFrame]);
+    expect(scenario.framesRef.current[0]?.pagePlacement).toEqual(initialFrame.pagePlacement);
+    expect(scenario.framesRef.current[0]?.y).toBeLessThan(-1_000);
     service.dispose();
   });
 

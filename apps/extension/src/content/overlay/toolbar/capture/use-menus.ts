@@ -19,7 +19,6 @@ function closeToolbarMenus(
     refs.viewportSelectorRef.current?.closeMenu();
     state.setViewportMenuOpen(false);
   }
-  state.setActiveMenuType(except);
 }
 
 function useViewportMenuSync(state: ToolbarMenuState, refs: ReturnType<typeof useToolbarMenuRefs>) {

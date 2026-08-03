@@ -74,10 +74,13 @@ function Harness(props: {
   return <div data-tick={String(props.tick)} />;
 }
 
-function LifecycleHarness(props: { isOpen: boolean }) {
+function LifecycleHarness(props: { historyTransaction?: boolean; isOpen: boolean }) {
   latestLifecycle = useFrameSettingsPopoverLifecycle({
     frameId: 'frame-1',
     isOpen: props.isOpen,
+    ...(props.historyTransaction === undefined
+      ? {}
+      : { historyTransaction: props.historyTransaction }),
   });
   return null;
 }
@@ -102,13 +105,20 @@ function renderHarness(
   });
 }
 
-function renderLifecycleHarness(isOpen: boolean) {
+function renderLifecycleHarness(isOpen: boolean, historyTransaction?: boolean) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
   }
-  act(() => root?.render(<LifecycleHarness isOpen={isOpen} />));
+  act(() =>
+    root?.render(
+      <LifecycleHarness
+        isOpen={isOpen}
+        {...(historyTransaction === undefined ? {} : { historyTransaction })}
+      />
+    )
+  );
 }
 
 beforeEach(() => {
@@ -198,6 +208,23 @@ describe('frame settings popover state lifecycle', () => {
     act(() => root?.unmount());
     root = null;
     expect(cancelTransaction).toHaveBeenCalledWith('frame-settings:frame-1');
+  });
+
+  it('does not create frame history for future-only session settings', () => {
+    storageMocks.loadHighlighterSettings.mockResolvedValue(DEFAULT_SETTINGS);
+    const beginTransaction = vi.spyOn(pagePreparationHistory, 'beginTransaction');
+    const commitTransaction = vi.spyOn(pagePreparationHistory, 'commitTransaction');
+    const cancelTransaction = vi.spyOn(pagePreparationHistory, 'cancelTransaction');
+
+    renderLifecycleHarness(false, false);
+    renderLifecycleHarness(true, false);
+    renderLifecycleHarness(false, false);
+    act(() => root?.unmount());
+    root = null;
+
+    expect(beginTransaction).not.toHaveBeenCalled();
+    expect(commitTransaction).not.toHaveBeenCalled();
+    expect(cancelTransaction).not.toHaveBeenCalled();
   });
 
   it('updates global defaults without overwriting a dirty local draft', async () => {

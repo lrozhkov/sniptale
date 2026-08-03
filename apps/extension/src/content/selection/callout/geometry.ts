@@ -4,52 +4,6 @@ import { getCalloutTailMetrics } from './tail';
 
 type NonAutoCalloutSide = Exclude<CalloutSide, 'auto'>;
 
-function getIdealCalloutRect(
-  side: NonAutoCalloutSide,
-  anchorPos: { x: number; y: number },
-  calloutDimensions: { width: number; height: number },
-  tailSize: number
-): { left: number; top: number; width: number; height: number } {
-  const { width: cw, height: ch } = calloutDimensions;
-  const { projection } = getCalloutTailMetrics(tailSize);
-  const totalGap = CALLOUT_GAP + projection;
-  let left = 0;
-  let top = 0;
-
-  switch (side) {
-    case 'top':
-      left = anchorPos.x - cw / 2;
-      top = anchorPos.y - ch - totalGap;
-      break;
-    case 'bottom':
-      left = anchorPos.x - cw / 2;
-      top = anchorPos.y + totalGap;
-      break;
-    case 'left':
-      left = anchorPos.x - cw - totalGap;
-      top = anchorPos.y - ch / 2;
-      break;
-    case 'right':
-      left = anchorPos.x + totalGap;
-      top = anchorPos.y - ch / 2;
-      break;
-  }
-
-  return { left, top, width: cw, height: ch };
-}
-
-function rectFitsInViewport(
-  rect: { left: number; top: number; width: number; height: number },
-  margin: number
-): boolean {
-  return (
-    rect.left >= margin &&
-    rect.top >= margin &&
-    rect.left + rect.width <= window.innerWidth - margin &&
-    rect.top + rect.height <= window.innerHeight - margin
-  );
-}
-
 export function getPreferredSideFromAnchor(anchor: CalloutAnchor): NonAutoCalloutSide | null {
   switch (anchor) {
     case 'middle-left':
@@ -100,44 +54,6 @@ export function getAnchorPosition(
   }
 }
 
-export function pickBestSide(
-  anchorPos: { x: number; y: number },
-  calloutDimensions: { width: number; height: number },
-  tailSize: number = 8,
-  preferredSide: NonAutoCalloutSide | null = null
-): NonAutoCalloutSide {
-  const margin = 12;
-  const defaultOrder: NonAutoCalloutSide[] = ['top', 'bottom', 'right', 'left'];
-  const sides =
-    preferredSide != null
-      ? [preferredSide, ...defaultOrder.filter((side) => side !== preferredSide)]
-      : defaultOrder;
-
-  for (const side of sides) {
-    const rect = getIdealCalloutRect(side, anchorPos, calloutDimensions, tailSize);
-    if (rectFitsInViewport(rect, margin)) {
-      return side;
-    }
-  }
-
-  let bestSide: NonAutoCalloutSide = preferredSide ?? 'top';
-  let bestOverflow = Infinity;
-  for (const side of sides) {
-    const rect = getIdealCalloutRect(side, anchorPos, calloutDimensions, tailSize);
-    const overflow =
-      Math.max(0, margin - rect.left) +
-      Math.max(0, margin - rect.top) +
-      Math.max(0, rect.left + rect.width - (window.innerWidth - margin)) +
-      Math.max(0, rect.top + rect.height - (window.innerHeight - margin));
-    if (overflow < bestOverflow) {
-      bestOverflow = overflow;
-      bestSide = side;
-    }
-  }
-
-  return bestSide;
-}
-
 export function getCalloutPosition(
   side: NonAutoCalloutSide,
   anchorPos: { x: number; y: number },
@@ -170,8 +86,5 @@ export function getCalloutPosition(
       break;
   }
 
-  const margin = 8;
-  x = Math.max(margin, Math.min(x, window.innerWidth - cw - margin));
-  y = Math.max(margin, Math.min(y, window.innerHeight - ch - margin));
   return { x, y };
 }

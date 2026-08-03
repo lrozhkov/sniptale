@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { getSortedFramesWithZIndex } from './layering';
+import { Z_INDEX_STEP_BADGE } from '../../interactive-frame/layout/portal';
 
 function frame(id: string, width: number, height: number): FrameData {
   return { effectMode: 'border', height, id, width, x: 0, y: 0 };
@@ -37,5 +38,12 @@ describe('frame visual layering', () => {
     expect(result.find(({ id }) => id === 'last')?.zIndex).toBeGreaterThan(
       result.find(({ id }) => id === 'first')?.zIndex ?? 0
     );
+  });
+
+  it('keeps every frame strictly below the global step-badge layer for large frame sets', () => {
+    const frames = Array.from({ length: 12 }, (_, index) => frame(`frame-${index}`, 200, 120));
+    const result = getSortedFramesWithZIndex(frames, new Map());
+
+    expect(Math.max(...result.map(({ zIndex }) => zIndex))).toBeLessThan(Z_INDEX_STEP_BADGE);
   });
 });

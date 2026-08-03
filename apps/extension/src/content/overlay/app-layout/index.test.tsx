@@ -34,6 +34,7 @@ vi.mock('./toolbar', () => ({
 }));
 
 import { ContentAppLayout } from '.';
+import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -176,6 +177,12 @@ function createProps() {
       captureAction: 'download_default',
       currentViewport: null,
       frameCount: 0,
+      futureFrameStyle: {
+        blurSettings: { amount: 8, blurType: 'gaussian', showBorder: true },
+        borderSettings: DEFAULT_BORDER_PRESET,
+        effectMode: 'border',
+        focusSettings: { opacity: 0.5, showBorder: false },
+      },
       handleTakeScreenshot: vi.fn(async () => undefined),
       isCompletelyHidden: false,
       isCursorMode: true,
@@ -191,6 +198,7 @@ function createProps() {
       },
       pinToTab: false,
       pinToTabAvailable: true,
+      setFutureFrameEffectMode: vi.fn(),
       setCaptureAction: vi.fn(),
       setCurrentViewport: vi.fn(),
       setPinToTab: vi.fn(),

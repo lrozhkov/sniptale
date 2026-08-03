@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCalloutLayoutState } from './layout';
+import { Z_INDEX_STEP_BADGE } from '../interactive-frame/layout/portal';
 
 const settings: CalloutSettings = {
   enabled: true,
@@ -31,6 +32,19 @@ describe('getCalloutLayoutState', () => {
     const editing = getCalloutLayoutState({ ...baseArgs, isEditing: true });
 
     expect(editing.editableStyle.minHeight).toBe(viewing.editableStyle.minHeight);
+    expect(editing.effectiveZIndex).toBeLessThan(Z_INDEX_STEP_BADGE);
+  });
+
+  it('caps a viewing callout below the global step-badge layer', () => {
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 160, height: 48 },
+      frameRect: { x: 200, y: 200, width: 120, height: 80 },
+      isEditing: false,
+      settings,
+      zIndex: Z_INDEX_STEP_BADGE,
+    });
+
+    expect(layout.effectiveZIndex).toBeLessThan(Z_INDEX_STEP_BADGE);
   });
 
   it('positions a manual callout relative to the frame center', () => {
@@ -103,5 +117,30 @@ describe('getCalloutLayoutState', () => {
     expect(manual.calloutPos).toEqual(automatic.calloutPos);
     expect(manual.dynamicTail?.path).toBe(automatic.dynamicTail?.path);
     expect(manual.dynamicTail?.attachment.framePoint).toEqual({ x: 200, y: 200 });
+  });
+
+  it('lets an automatic callout scroll beyond the viewport with its frame', () => {
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 100, height: 40 },
+      frameRect: { x: 200, y: -120, width: 120, height: 80 },
+      isEditing: false,
+      settings: { ...settings, side: 'auto' },
+      zIndex: 20,
+    });
+
+    expect(layout.resolvedSide).toBe('top');
+    expect(layout.calloutPos).toEqual({ x: 210, y: -178 });
+  });
+
+  it('does not clamp a manual callout back into the viewport during scroll', () => {
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 100, height: 40 },
+      frameRect: { x: 200, y: -120, width: 120, height: 80 },
+      isEditing: false,
+      settings: { ...settings, manualPlacement: { centerOffsetX: 140, centerOffsetY: 0 } },
+      zIndex: 20,
+    });
+
+    expect(layout.calloutPos).toEqual({ x: 350, y: -100 });
   });
 });

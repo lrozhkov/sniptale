@@ -1,29 +1,21 @@
-import {
-  SCENARIO_ELEMENT_ANIMATIONS,
-  type ScenarioElement,
-} from '@sniptale/runtime-contracts/scenario/types/v3';
+import type { ScenarioElement } from '@sniptale/runtime-contracts/scenario/types/v3';
 import { translate } from '../../platform/i18n';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { SCENARIO_INSPECTOR_LIMITS } from './constraints';
 import { ElementSpecificFields } from './element-router';
-import {
-  InspectorNativeSelect,
-  InspectorNumberField,
-  InspectorRangeField,
-  InspectorSection,
-  InspectorTextField,
-} from './fields';
-import { FrameFields } from './frame';
-import { getAnimationLabelKey, getElementKindLabelKey } from './labels';
+import { InspectorRangeField, InspectorSection, InspectorTextField } from './fields';
+import { getElementKindLabelKey } from './labels';
 import type { ScenarioInspectorElementPatch } from './types';
 
 export function SelectedElementInspector(props: {
   element: ScenarioElement;
+  onDelete: () => void;
   onEditImageElement?: (elementId: string) => void;
   onUpdateElement: (patch: ScenarioInspectorElementPatch) => void;
 }) {
   return (
     <div className="grid gap-5">
-      <InspectorSection title={translate('scenario.editor.element')}>
+      <InspectorSection title={translate('scenario.editor.selectedItem')}>
         <InspectorTextField
           label={translate('scenario.editor.name')}
           value={props.element.name}
@@ -40,12 +32,6 @@ export function SelectedElementInspector(props: {
           onCommit={(opacity) => props.onUpdateElement({ opacity })}
         />
       </InspectorSection>
-      <InspectorSection title={translate('scenario.editor.frame')}>
-        <FrameFields
-          element={props.element}
-          onFrameChange={(frame) => props.onUpdateElement({ frame })}
-        />
-      </InspectorSection>
       <InspectorSection title={translate(getElementKindLabelKey(props.element.kind))}>
         <ElementSpecificFields
           element={props.element}
@@ -53,46 +39,9 @@ export function SelectedElementInspector(props: {
           {...(props.onEditImageElement ? { onEditImageElement: props.onEditImageElement } : {})}
         />
       </InspectorSection>
-      <ElementBuildFields element={props.element} onUpdateElement={props.onUpdateElement} />
+      <ProductActionButton compact tone="danger" onClick={props.onDelete}>
+        {translate('scenario.editor.removeSelectedItem')}
+      </ProductActionButton>
     </div>
-  );
-}
-
-function ElementBuildFields(props: {
-  element: ScenarioElement;
-  onUpdateElement: (patch: ScenarioInspectorElementPatch) => void;
-}) {
-  return (
-    <InspectorSection title={translate('scenario.editor.build')}>
-      <InspectorNumberField
-        constraint={SCENARIO_INSPECTOR_LIMITS.buildIndex}
-        label={translate('scenario.editor.showAtClick')}
-        value={props.element.build.showAtClick}
-        onCommit={(showAtClick) => props.onUpdateElement({ build: { showAtClick } })}
-      />
-      <InspectorNumberField
-        constraint={SCENARIO_INSPECTOR_LIMITS.buildIndex}
-        label={translate('scenario.editor.hideAtClick')}
-        value={props.element.build.hideAtClick ?? 0}
-        onCommit={(value) =>
-          props.onUpdateElement({ build: { hideAtClick: value > 0 ? value : null } })
-        }
-      />
-      <InspectorNumberField
-        constraint={SCENARIO_INSPECTOR_LIMITS.buildIndex}
-        label={translate('scenario.editor.order')}
-        value={props.element.build.order}
-        onCommit={(order) => props.onUpdateElement({ build: { order } })}
-      />
-      <InspectorNativeSelect
-        label={translate('scenario.editor.animation')}
-        options={Object.values(SCENARIO_ELEMENT_ANIMATIONS).map((value) => ({
-          label: translate(getAnimationLabelKey(value)),
-          value,
-        }))}
-        value={props.element.animation.preset}
-        onChange={(preset) => props.onUpdateElement({ animation: { preset } })}
-      />
-    </InspectorSection>
   );
 }

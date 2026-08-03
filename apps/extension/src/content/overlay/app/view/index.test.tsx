@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentAppLayoutProps } from '../../app-layout/types';
 import type { ContentAppViewModel } from '../view-state/types';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
 const {
   contentAppLayoutMock,
@@ -132,10 +133,18 @@ function createScreenshotController() {
 }
 
 function createViewModel() {
+  const futureFrameStyle = {
+    blurSettings: { amount: 8, blurType: 'gaussian' as const, showBorder: true },
+    borderSettings: DEFAULT_BORDER_PRESET,
+    effectMode: 'border' as const,
+    focusSettings: { opacity: 0.5, showBorder: false },
+  };
   return {
     aiController: createAiController(),
     frameManager: {
       frames: [{ id: 'frame-1' }, { id: 'frame-2' }],
+      getFutureFrameStyle: vi.fn(() => futureFrameStyle),
+      setFutureFrameEffectMode: vi.fn(),
     },
     modeController: createModeController(),
     modeState: createModeState(),
@@ -186,6 +195,12 @@ async function verifiesGroupedLayoutProps() {
   });
   expect(contentAppLayoutMock).toHaveBeenCalledTimes(1);
   expect(firstCall?.[0]).toEqual(buildContentAppLayoutProps(viewModel));
+  expect(firstCall?.[0].toolbar.futureFrameStyle).toBe(
+    viewModel.frameManager.getFutureFrameStyle()
+  );
+  expect(firstCall?.[0].toolbar.setFutureFrameEffectMode).toBe(
+    viewModel.frameManager.setFutureFrameEffectMode
+  );
 }
 
 describe('App', () => {

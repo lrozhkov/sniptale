@@ -54,7 +54,6 @@ export function createSharedToolbarClickHandlers(props: InteractiveFrameToolbarP
     handleEffectClick:
       (mode: InteractiveFrameToolbarProps['effectMode']) => (event: ToolbarClickEvent) => {
         stopToolbarEvent(event);
-        props.closePopover();
         props.handleEffectButtonClick(mode);
       },
     handleEditClick: (event: ToolbarClickEvent) => {

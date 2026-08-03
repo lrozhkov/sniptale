@@ -15,6 +15,7 @@ export interface FrameSettingsPopoverProps {
   anchorEl: HTMLElement | null;
   blurSettings?: BlurSettings;
   borderSettings?: BorderPreset;
+  compact?: boolean;
   effectMode: EffectMode;
   focusSettings?: FocusSettings;
   frameId: string;
@@ -22,4 +23,5 @@ export interface FrameSettingsPopoverProps {
   isOpen: boolean;
   onApplyToFrame: (settings: FrameSettingsPopoverApplySettings) => void;
   onClose: () => void;
+  scope?: 'frame' | 'session';
 }

@@ -196,7 +196,7 @@ function expectTailFrameChangesInvalidateDescriptors() {
   ).toBe(false);
 }
 
-function expectPresentationChangesHideAndRestoreTheWholeFrameRoot() {
+function expectTransientPresentationKeepsTheWholeFrameRoot() {
   const frame = createFrame('frame-1');
   const container = document.createElement('div');
   const frameContainer = document.createElement('div');
@@ -220,10 +220,10 @@ function expectPresentationChangesHideAndRestoreTheWholeFrameRoot() {
   };
 
   renderInteractiveFrames({ ...shared, presentations: new Map([['frame-1', 'suspended']]) });
-  expect(frameContainer.isConnected).toBe(false);
-  expect(root.render).not.toHaveBeenCalled();
-  expect(root.unmount).toHaveBeenCalledTimes(1);
-  expect(shared.rootsRef.current.has('frame-1')).toBe(false);
+  expect(frameContainer.isConnected).toBe(true);
+  expect(root.render).toHaveBeenCalledTimes(1);
+  expect(root.unmount).not.toHaveBeenCalled();
+  expect(shared.rootsRef.current.has('frame-1')).toBe(true);
 
   container.remove();
 }
@@ -310,8 +310,8 @@ describe('frame-roots-renderer-dom descriptors', () => {
     expectTailFrameChangesInvalidateDescriptors
   );
   it(
-    'hides and restores the entire frame root from presentation state',
-    expectPresentationChangesHideAndRestoreTheWholeFrameRoot
+    'keeps the entire frame root during transient presentation loss',
+    expectTransientPresentationKeepsTheWholeFrameRoot
   );
   it(
     'unmounts portaled interaction effects while an anchor is unavailable',

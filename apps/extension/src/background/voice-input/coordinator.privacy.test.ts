@@ -5,11 +5,35 @@ import {
   flush,
   mocks,
 } from './coordinator.test-support';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VoiceInputPortMessageType } from '@sniptale/runtime-contracts/voice-input';
 
+afterEach(() => vi.useRealTimers());
+
 describe('background voice input coordinator cleanup', () => {
+  it.each(['status', 'force-stop'] as const)(
+    'returns failure when privacy cleanup %s never settles',
+    async (pendingExchange) => {
+      vi.useFakeTimers();
+      mocks.sendRuntimeMessage.mockImplementation(async (message) => {
+        if (message.type === MessageType.OFFSCREEN_VOICE_INPUT_STATUS) {
+          return pendingExchange === 'status'
+            ? new Promise(() => undefined)
+            : { snapshot: createSnapshot('orphan-after-worker-restart'), success: true };
+        }
+        return new Promise(() => undefined);
+      });
+      const coordinator = createVoiceInputCoordinator();
+      const cleanup = coordinator.cleanupForPrivacyErasure();
+      await flush();
+
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      await expect(cleanup).resolves.toBe(false);
+    }
+  );
+
   it('force-stops an orphaned offscreen session during privacy erasure', async () => {
     mocks.sendRuntimeMessage.mockImplementation(async (message) => {
       if (message.type === MessageType.OFFSCREEN_VOICE_INPUT_STATUS) {

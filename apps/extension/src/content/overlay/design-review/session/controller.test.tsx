@@ -17,6 +17,8 @@ const controllerMocks = vi.hoisted(() => ({
       }
     };
   }),
+  stopVoiceInput: vi.fn(),
+  voiceActive: false,
 }));
 
 const target = document.createElement('button');
@@ -55,6 +57,19 @@ vi.mock('./comment-draft', () => ({
     markerNumber: null,
     startCommentComposition: vi.fn(),
     updateCommentDraft: vi.fn(),
+  }),
+}));
+
+vi.mock('./comment-voice-input', () => ({
+  useDesignReviewCommentVoiceInput: () => ({
+    actions: { start: vi.fn(), stop: controllerMocks.stopVoiceInput },
+    state: {
+      active: controllerMocks.voiceActive,
+      audioLevel: 0,
+      caretPosition: null,
+      errorCode: null,
+      phase: 'idle',
+    },
   }),
 }));
 
@@ -105,6 +120,7 @@ function Harness() {
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   controllerMocks.closeComment.mockReturnValue(true);
+  controllerMocks.voiceActive = false;
   host = document.createElement('div');
   document.body.append(host, target);
   root = createRoot(host);
@@ -127,6 +143,7 @@ it('autosaves and closes the inspector through the picker outside-dismiss reques
   act(() => expect(controllerMocks.dismissRequestHandler?.()).toBe(true));
 
   expect(controllerMocks.closeComment).toHaveBeenCalledOnce();
+  expect(controllerMocks.stopVoiceInput).toHaveBeenCalledTimes(2);
   expect(controllerMocks.dismissSelection).toHaveBeenCalledOnce();
   expect(latest?.inspectorOpen).toBe(false);
 });
@@ -138,4 +155,27 @@ it('keeps the inspector open and selected when automatic save fails', () => {
 
   expect(controllerMocks.dismissSelection).not.toHaveBeenCalled();
   expect(latest?.inspectorOpen).toBe(true);
+});
+
+it('stops voice on the first dismissal request and closes only on the second', async () => {
+  controllerMocks.voiceActive = true;
+  await act(async () => root?.render(<Harness />));
+  controllerMocks.stopVoiceInput.mockClear();
+  controllerMocks.closeComment.mockClear();
+  controllerMocks.dismissSelection.mockClear();
+
+  act(() => expect(controllerMocks.dismissRequestHandler?.()).toBe(true));
+  expect(controllerMocks.stopVoiceInput).toHaveBeenCalledOnce();
+  expect(controllerMocks.closeComment).not.toHaveBeenCalled();
+  expect(controllerMocks.dismissSelection).not.toHaveBeenCalled();
+  expect(latest?.inspectorOpen).toBe(true);
+
+  controllerMocks.voiceActive = false;
+  await act(async () => root?.render(<Harness />));
+  act(() => expect(controllerMocks.dismissRequestHandler?.()).toBe(true));
+
+  expect(controllerMocks.stopVoiceInput).toHaveBeenCalledTimes(2);
+  expect(controllerMocks.closeComment).toHaveBeenCalledOnce();
+  expect(controllerMocks.dismissSelection).toHaveBeenCalledOnce();
+  expect(latest?.inspectorOpen).toBe(false);
 });

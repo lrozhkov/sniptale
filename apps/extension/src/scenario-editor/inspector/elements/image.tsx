@@ -1,8 +1,7 @@
 import type { ScenarioImageElement } from '@sniptale/runtime-contracts/scenario/types/v3';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { SCENARIO_INSPECTOR_LIMITS } from '../constraints';
-import { InspectorNativeSelect, InspectorNumberField } from '../fields';
+import { InspectorNativeSelect } from '../fields';
 import type { ScenarioInspectorElementPatch } from '../types';
 
 export function ImageElementFields(props: {
@@ -13,7 +12,6 @@ export function ImageElementFields(props: {
   return (
     <>
       <ImageFitField element={props.element} onChange={props.onChange} />
-      <ImageContentTransformFields element={props.element} onChange={props.onChange} />
       <ImageElementActions
         element={props.element}
         onChange={props.onChange}
@@ -39,34 +37,6 @@ function ImageFitField(props: {
       ]}
       onChange={(fit) => props.onChange({ fit })}
     />
-  );
-}
-
-function ImageContentTransformFields(props: {
-  element: ScenarioImageElement;
-  onChange: (patch: ScenarioInspectorElementPatch) => void;
-}) {
-  return (
-    <>
-      <InspectorNumberField
-        constraint={SCENARIO_INSPECTOR_LIMITS.contentOffset}
-        label={translate('scenario.editor.contentX')}
-        value={props.element.contentTransform.x}
-        onCommit={(x) => props.onChange({ contentTransform: { x } })}
-      />
-      <InspectorNumberField
-        constraint={SCENARIO_INSPECTOR_LIMITS.contentOffset}
-        label={translate('scenario.editor.contentY')}
-        value={props.element.contentTransform.y}
-        onCommit={(y) => props.onChange({ contentTransform: { y } })}
-      />
-      <InspectorNumberField
-        constraint={SCENARIO_INSPECTOR_LIMITS.contentScale}
-        label={translate('scenario.editor.contentScale')}
-        value={props.element.contentTransform.scale}
-        onCommit={(scale) => props.onChange({ contentTransform: { scale } })}
-      />
-    </>
   );
 }
 

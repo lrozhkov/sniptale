@@ -80,6 +80,7 @@ export function createOffscreenVoiceInputService(deps: VoiceInputRecognitionDeps
   }
 
   function start(args: {
+    maxDurationMs: number | null;
     preferences: VoiceInputPreferences;
     requestId: string;
     sessionId: string;
@@ -118,6 +119,7 @@ export function createOffscreenVoiceInputService(deps: VoiceInputRecognitionDeps
       deps,
       initialSnapshot: snapshot,
       lease: acquisition.lease,
+      maxDurationMs: args.maxDurationMs,
       preferences: args.preferences,
       requestId: args.requestId,
       sessionId: args.sessionId,

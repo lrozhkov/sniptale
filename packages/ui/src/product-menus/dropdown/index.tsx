@@ -5,6 +5,7 @@ import {
   type MouseEventHandler,
   type ReactNode,
 } from 'react';
+import { useFloatingSurfaceWheelContainment } from '../../floating-interactions/wheel';
 
 export interface ProductDropdownMenuProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
@@ -50,8 +51,10 @@ export function ProductDropdownMenu({
   style,
   ...props
 }: ProductDropdownMenuProps) {
+  const menuRef = useFloatingSurfaceWheelContainment<HTMLDivElement>();
   return (
     <div
+      ref={menuRef}
       {...props}
       className={['sniptale-dropdown-menu', className].filter(Boolean).join(' ')}
       style={style}

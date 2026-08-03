@@ -13,6 +13,45 @@ import {
 afterEach(resetServiceTestEnvironment);
 
 describe('frame host-layout unattributed geometry staging', () => {
+  it('does not publish the first offscreen sample from a non-scroll layout mutation', async () => {
+    vi.useFakeTimers();
+    const target = document.createElement('button');
+    target.id = 'target';
+    const layoutText = document.createTextNode('compact');
+    document.body.append(target, layoutText);
+    let targetRect: DOMRectInit = { x: 120, y: 60, width: 140, height: 44 };
+    installDynamicRect(target, () => targetRect);
+    const frame: FrameData = {
+      id: 'frame-1',
+      x: 120,
+      y: 60,
+      width: 140,
+      height: 44,
+      linkedElementSelector: '#target',
+      pagePlacement: { iframePath: [], pageX: 120, pageY: 60 },
+    };
+    const scenario = createRuntime([frame]);
+    const service = createFrameHostLayoutService();
+    service.link(frame.id, target, frame.linkedElementSelector!, {
+      pagePlacement: frame.pagePlacement!,
+      rect: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+    });
+    service.start(scenario.runtime);
+    vi.advanceTimersByTime(64);
+    const committedBeforeMutation = scenario.framesRef.current[0]!;
+
+    targetRect = { x: 120, y: -500, width: 140, height: 44 };
+    layoutText.data = 'expanded sibling content';
+    await Promise.resolve();
+    vi.advanceTimersByTime(17);
+
+    expect(scenario.framesRef.current[0]).toEqual(committedBeforeMutation);
+
+    vi.advanceTimersByTime(32);
+    expect(scenario.framesRef.current[0]?.y).toBeLessThan(-400);
+    service.dispose();
+  });
+
   it.each([
     [
       'sibling text-node data',

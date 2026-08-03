@@ -18,9 +18,14 @@ import type { EffectMode, ResizeDirection } from '../../../../features/highlight
 import type { FrameSurfaceRect } from '../../../../features/highlighter/frame-surface';
 
 export const MIN_FRAME_SIZE = 1;
+export const Z_INDEX_FRAME_IDLE_MAX = 2147483642;
 export const Z_INDEX_BLOCKING_OVERLAY = 2147483643;
+export const Z_INDEX_FRAME_ACTIVE = 2147483644;
+export const Z_INDEX_CALLOUT_VIEWING = 2147483645;
+export const Z_INDEX_CALLOUT_EDITING = 2147483646;
 export const Z_INDEX_RESIZE_HANDLES = 2147483646;
 export const Z_INDEX_FLOATING_UI = 2147483647;
+export const Z_INDEX_STEP_BADGE = 2147483647;
 
 export function getCursorForDirection(direction: ResizeDirection): string {
   switch (direction) {

@@ -8,21 +8,14 @@ import type {
 import type { ScenarioInspectorSlidePatch } from '../inspector';
 import { redoProjectHistory, pushProjectHistory, undoProjectHistory } from './history';
 import { insertImageFileIntoSelectedSlide } from './image-import';
-import {
-  createInsertedElement,
-  createInsertedElementAtPoint,
-  createInsertedElementFromDrag,
-} from './insert';
+import { createInsertedElement } from './insert';
 import {
   addProjectSlide,
-  appendProjectSlide,
   deleteProjectSlide,
   deleteSlideElement,
   duplicateProjectSlide,
   moveProjectSlide,
-  moveSlideElement,
   replaceProjectSlide,
-  updateProjectPresentationSettings,
   updateSlideElement,
   updateSlideSettings,
   type ScenarioV3ElementPatch,
@@ -30,7 +23,6 @@ import {
 import { keepReachableSelection } from './selection';
 import { insertSlideElementIntoSession } from './session-element-insert';
 import type { ScenarioV3EditorSession } from './types';
-import type { ScenarioPoint } from '@sniptale/runtime-contracts/scenario/types/v3';
 
 type SetSession = Dispatch<SetStateAction<ScenarioV3EditorSession>>;
 type GetSession = () => ScenarioV3EditorSession;
@@ -48,8 +40,6 @@ export function createHistoryCommands(setSession: SetSession) {
 export function createSlideCommands(setSession: SetSession) {
   return {
     addSlide: () => commitMutation(setSession, addProjectSlide, selectLastSlide),
-    addTemplateSlide: (slide: ScenarioV3EditorSession['project']['slides'][number]) =>
-      commitMutation(setSession, (project) => appendProjectSlide(project, slide), selectLastSlide),
     deleteSlide: (slideId: string) =>
       commitMutation(setSession, (project) => deleteProjectSlide(project, slideId)),
     duplicateSlide: (slideId: string) =>
@@ -73,8 +63,6 @@ export function createProjectCommands(setSession: SetSession) {
   return {
     applyProject: (nextProject: ScenarioV3EditorSession['project']) =>
       commitMutation(setSession, () => nextProject),
-    updatePresentation: (patch: Parameters<typeof updateProjectPresentationSettings>[1]) =>
-      commitMutation(setSession, (project) => updateProjectPresentationSettings(project, patch)),
   };
 }
 
@@ -91,13 +79,6 @@ export function createElementCommands(
       ),
     insertElement: (kind: ScenarioV3ElementKind) =>
       insertElementKindIntoSelectedSlide(setSession, kind),
-    insertElementAtPoint: (kind: ScenarioV3ElementKind, point: ScenarioPoint) =>
-      insertElementKindIntoSelectedSlideAtPoint(setSession, kind, point),
-    insertElementFromDrag: (
-      kind: ScenarioV3ElementKind,
-      origin: ScenarioPoint,
-      current: ScenarioPoint
-    ) => insertElementKindIntoSelectedSlideFromDrag(setSession, kind, origin, current),
     insertImageFile: (file?: File) =>
       insertImageFileWithErrorHandling({
         file,
@@ -106,10 +87,6 @@ export function createElementCommands(
         reportOperationError,
         setSession,
       }),
-    moveElement: (elementId: string, direction: 'backward' | 'forward') =>
-      commitSelectedSlideMutation(setSession, (project, slideId) =>
-        moveSlideElement(project, slideId, elementId, direction)
-      ),
     selectElement: (elementId: string) =>
       setSession((session) => ({ ...session, selectedElementId: elementId })),
     selectSlideSurface: () => setSession((session) => ({ ...session, selectedElementId: null })),
@@ -214,39 +191,6 @@ function insertElementKindIntoSelectedSlide(setSession: SetSession, kind: Scenar
   insertElementIntoSelectedSlide(setSession, createInsertedElement(kind));
 }
 
-function insertElementKindIntoSelectedSlideAtPoint(
-  setSession: SetSession,
-  kind: ScenarioV3ElementKind,
-  point: ScenarioPoint
-) {
-  setSession((session) => {
-    const slide = getSelectedSlide(session);
-    return slide
-      ? insertElementIntoSession(
-          session,
-          createInsertedElementAtPoint({ canvas: slide.canvas, kind, point })
-        )
-      : session;
-  });
-}
-
-function insertElementKindIntoSelectedSlideFromDrag(
-  setSession: SetSession,
-  kind: ScenarioV3ElementKind,
-  origin: ScenarioPoint,
-  current: ScenarioPoint
-) {
-  setSession((session) => {
-    const slide = getSelectedSlide(session);
-    return slide
-      ? insertElementIntoSession(
-          session,
-          createInsertedElementFromDrag({ canvas: slide.canvas, current, kind, origin })
-        )
-      : session;
-  });
-}
-
 function insertElementIntoSelectedSlide(setSession: SetSession, element: ScenarioElement) {
   setSession((session) => insertElementIntoSession(session, element));
 }
@@ -271,9 +215,4 @@ function selectLastSlide(
     selectedElementId: null,
     selectedSlideId: nextProject.slides.at(-1)?.id ?? session.selectedSlideId,
   };
-}
-
-function getSelectedSlide(session: ScenarioV3EditorSession) {
-  const slideId = session.selectedSlideId ?? session.project.slides[0]?.id;
-  return session.project.slides.find((slide) => slide.id === slideId) ?? null;
 }

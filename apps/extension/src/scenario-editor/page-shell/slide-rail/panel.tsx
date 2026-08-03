@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Copy, Layers3, LayoutTemplate, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Plus, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { translate } from '../../../platform/i18n';
@@ -8,10 +8,8 @@ import {
   renderScenarioSlide,
 } from '../../project/stage-render/slide';
 import type { ScenarioSlide } from '@sniptale/runtime-contracts/scenario/types/v3';
-import { EditorIconButton, ValueBadge } from '@sniptale/ui/editor-chrome';
+import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import { cx } from '../../../ui/compact-inspector-controls';
-import { ScenarioTemplatePicker } from '../../project/templates';
-import { ScenarioSlideTransitionBadges } from '../slide-transition-badges';
 import type { ScenarioSlideRailProps } from './types';
 
 type ScenarioSlideRailActions = Pick<
@@ -70,10 +68,10 @@ function ScenarioSlideRailHeader(props: ScenarioSlideRailProps) {
     <div className="flex items-center justify-between border-b border-[var(--sniptale-color-border-soft)] p-3">
       <div className="min-w-0">
         <h2 className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-          {translate('scenario.editor.slides')}
+          {translate('scenario.editor.steps')}
         </h2>
         <div className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {props.slides.length} {translate('scenario.editor.slideCountSuffix')}
+          {props.slides.length} {translate('scenario.editor.stepsCount')}
         </div>
       </div>
       <ScenarioSlideRailHeaderActions {...props} />
@@ -84,14 +82,7 @@ function ScenarioSlideRailHeader(props: ScenarioSlideRailProps) {
 function ScenarioSlideRailHeaderActions(props: ScenarioSlideRailProps) {
   return (
     <div className="flex items-center gap-1">
-      <RailIconButton
-        active={props.templatePickerOpen}
-        label={translate('scenario.editor.layouts')}
-        onClick={props.onToggleTemplatePicker}
-      >
-        <LayoutTemplate className="h-4 w-4" />
-      </RailIconButton>
-      <RailIconButton label={translate('scenario.editor.addSlide')} onClick={props.onAddSlide}>
+      <RailIconButton label={translate('scenario.editor.addStep')} onClick={props.onAddSlide}>
         <Plus className="h-4 w-4" />
       </RailIconButton>
       {props.onCollapsePanel ? (
@@ -111,16 +102,7 @@ function ScenarioSlideRailBody(
 ) {
   return (
     <div className="min-h-0 overflow-auto p-3">
-      {props.templatePickerOpen ? (
-        <ScenarioTemplatePicker
-          onCreateSlide={props.onCreateTemplateSlide}
-          onOpenManager={props.onOpenTemplateManager}
-          surface="embedded"
-          templates={props.templates}
-        />
-      ) : (
-        <ScenarioSlideRailCardList {...props} />
-      )}
+      <ScenarioSlideRailCardList {...props} />
     </div>
   );
 }
@@ -164,7 +146,6 @@ function ScenarioSlideRailCard(props: {
       )}
     >
       <SlideRailSelectButton {...props} />
-      <SlideRailIndicators slide={props.slide} />
       <SlideRailRowActions actions={props.actions} slideId={props.slide.id} />
     </article>
   );
@@ -205,10 +186,10 @@ function SlideRailSelectButton(props: {
       </span>
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-          {props.slide.title || translate('scenario.editor.untitledSlide')}
+          {props.slide.title || translate('scenario.editor.untitledStep')}
         </span>
         <span className="block text-xs text-[var(--sniptale-color-text-muted)]">
-          {props.slide.elements.length} {translate('scenario.editor.layers')}
+          {translate('scenario.editor.stepNumber')} {props.index + 1}
         </span>
       </span>
     </button>
@@ -229,18 +210,6 @@ function createSlideThumbnail(
   return createScenarioSlideSvgDataUrl(rendered.svg);
 }
 
-function SlideRailIndicators(props: { slide: ScenarioSlide }) {
-  const buildCount = props.slide.elements.filter((element) => element.build.showAtClick > 0).length;
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <ScenarioSlideTransitionBadges slide={props.slide} />
-      <ValueBadge className="gap-1">
-        <Layers3 className="h-3 w-3" /> {buildCount}/{props.slide.clicks.count}
-      </ValueBadge>
-    </div>
-  );
-}
-
 function SlideRailRowActions(props: { actions: ScenarioSlideRailActions; slideId: string }) {
   return (
     <div
@@ -248,25 +217,25 @@ function SlideRailRowActions(props: { actions: ScenarioSlideRailActions; slideId
       onClick={(event) => event.stopPropagation()}
     >
       <RailIconButton
-        label={translate('scenario.editor.moveSlideUp')}
+        label={translate('scenario.editor.moveStepUp')}
         onClick={() => props.actions.onMoveSlide(props.slideId, 'up')}
       >
         <ChevronUp className="h-4 w-4" />
       </RailIconButton>
       <RailIconButton
-        label={translate('scenario.editor.moveSlideDown')}
+        label={translate('scenario.editor.moveStepDown')}
         onClick={() => props.actions.onMoveSlide(props.slideId, 'down')}
       >
         <ChevronDown className="h-4 w-4" />
       </RailIconButton>
       <RailIconButton
-        label={translate('scenario.editor.duplicateSlide')}
+        label={translate('scenario.editor.duplicateStep')}
         onClick={() => props.actions.onDuplicateSlide(props.slideId)}
       >
         <Copy className="h-4 w-4" />
       </RailIconButton>
       <RailIconButton
-        label={translate('scenario.editor.deleteSlide')}
+        label={translate('scenario.editor.deleteStep')}
         onClick={() => props.actions.onDeleteSlide(props.slideId)}
       >
         <Trash2 className="h-4 w-4" />

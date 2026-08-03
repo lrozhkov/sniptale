@@ -65,6 +65,7 @@ describe('content-popover surface contract', () => {
   it('keeps the canonical content-popover owner stylesheet as the surface owner', () => {
     expect(contentPopoverIndexStylesheet).toContain("@import './surface.css';");
     expect(contentPopoverOwnerStylesheet).toContain('.sniptale-content-popover {');
+    expect(contentPopoverOwnerStylesheet).toContain('.sniptale-content-popover--toolbar-menu,');
     expect(contentPopoverOwnerStylesheet).toContain('.sniptale-content-popover-section,');
     expect(contentPopoverOwnerStylesheet).toContain('.sniptale-content-popover,');
     expect(contentPopoverOwnerStylesheet).toContain('.sniptale-content-popover * {');
@@ -180,8 +181,9 @@ describe('content-popover range thumb contract', () => {
   it('keeps content popover range thumb dark-safe and centered', verifyRangeThumbContract);
 
   it('does not leak range fill variables into the content popover switch track', () => {
-    expect(readRuleBlock('.sniptale-content-popover .sniptale-glass-switch')).not.toContain(
-      '--sniptale-range-fill-ratio'
-    );
+    const switchBlock = readRuleBlock('.sniptale-content-popover .sniptale-glass-switch');
+    expect(switchBlock).toContain('min-width: 38px;');
+    expect(switchBlock).toContain('flex: 0 0 38px;');
+    expect(switchBlock).not.toContain('--sniptale-range-fill-ratio');
   });
 });

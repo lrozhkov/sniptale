@@ -19,14 +19,14 @@ vi.mock('../../step-badge', () => ({
     onPositionChange: (placement: { position: number; side: 'bottom' }) => void;
     onSettingsClick: () => void;
   }) => (
-    <>
+    <div data-ui="step-badge">
       <button
         type="button"
         data-ui="move-step"
         onClick={() => props.onPositionChange({ position: 0.7, side: 'bottom' })}
       />
       <button type="button" data-ui="step-settings" onClick={props.onSettingsClick} />
-    </>
+    </div>
   ),
 }));
 

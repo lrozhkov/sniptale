@@ -2,6 +2,11 @@ import { isContentOwnedElement } from '../../../platform/dom-host';
 
 type SignalElement = Element & { ownerDocument: Document };
 
+export type HostLayoutInvalidationOptions = {
+  motion?: boolean;
+  viewportScroll?: boolean;
+};
+
 export type ExplicitMotionSignal = {
   family: 'animation' | 'transition';
   name: string;
@@ -15,7 +20,7 @@ type DocumentSignalArgs = {
   continueExplicitMotion(signal: ExplicitMotionSignal): boolean | void;
   documentWillUnload(doc: Document): void;
   endExplicitMotion(signal: ExplicitMotionSignal): boolean | void;
-  invalidate(options?: { motion?: boolean }): void;
+  invalidate(options?: HostLayoutInvalidationOptions): void;
   registerAddedNode(node: Node): void;
   unregisterRemovedNode(node: Node): void;
 };
@@ -56,7 +61,7 @@ function registerDocumentEvents(args: DocumentSignalArgs, doc: Document, win: Wi
   const handleScroll = (event: Event) => {
     const target = event.target;
     if (target && 'nodeType' in target && isOwnedNode(target as Node)) return;
-    args.invalidate();
+    args.invalidate({ viewportScroll: true });
   };
   const handleMotionStart = (event: Event) => {
     const signal = readExplicitMotionSignal(event);

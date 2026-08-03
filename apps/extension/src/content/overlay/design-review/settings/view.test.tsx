@@ -23,6 +23,7 @@ const actions: DesignReviewActions = {
   setSideFieldLinked: vi.fn(),
   updateValue: vi.fn(),
   updateValues: vi.fn(),
+  voice: { start: vi.fn(), stop: vi.fn() },
 };
 
 const state: DesignReviewViewState = {
@@ -43,6 +44,13 @@ const state: DesignReviewViewState = {
   },
   settingsOpen: true,
   values: { color: 'rgb(0, 0, 0)', height: '40px', width: '120px' },
+  voice: {
+    active: false,
+    audioLevel: 0,
+    caretPosition: null,
+    errorCode: null,
+    phase: 'idle',
+  },
 };
 
 let container: HTMLDivElement;

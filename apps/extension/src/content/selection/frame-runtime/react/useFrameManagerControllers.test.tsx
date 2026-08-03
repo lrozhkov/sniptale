@@ -19,10 +19,12 @@ const mocks = vi.hoisted(() => {
     addFrame: vi.fn(),
     clearFrames: vi.fn(),
     frames: [],
+    getFutureFrameStyle: vi.fn(),
     getGlobalStepBadgeSettings: vi.fn(),
     hasFrameForElement: vi.fn(),
     recalculateStepBadges: vi.fn(),
     removeFrame: vi.fn(),
+    setFutureFrameEffectMode: vi.fn(),
     syncFocusOpacity: vi.fn(),
     syncAutoBlurFrames: vi.fn(),
     updateFrame: vi.fn(),
@@ -42,7 +44,11 @@ const mocks = vi.hoisted(() => {
       mutations,
     })),
     useFrameManagerPublicResult: vi.fn<
-      (args: { getGlobalStepBadgeSettings: () => unknown }) => typeof publicResult
+      (args: {
+        getFutureFrameStyle: () => unknown;
+        getGlobalStepBadgeSettings: () => unknown;
+        setFutureFrameEffectMode: (mode: 'border' | 'blur' | 'focus') => void;
+      }) => typeof publicResult
     >(() => publicResult),
     useFrameManagerRuntimeSyncEffects: vi.fn(),
     useFrameManagerSessionEffects: vi.fn(),
@@ -206,9 +212,11 @@ function expectPublicResultOwnerCalled(args: Parameters<typeof useFrameManagerCo
       addFrame: mocks.mutations.addFrame,
       clearFrames: mocks.mutations.clearFrames,
       frames: args.frames,
+      getFutureFrameStyle: expect.any(Function),
       hasFrameForElement: expect.any(Function),
       recalculateStepBadges: expect.any(Function),
       removeFrame: mocks.mutations.removeFrame,
+      setFutureFrameEffectMode: expect.any(Function),
       syncFocusOpacity: mocks.mutations.syncFocusOpacity,
       updateFrame: mocks.mutations.updateFrame,
       updateFrameEffect: mocks.mutations.updateFrameEffect,
@@ -258,6 +266,14 @@ describe('useFrameManagerControllers', () => {
     expect(publicResultArgs?.getGlobalStepBadgeSettings()).toBe(
       args.refs.globalStepBadgeSettingsRef.current
     );
+    expect(publicResultArgs?.getFutureFrameStyle()).toMatchObject({
+      effectMode: 'border',
+      blurSettings: args.refs.sessionSettingsRefs.blurSettings.current,
+      focusSettings: args.refs.sessionSettingsRefs.focusSettings.current,
+    });
+    publicResultArgs?.setFutureFrameEffectMode('focus');
+    expect(args.refs.globalEffectModeRef.current).toBe('focus');
+    expect(args.refs.sessionSettingsRefs.defaultsInitialized.current).toBe(true);
     expect(latestResult).toBe(mocks.publicResult);
   });
 });

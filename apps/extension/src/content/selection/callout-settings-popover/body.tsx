@@ -9,6 +9,8 @@ import {
   CalloutPositionSection,
   CalloutTypographySection,
 } from './views';
+import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
+import { translate } from '../../../platform/i18n';
 
 export function CalloutSettingsPopoverContent(props: {
   handleDelete: () => void;
@@ -21,6 +23,9 @@ export function CalloutSettingsPopoverContent(props: {
 
   return (
     <>
+      <ProductToolbarMenuGroupLabel>
+        {translate('content.callout.settingsTitle')}
+      </ProductToolbarMenuGroupLabel>
       <CalloutPositionSection
         anchor={localSettings.anchor ?? 'top-center'}
         side={localSettings.side}

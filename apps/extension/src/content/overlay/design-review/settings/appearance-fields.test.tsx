@@ -34,6 +34,7 @@ it('keeps direct appearance controls and omits background asset and gradient inp
     setSideFieldLinked: vi.fn(),
     updateValue: vi.fn(),
     updateValues: vi.fn(),
+    voice: { start: vi.fn(), stop: vi.fn() },
   };
   const state: DesignReviewViewState = {
     action: 'refine',
@@ -45,6 +46,13 @@ it('keeps direct appearance controls and omits background asset and gradient inp
     selection: null,
     settingsOpen: true,
     values: { 'background-color': '#ffffff', 'box-shadow': 'none' },
+    voice: {
+      active: false,
+      audioLevel: 0,
+      caretPosition: null,
+      errorCode: null,
+      phase: 'idle',
+    },
   };
 
   host = document.createElement('div');

@@ -18,15 +18,26 @@ type AIModalDialogProps = {
   state: AIModalState;
   title: React.ReactNode;
   treeData?: AIModalProps['treeData'];
+  voiceActive: boolean;
+  onStopVoice(): void;
 };
 
-function createModalEscapeHandler(args: { isLoading: boolean | undefined; onClose: () => void }) {
+function createModalEscapeHandler(args: {
+  isLoading: boolean | undefined;
+  onClose: () => void;
+  onStopVoice(): void;
+  voiceActive: boolean;
+}) {
   return (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Escape' || args.isLoading) {
-      return;
-    }
+    if (event.key !== 'Escape') return;
 
     event.preventDefault();
+    event.stopPropagation();
+    if (args.voiceActive) {
+      args.onStopVoice();
+      return;
+    }
+    if (args.isLoading) return;
     args.onClose();
   };
 }
@@ -40,6 +51,8 @@ export function AIModalDialog({
   state,
   title,
   treeData,
+  voiceActive,
+  onStopVoice,
 }: AIModalDialogProps) {
   const headerProps = {
     title,
@@ -53,7 +66,7 @@ export function AIModalDialog({
     <ProductModal
       closeOnBackdrop={false}
       dialogClassName="sniptale-ai-modal-root"
-      onKeyDown={createModalEscapeHandler({ isLoading, onClose })}
+      onKeyDown={createModalEscapeHandler({ isLoading, onClose, onStopVoice, voiceActive })}
     >
       <ProductModalHeader {...headerProps} />
       <ProductModalBody className="sniptale-ai-modal-body sniptale-modal-scroll">

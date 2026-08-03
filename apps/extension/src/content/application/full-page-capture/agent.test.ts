@@ -33,9 +33,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./geometry', () => ({
   createLayoutGeneration: () => 'layout-generation-1',
   measureCaptureGeometry: () => ({ ...mocks.geometry }),
-  readRootScroll: () => ({ ...mocks.scroll }),
-  resolveScrollCaptureRoot: () => ({ element: document.documentElement, kind: 'document' }),
-  writeRootScroll: mocks.writeRootScroll,
+}));
+
+vi.mock('../../platform/page-scroll', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/page-scroll')>()),
+  readPageScroll: () => ({ ...mocks.scroll }),
+  resolvePageScrollRoot: () => ({ element: document.documentElement, kind: 'document' }),
+  writePageScroll: mocks.writeRootScroll,
 }));
 
 vi.mock('./mutations', async (importOriginal) => ({

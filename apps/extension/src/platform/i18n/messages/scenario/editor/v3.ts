@@ -1,4 +1,12 @@
 export const scenarioEditorV3Messages = {
+  addScreenshot: {
+    ru: 'Добавить скриншот',
+    en: 'Add screenshot',
+  },
+  addStep: {
+    ru: 'Добавить шаг',
+    en: 'Add step',
+  },
   animation: {
     ru: 'Анимация',
     en: 'Animation',
@@ -50,6 +58,14 @@ export const scenarioEditorV3Messages = {
   deleteSlide: {
     ru: 'Удалить слайд',
     en: 'Delete slide',
+  },
+  moveStepDown: {
+    ru: 'Переместить шаг вниз',
+    en: 'Move step down',
+  },
+  moveStepUp: {
+    ru: 'Переместить шаг вверх',
+    en: 'Move step up',
   },
   duplicateSlide: {
     ru: 'Дублировать слайд',
@@ -207,6 +223,14 @@ export const scenarioEditorV3Messages = {
     ru: 'Заметки',
     en: 'Notes',
   },
+  removeSelectedItem: {
+    ru: 'Удалить выбранный объект',
+    en: 'Remove selected item',
+  },
+  selectedItem: {
+    ru: 'Выбранный объект',
+    en: 'Selected item',
+  },
   opacity: {
     ru: 'Прозрачность',
     en: 'Opacity',
@@ -238,6 +262,18 @@ export const scenarioEditorV3Messages = {
   slide: {
     ru: 'Слайд',
     en: 'Slide',
+  },
+  stepDetails: {
+    ru: 'Содержание шага',
+    en: 'Step content',
+  },
+  stepNumber: {
+    ru: 'Шаг',
+    en: 'Step',
+  },
+  steps: {
+    ru: 'Шаги',
+    en: 'Steps',
   },
   slides: {
     ru: 'Слайды',

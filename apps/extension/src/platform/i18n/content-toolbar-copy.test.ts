@@ -81,9 +81,21 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     ru: 'Выберите элемент на странице и опишите изменение',
     en: 'Select a page element and describe the change',
   },
+  'content.toolbar.quickEditLabel': {
+    ru: 'Редактирование контента',
+    en: 'Content editing',
+  },
   'content.toolbar.quickEditEnable': {
-    ru: 'Редактируйте текст прямо на странице',
-    en: 'Edit text directly on the page',
+    ru: 'Выбирайте блоки, редактируйте текст напрямую или используйте ИИ',
+    en: 'Select blocks, edit text directly, or use AI',
+  },
+  'content.toolbar.quickEditBlockSelectionLabel': {
+    ru: 'Выбор блоков',
+    en: 'Select blocks',
+  },
+  'content.toolbar.quickEditBlockSelectionEnable': {
+    ru: 'Выбирать блоки для редактирования',
+    en: 'Select blocks to edit',
   },
   'content.toolbar.highlighterEnable': {
     ru: 'Добавляйте рамки, маски, размытие и комментарии',
@@ -114,12 +126,12 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Allow the extension on all sites so the toolbar can return after navigation',
   },
   'content.toolbar.hideToolbar': {
-    ru: 'Скрыть панель',
-    en: 'Hide toolbar',
+    ru: 'Свернуть панель',
+    en: 'Collapse toolbar',
   },
   'content.toolbar.screenshotDisable': {
-    ru: 'Выйти из режима снимка',
-    en: 'Exit screenshot mode',
+    ru: 'Закрыть панель',
+    en: 'Close toolbar',
   },
   'content.autoBlur.autoApplyEnableHint': {
     ru: 'Автоматически размывать найденные данные перед каждым снимком',
@@ -182,8 +194,8 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Add a step when you click a page element',
   },
   'scenario.content.modeByClickDisabledHint': {
-    ru: 'Сначала выключите аннотации, редактирование страницы и ИИ-редактор',
-    en: 'Turn off annotations, page editing, and the AI editor first',
+    ru: 'Сначала выключите аннотации и редактирование контента',
+    en: 'Turn off annotations and content editing first',
   },
   'scenario.content.captureMode': {
     ru: 'Как добавлять шаги',

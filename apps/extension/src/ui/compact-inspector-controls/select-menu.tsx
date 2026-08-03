@@ -11,6 +11,7 @@ import type {
 import type { AppTheme } from '@sniptale/ui/theme/types';
 import { mergeFloatingInteractionLayerStyle } from '@sniptale/ui/floating-interactions/placement';
 import { FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
+import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 import { cx } from './shared';
 import type { CompactSelectOption } from '@sniptale/ui/compact-inspector-controls/select-types';
 
@@ -50,10 +51,11 @@ export function CompactSelectMenu<T extends string>({
   theme,
   value,
 }: CompactSelectMenuProps<T>): ReactNode {
+  const containedMenuRef = useFloatingSurfaceWheelContainment(menuRef);
   return createPortal(
     <div
       id={menuId}
-      ref={menuRef}
+      ref={containedMenuRef}
       role="listbox"
       data-theme={theme ?? undefined}
       data-floating-ui-root="true"

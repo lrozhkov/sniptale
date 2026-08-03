@@ -11,6 +11,7 @@ import {
   useCalloutEscapeCaptureEffect,
 } from './editing.effects';
 import { useCalloutEditing } from './editing';
+import { useCalloutEditingHandlers } from './editing.handlers';
 
 function FocusEffectHarness(props: {
   htmlContent: string;
@@ -51,21 +52,30 @@ function BlurRequestHarness(props: {
 
 function EscapeCaptureHarness(props: {
   finishEditing: (editableElement?: HTMLDivElement | null) => void;
+  stopVoiceInput?: () => void;
+  voiceActive?: boolean;
 }) {
   const contentEditableRef = React.useRef<HTMLDivElement | null>(null);
   useCalloutEscapeCaptureEffect({
     contentEditableRef,
     finishEditing: props.finishEditing,
     isEditing: true,
+    stopVoiceInput: props.stopVoiceInput ?? vi.fn(),
+    voiceActive: props.voiceActive ?? false,
   });
 
   return (
-    <div
-      ref={contentEditableRef}
-      className="sniptale-callout-editable"
-      contentEditable
-      suppressContentEditableWarning
-    />
+    <div className="sniptale-callout">
+      <div
+        ref={contentEditableRef}
+        className="sniptale-callout-editable"
+        contentEditable
+        suppressContentEditableWarning
+      />
+      <button data-ui="callout-voice-input" type="button">
+        Voice
+      </button>
+    </div>
   );
 }
 
@@ -88,6 +98,50 @@ function RestoredContentMeasureHarness(props: { htmlContent: string }) {
       </div>
       <output data-ui="measured-width">{editing.dimensions.width}</output>
     </>
+  );
+}
+
+function VoiceFocusLifecycleHarness(props: {
+  onStopEditing: () => void;
+  stopVoiceInput: () => void;
+}) {
+  const [voiceActive, setVoiceActive] = React.useState(true);
+  const contentEditableRef = React.useRef<HTMLDivElement | null>(null);
+  const handlers = useCalloutEditingHandlers({
+    contentEditableRef,
+    frameId: 'voice-focus-frame',
+    isEditing: true,
+    onContentChange: vi.fn(),
+    onDelete: vi.fn(),
+    onManualInput: vi.fn(),
+    onStartEditing: vi.fn(),
+    onStopEditing: props.onStopEditing,
+  });
+  useCalloutEscapeCaptureEffect({
+    contentEditableRef,
+    finishEditing: handlers.finishEditing,
+    isEditing: true,
+    stopVoiceInput: () => {
+      props.stopVoiceInput();
+      setVoiceActive(false);
+    },
+    voiceActive,
+  });
+  return (
+    <div className="sniptale-callout">
+      <div
+        ref={contentEditableRef}
+        contentEditable
+        data-ui="voice-focus-editable"
+        onBlur={handlers.handleBlur}
+        suppressContentEditableWarning
+      >
+        Comment
+      </div>
+      <button data-ui="voice-focus-button" type="button">
+        Voice
+      </button>
+    </div>
   );
 }
 
@@ -207,6 +261,93 @@ describe('useCalloutEscapeCaptureEffect', () => {
     });
 
     expect(finishEditing).toHaveBeenCalledWith(editable);
+  });
+
+  it('stops active voice input before finishing the callout editor', () => {
+    const finishEditing = vi.fn();
+    const stopVoiceInput = vi.fn();
+    if (!container) {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+    }
+    act(() => {
+      root?.render(
+        <EscapeCaptureHarness
+          finishEditing={finishEditing}
+          stopVoiceInput={stopVoiceInput}
+          voiceActive
+        />
+      );
+    });
+    const editable = container.querySelector<HTMLDivElement>('.sniptale-callout-editable');
+
+    act(() => {
+      editable?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    });
+
+    expect(stopVoiceInput).toHaveBeenCalledOnce();
+    expect(finishEditing).not.toHaveBeenCalled();
+  });
+
+  it('stops active voice input when Escape comes from the keyboard-focused microphone', () => {
+    const finishEditing = vi.fn();
+    const stopVoiceInput = vi.fn();
+    if (!container) {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+    }
+    act(() => {
+      root?.render(
+        <EscapeCaptureHarness
+          finishEditing={finishEditing}
+          stopVoiceInput={stopVoiceInput}
+          voiceActive
+        />
+      );
+    });
+    const button = container.querySelector<HTMLButtonElement>('[data-ui="callout-voice-input"]');
+    button?.focus();
+
+    act(() => {
+      button?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    });
+
+    expect(stopVoiceInput).toHaveBeenCalledOnce();
+    expect(finishEditing).not.toHaveBeenCalled();
+  });
+
+  it('keeps editing across keyboard focus and orders voice stop before editor finish', () => {
+    const onStopEditing = vi.fn();
+    const stopVoiceInput = vi.fn();
+    if (!container) {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+    }
+    act(() => {
+      root?.render(
+        <VoiceFocusLifecycleHarness onStopEditing={onStopEditing} stopVoiceInput={stopVoiceInput} />
+      );
+    });
+    const editable = container.querySelector<HTMLElement>('[data-ui="voice-focus-editable"]');
+    const button = container.querySelector<HTMLButtonElement>('[data-ui="voice-focus-button"]');
+
+    editable?.focus();
+    act(() => button?.focus());
+    expect(onStopEditing).not.toHaveBeenCalled();
+
+    act(() => {
+      button?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    });
+    expect(stopVoiceInput).toHaveBeenCalledOnce();
+    expect(onStopEditing).not.toHaveBeenCalled();
+
+    act(() => {
+      button?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    });
+    expect(onStopEditing).toHaveBeenCalledOnce();
   });
 });
 

@@ -20,28 +20,35 @@ export function AIModalContent({
 }: AIModalProps & {
   state: ReturnType<typeof useAIModalState>;
 }) {
+  const handleClose = () => {
+    state.voice.actions.stop();
+    onClose();
+  };
   const handleSubmit = createAIModalSubmitHandler(
-    onSubmit,
+    (...args) => {
+      state.voice.actions.stop();
+      onSubmit(...args);
+    },
     isLoading,
     state.prompt,
     state.selectedData,
     state.selectedModelId
   );
-  const footerProps = getAIModalFooterProps(handleSubmit, isLoading, onClose, state);
+  const footerProps = getAIModalFooterProps(handleSubmit, isLoading, handleClose, state);
   const handleKeyDown = createAIModalKeyDownHandler({
     canSubmit: !footerProps.disabledSubmit,
     handleSubmit,
-    isLoading,
-    onClose,
   });
 
   return (
     <>
       <AIModalDialog
-        onClose={onClose}
+        onClose={handleClose}
+        onStopVoice={state.voice.actions.stop}
         promptField={renderAIModalPromptField(handleKeyDown, isLoading, state)}
         state={state}
         title={<AIModalHeaderTitle {...(treeData === undefined ? {} : { treeData })} />}
+        voiceActive={state.voice.state.active}
         {...(isLoading === undefined ? {} : { isLoading })}
         {...(onCancelLoading === undefined ? {} : { onCancelLoading })}
         {...(treeData === undefined ? {} : { treeData })}

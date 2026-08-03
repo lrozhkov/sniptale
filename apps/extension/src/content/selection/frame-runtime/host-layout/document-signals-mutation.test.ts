@@ -3,7 +3,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { initializeContentUiRoots } from '../../../platform/dom-host';
-import { createDocumentSignalRegistry, type ExplicitMotionSignal } from './document-signals';
+import {
+  createDocumentSignalRegistry,
+  type ExplicitMotionSignal,
+  type HostLayoutInvalidationOptions,
+} from './document-signals';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -19,7 +23,7 @@ function createMutationSignals(options: { transientMotionAccepted?: boolean } = 
     continueExplicitMotion: vi.fn<(signal: ExplicitMotionSignal) => boolean | void>(),
     documentWillUnload: vi.fn<(doc: Document) => void>(),
     endExplicitMotion: vi.fn<(signal: ExplicitMotionSignal) => boolean | void>(),
-    invalidate: vi.fn<(options?: { motion?: boolean }) => void>(),
+    invalidate: vi.fn<(options?: HostLayoutInvalidationOptions) => void>(),
     registerAddedNode: vi.fn<(node: Node) => void>(),
     unregisterRemovedNode: vi.fn<(node: Node) => void>(),
   };

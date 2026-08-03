@@ -41,7 +41,6 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     reason: 'Scenario page-shell suites.',
     testFiles: [
       'apps/extension/src/scenario-editor/page-shell/page.test.tsx',
-      'apps/extension/src/scenario-editor/page-shell/side-panels.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/timeline.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/toolbar/shell.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/view.presentation.test.tsx',
@@ -54,7 +53,6 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     exclusive: true,
     reason: 'Scenario inspector suites.',
     testFiles: [
-      'apps/extension/src/scenario-editor/inspector/layers.test.tsx',
       'apps/extension/src/scenario-editor/inspector/panel.tabs.test.tsx',
       'apps/extension/src/scenario-editor/inspector/panel.test.tsx',
     ],

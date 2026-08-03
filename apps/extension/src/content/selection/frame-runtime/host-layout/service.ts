@@ -11,7 +11,10 @@ import {
   type AnchorPresentation,
   type AnchorRect,
 } from './anchor-registry';
-import { createDocumentSignalRegistry } from './document-signals';
+import {
+  createDocumentSignalRegistry,
+  type HostLayoutInvalidationOptions,
+} from './document-signals';
 import { createIframeSignalRegistry } from './iframe-signals';
 import {
   applyFrameHostLayoutResult,
@@ -60,7 +63,7 @@ export interface FrameHostLayoutService {
   getNode(frameId: string): HTMLElement | null;
   getSnapshot(): FrameHostLayoutSnapshot;
   hasElement(element: HTMLElement): boolean;
-  invalidate(options?: { motion?: boolean }): void;
+  invalidate(options?: HostLayoutInvalidationOptions): void;
   link(
     frameId: string,
     node: HTMLElement,
@@ -111,6 +114,7 @@ class FrameHostLayoutServiceOwner implements FrameHostLayoutService {
   private readonly observedNodes = new Map<string, HTMLElement>();
   private runtime: FrameHostLayoutRuntime | null = null;
   private scheduler: ReturnType<typeof createHostLayoutScheduler> | null = null;
+  private viewportScrollInvalidated = false;
   private readonly motionAuthority = createHostLayoutMotionAuthority({
     bindings: () => this.registry.entries(),
     getBinding: (frameId) => this.registry.get(frameId),
@@ -153,6 +157,7 @@ class FrameHostLayoutServiceOwner implements FrameHostLayoutService {
     this.registry.retainAll();
     this.observedNodes.clear();
     this.motionAuthority.clear();
+    this.viewportScrollInvalidated = false;
     this.clearRecovery();
     this.rebuildSnapshot();
   };
@@ -177,7 +182,11 @@ class FrameHostLayoutServiceOwner implements FrameHostLayoutService {
 
   hasElement = (element: HTMLElement) => this.registry.hasElement(element);
 
-  invalidate = (options?: { motion?: boolean }) => this.scheduler?.invalidate(options);
+  invalidate = (options?: HostLayoutInvalidationOptions) => {
+    if (!this.scheduler) return;
+    this.viewportScrollInvalidated ||= options?.viewportScroll === true;
+    this.scheduler.invalidate(options?.motion ? { motion: true } : undefined);
+  };
 
   link: FrameHostLayoutService['link'] = (frameId, node, selector, initial, options) => {
     const observed = this.observedNodes.get(frameId);
@@ -389,6 +398,8 @@ class FrameHostLayoutServiceOwner implements FrameHostLayoutService {
   }
 
   private runReconcile = (stageLinkedMeasurements = false) => {
+    const projectOffscreenGeometry = this.viewportScrollInvalidated;
+    this.viewportScrollInvalidated = false;
     const runtime = this.runtime;
     if (!runtime) {
       return this.registry.createStabilitySample(
@@ -408,6 +419,7 @@ class FrameHostLayoutServiceOwner implements FrameHostLayoutService {
       frameStates: runtime.frameStatesRef.current,
       frames: sourceFrames,
       movingFrameGenerations: this.motionAuthority.getMovingGenerations(),
+      projectOffscreenGeometry,
       registry: this.registry,
       stageLinkedMeasurements,
     });
@@ -580,6 +592,7 @@ class FrameHostLayoutServiceOwner implements FrameHostLayoutService {
     this.documentSignals = null;
     this.observedNodes.clear();
     this.motionAuthority.clear();
+    this.viewportScrollInvalidated = false;
     this.registry.resetReacquireSamples();
     this.clearRecovery();
     this.runtime = null;

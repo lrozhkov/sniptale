@@ -41,6 +41,16 @@ function createStateProps() {
     templates: [{ content: 'Template content', id: 'template-1', name: 'Template 1' }],
     templatesLoading: false,
     totalTokens: 13,
+    voice: {
+      actions: { start: vi.fn(), stop: vi.fn() },
+      state: {
+        active: false,
+        audioLevel: 0,
+        caretPosition: null,
+        errorCode: null,
+        phase: 'idle' as const,
+      },
+    },
   };
 }
 
@@ -73,6 +83,7 @@ describe('buildAIModalState', () => {
       templatesLoading: false,
       textareaRef: props.resize.textareaRef,
       totalTokens: 13,
+      voice: props.voice,
     });
   });
 });

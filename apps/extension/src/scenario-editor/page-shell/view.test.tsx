@@ -3,13 +3,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  createScenarioProjectV3,
-  createScenarioTextElement,
-} from '../../features/scenario/project/v3';
+import { createScenarioProjectV3 } from '../../features/scenario/project/v3';
 import { translate } from '../../platform/i18n';
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import { clickScenarioCanvasAt } from './test-support';
 import { ScenarioV3EditorShell } from './view';
 
 const imageImportMock = vi.hoisted(() => ({ insertImageFileIntoSelectedSlide: vi.fn() }));
@@ -111,22 +107,15 @@ describe('scenario v3 editor shell layout', () => {
     expect(container?.querySelector('[data-ui="scenario.inspector.panel"]')).not.toBeNull();
   });
 
-  it('inserts elements through UI controls and groups undo/redo over project history', () => {
+  it('exposes screenshot and step actions without canvas object tools', () => {
     renderShell();
 
-    clickButton(translate('scenario.editor.insertText'));
-    act(() => clickScenarioCanvasAt(container, 120, 96));
-    expect(container?.textContent).toContain(translate('scenario.editor.text'));
-
-    clickButton(translate('scenario.editor.undo'));
-    expect(
-      container?.querySelector('[data-ui="scenario.inspector.layers"]')?.textContent
-    ).not.toContain(translate('scenario.editor.text'));
-
-    clickButton(translate('scenario.editor.redo'));
-    expect(
-      container?.querySelector('[data-ui="scenario.inspector.layers"]')?.textContent
-    ).toContain(translate('scenario.editor.text'));
+    expect(getButton(translate('scenario.editor.addScreenshot'))).not.toBeNull();
+    expect(getButton(translate('scenario.editor.addStep'))).not.toBeNull();
+    expect(getButton(translate('scenario.editor.insertText'))).toBeNull();
+    expect(getButton(translate('scenario.editor.insertShape'))).toBeNull();
+    expect(getButton(translate('scenario.editor.insertArrow'))).toBeNull();
+    expect(getButton(translate('scenario.editor.layouts'))).toBeNull();
   });
 });
 
@@ -152,69 +141,33 @@ it('keeps slide inspector edits on the shared project state', () => {
   );
 });
 
-describe('scenario v3 editor shell click preview', () => {
-  it('starts at the selected slide initial click index', () => {
+describe('scenario v3 editor shell step-first surface', () => {
+  it('does not expose click-build state for legacy slides', () => {
     const project = createShellProject();
     renderShell({
       ...project,
       slides: [{ ...project.slides[0]!, clicks: { count: 1, initialIndex: 1 } }],
     });
 
-    expect(container?.textContent).toContain('1/1');
+    expect(container?.querySelector('[data-ui="scenario.floating.build-timeline"]')).toBeNull();
+    expect(container?.textContent).not.toContain('1/1');
   });
 
-  it('advances edit click preview when selecting a delayed build element', async () => {
-    const project = createShellProject();
-    const delayedElement = {
-      ...createScenarioTextElement({
-        build: { hideAtClick: null, order: 0, showAtClick: 1 },
-        name: 'Step note',
-        text: 'Delayed build note',
-      }),
-      id: 'note-1',
-    };
-    renderShell({
-      ...project,
-      slides: [
-        {
-          ...project.slides[0]!,
-          clicks: { count: 1, initialIndex: 0 },
-          elements: [delayedElement],
-        },
-      ],
-    });
-
-    clickButton(`${translate('scenario.editor.buildStep')} 0`);
-
-    expect(decodeRenderedSvg()).not.toContain('Delayed');
-    await clickFirstLayerButton();
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(container?.textContent).toContain('1/1');
-    expect(decodeRenderedSvg()).toMatch(/Delayed[\s\S]*build note/);
+  it('does not expose layers as a second navigation model', () => {
+    renderShell();
+    expect(container?.querySelector('[data-ui="scenario.floating.layers-panel"]')).toBeNull();
   });
 });
 
 describe('scenario v3 editor shell toolbar actions', () => {
-  it('opens the template picker and manager from the slide sidebar', () => {
+  it('keeps layout, grid, and template controls out of guide authoring', () => {
     renderShell();
 
-    const gridButton = getButton(translate('scenario.editor.toggleGrid'));
-    expect(gridButton?.getAttribute('data-ui')).toBe('scenario.floating.workspace-panel.grid');
-    expect(gridButton?.getAttribute('aria-pressed')).toBe('true');
-    clickButton(translate('scenario.editor.toggleGrid'));
-    expect(getButton(translate('scenario.editor.toggleGrid'))?.getAttribute('aria-pressed')).toBe(
-      null
-    );
-
-    clickButton(translate('scenario.editor.layouts'));
-    expect(container?.querySelector('[data-ui="scenario.templates.picker"]')).not.toBeNull();
-    expect(container?.textContent).not.toContain(translate('scenario.editor.applyTemplate'));
-
-    clickButton(translate('scenario.editor.templateManagerOpen'));
-    expect(container?.querySelector('[data-ui="scenario.templates.manager"]')).not.toBeNull();
+    expect(getButton(translate('scenario.editor.toggleGrid'))).toBeNull();
+    expect(getButton(translate('scenario.editor.toggleMagnet'))).toBeNull();
+    expect(getButton(translate('scenario.editor.layouts'))).toBeNull();
+    expect(container?.querySelector('[data-ui="scenario.templates.picker"]')).toBeNull();
+    expect(container?.querySelector('[data-ui="scenario.templates.manager"]')).toBeNull();
   });
 
   it('exports the v3 deck from toolbar UI through the browser download seam', async () => {
@@ -272,14 +225,6 @@ async function clickButtonText(text: string) {
   await act(async () => button?.click());
 }
 
-async function clickFirstLayerButton() {
-  const button = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="scenario.inspector.layers"] button'
-  );
-  expect(button).not.toBeNull();
-  await act(async () => button?.click());
-}
-
 async function dispatchImageFile(file: File) {
   const input = container?.querySelector<HTMLInputElement>('input[type="file"]');
   expect(input).not.toBeNull();
@@ -291,9 +236,4 @@ async function dispatchImageFile(file: File) {
     input.dispatchEvent(new Event('change', { bubbles: true }));
     await Promise.resolve();
   });
-}
-
-function decodeRenderedSvg() {
-  const src = container?.querySelector<HTMLImageElement>('img')?.getAttribute('src') ?? '';
-  return decodeURIComponent(src.replace(/^data:image\/svg\+xml;charset=utf-8,/, ''));
 }

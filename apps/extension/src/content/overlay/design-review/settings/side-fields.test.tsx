@@ -20,6 +20,13 @@ function createState(values: DesignReviewViewState['values']): DesignReviewViewS
     selection: null,
     settingsOpen: true,
     values,
+    voice: {
+      active: false,
+      audioLevel: 0,
+      caretPosition: null,
+      errorCode: null,
+      phase: 'idle',
+    },
   };
 }
 

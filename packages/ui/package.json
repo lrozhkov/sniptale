@@ -37,6 +37,7 @@
     "./floating-chrome": "./src/floating-chrome/index.tsx",
     "./floating-interactions/placement": "./src/floating-interactions/placement.ts",
     "./floating-interactions/ownership": "./src/floating-interactions/ownership.ts",
+    "./floating-interactions/wheel": "./src/floating-interactions/wheel.ts",
     "./glass-popover/base-styles.data": "./src/glass-popover/base-styles.data.ts",
     "./glass-popover/controls-styles.data": "./src/glass-popover/controls-styles.data.ts",
     "./glass-popover/styles.data": "./src/glass-popover/styles.data.ts",
@@ -118,7 +119,8 @@
     "./styles/toolbar/transient/root": "./src/styles/toolbar/transient/root.css",
     "./theme/dom": "./src/theme/dom.ts",
     "./theme/safe-portal": "./src/theme/safe-portal.tsx",
-    "./theme/types": "./src/theme/types.ts"
+    "./theme/types": "./src/theme/types.ts",
+    "./voice-input/use-push-to-talk": "./src/voice-input/use-push-to-talk.ts"
   },
   "dependencies": {
     "@sniptale/foundation": "0.2.0",

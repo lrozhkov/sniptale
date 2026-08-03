@@ -5,27 +5,11 @@ import {
   createScenarioTextElement,
 } from '../../features/scenario/project/v3';
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import { listBundledScenarioTemplates } from '../../features/scenario/project/v3/templates';
 import type { ScenarioV3EditorShellContent } from './shell-content';
-import type { useScenarioV3TemplateState } from './template-state';
 import {
   createScenarioV3ElementActionStubs,
   createScenarioV3SlideActionStubs,
 } from './test-editor-action-stubs.test-support';
-
-export function createScenarioV3TemplateStateStub(): ReturnType<typeof useScenarioV3TemplateState> {
-  return {
-    closePanel: vi.fn(),
-    createSlide: vi.fn(),
-    deleteLibrary: vi.fn(),
-    libraries: [],
-    openManager: vi.fn(),
-    panelMode: null,
-    saveLibrary: vi.fn(),
-    templates: [...listBundledScenarioTemplates()],
-    toggleLibrary: vi.fn(),
-  };
-}
 
 export function createScenarioV3ShellContentEditorStub(args: {
   applyProject?: (project: ScenarioProjectV3) => void;
@@ -53,7 +37,6 @@ export function createScenarioV3ShellContentEditorStub(args: {
     project: args.project,
     projectActions: {
       applyProject: args.applyProject ?? vi.fn(),
-      updatePresentation: vi.fn(),
     },
     selectedElement,
     selectedElementId: args.selectedElementId ?? null,
@@ -104,24 +87,5 @@ export function createScenarioV3ClipboardEvent(
     configurable: true,
     value: clipboardData,
   });
-  return event;
-}
-
-export function clickScenarioCanvasAt(
-  container: ParentNode | null,
-  clientX: number,
-  clientY: number
-) {
-  const stage = container?.querySelector<HTMLDivElement>('[data-ui="scenario.canvas.stage"]');
-  if (!stage) {
-    throw new Error('Missing scenario canvas stage');
-  }
-  stage.dispatchEvent(createScenarioPointerEvent('pointerdown', clientX, clientY));
-  stage.dispatchEvent(createScenarioPointerEvent('pointerup', clientX, clientY));
-}
-
-function createScenarioPointerEvent(type: string, clientX: number, clientY: number) {
-  const event = new MouseEvent(type, { bubbles: true, clientX, clientY });
-  Object.defineProperty(event, 'pointerId', { value: 1 });
   return event;
 }

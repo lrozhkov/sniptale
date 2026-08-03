@@ -203,7 +203,7 @@ function expectMissingFrameRootsRenderState() {
   expect(renderState?.currentFrames).toHaveLength(1);
 }
 
-function expectUnavailableFrameRootUnmountsAfterRenderTick() {
+function expectTemporarilyUnavailableFrameRootStaysMounted() {
   vi.useFakeTimers();
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -226,12 +226,40 @@ function expectUnavailableFrameRootUnmountsAfterRenderTick() {
   });
 
   expect(root.unmount).not.toHaveBeenCalled();
-  expect(rootsRef.current.has('frame-1')).toBe(false);
-  expect(document.getElementById('frame-container-frame-1')).toBeNull();
+  expect(rootsRef.current.has('frame-1')).toBe(true);
+  expect(document.getElementById('frame-container-frame-1')).not.toBeNull();
   expect(prepareMocks.createRoot).not.toHaveBeenCalled();
 
   vi.runOnlyPendingTimers();
 
+  expect(root.unmount).not.toHaveBeenCalled();
+}
+
+function expectMissingFrameRootUnmountsAfterRenderTick() {
+  vi.useFakeTimers();
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  appendFrameContainer(container, 'frame-1');
+  const root = createRootStub();
+  const rootsRef = { current: new Map<string, Root>([['frame-1', root]]) };
+
+  prepareFrameRootsRender({
+    currentFrameStates: new Map<string, FrameState>([['frame-1', 'idle']]),
+    framesRef: { current: [createFrame('frame-1')] },
+    getOrCreateContainer: () => container,
+    isClearingRef: { current: false },
+    hostLayoutSnapshot: {
+      presentations: new Map([['frame-1', 'missing']]),
+      recoveries: [],
+      version: 1,
+    },
+    prevRenderDescriptorsRef: { current: [] },
+    rootsRef,
+  });
+
+  expect(rootsRef.current.has('frame-1')).toBe(false);
+  expect(document.getElementById('frame-container-frame-1')).toBeNull();
+  vi.runOnlyPendingTimers();
   expect(root.unmount).toHaveBeenCalledTimes(1);
 }
 
@@ -249,8 +277,12 @@ function registerPrepareFrameRootsRenderTests() {
     expectRemovedFrameRootUnmountsAfterRenderTick
   );
   it(
-    'defers unavailable frame root unmount until after the current render tick',
-    expectUnavailableFrameRootUnmountsAfterRenderTick
+    'keeps a temporarily unavailable frame root mounted while the page is scrolling',
+    expectTemporarilyUnavailableFrameRootStaysMounted
+  );
+  it(
+    'still unmounts a frame whose linked anchor is missing',
+    expectMissingFrameRootUnmountsAfterRenderTick
   );
   it('logs deferred removed root unmount failures', expectDeferredUnmountErrorsAreLogged);
 }

@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { createScenarioEditorDeckAiSubmitAction } from '../project/ai';
 import type { useScenarioEditorDeckAiState } from '../project/ai';
 import { ScenarioEditorDeckAiPanel } from '../project/ai/deck-panel';
-import { ScenarioTemplateManager } from '../project/templates';
 import { useScenarioCanvasViewport } from '../canvas/viewport-state';
 import { ScenarioImageElementEditorMount } from './image-editor';
 import {
@@ -14,7 +13,7 @@ import {
 import { ScenarioV3DeckExportDialogMount } from './deck-export-dialog-mount';
 import { SCENARIO_EDITOR_MODES, type ScenarioEditorMode } from './presentation/mode';
 import type { useScenarioV3EditorState } from './state';
-import type { useScenarioV3TemplateState } from './template-state';
+import type { listBundledScenarioTemplates } from '../../features/scenario/project/v3/templates';
 import type { ScenarioV3EditorSaveStatus } from './types';
 import { resolveScenarioFloatingChromeCanvasInsets } from './floating-chrome/canvas-insets';
 import { ScenarioV3Workspace } from './workspace';
@@ -23,14 +22,11 @@ type ScenarioV3EditorState = ReturnType<typeof useScenarioV3EditorState>;
 interface ScenarioV3EditorShellContentProps {
   aiPanelOpen: boolean;
   aiState: ReturnType<typeof useScenarioEditorDeckAiState>;
-  audienceOpening: boolean;
   clickIndex: number;
   editingImageElementId: string | null;
   editor: ScenarioV3EditorState;
-  elapsedSeconds: number;
   exportDialogOpen: boolean;
   mode: ScenarioEditorMode;
-  presentationError: string | null;
   saveStatus?: ScenarioV3EditorSaveStatus | undefined;
   onClickIndexChange: (clickIndex: number) => void;
   onCloseAi: () => void;
@@ -38,16 +34,12 @@ interface ScenarioV3EditorShellContentProps {
   onCloseImageElement: () => void;
   onEditImageElement: (elementId: string | null) => void;
   onModeChange: (mode: ScenarioEditorMode) => void;
-  onOpenAudienceScreen: () => void;
   onOpenExport: () => void;
-  onPresentationPositionChange: (position: { clickIndex: number; slideId: string }) => void;
   onToggleAi: () => void;
-  templates: ReturnType<typeof useScenarioV3TemplateState>;
+  templates: ReturnType<typeof listBundledScenarioTemplates>;
 }
 
 export function ScenarioV3EditorShellContent(props: ScenarioV3EditorShellContentProps) {
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
-  const [timelineHidden, setTimelineHidden] = useState(false);
   const inspectorTool = props.exportDialogOpen ? 'export' : null;
   useScenarioLayerClipboard({
     editor: props.editor,
@@ -60,22 +52,14 @@ export function ScenarioV3EditorShellContent(props: ScenarioV3EditorShellContent
       className="sniptale-extension-surface relative flex h-full min-h-0 flex-col overflow-hidden
         bg-[var(--sniptale-color-surface-canvas)] text-[var(--sniptale-color-text-primary)]"
     >
-      <ScenarioV3OperationError message={props.editor.operationError ?? props.presentationError} />
-      <ScenarioV3TemplatePanel templates={props.templates} />
-      <ScenarioV3WorkspaceMount
-        inspectorTool={inspectorTool}
-        props={props}
-        templatePickerOpen={templatePickerOpen}
-        timelineHidden={timelineHidden}
-        onTemplatePickerOpenChange={setTemplatePickerOpen}
-        onTimelineHiddenChange={setTimelineHidden}
-      />
+      <ScenarioV3OperationError message={props.editor.operationError} />
+      <ScenarioV3WorkspaceMount inspectorTool={inspectorTool} props={props} />
       <ScenarioV3AiPanelMount
         aiState={props.aiState}
         editor={props.editor}
         onClose={props.onCloseAi}
         open={props.aiPanelOpen}
-        templates={props.templates.templates}
+        templates={props.templates}
       />
       <ScenarioV3DeckExportDialogMount
         editor={props.editor}
@@ -93,58 +77,32 @@ export function ScenarioV3EditorShellContent(props: ScenarioV3EditorShellContent
 function ScenarioV3WorkspaceMount(args: {
   inspectorTool: 'export' | null;
   props: ScenarioV3EditorShellContentProps;
-  templatePickerOpen: boolean;
-  timelineHidden: boolean;
-  onTemplatePickerOpenChange: (open: boolean | ((open: boolean) => boolean)) => void;
-  onTimelineHiddenChange: (hidden: boolean) => void;
 }) {
   return <ScenarioV3Workspace {...useScenarioWorkspaceProps(args)} />;
 }
 function useScenarioWorkspaceProps(args: {
   inspectorTool: 'export' | null;
   props: ScenarioV3EditorShellContentProps;
-  templatePickerOpen: boolean;
-  timelineHidden: boolean;
-  onTemplatePickerOpenChange: (open: boolean | ((open: boolean) => boolean)) => void;
-  onTimelineHiddenChange: (hidden: boolean) => void;
 }) {
   const { props } = args;
   const canvasViewport = useScenarioCanvasViewport(props.editor.selectedSlide.canvas, {
-    fitInsets: (viewport) =>
-      resolveScenarioFloatingChromeCanvasInsets(viewport, { timelineHidden: args.timelineHidden }),
+    fitInsets: resolveScenarioFloatingChromeCanvasInsets,
   });
   const clearInspectorTool = () => props.onCloseExport();
-  const toggleTemplatePicker = () => {
-    props.onCloseExport();
-    args.onTemplatePickerOpenChange((open) => !open);
-  };
-  const createTemplateSlide = (template: Parameters<typeof props.templates.createSlide>[0]) => {
-    props.templates.createSlide(template);
-    args.onTemplatePickerOpenChange(false);
-  };
   return {
     aiPanelOpen: props.aiPanelOpen,
-    audienceOpening: props.audienceOpening,
     canvasViewport,
     clickIndex: props.clickIndex,
     editor: props.editor,
-    elapsedSeconds: props.elapsedSeconds,
     inspectorTool: args.inspectorTool,
     mode: props.mode,
     saveStatus: props.saveStatus,
-    templatePickerOpen: args.templatePickerOpen,
-    templates: { ...props.templates, createSlide: createTemplateSlide },
-    timelineHidden: args.timelineHidden,
     onClearInspectorTool: clearInspectorTool,
     onClickIndexChange: props.onClickIndexChange,
     onEditImageElement: props.onEditImageElement,
     onModeChange: props.onModeChange,
-    onOpenAudienceScreen: props.onOpenAudienceScreen,
     onOpenExport: props.onOpenExport,
-    onPresentationPositionChange: props.onPresentationPositionChange,
-    onTimelineHiddenChange: args.onTimelineHiddenChange,
     onToggleAi: props.onToggleAi,
-    onToggleTemplatePicker: toggleTemplatePicker,
   };
 }
 function useScenarioLayerClipboard(args: { editor: ScenarioV3EditorState; enabled: boolean }) {
@@ -217,7 +175,7 @@ function ScenarioV3AiPanelMount(props: {
   editor: ScenarioV3EditorState;
   onClose: () => void;
   open: boolean;
-  templates: ReturnType<typeof useScenarioV3TemplateState>['templates'];
+  templates: ReturnType<typeof listBundledScenarioTemplates>;
 }) {
   if (!props.open) {
     return null;
@@ -259,24 +217,6 @@ function ScenarioV3OperationError(props: { message: string | null }) {
       >
         {props.message}
       </div>
-    </div>
-  );
-}
-
-function ScenarioV3TemplatePanel(props: {
-  templates: ReturnType<typeof useScenarioV3TemplateState>;
-}) {
-  return (
-    <div className="absolute right-4 top-14 z-20 grid gap-3">
-      {props.templates.panelMode === 'manager' ? (
-        <ScenarioTemplateManager
-          libraries={props.templates.libraries}
-          onClose={props.templates.closePanel}
-          onDeleteLibrary={props.templates.deleteLibrary}
-          onSaveLibrary={props.templates.saveLibrary}
-          onToggleLibrary={props.templates.toggleLibrary}
-        />
-      ) : null}
     </div>
   );
 }

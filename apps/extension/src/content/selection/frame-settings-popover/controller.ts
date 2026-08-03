@@ -26,12 +26,14 @@ export function useFrameSettingsPopoverController(args: {
     focusSettings?: FocusSettings;
   }) => void;
   onClose: () => void;
+  scope?: 'frame' | 'session';
 }) {
   const portalTheme = useContentPortalTheme(args.anchorEl);
   const state = useFrameSettingsPopoverState({
     frameId: args.frameId,
     isOpen: args.isOpen,
     onApplyToFrame: args.onApplyToFrame,
+    scope: args.scope ?? 'frame',
     ...(args.blurSettings === undefined ? {} : { blurSettings: args.blurSettings }),
     ...(args.borderSettings === undefined ? {} : { borderSettings: args.borderSettings }),
     ...(args.focusSettings === undefined ? {} : { focusSettings: args.focusSettings }),

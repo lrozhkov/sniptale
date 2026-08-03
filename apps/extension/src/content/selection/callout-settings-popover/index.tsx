@@ -70,6 +70,7 @@ export function CalloutSettingsPopover({
       className={[
         'sniptale-callout-settings-popover sniptale-glass-popover',
         'sniptale-glass-popover--wide sniptale-content-popover--compact',
+        'sniptale-content-popover--toolbar-menu',
       ].join(' ')}
       style={popoverStyle}
       dataUi="content.callout-settings.popover"

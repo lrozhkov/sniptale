@@ -6,14 +6,27 @@ import { getAutoBlurRectUnion, hasBlurFrameForRect } from './geometry';
 import type { AutoBlurDetectionCandidate, AutoBlurMatch, AutoBlurScanInput } from './types';
 import { collectVisibleAutoBlurTextSources, getAutoBlurTextSourceRangeRects } from './visible-text';
 import { ruleAutoBlurDetector } from './detectors/rule-detector';
+import { visitAutoBlurPageViewports } from './full-page';
 
-function createDetectionCandidate(detection: AutoBlurDetection): AutoBlurDetectionCandidate | null {
+function createDetectionCandidate(
+  detection: AutoBlurDetection,
+  scrollDelta: { x: number; y: number }
+): AutoBlurDetectionCandidate | null {
   const source = detection.source as ReturnType<typeof collectVisibleAutoBlurTextSources>[number];
-  const rect = getAutoBlurRectUnion(
+  const currentRect = getAutoBlurRectUnion(
     getAutoBlurTextSourceRangeRects(source, detection.start, detection.end)
   );
 
-  return rect ? { ...detection, rect } : null;
+  return currentRect
+    ? {
+        ...detection,
+        rect: {
+          ...currentRect,
+          x: currentRect.x + scrollDelta.x,
+          y: currentRect.y + scrollDelta.y,
+        },
+      }
+    : null;
 }
 
 function createMatchId(detection: AutoBlurDetectionCandidate, index: number): string {
@@ -69,11 +82,22 @@ export async function scanAutoBlurTargets(
   input: AutoBlurScanInput,
   detector: AutoBlurDetector = ruleAutoBlurDetector
 ) {
-  const sources = collectVisibleAutoBlurTextSources();
-  const candidates = detector
-    .detect({ sources })
-    .map(createDetectionCandidate)
-    .filter((candidate): candidate is AutoBlurDetectionCandidate => candidate !== null);
+  const candidates: AutoBlurDetectionCandidate[] = [];
+  const collectCandidates = (scrollDelta: { x: number; y: number }) => {
+    const sources = collectVisibleAutoBlurTextSources();
+    candidates.push(
+      ...detector
+        .detect({ sources })
+        .map((detection) => createDetectionCandidate(detection, scrollDelta))
+        .filter((candidate): candidate is AutoBlurDetectionCandidate => candidate !== null)
+    );
+  };
+
+  if (input.mode === 'full-page') {
+    await visitAutoBlurPageViewports(collectCandidates);
+  } else {
+    collectCandidates({ x: 0, y: 0 });
+  }
 
   return {
     matches: dedupeCandidates(candidates).map((detection, index) =>

@@ -10,6 +10,7 @@ import { FrameSettingsPopoverContent } from './views';
 import { POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
 import { BorderPresetEditor } from '../../../ui/highlighter-preset-editor';
+import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 
 function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
   event.stopPropagation();
@@ -18,6 +19,7 @@ function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
 
 export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   const state = useFrameSettingsPopoverController(props);
+  const popoverRef = useFloatingSurfaceWheelContainment(state.surface.popoverRef);
   const popoverStyle = useFramePopoverPosition({
     anchorEl: props.anchorEl,
     fallbackSize: { width: POPOVER_WIDTH, height: POPOVER_HEIGHT },
@@ -34,8 +36,14 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   return createPortal(
     <>
       <div
-        ref={state.surface.popoverRef}
-        className="sniptale-frame-settings-popover sniptale-glass-popover sniptale-content-popover"
+        ref={popoverRef}
+        className={[
+          'sniptale-frame-settings-popover',
+          'sniptale-glass-popover',
+          'sniptale-content-popover',
+          'sniptale-content-popover--toolbar-menu',
+          props.compact ? 'sniptale-content-popover--compact' : '',
+        ].join(' ')}
         data-sniptale-activation-bridge="defer"
         data-theme={state.surface.portalTheme ?? undefined}
         data-frame-id={props.frameId}
@@ -45,6 +53,7 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
       >
         <div className="sniptale-content-popover-body">
           <FrameSettingsPopoverContent
+            compact={props.compact ?? false}
             effectMode={props.effectMode}
             globalSettings={{
               ...state.settings.global,

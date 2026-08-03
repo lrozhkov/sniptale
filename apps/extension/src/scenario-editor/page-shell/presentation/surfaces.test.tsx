@@ -11,9 +11,7 @@ import {
 import { translate } from '../../../platform/i18n';
 import type { ScenarioSlideRenderAssetMap } from '../../project/stage-render/slide';
 import type { ScenarioSlide } from '@sniptale/runtime-contracts/scenario/types/v3';
-import { ScenarioOverviewSurface } from './overview';
 import { ScenarioDeckPlaySurface } from './play-surface';
-import { ScenarioPresenterSurface } from './presenter';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -91,27 +89,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders overview tiles and jumps to a selected slide', () => {
-  const onSelectSlide = vi.fn();
-
-  renderNode(
-    <ScenarioOverviewSurface
-      onExit={vi.fn()}
-      onSelectSlide={onSelectSlide}
-      selectedSlideId="slide-2"
-      slides={createSlides()}
-    />
-  );
-  act(() => {
-    container?.querySelector<HTMLButtonElement>('button')?.click();
-  });
-
-  expect(container?.querySelector('[data-ui="scenario.editor.v3.overview"]')).not.toBeNull();
-  expect(container?.textContent).toContain('1. Intro');
-  expect(container?.textContent).toContain('Opening notes');
-  expect(onSelectSlide).toHaveBeenCalledWith('slide-1');
-});
-
 it('advances and rewinds deck builds from play controls and keyboard', () => {
   const onNext = vi.fn();
   const onPrevious = vi.fn();
@@ -164,48 +141,6 @@ it('passes image assets into the play surface slide render', () => {
       slide={createImageSlide('slide-1', 'asset-1')}
       slideIndex={0}
       slideTotal={1}
-    />
-  );
-
-  expect(decodeRenderedSvgs()).toContain('data:image/png;base64,presentation');
-});
-
-it('renders presenter current slide, next preview, notes, and timer', () => {
-  renderNode(
-    <ScenarioPresenterSurface
-      assets={createAssets()}
-      audienceOpening={false}
-      clickIndex={0}
-      elapsedSeconds={65}
-      nextSlide={createImageSlide('slide-2', 'asset-2')}
-      onExit={vi.fn()}
-      onNext={vi.fn()}
-      onOpenAudienceScreen={vi.fn()}
-      onPrevious={vi.fn()}
-      slide={createImageSlide('slide-1', 'asset-1')}
-      slideIndex={0}
-      slideTotal={2}
-    />
-  );
-
-  expect(container?.querySelector('[data-ui="scenario.editor.v3.presenter"]')).not.toBeNull();
-  expect(
-    container?.querySelector('[data-ui="scenario.presentation.zoom-viewport"]')
-  ).not.toBeNull();
-  expect(container?.textContent).toContain('01:05');
-  expect(decodeRenderedSvgs()).toContain('data:image/png;base64,presentation');
-  expect(decodeRenderedSvgs()).toContain('data:image/png;base64,next');
-  expect(container?.textContent).toContain('Следующий слайд');
-});
-
-it('passes image assets into overview thumbnails', () => {
-  renderNode(
-    <ScenarioOverviewSurface
-      assets={createAssets()}
-      onExit={vi.fn()}
-      onSelectSlide={vi.fn()}
-      selectedSlideId="slide-1"
-      slides={[createImageSlide('slide-1', 'asset-1')]}
     />
   );
 

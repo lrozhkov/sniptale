@@ -5,13 +5,8 @@ import type {
   FullPageCaptureSessionIdentity,
   FullPageCaptureTileState,
 } from '../../../contracts/full-page-capture';
-import {
-  createLayoutGeneration,
-  measureCaptureGeometry,
-  readRootScroll,
-  resolveScrollCaptureRoot,
-  writeRootScroll,
-} from './geometry';
+import { createLayoutGeneration, measureCaptureGeometry } from './geometry';
+import { readPageScroll, resolvePageScrollRoot, writePageScroll } from '../../platform/page-scroll';
 import {
   applyFloatingPolicyForTile,
   collectFloatingCandidates,
@@ -97,7 +92,7 @@ function createTileState(session: FullPageAgentSession): FullPageCaptureTileStat
   ) {
     throw new Error('Full-page capture viewport changed during capture');
   }
-  const scroll = readRootScroll(session.root);
+  const scroll = readPageScroll(session.root);
   return {
     actualX: scroll.x,
     actualY: scroll.y,
@@ -121,7 +116,7 @@ export function createFullPageCaptureAgent(): FullPageCaptureAgent {
     active.restored = true;
     active.abortController.abort(new Error('Full-page capture page session was restored'));
     if (active.watchdog) clearTimeout(active.watchdog);
-    writeRootScroll(active.root, active.originalScroll.x, active.originalScroll.y);
+    writePageScroll(active.root, active.originalScroll.x, active.originalScroll.y);
     restorePageMutations(active);
     if (session === active) {
       lastRestoredIdentity = { ...active.identity };
@@ -154,8 +149,8 @@ export function createFullPageCaptureAgent(): FullPageCaptureAgent {
       throw new Error('Another full-page capture session is active');
     }
 
-    const root = resolveScrollCaptureRoot();
-    const originalScroll = readRootScroll(root);
+    const root = resolvePageScrollRoot();
+    const originalScroll = readPageScroll(root);
     const active: FullPageAgentSession = {
       abortController: new AbortController(),
       classMutations: [],
@@ -193,7 +188,7 @@ export function createFullPageCaptureAgent(): FullPageCaptureAgent {
           active.abortController.signal
         );
         assertActive(active);
-        writeRootScroll(active.root, originalScroll.x, originalScroll.y);
+        writePageScroll(active.root, originalScroll.x, originalScroll.y);
         await waitForCaptureStability(active.abortController.signal);
         assertActive(active);
         active.geometry = measureCaptureGeometry(active.root);
@@ -216,7 +211,7 @@ export function createFullPageCaptureAgent(): FullPageCaptureAgent {
   ): Promise<TabResponseByType[typeof MessageType.PREPARE_FULL_PAGE_TILE]> {
     const active = requireIdentity(session, message);
     armWatchdog(active);
-    writeRootScroll(active.root, message.targetX, message.targetY);
+    writePageScroll(active.root, message.targetX, message.targetY);
     await waitForCaptureStability(active.abortController.signal);
     assertActive(active);
     applyFloatingPolicyForTile(active, message);

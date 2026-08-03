@@ -10,7 +10,9 @@ import { integrationTreeData } from './test-fixtures';
 
 type BodyHarnessProps = {
   onClose?: () => void;
+  onStopVoice?: () => void;
   onSubmit?: (...args: unknown[]) => void;
+  voiceActive?: boolean;
 };
 
 let container: HTMLDivElement | null = null;
@@ -46,6 +48,8 @@ function createBodyState(args: {
   setSelectedModelId: React.Dispatch<React.SetStateAction<string | null>>;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   totalTokens: number;
+  voiceActive: boolean;
+  stopVoice(): void;
 }) {
   return {
     availableModels,
@@ -71,6 +75,16 @@ function createBodyState(args: {
     templatesLoading: false,
     textareaRef: args.textareaRef,
     totalTokens: args.totalTokens,
+    voice: {
+      actions: { start: vi.fn(), stop: args.stopVoice },
+      state: {
+        active: args.voiceActive,
+        audioLevel: 0,
+        caretPosition: null,
+        errorCode: null,
+        phase: 'idle',
+      },
+    },
   } as never;
 }
 
@@ -78,6 +92,7 @@ function BodyHarness(props: BodyHarnessProps) {
   const [prompt, setPrompt] = useState('Summarize the selected field in detail');
   const [selectedData, setSelectedData] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<string | null>('model-1');
+  const [voiceActive, setVoiceActive] = useState(props.voiceActive ?? false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const totalTokens = useMemo(
     () => estimateTokens(prompt) + estimateTokens(selectedData),
@@ -101,6 +116,11 @@ function BodyHarness(props: BodyHarnessProps) {
           setSelectedModelId,
           textareaRef,
           totalTokens,
+          voiceActive,
+          stopVoice: () => {
+            props.onStopVoice?.();
+            setVoiceActive(false);
+          },
         })}
         treeData={integrationTreeData}
       />

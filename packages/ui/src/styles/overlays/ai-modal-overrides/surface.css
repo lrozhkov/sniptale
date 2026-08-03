@@ -26,6 +26,29 @@
     inset 0 1px 0 color-mix(in srgb, var(--sniptale-color-text-primary) 3%, transparent);
 }
 
+.sniptale-ai-modal-prompt-field {
+  position: relative;
+}
+
+.sniptale-ai-modal-root .sniptale-ai-modal-prompt-textarea {
+  padding-right: 48px;
+  padding-bottom: 44px;
+}
+
+.sniptale-ai-modal-prompt-voice-control {
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  z-index: 20;
+}
+
+.sniptale-ai-modal-prompt-voice-error {
+  margin: 6px 0 0;
+  color: var(--sniptale-color-danger);
+  font-size: 11px;
+  line-height: 16px;
+}
+
 .sniptale-ai-modal-root .sniptale-textarea,
 .sniptale-ai-modal-root .sniptale-input {
   border-radius: 10px;

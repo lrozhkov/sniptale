@@ -9,6 +9,7 @@ import { createCalloutSettingsKey } from './settings-key';
 import { getCalloutTailDragCursor } from './tail-drag';
 import { useCalloutInteractionLayout } from './interaction-layout';
 import type { CalloutHandleKeyboardEvent } from './keyboard';
+import { resolveCalloutVoiceButtonLeftOffset } from './voice-button';
 
 interface CalloutProps {
   frameId: string;
@@ -136,6 +137,12 @@ function createCalloutBodyProps(args: {
     handleInput: args.editing.handleInput,
     handleKeyDown: args.editing.handleKeyDown,
     handlePaste: args.editing.handlePaste,
+    voice: args.editing.voice,
+    voiceButtonLeftOffset: resolveCalloutVoiceButtonLeftOffset({
+      calloutLeft: args.layout.calloutPos.x,
+      calloutWidth: args.layout.calloutDimensions.width,
+      viewportWidth: window.innerWidth,
+    }),
     isEditing: args.isEditing,
     portalTheme: args.portalTheme,
     settings: args.settings,

@@ -41,5 +41,10 @@ describe('StepBadgePopoverAdapter', () => {
         .querySelector('.sniptale-step-badge-popover')
         ?.classList.contains('sniptale-content-popover--compact')
     ).toBe(true);
+    expect(
+      document
+        .querySelector('.sniptale-step-badge-popover')
+        ?.classList.contains('sniptale-content-popover--toolbar-menu')
+    ).toBe(true);
   });
 });

@@ -4,18 +4,10 @@ import { act } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  createScenarioProjectV3,
-  createScenarioSlide,
-  createScenarioTextElement,
-} from '../../features/scenario/project/v3';
+import { createScenarioTextElement } from '../../features/scenario/project/v3';
 import { translate } from '../../platform/i18n';
 import { SelectedElementInspector } from './element';
-import { FrameFields } from './frame';
 import { clampScenarioNumber, SCENARIO_INSPECTOR_LIMITS } from './constraints';
-import { ProjectPresentationFields } from './project-presentation';
-import { SlideCanvasFields } from './slide-canvas';
-import { SlidePresentationFields } from './slide-presentation';
 
 vi.mock('./fields', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./fields')>()),
@@ -63,43 +55,27 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('passes explicit constraints to frame, slide, build, and grid numeric fields', () => {
+it('keeps the selected-element destructive action explicit', () => {
   const text = createScenarioTextElement({ frame: { height: 120, width: 320, x: 40, y: 80 } });
-  const slide = createScenarioSlide();
-  const project = createScenarioProjectV3('Constraints');
+  const onDelete = vi.fn();
 
   render(
-    <>
-      <SelectedElementInspector element={text} onUpdateElement={vi.fn()} />
-      <FrameFields element={text} onFrameChange={vi.fn()} />
-      <SlideCanvasFields slide={slide} onUpdateSlide={vi.fn()} />
-      <SlidePresentationFields slide={slide} onUpdateSlide={vi.fn()} />
-      <ProjectPresentationFields
-        presentation={project.presentation}
-        onUpdatePresentation={vi.fn()}
-      />
-    </>
+    <SelectedElementInspector
+      element={text}
+      onDelete={onDelete}
+      onEditImageElement={vi.fn()}
+      onUpdateElement={vi.fn()}
+    />
   );
 
-  expect(numberField('X')).toMatchObject({ max: '7680', min: '-7680', scrub: 'true' });
-  expect(numberField('Width', { min: '1' })).toMatchObject({ max: '7680', min: '1' });
-  expect(numberField(translate('scenario.editor.width'), { min: '320' })).toMatchObject({
-    max: '7680',
-    min: '320',
+  act(() => {
+    Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find(
+        (button) => button.textContent?.trim() === translate('scenario.editor.removeSelectedItem')
+      )
+      ?.click();
   });
-  expect(numberField(translate('scenario.editor.showAtClick'))).toMatchObject({
-    max: '999',
-    min: '0',
-  });
-  expect(numberField(translate('scenario.editor.clicks'))).toMatchObject({
-    max: '999',
-    min: '0',
-  });
-  expect(numberField(translate('scenario.editor.gridMargin'))).toMatchObject({
-    max: '320',
-    min: '0',
-    scrub: 'true',
-  });
+  expect(onDelete).toHaveBeenCalledOnce();
 });
 
 it('clamps scenario inspector numbers against the shared limits', () => {
@@ -112,20 +88,4 @@ function render(node: ReactNode) {
   act(() => {
     root?.render(node);
   });
-}
-
-function numberField(label: string, matcher: { min?: string } = {}) {
-  const fields = Array.from(
-    container?.querySelectorAll<HTMLElement>(`[data-label="${label}"]`) ?? []
-  );
-  const field = fields.find((candidate) =>
-    matcher.min === undefined ? true : candidate.dataset['min'] === matcher.min
-  );
-  expect(field).not.toBeNull();
-  return {
-    max: field?.dataset['max'],
-    min: field?.dataset['min'],
-    scrub: field?.dataset['scrub'],
-    step: field?.dataset['step'],
-  };
 }

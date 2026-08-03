@@ -9,8 +9,13 @@ import {
   setFocusMaskRectBox,
 } from '../effects/geometry';
 import type { OverlayRefs } from './types';
+import type { AnchorPresentation } from '../host-layout/service';
 
-export function updateFocusOverlayMask(allFrames: FrameData[], refs: OverlayRefs) {
+export function updateFocusOverlayMask(
+  allFrames: FrameData[],
+  refs: OverlayRefs,
+  presentations: ReadonlyMap<string, AnchorPresentation> = new Map()
+) {
   const focusFrames = allFrames.filter((frame) => frame.effectMode === 'focus');
   if (focusFrames.length === 0) {
     hideFocusOverlay(refs);
@@ -22,7 +27,10 @@ export function updateFocusOverlayMask(allFrames: FrameData[], refs: OverlayRefs
     0.1
   );
   const overlay = ensureFocusOverlay(overlayOpacity, refs);
-  const svg = createFocusMaskSvg(focusFrames, refs.focusMaskIdRef.current);
+  const cutoutFrames = focusFrames.filter(
+    (frame) => (presentations.get(frame.id) ?? 'visible') !== 'offscreen'
+  );
+  const svg = createFocusMaskSvg(cutoutFrames, refs.focusMaskIdRef.current);
 
   refs.focusSvgRef.current?.remove();
   overlay.appendChild(svg);

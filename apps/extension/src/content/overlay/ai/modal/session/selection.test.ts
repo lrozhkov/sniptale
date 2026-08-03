@@ -33,10 +33,12 @@ describe('createTemplateSelectHandler', () => {
     textarea.setSelectionRange(7, 12);
     const blurSpy = vi.spyOn(textarea, 'blur');
     const setPrompt = vi.fn();
+    const stopVoiceInput = vi.fn();
 
     await createTemplateSelectHandler({
       selectTemplate: vi.fn().mockResolvedValue('Added'),
       setPrompt,
+      stopVoiceInput,
       textareaRef: { current: textarea },
     })({ content: 'Template', id: 'template-1', name: 'Template 1' });
 
@@ -45,19 +47,60 @@ describe('createTemplateSelectHandler', () => {
     expect(textarea.selectionStart).toBe(12);
     expect(textarea.selectionEnd).toBe(12);
     expect(blurSpy).toHaveBeenCalledTimes(1);
+    expect(stopVoiceInput).toHaveBeenCalledTimes(2);
   });
 
   it('prepends selected content when the textarea is not the active target', async () => {
     const setPrompt = vi.fn();
+    const stopVoiceInput = vi.fn();
 
     await createTemplateSelectHandler({
       selectTemplate: vi.fn().mockResolvedValue('Inserted'),
       setPrompt,
+      stopVoiceInput,
       textareaRef: { current: null },
     })({ content: 'Template', id: 'template-1', name: 'Template 1' });
 
     expect(setPrompt).toHaveBeenCalledWith(expect.any(Function));
     expect(setPrompt.mock.calls[0]?.[0]('Existing prompt')).toBe('Inserted\n\nExisting prompt');
+    expect(stopVoiceInput).toHaveBeenCalledTimes(2);
+  });
+
+  it('invalidates voice before loading and again before committing a delayed template', async () => {
+    let resolveTemplate!: (value: string) => void;
+    const selectTemplate = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveTemplate = resolve;
+        })
+    );
+    const setPrompt = vi.fn();
+    const stopVoiceInput = vi.fn();
+    const selection = createTemplateSelectHandler({
+      selectTemplate,
+      setPrompt,
+      stopVoiceInput,
+      textareaRef: { current: null },
+    });
+
+    const pendingSelection = selection({
+      content: 'Template',
+      id: 'template-1',
+      name: 'Template 1',
+    });
+
+    expect(stopVoiceInput).toHaveBeenCalledTimes(1);
+    expect(stopVoiceInput.mock.invocationCallOrder[0]).toBeLessThan(
+      selectTemplate.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
+    );
+
+    resolveTemplate('Resolved template');
+    await pendingSelection;
+
+    expect(stopVoiceInput).toHaveBeenCalledTimes(2);
+    expect(stopVoiceInput.mock.invocationCallOrder[1]).toBeLessThan(
+      setPrompt.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
+    );
   });
 });
 

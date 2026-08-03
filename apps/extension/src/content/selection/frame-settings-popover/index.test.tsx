@@ -284,6 +284,7 @@ describe('FrameSettingsPopover loading state', () => {
     const popover = document.querySelector<HTMLElement>('.sniptale-frame-settings-popover');
     expect(popover?.classList).toContain('sniptale-glass-popover');
     expect(popover?.classList).toContain('sniptale-content-popover');
+    expect(popover?.classList).toContain('sniptale-content-popover--toolbar-menu');
     expect(popover?.dataset['frameId']).toBe('frame-1');
     expect(popover?.dataset['theme']).toBe('dark');
     expect(popover?.dataset['sniptaleActivationBridge']).toBe('defer');
@@ -295,6 +296,13 @@ describe('FrameSettingsPopover loading state', () => {
     expect(popover?.querySelector('.sniptale-content-popover-body')).not.toBeNull();
     popover?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(hostClick).not.toHaveBeenCalled();
+    const wheelEvent = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 80,
+    });
+    popover?.dispatchEvent(wheelEvent);
+    expect(wheelEvent.defaultPrevented).toBe(true);
 
     document.body.removeEventListener('click', hostClick);
   });

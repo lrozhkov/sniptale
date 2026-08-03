@@ -22,6 +22,7 @@ const actions: DesignReviewActions = {
   setSideFieldLinked: vi.fn(),
   updateValue: vi.fn(),
   updateValues: vi.fn(),
+  voice: { start: vi.fn(), stop: vi.fn() },
 };
 
 const borderValues = {
@@ -53,6 +54,13 @@ const state: DesignReviewViewState = {
   selection: null,
   settingsOpen: true,
   values: borderValues,
+  voice: {
+    active: false,
+    audioLevel: 0,
+    caretPosition: null,
+    errorCode: null,
+    phase: 'idle',
+  },
 };
 
 it('owns four compact common border groups without nested disclosures', () => {

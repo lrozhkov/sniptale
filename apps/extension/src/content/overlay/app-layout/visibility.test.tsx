@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AutoBlurController } from '../auto-blur/controller';
 import type { ContentAppLayoutProps } from './types';
+import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
 
 const { contentDialogStackMock, contentToolbarShellMock, designReviewSurfaceMock } = vi.hoisted(
   () => ({
@@ -141,6 +142,12 @@ function createToolbarProps(
     captureAction: 'download_default',
     currentViewport: null,
     frameCount: 0,
+    futureFrameStyle: {
+      blurSettings: { amount: 8, blurType: 'gaussian', showBorder: true },
+      borderSettings: DEFAULT_BORDER_PRESET,
+      effectMode: 'border',
+      focusSettings: { opacity: 0.5, showBorder: false },
+    },
     handleTakeScreenshot: vi.fn(async () => undefined),
     isCompletelyHidden: true,
     isCursorMode: true,
@@ -166,6 +173,7 @@ function createToolbarProps(
     },
     pinToTab: false,
     pinToTabAvailable: true,
+    setFutureFrameEffectMode: vi.fn(),
     setCaptureAction: vi.fn(),
     setCurrentViewport: vi.fn(),
     setPinToTab: vi.fn(),

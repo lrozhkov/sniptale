@@ -469,6 +469,57 @@ describe('frame host-layout identity recovery', () => {
 });
 
 describe('frame host-layout identity race safety', () => {
+  it('does not publish geometry from an offscreen replacement before reacquisition is accepted', () => {
+    const original = document.createElement('a');
+    original.id = 'target';
+    original.href = '/learn-more';
+    document.body.appendChild(original);
+    installRect(original, { x: 20, y: 30, width: 120, height: 40 });
+    const frame: FrameData = {
+      id: 'frame-1',
+      x: 20,
+      y: 30,
+      width: 120,
+      height: 40,
+      linkedElementSelector: '#target',
+    };
+    const registry = createAnchorRegistry();
+    registry.link(frame.id, original, frame.linkedElementSelector!);
+    original.remove();
+    const replacement = original.cloneNode() as HTMLAnchorElement;
+    document.body.appendChild(replacement);
+    installRect(replacement, { x: 20, y: -500, width: 120, height: 40 });
+
+    const first = reconcileFrameHostLayout({
+      frameStates: new Map(),
+      frames: [frame],
+      movingFrameGenerations: new Map(),
+      registry,
+    });
+
+    expect(first.frames).toEqual([frame]);
+    expect(registry.get(frame.id)).toMatchObject({
+      bindingStatus: 'reacquired',
+      node: replacement,
+      presentation: 'offscreen',
+    });
+
+    document.body.appendChild(original.cloneNode());
+    const second = reconcileFrameHostLayout({
+      frameStates: new Map(),
+      frames: [frame],
+      movingFrameGenerations: new Map(),
+      registry,
+    });
+
+    expect(second.frames).toEqual([frame]);
+    expect(registry.get(frame.id)).toMatchObject({
+      bindingStatus: 'ambiguous',
+      node: null,
+      presentation: 'ambiguous',
+    });
+  });
+
   it('invalidates a replacement when an identical clone appears between stable samples', () => {
     const original = document.createElement('a');
     original.id = 'target';

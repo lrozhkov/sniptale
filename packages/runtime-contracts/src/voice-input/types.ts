@@ -7,6 +7,7 @@ export const VOICE_INPUT_LOCAL_QUALITY = 'dictation' as const;
 export const VOICE_INPUT_DEVICE_ID_MAX_CHARS = 512;
 export const VOICE_INPUT_LEVEL_PEAK_COUNT = 16;
 export const VOICE_INPUT_TRANSCRIPT_MAX_CHARS = 16_000;
+export const VOICE_INPUT_TEST_SESSION_DURATION_MS = 30_000;
 
 export const VoiceInputPortMessageType = {
   STATUS: 'VOICE_INPUT_STATUS',
@@ -140,6 +141,7 @@ export type OffscreenVoiceInputCommand =
     }
   | {
       capabilityToken: string;
+      maxDurationMs: typeof VOICE_INPUT_TEST_SESSION_DURATION_MS | null;
       type: typeof MessageType.OFFSCREEN_VOICE_INPUT_START;
       preferences: VoiceInputPreferences;
       quality: typeof VOICE_INPUT_LOCAL_QUALITY;

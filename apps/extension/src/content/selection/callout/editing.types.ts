@@ -10,6 +10,7 @@ export type CalloutEditingHandlersArgs = {
   contentEditableRef: RefObject<HTMLDivElement | null>;
   frameId: string;
   isEditing: boolean;
+  onManualInput: () => void;
   onContentChange: (htmlContent: string) => void;
   onDelete: () => void;
   onStartEditing: () => void;

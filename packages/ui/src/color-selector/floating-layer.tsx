@@ -16,6 +16,7 @@ import {
   FLOATING_INTERACTION_CAPTURE_TRANSIENT_ATTRIBUTE,
   FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE,
 } from '../floating-interactions/ownership';
+import { useFloatingSurfaceWheelContainment } from '../floating-interactions/wheel';
 
 const COLOR_SELECTOR_LAYER_WIDTH = 224;
 const COLOR_SELECTOR_LAYER_GAP = 8;
@@ -78,6 +79,7 @@ export function ColorSelectorFloatingLayer(props: {
   style: CSSProperties;
   ui: string;
 }) {
+  const layerRef = useFloatingSurfaceWheelContainment(props.layerRef);
   const floatingPanelClassName =
     'fixed z-[2147483647] overflow-x-visible overflow-y-auto overscroll-contain';
   const stopLayerEventPropagation = (
@@ -89,7 +91,7 @@ export function ColorSelectorFloatingLayer(props: {
 
   return (
     <div
-      ref={props.layerRef}
+      ref={layerRef}
       className={floatingPanelClassName}
       data-theme={props.portalTheme ?? undefined}
       data-floating-ui-root="true"

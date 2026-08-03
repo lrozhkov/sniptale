@@ -19,26 +19,16 @@ export function createFloatingProps(
   const { canvasControls: canvasControlOverrides, ...restOverrides } = overrides;
 
   return {
-    activeInsertKind: null,
     assets: new Map(),
     canvasControls: createFloatingCanvasControls(canvasControlOverrides),
-    clickIndex: 0,
     editor,
     inspectorTool: null,
     mode: SCENARIO_EDITOR_MODES.edit,
-    timelineHidden: false,
-    templatePickerOpen: false,
-    templates: createFloatingTemplateState(),
     onClearInspectorTool: vi.fn(),
-    onActiveInsertKindChange: vi.fn(),
-    onClickIndexChange: vi.fn(),
     onEditImageElement: vi.fn(),
     onModeChange: vi.fn(),
     onOpenExport: vi.fn(),
-    onPresentationPositionChange: vi.fn(),
-    onTimelineHiddenChange: vi.fn(),
     onToggleAi: vi.fn(),
-    onToggleTemplatePicker: vi.fn(),
     ...restOverrides,
   };
 }
@@ -65,20 +55,6 @@ function createFloatingCanvasControls(
   };
 }
 
-function createFloatingTemplateState(): ScenarioV3FloatingChromeProps['templates'] {
-  return {
-    closePanel: vi.fn(),
-    createSlide: vi.fn(),
-    deleteLibrary: vi.fn(),
-    libraries: [],
-    openManager: vi.fn(),
-    panelMode: null,
-    saveLibrary: vi.fn(),
-    templates: [],
-    toggleLibrary: vi.fn(),
-  };
-}
-
 function createFloatingEditor(
   project: ReturnType<typeof createScenarioProjectV3>
 ): ScenarioV3FloatingEditor {
@@ -92,7 +68,7 @@ function createFloatingEditor(
     history: { redo: vi.fn(), undo: vi.fn() },
     operationError: null,
     project,
-    projectActions: { applyProject: vi.fn(), updatePresentation: vi.fn() },
+    projectActions: { applyProject: vi.fn() },
     selectedElement: null,
     selectedElementId: null,
     selectedSlide: slide,

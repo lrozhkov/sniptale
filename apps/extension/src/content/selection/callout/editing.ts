@@ -9,6 +9,7 @@ import {
   useCalloutSyncContentEffect,
 } from './editing.effects';
 import { useCalloutEditingHandlers } from './editing.handlers';
+import { useCalloutVoiceInput } from './voice-input';
 
 type UseCalloutEditingArgs = {
   frameId: string;
@@ -51,6 +52,7 @@ function createCalloutEditingResult(args: {
   dimensions: { width: number; height: number };
   floatingToolbarRect: DOMRect | null;
   handlers: ReturnType<typeof useCalloutEditingHandlers>;
+  voice: ReturnType<typeof useCalloutVoiceInput>;
 }) {
   return {
     applyFormatting: args.handlers.applyFormatting,
@@ -63,6 +65,7 @@ function createCalloutEditingResult(args: {
     handleInput: args.handlers.handleInput,
     handleKeyDown: args.handlers.handleKeyDown,
     handlePaste: args.handlers.handlePaste,
+    voice: args.voice,
   };
 }
 
@@ -71,6 +74,7 @@ function useCalloutEditingEffects(args: {
   containerRef: React.RefObject<HTMLDivElement | null>;
   contentEditableRef: React.RefObject<HTMLDivElement | null>;
   handlers: ReturnType<typeof useCalloutEditingHandlers>;
+  voice: ReturnType<typeof useCalloutVoiceInput>;
   setDimensions: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
   setFloatingToolbarRect: React.Dispatch<React.SetStateAction<DOMRect | null>>;
 }) {
@@ -94,6 +98,8 @@ function useCalloutEditingEffects(args: {
     contentEditableRef,
     finishEditing: handlers.finishEditing,
     isEditing: calloutArgs.isEditing,
+    stopVoiceInput: args.voice.actions.stop,
+    voiceActive: args.voice.state.active,
   });
   useCalloutSelectionChangeEffect({
     isEditing: calloutArgs.isEditing,
@@ -112,11 +118,17 @@ export function useCalloutEditing(args: UseCalloutEditingArgs) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [floatingToolbarRect, setFloatingToolbarRect] = useState<DOMRect | null>(null);
   useCalloutEditingHistoryTransaction(args.frameId, args.isEditing);
+  const voice = useCalloutVoiceInput({
+    contentEditableRef,
+    isEditing: args.isEditing,
+    onContentChange: args.onContentChange,
+  });
 
   const handlers = useCalloutEditingHandlers({
     contentEditableRef,
     frameId: args.frameId,
     isEditing: args.isEditing,
+    onManualInput: voice.actions.stop,
     onContentChange: args.onContentChange,
     onDelete: args.onDelete,
     onStartEditing: args.onStartEditing,
@@ -128,6 +140,7 @@ export function useCalloutEditing(args: UseCalloutEditingArgs) {
     containerRef,
     contentEditableRef,
     handlers,
+    voice,
     setDimensions,
     setFloatingToolbarRect,
   });
@@ -138,5 +151,6 @@ export function useCalloutEditing(args: UseCalloutEditingArgs) {
     dimensions,
     floatingToolbarRect,
     handlers,
+    voice,
   });
 }

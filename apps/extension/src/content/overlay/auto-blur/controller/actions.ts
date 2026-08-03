@@ -151,6 +151,7 @@ export function useApplyOnceAction(args: {
         blurSettings: settings.blurSettings,
         frameManager,
         frames: frameManager.frames,
+        scanMode: 'full-page',
         selectedCategories: settings.selectedCategories,
       });
       reportApplyOnceResult(result.addedCount);

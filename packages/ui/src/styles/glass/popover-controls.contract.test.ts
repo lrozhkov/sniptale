@@ -21,4 +21,10 @@ describe('glass.popover-controls contract', () => {
       'background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);'
     );
   });
+
+  it('owns bounded scrolling for long preset catalogs', () => {
+    expect(glassPopoverControlsStylesheet).toMatch(
+      /\.sniptale-glass-preset-list--scroll\s*\{[^}]*max-height:[^}]*overflow-y:\s*auto;[^}]*overscroll-behavior:\s*contain;/s
+    );
+  });
 });

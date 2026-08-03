@@ -3,11 +3,9 @@ import type {
   FullPageCapturePreferences,
   FullPageCaptureSessionIdentity,
 } from '../../../contracts/full-page-capture';
+import type { PageScrollRoot } from '../../platform/page-scroll';
 
-export type ScrollCaptureRoot =
-  | { element: HTMLElement; kind: 'element' }
-  | { element: HTMLElement; kind: 'document' }
-  | { element: null; kind: 'viewport' };
+export type ScrollCaptureRoot = PageScrollRoot;
 
 export type OwnedStyleMutation = {
   appliedPriority: string;

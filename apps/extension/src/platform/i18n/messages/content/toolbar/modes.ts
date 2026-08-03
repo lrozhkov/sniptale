@@ -68,16 +68,24 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Select a page element and describe the change',
   },
   quickEditLabel: {
-    ru: 'Редактирование страницы',
-    en: 'Page editing',
+    ru: 'Редактирование контента',
+    en: 'Content editing',
   },
   quickEditDisable: {
-    ru: 'Отключить редактирование',
-    en: 'Disable editing',
+    ru: 'Отключить редактирование контента',
+    en: 'Disable content editing',
   },
   quickEditEnable: {
-    ru: 'Редактируйте текст прямо на странице',
-    en: 'Edit text directly on the page',
+    ru: 'Выбирайте блоки, редактируйте текст напрямую или используйте ИИ',
+    en: 'Select blocks, edit text directly, or use AI',
+  },
+  quickEditBlockSelectionLabel: {
+    ru: 'Выбор блоков',
+    en: 'Select blocks',
+  },
+  quickEditBlockSelectionEnable: {
+    ru: 'Выбирать блоки для редактирования',
+    en: 'Select blocks to edit',
   },
   designReviewLabel: {
     ru: 'Дизайн-ревью',
@@ -88,8 +96,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Select any element, leave feedback, and inspect its styles',
   },
   quickEditDocumentModeLabel: {
-    ru: 'Свободное редактирование',
-    en: 'Free text edit',
+    ru: 'Редактирование текста',
+    en: 'Edit text directly',
   },
   quickEditDocumentModeEnable: {
     ru: 'Редактировать текст прямо на странице',
@@ -172,16 +180,16 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Allow the extension on all sites so the toolbar can return after navigation',
   },
   hideToolbar: {
-    ru: 'Скрыть панель',
-    en: 'Hide toolbar',
+    ru: 'Свернуть панель',
+    en: 'Collapse toolbar',
   },
   screenshotDisable: {
-    ru: 'Выйти из режима снимка',
-    en: 'Exit screenshot mode',
+    ru: 'Закрыть панель',
+    en: 'Close toolbar',
   },
   screenshotDisableError: {
-    ru: 'Не удалось выйти из режима снимка. Повторите попытку.',
-    en: 'Could not exit screenshot mode. Try again.',
+    ru: 'Не удалось закрыть панель. Повторите попытку.',
+    en: 'Could not close the toolbar. Try again.',
   },
   screenshotEnable: {
     ru: 'Перейти в режим снимка',

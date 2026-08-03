@@ -56,6 +56,8 @@
 
 .sniptale-content-popover .sniptale-glass-switch {
   width: 38px;
+  min-width: 38px;
+  flex: 0 0 38px;
   height: 22px;
   padding: 2px;
   border-color: color-mix(

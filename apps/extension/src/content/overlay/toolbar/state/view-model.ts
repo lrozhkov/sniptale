@@ -65,6 +65,7 @@ function createToolbarModeToggleArgs(
   derivedState: ReturnType<typeof useToolbarDerivedState>,
   args: {
     highlighterMode: boolean;
+    quickEditDocumentMode: boolean;
     quickEditMode: boolean;
     screenshotMode: boolean;
   }
@@ -73,9 +74,12 @@ function createToolbarModeToggleArgs(
     aiPickMode: props.aiPickMode ?? false,
     screenshotMode: args.screenshotMode,
     highlighterMode: args.highlighterMode,
+    quickEditDocumentMode: args.quickEditDocumentMode,
     quickEditMode: args.quickEditMode,
+    onAiPickContentStart: props.onAiPickContentStart,
     onToggleScreenshotMode: props.onToggleScreenshotMode,
     onToggleHighlighterMode: props.onToggleHighlighterMode,
+    onToggleQuickEditDocumentMode: props.onToggleQuickEditDocumentMode,
     onToggleQuickEditMode: props.onToggleQuickEditMode,
     onClearHighlights: props.onClearHighlights,
     setIsLoading: derivedState.setIsLoading,
@@ -112,7 +116,13 @@ export function useToolbarViewModel(props: ToolbarProps) {
     props.captureAction,
     props.onCaptureActionChange
   );
-  const modeFlags = { designReviewMode, highlighterMode, quickEditMode, screenshotMode };
+  const modeFlags = {
+    designReviewMode,
+    highlighterMode,
+    quickEditDocumentMode,
+    quickEditMode,
+    screenshotMode,
+  };
   const toolbarMenuState = useToolbarMenuState();
 
   const derivedState = useToolbarDerivedState(createToolbarDerivedStateArgs(props, modeFlags));

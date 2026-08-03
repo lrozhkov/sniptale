@@ -88,6 +88,9 @@ describe('apply-once auto-blur feedback', () => {
 
     await act(async () => applyOnce?.());
 
+    expect(feedbackMocks.applyAutoBlurWithSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ scanMode: 'full-page' })
+    );
     expect(feedbackMocks.showToast).toHaveBeenCalledOnce();
     expect(feedbackMocks.showToast).toHaveBeenCalledWith('Найденные данные скрыты: 10', 'success');
     expect(failApplying).not.toHaveBeenCalled();

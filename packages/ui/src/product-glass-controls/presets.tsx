@@ -4,6 +4,7 @@ import { joinClassNames } from './helpers';
 
 export interface ProductGlassPresetListProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
+  scrollable?: boolean;
 }
 
 export interface ProductGlassPresetItemProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,10 +14,18 @@ export interface ProductGlassPresetItemProps extends ButtonHTMLAttributes<HTMLBu
 export function ProductGlassPresetList({
   children,
   className = '',
+  scrollable = false,
   ...props
 }: ProductGlassPresetListProps) {
   return (
-    <div className={joinClassNames('sniptale-glass-preset-list', className)} {...props}>
+    <div
+      className={joinClassNames(
+        'sniptale-glass-preset-list',
+        scrollable && 'sniptale-glass-preset-list--scroll',
+        className
+      )}
+      {...props}
+    >
       {children}
     </div>
   );

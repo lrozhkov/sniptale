@@ -19,6 +19,7 @@ import {
   type BlurFrameDescriptor,
   type FocusFrameDescriptor,
 } from '../effects/overlay-descriptors';
+import { isFramePresentationRenderable } from '../roots/presentation';
 
 type UseFrameEffectOverlaysArgs = {
   frames: FrameData[];
@@ -33,8 +34,8 @@ export function useFrameEffectOverlays({
 }: UseFrameEffectOverlaysArgs): void {
   const overlayRefs = useFrameEffectOverlayRefs();
   const renderableFramesRef = useRef<FrameData[]>([]);
-  renderableFramesRef.current = framesRef.current.filter(
-    (frame) => (hostLayoutSnapshot.presentations.get(frame.id) ?? 'visible') === 'visible'
+  renderableFramesRef.current = framesRef.current.filter((frame) =>
+    isFramePresentationRenderable(hostLayoutSnapshot.presentations.get(frame.id))
   );
   const ensureBlurFiltersSvg = useCallback(
     () => ensureBlurFiltersSvgContainer(overlayRefs),
@@ -54,6 +55,7 @@ export function useFrameEffectOverlays({
   useFrameEffectSync(
     frames,
     renderableFramesRef,
+    hostLayoutSnapshot.presentations,
     hostLayoutSnapshot.version,
     overlayRefs,
     ensureBlurFiltersSvg,
@@ -87,23 +89,29 @@ function useFrameEffectOverlayRefs(): OverlayRefs {
 function useFrameEffectSync(
   frames: FrameData[],
   framesRef: MutableRefObject<FrameData[]>,
+  presentations: FrameHostLayoutSnapshot['presentations'],
   presentationVersion: number,
   overlayRefs: OverlayRefs,
   ensureBlurFiltersSvg: () => void,
   updateDistortionFilterScale: (scale: number) => void
 ) {
   const prevFocusDescriptorsRef = useRef<FocusFrameDescriptor[]>([]);
+  const prevFocusPresentationVersionRef = useRef(-1);
   const prevBlurDescriptorsRef = useRef<BlurFrameDescriptor[]>([]);
 
   useEffect(() => {
     const focusDescriptors = buildFocusFrameDescriptors(framesRef.current);
-    if (areFocusFrameDescriptorsEqual(focusDescriptors, prevFocusDescriptorsRef.current)) {
+    if (
+      areFocusFrameDescriptorsEqual(focusDescriptors, prevFocusDescriptorsRef.current) &&
+      presentationVersion === prevFocusPresentationVersionRef.current
+    ) {
       return;
     }
 
     prevFocusDescriptorsRef.current = focusDescriptors;
-    updateFocusOverlayMask(framesRef.current, overlayRefs);
-  }, [frames, framesRef, overlayRefs, presentationVersion]);
+    prevFocusPresentationVersionRef.current = presentationVersion;
+    updateFocusOverlayMask(framesRef.current, overlayRefs, presentations);
+  }, [frames, framesRef, overlayRefs, presentations, presentationVersion]);
 
   useEffect(() => {
     const blurDescriptors = buildBlurFrameDescriptors(framesRef.current);

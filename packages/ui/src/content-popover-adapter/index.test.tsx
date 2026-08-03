@@ -120,6 +120,18 @@ describe('ContentPopoverAdapter', () => {
     expect(portalTarget?.innerHTML).toBe('');
   });
 
+  it('absorbs wheel input instead of scrolling the host page', () => {
+    renderPopover(true);
+    const popover = portalTarget?.querySelector<HTMLElement>(
+      '[data-ui="shared.ui.content-popover"]'
+    );
+    const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 80 });
+
+    popover?.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it('renders the dedicated content popover section contract', () => {
     const markup = renderSectionMarkup(
       <ContentPopoverSection title="Settings">

@@ -1,4 +1,5 @@
 import type { CSSProperties, MutableRefObject, PropsWithChildren } from 'react';
+import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
 import type { AppTheme } from '../theme/index';
 
@@ -68,9 +69,10 @@ export function GlassSelectMenuSurface({
   menuRef,
   children,
 }: GlassSelectMenuSurfaceProps) {
+  const containedMenuRef = useFloatingSurfaceWheelContainment(menuRef);
   return (
     <div
-      ref={menuRef}
+      ref={containedMenuRef}
       role="listbox"
       data-floating-ui-root="true"
       data-ui={portal ? 'shared.ui.glass-select.portal-surface' : 'shared.ui.glass-select.menu'}

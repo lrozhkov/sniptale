@@ -1,4 +1,5 @@
 import type { CSSProperties, FocusEventHandler, MouseEventHandler, ReactNode } from 'react';
+import { useFloatingSurfaceWheelContainment } from '../../floating-interactions/wheel';
 
 export type ProductToolbarMenuPlacement = 'down' | 'up' | 'side';
 
@@ -59,6 +60,7 @@ export function ProductToolbarMenu({
   placement = 'down',
   variant = 'default',
 }: ProductToolbarMenuProps) {
+  const menuRef = useFloatingSurfaceWheelContainment<HTMLDivElement>();
   const resolvedClassName = [
     'sniptale-popover-menu',
     'sniptale-toolbar-menu',
@@ -73,7 +75,7 @@ export function ProductToolbarMenu({
     .join(' ');
 
   return (
-    <div className={resolvedClassName} style={style}>
+    <div ref={menuRef} className={resolvedClassName} style={style}>
       {title ? <div className="sniptale-toolbar-menu-title">{title}</div> : null}
       <div className="sniptale-toolbar-menu-list">{children}</div>
     </div>

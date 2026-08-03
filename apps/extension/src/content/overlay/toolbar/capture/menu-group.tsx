@@ -84,8 +84,6 @@ export function ToolbarCaptureMenuGroup(
       getViewportMenuPosition={menus.getViewportMenuPosition}
       setViewportMenuOpen={menus.setViewportMenuOpen}
       closeMenus={menus.closeMenus}
-      activeMenuType={menus.activeMenuType}
-      setActiveMenuType={menus.setActiveMenuType}
     />
   );
 

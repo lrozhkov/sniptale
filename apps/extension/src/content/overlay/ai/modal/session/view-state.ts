@@ -5,6 +5,7 @@ import type {
   useAIModalSettingsState,
 } from './locals';
 import type { PromptTemplatesState } from '../../../../../features/prompt-templates/hooks/use-prompt-templates';
+import type { useAIModalPromptVoiceInput } from './prompt-voice-input';
 
 function buildAIModalTemplateState(props: {
   handleAddTemplate: () => void;
@@ -91,11 +92,13 @@ export function buildAIModalState(props: {
   templates: PromptTemplatesState['templates'];
   templatesLoading: boolean;
   totalTokens: number;
+  voice: ReturnType<typeof useAIModalPromptVoiceInput>;
 }) {
   return {
     ...buildAIModalTemplateState(props),
     ...buildAIModalEditorUiState(props),
     ...buildAIModalSelectionState(props),
     ...buildAIModalModelState(props),
+    voice: props.voice,
   };
 }

@@ -1,5 +1,5 @@
 import type { FullPageCaptureGeometry } from '../../../contracts/full-page-capture';
-import { writeRootScroll } from './geometry';
+import { writePageScroll } from '../../platform/page-scroll';
 import type { ScrollCaptureRoot } from './types';
 
 const QUIET_MS = 150;
@@ -110,7 +110,7 @@ export async function warmUpLazyContent(
         return;
       }
       throwIfAborted(signal);
-      writeRootScroll(root, x, y);
+      writePageScroll(root, x, y);
       heartbeat?.();
       visited += 1;
       await waitForCaptureStability(signal);

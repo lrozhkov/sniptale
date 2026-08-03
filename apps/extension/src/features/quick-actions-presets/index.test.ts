@@ -77,11 +77,11 @@ describe('quick-actions-presets after-capture catalog', () => {
 
     expect(descriptors.map((descriptor) => descriptor.value)).toEqual([
       'download_default',
-      'ask_preset',
-      'ask_system',
       'copy',
-      'scenario',
       'edit',
+      'ask_system',
+      'ask_preset',
+      'scenario',
     ]);
     expect(descriptors[0]).toEqual({
       value: 'download_default',

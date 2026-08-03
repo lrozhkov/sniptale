@@ -118,4 +118,15 @@ describe('frame-effect-overlays focus geometry', () => {
     expect(refs.focusOverlayRef.current?.isConnected).toBe(true);
     expect(refs.focusOverlayRef.current?.contains(refs.focusSvgRef.current)).toBe(true);
   });
+
+  it('keeps page dimming active without a stale cutout while the focus frame is offscreen', () => {
+    const refs = createOverlayRefs(createFocusRect());
+    const frame = createFrame(false);
+
+    updateFocusOverlayMask([frame], refs, new Map([[frame.id, 'offscreen']]));
+
+    expect(refs.focusOverlayRef.current?.style.display).toBe('block');
+    expect(refs.focusOverlayRef.current?.style.background).toBe('rgba(0, 0, 0, 0.4)');
+    expect(refs.focusSvgRef.current?.querySelector(`rect[data-frame-id="${frame.id}"]`)).toBeNull();
+  });
 });

@@ -45,10 +45,11 @@ it('preserves selected layer while a bounded numeric stepper repeats updates', (
     )?.value
   ).toBe('25');
   expect(
-    Array.from(container!.querySelectorAll<HTMLButtonElement>('button[aria-pressed="true"]')).some(
-      (button) => button.title === 'Selected line'
-    )
-  ).toBe(true);
+    container!.querySelector<HTMLInputElement>(
+      `input[aria-label="${translate('scenario.editor.name')}"]`
+    )?.value
+  ).toBe('Selected line');
+  expect(container!.querySelector('[data-ui="scenario.inspector.layers"]')).toBeNull();
 });
 
 function Harness(props: { initialElements: ScenarioElement[] }) {
@@ -106,8 +107,6 @@ function applyElementPatch(
 function createCallbacks() {
   return {
     onDeleteElement: vi.fn(),
-    onMoveElement: vi.fn(),
-    onSelectElement: vi.fn(),
     onUpdateElement: vi.fn(),
   };
 }

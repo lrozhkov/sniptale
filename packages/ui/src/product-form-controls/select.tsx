@@ -2,6 +2,7 @@ import { ChevronDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { forwardRef } from 'react';
 import type { CSSProperties, Ref, ReactNode } from 'react';
+import { useFloatingSurfaceWheelContainment } from '../floating-interactions/wheel';
 import { mergeFloatingInteractionLayerStyle } from '../floating-interactions/placement';
 import { mergeThemeScopedStyle, resolveThemeSafePortalTarget } from '../theme/safe-portal';
 import type { AppTheme } from '../theme/types';
@@ -160,10 +161,11 @@ function renderProductSelectMenuOption<T extends string = string>(
 }
 
 function ProductSelectMenu<T extends string = string>(props: ProductSelectMenuProps<T>) {
+  const menuRef = useFloatingSurfaceWheelContainment(props.menuRef);
   return (
     <div
       id={props.menuId}
-      ref={props.menuRef}
+      ref={menuRef}
       role="listbox"
       data-floating-ui-root="true"
       data-theme={props.portalTheme ?? undefined}

@@ -9,19 +9,13 @@ import {
   createScenarioCodeElement,
   createScenarioImageElement,
   createScenarioLineElement,
-  createScenarioProjectV3,
   createScenarioShapeElement,
-  createScenarioSlide,
   createScenarioTextElement,
 } from '../../features/scenario/project/v3';
 import { translate } from '../../platform/i18n';
 import type { ScenarioElement } from '@sniptale/runtime-contracts/scenario/types/v3';
 import { SelectedElementInspector } from './element';
 import { ElementSpecificFields } from './element-router';
-import { FrameFields } from './frame';
-import { ProjectPresentationFields } from './project-presentation';
-import { SlideCanvasFields } from './slide-canvas';
-import { SlidePresentationFields } from './slide-presentation';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -81,7 +75,7 @@ it('routes connector and callout controls to typed patches', () => {
 it('exercises every text, code, image, and shape control', () => {
   expect(exerciseTextControls()).toHaveLength(4);
   expect(exerciseCodeControls()).toHaveLength(3);
-  expect(exerciseImageControls()).toHaveLength(5);
+  expect(exerciseImageControls()).toHaveLength(2);
   expect(exerciseShapeControls()).toHaveLength(3);
 });
 
@@ -91,10 +85,9 @@ it('exercises every line, arrow, and callout control', () => {
   expect(exerciseCalloutControls()).toContainEqual({ connector: null });
 });
 
-it('renders bounded element, frame, slide, and grid fields with scrub ranges', () => {
+it('updates the selected element opacity without exposing frame controls', () => {
   const text = createScenarioTextElement({ frame: { height: 180, width: 320, x: 40, y: 80 } });
-  const slide = createScenarioSlide();
-  const project = createScenarioProjectV3('Constrained fields');
+  const onUpdateElement = vi.fn();
   cleanupMountedFields();
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -102,24 +95,24 @@ it('renders bounded element, frame, slide, and grid fields with scrub ranges', (
 
   act(() => {
     root?.render(
-      <>
-        <SelectedElementInspector element={text} onUpdateElement={vi.fn()} />
-        <FrameFields element={text} onFrameChange={vi.fn()} />
-        <SlideCanvasFields slide={slide} onUpdateSlide={vi.fn()} />
-        <SlidePresentationFields slide={slide} onUpdateSlide={vi.fn()} />
-        <ProjectPresentationFields
-          presentation={project.presentation}
-          onUpdatePresentation={vi.fn()}
-        />
-      </>
+      <SelectedElementInspector
+        element={text}
+        onDelete={vi.fn()}
+        onUpdateElement={onUpdateElement}
+      />
     );
   });
 
-  expect(rangeFor('X')).not.toBeNull();
   expect(rangeFor(translate('scenario.editor.fontSize'))).not.toBeNull();
-  expect(rangeFor(translate('scenario.editor.width'))).not.toBeNull();
-  expect(rangeFor(translate('scenario.editor.gridMargin'))).not.toBeNull();
-  expect(inputFor(translate('scenario.editor.clicks'))).not.toBeNull();
+  expect(rangeFor('X')).toBeNull();
+  const opacity = inputFor(translate('scenario.editor.opacity'));
+  expect(opacity).not.toBeNull();
+  act(() => {
+    setNativeInputValue(opacity!, '50');
+    opacity?.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    opacity?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+  });
+  expect(onUpdateElement).toHaveBeenCalledWith({ opacity: 0.5 });
 });
 
 function commitTextPatch() {
@@ -194,9 +187,6 @@ function exerciseImageControls() {
     translate('scenario.editor.imageFit'),
     translate('scenario.editor.imageFitCover')
   );
-  changeInput(0, '12');
-  changeInput(1, '18');
-  changeInput(2, '1.4');
   clickButton(translate('scenario.editor.resetContentTransform'));
   clickButton(translate('scenario.editor.editImage'));
   expect(onEditImageElement).toHaveBeenCalledTimes(1);

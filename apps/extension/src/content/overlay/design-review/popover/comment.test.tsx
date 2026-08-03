@@ -1,12 +1,23 @@
 // @vitest-environment jsdom
 
 import { readFileSync } from 'node:fs';
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { translate } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { PageStyleCommentField } from './comment';
+
+const trustedEventMocks = vi.hoisted(() => ({
+  isTrustedMouseEvent: vi.fn(() => true),
+  isTrustedPointerEvent: vi.fn(() => true),
+}));
+
+vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
+  ...(await importOriginal()),
+  isTrustedMouseEvent: trustedEventMocks.isTrustedMouseEvent,
+  isTrustedPointerEvent: trustedEventMocks.isTrustedPointerEvent,
+}));
 
 let host: HTMLDivElement;
 let root: Root;
@@ -69,13 +80,17 @@ function contrastRatio(left: ColorChannels, right: ColorChannels): number {
   return (lighter! + 0.05) / (darker! + 0.05);
 }
 
-function createActions(): DesignReviewActions['comment'] & { close: () => void } {
+function createActions(): DesignReviewActions['comment'] & {
+  close: () => void;
+  voice: DesignReviewActions['voice'];
+} {
   return {
     close: vi.fn(),
     commit: vi.fn(() => true),
     endComposition: vi.fn(),
     startComposition: vi.fn(),
     updateDraft: vi.fn(),
+    voice: { start: vi.fn(), stop: vi.fn() },
   };
 }
 
@@ -90,21 +105,45 @@ function createState(
   };
 }
 
-function renderField(state = createState(), actions = createActions()) {
+const idleVoiceState: DesignReviewViewState['voice'] = {
+  active: false,
+  audioLevel: 0,
+  caretPosition: null,
+  errorCode: null,
+  phase: 'idle',
+};
+
+function renderField(
+  state = createState(),
+  actions = createActions(),
+  voice = idleVoiceState,
+  footer?: ReactNode
+) {
   act(() => {
-    root.render(<PageStyleCommentField actions={actions} disabled={false} state={state} />);
+    root.render(
+      <PageStyleCommentField
+        actions={actions}
+        disabled={false}
+        footer={footer}
+        state={state}
+        voice={voice}
+      />
+    );
   });
   return { actions };
 }
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  trustedEventMocks.isTrustedMouseEvent.mockReturnValue(true);
+  trustedEventMocks.isTrustedPointerEvent.mockReturnValue(true);
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   act(() => root.unmount());
   host.remove();
   document.body.replaceChildren();
@@ -137,6 +176,7 @@ it('binds the comment draft, marker number, blur commit, and IME lifecycle actio
         actions={actions}
         disabled={false}
         state={createState({ draft: 'Changed' })}
+        voice={idleVoiceState}
       />
     );
   });
@@ -213,6 +253,143 @@ it('closes on Enter while preserving Shift+Enter for a new line', () => {
   expect(actions.close).toHaveBeenCalledOnce();
 });
 
+it('starts at the current caret, supports push-to-talk, and renders before the Enter hint', () => {
+  vi.useFakeTimers();
+  const actions = createActions();
+  renderField(
+    createState({ draft: 'Keep this text' }),
+    actions,
+    idleVoiceState,
+    <span>Action</span>
+  );
+  const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
+  const button = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.design-review.comment-voice-input"]'
+  );
+  const footer = document.querySelector('[data-ui="content.design-review.comment-footer"]');
+  if (!textarea || !button || !footer) throw new Error('Expected comment voice controls');
+  textarea.setSelectionRange(5, 5);
+  const down = new MouseEvent('pointerdown', { bubbles: true, button: 0 });
+  Object.defineProperty(down, 'pointerId', { value: 9 });
+
+  act(() => button.dispatchEvent(down));
+  act(() => vi.advanceTimersByTime(450));
+  const up = new MouseEvent('pointerup', { bubbles: true, button: 0 });
+  Object.defineProperty(up, 'pointerId', { value: 9 });
+  act(() => button.dispatchEvent(up));
+
+  expect(actions.voice.start).toHaveBeenCalledWith(5);
+  expect(actions.voice.stop).toHaveBeenCalledOnce();
+  expect(
+    button.compareDocumentPosition(
+      footer.querySelector('[data-ui="content.design-review.comment-submit-hint"]')!
+    ) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).not.toBe(0);
+  vi.useRealTimers();
+});
+
+it('keeps listening after a short microphone click until the same control is used again', () => {
+  vi.useFakeTimers();
+  const actions = createActions();
+  renderField(createState(), actions, idleVoiceState, <span>Action</span>);
+  const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
+  const button = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.design-review.comment-voice-input"]'
+  );
+  if (!textarea || !button) throw new Error('Expected comment voice controls');
+  textarea.setSelectionRange(3, 3);
+  const down = new MouseEvent('pointerdown', { bubbles: true, button: 0 });
+  const up = new MouseEvent('pointerup', { bubbles: true, button: 0 });
+  Object.defineProperty(down, 'pointerId', { value: 11 });
+  Object.defineProperty(up, 'pointerId', { value: 11 });
+
+  act(() => button.dispatchEvent(down));
+  act(() => vi.advanceTimersByTime(200));
+  act(() => button.dispatchEvent(up));
+
+  expect(actions.voice.start).toHaveBeenCalledWith(3);
+  expect(actions.voice.stop).not.toHaveBeenCalled();
+  vi.useRealTimers();
+});
+
+it('rejects synthetic pointer and keyboard-style click starts from the host page', () => {
+  const actions = createActions();
+  trustedEventMocks.isTrustedMouseEvent.mockReturnValue(false);
+  trustedEventMocks.isTrustedPointerEvent.mockReturnValue(false);
+  renderField(createState(), actions, idleVoiceState, <span>Action</span>);
+  const button = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.design-review.comment-voice-input"]'
+  );
+  if (!button) throw new Error('Expected comment voice control');
+  const down = new MouseEvent('pointerdown', { bubbles: true, button: 0 });
+  Object.defineProperty(down, 'pointerId', { value: 12 });
+
+  act(() => button.dispatchEvent(down));
+  act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 })));
+
+  expect(actions.voice.start).not.toHaveBeenCalled();
+});
+
+it('accepts a trusted keyboard-style click start', () => {
+  const actions = createActions();
+  renderField(createState(), actions, idleVoiceState, <span>Action</span>);
+  const button = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.design-review.comment-voice-input"]'
+  );
+  if (!button) throw new Error('Expected comment voice control');
+
+  act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 })));
+
+  expect(actions.voice.start).toHaveBeenCalledOnce();
+});
+
+it('shows an audio-reactive active ring and stops from the same microphone button', () => {
+  const actions = createActions();
+  renderField(
+    createState(),
+    actions,
+    {
+      active: true,
+      audioLevel: 0.5,
+      caretPosition: 4,
+      errorCode: null,
+      phase: 'listening',
+    },
+    <span>Action</span>
+  );
+  const button = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.design-review.comment-voice-input"]'
+  );
+  const ring = button?.querySelector<HTMLSpanElement>('span[aria-hidden="true"]');
+  if (!button) throw new Error('Expected active voice button');
+
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  expect(ring?.style.transform).toBe('scale(1.2)');
+  const down = new MouseEvent('pointerdown', { bubbles: true, button: 0 });
+  Object.defineProperty(down, 'pointerId', { value: 10 });
+  act(() => button.dispatchEvent(down));
+
+  expect(actions.voice.stop).toHaveBeenCalledOnce();
+});
+
+it('surfaces a localized voice failure without discarding the comment draft', () => {
+  renderField(
+    createState({ draft: 'Still here' }),
+    createActions(),
+    {
+      active: false,
+      audioLevel: 0,
+      caretPosition: null,
+      errorCode: 'permission-denied',
+      phase: 'error',
+    },
+    <span>Action</span>
+  );
+
+  expect(document.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('Still here');
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('Проверьте микрофон');
+});
+
 it('keeps the recoverable localized error associated with the textarea', () => {
   renderField(createState({ commitFailed: true }));
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
@@ -256,6 +433,7 @@ it('disables editing when no page target is selected', () => {
         actions={actions}
         disabled
         state={createState({ draft: '', marker: null })}
+        voice={idleVoiceState}
       />
     );
   });
@@ -269,4 +447,6 @@ it('ships the comment field and marker copy in both supported locales', () => {
   expect(translate('content.designReview.commentCommitFailed', 'en')).toContain(
     'draft is still here'
   );
+  expect(translate('content.designReview.voiceInputStart', 'ru')).toContain('Удерживайте');
+  expect(translate('content.designReview.voiceInputError', 'en')).toContain('voice input settings');
 });

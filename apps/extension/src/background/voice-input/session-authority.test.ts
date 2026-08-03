@@ -7,6 +7,7 @@ function createSession(sessionId: string): ActiveVoiceInputSession {
   return {
     consumerId: 'settings-test',
     documentId: `document-${sessionId}`,
+    maxDurationMs: 30_000,
     offscreenObserved: false,
     offscreenSessionId: `offscreen-${sessionId}`,
     port: createRuntimePortFixture().port,
@@ -16,6 +17,7 @@ function createSession(sessionId: string): ActiveVoiceInputSession {
       mode: 'local-first',
     },
     startRollbackPending: false,
+    stopCleanupPending: false,
     sessionId,
   };
 }

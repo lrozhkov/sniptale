@@ -1,4 +1,5 @@
 import type { PageStylePatch, PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
+import type { VoiceInputErrorCode } from '@sniptale/runtime-contracts/voice-input';
 import type { BrowserDesignReviewAction } from '../../parser/page-preparation/annotations';
 import type {
   PageStyleDeclarationValueMap,
@@ -16,6 +17,7 @@ export interface DesignReviewViewState {
   settingsOpen: boolean;
   sideFieldLinks?: Record<string, boolean>;
   values: PageStyleDeclarationValueMap;
+  voice: DesignReviewCommentVoiceViewState;
 }
 
 interface DesignReviewCommentViewState {
@@ -36,6 +38,7 @@ export interface DesignReviewActions {
   setSettingsOpen: (open: boolean) => void;
   updateValue: (property: PageStyleProperty, value: string) => void;
   updateValues: (updates: Array<{ property: PageStyleProperty; value: string }>) => void;
+  voice: DesignReviewCommentVoiceActions;
 }
 
 interface DesignReviewCommentActions {
@@ -43,4 +46,17 @@ interface DesignReviewCommentActions {
   endComposition: (value: string) => void;
   startComposition: () => void;
   updateDraft: (value: string) => void;
+}
+
+interface DesignReviewCommentVoiceActions {
+  start: (caretPosition: number) => void;
+  stop: () => void;
+}
+
+interface DesignReviewCommentVoiceViewState {
+  active: boolean;
+  audioLevel: number;
+  caretPosition: number | null;
+  errorCode: VoiceInputErrorCode | 'runtime' | null;
+  phase: 'error' | 'idle' | 'listening' | 'starting' | 'stopping';
 }

@@ -11,10 +11,16 @@ describe('frame style catalog styles', () => {
     expect(stylesheet).toMatch(/padding-inline:\s*0/);
     expect(stylesheet).toMatch(/text-align:\s*left/);
     expect(stylesheet).toMatch(
-      /\.sniptale-frame-style-section\s*>\s*\.sniptale-content-popover-section-label\s*\{[^}]*padding-inline:\s*11px/s
+      /\.sniptale-frame-style-section\s*>\s*\.sniptale-content-popover-section-label\s*\{[^}]*padding-inline:\s*0/s
     );
     expect(stylesheet).toMatch(
       /\.sniptale-frame-style-preset-row\s+\.sniptale-glass-preset-meta\s*\{[^}]*text-align:\s*left/s
+    );
+  });
+
+  it('keeps the frame-and-fill switch aligned with its option title', () => {
+    expect(stylesheet).toMatch(
+      /\.sniptale-frame-decoration-toggle-row\s*\{[^}]*align-items:\s*flex-start;/s
     );
   });
 
@@ -30,5 +36,10 @@ describe('frame style catalog styles', () => {
   it('keeps the add action as the final full-width catalog control', () => {
     expect(stylesheet).toContain('.sniptale-frame-style-add {');
     expect(stylesheet).toMatch(/\.sniptale-frame-style-add\s*\{[^}]*justify-content:\s*center;/s);
+  });
+
+  it('leaves catalog height to the shared scrollable preset list', () => {
+    expect(stylesheet).toContain('--sniptale-preset-list-max-height:');
+    expect(stylesheet).not.toMatch(/\.sniptale-frame-settings-popover\s*\{[^}]*overflow-y:/s);
   });
 });

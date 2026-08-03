@@ -13,7 +13,7 @@ import {
 describe('ProductGlass presets', () => {
   it('renders canonical preset classes through the preset owner seam', () => {
     const markup = renderToStaticMarkup(
-      <ProductGlassPresetList>
+      <ProductGlassPresetList scrollable>
         <ProductGlassPresetItem active>
           <ProductGlassPresetPreview />
           <ProductGlassPresetName>Preset</ProductGlassPresetName>
@@ -23,6 +23,7 @@ describe('ProductGlass presets', () => {
     );
 
     expect(markup).toContain('sniptale-glass-preset-list');
+    expect(markup).toContain('sniptale-glass-preset-list--scroll');
     expect(markup).toContain('sniptale-glass-preset-item--active');
     expect(markup).toContain('sniptale-glass-preset-preview');
     expect(markup).toContain('sniptale-glass-preset-name');

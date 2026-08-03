@@ -109,13 +109,9 @@ it('uses editor toolbar controls for deck modes and shell actions', () => {
   const { onModeChange, onOpenExport } = renderToolbar();
 
   clickToolbarButton(translate('scenario.editor.modePlay'));
-  clickToolbarButton(translate('scenario.editor.modePresenter'));
-  clickToolbarButton(translate('scenario.editor.modeOverview'));
   clickToolbarButton(translate('scenario.editor.export'));
 
   expect(onModeChange).toHaveBeenCalledWith(SCENARIO_EDITOR_MODES.play);
-  expect(onModeChange).toHaveBeenCalledWith(SCENARIO_EDITOR_MODES.presenter);
-  expect(onModeChange).toHaveBeenCalledWith(SCENARIO_EDITOR_MODES.overview);
   expect(onOpenExport).toHaveBeenCalledTimes(1);
 });
 
@@ -149,8 +145,6 @@ function expectToolbarGroupLabels(groups: HTMLElement[]) {
   expect(getButtonLabels(groups[0])).toEqual([
     translate('scenario.editor.modeEdit'),
     translate('scenario.editor.modePlay'),
-    translate('scenario.editor.modePresenter'),
-    translate('scenario.editor.modeOverview'),
   ]);
   expect(getButtonLabels(groups[1])).toEqual([
     translate('scenario.editor.insertText'),

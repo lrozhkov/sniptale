@@ -15,6 +15,8 @@ import type { UseAiPickControllerResult } from '../ai/pick/controller/types';
 import type { AutoBlurController } from '../auto-blur/controller';
 import type { UseToolbarModeControllerResult } from '../toolbar/mode-controller/types';
 import type { ToolbarViewportSelection } from '../toolbar/types';
+import type { ToolbarFutureFrameStyle } from '../toolbar/types';
+import type { EffectMode } from '../../../features/highlighter/contracts';
 
 type ContentAppAiController = Omit<UseAiPickControllerResult, 'handleCancelAIPrompt'> & {
   handleCancelAIPrompt?: UseAiPickControllerResult['handleCancelAIPrompt'];
@@ -80,6 +82,7 @@ export type ContentAppLayoutToolbarProps = {
   captureAction: CaptureActionType;
   currentViewport: { width: number; height: number } | null;
   frameCount: number;
+  futureFrameStyle: ToolbarFutureFrameStyle;
   handleTakeScreenshot: (
     type: 'visible' | 'full' | 'selection',
     contentIntentSource?: ContentPrivilegedActionIntentSource,
@@ -92,6 +95,7 @@ export type ContentAppLayoutToolbarProps = {
   modes: ContentAppModes;
   pinToTab: boolean;
   pinToTabAvailable: boolean;
+  setFutureFrameEffectMode: (mode: EffectMode) => void;
   setCaptureAction: (action: CaptureActionType) => void;
   setCurrentViewport: (viewport: { width: number; height: number } | null) => void;
   mutateViewport?: (viewport: ToolbarViewportSelection) => Promise<void>;

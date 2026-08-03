@@ -50,7 +50,7 @@ export function useScenarioV3PageProjectState(): ScenarioV3PageProjectState {
     setProject,
     setSaveState,
   });
-  const { saveProject, saveProjectOrThrow } = useScenarioV3ProjectSaver({
+  const { saveProject } = useScenarioV3ProjectSaver({
     savedProjectRef,
     saveRevisionRef,
     setError,
@@ -74,7 +74,6 @@ export function useScenarioV3PageProjectState(): ScenarioV3PageProjectState {
     project,
     retryLoad: loadProject,
     retrySave,
-    saveProject: saveProjectOrThrow,
     saveState,
     updateProject,
   };

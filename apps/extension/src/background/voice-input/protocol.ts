@@ -1,6 +1,7 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   VOICE_INPUT_LOCAL_QUALITY,
+  type VOICE_INPUT_TEST_SESSION_DURATION_MS,
   VoiceInputPortMessageType,
   type VoiceInputErrorCode,
   type VoiceInputPreferences,
@@ -14,6 +15,7 @@ const logger = createLogger({ namespace: 'BackgroundSpeechRecognition' });
 export type VoiceInputPortRegistration = {
   consumerId: VoiceInputConsumerId;
   documentId: string;
+  maxDurationMs: typeof VOICE_INPUT_TEST_SESSION_DURATION_MS | null;
   port: chrome.runtime.Port;
 };
 
@@ -22,6 +24,7 @@ export type ActiveVoiceInputSession = VoiceInputPortRegistration & {
   offscreenSessionId: string;
   preferences: VoiceInputPreferences;
   startRollbackPending: boolean;
+  stopCleanupPending: boolean;
   sessionId: string;
 };
 

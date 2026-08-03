@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AutoBlurController } from '../auto-blur/controller';
 import { ContentToolbarShell } from './toolbar';
 import type { ContentAppLayoutScenarioProps, ContentAppLayoutToolbarProps } from './types';
+import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
 
 const { preloadContentScenarioRecorderSidebarMock, toolbarMock } = vi.hoisted(() => ({
   preloadContentScenarioRecorderSidebarMock: vi.fn(async () => undefined),
@@ -107,6 +108,12 @@ function createToolbarProps(): ContentAppLayoutToolbarProps {
     captureAction: 'download_default',
     currentViewport: null,
     frameCount: 2,
+    futureFrameStyle: {
+      blurSettings: { amount: 8, blurType: 'gaussian', showBorder: true },
+      borderSettings: DEFAULT_BORDER_PRESET,
+      effectMode: 'border',
+      focusSettings: { opacity: 0.5, showBorder: false },
+    },
     handleTakeScreenshot: vi.fn(async () => undefined),
     isCompletelyHidden: false,
     isCursorMode: true,
@@ -132,6 +139,7 @@ function createToolbarProps(): ContentAppLayoutToolbarProps {
     },
     pinToTab: false,
     pinToTabAvailable: true,
+    setFutureFrameEffectMode: vi.fn(),
     setCaptureAction: vi.fn(),
     setCurrentViewport: vi.fn(),
     setPinToTab: vi.fn(),
@@ -261,6 +269,21 @@ async function verifiesToolbarForwardsQuickEditDocumentMode() {
   );
 }
 
+async function verifiesToolbarForwardsFutureFrameStyleSession() {
+  const props = createProps();
+  await renderShell(props);
+
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    futureFrameStyle: ContentAppLayoutToolbarProps['futureFrameStyle'];
+    onFutureFrameEffectModeChange: ContentAppLayoutToolbarProps['setFutureFrameEffectMode'];
+  };
+
+  expect(lastToolbarProps.futureFrameStyle).toBe(props.toolbar.futureFrameStyle);
+  expect(lastToolbarProps.onFutureFrameEffectModeChange).toBe(
+    props.toolbar.setFutureFrameEffectMode
+  );
+}
+
 async function verifiesScenarioSidebarPreloadOnIntent() {
   const props = createProps();
   await renderShell(props);
@@ -334,5 +357,9 @@ describe('ContentToolbarShell', () => {
   it(
     'forwards quick-edit document submode state and handler into the toolbar',
     verifiesToolbarForwardsQuickEditDocumentMode
+  );
+  it(
+    'forwards the future-frame session style and mode action into the toolbar',
+    verifiesToolbarForwardsFutureFrameStyleSession
   );
 });
