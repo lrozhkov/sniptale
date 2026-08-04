@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FramePresetName } from './overflow-hint';
+import { PresetNameWithOverflowHint, TextWithOverflowHint } from './overflow-hint';
 
 let container: HTMLDivElement | null = null;
 let observerCallback: ResizeObserverCallback | null = null;
@@ -40,9 +40,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('FramePresetName', () => {
+describe('overflow hints', () => {
   it('exposes the full name as a native hint only while the rendered label is clipped', () => {
-    act(() => root?.render(<FramePresetName name="A very long frame style name" />));
+    act(() => root?.render(<PresetNameWithOverflowHint name="A very long frame style name" />));
     const name = container?.querySelector<HTMLElement>('.sniptale-glass-preset-name');
     if (!name || !observerCallback) throw new Error('Expected observed preset name');
 
@@ -54,5 +54,20 @@ describe('FramePresetName', () => {
     setMetric(name, 'scrollWidth', 72);
     act(() => observerCallback?.([], {} as ResizeObserver));
     expect(name.hasAttribute('title')).toBe(false);
+  });
+
+  it('uses the same clipped-only hint behavior for inspector property labels', () => {
+    act(() => root?.render(<TextWithOverflowHint className="property-label" text="Padding" />));
+    const label = container?.querySelector<HTMLElement>('.property-label');
+    if (!label || !observerCallback) throw new Error('Expected observed property label');
+
+    setMetric(label, 'clientWidth', 120);
+    setMetric(label, 'scrollWidth', 80);
+    act(() => observerCallback?.([], {} as ResizeObserver));
+    expect(label.hasAttribute('title')).toBe(false);
+
+    setMetric(label, 'scrollWidth', 180);
+    act(() => observerCallback?.([], {} as ResizeObserver));
+    expect(label.title).toBe('Padding');
   });
 });

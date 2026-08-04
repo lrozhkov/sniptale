@@ -49,6 +49,7 @@ export function commitPointerDragDraft<T>(args: {
 
 export function registerPointerDragSession(args: {
   cancel(): boolean | void;
+  cancelOnLostPointerCapture?: boolean;
   move(event: PointerEvent): void;
   up(event: PointerEvent): void;
 }): () => void {
@@ -63,14 +64,18 @@ export function registerPointerDragSession(args: {
   document.addEventListener('pointermove', args.move, { capture: true });
   document.addEventListener('pointerup', args.up, { capture: true });
   document.addEventListener('pointercancel', cancel, { capture: true });
-  document.addEventListener('lostpointercapture', cancel, { capture: true });
+  if (args.cancelOnLostPointerCapture !== false) {
+    document.addEventListener('lostpointercapture', cancel, { capture: true });
+  }
   window.addEventListener('keydown', handleKeyDown, { capture: true });
   window.addEventListener('blur', cancel);
   return () => {
     document.removeEventListener('pointermove', args.move, { capture: true });
     document.removeEventListener('pointerup', args.up, { capture: true });
     document.removeEventListener('pointercancel', cancel, { capture: true });
-    document.removeEventListener('lostpointercapture', cancel, { capture: true });
+    if (args.cancelOnLostPointerCapture !== false) {
+      document.removeEventListener('lostpointercapture', cancel, { capture: true });
+    }
     window.removeEventListener('keydown', handleKeyDown, { capture: true });
     window.removeEventListener('blur', cancel);
   };

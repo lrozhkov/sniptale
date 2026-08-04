@@ -42,7 +42,7 @@ it('routes rich-shape select fields through the shared compact select row', () =
   expect(
     container?.querySelector('[data-ui="shared.ui.compact-inspector.select-field"]')
   ).not.toBeNull();
-  expect(container?.querySelector('button')?.getAttribute('title')).toBe('Сплошная');
+  expect(container?.querySelector('button')?.getAttribute('title')).toBeNull();
 });
 
 it('maps rich-shape range labels to compact numeric units', () => {

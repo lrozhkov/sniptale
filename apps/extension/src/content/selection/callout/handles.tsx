@@ -1,5 +1,10 @@
-import { GripVertical, Settings2 } from 'lucide-react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from 'react';
+import { Move, Plus, Settings2 } from 'lucide-react';
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  RefObject,
+} from 'react';
 import { translate } from '../../../platform/i18n';
 import type { AppTheme } from '../../../ui/theme';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
@@ -24,14 +29,22 @@ export type CalloutInteractionHandleProps = {
   handleTailBaseEndKeyDown: (event: CalloutHandleKeyboardEvent) => void;
   handleTailFramePointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   handleTailFrameKeyDown: (event: CalloutHandleKeyboardEvent) => void;
+  handleWaypointPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  handleWaypointKeyDown: (event: CalloutHandleKeyboardEvent) => void;
+  handleWaypointDoubleClick: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+  hasWaypoint: boolean;
   isDragging: boolean;
   isEditing: boolean;
+  isGeometryHandleHidden: boolean;
+  isWidthResizeHandleHidden: boolean;
   isHandleVisible: boolean;
   isResizingLeft: boolean;
   isResizingRight: boolean;
   isTailDragging: boolean;
   isTailBaseEndDragging: boolean;
   isTailFrameDragging: boolean;
+  isWaypointDragging: boolean;
+  isPolylineWaypoint: boolean;
   portalTheme: AppTheme | null;
   settingsAnchorRef: RefObject<HTMLButtonElement | null>;
   settingsHandleStyle: CSSProperties;
@@ -42,6 +55,9 @@ export type CalloutInteractionHandleProps = {
   tailHandleStyle: CSSProperties | null;
   tailBaseEndHandleStyle: CSSProperties | null;
   tailFrameHandleStyle: CSSProperties | null;
+  waypointHandleStyle: CSSProperties | null;
+  waypointAngle: number | null;
+  waypointAngleStyle: CSSProperties | null;
 };
 
 function renderCalloutWidthHandle(
@@ -55,7 +71,8 @@ function renderCalloutWidthHandle(
     style: CSSProperties;
   }
 ) {
-  if (props.isEditing) return null;
+  if (props.isEditing || props.isGeometryHandleHidden || props.isWidthResizeHandleHidden)
+    return null;
   const label = translate(`content.interactiveFrame.${control.labelKey}`);
   return (
     <button
@@ -109,8 +126,8 @@ function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
       title={label}
       style={mergeThemeScopedStyle(props.portalTheme, {
         ...props.settingsHandleStyle,
-        width: 20,
-        height: 20,
+        width: 26,
+        height: 26,
         padding: 0,
         borderRadius: '50%',
         border: '1px solid var(--sniptale-color-border-soft)',
@@ -142,7 +159,7 @@ function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
       onMouseEnter={props.handleMouseEnter}
       onMouseLeave={props.handleMouseLeave}
     >
-      <Settings2 size={13} aria-hidden="true" />
+      <Settings2 size={15} aria-hidden="true" />
     </button>
   );
 }
@@ -159,8 +176,8 @@ function renderCalloutMoveHandle(props: CalloutInteractionHandleProps) {
       title={translate('content.interactiveFrame.moveComment')}
       style={mergeThemeScopedStyle(props.portalTheme, {
         ...props.dragHandleStyle,
-        width: 20,
-        height: 20,
+        width: 26,
+        height: 26,
         padding: 0,
         borderRadius: '50%',
         border: '1px solid var(--sniptale-color-border-soft)',
@@ -183,7 +200,7 @@ function renderCalloutMoveHandle(props: CalloutInteractionHandleProps) {
       onMouseEnter={props.handleMouseEnter}
       onMouseLeave={props.handleMouseLeave}
     >
-      <GripVertical size={13} aria-hidden="true" />
+      <Move size={14} aria-hidden="true" style={{ display: 'block' }} />
     </button>
   );
 }
@@ -199,7 +216,7 @@ function renderCalloutTailHandle(
     style: CSSProperties | null;
   }
 ) {
-  if (props.isEditing || !control.style) return null;
+  if (props.isEditing || props.isGeometryHandleHidden || !control.style) return null;
   const label = translate(`content.interactiveFrame.${control.labelKey}`);
   return (
     <button
@@ -232,6 +249,81 @@ function renderCalloutTailHandle(
       onMouseEnter={props.handleMouseEnter}
       onMouseLeave={props.handleMouseLeave}
     />
+  );
+}
+
+function renderCalloutWaypointHandle(props: CalloutInteractionHandleProps) {
+  if (props.isEditing || props.isGeometryHandleHidden || !props.waypointHandleStyle) return null;
+  const label = translate('content.interactiveFrame.moveCommentRoutePoint');
+  return (
+    <>
+      <button
+        type="button"
+        className="sniptale-callout-tail-handle sniptale-callout-waypoint-handle"
+        data-theme={props.portalTheme ?? undefined}
+        aria-label={label}
+        aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Delete"
+        title={label}
+        style={mergeThemeScopedStyle(props.portalTheme, {
+          ...props.waypointHandleStyle,
+          width: 12,
+          height: 12,
+          padding: 0,
+          boxSizing: 'border-box',
+          borderRadius: props.isPolylineWaypoint ? 2 : '50%',
+          border: '2px solid var(--sniptale-color-accent)',
+          background: props.hasWaypoint ? 'var(--sniptale-color-accent)' : '#ffffff',
+          color: 'var(--sniptale-color-accent)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: props.isWaypointDragging ? 'grabbing' : 'grab',
+          opacity: props.isHandleVisible ? 1 : 0,
+          pointerEvents: props.isHandleVisible ? 'auto' : 'none',
+          boxShadow:
+            '0 1px 5px color-mix(in srgb, var(--sniptale-color-shadow-strong) 24%, transparent)',
+          transform: props.isPolylineWaypoint ? 'rotate(45deg)' : undefined,
+        })}
+        onPointerDown={props.handleWaypointPointerDown}
+        onDoubleClick={props.handleWaypointDoubleClick}
+        onKeyDown={props.handleWaypointKeyDown}
+        onFocus={props.handleHandleFocus}
+        onBlur={props.handleHandleBlur}
+        onMouseEnter={props.handleMouseEnter}
+        onMouseLeave={props.handleMouseLeave}
+      >
+        {props.hasWaypoint || props.isPolylineWaypoint ? null : (
+          <Plus aria-hidden="true" size={8} strokeWidth={3} />
+        )}
+      </button>
+      {props.isPolylineWaypoint &&
+      props.isWaypointDragging &&
+      props.waypointAngle !== null &&
+      props.waypointAngleStyle ? (
+        <span
+          aria-hidden="true"
+          data-theme={props.portalTheme ?? undefined}
+          style={mergeThemeScopedStyle(props.portalTheme, {
+            ...props.waypointAngleStyle,
+            minWidth: 34,
+            padding: '3px 6px',
+            border: '1px solid var(--sniptale-color-border-soft)',
+            borderRadius: 6,
+            background: 'var(--sniptale-color-surface-panel)',
+            color: 'var(--sniptale-color-text-primary)',
+            fontSize: 11,
+            fontWeight: 700,
+            lineHeight: 1.2,
+            textAlign: 'center',
+            boxShadow:
+              '0 2px 8px color-mix(in srgb, var(--sniptale-color-shadow-strong) 20%, transparent)',
+            pointerEvents: 'none',
+          })}
+        >
+          {props.waypointAngle}°
+        </span>
+      ) : null}
+    </>
   );
 }
 
@@ -280,6 +372,7 @@ export function renderCalloutInteractionHandles(props: CalloutInteractionHandleP
         onPointerDown: props.handleTailFramePointerDown,
         style: props.tailFrameHandleStyle,
       })}
+      {renderCalloutWaypointHandle(props)}
     </>
   );
 }

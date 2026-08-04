@@ -3,8 +3,8 @@ import { expectTypeOf, it } from 'vitest';
 import type {
   BlurStrokeStyle,
   CalloutAnchor,
+  CalloutConnectorKind,
   CalloutSide,
-  CalloutVariant,
   HighlighterState,
   HighlightRect,
   QuickEditState,
@@ -17,7 +17,7 @@ type RetainedHighlighterFacadeTypes = {
   blurStrokeStyle: BlurStrokeStyle;
   calloutAnchor: CalloutAnchor;
   calloutSide: CalloutSide;
-  calloutVariant: CalloutVariant;
+  calloutConnectorKind: CalloutConnectorKind;
   highlighterState: HighlighterState;
   highlightRect: HighlightRect;
   quickEditState: QuickEditState;

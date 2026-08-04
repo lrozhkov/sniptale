@@ -34,6 +34,7 @@ function resolveFocusRoot(dialog: HTMLElement): Document | ShadowRoot {
 }
 
 export function usePresetEditorModalLifecycle(args: {
+  isOpen?: boolean;
   modalRootRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
 }) {
@@ -41,6 +42,7 @@ export function usePresetEditorModalLifecycle(args: {
   onCloseRef.current = args.onClose;
 
   useLayoutEffect(() => {
+    if (args.isOpen === false) return;
     const dialog = args.modalRootRef.current?.querySelector<HTMLElement>('[role="dialog"]');
     if (!dialog) return;
 
@@ -94,5 +96,5 @@ export function usePresetEditorModalLifecycle(args: {
         previouslyFocused.focus({ preventScroll: true });
       }
     };
-  }, [args.modalRootRef]);
+  }, [args.isOpen, args.modalRootRef]);
 }

@@ -192,6 +192,9 @@ function renderToolbarShell(args: {
         framesCount={args.toolbar.frameCount}
         futureFrameStyle={args.toolbar.futureFrameStyle}
         onFutureFrameEffectModeChange={args.toolbar.setFutureFrameEffectMode}
+        {...(args.toolbar.futureFrameCalloutActions === undefined
+          ? {}
+          : { futureFrameCalloutActions: args.toolbar.futureFrameCalloutActions })}
       />
     </div>
   );

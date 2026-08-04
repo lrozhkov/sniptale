@@ -1,4 +1,5 @@
 import type { InteractiveFrameProps } from './types';
+import { createCalloutRenderKey } from '../../callout/model';
 
 function hasMeaningfulRectChange(
   prevProps: InteractiveFrameProps,
@@ -80,23 +81,7 @@ function hasCalloutChange(prevProps: InteractiveFrameProps, nextProps: Interacti
   const next = nextProps.frame.callout;
   return (
     prevProps.frame.callout !== nextProps.frame.callout &&
-    (prev?.enabled !== next?.enabled ||
-      prev?.htmlContent !== next?.htmlContent ||
-      prev?.anchor !== next?.anchor ||
-      prev?.side !== next?.side ||
-      prev?.variant !== next?.variant ||
-      prev?.bgColor !== next?.bgColor ||
-      prev?.textColor !== next?.textColor ||
-      prev?.tailSize !== next?.tailSize ||
-      prev?.fontFamily !== next?.fontFamily ||
-      prev?.fontWeight !== next?.fontWeight ||
-      prev?.fontSize !== next?.fontSize ||
-      prev?.maxWidth !== next?.maxWidth ||
-      prev?.manualPlacement?.centerOffsetX !== next?.manualPlacement?.centerOffsetX ||
-      prev?.manualPlacement?.centerOffsetY !== next?.manualPlacement?.centerOffsetY ||
-      prev?.tailBasePosition !== next?.tailBasePosition ||
-      prev?.tailBaseWidth !== next?.tailBaseWidth ||
-      prev?.tailFramePosition !== next?.tailFramePosition)
+    createCalloutRenderKey(prev) !== createCalloutRenderKey(next)
   );
 }
 

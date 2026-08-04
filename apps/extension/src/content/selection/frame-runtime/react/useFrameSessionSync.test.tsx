@@ -9,7 +9,7 @@ import type {
   FocusSettings,
   HighlighterSettings,
 } from '../../../../features/highlighter/contracts';
-import type { CalloutSettings } from '../../../../features/highlighter/contracts';
+import type { CalloutVisualStyle } from '../../../../features/highlighter/contracts';
 import type { GlobalStepBadgeSettings } from '../../../../features/highlighter/contracts';
 import type { FrameSessionSyncArgs } from '../session/core';
 import { useFrameSessionSync } from './useFrameSessionSync';
@@ -56,7 +56,7 @@ function Harness(props: {
   const globalEffectModeRef = useRef<'border'>('border');
   const highlighterSettingsCacheRef = useRef<HighlighterSettings | null>(DEFAULT_SETTINGS);
   const sessionBlurSettingsRef = useRef<BlurSettings>(DEFAULT_SETTINGS.defaultBlurSettings);
-  const sessionCalloutStyleRef = useRef<Partial<CalloutSettings> | null>(null);
+  const sessionCalloutStyleRef = useRef<CalloutVisualStyle | null>(null);
   const sessionDefaultsInitializedRef = useRef(true);
   const sessionFocusSettingsRef = useRef<FocusSettings>(DEFAULT_SETTINGS.defaultFocusSettings);
 

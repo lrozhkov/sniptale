@@ -1,5 +1,8 @@
 import React from 'react';
-import type { CalloutManualPlacement } from '@sniptale/runtime-contracts/highlighter/callout';
+import type {
+  CalloutConnectorWaypoint,
+  CalloutManualPlacement,
+} from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCalloutKeyboardDelta, type CalloutHandleKeyboardEvent } from './keyboard';
 import { useTransientControlVisibility } from '../interactive-frame/overlays/transient-control-visibility';
 import {
@@ -14,7 +17,17 @@ type Rect = { x: number; y: number; width: number; height: number };
 export interface CalloutDragStartEvent extends PointerDragStartEvent {
   clientX: number;
   clientY: number;
+  ctrlKey: boolean;
+  shiftKey: boolean;
 }
+
+export type CalloutDragBehavior = {
+  connectorBasePosition?: number | undefined;
+  connectorBaseWidth?: number | undefined;
+  connectorFramePosition?: number | undefined;
+  connectorWaypoint?: CalloutConnectorWaypoint | undefined;
+  translateConnectorGeometry: boolean;
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
@@ -47,15 +60,19 @@ export function useCalloutDrag(args: {
   isEditing: boolean;
   isHandlePinned?: boolean;
   manualPlacement: CalloutManualPlacement | undefined;
-  onPositionChange: (placement: CalloutManualPlacement) => void;
+  onPositionChange: (placement: CalloutManualPlacement, behavior: CalloutDragBehavior) => void;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const [draftPlacement, setDraftPlacement] = React.useState<CalloutManualPlacement | null>(null);
+  const [translateConnectorGeometry, setTranslateConnectorGeometry] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
   const pointerIdRef = React.useRef<number | null>(null);
   const pointerOffsetRef = React.useRef({ x: 0, y: 0 });
   const draftRef = React.useRef<CalloutManualPlacement | null>(null);
   const startPlacementRef = React.useRef<CalloutManualPlacement | null>(null);
+  const startRectRef = React.useRef<{ left: number; top: number } | null>(null);
+  const axisLockRef = React.useRef<'x' | 'y' | null>(null);
+  const translateConnectorGeometryRef = React.useRef(false);
   const observedPlacementRef = React.useRef(args.manualPlacement);
   const handleVisibility = useTransientControlVisibility(
     isDragging || Boolean(args.isHandlePinned)
@@ -70,13 +87,16 @@ export function useCalloutDrag(args: {
     if (isDragging || !draftRef.current || !propChanged) return;
     draftRef.current = null;
     setDraftPlacement(null);
+    setTranslateConnectorGeometry(false);
   }, [args.manualPlacement, isDragging]);
 
   const cancel = React.useCallback(() => {
     if (!isDragging || pointerIdRef.current === null) return false;
     pointerIdRef.current = null;
+    axisLockRef.current = null;
     draftRef.current = startPlacementRef.current;
     setDraftPlacement(null);
+    setTranslateConnectorGeometry(false);
     setIsDragging(false);
     return true;
   }, [isDragging]);
@@ -87,28 +107,35 @@ export function useCalloutDrag(args: {
       if (!acceptPointerDragEvent(event, pointerIdRef.current)) return;
       const width = args.dimensions.width || args.wrapperRef.current?.offsetWidth || 0;
       const height = args.dimensions.height || args.wrapperRef.current?.offsetHeight || 0;
-      const left = clamp(
-        event.clientX - pointerOffsetRef.current.x,
-        8,
-        window.innerWidth - width - 8
-      );
-      const top = clamp(
-        event.clientY - pointerOffsetRef.current.y,
-        8,
-        window.innerHeight - height - 8
-      );
+      const rawLeft = event.clientX - pointerOffsetRef.current.x;
+      const rawTop = event.clientY - pointerOffsetRef.current.y;
+      const startRect = startRectRef.current;
+      if (!event.shiftKey) axisLockRef.current = null;
+      if (event.shiftKey && !axisLockRef.current && startRect) {
+        axisLockRef.current =
+          Math.abs(rawLeft - startRect.left) >= Math.abs(rawTop - startRect.top) ? 'x' : 'y';
+      }
+      const constrainedLeft = axisLockRef.current === 'y' && startRect ? startRect.left : rawLeft;
+      const constrainedTop = axisLockRef.current === 'x' && startRect ? startRect.top : rawTop;
+      const left = clamp(constrainedLeft, 8, window.innerWidth - width - 8);
+      const top = clamp(constrainedTop, 8, window.innerHeight - height - 8);
       const placement = getManualPlacement({ frameRect: args.frameRect, height, left, top, width });
+      translateConnectorGeometryRef.current = event.ctrlKey;
+      setTranslateConnectorGeometry(event.ctrlKey);
       draftRef.current = placement;
       setDraftPlacement(placement);
     };
     const handleUp = (event: PointerEvent) => {
-      commitPointerDragDraft({
+      commitPointerDragDraft<CalloutManualPlacement>({
         draftRef,
         event,
         initialValue: args.manualPlacement,
         isEqual: areManualPlacementsEqual,
         onClear: () => setDraftPlacement(null),
-        onCommit: args.onPositionChange,
+        onCommit: (placement) =>
+          args.onPositionChange(placement, {
+            translateConnectorGeometry: translateConnectorGeometryRef.current,
+          }),
         onFinish: () => setIsDragging(false),
         pointerIdRef,
       });
@@ -117,7 +144,8 @@ export function useCalloutDrag(args: {
   }, [args, cancel, isDragging]);
 
   return {
-    draftPlacement,
+    draft:
+      draftPlacement === null ? null : { placement: draftPlacement, translateConnectorGeometry },
     isDragging,
     isHandleVisible: !args.isEditing && handleVisibility.isVisible,
     handlePointerDown: (event: CalloutDragStartEvent) => {
@@ -133,7 +161,11 @@ export function useCalloutDrag(args: {
         // The portal may be detached while capture is requested.
       }
       pointerIdRef.current = event.pointerId;
+      axisLockRef.current = null;
       pointerOffsetRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      startRectRef.current = { left: rect.left, top: rect.top };
+      translateConnectorGeometryRef.current = event.ctrlKey;
+      setTranslateConnectorGeometry(event.ctrlKey);
       startPlacementRef.current = args.manualPlacement ?? null;
       draftRef.current = args.manualPlacement ?? null;
       setIsDragging(true);
@@ -150,7 +182,8 @@ export function useCalloutDrag(args: {
       const left = clamp(rect.left + delta.x, 8, window.innerWidth - width - 8);
       const top = clamp(rect.top + delta.y, 8, window.innerHeight - height - 8);
       args.onPositionChange(
-        getManualPlacement({ frameRect: args.frameRect, height, left, top, width })
+        getManualPlacement({ frameRect: args.frameRect, height, left, top, width }),
+        { translateConnectorGeometry: false }
       );
     },
     handleFocus: handleVisibility.handleFocus,

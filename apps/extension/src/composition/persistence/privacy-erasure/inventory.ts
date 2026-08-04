@@ -53,6 +53,7 @@ const localPreferenceKeys = [
 const syncPreferenceKeys = [
   'sniptale_settings',
   'sniptale_highlighter_settings',
+  'sniptale_callout_presets',
   'sniptale_auto_blur_settings',
 ] as const;
 

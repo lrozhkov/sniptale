@@ -54,37 +54,71 @@ export function getAnchorPosition(
   }
 }
 
-export function getCalloutPosition(
-  side: NonAutoCalloutSide,
-  anchorPos: { x: number; y: number },
-  calloutDimensions: { width: number; height: number },
-  tailSize: number
-): { x: number; y: number } {
-  const { width: cw, height: ch } = calloutDimensions;
-  const { projection } = getCalloutTailMetrics(tailSize);
+export function getCalloutPosition(args: {
+  anchor: CalloutAnchor;
+  anchorPos: { x: number; y: number };
+  calloutDimensions: { width: number; height: number };
+  frameHeight: number;
+  side: NonAutoCalloutSide;
+  tailSize: number;
+}): { x: number; y: number } {
+  const { width: cw, height: ch } = args.calloutDimensions;
+  const { projection } = getCalloutTailMetrics(args.tailSize);
   const totalGap = CALLOUT_GAP + projection;
+  const cornerOffsetX = getCornerOffsetX({
+    anchor: args.anchor,
+    calloutHeight: ch,
+    frameHeight: args.frameHeight,
+    side: args.side,
+    totalGap,
+  });
 
-  let x = anchorPos.x;
-  let y = anchorPos.y;
+  let x = args.anchorPos.x;
+  let y = args.anchorPos.y;
 
-  switch (side) {
+  switch (args.side) {
     case 'top':
-      x = anchorPos.x - cw / 2;
-      y = anchorPos.y - ch - totalGap;
+      x = args.anchorPos.x - cw / 2 + cornerOffsetX;
+      y = args.anchorPos.y - ch - totalGap;
       break;
     case 'bottom':
-      x = anchorPos.x - cw / 2;
-      y = anchorPos.y + totalGap;
+      x = args.anchorPos.x - cw / 2 + cornerOffsetX;
+      y = args.anchorPos.y + totalGap;
       break;
     case 'left':
-      x = anchorPos.x - cw - totalGap;
-      y = anchorPos.y - ch / 2;
+      x = args.anchorPos.x - cw - totalGap;
+      y = args.anchorPos.y - ch / 2;
       break;
     case 'right':
-      x = anchorPos.x + totalGap;
-      y = anchorPos.y - ch / 2;
+      x = args.anchorPos.x + totalGap;
+      y = args.anchorPos.y - ch / 2;
       break;
   }
 
   return { x, y };
+}
+
+function getCornerOffsetX(args: {
+  anchor: CalloutAnchor;
+  calloutHeight: number;
+  frameHeight: number;
+  side: NonAutoCalloutSide;
+  totalGap: number;
+}) {
+  if (args.side !== 'top' && args.side !== 'bottom') return 0;
+
+  const direction =
+    args.anchor === 'top-left' || args.anchor === 'bottom-left'
+      ? -1
+      : args.anchor === 'top-right' || args.anchor === 'bottom-right'
+        ? 1
+        : 0;
+  if (direction === 0) return 0;
+
+  const halfCalloutHeight = args.calloutHeight / 2;
+  const rayDistance = args.frameHeight / 2 + halfCalloutHeight + args.totalGap;
+  const edgeProgress = rayDistance <= 0 ? 0 : halfCalloutHeight / rayDistance;
+  const diagonalOffset = args.totalGap / Math.max(0.25, 1 - edgeProgress);
+  const restrainedOffset = Math.min(diagonalOffset, args.totalGap * 2);
+  return direction * Math.round(restrainedOffset);
 }

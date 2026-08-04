@@ -168,4 +168,15 @@ describe('useCalloutWidthResize', () => {
 
     expect(onWidthChange).not.toHaveBeenCalled();
   });
+
+  it('lets the user replace the wrapping width without an upper resize limit', () => {
+    renderHarness(480);
+    startResize('right');
+    dispatchPointer('pointermove', 1_144);
+
+    expect(resize?.draftMaxWidth).toBe(1_200);
+
+    dispatchPointer('pointerup', 1_144);
+    expect(onWidthChange).toHaveBeenCalledWith(1_200, expect.any(Object));
+  });
 });

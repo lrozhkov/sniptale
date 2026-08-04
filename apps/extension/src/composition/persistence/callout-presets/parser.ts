@@ -1,0 +1,465 @@
+// policyStateIds: [] - exact preset parser sets are immutable value allowlists, not authority state.
+import {
+  SYSTEM_CALLOUT_PRESET_KEYS,
+  type CalloutAnchor,
+  type CalloutPreset,
+  type CalloutVisualStyle,
+  type SystemCalloutPresetKey,
+} from '@sniptale/runtime-contracts/highlighter/callout';
+import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
+
+export const CALLOUT_PRESET_STORAGE_SCHEMA_VERSION = 3;
+export const MAX_USER_CALLOUT_PRESETS = 16;
+export const MAX_CALLOUT_PRESET_NAME_LENGTH = 64;
+
+interface StoredCalloutPresetPlacement {
+  enabled: boolean;
+  id: string;
+  order: number;
+}
+
+interface StoredSystemCalloutPresetOverride {
+  basedOnRevision?: number;
+  customized?: boolean;
+  name: string;
+  placement?: CalloutPreset['placement'];
+  style: CalloutVisualStyle;
+  systemPresetKey: SystemCalloutPresetKey;
+}
+
+interface StoredUserCalloutPreset {
+  id: string;
+  name: string;
+  placement?: CalloutPreset['placement'];
+  style: CalloutVisualStyle;
+}
+
+export interface StoredCalloutPresetCatalog {
+  catalogCustomized?: boolean;
+  defaultPresetId?: string;
+  placements?: StoredCalloutPresetPlacement[];
+  schemaVersion?: number;
+  systemCatalogRevision?: number;
+  systemOverrides?: StoredSystemCalloutPresetOverride[];
+  userPresets?: StoredUserCalloutPreset[];
+}
+
+interface ParsedStoredCalloutPresetCatalog {
+  hasInvalidRoot: boolean;
+  invalidFieldCount: number;
+  value: StoredCalloutPresetCatalog;
+}
+
+const connectorKinds = new Set(['none', 'wedge', 'line']);
+const connectorRoutings = new Set(['straight', 'elbow', 'polyline']);
+const connectorMarkers = new Set(['none', 'circle', 'ring-dot', 'square', 'diamond', 'arrow']);
+const lineStyles = new Set(['solid', 'dashed', 'dotted']);
+const fontFamilies = new Set(['sans', 'serif', 'mono', 'cursive']);
+const fontStyles = new Set(['normal', 'italic']);
+const fontWeights = new Set(['normal', 'bold']);
+const textDecorations = new Set(['none', 'underline']);
+const textAlignments = new Set(['left', 'center', 'right', 'justify']);
+const colorSources = new Set(['custom', 'frame-border', 'frame-fill']);
+const systemKeys = new Set<string>(SYSTEM_CALLOUT_PRESET_KEYS);
+const calloutAnchors = new Set<CalloutAnchor>([
+  'middle-left',
+  'top-left',
+  'top-center',
+  'top-right',
+  'bottom-left',
+  'bottom-center',
+  'bottom-right',
+  'middle-right',
+]);
+const calloutSides = new Set(['top', 'bottom', 'left', 'right']);
+const accentSides = new Set(['top', 'right', 'bottom', 'left']);
+
+function getExpectedPresetSide(anchor: CalloutAnchor) {
+  if (anchor === 'middle-left') return 'left';
+  if (anchor === 'middle-right') return 'right';
+  return anchor.startsWith('bottom') ? 'bottom' : 'top';
+}
+
+function isConnectorMarker(
+  value: unknown
+): value is CalloutVisualStyle['connector']['blockMarker'] {
+  return isString(value) && connectorMarkers.has(value);
+}
+
+function isConnectorKind(value: unknown): value is CalloutVisualStyle['connector']['kind'] {
+  return isString(value) && connectorKinds.has(value);
+}
+
+function isConnectorRouting(value: unknown): value is CalloutVisualStyle['connector']['routing'] {
+  return isString(value) && connectorRoutings.has(value);
+}
+
+function isLineStyle(value: unknown): value is CalloutVisualStyle['connector']['lineStyle'] {
+  return isString(value) && lineStyles.has(value);
+}
+
+function isFontFamily(value: unknown): value is CalloutVisualStyle['typography']['fontFamily'] {
+  return isString(value) && fontFamilies.has(value);
+}
+
+function isFontWeight(value: unknown): value is CalloutVisualStyle['typography']['fontWeight'] {
+  return isString(value) && fontWeights.has(value);
+}
+
+function isFontStyle(value: unknown): value is CalloutVisualStyle['typography']['fontStyle'] {
+  return isString(value) && fontStyles.has(value);
+}
+
+function isTextDecoration(
+  value: unknown
+): value is CalloutVisualStyle['typography']['textDecoration'] {
+  return isString(value) && textDecorations.has(value);
+}
+
+function isTextAlignment(value: unknown): value is CalloutVisualStyle['typography']['textAlign'] {
+  return isString(value) && textAlignments.has(value);
+}
+
+function isSystemPresetKey(value: unknown): value is SystemCalloutPresetKey {
+  return isString(value) && systemKeys.has(value);
+}
+
+function isColorSource(value: unknown): value is CalloutVisualStyle['colorBindings']['connector'] {
+  return isString(value) && colorSources.has(value);
+}
+
+export function parseCalloutPresetPlacement(value: unknown): CalloutPreset['placement'] | null {
+  if (
+    !isPlainRecord(value) ||
+    !isString(value['anchor']) ||
+    !calloutAnchors.has(value['anchor'] as CalloutAnchor) ||
+    !isString(value['side']) ||
+    !calloutSides.has(value['side']) ||
+    value['side'] !== getExpectedPresetSide(value['anchor'] as CalloutAnchor)
+  ) {
+    return null;
+  }
+  return {
+    anchor: value['anchor'] as CalloutAnchor,
+    side: value['side'] as CalloutPreset['placement']['side'],
+  };
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNumber(value) && Number.isInteger(value) && value >= 0;
+}
+
+function isNumberInRange(value: unknown, minimum: number, maximum: number): value is number {
+  return isNumber(value) && value >= minimum && value <= maximum;
+}
+
+function isNumberAtLeast(value: unknown, minimum: number): value is number {
+  return isNumber(value) && value >= minimum;
+}
+
+function isCalloutColor(value: unknown): value is string {
+  if (value === 'transparent') return true;
+  if (!isString(value) || (value.length !== 7 && value.length !== 9) || value[0] !== '#') {
+    return false;
+  }
+  const hexDigits = '0123456789abcdefABCDEF';
+  return [...value.slice(1)].every((character) => hexDigits.includes(character));
+}
+
+export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | null {
+  if (!isPlainRecord(value)) return null;
+  const accentEdge = value['accentEdge'];
+  const connector = value['connector'];
+  const colorBindings = value['colorBindings'];
+  const customCss = value['customCss'] ?? '';
+  const surface = value['surface'];
+  const title = value['title'];
+  const typography = value['typography'];
+  const blockMarkerSize = isPlainRecord(connector) ? (connector['blockMarkerSize'] ?? 10) : null;
+  const frameMarkerSize = isPlainRecord(connector) ? (connector['frameMarkerSize'] ?? 10) : null;
+  const connectorLineStyle = isPlainRecord(connector) ? (connector['lineStyle'] ?? 'solid') : null;
+  const shadowColor = isPlainRecord(surface) ? (surface['shadowColor'] ?? '#000000') : null;
+  const borderStyle = isPlainRecord(surface) ? (surface['borderStyle'] ?? 'solid') : null;
+  const dividerColor = isPlainRecord(title) ? (title['dividerColor'] ?? 'transparent') : null;
+  const dividerStyle = isPlainRecord(title) ? (title['dividerStyle'] ?? 'solid') : null;
+  const dividerWidth = isPlainRecord(title) ? (title['dividerWidth'] ?? 0) : null;
+  const fontStyle = isPlainRecord(typography) ? (typography['fontStyle'] ?? 'normal') : null;
+  const textDecoration = isPlainRecord(typography)
+    ? (typography['textDecoration'] ?? 'none')
+    : null;
+  const textAlign = isPlainRecord(typography) ? (typography['textAlign'] ?? 'left') : null;
+  const connectorColorSource = isPlainRecord(colorBindings)
+    ? (colorBindings['connector'] ?? 'custom')
+    : 'custom';
+  const surfaceBackgroundColorSource = isPlainRecord(colorBindings)
+    ? (colorBindings['surfaceBackground'] ?? 'custom')
+    : 'custom';
+  const surfaceBorderColorSource = isPlainRecord(colorBindings)
+    ? (colorBindings['surfaceBorder'] ?? 'custom')
+    : 'custom';
+  const accentColorSource = isPlainRecord(colorBindings)
+    ? (colorBindings['accent'] ?? 'custom')
+    : 'custom';
+  const accentColor = isPlainRecord(accentEdge) ? (accentEdge['color'] ?? '#f97316') : '#f97316';
+  const accentEnabled = isPlainRecord(accentEdge) ? (accentEdge['enabled'] ?? false) : false;
+  const accentLineStyle = isPlainRecord(accentEdge)
+    ? (accentEdge['lineStyle'] ?? 'solid')
+    : 'solid';
+  const accentSide = isPlainRecord(accentEdge) ? (accentEdge['side'] ?? 'left') : 'left';
+  const accentWidth = isPlainRecord(accentEdge) ? (accentEdge['width'] ?? 4) : 4;
+  if (
+    !isColorSource(accentColorSource) ||
+    !isString(customCss) ||
+    customCss.length > 4_000 ||
+    !isCalloutColor(accentColor) ||
+    !isBoolean(accentEnabled) ||
+    !isLineStyle(accentLineStyle) ||
+    !isString(accentSide) ||
+    !accentSides.has(accentSide) ||
+    !isNumberInRange(accentWidth, 1, 12) ||
+    !isColorSource(connectorColorSource) ||
+    !isColorSource(surfaceBackgroundColorSource) ||
+    !isColorSource(surfaceBorderColorSource) ||
+    !isPlainRecord(connector) ||
+    !isConnectorMarker(connector['blockMarker']) ||
+    !isNumberInRange(blockMarkerSize, 4, 48) ||
+    !isCalloutColor(connector['color']) ||
+    !isConnectorMarker(connector['frameMarker']) ||
+    !isNumberInRange(frameMarkerSize, 4, 48) ||
+    !isConnectorKind(connector['kind']) ||
+    !isLineStyle(connectorLineStyle) ||
+    !isConnectorRouting(connector['routing']) ||
+    !isNumberInRange(connector['wedgeSize'], 4, 48) ||
+    !isNumberInRange(connector['width'], 1, 12) ||
+    !isPlainRecord(surface) ||
+    !isCalloutColor(surface['backgroundColor']) ||
+    !isCalloutColor(surface['borderColor']) ||
+    !isLineStyle(borderStyle) ||
+    !isNumberInRange(surface['borderWidth'], 0, 12) ||
+    !isNumberInRange(surface['paddingX'], 0, 48) ||
+    !isNumberInRange(surface['paddingY'], 0, 48) ||
+    !isNumberInRange(surface['radius'], 0, 64) ||
+    !isNumberInRange(surface['shadow'], 0, 100) ||
+    !isCalloutColor(shadowColor) ||
+    !isCalloutColor(surface['textColor']) ||
+    !isPlainRecord(title) ||
+    !isCalloutColor(title['backgroundColor']) ||
+    !isCalloutColor(dividerColor) ||
+    !isLineStyle(dividerStyle) ||
+    !isNumberInRange(dividerWidth, 0, 12) ||
+    !isBoolean(title['enabled']) ||
+    !isNumberInRange(title['fontSize'], 8, 144) ||
+    !isFontWeight(title['fontWeight']) ||
+    !isCalloutColor(title['textColor']) ||
+    !isPlainRecord(typography) ||
+    !isFontFamily(typography['fontFamily']) ||
+    !isNumberInRange(typography['fontSize'], 8, 72) ||
+    !isFontStyle(fontStyle) ||
+    !isFontWeight(typography['fontWeight']) ||
+    !isNumberAtLeast(typography['maxWidth'], 80) ||
+    !isTextAlignment(textAlign) ||
+    !isTextDecoration(textDecoration)
+  ) {
+    return null;
+  }
+
+  return {
+    accentEdge: {
+      color: accentColor,
+      enabled: accentEnabled,
+      lineStyle: accentLineStyle,
+      side: accentSide as CalloutVisualStyle['accentEdge']['side'],
+      width: accentWidth,
+    },
+    colorBindings: {
+      accent: accentColorSource,
+      connector: connectorColorSource,
+      surfaceBackground: surfaceBackgroundColorSource,
+      surfaceBorder: surfaceBorderColorSource,
+    },
+    connector: {
+      blockMarker: connector['blockMarker'],
+      blockMarkerSize,
+      color: connector['color'],
+      frameMarker: connector['frameMarker'],
+      frameMarkerSize,
+      kind: connector['kind'],
+      lineStyle: connectorLineStyle,
+      routing: connector['routing'],
+      wedgeSize: connector['wedgeSize'],
+      width: connector['width'],
+    },
+    customCss,
+    surface: {
+      backgroundColor: surface['backgroundColor'],
+      borderColor: surface['borderColor'],
+      borderStyle,
+      borderWidth: surface['borderWidth'],
+      paddingX: surface['paddingX'],
+      paddingY: surface['paddingY'],
+      radius: surface['radius'],
+      shadow: surface['shadow'],
+      shadowColor,
+      textColor: surface['textColor'],
+    },
+    title: {
+      backgroundColor: title['backgroundColor'],
+      dividerColor,
+      dividerStyle,
+      dividerWidth,
+      enabled: title['enabled'],
+      fontSize: title['fontSize'],
+      fontWeight: title['fontWeight'],
+      textColor: title['textColor'],
+    },
+    typography: {
+      fontFamily: typography['fontFamily'],
+      fontSize: typography['fontSize'],
+      fontStyle,
+      fontWeight: typography['fontWeight'],
+      maxWidth: typography['maxWidth'],
+      textAlign,
+      textDecoration,
+    },
+  };
+}
+
+function parsePlacement(value: unknown): StoredCalloutPresetPlacement | null {
+  if (
+    !isPlainRecord(value) ||
+    !isString(value['id']) ||
+    value['id'].length === 0 ||
+    !isBoolean(value['enabled']) ||
+    !isNonNegativeInteger(value['order'])
+  ) {
+    return null;
+  }
+  return { enabled: value['enabled'], id: value['id'], order: value['order'] };
+}
+
+function isValidPresetName(value: unknown): value is string {
+  return (
+    isString(value) &&
+    value.trim().length > 0 &&
+    value.trim().length <= MAX_CALLOUT_PRESET_NAME_LENGTH
+  );
+}
+
+function parseSystemOverride(value: unknown): StoredSystemCalloutPresetOverride | null {
+  if (
+    !isPlainRecord(value) ||
+    !isSystemPresetKey(value['systemPresetKey']) ||
+    (value['basedOnRevision'] !== undefined && !isNonNegativeInteger(value['basedOnRevision'])) ||
+    (value['customized'] !== undefined && !isBoolean(value['customized']))
+  ) {
+    return null;
+  }
+  const style = parseCalloutVisualStyle(value['style']);
+  const placement =
+    value['placement'] === undefined ? undefined : parseCalloutPresetPlacement(value['placement']);
+  if (!style || !isValidPresetName(value['name']) || placement === null) return null;
+  return {
+    ...(isNonNegativeInteger(value['basedOnRevision'])
+      ? { basedOnRevision: value['basedOnRevision'] }
+      : {}),
+    ...(isBoolean(value['customized']) ? { customized: value['customized'] } : {}),
+    name: value['name'].trim(),
+    ...(placement ? { placement } : {}),
+    style,
+    systemPresetKey: value['systemPresetKey'],
+  };
+}
+
+function parseUserPreset(value: unknown): StoredUserCalloutPreset | null {
+  if (
+    !isPlainRecord(value) ||
+    !isString(value['id']) ||
+    !value['id'].startsWith('user-') ||
+    !isValidPresetName(value['name'])
+  ) {
+    return null;
+  }
+  const style = parseCalloutVisualStyle(value['style']);
+  const placement =
+    value['placement'] === undefined ? undefined : parseCalloutPresetPlacement(value['placement']);
+  if (!style || placement === null) return null;
+  return {
+    id: value['id'],
+    name: value['name'].trim(),
+    ...(placement ? { placement } : {}),
+    style,
+  };
+}
+
+function parseArray<T>(
+  value: unknown,
+  parser: (entry: unknown) => T | null
+): { invalidFieldCount: number; value?: T[] } {
+  if (value === undefined) return { invalidFieldCount: 0 };
+  if (!Array.isArray(value)) return { invalidFieldCount: 1 };
+  const parsed = value.map(parser).filter((entry): entry is T => entry !== null);
+  return { invalidFieldCount: value.length - parsed.length, value: parsed };
+}
+
+function deduplicateBy<T>(
+  values: T[] | undefined,
+  keyOf: (value: T) => string
+): {
+  duplicateCount: number;
+  values: T[] | undefined;
+} {
+  if (!values) return { duplicateCount: 0, values };
+  const seen = new Set<string>();
+  const unique = values.filter((value) => {
+    const key = keyOf(value);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return { duplicateCount: values.length - unique.length, values: unique };
+}
+
+export function parseStoredCalloutPresetCatalog(value: unknown): ParsedStoredCalloutPresetCatalog {
+  if (value === undefined) return { hasInvalidRoot: false, invalidFieldCount: 0, value: {} };
+  if (!isPlainRecord(value)) return { hasInvalidRoot: true, invalidFieldCount: 0, value: {} };
+
+  let invalidFieldCount = 0;
+  const parsed: StoredCalloutPresetCatalog = {};
+  for (const field of ['schemaVersion', 'systemCatalogRevision'] as const) {
+    if (value[field] === undefined) continue;
+    if (isNonNegativeInteger(value[field])) parsed[field] = value[field];
+    else invalidFieldCount++;
+  }
+  if (value['catalogCustomized'] !== undefined) {
+    if (isBoolean(value['catalogCustomized']))
+      parsed.catalogCustomized = value['catalogCustomized'];
+    else invalidFieldCount++;
+  }
+  if (value['defaultPresetId'] !== undefined) {
+    if (isString(value['defaultPresetId'])) parsed.defaultPresetId = value['defaultPresetId'];
+    else invalidFieldCount++;
+  }
+
+  const placements = parseArray(value['placements'], parsePlacement);
+  const systemOverrides = parseArray(value['systemOverrides'], parseSystemOverride);
+  const userPresets = parseArray(value['userPresets'], parseUserPreset);
+  const uniquePlacements = deduplicateBy(placements.value, (item) => item.id);
+  const uniqueSystemOverrides = deduplicateBy(
+    systemOverrides.value,
+    (item) => item.systemPresetKey
+  );
+  const uniqueUserPresets = deduplicateBy(userPresets.value, (item) => item.id);
+  invalidFieldCount +=
+    placements.invalidFieldCount +
+    systemOverrides.invalidFieldCount +
+    userPresets.invalidFieldCount +
+    uniquePlacements.duplicateCount +
+    uniqueSystemOverrides.duplicateCount +
+    uniqueUserPresets.duplicateCount;
+  if ((uniqueUserPresets.values?.length ?? 0) > MAX_USER_CALLOUT_PRESETS) invalidFieldCount++;
+  if (uniquePlacements.values) parsed.placements = uniquePlacements.values;
+  if (uniqueSystemOverrides.values) parsed.systemOverrides = uniqueSystemOverrides.values;
+  if (uniqueUserPresets.values) parsed.userPresets = uniqueUserPresets.values;
+
+  return { hasInvalidRoot: false, invalidFieldCount, value: parsed };
+}

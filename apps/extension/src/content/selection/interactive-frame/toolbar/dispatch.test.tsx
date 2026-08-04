@@ -35,15 +35,19 @@ describe('interactive frame toolbar dispatch', () => {
   });
 
   it('keeps toolbar click handlers as thin orchestration wrappers', () => {
+    const previousAnchor = document.createElement('button');
+    const clickedButton = document.createElement('button');
     const props = {
       effectMode: 'border',
       handleDelete: vi.fn(),
       handleEffectButtonClick: vi.fn(),
       handleStartEditing: vi.fn(),
       closePopover: vi.fn(),
+      popoverAnchorRef: { current: previousAnchor },
     };
     const handlers = createSharedToolbarClickHandlers(props as never);
     const event = {
+      currentTarget: clickedButton,
       nativeEvent: { stopImmediatePropagation: vi.fn() },
       preventDefault: vi.fn(),
       stopPropagation: vi.fn(),
@@ -52,6 +56,7 @@ describe('interactive frame toolbar dispatch', () => {
     handlers.handleEffectClick('blur')(event);
 
     expect(props.handleEffectButtonClick).toHaveBeenCalledWith('blur');
+    expect(props.popoverAnchorRef.current).toBe(clickedButton);
     expect(props.closePopover).not.toHaveBeenCalled();
   });
 });

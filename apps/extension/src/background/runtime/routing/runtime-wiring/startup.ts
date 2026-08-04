@@ -2,6 +2,7 @@ import { ensurePersistentStorage } from '../../../../composition/persistence/inf
 import { cleanupOldRecordings } from '../../../../composition/persistence/recordings/index';
 import { initializeAiStorageAccess } from '../../../../composition/persistence/ai-settings/init';
 import { migrateHighlighterSystemPresetCatalog } from '../../../../composition/persistence/highlighter';
+import { migrateCalloutSystemPresetCatalog } from '../../../../composition/persistence/callout-presets';
 import { cleanupExpiredProjectExportInputs } from '../../../../composition/persistence/project-export-inputs';
 import {
   cleanupCapture,
@@ -56,6 +57,10 @@ export function runStartupMaintenance(
 
   migrateHighlighterSystemPresetCatalog().catch((error) => {
     logger.warn('Highlighter preset catalog migration failed (non-critical)', error);
+  });
+
+  migrateCalloutSystemPresetCatalog().catch((error) => {
+    logger.warn('Callout preset catalog migration failed (non-critical)', error);
   });
 
   resetVideoRecordingRuntimeState();

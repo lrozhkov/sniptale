@@ -2,26 +2,22 @@
 
 import { describe, expect, it } from 'vitest';
 import { createFrameDataFixture } from '../../../selection/frame-runtime/test-support';
-import { captureFrameSessionSnapshot } from './frame-session';
+import { captureFrameSessionSnapshot, hydrateFrameSessionSnapshot } from './frame-session';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
+import { createDefaultCalloutSettings } from '../../../selection/callout/model';
 
 describe('captureFrameSessionSnapshot', () => {
   it('deep-clones manual callout placement and free page placement', () => {
     const frame = createFrameDataFixture('free-frame', {
       callout: {
-        anchor: 'top-center',
-        bgColor: '#fff',
-        enabled: true,
-        fontFamily: 'sans',
-        fontSize: 14,
-        fontWeight: 'normal',
-        htmlContent: 'Comment',
-        maxWidth: 200,
-        manualPlacement: { centerOffsetX: 80, centerOffsetY: -40 },
-        side: 'auto',
-        tailSize: 8,
-        textColor: '#111',
-        variant: 'bubble',
+        ...createDefaultCalloutSettings(),
+        content: { bodyHtml: 'Comment', titleText: '' },
+        placement: {
+          anchor: 'top-center',
+          connectorWaypoint: { centerOffsetX: 20, centerOffsetY: 30 },
+          manualPlacement: { centerOffsetX: 80, centerOffsetY: -40 },
+          side: 'auto',
+        },
       },
       pagePlacement: { iframePath: ['iframe#content'], pageX: 120, pageY: 240 },
       stepBadge: {
@@ -46,14 +42,29 @@ describe('captureFrameSessionSnapshot', () => {
 
     expect(snapshot.sessionBorderPreset).not.toBe(DEFAULT_BORDER_PRESET);
     expect(snapshot.sessionBorderPreset.padding).not.toBe(DEFAULT_BORDER_PRESET.padding);
-    expect(saved.callout?.manualPlacement).not.toBe(frame.callout?.manualPlacement);
+    expect(saved.callout?.placement.manualPlacement).not.toBe(
+      frame.callout?.placement.manualPlacement
+    );
+    expect(saved.callout?.placement.connectorWaypoint).not.toBe(
+      frame.callout?.placement.connectorWaypoint
+    );
     expect(saved.pagePlacement).not.toBe(frame.pagePlacement);
     expect(saved.pagePlacement?.iframePath).not.toBe(frame.pagePlacement?.iframePath);
     expect(saved.stepBadge?.manualPlacement).not.toBe(frame.stepBadge?.manualPlacement);
     expect(saved).toMatchObject({
-      callout: { manualPlacement: { centerOffsetX: 80, centerOffsetY: -40 } },
+      callout: { placement: { manualPlacement: { centerOffsetX: 80, centerOffsetY: -40 } } },
       pagePlacement: { iframePath: ['iframe#content'], pageX: 120, pageY: 240 },
       stepBadge: { manualPlacement: { position: 0.72, side: 'bottom' } },
     });
+
+    frame.callout!.placement.connectorWaypoint!.centerOffsetX = 999;
+    expect(saved.callout?.placement.connectorWaypoint?.centerOffsetX).toBe(20);
+
+    const hydrated = hydrateFrameSessionSnapshot(snapshot).frames[0]!;
+    expect(hydrated.callout?.placement.connectorWaypoint).not.toBe(
+      saved.callout?.placement.connectorWaypoint
+    );
+    saved.callout!.placement.connectorWaypoint!.centerOffsetY = 999;
+    expect(hydrated.callout?.placement.connectorWaypoint?.centerOffsetY).toBe(30);
   });
 });

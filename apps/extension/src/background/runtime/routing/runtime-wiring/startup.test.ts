@@ -1,11 +1,17 @@
 import { expect, it, vi } from 'vitest';
 
 const migrateHighlighterSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
+const migrateCalloutSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
 const ensureActivePageAccessRuntime = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock('../../../../composition/persistence/highlighter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/highlighter')>()),
   migrateHighlighterSystemPresetCatalog,
+}));
+
+vi.mock('../../../../composition/persistence/callout-presets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/callout-presets')>()),
+  migrateCalloutSystemPresetCatalog,
 }));
 
 vi.mock('../../page-access/service', async (importOriginal) => ({
@@ -59,6 +65,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   });
   expect(initializeAiStorageAccess).toHaveBeenCalledOnce();
   expect(migrateHighlighterSystemPresetCatalog).toHaveBeenCalledOnce();
+  expect(migrateCalloutSystemPresetCatalog).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeState).toHaveBeenCalledOnce();
   expect(recoverVideoCaptureSurfaceOnStartup).toHaveBeenCalledWith(ensureActivePageAccessRuntime);
   expect(logger.warn).toHaveBeenCalledWith(

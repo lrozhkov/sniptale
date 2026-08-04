@@ -1,5 +1,6 @@
 import { Droplet, Eye, EyeOff, Plus, Settings2, Square, Waves } from 'lucide-react';
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
+import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
 import {
   ProductGlassChip,
   ProductGlassChipIcon,
@@ -25,7 +26,7 @@ import type {
 import { buildBlurTypeOptions, getBorderPresetPreviewStyle } from './helpers';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
-import { FramePresetName } from './overflow-hint';
+import { PresetNameWithOverflowHint } from '../../../ui/compact-inspector-controls/overflow-hint';
 
 function BlurTypeIcon(props: { iconName: 'droplet' | 'waves' | 'square' }) {
   if (props.iconName === 'droplet') {
@@ -37,6 +38,12 @@ function BlurTypeIcon(props: { iconName: 'droplet' | 'waves' | 'square' }) {
   }
 
   return <Square size={15} />;
+}
+
+function getFrameEffectTitle(effectMode: EffectMode) {
+  if (effectMode === 'border') return translate('content.interactiveFrame.effectBorder');
+  if (effectMode === 'blur') return translate('content.interactiveFrame.effectBlur');
+  return translate('content.interactiveFrame.effectFocus');
 }
 
 export function FrameSettingsPopoverContent(props: {
@@ -72,13 +79,7 @@ export function FrameSettingsPopoverContent(props: {
   return (
     <>
       <ProductToolbarMenuGroupLabel>
-        {translate(
-          props.effectMode === 'border'
-            ? 'content.interactiveFrame.effectBorder'
-            : props.effectMode === 'blur'
-              ? 'content.interactiveFrame.effectBlur'
-              : 'content.interactiveFrame.effectFocus'
-        )}
+        {getFrameEffectTitle(props.effectMode)}
       </ProductToolbarMenuGroupLabel>
       <FrameBorderSection
         borderPresets={props.globalSettings.borderPresets}
@@ -130,10 +131,7 @@ function FrameBorderSection(props: {
     (preset) => preset.enabled !== false
   ).length;
   return (
-    <ContentPopoverSection
-      className="sniptale-frame-style-section"
-      title={translate('content.overlayControls.frameStyleLabel')}
-    >
+    <ContentPopoverSection className="sniptale-frame-style-section">
       {props.effectMode === 'border' ? null : (
         <ProductGlassToggleRow
           className="sniptale-frame-decoration-toggle-row"
@@ -183,7 +181,7 @@ function FrameBorderSection(props: {
                 >
                   <ProductGlassPresetPreview style={getBorderPresetPreviewStyle(preset)} />
                   <ProductGlassPresetMeta>
-                    <FramePresetName name={displayName} />
+                    <PresetNameWithOverflowHint name={displayName} />
                   </ProductGlassPresetMeta>
                 </ProductGlassPresetItem>
                 <span className="sniptale-frame-style-preset-actions">

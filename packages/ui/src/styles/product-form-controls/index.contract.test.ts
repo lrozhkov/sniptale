@@ -71,6 +71,15 @@ function expectProductRangeThumbContract() {
 }
 
 describe('product-form-controls contract', () => {
+  it('uses text-entry cursors for editable fields without weakening disabled feedback', () => {
+    expect(productFormControlsStylesheet).toContain(
+      '.sniptale-input,\n.sniptale-textarea {\n  cursor: text;\n}'
+    );
+    expect(productFormControlsStylesheet).toContain(
+      '.sniptale-input:disabled,\n.sniptale-textarea:disabled {\n  cursor: not-allowed;\n}'
+    );
+  });
+
   it('keeps product range track and thumb rendering under the shared form owner', () => {
     const webkitTrackBlock = readRangeRuleBlock('.sniptale-range::-webkit-slider-runnable-track');
     const mozTrackBlock = readRangeRuleBlock('.sniptale-range::-moz-range-track');

@@ -1,6 +1,7 @@
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { areDescriptorListsEqual } from '../effects/descriptor-equality';
 import type { AnchorPresentation } from '../host-layout/service';
+import { createCalloutRenderKey } from '../../callout/model';
 
 export type FrameRenderDescriptor = {
   blurAmount: number | undefined;
@@ -22,23 +23,7 @@ export type FrameRenderDescriptor = {
   borderStrokeOpacity: number | undefined;
   borderStyle: string | undefined;
   borderWidth: number | undefined;
-  calloutAnchor: string | undefined;
-  calloutBgColor: string | undefined;
-  calloutEnabled: boolean | undefined;
-  calloutFontFamily: string | undefined;
-  calloutFontSize: number | undefined;
-  calloutFontWeight: string | undefined;
-  calloutHtmlContent: string | undefined;
-  calloutMaxWidth: number | undefined;
-  calloutSide: string | undefined;
-  calloutTailSize: number | undefined;
-  calloutTextColor: string | undefined;
-  calloutVariant: string | undefined;
-  calloutManualX: number | undefined;
-  calloutManualY: number | undefined;
-  calloutTailBasePosition: number | undefined;
-  calloutTailBaseWidth: number | undefined;
-  calloutTailFramePosition: number | undefined;
+  calloutKey: string;
   effectMode: FrameData['effectMode'];
   focusOpacity: number | undefined;
   focusShowBorder: boolean | undefined;
@@ -171,25 +156,7 @@ function buildFrameStepBadgeDescriptor(frame: FrameData) {
 }
 
 function buildFrameCalloutDescriptor(frame: FrameData) {
-  const callout = frame.callout;
-
   return {
-    calloutAnchor: callout?.anchor,
-    calloutBgColor: callout?.bgColor,
-    calloutEnabled: callout?.enabled,
-    calloutFontFamily: callout?.fontFamily,
-    calloutFontSize: callout?.fontSize,
-    calloutFontWeight: callout?.fontWeight,
-    calloutHtmlContent: callout?.htmlContent,
-    calloutMaxWidth: callout?.maxWidth,
-    calloutSide: callout?.side,
-    calloutTailSize: callout?.tailSize,
-    calloutTextColor: callout?.textColor,
-    calloutVariant: callout?.variant,
-    calloutManualX: callout?.manualPlacement?.centerOffsetX,
-    calloutManualY: callout?.manualPlacement?.centerOffsetY,
-    calloutTailBasePosition: callout?.tailBasePosition,
-    calloutTailBaseWidth: callout?.tailBaseWidth,
-    calloutTailFramePosition: callout?.tailFramePosition,
+    calloutKey: createCalloutRenderKey(frame.callout),
   };
 }

@@ -45,6 +45,17 @@ const logger = createLogger({ namespace: 'ContentFrameUiStore' });
 const HOVER_HIDE_DELAY_MS = 250;
 let hoverHideTimer: ReturnType<typeof setTimeout> | null = null;
 let hoverHideFrameId: string | null = null;
+let calloutEditRequestFrameId: string | null = null;
+
+export function requestFrameCalloutEdit(frameId: string): void {
+  calloutEditRequestFrameId = frameId;
+}
+
+export function consumeFrameCalloutEditRequest(frameId: string): boolean {
+  if (calloutEditRequestFrameId !== frameId) return false;
+  calloutEditRequestFrameId = null;
+  return true;
+}
 
 function cancelHoverHideTimer(frameId?: string) {
   if (hoverHideTimer === null) return;
@@ -186,6 +197,7 @@ function createFrameUIVisibilityActions(set: FrameStoreSet, get: FrameStoreGet) 
 
     reset: () => {
       cancelHoverHideTimer();
+      calloutEditRequestFrameId = null;
       logger.debug('reset');
       set({
         hoveredFrameId: null,

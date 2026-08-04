@@ -155,6 +155,9 @@ export function containsUnsafeCssSyntax(value: string): boolean {
       normalized.startsWith('@import', index) ||
       startsCssUrlFunction(normalized, index) ||
       startsCssFunction(normalized, index, 'expression') ||
+      startsCssFunction(normalized, index, 'image-set') ||
+      startsCssFunction(normalized, index, '-webkit-image-set') ||
+      startsCssFunction(normalized, index, 'var') ||
       startsCssProtocol(normalized, index, 'javascript') ||
       startsCssProtocol(normalized, index, 'data')
     ) {

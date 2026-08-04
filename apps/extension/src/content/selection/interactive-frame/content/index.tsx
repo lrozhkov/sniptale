@@ -82,6 +82,7 @@ function getInteractiveFramePopoverProps(props: InteractiveFrameContentProps) {
     isStepBadgePopoverOpen: props.isStepBadgePopoverOpen,
     isCalloutPopoverOpen: props.isCalloutPopoverOpen,
     isCalloutEditing: props.isCalloutEditing,
+    state: props.state,
     effectMode: props.effectMode,
     popoverAnchorRef: props.popoverAnchorRef,
     stepBadgePopoverAnchorRef: props.stepBadgePopoverAnchorRef,

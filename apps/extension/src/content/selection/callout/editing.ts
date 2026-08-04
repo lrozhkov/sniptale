@@ -14,6 +14,7 @@ import { useCalloutVoiceInput } from './voice-input';
 type UseCalloutEditingArgs = {
   frameId: string;
   htmlContent: string;
+  titleText?: string;
   isEditing: boolean;
   onContentChange: (htmlContent: string) => void;
   onDelete: () => void;
@@ -131,6 +132,7 @@ export function useCalloutEditing(args: UseCalloutEditingArgs) {
     onManualInput: voice.actions.stop,
     onContentChange: args.onContentChange,
     onDelete: args.onDelete,
+    ...(args.titleText === undefined ? {} : { titleText: args.titleText }),
     onStartEditing: args.onStartEditing,
     onStopEditing: args.onStopEditing,
   });

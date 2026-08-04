@@ -1,4 +1,4 @@
-import type { CalloutSettings } from '../../../../features/highlighter/contracts';
+import type { CalloutSettingsPatch } from '@sniptale/runtime-contracts/highlighter/callout';
 import {
   addContentRuntimeDetailEventListener,
   dispatchContentRuntimeDetailEvent,
@@ -7,7 +7,7 @@ import {
 
 export type FrameCalloutChangedDetail = {
   frameId: string;
-  settings: Partial<CalloutSettings>;
+  settings: CalloutSettingsPatch;
 };
 
 export type CalloutDeleteDetail = {

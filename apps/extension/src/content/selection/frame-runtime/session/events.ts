@@ -1,12 +1,12 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type {
   BlurSettings,
-  CalloutSettings,
   FocusSettings,
   FrameData,
   GlobalStepBadgeSettings,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
+import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { WithHistoryCommit } from '../contracts';
 import {
   createCalloutDeleteHandler,
@@ -29,7 +29,7 @@ export function buildFrameSessionWindowListeners(args: {
   updateFrameStepBadge: (frameId: string, settings: Partial<StepBadgeSettings>) => void;
   reorderStepBadge: (frameId: string, direction: 'up' | 'down') => void;
   setFrames: Dispatch<SetStateAction<FrameData[]>>;
-  sessionCalloutStyleRef: MutableRefObject<Partial<CalloutSettings> | null>;
+  sessionCalloutStyleRef: MutableRefObject<CalloutVisualStyle | null>;
   withHistoryCommit: WithHistoryCommit;
 }) {
   const frameCalloutHandlers = createFrameCalloutHandlers(args);
@@ -47,7 +47,7 @@ export function buildFrameSessionWindowListeners(args: {
 
 function createFrameCalloutHandlers(args: {
   setFrames: Dispatch<SetStateAction<FrameData[]>>;
-  sessionCalloutStyleRef: MutableRefObject<Partial<CalloutSettings> | null>;
+  sessionCalloutStyleRef: MutableRefObject<CalloutVisualStyle | null>;
   withHistoryCommit: WithHistoryCommit;
 }) {
   return {

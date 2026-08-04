@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addCalloutBlurRequestListener } from '../../../platform/page-context/frame-events';
 import { InteractiveFrameHoverOverlaySurface } from './hover-surface';
+import { Z_INDEX_CALLOUT_EDITING } from '../layout/portal';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -46,6 +47,13 @@ afterEach(() => {
 });
 
 describe('InteractiveFrameHoverOverlaySurface', () => {
+  it('stays below editable callout content so text remains selectable', () => {
+    renderHarness();
+
+    const overlay = document.querySelector<HTMLDivElement>('.sniptale-blocking-overlay');
+    expect(overlay?.style.zIndex).toBe(String(Z_INDEX_CALLOUT_EDITING - 1));
+  });
+
   it('dispatches callout blur requests through the shared event seam on mousedown', () => {
     const listener = vi.fn();
     const cleanup = addCalloutBlurRequestListener(listener);

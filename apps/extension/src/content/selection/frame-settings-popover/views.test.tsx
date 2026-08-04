@@ -64,11 +64,12 @@ function renderContent(effectMode: EffectMode, decorationVisible = true, compact
 }
 
 describe('FrameSettingsPopoverContent', () => {
-  it('uses the shared content popover section contract for border mode', () => {
+  it('keeps one short canonical menu heading without duplicate section headings', () => {
     const markup = renderContent('border');
 
-    expect(markup).toContain('sniptale-toolbar-menu-title');
+    expect(markup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(markup).toContain(translate('content.interactiveFrame.effectBorder'));
+    expect(markup).not.toContain(translate('content.overlayControls.frameStyleLabel'));
     expect(markup).toContain('shared.ui.content-popover-section');
     expect(markup).toContain('sniptale-content-popover-section');
     expect(markup).toContain('Default');
@@ -91,7 +92,15 @@ describe('FrameSettingsPopoverContent', () => {
     (effectMode) => {
       const markup = renderContent(effectMode, true);
 
-      expect(markup).toContain(translate('content.overlayControls.frameStyleLabel'));
+      expect(markup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
+      expect(markup).toContain(
+        translate(
+          effectMode === 'blur'
+            ? 'content.interactiveFrame.effectBlur'
+            : 'content.interactiveFrame.effectFocus'
+        )
+      );
+      expect(markup).not.toContain(translate('content.overlayControls.frameStyleLabel'));
       expect(markup).toContain(translate('content.overlayControls.showBorderTitle'));
       expect(markup).toContain('sniptale-frame-style-section');
       expect(markup).toContain('sniptale-glass-switch--on');
@@ -116,7 +125,7 @@ describe('FrameSettingsPopoverContent', () => {
     (effectMode) => {
       const markup = renderContent(effectMode, false);
 
-      expect(markup).toContain(translate('content.overlayControls.frameStyleLabel'));
+      expect(markup).not.toContain(translate('content.overlayControls.frameStyleLabel'));
       expect(markup).toContain(translate('content.overlayControls.showBorderTitle'));
       expect(markup).toContain('sniptale-glass-switch');
       expect(markup).not.toContain('sniptale-glass-switch--on');
@@ -141,8 +150,8 @@ describe('FrameSettingsPopoverContent', () => {
     expect(focusMarkup).toContain('type="range"');
     expect(focusMarkup).toContain('65%');
     expect(focusMarkup).toContain('--sniptale-range-fill-ratio:61.1%');
-    expect(blurMarkup).toContain(translate('content.interactiveFrame.effectBlur'));
-    expect(focusMarkup).toContain(translate('content.interactiveFrame.effectFocus'));
+    expect(blurMarkup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
+    expect(focusMarkup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(blurMarkup).not.toContain('sniptale-glass-range-meta');
     expect(focusMarkup).not.toContain('sniptale-glass-range-meta');
   });

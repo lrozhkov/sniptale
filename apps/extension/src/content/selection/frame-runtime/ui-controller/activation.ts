@@ -7,7 +7,11 @@ import {
   resolveFrameHitTarget,
   resolveFrameInteriorHitTarget,
 } from './hit-test';
-import { queryAllContentUiElements, queryContentUiElement } from '../../../platform/dom-host';
+import {
+  isContentOwnedEvent,
+  queryAllContentUiElements,
+  queryContentUiElement,
+} from '../../../platform/dom-host';
 import { isHighlighterEnabled, isHighlighterPausedState } from '../../highlighter';
 import { FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
 
@@ -31,6 +35,7 @@ const OWNED_FLOATING_SELECTORS = [
   '.sniptale-callout-settings-handle',
   '.sniptale-step-badge-controls',
   '.sniptale-content-size-tooltip',
+  '[data-floating-ui-root="true"]',
   `[${FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE}]`,
 ];
 
@@ -51,6 +56,13 @@ export function isFrameUiOwnedFloatingEvent(event: Event): boolean {
       target instanceof Element &&
       OWNED_FLOATING_SELECTORS.some((selector) => target.matches(selector))
   );
+}
+
+function isActivePopoverContentEvent(
+  event: Event,
+  activePopover: ActiveFramePopover | null
+): boolean {
+  return activePopover !== null && isContentOwnedEvent(event);
 }
 
 function resolveBorderHit(params: {
@@ -104,7 +116,13 @@ export function createFrameSelectionEventHandlers(params: {
 }) {
   return {
     pointerDown: (event: PointerEvent, iframe?: HTMLIFrameElement) => {
-      if (!params.selectedFrameIdRef.current || isFrameUiOwnedFloatingEvent(event)) return;
+      if (
+        !params.selectedFrameIdRef.current ||
+        isFrameUiOwnedFloatingEvent(event) ||
+        isActivePopoverContentEvent(event, params.activePopoverRef.current)
+      ) {
+        return;
+      }
       const borderHit = resolveBorderHit({
         event,
         frames: params.framesRef.current,
@@ -120,7 +138,12 @@ export function createFrameSelectionEventHandlers(params: {
       if (!borderHit && !interiorHit) params.clearSelection();
     },
     click: (event: MouseEvent, iframe?: HTMLIFrameElement) => {
-      if (!isHighlighterEnabled() || event.button !== 0 || isFrameUiOwnedFloatingEvent(event)) {
+      if (
+        !isHighlighterEnabled() ||
+        event.button !== 0 ||
+        isFrameUiOwnedFloatingEvent(event) ||
+        isActivePopoverContentEvent(event, params.activePopoverRef.current)
+      ) {
         return;
       }
       if (params.consumeSuppressedClick(event)) {

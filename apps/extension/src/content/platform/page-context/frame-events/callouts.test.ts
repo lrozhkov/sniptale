@@ -25,23 +25,23 @@ describe('frame-events callout family', () => {
 
     dispatchFrameCalloutChanged({
       frameId: 'frame-1',
-      settings: { enabled: true, variant: 'text-only' },
+      settings: { enabled: true, style: { surface: { backgroundColor: 'transparent' } } },
     });
     dispatchCalloutDelete({ frameId: 'frame-1' });
     dispatchCalloutPopoverSettingsChanged({
       frameId: 'frame-2',
-      settings: { enabled: true, variant: 'text-only' },
+      settings: { enabled: true, style: { surface: { backgroundColor: 'transparent' } } },
     });
     dispatchCalloutBlurRequest({ frameId: 'frame-2' });
 
     expect(changeListener).toHaveBeenCalledWith({
       frameId: 'frame-1',
-      settings: { enabled: true, variant: 'text-only' },
+      settings: { enabled: true, style: { surface: { backgroundColor: 'transparent' } } },
     });
     expect(deleteListener).toHaveBeenCalledWith({ frameId: 'frame-1' });
     expect(popoverListener).toHaveBeenCalledWith({
       frameId: 'frame-2',
-      settings: { enabled: true, variant: 'text-only' },
+      settings: { enabled: true, style: { surface: { backgroundColor: 'transparent' } } },
     });
     expect(blurListener).toHaveBeenCalledWith({ frameId: 'frame-2' });
 

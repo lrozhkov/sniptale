@@ -6,6 +6,7 @@ export type ToolbarPopoverMenu =
   | 'capture'
   | 'full-page'
   | 'frame-style'
+  | 'future-callout'
   | 'mode'
   | 'scenario-mode'
   | 'scenario-project'

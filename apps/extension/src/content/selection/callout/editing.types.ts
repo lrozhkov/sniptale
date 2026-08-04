@@ -13,6 +13,7 @@ export type CalloutEditingHandlersArgs = {
   onManualInput: () => void;
   onContentChange: (htmlContent: string) => void;
   onDelete: () => void;
+  titleText?: string;
   onStartEditing: () => void;
   onStopEditing: () => void;
 };

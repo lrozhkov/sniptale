@@ -3,6 +3,7 @@ import { cx, type CompactInspectorNumericScrub, type CompactInspectorUnit } from
 import { NumericRangeScrub } from './numeric-range-scrub';
 import { NumericStepper } from './stepper';
 import { useNumericValueFieldState } from './numeric-value-state';
+import { TextWithOverflowHint } from './overflow-hint';
 
 const NUMERIC_ROW_RANGE_HOT_EDGE_PX = 12;
 
@@ -112,11 +113,13 @@ function NumericUnitLabel({ state }: { state: ReturnType<typeof useNumericValueF
 }
 
 export interface NumericRowProps extends NumericValueFieldProps {
+  appearance?: 'surface' | 'plain';
   className?: string;
   labelVisible?: boolean;
 }
 
 export function NumericRow({
+  appearance = 'surface',
   className,
   label,
   labelVisible = true,
@@ -128,21 +131,30 @@ export function NumericRow({
   return (
     <div
       data-ui="shared.ui.compact-inspector.numeric-row"
+      data-appearance={appearance}
       data-range-visible={range.visible ? 'true' : 'false'}
       onPointerMove={range.handlePointerMove}
       onPointerLeave={range.hide}
       className={cx(
-        [
-          'group/compact-numeric-row relative flex min-h-10 items-center justify-between',
-          'gap-3 rounded-[10px] border px-3 py-1.5',
-        ].join(' '),
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
+        'group/compact-numeric-row relative min-h-10 items-center gap-2',
+        appearance === 'surface' &&
+          [
+            'flex justify-between gap-3 rounded-[10px] border px-3 py-1.5',
+            'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
+            'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
+          ].join(' '),
+        appearance === 'plain' && 'grid grid-cols-[7.5rem_minmax(0,1fr)] py-0.5',
         className
       )}
     >
-      {labelVisible ? <NumericRowLabel label={label} /> : null}
-      <NumericValueField label={label} {...props} />
+      {labelVisible ? <NumericRowLabel appearance={appearance} label={label} /> : null}
+      {appearance === 'plain' ? (
+        <div className={cx('min-w-0 justify-self-end', !labelVisible && 'col-start-2')}>
+          <NumericValueField label={label} {...props} />
+        </div>
+      ) : (
+        <NumericValueField label={label} {...props} />
+      )}
       {scrub ? (
         <NumericRangeScrub
           active={range.active}
@@ -181,13 +193,20 @@ function useNumericRowRangeState(
   return { active, handlePointerMove, hide, setActive, visible: hot || active };
 }
 
-function NumericRowLabel({ label }: { label: string }) {
+function NumericRowLabel({
+  appearance,
+  label,
+}: {
+  appearance: 'surface' | 'plain';
+  label: string;
+}) {
   return (
-    <span
-      className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[color:var(--sniptale-color-text-secondary)]"
-      title={label}
-    >
-      {label}
-    </span>
+    <TextWithOverflowHint
+      className={cx(
+        'min-w-0 truncate font-semibold text-[color:var(--sniptale-color-text-secondary)]',
+        appearance === 'plain' ? 'text-[11px]' : 'flex-1 text-[12px]'
+      )}
+      text={label}
+    />
   );
 }

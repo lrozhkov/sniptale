@@ -76,7 +76,7 @@ export interface EditorInspectorToolChoiceOptions {
   lineFillModeOptions: CompactSelectOption<EditorToolSettings['line']['fillMode']>[];
   lineRoughFillStyleOptions: CompactSelectOption<EditorToolSettings['line']['roughFillStyle']>[];
   textCalloutFormatOptions: CompactSelectOption<EditorTextCalloutFormat>[];
-  fontOptions: CompactSelectOption<'sans' | 'serif' | 'mono'>[];
+  fontOptions: CompactSelectOption<EditorToolSettings['text']['fontFamily']>[];
   textAlignOptions?: CompactSelectOption<EditorToolSettings['text']['textAlign']>[];
   textVerticalAlignOptions?: CompactSelectOption<EditorToolSettings['text']['verticalAlign']>[];
   textLayoutModeOptions?: CompactSelectOption<EditorToolSettings['text']['layoutMode']>[];

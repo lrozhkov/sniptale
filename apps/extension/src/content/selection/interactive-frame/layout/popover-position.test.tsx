@@ -8,7 +8,7 @@ import { useFramePopoverPosition } from './popover-position';
 let container: HTMLDivElement;
 let root: Root;
 
-function setRect(element: HTMLElement, rect: DOMRect) {
+function setRect(element: Element, rect: DOMRect) {
   element.getBoundingClientRect = vi.fn(() => rect);
 }
 
@@ -383,5 +383,81 @@ describe('frame toolbar popover positioning', () => {
 
     expect(Number((container.firstElementChild as HTMLElement).dataset['left'])).toBe(284);
     expect(Number((container.firstElementChild as HTMLElement).dataset['top'])).toBe(257);
+  });
+});
+
+describe('callout-aware popover positioning', () => {
+  it('keeps callout settings outside the callout and its connector when space permits', () => {
+    const callout = document.createElement('div');
+    callout.className = 'sniptale-callout';
+    callout.dataset['frameId'] = 'frame-1';
+    setRect(callout, new DOMRect(200, 80, 200, 120));
+    const connector = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    connector.classList.add('sniptale-callout-dynamic-tail');
+    setRect(connector, new DOMRect(180, 60, 240, 180));
+    callout.append(connector);
+    document.body.append(callout);
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(400, 90, 20, 20));
+    document.body.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+
+    const popover = container.firstElementChild as HTMLElement;
+    const popoverRect = {
+      x: Number(popover.dataset['left']),
+      y: Number(popover.dataset['top']),
+      width: 160,
+      height: 80,
+    };
+    expect(popoverRect.x).toBe(430);
+    expect(overlaps(popoverRect, { x: 180, y: 60, width: 240, height: 180 })).toBe(false);
+  });
+
+  it('keeps the settings panel fixed until the moved callout actually overlaps it', () => {
+    let calloutRect = new DOMRect(200, 80, 200, 120);
+    const callout = document.createElement('div');
+    callout.className = 'sniptale-callout';
+    callout.dataset['frameId'] = 'frame-1';
+    callout.getBoundingClientRect = vi.fn(() => calloutRect);
+    document.body.append(callout);
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(400, 90, 20, 20));
+    document.body.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['left'])).toBe(430);
+
+    calloutRect = new DOMRect(100, 300, 180, 100);
+    act(() =>
+      root.render(
+        <PositionHarness
+          anchorEl={anchor}
+          frameRect={{ x: 100, y: 300, width: 180, height: 100 }}
+        />
+      )
+    );
+    expect(Number(popover.dataset['left'])).toBe(430);
+    expect(Number(popover.dataset['top'])).toBe(100);
+
+    calloutRect = new DOMRect(425, 70, 165, 120);
+    act(() =>
+      root.render(
+        <PositionHarness anchorEl={anchor} frameRect={{ x: 425, y: 70, width: 165, height: 120 }} />
+      )
+    );
+    expect(Number(popover.dataset['left'])).toBe(600);
+    expect(
+      overlaps(
+        {
+          x: Number(popover.dataset['left']),
+          y: Number(popover.dataset['top']),
+          width: 160,
+          height: 80,
+        },
+        { x: 425, y: 70, width: 165, height: 120 }
+      )
+    ).toBe(false);
   });
 });

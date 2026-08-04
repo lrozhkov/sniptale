@@ -17,7 +17,16 @@ vi.mock('../../callout', () => ({
   Callout: (props: {
     frameRect: { x: number; y: number; width: number; height: number };
     onContentChange: (html: string) => void;
-    onPositionChange: (placement: { centerOffsetX: number; centerOffsetY: number }) => void;
+    onPositionChange: (
+      placement: { centerOffsetX: number; centerOffsetY: number },
+      behavior: {
+        connectorBasePosition?: number;
+        connectorBaseWidth?: number;
+        connectorFramePosition?: number;
+        connectorWaypoint?: { centerOffsetX: number; centerOffsetY: number };
+        translateConnectorGeometry: boolean;
+      }
+    ) => void;
     onSettingsClick: () => void;
     onTailBaseRangeChange: (position: number, width: number) => void;
     onTailFramePositionChange: (position: number) => void;
@@ -25,6 +34,7 @@ vi.mock('../../callout', () => ({
       maxWidth: number,
       placement: { centerOffsetX: number; centerOffsetY: number }
     ) => void;
+    isFrameEditing: boolean;
   }) => (
     <>
       <button data-ui="callout-settings" onClick={props.onSettingsClick} type="button">
@@ -54,9 +64,21 @@ vi.mock('../../callout', () => ({
       <output data-ui="callout-frame-size">
         {props.frameRect.x},{props.frameRect.y},{props.frameRect.width}×{props.frameRect.height}
       </output>
+      <output data-ui="callout-frame-editing">{String(props.isFrameEditing)}</output>
       <button
         data-ui="callout-move"
-        onClick={() => props.onPositionChange({ centerOffsetX: 70, centerOffsetY: -20 })}
+        onClick={() =>
+          props.onPositionChange(
+            { centerOffsetX: 70, centerOffsetY: -20 },
+            {
+              connectorBasePosition: 0.25,
+              connectorBaseWidth: 0.2,
+              connectorFramePosition: 0.75,
+              connectorWaypoint: { centerOffsetX: 12, centerOffsetY: 18 },
+              translateConnectorGeometry: false,
+            }
+          )
+        }
         type="button"
       >
         move
@@ -117,6 +139,7 @@ function createControlProps() {
   return {
     calloutPopoverAnchorRef: { current: null },
     isCalloutPopoverOpen: false,
+    isFrameEditing: false,
   };
 }
 
@@ -150,7 +173,7 @@ describe('interactive frame callout overlay', () => {
       ...frame,
       callout: {
         ...frame.callout!,
-        htmlContent: '<p>updated</p>',
+        content: { ...frame.callout!.content, bodyHtml: '<p>updated</p>' },
       },
     };
 
@@ -158,8 +181,15 @@ describe('interactive frame callout overlay', () => {
     expect(onUpdate).toHaveBeenCalledWith(expectedFrame);
   });
 
-  it('commits a manual callout placement as one merged frame update', () => {
+  it('commits a manual callout placement without dropping connector geometry', () => {
     const frame = createFrame();
+    frame.callout!.placement = {
+      ...frame.callout!.placement,
+      connectorBasePosition: 0.25,
+      connectorBaseWidth: 0.2,
+      connectorFramePosition: 0.75,
+      connectorWaypoint: { centerOffsetX: 12, centerOffsetY: 18 },
+    };
     const onUpdate = vi.fn();
 
     renderNode(
@@ -183,7 +213,13 @@ describe('interactive frame callout overlay', () => {
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         callout: expect.objectContaining({
-          manualPlacement: { centerOffsetX: 70, centerOffsetY: -20 },
+          placement: expect.objectContaining({
+            manualPlacement: { centerOffsetX: 70, centerOffsetY: -20 },
+            connectorBasePosition: 0.25,
+            connectorBaseWidth: 0.2,
+            connectorFramePosition: 0.75,
+            connectorWaypoint: { centerOffsetX: 12, centerOffsetY: 18 },
+          }),
         }),
       })
     );
@@ -214,8 +250,12 @@ describe('interactive frame callout overlay', () => {
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         callout: expect.objectContaining({
-          maxWidth: 260,
-          manualPlacement: { centerOffsetX: 84, centerOffsetY: -18 },
+          placement: expect.objectContaining({
+            manualPlacement: { centerOffsetX: 84, centerOffsetY: -18 },
+          }),
+          style: expect.objectContaining({
+            typography: expect.objectContaining({ maxWidth: 260 }),
+          }),
         }),
       })
     );
@@ -245,7 +285,12 @@ describe('interactive frame callout overlay', () => {
     expect(onUpdate).toHaveBeenCalledOnce();
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        callout: expect.objectContaining({ tailBasePosition: 0.75, tailBaseWidth: 0.2 }),
+        callout: expect.objectContaining({
+          placement: expect.objectContaining({
+            connectorBasePosition: 0.75,
+            connectorBaseWidth: 0.2,
+          }),
+        }),
       })
     );
   });
@@ -274,7 +319,9 @@ describe('interactive frame callout overlay', () => {
     expect(onUpdate).toHaveBeenCalledOnce();
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        callout: expect.objectContaining({ tailFramePosition: 0.25 }),
+        callout: expect.objectContaining({
+          placement: expect.objectContaining({ connectorFramePosition: 0.25 }),
+        }),
       })
     );
   });

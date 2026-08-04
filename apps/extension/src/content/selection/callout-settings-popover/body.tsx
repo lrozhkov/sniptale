@@ -1,65 +1,115 @@
 import type {
+  CalloutAnchor,
+  CalloutPlacement,
+  CalloutPreset,
   CalloutSettings,
-  CalloutSide,
-  CalloutVariant,
 } from '@sniptale/runtime-contracts/highlighter/callout';
-import {
-  CalloutAppearanceSection,
-  CalloutDeleteButton,
-  CalloutPositionSection,
-  CalloutTypographySection,
-} from './views';
 import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
+import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { useState } from 'react';
+import { X } from 'lucide-react';
+import type { PointerEventHandler } from 'react';
 import { translate } from '../../../platform/i18n';
+import { getPreferredSideFromAnchor } from '../callout/geometry';
+import type { CalloutSettingsPatch } from '../callout/model';
+import { CalloutDeleteButton, CalloutPositionSection, CalloutPresetSection } from './views';
+import { CalloutManualSettings } from '../../../ui/highlighter-preset-editor/callout/inspector';
+import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
+import type { CalloutSaveSectionProps } from '../../../ui/highlighter-preset-editor/callout/inspector-save';
+
+export function createCalloutAnchorPlacement(
+  anchor: CalloutAnchor
+): Pick<CalloutPlacement, 'anchor' | 'side'> {
+  return { anchor, side: getPreferredSideFromAnchor(anchor) ?? 'top' };
+}
 
 export function CalloutSettingsPopoverContent(props: {
   handleDelete: () => void;
-  handleSettingChange: (key: keyof CalloutSettings, value: unknown) => void;
-  isTextOnly: boolean;
+  headerDrag: {
+    isDragging: boolean;
+    onPointerDown: PointerEventHandler<HTMLDivElement>;
+    onPointerMove: PointerEventHandler<HTMLDivElement>;
+    onPointerUp: PointerEventHandler<HTMLDivElement>;
+  };
+  handleSettingChange: (patch: CalloutSettingsPatch) => void;
+  frameColors?: CalloutFrameColors;
   localSettings: CalloutSettings;
-  variantOptions: { value: CalloutVariant; label: string }[];
+  onApplyPreset: (preset: CalloutPreset) => void;
+  onCustomizePreset: (preset: CalloutPreset) => void;
+  onResetPreset?: ((preset: CalloutPreset) => void) | undefined;
+  onTogglePreset: (preset: CalloutPreset) => void;
+  pendingPresetIds: ReadonlySet<string>;
+  presets: CalloutPreset[];
+  presetError: string | null;
+  saveSection: CalloutSaveSectionProps;
+  onClose: () => void;
 }) {
-  const { handleSettingChange, isTextOnly, localSettings } = props;
-
+  const [mode, setMode] = useState<'preset' | 'manual'>('preset');
   return (
     <>
-      <ProductToolbarMenuGroupLabel>
-        {translate('content.callout.settingsTitle')}
-      </ProductToolbarMenuGroupLabel>
+      <div
+        className="sniptale-callout-settings-header"
+        data-dragging={props.headerDrag.isDragging ? 'true' : undefined}
+        onPointerDown={props.headerDrag.onPointerDown}
+        onPointerMove={props.headerDrag.onPointerMove}
+        onPointerUp={props.headerDrag.onPointerUp}
+      >
+        <ProductToolbarMenuGroupLabel>
+          {translate('content.callout.settingsTitle')}
+        </ProductToolbarMenuGroupLabel>
+        <button
+          aria-label={translate('content.callout.closeSettings')}
+          className="sniptale-callout-settings-close"
+          onClick={props.onClose}
+          title={translate('content.callout.closeSettings')}
+          type="button"
+        >
+          <X aria-hidden="true" size={14} />
+        </button>
+      </div>
       <CalloutPositionSection
-        anchor={localSettings.anchor ?? 'top-center'}
-        side={localSettings.side}
-        onAnchorChange={(anchor) => handleSettingChange('anchor', anchor)}
-        onSideChange={(side) => handleSettingChange('side', side as CalloutSide)}
-      />
-
-      <CalloutAppearanceSection
-        bgColor={localSettings.bgColor}
-        isTextOnly={isTextOnly}
-        onBackgroundChange={(value) => handleSettingChange('bgColor', value)}
-        onTextColorChange={(value) => handleSettingChange('textColor', value)}
-        onVariantChange={(value) => handleSettingChange('variant', value)}
-        textColor={localSettings.textColor}
-        variant={localSettings.variant}
-        variantOptions={props.variantOptions}
-      />
-
-      <CalloutTypographySection
-        fontFamily={localSettings.fontFamily}
-        fontSize={localSettings.fontSize}
-        fontWeight={localSettings.fontWeight}
-        isTextOnly={isTextOnly}
-        maxWidth={localSettings.maxWidth}
-        onFontFamilyChange={(value) => handleSettingChange('fontFamily', value)}
-        onFontSizeChange={(value) => handleSettingChange('fontSize', value)}
-        onFontWeightToggle={() =>
-          handleSettingChange('fontWeight', localSettings.fontWeight === 'bold' ? 'normal' : 'bold')
+        anchor={props.localSettings.placement.anchor}
+        onChange={(anchor) =>
+          props.handleSettingChange({
+            placement: createCalloutAnchorPlacement(anchor),
+          })
         }
-        onMaxWidthChange={(value) => handleSettingChange('maxWidth', value)}
-        onTailSizeChange={(value) => handleSettingChange('tailSize', value)}
-        tailSize={localSettings.tailSize}
       />
-
+      <ContentPopoverSection dataUi="content.callout-settings.mode-section">
+        <SegmentedSwitch
+          activeId={mode}
+          ariaLabel={translate('content.callout.settingsTitle')}
+          dataAttribute={{ 'data-callout-settings-mode-switch': 'true' }}
+          onChange={setMode}
+          options={[
+            { id: 'preset', label: translate('content.callout.modePreset') },
+            { id: 'manual', label: translate('content.callout.modeManual') },
+          ]}
+        />
+      </ContentPopoverSection>
+      {mode === 'preset' ? (
+        <CalloutPresetSection
+          {...(props.frameColors ? { frameColors: props.frameColors } : {})}
+          {...(props.localSettings.sourcePresetId
+            ? { activePresetId: props.localSettings.sourcePresetId }
+            : {})}
+          onApplyPreset={props.onApplyPreset}
+          onCustomizePreset={props.onCustomizePreset}
+          {...(props.onResetPreset ? { onResetPreset: props.onResetPreset } : {})}
+          onTogglePreset={props.onTogglePreset}
+          pendingPresetIds={props.pendingPresetIds}
+          presets={props.presets}
+          error={props.presetError}
+        />
+      ) : (
+        <CalloutManualSettings
+          {...(props.frameColors ? { frameColors: props.frameColors } : {})}
+          settings={props.localSettings}
+          saveSection={props.saveSection}
+          onChange={props.handleSettingChange}
+        />
+      )}
       <CalloutDeleteButton onDelete={props.handleDelete} />
     </>
   );

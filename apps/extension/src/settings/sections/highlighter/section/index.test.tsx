@@ -4,13 +4,18 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { highlighterContentPropsSpy, loadingStateSpy, useHighlighterSectionSpy } = vi.hoisted(
-  () => ({
+const { calloutController, highlighterContentPropsSpy, loadingStateSpy, useHighlighterSectionSpy } =
+  vi.hoisted(() => ({
+    calloutController: { catalog: null, isLoading: true },
     highlighterContentPropsSpy: vi.fn(),
     loadingStateSpy: vi.fn(),
     useHighlighterSectionSpy: vi.fn(),
-  })
-);
+  }));
+
+vi.mock('../callout-presets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../callout-presets')>()),
+  useCalloutPresetCatalogController: () => calloutController,
+}));
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -115,6 +120,7 @@ describe('HighlighterSection', () => {
     await renderSection();
 
     expect(highlighterContentPropsSpy).toHaveBeenCalledWith({
+      calloutPresets: calloutController,
       effects: controller.effects,
       presets: controller.presets,
       settings: controller.status.settings,

@@ -1,57 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const sanitizeMock = vi.hoisted(() => vi.fn());
-
-vi.mock('dompurify', () => ({
-  default: {
-    sanitize: sanitizeMock,
-  },
-}));
-
-function createChromiumStyleDeclaration(style: string) {
-  const declarations = style
-    .split(';')
-    .map((declaration) => declaration.trim())
-    .filter(Boolean)
-    .map((declaration) => {
-      const separatorIndex = declaration.indexOf(':');
-      return [
-        declaration.slice(0, separatorIndex).trim(),
-        declaration.slice(separatorIndex + 1).trim(),
-      ] as const;
-    });
-
-  return Object.assign(
-    {
-      getPropertyValue(property: string) {
-        return declarations.find(([name]) => name === property)?.[1] ?? '';
-      },
-      length: declarations.length,
-    },
-    Object.fromEntries(declarations.map(([property], index) => [index, property]))
-  );
-}
-
-function createSanitizedContainer(style: string) {
-  const wrapper = document.createElement('section');
-  const div = document.createElement('div');
-  Object.defineProperty(div, 'style', {
-    configurable: true,
-    value: createChromiumStyleDeclaration(style),
-  });
-  wrapper.append(div);
-  return wrapper;
-}
-
-beforeEach(() => {
-  sanitizeMock.mockReset();
-  sanitizeMock.mockImplementation((dirtyHtml: string) => {
-    const styleMatch = dirtyHtml.match(/style="([^"]*)"/);
-    return createSanitizedContainer(styleMatch?.[1] ?? '');
-  });
-});
+import { describe, expect, it } from 'vitest';
 
 describe('frame custom-css decoration projection', () => {
   it('rejects Chromium-prefixed geometry aliases from the real css validation flow', async () => {

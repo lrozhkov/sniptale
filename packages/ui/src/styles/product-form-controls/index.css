@@ -1,6 +1,16 @@
 @import './range.css';
 @import './select.css';
 
+.sniptale-input,
+.sniptale-textarea {
+  cursor: text;
+}
+
+.sniptale-input:disabled,
+.sniptale-textarea:disabled {
+  cursor: not-allowed;
+}
+
 .sniptale-product-toggle {
   position: relative;
   display: inline-flex;

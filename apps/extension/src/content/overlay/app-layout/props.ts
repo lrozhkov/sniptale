@@ -81,6 +81,9 @@ function createToolbarLayoutSection(
     pinToTab: viewModel.modeState.pinToTab,
     pinToTabAvailable: viewModel.modeState.pinToTabAvailable,
     setFutureFrameEffectMode: viewModel.frameManager.setFutureFrameEffectMode,
+    ...(viewModel.frameManager.futureFrameCallout === undefined
+      ? {}
+      : { futureFrameCalloutActions: viewModel.frameManager.futureFrameCallout }),
     setCaptureAction: viewModel.modeState.setCaptureAction,
     setCurrentViewport: viewModel.modeState.setCurrentViewport,
     setPinToTab: viewModel.modeState.setPinToTab,

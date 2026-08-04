@@ -3,7 +3,6 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { browserStorage } from '../../../../composition/persistence/infrastructure/browser-storage';
 import type {
   BlurSettings,
-  CalloutSettings,
   EffectMode,
   FocusSettings,
   FrameData,
@@ -11,6 +10,7 @@ import type {
   HighlighterSettings,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
+import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { WithHistoryCommit } from '../contracts';
 import { buildFrameSessionWindowListeners } from './events';
 import {
@@ -18,6 +18,8 @@ import {
   createFrameSessionSettingsLoader,
   createFrameSessionStorageChangedHandler,
 } from './settings';
+import { createCalloutPresetSessionSync } from './callout-defaults';
+import { setFutureFrameCallout } from './future-callout';
 
 export type FrameSessionSyncArgs = {
   setFrames: Dispatch<SetStateAction<FrameData[]>>;
@@ -26,7 +28,7 @@ export type FrameSessionSyncArgs = {
   sessionBlurSettingsRef: MutableRefObject<BlurSettings>;
   sessionDefaultsInitializedRef: MutableRefObject<boolean>;
   sessionFocusSettingsRef: MutableRefObject<FocusSettings>;
-  sessionCalloutStyleRef: MutableRefObject<Partial<CalloutSettings> | null>;
+  sessionCalloutStyleRef: MutableRefObject<CalloutVisualStyle | null>;
   syncFocusOpacity: (sourceFrameId: string, newOpacity: number) => void;
   updateGlobalStepBadgeSettings: (settings: Partial<GlobalStepBadgeSettings>) => void;
   updateFrameStepBadge: (frameId: string, settings: Partial<StepBadgeSettings>) => void;
@@ -48,6 +50,7 @@ export function setupFrameSessionSyncListeners({
   reorderStepBadge,
   withHistoryCommit,
 }: FrameSessionSyncArgs) {
+  setFutureFrameCallout(null);
   const loadSettings = createFrameSessionSettingsLoader({
     globalEffectModeRef,
     highlighterSettingsCacheRef,
@@ -72,11 +75,17 @@ export function setupFrameSessionSyncListeners({
   loadSettings();
   const cleanupWindowListeners = registerWindowListeners(windowListeners);
   const cleanupStorageListener = browserStorage.subscribeToChanges(handleStorageChanged);
+  const cleanupCalloutPresetSync = createCalloutPresetSessionSync(sessionCalloutStyleRef);
 
-  return combineFrameSessionSyncCleanups({
+  const cleanupFrameSession = combineFrameSessionSyncCleanups({
     cleanupStorageListener,
     cleanupWindowListeners,
   });
+  return () => {
+    setFutureFrameCallout(null);
+    cleanupFrameSession();
+    cleanupCalloutPresetSync();
+  };
 }
 
 function registerWindowListeners(cleanups: Array<() => void>) {
