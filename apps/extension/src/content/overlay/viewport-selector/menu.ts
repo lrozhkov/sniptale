@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { getContentEventTargetElement, isContentEventWithinElement } from '../../platform/dom-host';
+import { isContentEventWithinElement } from '../../platform/dom-host';
 import type { ViewportPreset } from '../../../contracts/settings';
 
 function useViewportMenuOutsideClick(
@@ -10,12 +10,9 @@ function useViewportMenuOutsideClick(
 ) {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (isContentEventWithinElement(event, wrapperRef.current)) return;
-
-      const target = getContentEventTargetElement(event);
-      if (target?.closest('.sniptale-toolbar .sniptale-btn[aria-haspopup="menu"]')) return;
-
-      setShowMenu(false);
+      if (!isContentEventWithinElement(event, wrapperRef.current)) {
+        setShowMenu(false);
+      }
     };
 
     if (showMenu) {
@@ -45,10 +42,15 @@ export function useViewportSelectorMenu(props: {
   const [showMenu, setShowMenu] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const onMenuStateChangeRef = useRef(onMenuStateChange);
 
   useEffect(() => {
-    onMenuStateChange?.(showMenu);
-  }, [onMenuStateChange, showMenu]);
+    onMenuStateChangeRef.current = onMenuStateChange;
+  }, [onMenuStateChange]);
+
+  useEffect(() => {
+    onMenuStateChangeRef.current?.(showMenu);
+  }, [showMenu]);
 
   useViewportMenuOutsideClick(showMenu, wrapperRef, setShowMenu);
 

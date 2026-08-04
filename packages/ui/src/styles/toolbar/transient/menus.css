@@ -30,10 +30,6 @@
   color: var(--sniptale-text-main);
 }
 
-.sniptale-toolbar .sniptale-full-page-wrapper .sniptale-btn:hover:not(:disabled) svg {
-  stroke-width: 2.6;
-}
-
 .sniptale-toolbar .sniptale-full-page-wrapper:has(.sniptale-btn:not(:disabled)):hover::after {
   border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 74%, transparent);
 }

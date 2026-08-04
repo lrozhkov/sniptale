@@ -15,17 +15,7 @@ function ToolbarCaptureMenusHarness() {
   const state = useToolbarMenuState();
   currentState = state;
   currentCaptureMenus = useToolbarCaptureMenus(state);
-  return (
-    <div className="sniptale-toolbar">
-      <button
-        className="sniptale-btn"
-        data-ui="test.settings-button"
-        onClick={() => state.toggleMenu('settings')}
-      >
-        Settings
-      </button>
-    </div>
-  );
+  return null;
 }
 
 function getCurrentState(): ToolbarMenuState {
@@ -73,20 +63,4 @@ it('still closes the active capture menu through the capture dismissal owner', (
 
   act(() => getCurrentCaptureMenus().closeMenus(null));
   expect(getCurrentState().activeMenuType).toBeNull();
-});
-
-it('keeps the viewport menu intact until a toolbar peer click switches menus', async () => {
-  act(() => getCurrentState().setViewportMenuOpen(true));
-  const settingsButton = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="test.settings-button"]'
-  );
-
-  act(() => settingsButton?.focus());
-  expect(getCurrentState().activeMenuType).toBe('viewport');
-
-  act(() => settingsButton?.click());
-  expect(getCurrentState().activeMenuType).toBe('settings');
-
-  await act(async () => new Promise((resolve) => window.setTimeout(resolve, 0)));
-  expect(getCurrentState().activeMenuType).toBe('settings');
 });

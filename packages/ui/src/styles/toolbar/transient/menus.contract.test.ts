@@ -49,9 +49,6 @@ describe('toolbar-transient-menus contract', () => {
       /\.sniptale-toolbar \.sniptale-full-page-wrapper \.sniptale-btn:hover:not\(:disabled\)\s*\{[^}]*\}/su
     )?.[0];
     expect(segmentHoverRule).toContain('background: var(--sniptale-hover-bg);');
-    expect(toolbarTransientMenusStylesheet).toMatch(
-      /\.sniptale-toolbar \.sniptale-full-page-wrapper \.sniptale-btn:hover:not\(:disabled\) svg\s*\{[^}]*stroke-width:\s*2\.6;/su
-    );
     expect(toolbarTransientMenusStylesheet).toContain(
       '.sniptale-toolbar .sniptale-full-page-wrapper:has(.sniptale-btn:not(:disabled)):hover::after'
     );
