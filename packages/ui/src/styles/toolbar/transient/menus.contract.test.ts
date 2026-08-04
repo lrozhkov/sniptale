@@ -35,23 +35,28 @@ describe('toolbar-transient-menus contract', () => {
     expect(toolbarTransientMenusStylesheet).not.toContain('.sniptale-countdown-toast-container');
   });
 
-  it('treats the full-page split action as one hover and focus surface', () => {
+  it('uses one split-action outline while emphasizing only the hovered segment', () => {
     expect(toolbarTransientMenusStylesheet).toMatch(
       /\.sniptale-toolbar \.sniptale-full-page-wrapper::after\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;[^}]*border:\s*1px solid transparent;/su
     );
     const sharedHoverRule = toolbarTransientMenusStylesheet.match(
       /\.sniptale-toolbar \.sniptale-full-page-wrapper:hover \.sniptale-btn:not\(:disabled\)\s*\{[^}]*\}/su
     )?.[0];
-    expect(sharedHoverRule).toContain('background: var(--sniptale-hover-bg);');
     expect(sharedHoverRule).toContain('border-color: transparent;');
+    expect(sharedHoverRule).not.toContain('background:');
+    expect(sharedHoverRule).not.toMatch(/(?:^|\n)\s*color:/u);
+    const segmentHoverRule = toolbarTransientMenusStylesheet.match(
+      /\.sniptale-toolbar \.sniptale-full-page-wrapper \.sniptale-btn:hover:not\(:disabled\)\s*\{[^}]*\}/su
+    )?.[0];
+    expect(segmentHoverRule).toContain('background: var(--sniptale-hover-bg);');
+    expect(toolbarTransientMenusStylesheet).toMatch(
+      /\.sniptale-toolbar \.sniptale-full-page-wrapper \.sniptale-btn:hover:not\(:disabled\) svg\s*\{[^}]*stroke-width:\s*2\.6;/su
+    );
     expect(toolbarTransientMenusStylesheet).toContain(
       '.sniptale-toolbar .sniptale-full-page-wrapper:has(.sniptale-btn:not(:disabled)):hover::after'
     );
-    expect(toolbarTransientMenusStylesheet).toContain(
+    expect(toolbarTransientMenusStylesheet).not.toContain(
       '.sniptale-toolbar .sniptale-full-page-wrapper:focus-within::after'
-    );
-    expect(toolbarTransientMenusStylesheet).toMatch(
-      /\.sniptale-toolbar \.sniptale-full-page-wrapper:focus-within \.sniptale-btn\s*\{[^}]*box-shadow:\s*none;/su
     );
   });
 });

@@ -88,6 +88,7 @@ export function useToolbarFocusMenuDismissal(params: {
   const { activeMenuType, closeMenus, viewportWrapperRef } = params;
 
   useEffect(() => {
+    let pendingDismissal: number | null = null;
     const handleFocusIn = (event: FocusEvent) => {
       if (!isCapturePopoverMenu(activeMenuType)) return;
 
@@ -109,12 +110,20 @@ export function useToolbarFocusMenuDismissal(params: {
             isContentEventWithinElement(event, viewportWrapperRef.current)));
 
       if (isToolbarButton && !isActiveMenuButton) {
-        closeMenus(null);
+        // The peer button click owns the atomic menu switch. Closing during focusin can
+        // unmount the current viewport menu before the browser dispatches that click.
+        pendingDismissal ??= window.setTimeout(() => {
+          pendingDismissal = null;
+          closeMenus(null);
+        }, 0);
       }
     };
 
     document.addEventListener('focusin', handleFocusIn);
-    return () => document.removeEventListener('focusin', handleFocusIn);
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      if (pendingDismissal !== null) window.clearTimeout(pendingDismissal);
+    };
   }, [activeMenuType, closeMenus, viewportWrapperRef]);
 }
 

@@ -23,8 +23,15 @@
 
 .sniptale-toolbar .sniptale-full-page-wrapper:hover .sniptale-btn:not(:disabled) {
   border-color: transparent;
+}
+
+.sniptale-toolbar .sniptale-full-page-wrapper .sniptale-btn:hover:not(:disabled) {
   background: var(--sniptale-hover-bg);
   color: var(--sniptale-text-main);
+}
+
+.sniptale-toolbar .sniptale-full-page-wrapper .sniptale-btn:hover:not(:disabled) svg {
+  stroke-width: 2.6;
 }
 
 .sniptale-toolbar .sniptale-full-page-wrapper:has(.sniptale-btn:not(:disabled)):hover::after {
@@ -34,13 +41,6 @@
 .sniptale-toolbar .sniptale-full-page-wrapper:focus-within .sniptale-btn {
   border-color: transparent;
   box-shadow: none;
-}
-
-.sniptale-toolbar .sniptale-full-page-wrapper:focus-within::after {
-  border-color: var(--sniptale-active-border);
-  box-shadow:
-    var(--sniptale-shadow-sm),
-    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 22%, transparent);
 }
 
 .sniptale-toolbar .sniptale-full-page-primary {

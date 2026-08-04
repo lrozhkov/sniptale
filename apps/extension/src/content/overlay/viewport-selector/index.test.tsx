@@ -172,6 +172,35 @@ it('renders the selector without a synthetic loading contract and opens the menu
   ).toBeNull();
 });
 
+it('does not dismiss on mousedown before a toolbar peer receives its click', async () => {
+  await act(async () => {
+    root?.render(
+      <div className="sniptale-toolbar">
+        <ViewportSelector
+          currentViewport={null}
+          onViewportChange={viewportSelectorMocks.onViewportChangeMock}
+          onMenuStateChange={viewportSelectorMocks.menuStateChangeMock}
+        />
+        <button aria-haspopup="menu" className="sniptale-btn" data-ui="test.toolbar-peer">
+          Settings
+        </button>
+      </div>
+    );
+  });
+  const toggle = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.viewport-button"]'
+  );
+  const peer = container?.querySelector<HTMLButtonElement>('[data-ui="test.toolbar-peer"]');
+
+  await act(async () => toggle?.click());
+  expect(container?.querySelector('.sniptale-popover-menu')).not.toBeNull();
+
+  await act(async () => {
+    peer?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  });
+  expect(container?.querySelector('.sniptale-popover-menu')).not.toBeNull();
+});
+
 it('renders the active availability notification above the preset list', async () => {
   const [viewportPreset, windowPreset] = viewportSelectorMocks.presetsMock;
   if (!viewportPreset || !windowPreset) throw new Error('Expected selector fixtures');
