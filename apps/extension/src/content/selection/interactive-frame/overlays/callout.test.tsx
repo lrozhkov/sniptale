@@ -17,7 +17,10 @@ vi.mock('../../callout', () => ({
   Callout: (props: {
     frameRect: { x: number; y: number; width: number; height: number };
     onContentChange: (html: string) => void;
-    onPositionChange: (placement: { centerOffsetX: number; centerOffsetY: number }) => void;
+    onPositionChange: (
+      placement: { centerOffsetX: number; centerOffsetY: number },
+      behavior: { preserveConnectorAnchors: boolean }
+    ) => void;
     onSettingsClick: () => void;
     onTailBaseRangeChange: (position: number, width: number) => void;
     onTailFramePositionChange: (position: number) => void;
@@ -25,6 +28,7 @@ vi.mock('../../callout', () => ({
       maxWidth: number,
       placement: { centerOffsetX: number; centerOffsetY: number }
     ) => void;
+    isFrameEditing: boolean;
   }) => (
     <>
       <button data-ui="callout-settings" onClick={props.onSettingsClick} type="button">
@@ -54,9 +58,15 @@ vi.mock('../../callout', () => ({
       <output data-ui="callout-frame-size">
         {props.frameRect.x},{props.frameRect.y},{props.frameRect.width}×{props.frameRect.height}
       </output>
+      <output data-ui="callout-frame-editing">{String(props.isFrameEditing)}</output>
       <button
         data-ui="callout-move"
-        onClick={() => props.onPositionChange({ centerOffsetX: 70, centerOffsetY: -20 })}
+        onClick={() =>
+          props.onPositionChange(
+            { centerOffsetX: 70, centerOffsetY: -20 },
+            { preserveConnectorAnchors: false }
+          )
+        }
         type="button"
       >
         move
@@ -117,6 +127,7 @@ function createControlProps() {
   return {
     calloutPopoverAnchorRef: { current: null },
     isCalloutPopoverOpen: false,
+    isFrameEditing: false,
   };
 }
 
@@ -160,6 +171,13 @@ describe('interactive frame callout overlay', () => {
 
   it('commits a manual callout placement as one merged frame update', () => {
     const frame = createFrame();
+    frame.callout!.placement = {
+      ...frame.callout!.placement,
+      connectorBasePosition: 0.25,
+      connectorBaseWidth: 0.2,
+      connectorFramePosition: 0.75,
+      connectorWaypoint: { centerOffsetX: 12, centerOffsetY: 18 },
+    };
     const onUpdate = vi.fn();
 
     renderNode(
@@ -185,6 +203,10 @@ describe('interactive frame callout overlay', () => {
         callout: expect.objectContaining({
           placement: expect.objectContaining({
             manualPlacement: { centerOffsetX: 70, centerOffsetY: -20 },
+            connectorBasePosition: undefined,
+            connectorBaseWidth: undefined,
+            connectorFramePosition: undefined,
+            connectorWaypoint: undefined,
           }),
         }),
       })

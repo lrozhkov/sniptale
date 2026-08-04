@@ -2,40 +2,55 @@ import { useEffect, useRef, useState } from 'react';
 import type {
   CalloutPreset,
   CalloutPresetCatalog,
-  CalloutSettings,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { translate } from '../../../platform/i18n';
 import {
-  createUserCalloutPreset,
   loadCalloutPresetCatalog,
-  setCalloutPresetEnabled,
   subscribeToCalloutPresetCatalog,
-  updateCalloutPreset,
 } from '../../../composition/persistence/callout-presets';
+import { useCalloutPresetPopoverMutations } from './preset-mutations';
 
-export function useCalloutPresetPopoverController(args: {
-  applyPreset: (preset: CalloutPreset) => void;
-  isOpen: boolean;
-  localSettings: CalloutSettings;
-}) {
+export function useCalloutPresetPopoverController(isOpen: boolean) {
   const [catalog, setCatalog] = useState<CalloutPresetCatalog | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingPresetIds, setPendingPresetIds] = useState<ReadonlySet<string>>(new Set());
+  const [sessionVisiblePresetIds, setSessionVisiblePresetIds] = useState<ReadonlySet<string>>(
+    new Set()
+  );
+  const [editor, setEditor] = useState<{ isOpen: boolean; preset?: CalloutPreset }>({
+    isOpen: false,
+  });
+  const [isSaving, setIsSaving] = useState(false);
   const catalogRequestRef = useRef(0);
   const sessionGenerationRef = useRef(0);
-  const isSessionCurrent = (sessionId: number) =>
-    args.isOpen && sessionId === sessionGenerationRef.current;
 
   useEffect(() => {
-    if (!args.isOpen) return;
+    if (!isOpen) return;
     const sessionId = sessionGenerationRef.current + 1;
     sessionGenerationRef.current = sessionId;
     const requestId = catalogRequestRef.current + 1;
     catalogRequestRef.current = requestId;
+    setEditor({ isOpen: false });
+    setSessionVisiblePresetIds(new Set());
+    let sessionVisibilityInitialized = false;
+    const acceptCatalog = (nextCatalog: CalloutPresetCatalog) => {
+      setCatalog(nextCatalog);
+      setError(null);
+      if (!sessionVisibilityInitialized) {
+        sessionVisibilityInitialized = true;
+        setSessionVisiblePresetIds(
+          new Set(
+            nextCatalog.presets
+              .filter((preset) => preset.enabled !== false)
+              .map((preset) => preset.id)
+          )
+        );
+      }
+    };
     void loadCalloutPresetCatalog()
       .then((nextCatalog) => {
         if (sessionId === sessionGenerationRef.current && requestId === catalogRequestRef.current) {
-          setCatalog(nextCatalog);
-          setError(null);
+          acceptCatalog(nextCatalog);
         }
       })
       .catch(() => {
@@ -46,81 +61,41 @@ export function useCalloutPresetPopoverController(args: {
     const unsubscribe = subscribeToCalloutPresetCatalog((nextCatalog) => {
       if (sessionId !== sessionGenerationRef.current) return;
       catalogRequestRef.current += 1;
-      setCatalog(nextCatalog);
-      setError(null);
+      acceptCatalog(nextCatalog);
     });
     return () => {
       if (sessionId === sessionGenerationRef.current) sessionGenerationRef.current += 1;
       catalogRequestRef.current += 1;
       unsubscribe();
     };
-  }, [args.isOpen]);
+  }, [isOpen]);
 
-  const loadCurrentCatalog = async (sessionId: number) => {
-    if (!isSessionCurrent(sessionId)) return null;
-    const requestId = catalogRequestRef.current + 1;
-    catalogRequestRef.current = requestId;
-    let nextCatalog: CalloutPresetCatalog;
-    try {
-      nextCatalog = await loadCalloutPresetCatalog();
-    } catch (caught) {
-      if (!isSessionCurrent(sessionId) || requestId !== catalogRequestRef.current) return null;
-      throw caught;
-    }
-    if (!isSessionCurrent(sessionId) || requestId !== catalogRequestRef.current) return null;
-    setCatalog(nextCatalog);
-    setError(null);
-    return nextCatalog;
-  };
-  const save = async (name: string) => {
-    const sessionId = sessionGenerationRef.current;
-    if (!isSessionCurrent(sessionId)) return;
-    try {
-      const result = await createUserCalloutPreset({ name, style: args.localSettings.style });
-      if (!isSessionCurrent(sessionId)) return;
-      if (result.outcome !== 'applied') throw new Error('Preset save rejected');
-      const nextCatalog = await loadCurrentCatalog(sessionId);
-      if (!nextCatalog) return;
-      const created = nextCatalog.presets.find((preset) => preset.id === result.id);
-      if (created) args.applyPreset(created);
-    } catch {
-      if (isSessionCurrent(sessionId)) {
-        setError(translate('content.callout.presetSaveError'));
-      }
-    }
-  };
-  const edit = async (preset: CalloutPreset) => {
-    const sessionId = sessionGenerationRef.current;
-    if (!isSessionCurrent(sessionId)) return;
-    try {
-      const result = await updateCalloutPreset({
-        id: preset.id,
-        name: preset.name,
-        style: args.localSettings.style,
-      });
-      if (!isSessionCurrent(sessionId)) return;
-      if (result.outcome === 'rejected') throw new Error('Preset update rejected');
-      await loadCurrentCatalog(sessionId);
-    } catch {
-      if (isSessionCurrent(sessionId)) {
-        setError(translate('content.callout.presetUpdateError'));
-      }
-    }
-  };
-  const toggle = async (preset: CalloutPreset) => {
-    const sessionId = sessionGenerationRef.current;
-    if (!isSessionCurrent(sessionId)) return;
-    try {
-      const result = await setCalloutPresetEnabled(preset.id, preset.enabled === false);
-      if (!isSessionCurrent(sessionId)) return;
-      if (result.outcome === 'rejected') throw new Error('Preset toggle rejected');
-      await loadCurrentCatalog(sessionId);
-    } catch {
-      if (isSessionCurrent(sessionId)) {
-        setError(translate('content.callout.presetToggleError'));
-      }
-    }
-  };
+  const mutations = useCalloutPresetPopoverMutations({
+    sessionGenerationRef,
+    setEditor,
+    setError,
+    setIsSaving,
+    setPendingPresetIds,
+  });
 
-  return { catalog, edit, error, save, toggle };
+  const visiblePresets =
+    catalog?.presets.filter((preset) => sessionVisiblePresetIds.has(preset.id)) ?? [];
+
+  return {
+    catalog: {
+      error,
+      pendingPresetIds,
+      toggle: mutations.toggle,
+      value: catalog,
+      visiblePresets,
+    },
+    editor: {
+      ...editor,
+      close: () => setEditor({ isOpen: false }),
+      isSaving,
+      open: (preset: CalloutPreset) => setEditor({ isOpen: true, preset }),
+      reset: mutations.reset,
+      save: mutations.save,
+    },
+  };
 }

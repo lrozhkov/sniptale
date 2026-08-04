@@ -63,26 +63,40 @@ function renderHarness(manualPlacement?: CalloutManualPlacement) {
   };
 }
 
-function startDrag() {
+function startDrag(modifiers: { ctrlKey?: boolean; shiftKey?: boolean } = {}) {
   act(() => {
     const event: CalloutDragStartEvent = {
       button: 0,
       clientX: 210,
       clientY: 210,
+      ctrlKey: modifiers.ctrlKey ?? false,
       currentTarget: { setPointerCapture: vi.fn() },
       nativeEvent: { stopImmediatePropagation: vi.fn() },
       pointerId: 7,
       preventDefault: vi.fn(),
       stopPropagation: vi.fn(),
+      shiftKey: modifiers.shiftKey ?? false,
     };
     drag?.handlePointerDown(event);
   });
 }
 
-function dispatchPointer(type: string, x: number, y: number) {
+function dispatchPointer(
+  type: string,
+  x: number,
+  y: number,
+  modifiers: { ctrlKey?: boolean; shiftKey?: boolean } = {}
+) {
   act(() => {
     document.dispatchEvent(
-      new TestPointerEvent(type, { button: 0, clientX: x, clientY: y, pointerId: 7 })
+      new TestPointerEvent(type, {
+        button: 0,
+        clientX: x,
+        clientY: y,
+        ctrlKey: modifiers.ctrlKey ?? false,
+        pointerId: 7,
+        shiftKey: modifiers.shiftKey ?? false,
+      })
     );
   });
 }
@@ -102,17 +116,20 @@ describe('useCalloutDrag', () => {
     startDrag();
     dispatchPointer('pointermove', 260, 250);
 
-    expect(drag?.draftPlacement).toEqual({ centerOffsetX: 140, centerOffsetY: 120 });
+    expect(drag?.draft?.placement).toEqual({ centerOffsetX: 140, centerOffsetY: 120 });
     expect(onPositionChange).not.toHaveBeenCalled();
 
     dispatchPointer('pointerup', 260, 250);
 
     expect(onPositionChange).toHaveBeenCalledOnce();
-    expect(onPositionChange).toHaveBeenCalledWith({ centerOffsetX: 140, centerOffsetY: 120 });
-    expect(drag?.draftPlacement).toEqual({ centerOffsetX: 140, centerOffsetY: 120 });
+    expect(onPositionChange).toHaveBeenCalledWith(
+      { centerOffsetX: 140, centerOffsetY: 120 },
+      { preserveConnectorAnchors: false }
+    );
+    expect(drag?.draft?.placement).toEqual({ centerOffsetX: 140, centerOffsetY: 120 });
 
     harness.rerender({ centerOffsetX: 140, centerOffsetY: 120 });
-    expect(drag?.draftPlacement).toBeNull();
+    expect(drag?.draft).toBeNull();
   });
 
   it('rolls back without a commit when pointer capture is lost', () => {
@@ -121,7 +138,7 @@ describe('useCalloutDrag', () => {
     dispatchPointer('pointermove', 260, 250);
     act(() => document.dispatchEvent(new Event('lostpointercapture')));
 
-    expect(drag?.draftPlacement).toBeNull();
+    expect(drag?.draft).toBeNull();
     expect(drag?.isDragging).toBe(false);
     expect(onPositionChange).not.toHaveBeenCalled();
   });
@@ -144,7 +161,7 @@ describe('useCalloutDrag', () => {
     });
 
     expect(onPositionChange).toHaveBeenCalledOnce();
-    expect(drag?.draftPlacement).toEqual({ centerOffsetX: 140, centerOffsetY: 120 });
+    expect(drag?.draft?.placement).toEqual({ centerOffsetX: 140, centerOffsetY: 120 });
   });
 
   it('moves and clamps the comment through arrow-key operations', () => {
@@ -154,7 +171,31 @@ describe('useCalloutDrag', () => {
     act(() => drag?.handleKeyDown(event));
 
     expect(event.preventDefault).toHaveBeenCalledOnce();
-    expect(onPositionChange).toHaveBeenCalledWith({ centerOffsetX: 95, centerOffsetY: 80 });
+    expect(onPositionChange).toHaveBeenCalledWith(
+      { centerOffsetX: 95, centerOffsetY: 80 },
+      { preserveConnectorAnchors: false }
+    );
+  });
+
+  it('constrains pointer movement to the dominant axis while Shift is held', () => {
+    renderHarness();
+    startDrag();
+    dispatchPointer('pointermove', 280, 230, { shiftKey: true });
+
+    expect(drag?.draft?.placement).toEqual({ centerOffsetX: 160, centerOffsetY: 80 });
+  });
+
+  it('preserves connector anchors only while Ctrl is held during the drag', () => {
+    renderHarness();
+    startDrag({ ctrlKey: true });
+    dispatchPointer('pointermove', 260, 250, { ctrlKey: true });
+
+    expect(drag?.draft?.preserveConnectorAnchors).toBe(true);
+    dispatchPointer('pointerup', 260, 250, { ctrlKey: true });
+    expect(onPositionChange).toHaveBeenCalledWith(
+      { centerOffsetX: 140, centerOffsetY: 120 },
+      { preserveConnectorAnchors: true }
+    );
   });
 
   it('reveals the handle while it owns keyboard focus', () => {

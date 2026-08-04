@@ -5,7 +5,13 @@ export type CalloutSide = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 export type CalloutFontFamily = 'sans' | 'serif' | 'mono';
 export type CalloutConnectorKind = 'none' | 'wedge' | 'line';
 export type CalloutConnectorRouting = 'straight' | 'elbow';
-export type CalloutConnectorMarker = 'none' | 'circle' | 'square' | 'diamond' | 'arrow';
+export type CalloutConnectorMarker =
+  | 'none'
+  | 'circle'
+  | 'ring-dot'
+  | 'square'
+  | 'diamond'
+  | 'arrow';
 export type CalloutPresetOrigin = 'system' | 'user';
 
 export const SYSTEM_CALLOUT_PRESET_KEYS = [
@@ -24,6 +30,8 @@ export interface CalloutManualPlacement {
   centerOffsetY: number;
 }
 
+export type CalloutConnectorWaypoint = CalloutManualPlacement;
+
 export interface CalloutContent {
   bodyHtml: string;
   titleText: string;
@@ -36,6 +44,7 @@ export interface CalloutPlacement {
   connectorBasePosition?: number | undefined;
   connectorBaseWidth?: number | undefined;
   connectorFramePosition?: number | undefined;
+  connectorWaypoint?: CalloutConnectorWaypoint | undefined;
 }
 
 export interface CalloutSurfaceStyle {
@@ -46,14 +55,18 @@ export interface CalloutSurfaceStyle {
   paddingY: number;
   radius: number;
   shadow: number;
+  shadowColor: string;
   textColor: string;
 }
 
 export interface CalloutTypographyStyle {
   fontFamily: CalloutFontFamily;
   fontSize: number;
+  fontStyle: 'normal' | 'italic';
   fontWeight: 'normal' | 'bold';
   maxWidth: number;
+  textAlign: 'left' | 'center' | 'right' | 'justify';
+  textDecoration: 'none' | 'underline';
 }
 
 export interface CalloutTitleStyle {
@@ -66,8 +79,10 @@ export interface CalloutTitleStyle {
 
 export interface CalloutConnectorStyle {
   blockMarker: CalloutConnectorMarker;
+  blockMarkerSize: number;
   color: string;
   frameMarker: CalloutConnectorMarker;
+  frameMarkerSize: number;
   kind: CalloutConnectorKind;
   routing: CalloutConnectorRouting;
   wedgeSize: number;
@@ -110,6 +125,7 @@ export interface CalloutPreset {
   name: string;
   order: number;
   origin?: CalloutPresetOrigin | undefined;
+  placement: Pick<CalloutPlacement, 'anchor' | 'side'>;
   style: CalloutVisualStyle;
   systemPresetKey?: SystemCalloutPresetKey | undefined;
 }

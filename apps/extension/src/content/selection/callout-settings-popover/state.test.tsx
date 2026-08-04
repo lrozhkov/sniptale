@@ -8,6 +8,7 @@ import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { useCalloutSettingsPopoverState } from './state';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import { createDefaultCalloutSettings } from '../callout/model';
+import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -76,6 +77,33 @@ describe('useCalloutSettingsPopoverState', () => {
     cleanup();
   });
 
+  it('applies the preset default position and clears session-only placement overrides', () => {
+    settings = createDefaultCalloutSettings();
+    settings.placement = {
+      ...settings.placement,
+      connectorBasePosition: 0.4,
+      connectorFramePosition: 0.7,
+      manualPlacement: { centerOffsetX: 20, centerOffsetY: 30 },
+    };
+    const preset = {
+      ...createSystemCalloutPresetCatalog()[0]!,
+      placement: { anchor: 'bottom-right', side: 'bottom' } as const,
+    };
+    renderHarness();
+
+    act(() => latestState?.applyPreset(preset));
+
+    expect(latestState?.localSettings.placement).toEqual({
+      anchor: 'bottom-right',
+      connectorBasePosition: undefined,
+      connectorBaseWidth: undefined,
+      connectorFramePosition: undefined,
+      manualPlacement: undefined,
+      side: 'bottom',
+    });
+    expect(latestState?.localSettings.sourcePresetId).toBe(preset.id);
+  });
+
   it('opens and commits one history transaction for the popover session', () => {
     const beginTransactionSpy = vi.spyOn(pagePreparationHistory, 'beginTransaction');
     const commitTransactionSpy = vi.spyOn(pagePreparationHistory, 'commitTransaction');
@@ -118,6 +146,36 @@ describe('useCalloutSettingsPopoverState', () => {
     expect(latestState?.localSettings.placement.connectorBasePosition).toBeUndefined();
     expect(latestState?.localSettings.placement.connectorBaseWidth).toBeUndefined();
     expect(latestState?.localSettings.placement.connectorFramePosition).toBeUndefined();
+    cleanup();
+  });
+
+  it('clears perimeter endpoint overrides when connector kind changes', () => {
+    settings = createDefaultCalloutSettings();
+    settings.style.connector.kind = 'line';
+    settings.placement = {
+      ...settings.placement,
+      connectorBasePosition: 0.8,
+      connectorBaseWidth: 0,
+      connectorFramePosition: 0.6,
+    };
+    const listener = vi.fn();
+    const cleanup = addCalloutPopoverSettingsChangedListener(listener);
+    renderHarness();
+
+    act(() => latestState?.handleSettingChange({ style: { connector: { kind: 'wedge' } } }));
+
+    expect(listener).toHaveBeenCalledWith({
+      frameId: 'frame-1',
+      settings: {
+        placement: {
+          connectorBasePosition: undefined,
+          connectorBaseWidth: undefined,
+          connectorFramePosition: undefined,
+        },
+        sourcePresetId: undefined,
+        style: { connector: { kind: 'wedge' } },
+      },
+    });
     cleanup();
   });
 

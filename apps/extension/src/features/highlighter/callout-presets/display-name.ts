@@ -15,7 +15,12 @@ const SYSTEM_NAME_KEYS: Record<SystemCalloutPresetKey, Parameters<typeof transla
 };
 
 export function getCalloutPresetDisplayName(preset: CalloutPreset, locale?: AppLocale): string {
-  return preset.systemPresetKey
-    ? translate(SYSTEM_NAME_KEYS[preset.systemPresetKey], locale)
-    : preset.name;
+  if (
+    preset.origin === 'system' &&
+    preset.systemPresetKey !== undefined &&
+    preset.customized !== true
+  ) {
+    return translate(SYSTEM_NAME_KEYS[preset.systemPresetKey], locale);
+  }
+  return preset.name;
 }

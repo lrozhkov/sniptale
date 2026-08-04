@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
 
+const placement = { anchor: 'top-center', side: 'top' } as const;
+
 const state = vi.hoisted(() => ({
   changeListener: null as
     | ((changes: Record<string, { newValue?: unknown }>, area: string) => void)
@@ -46,6 +48,7 @@ it('migrates once and supports committed CRUD invariants', async () => {
 
   const created = await owner.createUserCalloutPreset({
     name: 'My note',
+    placement,
     style: createSystemCalloutPresetCatalog()[0]!.style,
   });
   expect(created).toMatchObject({ outcome: 'applied' });
@@ -66,8 +69,8 @@ it('serializes concurrent commands and re-reads the latest committed value', asy
   await owner.migrateCalloutSystemPresetCatalog();
   const style = createSystemCalloutPresetCatalog()[0]!.style;
   const [first, second] = await Promise.all([
-    owner.createUserCalloutPreset({ name: 'First', style }),
-    owner.createUserCalloutPreset({ name: 'Second', style }),
+    owner.createUserCalloutPreset({ name: 'First', placement, style }),
+    owner.createUserCalloutPreset({ name: 'Second', placement, style }),
   ]);
   expect(first.outcome).toBe('applied');
   expect(second.outcome).toBe('applied');
@@ -93,6 +96,7 @@ it('keeps the cached snapshot unchanged on write failure and allows a retry', as
   mocks.set.mockRejectedValueOnce(new Error('sync failed'));
   const input = {
     name: 'Retry me',
+    placement,
     style: createSystemCalloutPresetCatalog()[0]!.style,
   };
   await expect(owner.createUserCalloutPreset(input)).rejects.toThrow('sync failed');
@@ -106,6 +110,7 @@ it('rejects an invalid style before committing it', async () => {
   const source = createSystemCalloutPresetCatalog()[0]!.style;
   const result = await owner.createUserCalloutPreset({
     name: 'Too large',
+    placement,
     style: {
       ...source,
       surface: { ...source.surface, backgroundColor: '#'.padEnd(8_000, 'f') },
@@ -167,12 +172,12 @@ it('does not return or cache an older read after a subscription snapshot', async
 it('rejects invalid inputs and missing preset commands without writing', async () => {
   const owner = await import('./index');
   const style = createSystemCalloutPresetCatalog()[0]!.style;
-  await expect(owner.createUserCalloutPreset({ name: ' ', style })).resolves.toEqual({
+  await expect(owner.createUserCalloutPreset({ name: ' ', placement, style })).resolves.toEqual({
     outcome: 'rejected',
     reason: 'invalid-input',
   });
   await expect(
-    owner.updateCalloutPreset({ id: 'missing', name: 'Missing', style })
+    owner.updateCalloutPreset({ id: 'missing', name: 'Missing', placement, style })
   ).resolves.toEqual({ outcome: 'rejected', reason: 'not-found' });
   await expect(owner.deleteCalloutPreset('missing')).resolves.toEqual({
     outcome: 'rejected',
@@ -228,7 +233,9 @@ it('enforces the user preset count limit', async () => {
       style,
     })),
   };
-  await expect(owner.createUserCalloutPreset({ name: 'Overflow', style })).resolves.toEqual({
+  await expect(
+    owner.createUserCalloutPreset({ name: 'Overflow', placement, style })
+  ).resolves.toEqual({
     outcome: 'rejected',
     reason: 'limit',
   });

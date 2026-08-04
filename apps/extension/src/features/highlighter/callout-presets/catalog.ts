@@ -12,13 +12,17 @@ type SystemCalloutPreset = CalloutPreset & {
   systemPresetKey: SystemCalloutPresetKey;
 };
 
-export const SYSTEM_CALLOUT_PRESET_CATALOG_REVISION = 1;
+export const SYSTEM_CALLOUT_PRESET_CATALOG_REVISION = 3;
+
+const DEFAULT_PRESET_PLACEMENT = { anchor: 'top-center', side: 'top' } as const;
 
 const baseStyle: CalloutVisualStyle = {
   connector: {
     blockMarker: 'none',
+    blockMarkerSize: 10,
     color: '#334155',
     frameMarker: 'none',
+    frameMarkerSize: 10,
     kind: 'none',
     routing: 'straight',
     wedgeSize: 8,
@@ -32,6 +36,7 @@ const baseStyle: CalloutVisualStyle = {
     paddingY: 8,
     radius: 8,
     shadow: 20,
+    shadowColor: '#000000',
     textColor: '#FFFFFF',
   },
   title: {
@@ -44,8 +49,11 @@ const baseStyle: CalloutVisualStyle = {
   typography: {
     fontFamily: 'sans',
     fontSize: 14,
+    fontStyle: 'normal',
     fontWeight: 'normal',
     maxWidth: 220,
+    textAlign: 'left',
+    textDecoration: 'none',
   },
 };
 
@@ -59,7 +67,11 @@ export function cloneCalloutVisualStyle(style: CalloutVisualStyle): CalloutVisua
 }
 
 export function cloneCalloutPreset(preset: CalloutPreset): CalloutPreset {
-  return { ...preset, style: cloneCalloutVisualStyle(preset.style) };
+  return {
+    ...preset,
+    placement: { ...preset.placement },
+    style: cloneCalloutVisualStyle(preset.style),
+  };
 }
 
 function createSystemPreset(
@@ -75,6 +87,7 @@ function createSystemPreset(
     name: systemPresetKey,
     order,
     origin: 'system',
+    placement: { ...DEFAULT_PRESET_PLACEMENT },
     style: cloneCalloutVisualStyle(style),
     systemPresetKey,
   };
@@ -122,55 +135,72 @@ const canonicalCatalog: readonly SystemCalloutPreset[] = [
     ...cloneCalloutVisualStyle(baseStyle),
     connector: {
       ...baseStyle.connector,
-      frameMarker: 'circle',
+      color: '#2563EB',
+      frameMarker: 'ring-dot',
+      frameMarkerSize: 12,
       kind: 'line',
     },
     surface: {
       ...baseStyle.surface,
       backgroundColor: 'transparent',
-      paddingX: 4,
+      paddingX: 6,
       paddingY: 4,
       radius: 0,
       shadow: 0,
-      textColor: '#0F172A',
+      textColor: '#1E3A8A',
     },
-    title: { ...baseStyle.title, enabled: true, textColor: '#0F172A' },
+    title: { ...baseStyle.title, enabled: true, textColor: '#1D4ED8' },
+    typography: { ...baseStyle.typography, fontSize: 13, maxWidth: 200 },
   }),
   createSystemPreset('system-callout-header-card', 4, {
     ...cloneCalloutVisualStyle(baseStyle),
     connector: {
       ...baseStyle.connector,
-      frameMarker: 'square',
+      color: '#2563EB',
+      frameMarker: 'circle',
       kind: 'line',
       routing: 'elbow',
     },
     surface: {
       ...baseStyle.surface,
-      backgroundColor: '#FFFFFF',
-      borderColor: '#CBD5E1',
+      backgroundColor: '#EFF6FF',
+      borderColor: '#93C5FD',
       borderWidth: 1,
-      radius: 4,
-      textColor: '#0F172A',
+      radius: 8,
+      shadow: 10,
+      textColor: '#1E3A8A',
     },
-    title: { ...baseStyle.title, backgroundColor: '#2563EB', enabled: true },
+    title: {
+      ...baseStyle.title,
+      backgroundColor: '#2563EB',
+      enabled: true,
+      textColor: '#FFFFFF',
+    },
   }),
   createSystemPreset('system-callout-framed-note', 5, {
     ...cloneCalloutVisualStyle(baseStyle),
     connector: {
       ...baseStyle.connector,
-      frameMarker: 'diamond',
+      color: '#D97706',
+      frameMarker: 'arrow',
+      frameMarkerSize: 12,
       kind: 'line',
     },
     surface: {
       ...baseStyle.surface,
-      backgroundColor: 'transparent',
-      borderColor: '#475569',
-      borderWidth: 2,
-      radius: 12,
-      shadow: 0,
-      textColor: '#0F172A',
+      backgroundColor: '#FFFBEB',
+      borderColor: '#F59E0B',
+      borderWidth: 1,
+      radius: 8,
+      shadow: 8,
+      textColor: '#78350F',
     },
-    title: { ...baseStyle.title, enabled: true, textColor: '#0F172A' },
+    title: {
+      ...baseStyle.title,
+      backgroundColor: '#F59E0B',
+      enabled: true,
+      textColor: '#451A03',
+    },
   }),
 ];
 

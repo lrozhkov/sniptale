@@ -1,23 +1,32 @@
 import React from 'react';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import { useCalloutDrag } from './drag';
+import type { CalloutDragBehavior } from './drag';
 import type { ConnectorSide } from './dynamic-tail';
 import { getCalloutLayoutState } from './layout';
-import { getCalloutEdgePosition, useCalloutEdgeDrag } from './tail-drag';
+import {
+  getCalloutEdgePosition,
+  getCalloutPerimeterPosition,
+  useCalloutEdgeDrag,
+} from './tail-drag';
 import { useCalloutTailBaseRange } from './tail-base-range';
 import { useCalloutWidthResize } from './width-resize';
+import { useCalloutWaypointDrag } from './waypoint-drag';
 
 type FrameRect = { x: number; y: number; width: number; height: number };
 type InteractionArgs = {
   dimensions: { width: number; height: number };
+  frameBorderWidth: number;
   frameRect: FrameRect;
   isEditing: boolean;
   isSettingsOpen?: boolean;
   onPositionChange: (
-    placement: NonNullable<CalloutSettings['placement']['manualPlacement']>
+    placement: NonNullable<CalloutSettings['placement']['manualPlacement']>,
+    behavior: CalloutDragBehavior
   ) => void;
   onTailBaseRangeChange: (position: number, width: number) => void;
   onTailFramePositionChange: (position: number) => void;
+  onWaypointChange: (waypoint: CalloutSettings['placement']['connectorWaypoint']) => void;
   onWidthChange: (
     maxWidth: number,
     placement: NonNullable<CalloutSettings['placement']['manualPlacement']>
@@ -60,10 +69,21 @@ function useCalloutPlacementDraft(args: InteractionArgs) {
       ...(widthResize.draftPlacement ? { manualPlacement: widthResize.draftPlacement } : {}),
     },
   };
-  const settings = drag.draftPlacement
+  const settings = drag.draft
     ? {
         ...widthSettings,
-        placement: { ...widthSettings.placement, manualPlacement: drag.draftPlacement },
+        placement: {
+          ...widthSettings.placement,
+          manualPlacement: drag.draft.placement,
+          ...(drag.draft.preserveConnectorAnchors
+            ? {}
+            : {
+                connectorBasePosition: undefined,
+                connectorBaseWidth: undefined,
+                connectorFramePosition: undefined,
+                connectorWaypoint: undefined,
+              }),
+        },
       }
     : widthSettings;
   return { drag, settings, widthResize };
@@ -75,6 +95,7 @@ function useCalloutConnectorDrafts(args: {
   isEditing: boolean;
   onTailBaseRangeChange: InteractionArgs['onTailBaseRangeChange'];
   onTailFramePositionChange: InteractionArgs['onTailFramePositionChange'];
+  onWaypointChange: InteractionArgs['onWaypointChange'];
   settings: CalloutSettings;
 }) {
   const connectorSide = args.baseLayout.dynamicTail?.side ?? null;
@@ -90,26 +111,47 @@ function useCalloutConnectorDrafts(args: {
   const lineBaseDrag = useCalloutEdgeDrag({
     edgeRect: bubbleRect,
     connectorSide: args.baseLayout.dynamicTail?.kind === 'line' ? connectorSide : null,
-    defaultPosition: getCalloutEdgePosition(
+    defaultPosition: getCalloutPerimeterPosition(
       bubbleRect,
-      connectorSide,
-      args.baseLayout.dynamicTail?.attachment.bubbleEdgePoint
+      args.baseLayout.dynamicTail?.attachment.bubbleEdgePoint ?? {
+        x: bubbleRect.x + bubbleRect.width / 2,
+        y: bubbleRect.y,
+      }
     ),
     isEditing: args.isEditing,
     onPositionChange: (position) => args.onTailBaseRangeChange(position, 0),
+    perimeter: true,
     position: args.settings.placement.connectorBasePosition,
   });
   const tailFrameDrag = useCalloutEdgeDrag({
     edgeRect: args.frameRect,
     connectorSide,
-    defaultPosition: getCalloutEdgePosition(
-      args.frameRect,
-      connectorSide,
-      args.baseLayout.dynamicTail?.attachment.framePoint
-    ),
+    defaultPosition:
+      args.baseLayout.dynamicTail?.kind === 'line'
+        ? getCalloutPerimeterPosition(
+            args.frameRect,
+            args.baseLayout.dynamicTail.attachment.framePoint
+          )
+        : getCalloutEdgePosition(
+            args.frameRect,
+            connectorSide,
+            args.baseLayout.dynamicTail?.attachment.framePoint
+          ),
     isEditing: args.isEditing,
     onPositionChange: args.onTailFramePositionChange,
+    perimeter: args.baseLayout.dynamicTail?.kind === 'line',
     position: args.settings.placement.connectorFramePosition,
+  });
+  const lineState =
+    args.baseLayout.dynamicTail?.kind === 'line' ? args.baseLayout.dynamicTail : null;
+  const waypointDrag = useCalloutWaypointDrag({
+    axis: lineState?.routeControlAxis ?? null,
+    defaultPoint: lineState?.routeControlPoint ?? null,
+    frameRect: args.frameRect,
+    isEditing: args.isEditing,
+    onChange: args.onWaypointChange,
+    position: args.settings.placement.connectorWaypoint,
+    snapPoints: lineState ? [lineState.routePoints[0]!, lineState.routePoints.at(-1)!] : [],
   });
   const settings: CalloutSettings = {
     ...args.settings,
@@ -127,17 +169,22 @@ function useCalloutConnectorDrafts(args: {
       ...(tailFrameDrag.draftPosition === null
         ? {}
         : { connectorFramePosition: tailFrameDrag.draftPosition }),
+      ...(waypointDrag.draftPosition === null
+        ? {}
+        : { connectorWaypoint: waypointDrag.draftPosition }),
     },
   };
   return {
     hasDraft:
       tailBaseRange.hasDraft ||
       lineBaseDrag.draftPosition !== null ||
-      tailFrameDrag.draftPosition !== null,
+      tailFrameDrag.draftPosition !== null ||
+      waypointDrag.draftPosition !== null,
     lineBaseDrag,
     settings,
     tailBaseRange,
     tailFrameDrag,
+    waypointDrag,
   };
 }
 
@@ -146,6 +193,7 @@ export function useCalloutInteractionLayout(args: InteractionArgs) {
   const placement = useCalloutPlacementDraft(args);
   const baseLayoutArgs = {
     dimensions: args.dimensions,
+    frameBorderWidth: args.frameBorderWidth,
     frameRect: args.frameRect,
     isEditing: args.isEditing,
     settings: placement.settings,
@@ -161,6 +209,7 @@ export function useCalloutInteractionLayout(args: InteractionArgs) {
     isEditing: args.isEditing,
     onTailBaseRangeChange: args.onTailBaseRangeChange,
     onTailFramePositionChange: args.onTailFramePositionChange,
+    onWaypointChange: args.onWaypointChange,
     settings: placement.settings,
   });
   const layout = connector.hasDraft
@@ -178,6 +227,7 @@ export function useCalloutInteractionLayout(args: InteractionArgs) {
         ? connector.lineBaseDrag
         : connector.tailBaseRange.startDrag,
     tailFrameDrag: connector.tailFrameDrag,
+    waypointDrag: connector.waypointDrag,
     widthResize: placement.widthResize,
   };
 }

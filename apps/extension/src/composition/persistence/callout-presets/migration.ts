@@ -37,11 +37,13 @@ export function resolveStoredCalloutPresetCatalog(
   const hasStoredCatalog = Object.keys(stored).length > 0;
   const placementById = new Map((stored.placements ?? []).map((item) => [item.id, item]));
   const overrideByKey = new Map(
-    (stored.systemOverrides ?? []).map((item) => [item.systemPresetKey, item])
+    (stored.systemOverrides ?? [])
+      .filter((item) => item.customized !== false)
+      .map((item) => [item.systemPresetKey, item])
   );
   const customized =
     stored.catalogCustomized === true ||
-    (stored.systemOverrides?.length ?? 0) > 0 ||
+    (stored.systemOverrides?.some((item) => item.customized !== false) ?? false) ||
     (stored.userPresets?.length ?? 0) > 0;
   const nextOrder =
     (stored.placements ?? []).reduce((maximum, item) => Math.max(maximum, item.order), -1) + 1;
@@ -59,11 +61,12 @@ export function resolveStoredCalloutPresetCatalog(
     }
     return {
       ...canonical,
-      basedOnRevision: stored.systemCatalogRevision ?? 0,
+      basedOnRevision: override.basedOnRevision ?? stored.systemCatalogRevision ?? 0,
       customized: true,
       enabled: placement?.enabled ?? true,
       name: override.name,
       order: placement?.order ?? nextOrder + index,
+      placement: { ...(override.placement ?? canonical.placement) },
       style: cloneCalloutVisualStyle(override.style),
     };
   });
@@ -76,6 +79,7 @@ export function resolveStoredCalloutPresetCatalog(
       name: user.name,
       order: placement?.order ?? nextOrder + systems.length + index,
       origin: 'user',
+      placement: { ...(user.placement ?? { anchor: 'top-center', side: 'top' }) },
       style: cloneCalloutVisualStyle(user.style),
     };
   });
@@ -113,7 +117,10 @@ export function serializeCalloutPresetCatalog(
           preset.systemPresetKey !== undefined
       )
       .map((preset) => ({
+        basedOnRevision: preset.basedOnRevision ?? catalog.systemCatalogRevision,
+        customized: true,
         name: preset.name,
+        placement: { ...preset.placement },
         style: cloneCalloutVisualStyle(preset.style),
         systemPresetKey: preset.systemPresetKey,
       })),
@@ -122,6 +129,7 @@ export function serializeCalloutPresetCatalog(
       .map((preset) => ({
         id: preset.id,
         name: preset.name,
+        placement: { ...preset.placement },
         style: cloneCalloutVisualStyle(preset.style),
       })),
   };

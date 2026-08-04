@@ -70,6 +70,12 @@ async function renderEditor(index: number) {
   await act(async () => root?.render(<CalloutPresetEditor controller={createController(index)} />));
 }
 
+async function openSection(label: string) {
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.click()
+  );
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
@@ -88,45 +94,44 @@ afterEach(() => {
 describe('CalloutPresetEditor', () => {
   it('shows line routing and both endpoint markers for a line preset', async () => {
     await renderEditor(4);
-    expect(document.body.textContent).toContain('highlighter.calloutPresets.editor.routing');
-    expect(document.body.textContent).toContain('highlighter.calloutPresets.editor.frameMarker');
-    expect(document.body.textContent).toContain('highlighter.calloutPresets.editor.blockMarker');
-    expect(document.body.textContent).toContain('highlighter.calloutPresets.editor.fontFamily');
-    expect(document.body.textContent).toContain('highlighter.calloutPresets.editor.titleFontSize');
+    const navigation = [...document.querySelectorAll<HTMLButtonElement>('nav button')];
+    expect(navigation.at(-1)?.getAttribute('aria-label')).toBe('content.callout.positionSection');
+    expect(document.querySelectorAll('[data-callout-anchor]')).toHaveLength(0);
+    await openSection('content.callout.positionSection');
+    expect(document.body.textContent).toContain(
+      'highlighter.calloutPresets.editor.defaultPosition'
+    );
+    expect(document.querySelectorAll('[data-callout-anchor]')).toHaveLength(8);
+    await openSection('content.callout.manualConnector');
+    expect(document.body.textContent).toContain('content.callout.routingLabel');
+    expect(document.body.textContent).toContain('content.callout.frameMarker');
+    expect(document.body.textContent).toContain('content.callout.blockMarker');
+    await openSection('content.callout.manualText');
+    expect(document.body.textContent).toContain('content.callout.fontFamilyLabel');
+    expect(document.body.textContent).toContain('content.callout.titleFontSizeLabel');
     expect(document.querySelector<HTMLInputElement>('input[maxlength="64"]')).not.toBeNull();
   });
 
   it('shows wedge size instead of line-only controls for a bubble preset', async () => {
     await renderEditor(0);
-    expect(document.body.textContent).toContain('highlighter.calloutPresets.editor.wedgeSize');
-    expect(document.body.textContent).not.toContain(
-      'highlighter.calloutPresets.editor.routingStraight'
-    );
+    await openSection('content.callout.manualConnector');
+    expect(document.body.textContent).toContain('content.callout.tailSizeLabelPrefix');
+    expect(document.body.textContent).not.toContain('content.callout.routing.straight');
   });
 
   it('updates visible style fields through product controls', async () => {
     await renderEditor(4);
-    const colorButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-color-field]')];
-    for (const button of colorButtons) {
-      await act(async () => button.click());
-    }
-    const numberInputs = [...document.querySelectorAll<HTMLInputElement>('input[type="number"]')];
-    for (const input of numberInputs) {
-      await act(async () => {
-        input.value = input.min || '10';
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-      });
-    }
-    const toggles = [...document.querySelectorAll<HTMLButtonElement>('[role="switch"]')];
-    for (const toggle of toggles) {
-      await act(async () => toggle.click());
-    }
-    const selectShell = document.querySelector<HTMLElement>('[data-ui="shared.ui.product-select"]');
-    await act(async () => selectShell?.querySelector<HTMLButtonElement>('button')?.click());
-    const option = document.querySelector<HTMLButtonElement>('[role="option"]');
-    await act(async () => option?.click());
-    expect(colorButtons.length).toBeGreaterThan(3);
-    expect(numberInputs.length).toBeGreaterThan(5);
+    await openSection('content.callout.manualBackground');
+    expect(document.querySelectorAll('[data-color-field]').length).toBeGreaterThan(1);
+    expect(
+      document.querySelectorAll('[data-ui="shared.ui.compact-inspector.numeric-row"]').length
+    ).toBeGreaterThan(0);
+    await openSection('content.callout.manualConnector');
+    expect(document.querySelector('[data-ui="shared.ui.compact-select"]')).not.toBeNull();
+    await openSection('content.callout.manualBorder');
+    expect(
+      document.querySelectorAll('[data-ui="shared.ui.compact-inspector.numeric-row"]').length
+    ).toBeGreaterThan(1);
   });
 
   it('starts a new user preset from the current default style', async () => {
@@ -135,5 +140,21 @@ describe('CalloutPresetEditor', () => {
     await act(async () => root?.render(<CalloutPresetEditor controller={controller} />));
     expect(document.body.textContent).toContain('highlighter.calloutPresets.editor.newTitle');
     expect(document.querySelector<HTMLInputElement>('input[maxlength="64"]')?.value).toBe('');
+  });
+
+  it('offers a factory reset for a customized system preset', async () => {
+    const controller = createController(0);
+    const source = controller.editor.preset!;
+    controller.editor = { isOpen: true, preset: { ...source, customized: true } };
+    await act(async () => root?.render(<CalloutPresetEditor controller={controller} />));
+
+    const reset = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'highlighter.calloutPresets.reset'
+    );
+    expect(reset).toBeDefined();
+    await act(async () => reset?.click());
+
+    expect(controller.actions.reset).toHaveBeenCalledWith(source.id);
+    expect(controller.actions.closeEditor).toHaveBeenCalledOnce();
   });
 });

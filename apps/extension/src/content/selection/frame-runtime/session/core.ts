@@ -19,6 +19,7 @@ import {
   createFrameSessionStorageChangedHandler,
 } from './settings';
 import { createCalloutPresetSessionSync } from './callout-defaults';
+import { setFutureFrameCallout } from './future-callout';
 
 export type FrameSessionSyncArgs = {
   setFrames: Dispatch<SetStateAction<FrameData[]>>;
@@ -49,6 +50,7 @@ export function setupFrameSessionSyncListeners({
   reorderStepBadge,
   withHistoryCommit,
 }: FrameSessionSyncArgs) {
+  setFutureFrameCallout(null);
   const loadSettings = createFrameSessionSettingsLoader({
     globalEffectModeRef,
     highlighterSettingsCacheRef,
@@ -80,6 +82,7 @@ export function setupFrameSessionSyncListeners({
     cleanupWindowListeners,
   });
   return () => {
+    setFutureFrameCallout(null);
     cleanupFrameSession();
     cleanupCalloutPresetSync();
   };

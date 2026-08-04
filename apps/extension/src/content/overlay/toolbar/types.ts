@@ -7,6 +7,7 @@ import type {
   EffectMode,
   FocusSettings,
 } from '../../../features/highlighter/contracts';
+import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 
 export type ToolbarViewportSelection = {
   presetId?: string;
@@ -62,6 +63,12 @@ export interface ToolbarFutureFrameStyle {
   borderSettings: BorderPreset;
   effectMode: EffectMode;
   focusSettings: FocusSettings;
+  futureCallout?: CalloutSettings | null;
+}
+
+export interface ToolbarFutureFrameCalloutActions {
+  enable: () => CalloutSettings;
+  set: (settings: CalloutSettings | null) => void;
 }
 
 export interface ToolbarProps {
@@ -107,6 +114,7 @@ export interface ToolbarProps {
   framesCount?: number;
   futureFrameStyle?: ToolbarFutureFrameStyle;
   onFutureFrameEffectModeChange?: (mode: EffectMode) => void;
+  futureFrameCalloutActions?: ToolbarFutureFrameCalloutActions;
   scenario?: {
     byClickDisabled: boolean;
     captureMode: 'manual' | 'by-click';

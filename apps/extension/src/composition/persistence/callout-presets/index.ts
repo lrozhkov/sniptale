@@ -1,4 +1,5 @@
 import type {
+  CalloutPreset,
   CalloutPresetCatalog,
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
@@ -24,6 +25,7 @@ import {
   CALLOUT_PRESET_STORAGE_SCHEMA_VERSION,
   MAX_CALLOUT_PRESET_NAME_LENGTH,
   MAX_USER_CALLOUT_PRESETS,
+  parseCalloutPresetPlacement,
   parseCalloutVisualStyle,
   parseStoredCalloutPresetCatalog,
 } from './parser';
@@ -186,9 +188,14 @@ function createUserPresetId(): string {
 
 export function createUserCalloutPreset(input: {
   name: string;
+  placement: CalloutPreset['placement'];
   style: CalloutVisualStyle;
 }): Promise<CalloutPresetMutationResult> {
-  if (!isValidName(input.name) || !parseCalloutVisualStyle(input.style)) {
+  if (
+    !isValidName(input.name) ||
+    !parseCalloutPresetPlacement(input.placement) ||
+    !parseCalloutVisualStyle(input.style)
+  ) {
     return Promise.resolve({ outcome: 'rejected', reason: 'invalid-input' });
   }
   return runCommand((catalog) => {
@@ -199,7 +206,12 @@ export function createUserCalloutPreset(input: {
       return { outcome: 'rejected', reason: 'limit' };
     }
     const id = createUserPresetId();
-    const next = addUserPreset(catalog, { id, name: input.name.trim(), style: input.style });
+    const next = addUserPreset(catalog, {
+      id,
+      name: input.name.trim(),
+      placement: input.placement,
+      style: input.style,
+    });
     return next
       ? { catalog: next, id, outcome: 'applied' }
       : { outcome: 'rejected', reason: 'duplicate-id' };
@@ -209,9 +221,14 @@ export function createUserCalloutPreset(input: {
 export function updateCalloutPreset(input: {
   id: string;
   name: string;
+  placement: CalloutPreset['placement'];
   style: CalloutVisualStyle;
 }): Promise<CalloutPresetMutationResult> {
-  if (!isValidName(input.name) || !parseCalloutVisualStyle(input.style)) {
+  if (
+    !isValidName(input.name) ||
+    !parseCalloutPresetPlacement(input.placement) ||
+    !parseCalloutVisualStyle(input.style)
+  ) {
     return Promise.resolve({ outcome: 'rejected', reason: 'invalid-input' });
   }
   return runCommand((catalog) => {

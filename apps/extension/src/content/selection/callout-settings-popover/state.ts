@@ -77,6 +77,9 @@ export function useCalloutSettingsPopoverState(args: {
   const handleSettingChange = (patch: CalloutSettingsPatch) => {
     const resetsManualPlacement =
       patch.placement?.anchor !== undefined || patch.placement?.side !== undefined;
+    const resetsConnectorPlacement =
+      patch.style?.connector?.kind !== undefined &&
+      patch.style.connector.kind !== localSettings.style.connector.kind;
     const placementPatch: CalloutSettingsPatch = resetsManualPlacement
       ? {
           ...patch,
@@ -86,9 +89,21 @@ export function useCalloutSettingsPopoverState(args: {
             connectorBasePosition: undefined,
             connectorBaseWidth: undefined,
             connectorFramePosition: undefined,
+            connectorWaypoint: undefined,
           },
         }
-      : patch;
+      : resetsConnectorPlacement
+        ? {
+            ...patch,
+            placement: {
+              ...patch.placement,
+              connectorBasePosition: undefined,
+              connectorBaseWidth: undefined,
+              connectorFramePosition: undefined,
+              connectorWaypoint: undefined,
+            },
+          }
+        : patch;
     const normalizedPatch: CalloutSettingsPatch =
       patch.style && !('sourcePresetId' in patch)
         ? { ...placementPatch, sourcePresetId: undefined }
@@ -99,7 +114,18 @@ export function useCalloutSettingsPopoverState(args: {
   };
 
   const applyPreset = (preset: CalloutPreset) => {
-    handleSettingChange({ sourcePresetId: preset.id, style: cloneCalloutStyle(preset.style) });
+    handleSettingChange({
+      placement: {
+        ...preset.placement,
+        connectorBasePosition: undefined,
+        connectorBaseWidth: undefined,
+        connectorFramePosition: undefined,
+        connectorWaypoint: undefined,
+        manualPlacement: undefined,
+      },
+      sourcePresetId: preset.id,
+      style: cloneCalloutStyle(preset.style),
+    });
   };
 
   return {

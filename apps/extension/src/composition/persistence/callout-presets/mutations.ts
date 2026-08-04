@@ -11,6 +11,7 @@ import {
 interface CalloutPresetUpdate {
   id: string;
   name: string;
+  placement: CalloutPreset['placement'];
   style: CalloutVisualStyle;
 }
 
@@ -30,7 +31,7 @@ function resolveDefaultId(presets: CalloutPreset[], requestedId: string): string
 
 export function addUserPreset(
   catalog: CalloutPresetCatalog,
-  preset: Pick<CalloutPreset, 'id' | 'name' | 'style'>
+  preset: Pick<CalloutPreset, 'id' | 'name' | 'placement' | 'style'>
 ): CalloutPresetCatalog | null {
   if (catalog.presets.some((current) => current.id === preset.id)) return null;
   const order =
@@ -45,6 +46,7 @@ export function addUserPreset(
         name: preset.name,
         order,
         origin: 'user',
+        placement: { ...preset.placement },
         style: cloneCalloutVisualStyle(preset.style),
       },
     ],
@@ -58,13 +60,18 @@ export function updatePreset(
   const current = catalog.presets.find((preset) => preset.id === update.id);
   if (!current) return null;
   const name = update.name.trim();
-  if (current.name === name && JSON.stringify(current.style) === JSON.stringify(update.style)) {
+  if (
+    current.name === name &&
+    JSON.stringify(current.placement) === JSON.stringify(update.placement) &&
+    JSON.stringify(current.style) === JSON.stringify(update.style)
+  ) {
     return null;
   }
   const updated: CalloutPreset = {
     ...current,
     customized: current.origin === 'system' ? true : current.customized,
     name,
+    placement: { ...update.placement },
     style: cloneCalloutVisualStyle(update.style),
   };
   return {
@@ -152,6 +159,7 @@ export function resetSystemPreset(
   if (
     current.customized !== true &&
     current.name === canonical.name &&
+    JSON.stringify(current.placement) === JSON.stringify(canonical.placement) &&
     JSON.stringify(current.style) === JSON.stringify(canonical.style)
   ) {
     return null;

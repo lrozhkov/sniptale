@@ -24,6 +24,9 @@ function cloneHistoryCalloutSettings(settings: CalloutSettings): CalloutSettings
       ...(settings.placement.manualPlacement
         ? { manualPlacement: { ...settings.placement.manualPlacement } }
         : {}),
+      ...(settings.placement.connectorWaypoint
+        ? { connectorWaypoint: { ...settings.placement.connectorWaypoint } }
+        : {}),
     },
     ...(settings.sourcePresetId === undefined ? {} : { sourcePresetId: settings.sourcePresetId }),
     style: cloneCalloutVisualStyle(settings.style),

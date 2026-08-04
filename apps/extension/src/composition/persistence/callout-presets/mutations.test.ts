@@ -24,14 +24,18 @@ describe('callout preset catalog mutations', () => {
   it('adds, updates, deletes, and rejects invalid user preset transitions', () => {
     const catalog = createCatalog();
     const style = catalog.presets[0]!.style;
-    const added = addUserPreset(catalog, { id: 'user-one', name: 'One', style })!;
+    const placement = catalog.presets[0]!.placement;
+    const added = addUserPreset(catalog, { id: 'user-one', name: 'One', placement, style })!;
     expect(added.catalogCustomized).toBe(true);
     expect(added.presets.at(-1)).toMatchObject({ enabled: true, origin: 'user' });
-    expect(addUserPreset(added, { id: 'user-one', name: 'Duplicate', style })).toBeNull();
+    expect(
+      addUserPreset(added, { id: 'user-one', name: 'Duplicate', placement, style })
+    ).toBeNull();
 
     const updated = updatePreset(added, {
       id: 'user-one',
       name: ' Updated ',
+      placement,
       style: { ...style, surface: { ...style.surface, radius: 17 } },
     })!;
     expect(updated.presets.at(-1)).toMatchObject({ name: 'Updated' });
@@ -39,10 +43,11 @@ describe('callout preset catalog mutations', () => {
       updatePreset(updated, {
         id: 'user-one',
         name: 'Updated',
+        placement,
         style: updated.presets.at(-1)!.style,
       })
     ).toBeNull();
-    expect(updatePreset(updated, { id: 'missing', name: 'Missing', style })).toBeNull();
+    expect(updatePreset(updated, { id: 'missing', name: 'Missing', placement, style })).toBeNull();
 
     const deleted = deleteUserPreset(updated, 'user-one')!;
     expect(deleted.presets.some((preset) => preset.id === 'user-one')).toBe(false);
@@ -83,6 +88,7 @@ describe('callout preset catalog mutations', () => {
     const customized = updatePreset(catalog, {
       id: ids[0]!,
       name: 'Changed',
+      placement: catalog.presets[0]!.placement,
       style: {
         ...catalog.presets[0]!.style,
         surface: { ...catalog.presets[0]!.style.surface, radius: 33 },
@@ -98,7 +104,17 @@ describe('callout preset catalog mutations', () => {
     const userOnly: CalloutPresetCatalog = {
       ...catalog,
       defaultPresetId: 'user-one',
-      presets: [{ enabled: true, id: 'user-one', name: 'One', order: 0, origin: 'user', style }],
+      presets: [
+        {
+          enabled: true,
+          id: 'user-one',
+          name: 'One',
+          order: 0,
+          origin: 'user',
+          placement: catalog.presets[0]!.placement,
+          style,
+        },
+      ],
     };
     expect(deleteUserPreset(userOnly, 'user-one')).toBeNull();
   });

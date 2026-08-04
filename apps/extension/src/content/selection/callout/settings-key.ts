@@ -7,6 +7,7 @@ export function createCalloutSettingsKey(settings: CalloutSettings) {
     settings.style.typography.maxWidth,
     settings.style.typography.fontSize,
     settings.style.typography.fontFamily,
+    settings.style.typography.textAlign,
     settings.style.surface.backgroundColor,
     settings.style.surface.textColor,
     settings.style.surface.paddingX,

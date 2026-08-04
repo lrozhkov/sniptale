@@ -81,10 +81,10 @@ it('ignores a stale initial read after a subscription snapshot', async () => {
   expect(ref.current).toEqual(subscribed.presets[1]!.style);
 });
 
-it('marks a new callout with the matching default preset without copying content or placement', () => {
+it('marks a new callout with the matching default preset and applies its default position', () => {
   const preset = mocks.catalog!.presets[0]!;
   const settings = createSessionCalloutSettings(preset.style);
   expect(settings.sourcePresetId).toBe(preset.id);
   expect(settings.content).toEqual({ bodyHtml: '', titleText: '' });
-  expect(settings.placement).toEqual({ anchor: 'top-center', side: 'auto' });
+  expect(settings.placement).toEqual(preset.placement);
 });

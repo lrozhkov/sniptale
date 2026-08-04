@@ -15,9 +15,25 @@ describe('getCalloutPresetDisplayName', () => {
     expect(getCalloutPresetDisplayName(preset, 'ru')).toBe('Облачко');
     expect(
       getCalloutPresetDisplayName(
+        {
+          ...preset,
+          id: 'system-callout-pointer-note',
+          systemPresetKey: 'system-callout-pointer-note',
+        },
+        'ru'
+      )
+    ).toBe('Точечная сноска');
+    expect(
+      getCalloutPresetDisplayName(
         { ...preset, origin: 'user', systemPresetKey: undefined, name: 'Mine' },
         'en'
       )
     ).toBe('Mine');
+  });
+
+  it('preserves an explicitly customized system name', () => {
+    expect(
+      getCalloutPresetDisplayName({ ...preset, customized: true, name: 'My bubble' }, 'ru')
+    ).toBe('My bubble');
   });
 });

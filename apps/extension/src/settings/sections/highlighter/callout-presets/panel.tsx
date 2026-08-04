@@ -12,7 +12,7 @@ import {
   SettingsDragHandle,
   SettingsSwitch,
 } from '../../../section-surface/panel-controls';
-import { CalloutPresetPreview } from './preview';
+import { CalloutPresetPreview } from '../../../../ui/highlighter-preset-editor/callout/thumbnail';
 import type { CalloutPresetCatalogController } from './types';
 
 type Preset = NonNullable<CalloutPresetCatalogController['catalog']>['presets'][number];
@@ -115,7 +115,7 @@ function PresetRow(props: {
       onMouseLeave={() => props.controller.actions.hover(null)}
     >
       <SettingsDragHandle />
-      <CalloutPresetPreview style={props.preset.style} />
+      <CalloutPresetPreview placement={props.preset.placement} style={props.preset.style} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-[var(--sniptale-color-text-primary)]">
           {getCalloutPresetDisplayName(props.preset, locale)}

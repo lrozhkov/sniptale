@@ -56,10 +56,12 @@ describe('callout model', () => {
       ...legacy,
       manualPlacement: { centerOffsetX: 10, centerOffsetY: 20 },
     });
+    normalized.placement.connectorWaypoint = { centerOffsetX: -30, centerOffsetY: 40 };
     const cloned = cloneCalloutSettings(normalized);
     expect(cloned.content).not.toBe(normalized.content);
     expect(cloned.placement).not.toBe(normalized.placement);
     expect(cloned.placement.manualPlacement).not.toBe(normalized.placement.manualPlacement);
+    expect(cloned.placement.connectorWaypoint).not.toBe(normalized.placement.connectorWaypoint);
     expect(cloned.style.surface).not.toBe(normalized.style.surface);
   });
 });

@@ -1,6 +1,9 @@
 import React from 'react';
 import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
-import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
+import {
+  consumeFrameCalloutEditRequest,
+  useFrameUIStore,
+} from '../../frame-runtime/state/frame-ui.store';
 import type { FrameUIState } from '../../frame-runtime/state/frame-ui.store';
 
 export function useInteractiveFrameViewState(params: {
@@ -22,7 +25,9 @@ function useInteractiveFrameLocalState(params: {
   defaultEffectMode: EffectMode;
 }) {
   const [state, setState] = React.useState<FrameState>('idle');
-  const [isCalloutEditing, setIsCalloutEditing] = React.useState(false);
+  const [isCalloutEditing, setIsCalloutEditing] = React.useState(() =>
+    consumeFrameCalloutEditRequest(params.frame.id)
+  );
   const [tempFrame, setTempFrame] = React.useState<FrameData>(params.frame);
   const [effectMode, setEffectMode] = React.useState<EffectMode>(
     params.frame.effectMode || params.defaultEffectMode

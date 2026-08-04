@@ -39,6 +39,7 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
       <div
         ref={props.wrapperRef as Ref<HTMLDivElement>}
         className="sniptale-callout"
+        data-frame-id={props.frameId}
         data-theme={props.portalTheme ?? undefined}
         style={mergeThemeScopedStyle(props.portalTheme, props.wrapperStyle)}
         onClick={props.handleClick}
@@ -122,6 +123,7 @@ type CalloutBodyProps = CalloutInteractionHandleProps & {
   editableStyle: CSSProperties;
   effectiveZIndex: number;
   floatingToolbarRect: DOMRect | null;
+  frameId: string;
   handleBlur: (event?: ReactFocusEvent<HTMLDivElement>) => void;
   handleClick: (event: MouseEvent) => void;
   handleInput: () => void;

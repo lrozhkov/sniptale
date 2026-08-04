@@ -5,10 +5,31 @@ export const contentCalloutMessages = defineMessageSource({
     ru: 'Настройки комментария',
     en: 'Comment settings',
   },
+  closeSettings: { ru: 'Закрыть настройки комментария', en: 'Close comment settings' },
   presetsSection: {
     ru: 'Пресеты',
     en: 'Presets',
   },
+  modePreset: { ru: 'Пресет', en: 'Preset' },
+  modeManual: { ru: 'Вручную', en: 'Manual' },
+  italicTitle: { ru: 'Курсив', en: 'Italic' },
+  underlineTitle: { ru: 'Подчёркнутый', en: 'Underline' },
+  alignLeft: { ru: 'По левому краю', en: 'Align left' },
+  alignCenter: { ru: 'По центру', en: 'Align center' },
+  alignRight: { ru: 'По правому краю', en: 'Align right' },
+  alignJustify: { ru: 'По ширине', en: 'Justify' },
+  configurePreset: { ru: 'Настроить стиль', en: 'Customize style' },
+  hidePreset: { ru: 'Скрыть из списка', en: 'Hide from list' },
+  showPreset: { ru: 'Вернуть в список', en: 'Restore to list' },
+  manualNavigation: { ru: 'Параметры комментария', en: 'Comment properties' },
+  manualText: { ru: 'Текст', en: 'Text' },
+  manualSize: { ru: 'Размер', en: 'Size' },
+  manualSpacing: { ru: 'Отступы', en: 'Spacing' },
+  manualBackground: { ru: 'Фон и тень', en: 'Background & shadow' },
+  manualConnector: { ru: 'Коннектор', en: 'Connector' },
+  manualEffects: { ru: 'Эффекты', en: 'Effects' },
+  manualBorder: { ru: 'Границы', en: 'Borders' },
+  manualRadius: { ru: 'Скругление', en: 'Corner radius' },
   savePreset: {
     ru: 'Сохранить как пресет',
     en: 'Save as preset',
@@ -65,10 +86,12 @@ export const contentCalloutMessages = defineMessageSource({
     ru: 'Наконечник у блока',
     en: 'Block marker',
   },
+  blockMarkerSize: { ru: 'Размер у блока', en: 'Block marker size' },
   frameMarker: {
     ru: 'Наконечник у рамки',
     en: 'Frame marker',
   },
+  frameMarkerSize: { ru: 'Размер у рамки', en: 'Frame marker size' },
   connector: {
     none: { ru: 'Нет', en: 'None' },
     wedge: { ru: 'Хвостик', en: 'Tail' },
@@ -81,6 +104,7 @@ export const contentCalloutMessages = defineMessageSource({
   marker: {
     none: { ru: 'Нет', en: 'None' },
     circle: { ru: 'Круг', en: 'Circle' },
+    ringDot: { ru: 'Кольцо с точкой', en: 'Ring with dot' },
     square: { ru: 'Квадрат', en: 'Square' },
     diamond: { ru: 'Ромб', en: 'Diamond' },
     arrow: { ru: 'Стрелка', en: 'Arrow' },
@@ -90,11 +114,14 @@ export const contentCalloutMessages = defineMessageSource({
   paddingXLabel: { ru: 'Отступ по горизонтали:', en: 'Horizontal padding:' },
   paddingYLabel: { ru: 'Отступ по вертикали:', en: 'Vertical padding:' },
   shadowLabel: { ru: 'Тень:', en: 'Shadow:' },
+  shadowColorLabel: { ru: 'Цвет тени', en: 'Shadow color' },
   font: {
     sans: { ru: 'Sans', en: 'Sans' },
     serif: { ru: 'Serif', en: 'Serif' },
     mono: { ru: 'Mono', en: 'Mono' },
   },
+  fontFamilyLabel: { ru: 'Шрифт', en: 'Font' },
+  routingLabel: { ru: 'Трассировка', en: 'Routing' },
   variantBubble: {
     ru: 'Облачко',
     en: 'Bubble',
@@ -108,8 +135,18 @@ export const contentCalloutMessages = defineMessageSource({
     en: 'Text',
   },
   positionSection: {
-    ru: 'Позиция и сторона',
-    en: 'Position and side',
+    ru: 'Позиция',
+    en: 'Position',
+  },
+  anchor: {
+    middleLeft: { ru: 'По центру слева', en: 'Middle left' },
+    topLeft: { ru: 'Сверху слева', en: 'Top left' },
+    topCenter: { ru: 'Сверху по центру', en: 'Top center' },
+    topRight: { ru: 'Сверху справа', en: 'Top right' },
+    bottomLeft: { ru: 'Снизу слева', en: 'Bottom left' },
+    bottomCenter: { ru: 'Снизу по центру', en: 'Bottom center' },
+    bottomRight: { ru: 'Снизу справа', en: 'Bottom right' },
+    middleRight: { ru: 'По центру справа', en: 'Middle right' },
   },
   sideTop: {
     ru: 'Сверху',
@@ -134,6 +171,10 @@ export const contentCalloutMessages = defineMessageSource({
   appearanceSection: {
     ru: 'Внешний вид',
     en: 'Appearance',
+  },
+  parametersSection: {
+    ru: 'Параметры',
+    en: 'Parameters',
   },
   backgroundLabel: {
     ru: 'Фон',
@@ -167,9 +208,9 @@ export const contentCalloutMessages = defineMessageSource({
     ru: 'Размер шрифта:',
     en: 'Font size:',
   },
-  maxWidthLabelPrefix: {
-    ru: 'Макс. ширина:',
-    en: 'Max width:',
+  defaultWidthLabel: {
+    ru: 'Ширина по умолчанию',
+    en: 'Default width',
   },
   tailSizeLabelPrefix: {
     ru: 'Размер хвостика:',

@@ -8,33 +8,38 @@ import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { useCalloutEditingHandlers } from './editing.handlers';
 
 function EditingHandlersHarness(props: {
+  isEditing?: boolean;
   onContentChange: (html: string) => void;
   onDelete?: () => void;
+  onStartEditing?: () => void;
   titleText?: string;
 }) {
   const contentEditableRef = React.useRef<HTMLDivElement | null>(null);
   const handlers = useCalloutEditingHandlers({
     contentEditableRef,
     frameId: 'frame-1',
-    isEditing: true,
+    isEditing: props.isEditing ?? true,
     onManualInput: vi.fn(),
     onContentChange: props.onContentChange,
     onDelete: props.onDelete ?? vi.fn(),
     ...(props.titleText === undefined ? {} : { titleText: props.titleText }),
-    onStartEditing: vi.fn(),
+    onStartEditing: props.onStartEditing ?? vi.fn(),
     onStopEditing: vi.fn(),
   });
 
   return (
-    <div
-      ref={contentEditableRef}
-      contentEditable
-      data-ui="callout-editable"
-      onBlur={handlers.handleBlur}
-      onInput={handlers.handleInput}
-      onPaste={handlers.handlePaste}
-      suppressContentEditableWarning
-    />
+    <div className="sniptale-callout" onClick={handlers.handleClick}>
+      <input data-sniptale-callout-title="true" readOnly={!(props.isEditing ?? true)} />
+      <div
+        ref={contentEditableRef}
+        contentEditable
+        data-ui="callout-editable"
+        onBlur={handlers.handleBlur}
+        onInput={handlers.handleInput}
+        onPaste={handlers.handlePaste}
+        suppressContentEditableWarning
+      />
+    </div>
   );
 }
 
@@ -54,6 +59,34 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+});
+
+it('restores title focus when title click starts callout editing', () => {
+  const onStartEditing = vi.fn();
+  const animationFrames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  });
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+
+  act(() => {
+    root?.render(
+      <EditingHandlersHarness
+        isEditing={false}
+        onContentChange={vi.fn()}
+        onStartEditing={onStartEditing}
+      />
+    );
+  });
+  const title = container.querySelector<HTMLInputElement>('[data-sniptale-callout-title]')!;
+
+  act(() => title.click());
+  expect(onStartEditing).toHaveBeenCalledOnce();
+  act(() => animationFrames[0]?.(0));
+  expect(document.activeElement).toBe(title);
 });
 
 it('sanitizes contenteditable input before publishing callout content changes', () => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
+import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { CalloutSettingsPopover } from '../../callout-settings-popover';
 import { FrameSettingsPopover } from '../../frame-settings-popover';
 import { StepBadgePopover } from '../../step-badge-popover';
@@ -15,6 +15,7 @@ export interface InteractiveFramePopoversProps {
   isStepBadgePopoverOpen: boolean;
   isCalloutPopoverOpen: boolean;
   isCalloutEditing: boolean;
+  state: FrameState;
   popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   stepBadgePopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   calloutPopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
@@ -101,6 +102,7 @@ function renderCalloutOverlay(props: InteractiveFramePopoversProps) {
       frameZIndex={props.frameZIndex}
       isCalloutEditing={props.isCalloutEditing}
       isCalloutPopoverOpen={props.isCalloutPopoverOpen}
+      isFrameEditing={props.state === 'editing'}
       calloutPopoverAnchorRef={props.calloutPopoverAnchorRef}
       setIsCalloutEditing={props.setIsCalloutEditing}
       setTempFrame={props.setTempFrame}

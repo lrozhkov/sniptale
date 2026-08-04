@@ -25,7 +25,7 @@ import type {
 import { buildBlurTypeOptions, getBorderPresetPreviewStyle } from './helpers';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
-import { FramePresetName } from './overflow-hint';
+import { PresetNameWithOverflowHint } from '../../../ui/compact-inspector-controls/overflow-hint';
 
 function BlurTypeIcon(props: { iconName: 'droplet' | 'waves' | 'square' }) {
   if (props.iconName === 'droplet') {
@@ -183,7 +183,7 @@ function FrameBorderSection(props: {
                 >
                   <ProductGlassPresetPreview style={getBorderPresetPreviewStyle(preset)} />
                   <ProductGlassPresetMeta>
-                    <FramePresetName name={displayName} />
+                    <PresetNameWithOverflowHint name={displayName} />
                   </ProductGlassPresetMeta>
                 </ProductGlassPresetItem>
                 <span className="sniptale-frame-style-preset-actions">

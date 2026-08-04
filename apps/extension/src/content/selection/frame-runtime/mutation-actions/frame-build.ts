@@ -10,6 +10,7 @@ import type {
 import { createCompositeSelector } from '../../../platform/frame/selectors';
 import type { UseFrameMutationActionHelperOptions } from './types';
 import { getFrameSessionBorderPreset } from '../session/border-preset';
+import { getFutureFrameCallout } from '../session/future-callout';
 
 type BuildFrameForAddArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -75,6 +76,7 @@ function resolveFrameBuildSettings(
     effectMode: args.globalEffectModeRef.current,
     template: args.sessionStepBadgeTemplateRef.current,
     isAutoMode: args.globalStepBadgeAutoModeRef.current,
+    callout: getFutureFrameCallout(),
   };
 }
 
@@ -87,6 +89,7 @@ function applyFrameBuildSettings(
     effectMode: EffectMode;
     template: StepBadgeSettings | null;
     isAutoMode: boolean;
+    callout: import('@sniptale/runtime-contracts/highlighter/callout').CalloutSettings | null;
   },
   linked?: { linkedElementSelector: string }
 ) {
@@ -100,6 +103,7 @@ function applyFrameBuildSettings(
     focusSettings: params.focusSettings,
     ...(linked ?? {}),
     ...(stepBadge === undefined ? {} : { stepBadge }),
+    ...(params.callout === null ? {} : { callout: structuredClone(params.callout) }),
   } satisfies FrameData;
 }
 

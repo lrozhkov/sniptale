@@ -19,9 +19,9 @@ const DEFAULT_PLACEMENT: CalloutPlacement = {
 export function cloneCalloutStyle(style: CalloutVisualStyle): CalloutVisualStyle {
   return {
     connector: { ...style.connector },
-    surface: { ...style.surface },
+    surface: { ...DEFAULT_STYLE.surface, ...style.surface },
     title: { ...style.title },
-    typography: { ...style.typography },
+    typography: { ...DEFAULT_STYLE.typography, ...style.typography },
   };
 }
 
@@ -34,6 +34,9 @@ export function cloneCalloutSettings(settings: CalloutSettings): CalloutSettings
       ...(settings.placement.manualPlacement
         ? { manualPlacement: { ...settings.placement.manualPlacement } }
         : {}),
+      ...(settings.placement.connectorWaypoint
+        ? { connectorWaypoint: { ...settings.placement.connectorWaypoint } }
+        : {}),
     },
     ...(settings.sourcePresetId === undefined ? {} : { sourcePresetId: settings.sourcePresetId }),
     style: cloneCalloutStyle(settings.style),
@@ -42,12 +45,13 @@ export function cloneCalloutSettings(settings: CalloutSettings): CalloutSettings
 
 export function createDefaultCalloutSettings(
   style?: CalloutVisualStyle,
-  sourcePresetId?: string
+  sourcePresetId?: string,
+  placement?: Pick<CalloutPlacement, 'anchor' | 'side'>
 ): CalloutSettings {
   return {
     content: { bodyHtml: '', titleText: '' },
     enabled: true,
-    placement: { ...DEFAULT_PLACEMENT },
+    placement: { ...(placement ?? DEFAULT_PLACEMENT) },
     ...(sourcePresetId ? { sourcePresetId } : {}),
     style: cloneCalloutStyle(style ?? DEFAULT_STYLE),
   };
@@ -65,6 +69,9 @@ export function applyCalloutSettingsPatch(
       ...patch.placement,
       ...(patch.placement?.manualPlacement
         ? { manualPlacement: { ...patch.placement.manualPlacement } }
+        : {}),
+      ...(patch.placement?.connectorWaypoint
+        ? { connectorWaypoint: { ...patch.placement.connectorWaypoint } }
         : {}),
     },
     ...('sourcePresetId' in patch
@@ -121,8 +128,11 @@ function normalizeLegacyCallout(settings: LegacyCalloutSettings): CalloutSetting
       typography: {
         fontFamily: settings.fontFamily,
         fontSize: settings.fontSize,
+        fontStyle: 'normal',
         fontWeight: settings.fontWeight,
         maxWidth: settings.maxWidth,
+        textAlign: 'left',
+        textDecoration: 'none',
       },
     },
   };

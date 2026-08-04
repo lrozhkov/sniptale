@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type RefObject } from 'react';
 import { useAppLocale } from '../../../platform/i18n';
 import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
@@ -7,13 +7,11 @@ import { resolveContentPortalTarget } from '../interactive-frame/layout/portal';
 import { CalloutSettingsPopoverContent } from './body';
 import { POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
-import {
-  usePopoverDistanceClose as useCalloutSettingsPopoverDistanceClose,
-  usePopoverEscapeClose,
-  usePopoverOutsideClose as useCalloutSettingsPopoverOutsideClose,
-} from '../popover-sync/hooks';
+import { usePopoverEscapeClose } from '../popover-sync/hooks';
 import { useCalloutSettingsPopoverState } from './state';
 import { useCalloutPresetPopoverController } from './preset-controller';
+import { CalloutPresetEditor } from '../../../ui/highlighter-preset-editor/callout';
+import { useCalloutSettingsPopoverDrag } from './drag';
 
 interface CalloutSettingsPopoverProps {
   isOpen: boolean;
@@ -22,6 +20,36 @@ interface CalloutSettingsPopoverProps {
   frameRect: { x: number; y: number; width: number; height: number };
   settings?: CalloutSettings;
   anchorEl: HTMLElement | null;
+}
+
+function useCalloutPopoverPresentation(args: {
+  anchorEl: HTMLElement | null;
+  frameId: string;
+  frameRect: CalloutSettingsPopoverProps['frameRect'];
+  isOpen: boolean;
+  popoverRef: RefObject<HTMLDivElement | null>;
+}) {
+  const popoverStyle = useFramePopoverPosition({
+    anchorEl: args.anchorEl,
+    fallbackSize: { width: POPOVER_WIDTH, height: POPOVER_HEIGHT },
+    frameId: args.frameId,
+    frameRect: args.frameRect,
+    isOpen: args.isOpen,
+    popoverRef: args.popoverRef,
+  });
+  const drag = useCalloutSettingsPopoverDrag({
+    basePosition: {
+      left: typeof popoverStyle.left === 'number' ? popoverStyle.left : 0,
+      top: typeof popoverStyle.top === 'number' ? popoverStyle.top : 0,
+    },
+    isOpen: args.isOpen,
+    popoverRef: args.popoverRef,
+    resetKey: args.frameId,
+  });
+  return {
+    drag,
+    style: { ...popoverStyle, left: drag.position.left, top: drag.position.top },
+  };
 }
 
 export function CalloutSettingsPopover({
@@ -34,9 +62,8 @@ export function CalloutSettingsPopover({
 }: CalloutSettingsPopoverProps) {
   useAppLocale();
   const popoverRef = useRef<HTMLDivElement | null>(null);
-  const popoverStyle = useFramePopoverPosition({
+  const presentation = useCalloutPopoverPresentation({
     anchorEl,
-    fallbackSize: { width: POPOVER_WIDTH, height: POPOVER_HEIGHT },
     frameId,
     frameRect,
     isOpen,
@@ -47,11 +74,9 @@ export function CalloutSettingsPopover({
     isOpen,
     ...(settings === undefined ? {} : { settings }),
   });
-  const presets = useCalloutPresetPopoverController({ applyPreset, isOpen, localSettings });
+  const presets = useCalloutPresetPopoverController(isOpen);
 
-  useCalloutSettingsPopoverOutsideClose({ isOpen, onClose, popoverRef });
-  useCalloutSettingsPopoverDistanceClose({ isOpen, onClose, popoverRef });
-  usePopoverEscapeClose({ anchorEl, isOpen, onClose });
+  usePopoverEscapeClose({ anchorEl, isOpen: isOpen && !presets.editor.isOpen, onClose });
 
   const handleDelete = () => {
     dispatchCalloutDelete({ frameId });
@@ -67,22 +92,41 @@ export function CalloutSettingsPopover({
       className={[
         'sniptale-callout-settings-popover sniptale-glass-popover',
         'sniptale-glass-popover--wide sniptale-content-popover--compact',
-        'sniptale-content-popover--toolbar-menu',
+        'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',
       ].join(' ')}
-      style={popoverStyle}
+      style={{
+        ...presentation.style,
+        width: POPOVER_WIDTH,
+      }}
       dataUi="content.callout-settings.popover"
     >
       <CalloutSettingsPopoverContent
         handleDelete={handleDelete}
+        headerDrag={presentation.drag}
         handleSettingChange={handleSettingChange}
         localSettings={localSettings}
         onApplyPreset={applyPreset}
-        onEditPreset={(preset) => void presets.edit(preset)}
-        onSavePreset={(name) => void presets.save(name)}
-        onTogglePreset={(preset) => void presets.toggle(preset)}
-        presets={presets.catalog?.presets ?? []}
-        presetError={presets.error}
+        onCustomizePreset={presets.editor.open}
+        onResetPreset={(preset) => void presets.editor.reset(preset)}
+        onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
+        pendingPresetIds={presets.catalog.pendingPresetIds}
+        presets={presets.catalog.visiblePresets}
+        presetError={presets.catalog.error}
+        onClose={onClose}
       />
+      {presets.editor.preset ? (
+        <CalloutPresetEditor
+          isOpen={presets.editor.isOpen}
+          isSaving={presets.editor.isSaving}
+          preset={presets.editor.preset}
+          onClose={presets.editor.close}
+          {...(presets.editor.preset.origin === 'system' &&
+          presets.editor.preset.customized === true
+            ? { onReset: () => presets.editor.reset(presets.editor.preset!) }
+            : {})}
+          onSave={presets.editor.save}
+        />
+      ) : null}
     </ContentPopoverAdapter>
   );
 }

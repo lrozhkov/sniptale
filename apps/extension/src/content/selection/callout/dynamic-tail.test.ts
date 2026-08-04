@@ -33,6 +33,45 @@ describe('getDynamicTailState', () => {
     expect(state.side).toBe('right');
   });
 
+  it('builds one outer contour around a bordered bubble and its tail', () => {
+    const state = getDynamicTailState({
+      borderRadius: 12,
+      borderWidth: 6,
+      frameRect: { x: 100, y: 100, width: 160, height: 120 },
+      bubbleRect: { x: 120, y: 20, width: 160, height: 48 },
+      preferredSide: 'top',
+      tailSize: 8,
+    });
+
+    expect(state.outlinePath.match(/ M /g)).toBeNull();
+    expect(state.outlinePath.startsWith('M ')).toBe(true);
+    expect(state.outlinePath.match(/ Q /g)).toHaveLength(5);
+    expect(state.outlinePath.endsWith('Z')).toBe(true);
+  });
+
+  it.each([
+    ['top', { x: 140, y: 20, width: 120, height: 48 }],
+    ['right', { x: 300, y: 120, width: 120, height: 48 }],
+    ['bottom', { x: 140, y: 280, width: 120, height: 48 }],
+    ['left', { x: -40, y: 120, width: 120, height: 48 }],
+  ] as const)('keeps a single rounded outer contour on the %s side', (side, bubbleRect) => {
+    const state = getDynamicTailState({
+      borderRadius: 10,
+      borderWidth: 4,
+      bubbleRect,
+      frameRect: { x: 100, y: 100, width: 160, height: 120 },
+      preferredSide: side,
+      tailSize: 8,
+    });
+
+    expect(state.side).toBe(side);
+    expect(state.outlinePath.startsWith('M ')).toBe(true);
+    expect(state.outlinePath.match(/ M /g)).toBeNull();
+    expect(state.outlinePath.match(/ Q /g)).toHaveLength(5);
+    expect(state.outlinePath.endsWith('Z')).toBe(true);
+    expect(state.outlinePath).not.toContain('NaN');
+  });
+
   it('overlaps the bubble edge and keeps a visible-width frame endpoint at an angle', () => {
     const bubbleRect = { x: 330, y: 78, width: 150, height: 72 };
     const state = getDynamicTailState({
@@ -47,7 +86,7 @@ describe('getDynamicTailState', () => {
         state.attachment.tipA.x - state.attachment.tipB.x,
         state.attachment.tipA.y - state.attachment.tipB.y
       )
-    ).toBeGreaterThanOrEqual(5);
+    ).toBeGreaterThan(0.5);
   });
 
   it.each([
@@ -135,7 +174,8 @@ describe('getDynamicTailState', () => {
     const tipWidth = width(near.attachment.tipA, near.attachment.tipB);
 
     expect(baseWidth).toBeGreaterThan(tipWidth);
-    expect(tipWidth).toBeGreaterThanOrEqual(5);
+    expect(tipWidth).toBeGreaterThan(0.5);
+    expect(tipWidth).toBeLessThan(5);
     expect(width(far.attachment.tipA, far.attachment.tipB)).toBeCloseTo(tipWidth);
     expect(near.path.match(/ Q /g)).toHaveLength(1);
     expect(near.path).not.toContain('A ');

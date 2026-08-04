@@ -215,6 +215,21 @@ describe('InteractiveFrame size edit interactions', () => {
     }).toEqual(before);
   });
 
+  it('switches an inactive frame effect and opens its settings with one click', () => {
+    const { frame } = renderFrame();
+    act(() => useFrameUIStore.getState().selectFrame(frame.id));
+
+    act(() => {
+      findToolbarButton(/Blur|Размытие/).click();
+    });
+
+    expect(useFrameUIStore.getState().activePopover).toEqual({
+      frameId: frame.id,
+      kind: 'frame-settings',
+    });
+    expect(queryContentUiElement('.sniptale-frame-settings-popover')).toBeInstanceOf(HTMLElement);
+  });
+
   it('keeps the highlighter frame visible when the width input is cleared', () => {
     const { onDelete } = renderFrame();
     const { frameContainer, widthInput } = openFrameSizeEditor();

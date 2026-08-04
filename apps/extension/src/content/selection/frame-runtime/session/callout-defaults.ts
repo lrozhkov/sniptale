@@ -72,7 +72,11 @@ export function createSessionCalloutSettings(style: CalloutVisualStyle | null) {
     preset && resolvedStyle && styleKey(preset.style) === styleKey(resolvedStyle)
       ? preset.id
       : undefined;
-  return createDefaultCalloutSettings(resolvedStyle, sourcePresetId);
+  return createDefaultCalloutSettings(
+    resolvedStyle,
+    sourcePresetId,
+    sourcePresetId ? preset?.placement : undefined
+  );
 }
 
 export { createDefaultCalloutSettings } from '../../callout/model';

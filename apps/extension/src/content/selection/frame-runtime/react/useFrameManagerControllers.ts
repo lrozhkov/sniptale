@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
 import type { InteractiveFrameComponent } from '../roots/component';
 import type {
@@ -13,6 +13,9 @@ import { useFrameManagerRuntimeSyncEffects } from './useFrameManagerRuntimeSyncE
 import { useFrameManagerSessionEffects } from './useFrameManagerSessionEffects';
 import { useStepBadgeControllers } from '../manager/step-badge/controllers';
 import { getFrameSessionBorderPreset } from '../session/border-preset';
+import { createSessionCalloutSettings } from '../session/callout-defaults';
+import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import { getFutureFrameCallout, setFutureFrameCallout } from '../session/future-callout';
 
 /**
  * Builds the internal frame manager controllers and side effects.
@@ -98,6 +101,7 @@ function useOwnedFrameManagerPublicResult(args: {
     updateFrame: args.mutations.updateFrame,
     updateFrameEffect: args.mutations.updateFrameEffect,
     setFutureFrameEffectMode: args.frameSessionStyle.setFutureFrameEffectMode,
+    futureFrameCallout: args.frameSessionStyle.futureFrameCallout,
   });
 }
 
@@ -108,6 +112,7 @@ function useFrameSessionStyle(refs: FrameManagerRefs) {
       borderSettings: getFrameSessionBorderPreset(),
       blurSettings: { ...refs.sessionSettingsRefs.blurSettings.current },
       focusSettings: { ...refs.sessionSettingsRefs.focusSettings.current },
+      futureCallout: getFutureFrameCallout(),
     }),
     [refs.globalEffectModeRef, refs.sessionSettingsRefs]
   );
@@ -119,7 +124,28 @@ function useFrameSessionStyle(refs: FrameManagerRefs) {
     [refs.globalEffectModeRef, refs.sessionSettingsRefs]
   );
 
-  return { getFutureFrameStyle, setFutureFrameEffectMode };
+  const updateFutureFrameCallout = useCallback(
+    (settings: CalloutSettings | null) => {
+      setFutureFrameCallout(settings);
+      if (settings) refs.sessionCalloutStyleRef.current = structuredClone(settings.style);
+    },
+    [refs.sessionCalloutStyleRef]
+  );
+  const enableFutureFrameCallout = useCallback(() => {
+    const settings = createSessionCalloutSettings(refs.sessionCalloutStyleRef.current);
+    setFutureFrameCallout(settings);
+    return settings;
+  }, [refs.sessionCalloutStyleRef]);
+  const futureFrameCallout = useMemo(
+    () => ({ enable: enableFutureFrameCallout, set: updateFutureFrameCallout }),
+    [enableFutureFrameCallout, updateFutureFrameCallout]
+  );
+
+  return {
+    futureFrameCallout,
+    getFutureFrameStyle,
+    setFutureFrameEffectMode,
+  };
 }
 
 function useGlobalStepBadgeSettingsGetter(refs: FrameManagerRefs) {

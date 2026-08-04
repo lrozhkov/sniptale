@@ -111,13 +111,15 @@ export function renderDynamicCalloutTail(
           style.connector.blockMarker,
           tail.blockPoint,
           style.connector.color,
-          tail.blockAngle
+          tail.blockAngle,
+          style.connector.blockMarkerSize
         )}
         {renderConnectorMarker(
           style.connector.frameMarker,
           tail.framePoint,
           style.connector.color,
-          tail.frameAngle
+          tail.frameAngle,
+          style.connector.frameMarkerSize
         )}
       </svg>
     );
@@ -138,7 +140,20 @@ export function renderDynamicCalloutTail(
         stroke="transparent"
         strokeWidth={18}
       />
-      <path d={tail.path} fill={style.surface.backgroundColor} pointerEvents="none" />
+      {style.surface.borderWidth > 0 ? (
+        <path
+          data-ui="content.callout.tail-outline"
+          d={tail.outlinePath}
+          fill={style.surface.backgroundColor}
+          pointerEvents="none"
+          stroke={style.surface.borderColor}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={style.surface.borderWidth}
+        />
+      ) : (
+        <path d={tail.path} fill={style.surface.backgroundColor} pointerEvents="none" />
+      )}
     </svg>
   );
 }
@@ -147,32 +162,64 @@ function renderConnectorMarker(
   marker: CalloutConnectorMarker,
   point: { x: number; y: number },
   color: string,
-  angle: number
+  angle: number,
+  size: number
 ) {
   if (marker === 'none') return null;
+  const halfSize = size / 2;
   if (marker === 'circle') {
-    return <circle cx={point.x} cy={point.y} r={5} fill={color} pointerEvents="none" />;
+    return <circle cx={point.x} cy={point.y} r={halfSize} fill={color} pointerEvents="none" />;
+  }
+  if (marker === 'ring-dot') {
+    const ringStrokeWidth = Number(Math.max(1, size * 0.12).toFixed(2));
+    const dotRadius = Number(Math.max(1, size * 0.14).toFixed(2));
+    return (
+      <g pointerEvents="none">
+        <circle
+          cx={point.x}
+          cy={point.y}
+          fill="none"
+          r={halfSize}
+          stroke={color}
+          strokeWidth={ringStrokeWidth}
+        />
+        <circle cx={point.x} cy={point.y} fill={color} r={dotRadius} />
+      </g>
+    );
   }
   if (marker === 'square') {
-    return <rect x={point.x - 5} y={point.y - 5} width={10} height={10} fill={color} />;
+    return (
+      <rect
+        fill={color}
+        height={size}
+        pointerEvents="none"
+        width={size}
+        x={point.x - halfSize}
+        y={point.y - halfSize}
+      />
+    );
   }
   if (marker === 'diamond') {
     return (
       <polygon
         points={
-          `${point.x},${point.y - 6} ${point.x + 6},${point.y} ` +
-          `${point.x},${point.y + 6} ${point.x - 6},${point.y}`
+          `${point.x + halfSize},${point.y} ${point.x},${point.y + halfSize} ` +
+          `${point.x - halfSize},${point.y} ${point.x},${point.y - halfSize}`
         }
         fill={color}
+        pointerEvents="none"
       />
     );
   }
   return (
     <polygon
       points={
-        `${point.x + 7},${point.y} ${point.x - 6},${point.y - 6} ` + `${point.x - 6},${point.y + 6}`
+        `${point.x + halfSize},${point.y} ` +
+        `${point.x - halfSize},${point.y - size * 0.42} ` +
+        `${point.x - halfSize},${point.y + size * 0.42}`
       }
       fill={color}
+      pointerEvents="none"
       transform={`rotate(${angle} ${point.x} ${point.y})`}
     />
   );

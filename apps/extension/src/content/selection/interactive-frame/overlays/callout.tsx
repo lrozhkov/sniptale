@@ -1,5 +1,6 @@
 import React from 'react';
 import type { FrameData } from '../../../../features/highlighter/contracts';
+import { resolveFrameSurface } from '../../../../features/highlighter/frame-surface';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 import { Callout } from '../../callout';
 
@@ -9,6 +10,7 @@ interface InteractiveFrameCalloutOverlayProps {
   frameZIndex: number;
   isCalloutEditing: boolean;
   isCalloutPopoverOpen: boolean;
+  isFrameEditing: boolean;
   calloutPopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
@@ -23,6 +25,12 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
   if (!callout?.enabled) {
     return null;
   }
+  const effectMode = props.currentFrame.effectMode ?? props.frame.effectMode ?? 'border';
+  const frameSurface = resolveFrameSurface({
+    ...props.currentFrame,
+    effectMode,
+  });
+  const frameBorderWidth = frameSurface.strokeVisible ? frameSurface.geometry.strokeWidth : 0;
 
   const applyCalloutFrameUpdate = (nextCallout: NonNullable<FrameData['callout']>) => {
     const nextFrameSnapshot = {
@@ -37,10 +45,12 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
   return (
     <Callout
       frameId={props.frame.id}
+      frameBorderWidth={frameBorderWidth}
       settings={callout}
       frameRect={props.currentFrame}
       zIndex={props.frameZIndex + 1}
       isEditing={props.isCalloutEditing}
+      isFrameEditing={props.isFrameEditing}
       isSettingsOpen={props.isCalloutPopoverOpen}
       onStartEditing={() => props.setIsCalloutEditing(true)}
       onStopEditing={() => props.setIsCalloutEditing(false)}
@@ -61,10 +71,21 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
         props.setIsCalloutEditing(false);
       }}
       onSettingsClick={() => toggleQuickPopover(props.frame.id, 'callout-settings')}
-      onPositionChange={(manualPlacement) => {
+      onPositionChange={(manualPlacement, behavior) => {
         applyCalloutFrameUpdate({
           ...callout,
-          placement: { ...callout.placement, manualPlacement },
+          placement: {
+            ...callout.placement,
+            manualPlacement,
+            ...(behavior.preserveConnectorAnchors
+              ? {}
+              : {
+                  connectorBasePosition: undefined,
+                  connectorBaseWidth: undefined,
+                  connectorFramePosition: undefined,
+                  connectorWaypoint: undefined,
+                }),
+          },
         });
       }}
       onTailBaseRangeChange={(tailBasePosition, tailBaseWidth) => {
@@ -81,6 +102,12 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
         applyCalloutFrameUpdate({
           ...callout,
           placement: { ...callout.placement, connectorFramePosition: tailFramePosition },
+        });
+      }}
+      onWaypointChange={(connectorWaypoint) => {
+        applyCalloutFrameUpdate({
+          ...callout,
+          placement: { ...callout.placement, connectorWaypoint },
         });
       }}
       onWidthChange={(maxWidth, manualPlacement) => {

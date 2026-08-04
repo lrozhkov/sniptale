@@ -13,6 +13,7 @@ type RegionRect = { x: number; y: number; width: number; height: number };
 
 export function getCalloutLayoutState(args: {
   dimensions: { width: number; height: number };
+  frameBorderWidth?: number;
   frameRect: RegionRect;
   isEditing: boolean;
   settings: CalloutSettings;
@@ -35,19 +36,23 @@ export function getCalloutLayoutState(args: {
     args.dimensions.width > 0 && args.dimensions.height > 0 ? args.dimensions : effectiveDimensions;
   const calloutPos = placement.manualPlacement
     ? getManualCalloutPosition(args.frameRect, positionDimensions, placement.manualPlacement)
-    : getCalloutPosition(
-        resolvedSide,
+    : getCalloutPosition({
+        anchor: placement.anchor,
         anchorPos,
-        positionDimensions,
-        style.connector.kind === 'wedge' ? style.connector.wedgeSize : 0
-      );
+        calloutDimensions: positionDimensions,
+        frameHeight: args.frameRect.height,
+        side: resolvedSide,
+        tailSize: style.connector.kind === 'wedge' ? style.connector.wedgeSize : 0,
+      });
   const effectiveZIndex = args.isEditing
     ? Z_INDEX_CALLOUT_EDITING
     : Math.min(args.zIndex, Z_INDEX_CALLOUT_VIEWING);
-  const dynamicTail =
+  const connectorState =
     style.connector.kind === 'wedge'
       ? getDynamicTailState({
           anchorPoint: anchorPos,
+          borderRadius: style.surface.radius,
+          borderWidth: style.surface.borderWidth,
           bubbleRect: { ...calloutPos, ...positionDimensions },
           frameRect: args.frameRect,
           ...(placement.connectorBasePosition === undefined
@@ -66,8 +71,15 @@ export function getCalloutLayoutState(args: {
       : style.connector.kind === 'line'
         ? getLineConnectorState({
             anchorPoint: anchorPos,
+            blockBoundaryWidth: style.surface.borderWidth,
+            blockMarker: style.connector.blockMarker,
+            blockMarkerSize: style.connector.blockMarkerSize,
             bubbleRect: { ...calloutPos, ...positionDimensions },
+            frameBoundaryWidth: args.frameBorderWidth ?? 0,
+            frameMarker: style.connector.frameMarker,
+            frameMarkerSize: style.connector.frameMarkerSize,
             frameRect: args.frameRect,
+            lineWidth: style.connector.width,
             placement,
             routing: style.connector.routing,
             wedgeSize: style.connector.wedgeSize,
@@ -75,6 +87,11 @@ export function getCalloutLayoutState(args: {
             ...(args.previousConnectorSide ? { previousSide: args.previousConnectorSide } : {}),
           })
         : null;
+  const dynamicTail =
+    connectorState?.kind === 'wedge' &&
+    !doesWedgeExitBubble(connectorState, { ...calloutPos, ...positionDimensions })
+      ? null
+      : connectorState;
 
   return {
     effectiveZIndex,
@@ -83,9 +100,26 @@ export function getCalloutLayoutState(args: {
     calloutPos,
     calloutDimensions: positionDimensions,
     wrapperStyle: getCalloutWrapperStyle(args.settings, calloutPos, effectiveZIndex),
-    cloudStyle: getCalloutCloudStyle(args.settings, args.isEditing),
+    cloudStyle: getCalloutCloudStyle(args.settings, args.isEditing, dynamicTail),
     editableStyle: getCalloutEditableStyle(args.isEditing),
   };
+}
+
+function doesWedgeExitBubble(
+  connector: ReturnType<typeof getDynamicTailState>,
+  bubbleRect: RegionRect
+) {
+  const tip = connector.attachment.tipPoint;
+  switch (connector.side) {
+    case 'top':
+      return tip.y >= bubbleRect.y + bubbleRect.height;
+    case 'right':
+      return tip.x <= bubbleRect.x;
+    case 'bottom':
+      return tip.y <= bubbleRect.y;
+    case 'left':
+      return tip.x >= bubbleRect.x + bubbleRect.width;
+  }
 }
 
 function getManualCalloutPosition(
@@ -112,7 +146,7 @@ function getCalloutWrapperStyle(
     settings.style.surface.shadow <= 0
       ? 'none'
       : `drop-shadow(0 4px ${settings.style.surface.shadow}px ` +
-        'color-mix(in srgb, var(--sniptale-color-overlay) 32%, transparent))';
+        `color-mix(in srgb, ${settings.style.surface.shadowColor} 32%, transparent))`;
 
   return {
     position: 'fixed',
@@ -124,20 +158,32 @@ function getCalloutWrapperStyle(
   };
 }
 
-function getCalloutCloudStyle(settings: CalloutSettings, isEditing: boolean): CSSProperties {
+function getCalloutCloudStyle(
+  settings: CalloutSettings,
+  isEditing: boolean,
+  connector:
+    | ReturnType<typeof getDynamicTailState>
+    | ReturnType<typeof getLineConnectorState>
+    | null
+): CSSProperties {
   const { surface, typography } = settings.style;
+  const hasWedgeOutline = connector?.kind === 'wedge' && surface.borderWidth > 0;
   return {
     position: 'relative',
     minWidth: 40,
+    width: 'max-content',
     maxWidth: typography.maxWidth,
-    backgroundColor: surface.backgroundColor,
+    backgroundColor: hasWedgeOutline ? 'transparent' : surface.backgroundColor,
     color: surface.textColor,
-    border: `${surface.borderWidth}px solid ${surface.borderColor}`,
+    border: `${surface.borderWidth}px solid ${hasWedgeOutline ? 'transparent' : surface.borderColor}`,
     borderRadius: surface.radius,
     padding: `${surface.paddingY}px ${surface.paddingX}px`,
     fontFamily: FONT_FAMILY_MAP[typography.fontFamily],
     fontSize: typography.fontSize,
+    fontStyle: typography.fontStyle,
     fontWeight: typography.fontWeight,
+    textAlign: typography.textAlign,
+    textDecoration: typography.textDecoration,
     lineHeight: 1.4,
     cursor: isEditing ? 'text' : 'pointer',
     isolation: 'isolate',

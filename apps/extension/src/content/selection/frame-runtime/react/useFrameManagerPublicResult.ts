@@ -9,6 +9,7 @@ import type {
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
 import type { FrameMutations, RecalculateStepBadges } from '../contracts';
+import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 
 interface FrameManagerPublicResultParams {
   addAutoBlurFrames: FrameMutations['addAutoBlurFrames'];
@@ -22,12 +23,17 @@ interface FrameManagerPublicResultParams {
     borderSettings: BorderPreset;
     effectMode: EffectMode;
     focusSettings: FocusSettings;
+    futureCallout?: CalloutSettings | null;
   };
   getGlobalStepBadgeSettings: () => GlobalStepBadgeSettings;
   hasFrameForElement: (element: HTMLElement) => boolean;
   recalculateStepBadges: RecalculateStepBadges;
   removeFrame: FrameMutations['removeFrame'];
   setFutureFrameEffectMode: (mode: EffectMode) => void;
+  futureFrameCallout?: {
+    enable: () => CalloutSettings;
+    set: (settings: CalloutSettings | null) => void;
+  };
   syncAutoBlurFrames: FrameMutations['syncAutoBlurFrames'];
   syncFocusOpacity: FrameMutations['syncFocusOpacity'];
   updateFrame: FrameMutations['updateFrame'];
@@ -68,6 +74,7 @@ function arePublicResultParamsEqual(
     prev.recalculateStepBadges === next.recalculateStepBadges &&
     prev.removeFrame === next.removeFrame &&
     prev.setFutureFrameEffectMode === next.setFutureFrameEffectMode &&
+    prev.futureFrameCallout === next.futureFrameCallout &&
     prev.syncFocusOpacity === next.syncFocusOpacity &&
     prev.syncAutoBlurFrames === next.syncAutoBlurFrames &&
     prev.updateFrame === next.updateFrame &&
@@ -87,6 +94,9 @@ function buildFrameManagerResult(params: FrameManagerPublicResultParams) {
     clearAutoBlurFrames: params.clearAutoBlurFrames,
     removeFrame: params.removeFrame,
     setFutureFrameEffectMode: params.setFutureFrameEffectMode,
+    ...(params.futureFrameCallout === undefined
+      ? {}
+      : { futureFrameCallout: params.futureFrameCallout }),
     clearFrames: params.clearFrames,
     syncAutoBlurFrames: params.syncAutoBlurFrames,
     updateFrame: params.updateFrame,

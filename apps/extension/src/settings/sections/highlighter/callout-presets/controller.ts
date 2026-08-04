@@ -99,8 +99,17 @@ function createCatalogActions(args: {
       const saved = await args.mutate(
         () =>
           exists
-            ? updateCalloutPreset({ id: preset.id, name: preset.name, style: preset.style })
-            : createUserCalloutPreset({ name: preset.name, style: preset.style }),
+            ? updateCalloutPreset({
+                id: preset.id,
+                name: preset.name,
+                placement: preset.placement,
+                style: preset.style,
+              })
+            : createUserCalloutPreset({
+                name: preset.name,
+                placement: preset.placement,
+                style: preset.style,
+              }),
         exists
           ? 'highlighter.calloutPresets.messages.updated'
           : 'highlighter.calloutPresets.messages.created'

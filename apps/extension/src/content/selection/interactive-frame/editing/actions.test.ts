@@ -27,7 +27,7 @@ describe('toggleInteractiveFrameEffectMode', () => {
   });
 
   it.each(['step-badge', 'callout-settings'] as const)(
-    'closes an open %s popover before switching to another effect',
+    'replaces an open %s popover with settings for the selected effect',
     (popoverKind) => {
       const store = useFrameUIStore.getState();
       store.selectFrame('frame-1');
@@ -43,8 +43,31 @@ describe('toggleInteractiveFrameEffectMode', () => {
         togglePopover: store.togglePopover,
       });
 
-      expect(useFrameUIStore.getState().activePopover).toBeNull();
+      expect(useFrameUIStore.getState().activePopover).toEqual({
+        frameId: 'frame-1',
+        kind: 'frame-settings',
+      });
       expect(setEffectMode).toHaveBeenCalledWith('blur');
     }
   );
+
+  it('keeps frame settings open when switching between effects', () => {
+    const store = useFrameUIStore.getState();
+    store.selectFrame('frame-1');
+    store.togglePopover('frame-1', 'frame-settings');
+
+    toggleInteractiveFrameEffectMode({
+      closePopover: store.closePopover,
+      effectMode: 'border',
+      frameId: 'frame-1',
+      mode: 'focus',
+      setEffectMode: vi.fn(),
+      togglePopover: store.togglePopover,
+    });
+
+    expect(useFrameUIStore.getState().activePopover).toEqual({
+      frameId: 'frame-1',
+      kind: 'frame-settings',
+    });
+  });
 });

@@ -17,6 +17,82 @@ it('parses compact catalog rows and preserves transparent colors', () => {
   expect(parsed.value.userPresets?.[0]?.style.surface.backgroundColor).toBe('transparent');
 });
 
+it('defaults the shadow color for catalogs saved before shadow colors existed', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const legacyStyle = {
+    ...style,
+    surface: Object.fromEntries(
+      Object.entries(style.surface).filter(([key]) => key !== 'shadowColor')
+    ),
+  };
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [{ id: 'user-legacy', name: 'Legacy', style: legacyStyle }],
+  });
+
+  expect(parsed.value.userPresets?.[0]?.style.surface.shadowColor).toBe('#000000');
+});
+
+it('defaults text formatting for catalogs saved before emphasis and alignment existed', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const legacyStyle = {
+    ...style,
+    typography: Object.fromEntries(
+      Object.entries(style.typography).filter(
+        ([key]) => key !== 'fontStyle' && key !== 'textAlign' && key !== 'textDecoration'
+      )
+    ),
+  };
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [{ id: 'user-legacy-type', name: 'Legacy type', style: legacyStyle }],
+  });
+
+  expect(parsed.value.userPresets?.[0]?.style.typography).toMatchObject({
+    fontStyle: 'normal',
+    textAlign: 'left',
+    textDecoration: 'none',
+  });
+});
+
+it('defaults endpoint sizes for catalogs saved before marker sizing existed', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const legacyStyle = {
+    ...style,
+    connector: Object.fromEntries(
+      Object.entries(style.connector).filter(
+        ([key]) => key !== 'blockMarkerSize' && key !== 'frameMarkerSize'
+      )
+    ),
+  };
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [{ id: 'user-legacy-markers', name: 'Legacy markers', style: legacyStyle }],
+  });
+
+  expect(parsed.value.userPresets?.[0]?.style.connector).toMatchObject({
+    blockMarkerSize: 10,
+    frameMarkerSize: 10,
+  });
+});
+
+it('parses the explicit system customization marker and its source revision', () => {
+  const preset = createSystemCalloutPresetCatalog()[0]!;
+  const parsed = parseStoredCalloutPresetCatalog({
+    systemOverrides: [
+      {
+        basedOnRevision: 1,
+        customized: false,
+        name: preset.name,
+        style: preset.style,
+        systemPresetKey: preset.systemPresetKey,
+      },
+    ],
+  });
+  expect(parsed).toMatchObject({ hasInvalidRoot: false, invalidFieldCount: 0 });
+  expect(parsed.value.systemOverrides?.[0]).toMatchObject({
+    basedOnRevision: 1,
+    customized: false,
+  });
+});
+
 it('counts malformed boundary rows without casting them into the catalog', () => {
   const parsed = parseStoredCalloutPresetCatalog({
     placements: [{ id: 'x', enabled: 'yes', order: -1 }],
@@ -35,7 +111,7 @@ it('drops duplicate identifiers and marks the payload unsafe for mutation', () =
   expect(parsed.value.placements).toEqual([duplicate]);
 });
 
-it('rejects unsafe colors and out-of-range visual resources at the storage boundary', () => {
+it('rejects unsafe colors while preserving a user-expanded wrapping width', () => {
   const style = createSystemCalloutPresetCatalog()[0]!.style;
   const unsafeColor = {
     ...style,
@@ -52,6 +128,64 @@ it('rejects unsafe colors and out-of-range visual resources at the storage bound
     ],
   });
 
-  expect(parsed.invalidFieldCount).toBe(2);
+  expect(parsed.invalidFieldCount).toBe(1);
+  expect(parsed.value.userPresets).toHaveLength(1);
+  expect(parsed.value.userPresets?.[0]?.style.typography.maxWidth).toBe(100_000);
+});
+
+it('rejects endpoint sizes outside the supported visual range', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      {
+        id: 'user-invalid-marker',
+        name: 'Invalid marker',
+        style: {
+          ...style,
+          connector: { ...style.connector, blockMarkerSize: 49 },
+        },
+      },
+    ],
+  });
+
+  expect(parsed.invalidFieldCount).toBe(1);
   expect(parsed.value.userPresets).toEqual([]);
+});
+
+it('rejects a preset position whose anchor and side are outside the supported grid', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      {
+        id: 'user-invalid-position',
+        name: 'Invalid position',
+        placement: { anchor: 'center', side: 'auto' },
+        style,
+      },
+    ],
+  });
+
+  expect(parsed.invalidFieldCount).toBe(1);
+  expect(parsed.value.userPresets).toEqual([]);
+});
+
+it('accepts larger title typography while keeping its persisted range bounded', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      {
+        id: 'user-large-title',
+        name: 'Large title',
+        style: { ...style, title: { ...style.title, fontSize: 144 } },
+      },
+      {
+        id: 'user-oversized-title',
+        name: 'Oversized title',
+        style: { ...style, title: { ...style.title, fontSize: 145 } },
+      },
+    ],
+  });
+
+  expect(parsed.invalidFieldCount).toBe(1);
+  expect(parsed.value.userPresets?.map((preset) => preset.id)).toEqual(['user-large-title']);
 });

@@ -10,7 +10,7 @@ type Point = { x: number; y: number };
 const BUBBLE_EDGE_MARGIN = 4;
 const FRAME_PORT_FOLLOW_RATIO = 0.86;
 const SIDE_HYSTERESIS = 0.12;
-const TIP_ROUNDING_RATIO = 0.28;
+const TIP_ROUNDING_RATIO = 0.08;
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
@@ -192,6 +192,8 @@ function getRoundedTriangleTip(args: {
 }
 
 function getBubbleBase(args: {
+  baseOverlap: number;
+  borderRadius: number;
   bubbleRect: Rect;
   bubbleSide: ConnectorSide;
   candidate: Point;
@@ -202,7 +204,7 @@ function getBubbleBase(args: {
   const horizontal = args.bubbleSide === 'top' || args.bubbleSide === 'bottom';
   const edgeStart = horizontal ? args.bubbleRect.x : args.bubbleRect.y;
   const edgeLength = horizontal ? args.bubbleRect.width : args.bubbleRect.height;
-  const straightInset = Math.min(BUBBLE_EDGE_MARGIN, edgeLength / 2);
+  const straightInset = Math.min(Math.max(BUBBLE_EDGE_MARGIN, args.borderRadius), edgeLength / 2);
   const straightStart = edgeStart + straightInset;
   const straightEnd = edgeStart + edgeLength - straightInset;
   const availableSpan = Math.max(0, straightEnd - straightStart);
@@ -227,9 +229,9 @@ function getBubbleBase(args: {
   const baseEdgeA = offsetPoint(edgePoint, tangent, -baseSpan / 2);
   const baseEdgeB = offsetPoint(edgePoint, tangent, baseSpan / 2);
   const interiorNormal = getInteriorNormal(args.bubbleSide);
-  const baseA = offsetPoint(baseEdgeA, interiorNormal, 2);
-  const baseB = offsetPoint(baseEdgeB, interiorNormal, 2);
-  const bubblePoint = offsetPoint(edgePoint, interiorNormal, 2);
+  const baseA = offsetPoint(baseEdgeA, interiorNormal, args.baseOverlap);
+  const baseB = offsetPoint(baseEdgeB, interiorNormal, args.baseOverlap);
+  const bubblePoint = offsetPoint(edgePoint, interiorNormal, args.baseOverlap);
 
   return {
     baseA,
@@ -244,6 +246,8 @@ function getBubbleBase(args: {
 
 function getConnectorPoints(args: {
   anchorPoint?: Point;
+  borderRadius?: number;
+  borderWidth?: number;
   bubbleRect: Rect;
   frameRect: Rect;
   side: ConnectorSide;
@@ -264,6 +268,8 @@ function getConnectorPoints(args: {
   );
   const { baseSpan } = getCalloutTailMetrics(args.tailSize);
   const base = getBubbleBase({
+    baseOverlap: Math.max(2, (args.borderWidth ?? 0) + 1),
+    borderRadius: Math.max(0, args.borderRadius ?? 0),
     bubbleRect: args.bubbleRect,
     bubbleSide,
     candidate: bubbleEdgeCandidate,
@@ -291,16 +297,27 @@ function getConnectorPoints(args: {
   };
 }
 
-function getPathGeometry(points: ReturnType<typeof getConnectorPoints>) {
+function getPathGeometry(args: {
+  borderWidth: number;
+  bubbleRect: Rect;
+  points: ReturnType<typeof getConnectorPoints>;
+}) {
   const pathPoints = [
-    points.baseA,
-    points.baseB,
-    points.tipA,
-    points.tipB,
-    points.tipPoint,
-    points.tipVertex,
+    args.points.baseA,
+    args.points.baseB,
+    args.points.baseEdgeA,
+    args.points.baseEdgeB,
+    args.points.tipA,
+    args.points.tipB,
+    args.points.tipPoint,
+    args.points.tipVertex,
+    { x: args.bubbleRect.x, y: args.bubbleRect.y },
+    {
+      x: args.bubbleRect.x + args.bubbleRect.width,
+      y: args.bubbleRect.y + args.bubbleRect.height,
+    },
   ];
-  const padding = 2;
+  const padding = Math.max(2, args.borderWidth / 2 + 1);
   const left = Math.min(...pathPoints.map((point) => point.x)) - padding;
   const top = Math.min(...pathPoints.map((point) => point.y)) - padding;
   const right = Math.max(...pathPoints.map((point) => point.x)) + padding;
@@ -309,20 +326,94 @@ function getPathGeometry(points: ReturnType<typeof getConnectorPoints>) {
 
   return {
     left,
-    localBaseA: local(points.baseA),
-    localBaseB: local(points.baseB),
-    localTipA: local(points.tipA),
-    localTipB: local(points.tipB),
-    localTipPoint: local(points.tipPoint),
-    localTipVertex: local(points.tipVertex),
+    localBaseA: local(args.points.baseA),
+    localBaseB: local(args.points.baseB),
+    localBaseEdgeA: local(args.points.baseEdgeA),
+    localBaseEdgeB: local(args.points.baseEdgeB),
+    localBubbleRect: {
+      height: args.bubbleRect.height,
+      width: args.bubbleRect.width,
+      x: args.bubbleRect.x - left,
+      y: args.bubbleRect.y - top,
+    },
+    localTipA: local(args.points.tipA),
+    localTipB: local(args.points.tipB),
+    localTipPoint: local(args.points.tipPoint),
+    localTipVertex: local(args.points.tipVertex),
     right,
     top,
     bottom,
   };
 }
 
+function getBubblePerimeterPath(args: {
+  baseA: Point;
+  bubbleRect: Rect;
+  radius: number;
+  side: ConnectorSide;
+}): string {
+  const left = args.bubbleRect.x;
+  const top = args.bubbleRect.y;
+  const right = left + args.bubbleRect.width;
+  const bottom = top + args.bubbleRect.height;
+  const radius = Math.min(args.radius, args.bubbleRect.width / 2, args.bubbleRect.height / 2);
+
+  switch (getOppositeSide(args.side)) {
+    case 'top':
+      return [
+        `L ${right - radius} ${top}`,
+        `Q ${right} ${top} ${right} ${top + radius}`,
+        `L ${right} ${bottom - radius}`,
+        `Q ${right} ${bottom} ${right - radius} ${bottom}`,
+        `L ${left + radius} ${bottom}`,
+        `Q ${left} ${bottom} ${left} ${bottom - radius}`,
+        `L ${left} ${top + radius}`,
+        `Q ${left} ${top} ${left + radius} ${top}`,
+        `L ${args.baseA.x} ${args.baseA.y}`,
+      ].join(' ');
+    case 'right':
+      return [
+        `L ${right} ${bottom - radius}`,
+        `Q ${right} ${bottom} ${right - radius} ${bottom}`,
+        `L ${left + radius} ${bottom}`,
+        `Q ${left} ${bottom} ${left} ${bottom - radius}`,
+        `L ${left} ${top + radius}`,
+        `Q ${left} ${top} ${left + radius} ${top}`,
+        `L ${right - radius} ${top}`,
+        `Q ${right} ${top} ${right} ${top + radius}`,
+        `L ${args.baseA.x} ${args.baseA.y}`,
+      ].join(' ');
+    case 'bottom':
+      return [
+        `L ${right - radius} ${bottom}`,
+        `Q ${right} ${bottom} ${right} ${bottom - radius}`,
+        `L ${right} ${top + radius}`,
+        `Q ${right} ${top} ${right - radius} ${top}`,
+        `L ${left + radius} ${top}`,
+        `Q ${left} ${top} ${left} ${top + radius}`,
+        `L ${left} ${bottom - radius}`,
+        `Q ${left} ${bottom} ${left + radius} ${bottom}`,
+        `L ${args.baseA.x} ${args.baseA.y}`,
+      ].join(' ');
+    case 'left':
+      return [
+        `L ${left} ${bottom - radius}`,
+        `Q ${left} ${bottom} ${left + radius} ${bottom}`,
+        `L ${right - radius} ${bottom}`,
+        `Q ${right} ${bottom} ${right} ${bottom - radius}`,
+        `L ${right} ${top + radius}`,
+        `Q ${right} ${top} ${right - radius} ${top}`,
+        `L ${left + radius} ${top}`,
+        `Q ${left} ${top} ${left} ${top + radius}`,
+        `L ${args.baseA.x} ${args.baseA.y}`,
+      ].join(' ');
+  }
+}
+
 export function getDynamicTailState(args: {
   anchorPoint?: Point;
+  borderRadius?: number;
+  borderWidth?: number;
   bubbleRect: Rect;
   frameRect: Rect;
   preferredSide?: ConnectorSide;
@@ -346,6 +437,7 @@ export function getDynamicTailState(args: {
     tipVertex: Point;
   };
   kind: 'wedge';
+  outlinePath: string;
   path: string;
   side: ConnectorSide;
   style: CSSProperties;
@@ -358,7 +450,8 @@ export function getDynamicTailState(args: {
     args.preferredSide
   );
   const points = getConnectorPoints({ ...args, side });
-  const geometry = getPathGeometry(points);
+  const borderWidth = Math.max(0, args.borderWidth ?? 0);
+  const geometry = getPathGeometry({ borderWidth, bubbleRect: args.bubbleRect, points });
   const width = Math.max(1, geometry.right - geometry.left);
   const height = Math.max(1, geometry.bottom - geometry.top);
 
@@ -376,6 +469,20 @@ export function getDynamicTailState(args: {
       tipPoint: points.tipPoint,
       tipVertex: points.tipVertex,
     },
+    outlinePath: [
+      `M ${geometry.localBaseEdgeA.x} ${geometry.localBaseEdgeA.y}`,
+      `L ${geometry.localTipA.x} ${geometry.localTipA.y}`,
+      `Q ${geometry.localTipVertex.x} ${geometry.localTipVertex.y}` +
+        ` ${geometry.localTipB.x} ${geometry.localTipB.y}`,
+      `L ${geometry.localBaseEdgeB.x} ${geometry.localBaseEdgeB.y}`,
+      getBubblePerimeterPath({
+        baseA: geometry.localBaseEdgeA,
+        bubbleRect: geometry.localBubbleRect,
+        radius: Math.max(0, args.borderRadius ?? 0),
+        side,
+      }),
+      'Z',
+    ].join(' '),
     path: [
       `M ${geometry.localBaseA.x} ${geometry.localBaseA.y}`,
       `L ${geometry.localTipA.x} ${geometry.localTipA.y}`,

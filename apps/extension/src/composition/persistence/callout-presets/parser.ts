@@ -1,12 +1,14 @@
 // policyStateIds: [] - exact preset parser sets are immutable value allowlists, not authority state.
 import {
   SYSTEM_CALLOUT_PRESET_KEYS,
+  type CalloutAnchor,
+  type CalloutPreset,
   type CalloutVisualStyle,
   type SystemCalloutPresetKey,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 
-export const CALLOUT_PRESET_STORAGE_SCHEMA_VERSION = 1;
+export const CALLOUT_PRESET_STORAGE_SCHEMA_VERSION = 3;
 export const MAX_USER_CALLOUT_PRESETS = 16;
 export const MAX_CALLOUT_PRESET_NAME_LENGTH = 64;
 
@@ -17,7 +19,10 @@ interface StoredCalloutPresetPlacement {
 }
 
 interface StoredSystemCalloutPresetOverride {
+  basedOnRevision?: number;
+  customized?: boolean;
   name: string;
+  placement?: CalloutPreset['placement'];
   style: CalloutVisualStyle;
   systemPresetKey: SystemCalloutPresetKey;
 }
@@ -25,6 +30,7 @@ interface StoredSystemCalloutPresetOverride {
 interface StoredUserCalloutPreset {
   id: string;
   name: string;
+  placement?: CalloutPreset['placement'];
   style: CalloutVisualStyle;
 }
 
@@ -46,10 +52,30 @@ interface ParsedStoredCalloutPresetCatalog {
 
 const connectorKinds = new Set(['none', 'wedge', 'line']);
 const connectorRoutings = new Set(['straight', 'elbow']);
-const connectorMarkers = new Set(['none', 'circle', 'square', 'diamond', 'arrow']);
+const connectorMarkers = new Set(['none', 'circle', 'ring-dot', 'square', 'diamond', 'arrow']);
 const fontFamilies = new Set(['sans', 'serif', 'mono']);
+const fontStyles = new Set(['normal', 'italic']);
 const fontWeights = new Set(['normal', 'bold']);
+const textDecorations = new Set(['none', 'underline']);
+const textAlignments = new Set(['left', 'center', 'right', 'justify']);
 const systemKeys = new Set<string>(SYSTEM_CALLOUT_PRESET_KEYS);
+const calloutAnchors = new Set<CalloutAnchor>([
+  'middle-left',
+  'top-left',
+  'top-center',
+  'top-right',
+  'bottom-left',
+  'bottom-center',
+  'bottom-right',
+  'middle-right',
+]);
+const calloutSides = new Set(['top', 'bottom', 'left', 'right']);
+
+function getExpectedPresetSide(anchor: CalloutAnchor) {
+  if (anchor === 'middle-left') return 'left';
+  if (anchor === 'middle-right') return 'right';
+  return anchor.startsWith('bottom') ? 'bottom' : 'top';
+}
 
 function isConnectorMarker(
   value: unknown
@@ -73,8 +99,39 @@ function isFontWeight(value: unknown): value is CalloutVisualStyle['typography']
   return isString(value) && fontWeights.has(value);
 }
 
+function isFontStyle(value: unknown): value is CalloutVisualStyle['typography']['fontStyle'] {
+  return isString(value) && fontStyles.has(value);
+}
+
+function isTextDecoration(
+  value: unknown
+): value is CalloutVisualStyle['typography']['textDecoration'] {
+  return isString(value) && textDecorations.has(value);
+}
+
+function isTextAlignment(value: unknown): value is CalloutVisualStyle['typography']['textAlign'] {
+  return isString(value) && textAlignments.has(value);
+}
+
 function isSystemPresetKey(value: unknown): value is SystemCalloutPresetKey {
   return isString(value) && systemKeys.has(value);
+}
+
+export function parseCalloutPresetPlacement(value: unknown): CalloutPreset['placement'] | null {
+  if (
+    !isPlainRecord(value) ||
+    !isString(value['anchor']) ||
+    !calloutAnchors.has(value['anchor'] as CalloutAnchor) ||
+    !isString(value['side']) ||
+    !calloutSides.has(value['side']) ||
+    value['side'] !== getExpectedPresetSide(value['anchor'] as CalloutAnchor)
+  ) {
+    return null;
+  }
+  return {
+    anchor: value['anchor'] as CalloutAnchor,
+    side: value['side'] as CalloutPreset['placement']['side'],
+  };
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
@@ -83,6 +140,10 @@ function isNonNegativeInteger(value: unknown): value is number {
 
 function isNumberInRange(value: unknown, minimum: number, maximum: number): value is number {
   return isNumber(value) && value >= minimum && value <= maximum;
+}
+
+function isNumberAtLeast(value: unknown, minimum: number): value is number {
+  return isNumber(value) && value >= minimum;
 }
 
 function isCalloutColor(value: unknown): value is string {
@@ -100,11 +161,21 @@ export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | nu
   const surface = value['surface'];
   const title = value['title'];
   const typography = value['typography'];
+  const blockMarkerSize = isPlainRecord(connector) ? (connector['blockMarkerSize'] ?? 10) : null;
+  const frameMarkerSize = isPlainRecord(connector) ? (connector['frameMarkerSize'] ?? 10) : null;
+  const shadowColor = isPlainRecord(surface) ? (surface['shadowColor'] ?? '#000000') : null;
+  const fontStyle = isPlainRecord(typography) ? (typography['fontStyle'] ?? 'normal') : null;
+  const textDecoration = isPlainRecord(typography)
+    ? (typography['textDecoration'] ?? 'none')
+    : null;
+  const textAlign = isPlainRecord(typography) ? (typography['textAlign'] ?? 'left') : null;
   if (
     !isPlainRecord(connector) ||
     !isConnectorMarker(connector['blockMarker']) ||
+    !isNumberInRange(blockMarkerSize, 4, 48) ||
     !isCalloutColor(connector['color']) ||
     !isConnectorMarker(connector['frameMarker']) ||
+    !isNumberInRange(frameMarkerSize, 4, 48) ||
     !isConnectorKind(connector['kind']) ||
     !isConnectorRouting(connector['routing']) ||
     !isNumberInRange(connector['wedgeSize'], 4, 48) ||
@@ -117,18 +188,22 @@ export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | nu
     !isNumberInRange(surface['paddingY'], 0, 48) ||
     !isNumberInRange(surface['radius'], 0, 64) ||
     !isNumberInRange(surface['shadow'], 0, 100) ||
+    !isCalloutColor(shadowColor) ||
     !isCalloutColor(surface['textColor']) ||
     !isPlainRecord(title) ||
     !isCalloutColor(title['backgroundColor']) ||
     !isBoolean(title['enabled']) ||
-    !isNumberInRange(title['fontSize'], 8, 72) ||
+    !isNumberInRange(title['fontSize'], 8, 144) ||
     !isFontWeight(title['fontWeight']) ||
     !isCalloutColor(title['textColor']) ||
     !isPlainRecord(typography) ||
     !isFontFamily(typography['fontFamily']) ||
     !isNumberInRange(typography['fontSize'], 8, 72) ||
+    !isFontStyle(fontStyle) ||
     !isFontWeight(typography['fontWeight']) ||
-    !isNumberInRange(typography['maxWidth'], 80, 800)
+    !isNumberAtLeast(typography['maxWidth'], 80) ||
+    !isTextAlignment(textAlign) ||
+    !isTextDecoration(textDecoration)
   ) {
     return null;
   }
@@ -136,8 +211,10 @@ export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | nu
   return {
     connector: {
       blockMarker: connector['blockMarker'],
+      blockMarkerSize,
       color: connector['color'],
       frameMarker: connector['frameMarker'],
+      frameMarkerSize,
       kind: connector['kind'],
       routing: connector['routing'],
       wedgeSize: connector['wedgeSize'],
@@ -151,6 +228,7 @@ export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | nu
       paddingY: surface['paddingY'],
       radius: surface['radius'],
       shadow: surface['shadow'],
+      shadowColor,
       textColor: surface['textColor'],
     },
     title: {
@@ -163,8 +241,11 @@ export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | nu
     typography: {
       fontFamily: typography['fontFamily'],
       fontSize: typography['fontSize'],
+      fontStyle,
       fontWeight: typography['fontWeight'],
       maxWidth: typography['maxWidth'],
+      textAlign,
+      textDecoration,
     },
   };
 }
@@ -191,11 +272,25 @@ function isValidPresetName(value: unknown): value is string {
 }
 
 function parseSystemOverride(value: unknown): StoredSystemCalloutPresetOverride | null {
-  if (!isPlainRecord(value) || !isSystemPresetKey(value['systemPresetKey'])) return null;
+  if (
+    !isPlainRecord(value) ||
+    !isSystemPresetKey(value['systemPresetKey']) ||
+    (value['basedOnRevision'] !== undefined && !isNonNegativeInteger(value['basedOnRevision'])) ||
+    (value['customized'] !== undefined && !isBoolean(value['customized']))
+  ) {
+    return null;
+  }
   const style = parseCalloutVisualStyle(value['style']);
-  if (!style || !isValidPresetName(value['name'])) return null;
+  const placement =
+    value['placement'] === undefined ? undefined : parseCalloutPresetPlacement(value['placement']);
+  if (!style || !isValidPresetName(value['name']) || placement === null) return null;
   return {
+    ...(isNonNegativeInteger(value['basedOnRevision'])
+      ? { basedOnRevision: value['basedOnRevision'] }
+      : {}),
+    ...(isBoolean(value['customized']) ? { customized: value['customized'] } : {}),
     name: value['name'].trim(),
+    ...(placement ? { placement } : {}),
     style,
     systemPresetKey: value['systemPresetKey'],
   };
@@ -211,7 +306,15 @@ function parseUserPreset(value: unknown): StoredUserCalloutPreset | null {
     return null;
   }
   const style = parseCalloutVisualStyle(value['style']);
-  return style ? { id: value['id'], name: value['name'].trim(), style } : null;
+  const placement =
+    value['placement'] === undefined ? undefined : parseCalloutPresetPlacement(value['placement']);
+  if (!style || placement === null) return null;
+  return {
+    id: value['id'],
+    name: value['name'].trim(),
+    ...(placement ? { placement } : {}),
+    style,
+  };
 }
 
 function parseArray<T>(

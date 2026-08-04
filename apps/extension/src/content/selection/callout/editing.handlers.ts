@@ -200,7 +200,15 @@ function useCalloutPointerHandlers(
       event.nativeEvent.stopImmediatePropagation();
 
       if (!args.isEditing) {
+        const titleInput =
+          event.target instanceof HTMLInputElement &&
+          event.target.matches('[data-sniptale-callout-title="true"]')
+            ? event.target
+            : null;
         args.onStartEditing();
+        if (titleInput) {
+          window.requestAnimationFrame(() => titleInput.focus({ preventScroll: true }));
+        }
         return;
       }
 
