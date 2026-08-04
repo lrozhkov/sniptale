@@ -124,7 +124,7 @@ describe('useCalloutDrag', () => {
     expect(onPositionChange).toHaveBeenCalledOnce();
     expect(onPositionChange).toHaveBeenCalledWith(
       { centerOffsetX: 140, centerOffsetY: 120 },
-      { preserveConnectorAnchors: false }
+      { translateConnectorGeometry: false }
     );
     expect(drag?.draft?.placement).toEqual({ centerOffsetX: 140, centerOffsetY: 120 });
 
@@ -173,7 +173,7 @@ describe('useCalloutDrag', () => {
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(onPositionChange).toHaveBeenCalledWith(
       { centerOffsetX: 95, centerOffsetY: 80 },
-      { preserveConnectorAnchors: false }
+      { translateConnectorGeometry: false }
     );
   });
 
@@ -185,16 +185,16 @@ describe('useCalloutDrag', () => {
     expect(drag?.draft?.placement).toEqual({ centerOffsetX: 160, centerOffsetY: 80 });
   });
 
-  it('preserves connector anchors only while Ctrl is held during the drag', () => {
+  it('translates connector geometry only while Ctrl is held during the drag', () => {
     renderHarness();
     startDrag({ ctrlKey: true });
     dispatchPointer('pointermove', 260, 250, { ctrlKey: true });
 
-    expect(drag?.draft?.preserveConnectorAnchors).toBe(true);
+    expect(drag?.draft?.translateConnectorGeometry).toBe(true);
     dispatchPointer('pointerup', 260, 250, { ctrlKey: true });
     expect(onPositionChange).toHaveBeenCalledWith(
       { centerOffsetX: 140, centerOffsetY: 120 },
-      { preserveConnectorAnchors: true }
+      { translateConnectorGeometry: true }
     );
   });
 

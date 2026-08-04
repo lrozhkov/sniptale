@@ -3,8 +3,10 @@ import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/ca
 import { useCalloutDrag } from './drag';
 import type { CalloutDragBehavior } from './drag';
 import type { ConnectorSide } from './dynamic-tail';
+import { getStationaryConnectorWaypoint, getTranslatedConnectorGeometry } from './drag-anchor';
 import { getCalloutLayoutState } from './layout';
 import {
+  getCalloutPerimeterAnchorPositions,
   getCalloutEdgePosition,
   getCalloutPerimeterPosition,
   useCalloutEdgeDrag,
@@ -14,6 +16,7 @@ import { useCalloutWidthResize } from './width-resize';
 import { useCalloutWaypointDrag } from './waypoint-drag';
 
 type FrameRect = { x: number; y: number; width: number; height: number };
+type SectionRect = { x: number; y: number; width: number; height: number };
 type InteractionArgs = {
   dimensions: { width: number; height: number };
   frameBorderWidth: number;
@@ -46,15 +49,6 @@ function useCalloutPlacementDraft(args: InteractionArgs) {
     onWidthChange: args.onWidthChange,
     wrapperRef: args.wrapperRef,
   });
-  const drag = useCalloutDrag({
-    frameRect: args.frameRect,
-    dimensions: args.dimensions,
-    isEditing: args.isEditing,
-    isHandlePinned: Boolean(args.isSettingsOpen) || widthResize.isResizing,
-    manualPlacement: args.settings.placement.manualPlacement,
-    onPositionChange: args.onPositionChange,
-    wrapperRef: args.wrapperRef,
-  });
   const widthSettings: CalloutSettings = {
     ...args.settings,
     style: {
@@ -69,24 +63,111 @@ function useCalloutPlacementDraft(args: InteractionArgs) {
       ...(widthResize.draftPlacement ? { manualPlacement: widthResize.draftPlacement } : {}),
     },
   };
+  const restingLayout = getCalloutLayoutState({
+    dimensions: args.dimensions,
+    frameBorderWidth: args.frameBorderWidth,
+    frameRect: args.frameRect,
+    isEditing: args.isEditing,
+    settings: widthSettings,
+    zIndex: args.zIndex,
+  });
+  const createDraggedSettings = (
+    placement: NonNullable<CalloutSettings['placement']['manualPlacement']>,
+    translateConnectorGeometry: boolean
+  ) =>
+    getDraggedCalloutSettings({
+      args,
+      placement,
+      translateConnectorGeometry,
+      restingLayout,
+      widthSettings,
+    });
+  const drag = useCalloutDrag({
+    frameRect: args.frameRect,
+    dimensions: args.dimensions,
+    isEditing: args.isEditing,
+    isHandlePinned: Boolean(args.isSettingsOpen) || widthResize.isResizing,
+    manualPlacement: args.settings.placement.manualPlacement,
+    onPositionChange: (placement, behavior) => {
+      const draggedSettings = createDraggedSettings(placement, behavior.translateConnectorGeometry);
+      args.onPositionChange(placement, {
+        ...behavior,
+        connectorBasePosition: draggedSettings.placement.connectorBasePosition,
+        connectorBaseWidth: draggedSettings.placement.connectorBaseWidth,
+        connectorFramePosition: draggedSettings.placement.connectorFramePosition,
+        connectorWaypoint: draggedSettings.placement.connectorWaypoint,
+      });
+    },
+    wrapperRef: args.wrapperRef,
+  });
   const settings = drag.draft
-    ? {
-        ...widthSettings,
-        placement: {
-          ...widthSettings.placement,
-          manualPlacement: drag.draft.placement,
-          ...(drag.draft.preserveConnectorAnchors
-            ? {}
-            : {
-                connectorBasePosition: undefined,
-                connectorBaseWidth: undefined,
-                connectorFramePosition: undefined,
-                connectorWaypoint: undefined,
-              }),
-        },
-      }
+    ? createDraggedSettings(drag.draft.placement, drag.draft.translateConnectorGeometry)
     : widthSettings;
   return { drag, settings, widthResize };
+}
+
+export function getCalloutSectionAnchorGuides(
+  bubbleRect: SectionRect,
+  titleRect: SectionRect | null
+) {
+  if (!titleRect || titleRect.height <= 0) return [];
+  const bubbleBottom = bubbleRect.y + bubbleRect.height;
+  const titleTop = Math.max(bubbleRect.y, titleRect.y);
+  const dividerY = Math.min(bubbleBottom, titleRect.y + titleRect.height);
+  if (dividerY <= bubbleRect.y || titleTop >= bubbleBottom) return [];
+  return [titleTop + (dividerY - titleTop) / 2, dividerY, dividerY + (bubbleBottom - dividerY) / 2];
+}
+
+function getDraggedCalloutSettings(args: {
+  args: InteractionArgs;
+  placement: NonNullable<CalloutSettings['placement']['manualPlacement']>;
+  translateConnectorGeometry: boolean;
+  restingLayout: ReturnType<typeof getCalloutLayoutState>;
+  widthSettings: CalloutSettings;
+}): CalloutSettings {
+  const placement = {
+    ...args.widthSettings.placement,
+    manualPlacement: args.placement,
+  };
+  const stableWaypoint = getStationaryConnectorWaypoint(
+    args.restingLayout,
+    args.args.frameRect,
+    placement.connectorWaypoint
+  );
+  if (!args.translateConnectorGeometry) {
+    return {
+      ...args.widthSettings,
+      placement: {
+        ...placement,
+        ...(stableWaypoint ? { connectorWaypoint: stableWaypoint } : {}),
+      },
+    };
+  }
+  const provisionalSettings = { ...args.widthSettings, placement };
+  const nextLayout = getCalloutLayoutState({
+    dimensions: args.args.dimensions,
+    frameBorderWidth: args.args.frameBorderWidth,
+    frameRect: args.args.frameRect,
+    isEditing: args.args.isEditing,
+    ...(args.restingLayout.dynamicTail
+      ? { previousConnectorSide: args.restingLayout.dynamicTail.side }
+      : {}),
+    settings: provisionalSettings,
+    zIndex: args.args.zIndex,
+  });
+  const connectorGeometry = getTranslatedConnectorGeometry(
+    args.restingLayout,
+    nextLayout,
+    args.args.frameRect,
+    args.widthSettings.placement.connectorWaypoint
+  );
+  return {
+    ...provisionalSettings,
+    placement: {
+      ...placement,
+      ...connectorGeometry,
+    },
+  };
 }
 
 function useCalloutConnectorDrafts(args: {
@@ -97,9 +178,17 @@ function useCalloutConnectorDrafts(args: {
   onTailFramePositionChange: InteractionArgs['onTailFramePositionChange'];
   onWaypointChange: InteractionArgs['onWaypointChange'];
   settings: CalloutSettings;
+  wrapperRef: InteractionArgs['wrapperRef'];
 }) {
   const connectorSide = args.baseLayout.dynamicTail?.side ?? null;
   const bubbleRect = { ...args.baseLayout.calloutPos, ...args.baseLayout.calloutDimensions };
+  const titleRect = args.wrapperRef.current
+    ?.querySelector<HTMLElement>('[data-sniptale-callout-title="true"]')
+    ?.getBoundingClientRect();
+  const bubbleAnchorPositions = getCalloutPerimeterAnchorPositions(
+    bubbleRect,
+    getCalloutSectionAnchorGuides(bubbleRect, titleRect ?? null)
+  );
   const tailBaseRange = useCalloutTailBaseRange({
     bubbleRect,
     connectorSide: args.baseLayout.dynamicTail?.kind === 'wedge' ? connectorSide : null,
@@ -120,6 +209,7 @@ function useCalloutConnectorDrafts(args: {
     ),
     isEditing: args.isEditing,
     onPositionChange: (position) => args.onTailBaseRangeChange(position, 0),
+    perimeterAnchorPositions: bubbleAnchorPositions,
     perimeter: true,
     position: args.settings.placement.connectorBasePosition,
   });
@@ -145,6 +235,8 @@ function useCalloutConnectorDrafts(args: {
   const lineState =
     args.baseLayout.dynamicTail?.kind === 'line' ? args.baseLayout.dynamicTail : null;
   const waypointDrag = useCalloutWaypointDrag({
+    angleSnap: lineState?.routeControlAngleSnap ?? null,
+    elbowConstraint: lineState?.routeControlConstraint ?? null,
     axis: lineState?.routeControlAxis ?? null,
     defaultPoint: lineState?.routeControlPoint ?? null,
     frameRect: args.frameRect,
@@ -211,6 +303,7 @@ export function useCalloutInteractionLayout(args: InteractionArgs) {
     onTailFramePositionChange: args.onTailFramePositionChange,
     onWaypointChange: args.onWaypointChange,
     settings: placement.settings,
+    wrapperRef: args.wrapperRef,
   });
   const layout = connector.hasDraft
     ? getCalloutLayoutState({ ...baseLayoutArgs, settings: connector.settings })

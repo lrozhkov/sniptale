@@ -30,7 +30,10 @@ function getPresetPlacement(anchor: CalloutAnchor): CalloutPreset['placement'] {
 
 function applyStylePatch(style: CalloutVisualStyle, patch: CalloutSettingsPatch) {
   return {
+    accentEdge: { ...style.accentEdge, ...patch.style?.accentEdge },
+    colorBindings: { ...style.colorBindings, ...patch.style?.colorBindings },
     connector: { ...style.connector, ...patch.style?.connector },
+    customCss: patch.style?.customCss ?? style.customCss,
     surface: { ...style.surface, ...patch.style?.surface },
     title: { ...style.title, ...patch.style?.title },
     typography: { ...style.typography, ...patch.style?.typography },
@@ -88,6 +91,7 @@ function PresetEditorBody(props: {
             </div>
             <CalloutSettingsPositionGrid
               anchor={props.placement.anchor}
+              layout="square"
               onChange={(anchor) => props.setPlacement(getPresetPlacement(anchor))}
             />
           </div>
@@ -147,7 +151,7 @@ export function CalloutPresetEditor(props: CalloutPresetEditorProps) {
     <div ref={modalRootRef} style={{ display: 'contents' }}>
       <ProductModal
         isOpen
-        width="620px"
+        width="400px"
         maxWidth="94vw"
         maxHeight="88vh"
         scrollable

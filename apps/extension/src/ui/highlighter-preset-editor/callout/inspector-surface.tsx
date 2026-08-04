@@ -9,6 +9,7 @@ import { translate } from '../../../platform/i18n';
 import { CompactSelect } from '../../compact-inspector-controls';
 import { CALLOUT_BACKGROUND_PRESETS, CALLOUT_TEXT_PRESETS } from './inspector-palettes';
 import {
+  BoundColorField,
   ColorField,
   NumericProperty,
   PropertyField,
@@ -18,11 +19,12 @@ import {
 
 export function CalloutTextSettings(props: ManualContentProps) {
   const typography = props.settings.style.typography;
-  const title = props.settings.style.title;
-  const fontOptions = (['sans', 'serif', 'mono'] as CalloutFontFamily[]).map((value) => ({
-    value,
-    label: translate(`content.callout.font.${value}`),
-  }));
+  const fontOptions = (['sans', 'serif', 'mono', 'cursive'] as CalloutFontFamily[]).map(
+    (value) => ({
+      value,
+      label: translate(`content.callout.font.${value}`),
+    })
+  );
   return (
     <SettingsStack>
       <ColorField
@@ -33,6 +35,7 @@ export function CalloutTextSettings(props: ManualContentProps) {
       />
       <PropertyField compactLabel label={translate('content.callout.fontFamilyLabel')}>
         <CompactSelect
+          appearance="plain"
           aria-label={translate('content.callout.fontFamilyLabel')}
           options={fontOptions}
           value={typography.fontFamily}
@@ -132,6 +135,14 @@ export function CalloutTextSettings(props: ManualContentProps) {
         value={typography.fontSize}
         onChange={(fontSize) => props.onChange({ style: { typography: { fontSize } } })}
       />
+    </SettingsStack>
+  );
+}
+
+export function CalloutTitleSettings(props: ManualContentProps) {
+  const title = props.settings.style.title;
+  return (
+    <SettingsStack>
       <ProductGlassToggleRow
         title={translate('content.callout.titleToggle')}
         control={
@@ -149,6 +160,14 @@ export function CalloutTextSettings(props: ManualContentProps) {
             value={title.textColor}
             palette={CALLOUT_TEXT_PRESETS}
             onChange={(textColor) => props.onChange({ style: { title: { textColor } } })}
+          />
+          <ColorField
+            label={translate('content.callout.titleBackgroundLabel')}
+            value={title.backgroundColor}
+            palette={CALLOUT_BACKGROUND_PRESETS}
+            onChange={(backgroundColor) =>
+              props.onChange({ style: { title: { backgroundColor } } })
+            }
           />
           <NumericProperty
             label={translate('content.callout.titleFontSizeLabel')}
@@ -171,7 +190,8 @@ export function CalloutSizeSettings(props: ManualContentProps) {
     <SettingsStack>
       <NumericProperty
         label={translate('content.callout.defaultWidthLabel')}
-        min={80}
+        min={100}
+        scrubMax={800}
         step={10}
         value={typography.maxWidth}
         onChange={(maxWidth) => props.onChange({ style: { typography: { maxWidth } } })}
@@ -196,23 +216,21 @@ export function CalloutSizeSettings(props: ManualContentProps) {
 
 export function CalloutBackgroundSettings(props: ManualContentProps) {
   const surface = props.settings.style.surface;
-  const title = props.settings.style.title;
   return (
     <SettingsStack>
-      <ColorField
+      <BoundColorField
+        customColor={surface.backgroundColor}
+        frameColors={props.frameColors}
         label={translate('content.callout.backgroundLabel')}
-        value={surface.backgroundColor}
         palette={CALLOUT_BACKGROUND_PRESETS}
-        onChange={(backgroundColor) => props.onChange({ style: { surface: { backgroundColor } } })}
+        source={props.settings.style.colorBindings.surfaceBackground}
+        onColorChange={(backgroundColor) =>
+          props.onChange({ style: { surface: { backgroundColor } } })
+        }
+        onSourceChange={(surfaceBackground) =>
+          props.onChange({ style: { colorBindings: { surfaceBackground } } })
+        }
       />
-      {title.enabled ? (
-        <ColorField
-          label={translate('content.callout.titleBackgroundLabel')}
-          value={title.backgroundColor}
-          palette={CALLOUT_BACKGROUND_PRESETS}
-          onChange={(backgroundColor) => props.onChange({ style: { title: { backgroundColor } } })}
-        />
-      ) : null}
       <NumericProperty
         label={translate('content.callout.shadowLabel')}
         min={0}

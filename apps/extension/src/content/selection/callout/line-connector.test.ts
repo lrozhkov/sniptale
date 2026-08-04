@@ -47,6 +47,40 @@ describe('line callout connector', () => {
     expect(line.routeControlPoint).toBeNull();
   });
 
+  it('builds an angled route with a draggable normal landing segment', () => {
+    const line = getLineConnectorState({
+      ...base,
+      placement: {
+        ...base.placement,
+        connectorBasePosition: 144 / 336,
+        connectorFramePosition: 80 / 560,
+      },
+      routing: 'polyline',
+    });
+
+    expect(line.routePoints).toHaveLength(3);
+    expect(line.routePoints[0]?.y).toBe(line.routePoints[1]?.y);
+    expect(line.routeControlAxis).toBe('x');
+    expect(line.routeControlAngle).not.toBeNull();
+    expect(line.routeControlAngleSnap).not.toBeNull();
+  });
+
+  it('keeps a moved angled-route control on the landing rail', () => {
+    const line = getLineConnectorState({
+      ...base,
+      placement: {
+        ...base.placement,
+        connectorBasePosition: 144 / 336,
+        connectorFramePosition: 80 / 560,
+        connectorWaypoint: { centerOffsetX: 180, centerOffsetY: -160 },
+      },
+      routing: 'polyline',
+    });
+
+    expect(line.routePoints).toHaveLength(3);
+    expect(line.routePoints[0]?.y).toBe(line.routePoints[1]?.y);
+  });
+
   it('uses a movable safe channel for parallel offset endpoints', () => {
     const placement = {
       ...base.placement,
@@ -82,7 +116,8 @@ describe('line callout connector', () => {
       { x: 260, y: 44 },
       { x: 260, y: 100 },
     ]);
-    expect(line.routeControlPoint).toBeNull();
+    expect(line.routeControlAxis).toBe('both');
+    expect(line.routeControlPoint).toEqual({ x: 260, y: 44 });
   });
 
   it('returns endpoint angles aligned with adjacent route segments', () => {

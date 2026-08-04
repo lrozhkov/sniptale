@@ -12,6 +12,7 @@ export interface CompactSelectProps<T extends string = string> extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   'children' | 'onChange' | 'value'
 > {
+  appearance?: 'surface' | 'plain';
   containerClassName?: string;
   controlSize?: 'sm' | 'md';
   dataUi?: string;
@@ -76,6 +77,7 @@ function CompactSelectTriggerView<T extends string>({
 }) {
   const {
     containerClassName: _containerClassName,
+    appearance: _appearance,
     controlSize: _controlSize,
     dataUi: _dataUi,
     menuAnchorRef: _menuAnchorRef,
@@ -105,6 +107,7 @@ function CompactSelectTriggerView<T extends string>({
       }}
       onKeyDown={select.keyboard.handleTriggerKeyDown}
       className={props.className}
+      appearance={props.appearance}
       menuId={menuId}
       open={select.state.open}
       placeholder={props.placeholder}

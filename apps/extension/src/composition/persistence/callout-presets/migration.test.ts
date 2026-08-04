@@ -83,7 +83,7 @@ it('upgrades untouched system presets but preserves explicit customized override
   });
 });
 
-it('upgrades the untouched legacy pointer preset to the canonical ring-dot design', () => {
+it('upgrades an untouched presentation preset to the latest canonical design', () => {
   const migrated = resolveStoredCalloutPresetCatalog({
     systemCatalogRevision: 2,
     placements: [{ id: 'system-callout-pointer-note', enabled: true, order: 0 }],
@@ -94,7 +94,10 @@ it('upgrades the untouched legacy pointer preset to the canonical ring-dot desig
   ).toMatchObject({
     basedOnRevision: SYSTEM_CALLOUT_PRESET_CATALOG_REVISION,
     customized: false,
-    style: { connector: { frameMarker: 'ring-dot', frameMarkerSize: 12 } },
+    style: {
+      connector: { frameMarker: 'ring-dot', frameMarkerSize: 11 },
+      title: { dividerWidth: 1 },
+    },
   });
 });
 

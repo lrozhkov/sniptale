@@ -1,49 +1,11 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const sanitizeMock = vi.hoisted(() => vi.fn());
-
-vi.mock('dompurify', () => ({
-  default: {
-    sanitize: sanitizeMock,
-  },
-}));
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal()),
   translate: (key: string) => key,
 }));
-
-function createSanitizedContainer(style: string) {
-  const wrapper = document.createElement('section');
-  const div = document.createElement('div');
-
-  div.setAttribute('style', style);
-  wrapper.append(div);
-
-  return wrapper;
-}
-
-beforeEach(() => {
-  sanitizeMock.mockReset();
-  sanitizeMock.mockImplementation((dirtyHtml: string) => {
-    if (dirtyHtml.includes('throw-error')) {
-      throw new Error('css parse failed');
-    }
-
-    if (dirtyHtml.includes('throw-string')) {
-      throw 'css exploded';
-    }
-
-    if (dirtyHtml.includes('no-div')) {
-      return document.createElement('section');
-    }
-
-    const styleMatch = dirtyHtml.match(/style="([^"]*)"/);
-    return createSanitizedContainer(styleMatch?.[1] ?? '');
-  });
-});
 
 describe('css-sanitizer validateCssString', () => {
   it('reports blocked props while preserving safe styles', async () => {
@@ -61,30 +23,48 @@ describe('css-sanitizer validateCssString', () => {
       },
     });
   });
-});
 
-describe('css-sanitizer parse failures', () => {
-  it('surfaces recognition failures and parse errors', async () => {
+  it.each([
+    'made-up: 1; color: red;',
+    'color: red; broken',
+    'background-image: u&#114;l(https://attacker.example/pixel);',
+    'background-image: url(https://attacker.example/pixel);',
+    'background-image: image-set("https://attacker.example/pixel" 1x);',
+    'background-image: var(--page-image);',
+    'color: red !important;',
+  ])('fails closed when any declaration is not recognized: %s', async (css) => {
     const { validateCssString } = await import('./css');
+    expect(validateCssString(css)).toMatchObject({
+      blockedProps: [],
+      hasBlockedProps: false,
+      rawError: 'shared.runtime.cssRecognitionFailed',
+      styles: {},
+    });
+  });
 
-    expect(validateCssString('no-div')).toEqual({
+  it('accounts for quoted separators, escapes, and comments without splitting declarations', async () => {
+    const { validateCssString } = await import('./css');
+    expect(
+      validateCssString('font-family: "A; B\\ C"; /* keep ; inside comment */ color: rgb(1, 2, 3);')
+    ).toMatchObject({
+      rawError: null,
+      styles: { color: 'rgb(1, 2, 3)', fontFamily: '"A; B C"' },
+    });
+  });
+
+  it.each([
+    'color: red; /* unclosed',
+    'font-family: "unclosed;',
+    'filter: drop-shadow(0 0 2px red;',
+    'filter: drop-shadow(0 0 2px red));',
+  ])('rejects unbalanced declaration syntax: %s', async (css) => {
+    const { validateCssString } = await import('./css');
+    expect(validateCssString(css)).toMatchObject({
       blockedProps: [],
       hasBlockedProps: false,
-      rawError: 'shared.runtime.cssRecognitionFailed',
       styles: {},
     });
-    expect(validateCssString('throw-error')).toEqual({
-      blockedProps: [],
-      hasBlockedProps: false,
-      rawError: 'shared.runtime.cssRecognitionFailed',
-      styles: {},
-    });
-    expect(validateCssString('throw-string')).toEqual({
-      blockedProps: [],
-      hasBlockedProps: false,
-      rawError: 'shared.runtime.cssRecognitionFailed',
-      styles: {},
-    });
+    expect(validateCssString(css).rawError).not.toBeNull();
   });
 });
 

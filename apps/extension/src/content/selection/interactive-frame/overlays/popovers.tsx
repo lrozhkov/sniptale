@@ -1,5 +1,6 @@
 import React from 'react';
 import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
+import { getCalloutFrameColors } from '../../../../features/highlighter/callout-color-bindings';
 import { CalloutSettingsPopover } from '../../callout-settings-popover';
 import { FrameSettingsPopover } from '../../frame-settings-popover';
 import { StepBadgePopover } from '../../step-badge-popover';
@@ -84,11 +85,13 @@ function createStepBadgeProps(props: InteractiveFramePopoversProps) {
 
 function createCalloutSettingsProps(props: InteractiveFramePopoversProps) {
   const callout = props.currentFrame.callout ?? props.frame.callout;
+  const borderSettings = props.currentFrame.borderSettings ?? props.frame.borderSettings;
   return {
     isOpen: props.isCalloutPopoverOpen && !!callout?.enabled,
     onClose: props.closePopover,
     frameId: props.frame.id,
     frameRect: props.currentFrame,
+    frameColors: getCalloutFrameColors(borderSettings),
     anchorEl: props.calloutPopoverAnchorRef.current,
     ...(callout === undefined ? {} : { settings: callout }),
   };

@@ -7,6 +7,13 @@ import type {
 import { getDynamicTailState, type ConnectorSide } from './dynamic-tail';
 import { getCalloutPerimeterPoint } from './tail-drag';
 import { getConnectorEndpointGeometry } from './connector-marker-geometry';
+import {
+  getElbowRouteControl,
+  getPerpendicularSingleCornerRoute,
+  getPerpendicularWaypointRoute,
+  type ElbowWaypointConstraint,
+} from './elbow-control';
+import { getPolylineRouteState } from './polyline-control';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -137,6 +144,17 @@ function segmentCrossesRectInterior(from: Point, to: Point, rect: Rect) {
     Math.min(from.x, to.x) < rect.x + rect.width &&
     Math.max(from.x, to.x) > rect.x
   );
+}
+
+function routeCrossesObstacle(points: Point[], obstacles: Rect[]) {
+  for (let index = 1; index < points.length; index += 1) {
+    if (
+      obstacles.some((rect) => segmentCrossesRectInterior(points[index - 1]!, points[index]!, rect))
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function getRouteScore(points: Point[], obstacles: Rect[]) {
@@ -276,6 +294,17 @@ function getRoute(args: {
   ) {
     return [blockPoint, framePoint];
   }
+  if (!args.waypoint) {
+    const singleCornerRoute = getPerpendicularSingleCornerRoute({
+      blockPoint,
+      blockSide,
+      framePoint,
+      frameSide,
+    });
+    if (singleCornerRoute && !routeCrossesObstacle(singleCornerRoute, obstacles)) {
+      return singleCornerRoute;
+    }
+  }
   const parallelEndpointAxes = isVerticalSide(blockSide) === isVerticalSide(frameSide);
   if (args.waypoint && parallelEndpointAxes) {
     const controlledAxisHasSpan = isVerticalSide(blockSide)
@@ -305,6 +334,17 @@ function getRoute(args: {
           framePoint,
         ]);
   }
+  if (args.waypoint) {
+    return compactRoute(
+      getPerpendicularWaypointRoute({
+        blockPoint,
+        blockSide,
+        framePoint,
+        frameSide,
+        waypoint: args.waypoint,
+      })
+    );
+  }
   const blockStub = offsetOutward(blockPoint, blockSide, endpointClearance);
   const frameStub = offsetOutward(framePoint, frameSide, endpointClearance);
   return compactRoute([
@@ -321,20 +361,12 @@ function getRoute(args: {
   ]);
 }
 
-function getRouteControlPoint(route: Point[]) {
-  const from = route.length >= 4 ? route[1]! : route[0]!;
-  const to = route.length >= 4 ? route.at(-2)! : route.at(-1)!;
-  return {
-    x: (from.x + to.x) / 2,
-    y: (from.y + to.y) / 2,
-  };
-}
-
 type LineConnectorArgs = {
   anchorPoint: Point;
   blockBoundaryWidth: number;
   blockMarker: CalloutConnectorMarker;
   blockMarkerSize: number;
+  bubbleOffset?: Point;
   bubbleRect: Rect;
   frameBoundaryWidth: number;
   frameMarker: CalloutConnectorMarker;
@@ -351,6 +383,7 @@ type LineConnectorArgs = {
 function getConnectorAttachment(args: LineConnectorArgs) {
   const attachment = getDynamicTailState({
     anchorPoint: args.anchorPoint,
+    ...(args.bubbleOffset ? { bubbleOffset: args.bubbleOffset } : {}),
     bubbleRect: args.bubbleRect,
     frameRect: args.frameRect,
     ...(args.preferredSide ? { preferredSide: args.preferredSide } : {}),
@@ -397,50 +430,37 @@ function getPlacementWaypoint(args: LineConnectorArgs): Point | undefined {
   };
 }
 
-function getRouteControlAxis(args: {
-  blockPoint: Point;
-  blockSide: PerimeterSide;
-  framePoint: Point;
-  frameSide: PerimeterSide;
-  route: Point[];
-  routing: CalloutConnectorRouting;
-}) {
-  if (
-    args.routing !== 'elbow' ||
-    args.route.length <= 2 ||
-    isVerticalSide(args.blockSide) !== isVerticalSide(args.frameSide)
-  ) {
-    return null;
-  }
-  const controlledAxisHasSpan = isVerticalSide(args.blockSide)
-    ? Math.abs(args.framePoint.x - args.blockPoint.x) > 6
-    : Math.abs(args.framePoint.y - args.blockPoint.y) > 6;
-  if (!controlledAxisHasSpan) return null;
-  return isVerticalSide(args.blockSide) ? ('y' as const) : ('x' as const);
-}
-
 export function getLineConnectorState(args: LineConnectorArgs) {
   const { attachment, blockPoint, blockSide, framePoint, frameSide } = getConnectorAttachment(args);
   const endpointClearance = getEndpointClearance(args);
   const waypoint = getPlacementWaypoint(args);
-  const route = getRoute({
-    blockPoint,
-    blockSide,
-    framePoint,
-    frameSide,
-    obstacles: [args.bubbleRect, args.frameRect],
-    routing: args.routing,
-    endpointClearance,
-    ...(waypoint ? { waypoint } : {}),
-  });
-  const routeControlAxis = getRouteControlAxis({
-    blockPoint,
-    blockSide,
-    framePoint,
-    frameSide,
-    route,
-    routing: args.routing,
-  });
+  const polylineState =
+    args.routing === 'polyline'
+      ? getPolylineRouteState({
+          blockPoint,
+          blockSide,
+          framePoint,
+          ...(waypoint ? { waypoint } : {}),
+        })
+      : null;
+  const route =
+    polylineState?.route ??
+    getRoute({
+      blockPoint,
+      blockSide,
+      framePoint,
+      frameSide,
+      obstacles: [args.bubbleRect, args.frameRect],
+      routing: args.routing,
+      endpointClearance,
+      ...(waypoint ? { waypoint } : {}),
+    });
+  const routeControl =
+    polylineState ?? getElbowRouteControl({ blockSide, frameSide, route, routing: args.routing });
+  const routeControlConstraint: ElbowWaypointConstraint | null =
+    args.routing === 'elbow' && isVerticalSide(blockSide) !== isVerticalSide(frameSide)
+      ? { blockPoint, blockSide, framePoint, frameSide }
+      : null;
   const blockMarkerGeometry = getConnectorEndpointGeometry({
     adjacentPoint: route[1]!,
     boundaryWidth: args.blockBoundaryWidth,
@@ -483,7 +503,7 @@ export function getLineConnectorState(args: LineConnectorArgs) {
     width: Math.max(1, right - left),
     height: Math.max(1, bottom - top),
     overflow: 'visible',
-    pointerEvents: 'auto',
+    pointerEvents: 'none',
     zIndex: 0,
   };
 
@@ -511,8 +531,11 @@ export function getLineConnectorState(args: LineConnectorArgs) {
     frameAngle: frameMarkerGeometry.angle,
     kind: 'line' as const,
     path: createPath(renderRoute, left, top),
-    routeControlAxis,
-    routeControlPoint: routeControlAxis ? getRouteControlPoint(route) : null,
+    routeControlAxis: routeControl?.axis ?? null,
+    routeControlAngle: polylineState?.angle ?? null,
+    routeControlAngleSnap: polylineState?.angleSnap ?? null,
+    routeControlConstraint,
+    routeControlPoint: routeControl?.point ?? null,
     routePoints: route,
     side: attachment.side,
     style,

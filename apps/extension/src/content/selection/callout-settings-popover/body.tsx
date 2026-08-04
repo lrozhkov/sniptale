@@ -15,6 +15,8 @@ import { getPreferredSideFromAnchor } from '../callout/geometry';
 import type { CalloutSettingsPatch } from '../callout/model';
 import { CalloutDeleteButton, CalloutPositionSection, CalloutPresetSection } from './views';
 import { CalloutManualSettings } from '../../../ui/highlighter-preset-editor/callout/inspector';
+import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
+import type { CalloutSaveSectionProps } from '../../../ui/highlighter-preset-editor/callout/inspector-save';
 
 export function createCalloutAnchorPlacement(
   anchor: CalloutAnchor
@@ -31,6 +33,7 @@ export function CalloutSettingsPopoverContent(props: {
     onPointerUp: PointerEventHandler<HTMLDivElement>;
   };
   handleSettingChange: (patch: CalloutSettingsPatch) => void;
+  frameColors?: CalloutFrameColors;
   localSettings: CalloutSettings;
   onApplyPreset: (preset: CalloutPreset) => void;
   onCustomizePreset: (preset: CalloutPreset) => void;
@@ -39,6 +42,7 @@ export function CalloutSettingsPopoverContent(props: {
   pendingPresetIds: ReadonlySet<string>;
   presets: CalloutPreset[];
   presetError: string | null;
+  saveSection: CalloutSaveSectionProps;
   onClose: () => void;
 }) {
   const [mode, setMode] = useState<'preset' | 'manual'>('preset');
@@ -86,6 +90,7 @@ export function CalloutSettingsPopoverContent(props: {
       </ContentPopoverSection>
       {mode === 'preset' ? (
         <CalloutPresetSection
+          {...(props.frameColors ? { frameColors: props.frameColors } : {})}
           {...(props.localSettings.sourcePresetId
             ? { activePresetId: props.localSettings.sourcePresetId }
             : {})}
@@ -99,7 +104,9 @@ export function CalloutSettingsPopoverContent(props: {
         />
       ) : (
         <CalloutManualSettings
+          {...(props.frameColors ? { frameColors: props.frameColors } : {})}
           settings={props.localSettings}
+          saveSection={props.saveSection}
           onChange={props.handleSettingChange}
         />
       )}

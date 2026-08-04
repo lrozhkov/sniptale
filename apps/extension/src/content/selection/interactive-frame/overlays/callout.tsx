@@ -3,6 +3,10 @@ import type { FrameData } from '../../../../features/highlighter/contracts';
 import { resolveFrameSurface } from '../../../../features/highlighter/frame-surface';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 import { Callout } from '../../callout';
+import {
+  getCalloutFrameColors,
+  resolveCalloutColorBindings,
+} from '../../../../features/highlighter/callout-color-bindings';
 
 interface InteractiveFrameCalloutOverlayProps {
   frame: FrameData;
@@ -31,6 +35,13 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
     effectMode,
   });
   const frameBorderWidth = frameSurface.strokeVisible ? frameSurface.geometry.strokeWidth : 0;
+  const frameColors = getCalloutFrameColors(
+    props.currentFrame.borderSettings ?? props.frame.borderSettings
+  );
+  const resolvedCallout = {
+    ...callout,
+    style: resolveCalloutColorBindings(callout.style, frameColors),
+  };
 
   const applyCalloutFrameUpdate = (nextCallout: NonNullable<FrameData['callout']>) => {
     const nextFrameSnapshot = {
@@ -46,7 +57,7 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
     <Callout
       frameId={props.frame.id}
       frameBorderWidth={frameBorderWidth}
-      settings={callout}
+      settings={resolvedCallout}
       frameRect={props.currentFrame}
       zIndex={props.frameZIndex + 1}
       isEditing={props.isCalloutEditing}
@@ -77,14 +88,10 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
           placement: {
             ...callout.placement,
             manualPlacement,
-            ...(behavior.preserveConnectorAnchors
-              ? {}
-              : {
-                  connectorBasePosition: undefined,
-                  connectorBaseWidth: undefined,
-                  connectorFramePosition: undefined,
-                  connectorWaypoint: undefined,
-                }),
+            connectorBasePosition: behavior.connectorBasePosition,
+            connectorBaseWidth: behavior.connectorBaseWidth,
+            connectorFramePosition: behavior.connectorFramePosition,
+            connectorWaypoint: behavior.connectorWaypoint,
           },
         });
       }}

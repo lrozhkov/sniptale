@@ -164,6 +164,33 @@ describe('useCalloutEdgeDrag', () => {
     ]);
   });
 
+  it('adds title, divider, and body-center anchors to both sides of a comment card', () => {
+    const rect = { x: 100, y: 50, width: 200, height: 120 };
+    const anchors = getCalloutPerimeterAnchorPositions(rect, [70, 90, 130]).map((position) =>
+      getCalloutPerimeterPoint(rect, position)
+    );
+
+    expect(anchors).toEqual(
+      expect.arrayContaining([
+        { x: 300, y: 70 },
+        { x: 100, y: 70 },
+        { x: 300, y: 90 },
+        { x: 100, y: 90 },
+        { x: 300, y: 130 },
+        { x: 100, y: 130 },
+      ])
+    );
+  });
+
+  it('snaps to a supplied comment-section anchor with the same magnetic hysteresis', () => {
+    const rect = { x: 100, y: 50, width: 200, height: 120 };
+    const anchors = getCalloutPerimeterAnchorPositions(rect, [90]);
+    const snapped = getSnappedCalloutPerimeterPosition(rect, { x: 294, y: 91 }, null, anchors);
+
+    expect(getCalloutPerimeterPoint(rect, snapped.position)).toEqual({ x: 300, y: 90 });
+    expect(snapped.snapPosition).toBe(snapped.position);
+  });
+
   it('holds a perimeter anchor until the pointer crosses the wider release distance', () => {
     const rect = { x: 100, y: 50, width: 200, height: 80 };
     const entered = getSnappedCalloutPerimeterPosition(rect, { x: 293, y: 50 }, null);

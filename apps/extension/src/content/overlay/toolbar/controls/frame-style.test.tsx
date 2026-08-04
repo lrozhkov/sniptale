@@ -115,6 +115,7 @@ it('switches the future mode and opens its settings on the first click', () => {
     isOpen: true,
     scope: 'session',
   });
+  expect(popoverMocks.props?.['anchorEl']).toBe(blurButton);
 
   act(() => blurButton?.click());
   expect(popoverMocks.props?.['isOpen']).toBe(false);

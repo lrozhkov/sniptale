@@ -31,6 +31,12 @@ function getElementSelection(element: HTMLElement): Selection | null {
   return element.ownerDocument.defaultView?.getSelection() ?? null;
 }
 
+function hasNonCollapsedSelectionWithinElement(element: HTMLElement): boolean {
+  const selection = getElementSelection(element);
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return false;
+  return isRangeWithinElement(selection.getRangeAt(0), element);
+}
+
 function insertPlainTextAtSelection(text: string, editableElement: HTMLDivElement): void {
   const selection = getElementSelection(editableElement);
   const selectedRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
@@ -212,9 +218,13 @@ function useCalloutPointerHandlers(
         return;
       }
 
-      if (!isPointerEventWithinEditable(event, args.contentEditableRef.current)) {
+      const editableElement = args.contentEditableRef.current;
+      if (
+        !isPointerEventWithinEditable(event, editableElement) &&
+        !(editableElement && hasNonCollapsedSelectionWithinElement(editableElement))
+      ) {
         event.preventDefault();
-        finishEditing(args.contentEditableRef.current);
+        finishEditing(editableElement);
       }
     },
     [args, finishEditing]

@@ -8,7 +8,9 @@ type Rect = { x: number; y: number; width: number; height: number };
 type Point = { x: number; y: number };
 
 const BUBBLE_EDGE_MARGIN = 4;
+const BUBBLE_PORT_FOLLOW_RATIO = 0.32;
 const FRAME_PORT_FOLLOW_RATIO = 0.86;
+const MAX_AUTO_BASE_EXPANSION = 0.75;
 const SIDE_HYSTERESIS = 0.12;
 const TIP_ROUNDING_RATIO = 0.08;
 
@@ -168,6 +170,61 @@ function getFollowingFramePoint(args: {
   };
 }
 
+function getFollowingBubblePoint(args: {
+  bubbleOffset?: Point;
+  bubbleRect: Rect;
+  bubbleSide: ConnectorSide;
+  routingPole: Point;
+}): Point {
+  const bubbleOffset = args.bubbleOffset ?? { x: 0, y: 0 };
+  const referenceRect = {
+    ...args.bubbleRect,
+    x: args.bubbleRect.x - bubbleOffset.x,
+    y: args.bubbleRect.y - bubbleOffset.y,
+  };
+  const referenceCenter = getCenter(referenceRect);
+  const rayPoint = getPointOnSide(
+    referenceRect,
+    referenceCenter,
+    args.routingPole,
+    args.bubbleSide
+  );
+  const horizontal = args.bubbleSide === 'top' || args.bubbleSide === 'bottom';
+  const movement = horizontal ? bubbleOffset.x : bubbleOffset.y;
+  const followingAxis =
+    (horizontal ? rayPoint.x : rayPoint.y) + movement * (1 - BUBBLE_PORT_FOLLOW_RATIO);
+  const currentEdgePoint = getPointOnSide(
+    args.bubbleRect,
+    getCenter(args.bubbleRect),
+    args.routingPole,
+    args.bubbleSide
+  );
+
+  return horizontal
+    ? { x: followingAxis, y: currentEdgePoint.y }
+    : { x: currentEdgePoint.x, y: followingAxis };
+}
+
+function getAutomaticBaseSpan(args: {
+  baseSpan: number;
+  bubblePoint: Point;
+  framePoint: Point;
+  side: ConnectorSide;
+}) {
+  const horizontal = args.side === 'top' || args.side === 'bottom';
+  const tangentDistance = Math.abs(
+    horizontal ? args.bubblePoint.x - args.framePoint.x : args.bubblePoint.y - args.framePoint.y
+  );
+  const normalDistance = Math.max(
+    1,
+    Math.abs(
+      horizontal ? args.bubblePoint.y - args.framePoint.y : args.bubblePoint.x - args.framePoint.x
+    )
+  );
+  const sharpness = clamp((tangentDistance / normalDistance - 0.2) / 0.8, 0, 1);
+  return args.baseSpan * (1 + sharpness * MAX_AUTO_BASE_EXPANSION);
+}
+
 function getRoundedTriangleTip(args: {
   basePoint: Point;
   baseA: Point;
@@ -248,6 +305,7 @@ function getConnectorPoints(args: {
   anchorPoint?: Point;
   borderRadius?: number;
   borderWidth?: number;
+  bubbleOffset?: Point;
   bubbleRect: Rect;
   frameRect: Rect;
   side: ConnectorSide;
@@ -260,22 +318,11 @@ function getConnectorPoints(args: {
   const bubbleCenter = getCenter(args.bubbleRect);
   const anchorPoint = args.anchorPoint ?? getCenter(args.frameRect);
   const routingPole = getRoutingPole(args.frameRect, anchorPoint, args.side);
-  const bubbleEdgeCandidate = getPointOnSide(
-    args.bubbleRect,
-    bubbleCenter,
-    routingPole,
-    bubbleSide
-  );
-  const { baseSpan } = getCalloutTailMetrics(args.tailSize);
-  const base = getBubbleBase({
-    baseOverlap: Math.max(2, (args.borderWidth ?? 0) + 1),
-    borderRadius: Math.max(0, args.borderRadius ?? 0),
+  const bubbleEdgeCandidate = getFollowingBubblePoint({
+    ...(args.bubbleOffset ? { bubbleOffset: args.bubbleOffset } : {}),
     bubbleRect: args.bubbleRect,
     bubbleSide,
-    candidate: bubbleEdgeCandidate,
-    desiredSpan: baseSpan,
-    ...(args.tailBasePosition === undefined ? {} : { position: args.tailBasePosition }),
-    ...(args.tailBaseWidth === undefined ? {} : { width: args.tailBaseWidth }),
+    routingPole,
   });
   const framePoint = getFollowingFramePoint({
     anchorPoint,
@@ -283,6 +330,26 @@ function getConnectorPoints(args: {
     frameRect: args.frameRect,
     ...(args.tailFramePosition === undefined ? {} : { position: args.tailFramePosition }),
     side: args.side,
+  });
+  const { baseSpan } = getCalloutTailMetrics(args.tailSize);
+  const desiredSpan =
+    args.tailBaseWidth === undefined
+      ? getAutomaticBaseSpan({
+          baseSpan,
+          bubblePoint: bubbleEdgeCandidate,
+          framePoint,
+          side: args.side,
+        })
+      : baseSpan;
+  const base = getBubbleBase({
+    baseOverlap: Math.max(2, (args.borderWidth ?? 0) + 1),
+    borderRadius: Math.max(0, args.borderRadius ?? 0),
+    bubbleRect: args.bubbleRect,
+    bubbleSide,
+    candidate: bubbleEdgeCandidate,
+    desiredSpan,
+    ...(args.tailBasePosition === undefined ? {} : { position: args.tailBasePosition }),
+    ...(args.tailBaseWidth === undefined ? {} : { width: args.tailBaseWidth }),
   });
   return {
     ...base,
@@ -414,6 +481,7 @@ export function getDynamicTailState(args: {
   anchorPoint?: Point;
   borderRadius?: number;
   borderWidth?: number;
+  bubbleOffset?: Point;
   bubbleRect: Rect;
   frameRect: Rect;
   preferredSide?: ConnectorSide;
@@ -499,7 +567,7 @@ export function getDynamicTailState(args: {
       width,
       height,
       overflow: 'visible',
-      pointerEvents: 'auto',
+      pointerEvents: 'none',
       zIndex: 0,
     },
     viewBox: `0 0 ${width} ${height}`,

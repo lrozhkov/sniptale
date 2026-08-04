@@ -4,6 +4,13 @@ import type {
   CalloutConnectorMarker,
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
+import { getCalloutStrokeDasharray } from '../../../features/highlighter/callout-stroke';
+import { getCalloutAccentEdgePath } from '../../../features/highlighter/callout-accent-edge';
+import {
+  projectCalloutLineCustomCss,
+  resolveCalloutCustomCss,
+  type ResolvedCalloutCustomCss,
+} from '../../../features/highlighter/callout-custom-css';
 
 const TARGET_COLOR = 'var(--sniptale-color-text-tertiary, #94a3b8)';
 
@@ -82,25 +89,47 @@ function CalloutEndpointMarker(props: {
   }
 }
 
-function CalloutPreviewConnector({ style }: { style: CalloutVisualStyle }) {
+function CalloutPreviewConnector(props: {
+  customStyles: ResolvedCalloutCustomCss;
+  style: CalloutVisualStyle;
+}) {
+  const { style } = props;
   const connector = style.connector;
   if (connector.kind === 'none') return null;
 
   if (connector.kind === 'wedge') {
-    return <path d="M 50 19 L 50 28 L 29 35 Z" fill={style.surface.backgroundColor} />;
+    return (
+      <path
+        d="M 50 19 L 50 28 L 29 35 Z"
+        data-ui="shared.callout-preview.connector"
+        fill={style.surface.backgroundColor}
+        style={props.customStyles.connector}
+      />
+    );
   }
 
   const path =
-    connector.routing === 'elbow' ? 'M 50 25 L 40 25 L 40 35 L 29 35' : 'M 50 25 L 29 35';
+    connector.routing === 'elbow'
+      ? 'M 50 25 L 40 25 L 40 35 L 29 35'
+      : connector.routing === 'polyline'
+        ? 'M 50 25 L 41 25 L 29 35'
+        : 'M 50 25 L 29 35';
+  const connectorCustomStyles = projectCalloutLineCustomCss(props.customStyles.connector);
   return (
-    <g data-ui="shared.callout-preview.connector">
+    <g data-ui="shared.callout-preview.connector" style={connectorCustomStyles.group}>
       <path
+        data-ui="shared.callout-preview.connector-line"
         d={path}
         fill="none"
         stroke={connector.color}
+        strokeDasharray={getCalloutStrokeDasharray(
+          connector.lineStyle,
+          Math.min(Math.max(connector.width, 1), 3)
+        )}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={Math.min(Math.max(connector.width, 1), 3)}
+        style={connectorCustomStyles.line}
       />
       <CalloutEndpointMarker
         color={connector.color}
@@ -126,6 +155,150 @@ function resolvePreviewFill(backgroundColor: string, checkerPatternId: string): 
     : backgroundColor;
 }
 
+function getWedgeOutlinePath(radius: number) {
+  return [
+    'M 50 19 L 29 35 L 50 28',
+    `L 50 ${33 - radius} Q 50 33 ${50 + radius} 33`,
+    `L ${93 - radius} 33 Q 93 33 93 ${33 - radius}`,
+    `L 93 ${4 + radius} Q 93 4 ${93 - radius} 4`,
+    `L ${50 + radius} 4 Q 50 4 50 ${4 + radius}`,
+    'L 50 19 Z',
+  ].join(' ');
+}
+
+function CalloutPreviewAccent(props: {
+  clipPathId: string;
+  customStyles: ResolvedCalloutCustomCss;
+  radius: number;
+  style: CalloutVisualStyle;
+}) {
+  const { radius, style } = props;
+  if (!style.accentEdge.enabled) return null;
+  const accentWidth = Math.min(Math.max(style.accentEdge.width / 2, 1), 3);
+  return (
+    <>
+      <defs>
+        <clipPath id={props.clipPathId} clipPathUnits="userSpaceOnUse">
+          <rect height="29" rx={radius} width="43" x="50" y="4" />
+        </clipPath>
+      </defs>
+      <path
+        clipPath={`url(#${props.clipPathId})`}
+        d={getCalloutAccentEdgePath({
+          rect: { x: 50, y: 4, width: 43, height: 29 },
+          side: style.accentEdge.side,
+        })}
+        data-ui="shared.callout-preview.accent-edge"
+        fill="none"
+        stroke={style.accentEdge.color}
+        strokeDasharray={getCalloutStrokeDasharray(style.accentEdge.lineStyle, accentWidth)}
+        strokeLinecap={style.accentEdge.lineStyle === 'dotted' ? 'round' : 'butt'}
+        strokeLinejoin="round"
+        strokeWidth={accentWidth * 2}
+        style={props.customStyles.accent}
+      />
+    </>
+  );
+}
+
+function CalloutPreviewCard(props: {
+  checkerPatternId: string;
+  clipPathId: string;
+  customStyles: ResolvedCalloutCustomCss;
+  style: CalloutVisualStyle;
+}) {
+  const { style } = props;
+  const surface = style.surface;
+  const radius = Math.min(Math.max(surface.radius / 3, 1), 9);
+  const previewBorderWidth = Math.min(surface.borderWidth, 2);
+  const hasWedgeOutline = style.connector.kind === 'wedge' && previewBorderWidth > 0;
+  return (
+    <>
+      <defs>
+        <pattern height="4" id={props.checkerPatternId} patternUnits="userSpaceOnUse" width="4">
+          <rect fill="var(--sniptale-color-surface-input, #e2e8f0)" height="4" width="4" />
+          <path
+            d="M 0 0 H 2 V 2 H 0 Z M 2 2 H 4 V 4 H 2 Z"
+            fill="var(--sniptale-color-surface-panel, #fff)"
+          />
+        </pattern>
+        <clipPath id={props.clipPathId}>
+          <rect height="29" rx={radius} width="43" x="50" y="4" />
+        </clipPath>
+      </defs>
+      <g
+        clipPath={`url(#${props.clipPathId})`}
+        data-ui="shared.callout-preview.surface"
+        style={props.customStyles.card}
+      >
+        <rect
+          fill={resolvePreviewFill(surface.backgroundColor, props.checkerPatternId)}
+          height="29"
+          rx={radius}
+          stroke={surface.borderColor}
+          strokeDasharray={getCalloutStrokeDasharray(surface.borderStyle, previewBorderWidth)}
+          strokeWidth={hasWedgeOutline ? 0 : previewBorderWidth}
+          width="43"
+          x="50"
+          y="4"
+        />
+        {style.title.enabled ? (
+          <g style={props.customStyles.title}>
+            <rect fill={style.title.backgroundColor} height="9" width="43" x="50" y="4" />
+            <path
+              d="M 56 9 H 73"
+              stroke={style.title.textColor}
+              strokeLinecap="round"
+              strokeWidth="1.6"
+            />
+            {style.title.dividerWidth > 0 ? (
+              <path
+                d="M 50 13 H 93"
+                stroke={style.title.dividerColor}
+                strokeDasharray={getCalloutStrokeDasharray(
+                  style.title.dividerStyle,
+                  Math.min(style.title.dividerWidth, 2)
+                )}
+                strokeLinecap="round"
+                strokeWidth={Math.min(style.title.dividerWidth, 2)}
+              />
+            ) : null}
+          </g>
+        ) : null}
+        <path
+          d={
+            style.title.enabled
+              ? 'M 56 20 H 86 M 56 25 H 78'
+              : 'M 56 14 H 86 M 56 20 H 82 M 56 26 H 74'
+          }
+          stroke={surface.textColor}
+          strokeLinecap="round"
+          strokeOpacity="0.76"
+          strokeWidth="1.5"
+          style={props.customStyles.body}
+        />
+      </g>
+      {hasWedgeOutline ? (
+        <path
+          d={getWedgeOutlinePath(radius)}
+          data-ui="shared.callout-preview.outline"
+          fill="none"
+          stroke={surface.borderColor}
+          strokeDasharray={getCalloutStrokeDasharray(surface.borderStyle, previewBorderWidth)}
+          strokeLinejoin="round"
+          strokeWidth={previewBorderWidth}
+        />
+      ) : null}
+      <CalloutPreviewAccent
+        clipPathId={`${props.clipPathId}-accent`}
+        customStyles={props.customStyles}
+        radius={radius}
+        style={style}
+      />
+    </>
+  );
+}
+
 export function CalloutPresetPreview({
   compact = false,
   placement,
@@ -138,20 +311,8 @@ export function CalloutPresetPreview({
   const id = useId().replaceAll(':', '');
   const checkerPatternId = `callout-checker-${id}`;
   const clipPathId = `callout-surface-${id}`;
-  const surface = style.surface;
-  const radius = Math.min(Math.max(surface.radius / 3, 1), 9);
-  const surfaceFill = resolvePreviewFill(surface.backgroundColor, checkerPatternId);
-  const previewBorderWidth = Math.min(surface.borderWidth, 2);
-  const hasWedgeOutline = style.connector.kind === 'wedge' && previewBorderWidth > 0;
+  const customStyles = resolveCalloutCustomCss(style.customCss).styles;
   const placementPoint = placement ? getPlacementPreviewPoint(placement) : null;
-  const wedgeOutlinePath = [
-    'M 50 19 L 29 35 L 50 28',
-    `L 50 ${33 - radius} Q 50 33 ${50 + radius} 33`,
-    `L ${93 - radius} 33 Q 93 33 93 ${33 - radius}`,
-    `L 93 ${4 + radius} Q 93 4 ${93 - radius} 4`,
-    `L ${50 + radius} 4 Q 50 4 50 ${4 + radius}`,
-    'L 50 19 Z',
-  ].join(' ');
 
   return (
     <span
@@ -159,25 +320,13 @@ export function CalloutPresetPreview({
         'relative flex flex-shrink-0 items-center justify-center overflow-hidden rounded-[8px]',
         'border border-[color:var(--sniptale-color-border-soft)]',
         'bg-[color:var(--sniptale-color-surface-canvas)]',
-        compact ? 'h-11 w-[4.5rem]' : 'h-[3.25rem] w-24',
+        compact ? 'h-9 w-16' : 'h-[3.25rem] w-24',
       ].join(' ')}
       aria-hidden="true"
       data-callout-placement={placement?.anchor}
       data-ui="shared.callout-preview"
     >
       <svg className="h-full w-full" viewBox="0 0 96 52" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern height="4" id={checkerPatternId} patternUnits="userSpaceOnUse" width="4">
-            <rect fill="var(--sniptale-color-surface-input, #e2e8f0)" height="4" width="4" />
-            <path
-              d="M 0 0 H 2 V 2 H 0 Z M 2 2 H 4 V 4 H 2 Z"
-              fill="var(--sniptale-color-surface-panel, #fff)"
-            />
-          </pattern>
-          <clipPath id={clipPathId}>
-            <rect height="29" rx={radius} width="43" x="50" y="4" />
-          </clipPath>
-        </defs>
         <rect
           data-ui="shared.callout-preview.target"
           fill="none"
@@ -204,51 +353,13 @@ export function CalloutPresetPreview({
             r="2"
           />
         ) : null}
-        <CalloutPreviewConnector style={style} />
-        <g clipPath={`url(#${clipPathId})`} data-ui="shared.callout-preview.surface">
-          <rect
-            fill={surfaceFill}
-            height="29"
-            rx={radius}
-            stroke={surface.borderColor}
-            strokeWidth={hasWedgeOutline ? 0 : previewBorderWidth}
-            width="43"
-            x="50"
-            y="4"
-          />
-          {style.title.enabled ? (
-            <>
-              <rect fill={style.title.backgroundColor} height="9" width="43" x="50" y="4" />
-              <path
-                d="M 56 9 H 73"
-                stroke={style.title.textColor}
-                strokeLinecap="round"
-                strokeWidth="1.6"
-              />
-            </>
-          ) : null}
-          <path
-            d={
-              style.title.enabled
-                ? 'M 56 20 H 86 M 56 25 H 78'
-                : 'M 56 14 H 86 M 56 20 H 82 M 56 26 H 74'
-            }
-            stroke={surface.textColor}
-            strokeLinecap="round"
-            strokeOpacity="0.76"
-            strokeWidth="1.5"
-          />
-        </g>
-        {hasWedgeOutline ? (
-          <path
-            d={wedgeOutlinePath}
-            data-ui="shared.callout-preview.outline"
-            fill="none"
-            stroke={surface.borderColor}
-            strokeLinejoin="round"
-            strokeWidth={previewBorderWidth}
-          />
-        ) : null}
+        <CalloutPreviewConnector customStyles={customStyles} style={style} />
+        <CalloutPreviewCard
+          checkerPatternId={checkerPatternId}
+          clipPathId={clipPathId}
+          customStyles={customStyles}
+          style={style}
+        />
       </svg>
     </span>
   );

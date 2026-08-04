@@ -12,6 +12,10 @@ import { translate, useAppLocale } from '../../../platform/i18n';
 import { CalloutPresetPreview } from '../../../ui/highlighter-preset-editor/callout/thumbnail';
 import { PresetNameWithOverflowHint } from '../../../ui/compact-inspector-controls/overflow-hint';
 import { CalloutSettingsPositionGrid } from '../../../ui/highlighter-preset-editor/callout/position-grid';
+import {
+  resolveCalloutColorBindings,
+  type CalloutFrameColors,
+} from '../../../features/highlighter/callout-color-bindings';
 
 export function CalloutPresetSection(props: {
   activePresetId?: string;
@@ -22,6 +26,7 @@ export function CalloutPresetSection(props: {
   pendingPresetIds: ReadonlySet<string>;
   presets: CalloutPreset[];
   error: string | null;
+  frameColors?: CalloutFrameColors;
 }) {
   const locale = useAppLocale();
   const enabledPresetCount = props.presets.filter((preset) => preset.enabled !== false).length;
@@ -46,7 +51,11 @@ export function CalloutPresetSection(props: {
                 disabled={disabled}
                 onClick={() => props.onApplyPreset(preset)}
               >
-                <CalloutPresetPreview compact placement={preset.placement} style={preset.style} />
+                <CalloutPresetPreview
+                  compact
+                  placement={preset.placement}
+                  style={resolveCalloutColorBindings(preset.style, props.frameColors ?? {})}
+                />
                 <ProductGlassPresetMeta>
                   <PresetNameWithOverflowHint name={displayName} />
                 </ProductGlassPresetMeta>

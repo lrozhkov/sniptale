@@ -91,20 +91,26 @@
 }
 
 .sniptale-callout-preset-list {
-  gap: 10px;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  gap: 8px;
+  padding: 8px 2px 6px;
+  scroll-padding-block: 8px;
 }
 
 .sniptale-callout-preset-row {
   position: relative;
   display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
   align-items: center;
-  min-height: 52px;
+  min-height: 50px;
 }
 
 .sniptale-callout-preset-row .sniptale-glass-preset-item {
   position: relative;
+  gap: 8px;
+  min-height: 50px;
+  padding: 6px 66px 6px 8px;
+  box-sizing: border-box;
   overflow: hidden;
 }
 
@@ -131,10 +137,6 @@
 .sniptale-callout-preset-row[data-disabled='true']:hover,
 .sniptale-callout-preset-row[data-disabled='true']:focus-within {
   opacity: 0.72;
-}
-
-.sniptale-callout-preset-row .sniptale-glass-preset-item {
-  padding-right: 66px;
 }
 
 .sniptale-callout-preset-row .sniptale-glass-preset-meta {

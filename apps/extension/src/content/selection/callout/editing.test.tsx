@@ -179,6 +179,29 @@ describe('useCalloutEditing callout click lifecycle', () => {
     expect(history.commitTransactionSpy).not.toHaveBeenCalled();
   });
 
+  it('keeps editing when a text selection drag ends over the callout padding', () => {
+    const history = mockHistoryTransactions();
+    const onContentChange = vi.fn();
+    const onStopEditing = vi.fn();
+    const { editable, wrapper } = renderHarness({ onContentChange, onStopEditing });
+    const textNode = editable.querySelector('p')?.firstChild;
+    if (!textNode) throw new Error('Expected editable text');
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.setStart(textNode, 0);
+    range.setEnd(textNode, 4);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+
+    act(() => {
+      wrapper.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    expect(onStopEditing).not.toHaveBeenCalled();
+    expect(history.commitTransactionSpy).not.toHaveBeenCalled();
+    expect(selection?.toString()).toBe('upda');
+  });
+
   it('keeps the callout editing transaction open when the title is clicked', () => {
     const history = mockHistoryTransactions();
     const onContentChange = vi.fn();

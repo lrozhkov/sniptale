@@ -6,6 +6,7 @@ import {
   setCalloutPresetEnabled,
   updateCalloutPreset,
 } from '../../../composition/persistence/callout-presets';
+import { useCalloutPresetSaveMutations } from './preset-save-mutations';
 
 type EditorState = { isOpen: boolean; preset?: CalloutPreset };
 
@@ -16,6 +17,8 @@ export function useCalloutPresetPopoverMutations(args: {
   setIsSaving: Dispatch<SetStateAction<boolean>>;
   setPendingPresetIds: Dispatch<SetStateAction<ReadonlySet<string>>>;
 }) {
+  const presetSave = useCalloutPresetSaveMutations(args);
+
   const toggle = useCallback(
     async (preset: CalloutPreset) => {
       const sessionId = args.sessionGenerationRef.current;
@@ -98,5 +101,5 @@ export function useCalloutPresetPopoverMutations(args: {
     [args]
   );
 
-  return { reset, save, toggle };
+  return { ...presetSave, reset, save, toggle };
 }

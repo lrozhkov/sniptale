@@ -41,6 +41,7 @@ function createProps(
     isTailBaseEndDragging: false,
     isTailFrameDragging: false,
     isWaypointDragging: false,
+    isPolylineWaypoint: false,
     portalTheme: null,
     settingsAnchorRef: { current: null },
     settingsHandleStyle: { left: 124, top: 100 },
@@ -52,6 +53,8 @@ function createProps(
     tailBaseEndHandleStyle: { left: 140, top: 140 },
     tailFrameHandleStyle: { left: 160, top: 180 },
     waypointHandleStyle: { left: 150, top: 150 },
+    waypointAngle: null,
+    waypointAngleStyle: null,
     ...overrides,
   };
 }
@@ -81,6 +84,23 @@ describe('callout interaction handles', () => {
     );
 
     expect(markup).toContain('sniptale-callout-waypoint-handle');
+    expect(markup).not.toContain('lucide-plus');
+  });
+
+  it('renders a diamond control and a compact angle readout while an angled route is dragged', () => {
+    const markup = renderToStaticMarkup(
+      renderCalloutInteractionHandles(
+        createProps({
+          isPolylineWaypoint: true,
+          isWaypointDragging: true,
+          waypointAngle: 45,
+          waypointAngleStyle: { left: 170, top: 120 },
+        })
+      )
+    );
+
+    expect(markup).toContain('transform:rotate(45deg)');
+    expect(markup).toContain('45°');
     expect(markup).not.toContain('lucide-plus');
   });
 
@@ -126,13 +146,17 @@ describe('callout interaction handles', () => {
     expect(markup).not.toContain('sniptale-callout-tail-handle');
   });
 
-  it('hides only comment width handles while the connected frame is being edited', () => {
+  it('hides comment and connector geometry while the connected frame is being edited', () => {
     const markup = renderToStaticMarkup(
-      renderCalloutInteractionHandles(createProps({ isWidthResizeHandleHidden: true }))
+      renderCalloutInteractionHandles(
+        createProps({ isGeometryHandleHidden: true, isWidthResizeHandleHidden: true })
+      )
     );
 
     expect(markup).not.toContain('sniptale-callout-resize-handle');
-    expect(markup).toContain('sniptale-callout-tail-base-start-handle');
+    expect(markup).not.toContain('sniptale-callout-tail-base-start-handle');
+    expect(markup).not.toContain('sniptale-callout-tail-frame-handle');
+    expect(markup).not.toContain('sniptale-callout-waypoint-handle');
     expect(markup).toContain('sniptale-callout-drag-handle');
   });
 

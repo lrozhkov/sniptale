@@ -80,6 +80,9 @@ export function useCalloutSettingsPopoverState(args: {
     const resetsConnectorPlacement =
       patch.style?.connector?.kind !== undefined &&
       patch.style.connector.kind !== localSettings.style.connector.kind;
+    const resetsConnectorWaypoint =
+      patch.style?.connector?.routing !== undefined &&
+      patch.style.connector.routing !== localSettings.style.connector.routing;
     const placementPatch: CalloutSettingsPatch = resetsManualPlacement
       ? {
           ...patch,
@@ -103,7 +106,12 @@ export function useCalloutSettingsPopoverState(args: {
               connectorWaypoint: undefined,
             },
           }
-        : patch;
+        : resetsConnectorWaypoint
+          ? {
+              ...patch,
+              placement: { ...patch.placement, connectorWaypoint: undefined },
+            }
+          : patch;
     const normalizedPatch: CalloutSettingsPatch =
       patch.style && !('sourcePresetId' in patch)
         ? { ...placementPatch, sourcePresetId: undefined }

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { getDynamicTailState } from './dynamic-tail';
-import { getCalloutTailMetrics } from './tail';
 
 describe('getDynamicTailState', () => {
   it('slides the frame endpoint along the nearest side as the bubble moves', () => {
@@ -129,29 +128,6 @@ describe('getDynamicTailState', () => {
     ).toBeGreaterThanOrEqual(16);
     expect(shifted.attachment.framePoint.x - centered.attachment.framePoint.x).toBeLessThan(20);
     expect(shifted.path.startsWith('M ')).toBe(true);
-  });
-
-  it('keeps the bubble base stable while the tapered body stretches', () => {
-    const frameRect = { x: 100, y: 100, width: 160, height: 120 };
-    const near = getDynamicTailState({
-      frameRect,
-      bubbleRect: { x: 280, y: 120, width: 120, height: 60 },
-      tailSize: 8,
-    });
-    const far = getDynamicTailState({
-      frameRect,
-      bubbleRect: { x: 520, y: 20, width: 120, height: 60 },
-      tailSize: 8,
-    });
-    const baseWidth = (state: typeof near) =>
-      Math.hypot(
-        state.attachment.baseA.x - state.attachment.baseB.x,
-        state.attachment.baseA.y - state.attachment.baseB.y
-      );
-
-    expect(baseWidth(near)).toBeCloseTo(getCalloutTailMetrics(8).baseSpan);
-    expect(baseWidth(far)).toBeCloseTo(baseWidth(near));
-    expect(far.path).not.toBe(near.path);
   });
 
   it('tapers continuously instead of keeping one width along the connector', () => {

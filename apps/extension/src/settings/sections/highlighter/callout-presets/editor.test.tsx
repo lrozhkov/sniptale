@@ -108,6 +108,7 @@ describe('CalloutPresetEditor', () => {
     expect(document.body.textContent).toContain('content.callout.blockMarker');
     await openSection('content.callout.manualText');
     expect(document.body.textContent).toContain('content.callout.fontFamilyLabel');
+    await openSection('content.callout.manualTitle');
     expect(document.body.textContent).toContain('content.callout.titleFontSizeLabel');
     expect(document.querySelector<HTMLInputElement>('input[maxlength="64"]')).not.toBeNull();
   });

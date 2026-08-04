@@ -15,5 +15,6 @@ export function createCalloutSettingsKey(settings: CalloutSettings) {
     settings.style.surface.borderWidth,
     settings.style.title.enabled,
     settings.style.title.fontSize,
+    settings.style.title.dividerWidth,
   ].join('|');
 }

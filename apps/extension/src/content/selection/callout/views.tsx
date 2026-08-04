@@ -11,6 +11,12 @@ import type {
   CalloutConnectorMarker,
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
+import { getCalloutStrokeDasharray } from '../../../features/highlighter/callout-stroke';
+import { getCalloutAccentEdgePath } from '../../../features/highlighter/callout-accent-edge';
+import {
+  projectCalloutLineCustomCss,
+  type ResolvedCalloutCustomCss,
+} from '../../../features/highlighter/callout-custom-css';
 
 type CalloutConnectorState =
   | ReturnType<typeof getDynamicTailState>
@@ -78,10 +84,12 @@ export function renderCalloutFloatingToolbar(props: {
 
 export function renderDynamicCalloutTail(
   tail: CalloutConnectorState | null,
-  style: CalloutVisualStyle
+  style: CalloutVisualStyle,
+  customStyles?: ResolvedCalloutCustomCss
 ) {
   if (!tail) return null;
   if (tail.kind === 'line') {
+    const connectorCustomStyles = projectCalloutLineCustomCss(customStyles?.connector ?? {});
     return (
       <svg
         className="sniptale-callout-dynamic-tail"
@@ -98,29 +106,37 @@ export function renderDynamicCalloutTail(
           stroke="transparent"
           strokeWidth={18}
         />
-        <path
-          d={tail.path}
-          fill="none"
-          pointerEvents="none"
-          stroke={style.connector.color}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={style.connector.width}
-        />
-        {renderConnectorMarker(
-          style.connector.blockMarker,
-          tail.blockPoint,
-          style.connector.color,
-          tail.blockAngle,
-          style.connector.blockMarkerSize
-        )}
-        {renderConnectorMarker(
-          style.connector.frameMarker,
-          tail.framePoint,
-          style.connector.color,
-          tail.frameAngle,
-          style.connector.frameMarkerSize
-        )}
+        <g style={connectorCustomStyles.group}>
+          <path
+            data-ui="content.callout.connector-line"
+            d={tail.path}
+            fill="none"
+            pointerEvents="none"
+            stroke={style.connector.color}
+            strokeDasharray={getCalloutStrokeDasharray(
+              style.connector.lineStyle,
+              style.connector.width
+            )}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={style.connector.width}
+            style={connectorCustomStyles.line}
+          />
+          {renderConnectorMarker(
+            style.connector.blockMarker,
+            tail.blockPoint,
+            style.connector.color,
+            tail.blockAngle,
+            style.connector.blockMarkerSize
+          )}
+          {renderConnectorMarker(
+            style.connector.frameMarker,
+            tail.framePoint,
+            style.connector.color,
+            tail.frameAngle,
+            style.connector.frameMarkerSize
+          )}
+        </g>
       </svg>
     );
   }
@@ -147,13 +163,75 @@ export function renderDynamicCalloutTail(
           fill={style.surface.backgroundColor}
           pointerEvents="none"
           stroke={style.surface.borderColor}
+          strokeDasharray={getCalloutStrokeDasharray(
+            style.surface.borderStyle,
+            style.surface.borderWidth
+          )}
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth={style.surface.borderWidth}
+          style={customStyles?.connector}
         />
       ) : (
-        <path d={tail.path} fill={style.surface.backgroundColor} pointerEvents="none" />
+        <path
+          d={tail.path}
+          fill={style.surface.backgroundColor}
+          pointerEvents="none"
+          style={customStyles?.connector}
+        />
       )}
+    </svg>
+  );
+}
+
+export function renderCalloutAccentEdge(
+  style: CalloutVisualStyle,
+  dimensions: { width: number; height: number },
+  customStyles?: ResolvedCalloutCustomCss
+) {
+  return (
+    <CalloutAccentEdgeView customStyles={customStyles} dimensions={dimensions} style={style} />
+  );
+}
+
+function CalloutAccentEdgeView(props: {
+  customStyles: ResolvedCalloutCustomCss | undefined;
+  dimensions: { width: number; height: number };
+  style: CalloutVisualStyle;
+}) {
+  const clipId = `sniptale-callout-accent-${React.useId().replaceAll(':', '')}`;
+  const { dimensions, style } = props;
+  const accent = style.accentEdge;
+  if (!accent.enabled || dimensions.width <= 0 || dimensions.height <= 0) return null;
+  const path = getCalloutAccentEdgePath({
+    rect: { x: 0, y: 0, ...dimensions },
+    side: accent.side,
+  });
+  return (
+    <svg
+      aria-hidden="true"
+      data-ui="content.callout.accent-edge"
+      height={dimensions.height}
+      pointerEvents="none"
+      style={{ position: 'absolute', inset: 0, overflow: 'visible', zIndex: 2 }}
+      width={dimensions.width}
+    >
+      <defs>
+        <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+          <rect height={dimensions.height} rx={style.surface.radius} width={dimensions.width} />
+        </clipPath>
+      </defs>
+      <path
+        clipPath={`url(#${clipId})`}
+        d={path}
+        fill="none"
+        stroke={accent.color}
+        strokeDasharray={getCalloutStrokeDasharray(accent.lineStyle, accent.width)}
+        strokeLinecap={accent.lineStyle === 'dotted' ? 'round' : 'butt'}
+        strokeLinejoin="round"
+        strokeWidth={accent.width * 2}
+        style={props.customStyles?.accent}
+      />
     </svg>
   );
 }

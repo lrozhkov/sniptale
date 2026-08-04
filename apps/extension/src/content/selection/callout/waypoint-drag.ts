@@ -8,9 +8,16 @@ import {
   type PointerDragStartEvent,
 } from '../pointer-drag-session';
 import { getCalloutKeyboardDelta, type CalloutHandleKeyboardEvent } from './keyboard';
+import { snapPolylineControlPoint, type PolylineAngleSnap } from './polyline-control';
+import { constrainPerpendicularWaypoint, type ElbowWaypointConstraint } from './elbow-control';
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
+
+interface CalloutWaypointDragStartEvent extends PointerDragStartEvent {
+  clientX: number;
+  clientY: number;
+}
 
 const WAYPOINT_SNAP_DISTANCE = 8;
 
@@ -35,6 +42,26 @@ function snapWaypoint(point: Point, snapPoints: Point[]) {
   };
 }
 
+function resolveWaypointPoint(args: {
+  angleSnap: PolylineAngleSnap | null | undefined;
+  elbowConstraint: ElbowWaypointConstraint | null | undefined;
+  point: Point;
+  snapPoints: Point[];
+  strictAngleSnap: boolean;
+}) {
+  if (args.angleSnap) {
+    return snapPolylineControlPoint({
+      point: args.point,
+      snap: args.angleSnap,
+      strict: args.strictAngleSnap,
+    });
+  }
+  const snapped = snapWaypoint(args.point, args.snapPoints);
+  return args.elbowConstraint
+    ? constrainPerpendicularWaypoint({ ...args.elbowConstraint, waypoint: snapped })
+    : snapped;
+}
+
 function toWaypoint(frameRect: Rect, point: Point): CalloutConnectorWaypoint {
   return {
     centerOffsetX: point.x - (frameRect.x + frameRect.width / 2),
@@ -49,8 +76,40 @@ function fromWaypoint(frameRect: Rect, waypoint: CalloutConnectorWaypoint): Poin
   };
 }
 
+function areWaypointsEqual(
+  left: CalloutConnectorWaypoint | null | undefined,
+  right: CalloutConnectorWaypoint | null | undefined
+) {
+  if (!left || !right) return left === right;
+  return left.centerOffsetX === right.centerOffsetX && left.centerOffsetY === right.centerOffsetY;
+}
+
+function useCommittedWaypointCleanup(args: {
+  draftRef: React.RefObject<CalloutConnectorWaypoint | null>;
+  isDragging: boolean;
+  pendingCommitRef: React.RefObject<boolean>;
+  position: CalloutConnectorWaypoint | undefined;
+  setDraftPosition: React.Dispatch<React.SetStateAction<CalloutConnectorWaypoint | null>>;
+}) {
+  React.useEffect(() => {
+    if (
+      args.isDragging ||
+      !args.pendingCommitRef.current ||
+      !args.draftRef.current ||
+      !areWaypointsEqual(args.position, args.draftRef.current)
+    ) {
+      return;
+    }
+    args.pendingCommitRef.current = false;
+    args.draftRef.current = null;
+    args.setDraftPosition(null);
+  }, [args]);
+}
+
 export function useCalloutWaypointDrag(args: {
-  axis: 'x' | 'y' | null;
+  angleSnap?: PolylineAngleSnap | null;
+  elbowConstraint?: ElbowWaypointConstraint | null;
+  axis: 'x' | 'y' | 'both' | null;
   defaultPoint: Point | null;
   frameRect: Rect;
   isEditing: boolean;
@@ -61,12 +120,25 @@ export function useCalloutWaypointDrag(args: {
   const [draftPosition, setDraftPosition] = React.useState<CalloutConnectorWaypoint | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
   const pointerIdRef = React.useRef<number | null>(null);
+  const pointerOffsetRef = React.useRef({ x: 0, y: 0 });
+  const dragOriginPointRef = React.useRef<Point | null>(null);
   const draftRef = React.useRef<CalloutConnectorWaypoint | null>(null);
+  const pendingCommitRef = React.useRef(false);
+
+  useCommittedWaypointCleanup({
+    draftRef,
+    isDragging,
+    pendingCommitRef,
+    position: args.position,
+    setDraftPosition,
+  });
 
   const cancel = React.useCallback(() => {
-    if (!isDragging) return false;
+    if (!isDragging || pointerIdRef.current === null) return false;
     pointerIdRef.current = null;
+    dragOriginPointRef.current = null;
     draftRef.current = null;
+    pendingCommitRef.current = false;
     setDraftPosition(null);
     setIsDragging(false);
     return true;
@@ -76,28 +148,42 @@ export function useCalloutWaypointDrag(args: {
     if (!isDragging) return;
     const handleMove = (event: PointerEvent) => {
       if (!acceptPointerDragEvent(event, pointerIdRef.current)) return;
-      const currentPoint = args.position
-        ? fromWaypoint(args.frameRect, args.position)
-        : args.defaultPoint!;
+      const currentPoint = dragOriginPointRef.current ?? args.defaultPoint!;
       const pointerPoint = {
-        x: args.axis === 'y' ? currentPoint.x : event.clientX,
-        y: args.axis === 'x' ? currentPoint.y : event.clientY,
+        x: args.axis === 'y' ? currentPoint.x : event.clientX - pointerOffsetRef.current.x,
+        y: args.axis === 'x' ? currentPoint.y : event.clientY - pointerOffsetRef.current.y,
       };
-      const waypoint = toWaypoint(args.frameRect, snapWaypoint(pointerPoint, args.snapPoints));
+      const waypoint = toWaypoint(
+        args.frameRect,
+        resolveWaypointPoint({
+          angleSnap: args.angleSnap,
+          elbowConstraint: args.elbowConstraint,
+          point: pointerPoint,
+          snapPoints: args.snapPoints,
+          strictAngleSnap: event.shiftKey,
+        })
+      );
       draftRef.current = waypoint;
       setDraftPosition(waypoint);
     };
     const handleUp = (event: PointerEvent) => {
       if (!finishPointerDragEvent(event, pointerIdRef, () => setIsDragging(false))) return;
       const waypoint = draftRef.current;
-      draftRef.current = null;
-      setDraftPosition(null);
-      if (waypoint) args.onChange(waypoint);
+      dragOriginPointRef.current = null;
+      if (waypoint) {
+        pendingCommitRef.current = true;
+        args.onChange(waypoint);
+      }
     };
-    return registerPointerDragSession({ cancel, move: handleMove, up: handleUp });
+    return registerPointerDragSession({
+      cancel,
+      cancelOnLostPointerCapture: false,
+      move: handleMove,
+      up: handleUp,
+    });
   }, [args, cancel, isDragging]);
 
-  const begin = (event: PointerDragStartEvent) => {
+  const begin = (event: CalloutWaypointDragStartEvent) => {
     if (args.isEditing || !args.axis || !args.defaultPoint || event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -107,9 +193,16 @@ export function useCalloutWaypointDrag(args: {
     } catch {
       // The transient portal may be detached while capture is requested.
     }
-    const initial = args.position ?? toWaypoint(args.frameRect, args.defaultPoint);
+    const initialPoint = args.defaultPoint;
+    const initial = toWaypoint(args.frameRect, initialPoint);
     pointerIdRef.current = event.pointerId;
+    pointerOffsetRef.current = {
+      x: event.clientX - initialPoint.x,
+      y: event.clientY - initialPoint.y,
+    };
+    dragOriginPointRef.current = initialPoint;
     draftRef.current = initial;
+    pendingCommitRef.current = false;
     setDraftPosition(initial);
     setIsDragging(true);
   };
@@ -131,7 +224,18 @@ export function useCalloutWaypointDrag(args: {
       x: args.axis === 'y' ? current.x : current.x + delta.x,
       y: args.axis === 'x' ? current.y : current.y + delta.y,
     };
-    args.onChange(toWaypoint(args.frameRect, snapWaypoint(nextPoint, args.snapPoints)));
+    args.onChange(
+      toWaypoint(
+        args.frameRect,
+        resolveWaypointPoint({
+          angleSnap: args.angleSnap,
+          elbowConstraint: args.elbowConstraint,
+          point: nextPoint,
+          snapPoints: args.snapPoints,
+          strictAngleSnap: event.shiftKey,
+        })
+      )
+    );
   };
 
   const handleDoubleClick = (event: ReactMouseEvent<HTMLButtonElement>) => {

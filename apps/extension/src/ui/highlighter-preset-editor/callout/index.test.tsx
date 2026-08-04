@@ -41,6 +41,7 @@ it('edits an existing preset in the shared persistent modal', async () => {
   });
 
   expect(document.querySelector<HTMLInputElement>('input[maxlength="64"]')?.value).toBe('Облачко');
+  expect(document.querySelector<HTMLElement>('[role="dialog"]')?.style.width).toBe('400px');
   const navigation = [...document.querySelectorAll<HTMLButtonElement>('nav button')];
   expect(navigation.at(-1)?.getAttribute('aria-label')).toBe('Позиция');
   expect(document.querySelectorAll('[data-callout-anchor]')).toHaveLength(0);
@@ -72,6 +73,13 @@ it('updates the default position and saves it with the live preset preview', asy
   await act(async () =>
     document.querySelector<HTMLButtonElement>('button[aria-label="Позиция"]')?.click()
   );
+
+  const positionGrid = document.querySelector<HTMLElement>('[data-position-layout="square"]');
+  expect(positionGrid?.style.gridTemplateColumns).toBe('repeat(3, 28px)');
+  expect(
+    positionGrid?.querySelector<HTMLElement>('[data-callout-anchor="middle-right"]')?.style
+      .gridColumn
+  ).toBe('3');
 
   await act(async () =>
     document.querySelector<HTMLButtonElement>('[data-callout-anchor="bottom-right"]')?.click()

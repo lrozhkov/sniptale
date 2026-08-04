@@ -51,13 +51,15 @@ interface ParsedStoredCalloutPresetCatalog {
 }
 
 const connectorKinds = new Set(['none', 'wedge', 'line']);
-const connectorRoutings = new Set(['straight', 'elbow']);
+const connectorRoutings = new Set(['straight', 'elbow', 'polyline']);
 const connectorMarkers = new Set(['none', 'circle', 'ring-dot', 'square', 'diamond', 'arrow']);
-const fontFamilies = new Set(['sans', 'serif', 'mono']);
+const lineStyles = new Set(['solid', 'dashed', 'dotted']);
+const fontFamilies = new Set(['sans', 'serif', 'mono', 'cursive']);
 const fontStyles = new Set(['normal', 'italic']);
 const fontWeights = new Set(['normal', 'bold']);
 const textDecorations = new Set(['none', 'underline']);
 const textAlignments = new Set(['left', 'center', 'right', 'justify']);
+const colorSources = new Set(['custom', 'frame-border', 'frame-fill']);
 const systemKeys = new Set<string>(SYSTEM_CALLOUT_PRESET_KEYS);
 const calloutAnchors = new Set<CalloutAnchor>([
   'middle-left',
@@ -70,6 +72,7 @@ const calloutAnchors = new Set<CalloutAnchor>([
   'middle-right',
 ]);
 const calloutSides = new Set(['top', 'bottom', 'left', 'right']);
+const accentSides = new Set(['top', 'right', 'bottom', 'left']);
 
 function getExpectedPresetSide(anchor: CalloutAnchor) {
   if (anchor === 'middle-left') return 'left';
@@ -89,6 +92,10 @@ function isConnectorKind(value: unknown): value is CalloutVisualStyle['connector
 
 function isConnectorRouting(value: unknown): value is CalloutVisualStyle['connector']['routing'] {
   return isString(value) && connectorRoutings.has(value);
+}
+
+function isLineStyle(value: unknown): value is CalloutVisualStyle['connector']['lineStyle'] {
+  return isString(value) && lineStyles.has(value);
 }
 
 function isFontFamily(value: unknown): value is CalloutVisualStyle['typography']['fontFamily'] {
@@ -115,6 +122,10 @@ function isTextAlignment(value: unknown): value is CalloutVisualStyle['typograph
 
 function isSystemPresetKey(value: unknown): value is SystemCalloutPresetKey {
   return isString(value) && systemKeys.has(value);
+}
+
+function isColorSource(value: unknown): value is CalloutVisualStyle['colorBindings']['connector'] {
+  return isString(value) && colorSources.has(value);
 }
 
 export function parseCalloutPresetPlacement(value: unknown): CalloutPreset['placement'] | null {
@@ -157,19 +168,58 @@ function isCalloutColor(value: unknown): value is string {
 
 export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | null {
   if (!isPlainRecord(value)) return null;
+  const accentEdge = value['accentEdge'];
   const connector = value['connector'];
+  const colorBindings = value['colorBindings'];
+  const customCss = value['customCss'] ?? '';
   const surface = value['surface'];
   const title = value['title'];
   const typography = value['typography'];
   const blockMarkerSize = isPlainRecord(connector) ? (connector['blockMarkerSize'] ?? 10) : null;
   const frameMarkerSize = isPlainRecord(connector) ? (connector['frameMarkerSize'] ?? 10) : null;
+  const connectorLineStyle = isPlainRecord(connector) ? (connector['lineStyle'] ?? 'solid') : null;
   const shadowColor = isPlainRecord(surface) ? (surface['shadowColor'] ?? '#000000') : null;
+  const borderStyle = isPlainRecord(surface) ? (surface['borderStyle'] ?? 'solid') : null;
+  const dividerColor = isPlainRecord(title) ? (title['dividerColor'] ?? 'transparent') : null;
+  const dividerStyle = isPlainRecord(title) ? (title['dividerStyle'] ?? 'solid') : null;
+  const dividerWidth = isPlainRecord(title) ? (title['dividerWidth'] ?? 0) : null;
   const fontStyle = isPlainRecord(typography) ? (typography['fontStyle'] ?? 'normal') : null;
   const textDecoration = isPlainRecord(typography)
     ? (typography['textDecoration'] ?? 'none')
     : null;
   const textAlign = isPlainRecord(typography) ? (typography['textAlign'] ?? 'left') : null;
+  const connectorColorSource = isPlainRecord(colorBindings)
+    ? (colorBindings['connector'] ?? 'custom')
+    : 'custom';
+  const surfaceBackgroundColorSource = isPlainRecord(colorBindings)
+    ? (colorBindings['surfaceBackground'] ?? 'custom')
+    : 'custom';
+  const surfaceBorderColorSource = isPlainRecord(colorBindings)
+    ? (colorBindings['surfaceBorder'] ?? 'custom')
+    : 'custom';
+  const accentColorSource = isPlainRecord(colorBindings)
+    ? (colorBindings['accent'] ?? 'custom')
+    : 'custom';
+  const accentColor = isPlainRecord(accentEdge) ? (accentEdge['color'] ?? '#f97316') : '#f97316';
+  const accentEnabled = isPlainRecord(accentEdge) ? (accentEdge['enabled'] ?? false) : false;
+  const accentLineStyle = isPlainRecord(accentEdge)
+    ? (accentEdge['lineStyle'] ?? 'solid')
+    : 'solid';
+  const accentSide = isPlainRecord(accentEdge) ? (accentEdge['side'] ?? 'left') : 'left';
+  const accentWidth = isPlainRecord(accentEdge) ? (accentEdge['width'] ?? 4) : 4;
   if (
+    !isColorSource(accentColorSource) ||
+    !isString(customCss) ||
+    customCss.length > 4_000 ||
+    !isCalloutColor(accentColor) ||
+    !isBoolean(accentEnabled) ||
+    !isLineStyle(accentLineStyle) ||
+    !isString(accentSide) ||
+    !accentSides.has(accentSide) ||
+    !isNumberInRange(accentWidth, 1, 12) ||
+    !isColorSource(connectorColorSource) ||
+    !isColorSource(surfaceBackgroundColorSource) ||
+    !isColorSource(surfaceBorderColorSource) ||
     !isPlainRecord(connector) ||
     !isConnectorMarker(connector['blockMarker']) ||
     !isNumberInRange(blockMarkerSize, 4, 48) ||
@@ -177,12 +227,14 @@ export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | nu
     !isConnectorMarker(connector['frameMarker']) ||
     !isNumberInRange(frameMarkerSize, 4, 48) ||
     !isConnectorKind(connector['kind']) ||
+    !isLineStyle(connectorLineStyle) ||
     !isConnectorRouting(connector['routing']) ||
     !isNumberInRange(connector['wedgeSize'], 4, 48) ||
     !isNumberInRange(connector['width'], 1, 12) ||
     !isPlainRecord(surface) ||
     !isCalloutColor(surface['backgroundColor']) ||
     !isCalloutColor(surface['borderColor']) ||
+    !isLineStyle(borderStyle) ||
     !isNumberInRange(surface['borderWidth'], 0, 12) ||
     !isNumberInRange(surface['paddingX'], 0, 48) ||
     !isNumberInRange(surface['paddingY'], 0, 48) ||
@@ -192,6 +244,9 @@ export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | nu
     !isCalloutColor(surface['textColor']) ||
     !isPlainRecord(title) ||
     !isCalloutColor(title['backgroundColor']) ||
+    !isCalloutColor(dividerColor) ||
+    !isLineStyle(dividerStyle) ||
+    !isNumberInRange(dividerWidth, 0, 12) ||
     !isBoolean(title['enabled']) ||
     !isNumberInRange(title['fontSize'], 8, 144) ||
     !isFontWeight(title['fontWeight']) ||
@@ -209,6 +264,19 @@ export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | nu
   }
 
   return {
+    accentEdge: {
+      color: accentColor,
+      enabled: accentEnabled,
+      lineStyle: accentLineStyle,
+      side: accentSide as CalloutVisualStyle['accentEdge']['side'],
+      width: accentWidth,
+    },
+    colorBindings: {
+      accent: accentColorSource,
+      connector: connectorColorSource,
+      surfaceBackground: surfaceBackgroundColorSource,
+      surfaceBorder: surfaceBorderColorSource,
+    },
     connector: {
       blockMarker: connector['blockMarker'],
       blockMarkerSize,
@@ -216,13 +284,16 @@ export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | nu
       frameMarker: connector['frameMarker'],
       frameMarkerSize,
       kind: connector['kind'],
+      lineStyle: connectorLineStyle,
       routing: connector['routing'],
       wedgeSize: connector['wedgeSize'],
       width: connector['width'],
     },
+    customCss,
     surface: {
       backgroundColor: surface['backgroundColor'],
       borderColor: surface['borderColor'],
+      borderStyle,
       borderWidth: surface['borderWidth'],
       paddingX: surface['paddingX'],
       paddingY: surface['paddingY'],
@@ -233,6 +304,9 @@ export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | nu
     },
     title: {
       backgroundColor: title['backgroundColor'],
+      dividerColor,
+      dividerStyle,
+      dividerWidth,
       enabled: title['enabled'],
       fontSize: title['fontSize'],
       fontWeight: title['fontWeight'],

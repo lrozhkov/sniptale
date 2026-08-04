@@ -18,9 +18,12 @@ const DEFAULT_PLACEMENT: CalloutPlacement = {
 
 export function cloneCalloutStyle(style: CalloutVisualStyle): CalloutVisualStyle {
   return {
-    connector: { ...style.connector },
+    accentEdge: { ...DEFAULT_STYLE.accentEdge, ...style.accentEdge },
+    colorBindings: { ...DEFAULT_STYLE.colorBindings, ...style.colorBindings },
+    connector: { ...DEFAULT_STYLE.connector, ...style.connector },
+    customCss: style.customCss ?? DEFAULT_STYLE.customCss,
     surface: { ...DEFAULT_STYLE.surface, ...style.surface },
-    title: { ...style.title },
+    title: { ...DEFAULT_STYLE.title, ...style.title },
     typography: { ...DEFAULT_STYLE.typography, ...style.typography },
   };
 }
@@ -82,7 +85,10 @@ export function applyCalloutSettingsPatch(
         ? {}
         : { sourcePresetId: settings.sourcePresetId }),
     style: {
+      accentEdge: { ...settings.style.accentEdge, ...patch.style?.accentEdge },
+      colorBindings: { ...settings.style.colorBindings, ...patch.style?.colorBindings },
       connector: { ...settings.style.connector, ...patch.style?.connector },
+      customCss: patch.style?.customCss ?? settings.style.customCss,
       surface: { ...settings.style.surface, ...patch.style?.surface },
       title: { ...settings.style.title, ...patch.style?.title },
       typography: { ...settings.style.typography, ...patch.style?.typography },
@@ -110,6 +116,9 @@ function normalizeLegacyCallout(settings: LegacyCalloutSettings): CalloutSetting
         : { connectorFramePosition: settings.tailFramePosition }),
     },
     style: {
+      accentEdge: { ...DEFAULT_STYLE.accentEdge },
+      colorBindings: { ...DEFAULT_STYLE.colorBindings },
+      customCss: DEFAULT_STYLE.customCss,
       connector: {
         ...DEFAULT_STYLE.connector,
         color: settings.bgColor,

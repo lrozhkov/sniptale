@@ -34,16 +34,21 @@ export function getCalloutLayoutState(args: {
     placement.side === 'auto' ? (preferredSide ?? 'top') : placement.side;
   const positionDimensions =
     args.dimensions.width > 0 && args.dimensions.height > 0 ? args.dimensions : effectiveDimensions;
+  const automaticCalloutPos = getCalloutPosition({
+    anchor: placement.anchor,
+    anchorPos,
+    calloutDimensions: positionDimensions,
+    frameHeight: args.frameRect.height,
+    side: resolvedSide,
+    tailSize: style.connector.kind === 'wedge' ? style.connector.wedgeSize : 0,
+  });
   const calloutPos = placement.manualPlacement
     ? getManualCalloutPosition(args.frameRect, positionDimensions, placement.manualPlacement)
-    : getCalloutPosition({
-        anchor: placement.anchor,
-        anchorPos,
-        calloutDimensions: positionDimensions,
-        frameHeight: args.frameRect.height,
-        side: resolvedSide,
-        tailSize: style.connector.kind === 'wedge' ? style.connector.wedgeSize : 0,
-      });
+    : automaticCalloutPos;
+  const bubbleOffset = {
+    x: calloutPos.x - automaticCalloutPos.x,
+    y: calloutPos.y - automaticCalloutPos.y,
+  };
   const effectiveZIndex = args.isEditing
     ? Z_INDEX_CALLOUT_EDITING
     : Math.min(args.zIndex, Z_INDEX_CALLOUT_VIEWING);
@@ -53,6 +58,7 @@ export function getCalloutLayoutState(args: {
           anchorPoint: anchorPos,
           borderRadius: style.surface.radius,
           borderWidth: style.surface.borderWidth,
+          bubbleOffset,
           bubbleRect: { ...calloutPos, ...positionDimensions },
           frameRect: args.frameRect,
           ...(placement.connectorBasePosition === undefined
@@ -74,6 +80,7 @@ export function getCalloutLayoutState(args: {
             blockBoundaryWidth: style.surface.borderWidth,
             blockMarker: style.connector.blockMarker,
             blockMarkerSize: style.connector.blockMarkerSize,
+            bubbleOffset,
             bubbleRect: { ...calloutPos, ...positionDimensions },
             frameBoundaryWidth: args.frameBorderWidth ?? 0,
             frameMarker: style.connector.frameMarker,
@@ -175,7 +182,9 @@ function getCalloutCloudStyle(
     maxWidth: typography.maxWidth,
     backgroundColor: hasWedgeOutline ? 'transparent' : surface.backgroundColor,
     color: surface.textColor,
-    border: `${surface.borderWidth}px solid ${hasWedgeOutline ? 'transparent' : surface.borderColor}`,
+    border: `${surface.borderWidth}px ${surface.borderStyle} ${
+      hasWedgeOutline ? 'transparent' : surface.borderColor
+    }`,
     borderRadius: surface.radius,
     padding: `${surface.paddingY}px ${surface.paddingX}px`,
     fontFamily: FONT_FAMILY_MAP[typography.fontFamily],

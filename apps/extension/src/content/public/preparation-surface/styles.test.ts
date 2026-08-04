@@ -44,7 +44,9 @@ describe('content entrypoint styles', () => {
     expect(hostStyles).toContain(':host {');
     expect(frameSettingsStyles).toContain('.sniptale-frame-style-preset-row');
     expect(calloutSettingsStyles).toContain('.sniptale-callout-preset-row');
-    expect(calloutSettingsStyles).toContain('.sniptale-callout-preset-list {\n  gap: 10px;');
+    expect(calloutSettingsStyles).toContain('.sniptale-callout-preset-list {\n  gap: 8px;');
+    expect(calloutSettingsStyles).toContain('padding: 8px 2px 6px;');
+    expect(calloutSettingsStyles).toContain('flex: 0 0 auto;');
     expect(calloutSettingsStyles).toContain("[data-callout-settings-mode-switch='true']");
     expect(calloutSettingsStyles).toContain(
       "[data-callout-settings-mode-switch='true'] > button > span {\n  line-height: 16px;"

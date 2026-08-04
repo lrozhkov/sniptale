@@ -15,6 +15,7 @@ import {
   type CalloutSettingsPatch,
 } from '../../../selection/callout/model';
 import { CalloutPresetEditor } from '../../../../ui/highlighter-preset-editor/callout';
+import { createCalloutSaveSection } from '../../../selection/callout-settings-popover/save-section';
 
 const FUTURE_CALLOUT_ID = 'future-frame-callout';
 const FUTURE_CALLOUT_RECT = { x: 0, y: 0, width: 0, height: 0 };
@@ -31,6 +32,14 @@ export function FutureCalloutSettingsPopover(props: {
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [localSettings, setLocalSettings] = useState(props.settings);
   const presets = useCalloutPresetPopoverController(props.isOpen);
+  const saveSection = createCalloutSaveSection({
+    create: presets.catalog.create,
+    error: presets.catalog.error,
+    isSaving: presets.catalog.isSaving,
+    overwrite: presets.catalog.overwrite,
+    presets: presets.catalog.presets,
+    settings: localSettings,
+  });
   const popoverStyle = useFramePopoverPosition({
     anchorEl: props.anchorEl,
     fallbackSize: { width: 384, height: 620 },
@@ -99,6 +108,7 @@ export function FutureCalloutSettingsPopover(props: {
         onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
         pendingPresetIds={presets.catalog.pendingPresetIds}
         presetError={presets.catalog.error}
+        saveSection={saveSection}
         presets={presets.catalog.visiblePresets}
       />
       {presets.editor.preset ? (

@@ -31,7 +31,7 @@ export function FutureFrameStyleControls(props: {
   toolbarMenuState: ToolbarMenuState;
 }) {
   const [style, setStyle] = useState(props.futureFrameStyle);
-  const activeButtonRef = useRef<HTMLButtonElement>(null);
+  const [effectAnchorEl, setEffectAnchorEl] = useState<HTMLButtonElement | null>(null);
   const calloutButtonRef = useRef<HTMLButtonElement>(null);
   const open = props.toolbarMenuState.activeMenuType === 'frame-style';
 
@@ -58,7 +58,6 @@ export function FutureFrameStyleControls(props: {
         return (
           <ContentToolbarButton
             key={mode}
-            ref={active ? activeButtonRef : undefined}
             active={active}
             dataUi={`content.toolbar.future-frame-${mode}`}
             menuIndicator
@@ -67,6 +66,7 @@ export function FutureFrameStyleControls(props: {
             aria-expanded={active && open}
             onClick={(event) => {
               event.stopPropagation();
+              setEffectAnchorEl(event.currentTarget);
               handleEffectClick(mode);
             }}
           >
@@ -76,7 +76,7 @@ export function FutureFrameStyleControls(props: {
       })}
 
       <FrameSettingsPopover
-        anchorEl={activeButtonRef.current}
+        anchorEl={effectAnchorEl}
         blurSettings={style.blurSettings}
         borderSettings={style.borderSettings}
         compact={props.compactMenus ?? false}

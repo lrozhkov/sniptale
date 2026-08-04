@@ -5,6 +5,8 @@ import type {
   ResizeDirection,
 } from '../../../../features/highlighter/contracts';
 import { MIN_FRAME_SIZE, updateEffectOverlay } from '../layout/portal';
+import { getCalloutPerimeterPoint, getCalloutPerimeterPosition } from '../../callout/tail-drag';
+import { getResizeCalloutCenter } from './resize-callout-geometry';
 
 export function syncInteractiveFrameContainer(
   container: HTMLDivElement | null,
@@ -101,6 +103,7 @@ function applyResizeUpdate(params: {
   frameId: string;
   effectMode: EffectMode;
   tempFrameRef?: React.MutableRefObject<FrameData>;
+  calloutCenter: { x: number; y: number } | null;
 }) {
   const resizedFrame = getResizedFrame(
     params.direction,
@@ -109,7 +112,11 @@ function applyResizeUpdate(params: {
     params.startFrame
   );
   syncInteractiveFrameContainer(params.containerRef.current, resizedFrame);
-  const nextFrame = { ...params.startFrame, ...resizedFrame };
+  const nextFrame = preserveCalloutGeometryDuringResize(
+    params.startFrame,
+    resizedFrame,
+    params.calloutCenter
+  );
   if (params.tempFrameRef) params.tempFrameRef.current = nextFrame;
   params.setTempFrame(nextFrame);
   updateEffectOverlay(params.effectMode, params.frameId, resizedFrame);
@@ -143,8 +150,64 @@ export function applyInteractiveFramePointerUpdate(
     tempFrameRef: params.tempFrameRef,
   };
   if (direction) {
-    applyResizeUpdate({ ...update, direction });
+    applyResizeUpdate({
+      ...update,
+      direction,
+      calloutCenter: getResizeCalloutCenter(params.startFrameRef),
+    });
     return;
   }
   applyDragUpdate(update);
+}
+
+function preserveCalloutGeometryDuringResize(
+  startFrame: FrameData,
+  resizedFrame: Pick<FrameData, 'x' | 'y' | 'width' | 'height'>,
+  calloutCenter: { x: number; y: number } | null
+): FrameData {
+  const nextFrame = { ...startFrame, ...resizedFrame };
+  if (!startFrame.callout?.enabled || !calloutCenter) return nextFrame;
+
+  const startCenter = {
+    x: startFrame.x + startFrame.width / 2,
+    y: startFrame.y + startFrame.height / 2,
+  };
+  const resizedCenter = {
+    x: resizedFrame.x + resizedFrame.width / 2,
+    y: resizedFrame.y + resizedFrame.height / 2,
+  };
+  const connectorWaypoint = startFrame.callout.placement.connectorWaypoint;
+  const connectorFramePosition = startFrame.callout.placement.connectorFramePosition;
+  const stationaryFramePosition =
+    startFrame.callout.style.connector.kind === 'line' && connectorFramePosition !== undefined
+      ? getCalloutPerimeterPosition(
+          resizedFrame,
+          getCalloutPerimeterPoint(startFrame, connectorFramePosition)
+        )
+      : connectorFramePosition;
+
+  return {
+    ...nextFrame,
+    callout: {
+      ...startFrame.callout,
+      placement: {
+        ...startFrame.callout.placement,
+        manualPlacement: {
+          centerOffsetX: calloutCenter.x - resizedCenter.x,
+          centerOffsetY: calloutCenter.y - resizedCenter.y,
+        },
+        ...(stationaryFramePosition === undefined
+          ? {}
+          : { connectorFramePosition: stationaryFramePosition }),
+        ...(connectorWaypoint
+          ? {
+              connectorWaypoint: {
+                centerOffsetX: startCenter.x + connectorWaypoint.centerOffsetX - resizedCenter.x,
+                centerOffsetY: startCenter.y + connectorWaypoint.centerOffsetY - resizedCenter.y,
+              },
+            }
+          : {}),
+      },
+    },
+  };
 }

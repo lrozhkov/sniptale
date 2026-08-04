@@ -1,16 +1,47 @@
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
-import { Cable, MapPin, Maximize2, PaintBucket, Square, Type } from 'lucide-react';
-import { useState, type ComponentType, type ReactNode } from 'react';
+import {
+  Cable,
+  Braces,
+  Heading,
+  MapPin,
+  Maximize2,
+  Minus,
+  PaintBucket,
+  PanelTop,
+  Save,
+  Square,
+  Type,
+} from 'lucide-react';
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { translate, type TranslationKey } from '../../../platform/i18n';
-import { CalloutBorderSettings, CalloutConnectorSettings } from './inspector-effects';
+import {
+  CalloutBorderSettings,
+  CalloutAccentSettings,
+  CalloutConnectorSettings,
+  CalloutDividerSettings,
+} from './inspector-effects';
 import type { ManualContentProps } from './inspector-fields';
+import { CalloutCssSettings } from './inspector-css';
+import { CalloutSaveSettings, type CalloutSaveSectionProps } from './inspector-save';
 import {
   CalloutBackgroundSettings,
   CalloutSizeSettings,
   CalloutTextSettings,
+  CalloutTitleSettings,
 } from './inspector-surface';
 
-type ManualSection = 'position' | 'text' | 'size' | 'background' | 'connector' | 'border';
+type ManualSection =
+  | 'position'
+  | 'save'
+  | 'accent'
+  | 'text'
+  | 'title'
+  | 'divider'
+  | 'size'
+  | 'background'
+  | 'connector'
+  | 'css'
+  | 'border';
 
 type ManualSectionOption = {
   icon: ComponentType<{ size?: number }>;
@@ -20,39 +51,78 @@ type ManualSectionOption = {
 
 const MANUAL_SECTIONS: ManualSectionOption[] = [
   { icon: Type, key: 'text', labelKey: 'content.callout.manualText' },
+  { icon: Heading, key: 'title', labelKey: 'content.callout.manualTitle' },
   { icon: Maximize2, key: 'size', labelKey: 'content.callout.manualSize' },
   { icon: PaintBucket, key: 'background', labelKey: 'content.callout.manualBackground' },
+  { icon: PanelTop, key: 'accent', labelKey: 'content.callout.manualAccent' },
   { icon: Cable, key: 'connector', labelKey: 'content.callout.manualConnector' },
   { icon: Square, key: 'border', labelKey: 'content.callout.manualBorder' },
+  { icon: Braces, key: 'css', labelKey: 'content.callout.manualCss' },
 ];
 
 function ManualSettingsContent(
-  props: ManualContentProps & { positionSection?: ReactNode; section: ManualSection }
+  props: ManualContentProps & {
+    positionSection?: ReactNode;
+    saveSection?: CalloutSaveSectionProps;
+    section: ManualSection;
+  }
 ) {
   switch (props.section) {
     case 'position':
       return props.positionSection ?? null;
+    case 'save':
+      return props.saveSection ? <CalloutSaveSettings {...props.saveSection} /> : null;
     case 'text':
       return <CalloutTextSettings {...props} />;
+    case 'title':
+      return <CalloutTitleSettings {...props} />;
+    case 'accent':
+      return <CalloutAccentSettings {...props} />;
+    case 'divider':
+      return <CalloutDividerSettings {...props} />;
     case 'size':
       return <CalloutSizeSettings {...props} />;
     case 'background':
       return <CalloutBackgroundSettings {...props} />;
     case 'connector':
       return <CalloutConnectorSettings {...props} />;
+    case 'css':
+      return <CalloutCssSettings {...props} />;
     case 'border':
       return <CalloutBorderSettings {...props} />;
   }
 }
 
-export function CalloutManualSettings(props: ManualContentProps & { positionSection?: ReactNode }) {
-  const sections = props.positionSection
-    ? ([
-        ...MANUAL_SECTIONS,
-        { icon: MapPin, key: 'position', labelKey: 'content.callout.positionSection' },
-      ] satisfies ManualSectionOption[])
-    : MANUAL_SECTIONS;
+export function CalloutManualSettings(
+  props: ManualContentProps & {
+    positionSection?: ReactNode;
+    saveSection?: CalloutSaveSectionProps;
+  }
+) {
   const [section, setSection] = useState<ManualSection>('text');
+  const sections: ManualSectionOption[] = [
+    MANUAL_SECTIONS[0]!,
+    MANUAL_SECTIONS[1]!,
+    ...(props.settings.style.title.enabled
+      ? ([
+          { icon: Minus, key: 'divider', labelKey: 'content.callout.manualDivider' },
+        ] satisfies ManualSectionOption[])
+      : []),
+    ...MANUAL_SECTIONS.slice(2),
+    ...(props.positionSection
+      ? ([
+          { icon: MapPin, key: 'position', labelKey: 'content.callout.positionSection' },
+        ] satisfies ManualSectionOption[])
+      : []),
+    ...(props.saveSection
+      ? ([
+          { icon: Save, key: 'save', labelKey: 'content.callout.manualSave' },
+        ] satisfies ManualSectionOption[])
+      : []),
+  ];
+  useEffect(() => {
+    if (!props.settings.style.title.enabled && section === 'divider') setSection('text');
+  }, [props.settings.style.title.enabled, section]);
   return (
     <ContentPopoverSection
       dataUi="content.callout-settings.manual-section"

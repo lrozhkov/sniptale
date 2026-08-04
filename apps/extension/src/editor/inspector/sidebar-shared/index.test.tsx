@@ -77,7 +77,12 @@ it('builds the editor option catalogs with translated labels', () => {
     'diamond-outline',
     'block',
   ]);
-  expect(getFontOptions().map((option) => option.value)).toEqual(['sans', 'serif', 'mono']);
+  expect(getFontOptions().map((option) => option.value)).toEqual([
+    'sans',
+    'serif',
+    'mono',
+    'cursive',
+  ]);
   expect(getStepTypeOptions().map((option) => option.value)).toEqual([
     'number',
     'letter',

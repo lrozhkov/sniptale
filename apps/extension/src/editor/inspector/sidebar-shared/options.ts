@@ -138,11 +138,12 @@ export function getTextLayoutModeOptions(): CompactSelectOption<'auto' | 'fixed-
   ];
 }
 
-export function getFontOptions(): CompactSelectOption<'sans' | 'serif' | 'mono'>[] {
+export function getFontOptions(): CompactSelectOption<EditorToolSettings['text']['fontFamily']>[] {
   return [
     { value: 'sans', label: translate('editor.compact.fontSans') },
     { value: 'serif', label: translate('editor.compact.fontSerif') },
     { value: 'mono', label: translate('editor.compact.fontMono') },
+    { value: 'cursive', label: translate('editor.compact.fontCursive') },
   ];
 }
 

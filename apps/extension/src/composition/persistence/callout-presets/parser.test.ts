@@ -32,6 +32,58 @@ it('defaults the shadow color for catalogs saved before shadow colors existed', 
   expect(parsed.value.userPresets?.[0]?.style.surface.shadowColor).toBe('#000000');
 });
 
+it('defaults custom callout CSS for older catalogs and bounds persisted input', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const { customCss: _customCss, ...legacyStyle } = style;
+  const legacy = parseStoredCalloutPresetCatalog({
+    userPresets: [{ id: 'user-legacy-css', name: 'Legacy CSS', style: legacyStyle }],
+  });
+  const oversized = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      {
+        id: 'user-oversized-css',
+        name: 'Oversized CSS',
+        style: { ...style, customCss: 'x'.repeat(4_001) },
+      },
+    ],
+  });
+
+  expect(legacy.value.userPresets?.[0]?.style.customCss).toBe('');
+  expect(oversized.invalidFieldCount).toBe(1);
+  expect(oversized.value.userPresets).toEqual([]);
+});
+
+it('defaults frame color bindings to custom for older catalogs', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const { colorBindings: _colorBindings, ...legacyStyle } = style;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [{ id: 'user-legacy-colors', name: 'Legacy colors', style: legacyStyle }],
+  });
+
+  expect(parsed.value.userPresets?.[0]?.style.colorBindings).toEqual({
+    accent: 'custom',
+    connector: 'custom',
+    surfaceBackground: 'custom',
+    surfaceBorder: 'custom',
+  });
+});
+
+it('defaults to a disabled left accent for catalogs saved before perimeter accents existed', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const { accentEdge: _accentEdge, ...legacyStyle } = style;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [{ id: 'user-legacy-accent', name: 'Legacy accent', style: legacyStyle }],
+  });
+
+  expect(parsed.value.userPresets?.[0]?.style.accentEdge).toEqual({
+    color: '#f97316',
+    enabled: false,
+    lineStyle: 'solid',
+    side: 'left',
+    width: 4,
+  });
+});
+
 it('defaults text formatting for catalogs saved before emphasis and alignment existed', () => {
   const style = createSystemCalloutPresetCatalog()[0]!.style;
   const legacyStyle = {
@@ -71,6 +123,51 @@ it('defaults endpoint sizes for catalogs saved before marker sizing existed', ()
     blockMarkerSize: 10,
     frameMarkerSize: 10,
   });
+});
+
+it('defaults line styles and a disabled title divider for older catalogs', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const legacyStyle = {
+    ...style,
+    connector: Object.fromEntries(
+      Object.entries(style.connector).filter(([key]) => key !== 'lineStyle')
+    ),
+    surface: Object.fromEntries(
+      Object.entries(style.surface).filter(([key]) => key !== 'borderStyle')
+    ),
+    title: Object.fromEntries(
+      Object.entries(style.title).filter(
+        ([key]) => !['dividerColor', 'dividerStyle', 'dividerWidth'].includes(key)
+      )
+    ),
+  };
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [{ id: 'user-legacy-lines', name: 'Legacy lines', style: legacyStyle }],
+  });
+
+  expect(parsed.value.userPresets?.[0]?.style).toMatchObject({
+    connector: { lineStyle: 'solid' },
+    surface: { borderStyle: 'solid' },
+    title: { dividerColor: 'transparent', dividerStyle: 'solid', dividerWidth: 0 },
+  });
+});
+
+it('preserves the explicit angled connector routing mode', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      {
+        id: 'user-angled',
+        name: 'Angled',
+        style: {
+          ...style,
+          connector: { ...style.connector, kind: 'line', routing: 'polyline' },
+        },
+      },
+    ],
+  });
+
+  expect(parsed.value.userPresets?.[0]?.style.connector.routing).toBe('polyline');
 });
 
 it('parses the explicit system customization marker and its source revision', () => {
@@ -149,6 +246,46 @@ it('rejects endpoint sizes outside the supported visual range', () => {
   });
 
   expect(parsed.invalidFieldCount).toBe(1);
+  expect(parsed.value.userPresets).toEqual([]);
+});
+
+it('rejects unknown frame color binding sources', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      {
+        id: 'user-invalid-binding',
+        name: 'Invalid binding',
+        style: {
+          ...style,
+          colorBindings: { ...style.colorBindings, connector: 'page-css-variable' },
+        },
+      },
+    ],
+  });
+
+  expect(parsed.invalidFieldCount).toBe(1);
+  expect(parsed.value.userPresets).toEqual([]);
+});
+
+it('rejects unsupported accent sides and widths', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      {
+        id: 'user-invalid-accent-side',
+        name: 'Invalid accent side',
+        style: { ...style, accentEdge: { ...style.accentEdge, side: 'center' } },
+      },
+      {
+        id: 'user-invalid-accent-width',
+        name: 'Invalid accent width',
+        style: { ...style, accentEdge: { ...style.accentEdge, width: 13 } },
+      },
+    ],
+  });
+
+  expect(parsed.invalidFieldCount).toBe(2);
   expect(parsed.value.userPresets).toEqual([]);
 });
 

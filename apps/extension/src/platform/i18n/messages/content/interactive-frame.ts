@@ -62,8 +62,8 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     en: 'Expand frame by 5 px on each side',
   },
   moveComment: {
-    ru: 'Переместить комментарий · Shift — движение по оси · Ctrl — сохранить точки коннектора',
-    en: 'Move comment · Shift constrains movement to an axis · Ctrl preserves connector anchors',
+    ru: 'Переместить комментарий · Shift — движение по оси · Ctrl — перемещать точки коннектора',
+    en: 'Move comment · Shift constrains movement to an axis · Ctrl moves connector points',
   },
   resizeCommentLeft: {
     ru: 'Изменить ширину комментария слева',
@@ -98,8 +98,8 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     en: 'Move the pointer end along the frame edge',
   },
   moveCommentRoutePoint: {
-    ru: 'Добавить или переместить точку углового маршрута; Delete или двойной клик — сбросить',
-    en: 'Add or move the elbow route point; press Delete or double-click to reset',
+    ru: 'Переместить точку маршрута · Shift — шаг 15° · Delete или двойной клик — сбросить',
+    en: 'Move route point · Shift snaps by 15° · Delete or double-click resets it',
   },
   deleteButton: {
     ru: 'Удалить (Delete)',

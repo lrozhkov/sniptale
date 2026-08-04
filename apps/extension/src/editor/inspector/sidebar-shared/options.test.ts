@@ -142,7 +142,12 @@ it('covers the remaining select-option helpers with deterministic labels', () =>
     'solid',
   ]);
   expect(getTextCalloutFormatOptions()).toHaveLength(6);
-  expect(getFontOptions().map((option) => option.value)).toEqual(['sans', 'serif', 'mono']);
+  expect(getFontOptions().map((option) => option.value)).toEqual([
+    'sans',
+    'serif',
+    'mono',
+    'cursive',
+  ]);
   expect(getBrushShapeCorrectionOptions()).toHaveLength(3);
   expect(getStepTypeOptions().map((option) => option.value)).toEqual([
     'number',

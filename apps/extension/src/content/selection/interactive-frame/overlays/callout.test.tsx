@@ -19,7 +19,13 @@ vi.mock('../../callout', () => ({
     onContentChange: (html: string) => void;
     onPositionChange: (
       placement: { centerOffsetX: number; centerOffsetY: number },
-      behavior: { preserveConnectorAnchors: boolean }
+      behavior: {
+        connectorBasePosition?: number;
+        connectorBaseWidth?: number;
+        connectorFramePosition?: number;
+        connectorWaypoint?: { centerOffsetX: number; centerOffsetY: number };
+        translateConnectorGeometry: boolean;
+      }
     ) => void;
     onSettingsClick: () => void;
     onTailBaseRangeChange: (position: number, width: number) => void;
@@ -64,7 +70,13 @@ vi.mock('../../callout', () => ({
         onClick={() =>
           props.onPositionChange(
             { centerOffsetX: 70, centerOffsetY: -20 },
-            { preserveConnectorAnchors: false }
+            {
+              connectorBasePosition: 0.25,
+              connectorBaseWidth: 0.2,
+              connectorFramePosition: 0.75,
+              connectorWaypoint: { centerOffsetX: 12, centerOffsetY: 18 },
+              translateConnectorGeometry: false,
+            }
           )
         }
         type="button"
@@ -169,7 +181,7 @@ describe('interactive frame callout overlay', () => {
     expect(onUpdate).toHaveBeenCalledWith(expectedFrame);
   });
 
-  it('commits a manual callout placement as one merged frame update', () => {
+  it('commits a manual callout placement without dropping connector geometry', () => {
     const frame = createFrame();
     frame.callout!.placement = {
       ...frame.callout!.placement,
@@ -203,10 +215,10 @@ describe('interactive frame callout overlay', () => {
         callout: expect.objectContaining({
           placement: expect.objectContaining({
             manualPlacement: { centerOffsetX: 70, centerOffsetY: -20 },
-            connectorBasePosition: undefined,
-            connectorBaseWidth: undefined,
-            connectorFramePosition: undefined,
-            connectorWaypoint: undefined,
+            connectorBasePosition: 0.25,
+            connectorBaseWidth: 0.2,
+            connectorFramePosition: 0.75,
+            connectorWaypoint: { centerOffsetX: 12, centerOffsetY: 18 },
           }),
         }),
       })

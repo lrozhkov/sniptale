@@ -207,6 +207,15 @@ function createCalloutHandleStyles(args: CalloutBodyPropsArgs) {
             zIndex: args.layout.effectiveZIndex + 1,
           }
         : null,
+    waypointAngleStyle:
+      args.layout.dynamicTail?.kind === 'line' && args.layout.dynamicTail.routeControlPoint
+        ? {
+            position: 'fixed' as const,
+            left: args.layout.dynamicTail.routeControlPoint.x + 12,
+            top: args.layout.dynamicTail.routeControlPoint.y - 28,
+            zIndex: args.layout.effectiveZIndex + 2,
+          }
+        : null,
     resizeLeftHandleStyle: {
       position: 'fixed' as const,
       left: args.layout.calloutPos.x - 6,
@@ -267,6 +276,11 @@ function createCalloutHandleState(args: CalloutBodyPropsArgs) {
     isTailBaseEndDragging: args.tailBaseEndDrag.isDragging,
     isTailFrameDragging: args.tailFrameDrag.isDragging,
     isWaypointDragging: args.waypointDrag.isDragging,
+    isPolylineWaypoint:
+      args.settings.style.connector.kind === 'line' &&
+      args.settings.style.connector.routing === 'polyline',
+    waypointAngle:
+      args.layout.dynamicTail?.kind === 'line' ? args.layout.dynamicTail.routeControlAngle : null,
     hasWaypoint: args.settings.placement.connectorWaypoint !== undefined,
   };
 }
@@ -274,6 +288,7 @@ function createCalloutHandleState(args: CalloutBodyPropsArgs) {
 function createCalloutBodyProps(args: CalloutBodyPropsArgs) {
   return {
     applyFormatting: args.editing.applyFormatting,
+    calloutDimensions: args.layout.calloutDimensions,
     cloudStyle: args.layout.cloudStyle,
     containerRef: args.editing.containerRef,
     contentEditableRef: args.editing.contentEditableRef,
@@ -293,7 +308,7 @@ function createCalloutBodyProps(args: CalloutBodyPropsArgs) {
       viewportWidth: window.innerWidth,
     }),
     isEditing: args.isEditing,
-    isGeometryHandleHidden: args.isSettingsOpen,
+    isGeometryHandleHidden: args.isSettingsOpen || args.isFrameEditing,
     isWidthResizeHandleHidden: args.isFrameEditing,
     portalTheme: args.portalTheme,
     settings: args.settings,

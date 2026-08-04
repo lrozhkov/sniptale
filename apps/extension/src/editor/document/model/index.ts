@@ -72,6 +72,8 @@ export function fontFamilyToCss(fontFamily: string): string {
       return 'Georgia, Cambria, "Times New Roman", Times, serif';
     case 'mono':
       return 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+    case 'cursive':
+      return '"Segoe Print", "Bradley Hand", "Comic Sans MS", cursive';
     case 'sans':
     default:
       return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';

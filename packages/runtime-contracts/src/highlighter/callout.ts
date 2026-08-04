@@ -2,9 +2,10 @@ import type { StepBadgeAnchor } from './step-badge';
 
 export type CalloutAnchor = StepBadgeAnchor;
 export type CalloutSide = 'top' | 'bottom' | 'left' | 'right' | 'auto';
-export type CalloutFontFamily = 'sans' | 'serif' | 'mono';
+export type CalloutFontFamily = 'sans' | 'serif' | 'mono' | 'cursive';
 export type CalloutConnectorKind = 'none' | 'wedge' | 'line';
-export type CalloutConnectorRouting = 'straight' | 'elbow';
+export type CalloutConnectorRouting = 'straight' | 'elbow' | 'polyline';
+export type CalloutLineStyle = 'solid' | 'dashed' | 'dotted';
 export type CalloutConnectorMarker =
   | 'none'
   | 'circle'
@@ -13,6 +14,8 @@ export type CalloutConnectorMarker =
   | 'diamond'
   | 'arrow';
 export type CalloutPresetOrigin = 'system' | 'user';
+export type CalloutColorSource = 'custom' | 'frame-border' | 'frame-fill';
+export type CalloutAccentSide = 'top' | 'right' | 'bottom' | 'left';
 
 export const SYSTEM_CALLOUT_PRESET_KEYS = [
   'system-callout-bubble',
@@ -50,6 +53,7 @@ export interface CalloutPlacement {
 export interface CalloutSurfaceStyle {
   backgroundColor: string;
   borderColor: string;
+  borderStyle: CalloutLineStyle;
   borderWidth: number;
   paddingX: number;
   paddingY: number;
@@ -71,6 +75,9 @@ export interface CalloutTypographyStyle {
 
 export interface CalloutTitleStyle {
   backgroundColor: string;
+  dividerColor: string;
+  dividerStyle: CalloutLineStyle;
+  dividerWidth: number;
   enabled: boolean;
   fontSize: number;
   fontWeight: 'normal' | 'bold';
@@ -84,13 +91,32 @@ export interface CalloutConnectorStyle {
   frameMarker: CalloutConnectorMarker;
   frameMarkerSize: number;
   kind: CalloutConnectorKind;
+  lineStyle: CalloutLineStyle;
   routing: CalloutConnectorRouting;
   wedgeSize: number;
   width: number;
 }
 
+export interface CalloutColorBindings {
+  accent: CalloutColorSource;
+  connector: CalloutColorSource;
+  surfaceBackground: CalloutColorSource;
+  surfaceBorder: CalloutColorSource;
+}
+
+export interface CalloutAccentEdgeStyle {
+  color: string;
+  enabled: boolean;
+  lineStyle: CalloutLineStyle;
+  side: CalloutAccentSide;
+  width: number;
+}
+
 export interface CalloutVisualStyle {
+  accentEdge: CalloutAccentEdgeStyle;
+  colorBindings: CalloutColorBindings;
   connector: CalloutConnectorStyle;
+  customCss: string;
   surface: CalloutSurfaceStyle;
   title: CalloutTitleStyle;
   typography: CalloutTypographyStyle;
@@ -110,7 +136,10 @@ export type CalloutSettingsPatch = {
   placement?: Partial<CalloutPlacement>;
   sourcePresetId?: string | undefined;
   style?: {
+    accentEdge?: Partial<CalloutAccentEdgeStyle>;
+    colorBindings?: Partial<CalloutColorBindings>;
     connector?: Partial<CalloutConnectorStyle>;
+    customCss?: string;
     surface?: Partial<CalloutSurfaceStyle>;
     title?: Partial<CalloutTitleStyle>;
     typography?: Partial<CalloutTypographyStyle>;

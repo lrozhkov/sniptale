@@ -7,6 +7,7 @@ import type { CalloutPresetCatalog } from '@sniptale/runtime-contracts/highlight
 import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
 
 const mocks = vi.hoisted(() => ({
+  create: vi.fn(),
   listener: null as ((catalog: CalloutPresetCatalog) => void) | null,
   load: vi.fn<() => Promise<CalloutPresetCatalog>>(),
   reset: vi.fn(),
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../composition/persistence/callout-presets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/callout-presets')>()),
+  createUserCalloutPreset: mocks.create,
   loadCalloutPresetCatalog: mocks.load,
   resetSystemCalloutPreset: mocks.reset,
   setCalloutPresetEnabled: mocks.setEnabled,
@@ -55,10 +57,41 @@ beforeEach(() => {
   latest = null;
   isOpen = true;
   mocks.listener = null;
+  mocks.create.mockReset().mockResolvedValue({ outcome: 'applied', id: 'user-new' });
   mocks.load.mockReset().mockResolvedValue(createCatalog('system-callout-bubble'));
   mocks.reset.mockReset().mockResolvedValue({ outcome: 'applied' });
   mocks.setEnabled.mockReset().mockResolvedValue({ outcome: 'applied' });
   mocks.update.mockReset().mockResolvedValue({ outcome: 'applied' });
+});
+
+it('creates and overwrites presets through the canonical catalog owner', async () => {
+  await act(async () => root?.render(<Harness />));
+  const preset = latest?.catalog.value?.presets[0];
+  expect(preset).toBeDefined();
+  if (!preset) return;
+
+  const createInput = { name: 'Saved manually', placement: preset.placement, style: preset.style };
+  await act(async () => {
+    expect(await latest?.catalog.create(createInput)).toBe(true);
+  });
+  await act(async () => {
+    expect(
+      await latest?.catalog.overwrite({
+        id: preset.id,
+        name: preset.name,
+        placement: preset.placement,
+        style: preset.style,
+      })
+    ).toBe(true);
+  });
+
+  expect(mocks.create).toHaveBeenCalledWith(createInput);
+  expect(mocks.update).toHaveBeenCalledWith({
+    id: preset.id,
+    name: preset.name,
+    placement: preset.placement,
+    style: preset.style,
+  });
 });
 
 afterEach(() => {

@@ -179,6 +179,38 @@ describe('useCalloutSettingsPopoverState', () => {
     cleanup();
   });
 
+  it('clears only the route control point when connector routing changes', () => {
+    settings = createDefaultCalloutSettings();
+    settings.style.connector.kind = 'line';
+    settings.style.connector.routing = 'elbow';
+    settings.placement = {
+      ...settings.placement,
+      connectorBasePosition: 0.8,
+      connectorFramePosition: 0.6,
+      connectorWaypoint: { centerOffsetX: 20, centerOffsetY: -30 },
+    };
+    const listener = vi.fn();
+    const cleanup = addCalloutPopoverSettingsChangedListener(listener);
+    renderHarness();
+
+    act(() => latestState?.handleSettingChange({ style: { connector: { routing: 'polyline' } } }));
+
+    expect(latestState?.localSettings.placement).toMatchObject({
+      connectorBasePosition: 0.8,
+      connectorFramePosition: 0.6,
+    });
+    expect(latestState?.localSettings.placement.connectorWaypoint).toBeUndefined();
+    expect(listener).toHaveBeenCalledWith({
+      frameId: 'frame-1',
+      settings: {
+        placement: { connectorWaypoint: undefined },
+        sourcePresetId: undefined,
+        style: { connector: { routing: 'polyline' } },
+      },
+    });
+    cleanup();
+  });
+
   it('cancels an open history transaction when the popover unmounts mid-session', () => {
     const cancelTransactionSpy = vi.spyOn(pagePreparationHistory, 'cancelTransaction');
 

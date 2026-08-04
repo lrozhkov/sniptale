@@ -12,11 +12,33 @@ import { useCalloutSettingsPopoverState } from './state';
 import { useCalloutPresetPopoverController } from './preset-controller';
 import { CalloutPresetEditor } from '../../../ui/highlighter-preset-editor/callout';
 import { useCalloutSettingsPopoverDrag } from './drag';
+import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
+import { createCalloutSaveSection } from './save-section';
+
+function CalloutPersistentPresetEditor(props: {
+  editor: ReturnType<typeof useCalloutPresetPopoverController>['editor'];
+}) {
+  const { editor } = props;
+  if (!editor.preset) return null;
+  return (
+    <CalloutPresetEditor
+      isOpen={editor.isOpen}
+      isSaving={editor.isSaving}
+      preset={editor.preset}
+      onClose={editor.close}
+      {...(editor.preset.origin === 'system' && editor.preset.customized === true
+        ? { onReset: () => editor.reset(editor.preset!) }
+        : {})}
+      onSave={editor.save}
+    />
+  );
+}
 
 interface CalloutSettingsPopoverProps {
   isOpen: boolean;
   onClose: () => void;
   frameId: string;
+  frameColors?: CalloutFrameColors;
   frameRect: { x: number; y: number; width: number; height: number };
   settings?: CalloutSettings;
   anchorEl: HTMLElement | null;
@@ -56,6 +78,7 @@ export function CalloutSettingsPopover({
   isOpen,
   onClose,
   frameId,
+  frameColors,
   frameRect,
   settings,
   anchorEl,
@@ -75,6 +98,14 @@ export function CalloutSettingsPopover({
     ...(settings === undefined ? {} : { settings }),
   });
   const presets = useCalloutPresetPopoverController(isOpen);
+  const saveSection = createCalloutSaveSection({
+    create: presets.catalog.create,
+    error: presets.catalog.error,
+    isSaving: presets.catalog.isSaving,
+    overwrite: presets.catalog.overwrite,
+    presets: presets.catalog.presets,
+    settings: localSettings,
+  });
 
   usePopoverEscapeClose({ anchorEl, isOpen: isOpen && !presets.editor.isOpen, onClose });
 
@@ -101,6 +132,7 @@ export function CalloutSettingsPopover({
       dataUi="content.callout-settings.popover"
     >
       <CalloutSettingsPopoverContent
+        {...(frameColors ? { frameColors } : {})}
         handleDelete={handleDelete}
         headerDrag={presentation.drag}
         handleSettingChange={handleSettingChange}
@@ -112,21 +144,10 @@ export function CalloutSettingsPopover({
         pendingPresetIds={presets.catalog.pendingPresetIds}
         presets={presets.catalog.visiblePresets}
         presetError={presets.catalog.error}
+        saveSection={saveSection}
         onClose={onClose}
       />
-      {presets.editor.preset ? (
-        <CalloutPresetEditor
-          isOpen={presets.editor.isOpen}
-          isSaving={presets.editor.isSaving}
-          preset={presets.editor.preset}
-          onClose={presets.editor.close}
-          {...(presets.editor.preset.origin === 'system' &&
-          presets.editor.preset.customized === true
-            ? { onReset: () => presets.editor.reset(presets.editor.preset!) }
-            : {})}
-          onSave={presets.editor.save}
-        />
-      ) : null}
+      <CalloutPersistentPresetEditor editor={presets.editor} />
     </ContentPopoverAdapter>
   );
 }

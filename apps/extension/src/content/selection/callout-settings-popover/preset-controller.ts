@@ -83,8 +83,12 @@ export function useCalloutPresetPopoverController(isOpen: boolean) {
 
   return {
     catalog: {
+      create: mutations.create,
       error,
+      isSaving,
+      overwrite: mutations.overwrite,
       pendingPresetIds,
+      presets: catalog?.presets ?? [],
       toggle: mutations.toggle,
       value: catalog,
       visiblePresets,

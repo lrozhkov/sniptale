@@ -47,6 +47,13 @@ describe('callout settings views', () => {
         pendingPresetIds={new Set()}
         presets={[]}
         presetError={null}
+        saveSection={{
+          error: null,
+          isSaving: false,
+          onCreate: vi.fn().mockResolvedValue(true),
+          onOverwrite: vi.fn().mockResolvedValue(true),
+          presets: [],
+        }}
         onClose={vi.fn()}
       />
     );
@@ -78,11 +85,34 @@ describe('callout settings views', () => {
     );
 
     expect(markup).toContain('aria-label="Параметры комментария"');
-    expect(markup.match(/aria-pressed=/g)).toHaveLength(5);
+    expect(markup.match(/aria-pressed=/g)).toHaveLength(8);
     expect(markup).toContain('data-field-label="Текст"');
     expect(markup).toContain('shared.ui.color-selector');
     expect(markup).toContain('aria-label="Курсив"');
     expect(markup).toContain('aria-label="Подчёркнутый"');
+  });
+
+  it('adds saving as the last manual section only when persistence actions are provided', () => {
+    const presets = createSystemCalloutPresetCatalog();
+    const markup = renderToStaticMarkup(
+      <CalloutManualSettings
+        onChange={vi.fn()}
+        saveSection={{
+          error: null,
+          isSaving: false,
+          onCreate: vi.fn().mockResolvedValue(true),
+          onOverwrite: vi.fn().mockResolvedValue(true),
+          presets,
+        }}
+        settings={settings}
+      />
+    );
+
+    expect(markup.match(/aria-pressed=/g)).toHaveLength(9);
+    expect(markup).toContain('aria-label="Сохранение"');
+    expect(markup.lastIndexOf('aria-label="Сохранение"')).toBeGreaterThan(
+      markup.lastIndexOf('aria-label="Стили"')
+    );
   });
 
   it('renders preset previews with hover customization and hide actions', () => {
@@ -99,6 +129,7 @@ describe('callout settings views', () => {
     );
 
     expect(markup).toContain('relative flex flex-shrink-0');
+    expect(markup).toContain('h-9 w-16');
     expect(markup).toContain('sniptale-callout-preset-list');
     expect(markup).toContain('sniptale-glass-preset-item--active');
     expect(markup).toContain('Настроить стиль');

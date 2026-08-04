@@ -71,9 +71,9 @@ export function getCalloutPerimeterPosition(rect: Rect, point: { x: number; y: n
   return closest.offset / Math.max(1, 2 * (rect.width + rect.height));
 }
 
-export function getCalloutPerimeterAnchorPositions(rect: Rect) {
+export function getCalloutPerimeterAnchorPositions(rect: Rect, horizontalGuides: number[] = []) {
   const perimeter = Math.max(1, 2 * (rect.width + rect.height));
-  return [
+  const canonicalOffsets = [
     0,
     rect.width / 2,
     rect.width,
@@ -82,15 +82,20 @@ export function getCalloutPerimeterAnchorPositions(rect: Rect) {
     rect.width + rect.height + rect.width / 2,
     2 * rect.width + rect.height,
     2 * rect.width + rect.height + rect.height / 2,
-  ].map((offset) => offset / perimeter);
+  ];
+  const guideOffsets = horizontalGuides.flatMap((guideY) => {
+    const localY = clamp(guideY - rect.y, 0, rect.height);
+    return [rect.width + localY, 2 * rect.width + 2 * rect.height - localY];
+  });
+  return [...new Set([...canonicalOffsets, ...guideOffsets])].map((offset) => offset / perimeter);
 }
 
 function getPointDistance(first: Point, second: Point) {
   return Math.hypot(first.x - second.x, first.y - second.y);
 }
 
-function getNearestPerimeterAnchor(rect: Rect, point: Point) {
-  return getCalloutPerimeterAnchorPositions(rect).reduce<{
+function getNearestPerimeterAnchor(rect: Rect, point: Point, anchorPositions: number[]) {
+  return anchorPositions.reduce<{
     distance: number;
     position: number;
   } | null>((nearest, position) => {
@@ -102,7 +107,8 @@ function getNearestPerimeterAnchor(rect: Rect, point: Point) {
 export function getSnappedCalloutPerimeterPosition(
   rect: Rect,
   point: Point,
-  activeSnapPosition: number | null
+  activeSnapPosition: number | null,
+  anchorPositions = getCalloutPerimeterAnchorPositions(rect)
 ) {
   if (activeSnapPosition !== null) {
     const snapPoint = getCalloutPerimeterPoint(rect, activeSnapPosition);
@@ -111,7 +117,7 @@ export function getSnappedCalloutPerimeterPosition(
     }
   }
 
-  const nearestAnchor = getNearestPerimeterAnchor(rect, point);
+  const nearestAnchor = getNearestPerimeterAnchor(rect, point, anchorPositions);
   if (nearestAnchor && nearestAnchor.distance <= PERIMETER_SNAP_ENTER_DISTANCE) {
     return { position: nearestAnchor.position, snapPosition: nearestAnchor.position };
   }
@@ -145,6 +151,7 @@ export function useCalloutEdgeDrag(args: {
   maxPosition?: number;
   minPosition?: number;
   onPositionChange: (position: number) => void;
+  perimeterAnchorPositions?: number[];
   perimeter?: boolean;
   position: number | undefined;
 }) {
@@ -182,7 +189,8 @@ export function useCalloutEdgeDrag(args: {
         const snappedPosition = getSnappedCalloutPerimeterPosition(
           args.edgeRect,
           point,
-          snapPositionRef.current
+          snapPositionRef.current,
+          args.perimeterAnchorPositions
         );
         position = snappedPosition.position;
         snapPositionRef.current = snappedPosition.snapPosition;
@@ -229,7 +237,8 @@ export function useCalloutEdgeDrag(args: {
         snapPositionRef.current = getSnappedCalloutPerimeterPosition(
           args.edgeRect,
           currentPoint,
-          null
+          null,
+          args.perimeterAnchorPositions
         ).snapPosition;
       }
       setIsDragging(true);

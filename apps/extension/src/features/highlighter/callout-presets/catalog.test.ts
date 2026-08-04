@@ -40,19 +40,28 @@ it('provides distinct annotation roles and a ring-dot endpoint preset', () => {
   const warning = presets.find((preset) => preset.id === 'system-callout-framed-note')!;
 
   expect(pinpoint.style.connector).toMatchObject({
-    color: '#2563EB',
+    color: '#172033',
     frameMarker: 'ring-dot',
-    frameMarkerSize: 12,
+    frameMarkerSize: 11,
     kind: 'line',
+    routing: 'polyline',
+    width: 1,
+  });
+  expect(pinpoint.style.title).toMatchObject({
+    dividerColor: '#172033',
+    dividerWidth: 1,
+    enabled: true,
   });
   expect(info.style).toMatchObject({
-    connector: { routing: 'elbow' },
-    surface: { backgroundColor: '#EFF6FF', borderColor: '#93C5FD' },
-    title: { backgroundColor: '#2563EB', enabled: true },
+    connector: { frameMarker: 'square', routing: 'polyline', width: 2 },
+    surface: { backgroundColor: '#F8FAFC', borderColor: '#486581' },
+    title: { backgroundColor: '#243B53', dividerColor: '#243B53', dividerWidth: 2, enabled: true },
   });
   expect(warning.style).toMatchObject({
-    connector: { color: '#D97706', frameMarker: 'arrow' },
-    surface: { backgroundColor: '#FFFBEB', borderColor: '#F59E0B' },
-    title: { backgroundColor: '#F59E0B', enabled: true },
+    accentEdge: { color: '#D99000', enabled: true, side: 'left' },
+    connector: { color: '#8A5A00', frameMarker: 'diamond', width: 2 },
+    surface: { backgroundColor: '#FFF9E8', borderColor: '#E8C56A' },
+    title: { dividerColor: '#D99000', dividerWidth: 2, enabled: true },
   });
+  expect(warning.style.connector.frameMarker).not.toBe('arrow');
 });

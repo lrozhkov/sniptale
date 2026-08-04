@@ -41,6 +41,13 @@ it('renders compact inspector inputs, ranges, selects, and color options', () =>
           { value: 'dark', label: 'Dark' },
         ]}
       />
+      <CompactSelect
+        appearance="plain"
+        aria-label="Plain mode"
+        value="light"
+        onChange={() => undefined}
+        options={[{ value: 'light', label: 'Light' }]}
+      />
       <CompactColorOption active style={{ backgroundColor: '#2563eb' }} />
     </div>
   );
@@ -62,6 +69,8 @@ it('renders compact inspector inputs, ranges, selects, and color options', () =>
   expect(markup).toContain('--sniptale-range-shell-bg-active:transparent');
   expect(markup).toContain('--sniptale-range-shell-shadow-active:none');
   expect(markup).toContain('shared.ui.compact-select');
+  expect(markup).toContain('border-transparent bg-transparent');
+  expect(markup).not.toContain('title="Light"');
   expect(markup).toContain('relative w-full min-w-0 max-w-full');
   expect(markup).toContain('max-w-full items-center justify-between gap-2 overflow-hidden');
   expect(markup).toContain('h-10 w-full min-w-0 max-w-full');
